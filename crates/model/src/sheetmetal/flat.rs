@@ -52,6 +52,26 @@ pub struct FlatPattern {
 }
 
 impl FlatPattern {
+    /// Model space → the flat view's place: the flat plane's X / Y on the
+    /// world's, its reference side at z 0 facing +Z (live REST
+    /// isFlattenedBody of "qa5 sm": z −2…0; the flat view shows it from Top).
+    fn flat_view_matrix(&self) -> DMat4 {
+        let (x, y, n) = (self.frame.unit_x(), self.frame.unit_y(), self.frame.unit_x().cross(self.frame.unit_y()));
+        DMat4::from_cols(x.extend(0.0), y.extend(0.0), n.extend(0.0), self.frame.origin.extend(1.0)).inverse()
+    }
+
+    /// The flat as a solid in the flat view's place: the sheet under z 0,
+    /// `thickness` deep.
+    pub fn flat_view_solid(&self) -> Option<Shape> {
+        let face = self.shape.as_ref()?.transformed(&mat_transform(&self.flat_view_matrix())).ok()?;
+        k::ops::extrude(&face, DVec3::new(0.0, 0.0, -self.thickness)).ok().map(|r| r.shape)
+    }
+
+    /// The bend lines in the flat view's place (on the top, z 0).
+    pub fn flat_view_bend_lines(&self) -> Vec<(DVec3, DVec3)> {
+        self.bend_lines.iter().map(|b| (b.a.extend(0.0), b.b.extend(0.0))).collect()
+    }
+
     /// Bounding box of the outline (min, max) in plane coordinates.
     pub fn bounds(&self) -> (DVec2, DVec2) {
         let mut lo = DVec2::splat(f64::INFINITY);

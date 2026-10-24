@@ -33,10 +33,9 @@ use noshape_model::drawing::{Annotation, AnnotationKind, DimUnits, FitMode, FitS
 /// The symbols list (live drawing/461; D32).
 pub const SYMBOLS: [&str; 14] = ["°", "Ø", "℄", "⌵", "↧", "⌴", "▢", "⌒", "±", "Ⓤ", "Ⓘ", "✟", "✝", "▷"];
 /// Precision list: label and decimals (None: the drawing's).
-pub const PRECISIONS: [(&str, Option<u8>); 10] = [("0", Some(0)), ("0.1", Some(1)), ("0.12", Some(2)), ("0.123", Some(3)), ("(Drawing)", None), ("0.1234", Some(4)), ("0.12345", Some(5)), ("0.123456", Some(6)), ("0.1234567", Some(7)), ("0.12345678", Some(8))];
+pub use noshape_ops::drawing::PRECISIONS;
 /// Tolerance lists (D35; hole callouts have no Basic).
-pub const DIM_TOLERANCES: [&str; 10] = ["None", "Symmetrical", "Deviation", "Limits", "Basic", "MIN", "MAX", "Fit", "Fit with tolerance", "Fit (Tolerance only)"];
-pub const HOLE_TOLERANCES: [&str; 9] = ["None", "Symmetrical", "Deviation", "Limits", "MIN", "MAX", "Fit", "Fit with tolerance", "Fit (Tolerance only)"];
+pub use noshape_ops::drawing::{DIM_TOLERANCES, HOLE_TOLERANCES};
 
 /// The open palette.
 pub struct PaletteDlg {
@@ -66,19 +65,7 @@ pub struct PaletteDlg {
     _subs: Vec<Subscription>,
 }
 
-/// The tolerance list entry of a format.
-fn tol_name(a: &Annotation) -> &'static str {
-    match &a.format.tolerance {
-        Tolerance::None => "None",
-        Tolerance::Symmetric { .. } => "Symmetrical",
-        Tolerance::Deviation { .. } => "Deviation",
-        Tolerance::Limits { .. } => "Limits",
-        Tolerance::Basic => "Basic",
-        Tolerance::Min => "MIN",
-        Tolerance::Max => "MAX",
-        Tolerance::Fit { .. } => a.format.fit.mode.name(),
-    }
-}
+use noshape_ops::drawing::tolerance_name as tol_name;
 
 impl DrawingEditor {
     /// Double-click / Edit… on a dimension.
@@ -150,27 +137,7 @@ impl DrawingEditor {
         f.below = val(&d.below);
         f.prefix = val(&d.prefix);
         f.suffix = val(&d.suffix);
-        let classes = match &f.tolerance {
-            Tolerance::Fit { hole, shaft } => (hole.clone(), shaft.clone()),
-            _ => ("H7".into(), String::new()),
-        };
-        f.tolerance = match d.tol {
-            "Symmetrical" => Tolerance::Symmetric { value: m(&d.tol_a).unwrap_or(0.0) },
-            "Deviation" => Tolerance::Deviation { upper: m(&d.tol_a).unwrap_or(0.0), lower: m(&d.tol_b).unwrap_or(0.0) },
-            "Limits" => Tolerance::Limits { upper: m(&d.tol_a).unwrap_or(0.0), lower: m(&d.tol_b).unwrap_or(0.0) },
-            "Basic" => Tolerance::Basic,
-            "MIN" => Tolerance::Min,
-            "MAX" => Tolerance::Max,
-            "Fit" | "Fit with tolerance" | "Fit (Tolerance only)" => {
-                f.fit.mode = match d.tol {
-                    "Fit with tolerance" => FitMode::WithTolerance,
-                    "Fit (Tolerance only)" => FitMode::ToleranceOnly,
-                    _ => FitMode::Fit,
-                };
-                Tolerance::Fit { hole: classes.0, shaft: classes.1 }
-            }
-            _ => Tolerance::None,
-        };
+        noshape_ops::drawing::set_tolerance(f, d.tol, m(&d.tol_a).unwrap_or(0.0), m(&d.tol_b).unwrap_or(0.0));
         // A typed value overrides a linear dimension's text.
         let typed = val(&d.value);
         if let AnnotationKind::LinearDimension { override_text, .. } = &mut d.cur.kind {
@@ -333,7 +300,15 @@ impl DrawingEditor {
         let mut unit_items: Vec<(String, bool, Act)> = DimUnits::CALLOUT.iter().map(|&u| (u.name().to_string(), units == Some(u), std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.units = Some(u)) as Act)).collect();
         let drawing_units = if self.drawing.units_mm { "Millimeters (Drawing)" } else { "Inches (Drawing)" };
         unit_items.insert(if self.drawing.units_mm { 1 } else { 4 }, (drawing_units.to_string(), units.is_none(), std::rc::Rc::new(|d: &mut PaletteDlg| d.cur.format.units = None) as Act));
-        let dual_items: Vec<(String, bool, Act)> = [("Single unit", Some(false)), ("Single unit (Drawing)", None), ("Dual unit", Some(true))]
+        // Live: the drawing's own entry follows its Dual setting (asb 10-24:
+        // Single unit | Dual unit | Dual unit (Drawing); drawing/461 with dual
+        // off: Single unit | Single unit (Drawing) | Dual unit).
+        let entries: [(&str, Option<bool>); 3] = if self.drawing.props.dual.show {
+            [("Single unit", Some(false)), ("Dual unit", Some(true)), ("Dual unit (Drawing)", None)]
+        } else {
+            [("Single unit", Some(false)), ("Single unit (Drawing)", None), ("Dual unit", Some(true))]
+        };
+        let dual_items: Vec<(String, bool, Act)> = entries
             .iter()
             .map(|&(l, v)| (l.to_string(), fmt.dual == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.dual = v) as Act))
             .collect();

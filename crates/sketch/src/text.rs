@@ -137,6 +137,103 @@ static SKETCH_FILES: [&[u8]; 55] = [
 
 static SKETCH_UNPACKED: [std::sync::OnceLock<&'static [u8]>; 55] = [const { std::sync::OnceLock::new() }; 55];
 
+/// The drawing Font list's files: the releases Onshape's drawings use
+/// (live asb 10-24 "drawing font files", verified against its PDF exports):
+/// DejaVu 2.34 Sans / Sans Mono / Serif (Bitstream Vera license), Arimo /
+/// Tinos 1.23, Open Sans 1.10, Noto Sans 1.05, Noto Sans UI 1.04, Noto
+/// Serif 1.02 (Apache 2.0), each regular / bold / italic / bold italic;
+/// Noto Sans SC / TC (Regular, Thin), JP, KR 1.004 (SIL OFL 1.1). Licenses
+/// in `fonts/drawing/LICENSE-*.txt`; zstd-compressed, unpacked on first use.
+static DRAWING_FILES: [&[u8]; 42] = [
+    include_bytes!("../fonts/drawing/DejaVuSans.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSans-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSans-Oblique.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSans-BoldOblique.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSansMono.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSansMono-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSansMono-Oblique.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSansMono-BoldOblique.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSerif.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSerif-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSerif-Italic.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSerif-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/drawing/Arimo-Regular.ttf.zst"),
+    include_bytes!("../fonts/drawing/Arimo-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/Arimo-Italic.ttf.zst"),
+    include_bytes!("../fonts/drawing/Arimo-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/drawing/Tinos-Regular.ttf.zst"),
+    include_bytes!("../fonts/drawing/Tinos-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/Tinos-Italic.ttf.zst"),
+    include_bytes!("../fonts/drawing/Tinos-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/drawing/OpenSans-Regular.ttf.zst"),
+    include_bytes!("../fonts/drawing/OpenSans-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/OpenSans-Italic.ttf.zst"),
+    include_bytes!("../fonts/drawing/OpenSans-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSans-Regular.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSans-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSans-Italic.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSans-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansUI-Regular.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansUI-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansUI-Italic.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansUI-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSerif-Regular.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSerif-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSerif-Italic.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSerif-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansSC-Regular.otf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansSC-Thin.otf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansTC-Regular.otf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansTC-Thin.otf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansJP-Regular.otf.zst"),
+    include_bytes!("../fonts/drawing/NotoSansKR-Regular.otf.zst"),
+];
+
+static DRAWING_UNPACKED: [std::sync::OnceLock<&'static [u8]>; 42] = [const { std::sync::OnceLock::new() }; 42];
+
+fn drawing_file(i: usize) -> &'static [u8] {
+    DRAWING_UNPACKED[i].get_or_init(|| Box::leak(zstd::decode_all(DRAWING_FILES[i]).unwrap_or_default().into_boxed_slice()))
+}
+
+/// A drawing font's face: its file, and whether bold / italic are
+/// synthesized (live: the CJK families have one face; Onshape emboldens
+/// and slants it).
+struct DrawingFace {
+    data: &'static [u8],
+    synth_bold: bool,
+    synth_italic: bool,
+}
+
+/// The face of a drawing Font list family (live's 22). "Light" CJK is the
+/// Thin face (live: NotoSansSC-Thin). The AR* / APMONO shape fonts draw in a
+/// free stand-in until their own glyphs exist (parity S28).
+fn drawing_face(font: &str, bold: bool, italic: bool) -> Option<DrawingFace> {
+    let style = usize::from(bold) + 2 * usize::from(italic);
+    let four = |base: usize| Some(DrawingFace { data: drawing_file(base + style), synth_bold: false, synth_italic: false });
+    let one = |i: usize| Some(DrawingFace { data: drawing_file(i), synth_bold: bold, synth_italic: italic });
+    match font {
+        "DejaVu Sans" => four(0),
+        "DejaVu Sans Mono" => four(4),
+        "DejaVu Serif" => four(8),
+        "Arimo" => four(12),
+        "Tinos" => four(16),
+        "Open Sans" => four(20),
+        "Noto Sans" => four(24),
+        "Noto Sans UI" => four(28),
+        "Noto Serif" => four(32),
+        "Noto Sans Chinese Simplified" => one(36),
+        "Noto Sans Chinese Simplified Light" => one(37),
+        "Noto Sans Chinese Traditional" => one(38),
+        "Noto Sans Chinese Traditional Light" => one(39),
+        "Noto Sans Japanese" => one(40),
+        "Noto Sans Korean" => one(41),
+        "APMONO" | "ARMono" => drawing_face("DejaVu Sans Mono", bold, italic),
+        "ARComp" | "ARIsoP1" | "ARSimp" | "ARTxt" => drawing_face("DejaVu Sans", bold, italic),
+        "ARItal" => drawing_face("DejaVu Sans", bold, true),
+        _ => None,
+    }
+}
+
 fn sketch_file(i: usize) -> &'static [u8] {
     SKETCH_UNPACKED[i].get_or_init(|| Box::leak(zstd::decode_all(SKETCH_FILES[i]).unwrap_or_default().into_boxed_slice()))
 }
@@ -432,6 +529,26 @@ pub fn layout_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayo
         Some(SketchFace::Noto) => (font_data("Noto Sans", bold, italic), None),
         None => (font_data(font, bold, italic), None),
     };
+    layout_face(text, data, wght, false, false)
+}
+
+/// Lays out drawing text (live's 22 families in the files Onshape's
+/// drawings use, see [`drawing_face`]); other names as [`layout_text`].
+pub fn layout_drawing_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayout {
+    match drawing_face(font, bold, italic) {
+        Some(f) => layout_face(text, f.data, None, f.synth_bold, f.synth_italic),
+        None => layout_text(text, font, bold, italic),
+    }
+}
+
+/// Synthesized italic: the slant (x per y, live asb 10-24: 0.27–0.30).
+const SYNTH_SLANT: f64 = 0.28;
+/// Synthesized bold: the extra advance per glyph (live: about +30/1000 em)
+/// and the outline drawn again that far right.
+const SYNTH_BOLD: f64 = 0.03;
+
+/// [`layout_text`] of one face (`wght`: a variable font's weight).
+fn layout_face(text: &str, data: &[u8], wght: Option<f32>, synth_bold: bool, synth_italic: bool) -> TextLayout {
     let Ok(mut face) = ttf_parser::Face::parse(data, 0) else { return TextLayout::default() };
     // A variable font's weight (Bold = 700; otherwise its default instance).
     if let Some(w) = wght {
@@ -439,6 +556,7 @@ pub fn layout_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayo
     }
     let asc = (face.ascender() as f64).max(1.0);
     let scale = 1.0 / asc;
+    let em = face.units_per_em() as f64 * scale;
     let line_h = (face.ascender() as f64 - face.descender() as f64 + face.line_gap() as f64) * scale;
     let mut out = TextLayout::default();
     for (li, line) in text.chars().take(MAX_CHARS).collect::<String>().lines().enumerate() {
@@ -448,13 +566,35 @@ pub fn layout_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayo
             let mut ol = Outline { scale, origin: pen, contours: Vec::new(), cur: Vec::new(), last: pen, start: pen };
             face.outline_glyph(gid, &mut ol);
             ol.flush();
-            out.contours.extend(ol.contours.into_iter().filter(|c| c.len() >= 2 || matches!(c.first(), Some(TextSegment::Bezier(_)))));
-            pen.x += face.glyph_hor_advance(gid).unwrap_or(0) as f64 * scale;
+            let mut glyph: Vec<Vec<TextSegment>> = ol.contours.into_iter().filter(|c| c.len() >= 2 || matches!(c.first(), Some(TextSegment::Bezier(_)))).collect();
+            // Synthesized styles (fonts with one face): slanted about the
+            // baseline; emboldened by drawing the outline again to the right.
+            if synth_italic {
+                let base = pen.y;
+                glyph = glyph.iter().map(|c| map_contour(c, &|p| DVec2::new(p.x + (p.y - base) * SYNTH_SLANT, p.y))).collect();
+            }
+            if synth_bold {
+                let dx = SYNTH_BOLD * em;
+                let shifted: Vec<Vec<TextSegment>> = glyph.iter().map(|c| map_contour(c, &|p| DVec2::new(p.x + dx, p.y))).collect();
+                glyph.extend(shifted);
+            }
+            out.contours.extend(glyph);
+            pen.x += face.glyph_hor_advance(gid).unwrap_or(0) as f64 * scale + if synth_bold { SYNTH_BOLD * em } else { 0.0 };
         }
         out.width = out.width.max(pen.x);
         out.lines = li + 1;
     }
     out
+}
+
+/// A contour with every point moved by `f`.
+fn map_contour(c: &[TextSegment], f: &dyn Fn(DVec2) -> DVec2) -> Vec<TextSegment> {
+    c.iter()
+        .map(|s| match s {
+            TextSegment::Line(a, b) => TextSegment::Line(f(*a), f(*b)),
+            TextSegment::Bezier(pts) => TextSegment::Bezier(pts.iter().map(|p| f(*p)).collect()),
+        })
+        .collect()
 }
 
 /// Placement of a text layout in the sketch: box corner, axis directions and
@@ -622,5 +762,31 @@ mod tests {
         assert_eq!(two.lines, 2);
         let ys: Vec<f64> = two.polylines(4).iter().flatten().map(|p| p.y).collect();
         assert!(ys.iter().cloned().fold(f64::INFINITY, f64::min) < -0.5, "second line below the first");
+    }
+}
+
+#[cfg(test)]
+mod drawing_font_tests {
+    use super::*;
+
+    /// Live's 22 drawing families all lay out real glyphs; DejaVu is its own
+    /// face, and the CJK "Light" ones are thinner than their regular.
+    #[test]
+    fn drawing_font_families_have_faces() {
+        let families = ["APMONO", "ARComp", "ARIsoP1", "ARItal", "ARMono", "ARSimp", "ARTxt", "Arimo", "DejaVu Sans", "DejaVu Sans Mono", "DejaVu Serif", "Noto Sans", "Noto Sans Chinese Simplified", "Noto Sans Chinese Simplified Light", "Noto Sans Chinese Traditional", "Noto Sans Chinese Traditional Light", "Noto Sans Japanese", "Noto Sans Korean", "Noto Sans UI", "Noto Serif", "Open Sans", "Tinos"];
+        for f in families {
+            let l = layout_drawing_text("Hag", f, false, false);
+            assert!(l.width > 0.0 && !l.contours.is_empty(), "{f}");
+        }
+        assert_ne!(layout_drawing_text("Hag", "DejaVu Sans", false, false).width, layout_drawing_text("Hag", "Noto Sans", false, false).width);
+        let ink = |f: &str| -> usize { layout_drawing_text("永", f, false, false).contours.iter().map(|c| c.len()).sum() };
+        assert!(ink("Noto Sans Chinese Simplified Light") > 0 && ink("Noto Sans Chinese Simplified") > 0);
+        let wide = |f: &str, b: bool| layout_drawing_text("Hag", f, b, false).width;
+        assert!(wide("DejaVu Sans", true) > wide("DejaVu Sans", false));
+        // CJK: one face; bold is synthesized (wider, the outline twice), italic slanted.
+        let w = |b: bool| layout_drawing_text("永永", "Noto Sans Japanese", b, false);
+        assert!(w(true).width > w(false).width && w(true).contours.len() == 2 * w(false).contours.len());
+        let right = |l: &TextLayout| l.polylines(2).iter().flatten().map(|p| p.x).fold(f64::MIN, f64::max);
+        assert!(right(&layout_drawing_text("l", "Noto Sans Korean", false, true)) > right(&layout_drawing_text("l", "Noto Sans Korean", false, false)));
     }
 }

@@ -178,7 +178,7 @@ impl SheetPick<'_> {
             && anchor.r.is_none()
         {
             callout.part = self.part_under(anchor.view, anchor.p);
-            callout.on_face |= callout.part.is_some() && views::view_source(self.current_sheet(), anchor.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
+            callout.on_face |= super::pending::leader_dot(false, callout.part.is_some() && views::view_source(self.current_sheet(), anchor.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly));
         }
     }
 }

@@ -1,0 +1,1603 @@
+ - X	 - X
+###name	###name
+###name #description	###name #description
+###name = #value	###name = #value
+###name = #value #description	###name = #value #description
+#booleanOperation of #addQlowercaseSelectionType	#booleanOperation of #addQlowercaseSelectionType
+#column = #value	#column = #value
+#connectionEntities	#connectionEntities
+#edge	#edge
+#entity	#entity
+#featureName	#featureName
+#frames	#frames
+#guideEntities	#guideEntities
+#header = #value	#header = #value
+#index	#index
+#index: #x;#y;#z	#index: #x;#y;#z
+#matesQuery	#matesQuery
+#sheetProfileEntities	#sheetProfileEntities
+#vertex	#vertex
+#vertex [#cornerType]	#vertex [#cornerType]
+#wireProfileEntities	#wireProfileEntities
+% diametric engagement	% engagement diamétrique
+(#index1, #index2)	(#index1, #index2)
++/-	+/-
++X	+X
++Y	+Y
+- Y	- Y
+- Y'	- Y'
+- Z	- Z
+- Z'	- Z'
+-X	-X
+-Y	-Y
+0	0
+0.1	0.1
+0.12	0.12
+0.123	0.123
+0.1234	0.1234
+0.12345	0.12345
+0.123456	0.123456
+118 deg	118 deg
+135 deg	135 deg
+3D fit spline	Spline ajustée en 3D
+ANSI	ANSI
+Acceleration	Accélération
+Access type	Type d'accès
+Add	Ajouter
+Add additional queries	Ajouter des requêtes supplémentaires
+Add chamfer	Ajouter un chanfrein
+Add point on axis drag	Ajouter un point lors du déplacement de l'axe
+Add points	Ajouter des points
+Add undercut	Ajouter une contre-dépouille
+Added by the array	Added by the array
+Additional alignment points	Points d'alignement additionnels
+Additional columns	Colonnes supplémentaires
+Additional queries	Requêtes supplémentaires
+Adjacent	Adjacent
+Adjacent faces	Faces adjacentes
+Align coordinate system	Aligner le système de coordonnées
+Align to geometry	Aligner sur la géométrie
+Aligned	Aligné
+Aligned with direction	Aligné sur la direction
+Alignment entity	Entité d'alignement
+All deviations	Toutes les déviations
+All frames	Tous les cadres
+All solid bodies	Tous les corps solides
+All values	Toutes les valeurs
+Allow edge overflow	Autoriser le débordement d'arête
+Allow faulty parts	Autoriser les pièces défectueuses
+Allow owner entity	Allow owner entity
+Along X	Le long de X
+Along Y	Le long de Y
+Along Z	Le long de Z
+Along custom	Le long d'une direction personnalisée
+Angle	Angle
+Angle Tolerance	Tolérance d'angle
+Angle control type	Type de contrôle d'angle
+Angle from direction	Angle à partir de la direction
+Angle opposite direction	Angle dans la direction opposée
+Angle reference	Référence d'angle
+Angular velocity	Vitesse angulaire
+Animate Mate	Animer la contrainte
+Any	Tous
+Approximate	Approximation
+Approximation parameters	Paramètres d'approximation
+Approximation target degree	Degré cible d'approximation
+Approximation type	Types d'approximation
+Arcs to extrude as bends	Arcs à extruder comme plis
+Array	Tableau
+Aspect ratio constraint	Contrainte de rapport d'apparence
+Assembly to mirror	Assemblage à symétriser
+Assigned	Assigné(e) à moi
+Associated component instance	Instance de composant associé
+Asymmetric	Asymétrique
+Attach to	Attacher à
+Attachment	Attache
+Auto position	Position automatique
+Automatic miter	Repli automatique
+Axes are determined by the first selected instance	Axes are determined by the first selected instance
+Axis	Axe
+Axis measurements	Mesures d'axe
+Axis of pattern	Axe de répétition
+BOTTOM_AXIS_POINT	BOTTOM_AXIS_POINT
+BSO™/BSOS™/BSOA™/BSO4™ blind threaded standoffs	Colonnettes de couplage à filetage borgne BSO™/BSOS™/BSOA™/BSO4™
+Ball	Rotatif
+Base faces	Base faces
+Base mate connector	Connecteur de positionnement de base
+Base mate connector feature index	Base mate connector feature index
+Base mate connector id	Base mate connector id
+Base origin	Origine de base
+Base plane	Plan de base
+Basic	Basique
+Bearing	Palier
+Bend	Pli
+Bend alignment	Alignement du pli
+Bend allowance	Zone de pliage
+Bend angle	Angle de pli
+Bend angle set programmatically	Bend angle set programmatically
+Bend calculation	Calcul du pli
+Bend deduction	Perte au pli
+Bend line	Ligne de pli
+Bend or non-planar faces	Faces pliées ou non planes
+Bend or non-planar faces to unfold	Faces pliées ou non planes à déplier
+Bend radius	Rayon de courbure
+Bend relief	Grugeage
+Bend relief depth	Profondeur de grugeage
+Bend relief depth scale	Échelle de profondeur de grugeage
+Bend relief type	Type de grugeage
+Bend relief width scale	Échelle de largeur de grugeage
+Best fit	Ajustement optimal
+Between entities	Entre entités
+Between entity	Entre entités
+Bias	Biais
+Blind	Borgne
+Blind in last	Borgne en dernier
+Blob Data	Blob Data
+Bodies	Corps
+Body	Corps
+Body draft	Corps de dépouille
+Body type	Type de corps
+Boolean	Booléen
+Boolean operation	Opération booléenne
+Bottom edges	Arêtes inférieures
+Bound type	Type de contrainte
+Boundary condition	Condition du contour
+Boundary condition direction	Direction de la condition aux limites
+Boundary surface	Surface du contour
+Bounded faces	Faces contraintes
+Bounding box XY	Boîte limite XY
+Bounding box YZ	Boîte limite YZ
+Bounding box ZX	Boîte limite ZX
+Bounding type	Type de contrainte
+Bounds	Contraintes
+Bridging curve	Courbe de jonction
+Butt	Bout
+Butt joint - Direction 1	Point de jonction bout à bout - Direction 1
+Butt joint - Direction 2	Point de jonction bout à bout - Direction 2
+By index	Par index
+By index range	Par plage d'index
+By label	Par étiquette
+CENTER	CENTER
+CENTROID	CENTROID
+CLA™ free-running locknuts	Contre-écrous CLA™
+CSV file	Fichier CSV
+Cap	Fermeture
+Cap entity	Entité fermeture
+Caps	Fermetures
+Center	Centre
+Center of mass x coordinate	Coordonnée x du barycentre
+Center of mass y coordinate	Coordonnée y du barycentre
+Center of mass z coordinate	Coordonnée z du barycentre
+Centered	Centré
+Centimeter	Centimeter
+Chain type	Type de chaîne
+Chamfer	Chanfrein
+Chamfer angle	Angle du chanfrein
+Chamfer length	Longueur du chanfrein
+Chamfer size	Taille de congé
+Chamfer type	Type de chanfrein
+Change radius	Changer le rayon
+Change thickness	Modifier l'épaisseur
+Check to include the clearance for bends	Cochez pour inclure le dégagement pour les plis
+Choose to measure minimum or maximum distance between entities	Choisir de mesurer la distance minimale ou maximale entre les entités
+Chordal tolerance	Tolérance rectiligne
+Circle	Cercle
+Circular	Circulaire
+Circular edge	Arête circulaire
+Circular pattern	Répétition circulaire
+Clearance	Dégagement
+Clearance & tapped	Dégagement et taraudage
+Clearance from input	Dégagement à partir de l'entrée
+Cliff edges	Arêtes vives
+Clockwise	Sens horaire
+Close	Fermer
+Close (ASME)	Serré (ASME)
+Closed	Fermé
+Closed spline	Spline fermée
+Column	Colonne
+Column Override	Column Override
+Column access type	Type d'accès aux colonnes
+Column index (0-based)	Index de colonne (base 0)
+Column max index (0-based)	Index maximum de colonne (base 0)
+Column min index (0-based)	Index minimum de colonne (base 0)
+Column regular expression	Expression régulière de colonne
+Column result type	Type de résultat de colonne
+Column value	Valeur de colonne
+Composite curve	Courbe composite
+Composite name	Composite name
+Composite part	Pièce composite
+Composite part options	Options des pièces composites
+Compressive yield strength	Compressive yield strength
+Computed pitch	Pas calculé
+Computed revolutions	Révolutions calculées
+Concave	Concave
+Concave repair	Réparation du contrefort
+Confirm	Confirmer
+Conic	Conique
+Conic edges	Arêtes coniques
+Conic hold lines	Lignes de support coniques
+Conical or cylindrical face	Face conique ou cylindrique
+Connections	Connexions
+Constrained surface	Surface contrainte
+Constraints	Contraintes
+Constraints and limits	Contraintes et limites
+Contact analysis	Contact analysis
+Continuity	Continuité
+Control	Contrôle
+Control how the load is transferred between the instances	Contrôler la façon dont la charge est transférée entre les instances
+Control point index	Index des points de contrôle
+Control point index #indexValue	Control point index #indexValue
+Control point indices	Index des points de contrôle
+Control points	Points de contrôle
+Conversion factor	Facteur de conversion
+Convert	Convertir
+Convex	Convexe
+Coordinate system	Système de coordonnées
+Coped butt	Bout complémentaire
+Copy in place	Copier en place
+Copy part	Copier la pièce
+Corner	Coin
+Corner break	Grugeage en coin
+Corner break style	Style de grugeage en coin
+Corner overrides	Chevauchement de coin
+Corner relief diameter	Diamètre du grugeage en coin
+Corner relief scale	Échelle de grugeage en coin
+Corner relief type	Type de grugeage en coin
+Corner relief width	Largeur du grugeage en coin
+Corner type	Type de coin
+Corners to break	Coins à rompre
+Corners to exclude	Coins à exclure
+Count	Nombre
+Counterbore	Chambrage
+Counterbore depth	Profondeur du chambrage
+Counterbore depth deviation	Déviation de la profondeur du chambrage
+Counterbore depth lower deviation	Déviation inférieure de la profondeur du chambrage
+Counterbore depth lower limit	Limite inférieure de la profondeur du chambrage
+Counterbore depth precision	Précision de la profondeur du chambrage
+Counterbore depth tolerance controls	Contrôles de tolérance de la profondeur du chambrage
+Counterbore depth tolerance type	Type de tolérance de la profondeur du chambrage
+Counterbore depth upper deviation	Déviation supérieure de la profondeur du chambrage
+Counterbore depth upper limit	Limite supérieure de la profondeur du chambrage
+Counterbore diameter	Diamètre du chambrage
+Counterbore diameter deviation	Déviation du diamètre du chambrage
+Counterbore diameter lower deviation	Déviation inférieure du diamètre du chambrage
+Counterbore diameter lower limit	Limite inférieure du diamètre du chambrage
+Counterbore diameter precision	Précision du diamètre du chambrage
+Counterbore diameter tolerance controls	Contrôles de tolérance du diamètre du chambrage
+Counterbore diameter tolerance type	Type de tolérance du diamètre du chambrage
+Counterbore diameter upper deviation	Déviation supérieure du diamètre du chambrage
+Counterbore diameter upper limit	Limite supérieure du diamètre du chambrage
+Counterclockwise	Sens anti-horaire
+Countersink	Fraisé
+Countersink angle	Angle de fraisage
+Countersink angle deviation	Déviation de l'angle du fraisage
+Countersink angle lower deviation	Déviation inférieure de l'angle du fraisage
+Countersink angle lower limit	Limite inférieure de l'angle du fraisage
+Countersink angle precision	Précision de l'angle du fraisage
+Countersink angle tolerance controls	Contrôles de tolérance de l'angle du fraisage
+Countersink angle tolerance type	Type de tolérance de l'angle du fraisage
+Countersink angle upper deviation	Déviation supérieure de l'angle du fraisage
+Countersink angle upper limit	Limite supérieure de l'angle du fraisage
+Countersink diameter	Diamètre de fraisage
+Countersink diameter deviation	Déviation du diamètre du fraisage
+Countersink diameter lower deviation	Déviation inférieure du diamètre de fraisage
+Countersink diameter lower limit	Limite inférieure du diamètre de fraisage
+Countersink diameter precision	Précision du diamètre du fraisage
+Countersink diameter tolerance controls	Contrôles de tolérance du diamètre du fraisage
+Countersink diameter tolerance type	Type de tolérance du diamètre du fraisage
+Countersink diameter upper deviation	Déviation supérieure du diamètre du fraisage
+Countersink diameter upper limit	Limite supérieure du diamètre de fraisage
+Create	Create
+Create composite	Créer un composite
+Create points in addition to the curve.	Créez des points en plus de la courbe.
+Created by	Créé par
+Created by features	Créé par des fonctions
+Creation type	Type de création
+Cross section	Section croisée
+Cross sectional control	Contrôle de section transversale
+Cube	Cube
+Current value	Valeur active
+Curvature	Courbure
+Curve	Courbe
+Curve length	Curve length
+Curve pattern	Répétition pilotée par une courbe
+Curve point	Point courbe
+Curve projection type	Type de projection courbe
+Curve reference	Référence de la courbe
+Curve to face	Courbe jusqu'à la face
+Curve type	Type de courbe
+Curves	Courbes
+Curves to adjust	Courbes à ajuster
+Custom	Personnalisé
+Custom direction	Direction personnalisée
+CustomMaterial	CustomMaterial
+Cut list	Liste de coupe
+Cut list table	Tableau de liste de coupe
+Cutouts	Découpes
+Cylinder edges	Arêtes du cylindre
+Cylinder/Cone	Cylindre/Cône
+Cylindrical	Cylindrique
+DSO™/DSOS™ threaded standoffs	Colonnettes filetées DSO™/DSOS™
+Data start column (0,1,2,.)	Colonne de début des données (0,1,2,.)
+Decal	Décalcomanie
+Default	Par défaut
+Default bend K Factor	Facteur-k par défaut du pli
+Default corner type	Type de coin par défaut
+Defaults changed	Defaults changed
+Degree	Degré
+Delete composite parts	Supprimer les pièces composites
+Delete face	Supprimer la face
+Delete faces	Supprimer les faces
+Delete fillet faces	Supprimer les faces arrondies
+Delete part	Supprimer la pièce
+Density	Densité
+Depends on blob	Depends on blob
+Depth	Profondeur
+Depth deviation	Déviation de la profondeur
+Depth lower deviation	Déviation inférieure de la profondeur
+Depth lower limit	Limite inférieure de la profondeur
+Depth precision	Précision de la profondeur
+Depth tolerance controls	Contrôles de tolérance de la profondeur
+Depth tolerance type	Type de tolérance de la profondeur
+Depth upper deviation	Déviation supérieure de la profondeur
+Depth upper limit	Limite supérieure de la profondeur
+Derivative	Dérivée
+Derivative alignment	Alignement de la dérivée
+Derivative direction	Direction de la dérivée
+Derived	Dérivé
+Derived mirror	Symétrie dérivée
+Description	Description
+Designator	Concepteur
+Detached	Détaché
+Deviation	Déviation
+Deviation type	Type de déviation
+Diameter	Diamètre
+Diameter Tolerance	Tolérance du diamètre
+Diameter deviation	Déviation du diamètre
+Diameter fit tolerance table	Tableau de tolérance d'ajustement du diamètre
+Diameter lower deviation	Déviation inférieure du diamètre
+Diameter lower limit	Limite inférieure du diamètre
+Diameter precision	Précision du diamètre
+Diameter tolerance controls	Contrôles de tolérance du diamètre
+Diameter tolerance type	Type de tolérance du diamètre
+Diameter upper deviation	Déviation supérieure du diamètre
+Diameter upper limit	Limite supérieure du diamètre
+Direction	Direction
+Direction overrides	Remplacements de direction
+Direction to lock	Direction à verrouiller
+Disable imprinting	Désactiver l'impression
+Dissolve composite parts	Décomposer les pièces composites
+Distance	Distance
+Distance 1	Distance 1
+Distance 2	Distance 2
+Distance and angle	Distance et angle
+Distance per revolution	Distance par révolution
+Draft	Dépouille
+Draft angle	Angle de dépouille
+Draft on self	Auto-dépouille
+Draft opposite direction	Direction opposée de la dépouille
+Draft scope	Étendue de la dépouille
+Draft type	Type de dépouille
+Drill size	Taille de perçage
+Drilled	Percé
+Driving mate selector	Sélecteur de contrainte principale
+ECAD	ECAD
+Edge	Arête
+Edge convexity	Convexité des arêtes
+Edge convexity type	Type de convexité des arêtes
+Edge joint	Jonction d'arête
+Edge limit	Limite d'arête
+Edge limits	Limites d'arête
+Edge match scope	Étendue de correspondance d'arêtes
+Edge or face	Arête ou face
+Edge overflow	Débordement d'arête
+Edge parameters	Edge parameters
+Edge point	Arête
+Edge positions	Positions des arêtes
+Edge projection options	Options de projection des arêtes
+Edge queries	Edge queries
+Edges	Arêtes
+Edges and curves for ruled surface path	Arêtes et courbes pour la trajectoire de surface réglée
+Edges and faces	Arêtes et faces
+Edges and sketch curves to revolve	Arêtes et zones d'esquisse à pivoter
+Edges and sketch curves to sweep	Arêtes et courbes d'esquisse à balayer
+Edges or cylinders to bend	Arêtes ou cylindres à plier
+Edges or faces	Arêtes ou faces
+Edges or side faces to flange	Arêtes ou faces latérales à rabattre
+Edges or side faces to hem	Arêtes ou faces latérales à rabattre
+Edges or side faces to join	Arêtes ou faces latérales à joindre
+Edges that define the bases of the gussets	Arêtes définissant les bases des goussets
+Edges to hold	Arêtes à conserver
+Edges to keep	Arêtes à conserver
+Edges, curves and sketches	Arêtes, courbes et esquisses
+Edges, faces, and vertices	Arêtes, faces et sommets
+Edges, vertices, or faces	Arêtes, sommets ou faces
+Edit angles	Modifier les angles
+Edit control points	Modifier les points de contôle
+Edit curve	Modifier la courbe
+Edit edge positions	Modifier les positions des arêtes
+Edit mode	Mode édition
+Edit reference	Modifier la référence
+Edit tangency angles	Modifier les angles de tangence
+Edits a curve directly if possible or a composite curve of the selection otherwise.	Edits a curve directly if possible or a composite curve of the selection otherwise.
+Elevate	Élever
+Elevation parameters	Paramètres d'élévation
+Elevation target degree	Degré cible d'élévation
+Enclose	Entourer
+End	Fin
+End angle	Angle de fin
+End cap	Embout
+End condition	Condition d'arrivée
+End conditions	Conditions de fin
+End curvature offset	Terminer le décalage de la courbure
+End direction	Direction d'arrivée
+End edge position	Fin de la position d'arête
+End flow offset	Fin des effets (décalage)
+End magnitude	Intensité d'arrivée
+End offset	Décalage de fin
+End point	Point final
+End position	Position d'arrivée
+End profile adjacent faces	Faces adjacentes de la fin du contour
+End profile condition	Condition de profil d'arrivée
+End radius	Rayon d'arrivée
+End trim	Fin de l'ajustement
+End type	Type d'extrémité
+End value	Valeur d'arrivée
+Entities	Entités
+Entities to chamfer	Entités à chanfreiner
+Entities to copy	Entités à copier
+Entities to delete	Entités à supprimer
+Entities to draft	Entités à dépouiller
+Entities to fillet	Entités à arrondir
+Entities to fillet or chamfer	Entités sur lesquelles appliquer un congé ou un chanfrein
+Entities to measure between	Distance à mesurer entre deux entités
+Entities to mirror	Entités à symétriser
+Entities to pattern	Entités à répéter
+Entities to split with	Entités à utiliser pour la scission
+Entities to transform or copy	Entités à transformer ou à copier
+Entity	Entité
+Entity or mate connector	Entité ou connecteur de positionnement
+Entity to split with	Entité à utiliser pour la scission
+Entity type	Type d'entité
+Equal	Égal
+Equal distance	Distance égale
+Equal spacing	Espacement constant
+Equal trim	Ajustement égal
+Euclidean	Euclidien
+Evaluate on use	Évaluer à l'utilisation
+Explode lines	Lignes d'éclatement
+Explode step	Étape d'éclatement
+Explode step type	Type d'étape d'éclatement
+Extend	Prolonger
+Extend bend relief	Prolonger le grugeage
+Extend entities	Étendre les entités
+Extend profiles to part	Prolonger les profils jusqu'à la pièce
+Extend to full path	Prolonger à la trajectoire complète
+Extended corner	Coin étendu
+Extension shape	Forme d'extension
+External thread	Filetage externe
+Extrude	Extruder
+Extrude direction	Direction d'extrusion
+FH4™/FHP™ flush-head studs for stainless steel sheets	Goujons à tête affleurante pour tôles en acier inoxydable FH4™/FHP™
+FHL™/FHLS™ flush, low-displacement head studs	Goujons à tête à faible déplacement FHL™/FHLS™
+FHX™ flush-head studs with X-Press™ thread	Goujons à tête affleurante avec filetage X-Press™ FHX™
+FH™/FHS™/FHA™ flush-head pins	Goujons à tête affleurante FH™/FHS™/FHA™
+FH™/FHS™/FHA™ flush-head studs	Goujons à tête affleurante FH™/FHS™/FHA™
+FLAT	FLAT
+FS sizes	FS sizes
+Face	Face
+Face blend	Combinaison de faces
+Face limits	Limites de face
+Face match scope	Étendue de correspondance de face
+Face mirror	Symétrie de face
+Face pattern	Répétition de face
+Face to trim to	Face de référence pour l'ajustement
+Face, edge or vertex	Face, arête ou sommet
+Face, plane, mate connector, or planar face to use as trim tool	Face, plan, connecteur de positionnement ou face plane à utiliser comme outil d'ajustement
+Faces	Faces
+Faces and sketch regions	Faces et zones d'esquisse
+Faces and sketch regions to extrude	Faces et zones d'esquisse à extruder
+Faces and sketch regions to revolve	Faces et zones d'esquisse à pivoter
+Faces and sketch regions to sweep	Faces et zones d'esquisse à balayer
+Faces and surfaces to thicken	Faces et surfaces à épaissir
+Faces or sketch regions to thicken	Faces ou zones d'esquisse à épaissir
+Faces to be normal to	Faces pour la normalisation
+Faces to connect	Faces à connecter
+Faces to draft	Faces à dépouiller
+Faces to exclude	Faces à exclure
+Faces to find match in	Faces cible de correspondance
+Faces to load	Faces à charger
+Faces to lock	Faces à verrouiller
+Faces to measure	Faces à mesurer
+Faces to mirror	Faces à symétriser
+Faces to move	Faces à déplacer
+Faces to offset	Faces à décaler
+Faces to pattern	Faces à répéter
+Faces to remove	Faces à retirer
+Faces to replace	Faces à remplacer
+Faces to replace with	Faces à utiliser pour le remplacement
+Faces to round	Faces à arrondir
+Faces to split	Faces à scinder
+Faces to trim to	Faces de référence pour l'ajustement
+Faces, edges, and vertices that define sweep paths	Faces, arêtes et sommets définissant des trajectoires de balayage
+Faces, surfaces, and sketch regions to offset	Faces, surfaces et zones d'esquisse à décaler
+Fastened	Fixe
+Fastener	Fixation
+Fastener fit	Ajustement de la fixation
+Fastener type	Type de fixation
+Feature Name Template	Feature Name Template
+Feature mirror	Symétrie de fonction
+Feature pattern	Répétition de fonction
+Feature version	Feature version
+Features to find match in	Fonctions cible de correspondance
+Features to mirror	Fonctions à symétriser
+Features to pattern	Fonctions à répéter
+Fill	Remplir
+Fillet	Congé
+Fillet compare type	Type de comparaison de congé
+Fillet faces to modify	Faces arrondies à modifier
+Fillet radius	Rayon du congé
+Fillet type	Type de congé
+Fillets	Congés
+Filter by body type	Filtrer par type de corps
+Filter construction entities	Filtrer les entités de construction
+Finish flex PCB model	Finir le modèle PCB flexible
+Finish sheet metal model	Modèle de tôlerie de finition
+First direction	Première direction
+First set of surfaces	Premier ensemble de surfaces
+First side face	Première face latérale
+First sketch	Première esquisse
+Fit	Ajuster
+Fit (tolerance only)	Ajustement (tolérance uniquement)
+Fit type	Type d'ajustement
+Fit with tolerance	Ajustement avec tolérance
+Flange	Bord tombé
+Flange alignment	Alignement du bord tombé
+Flange to merge	Bord tombé à fusionner
+Flat	Plat
+Flatten assembly	Flatten assembly
+Flattened	Mis à plat
+Flex PCB model	Modèle PCB flexible
+Flip	Inverser
+Flip alignment	Inverser l'alignement
+Flip asymmetric	Inverser de manière asymétrique
+Flip base sides	Inverser les côtés de la base
+Flip cap	Inverser la fermeture
+Flip coordinate system	Inverser le système de coordonnées
+Flip corner	Inverser le coin
+Flip direction	Inverser la direction
+Flip direction up	Inverser la direction vers le haut
+Flip first plane	Inverser le premier plan
+Flip normal	Inversion normale
+Flip offset	Inverser le décalage
+Flip primary axis	Inverser l'axe principal
+Flip pull direction	Inverser la direction d'ouverture
+Flip rounding	Inverser l'arrondi
+Flip second plane	Inverser le second plan
+Flip side 1	Inverser le côté 1
+Flip side 2	Inverser le côté 2
+Flip sides	Inverser les côtés
+Flip wall	Inverser la paroi
+Follow seed position	Follow seed position
+Foot	Foot
+Force	Force
+Foreign Id	Foreign Id
+Form	Forme
+Form Part Studio	Part Studio de la forme
+Form origin mate connector	Connecteur de positionnement d'origine de la forme
+Frame	Cadre
+Frame groups	Groupes de recadrage
+Frame segments are trimmed against preceding groups and are used as tools for later groups	Les segments de cadre sont ajustés par rapport aux groupes précédents et sont utilisés comme outils pour les groupes suivants.
+Frame segments in earlier groups are used as tools for later groups	Les segments de cadre des groupes précédents sont utilisés comme outils pour les groupes suivants.
+Frame trim	Ajuster le cadre
+Frames	Cadres
+Free	Libre
+From import	À partir de l'import
+From mate connector	À partir du connecteur de positionnement
+Full revolve	Pivot complet
+Full round	Arrondi complet
+Gap	Écart
+Gap fill	Remplissage de l'écartement
+Gear	Engrenage
+General	Général
+Geodesic	Géodésique
+Greater or equal	Supérieur ou égal
+Group	Groupe
+Group 1	Groupe 1
+Group 2	Groupe 2
+Guides	Guides
+Guides and continuity	Guides et continuité
+Gusset	Gousset
+Gusset position	Position du gousset
+Gusset type	Type de gousset
+HF109™ heavy-duty, high tensile strength studs	Goujons à force résistance à la traction HF109™
+HFE™/THFE™ heavy-duty studs for thin sheets	Goujons offrant une grande résistance dans les tôles minces HFE™/THFE™
+HFG8™ heavy-duty, high tensile strength studs	Goujons à force résistance à la traction HFG8™
+HFH™/HFHS™/HFHB™ heavy-duty studs	Goujons pour applications à forte résistance HFH™/HFHS™/HFHB™
+HFLH™ hard panel studs	Goujons à support de charge HFLH™
+Handedness	Gaucher/Droitier
+Has clearance	Has clearance
+Has end direction	Has end direction
+Has offset	A un décalage
+Has second direction	A une deuxième direction
+Has start direction	Has start direction
+Has style	Has style
+Has third direction	A une troisième direction
+Header	En-tête
+Heal	Corriger
+Height	Hauteur
+Helix	Hélice
+Helix axis	Axe de l'hélice
+Helix axis type	Type d'axe d'hélice
+Help point	Point de support
+Hem	Bord rabattu
+Hem alignment	Alignement de bord rabattu
+Hem type	Type de bord rabattu
+Hidden references	Hidden references
+Hold adjacent edges	Arêtes adjacentes de support
+Hold line	Ligne de support
+Hold opposite side	Maintenir le côté opposé
+Hold other line	Maintenir l'autre ligne
+Hole	Perçage
+Hole ID	Hole ID
+Hole class	Type de perçage
+Hole start plane or mate connector	Plan de départ du perçage ou connecteur de positionnement
+Hole table	Tableau des perçages
+Hole type	Type de perçage
+Hole version	Hole version
+Holes	Perçages
+Hollow	Creuser
+Horizontal reference	Référence horizontale
+H™ nuts/HNL™ prevailing torque locknuts	Écrous H™/Contre-écrous HNL™
+ISO	ISO
+If none selected, this feature will create one at Origin	Si aucun n'est sélectionné, cette fonction en créera un à l'origine
+Ignore composite parts	Ignorer les pièces composites
+Image	Image
+Image origin index	Image origin index
+Import	Importer
+Import appearances	Importer les apparences
+Import material density	Importer la densité des matériaux
+In place	En place
+Inch	Inch
+Include bends	Inclure les plis
+Include composite parts filter	Include composite parts filter
+Include mate connectors	Inclure les connecteurs de positionnement
+Include parts filter	Include parts filter
+Include properties	Inclure des propriétés
+Include sketches filter	Include sketches filter
+Include surfaces filter	Include surfaces filter
+Index	Index
+Index (0-based)	Index (base 0)
+Individual edges to match	Arêtes individuelles à faire correspondre
+Individual faces to match	Faces individuelles à faire correspondre
+Inertial relief	Inertial relief
+Initial Entities	Initial Entities
+Inner	Intérieur
+Inner radius	Rayon intérieur
+Input type	Type d'entrée
+Inputs	Entrées
+Inset	Insert
+Inside	À l'intérieur
+Instance	Instance
+Instance count	Compteur d'instances
+Instances	Instances
+Instances or faces to constrain	Instances ou faces à contraindre
+Instances to measure	Instances à mesurer
+Instances to mirror	Instances à symétriser
+Instances to replace	Instances à remplacer
+Instances to skip	Instances à ignorer
+Interference	Interférence
+Interior faces	Faces intérieures
+Internal	Interne
+Interpolated spline	Spline interpolée
+Intersect	Intersection
+Intersection curve	Courbe d'intersection
+Inverse conic edges	Inverser les arêtes coniques
+Inverse tangent edges	Inverser les arêtes tangentes
+Is first	Is first
+IsInContext	IsInContext
+Isocline	Isocline
+Isoparametric curve	Courbe isoparamétrique
+Jog	Décalage
+Jog offset	Décalage
+Jog offset anchor	Ancrage du décalage
+Joint	Point de jonction
+Joint style	Style de jonction
+Joint type	Type de jonction
+K Factor	Facteur K
+Keep both sides	Conserver les deux côtés
+Keep end derivative	Conserver la dérivée d'arrivée
+Keep input parts	Conserver les pièces en entrée
+Keep material	Conserver le matériau
+Keep opposite side	Conserver le côté opposé
+Keep points	Conserver les points
+Keep profile orientation	Conserver l'orientation du profil
+Keep start derivative	Conserver la dérivée de départ
+Keep tool surfaces and curves	Surfaces et courbes avec outils conservés
+Keep tools	Conserver les outils
+LOOP_CENTER	LOOP_CENTER
+LRA or Length, Rotation, and Angle table shows coordinates for CNC tube bending machines.	Le tableau LRA (Longueur, Rotation et Angle) indique les coordonnées pour les cintreuses de tubes à commande numérique.
+LRA table	Tableau LRA
+Label column index	Index des colonnes d'étiquettes
+Label row index	Index des lignes d'étiquettes
+Leave open	Laisser ouvert
+Legacy	Legacy
+Length	Longueur
+Length Tolerance	Tolérance de longueur
+Length control	Contrôle de la longueur
+Less or equal	Inférieur ou égal
+Limit	Limite
+Limit X maximum distance	Distance max. sur X
+Limit X minimum distance	Distance min. sur X
+Limit Y maximum distance	Distance max. sur Y
+Limit Y minimum distance	Distance min. sur Y
+Limit Z maximum distance	Distance max. sur Z
+Limit Z minimum distance	Distance min. en Z
+Limit axial X maximum angle	Angle max. avec X
+Limit axial X minimum angle	Angle min. avec X
+Limit axial Y maximum angle	Angle max. avec Y
+Limit axial Y minimum angle	Angle min. avec Y
+Limit axial Z maximum angle	Angle max. avec Z
+Limit axial Z minimum angle	Angle min. avec Z
+Limit cone maximum angle	Limit cone maximum angle
+Limit frame ends	Limiter les extrémités des cadres
+Limits	Limites
+Line angle	Angle de la ligne
+Line or points	Line ou points
+Linear	Linéaire
+Linear pattern	Répétition linéaire
+Linear static	Linear static
+Load	Load
+Load direction	Direction de la charge
+Load region	Charger la région
+Load type	Load type
+Location	Emplacement
+Location signatures	Location signatures
+Location(s)	Emplacement(s)
+Locations	Localisations
+Lock ends	Verrouiller les extrémités
+Lock profile direction	Verrouiller la direction du profil
+Lock profile faces	Verrouiller les faces du profil
+Locked	Verrouillé
+Loft	Lisser
+Lofted corner	Coin lissé
+Long	Long
+Loop	Loop
+Loop/chain connected	Boucle/chaîne connectée
+Loose	Libre
+Loose (ASME)	Libre (ASME)
+Lower	Inférieur
+Lxx	Lxx
+Lxy	Lxy
+Lxz	Lxz
+Lyx	Lyx
+Lyy	Lyy
+Lyz	Lyz
+Lzx	Lzx
+Lzy	Lzy
+Lzz	Lzz
+MCAD	MCAD
+MID_AXIS_POINT	MID_AXIS_POINT
+MID_POINT	MID_POINT
+MODEL	MODEL
+Magnitude	Intensité
+Magnitude/bias	Amplitude/biais
+Maintain aspect ratio	Conserver le rapport d'apparence
+Maintain curvature	Maintenir la courbure
+Make joint	Créer un point de jonction
+Make periodic	Make periodic
+Manipulator X axis	Axe X du manipulateur
+Manipulator Y axis	Axe Y du manipulateur
+Manipulator Z axis	Axe Z du manipulateur
+Map	Carte
+Mass	Masse
+Match	Correspondance
+Match connections	Faire correspondre les connexions
+Match curvature	Faire correspondre la courbe
+Match curvature at end	Faire correspondre la courbure à l'arrivée
+Match curvature at start	Faire correspondre la courbure au départ
+Match edges on face	Faire correspondre des arêtes sur une face
+Match edges on plane	Faire correspondre des arêtes sur un plan
+Match face options	Faire correspondre les options des faces
+Match faces at parting	Faire correspondre les faces à la séparation
+Match faces in features	Faire correspondre des faces dans des fonctions
+Match faces in parts	Faire correspondre des faces dans des pièces
+Match flow (G3)	Faire correspondre le flux (G3)
+Match individual edges	Faire correspondre des arêtes individuelles
+Match individual faces	Faire correspondre des faces individuelles
+Match position	Correspondance de position
+Match profile	Profil de correspondance
+Match tangent	Correspondance des tangentes
+Match type	Type de correspondance
+Matching	Correspondant
+Mate	Contrainte
+Mate DOF to animate	DDL de contrainte à animer
+Mate connector	Connecteur de positionnement
+Mate connector for reference frame	Connecteur de positionnement pour le cadre de référence
+Mate connector index	Mate connector index
+Mate connectors	Connecteurs de positionnement
+Mate to be matched	Contrainte à associer
+Mate type	Type de contrainte
+Mate(s)	Contrainte(s)
+Material	Matériau
+Mates to drive positions	Contraintes pour guider les positions
+Max	Max
+Max deviation	Déviation maximale
+Max index (0-based)	Index maximum (base 0)
+Maximum	Maximum
+Maximum angle	Angle maximum
+Maximum control points	Points de contrôle maximum
+Maximum deviation	Déviation maximale
+Maximum number of assemblies created	Maximum number of assemblies created
+Measure instances	Measure instances
+Measure to axis of cylinders, circles, arcs, or revolved surfaces	Mesure à l'axe de cylindres, de cercles, d'arcs ou de surfaces avec révolution
+Measure to infinitely extended lines, arcs, cylinders, etc.	Mesure à des lignes, des arcs, des cylindres, etc. infiniment étendus
+Measured	Mesuré
+Measurement	Mesure
+Merge	Fusionner
+Merge ribs	Fusionner les nervures
+Merge scope	Étendue de fusion
+Merge tangent segments	Fusionner les segments tangents
+Merge with all	Fusionner avec tous
+Mesh	Maille
+Mesh bodies or faces	Corps ou faces de maillage
+Mesh point	Point de maille
+Meter	Meter
+Method	Méthode
+Metric	Métrique
+Mid plane	Plan milieu
+Middle	Milieu
+Millimeter	Millimeter
+Min	Min
+Min index (0-based)	Index minimum (base 0)
+Minimal gap	Écart minimal
+Minimum	Minimum
+Minimum/Maximum	Minimum/Maximum
+Mirror	Miroir
+Mirror across Y axis	Symétrie par rapport à l'axe Y
+Mirror placement type	Mirror placement type
+Mirror plane	Plan de symétrie
+Mirror reference	Référence de la symétrie
+Mirror strategy	Stratégie de symétrie
+Mirror type	Type de symétrie
+Miter	Replier
+Miter angle	Angle de repli
+Mix	Mix
+Modal	Modal
+Mode	Mode
+Modification type	Type de modification
+Modify fillet	Modifier le congé
+Modify joint	Modifier le point de jonction
+Moment	Moment
+Mounting	Fixation
+Move	Déplacer
+Move boundary	Déplacer le contour
+Move curve boundary type	Modifier le type de contour de la courbe
+Move end condition	Déplacer la condition limite
+Move face	Déplacer la face
+Move face type	Type de déplacement de face
+Multi X offset	Multi X offset
+Multi Y offset	Multi Y offset
+Multi Z offset	Multi Z offset
+Multi rotation matrix	Multi rotation matrix
+Multiple	Multiple
+Mutual trim	Ajustement mutuel
+Name	Nom
+Name #entityName	Nom #entityName
+Name entity	Nommer une entité
+Neutral plane	Plan neutre
+New	Nouveau
+Next	Suivant
+No corner	Aucun coin
+No maximum	Aucun maximum
+No minimum	Aucun minimum
+No tolerance	Aucune tolérance
+No trim	Pas d'ajustement
+Nominal	Nominal
+NonGeometricItem	NonGeometricItem
+None	Aucun
+Normal	Normal
+Normal (ASME)	Normal (ASME)
+Normal direction	Direction normale
+Normal to face	Normal à la face
+Normal to guide	Normal au guide
+Normal to profile	Perpendiculaire au profil
+Normal to sketch plane	Perpendiculaire au plan d'esquisse
+Normal to target	Normal à la cible
+Normal x	Normal x
+Normal y	Normal y
+Normal z	Normal z
+Not supported	Not supported
+Number	Nombre
+Number of modes	Number of modes
+Number of points to add	Nombre de points à ajouter
+Number of samples	Nombre d'échantillons
+ORIGIN_X	ORIGIN_X
+ORIGIN_Y	ORIGIN_Y
+ORIGIN_Z	ORIGIN_Z
+Obround - Scaled	Oblong - Mis à l'échelle
+Obround - Sized	Oblong - Dimensionné
+Offset	Décalage
+Offset X distance	Distance de décalage sur X
+Offset Y distance	Distance de décalage sur Y
+Offset Z distance	Distance de décalage en Z
+Offset all	Décaler tout
+Offset and extend	Décaler et prolonger
+Offset angle	Angle de décalage
+Offset curve	Courbe de décalage
+Offset distance	Distance de décalage
+Offset from tip	Décalage depuis l'extrémité
+Offset opposite direction	Direction de décalage opposée
+Offset surface	Décaler la surface
+Offset type	Type de décalage
+Offset, extend, and split	Décaler, prolonger et scinder
+On entity	Sur l'entité
+One sided	À un côté
+Only edges	Arêtes seulement
+Only faces	Faces seulement
+Only vertices	Sommets seulement
+Operation type	Type d'opération
+Opposite alignment	Alignement opposé
+Opposite angle	Angle opposé
+Opposite direction	Direction opposée
+Opposite direction angle	Angle de direction opposée
+Opposite offset direction	Direction de décalage opposée
+Opposite origin	Origine opposée
+Opposite side	Côté opposé
+Optimize	Optimiser
+Ordered groups	Groupes ordonnés
+Orientation	Orientation
+Origin	Origine
+Origin XY	Origine XY
+Origin YZ	Origine YZ
+Origin ZX	Origine ZX
+Origin entity	Entité d'origine
+Origin type	Type d'origine
+Original unit	Original unit
+Orthogonal path	Trajectoire orthogonale
+Orthogonal path coordinate system	Système de coordonnées de la trajectoire orthogonale
+Other	Autre
+Outer	Extérieur
+Outside	Extérieur
+Overall parameters	Paramètres globaux
+Override	Écraser
+Override bend radius	Remplacer le rayon de courbure
+Overrides	Chevauchement
+Overwrite points	Remplacer les points
+Owned by	Propriétaire
+Owner	Propriétaire
+Owner entity	Entité propriétaire
+PART_ORIGIN	PART_ORIGIN
+PCB entity type	Type d'entité PCB
+PCB holes	Perçages PCB
+PCB part to finish	Pièce PCB à finir
+POINT	POINT
+Parallel	Parallèle
+Parallel to	Parallèle à
+Parallel to sketch plane	Parallèle au plan d'esquisse
+Parameter	Paramètre
+ParametricPartStudio	ParametricPartStudio
+Part	Pièce
+Part Studio	Part Studio
+Part mirror	Symétrie de pièce
+Part or Face mode	Part or Face mode
+Part pattern	Répétition de pièce
+Part to add	Pièce à ajouter
+Part to remove	Pièce à retirer
+Partial fillet	Congé partiel
+Partial flange	Bord tombé partiel
+Parting edges	Bords de séparation
+Parting entity	Entité de séparation
+Parting line	Ligne de séparation
+Parting line propagation	Propagation avec ligne de séparation
+Parts	Pièces
+Parts and surfaces to convert	Pièces et surfaces à convertir
+Parts or bends	Pièces ou plis
+Parts to draft	Pièces à dépouiller
+Parts to find match in	Pièces cible de correspondance
+Parts to hollow	Faces à creuser
+Parts to import	Parts to import
+Parts to measure	Pièces à mesurer
+Parts to trim	Pièces à ajuster
+Parts to trim to	Pièces de référence pour l'ajustement
+Parts to trim using trim tool	Pièces à ajuster en utilisant l'outil d'ajustement
+Parts to use as trim tools	Pièces à utiliser comme outils d'ajustement
+Parts, surfaces, or curves to split	Pièces, surfaces ou courbes à scinder
+Path	Trajectoire
+Path to pattern along	Trajectoire pour la répétition
+Pattern	Répétition
+Pattern type	Type de répétition
+Per chain	Par chaîne
+Per edge	Par arête
+Performance	Performances
+Perimeter	Périmètre
+Pin	Broche
+Pin slot	Broche
+Pitch	Pas
+Pitch length	Longueur de pas
+Placement	Emplacement
+Placement origin	Origine du placement
+Planar	Planaire
+Planarization parameters	Paramètres de planarisation
+Planarize	Planariser
+Plane	Plan
+Plane limit	Limite du plan
+Plane point	Point plan
+Plane type	Type de plan
+Planes and planar faces to use as trim tools	Plans et faces planaires à utiliser comme outils d'ajustement
+Planes to find match in	Plans cible de correspondance
+Plated	Métallisés
+Playback type	Playback type
+Pocket	Poche
+Point	Point
+Point #index	Point #index
+Point edit type	Type de modification des points
+Point index	Index des points
+Point normal	Point perpendiculaire
+Point or mate connector	Point ou connecteur de positionnement
+Point or mate connector used as reference for the curve. Defaults to origin.	Point ou connecteur de positionnement utilisé comme référence pour la courbe. La valeur par défaut est l'origine.
+Point type	Type de point
+Points	Points
+Points on edges	Points sur les arêtes
+Points overrides	Chevauchement de points
+Poisson's ratio	Poisson's ratio
+Polyline	Ligne polygonale
+Position	Position
+Precise	Précis
+Precision	Précision
+Preselection	Preselection
+Preserve active sheet metal models	Conserver les modèles de tôlerie actifs
+Preserve material	Préserver le matériau
+Pressure	Pression
+Previous	Précédent
+Primary axis entity	Entité d'axe principal
+Process	Processus
+Profile 1	Profil 1
+Profile 2	Profil 2
+Profile control	Contrôle du profil
+Profile type	Type de profil
+Profiles	Profils
+Projected curve	Courbe projetée
+Projection direction type	Type de direction de la projection
+Propagation	Propagation
+Propagation type	Type de propagation
+Protrusion	Protrusion
+Pull direction	Direction d'ouverture
+Purpose	Objectif
+Quantity	Quantity
+Query variable	Variable de requête
+Rack and pinion	Mécanisme à crémaillère
+Radius	Rayon
+Range	Plage
+Ratio	Ratio
+Realign	Réaligner
+Reapply features	Réappliquer les fonctions
+Reapply fillet	Réappliquer le congé
+Reciprocate	Reciprocate
+Recognize	Reconnaître
+Rectangle	Rectangle
+Rectangle - Scaled	Rectangle - Mis à l'échelle
+Reference	Référence
+Reference edge	Arête de référence
+Reference faces	Faces de référence
+Reference plane	Plan de référence
+References	Références
+Refold	Replier
+Regular expression	Expression régulière
+Relation	Relation
+Relation ratio	Coefficient de relation
+Relation type	Type de relation
+Relative	Relatif
+Relief	Découpe
+Remove	Retirer
+Remove fillet	Retirer le congé
+Reorient secondary axis	Réorienter l'axe secondaire
+Replace all instances	Remplacer toutes les instances
+Replace face	Remplacer la face
+Replace part	Replace part
+Replacement component	Composant de remplacement
+Replacement part	Pièce de remplacement
+Replicate	Répliquer
+Reset triad	Réinitialiser le trièdre
+Result body operation type	Type d'opération pour le corps résultant
+Result type	Type de résultat
+Reverse direction	Inversion la direction
+Reverse playback	Reverse playback
+Revolute	Pivot
+Revolutions	Révolutions
+Revolve	Pivoter
+Revolve angle	Angle de révolution
+Revolve axis	Axe de révolution
+Rho	Rho
+Rib	Nervure
+Rib extrusion direction	Direction d'extrusion de la nervure
+Rigid body	Rigid body
+Rip	Déchirure
+Rolled	Enroulé
+Rolled K Factor	Facteur K d'enroulement
+Rolling ball	Boule roulante
+Rotate	Pivoter
+Rotate about X	Pivoter autour de X
+Rotate about Y	Pivoter autour de Y
+Rotate about Z	Pivoter autour de Z
+Rotation	Pivoter
+Rotation about Y'	Rotation autour de Y
+Rotation about Z	Rotation autour de Z
+Rotation about Z'	Rotation autour de Z
+Rotation angle	Angle de rotation
+Rotation axis	Axe de rotation
+Rotation matrix	Rotation matrix
+Round	Rond
+Round - Scaled	Arrondi - Mis à l'échelle
+Round - Sized	Arrondi - Dimensionné
+Routing curve	Courbe de routage
+Routing curve (#curveLength)	Courbe de routage (#curveLength)
+Routing curve table	Tableau de courbes de routage
+Row	Ligne
+Row access type	Type d'accès aux lignes
+Row index (0-based)	Index de ligne (base 0)
+Row max index (0-based)	Index maximum de ligne (base 0)
+Row min index (0-based)	Index minimum de ligne (base 0)
+Row regular expression	Expression régulière de ligne
+Row result type	Type de résultat de ligne
+Row value	Valeur de ligne
+Ruled surface	Surface réglée
+Ruled surface type	Type de surface réglée
+S-RT™ free-running locknuts	Contre-écrous S-RT™
+SGPC™ swaging collar studs	Goujons SGPC™
+SH™ hard panel nuts	Écrous à support de charge SH™
+SL™ TRI-DENT® prevailing torque locknuts	Contre-écrous SL™ TRI-DENT®
+SMPS™/SMPP™ nuts	Écrous SMPS™/SMPP™
+SOSG™/SOAG™ threaded standoffs	Colonnettes filetées SOSG™/SOAG™
+SO™/SOS™/SOA™/SO4™ through threaded standoffs	Colonnettes avec filetage à placer dans un orifice SO™/SOS™/SOA™/SO4™
+SO™/SOS™/SOA™/SO4™ through unthreaded standoffs	Colonnettes sans filetage à placer dans un orifice SO™/SOS™/SOA™/SO4™
+Same frames as previous	Mêmes cadres qu'auparavant
+Sample size	Taille de l'échantillon
+Sampled	Échantillonné
+Scale	Échelle
+Scale factor	Facteur d'échelle
+Scale uniformly	Mettre à l'échelle uniformément
+Scope	Étendue
+Screw	Hélicoïdal
+Second bound	Seconde contrainte
+Second bound type	Type de la seconde contrainte
+Second centered	Second centre
+Second depth	Seconde profondeur
+Second direction	Deuxième direction
+Second direction has offset	La deuxième direction est décalée
+Second distance	Deuxième distance
+Second draft	Seconde dépouille
+Second draft angle	Second angle de dépouille
+Second draft opposite direction	Direction opposée de la seconde dépouille
+Second end position	Seconde position d'arrivée
+Second end type	Second type d'extrémité
+Second equal spacing	Deuxième espacement constant
+Second instance count	Second compteur d'instances
+Second match	Seconde correspondance
+Second offset distance	Deuxième direction de décalage
+Second offset opposite direction	Direction opposée à la deuxième direction de décalage
+Second opposite direction	Seconde direction opposée
+Second plane limit	Limite du second plan
+Second radius	Second rayon
+Second set of surfaces	Deuxième ensemble de surfaces
+Second side face	Deuxième face latérale
+Second sketch	Deuxième esquisse
+Second trim to face boundaries	Ajustement secondaire aux contours de la face
+Second up to face	Second jusqu'à la face
+Second up to surface or part	Second jusqu'à la surface ou la pièce
+Second up to vertex or mate connector	Second jusqu'au sommet ou connecteur de positionnement
+Secondary axis entity	Entité d'axe secondaire
+Section count	Nombre de sections
+Seed geometry type	Type de géométrie de départ
+Seed instance key	Seed instance key
+Segment edit type	Type de modification du segment
+Segment index	Segment index
+Segments	Segments
+Select	Sélectionner
+Select (edge)	Sélectionner (arête)
+Select (vertex)	Sélectionner (sommet)
+Select all frames	Sélectionner tous les cadres
+Select an entity or mate connector	Sélectionnez une entité ou un connecteur de positionnement
+Select distance to measure the linear distance between two entities./nSelect length to measure the total length of the selected entities.	Sélectionnez la distance pour mesurer la distance linéaire entre deux entités./nSélectionnez la longueur pour mesurer la longueur totale des entités sélectionnées.
+Select face	Sélectionner la face
+Select or create mate connectors in this Part Studio to position derived instances	Sélectionnez ou créez des connecteurs de positionnement dans ce Part Studio pour positionner les instances dérivées.
+Select owner entity	Sélectionner l'entité propriétaire
+Select point	Sélectionner le point
+Selected Point	Selected Point
+Selected point #indexValue	Selected point #indexValue
+Selected points	Points sélectionnés
+Selection	Sélection
+Selection type	Type de sélection
+Selections	Sélections
+Self-clinching nuts	Écrous autoriveurs
+Self-clinching standoffs	Colonnettes autoriveuses
+Self-clinching studs & pins	Goujons et goupilles autoriveurs
+Shaft class	Type d'arbre
+Shared	Partagé
+Sheet metal face to bend	Face de tôlerie à plier
+Sheet metal loft	Lissage de tôlerie
+Sheet metal model	Modèle de tôlerie
+Sheet metal part	Pièce en tôle
+Sheet metal parts	Pièces en tôle
+Shell	Coque
+Shell thickness	Épaisseur de la coque
+Short	Court
+Show Flip	Show Flip
+Show calculation variance	Afficher la variance de calcul
+Show coordinate system of the reference used by the current vertex.	Afficher le système de coordonnées de la référence utilisée par le sommet actuel.
+Show default points	Afficher les points par défaut
+Show details	Afficher les détails
+Show deviation	Afficher la déviation
+Show isocurves	Afficher les courbes iso
+Show reference coordinate system	Afficher le système de coordonnées de référence
+Show ruled lines	Afficher les lignes
+Show selection	Afficher la sélection
+Show start and end profiles	Afficher les profils de départ et d'arrivée
+Side	Côté
+Side 1	Côté 1
+Side 2	Côté 2
+Side length	Longueur de côté
+Sides	Côtés
+Simple	Simple
+Simulation	Simulation
+Simulation connection	Connexion de simulation
+Single	Unique
+Single value	Valeur unique
+Size	Taille
+Sketch	Esquisse
+Sketch curves to extrude	Courbes d'esquisse à extruder
+Sketch for flat view	Esquisse pour vue à plat
+Sketch plane	Plan d'esquisse
+Sketch points	Points d'esquisse
+Sketch points to place holes	Points d'esquisse pour l'emplacement des perçages
+Sketch profile	Profil d'esquisse
+Sketch profiles	Profils d'esquisse
+Skip instances	Ignorer les instances
+Slider	Glissière
+Smooth	Lisse
+Smooth fillet corners	Adoucir les coins du congé
+Smooth transition	Transition lisse
+Smoothness	Lissage
+Solid	Solide
+Solution index	Solution index
+Source is 'Y Axis Up'	La source est 'axe Y vers le haut'.
+Spacing type	Type d'espacement
+Spans	Portées
+Specify anchor points	Spécifier des points d'ancrage
+Specify axis	Spécifier l'axe
+Specify direction	Spécifier la direction
+Specify normal	Specify normal
+Sphere	Sphère
+Spine	Spine
+Split	Scinder
+Split face	Scinder la face
+Split faces	Scinder les faces
+Split type	Type de scission
+Spun corner	Coin roulé
+Square - Sized	Carré - Dimensionné
+Standard	Standard
+Start	Début
+Start angle	Angle de départ
+Start condition	Condition de départ
+Start curvature offset	Commencer le décalage de la courbure
+Start direction	Direction de départ
+Start direction has offset	La direction de départ est décalée
+Start direction offset angle	Angle de décalage de la direction de départ
+Start edge position	Début de la position d'arête
+Start flow offset	Démarrage des effets (décalage)
+Start from part	Partir de la pièce
+Start from selected plane	Partir du plan sélectionné
+Start from sketch plane	Démarrer du plan d'esquisse
+Start magnitude	Intensité de départ
+Start offset	Décalage de départ
+Start offset opposite direction	Commencer dans la direction de décalage opposée
+Start opposite direction	Commencer dans la direction opposée
+Start plane	Plan de départ
+Start point	Point de départ
+Start position	Position de départ
+Start profile adjacent faces	Faces adjacentes du début du contour
+Start profile condition	Condition de profil de départ
+Start radius	Rayon de départ
+Start trim	Début de l'ajustement
+Start type	Type de début
+Start up to face	Commencer jusqu'à la face
+Start up to surface or part	Commencer jusqu'à la surface ou la pièce
+Start up to vertex or mate connector	Commencer vers l'arête ou le connecteur de positionnement
+Start value	Valeur de départ
+Starting height	Starting height
+Starting offset	Décalage de départ
+Starting offset bound	Contrainte de décalage de départ
+Starting offset depth	Profondeur de décalage de départ
+Starting offset entity	Entité de décalage de départ
+Starting offset opposite direction	Direction opposée de décalage de départ
+Starting width	Starting width
+Step	Étape
+Steps	Pas
+Straight	Droit
+Straight pipe tap	Taraudage pour tuyauterie droit
+Straight tap	Perçage taraudé droit
+Style	Style
+Subtract	Soustraire
+Subtraction offset	Décalage de soustraction
+Subtraction scope	Étendue de soustraction
+Surface	Surface
+Surface area	Superficie
+Surface or boundary edges	Surface ou arêtes de contour
+Sweep	Balayer
+Sweep path	Chemin de balayage
+Swept profile	Profil balayé
+Switch face	Face suivante
+Switch side	Changer de côté
+Symmetric	Symétrique
+Symmetrical	Symétrique
+S™/SS™/CLS™/CLSS™/SP™ nuts	Écrous S™/SS™/CLS™/CLSS™/SP™
+TFH™/TFHS™ non-flush studs	Goujons non affleurants TFH™/TFHS™
+TOP_AXIS_POINT	TOP_AXIS_POINT
+TPS™/TP4™ flush-head pilot pins	Goupilles pilotes affleurantes TPS™/TP4™
+TPXS™ self-clinching pilot pins	Goupilles d’alignement autoriveuses TPXS™
+TSO™/TSOS™/TSOA™/TSO4™ blind standoffs for thin sheet	Colonnettes borgnes pour les tôles ultraminces TSO™/TSOS™/TSOA™/TSO4™
+Tab	Onglet
+Tab mate connector(s)	Connecteur(s) de positionnement de languette
+Tab profile	Profil de patte
+Table	Table
+Tag	Identifier
+Tag purpose	Objectif de l'identification
+Tangency	Tangence
+Tangent	Tangente
+Tangent connected	Tangente connectée
+Tangent direction	Direction tangente
+Tangent edges	Arêtes tangentes
+Tangent hold lines	Lignes de support tangentes
+Tangent propagation	Propagation tangente
+Tangent to curve	Tangent à la courbe
+Tangent to face	Tangent à la face
+Tangent to guide	Tangent au guide
+Tangent to profile	Tangent au profile
+Tap clearance (number of thread pitch lengths)	Dégagement de taraudage (nombre de longueurs de pas de filetage)
+Tap drill diameter	Diamètre de taraud
+Tap drill diameter deviation	Déviation du diamètre du taraud
+Tap drill diameter lower deviation	Déviation inférieure du diamètre du taraud
+Tap drill diameter lower limit	Limite inférieure du diamètre du taraud
+Tap drill diameter precision	Précision du diamètre du taraud
+Tap drill diameter tolerance controls	Contrôles de tolérance du diamètre du taraud
+Tap drill diameter tolerance type	Type de tolérance du diamètre du taraud
+Tap drill diameter upper deviation	Déviation supérieure du diamètre du taraud
+Tap drill diameter upper limit	Limite supérieure du diamètre du taraud
+Tap major diameter	Tap major diameter
+Tap through all	Tarauder à travers tous
+Tap type	Type de perçage taraudé
+Tapered pipe tap	Taraudage pour tuyauterie conique
+Tapped	Taraudé
+Tapped angle	Tapped angle
+Tapped depth	Profondeur de taraudage
+Tapped depth deviation	Déviation de la profondeur de taraudage
+Tapped depth lower deviation	Déviation inférieure de la profondeur de taraudage
+Tapped depth lower limit	Limite inférieure de la profondeur de taraudage
+Tapped depth precision	Précision de la profondeur de taraudage
+Tapped depth tolerance controls	Contrôles de tolérance de la profondeur de taraudage
+Tapped depth tolerance type	Type de tolérance de la profondeur de taraudage
+Tapped depth upper deviation	Déviation supérieure de la profondeur de taraudage
+Tapped depth upper limit	Limite supérieure de la profondeur de taraudage
+Tapped details	Tapped details
+Target	Cible
+Target anchor point	Point d'ancrage cible
+Target degree	Degré cible
+Target face(s)	Face(s) cible(s)
+Target length	Longueur cible
+Target pitch	Pas cible
+Target revolutions	Révolutions cibles
+Targets	Cibles
+Tear	Goutte
+Tear drop	Goutte d'eau
+Tensile yield strength	Tensile yield strength
+Termination	Terminaison
+Thermal via	Interconnexion thermique
+Thicken	Épaissir
+Thickness	Épaisseur
+Thickness 1	Épaisseur 1
+Thickness 2	Épaisseur 2
+Thickness factor	Facteur d'épaisseur
+Thickness opposite direction	Épaisseur dans la direction opposée
+Thin	Mince
+Third centered	Troisième centre
+Third direction	Troisième direction
+Third distance	Troisième distance
+Third equal spacing	Troisième espacement constant
+Third instance count	Troisième compteur d'instances
+Thread class	Classe de filetage
+Thread length	Longueur de filetage
+Thread standard	Thread standard
+Thread type	Type de filetage
+Threads/inch	Filetage/pouce
+Three point	Trois points
+Through all	À travers tous
+Tip angle	Angle de pointe
+Tip angle deviation	Déviation de l'angle de pointe
+Tip angle lower deviation	Déviation inférieure de l'angle de pointe
+Tip angle lower limit	Limite inférieure de l'angle de pointe
+Tip angle precision	Précision de l'angle de pointe
+Tip angle style	Style d'angle de pointe
+Tip angle tolerance controls	Contrôles de tolérance de l'angle de pointe
+Tip angle tolerance type	Type de tolérance de l'angle de pointe
+Tip angle upper deviation	Déviation supérieure de l'angle de pointe
+Tip angle upper limit	Limite supérieure de l'angle de pointe
+To mate connector	Jusqu'au connecteur de positionnement
+To owner	Au propriétaire
+To selection	À la sélection
+Tolerance	Tolérance
+Tolerance matching	Tolerance matching
+Tolerance type	Type de tolérance
+Tooling	Positionnement
+Tools	Outils
+Tools anchor point	Point d'ancrage des outils
+Total length	Longueur totale
+Transform	Transformer
+Transform by mate connectors	Transformer par connecteurs de positionnement
+Transform type	Type de transformation
+Transition	Transition
+Translate	Translater
+Translate by XYZ	Translater en XYZ
+Translate by distance	Translater suivant une distance
+Translate by line	Translater suivant une ligne
+Translation	Translation
+Translation along X	Translation le long de X
+Translation along Y	Translation le long de Y
+Translation along Z	Translation le long de Z
+Treatment type	Type de traitement
+Triangle	Triangle
+Trim	Ajuster
+Trim Type	Type d'ajustement
+Trim control	Contrôle de l'ajustement
+Trim curve	Ajuster la courbe
+Trim ends	Ajuster les extrémités
+Trim guides	Guides d'ajustement
+Trim profiles	Ajuster les profils
+Trim to face boundaries	Ajuster aux contours de la face
+Trim to target	Ajuster à la cible
+Trim type	Type d'ajustement
+Trimming	Ajustement
+Turns	Tours
+Turns and pitch	Tours et pas
+Twist	Torsion
+Twist opposite direction	Torsion dans la direction opposée
+Twist type	Type de torsion
+Two distances	Deux distances
+Two sided	À deux côtés
+Two sketches	Deux esquisses
+Type	Type
+U direction	direction U
+U profiles	Profils en U
+U shift	Basculer horizontalement
+U shift opposite direction	Basculer horizontalement dans la direction opposée
+UNSET	UNSET
+UVN (Control polygon)	UVN (polygone de contrôle)
+UVN (Tangent)	UVN (Tangente)
+Ultimate compressive strength	Ultimate compressive strength
+Ultimate tensile strength	Ultimate tensile strength
+Undercut	Contre-dépouille
+Undercut diameter	Diamètre de contre-dépouille
+Undercut length	Longueur de contre-dépouille
+Unfold	Déplier
+Unfold all	Déplier tout
+Unfold none	Déplier aucun
+Unfold selected	Déplier les éléments sélectionnés
+Unfold type	Type de dépliage
+Unified	Unifié
+Union	Union
+Unit	Unité
+Units	Unités
+Unowned	Inconnu
+Up to entity	Jusqu'à l'entité
+Up to entity or mate connector	Jusqu'à l'entité ou au connecteur de positionnement
+Up to entity with offset	Jusqu'à l'entité avec décalage
+Up to face	Jusqu'à la face
+Up to next	Jusqu'au prochain
+Up to part	Jusqu'à la pièce
+Up to part/surface	Jusqu'à la pièce/surface
+Up to surface or part	Jusqu'à la surface ou la pièce
+Up to vertex	Jusqu'au sommet
+Up to vertex or mate connector	Jusqu'au sommet ou au connecteur de positionnement
+Upper	Supérieur
+Use axis	Utiliser l'axe
+Use cubic interpolation	Utiliser l'interpolation cubique
+Use default minimal gap	Utiliser l'écart minimal par défaut
+Use minimal gap	Utiliser l'écart minimal
+Use model K Factor	Utiliser le facteur-k du modèle
+Use model bend radius	Utiliser le rayon de courbure du modèle
+Use sketch plane direction	Utiliser la direction du plan d'esquisse
+User defined	Défini par l'utilisateur
+V direction	direction V
+V profiles	Profils en V
+V shift	Basculer verticalement
+V shift opposite direction	Basculer verticalement dans la direction opposée
+V3	V3
+VIRTUAL_SHARP	VIRTUAL_SHARP
+Value	Valeur
+Value to record	Valeur à enregistrer
+Variable	Variable
+Variable Studio reference	Référence Variable Studio
+Variable fillet	Congé variable
+Variable type	Type de variable
+VariableStudioVariable	VariableStudioVariable
+Vertex	Sommet
+Vertex overrides	Chevauchement de sommets
+Vertex pairs to split with	Paires de sommets pour la scission
+Vertices	Sommets
+Vertices or curves	Sommets et courbes
+Vertices or edges	Sommets ou arêtes
+Via	Interconnexion
+Volume	Volume
+Wall face or bounding edge to hold	Face de paroi ou arête de contour à maintenir
+Walls	Parois
+Weight	Poids
+Width	Largeur
+Width mate connectors	Connecteurs de positionnement de largeur
+Workspace precision	Précision de l'espace de travail
+World	Monde
+Wrap	Emballage
+X	X
+X Component	X Component
+X axis	X axis
+X offset	Décalage X
+X rotation	Rotation X
+X scale	Échelle X‏
+X translation	Translation X
+XY plane	Plan XY
+XYZ	XYZ
+XZ plane	Plan XZ
+Y	O
+Y Component	Y Component
+Y axis	Y axis
+Y offset	Décalage Y
+Y rotation	Rotation Y
+Y scale	Échelle Y
+Y translation	Translation Y
+YZ plane	Plan YZ
+Yard	Yard
+Young's modulus	Young's modulus
+Z	Z
+Z Component	Z Component
+Z axis	Z axis
+Z offset	Décalage Z
+Z rotation	Rotation Z
+Z scale	Échelle Z
+Z translation	Translation en Z
+[#continuity] #entities	[#continuity] #entities
+[#designator] #interiorFaces	[#designator] #interiorFaces
+[#pointOnEdgeRadius] #edge	[#pointOnEdgeRadius] #edge
+[#uCondition] #uProfileEntities	[#uCondition] #uProfileEntities
+[#vCondition] #vProfileEntities	[#vCondition] #vProfileEntities
+[#vertexRadius] #vertex	[#vertexRadius] #vertex
+additional query	additional query
+arrayItem	arrayItem
+baseOccurrence	baseOccurrence
+buildFunction	buildFunction
+cap	cap
+computeMass	computeMass
+connection	connection
+domain	domain
+edge	edge
+edge limit	edge limit
+entityInferenceType	entityInferenceType
+fixSingleCompositeEmptyName	fixSingleCompositeEmptyName
+group	group
+guide	guide
+hintFaces	hintFaces
+index	index
+instance	instance
+isForSubFeature	isForSubFeature
+newUI	newUI
+point	point
+point on edge	point on edge
+point override	point override
+profile	profile
+secondaryOriginQuery	secondaryOriginQuery
+side1HasFace	side1HasFace
+side1HasVertex	side1HasVertex
+side2HasFace	side2HasFace
+side2HasVertex	side2HasVertex
+source	source
+specifyMaterialData	specifyMaterialData
+specifyUnits	specifyUnits
+value	value
+vertex	vertex

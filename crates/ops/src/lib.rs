@@ -10,6 +10,7 @@
 pub mod analysis;
 pub mod analysis_tools;
 pub mod appearance;
+pub mod asm_config;
 pub mod assembly;
 pub mod config;
 pub mod coverage;
@@ -28,6 +29,7 @@ pub mod reference;
 pub mod refs;
 pub mod registry;
 pub mod session;
+pub mod sketch_export;
 pub mod sketch_use;
 pub mod studio;
 pub mod values;

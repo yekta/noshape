@@ -248,6 +248,12 @@ pub struct PartStudio {
     /// Saved camera views (Shift+V).
     #[serde(default)]
     pub named_views: Vec<NamedView>,
+    /// The Sheet metal table's Bends row order per sheet metal model (Move up
+    /// / Move down, live "ui (10-24 b)": only the rows move, no feature, kept
+    /// with the document), by a face of each bend; bends not listed follow
+    /// in model order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bend_order: Vec<(FeatureId, Vec<Reference>)>,
     /// Face, feature and sketch appearances.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub appearances: Vec<FaceAppearance>,

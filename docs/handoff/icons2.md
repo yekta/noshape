@@ -1024,3 +1024,30 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   Studio; keys right-aligned at 39.6 %, legend bar, our version in the footer — no PTC/Terms, rule 6/cloud).
   The modal is now window-level (deferred/anchored over navbar and panels), 1000 px centred, top 26, height
   window − 154 (live 616). Page section spacing and the popout window size: requested.
+- Round 20b (10-24): crates/app/src/section_dialog.rs = the Section view dialog for both views (Props + Action,
+  host handles actions). Assembly: our simpler panel (offset field + Flip) replaced by it: AsmSection now =
+  planes (≤3, from the hovered face / selected mate connector on open, then face picks), Exclude/Include
+  instances (AsmSceneOptions::section_skip → ignore_clip), dialog state with Cancel restoring; tan cap while open
+  (section_selected). Missing for skb: the assembly section ARROW manipulator (offset/rotate + value box; the
+  Part Studio's lives in part_studio/manipulators.rs), right-click "Edit section view…/Turn off section view".
+  The plane button adds Front (assembly) / a view-facing plane (Part Studio) until Onshape's "Select a plane"
+  options are captured (requested). Shortcut modal: ↗ ml 17 / × ml -5 (header is right-anchored), legend spacers 4.
+- VC8 (10-24): crates/app/src/camera_menu.rs = the "Camera and render options" menu for both views (State +
+  Action, built into OsMenu camera style; the assembly opens it like the Part Studio: OsMenu::build +
+  open_anchored at the button's bottom right, 22 px rows). Row rules come from Onshape's bundle
+  (`viewCubeItems`, woolsthorpe.*.js): Zoom to fit, Zoom to selection (with a selection), Zoom to window;
+  no hidden-edges row in Shaded without edges / Translucent, no tangent row in Shaded without edges;
+  "Disable high quality" (no check) while on; section on = "Edit section view…" (not while its dialog is
+  open) + "Turn off section view" (section icon only with the dialog open). Edit's ✕ turns the section off
+  (behaviours "Edit section view…"): part_studio edit_section, assembly edit_section/turn_off_section
+  (pub(crate), for skb's right-click). Assembly now has: render modes (Translucent 0.48 alpha, Unshaded,
+  Shaded without edges), hidden edges dashed, tangent visible/phantom/removed (assembly_scene caches),
+  Graphics preferences dialog, Named views (named_views_dialog.rs shared; Assembly::named_views in the
+  model, saved as an undoable edit; Shift+V), Previous view history, Zoom to window (W), Zoom to selection,
+  high quality.
+  Pixel check vs live menus/qa5-vc8-assembly-camera-menu-1x: menu 1681–1906 x 246–562, button top 218 (the
+  assembly cube now 14 px down as the Part Studio's), new hand-drawn icons/camera-caret.svg (8x4 on whole
+  pixels, both views; drawing-tool-caret sat at y 4.2 and blurred). "Edit section view…" opens with no active
+  plane (plain chip, part-colour caps: live dark-2437). Esc closes the assembly Named views from the graphics.
+  Open: our 3D-drawn cube (triangle, X label) is 1 px above live in both views (button/menu exact); live's
+  open button reads #eaeaea with darker edges vs our flat #e5e5e5 (captures disagree: part-studio/53).

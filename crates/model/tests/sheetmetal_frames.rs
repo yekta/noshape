@@ -196,8 +196,12 @@ fn l_bracket_flat_length() {
     assert_eq!(data.walls.len(), 2);
     assert_eq!(data.bends.len(), 1);
     let (t, rad, k) = (mm(2.0), mm(3.0), 0.45);
-    // The sketch is the outer face: walls lose R + T each.
-    let expected = (mm(50.0) - (rad + t)) + (mm(30.0) - (rad + t)) + ba(PI / 2.0, rad, k, t);
+    // Live ("fs (10-23 05:00)"): material outside the L by default, the sketch is
+    // the inner face, walls lose R each: flat 80.126106 x 20, 3211.3274122872 mm³.
+    let expected = (mm(50.0) - rad) + (mm(30.0) - rad) + ba(PI / 2.0, rad, k, t);
+    assert!(near(volume(&r, 0) * 1e9, 3_211.327_412_287_2, 1e-6), "volume {}", volume(&r, 0) * 1e9);
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.min.y, -t, 1e-7) && near(bb.max.x, mm(52.0), 1e-7), "material outside: {bb:?}");
     let fp = flat(&r, 0);
     let (len, width) = sorted_size(&fp);
     assert!(near(len, expected, 1e-7), "flat length {len} vs {expected}");
@@ -209,11 +213,13 @@ fn l_bracket_flat_length() {
     let bl = &fp.bend_lines[0];
     assert!(near((bl.b - bl.a).length(), mm(20.0), 1e-9));
 
-    // Material outside the turn: the sketch is the inner face.
+    // Opposite direction: material inside, the sketch is the outer face, walls lose
+    // R + T each (live: 76.126106 x 20, 3051.3274122872 mm³).
     let mut s = extrude_model(&[(0.0, 0.0), (50.0, 0.0), (50.0, 30.0)]);
     s.ps.features.last_mut().unwrap().params.set("oppositeDirection", ParamValue::Bool(true));
     let r = s.ok();
-    let expected = (mm(50.0) - rad) + (mm(30.0) - rad) + ba(PI / 2.0, rad, k, t);
+    assert!(near(volume(&r, 0) * 1e9, 3_051.327_412_287_2, 1e-6), "volume {}", volume(&r, 0) * 1e9);
+    let expected = (mm(50.0) - (rad + t)) + (mm(30.0) - (rad + t)) + ba(PI / 2.0, rad, k, t);
     let (len, _) = sorted_size(&flat(&r, 0));
     assert!(near(len, expected, 1e-7), "flat length {len} vs {expected}");
 }
@@ -223,7 +229,8 @@ fn u_channel_flat_length_and_export() {
     let mut s = extrude_model(&[(0.0, 30.0), (0.0, 0.0), (50.0, 0.0), (50.0, 30.0)]);
     let r = s.ok();
     let (t, rad, k) = (mm(2.0), mm(3.0), 0.45);
-    let expected = (mm(30.0) - (rad + t)) + (mm(50.0) - 2.0 * (rad + t)) + (mm(30.0) - (rad + t)) + 2.0 * ba(PI / 2.0, rad, k, t);
+    // Material outside (the default, as live's L): the sketch is the inner face.
+    let expected = (mm(30.0) - rad) + (mm(50.0) - 2.0 * rad) + (mm(30.0) - rad) + 2.0 * ba(PI / 2.0, rad, k, t);
     let fp = flat(&r, 0);
     let (len, width) = sorted_size(&fp);
     assert!(near(len, expected, 1e-7), "flat length {len} vs {expected}");
@@ -382,9 +389,9 @@ fn hem_straight_and_rolled() {
     let (len, _) = across_along(&fp);
     let expected = (mm(40.0) - (rad + t)) + ba(PI, rad, k, t) + (mm(10.0) - (rad + t));
     assert!(near(len, expected, 1e-7), "hem flat {len} vs {expected}");
-    // The hem folds back over the plate: total height = 2T + gap.
+    // The hem folds back over the plate: total height = 2T + gap (the box is padded by 1e-7).
     let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
-    assert!(near(bb.max.z, 2.0 * t + 2.0 * rad, 1e-7), "{bb:?}");
+    assert!(near(bb.max.z, 2.0 * t + 2.0 * rad, 1e-6), "{bb:?}");
 
     let mut s = plate();
     let r = s.ok();
@@ -398,7 +405,8 @@ fn hem_straight_and_rolled() {
     let r = s.ok();
     let fp = flat(&r, 0);
     let (len, _) = across_along(&fp);
-    let expected = (mm(40.0) - mm(5.0)) + ba(1.5 * PI, mm(3.0), 0.5, mm(2.0));
+    // A rolled hem is a bend: the bend K factor (the Rolled K factor is for rolled walls).
+    let expected = (mm(40.0) - mm(5.0)) + ba(1.5 * PI, mm(3.0), 0.45, mm(2.0));
     assert!(near(len, expected, 1e-7), "rolled flat {len} vs {expected}");
 
     let mut s = plate();
@@ -432,10 +440,15 @@ fn bend_feature_keeps_flat_length() {
     });
     let r = s.ok();
     assert_eq!(r.context.bodies.len(), 1);
-    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap();
-    assert_eq!(data.walls.len(), 2);
-    assert_eq!(data.bends.len(), 1);
+    // One bend: inner radius 3, outer 5 (T 2).
+    let mut radii: Vec<f64> = r.context.bodies[0].shape.faces().iter().filter_map(|f| match f.face_surface().unwrap() {
+        noshape_kernel::Surface::Cylinder { radius, .. } => Some(radius),
+        _ => None,
+    }).collect();
+    radii.sort_by(f64::total_cmp);
+    assert!(radii.len() == 2 && near(radii[0], mm(3.0), 1e-9) && near(radii[1], mm(5.0), 1e-9), "{radii:?}");
     let fp = flat(&r, 0);
+    assert_eq!(fp.bend_lines.len(), 1);
     let (len, width) = sorted_size(&fp);
     assert!(near(len, mm(60.0), 1e-7), "bent plate flat {len}");
     assert!(near(width, mm(40.0), 1e-9));

@@ -18,7 +18,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::format::{DATE_FORMATS, DRAWING_FIELDS, SHEET_REF_FIELDS, TEXT_FORMATS, is_date_field, is_field};
 use noshape_model::drawing::note::{FlagShape, NoteAlign, NoteList, NoteStyle, NoteVAlign};
-use noshape_model::drawing::sheet::{FONT_FAMILIES, TextFont};
+use noshape_model::drawing::sheet::{DRAWING_DEFAULT_FONT, FONT_FAMILIES, TextFont};
 
 type Set = std::rc::Rc<dyn Fn(&mut NoteStyle)>;
 
@@ -153,22 +153,24 @@ impl DrawingEditor {
         let entry = |l: &str, icon: Option<&'static str>, on: bool, f: Set| -> Entry { Some((l.to_string(), icon, on, f)) };
         let free = st.leaders.is_empty();
         let (bold, italic) = st.font.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
+        // Live (asb 10-24): SHX fonts disable Bold and Italic.
+        let shx = st.font.as_ref().is_some_and(|f| noshape_model::drawing::sheet::is_shx(&f.family));
         fn font_mut(s: &mut NoteStyle) -> &mut TextFont {
-            s.font.get_or_insert_with(|| TextFont { family: FONT_FAMILIES[0].into(), bold: false, italic: false })
+            s.font.get_or_insert_with(|| TextFont { family: DRAWING_DEFAULT_FONT.into(), bold: false, italic: false })
         }
 
         // Row 1: Font (238 × 24) and Text height (75 × 24).
         let font_label = match &st.font {
-            Some(f) if f.family != FONT_FAMILIES[0] => f.family.clone(),
+            Some(f) if f.family != DRAWING_DEFAULT_FONT => f.family.clone(),
             _ => "Noto Sans ( Note )".to_string(),
         };
-        let mut fonts: Vec<Entry> = vec![entry("Noto Sans ( Note )", None, st.font.as_ref().is_none_or(|f| f.family == FONT_FAMILIES[0]), std::rc::Rc::new(|s: &mut NoteStyle| match &mut s.font {
-            Some(f) if f.bold || f.italic => f.family = FONT_FAMILIES[0].into(),
+        let mut fonts: Vec<Entry> = vec![entry("Noto Sans ( Note )", None, st.font.as_ref().is_none_or(|f| f.family == DRAWING_DEFAULT_FONT), std::rc::Rc::new(|s: &mut NoteStyle| match &mut s.font {
+            Some(f) if f.bold || f.italic => f.family = DRAWING_DEFAULT_FONT.into(),
             _ => s.font = None,
         }))];
-        for fam in FONT_FAMILIES.iter().skip(1).copied() {
+        for fam in FONT_FAMILIES.iter().copied().filter(|f| *f != DRAWING_DEFAULT_FONT) {
             fonts.push(entry(fam, None, st.font.as_ref().is_some_and(|f| f.family == fam), std::rc::Rc::new(move |s: &mut NoteStyle| {
-                let (b, i) = s.font.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
+                let (b, i) = s.font.as_ref().map(|f| (f.bold, f.italic)).filter(|_| !noshape_model::drawing::sheet::is_shx(fam)).unwrap_or((false, false));
                 s.font = Some(TextFont { family: fam.into(), bold: b, italic: i });
             })));
         }
@@ -227,14 +229,22 @@ impl DrawingEditor {
             .h(px(30.))
             .pl(px(1.))
             .gap(px(2.))
-            .child(toggle("note-b", "note-bold", "Bold", bold, |s| {
-                let f = font_mut(s);
-                f.bold = !f.bold;
-            }, cx))
-            .child(toggle("note-i", "note-italic", "Italic", italic, |s| {
-                let f = font_mut(s);
-                f.italic = !f.italic;
-            }, cx))
+            .child(if shx {
+                button("note-b", "note-bold", "Bold", false, cx).opacity(0.4)
+            } else {
+                toggle("note-b", "note-bold", "Bold", bold, |s| {
+                    let f = font_mut(s);
+                    f.bold = !f.bold;
+                }, cx)
+            })
+            .child(if shx {
+                button("note-i", "note-italic", "Italic", false, cx).opacity(0.4)
+            } else {
+                toggle("note-i", "note-italic", "Italic", italic, |s| {
+                    let f = font_mut(s);
+                    f.italic = !f.italic;
+                }, cx)
+            })
             .child(toggle("note-u", "note-underline", "Underline", st.underline, |s| s.underline = !s.underline, cx))
             .child(toggle("note-s", "note-strike", "Strikethrough", st.strikethrough, |s| s.strikethrough = !s.strikethrough, cx))
             // Live 1137: opens the "Note color" panel under it.

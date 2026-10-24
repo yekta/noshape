@@ -23,6 +23,7 @@ mod drawing_watermark;
 mod release_conditions;
 mod release_prefs;
 mod release_settings;
+mod revision_template;
 mod revision_tools;
 mod company_settings;
 mod material_prefs;
@@ -33,6 +34,9 @@ mod doc_dialogs;
 mod doc_model;
 mod drawing_centermark;
 mod drawing_create;
+mod camera_menu;
+mod named_views_dialog;
+mod section_dialog;
 mod shortcuts_page;
 mod drawing_drawprops;
 mod drawing_insert;
@@ -224,6 +228,8 @@ fn apply_theme(cx: &mut App) {
         let prefs = crate::preferences_window::ListPrefs::load();
         crate::i18n::set_current(prefs.language.as_deref().unwrap_or(crate::i18n::DEFAULT));
         crate::theme::set_dark(prefs.dark_mode);
+        // Company settings: drawings' revision tables follow its template.
+        crate::release_settings::release_settings();
     }
     cx.set_global(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(FontWeight::LIGHT), color: Some(gpui_kit::rgb(0x666666).into()) });
     // Live document/70 (Ace): the Feature Studio gutter is 42 px for one-digit

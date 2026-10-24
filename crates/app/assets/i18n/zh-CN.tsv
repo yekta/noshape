@@ -35,6 +35,7 @@
 "__value__" is not a valid standard library version.	“__value__”不是有效的标准库版本。
 #__queryName__ not found, is suppressed or evaluates to nothing in the current selection.	找不到 #__queryName__，受抑制或在当前的选择中求值无结果。
 $__amountOff__ off	减去 $__amountOff__
+% diametric engagement	直径接合百分比
 (Enterprise is Inactive. Please contact the administrator to activate.)	（Enterprise 处于非活跃状态。请联系管理员以进行激活。）
 (External)	（外部）
 (Maximum of 10000 characters)	（最多 10000 个字符）
@@ -87,7 +88,9 @@ $__amountOff__ off	减去 $__amountOff__
 1 uppercase	1 个大写字母
 1 user	1 个用户
 1. Install the app	1. 安装该应用程序
+118 deg	118 度
 12 hour	12 小时
+135 deg	135 度
 2 additional months free	额外免费使用 2 个月
 2 point circle centerline	两点圆中心线
 2 point linear centerline	两点线性中心线
@@ -171,6 +174,7 @@ Access to this document has been restricted with the message '__message__'.	已�
 Access to this document has been restricted.	已限制对此文档的访问。
 Access to this document has been temporarily restricted by an Onshape administrator. You may	Onshape 管理员暂时限制了对该文档的访问。您可以
 Access token URL	访问令牌 URL
+Access type	访问类型
 Access your Altium 365 workspaces from Onshape. Import and export between Altium 365 and PCB Studio.	从 Onshape 访问您的 Altium 365 工作区。在 Altium 365 和 PCB Studio 之间导入和导出。
 Account	帐户
 Account Balance:	帐户余额:
@@ -230,6 +234,7 @@ Add a reply	添加回复
 Add a tab to a sheet metal flange, remove interfering material, or bridge 2 flanges from the same sheet metal model.	向钣金法兰添加薄片，移除干涉材料，或桥接同一钣金模型中的 2 个法兰。
 Add a visibility condition for this configuration input	为此配置输入添加可见性条件
 Add a visibility rule for the options of this configuration input	为此配置输入的选项添加可见性条件
+Add additional queries	添加其他查询
 Add an external thread to cylindrical parts by selecting a leading edge or edges. Specify the standard, size, pitch, length, end type, and optionally add a chamfer or undercut.	通过选择一个或多个前缘为圆柱零件添加外螺纹。指定标准、尺寸、间距、长度、终止类型，并可选择添加倒角或底切。
 Add appearance to __numberBiggerThanOne__ faces…	为 __numberBiggerThanOne__ 个面添加外观…
 Add appearance to __numberBiggerThanOne__ features…	为 __numberBiggerThanOne__ 个特征添加外观…
@@ -240,6 +245,7 @@ Add appearance to feature…	为特征添加外观…
 Add appearance to selection…	为选定对象添加外观…
 Add appearance to sketch…	为草图添加外观…
 Add category to rule…	添加类别至规则…
+Add chamfer	添加倒角
 Add column	添加列
 Add columns to the BOM table	向 BOM 表格添加列
 Add columns to the template	为模板添加列
@@ -299,6 +305,8 @@ Add option rule	添加选项规则
 Add parts and assemblies to build a bill of materials where you can view and edit metadata, as well as viewing instance counts and assembly structure.	添加零件和装配体以生成物料清单，您可以在其中查看和编辑元数据，以及查看实例数量和装配体结构。
 Add payment information	添加支付信息
 Add payment information to make purchases in Onshape	添加支付信息以在 Onshape 中进行购物
+Add point on axis drag	在轴拖动上添加点
+Add points	添加点
 Add points to a spline or to a Bezier curve control polygon by clicking anywhere along it.	向样条或 Bezier 曲线控制多边形添加点，方法是沿其单击任意位置。
 Add project role	添加项目角色
 Add project role and permissions	添加项目角色和权限
@@ -336,6 +344,7 @@ Add to team…	添加到团队…
 Add to toolbar	添加到工具栏
 Add tolerance type	添加公差类型
 Add tolerances to sketch dimensions and feature parameters, or add annotations and dimensions with the Inspection panel tools to see data on any part in the Part Studio.	将公差添加至草图尺寸和特征参数，或使用检查面板工具添加注释和尺寸，以便在 Part Studio 中查看任何零件的数据。
+Add undercut	添加底切
 Add users	添加用户
 Add users / teams	添加用户/团队
 Add users from your enterprise	添加来自您 Enterprise 的用户
@@ -365,9 +374,14 @@ Adding row, __name__	正在添加行，__name__
 Adding selection to Obsolete candidate…	将选定对象添加到淘汰候选中…
 Adding selection to Release candidate…	将选定内容添加到发布候选中…
 Adding to a company will make the library available to all users of the company.	如果将库添加到公司，将使其可供该公司的所有用户使用。
+Additional alignment points	其他对齐点
+Additional columns	其他列
+Additional queries	其他查询
 Additionally, the following users must leave the document:	此外，以下用户必须离开此文档：
 Address	地址
 Address:	地址：
+Adjacent	相邻
+Adjacent faces	相邻面
 Adjacent surfaces with overlapping edges will be joined upon import.	导入时将连接边重叠的相邻曲面。
 Adjust the location, orientation and scale of a sketch entity using a manipulator.	使用操纵器调整草图图元的位置、方向和比例。
 Adjust the whitespace of this Feature Studio to match a common style.	调整此 Feature Studio 的白色空间以与常用样式匹配。
@@ -376,6 +390,7 @@ Admin tools	管理工具
 Administration	管理
 Advanced CAD and PDM for teams that want to improve productivity and collaboration.	高级 CAD 和 PDM，适用于想要提高工作效率和协作的团队。
 Advanced PDM	高级 PDM
+Advanced admin and security	高级管理和安全
 Advanced admin and security (SSO)	高级管理和安全 (SSO)
 Advanced built-in PDM	高级内置 PDM
 Advanced provisioning & security settings	高级配置和安全设置
@@ -402,10 +417,15 @@ Alias name must be at least 1 and no more than __maxNameLimit__ characters in le
 Alias name must not contain HTML.	别名不得包含 HTML。
 Alias saved.	已保存别名。
 Aliases	别名
+Align coordinate system	对齐坐标系
+Align to geometry	与几何图元对齐
 Align view with vertical axis	将视图与竖直轴对齐
 Align with Z	与 Z 轴对齐
+Aligned	已对齐
 Aligned rectangle	对齐矩形
 Aligned section view	转正剖视图
+Aligned with direction	与方向对齐
+Alignment entity	对齐图元
 All	所有
 All Feature Studios are committed.	已提交所有的 Feature Studio。
 All Onshape users	所有 Onshape 用户
@@ -418,6 +438,7 @@ All companies	所有公司
 All company categories	所有公司类别
 All custom features are used in at least one Part Studio	所有自定义特征均在至少一个 Part Studio 中使用
 All custom features have descriptions	所有自定义特征都有说明
+All deviations	所有偏差
 All document and publication names containing only numbers must be unique	仅包含数字的所有文档和公布名称必须是唯一的
 All document and publication names must be unique	所有文档和公布名称必须是唯一的
 All document and publication names must be unique unless they start with "test"	所有文档和公布名称必须是唯一的，除非名称以“test”开头
@@ -429,6 +450,7 @@ All existing documents will remain private and all new documents created on the 
 All file formats	所有文件格式
 All flat pattern parts in the Part Studio	Part Studio 中所有展开图样的零件
 All flat pattern parts in the current model	当前模型中的所有展开图样的零件
+All frames	所有框架
 All inputs	所有输入
 All instances are updated.	所有实例均已更新。
 All items are already in the toolbar	所有项目均已在工具栏中
@@ -442,10 +464,12 @@ All permissions	所有权限
 All published classes	所有已发布的班级
 All revisions	所有修订版本
 All sheets	所有图纸
+All solid bodies	所有实体主体
 All statuses	所有状态
 All tabs	所有页签
 All uppercase in Drawings	工程图中全部大写
 All users	所有用户
+All values	所有值
 All versions	所有版本
 All workspaces	所有工作区
 Allow	允许
@@ -454,6 +478,8 @@ Allow access to public documents	允许访问公开文档
 Allow adding items from other documents	允许从其他文档添加项目
 Allow administrators to add custom features to the enterprise toolset and enterprise custom tables to the custom tables panel. These features and tables will only appear for users with link permission to the source document.	允许管理员将自定义特征添加到企业工具集并将企业自定义表格添加到自定义表格面板。这些特征和表格仅向对源文档具有链接权限的用户显示。
 Allow all integrations	允许所有集成
+Allow edge overflow	允许边溢出
+Allow faulty parts	允许错误零件
 Allow rotation about the X, Y, and Z axes. The 1st selection serves as the rotational movement point, and the 2nd selection serves as the stationary point.	允许绕 X 轴、Y 轴和 Z 轴旋转。第 1 个选定对象充当旋转移动点，第 2 个选定对象充当驻点。
 Allow rotation about the Z axis and translation along the X axis. The 1st selection serves as the pin and the rotational movement point, and the 2nd selection serves as the translational movement.	允许绕 Z 轴旋转以及沿 X 轴平动。第 1 个选定对象充当销和旋转移动点，第 2 个选定对象充当平动移动点。
 Allow rotation about the Z axis. The 1st selection serves as the rotational point, and the 2nd as the stationary point.	允许绕 Z 轴旋转。第 1 个选定对象充当旋转点，第 2 个选定对象充当驻点。
@@ -466,6 +492,10 @@ Allow translation along the X and Y axes, and rotation about the Z axis. The 1st
 Allow translation along the Z axis. The 1st selection serves as the sliding point, and the 2nd as the stationary point.	允许沿 Z 轴平动。第 1 个选定对象充当滑动点，第 2 个选定对象充当驻点。
 Allow translation and rotation about the Z axis. The 1st selection serves as the translational and rotational point, and the 2nd as the stationary point.	允许沿 Z 轴平动和旋转。第 1 个选定对象充当平动和旋转点，第 2 个选定对象充当驻点。
 Allow translation on a slot’s center plane and rotation about an axis perpendicular to that plane. The 1st selection defines the item to be centered. The 2nd selection defines the center plane.	允许在槽的中心平面上平移，并绕垂直于该平面的轴进行旋转。第 1 个选择定义作为中心的项。第 2 个选择定义中心平面。
+Along X	沿着 X
+Along Y	沿着 Y
+Along Z	沿着 Z
+Along custom	沿着自定义
 Always	始终
 Always open documents in view-only mode for all Editors, except document creators	对于所有编辑者（文档创建者除外），始终以“仅限查看”模式打开文档
 Always shown	始终显示
@@ -496,12 +526,18 @@ Analytics are only available for In progress and Submitted documents	仅为“�
 Analyze input tessellation…	分析输入镶嵌…
 And	和
 Angle	角度
+Angle Tolerance	角度公差
+Angle control type	角度控制类型
+Angle from direction	与方向所成的角度
+Angle opposite direction	角度相反方向
+Angle reference	角度参考
 Angle unit:  	角度单位:  
 Angle: __angleUnit__	角度：__angleUnit__
 Angular deviation	角度偏差
 Angular tolerance	角度公差
 Angular tolerances	角度公差
 Angular velocity	角速度
+Animate Mate	动画化配合
 Animate __mateName__…	动画化 __mateName__ …
 Animate mate	动画化配合
 Animate mate degree of freedom	动画化配合自由度
@@ -560,6 +596,10 @@ Approved by	审批人
 Approved by __name__	__name__ 已批准
 Approver	审批人
 Approvers	核准者
+Approximate	近似
+Approximation parameters	近似参数
+Approximation target degree	近似目标度数
+Approximation type	近似类型
 Arc	圆弧
 Arc length	弧长
 Arc length dimension	弧长尺寸
@@ -569,6 +609,7 @@ Archived	已存档
 Archived classes	已存档的班级
 Archived classes can be cloned. Cloning an archived class will create a new unpublished class without members containing all the existing content.	可以克隆已存档班级。克隆一个已存档的班级将创建一个新的没有成员的未发布班级，其包含所有现有内容。
 Archiving a class will:	存档班级将会：
+Arcs to extrude as bends	要以折弯形式拉伸的圆弧
 Are you a student or an educator?	您是学生还是教育工作者？
 Are you student or an educator?	您是学生还是教育工作者？
 Are you sure you want to cancel your Education subscription?	是否确实要取消 Education 订阅？
@@ -605,6 +646,7 @@ Arena connection settings failed to save.	保存 Arena 连接设置失败。
 Arena connection settings updated.	Arena 连接设置已更新。
 Arena release management sync is disabled in __companyName__.	已在 __companyName__ 中禁用 Arena 发布管理同步。
 Arena release management sync is enabled in __companyName__.	已在 __companyName__ 中启用 Arena 发布管理同步。
+Array	排列
 Array parameters cannot be configured.	无法配置数组参数。
 Arrow	箭头
 As a __companyType__ administrator you can override all other approvers and __transition__ this Release candidate immediately.	作为 __companyType__ 管理员，您可以覆盖所有其他审批人员并立即 __transition__ 此发布候选。
@@ -612,6 +654,7 @@ As a __companyType__ administrator you can override other users and __transition
 As a company administrator, you can complete the task on behalf of the assignee.	作为公司管理员，您可以代表任务负责人完成任务。
 As a light user you can view, comment on and export from documents, publications that have been shared with you. For more information about using Onshape as a light user, 	作为轻用户，您可以查看、评论和导出已与您共享的文档和公布。了解更多关于以轻用户身份使用 Onshape 的资讯。 
 As creator of this release you can override all other approvers and reject this Release candidate immediately.	作为此发布的创建者，您可以覆盖所有其他审批者并立即拒绝此发布候选。
+Aspect ratio constraint	长宽比约束
 Assemblies	装配体
 Assemblies…	装配体…
 Assembly	装配体
@@ -632,6 +675,7 @@ Assembly locked to __positionName__.	装配体已锁定到 __positionName__。
 Assembly mirror	装配体镜像
 Assembly settings	装配体设置
 Assembly settings updated.	装配体设置已更新。
+Assembly to mirror	要镜像的装配体
 Assign	指定
 Assign a FeatureScript function to run and compute values for the part property.	指定要运行的 FeatureScript 函数，并计算零件属性的值。
 Assign a name to a specific display state of an assembly. Specify which parts, subassemblies, and mates are hidden or in view.	为装配体的特定显示状态指定一个名称。指定哪些零件、子装配体和配合隐藏或可出现在视图中。
@@ -640,6 +684,7 @@ Assign material for __name__…	将材料指定用于 __name__…
 Assign material for __numberBiggerThanOne__ parts…	将材料指定用于 __numberBiggerThanOne__ 个零件…
 Assign material…	指定材料…
 Assign to __assignee__	分配给 __assignee__
+Assigned	已分配
 Assigned seats:	已分配的席位:
 Assigned to	负责人
 Assigned to me	已分配给我
@@ -664,7 +709,11 @@ Assignment submission type failed to load.	加载作业提交类型失败。
 Assignment submissions failed to download.	未能下载作业提交项。
 Assignments	作业
 Assignments failed to load.	加载作业失败。
+Associated component instance	关联零部件实例
+Asymmetric	不对称
 At least one workflow must be selected	必须至少选择一个工作流程
+Attach to	附加到
+Attachment	附件
 Attachment cannot exceed 20MB	附件不能超过 20MB
 Attachment exceeds 20MB limit.	附件超过 20MB 的限制。
 Attachment failed to upload.	附件上传失败。
@@ -684,10 +733,12 @@ Authoring permissions updated.	编写权限已更新。
 Authorization completed successfully!	已成功完成授权！
 Authorization failed!	授权失败！
 Auto	自动
+Auto position	自动位置
 Auto-size fastener	自动调整紧固件大小
 Automated part numbering	自动进行零件编号
 Automatic	自动
 Automatic (default)	自动 (默认)
+Automatic miter	自动斜接
 Automatic obsoletion	自动淘汰
 Automatic references enable you to insert this Variable Studio into multiple tabs. References to this Variable Studio will be placed in every new and existing Part Studio and Assembly in this workspace.	自动参考可让您将此 Variable Studio 插入多个页签。系统会将对此 Variable Studio 的参考置于此工作区内每个新的和现有的 Part Studio 和装配体中。
 Automatic version	自动版本
@@ -698,6 +749,9 @@ Automatically select constraints	自动选择约束
 Auxiliary view	辅助视图
 Average	平均
 Awaiting approval	等待审批
+Axis	轴
+Axis measurements	轴线测量
+Axis of pattern	阵列轴
 Axis perpendicular distance	轴垂直距离
 BOM Table	物料清单表格
 BOM URL failed to load.	加载物料清单 URL 失败。
@@ -709,7 +763,9 @@ BOM sync to __plmName__ has started…	已开始将物料清单同步到 __plmNa
 BOM synced to Arena.	已将物料清单同步到 Arena。
 BOM type	物料清单类型
 BOM type:	物料清单类型:
+BSO™/BSOS™/BSOA™/BSO4™ blind threaded standoffs	BSO™/BSOS™/BSOA™/BSO4™ 盲孔螺纹支架
 Back	后
+Back reference	反向参考
 Back reference (Ctrl-a)	反向参考 (Ctrl+A)
 Back to Release properties	返回至发布属性
 Back to Task properties	返回至任务属性
@@ -721,14 +777,34 @@ Ball	球
 Ball mate	球配合
 Ball mate (m)	球配合 (m)
 Base URL	基本 URL
+Base mate connector	基础配合连接器
+Base origin	基础原点
+Base plane	基准平面
+Basic	基本
 Be confident in the security of your data	对守护您数据的安全性充满信心
 Bearing	轴承
 Before	之前
 Bend	折弯
 Bend a sheet metal model along a reference line, with additional bend control options.	使用其他折弯控制选项沿参考线折弯钣金模型。
+Bend alignment	折弯对齐
+Bend allowance	折弯裕度
+Bend angle	折弯角度
+Bend calculation	折弯计算
+Bend deduction	折弯扣除
+Bend line	折弯线
+Bend or non-planar faces	折弯面或非平坦面
+Bend or non-planar faces to unfold	要展开的折弯面或非平坦面
+Bend radius	折弯半径
 Bend relief	折弯止裂槽
+Bend relief depth	折弯止裂槽深度
+Bend relief depth scale	折弯止裂槽深度比例
+Bend relief type	折弯止裂槽类型
+Bend relief width scale	折弯止裂槽宽度比例
+Best fit	最佳效果
 Best for Individuals	最适合个人使用
 Between	介于
+Between entities	在图元之间
+Between entity	在图元之间
 Bezier degree	Bezier 度数
 Bias	偏离
 Bill of Materials	物料清单
@@ -739,25 +815,38 @@ Bio	个人简历
 Black	黑色
 Black and white	黑白
 Blend 2 or more faces. Specify propagation, cross section type, measurement type, symmetry, control type, and trim type.	混合 2 个或多个面。指定延伸、横截面类型、测量类型、对称性、控制类型和修剪类型。
+Blind	给定深度
+Blind in last	盲孔在最后
 Blob	二进制大型对象 (Blob)
 Blue	蓝色
 Blue sky	蓝天
 Blue → Red	蓝色 → 红色
 Blur environment	模糊环境
+Bodies	主体
 Body	主体
 Body Type	主体类型
 Body draft	主体拔模
+Body type	主体类型
 Bold	粗体
 Bond all touching faces	粘合所有接触面
 Boolean	布尔运算
 Boolean filter property	布尔过滤器属性
+Boolean operation	布尔运算
 Border	边界
 Bottom	下
+Bottom edges	底部边
 Bottom right	右下角
 Bottom view	仰视图
+Bound type	界限类型
 Boundary condition	边界条件
+Boundary condition direction	边界条件方向
 Boundary surface	边界曲面
 Bounded faces	界限内的面
+Bounding box XY	界限框 XY
+Bounding box YZ	界限框 YZ
+Bounding box ZX	界限框 ZX
+Bounding type	边界类型
+Bounds	边界
 Branch to create workspace	创建分支以创建工作区
 Branch to create workspace…	创建分支以创建工作区…
 Branched from __versionName__	已从 __versionName__ 创建分支
@@ -779,6 +868,9 @@ Browser looks good!	浏览器一切正常！
 Build steps by dragging components	通过拖动组件来构建步骤
 Built for teams	专为团队打造
 Business - For designing products for my company.	商业用途 - 用于为我的公司设计产品。
+Butt	柄形
+Butt joint - Direction 1	对接接头 - 方向 1
+Butt joint - Direction 2	对接接头 - 方向 2
 Button parameters cannot be configured.	无法配置按钮参数。
 Buy	购买
 Buy Onshape now or contact our sales team	立即购买 Onshape 或联系我们的销售团队
@@ -786,6 +878,9 @@ Buy __appName__ __planDescription__	购买 __appName__ __planDescription__
 Buy now	立即购买
 By adding or using this library, the user acknowledges and accepts full responsibility for its installation, configuration, use, and any resulting effects on their systems or applications.	如果用户添加或使用此库，即表示该用户确认在其系统或应用程序上安装、配置、使用此库，并对由此产生的任何影响承担全部责任。
 By checking this box, I agree to the	勾选此框，即表示我同意
+By index	根据索引
+By index range	根据索引范围
+By label	根据标签
 By leaving a classroom, you will:	离开教室后，您将面临以下情况：
 CAD Import	CAD 导入
 CAD files	CAD 文件
@@ -794,6 +889,7 @@ CAM Studio Tool Holders	CAM Studio 刀具夹
 CAM Studio Tools	CAM Studio 刀具
 CAM, Simulation, Rendering and more	CAM、仿真、渲染等
 CATIA part file	CATIA 零件文件
+CLA™ free-running locknuts	CLA™ 自由运转型锁紧螺母
 CLEAR	清除
 COLLADA file	COLLADA 文件
 COMMENT	评论
@@ -877,6 +973,9 @@ Cannot send to trash	无法移至垃圾桶
 Cannot show versions and history of a document in the trash.	无法显示垃圾桶中文档的版本和历史记录。
 Cannot update an element with file type "__currentType__" with a different file type "__newType__".	无法将文件类型为“__currentType__”的元素更新为其他文件类型“__newType__”。
 Cannot update external references	无法更新外部参考
+Cap	加盖
+Cap entity	封盖图元
+Caps	封盖
 Capture & annotate screen	捕获屏幕并添加注释
 Capture variants of the assembly as named positions	捕获装配体的变体作为已命名位置
 Card ending in	信用卡结尾为
@@ -898,25 +997,35 @@ Category parameters will be editable once the category is created.	创建类别�
 Category:	类别:
 Ceiling hexagonal	六角形天花板
 Ceiling square	正方形天花板
+Center	中心
 Center axis distance	中心轴距离
 Center distance	中心距
 Center line	中心线
 Center of mass	质心
+Center of mass x coordinate	质心 x 坐标
+Center of mass y coordinate	质心 y 坐标
+Center of mass z coordinate	质心 z 坐标
 Center point arc	圆心圆弧
 Center point circle	中心点圆
 Center point circle (c)	中心点圆 (c)
 Center point rectangle	中心点矩形
 Center point rectangle (r)	中心点矩形 (r)
 Center position	中心位置
+Centered	居中
 Centerline	中心线
 Centermark	中心符号线
 Chain 1	链 1
 Chain 2	链 2
+Chain type	链类型
 Chamfer	倒角
+Chamfer angle	倒角角度
 Chamfer angles	倒角角度
 Chamfer callout	倒角标注
 Chamfer dimension	倒角尺寸
 Chamfer distances	倒角距离
+Chamfer length	倒角长度
+Chamfer size	倒角尺寸
+Chamfer type	倒角类型
 Chamfer…	倒角…
 Change	更改
 Change Onshape Server	更改 Onshape 服务器
@@ -932,6 +1041,7 @@ Change part transparency	更改零件透明度
 Change password	更改密码
 Change perspective camera field of view	变更透视摄像机的视野
 Change publish state to Active?	是否将发布状态更改为“活跃”？
+Change radius	更改半径
 Change scale of dihedral combs	更改二面角梳形比例
 Change scale of min/max deviation	更改最小/最大偏差的比例
 Change size of curvature combs	更改曲率梳的大小
@@ -947,6 +1057,7 @@ Change the line width of surfaces and edges	变更曲面和边的线宽
 Change the second dash length of construction lines	更改构造线第二个划线的长度
 Change the second gap length of construction lines	更改构造线的第二个间隙长度
 Change the shininess of shaded surfaces	变更着色曲面的光泽度
+Change thickness	更改厚度
 Change to Free	变更为 Free
 Change to a version reference to maintain the link.	更改为版本参考以维护链接。
 Change to driven dimension	更改为从动尺寸
@@ -975,6 +1086,7 @@ Check interference…	检查干涉…
 Check part	检查零件
 Check system compatibility in a new tab	在新的页签中检查系统兼容性
 Check the configuration and try again.	检查配置，然后重试。
+Check to include the clearance for bends	选中该项可包含折弯间隙
 Checkbox	复选框
 Checkbox input	复选框输入
 Checked __versionCount__ recent document history moments - no healthy state found.	已查看 __versionCount__ 条最近的文档历史记录时刻——未找到健康状态。
@@ -987,11 +1099,14 @@ Choose a publication	选择公布
 Choose instances and mate parameters to be driven by this configuration input	选择要由此配置输入驱动的实例和配合参数。
 Choose sketch dimensions and feature parameters to be driven by this configuration input	选择要由此配置输入驱动的草图尺寸和特征参数。
 Choose the integrations that are available in your enterprise.	选择您的企业中可用的集成。
+Choose to measure minimum or maximum distance between entities	选择测量图元之间的最小或最大距离
 Choose who can access the integration. All users allows all members of the enterprise to access the integrations. Otherwise you can select the users or teams who can access integrations.	选择可以访问集成的用户。所有用户可允许 Enterprise 的所有成员访问集成。否则，您可以选择可以访问集成的用户或团队。
 Choose your role:	选择您的角色:
 Chordal tolerance	弦公差
 Chromatic	彩色
 Circle	圆
+Circular	环形
+Circular edge	环形边
 Circular pattern	环形阵列
 Circumscribed polygon	外接多边形
 City	城市
@@ -1028,6 +1143,9 @@ Clear property function	清除属性函数
 Clear scheduling applied to assignments.	清除已应用至作业上的日程安排。
 Clear search	清除搜索
 Clear selection	清除选定内容
+Clearance	间隙孔
+Clearance & tapped	间隙孔和螺纹孔
+Clearance from input	自输入的间隙
 Click here for more information.	单击此处了解更多信息。
 Click here to go to release management part number generation settings	单击此处前往发布管理的零件编号生成设置
 Click here to learn more about the system requirements.	单击此处了解有关系统要求的更多信息。
@@ -1060,6 +1178,8 @@ Click to select one or more files to import	单击以选择要导入的一个或
 Clicking confirm will try to stop extraction of document if one is running. You will receive a notification if/when the document extraction has stopped.	如果文档提取正在运行，单击确认将尝试停止该提取。如果文档提取已停止，或当文档提取停止时，您都将收到通知。
 Client id	客户 ID
 Client secret	客户秘密
+Cliff edges	崖边
+Clockwise	顺时针
 Clone	克隆
 Clone __currentClassname__	克隆 __currentClassname__
 Clone __projectName__	克隆 __projectName__
@@ -1080,6 +1200,7 @@ Cloned to __successCount__ classes.	已克隆到 __successCount__ 个班级中�
 Cloned, failed to publish	已克隆但发布失败
 Cloning assignment…	正在克隆作业…
 Close	关闭
+Close (ASME)	紧密 (ASME)
 Close assignment	关闭作业
 Close assignment now?	现在就结束作业吗？
 Close date	结束日期
@@ -1090,6 +1211,7 @@ Close now	立即结束
 Close publication	关闭公布
 Close search	关闭搜索
 Closed	已闭合
+Closed spline	闭合样条
 Cloud Storage	云存储
 Cloud storage failed to load.	加载云存储失败。
 Cloud storage integration settings	云存储集成设置
@@ -1119,9 +1241,17 @@ College or University	学院或大学
 Color	颜色
 Color map may exceed browser memory limits. Try hiding unnecessary parts or surfaces.	颜色表数据可能超过浏览器的内存限制。请尝试隐藏不必要的零件或曲面。
 Colors	颜色
+Column	柱
 Column 	列 
+Column access type	列访问类型
+Column index (0-based)	列索引（基于 0）
+Column max index (0-based)	列最大索引（基于 0）
+Column min index (0-based)	列最小索引（基于 0）
 Column name cannot be longer than 256 characters.	列名称不能超过 256 个字符。
 Column name cannot contain HTML.	列名称不能包含 HTML。
+Column regular expression	列正则表达式
+Column result type	列结果类型
+Column value	列值
 Columns	列
 Columns added while viewing this bill of materials are for reference only and will not be saved.	查看此物料清单时添加的列仅供参考，不会保存。
 Comb size	曲率梳大小
@@ -1200,6 +1330,7 @@ Composite	复合
 Composite Part	复合零件
 Composite curve	复合曲线
 Composite part	复合零件
+Composite part options	复合零件选项
 Composite parts	复合零件
 Composite parts (__numberOfCompositeParts__)	复合零件数 (__numberOfCompositeParts__)
 Compress	压缩
@@ -1214,11 +1345,15 @@ Computed part properties	计算的零件属性
 Computed part property document/version/element not found.	未找到计算的零件属性文档/版本/元素。
 Computed part property functions	计算的零件属性功能
 Computed part property tables	计算的零件属性表格
+Computed pitch	计算螺距
 Computed property overridden by Feature	由特征覆盖的计算的属性
 Computed property overridden in configuration.	已在配置中覆盖计算的属性。
+Computed revolutions	计算的转数
 Computed value	经计算值
 Computing center of mass…	正在计算质心…
 Computing…	计算中…
+Concave	凹
+Concave repair	凹面修复
 Concentric	同心
 Cone	圆锥
 Confidence in data security	对数据安全充满信心
@@ -1309,6 +1444,9 @@ Confirm your Onshape password	确认您的 Onshape 密码
 Confirm your password:	确认您的密码:
 Confirmation failed: __error__	确认失败: __error__
 Conic	圆锥
+Conic edges	圆锥边
+Conic hold lines	圆锥控制线
+Conical or cylindrical face	圆锥或圆柱面
 Conjugate angle	共轭角度
 Connect	连接
 Connect service…	连接服务…
@@ -1347,6 +1485,8 @@ Constrained rotate	受约束旋转
 Constrained surface	约束曲面
 Constraint manager	约束管理器
 Constraint manager…	约束管理器…
+Constraints	约束
+Constraints and limits	约束和限制
 Construction	建构线
 Construction (q)	构造 (q)
 Construction lines	构造线
@@ -1373,9 +1513,15 @@ Continue	继续
 Continue to	继续至
 Continue to payment	继续付款
 Continue to wait	继续等待
+Continuity	连续性
 Continuous feature	连续特征
 Contour	等高线
+Control	控制
+Control how the load is transferred between the instances	控制如何在实例之间传递载荷
 Control point grids	控制点栅格
+Control point index	控制点索引
+Control point indices	控制点索引
+Control points	控制点
 Controlled radius	受控半径
 Controls the default color of constrained lines and points.	控制约束线和点的默认颜色。
 Controls the default color of lines and points in inactive sketches.	控制非活跃草图中线条和点的默认颜色。
@@ -1400,11 +1546,16 @@ Convention	约定
 Convention contains unknown or inactive properties.	惯例包含未知属性或非活跃属性。
 Convention exceeds __max__ characters in length.	约定的长度超过 __max__ 个字符。
 Convention is blank.	约定为空。
+Conversion factor	转换系数
+Convert	转换
 Convert __jointName__ to __jointType__	将 __jointName__ 转换为 __jointType__
 Convert to checkbox	转换为复选框
 Convert to expression	转换为表达式
 Convert to text	转换为文本
 Convert to toggle button	转换为切换按钮
+Convex	凸
+Coordinate system	坐标系
+Coped butt	搭接
 Copied generative design recipe to clipboard	已将生成性设计方案复制到剪贴板
 Copied link to job __jobId__.	已复制作业 __jobId__ 的链接。
 Copied to clipboard.	已复制到剪贴板。
@@ -1423,6 +1574,7 @@ Copy document to	复制文档到
 Copy filtered inputs	复制筛选后的输入
 Copy here	复制至此
 Copy here…	复制至此…
+Copy in place	原位复制
 Copy input	复制输入
 Copy is created in the top level of your __company__.	已在您的 __company__ 的最上层创建副本。
 Copy is created in the top level.	已在最上层创建副本。
@@ -1433,6 +1585,7 @@ Copy link to the document, including the active configuration, render mode, expl
 Copy link to this publication at this tab, including the active configuration, render mode, exploded view, panel states, and view orientation.	在此页签上复制链接至公布中，包括主动配置、渲染模式、爆炸视图、面板状态和视图方向。
 Copy obsoletion candidate URL	复制淘汰候选 URL
 Copy of __configurationName__	__configurationName__ 的副本
+Copy part	复制零件
 Copy publication to	复制公布到
 Copy publication…	复制公布…
 Copy release candidate URL	复制发布候选 URL
@@ -1451,8 +1604,17 @@ Core	核心
 Core WebGL	核心 WebGL
 Corner	尖角
 Corner break	尖角倒钝
+Corner break style	尖角倒钝样式
+Corner overrides	拐角覆盖
 Corner rectangle	拐角矩形
 Corner rectangle (g)	拐角矩形 (g)
+Corner relief diameter	拐角止裂槽直径
+Corner relief scale	拐角止裂槽比例
+Corner relief type	拐角止裂槽类型
+Corner relief width	拐角止裂槽宽度
+Corner type	拐角类型
+Corners to break	要倒钝的尖角
+Corners to exclude	要排除的圆角
 Cost:	价格：
 Could not create a dimension with the selections.	无法创建所选项的尺寸。
 Could not create an annotation with the selections.	无法使用选定内容创建标注。
@@ -1472,7 +1634,44 @@ Count: __count__ __itemName__	计数：__count__ __itemName__
 Count: __count__ user	计数：__count__ 个用户
 Count: __count__ users	计数：__count__ 个用户
 Counterbore	沉头孔
+Counterbore depth	沉头孔深度
+Counterbore depth deviation	沉头孔深度偏差
+Counterbore depth lower deviation	沉头孔深度下偏差
+Counterbore depth lower limit	沉头孔深度下限
+Counterbore depth precision	沉头孔深度精度
+Counterbore depth tolerance controls	沉头孔深度公差控制
+Counterbore depth tolerance type	沉头孔深度公差类型
+Counterbore depth upper deviation	沉头孔深度上偏差
+Counterbore depth upper limit	沉头孔深度上限
+Counterbore diameter	沉头孔直径
+Counterbore diameter deviation	沉头孔直径偏差
+Counterbore diameter lower deviation	沉头孔直径下偏差
+Counterbore diameter lower limit	沉头孔直径下限
+Counterbore diameter precision	沉头孔直径精度
+Counterbore diameter tolerance controls	沉头孔直径公差控制
+Counterbore diameter tolerance type	沉头孔直径公差类型
+Counterbore diameter upper deviation	沉头孔直径上偏差
+Counterbore diameter upper limit	沉头孔直径上限
+Counterclockwise	逆时针
 Countersink	倒角孔
+Countersink angle	倒角孔角度
+Countersink angle deviation	倒角孔角度偏差
+Countersink angle lower deviation	倒角孔角度下偏差
+Countersink angle lower limit	倒角孔角度下限
+Countersink angle precision	倒角孔角度精度
+Countersink angle tolerance controls	倒角孔角度公差控制
+Countersink angle tolerance type	倒角孔角度公差类型
+Countersink angle upper deviation	倒角孔角度上偏差
+Countersink angle upper limit	倒角孔角度上限
+Countersink diameter	倒角孔直径
+Countersink diameter deviation	倒角孔直径偏差
+Countersink diameter lower deviation	倒角孔直径下偏差
+Countersink diameter lower limit	倒角孔直径下限
+Countersink diameter precision	倒角孔直径精度
+Countersink diameter tolerance controls	倒角孔直径公差控制
+Countersink diameter tolerance type	倒角孔直径公差类型
+Countersink diameter upper deviation	倒角孔直径上偏差
+Countersink diameter upper limit	倒角孔直径上限
 Country	国家/地区
 Create	创建
 Create Assembly	创建装配体
@@ -1552,6 +1751,7 @@ Create assignment	创建作业
 Create beveled edges or faces. Specify measurement type (offset or tangent) and chamfer type (equal, two distances or distance/angle). Individual edges can be overridden to change the direction.	创建斜边或面。指定测量类型（偏移或相切）和倒角类型（相等、两个距离或距离/角度）。可以覆盖各个边以更改方向。
 Create category	创建类别
 Create class failed: 	创建班级失败: 
+Create composite	创建复合零件
 Create connection	创建连接
 Create constant, variable, partial, or asymmetric edge fillets, or create full round fillets. Specify measurement type (radius or width) and control type (distance, conic, or curvature).	创建恒定、可变、部分或不对称的边圆角，或创建全圆角。指定测量类型（半径或宽度）和控制类型（距离、圆锥或曲率）。
 Create curvature continuous transitions between sketch splines or conics and surrounding geometry.	在草图样条或圆锥与周围的几何图元之间创建曲率连续的过渡。
@@ -1593,6 +1793,7 @@ Create new label __searchText__	创建新标签 __searchText__
 Create new label…	创建新标签…
 Create new project	创建新项目
 Create new publication	创建新公布
+Create new sketch	创建新草图
 Create new sketch (Shift-s)	创建新草图 (Shift-s)
 Create new workspace	创建新工作区
 Create one document per part or assembly	每个零件或装配体创建一个文档
@@ -1601,6 +1802,7 @@ Create or add a surface specified by its boundary profiles.	创建或添加由�
 Create or add to a surface by selecting a set of curves or edges to form a closed boundary. Specify the continuity condition for each selection.	通过选择一组曲线或边以形成闭合边界来创建曲面或添加到曲面。为各选定对象指定连续性条件。
 Create or add to existing sheet metal parts by selecting two profiles to loft. Adjust chordal tolerance to change loft resolution. Rips are automatically added to closed profiles. Operations on sheet metal models are automatically represented as a flat pattern, and joints and bends are listed in a table.	通过选择两个轮廓进行放样来创建新的钣金零件或添加到现有零件。调整弦公差可变更放样分辨率。闭合轮廓会自动添加接缝。钣金模型上的操作会自动以展开图样表示，接头点和折弯会列在表格中。
 Create permission scheme	创建权限方案
+Create points in addition to the curve.	除曲线之外还要创建点。
 Create profile	创建配置文件
 Create project role	创建项目角色
 Create public document	创建公开文档
@@ -1646,6 +1848,7 @@ Created	已创建
 Created by	创建者
 Created by 	创建者 
 Created by __name__	由 __name__ 所创建
+Created by features	由特征创建的
 Created by me	由我创建的
 Created link to __documentNameWithLink__	已创建导向至 __documentNameWithLink__ 的链接
 Created on	创建于
@@ -1660,6 +1863,7 @@ Creating tutorial…	正在创建教程…
 Creating version…	正在创建版本…
 Creating workspace…	正在创建工作区…
 Creation of linked document reference failed.	创建链接的文档参考失败。
+Creation type	创建类型
 Creator	创建者
 Credi card failed to be added.	添加信用卡失败。
 Credit card	信用卡
@@ -1671,9 +1875,13 @@ Credits	积分
 Creo part / NX file	Creo 零件/NX 文件
 Creo part file	Creo 零件文件
 Crop view	修剪视图
+Cross section	横截面
+Cross sectional control	横截面控制
 Ctrl + Middle mouse button drag	按住 Alt 以及鼠标中间滚轮按钮进行拖动
+Ctrl + Right mouse button drag or	按住 Ctrl 并且单击鼠标右键进行拖动或
 Ctrl + Right mouse button drag or \nMiddle mouse button drag	按住 Ctrl 并且单击鼠标右键进行拖动或\n按住鼠标中间滚轮按钮进行拖动
 Ctrl + Right mouse button drag or \nMiddle mouse button drag or \nRight mouse button drag or \nCtrl + Middle mouse button drag	按住 Ctrl 并且单击鼠标右键进行拖动或 \n按住鼠标中间滚轮进行拖动或 \n按住鼠标右键进行拖动或 \n按住 Ctrl 并且按住鼠标中间滚轮进行拖动
+Cube	立方体
 Current Onshape account email	当前 Onshape 帐户电子邮件
 Current assembly position	当前装配体位置
 Current category is not mapped to an Arena category. Change category or configure mapping to generate part number.	当前类别并未映射到 Arena 类别。请更改类别或配置映射以生成零件编号。
@@ -1684,6 +1892,7 @@ Current password	当前密码
 Current publication	当前公布
 Current sheet	当前图纸
 Current state:	当前状态:
+Current value	当前值
 Curvature	曲率
 Curvature color map	曲率颜色表
 Curvature color map is not currently supported during interference detection.	在干涉检测期间目前不支持曲率颜色表。
@@ -1692,11 +1901,17 @@ Curvature combs	曲率梳
 Curvature deviation	曲率偏差
 Curve	曲线
 Curve pattern	曲线阵列
+Curve point	曲线点
+Curve projection type	曲线投影类型
+Curve reference	曲线参考
+Curve to face	曲线到面
+Curve type	曲线类型
 Curve/surface analysis	曲线/曲面分析
 Curve/surface analysis…	曲线/曲面分析…
 Curved Text	弯曲文字
 Curves	曲线
 Curves (__numberOfCurves__)	曲线数 (__numberOfCurves__)
+Curves to adjust	要调整的曲线
 Custom	自定义
 Custom Feature Class ID	自定义特征类别 ID
 Custom Parameters	自定义参数
@@ -1705,6 +1920,7 @@ Custom boundary condition	自定义边界条件
 Custom class	自定义类别
 Custom class variable names must be unique for each unit type	自定义类别变量名称必须在每个单元类型中保持唯一性
 Custom colors	自定义颜色
+Custom direction	自定义方向
 Custom feature __featureName__ could not be updated because it does not exist in the update version.	无法更新自定义特征 __featureName__，因为它在更新版本中不存在。
 Custom feature __featureName__ failed to be added to your toolbar.	将自定义特征 __featureName__ 添加到工具栏失败。
 Custom feature __featureName__ was updated.	已更新自定义特征 __featureName__。
@@ -1757,11 +1973,15 @@ Cut	剪切
 Cut list	切割清单
 Cut list panel	切割清单面板
 Cut list table	切割清单表格
+Cutouts	切口
 Cylinder	圆柱
+Cylinder edges	圆柱边
+Cylinder/Cone	圆柱/圆锥
 Cylindrical	圆柱
 Cylindrical mate	圆柱配合
 Cylindrical mate (m)	圆柱配合 (m)
 DONE	完成
+DSO™/DSOS™ threaded standoffs	DSO™/DSOS™ 螺纹支架
 DXF or DWG files	DXF 或 DWG 文件
 Daily	每日
 Daily at __time__	每日在 __time__
@@ -1786,6 +2006,7 @@ Data from CAM Studio (beta) is saved outside Onshape. Changes may not be visible
 Data from PCB Studios (beta) is saved outside Onshape and can be accessed from any workspace.	来自 PCB Studio (测试版) 的数据保存在 Onshape 之外，可从任何工作区进行访问。
 Data from Render Studios is saved outside Onshape and can be accessed from any workspace.	来自 Render Studio 的数据保存在 Onshape 之外，可从任何工作区进行访问。
 Data from application tabs may be saved outside Onshape. Changes may not be visible here.	来自应用程序页签的数据可能保存在 Onshape 之外。可能无法在此处看到变更。
+Data start column (0,1,2,.)	数据起始列 (0,1,2,.)
 Data to be pasted has too many columns and rows to fit in the table and will be truncated.	要粘贴的数据行数和列数太多，与表格不匹配，因此将被截断。
 Data to be pasted has too many columns to fit in the table and will be truncated.	要粘贴的数据列数太多，与表格不匹配，因此将被截断。
 Data to be pasted has too many rows to fit in the table and will be truncated.	要粘贴的数据行数太多，与表格不匹配，因此将被截断。
@@ -1826,7 +2047,9 @@ Default Windchill attribute with html content cannot be created in Onshape	无�
 Default Windchill library - Non-geometric items	默认 Windchill 库——非几何主体项
 Default Windchill library - Standard Content	默认 Windchill 库——标准内容
 Default assembly BOM table template failed to update.	更新默认装配体物料清单表格模板失败。
+Default bend K Factor	默认折弯 K 系数
 Default color scheme for Onshape featuring dark elements on light backgrounds.	Onshape 的默认配色方案主要是在浅色背景上显示深色元素。
+Default corner type	默认拐角类型
 Default drawing BOM table template failed to update.	更新默认工程图物料清单表格模板失败。
 Default feature selected	默认特征已选定
 Default geometry	默认几何图元
@@ -1865,6 +2088,7 @@ Delete category	删除类别
 Delete category mapping.	删除类别映射。
 Delete column	删除列
 Delete comment?	是否删除评论？
+Delete composite parts	删除复合零件
 Delete constraint	删除约束
 Delete degree of freedom	删除自由度
 Delete dimension__ctxt__sketch-delete-action	删除尺寸
@@ -1872,6 +2096,8 @@ Delete draft	删除草稿
 Delete draft release	删除草稿发布
 Delete entity	删除图元
 Delete face	删除面
+Delete faces	删除面
+Delete fillet faces	删除圆角面
 Delete forever	永久删除
 Delete forever?	是否永久删除？
 Delete label __labelName__?	是否删除标签 __labelName__？
@@ -1935,8 +2161,20 @@ Dependencies	依赖项
 Dependencies of __featureName__	__featureName__ 的依赖项
 Deprecated	已弃用
 Depth	深度
+Depth deviation	深度偏差
+Depth lower deviation	深度下偏差
+Depth lower limit	深度下限
+Depth precision	深度精度
+Depth tolerance controls	深度公差控制
+Depth tolerance type	深度公差类型
+Depth upper deviation	深度上偏差
+Depth upper limit	深度上限
+Derivative	导数
+Derivative alignment	导数对齐
+Derivative direction	导数方向
 Derive failed. The source tab may have been deleted.	派生失败。源页签可能已被删除。
 Derived	派生
+Derived mirror	派生镜像
 Describe your feedback in detail	详细描述您的反馈意见
 Description	说明
 Description (optional)	说明 (可选)
@@ -1963,20 +2201,34 @@ Deselect project	取消选择项目
 Deselect publication	取消选择公布
 Deselect variable studio	取消选择 Variable Studio
 Design it together with a document	使用文档一起来设计
+Designator	指示符
+Detached	分离
 Detail view	详细视图
 Detailed description	详细说明
 Detailed description cannot exceed __maxLength__ characters.	详细说明不能超过 __maxLength__ 个字符。
 Details	详细信息
 Details are only available for In progress and Submitted documents	仅为“进行中”和“已提交”文档提供详细信息
+Deviation	偏差
 Deviation analysis	偏差分析
 Deviation analysis failed. If the problem persists, please contact support.	偏差分析失败。如果问题仍然存在，请联系技术支持人员。
 Deviation analysis…	偏差分析…
+Deviation type	偏差类型
 Device failed to be removed.	移除设备失败。
 Device type	设备类型
 Devices	设备
 Devices failed to load.	加载设备失败。
 Diameter	直径
+Diameter Tolerance	直径公差
+Diameter deviation	直径偏差
 Diameter dimension	直径尺寸
+Diameter fit tolerance table	直径配合公差表格
+Diameter lower deviation	直径下偏差
+Diameter lower limit	直径下限
+Diameter precision	直径精度
+Diameter tolerance controls	直径公差控制
+Diameter tolerance type	直径公差类型
+Diameter upper deviation	直径上偏差
+Diameter upper limit	直径上限
 Did not update any IDs: No IDs were modified	未更新任何 ID: 未修改任何 ID
 Did you mean:	您是指:
 Differences for this type of tab cannot be displayed.	无法显示此类型页签的区别。
@@ -1990,11 +2242,15 @@ Dimetric	正二等轴测
 Direct	直接
 Direct shares, mentions and marked documents	直接共享、简短陈述和标记的文档
 Direct, in product support	直接的、产品内支持
+Direction	方向
+Direction overrides	方向覆盖
+Direction to lock	要锁定的方向
 Disable	禁用
 Disable Onshape password sign in	禁用 Onshape 密码登录
 Disable auto provisioning of users	禁用用户的自动配置
 Disable high quality	禁用高质量视图
 Disable imported appearances	禁用导入的外观
+Disable imprinting	禁用压印
 Disable shortcut	禁用快捷方式
 Disable sync	禁用同步
 Disabled	已禁用
@@ -2026,8 +2282,13 @@ Display state updated.	已更新显示状态。
 Display states	显示状态
 Dissolve __parametricPartStudioName__	解散 __parametricPartStudioName__
 Dissolve __replicateName__	解散 __replicateName__
+Dissolve composite parts	解散复合零件
 Dissolve subassembly	解散子装配体
 Distance	距离
+Distance 1	距离 1
+Distance 2	距离 2
+Distance and angle	距离和角度
+Distance per revolution	每转距离
 Distance tolerance	距离公差
 Distortion scale	扭曲比例
 Do not allow creator as approver	不允许创建者作为审批人
@@ -2139,7 +2400,12 @@ Download users list	下载用户列表
 Draft	草稿
 Draft analysis	拔模分析
 Draft analysis…	拔模分析…
+Draft angle	拔模角度
 Draft failed to save.	保存拔模失败。
+Draft on self	自身拔模
+Draft opposite direction	拔模相反方向
+Draft scope	拔模范围
+Draft type	拔模类型
 Drafts	草稿
 Drag an entity to snap to a Mate connector on another entity. Specify the mate type and orientation.	拖动一个图元以捕捉到另一个图元上的配合连接器。指定配合类型和方向。
 Drag sketch text by its text box.	通过其文本框拖动草图文本。
@@ -2166,8 +2432,11 @@ Drawings were unable to be added from workspaces: 	无法从工作区添加工�
 Drawings…	工程图…
 Drawing…	工程图…
 Drawn by	绘制者
+Drill size	钻孔尺寸
+Drilled	钻孔
 Drive failed to load.	加载驱动器失败。
 Driven	从动
+Driving mate selector	驱动配合选择器
 Drop items here to remove them from the toolbar	在此处放置项目，以将其从工具栏中移除
 Drop to import file to __containerNameForDrop__	拖放以将文件导入到 __containerNameForDrop__
 Duplicate	复制
@@ -2189,11 +2458,36 @@ Each part and assembly is given its own document. For large assemblies, this opt
 Edge	边
 Edge __edgeNumber__ from __partName__	来自 __partName__ 的边 __edgeNumber__
 Edge condition symbol	边条件符号
+Edge convexity	边凸度
+Edge convexity type	边凸度类型
+Edge joint	边接头
+Edge limit	边界限
+Edge limits	边限制
+Edge match scope	边匹配范围
+Edge or face	边或面
+Edge overflow	边溢出
 Edge point	边点
+Edge positions	边位置
+Edge projection options	边缘投影选项
 Edge to edge centerline	边到边中心线
 Edges	边
+Edges and curves for ruled surface path	直纹曲面路径的边和曲线
+Edges and faces	边和面
 Edges and faces to analyze	要分析的边和面
+Edges and sketch curves to revolve	要旋转的边和草图曲线
+Edges and sketch curves to sweep	要旋转的边和草图曲线
+Edges or cylinders to bend	要折弯的边或圆柱体
+Edges or faces	边或面
+Edges or side faces to flange	要添加法兰的边或侧面
+Edges or side faces to hem	要卷边的边或侧面
+Edges or side faces to join	要连接的边或侧面
+Edges that define the bases of the gussets	用于定义角撑板底座的边
+Edges to hold	要按住的边
+Edges to keep	要保留的边
 Edges to show dihedral	显示二面角的边
+Edges, curves and sketches	边、曲线和草图
+Edges, faces, and vertices	边、面，和顶点
+Edges, vertices, or faces	边、顶点或面
 Edit	编辑
 Edit BOM template	编辑物料清单模板
 Edit Exclusions	编辑排除项
@@ -2216,6 +2510,7 @@ Edit __roleName__	编辑 __roleName__
 Edit __teamName__	编辑 __teamName__
 Edit alias details	编辑别名详细信息
 Edit an existing curve or create a new curve by selecting sketch entities, edges, and/or curves to apply a simplified approximation, elevate the degree, reposition control curve vertices, and/or planarize into any 2D plane.	通过选择草图图元、边和/或曲线以应用简化的近似、提高度数、重新定位控制曲线顶点和/或平面化至任何 2D 平面以编辑现有曲线或创建新曲线。
+Edit angles	编辑角度
 Edit appearance for __name__…	编辑 __name__ 的外观…
 Edit appearance for __numberBiggerThanOne__ curves…	编辑 __numberBiggerThanOne__ 曲线的外观…
 Edit appearance for __numberBiggerThanOne__ parts…	编辑 __numberBiggerThanOne__ 个零件的外观…
@@ -2227,6 +2522,7 @@ Edit appearance…	编辑外观…
 Edit class properties…	编辑班级属性…
 Edit close date	编辑结束日期
 Edit connection details	编辑连接详细信息
+Edit control points	编辑控制点
 Edit curve	编辑曲线
 Edit dashboard	编辑仪表板
 Edit dashboard…	编辑仪表板…
@@ -2236,6 +2532,7 @@ Edit details…	编辑详细信息…
 Edit dialog failed to open.	打开编辑对话失败。
 Edit draft analysis…	编辑拔模分析…
 Edit dynamic suppression	编辑动态抑制
+Edit edge positions	编辑边位置
 Edit export rule	编辑导出规则
 Edit expression…	编辑表达式…
 Edit face appearances…	编辑面外观…
@@ -2255,6 +2552,7 @@ Edit material for __name__…	编辑 __name__ 的材料…
 Edit material for __numberBiggerThanOne__ parts…	编辑 __numberBiggerThanOne__ 个零件的材料…
 Edit material…	编辑材料…
 Edit mates	编辑配合
+Edit mode	编辑模式
 Edit named position	编辑命名位置
 Edit named position driver mate…	编辑命名的位置主动件配合…
 Edit notes	编辑注释
@@ -2267,6 +2565,7 @@ Edit project role and permissions	编辑项目角色和权限
 Edit project…	编辑项目…
 Edit properties	编辑属性
 Edit publish and close dates	编辑发布和结束日期
+Edit reference	编辑参考
 Edit reference…	编辑参考…
 Edit reflection analysis…	编辑反射分析…
 Edit revision table template	编辑修订表格模板
@@ -2283,6 +2582,7 @@ Edit sketch appearance…	编辑草图外观…
 Edit sketches	编辑草图
 Edit standard content	编辑标准内容
 Edit standard content instance…	编辑标准内容实例…
+Edit tangency angles	编辑相切角度
 Edit task	编辑任务
 Edit team details	编辑团队详细信息
 Edit text	编辑文本
@@ -2318,6 +2618,9 @@ Element change URL dialog failed to open.	打开元素更改 URL 对话失败。
 Element libraries	元素库
 Element not found	未找到元素
 Element properties dialog failed to open.	打开元素属性对话失败。
+Elevate	提高
+Elevation parameters	提高参数
+Elevation target degree	提高目标度数
 Ellipse	椭圆
 Elliptical arc	椭圆弧
 Email	电子邮件
@@ -2364,9 +2667,27 @@ Enables users to use AI Advisor in documents.	使用户能够在文档中使用 
 Enabling sync	正在启用同步
 Enclose	封闭
 Encrypting your data with your own AWS KMS key changes how some Onshape features behave. Before you continue, please review how the following will be affected:	使用您自己的 AWS KMS 密钥加密数据会改变某些 Onshape 功能的行为方式。在继续之前，请查看以下内容将如何受到影响：
+End	结束
+End angle	末端角度
 End cap	端盖
+End condition	终止形态
+End conditions	终止形态
+End curvature offset	结束曲率偏移
 End date	结束日期
 End date is before start date	结束日期在开始日期之前
+End direction	结束方向
+End edge position	结束边位置
+End flow offset	结束流偏移
+End magnitude	结束幅值
+End offset	结束偏移
+End point	端点
+End position	结束位置
+End profile adjacent faces	结束轮廓相邻面
+End profile condition	终止轮廓形态
+End radius	结束半径
+End trim	结束修剪
+End type	终止类型
+End value	结束值
 Energy	能源
 Enforce unique document and publication name enterprise wide for matching regular expression	在企业范围内强制实施唯一文档和公布名称以匹配正则表达式
 Enjoy a 14-day trial of Onshape Professional at no cost.	免费享受 Onshape Professional 的 14 天试用。
@@ -2428,20 +2749,37 @@ Enterprise:	企业：
 Entire document	整个文档
 Entities	图元
 Entities and constraints	图元和约束
+Entities to chamfer	要创建倒角的图元
 Entities to check	要检查的图元
+Entities to copy	要复制的图元
+Entities to delete	要删除的图元
+Entities to draft	要拔模的图元
+Entities to fillet	要设置圆角的图元
+Entities to fillet or chamfer	要圆角或倒角的图元
+Entities to measure between	要测量其间距的图元
+Entities to mirror	要镜像的图元
+Entities to pattern	要阵列化的图元
+Entities to split with	用于分割的图元
+Entities to transform or copy	要变换或复制的图元
 Entity	图元
 Entity Type	图元类型
+Entity or mate connector	图元或配合连接器
+Entity to split with	用于分割的图元
+Entity type	图元类型
 Environment	环境
 Environment profile	环境配置文件
 Environment profile settings	环境配置文件设置
 Environment profiles failed to load.	加载环境配置文件失败。
 Equal	等长
 Equal (e)	等长 (e)
+Equal distance	等距离
 Equal length/radius	等长/等径
 Equal length/radius edges	等长/等径边
 Equal or greater radius	相等或更大的半径
 Equal or smaller radius	相等或更小的半径
 Equal radius	相等半径
+Equal spacing	相等间距
+Equal trim	同等修剪
 Equals	相等
 Error accessing cloud drive.	访问云驱动器时出错。
 Error accessing drive.	访问驱动器时出错。
@@ -2486,7 +2824,9 @@ Error while taking screenshot.	截屏时出错。
 Errors	错误
 Errors must be resolved before a parameter can be configured: __parameterError__	必须先解决错误，然后才能配置参数: __parameterError__
 Escape __command__	退出 __command__
+Euclidean	欧几里得
 Evaluate functions	计算函数
+Evaluate on use	使用时评估
 Evaluating…	正在评估…
 Every __weekDay__ at __time__	每个 __weekDay__ 在 __time__
 Everything in Free, plus:	Free 版本中的所有功能，以及：
@@ -2544,6 +2884,9 @@ Explode	爆炸
 Explode all into polylines	全部爆炸为多段线
 Explode into polylines	爆炸为多段线
 Explode into polylines (notes)	爆炸为多段线（注释）
+Explode lines	爆炸线
+Explode step	爆炸步骤
+Explode step type	爆炸步骤类型
 Exploded view failed to be activated.	激活爆炸视图失败。
 Exploded views	爆炸视图
 Exploded views help visualize how components fit together in an assembly.	爆炸视图有助于查看装配体中零部件是如何组合在一起的。
@@ -2586,9 +2929,15 @@ Extend (x)	延伸 (x)
 Extend Trial	延长试用期
 Extend a line or curve to the first intersecting point or bounding geometry. If no intersection or bounding geometry is found, the line or curve ends at the release point.	将一条直线或曲线延伸到第一个交点或界限几何。如果未找到交点或界限几何，则这条直线或曲线在释放点处结束。
 Extend across face	跨面延伸
+Extend bend relief	扩大折弯止裂槽
+Extend entities	延伸图元
 Extend or trim the boundary edges of a surface.	延伸或修剪曲面的边界边。
+Extend profiles to part	将轮廓延伸到零件
 Extend surface	移动边界
+Extend to full path	延伸至完整路径
 Extended access to Onshape's Professional features	扩展对 Onshape Professional 特征的访问
+Extended corner	扩展角点
+Extension shape	延伸形状
 External	外部
 External access	外部访问
 External thread	外部螺纹
@@ -2597,19 +2946,58 @@ Extract document	提取文档
 Extract document…	提取文档…
 Extrude	拉伸
 Extrude (Shift-e)	拉伸 (Shift-e)
+Extrude direction	拉伸方向
 Extruded	拉伸
 Extrude…	拉伸…
 FGS version information	FGS 版本信息
+FH4™/FHP™ flush-head studs for stainless steel sheets	FH4™/FHP™ 不锈钢板用平头钉
+FHL™/FHLS™ flush, low-displacement head studs	FHL™/FHLS™ 低位移平头钉
+FHX™ flush-head studs with X-Press™ thread	带 X-Press™ 螺纹的 FHX™ 平头钉
+FH™/FHS™/FHA™ flush-head pins	FH™/FHS™/FHA™ 平头销
+FH™/FHS™/FHA™ flush-head studs	FH™/FHS™/FHA™ 平头钉
 Face	面
 Face appearance	面外观
 Face blend	面混合
+Face limits	面限制
+Face match scope	面匹配范围
+Face mirror	面镜像
 Face of __featureName__	__featureName__ 的面
+Face pattern	面阵列
 Face selections are not coplanar	面选择不是共面的
 Face tangent angle	面相切角度：
+Face to trim to	要修剪到的面
+Face, edge or vertex	面、边或顶点
+Face, plane, mate connector, or planar face to use as trim tool	用作修剪工具的面、平面、配合连接器或平坦面
 Faces	面
+Faces and sketch regions	面和草图面域
+Faces and sketch regions to extrude	要拉伸的面和草图面域
+Faces and sketch regions to revolve	要旋转的面和草图面域
+Faces and sketch regions to sweep	要扫掠的面和草图面域
+Faces and surfaces to thicken	要加厚的面和曲面
 Faces of __featureName__	__featureName__ 的面
 Faces or features	面或特征
+Faces or sketch regions to thicken	要加厚的面和草图面域
+Faces to be normal to	要垂直的面
+Faces to connect	要连接的面
+Faces to draft	要拔模的面
+Faces to exclude	要排除的面
+Faces to find match in	要在其中查找匹配的面
 Faces to flatten	要展平的面
+Faces to load	要加载的面
+Faces to lock	要锁定的面
+Faces to measure	要测量的面
+Faces to mirror	要镜像的面
+Faces to move	要移动的面
+Faces to offset	要偏移的面
+Faces to pattern	要阵列化的面
+Faces to remove	要移除的面
+Faces to replace	要替换的面
+Faces to replace with	用来替换的面
+Faces to round	要倒圆角的面
+Faces to split	要分割的面
+Faces to trim to	要修剪到的面
+Faces, edges, and vertices that define sweep paths	用于定义扫掠路径的面、边和顶点
+Faces, surfaces, and sketch regions to offset	要偏移的面、曲面或草图面域
 Failed	失败
 Failed captures	捕获失败
 Failed to accept terms.	未能接受条款。
@@ -2849,6 +3237,9 @@ False	错误
 Fastened	紧固
 Fastened mate	紧固配合
 Fastened mate (m)	紧固配合 (m)
+Fastener	紧固件
+Fastener fit	紧固件配合
+Fastener type	紧固件类型
 Feature	特征
 Feature Studio __name__ has errors	Feature Studio __name__ 有错误
 Feature Studio __name__ has errors and warnings	Feature Studio __name__ 有错误和警告
@@ -2864,8 +3255,10 @@ Feature does not exist in target.	目标中不存在特征。
 Feature from __locationName__	来自 __locationName__ 的特征
 Feature from current workspace	来自当前工作区的特征
 Feature has no dependencies.	特征没有依赖项。
+Feature mirror	特征镜像
 Feature name	特征名称
 Feature parameters	特征参数
+Feature pattern	特征阵列
 Feature-linked custom tables	特征链接的自定义表格
 FeatureScript documentation	FeatureScript 文档
 FeatureScript execution produced table errors. See the FeatureScript notices pane for more information.	FeatureScript 执行产生了表格错误。有关更多信息，请参见 FeatureScript 通知窗格。
@@ -2880,6 +3273,9 @@ Features (__numberOfFeatures__)	特征 (__numberOfFeatures__)
 Features (__shownCount__ of __featureCount__)	特征 (__shownCount__/__featureCount__)
 Features and parts	特征和零件
 Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Onshape Labs 中的功能是实验性的，可能会出问题，并且随时可能更改或移除。Onshape Labs 功能仅用于测试和评估，不得用于生产环境。请自行决定使用。
+Features to find match in	要在其中查找匹配的特征
+Features to mirror	要镜像的特征
+Features to pattern	要阵列化的特征
 Features used by __featureName__	由 __featureName__ 使用的特征
 Features using __featureName__	使用 __featureName__ 的特征
 Feedback/Report a bug	反馈/报告错误
@@ -2906,9 +3302,13 @@ Files	文件
 Fill	填充
 Fillet	圆角
 Fillet (Shift-f)	圆角 (Shift-f)
+Fillet compare type	圆角比较类型
 Fillet dimension	圆角尺寸
 Fillet faces	圆角面
+Fillet faces to modify	要修改的圆角面
 Fillet radii	圆角半径
+Fillet radius	圆角半径
+Fillet type	圆角类型
 Fillets	圆角
 Fillet…	圆角…
 Filter	筛选器
@@ -2922,6 +3322,7 @@ Filter bodies by name and features by bodies directly affected	按名称筛选�
 Filter branches	筛选分支
 Filter by __label__	按 __label__ 筛选
 Filter by assembly folders	按装配体文件夹筛选
+Filter by body type	按主体类型筛选
 Filter by contents with errors	按有错误的内容筛选
 Filter by contents with warnings	按带有警告的内容筛选
 Filter by current tab	按当前页签筛选
@@ -2957,6 +3358,7 @@ Filter by type	按类型过滤
 Filter by user role	按用户角色筛选
 Filter comments	筛选评论
 Filter configuration inputs	筛选配置输入
+Filter construction entities	筛选构造图元
 Filter feature list	筛选特征列表
 Filter features and bodies by name	按名称筛选特征和主体
 Filter features and bodies by type	按类型筛选特征和主体
@@ -2996,16 +3398,27 @@ Finish flex PCB model	完成柔性 PCB 模型
 Finish sheet metal model	结束钣金模型
 Finishing	抛光
 First	第一个
+First angle	第一角度
 First angle (ISO)	第一角度 (ISO)
 First dash	第一个划线
+First direction	第一个方向
 First gap	第一个间隙
 First name	名字
 First name must be less than 64 characters in length	名字长度必须小于 64 个字符
+First set of surfaces	第一组曲面
 First sheet	第一张图纸
+First side face	第一个侧面
+First sketch	第一个草图
 First used on	首次使用日期
+Fit	配合
+Fit (tolerance only)	配合（仅显示公差）
 Fit spline	3D 拟合样条
+Fit type	配合类型
+Fit with tolerance	配合与公差
 Fix	固定
 Flange	法兰
+Flange alignment	法兰对齐
+Flange to merge	要合并的法兰
 Flat	平面
 Flat patterns	展开图样
 Flatten	展平
@@ -3015,11 +3428,31 @@ Flattened	平阶化
 Flattened angle	展开的角度
 Flattened offset	展开的偏移
 Flattened position (mate connector)	展开的位置（配合连接器）
+Flex PCB model	柔性 PCB 模型
+Flip	反转
+Flip alignment	反转对齐
+Flip asymmetric	反转不对称
+Flip base sides	反转底边
+Flip cap	反转封盖
+Flip coordinate system	反转坐标系
+Flip corner	反转角点
+Flip direction	反转方向
+Flip direction up	向上反转方向
+Flip first plane	反转第一平面
 Flip horizontal	水平反转
+Flip normal	反转法线
+Flip offset	反转偏移
 Flip plane	反转平面
 Flip primary axis	反转主轴
+Flip pull direction	反转拉伸方向
+Flip rounding	反转圆角
+Flip second plane	反转第二平面
+Flip side 1	反转侧面 1
+Flip side 2	反转侧面 2
+Flip sides	反转到对侧
 Flip stripes	反转条纹
 Flip vertical	竖直反转
+Flip wall	反转壁
 Float buffer blending	浮动缓冲区混合
 Float buffer blending is used for rendering section planes endcaps. Without this extension, this functionality will be disabled. 	浮动缓冲区混合用于渲染剖切平面收头。没有此扩展，将禁用此功能。 
 Float framebuffer rendering	浮点帧缓冲渲染
@@ -3069,6 +3502,8 @@ Forget	忘记
 Forgot password?	忘记密码？
 Forgot your password?	忘记密码？
 Form	表格
+Form Part Studio	成形 Part Studio
+Form origin mate connector	成型原点配合连接器
 Format	格式
 Format Feature Studio	格式化 Feature Studio
 Format for date type properties in documents owned by the __companyType__.	__companyType__ 拥有的文档中日期类型属性的格式。
@@ -3079,6 +3514,7 @@ Formats failed to load.	加载格式失败。
 Forum username must be at least 2 characters in length	论坛用户名长度必须至少为 2 个字符
 Forum username must be less than 64 characters in length	论坛用户名长度必须小于 64 个字符
 Forums	论坛
+Forward reference	正向参考
 Forward reference (Ctrl-a)	正向参考 (Ctrl+A)
 Found no categories that match: 	未找到与之匹配的类别: 
 Found no categories that match:  	未找到与之匹配的类别:  
@@ -3087,12 +3523,19 @@ Found no items that match:  	未找到与之匹配的项目:
 Found no properties that match: 	未找到匹配的属性： 
 Four views	四个视图
 Frame	框架
+Frame groups	框架组
 Frame profile library	框架轮廓库
+Frame segments are trimmed against preceding groups and are used as tools for later groups	框架段根据前面的组进行修剪，并用作后面组的工具
+Frame segments in earlier groups are used as tools for later groups	前面组中的框架段用作后面组的工具
 Frame trim	框架修剪
+Frames	框架
+Free	自由
 Free state	自由状态
 Frequency	频率
 Frequency:	频率：
 Friday	星期五
+From import	来自导入
+From mate connector	从配合连接器
 From to	从…至…
 Front	前
 Front view	前视图
@@ -3100,6 +3543,8 @@ Full	完全
 Full access	完全访问权限
 Full access to Onshape's Professional features	Onshape Professional 特征的完整访问权限
 Full performance check	全面性能检查
+Full revolve	全方位旋转
+Full round	全圆角
 Full user	完全用户
 Full users: __fullUsers__ / __totalFullUserSeats__	完全用户: __fullUsers__ / __totalFullUserSeats__
 Fun - For designing personal projects as a hobby.	纯属兴趣 - 将个人项目设计作为一种爱好。
@@ -3109,7 +3554,10 @@ G3 tolerance	G3 公差
 GENERAL	常规
 GL renderer	GL 渲染器
 GL vendor	GL 供应商
+Gap	间隙
+Gap fill	填充间隙
 Gaussian (1/__unit__\\u00B2)	高斯 (1/__unit__\\ u00B2)
+Gear	齿轮
 Gear relation	齿轮关系
 General	常规
 General sync settings	常规同步设置
@@ -3132,6 +3580,7 @@ Generative	生成式
 Generative returned an error: __errorText__	生成式返回了一个错误：__errorText__
 Generatives (__generativeDesignItemCount__)	生成式 (__generativeDesignItemCount__)
 Generic thumbnail image for a document without a preview image.	没有预览图像的文档的通用缩略图图像。
+Geodesic	测地线
 Geographical data	地理数据
 Geometric tolerance	形位公差
 Geometric tolerance symbol	形位公差符号
@@ -3188,10 +3637,13 @@ Graphics preferences saved successfully.	已成功保存图形偏好设定。
 Graphics preferences…	图形首选项…
 Graphics rendering mode	图形渲染模式
 Grayscale	灰度
+Greater or equal	大于或等于
 Green	绿色
 Grid view	网格视图
 Groove	坡口
 Group	分组
+Group 1	分组 1
+Group 2	分组 2
 Group composite parts into a single part file	将复合零件分组为单个零件文件
 Groups subassemblies with their parts in the same document	将子装配体及其零件分组在同一文档中
 Guest	访客
@@ -3200,18 +3652,39 @@ Guest user	访客用户
 Guest users	访客用户
 Guests failed to be invited. Number of guests (__guestsnumber__) exceeds the remaining subscriptions (__availableseats__).	邀请访客失败。访客数量 (__guestsnumber__) 超出剩余的订阅 (__availableseats__)。
 Guests only have access to data that is shared with them.	访客只能访问与他们分享的数据。
+Guides	引导线
+Guides and continuity	引导线和连续性
 Gusset	角撑板
+Gusset position	角撑板位置
+Gusset type	角撑板类型
+HF109™ heavy-duty, high tensile strength studs	HF109™ 高张力重型钉
+HFE™/THFE™ heavy-duty studs for thin sheets	HFE™/THFE™ 薄板用重型钉
+HFG8™ heavy-duty, high tensile strength studs	HFG8™ 高张力重型钉
+HFH™/HFHS™/HFHB™ heavy-duty studs	HFH™/HFHS™/HFHB™ 重型钉
+HFLH™ hard panel studs	HFLH™ 硬板钉
 HTML content is not supported in document notes	文档注释中不支持 HTML 内容
 HTML content is not supported in publication notes	在公布注释中不支持 HTML 内容
+Handedness	左右手习惯
 Has configured parameters	已配置参数
 Has conflict	有冲突
 Has degrees of freedom	有自由度
+Has offset	有偏移
+Has second direction	有第二个方向
+Has third direction	具有第三方向
 Hatch region	剖面线区域
+Header	标头
 Headers without properties:	没有属性的标头:
+Heal	修复
+Height	高度
 Helix	螺旋
+Helix axis	螺旋轴
+Helix axis type	螺旋轴类型
 Help	帮助
 Help menu	帮助菜单
+Help point	辅助点
 Hem	卷边
+Hem alignment	卷边对齐
+Hem type	卷边类型
 Hencky strain	Hencky 应变
 Here is a summary of what will happen next:	下面简要说明了接下来会发生什么:
 Hidden edges removed	消除隐藏边
@@ -3290,19 +3763,30 @@ Highlight boundary edges enabled	已启用亮显边界边
 Highlight tool in toolbar	亮显工具栏中的工具
 History changes are view only. Viewing __momentName__	历史记录变更仅供查看。正在查看 __momentName__
 Hobbyist - I use CAD for personal projects.	业余爱好者 - 我将 CAD 用于个人项目。
+Hold adjacent edges	保持相邻边
+Hold line	控制线
+Hold opposite side	按住对立面
+Hold other line	按住其他线
 Hole	孔
 Hole callout	孔标注
+Hole class	孔等级
 Hole faces	孔面
+Hole start plane or mate connector	孔起始平面或配合连接器
 Hole table	孔表格
 Hole table panel	孔表格面板
+Hole type	孔类型
 Hole/thread callout	孔/螺纹标注
+Holes	孔
+Hollow	挖空
 Home	主页
 Horizontal	水平
 Horizontal (h)	水平 (h)
+Horizontal reference	水平参考
 Horizontal stripe	水平条纹
 Horizontal zones	水平分区
 Hover over or select an instance to show its mates.	将光标悬停在实例上或选择实例以显示其配合。
 How Onshape Labs features use your data	Onshape Labs 功能如何使用您的数据
+H™ nuts/HNL™ prevailing torque locknuts	H™ 螺母/HNL™ 有效力矩型锁紧螺母
 I agree to the	我同意
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use	我同意将此计划用于课程、个人学习项目、学校俱乐部/组织和学术研究。我不会将此计划用于政府、商业或其他组织用途
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use.	我同意将此计划用于课程、个人学习项目、学校俱乐部/组织和学术研究。我不会将此计划用于政府、商业或其他组织用途。
@@ -3317,11 +3801,13 @@ IGES file	IGES 文件
 IGES postprocessing	IGES 后期处理
 Id	ID
 Identical references	相同的参考
+If none selected, this feature will create one at Origin	如果没有选择，则将在原点创建一个特征
 If you are no longer an educator, please update the following:	如果您已不再是教育工作者，请更新以下内容：
 If you continue, you will be signed out and redirected to the sign in page.	如果您继续，您将登出并重定向到登录页面。
 If you lose access to the authentication app and the recovery codes, Onshape Support will not be able to unlock your account.	如果您无法访问身份验证应用和恢复码，Onshape 技术支持将无法解锁您的帐户。
 If your KMS key is ever deleted, your encrypted documents become permanently unrecoverable - including by Onshape.	如果您的 KMS 密钥被删除，您的加密文档将永久无法恢复——包括 Onshape 也无法恢复。
 Ignore	忽略
+Ignore composite parts	忽略复合零件
 Ignore faulty part warning for __numberBiggerThanOne__ parts	忽略 __numberBiggerThanOne__ 个零件的错误零件警告
 Ignore faulty part warning for __partName__	忽略 __partName__ 的错误零件警告
 Ignored invalid selections. Select a plane, planar face, cylinder, cone, or mate connector in main view.	已忽略无效选择。请在主视图中选择平面、平整面、圆柱、圆锥或配合连接器。
@@ -3354,6 +3840,7 @@ Import…	导入…
 In context	在关联环境中
 In order to re-join this classroom, the classroom's administrator must add you.	要重新加入此教室，必须由教室管理员添加您。
 In pan mode, click and drag to move the viewport.	在平移模式下，单击并拖动以移动视口。
+In place	原位
 In progress	进行中
 In property __propertyId__: __message__	在属性 __propertyId__ 中: __message__
 In state __stateName__: __message__	在状态 __stateName__ 中: __message__
@@ -3373,6 +3860,7 @@ Include a personal message	包括个人消息
 Include associated drawings	包括关联的工程图
 Include bend centerlines	包括折弯中心线
 Include bend tangent lines	包括折弯切线
+Include bends	包含折弯
 Include configuration parameter in properties	在属性中包含配置参数
 Include counterbore and countersink lines	包括沉头孔和倒角孔线
 Include derived tolerances in export	在导出中包含派生公差
@@ -3381,6 +3869,8 @@ Include form feature outlines	包括成型特征轮廓线
 Include hidden instances in export	在导出中包含隐藏的实例
 Include in all BOMs	包含在所有物料清单中
 Include in properties	包含在属性中
+Include mate connectors	包括配合连接器
+Include properties	包括属性
 Include standard content	包括标准内容
 Include visible sketches	包括可见草图
 Include when true	为真时包括
@@ -3390,9 +3880,15 @@ Incompatible data for boolean type: __dataValue__	布尔类型的不兼容数据
 Incompatible data for list box type: __dataValue__	列表框类型的不兼容数据: __dataValue__
 Incorrect password	密码不正确
 Independency	独立性
+Index	索引
+Index (0-based)	索引（基于 0）
 Individual	个人
+Individual edges to match	要匹配的各个边
+Individual faces to match	要匹配的各个面
 Individuals	个人
 Inherited properties	继承的属性
+Inner	内部
+Inner radius	内半径
 Input ID	输入 ID
 Input email	输入电子邮件
 Input is invalid: Enter text and check for unsupported entries, for example end of line markers.	输入无效: 输入文本或检查不受支持的条目，例如线标记的末尾。
@@ -3401,6 +3897,8 @@ Input must match the pattern "__regexp__".	输入的内容必须与阵列“__re
 Input name	输入名称
 Input propagation for 	输入延伸 - 
 Input propagation…	输入延伸...
+Input type	输入类型
+Inputs	输入
 Inputs copied.	已复制输入。
 Inputs pasted into Assemblies will not be excluded from properties.	粘贴到装配体中的输入项将不会被排除在属性之外。
 Inputs pasted into Variable Studios will not be excluded from properties.	粘贴到 Variable Studio 中的输入项将不会被排除在属性之外。
@@ -3447,16 +3945,21 @@ Inserted: 	已插入:
 Inserting __name__	正在插入 __name__
 Inserting parts or data from public documents into your encrypted documents will be blocked.	将公开文档中的零件或数据插入您的加密文档将被阻止。
 Inserting…	正在插入…
+Inset	插入
+Inside	内部
 Inspection count	检验计数
 Inspection item	检验项
 Inspection list	检验列表
 Inspection table	检查表格
 Inspection table template	检查表格模板
+Instance	实例
 Instance contains error	实例包含错误
+Instance count	实例数
 Instance is not primary instance of context.	实例不是关联环境的主要实例。
 Instance properties	实例属性
 Instance properties updated.	实例属性已更新。
 Instance properties…	实例属性…
+Instances	实例
 Instances (0)	实例 (0)
 Instances (__instanceCount__)	实例 (__instanceCount__)
 Instances and mates	实例和配合
@@ -3468,7 +3971,12 @@ Instances in folder have newer versions	文件夹中的实例具有更高版本
 Instances in folder have newer versions and contexts	文件夹中的实例具有较新的版本和关联环境
 Instances in some documents could not be updated. Edit permissions are needed.	无法更新某些文档中的实例。需要编辑权限。
 Instances inside will update	内部实例将更新
+Instances or faces to constrain	要约束的实例或面
 Instances to analyze	要分析的示例
+Instances to measure	要测量的实例
+Instances to mirror	要镜像的实例
+Instances to replace	要替换的实例
+Instances to skip	要跳过的实例
 Instant access	即时访问
 Instructions	说明
 Instructions, description, or notes for this document	此文档的说明、描述或注释
@@ -3484,18 +3992,22 @@ Integrations are not allowed for all users	所有用户均不允许集成
 Integrations failed to load.	加载集成失败。
 Intended use	预期用途
 Interactive framerate:	交互式帧速率:
+Interference	干扰
 Interference __index__ between __parentPart1Name__ and __parentPart2Name__	__parentPart1Name__ 和 __parentPart2Name__ 之间的干涉 __index__
 Interference between __parentPart1Name__ and __parentPart2Name__	__parentPart1Name__ 和 __parentPart2Name__ 之间的干涉
 Interference detection	干涉检测
 Interference detection not accurate, instances have moved.	干涉检测不准确，实例已移动。
 Interference detection…	干涉检测…
 Interferences	干涉
+Interior faces	内部面
 Internal	内部
 Internal FeatureScript ID	内部 FeatureScript ID
 Internal ID	内部 ID
 Internal feature	内部特征
 Internal geometry for assembly context not shown in current graphics mode	当前图形模式不显示装配体关联环境的内部几何图元
 Internal geometry not shown in current graphics mode	在当前图形模式下未显示内部几何图元
+Interpolated spline	插值样条
+Intersect	相交
 Intersection	交点
 Intersection angle	相交角度
 Intersection curve	交点曲线
@@ -3522,6 +4034,8 @@ Invalid text entry. HTML is not supported.	输入的文本无效。不支持 HTM
 Invalid text or symbols.	无效的文本或符号。
 Invalid tutorial URL.	无效的教程 URL 。
 Inventor part file	Inventor 零件文件
+Inverse conic edges	反向圆锥边
+Inverse tangent edges	反向相切边
 Investigate	调查
 Invitation failed to load.	加载邀请失败。
 Invitation failed to load. Contact Onshape Support for further assistance.	加载邀请失败。如需进一步帮助，请联系 Onshape 技术支持以获取进一步帮助。
@@ -3593,20 +4107,39 @@ Job not found.	未找到作业。
 Job queue	作业队列
 Job run started successfully.	已成功启动作业运行。
 Jog	折弯
+Jog offset	折弯偏移
+Jog offset anchor	折弯偏移锚点
 Join adjacent surfaces	连接相邻曲面
 Joint	接头
+Joint style	接头样式
+Joint type	接头类型
+K Factor	K 系数
 Keep __targetname__	保留 __targetname__
 Keep access	保持访问
+Keep both sides	保留两侧
+Keep end derivative	保留结束导数
+Keep input parts	保留输入零件
+Keep material	保留材料
+Keep opposite side	保留对边
+Keep points	保留点
+Keep profile orientation	保持轮廓方向
+Keep start derivative	保留起始导数
+Keep tool surfaces and curves	保留工具曲面和曲线
+Keep tools	保留工具
 Key size must be 32 characters or empty.	密钥大小必须为 32 个字符或为空。
 Keyboard shortcut failed to be restored to default.	将键盘快捷键还原为默认值失败。
 Keyboard shortcuts	键盘快捷键
 Keyboard shortcuts failed to be restored to default.	将键盘快捷键还原为默认值失败。
 Keyboard shortcuts failed to load.	加载键盘快捷键失败。
 Knot points	节点
+LRA or Length, Rotation, and Angle table shows coordinates for CNC tube bending machines.	LRA（长度、旋转和角度）表格显示 CNC 弯管机的坐标。
+LRA table	LRA 表格
 Label already exists. Please choose another name.	标签已存在。请选择其他名称。
+Label column index	标签列索引
 Label must be between 1 and 255 characters with no forward slashes '/'.	标签必须介于 1 个和 255 个字符之间，且不包含正斜杠“/”。
 Label name	标签名称
 Label name cannot contain HTML.	标签名称不能包含 HTML。
+Label row index	标签行索引
 Labels	标签
 Labels…	标签…
 Label…	标签…
@@ -3672,6 +4205,7 @@ Leave all classroom-owned teams	离开所有教室拥有的团队
 Leave classroom	离开教室
 Leave classroom?	是否离开教室？
 Leave now	立即离开
+Leave open	保持为开放
 Leave organization	离开组织
 Leave team	离开团队
 Leave team?	离开团队？
@@ -3681,10 +4215,13 @@ Left view	左视图
 Legal	法律
 Legend	图例
 Length	长度
+Length Tolerance	长度公差
+Length control	长度控制
 Length must be at least __minLength__ characters.	长度不得少于 __minLength__ 个字符。
 Length must not exceed __maxLength__ characters.	长度不得超过 __maxLength__ 个字符。
 Length unit:  	长度单位:  
 Length: __lengthUnit__	长度：__lengthUnit__
+Less or equal	小于或等于
 Let others know who you are and collaborate together in real time	让别人知道你是谁并实时协作
 Letter	字母
 Libraries	库
@@ -3698,18 +4235,36 @@ Light users: __lightUsers__ / __totalLightUserSeats__	轻用户: __lightUsers__ 
 Light view	浅色
 Like	点赞
 Likes	点赞
+Limit	限制
+Limit X maximum distance	限制 X 最大距离
+Limit X minimum distance	限制 X 最小距离
+Limit Y maximum distance	限制 Y 最大距离
+Limit Y minimum distance	限制 Y 最小距离
+Limit Z maximum distance	限制 Z 最大距离
+Limit Z minimum distance	限制 Z 最小距离
 Limit application access per document through the Share dialog	通过“共享”对话限制每个文档的应用程序访问权限
+Limit axial X maximum angle	限制 X 轴最大角度
+Limit axial X minimum angle	限制 X 轴最小角度
+Limit axial Y maximum angle	限制 Y 轴最大角度
+Limit axial Y minimum angle	限制 Y 轴最小角度
+Limit axial Z maximum angle	限制 Z 轴最大角度
+Limit axial Z minimum angle	限制 Z 轴最小角度
+Limit frame ends	限制框架末端
 Limitations of experimental AI features	实验性 AI 功能的限制
 Limited permissions reduce the risk of 3rd parties copying or exporting your documents.	受限制的权限可降低第三方复制或导出您的文档的风险。
 Limited permissions reduce the risk of 3rd parties copying or exporting your publications.	受限制的权限可降低第三方复制或导出您的出版物的风险。
+Limits	限制
 Line	线
 Line 	线 
 Line (l)	线 (l)
+Line angle	线角度
 Line length can't be tolerant. Use a distance between entities.	线长不能设置公差。请使用图元之间的距离。
+Line or points	线或点
 Line to line angular dimension	线到线角度尺寸
 Line to line linear dimension	线到线线性尺寸
 Line width	线宽
 Line/tangent arc switch	线/相切圆弧开关
+Linear	线性
 Linear acceleration	线性加速度
 Linear pattern	线性阵列
 Linear relation	线性关系
@@ -3729,8 +4284,10 @@ List of categories this property belongs to	此属性所属的类别列表
 List values	列出值
 List values copied.	已复制列表值。
 List view	列表视图
+Load direction	载荷方向
 Load more	加载更多
 Load more changes…	加载更多更改…
+Load region	载荷区域
 Loading	正在加载
 Loading Action items…	正在加载行动项…
 Loading CAM Studio…	正在加载 CAM Studio…
@@ -3799,30 +4356,41 @@ Loads	载荷
 Loads (__loadItemCount__)	(__loadItemCount__) 个载荷
 Local storage	本地存储
 Location	位置
+Location(s)	位置
+Locations	位置
 Lock __itemName__ at current position	将 __itemName__ 锁定在当前位置
 Lock a sketch entity onto the sketch plane so it does not move.	将草图图元固定到草图平面上，以使其无法移动。
 Lock current position	锁定当前位置
+Lock ends	锁定末端
 Lock environment	锁定环境
 Lock mate inference	锁定配合推断
+Lock profile direction	锁定轮廓方向
+Lock profile faces	锁定轮廓面
 Lock the position of selected entities relative to one another.	锁定选定图元的相对位置。
 Lock to named position	锁定到命名位置
 Lock/follow position to…	锁定/跟随位置至…
+Locked	已锁定
 Locked at current position	锁定在当前位置
 Locked at named position __positionName__	已锁定在命名的位置 __positionName__
 Locked at subassembly tab position	已锁定在子装配体页签位置
 Loft	放样
+Lofted corner	放样角点
 Login Failed. Please solve recaptcha puzzle to continue.	登录失败。请解开 recaptcha 拼图后继续。
 Login Failed. Please try again.	登录失败。请重试。
 Logo removed.	已移除徽标。
+Long	长
 Longest execution steps in this Feature Studio:	此 Feature Studio 中耗时最长的执行步骤：
 Loop/chain connected	环/链相连
 Loop/chain connected edges	环/链相连边
+Loose	松动
+Loose (ASME)	松动 (ASME)
 Loose end	松动端
 Loose ends	松动端
 Loose ends (__looseEndCount__)	松动端 (__looseEndCount__)
 Lose access to all directly shared classroom-owned documents, publications, and folders	将失去对所有直接共享的、属于教室的文档、公布和文件夹的访问权限
 Low luminance color scheme mainly featuring light elements on dark backgrounds.	低亮度配色方案主要强调深色背景上的浅色元素。
 Low threshold	低阈值
+Lower	小写
 Lower flag symbol	下方标记符号
 Lower text	下方文本
 Lower tolerance	较低的公差
@@ -3830,6 +4398,10 @@ MBD data is not exported for closed composite parts.	对于封闭的复合零件
 MM/YY:	MM/YY：
 MTL file	MTL 文件
 Machine model and post processor	机器模型和后处理器
+Magnitude	幅值
+Magnitude/bias	幅值/偏离
+Maintain aspect ratio	保持纵横比
+Maintain curvature	维持曲率
 Major diameter	大直径
 Make 2 entities of the same type symmetric, relative to a line, plane, or linear edge.	使同一类型的两个图元相对于直线、平面或线性边对称。
 Make 2 lines perpendicular.	使两条直线垂直。
@@ -3867,6 +4439,10 @@ Manage users	管理用户
 Manage users…	管理用户…
 Manage via CSV	通过 CSV 管理
 Manage your Onshape subscription	管理您的 Onshape 订阅
+Manipulator X axis	操纵器 X 轴
+Manipulator Y axis	操纵器 Y 轴
+Manipulator Z axis	操纵器 Z 轴
+Map	映射
 Mapping	映射
 Mapping failed to refresh.	刷新映射失败。
 Mapping is no longer valid and should be deleted.	映射不再有效，应予以删除。
@@ -3889,22 +4465,48 @@ Mass and section properties…	质量和剖切属性…
 Mass calculation skipped items excluded/suppressed from BOM	批量计算已略过从物料清单中排除/抑制的项目
 Mass moments of inertia (__units__)	质量惯性矩 (__units__)
 Mass properties failed to calculate for the current selections.	未能为当前选定内容计算质量属性。
+Match	匹配
 Match case	区分大小写
+Match connections	匹配连接
+Match curvature	匹配曲率
+Match curvature at end	在端点处匹配曲率
+Match curvature at start	在起点处匹配曲率
+Match edges on face	在面上匹配边
+Match edges on plane	在平面上匹配边
+Match face options	匹配面选项
+Match faces at parting	分型时匹配面
+Match faces in features	在特征中匹配面
+Match faces in parts	在零件中匹配面
+Match flow	配对流
+Match flow (G3)	配对流 (G3)
+Match individual edges	匹配各个边
+Match individual faces	匹配各个面
 Match pixel density on high resolution displays (can affect performance)	在高清显示器上匹配像素密度 (会影响性能)
+Match position	匹配位置
+Match profile	匹配轮廓
 Match release candidate name with Arena change	将发布候选名称与 Arena 变更进行匹配
 Match release candidate name with Windchill change	将发布候选名称与 Windchill 更改进行匹配
+Match tangent	匹配相切
+Match type	匹配类型
+Matching	匹配
 Matching parameters successfully configured.	匹配参数已成功配置。
 Mate	配合
 Mate 2 entities tangentially, based on the selected faces, edges, or vertices.	根据选中的面、边或顶点，切向配合 2 个图元。
+Mate DOF to animate	要动画化的配合 DOF
 Mate connector	配合连接器
 Mate connector (Ctrl-m)	配合连接器 (Ctrl-m)
 Mate connector Z axis is not normal to face selections	配合连接器 Z 轴不与所选面垂直
 Mate connector for reference coordinate system	以配合连接器为参考坐标系
+Mate connector for reference frame	以配合连接器为参考系
+Mate connectors	配合连接器
 Mate error	配合错误
 Mate features	配合特征
 Mate indicator	配合指示器
 Mate limits	配合限制
 Mate solve time : __solveTimeInSeconds__	配合解出时间： __solveTimeInSeconds__
+Mate to be matched	要匹配的配合
+Mate type	配合类型
+Mate(s)	配合
 Material	材料
 Material Library	材料库
 Material __materialName__ is specified more than once. 	材料 __materialName__ 被多次指定。 
@@ -3915,6 +4517,7 @@ Material library __libraryName__ is already added.	已添加材料库 __libraryN
 Material library __libraryName__ is removed.	已移除材料库 __libraryName__ 。
 Mates	配合
 Mates and touching faces	配合与接触面
+Mates to drive positions	驱动位置的配合
 Mates with errors cannot be applied.	无法应用出现错误的配合。
 Mates with errors cannot be locked.	有错误的配合无法锁定。
 Math functions	数学函数
@@ -3933,7 +4536,9 @@ Max cone angle has been applied to 	最大圆锥角度已应用于
 Max count	最大计数
 Max date	最大日期
 Max date must not be earlier than __date__.	日期最大值不得早于 __date__。
+Max deviation	最大偏差
 Max distance	最大距离
+Max index (0-based)	最大索引（基于 0）
 Max length	最大长度
 Max principal stress (__unit__)	最大主应力(__unit__)
 Max radius	最大半径
@@ -3943,7 +4548,10 @@ Max value must be an integer.	最大值必须是一个整数。
 Max: __max__	最大值：__max__
 Max: __value__	最大值：__value__
 Maximum	最大
+Maximum angle	最大角度
 Maximum chord length	最大弦长
+Maximum control points	最大控制点
+Maximum deviation	最大偏差
 Maximum dimension	最大尺寸
 Maximum length of 64 is reached.	已达到 64 的最大长度限制。
 Maximum length of __maxLength__ exceeded.	超过最大长度 __maxLength__。
@@ -3956,9 +4564,13 @@ Maximum of __limit__ characters	最多 __limit__ 个字符
 Maximum/minimum dimension	最大/最小尺寸
 Mean (1/__unit__)	平均值 (1/__unit__)
 Measure	测量
+Measure to axis of cylinders, circles, arcs, or revolved surfaces	测量到圆柱、圆形、弧线或旋转曲面的轴线
+Measure to infinitely extended lines, arcs, cylinders, etc.	测量到无限延伸的线、弧线、圆柱等
 Measure type:	测量类型:
+Measured	已测量
 Measured lines per second	每秒绘制的行数测量
 Measured triangles per second	每秒绘制的三角形数测量
+Measurement	测量
 Measure…	测量…
 Measuring performance	测量性能
 Measuring performance. For best results: keep tab in focus until performance check is complete.	正在测量性能。为获得最佳结果: 使页签保持在焦点范围内，直到性能检查完成。
@@ -3983,6 +4595,10 @@ Merge changes from both	合并两者的更改
 Merge into __targetname__	合并至 __targetname__
 Merge into current workspace…	合并至当前工作区…
 Merge into: __targetBranchName__, from: __sourceBranchName__	合并到：__targetBranchName__，来自：__sourceBranchName__
+Merge ribs	合并筋
+Merge scope	合并范围
+Merge tangent segments	合并相切线段
+Merge with all	全部合并
 Merged __sourcename__ into __targetname__.	__sourcename__ 已合并到 __targetname__。
 Merging changes into __targetname__ from __sourcename__	正在将 __sourcename__ 中的更改合并到 __targetname__
 Merging feature changes is only supported for Part Studio and Assembly tabs	仅在“Part Studio”和“装配体”页签支持合并特征更改
@@ -3990,6 +4606,7 @@ Merging…	正在合并…
 Mesh	网格
 Mesh Part	网格零件
 Mesh bodies	网格主体
+Mesh bodies or faces	网格主体或面
 Mesh line width	网格线宽
 Mesh point	网格点
 Meshes (__numberOfMeshes__)	网格数 (__numberOfMeshes__)
@@ -4002,9 +4619,13 @@ Metadata failed to update.	更新元数据失败。
 Metadata updates failed to apply.	元数据更新未能应用。
 Method	方法
 Method:	方法：
+Metric	公制
 Metro station	地铁站
 Microsoft Edge (Version 17 and above)	Microsoft Edge (版本 17 及更高版本)
+Mid plane	中间平面
+Middle	中间
 Middle mouse button drag	鼠标中间滚轮拖动
+Middle mouse button drag or	按住鼠标中间滚轮进行拖动或
 Middle mouse button drag or \nCtrl + Middle mouse button drag	按住鼠标中间滚轮进行拖动或 \n按住 Ctrl 以及鼠标中间滚轮按钮进行拖动
 Midpoint	中点
 Midpoint line	中点线
@@ -4022,6 +4643,7 @@ Min date	最小日期
 Min date must be before or equal to max date.	最小日期必须在最大日期之前或与之相同。
 Min date must not be earlier than __date__.	日期最小值不得早于 __date__。
 Min distance	最小距离
+Min index (0-based)	最小索引（基于 0）
 Min length	最小长度
 Min radius	最小半径
 Min radius (__unit__)	最小半径 (__unit__)
@@ -4029,6 +4651,7 @@ Min value	最小值
 Min value must be an integer.	最小值必须是一个整数。
 Min: __min__	最小值：__min__
 Min: __value__	最小值：__value__
+Minimal gap	最小间隙
 Minimum	最小
 Minimum count must be less than or equal to max count.	最小计数必须小于或等于最大计数
 Minimum dimension	最小尺寸
@@ -4039,8 +4662,14 @@ Minimum length of __minLength__ for __propertyName__ not met. 	不符合 __prope
 Minimum length of __minLength__ not met.	不符合最小长度 __minLength__。
 Minimum radius	最小半径
 Minimum value must be less than or equal to max value.	最小值必须小于或等于最大值。
+Minimum/Maximum	最小值/最大值
 Minor diameter	小直径
 Mirror	镜像
+Mirror across Y axis	沿 Y 轴镜像
+Mirror plane	镜像平面
+Mirror reference	镜像参考
+Mirror strategy	镜像策略
+Mirror type	镜像类型
 Missing	缺失
 Missing Variable Studio	遗漏 Variable Studio
 Missing __category__	遗漏__category__
@@ -4058,6 +4687,9 @@ Missing selection	遗漏选定内容
 Missing sketch dimension data	缺少草图尺寸数据
 Missing tab	遗漏页签
 Missing value handling	遗漏值处理
+Miter	斜接
+Miter angle	斜接角度
+Mix	混合
 Mixer	混合器
 Mobile notification setting saved.	已保存移动通知设置。
 Mobile notifications for shares and comments	共享和评论的移动通知
@@ -4071,12 +4703,14 @@ Model definitions	模型定义
 Model space only	仅限模型空间
 Modeling	建模
 Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.	在 Y 轴向上的环境中构建的模型（例如 SOLIDWORKS、Creo 或 Inventor）将在导入时保持其原始方向。
+Modification type	修改类型
 Modified	已修改
 Modified at	修改于
 Modified by	修改者
 Modify an individual sheet metal bend relief. Specify bend relief type and scale.	修改单个钣金折弯止裂槽。指定折弯止裂槽类型和比例。
 Modify an individual sheet metal corner by selecting an edge, vertex, or face of the existing corner. Specify corner relief type and scale.	通过选择现有拐角的边、顶点或面来修改单个钣金拐角。指定拐角止裂槽类型和比例。
 Modify fillet	修改圆角
+Modify joint	修改接头
 Modify visibility conditions	修改可见性条件
 Module outline	模块大纲
 Module outline (cmd+shift+O / ctrl+shift+O)	模块大纲 (cmd+shift+O / ctrl+shift+O)
@@ -4096,6 +4730,7 @@ More than __changeCount__ changes	超过 __changeCount__ 项更改
 More than one part inside is fixed	内部有多个零件已固定
 More than one part is fixed	多个零件已固定
 Most Popular	最受欢迎
+Mounting	安装
 Mouse controls	鼠标控制
 Mouse controls updated.	鼠标控制已更新。
 Move	移动
@@ -4107,10 +4742,13 @@ Move column to right	将列右移
 Move column to start	将列移至开头
 Move copied instances here	将复制的实例移至此处
 Move copied mates here	将复制的配合移动至此
+Move curve boundary type	移动曲线边界类型
 Move documents and folders to	将文档和文件夹移动至
 Move documents, publications, and folders to	将文档、公布和文件夹移动至
 Move down	下移
+Move end condition	移动终止形态
 Move face	移动面
+Move face type	移动面类型
 Move here	移动至此
 Move left	左移
 Move right	右移
@@ -4171,10 +4809,12 @@ My standard content	我的标准内容
 N/A	不适用
 NOT COMPARABLE	不可比较
 Name	名称
+Name #entityName	名称 #entityName
 Name cannot be empty.	名称不能为空。
 Name cannot contain HTML.	名称不能包含 HTML。
 Name cannot exceed 256 characters.	名称不能超过 256 个字符。
 Name could not be generated.	无法生成名称。
+Name entity	名称图元
 Name is required	名称是必填项
 Name is required and cannot exceed __maxInputLengthForName__ characters.	名称是必填项且不能超过 __maxInputLengthForName__ 个字符。
 Name is required.	名称是必填项。
@@ -4197,7 +4837,9 @@ Need help formatting? Click one of the buttons below to download a template.	需
 Need to sign into an enterprise?	需要登录至一个企业吗？
 Needs revision	需要修订
 Network and region	网络和区域
+Neutral plane	中性面
 Never	从不
+New	新建
 New Part Studios and Assemblies in this workspace will automatically reference this Variable Studio at its default configuration.	此工作区中的新 Part Studio 和装配体将按其默认配置自动参考此 Variable Studio。
 New Part Studios and Assemblies in this workspace will automatically reference this Variable Studio.	此工作区内的新 Part Studio 和装配体将自动参考此 Variable Studio。
 New Standard Content Custom Parameter	新建标准内容自定义参数
@@ -4281,6 +4923,7 @@ No configurable properties	无可配置的属性
 No connection	未连接
 No connections found.	未找到连接。
 No contents found in __fileName__	在 __fileName__ 中未找到内容
+No corner	无角点
 No created connections.	未创建连接。
 No credit card	没有信用卡
 No credit card needed	无需信用卡
@@ -4351,10 +4994,12 @@ No matching company found.	未找到匹配的公司。
 No matching parameters selected to configure.	未选择要配置的匹配参数。
 No material assigned	未指定任何材料
 No material library linked with your account.	没有与帐户连接的材料库。
+No maximum	无最大值
 No measurements available for current selection.	当前选择没有可用的测量值。
 No measurements of this type available for current selection.	当前选择没有此类型的测量值可用。
 No members are added to this alias yet.	还没有向此别名添加成员。
 No members found	未找到成员
+No minimum	无最小值
 No models.	没有模型。
 No non-manifold edges found	未找到非流形边
 No notes available	没有可用的注释
@@ -4400,9 +5045,11 @@ No teams defined.	未定义团队。
 No teams found.	未找到团队。
 No templates created	未创建模板
 No templates found	未找到模板
+No tolerance	无公差
 No tools added	未添加工具
 No top-level symbols found	未找到顶级符号
 No translation	没有平动
+No trim	不修剪
 No unpublished classes.	没有未发布的班级。
 No updates available.	没有可用的更新。
 No users are added to this connection yet.	尚未向此连接中添加用户。
@@ -4415,12 +5062,20 @@ No variables are configured	没有配置任何变量
 No views	没有视图
 No views created	未创建视图
 No, I'm no longer a student	否，本人已不再是一名学生
+Nominal	名义值
 Non-geometric item authoring:	非几何项编写：
 Non-manifold tessellation edges	非流形镶嵌边
 Non-numeric value for __propertyName__ on row # __rowNumber__. 	第 __rowNumber__ 行上 __propertyName__ 的非数字值。 
 None	无
 None of the selected entities could be deleted.	无法删除选中的图元。
 Normal	法向
+Normal (ASME)	正常 (ASME)
+Normal direction	法线方向
+Normal to face	垂直于面
+Normal to guide	垂直于引导线
+Normal to profile	垂直于轮廓
+Normal to sketch plane	垂直于草图平面
+Normal to target	垂直于目标
 Not Mapped	未映射
 Not Started	未开始
 Not a member of this enterprise?	不是此 Enterprise 的成员？
@@ -4465,6 +5120,7 @@ Number generation	编号生成
 Number of dashboards	仪表板数量
 Number of members for this trial: 	此次试用的成员数量: 
 Number of non-rigid modes	非刚性模式的数量
+Number of points to add	要添加的点数
 Number of samples	样本数量
 Number of seats used:	已使用的席位数量：
 Number of subscriptions should not be less than the number of users in a company. There are __numusers__ users in your company.	订阅数量不能小于公司中的用户数。您的公司中有 __numusers__ 个用户。
@@ -4489,6 +5145,8 @@ OK	确定
 Object	对象
 Object property	对象属性
 Object type:	对象类型：
+Obround - Scaled	圆角矩形 - 使用比例
+Obround - Sized	圆角矩形 - 使用大小
 Obsolete	淘汰
 Obsolete all previous revisions related to the previous object type and part number	淘汰所有与先前对象类型和零件编号相关的先前修订
 Obsolete revision	淘汰修订版本
@@ -4505,13 +5163,25 @@ Occurrences to affect	造成影响的实例
 Off	关闭
 Offset	偏移
 Offset (o)	偏移 (o)
+Offset X distance	偏移 X 距离
+Offset Y distance	偏移 Y 距离
+Offset Z distance	偏移 Z 距离
 Offset a sheet metal model at a reference line with two bends in opposite directions with additional jog controls.	在参考线处偏移钣金模型，在相反方向上进行两次折弯，并提供额外的折弯控制。
+Offset all	全部偏移
+Offset and extend	偏移和延伸
+Offset angle	偏移角度
 Offset curve	偏移曲线
+Offset distance	偏移距离
+Offset from tip	相对于顶锥角的偏移量
+Offset opposite direction	偏移相反方向
 Offset plane…	偏移平面…
 Offset surface	偏移曲面
+Offset type	偏移类型
+Offset, extend, and split	偏移、延伸和分割
 Ok	确定
 Oldest first	旧的优先
 On	打开
+On entity	在图元上
 Once a class is selected, you may choose to publish the cloned assignment automatically or create a draft.	在选择班级后，您可以选择自动发布克隆的作业或创建一个草稿。
 Once a connection is created, an admin from the enterprise will receive an email to approve the request. No data is ever shared until the connection is approved, a user is added, and that data is shared with the user via the share dialog.	创建连接后，Enterprise 管理员将收到一封批准该请求的电子邮件。任何数据都不会开放共享，除非连接已获得批准、用户已被添加以及通过共享对话与用户共享数据。
 Once set, the KMS key cannot be swapped out or replaced with a different key.	一旦设置，KMS 密钥将无法更换或替换为不同的密钥。
@@ -4526,6 +5196,7 @@ One or more recipients do not have view access to the scheduled report. Verify t
 One or more students have started this assignment. The submission option is no longer editable.	一个或多个学生已开始此作业。提交选项不再可编辑。
 One or more tabs being moved contain workspace references. All referenced tabs will be moved as part of this operation.	移除的一个或多个页签包含工作区的参考。作为此操作的一部分，所有参考的页签都将移除。
 One or more values is invalid.	一个或多个值无效。
+One sided	单面
 One time	一次
 One workspace	一个工作区
 Only active and compatible Onshape properties in the mapped Onshape category can be selected.	只能选择映射的 Onshape 类别中活跃和兼容的 Onshape 属性。
@@ -4533,6 +5204,8 @@ Only administrators can delete documents containing released objects	只有管�
 Only administrators can edit the properties of released objects	只有管理员可以编辑已发布对象的属性
 Only administrators can mark objects as not revision-managed	只有管理员可以将对象标记为非修订托管的
 Only data created after configuration is encrypted. Existing documents are not encrypted retroactively, so configure your key as the first step after setting up your company.	仅配置后创建的数据会被加密。现有文档不会进行追溯加密，因此请在设置公司后将配置密钥作为第一步。
+Only edges	仅限边
+Only faces	仅限面
 Only items with status "Pending" can be deleted.	仅可删除状态为“待决中”的项目。
 Only me	只有我
 Only numbers are allowed	只允许使用数字
@@ -4541,6 +5214,7 @@ Only show differences	仅显示差异
 Only show mappings with errors	仅显示存在错误的映射
 Only show unread	只显示未读
 Only some instances will be highlighted.	只有部分实例会以高亮显示。
+Only vertices	仅限顶点
 Onshape (default)	Onshape (默认)
 Onshape AI Advisor cannot see your data.	Onshape AI Advisor 无法看到您的数据。
 Onshape API Keys Connection	Onshape API 密钥连接
@@ -4633,27 +5307,47 @@ Opening __name__	正在打开 __name__
 Opening configuration inputs references dialog	打开配置输入参考对话
 Operation failed because it would create cyclical references.	操作失败，因为将创建循环引用。
 Operation functions	操作函数
+Operation type	操作类型
+Opposite alignment	反向对齐
+Opposite angle	对角
 Opposite direction	反向
+Opposite direction angle	相反方向角度
+Opposite offset direction	相对偏移方向
+Opposite origin	相反原点
+Opposite side	对边
+Optimize	优化
 Option "__name__" not found. Select a valid value.	未找到选项“__name__”。请选择有效值。
 Option has been disabled by administrator	该选项已被管理员禁用
 Optional: include a personal message	可选: 包括个人消息
 Options	选项
+Ordered groups	排序的组
 Ordinate dimension	坐标尺寸
 Orient imported models with Y Axis Up	以 Y 轴向上定位导入的模型
 Orient normal to sketch on edit	编辑时使法向方向垂直于草图
+Orientation	方向
 Origin	原点
+Origin XY	原点 XY
+Origin YZ	原点 YZ
+Origin ZX	原点 ZX
+Origin entity	原点图元
 Origin of new Part Studio	新 Part Studio 的原点
+Origin type	原点类型
+Orthogonal path	正交路径
+Orthogonal path coordinate system	正交路径坐标系
 Other	其他
 Other Onshape account email	其他 Onshape 帐户电子邮件
 Other documents	其他文档
 Other part(s) fastened to origin	其他零件已固定到原点
 Other tabs	其他页签
 Out-of-date drawings failed to update.	更新过期工程图失败。
+Outer	外部
 Output units	输出单位
+Outside	外部
 Over	超过
 Over __limit__	超过 __limit__
 Overage	超额
 Overall merge strategy	整体合并策略
+Overall parameters	总体参数
 Overall performance*	总体性能*
 Overall restore strategy	整体还原策略
 Overridden by administrator __name__	被管理员 __name__ 覆盖
@@ -4662,19 +5356,27 @@ Overridden by creator __name__	被创建者 __name__ 覆盖
 Overridden computed property	被覆盖的已计算属性
 Overridden dimensions	被覆盖的尺寸
 Override	覆盖
+Override bend radius	覆盖折弯半径
 Override parameter library value	覆盖参数库值
 Override task	覆盖任务
+Overrides	覆盖
 Overwrite	重写
+Overwrite points	重写点
 Overwriting the existing dashboard might break any saved copies of the dashboard	覆盖现有仪表板可能会损坏仪表板的已保存副本
 Own properties	拥有属性
 Owned by	所有者
+Owned by me	由我所有
 Owned by:	所有者:
 Owner	所有者
 Owner ID	所有者 ID
+Owner entity	所有者图元
 Owner not found	未找到所有者
 Owner type not found	未找到所有者类型
 Ownership transfer not available. Not a member of any other enterprise.	所有权转让不可用。不是任何其他 Enterprise 的成员。
+PCB entity type	PCB 图元类型
 PCB flex model	PCB 柔性模型
+PCB holes	PCB 孔
+PCB part to finish	要完成的 PCB 零件
 PLM Integration	PLM 集成
 PLM Integrations	PLM 集成
 PTC Terms & Privacy Policy	PTC 条款及隐私政策
@@ -4691,6 +5393,9 @@ Parallel axis distance	平行轴距离
 Parallel distance	平行距离
 Parallel edges	平行边
 Parallel mate	平行配合
+Parallel to	平行于
+Parallel to sketch plane	平行于草图平面
+Parameter	参数
 Parameter Name	参数名称
 Parameter drives configuration	参数驱动配置
 Parameter library	参数库
@@ -4715,6 +5420,7 @@ Part Studios	Part Studio
 Part Studios will be updated to the latest FeatureScript version upon import	会在导入时将 Part Studio 将更新为最新的 FeatureScript 版本
 Part Studios…	Part Studio…
 Part is fixed	零件已固定
+Part mirror	零件镜像
 Part number	零件编号
 Part number must be unique.	零件编号必须是唯一的。
 Part number propagation	零件编号扩增
@@ -4728,19 +5434,39 @@ Part numbers are tied to the type of released object. Resetting the released obj
 Part numbers will be applied in all workspaces associated with the version being released.	零件编号将应用在与要发布的版本关联的所有工作区中。
 Part numbers will be applied only if the version being released has exactly one associated workspace.	仅当要发布的版本恰好有一个关联工作区时，才会应用零件编号。
 Part numbers will only be applied in the version being released.	零件编号只会应用在要发布的版本中。
+Part pattern	零件阵列
 Part properties dialog failed to open.	打开“零件属性”对话失败。
+Part to add	要添加的零件
+Part to remove	要移除的零件
 Part(s) inside are fixed	内部零件已固定
 Part/Surface	零件/曲面
 Partial Success	部分成功
 Partial Variable Studio	部分 Variable Studio
+Partial fillet	部分圆角
+Partial flange	部分法兰
 Partially suppressed from this BOM	已从此物料清单中部分抑制
+Parting edges	分型边
+Parting entity	分型图元
+Parting line	分型线
+Parting line propagation	分型线延伸
 Partner	合作伙伴
 Parts	零件
 Parts (__numberOfParts__)	零件数 (__numberOfParts__)
 Parts and Surfaces to affect	造成影响的零件和曲面
 Parts and surfaces	零件和曲面
+Parts and surfaces to convert	要转换的零件和曲面
+Parts or bends	零件或折弯
 Parts to analyze	要分析的零件
+Parts to draft	要拔模的零件
+Parts to find match in	要在其中查找匹配的零件
+Parts to hollow	要挖空的零件
+Parts to measure	要测量的零件
+Parts to trim	要修剪的零件
+Parts to trim to	要修剪到的零件
+Parts to trim using trim tool	要使用修剪工具修剪的零件
+Parts to use as trim tools	要用作修剪工具的零件
 Parts within a single Part Studio will become a composite part upon import	单个 Part Studio 中的零件将在导入时成为复合零件
+Parts, surfaces, or curves to split	要分割的零件、曲面或曲线
 Password	密码
 Password and confirm password do not match.	密码和确认密码不匹配。
 Password and password confirmation must match	密码和确认密码必须匹配
@@ -4772,9 +5498,12 @@ Paste permission denied by browser. Use Ctrl-V or ⌘-V to paste text.	浏览器
 Paste sketch	粘贴草图
 Paste sketch entities	粘贴草图图元
 Paste tab	粘贴页签
+Path	路径
 Path failed to load.	加载路径失败。
+Path to pattern along	沿其进行阵列化的路径
 Pattern	阵列
 Pattern must match __pattern__.	阵列必须与 __pattern__ 匹配。
+Pattern type	阵列类型
 Pause	暂停
 Paused regeneration	已暂停重生成
 Pausing…	正在暂停…
@@ -4792,12 +5521,15 @@ Pending cancellation	等待取消
 Pending edits have been discarded.	已舍弃待处理的编辑。
 Pending owner	待处理所有者
 Pending…	待决中…
+Per chain	根据链
+Per edge	根据边
 Perform a union, subtraction, or intersection on two or more parts or surfaces.	对两个或更多零件或曲面执行并集、差集或交集运算。
 Perform actions within Onshape on your behalf during an active session.	在活动会话期间代表您在 Onshape 中执行操作。
 Performance	性能
 Performance check	性能检查
 Performance errors detected	检测到性能错误
 Performance warning detected	检测到性能警告
+Perimeter	周长
 Period (12.34)	周期 (12.34)
 Permanently delete all items in Trash	永久删除垃圾桶中的所有物项
 Permission inherited	权限已继承
@@ -4837,7 +5569,9 @@ Photo failed to be deleted.	删除照片失败。
 Pick the default template used for the BOM table created in a Drawing owned by the __companyType__.	挑选用于在 __companyType__ 拥有的工程图中创建的物料清单的默认模板。
 Pick the default template used for the BOM table created in an Assembly owned by the __companyType__.	挑选用于在 __companyType__ 拥有的装配体中创建的物料清单的默认模板。
 Pierce	穿透
+Pin	固定
 Pin reference	钉选参考
+Pin slot	销槽
 Pin slot mate	销槽配合
 Pin slot mate (m)	销槽配合 (m)
 Ping time:	Ping 时间:
@@ -4855,15 +5589,27 @@ Pinned versioned reference from current document	已钉选从当前文档版本�
 Pinned versioned reference from current document with newer version	已钉选从具有更高版本的当前文档版本控制的引用
 Pinned versioned reference from other document	已钉选从其他文档版本控制的引用
 Pinned versioned reference from other document with newer version	已钉选从具有较新版本的其他文档版本控制的引用
+Pitch	螺距
+Pitch length	螺距长度
+Placement	放置
+Placement origin	放置原点
 Plan	计划
 Plan details	计划详情
 Planar	平面
 Planar mate	平面配合
 Planar mate (m)	平面配合 (m)
+Planarization parameters	平面化参数
+Planarize	平面化
 Plane	平面
+Plane limit	平面限制
+Plane point	平面点
+Plane type	平面类型
+Planes and planar faces to use as trim tools	要用作修剪工具的平面和平整面
+Planes to find match in	要在其中查找匹配的平面
 Plans & Pricing	计划与定价
 Plans and pricing	计划和定价
 Plasma	等离子体
+Plated	电镀
 Platform	平台
 Play	播放
 Plus/minus	加号/减号
@@ -4871,10 +5617,19 @@ Pocket	型腔
 Pocket faces	腔面
 Point	点
 Point (Shift-s)	点 (Shift-s)
+Point edit type	点编辑类型
+Point normal	点法线
+Point or mate connector	点或配合连接器
+Point or mate connector used as reference for the curve. Defaults to origin.	使用点或配合连接器作为曲线参考。默认为原点。
 Point to line linear dimension	点到线线性尺寸
 Point to point linear dimension	点到点线性尺寸
+Point type	点类型
+Points	点
+Points on edges	边上的点
+Points overrides	点覆盖
 Poisson's ratio	泊松比
 Polar moment of inertia (__units__)	极惯性矩 (__units__)
+Polyline	多段线
 Poor connection…	连接状况不佳…
 Populating Configurations to Current Configuration	将配置填充到当前配置
 Popup blocked or failed to open	弹出窗口被阻止或无法打开
@@ -4890,6 +5645,7 @@ Postal code exceeded maximum length.	邮政编码超出最大长度。
 Postprocessing thickness analysis...	后处理厚度分析中...
 Pre-select planar faces that contains holes or standard content and click 'Insert closest to selection'	预选包含孔或标准内容的平坦面，然后单击“在距选定对象最近的位置插入”
 Pre-select planar faces that contains holes or standard content and click 'Insert furthest from selection'	预选包含孔或标准内容的平坦面，然后单击“在距选定对象最远的位置插入”
+Precise	精确
 Precision	精度
 Precision rotate	精度旋转
 Preference changes failed to update.	更新首选项更改失败。
@@ -4907,6 +5663,8 @@ Preparing thickness analysis...	准备厚度分析中...
 Preprocessing	预处理
 Present	存在
 Presentation view	演示视图
+Preserve active sheet metal models	保留活跃的钣金模型
+Preserve material	保留材料
 Preserve source IDs	保留来源 ID
 Press desired key combination and confirm	按下所需的组合键，然后确认
 Pressure	压力
@@ -4931,6 +5689,7 @@ Price:	价格:
 Prices are in $ USD	以 $ USD 为单位的价格
 Prices in $ USD	以$ USD 为单位的价格
 Primary	主要
+Primary axis entity	主轴图元
 Primary key	主密钥
 Primary key copied.	已复制主密钥。
 Primary template is the first sheet.	主模板是第一张图纸。
@@ -4967,6 +5726,7 @@ Profile __profileName__ is created.	已创建配置文件 __profileName__。
 Profile __profileName__ is deleted.	已删除配置文件 __profileName__。
 Profile __profileName__ is selected.	选中配置文件 __profileName__。
 Profile __profileName__ is updated.	已更新配置文件 __profileName__。
+Profile control	轮廓控制
 Profile data currently displayed is from the latest profiled Part Studio you started across all Onshape documents. It can be cleared from the FeatureScript notices panel, or by profiling another Part Studio.	当前显示的配置文件数据来自您在所有 Onshape 文档中启动的最新配置的 Part Studio。它可以从 FeatureScript 通知面板中清除，或者通过配置另一个 Part Studio 来清除。
 Profile failed to be created.	创建配置文件失败。
 Profile inspector	轮廓检查器
@@ -4975,6 +5735,8 @@ Profile link copied to clipboard.	配置文件链接已复制到剪贴板。
 Profile name contains invalid characters. Characters such as &"<> are not allowed.	配置文件名称包含无效的字符。不允许使用 &"<> 等字符。
 Profile name must be less than 64 characters in length.	配置文件名称的长度必须小于 64 个字符。
 Profile of __elementName__	__elementName__ 的轮廓
+Profile type	轮廓类型
+Profiles	轮廓
 Profiling	配置
 Profiling __partStudioName__	配置 __partStudioName__
 Program number	程序编号
@@ -5008,6 +5770,7 @@ Projected curve	投影曲线
 Projected tolerance zone	延伸公差带
 Projected view	投影视图
 Projection	投影
+Projection direction type	投影方向类型
 Projects	项目
 Projects and Folders	项目和文件夹
 Propagate	延伸
@@ -5015,6 +5778,8 @@ Propagate changes	传播更改
 Propagate error	传播错误
 Propagated	已延伸
 Propagating changes to features	传播更改至特征上
+Propagation	延伸
+Propagation type	延伸类型
 Properties	属性
 Properties date format updated.	已更新属性日期格式。
 Properties failed to be reordered.	对属性进行重新排序失败。
@@ -5062,6 +5827,7 @@ Publication labels	公布标签
 Publication link copied to clipboard.	公布链接已复制到剪贴板。
 Publication link:	公布链接：
 Publication location	公布位置
+Publication manager	公布管理器
 Publication manager (Alt-t)	公布管理器 (Alt-t)
 Publication name	公布名称
 Publication notes	公布注释
@@ -5093,6 +5859,7 @@ Published FeatureScript	已发布的 FeatureScript
 Published by	发布者
 Published date	发布日期
 Publish…	发布…
+Pull direction	拉伸方向
 Purchase Onshape	购买 Onshape
 Purchase record not found.	未找到购买记录。
 Purchase type:	购买类型:
@@ -5113,6 +5880,7 @@ Queuing…	正在排队...
 Quick tab switching - backward	快速页签切换 - 向后
 Quick tab switching - forward	快速页签切换 - 向前
 RELEASE	发布
+Rack and pinion	齿轮齿条
 Rack and pinion relation	齿条齿轮关系
 Radial dimension	径向尺寸
 Radius	半径
@@ -5121,7 +5889,9 @@ Range	范围
 Range end cannot appear before range start	结束范围不能出现在起始范围之前
 Range start and range end cannot be same	起始范围和结束范围不能相同
 Range start cannot appear after range end	起始范围不能出现在结束范围之后
+Ratio	比率
 Ray (__unit__)	光线 (__unit__)
+Ray gradient	光线渐变
 Ray gradient (%)	光线渐变 (%)
 Re-invite	重新邀请
 Re-releasable?	可以重新发布吗？
@@ -5129,6 +5899,9 @@ Reactivate your subscription	重新激活您的订阅
 Read or write data within your Onshape documents, only in response to your actions.	仅在响应您的操作时，读取或写入您的 Onshape 文档中的数据。
 Read-only access	只读访问
 Real	实数
+Realign	重新对齐
+Reapply features	重新应用特征
+Reapply fillet	重新应用圆角
 Receipt Id: 	收据 ID: 
 Receipt failed to load.	加载收据失败。
 Receive email notifications for all new shares, including to your teams, classrooms or companies, and comments in documents or publications you have access to.	接收所有新共享的电子邮件通知，包括发送给您的团队、教师或公司的通知，以及您有权限访问的文档或公布中的评论。
@@ -5146,12 +5919,14 @@ Recent activity	最近的活动
 Recent activity failed to load.	加载近期活动失败。
 Recently opened	最近打开过的
 Recently used	最近使用
+Recognize	识别
 Reconfigure	重新配置
 Recover Document	恢复文档
 Recover Part Studio	恢复 Part Studio
 Recovery codes	恢复码
 Recreate Release from the current workspace	从当前工作区重新创建发布版本
 Rectangle	矩形
+Rectangle - Scaled	矩形 - 已缩放
 Red	红色
 Redo	重做
 Redo (Ctrl-y)	重做 (Ctrl-y)
@@ -5162,7 +5937,10 @@ Refer a friend	推荐朋友
 Reference	参考
 Reference coordinate system	参考坐标系
 Reference designator	参考指示符
+Reference edge	参考边
+Reference faces	参考面
 Reference manager	参考管理器
+Reference plane	参考平面
 References	参考
 References from seed assembly are updated	已更新来自源装配体的参考
 References:	参考:
@@ -5193,6 +5971,7 @@ Regenerating the Slack integration token will require you to transfer the new to
 Regeneration times	重生成时间
 Regex	正则表达式
 Region	区域
+Regular expression	正则表达式
 Regular expression search	正则表达式搜索
 Reject	拒绝
 Reject connection?	要拒绝连接吗？
@@ -5201,6 +5980,10 @@ Rejected by __name__	__name__ 已拒绝
 Rejected by: 	拒绝者： 
 Relate a mate with a rotational degree of freedom to a mate with a linear degree of freedom.	使具有旋转自由度的配合与具有线性自由度的配合相关。
 Relate the rotational and translational degrees of freedom of a Cylindrical Mate.	使圆柱配合的旋转自由度和平移自由度相关。
+Relation	关系
+Relation ratio	关系比率
+Relation type	关系类型
+Relative	相对
 Release	发布
 Release all configurations…	发布所有配置…
 Release candidate	发布候选
@@ -5233,6 +6016,7 @@ Released reference with newer revision	已发布具有较新修订版本的参�
 Releases	发布版本
 Releases failed to be displayed in versions and history.	未能在版本和历史记录中显示发布版本。
 Release…	发布…
+Relief	止裂
 Reload and disable graphics	重新加载并禁用图形
 Reload and enable graphics	重新加载并启用图形
 Remapped headers:	已重新映射标头:
@@ -5253,6 +6037,7 @@ Remove display state	移除显示状态
 Remove document	删除文档
 Remove existing fillets and rounds, or change their radius. Useful for imported parts.	移除现有的圆角和圆边，或更改其半径。对导入的零件很有用。
 Remove expression	移除表达式
+Remove fillet	移除圆角
 Remove from category	从类别中移除
 Remove from obsoletion	从淘汰中移除
 Remove from recently opened	从最近打开的文件中移除
@@ -5338,6 +6123,7 @@ Replace __items__	替换 __items__
 Replace __name__…	替换 __name__…
 Replace __numberBiggerThanOne__ instances…	替换 __numberBiggerThanOne__ 个实例…
 Replace all	全部替换
+Replace all instances	替换所有实例
 Replace face	替换面
 Replace instance	替换实例
 Replace instances with a selected part, surface, sketch, or subassembly.	将实例替换为选中的零件、曲面、草图或子装配体。
@@ -5347,6 +6133,8 @@ Replace reference	替换参考
 Replace with	替换为
 Replace with __sourcename__	替换为 __sourcename__
 Replace workflow	替换工作流程
+Replacement component	替换零部件
+Replacement part	替换零件
 Replace…	替换…
 Replacing…	正在替换…
 Replicate	仿制
@@ -5413,6 +6201,7 @@ Reset to default	重置为默认值
 Reset to defaults	设置为默认值
 Reset to parameter library value	重置参数库值
 Reset to the default __parameterName__	重置为 default __parameterName__
+Reset triad	重置三重轴
 Resetting the part number type of a releasable object will mark all previous revisions as obsolete and re-releasable. Revision history will still be visible for any previous revisions.	重置一个已发布对象的零件编号的类型会将所有先前的版本标记为淘汰且可重新发布。之前的任何修订版本的修订历史记录仍然可见。
 Resolution	分辨率
 Resolve	解析
@@ -5449,7 +6238,9 @@ Restrict geometry changes to merges only	将几何图元变更限制为仅限合
 Restrict metadata changes to merges only	将元数据变更限制为仅限合并
 Restrict students to only editing their assignment document	限制学生只能编辑自己的作业文档
 Resubmit	重新提交
+Result body operation type	结果主体操作类型
 Result mode	结果模式
+Result type	结果类型
 Results	结果
 Results and history	结果和历史记录
 Results from	结果来源
@@ -5466,6 +6257,7 @@ Return to document	返回至文档
 Return to documents	返回到文档
 Return to this dialog at any time by pressing 	按以下键可随时返回此对话 
 Reverse compare	反向比较
+Reverse direction	反转方向
 Reverse scroll wheel zoom direction	反转滚轮缩放方向
 Revert item to last revision	将项目退回至上一个修订版本
 Revert to before this merge	退回至这个合并之前
@@ -5500,12 +6292,16 @@ Revoking the Slack integration token will prevent notifications to Slack and dis
 Revolute	旋转
 Revolute mate	旋转配合
 Revolute mate (m)	旋转配合 (m)
+Revolutions	旋转
 Revolve	旋转
 Revolve (Shift-w)	旋转 (Shift-w)
+Revolve angle	旋转角度
+Revolve axis	旋转轴
 Revolved	已旋转
 Revolve…	旋转…
 Rhino file	Rhino 文件
 Rib	筋
+Rib extrusion direction	筋拉伸方向
 Right	右
 Right click a variable value or description to configure them.	右键单击变量值或说明以进行配置。
 Right click on the tab and click Export to download a CSV file, or download a sample.	右键单击页签并单击“导出”，以下载 CSV 文件或下载示例。
@@ -5513,6 +6309,7 @@ Right click on this tab and click Update, then choose your saved CSV file.	右�
 Right click patterns, mates, or instances to configure them.	右键单击阵列、配合或实例以进行配置。
 Right click sketch dimensions, features, or feature parameters to configure them.	右键单击草图尺寸、特征或特征参数以对其进行配置。
 Right mouse button drag	鼠标右键拖动
+Right mouse button drag or	按住鼠标右键进行拖动或
 Right view	右视图
 Right-click on a row to perform actions	右键单击某一行以执行操作
 Rigid body	刚性主体
@@ -5534,22 +6331,47 @@ Rollback	回滚
 Rollback bar	回滚栏
 Rollback failed.  Consider opening a previous version instead.	回滚失败。请考虑改为打开以前的版本。
 Rollback to the top of feature list	回滚至特征列表的顶部
+Rolled	滚动
+Rolled K Factor	轧制 K 系数
+Rolling ball	滚球
 Rolling ball (__unit__)	滚动球 (__unit__)
+Rolling ball gradient	滚动球渐变
 Rolling ball gradient (%)	滚动球渐变 (%)
 Root opening	根部间隙
 Rotate	旋转
 Rotate 180 deg	旋转 180 度
 Rotate 90 deg	旋转 90 度
+Rotate about X	绕 X 旋转
+Rotate about Y	绕 Y 旋转
+Rotate about Z	绕 Z 旋转
 Rotate pi rad	旋转 pi 弧度
 Rotate pi/2 rad	旋转 pi/2 弧度
+Rotation	旋转
+Rotation about Y'	绕 Y 旋转
+Rotation about Z	绕 Z 旋转
+Rotation about Z'	绕 Z 旋转
 Rotation angle	旋转角度
+Rotation axis	旋转轴
+Round	圆形
+Round - Scaled	圆角 - 已缩放
+Round - Sized	圆角 - 使用大小
 Routing curve	路线曲线
+Routing curve (#curveLength)	路线曲线 (#curveLength)
 Routing curve table	路线曲线表格
 Routing curve table panel	路线曲线表格面板
+Row	行
 Row IDs	行 ID
+Row access type	行访问类型
+Row index (0-based)	行索引（基于 0）
+Row max index (0-based)	行最大索引（基于 0）
+Row min index (0-based)	行最小索引（基于 0）
 Row name	行名称
+Row regular expression	行正则表达式
+Row result type	行结果类型
+Row value	行值
 Rule: __RuleType__	规则：__RuleType__
 Ruled surface	直纹曲面
+Ruled surface type	直纹曲面类型
 Run History	运行历史记录
 Run Logs	运行日志
 Run active simulation	运行启用中的仿真
@@ -5564,8 +6386,12 @@ Run restarted successfully.	运行已成功重启。
 Run started successfully.	运行已成功启动。
 Running (__progressPercentage__% complete)	正在运行（完成 __progressPercentage__%）
 Runtime	运行时
+S-RT™ free-running locknuts	S-RT™ 自由运转型锁紧螺母
 SAML2 Metadata XML	SAML2 元数据 XML
 SAML2 metadata XML	SAML2 元数据 XML
+SGPC™ swaging collar studs	SGPC™ 型锻环钉
+SH™ hard panel nuts	SH™ 硬面螺母
+SL™ TRI-DENT® prevailing torque locknuts	SL™ TRI-DENT® 有效力矩型锁紧螺母
 SMBend	折弯
 SMBendRelief	折弯止裂槽
 SMCorner	角点
@@ -5576,15 +6402,22 @@ SMHem	卷边
 SMJoint	接头
 SMLoft	钣金放样
 SMMakeJoint	制作接头
+SMPS™/SMPP™ nuts	SMPS™/SMPP™ 螺母
 SMRip	接缝
 SMStartSheetMetal	钣金模型
 SMTab	薄片
 SOLIDWORKS part file	SOLIDWORKS 零件文件
+SOSG™/SOAG™ threaded standoffs	SOSG™/SOAG™ 螺纹支架
+SO™/SOS™/SOA™/SO4™ through threaded standoffs	SO™/SOS™/SOA™/SO4™ 直通螺纹支架
+SO™/SOS™/SOA™/SO4™ through unthreaded standoffs	SO™/SOS™/SOA™/SO4™ 直通无螺纹支架
 STEP file	STEP 文件
 STL Format	STL 格式
 STL file	STL 文件
 Safari (Version 6 and above)	Safari (版本 6 或更高版本)
 Safety factor	安全系数
+Same frames as previous	与之前相同的框架
+Sample size	样例大小
+Sampled	抽样
 Saturday	星期六
 Save	保存
 Save Arena settings	保存 Arena 设置
@@ -5628,6 +6461,8 @@ Saving settings…	正在保存设置…
 Saving…	正在保存…
 Scalable, configurable solutions	可扩展、可配置的解决方案
 Scale	缩放
+Scale factor	比例因子
+Scale uniformly	均匀缩放
 Schedule a date to remove user(s) from your enterprise.	计划要从您的企业移除用户的日期。
 Schedule assignment	安排作业
 Schedule deleted.	已删除计划。
@@ -5650,6 +6485,7 @@ Scheduling update…	计划更新中…
 School level	学校等级
 School level is required.	学校等级为必填项。
 Scope	范围
+Screw	螺栓
 Screw relation	螺钉关系
 Scroll left (RMB: to first)	向左滚动（RMB：至第一个）
 Scroll right (RMB: to last)	向右滚动（RMB：至最后一个）
@@ -5658,6 +6494,7 @@ Scroll to branch top	滚动到分支顶部
 Scroll to merge source	滚动到合并来源
 Scroll to merge target	滚动到合并目标
 Scroll wheel in/out	向上/向下滚动滚轮
+Scroll wheel in/out or	滑动鼠标中间滚轮以放大/缩小或
 Scroll wheel in/out or \nCtrl + Middle mouse button drag	滑动鼠标中间滚轮以放大/缩小或\n按住 Ctrl 以及鼠标中间滚轮进行拖动
 Scroll wheel in/out or \nShift + Middle mouse button drag	滑动鼠标中间滚轮以放大/缩小或 \n按住 Shift 以及鼠标中间滚轮进行拖动
 Search	搜索
@@ -5718,10 +6555,39 @@ Searches in name, description, and part number. Use "*" for wildcard matching	�
 Searching…	正在搜索…
 Seats	坐席
 Seats:	座席:
+Second bound	第二界限
+Second bound type	第二界限类型
+Second centered	第二个居中
 Second dash	第二个划线
+Second depth	第二个深度
+Second direction	第二个方向
+Second direction has offset	第二个方向有偏移
+Second distance	第二个距离
+Second draft	第二个拔模
+Second draft angle	第二个拔模角度
+Second draft opposite direction	第二个拔模相反方向
+Second end position	第二个终止位置
+Second end type	第二终止类型
+Second equal spacing	第二相等间距
 Second gap	第二个间隙
+Second instance count	第二个实例数
+Second match	第二个匹配
+Second offset distance	第二个偏移距离
+Second offset opposite direction	第二个偏移相反方向
+Second opposite direction	第二个相反方向
+Second plane limit	第二平面限制
+Second radius	第二半径
+Second set of surfaces	第二组曲面
+Second side face	第二个侧面
+Second sketch	第二个草图
+Second trim to face boundaries	第二次修剪到面边界
+Second up to face	第二个成形到面
+Second up to surface or part	第二个成形到曲面或零件
+Second up to vertex or mate connector	第二个成形到顶点或配合连接器
+Secondary axis entity	副轴图元
 Secondary key	辅助密钥
 Secondary key copied.	已复制辅助密钥。
+Section count	剖面数
 Section interference color	剖面干涉颜色
 Section plane __oneTwoOrThree__ __name__	剖切平面 __oneTwoOrThree__ __name__
 Section planes	剖切平面
@@ -5731,8 +6597,13 @@ Sectioned __typeName__ of __entityName__	__entityName__ 的剖切 __typeName__
 Security	安全
 Security code exceeded maximum length.	安全代码超出最大长度。
 See all your enterprises	查看您的所有企业
+Seed geometry type	源几何图元类型
 Seen when collaborating with other users	与其他用户协作时可见
+Segment edit type	段编辑类型
+Segments	线段
 Select	选择
+Select (edge)	选择（边）
+Select (vertex)	选择（顶点）
 Select Onshape category	选择 Onshape 类别
 Select Onshape property	选择 Onshape 属性
 Select __companyType__	选择 __companyType__
@@ -5780,10 +6651,12 @@ Select a workspace to update	选择要更新的工作区
 Select action	选择操作
 Select advanced permissions	选择高级权限
 Select all	全选
+Select all frames	选择所有框架
 Select an action	选择操作
 Select an action below to continue	在下方选择一项操作以继续
 Select an assignment to view analytics	选择一项作业来查看分析
 Select an assignment to view details	选择一项作业来查看详细信息
+Select an entity or mate connector	选择一个图元或配合连接器
 Select an entity to add tag to current comment.	选择图元，以将标记添加到当前评论。
 Select an individual assembly tree item to view its properties. Select nothing to view assembly properties	选择单个装配体树项目以查看其属性。不作任何选择以查看装配体属性
 Select an individual part to view its properties. Select multiple parts to view their properties. Select nothing to view part studio and all part properties.	选择单个零件以查看其属性。选择多个零件以查看其属性。无需选择任何内容即可查看 Part Studio 和所有零件属性。
@@ -5807,10 +6680,12 @@ Select degree of freedom	选择自由度
 Select dimension and annotation types to show	选择要显示的尺寸和标注类型
 Select dimensions or sketch plane to configure	选择要配置的尺寸或草图平面
 Select dimensions or sketch plane to configure with __configurationName__	选择要使用 __configurationName__ 配置的尺寸或草图平面
+Select distance to measure the linear distance between two entities./nSelect length to measure the total length of the selected entities.	选择距离以测量两个图元之间的线性距离。/n选择长度以测量所选图元的总长度。
 Select document	选择文档
 Select entities to be mirrored.	选择要镜像的图元。
 Select entities to measure	选择要测量的图元
 Select entities to split. For parts and surfaces, specify whether to keep or remove the split tool. For faces, select a sketch curve, curve, surface, or plane to use as the split tool.	选择要分割的图元。对于零件和曲面，指定是保留还是移除分割工具。对于面，选择要用作分割工具的草图曲线、曲线、曲面或平面。
+Select face	选择面
 Select file	选择文件
 Select folder	选择文件夹
 Select from your published and draft classes	从您已发布和草拟的班级中选择
@@ -5825,9 +6700,11 @@ Select items to insert	选择要插入的主体项
 Select mate connector (__keybind__)	选择配合连接器 (__keybind__)
 Select mate connectors (__keybind__)	选择配合连接器 (__keybind__)
 Select options	选择选项
+Select or create mate connectors in this Part Studio to position derived instances	在此 Part Studio 中选择或创建配合连接器以定位派生实例
 Select origin/mate connector	选择原点/配合连接器
 Select other	选择其他
 Select other…	选择其他…
+Select owner entity	选择所有者图元
 Select parameters to configure	选择要配置的参数
 Select parameters to configure with __configurationName__	选择要使用 __configurationName__ 配置的参数
 Select parent categories	选择父类别
@@ -5836,6 +6713,7 @@ Select part or appearance	选择零件或外观
 Select part or assembly	选择零件或装配体
 Select parts/surfaces/sketches	选择零件/曲面/草图
 Select patterns	选择阵列
+Select point	选择点
 Select provider type	选择提供商类型
 Select range end	选择结束范围
 Select range start	选择起始范围
@@ -5865,6 +6743,7 @@ Selected edges do not form a continuous chain.	选中的边未形成连续链。
 Selected format only supports exporting the active sheet.	选定格式仅支持导出活跃图纸。
 Selected items moved.	已移动所选主体项。
 Selected material library has a new version available. Accept changes to update part(s) to latest version.	选定材料库有可用的新版本。请接受更改以将零件更新为最新版本。
+Selected points	选定的点
 Selected resource is not valid for ownership transfer.	所选资源对所有权转让无效。
 Selected tab contains no supported geometry for export.	选中的页签不含可供导出的受支持几何图元。
 Selected users and teams	选中的用户和团队
@@ -5879,8 +6758,13 @@ Selection no longer available. Close the dialog to leave unchanged.	选定对象
 Selection no longer available. Make a new selection (or close the dialog to leave unchanged)	选定内容不再可用。请进行新选择 (或关闭对话而不进行任何更改)
 Selection to replace	要被替换的选定对象
 Selection to replace with	用来替换的选定对象
+Selection type	选择类型
+Selections	选择
 Selective update	选择性更新
 Select…	选择…
+Self-clinching nuts	压铆螺母
+Self-clinching standoffs	自锁支架
+Self-clinching studs & pins	压铆销钉
 Semantic	语义
 Send invitation	发送邀请
 Send me a copy	向我发送副本
@@ -5923,6 +6807,7 @@ Setup a new domain for verification	设置新域名进行验证
 Shaded bodies	阴影部分
 Shaded with edges	带边着色
 Shaded without edges	不带边着色
+Shaft class	轴等级
 Share	共享
 Share details	共享详细信息
 Share dialog failed to open.	开启共享对话失败。
@@ -5938,6 +6823,7 @@ Share with mentioned approver	与提及的审批人共享
 Share with mentioned approvers	与提及的审批人员共享
 Share with mentioned user	与提及的用户共享
 Share with mentioned users	与提及的用户共享
+Shared	已共享
 Shared with Onshape support	已与 Onshape 技术支持共享
 Shared with me	与我共享
 Share…	共享…
@@ -5952,18 +6838,23 @@ Sharing will give this user permission to view and comment on this publication.	
 Sharing…	正在共享…
 Sheet	图纸
 Sheet metal context:	钣金模型环境:
+Sheet metal face to bend	要折弯的钣金面
 Sheet metal form library	钣金成型工具库
 Sheet metal loft	钣金放样
 Sheet metal materials	钣金材料
 Sheet metal materials library	钣金材料库
 Sheet metal model	钣金模型
+Sheet metal part	钣金零件
+Sheet metal parts	钣金零件
 Sheet metal table and flat view	钣金表格和展开视图
 Sheet range cannot be empty	图纸范围不能为空
 Sheet range is out of bounds	图纸范围超出界限
 Sheets	图纸
 Shell	抽壳
+Shell thickness	抽壳厚度
 Shift + Middle mouse button drag	Shift + 鼠标中间滚轮拖动
 Shininess	光泽度
+Short	短
 Shortcut toolbar settings updated.	快捷栏设置已更新。
 Shortcut toolbars	快捷栏
 Show	显示
@@ -5999,6 +6890,7 @@ Show all rigid bodies	显示所有刚性主体
 Show analysis tools__ctxt__toolbar-analysis-btn	显示分析工具
 Show analysis tools…	显示分析工具…
 Show automatic versions	显示自动版本
+Show calculation variance	显示计算方差
 Show center of mass	显示质心
 Show changes in history	显示更改历史记录
 Show changes…	显示更改…
@@ -6007,14 +6899,17 @@ Show code	显示代码
 Show completed	显示已完成行动项
 Show connections	显示连接
 Show constraints	显示约束
+Show coordinate system of the reference used by the current vertex.	显示当前顶点使用的参考坐标系。
 Show current branch	显示当前分支
 Show current branch with parent branches	显示当前分支与其父分支
+Show default points	显示默认点
 Show default tolerances	显示默认公差
 Show deformation	显示变形
 Show dependencies of __name__…	显示 __name__ 的依赖项…
 Show dependencies…	显示依赖项…
 Show derived tolerances	显示派生公差
 Show details	显示详细信息
+Show deviation	显示偏差
 Show dimensions	显示尺寸
 Show distortion	显示扭曲
 Show drawings	显示工程图
@@ -6039,6 +6934,7 @@ Show inactive values	显示非活跃值
 Show instance list properties	显示实例列表属性
 Show instances	显示实例
 Show internal geometry	显示内部几何图元
+Show isocurves	显示等参线
 Show items already in toolbar	显示已在工具栏中的项目
 Show less	显示更少
 Show mates	显示配合
@@ -6060,16 +6956,20 @@ Show parts list properties	显示零件列表属性
 Show password	显示密码
 Show pinned references only	仅显示已钉选的参考
 Show preview	显示预览
+Show reference coordinate system	显示参考坐标系
 Show regeneration times	显示重生成时间
 Show replies	显示回复
 Show results	显示结果
 Show results in new browser tab	在新的浏览器页签中显示结果
 Show revisions	显示修订版本
+Show ruled lines	显示直纹线
 Show search results as list	以列表形式显示搜索结果
 Show selected part	显示选中的零件
+Show selection	显示选择
 Show setup	显示设置
 Show setup in new browser tab	在新浏览器页签中显示设置
 Show sketch diagnostics tools	显示草图诊断工具
+Show start and end profiles	显示起始和结束轮廓
 Show top level assembly row	显示最上层装配体行
 Show top level only	仅显示顶层
 Show undercut regions	显示切槽面域
@@ -6089,8 +6989,11 @@ Showing message	显示邮件
 Shown when __displayName__ is __value__	当 __displayName__ 为 __value__ 时显示
 Shown when __displayName__ is between __value__	当 __displayName__ 介于 __value__ 之间时显示
 Shows all top level symbols in the dropdown. Use the search field to filter symbols by name. Click on a symbol to navigate to it in the editor.	在下拉菜单中显示所有顶级符号。使用搜索输入框按名称筛选符号。单击符号可在编辑器中导航到该符号。
+Side	边
 Side 1	侧面 1
 Side 2	侧面 2
+Side length	边长度
+Sides	侧面
 Sign in	登录
 Sign in to Onshape	登录到 Onshape
 Sign in to __companyName__	登录到 __companyName__
@@ -6112,6 +7015,7 @@ Sign-in attempt throttled. Click "Sign in" again to continue.	登录尝试受限
 Sign-in attempt throttled. Solve recaptcha puzzle to continue.	登录尝试受限。解开 recaptcha 拼图即可继续。
 Signed von Mises stress (__unit__)	冯·米塞斯应力(__unit__)
 Signing in…	正在登录…
+Simple	简单
 Simulate the effect of a bearing load on one or more faces of an instance.	仿真轴承载荷对实例的一个或多个面上的影响。
 Simulate the effect of a static, uniform, linear acceleration acting on an instance.	仿真作用于实例的静态、均匀、线性加速度的效果。
 Simulate the effect of an angular velocity and the resultant load acting on an instance.	模拟角速度及其作用于实例上的合成载荷所产生的效果。
@@ -6127,6 +7031,7 @@ Simulation "__simulationName__" results were deleted	仿真“__simulationName__
 Simulation "__simulationName__" was canceled	仿真“__simulationName__”已取消
 Simulation bonded	仿真粘合
 Simulation cannot be queued. The maximum number of queued simulations per user (__max__) has been reached.	仿真无法排队。已达到每个用户的最大排队仿真数量 (__max__)。
+Simulation connection	仿真连接
 Simulation features	仿真功能
 Simulation is complete	仿真完成
 Simulation is not included in your current Onshape subscription plan	仿真不包含在您当前的 Onshape 订阅计划中
@@ -6139,10 +7044,13 @@ Simulation status	仿真状况
 Simulation was canceled	仿真已取消
 Simulations	仿真
 Simulations can help estimate how a loaded assembly behaves while being constrained by mates and fixed components.	仿真可帮助估计加载的装配体在受到配合和固定零部件约束时的行为方式。
+Single	单一
 Single flat pattern part only	仅限单一展开图样的零件
+Single sign on	显示单点登录
 Single sign on (SSO)	显示单点登录 (SSO)
 Single sign on (SSO) user auto-provisioning	单点登录 (SSO) 用户自动配置
 Single sign on is disabled due to bad configuration.	由于配置错误，单点登录已被禁用。
+Single value	单一值
 Size	大小
 Size bytes: __sizeBytes__	字节大小: __sizeBytes__
 Size to Part Studio	将尺寸关联到 Part Studio
@@ -6169,16 +7077,25 @@ Sketch an elliptical arc by defining its center point, major axis, minor axis, s
 Sketch chamfer	草图倒角
 Sketch copy and pasted	草图复制和粘贴
 Sketch curved text	绘制弯曲文字草图
+Sketch curves to extrude	要拉伸的草图曲线
+Sketch fillet	草图圆角
 Sketch fillet (Shift-f)	草图圆角 (Shift-f)
+Sketch for flat view	平面视图草图
 Sketch functions	草图函数
 Sketch inflection points	草图反曲率点
 Sketch new construction geometry or convert existing sketch entities into construction geometry.	绘制新构造几何图元的草图或将现有草图图元转换为构造几何图元。
+Sketch plane	草图平面
 Sketch point	草图点
+Sketch points	草图点
+Sketch points to place holes	要放置孔的草图点
+Sketch profile	草图轮廓
+Sketch profiles	草图轮廓
 Sketch text border	草图文本边框
 Sketches	草图
 Sketches and curves	草图和曲线
 Skip	跳过
 Skip aggregation	跳过聚合
+Skip instances	跳过实例
 Slack Workspace ID	Slack 工作区 ID
 Slack connection	Slack 连接
 Slack integration token	Slack 集成令牌
@@ -6189,6 +7106,10 @@ Slider mate	滑块配合
 Slider mate (m)	滑块配合 (m)
 Slot	槽
 Slowest features (__numberOfFeatures__)	最慢的特征 (__numberOfFeatures__)
+Smooth	平滑
+Smooth fillet corners	平滑圆角
+Smooth transition	平滑过渡
+Smoothness	平滑度
 Snap mode	卡扣模式
 Snap mode (Shift-s)	卡扣模式 (Shift-s)
 Snippet not found. To use this snippet, import the Onshape Standard Library.	未找到代码段。要使用此代码段，请导入 Onshape 标准库。
@@ -6234,7 +7155,9 @@ Sort tasks	排序工作
 Source	源
 Source category	源类别
 Source drawing view is not selected	未选择源工程图视图
+Source is 'Y Axis Up'	来源为“Y 轴向上”
 Source version name	源版本名称
+Spacing type	间距类型
 Spans	跨距
 Specify a maximum count no greater than __maxLength__.	指定的最大计数不得超过 __maxLength__。
 Specify a maximum count of at least __minLength__.	指定的最大计数不得小于 __minLength__。
@@ -6247,20 +7170,29 @@ Specify a minimum length of at least __minLength__.	指定的最小长度至少�
 Specify a valid configuration.	指定有效配置。
 Specify a value no greater than __maxValue__.	指定的值不得超过 __maxValue__。
 Specify a value of at least __minValue__.	指定的值至少为 __minValue__。
+Specify anchor points	指定锚点
+Specify axis	指定轴
 Specify diameter	指定直径
+Specify direction	指定方向
 Specify what user type should be used when automatically provisioning a user who signs in using SSO.	当自动配置用户使用 SSO 登录时，应指定使用哪种用户类型。
 Specular color	镜面反射颜色
 Sphere	球体
 Spherical diameter	球形直径
 Spherical radius	球形半径
+Spine	样条曲线
 Spline	样条
 Spline control point	样条控制点
 Spline handle	样条柄
 Split	分割
+Split face	分割面
+Split faces	分割面
 Split into multiple documents	分成多个文档
 Split sketch curves into multiple segments. For open curves, select 1 or more points. For closed curves, select 2 or more points.	将草图曲线分割成多段。对于开放曲线，选择 1 个或更多个点。对于闭合曲线，选择 2 个或更多个点。
+Split type	分割类型
 Spot face	聚光灯面
+Spun corner	旋转角点
 Square	正方形
+Square - Sized	正方形 - 使用大小
 Standard	标准
 Standard Content	标准内容
 Standard Content Administration	标准内容管理
@@ -6274,21 +7206,54 @@ Standard content library	标准内容库
 Standard content parameters failed to load.	加载标准内容参数失败。
 Standard library version range start must not be after its stop.	标准库版本范围的起始版本不能晚于结束版本。
 Standard:	标准:
+Start	起始
 Start 7 day trial	开始 7 天试用
 Start New Run	启动新运行
 Start Onshape Professional Trial	开始 Onshape Professional 试用
 Start Professional Trial	开始 Professional 试用
+Start angle	起始角度
 Start assignment	启动作业
 Start assignment and select an existing document.	开始作业并选择一个现有的文档。
 Start assignment to create a copy of the starter document.	开始作业并创建初始文档的副本。
 Start assignment to create a new document.	开始任务以创建一个新文档。
 Start assignment…	开始作业…
+Start condition	起始形态
+Start curvature offset	起始曲率偏移
 Start date	开始日期
 Start date is after end date	开始日期晚于结束日期
 Start date is after today's date	开始日期在今天的日期之后
+Start direction	起始方向
+Start direction has offset	起始方向有偏移
+Start direction offset angle	起始方向偏移角度
+Start edge position	开始边位置
+Start flow offset	起始流偏移
+Start from part	从零件开始
+Start from selected plane	从选定平面开始
+Start from sketch plane	从草图平面开始
+Start magnitude	起始幅值
+Start offset	起始偏移
+Start offset opposite direction	起始偏移相反方向
+Start opposite direction	起始相反方向
+Start plane	起始平面
+Start point	起点
+Start position	起始位置
+Start profile adjacent faces	开始轮廓相邻面
+Start profile condition	起始轮廓形态
+Start radius	起始半径
+Start trim	开始修剪
+Start type	开始类型
 Start typing to search tools	开始键入以搜索工具
+Start up to face	开始直到面
+Start up to surface or part	开始直到曲面或零件
+Start up to vertex or mate connector	开始直到顶点或配合连接器
+Start value	起始值
 Start zones	起始分区
 Started	已启动
+Starting offset	起始偏移
+Starting offset bound	起始偏移界限
+Starting offset depth	起始偏移深度
+Starting offset entity	起始偏移图元
+Starting offset opposite direction	起始偏移相反方向
 Starting simulation (__current__ of __max__ allocated)...	正在启动仿真（已分配 __current__/__max__）...
 Starting…	正在启动…
 Startup page	启动页面
@@ -6298,6 +7263,8 @@ State / Region:	州 / 区域
 Statistical tolerance	统计公差
 Status	状态
 Steep	陡峭
+Step	步骤
+Steps	步骤
 Still waiting on an input TRS for __assemblyName__ __simulation__.	仍在等待 __assemblyName__ __simulation__ 的输入 TRS。
 Still waiting on an input TRS for __assemblyName__.	仍在等待 __assemblyName__ 的输入 TRS。
 Stop	停止
@@ -6305,6 +7272,9 @@ Stop Document Extraction	停止文档提取
 Stop extraction if running	如果正在运行，则停止提取
 Store file in __drive__ (__account__)	在 __drive__ (__account__) 中存储文件
 Store file in a new tab	在新页签中存储文件
+Straight	直线
+Straight pipe tap	直式管螺纹
+Straight tap	直式螺纹
 Street address	街道地址
 Stripe count	条纹数
 Structural	结构
@@ -6323,6 +7293,7 @@ Students cannot view an unpublished class	学生无法查看未发布的班级
 Students do not have sharing permissions.	学生没有共享权限。
 Students will have view access to the starter document once the assignment is published. It will appear in their document list.	在作业发布后，学生将拥有对初始文档的查看权限。它将出现在他们的文档列表中。
 Students: __students__	学生: __students__
+Style	样式
 Sub-total	小计
 Subassemblies added to named positions.	已将子装配体添加到命名位置。
 Subassemblies position unlocked.	已解锁子装配体位置。
@@ -6368,6 +7339,9 @@ Subscription: Active	订阅: 活跃
 Subscription: __accountState__	订阅: __accountState__
 Subscriptions	订阅
 Subtotal	小计
+Subtract	差集
+Subtraction offset	差集偏移
+Subtraction scope	差集范围
 Successfully added export rule with convention:  __convention__	已成功添加具有以下约定的导出规则: __convention__
 Successfully exported Onshape__type__ library.	已成功导出 Onshape__type__ 库。
 Successfully exported __name____type__ library.	已成功导出 __name____type__ 库。
@@ -6395,10 +7369,15 @@ Suppressed from this BOM	已从此物料清单中抑制
 Surface	曲面
 Surface area	曲面面积
 Surface finish symbol	表面粗糙度符号
+Surface or boundary edges	曲面或边界边
 Surfaces	曲面
 Surfaces (__numberOfSurfaces__)	曲面数 (__numberOfSurfaces__)
 Sweep	扫掠
+Sweep path	扫掠路径
+Swept profile	扫掠轮廓
 Switch context workspace?	切换关联环境工作区？
+Switch face	切换面
+Switch side	切换边
 Switch to	切换至
 Switch to "__rowName__"	切换到“__rowName__”
 Switch to Assembly	切换至装配体
@@ -6415,6 +7394,7 @@ Symbol "__symbolName__" no longer exists at specified location	符号“__symbol
 Symbol search cannot be performed due to a collaborator edit.	由于协作者正在编辑，无法执行符号搜索。
 Symmetric	对称
 Symmetric Dirichlet	对称 Dirichlet
+Symmetrical	对称
 Sync Arena revision value upon release candidate approval	发布候选获得批准后同步 Arena 修订值
 Sync BOM line items	同步物料清单行项目
 Sync BOM to __plmName__	将物料清单同步到 __plmName__
@@ -6443,6 +7423,11 @@ Syncing to Windchill is enabled.	已启用“同步至 Windchill”。
 Syncing to __plmName__…	正在同步到 __plmName__…
 System	系统
 System check	系统检查
+S™/SS™/CLS™/CLSS™/SP™ nuts	S™/SS™/CLS™/CLSS™/SP™ 螺母
+TFH™/TFHS™ non-flush studs	TFH™/TFHS™ 非平头钉
+TPS™/TP4™ flush-head pilot pins	TPS™/TP4™ 平头定位销
+TPXS™ self-clinching pilot pins	TPXS™ 压铆定位销
+TSO™/TSOS™/TSOA™/TSO4™ blind standoffs for thin sheet	TSO™/TSOS™/TSOA™/TSO4™ 薄板用盲孔支架
 TXT verification code	TXT 验证码
 TXT verification file	TXT 验证文件
 TYPE INFO	类型信息
@@ -6452,7 +7437,9 @@ Tab cannot be moved into a protected workspace. Create or select a branch to mov
 Tab failed to be moved.	移动页签失败。
 Tab failed to paste.	粘贴页签失败。
 Tab graphics	页签图形
+Tab manager	页签管理器
 Tab manager (Alt-t)	页签管理器 (Alt-t)
+Tab mate connector(s)	薄片配合连接器
 Tab merge strategy	页签合并策略
 Tab must be opened before actions can be performed.	必须先打开页签，然后才能执行操作。
 Tab name cannot be empty.	页签名称不得为空。
@@ -6461,6 +7448,7 @@ Tab name cannot contain HTML.	页签名称不能包含 HTML。
 Tab only exists in '__versionName__'.	页签仅存在于“__versionName__”中。
 Tab order	页签顺序
 Tab performance	页签性能
+Tab profile	薄片轮廓
 Tab restore strategy	页签还原策略
 Tab types	页签类型
 Tab will not exist in __targetname__ after merge	合并之后在 __targetname__ 中不会存在页签
@@ -6476,21 +7464,62 @@ Tabs are filtered, some results may not appear in search.	页签已筛选，有�
 Tag	标记
 Tag entity	标记图元
 Tag profile	标记轮廓
+Tag purpose	标记目的
 Take a self-paced course	参加自学课程
+Tangency	相切
 Tangent	相切
 Tangent (t)	相切 (t)
 Tangent arc	相切弧
 Tangent connected	相切相连
 Tangent connected edges	相切相连边
 Tangent connected faces	相切相连面
+Tangent direction	相切方向
+Tangent edges	相切边
 Tangent edges phantom	相切边影线
 Tangent edges removed	移除相切边
 Tangent edges visible	相切边可见
+Tangent hold lines	相切控制线
 Tangent mate	相切配合
 Tangent mates	相切配合
 Tangent plane	相切平面
+Tangent propagation	切向延伸
+Tangent to curve	与曲线相切
+Tangent to face	与面相切
+Tangent to guide	与引导线相切
+Tangent to profile	相切于轮廓
+Tap clearance (number of thread pitch lengths)	攻牙间隙 (螺纹螺距长度数量)
+Tap drill diameter	攻丝底孔直径
+Tap drill diameter deviation	攻丝底孔直径偏差
+Tap drill diameter lower deviation	攻丝底孔直径下偏差
+Tap drill diameter lower limit	攻丝底孔直径下限
+Tap drill diameter precision	攻丝底孔直径精度
+Tap drill diameter tolerance controls	攻丝底孔直径公差控制
+Tap drill diameter tolerance type	攻丝底孔直径公差类型
+Tap drill diameter upper deviation	攻丝底孔直径上偏差
+Tap drill diameter upper limit	攻丝底孔直径上限
+Tap through all	攻牙完全贯穿
+Tap type	螺纹类型
+Tapered pipe tap	锥形管螺纹
+Tapped	螺纹孔
+Tapped depth	螺纹孔深度
+Tapped depth deviation	螺纹孔深度偏差
+Tapped depth lower deviation	螺纹孔深度下偏差
+Tapped depth lower limit	螺纹孔深度下限
+Tapped depth precision	螺纹孔深度精度
+Tapped depth tolerance controls	螺纹孔深度公差控制
+Tapped depth tolerance type	螺纹孔深度公差类型
+Tapped depth upper deviation	螺纹孔深度上偏差
+Tapped depth upper limit	螺纹孔深度上限
+Target	目标
+Target anchor point	目标锚点
+Target degree	目标度数
+Target face(s)	目标面
 Target input is empty	目标输入为空
+Target length	目标长度
+Target pitch	目标螺距
+Target revolutions	目标转数
 Target version name	目标版本名称
+Targets	目标
 Task	任务
 Task failed to be completed.	完成任务失败。
 Task failed to be deleted.	删除任务失败。
@@ -6528,11 +7557,14 @@ Teams connection	团队连接
 Teams deleted.	已删除团队。
 Teams failed to delete.	删除团队失败。
 Teams failed to load.	加载团队失败。
+Tear	撕裂
+Tear drop	泪珠状
 Template	模板
 Template document:	模板文档:
 Templates	模板
 Tensile yield strength	抗拉屈服强度
 Tensile yield strength (__units__)	抗拉屈服强度 (__units__)
+Termination	终止
 Terms	条款
 Terms & Privacy	条款和隐私
 Terms failed to load.	加载条目失败。
@@ -6641,6 +7673,7 @@ There was a problem creating a Websocket connection to Onshape's servers. This u
 There was a problem submitting your ticket. Try again.	提交您的工单时出现问题。请再试一次。
 There was an error upgrading your subscription. Try again or contact Onshape Support.	升级您的订阅时出错。请重试或联系 Onshape 技术支持。
 There was an error upgrading your subscription. __error__. Try again or contact Onshape Support.	升级您的订阅时出现错误。__error__。请重试或联系 Onshape 技术支持。
+Thermal via	散热过孔
 These categories are owned by __company__.	这些类别由 __company__ 拥有。
 These configuration inputs will always be visible	这些配置输入将始终可见
 These drawings should be updated before creating a version	在创建版本之前，应该更新这些工程图
@@ -6649,10 +7682,21 @@ These properties only apply to documents owned by __company__.	以下属性仅�
 These tabs should be updated	这些页签应该更新
 They can obtain their enterprise ID from the Details page of their Enterprise setting.	可以从企业设置的详细信息页面获取其企业 ID。
 Thicken	加厚
+Thickness	厚度
+Thickness 1	厚度 1
+Thickness 2	厚度 2
 Thickness analysis	厚度分析
 Thickness analysis on closed composite parts is not supported.	不支持闭合复合零件的厚度分析。
 Thickness analysis…	厚度分析…
+Thickness factor	厚度因子
+Thickness opposite direction	厚度相反方向
+Thin	薄壁
 Third angle (ANSI)	第三角度 (ANSI)
+Third centered	第三个居中
+Third direction	第三方向
+Third distance	第三距离
+Third equal spacing	第三相等间距
+Third instance count	第三实例数
 This Variable Studio is automatically referenced in this workspace	在此工作区内会自动参考此 Variable Studio
 This __documentType__ was created by an education subscriber.	此 __documentType__由 education 订阅者创建。
 This action cannot be undone.	此操作无法撤消。
@@ -6753,13 +7797,29 @@ This workspace is currently being updated. Try again later. You may	此工作区
 This workspace is currently not accessible. Try again later.	此工作区当前无法访问。请稍后重试。
 This workspace is using an old version of the feature library and must be updated before the __featureTypeName__ feature can be used.	此工作区使用的是旧版本特征库，必须先进行更新，然后才可使用 __featureTypeName__ 特征。
 This workspace only	仅此工作区
+Thread class	螺纹类别
+Thread length	螺纹长度
+Thread type	螺纹类型
+Threads/inch	螺纹/英寸
+Three point	三点
 Three point angular dimension	三点角度尺寸
 Three point circular centerline	三点环形中心线
+Through all	完全贯穿
 Thumbnail image for a document.	文档的缩略图图像。
 Thursday	星期四
 Time	时间
 Time format	时间格式
 Timed out while verifying that no other users are in the document.	在验证文档中没有其他用户时超时。
+Tip angle	顶锥角
+Tip angle deviation	顶锥角偏差
+Tip angle lower deviation	顶锥角下偏差
+Tip angle lower limit	顶锥角下限
+Tip angle precision	顶锥角精度
+Tip angle style	顶锥角样式
+Tip angle tolerance controls	顶锥角公差控制
+Tip angle tolerance type	顶锥角公差类型
+Tip angle upper deviation	顶锥角上偏差
+Tip angle upper limit	顶锥角上限
 Title	标题
 Title 1	标题 1
 Title 2	标题 2
@@ -6774,7 +7834,10 @@ To edit this material library:	要编辑此材料库，请执行以下操作：
 To get started, enter a name for your company	若要开始，请输入贵公司的名称
 To insert closest to selection, preselect planar faces containing holes first.	要在距选定对象最近的位置插入，请首先预选包含孔的平面。
 To insert furthest from selection, preselect planar faces containing holes first.	要在距选定对象最远的位置插入，请首先预选包含孔的平面。
+To mate connector	到配合连接器
 To measure	测量
+To owner	转到所有者
+To selection	转到选定对象
 To size the component, select a circular edge or cylindrical face.	要调整零部件的大小，请选择环形边或圆柱面。
 To: __toEmailList__	收件人: __toEmailList__
 Toggle construction	切换结构
@@ -6786,12 +7849,16 @@ Toggle replace	切换替换
 Token Value:	令牌值：
 Tolerance	公差
 Tolerance options	公差选项
+Tolerance type	公差类型
 Too few fields on row #__rowNumber__.	第 __rowNumber__ 行上的字段太少。
 Too many fields on row #__rowNumber__.	第 __rowNumber__ 行上的字段太多。
 Toolbar customization could not be saved.	无法保存工具栏自定义。
 Toolbars	工具栏
 Toolbars failed to reset.	重置工具栏失败。
 Toolbars reset.	工具栏已重置。
+Tooling	工艺
+Tools	工具
+Tools anchor point	工具锚点
 Top	上
 Top left	左上
 Top level instances	顶级实例
@@ -6799,6 +7866,7 @@ Top view	俯视图
 Torus	圆环
 Total	总计
 Total instances (__numberOfInstances__)	实例总计 (__numberOfInstances__)
+Total length	总长度
 Total modules imported: __numImportedModules__	导入的模块总数：__numImportedModules__
 Total parts	零件总数
 Total reflects charge of the next bill.	总计反应下一帐单的费用。
@@ -6824,12 +7892,21 @@ Transferred publication __documentName__ to __companyType__ __companyName__.	公
 Transferred publication __documentName__ to user __userEmail__.	公布 __documentName__ 已转让给用户 __userEmail__。
 Transferring ownership…	正在转让所有权…
 Transform	变换
+Transform by mate connectors	按配合连接器变换
 Transform sketch entities	变换草图图元
+Transform type	变换类型
+Transition	转换
 Translate	平动
+Translate by XYZ	按 XYZ 平动
+Translate by distance	按距离平动
+Translate by line	按直线平动
 Translate, rotate, or offset selected faces. Specify end type and distance, or axis and rotation angle. Useful for imported parts.	使选中的面平动、旋转或偏移。指定终止类型和距离，或者轴和旋转角度。对导入的零件很有用。
 Translated	已平动
 Translating…	正在平动…
 Translation	平动
+Translation along X	沿 X 平移
+Translation along Y	沿 Y 平移
+Translation along Z	沿 Z 平移
 Translation failed.	转译失败。
 Translucent	半透明
 Transmit relevant data to third-party AI providers to generate outputs, where applicable.	在适用情况下，将相关数据传输给第三方 AI 提供商以生成输出。
@@ -6840,17 +7917,28 @@ Trashed	已丢弃
 Treat as false	视为假
 Treat as true	视为真
 Treat as zero	视为零
+Treatment type	处理类型
 Trial	试用
 Trial expires 	试用过期 
+Triangle	三角形
 Triangles	三角形
 Triggers	触发器
 Trim	修剪
 Trim (m)	修剪 (m)
+Trim Type	修剪类型
 Trim a face or extend a face to a new surface. Select faces to replace and the surface to use for the replacement. Useful for imported parts.	修剪面或将面延伸到新曲面。选择要替换的面和要用于替换的曲面。这对导入的零件很有用。
 Trim a line or curve to the first intersecting point or bounding geometry. If no intersection or bounding geometry is found, the entire entity is deleted.	将直线或曲线修剪到第一个交点或界限几何。如果未找到交点或界限几何，则会删除整个图元。
+Trim control	修剪控制
 Trim curve	修剪曲线
+Trim ends	修剪末端
+Trim guides	修剪引导线
 Trim or extend existing curves by a distance or to a bounding entity.	沿着一定距离修剪或延伸现有曲线，或是修剪或延伸到边界图元。
+Trim profiles	修剪轮廓
+Trim to face boundaries	修剪到面边界
+Trim to target	修剪到目标
+Trim type	修剪类型
 Trimetric	正三轴测
+Trimming	正在修剪
 Troubleshooting the performance check	性能检查疑难解答
 True	正确
 Try	试用
@@ -6870,14 +7958,24 @@ Turn profile inspector off	关闭轮廓检查器
 Turn reflection analysis off	关闭反射分析
 Turn thickness analysis off	关闭厚度分析
 Turn zebra stripes off	关闭斑马条纹
+Turns	圈数
+Turns and pitch	圈数和螺距
 Tutorial	教程
 Tutorial name is required	必须提供教程名称
 Tutorial type	教程类型
+Tutorials	教程
 Tutorials & Samples	教程和样例
+Tutorials [9]	教程
+Twist	扭曲
+Twist opposite direction	扭曲相反方向
+Twist type	扭曲类型
+Two distances	两个距离
 Two edge centerline	两条边中心线
 Two point circular centerline	两点环形中心线
 Two point line	两点线
 Two point linear centerline	两点线性中心线
+Two sided	双面
+Two sketches	两个草图
 Two-factor authentication	双重身份验证
 Two-factor authentication (2FA)	双重身份验证 (2FA)
 Two-factor authentication activated.	双重身份验证已激活。
@@ -6893,9 +7991,15 @@ Type to filter	键入以进行筛选
 Type:	类型：
 Types	类型
 U curves	U 曲线
+U direction	U 方向
+U profiles	U 轮廓
+U shift	U 偏移
+U shift opposite direction	U 偏移相反方向
 URL of a document in trash cannot be changed.	无法更改垃圾桶中文档的 URL。
 USD user / month	USD 用户 / 月
 USD user / year	USD 用户 / 年
+UVN (Control polygon)	UVN（控制多边形）
+UVN (Tangent)	UVN（相切）
 Ultimate compressive strength	极限抗压强度
 Ultimate compressive strength (__units__)	极限抗压强度 (__units__)
 Ultimate tensile strength	极限抗拉强度
@@ -6938,6 +8042,8 @@ Unconfigure text	取消配置文本
 Underconstrained color	欠约束颜色
 Underconstrained occluded color	欠约束被遮挡颜色
 Undercut	切槽
+Undercut diameter	底切直径
+Undercut length	底切长度
 Understand Onshape's document structure with a simple model.	通过简单的模型了解 Onshape 的文档结构。
 Undo	撤消
 Undo (Ctrl-z)	撤消 (Ctrl-z)
@@ -6948,10 +8054,17 @@ Unexpected character "__char__".	意外字符 "__char__"。
 Unfix	取消固定
 Unfix all	取消固定全部
 Unfold	展开
+Unfold all	全部展开
+Unfold none	不展开
+Unfold selected	展开所选内容
+Unfold type	展开类型
+Unified	统一
+Union	并集
 Unique parts	独特零件
 Unique sketches	独特草图
 Unique subassemblies	独特子装配体
 Unique surfaces	独特曲面
+Unit	单位
 Unit of measure	测量单位
 Unit settings failed to load.	加载单位设置失败。
 Unit type	单位类型
@@ -6967,6 +8080,7 @@ Unlock	解锁
 Unlock assembly from named positon	从命名位置解锁装配体
 Unmark visited	取消标记已访问
 Unnamed	未命名
+Unowned	无所有者
 Unpack	拆开
 Unpack folder	拆开文件夹
 Unpaid	未支付
@@ -7010,6 +8124,16 @@ Unverified emails cannot be made primary. Click `Resend verification email` butt
 Up to	直到
 Up to 6 months free	免费使用长达 6 个月
 Up to __limit__	直到 __limit__
+Up to entity	成形到图元
+Up to entity or mate connector	成形到图元或配合连接器
+Up to entity with offset	成形到图元再偏移
+Up to face	成形到面
+Up to next	成形到下一个面
+Up to part	成形到零件
+Up to part/surface	成形到零件或曲面
+Up to surface or part	成形到曲面或零件
+Up to vertex	成形到顶点
+Up to vertex or mate connector	成形到顶点或配合连接器
 Update	更新
 Update FeatureScript version	更新 FeatureScript 版本
 Update SSO provider	更新 SSO 提供程序
@@ -7102,6 +8226,7 @@ Uploaded file	已上传文件
 Uploading…	正在上传…
 Upon closing, assignment will be in a "Closed" state. Students will no longer be able to submit and view from the assignments list.	作业结束后，该作业将处于“已结束”状态。学生将无法再提交作业，也无法在作业列表中查看该作业。
 Upon publishing, assignment will be in an "In progress" state.	发布后，该作业将处于“进行中”状态。
+Upper	大写
 Upper flag symbol	上方标记符号
 Upper limit should be greater	上限应该设置为更大的值
 Upper text	上方文本
@@ -7113,18 +8238,25 @@ Use	使用
 Use (Project/Convert) (u)	使用（投影/转换）(u)
 Use AI to contextually suggest and complete code as you type. Toggling this setting will only affect this session.	使用 AI 根据上下文在您键入时提供建议并完成代码。切换此设置将仅影响当前会话。
 Use automatic tessellation setting	使用自动镶嵌设置
+Use axis	使用轴
 Use best available tessellation	使用最佳可用镶嵌
 Use comma as decimal separator	使用逗号作为小数点分隔符
 Use compatibility mode for surfaces and curves	对曲面和曲线使用兼容模式
+Use cubic interpolation	使用三次插值
 Use custom annotation text height for MBD export	使用自定义标注文本高度进行 MBD 导出
 Use custom units for export	使用自定义单位导出
+Use default minimal gap	使用默认最小间隙
 Use drawing units	使用工程图单位
 Use entityId with company domain prefix	使用带有公司域名前缀的 entityId
 Use file origin position	使用文件原点位置
 Use latest version	使用最新版本
+Use minimal gap	使用最小间隙
+Use model K Factor	使用模型 K 系数
+Use model bend radius	使用模型折弯半径
 Use one of the recovery codes you previously obtained. Cross it off your list after you've entered it here.	使用您以前获取的一个恢复代码。在此处输入该代码后，将其从列表中划掉。
 Use pen input as mouse	将笔输入作为鼠标使用
 Use scheduled date/time	使用计划日期/时间
+Use sketch plane direction	使用草图平面方向
 Use with small assemblies	与小装配体一起使用
 Use workspace units	使用工作区单位
 User	用户
@@ -7137,6 +8269,7 @@ User added to __companyType__. User __user__ is already a member of the __compan
 User added to __companyType__. Users __users__ are already members of the __companyType__.	用户已添加到 __companyType__。用户 __users__ 已经是 __companyType__ 的成员。
 User added to your class.	用户已被添加到您的班级。
 User agent	用户代理
+User defined	用户定义
 User details failed to load.	加载用户详细信息失败。
 User enterprise companies failed to load.	加载用户企业公司失败。
 User export rules	用户导出规则
@@ -7191,6 +8324,10 @@ Using an associative link, insert parts, sketches, surfaces, curves, planes, or 
 Using file:	正在使用文件:
 Using this feature will allow data to leave this Customer-Managed Keys (CMK) enterprise through export/transfer methods. Data will no longer be encrypted and will not be destroyed upon revocation of your Customer-Managed Keys.	使用此功能将允许数据通过导出/转移方法离开此客户托管密钥 (CMK) 企业。数据将不再加密，并且在撤销客户托管密钥时不会被销毁 。
 V curves	V 曲线
+V direction	V 方向
+V profiles	V 轮廓
+V shift	V 偏移
+V shift opposite direction	V 偏移相反方向
 Valid annotations text height in range from 0.0001 to 50 is required.	需要有从 0.0001 到 50 范围内的有效注释文本高度。
 Valid email required	需要有效的电子邮件
 Valid file name is required.	必须提供有效的文件名。
@@ -7220,17 +8357,21 @@ Value is required for __propertyName__. 	__propertyName__ 的值为必填项。
 Value is too low.	数值过低。
 Value must be an integer.	值必须是一个整数。
 Value should not be empty	值不应为空
+Value to record	要记录的值
 Value with units	包含单位的值
 Variable	变量
 Variable Studio name	Variable Studio 名称
 Variable Studio name cannot be longer than 256 characters	Variable Studio 名称长度不能超过 256 个字符。
+Variable Studio reference	Variable Studio 参考
 Variable Studio reference failed. The source tab may have been deleted.	Variable Studio 参考失败。源页签可能已被删除。
 Variable Studios	Variable Studio
 Variable feature	可变功能
+Variable fillet	可变圆角
 Variable input	变量输入
 Variable name must be a letter followed by a string of letters or numbers.	变量名称必须以字母开头，后跟由字母或数字组成的字符串。
 Variable table	变量表格
 Variable tables are not shown without edit or copy permissions.	没有编辑或复制权限无法显示变量表格。
+Variable type	变量类型
 Variables are used to drive mates and part configurations in the assembly.	变量用于驱动装配体中的配合和零件配置。
 Variables are used to drive sketch and feature parameters in the Part Studio.	变量用于在 Part Studio 中驱动草图和特征参数。
 Vendor	供应商
@@ -7272,12 +8413,17 @@ Versions of __instanceName__ and __extraNumber__ referenced elements updated.	�
 Versions of a document in trash cannot be shown.	无法显示垃圾桶中文档的属性。
 Versions updated	版本已更新
 Vertex	顶点
+Vertex overrides	顶点覆盖
+Vertex pairs to split with	用于分割的顶点对
 Vertical	竖直
 Vertical (v)	竖直 (v)
 Vertical zones	竖直分区
 Vertices	顶点
+Vertices or curves	顶点或曲线
+Vertices or edges	顶点或边
 Very fine	极精细
 Very fine tessellation (__numberOfVeryFineTessellation__)	非常精细的镶嵌 (__numberOfVeryFineTessellation__)
+Via	过孔
 Video	视频
 View	查看
 View & comment	查看和评论
@@ -7344,7 +8490,9 @@ Volume	体积
 Wait	等候
 Waiting for workflow transition…	正在等待工作流程过渡…
 Waiting to run…	正在等待运行...
+Wall face or bounding edge to hold	要保持的壁面或边界线
 Wall stripes	墙条纹
+Walls	壁
 Warning: Onshape does not currently support ' + browserName + '.	警告：Onshape 当前不支持 ' + browserName + '。
 Warning: Onshape does not currently support mobile browsers.	警告：Onshape 当前不支持移动浏览器。
 Warning: White is a difficult color to see on an Onshape drawing.	警告：白色是在 Onshape 工程图中很难看出的颜色。
@@ -7378,9 +8526,11 @@ Webhook signatures	Webhook 签名
 Webhooks	Webhook
 Wednesday	星期三
 Weekly	每周
+Weight	权重
 Weight property	权重属性
 Weighted average	加权平均
 Weighted sum	加权总和
+Welcome to Creo Generative Design Extension	欢迎使用 Creo Generative Design Extension
 Welcome to Creo Generative Design Extension (GDX)	欢迎使用 Creo Generative Design Extension (GDX)
 Weld	焊接
 Weld symbol	焊接符号
@@ -7402,7 +8552,9 @@ Where used for workspaces is not supported.	不支持工作区的“使用处”
 Where used is not included in your current Onshape subscription plan	“使用处”目前不包含在您当前的 Onshape 订阅计划中
 Where used…	使用处…
 White	白色
+Width	宽度
 Width mate	宽度配合
+Width mate connectors	宽度配合连接器
 Will be seen by all members of the connection.	将被连接的所有成员看到。
 Will navigate to versions and history	将导航到版本和历史记录
 Windchill BOM sync scheduled.	已安排同步 Windchill 物料清单。
@@ -7472,8 +8624,20 @@ Workspace units…	工作区单位…
 Workspaces	工作区
 Workspaces and versions	工作区和版本
 Workspaces can be restored within 30 days of deletion.	可以在删除后的 30 天内还原工作区。
+World	世界坐标系
 Wrap	包覆
 Wrap faces or sketch entities around a cylindrical or conical part or surface. Create, add to, subtract from, or intersect solids. Create surfaces or split the target face. Adjust the position of the result by specifying anchor points, angle, or shift.	绕圆柱零件或圆锥零件或曲面包覆面或草图图元。创建实体、添加到实体、从实体中减去或与实体相交。创建曲面或分割目标面。通过指定锚点、角度或偏移来调整结果的位置。
+X offset	X 偏移
+X rotation	X 轴旋转
+X scale	X 比例
+X translation	X 向平动
+XY plane	XY 平面
+XZ plane	XZ 平面
+Y offset	Y 偏移
+Y rotation	Y 轴旋转
+Y scale	Y 比例
+Y translation	Y 向平动
+YZ plane	YZ 平面
 Yellow	黄色
 Yes	是
 Yes, I'm a student	是的，我是学生
@@ -7619,6 +8783,10 @@ Your subscription will be invoiced to the address on file:	您的订阅将开具
 Your system is running an integrated GPU. If you have a dual-GPU system with a discrete chipset (NVIDIA or AMD) you can get better performance by forcing the browser to use the discrete GPU. See	您的系统运行的是集成 GPU。如果您的双 GPU 系统具有独立芯片组（NVIDIA 或 AMD），则可以通过强制浏览器使用独立 GPU 来获得更好的性能。请参阅
 Your toolbar changed elsewhere, so we could not apply your edit.	您的工具栏已在其他位置更改，我们无法应用您的编辑。
 Your__type__ library is already up to date.	您的 __type__ 库已经是最新。
+Z offset	Z 偏移
+Z rotation	Z 轴旋转
+Z scale	Z 比例
+Z translation	Z 向平动
 Zebra stripes	斑马条纹
 Zebra stripes are not supported during interference detection.	在干涉检测期间不支持斑马条纹。
 Zebra stripes…	斑马条纹…

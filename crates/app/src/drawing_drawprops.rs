@@ -440,14 +440,16 @@ impl DrawingEditor {
         };
         // Font row: family, Bold, Italic (the default is the drawing sans).
         let font_row = |w: FontOf, cur: Option<noshape_model::drawing::sheet::TextFont>, cx: &mut Context<Self>| -> AnyElement {
-            use noshape_model::drawing::sheet::{FONT_FAMILIES, TextFont};
-            let label = cur.as_ref().map(|f| f.family.clone()).unwrap_or_else(|| "Default".into());
-            let mut items: Vec<(String, bool, Act)> = vec![("Default".into(), cur.is_none(), std::rc::Rc::new(move |p: &mut DrawingProps| *font_of(p, w) = None) as Act)];
+            use noshape_model::drawing::sheet::{DRAWING_DEFAULT_FONT, FONT_FAMILIES, TextFont};
+            // Live (dom/drawing-properties-annotations): "Noto Sans" of the 22
+            // families; no separate Default entry.
+            let label = cur.as_ref().map(|f| f.family.clone()).unwrap_or_else(|| DRAWING_DEFAULT_FONT.into());
+            let mut items: Vec<(String, bool, Act)> = Vec::new();
             for fam in FONT_FAMILIES {
-                let on = cur.as_ref().is_some_and(|f| f.family == fam);
+                let on = cur.as_ref().map_or(fam == DRAWING_DEFAULT_FONT, |f| f.family == fam);
                 items.push((fam.to_string(), on, std::rc::Rc::new(move |p: &mut DrawingProps| {
                     let f = font_of(p, w);
-                    let (b, i) = f.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
+                    let (b, i) = f.as_ref().map(|f| (f.bold, f.italic)).filter(|_| !noshape_model::drawing::sheet::is_shx(fam)).unwrap_or((false, false));
                     *f = Some(TextFont { family: fam.into(), bold: b, italic: i });
                 }) as Act));
             }
@@ -467,13 +469,15 @@ impl DrawingEditor {
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.set_drawing_prop(&move |p| {
                             let slot = font_of(p, w);
-                            let mut font = slot.clone().unwrap_or_else(|| TextFont { family: FONT_FAMILIES[0].into(), bold: false, italic: false });
+                            let mut font = slot.clone().unwrap_or_else(|| TextFont { family: DRAWING_DEFAULT_FONT.into(), bold: false, italic: false });
                             f(&mut font);
                             *slot = Some(font);
                         }, cx)
                     }))
             };
             let (b, i) = cur.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
+            // Live (asb 10-24): SHX fonts disable Bold and Italic.
+            let shx = cur.as_ref().is_some_and(|f| noshape_model::drawing::sheet::is_shx(&f.family));
             let id = match w {
                 FontOf::Dims => ("dp-dfont", "dp-dfont-b", "dp-dfont-i"),
                 FontOf::Inspection => ("dp-ifont", "dp-ifont-b", "dp-ifont-i"),
@@ -485,8 +489,8 @@ impl DrawingEditor {
             h_flex()
                 .gap(px(2.))
                 .child(select(id.0, label, items))
-                .child(toggle(id.1, "B", b, |f| f.bold = !f.bold, cx))
-                .child(toggle(id.2, "I", i, |f| f.italic = !f.italic, cx))
+                .child(if shx { div().size(px(24.)).flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).opacity(0.4).child("B").into_any_element() } else { toggle(id.1, "B", b, |f| f.bold = !f.bold, cx).into_any_element() })
+                .child(if shx { div().size(px(24.)).flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).opacity(0.4).child("I").into_any_element() } else { toggle(id.2, "I", i, |f| f.italic = !f.italic, cx).into_any_element() })
                 .into_any_element()
         };
         // Live dom drawing-properties-*: labels 14 px in, 13.33 px #666; group
@@ -533,8 +537,8 @@ impl DrawingEditor {
                 .child(row("Dimension location", select("dp-dual-dloc", props.dual.dim_location.name().into(), noshape_model::drawing::DualLocation::ALL.iter().map(|&l| (l.name().to_string(), l == props.dual.dim_location, std::rc::Rc::new(move |p: &mut DrawingProps| p.dual.dim_location = l) as Act)).collect())))
                 .child(row("Hole/thread callout location", select("dp-dual-hloc", props.dual.hole_location.name().into(), noshape_model::drawing::DualLocation::ALL.iter().map(|&l| (l.name().to_string(), l == props.dual.hole_location, std::rc::Rc::new(move |p: &mut DrawingProps| p.dual.hole_location = l) as Act)).collect())))
                 .child(row("Units", select("dp-dual-units", props.dual.units_for(self.drawing.units_mm).name().into(), DimUnits::ALL.iter().map(|&u| (u.name().to_string(), u == props.dual.units_for(self.drawing.units_mm), std::rc::Rc::new(move |p: &mut DrawingProps| p.dual.units = Some(u)) as Act)).collect())))
-                .child(row("Precision", select("dp-dual-prec", shown(props.dual.precision, 2), precision_items(props.dual.precision, 6, |p, v| p.dual.precision = v))))
-                .child(row("Tolerance precision", select("dp-dual-tprec", shown(props.dual.tolerance_precision, 2), precision_items(props.dual.tolerance_precision, 6, |p, v| p.dual.tolerance_precision = v))))
+                .child(row("Precision", select("dp-dual-prec", shown(props.dual.precision, 3), precision_items(props.dual.precision, 6, |p, v| p.dual.precision = v))))
+                .child(row("Tolerance precision", select("dp-dual-tprec", shown(props.dual.tolerance_precision, 3), precision_items(props.dual.tolerance_precision, 6, |p, v| p.dual.tolerance_precision = v))))
                 .child(section("Leading and trailing zeros"))
                 .child(check("dp-lz", "Length leading zeros", props.leading_zeros, |p, v| p.leading_zeros = v, cx))
                 .child(check("dp-tz", "Length trailing zeros", props.trailing_zeros, |p, v| p.trailing_zeros = v, cx))
@@ -910,7 +914,7 @@ impl DrawingEditor {
         let ed = cx.entity();
         let locked = self.drawing.props.locked;
         let dwt = Button::new("dp-dwt").ghost().small().w(px(25.)).h(px(25.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
-            for row in crate::drawing_create::template_rows() {
+            for row in noshape_ops::drawing::template_rows() {
                 let e = ed.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(row.file).on_click(move |_, _, cx| {
                     e.update(cx, |t, cx| {

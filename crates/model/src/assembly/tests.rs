@@ -974,7 +974,7 @@ fn mirror_instances_across_connector_plane() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Mirror 1".into(),
-        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: false, derived: vec![], placement: vec![] },
+        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: false, derived: vec![], placement: vec![], mirrored_studios: vec![] },
         seeds: vec![InstanceId(1)],
         generated: vec![],
         suppressed: false,
@@ -989,6 +989,89 @@ fn mirror_instances_across_connector_plane() {
     // A proper rigid motion (no reflection in the stored placement).
     let p = res.solved.placement(created[0]).unwrap();
     assert!((quat_of(&p).length() - 1.0).abs() < 1e-9);
+}
+
+/// Live's Mirror strategy (behaviours "skb (10-23 15:30)" (2), (3)): a part's
+/// symmetry is detected about its bounding box mid-planes; Transform with
+/// Placement type Bounding box XY / Origin XY is the reflection completed by
+/// the part's XY plane through its bounds' centre / its origin (a rotation
+/// of 180° about Y for a mirror in X): Bounding box XY keeps the Z range,
+/// Origin XY flips the copy below Z = 0.
+#[test]
+fn mirror_placement_types_and_symmetry() {
+    use super::MirrorPlacement;
+    let block = noshape_kernel::make_box_corners(DVec3::ZERO, DVec3::new(0.05, 0.02, 0.04)).unwrap();
+    assert_eq!(super::eval::part_symmetry(&block), [true; 3]);
+    let notch = noshape_kernel::make_box_corners(DVec3::ZERO, DVec3::new(0.01, 0.005, 0.01)).unwrap();
+    let notched = noshape_kernel::cut(&block, &notch).unwrap().shape;
+    assert_eq!(super::eval::part_symmetry(&notched), [false; 3]);
+    // Fillets (tori, B-spline blends) don't spoil it: the top edges rounded.
+    let rounded = with_feature(block_studio(), "fillet", |f, r| {
+        f.params.set("entities", ParamValue::Query(edges_with(r, "CapEnd")));
+        f.params.set("radius", ParamValue::Expr(ExprValue::new("2 mm")));
+    });
+    let fr = doc_with(vec![rounded]);
+    let mut evr = AssemblyEvaluator::new();
+    let (rb, rr) = body_of(&mut evr, &fr.doc, fr.studios[0]);
+    assert_eq!(super::eval::part_symmetry(&rr.context.body(&rb).unwrap().shape), [true, true, false]);
+    // The demo parts: the plate (off-centre holes, top fillet) has none, the
+    // pin every one, the flange X and Y.
+    let doc = crate::demo::demo_document();
+    for (tab, want) in [("Part Studio 1", [false; 3]), ("Pin", [true; 3]), ("Flange", [true, true, false])] {
+        let t = doc.tabs.iter().find(|t| t.name == tab).unwrap();
+        let r = AssemblyEvaluator::new().studio(&doc, t.id, &Default::default()).unwrap();
+        assert_eq!(super::eval::part_symmetry(&r.context.bodies[0].shape), want, "{tab}");
+    }
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    for (pl, z_lo, z_hi) in [(MirrorPlacement::BoxXY, 0.0, 0.01), (MirrorPlacement::OriginXY, -0.01, 0.0)] {
+        let mut asm = Assembly {
+            instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::new(0.05, 0.0, 0.0), true)],
+            connectors: vec![x_axis_connector(60)],
+            ..Default::default()
+        };
+        asm.patterns.push(InstancePattern {
+            id: MateId(70),
+            name: "Mirror 1".into(),
+            kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: false, derived: vec![], placement: vec![(InstanceId(1), pl)], mirrored_studios: vec![] },
+            seeds: vec![InstanceId(1)],
+            generated: vec![],
+            suppressed: false,
+        });
+        let created = asm.sync_pattern(MateId(70));
+        let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+        assert_eq!(res.prepared.mirror_symmetric.get(&InstanceId(1)), Some(&true));
+        let occ = res.occurrences.iter().find(|o| o.top() == created[0]).unwrap();
+        let (lo, hi) = occ.world_bounds().unwrap();
+        assert!((lo - DVec3::new(-0.09, 0.0, z_lo)).length() < 1e-6 && (hi - DVec3::new(-0.05, 0.02, z_hi)).length() < 1e-6, "{pl:?}: {lo:?} {hi:?}");
+        // 180° about Y.
+        let q = quat_of(&res.solved.placement(created[0]).unwrap());
+        assert!((q * DVec3::X + DVec3::X).length() < 1e-6 && (q * DVec3::Y - DVec3::Y).length() < 1e-6, "{pl:?}: {q:?}");
+    }
+}
+
+/// Live's Mirror strategy › Update with Derived (behaviours "skb (10-23
+/// 15:30)" (1), (4)): a "<Part Studio>-Mirrored" Part Studio with one
+/// "Derived mirror" feature, inside the folder "Mirrored parts and
+/// assemblies" at the end of the tab bar; a second Derived mirror of the same
+/// source reuses it.
+#[test]
+fn derived_mirror_makes_one_mirrored_studio() {
+    let mut f = doc_with(vec![block_studio()]);
+    let src = f.studios[0];
+    let name = f.doc.tab(src).unwrap().name.clone();
+    let m = f.doc.ensure_mirrored_studio(src).unwrap();
+    let tab = f.doc.tab(m).unwrap();
+    assert_eq!(tab.name, format!("{name}-Mirrored"));
+    let crate::document::TabContent::PartStudio(ps) = &tab.content else { panic!("a Part Studio") };
+    assert_eq!(ps.features.len(), 1);
+    assert_eq!((ps.features[0].type_id.as_str(), ps.features[0].name.as_str()), ("derivedMirror", "Derived mirror"));
+    let folder = f.doc.parent_of(m).unwrap();
+    assert_eq!(f.doc.folder(folder).unwrap().name, crate::document::MIRRORED_FOLDER);
+    assert_eq!(f.doc.settings.tab_order.iter().rev().take(2).copied().collect::<Vec<_>>(), vec![m, folder]);
+    assert_eq!(f.doc.ensure_mirrored_studio(src), Some(m));
+    assert_eq!(f.doc.tabs.len(), 2);
 }
 
 /// 80 x 40 x 10 mm plate with two 5 mm holes at x = ±20 mm and a 3 mm hole at (0, 10).
@@ -1438,7 +1521,7 @@ fn handed_mirror_creates_mirrored_part() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Mirror 1".into(),
-        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: true, derived: vec![], placement: vec![] },
+        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: true, derived: vec![], placement: vec![], mirrored_studios: vec![] },
         seeds: vec![InstanceId(1)],
         generated: vec![],
         suppressed: false,
@@ -1464,15 +1547,18 @@ fn handed_mirror_creates_mirrored_part() {
     let rows = bom(&res);
     assert_eq!(rows.len(), 2);
     assert!(rows[1].mirrored && rows[1].name.ends_with("(mirrored)"));
-    // Turning the option off makes the copy a plain (rigid) part again.
+    // Turning the option off makes the copy a plain (rigid) part again. The
+    // plate is symmetric (about its XY mid-plane), so Auto position's rigid
+    // copy still lands as the mirror image (the small hole at y = -110 mm).
     if let PatternKind::Mirror { handed, .. } = &mut asm.patterns[0].kind {
         *handed = false;
     }
     asm.sync_pattern(MateId(70));
     assert!(matches!(asm.instance(created[0]).unwrap().source, InstanceSource::Part { .. }));
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(!res.occurrences.iter().find(|o| o.top() == created[0]).unwrap().mirrored);
     let w = res.connector_world(&conn(created[0].0, small, Inference::Centroid), &units).unwrap();
-    assert!((w.origin.y + 0.09).abs() < 1e-6, "rigid copy: {:?}", w.origin);
+    assert!((w.origin.y + 0.11).abs() < 1e-6, "rigid copy: {:?}", w.origin);
     // Live's Mirror strategy: Mirror action Derived for this seed alone.
     if let PatternKind::Mirror { derived, .. } = &mut asm.patterns[0].kind {
         derived.push(InstanceId(1));
@@ -3626,6 +3712,15 @@ fn b17_keys_match_live() {
         assert_eq!(b.faces.len(), faces, "{name} {size}");
         assert!((area / live_area - 1.0).abs() < 1e-6, "{name} {size}: area {area} live {live_area}");
     }
+    // Live's Length is a free text box: a typed length stays through size
+    // changes and names the part ("… x 2.5").
+    let c = CATALOGUE.iter().find(|c| c.name == "B17.1 Standard parallel key").unwrap();
+    assert!(c.length_edit);
+    let mut spec = StandardSpec::new(c);
+    assert_eq!(spec.length.as_deref(), Some("1"));
+    spec.length = Some("2.5".into());
+    spec.set_size("26 - 30");
+    assert_eq!(spec.part_name(), "Parallel key B17.1 7 x 5 x 2.5");
     let c = CATALOGUE.iter().find(|c| c.name == "B17.1 Tapered key").unwrap();
     let mut spec = StandardSpec::new(c);
     spec.set_size("7/16 - 9/16");
@@ -3640,18 +3735,28 @@ fn b17_keys_match_live() {
 #[test]
 fn retaining_rings_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    let cases: [(&str, &str, usize, f64); 11] = [
+    let cases: [(&str, &str, usize, f64); 19] = [
         ("External retaining ring DIN 471", "3", 16, 2.9818272413563026e-5),
         ("External retaining ring DIN 471", "20", 16, 4.335286134113179e-4),
         ("External retaining ring DIN 471", "300", 16, 2.9904218621879402e-2),
         ("External heavy retaining ring DIN 471", "15", 16, 3.8767709584080676e-4),
         ("External retaining ring ANSI", "1/8", 16, 1.7601329908219825e-5),
         ("External retaining ring ANSI", "10", 16, 2.9542221674196612e-2),
+        // Internal rings by live's configuration (behaviours "skb (10-24)
+        // rings / washers", dom/skb-sc-geom/*-cfg.json): A 12 faces, B 16, C 8.
         ("Internal retaining ring DIN 472", "8", 12, 9.06039056661354e-5),
         ("Internal retaining ring DIN 472", "20", 12, 3.530270066208348e-4),
-        ("Internal retaining ring DIN 472", "300", 12, 3.015440638327799e-2),
+        ("Internal retaining ring DIN 472", "50", 16, 1.736065747516791e-3),
+        ("Internal retaining ring DIN 472", "165", 16, 1.2673866128864023e-2),
+        ("Internal retaining ring DIN 472", "170", 8, 1.6487842814705427e-2),
+        ("Internal retaining ring DIN 472", "300", 8, 3.598308846165846e-2),
+        ("Internal heavy retaining ring DIN 472", "20", 12, 4.3285329774319357e-4),
+        ("Internal heavy retaining ring DIN 472", "24", 12, 5.705149742541508e-4),
+        ("Internal heavy retaining ring DIN 472", "25", 16, 6.296372798030354e-4),
+        ("Internal heavy retaining ring DIN 472", "50", 16, 1.9563687460152457e-3),
+        ("Internal heavy retaining ring DIN 472", "100", 16, 6.267662448717445e-3),
         ("Internal retaining ring ANSI", "1/4", 12, 4.179622202617048e-5),
-        ("Internal retaining ring ANSI", "10", 12, 2.6594710422036226e-2),
+        ("Internal retaining ring ANSI", "10", 16, 2.6929616519916714e-2),
     ];
     for (name, size, faces, live_area) in cases {
         let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));

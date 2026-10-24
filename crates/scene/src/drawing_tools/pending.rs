@@ -117,10 +117,12 @@ impl SheetPick<'_> {
                 // BOM item number).
                 let (text, style) = v.callout.clone().unwrap_or_default();
                 let mut kind = AnnotationKind::balloon(a.view, a.p, text);
-                // On an assembly part (a face): a dot instead of an arrow.
+                // A click on an edge or snap point: the leader ends in an
+                // arrow, also on an assembly part; a dot only inside a face
+                // (`finish_callout`, live qa4 round 4 S2).
                 if let AnnotationKind::Balloon { callout, .. } = &mut kind {
                     *callout = style;
-                    callout.on_face = linked;
+                    callout.on_face = leader_dot(true, linked);
                     callout.part = part;
                 }
                 Some(ann(kind, vec![(0, a.r.clone())]))
@@ -313,5 +315,23 @@ impl SheetPick<'_> {
         let mut s = self.current_sheet().clone();
         let id = s.add_sketch_dimension(e, self.cursor)?;
         s.annotations.into_iter().find(|a| a.id == id)
+    }
+}
+
+/// Whether a callout's leader ends in a dot: only when it is attached inside a
+/// face (or a silhouette) of an assembly part; on an edge or a snap point it
+/// ends in an arrow (live qa4 round 4 S2: arrowheads on Parts 1 and 3's edges,
+/// a dot inside Part 2's face).
+pub(crate) fn leader_dot(on_edge_or_point: bool, assembly_part: bool) -> bool {
+    !on_edge_or_point && assembly_part
+}
+
+#[cfg(test)]
+mod leader_tests {
+    #[test]
+    fn callout_leaders_end_in_arrows_on_edges() {
+        assert!(!super::leader_dot(true, true), "an edge of an assembly part: arrow");
+        assert!(super::leader_dot(false, true), "inside an assembly part's face: dot");
+        assert!(!super::leader_dot(false, false));
     }
 }

@@ -4,6 +4,13 @@ qa5, 2026-10-21 pass 4, CLI /tmp/qa5/noshape-cli-1436 `import_files` (defaults),
 script /root/qa5-scratch/pass3/impmatrix.py, raw results pass3/impmatrix.log/.json. Live values: behaviours.md G13–G38, G47.
 Status: ✅ matches live (≤1e-5 relative), ✗ differs, ? live value unknown.
 
+**Grading rule for volumes and areas (lead, 2026-10-24):** Onshape's mass properties are estimates with a band
+(REST massproperties `[value, lo, hi]`; e.g. "kern G24 b" volume 7582.912205 in 7576.2420 – 7589.5825, and its own
+STEP / SAT re-imports give 7582.848 / 7582.872; behaviours.md "api (10-23) import parity"). An import **matches**
+(✅) when our value lies inside live's band **and** the faces whose exact areas can be computed (planes, cylinders,
+cones, spheres, tori) have those areas; digit-for-digit equality with live's estimate is not required. Rows without a
+known band keep the ≤1e-5 rule until live supplies one.
+
 | Sample (format) | Ours | Live | Status |
 |---|---|---|---|
 | g36-g24b-v25.0 … v38.1 (27 Parasolid versions) | 7583.000869, 18 faces, all identical | B-rep 7582.912205 | ✗ I1 (+0.089, same for every version) |
@@ -108,3 +115,35 @@ impmatrix16 (117 samples incl. the new psb-L11-boss-fillet.step: Part 1 8179.765
 | IM2 B-spline volumes | unchanged (ktane, McMaster, g26, g48, g49, g50 same digits as pass 16) | ✗ kern |
 | I1 g25-b SAT / STEP / X_T | 7585.978524 / 7582.713024 / 7583.000869, unchanged | ✗ kern |
 | No import errors | 0 errors over every sample (incl. qa4-s5-*) | ✅ |
+
+## IM2 graded under the band rule (api, 2026-10-24)
+Live: behaviours.md "api (10-24) IM2 bands" (REST massproperties `[value, lo, hi]`; the four g38b rows are from live's
+native Part Studios the .x_t files were exported from, not re-uploaded). Ours: CLI from agent/api 1958242d,
+`import_files` with defaults, `query_mass_properties` + `query_entities` (/root/api-scratch/im2).
+| Sample | Ours volume / area / faces | Live band volume / area / faces | Status |
+|---|---|---|---|
+| g26-revolved-spline.x_t | 1726.080764 / 764.757501 / 3 | 1723.48714–1728.70956 / 763.82643–765.64946 / 3 | ✅ |
+| g48-types.step | 22595.371166 / 5859.027270 / 15 | 22593.47604–22597.26157 / 5858.64505–5859.41140 / 15 | ✅ |
+| g49-chamfer1.x_t | 44833.530070 / 7674.032869 / 10 | 44830.51265–44836.20455 / 7673.93667–7674.10522 / 10 | ✅ |
+| g49-chamfer2.x_t | 44789.972897 / 7654.531075 / 10 | 44786.54841–44793.28002 / 7654.41848–7654.65347 / 10 | ✅ |
+| g50-reorder-shell1.x_t | 5990.523086 / 12131.769122 / 20 | 5986.86289–5994.17629 / 12131.64289–12131.90190 / 20 | ✅ |
+| g50-g46-shell1.x_t (IM4) | 6053.320139 / 12258.695405 / 21 | 6048.91104–6056.61040 / 12258.60418–12258.89664 / 21 | ✅ |
+| g38b-ktane_Bracket.x_t | 19377.868698 / 9223.353906 / 12 | 19370.14999–19387.54423 / 9222.82507–9224.00498 / 12 | ✅ |
+| g38b-psas_Bell_Crank.x_t | 2050.807089 / 1921.487523 / 27 | 2050.43259–2051.24046 / 1921.37196–1921.61854 / 27 | ✅ |
+| g38b-mcmaster-91274A118.x_t | 254.521984 / 407.613254 / 25 | 248.20340–260.60416 / 397.20399–417.95194 / 25 | ✅ |
+| g38b-fluxpad_102_STEM.x_t | 255.767857 / 636.018340 / 167 | 255.68612–255.85159 / 635.94739–636.09426 / 167 | ✅ |
+
+IM2 is closed on volumes and areas: every value lies inside live's band, with the same face counts.
+
+**IM2b, per-face check (live: behaviours.md "api (10-24) IMP2 parts order + IM2 per-face data", the Geom dump's evArea):**
+| Sample | Faces equal to live (≤1e-6 rel.) | Faces that differ (ours − live, mm²) | Status |
+|---|---|---|---|
+| g50-g46-shell1.x_t | 17 of 21: every plane but F11, cylinders F6, F7, F17 | **F18 cylinder r2 −0.0617** (82.786126 vs 82.8478429); F8 −0.0093 (ours B-spline, live EXTRUDED); F19 OTHER +0.0081; F11 plane −0.0004 (45.999575 vs 46) | ✗ **IM2b** |
+| g38b-mcmaster-91274A118.x_t (live: native import) | 22 of 25: every plane and cone, F4, F6 | **F0 cylinder r1.545 +0.0341** (13.946297 vs 13.9122437); thread flanks F1 −0.0008, F2 −0.0016 | ✗ **IM2b** |
+
+The differing faces all meet the blend pieces (g50) or the thread flanks (McMaster): their shared edges are bounded
+differently from live's. On g50, F18 + F8 + F19 + F11 add up to the whole −0.063 gap between our Σ 12258.695 and live's
+Σ 12258.759. Live's EXTRUDED F8 is a B-spline in ours. The other samples have no live per-face data.
+
+**IMP2 (parts order after a two-part STEP import): ✅.** Live lists "Part 2, Part 1" for g48-two.step, which is the
+file's product/body order, the same as ours.

@@ -99,23 +99,105 @@ impl Render for MateDrag {
     }
 }
 
-/// Section view state.
-pub(crate) struct AsmSection {
-    pub label: String,
+/// A section plane (origin, normal, offset along it, flipped) and its
+/// in-plane X axis (the rotate handles turn it about X and Y).
+#[derive(Clone, Debug)]
+pub(crate) struct AsmSectionPlane {
     pub origin: DVec3,
     pub normal: DVec3,
     pub offset: f64,
     pub flipped: bool,
-    pub input: Entity<InputState>,
-    _sub: Subscription,
+    pub x: DVec3,
 }
 
-impl AsmSection {
+impl AsmSectionPlane {
+    pub fn new(origin: DVec3, normal: DVec3, x: DVec3) -> Self {
+        let x = (x - normal * x.dot(normal)).try_normalize().unwrap_or_else(|| normal.any_orthonormal_vector());
+        Self { origin, normal, offset: 0.0, flipped: false, x }
+    }
+
     /// Clip plane (normal, d): geometry with dot(normal, p) > d is removed.
     pub fn clip(&self) -> (DVec3, f64) {
         let n = if self.flipped { -self.normal } else { self.normal };
         (n, n.dot(self.origin + self.normal * self.offset))
     }
+
+    /// The manipulator's base (on the plane).
+    pub fn base(&self) -> DVec3 {
+        self.origin + self.normal * self.offset
+    }
+
+    /// The arrow's direction: the side cut away.
+    pub fn dir(&self) -> DVec3 {
+        if self.flipped { -self.normal } else { self.normal }
+    }
+
+    pub fn y(&self) -> DVec3 {
+        self.normal.cross(self.x)
+    }
+
+    /// Live's chip suffix (behaviours "skb (10-24) assembly section"): the
+    /// standard direction the arrow points along ("Top", "Back" when the
+    /// Front plane is flipped, …), nothing once rotated off them.
+    pub fn direction_name(&self) -> &'static str {
+        let d = self.dir();
+        let names = [(DVec3::Z, "Top"), (DVec3::NEG_Z, "Bottom"), (DVec3::NEG_Y, "Front"), (DVec3::Y, "Back"), (DVec3::X, "Right"), (DVec3::NEG_X, "Left")];
+        names.iter().find(|(v, _)| d.dot(*v) > 1.0 - 1e-9).map(|(_, n)| *n).unwrap_or("")
+    }
+}
+
+pub(crate) use crate::assembly_scene::SectionHandle;
+
+/// Section view state (Onshape's Section view dialog, as in the Part Studio).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct AsmSection {
+    pub planes: Vec<AsmSectionPlane>,
+    /// Include tab: only the listed instances are cut (Exclude: they aren't).
+    pub include: bool,
+    /// Instances in "Items to exclude/include".
+    pub items: Vec<InstanceId>,
+    /// The open dialog.
+    pub dialog: Option<AsmSectionDialog>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AsmSectionDialog {
+    /// The "Items" field takes picks (else "Section planes").
+    pub items_active: bool,
+    /// The plane the dialog edits (the manipulator's).
+    pub active: usize,
+    /// It was picked in this dialog: its chip is bold, its cap tan. Not in
+    /// "Edit section view…" until a plane is picked (live dark-2437, 2403).
+    pub chosen: bool,
+    /// The section before the dialog opened (restored by Cancel).
+    saved: Option<Box<AsmSection>>,
+}
+
+/// Most section planes the renderer cuts with.
+const MAX_SECTION_PLANES: usize = 3;
+
+/// A drag of a section handle: the plane as it was at the press, the
+/// press's grab (arrow: parameter along it; ring: the start vector around
+/// its axis; base: the point on the plane) and the dragged value (length
+/// from the start / angle).
+#[derive(Clone, Debug)]
+pub(crate) struct SectionDrag {
+    pub handle: SectionHandle,
+    pub plane0: AsmSectionPlane,
+    pub s0: f64,
+    pub v0: DVec3,
+    pub grab0: DVec3,
+    pub value: f64,
+    pub moved: bool,
+}
+
+/// The value box after a section drag (live: Onshape's canvas number box,
+/// focused and selected; Enter moves the plane from the drag's start).
+pub(crate) struct SectionValue {
+    pub handle: SectionHandle,
+    pub plane0: AsmSectionPlane,
+    pub input: Entity<crate::quantity_field::QuantityInput>,
+    _sub: Subscription,
 }
 
 /// Row being renamed inline.
@@ -272,8 +354,29 @@ pub(crate) struct AsmUi {
     pub measure_settings: crate::measure_panel::MeasureSettings,
     /// Section view (Shift+X): plane origin, normal, offset, flipped, offset field.
     pub section: Option<AsmSection>,
+    /// A drag of the section arrow in progress.
+    pub section_drag: Option<SectionDrag>,
+    /// The section manipulator's value box (after a drag).
+    pub section_value: Option<SectionValue>,
     /// Isolate / Make transparent slider: opacity of the transparent instances.
     pub transparency: Option<f32>,
+    /// Camera menu render choices (Onshape's display modes, hidden and
+    /// tangent edges) and View in high quality.
+    pub display_mode: crate::scene_builder::DisplayMode,
+    pub hidden_edges_visible: bool,
+    pub tangent_edges: crate::scene_builder::TangentEdges,
+    pub high_quality: bool,
+    /// Cameras before each view change, for "Previous view".
+    pub cam_history: Vec<noshape_render::Camera>,
+    /// The open Graphics preferences dialog.
+    pub graphics_dialog: Option<(Entity<crate::graphics_prefs_dialog::GraphicsPrefsDialog>, Subscription)>,
+    /// The open camera menu (its button shows the open state).
+    pub camera_menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
+    /// The open Named views dialog's name field, and the view picked in its list.
+    pub named_views: Option<(Entity<InputState>, Subscription)>,
+    pub named_view_picked: Option<String>,
+    /// The Graphics preferences the scene is built with (kept current).
+    pub graphics: crate::graphics_prefs::GraphicsPrefs,
     /// Isolate dialog › Select transparent geometry; Alt held (pick through
     /// transparent instances).
     pub select_transparent: bool,
@@ -678,8 +781,7 @@ impl AssemblyView {
             cx.notify();
             return;
         }
-        let n = clip.instances.len();
-        let ids = self.edit_insert(&if n == 1 { format!("Paste {}", clip.instances[0].name) } else { format!("Paste {n} items") }, cx, |a| clip.paste(a, [0.0; 3])).unwrap_or_default();
+        let ids = self.edit_insert(&noshape_ops::assembly::paste_description(&clip), cx, |a| clip.paste(a, [0.0; 3])).unwrap_or_default();
         self.start_placing(ids, cx);
     }
 
@@ -837,8 +939,8 @@ impl AssemblyView {
         let tg = targets.clone();
         m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(tg.clone(), !hidden, cx)));
         let tg = targets.clone();
-        m.push(item("Hide other instances", move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
-        m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
+        m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
+        m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
         let tg = targets.clone();
         let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == targets);
         m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
@@ -868,20 +970,21 @@ impl AssemblyView {
         let best = inst.best_tessellation;
         let tg = targets.clone();
         m.push(item(if best { "Use automatic tessellation setting" } else { "Use best available tessellation" }, move |t, _, cx| t.set_best_tessellation(tg.clone(), !best, cx)));
+        // Live (behaviours "qa4 S2" instance menu, "skb sc stack" (7);
+        // locales/de-menu-long-asm-instance-*): with mates, "Show mates" and
+        // "Hide mates" follow Use best available tessellation in both menus
+        // (they show / hide the selected instances' mates).
+        let mates: Vec<MateId> = asm.mates.iter().filter(|mt| mt.instances().iter().any(|i| targets.contains(i))).map(|mt| mt.id).collect();
+        if !mates.is_empty() {
+            let ids = mates.clone();
+            m.push(item("Show mates", move |t, _, cx| t.set_mates_hidden(ids.clone(), false, cx)));
+            m.push(item("Hide mates", move |t, _, cx| t.set_mates_hidden(mates.clone(), true, cx)));
+        }
+        // (With mates too: their order against Check interference… is
+        // UNCONFIRMED.)
         if is_asm || multi {
             let tg = targets.clone();
             m.push(item("Check interference…", move |t, _, cx| t.open_interference_with(tg.clone(), cx)));
-        }
-        // Show mates (instances with mates).
-        let mated = asm.mates.iter().any(|mt| mt.instances().contains(&top));
-        if mated && !graphics {
-            m.push(MenuEntry::Sep);
-            m.push(item("Show mates", move |t, _, cx| {
-                t.show_mates_mode = true;
-                t.mates_pinned = Some(top);
-                t.update_capture(cx);
-                t.refresh_scene(false, cx);
-            }));
         }
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
@@ -1226,13 +1329,7 @@ impl AssemblyView {
             return;
         }
         let (instances, features) = (d.instances, d.features);
-        let Some(fid) = self.edit("Add selection to folder", cx, |a| {
-            let id = a.add_folder(&instances, &features);
-            if let Some(f) = a.folders.iter_mut().find(|f| f.id == id) {
-                f.name = name.clone();
-            }
-            id
-        }) else {
+        let Some(fid) = self.edit(noshape_ops::assembly::ADD_FOLDER_DESCRIPTION, cx, |a| noshape_ops::assembly::add_folder(a, &instances, &features, &name)) else {
             return;
         };
         if features.is_empty() {
@@ -1469,8 +1566,8 @@ impl AssemblyView {
             let (a1, a2, a3, a4, a5) = (insts.clone(), insts.clone(), insts.clone(), insts.clone(), insts.clone());
             let hidden = self.assembly(cx).is_some_and(|a| !insts.is_empty() && insts.iter().all(|i| a.instance(*i).is_some_and(|x| x.hidden)));
             m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(a1.clone(), !hidden, cx)));
-            m.push(item("Hide other instances", move |t, _, cx| t.hide_other_instances(a2.clone(), cx)));
-            m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
+            m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(a2.clone(), cx)));
+            m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
             m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, a3.clone(), cx)));
             m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, a4.clone(), cx)));
             let suppressed = self.assembly(cx).is_some_and(|a| !insts.is_empty() && insts.iter().all(|i| a.instance(*i).is_some_and(|x| x.suppressed)));
@@ -1520,7 +1617,7 @@ impl AssemblyView {
             t.edit("Delete folder", cx, |a| a.delete_folder(id));
         }));
         m.push(item("Unpack folder", move |t, _, cx| {
-            t.edit("Unpack folder", cx, |a| a.unpack_folder(id));
+            t.edit(noshape_ops::assembly::UNPACK_FOLDER_DESCRIPTION, cx, |a| a.unpack_folder(id));
         }));
         m
     }
@@ -1531,19 +1628,9 @@ impl AssemblyView {
     /// a named position (rigid), or unlock it (flexible).
     pub(super) fn set_sub_lock(&mut self, id: InstanceId, lock: SubassemblyLock, cx: &mut Context<Self>) {
         let name = self.assembly(cx).and_then(|a| a.instance(id).map(|i| i.name.clone())).unwrap_or_default();
-        self.message = Some((
-            false,
-            match &lock {
-                SubassemblyLock::Flexible => "Assembly is unlocked from named position.".to_string(),
-                SubassemblyLock::Current => format!("{name} locked at current position."),
-                SubassemblyLock::Named(n) => format!("{name} locked at named position {n}."),
-            },
-        ));
-        self.edit(&format!("Lock/follow position : {name}"), cx, |a| {
-            if let Some(i) = a.instance_mut(id) {
-                i.lock = lock;
-            }
-        });
+        let (desc, message) = noshape_ops::assembly::lock_description(&name, &lock);
+        self.message = Some((false, message));
+        self.edit(&desc, cx, |a| noshape_ops::assembly::set_lock(a, id, lock));
     }
 
     /// Structural edit touching several tabs, with the solved placements folded in.
@@ -1567,21 +1654,12 @@ impl AssemblyView {
     /// Move to new subassembly: a new Assembly tab holding the instances
     /// (and their mates), inserted here in their place.
     pub(super) fn move_to_new_subassembly(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
-        let ids: Vec<InstanceId> = self.assembly(cx).map(|a| ids.into_iter().filter(|id| a.generated_by(*id).is_none()).collect()).unwrap_or_default();
+        let ids: Vec<InstanceId> = self.assembly(cx).map(|a| noshape_ops::assembly::movable_to_subassembly(a, &ids)).unwrap_or_default();
         if ids.is_empty() {
             return;
         }
         let mut new_id = None;
-        self.edit_doc("Move to new subassembly", cx, |doc, tab| {
-            let name = noshape_model::assembly::ops::next_assembly_tab_name(doc);
-            let sub_tab = doc.add_tab(&name, TabContent::Assembly(Box::default()));
-            let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) else { return };
-            let (sub, sid) = parent.move_to_new_subassembly(&ids, sub_tab, &name);
-            new_id = Some(sid);
-            if let Some(t) = doc.tab_mut(sub_tab) {
-                t.content = TabContent::Assembly(Box::new(sub));
-            }
-        });
+        self.edit_doc(noshape_ops::assembly::MOVE_TO_NEW_SUBASSEMBLY, cx, |doc, tab| new_id = noshape_ops::assembly::move_to_new_subassembly(doc, tab, &ids));
         if let Some(id) = new_id {
             self.selected = vec![id];
             self.selected_mate = None;
@@ -1617,15 +1695,7 @@ impl AssemblyView {
     /// Create empty subassembly: a new, empty Assembly tab inserted here.
     pub(super) fn create_empty_subassembly(&mut self, cx: &mut Context<Self>) {
         let mut new_id = None;
-        self.edit_doc("Create empty subassembly", cx, |doc, tab| {
-            let name = noshape_model::assembly::ops::next_assembly_tab_name(doc);
-            let sub_tab = doc.add_tab(&name, TabContent::Assembly(Box::default()));
-            let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) else { return };
-            let id = InstanceId(parent.next_id());
-            let n = parent.next_instance_name(&name);
-            parent.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: sub_tab, config: Default::default() }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
-            new_id = Some(id);
-        });
+        self.edit_doc(noshape_ops::assembly::CREATE_EMPTY_SUBASSEMBLY, cx, |doc, tab| new_id = noshape_ops::assembly::create_empty_subassembly(doc, tab));
         if let Some(id) = new_id {
             self.selected = vec![id];
         }
@@ -1638,23 +1708,7 @@ impl AssemblyView {
             return;
         }
         let mut created = Vec::new();
-        self.edit_doc("Dissolve subassembly", cx, |doc, tab| {
-            for sid in &ids {
-                let Some(TabContent::Assembly(parent)) = doc.tab(tab).map(|t| &t.content) else { return };
-                let Some(InstanceSource::Assembly { assembly: sub_tab, .. }) = parent.instance(*sid).map(|i| i.source.clone()) else { continue };
-                let Some(TabContent::Assembly(sub)) = doc.tab(sub_tab).map(|t| t.content.clone()) else { continue };
-                if let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) {
-                    created.extend(parent.dissolve_subassembly(*sid, &sub));
-                }
-                let used_elsewhere = doc.tabs.iter().any(|t| match &t.content {
-                    TabContent::Assembly(a) => a.instances.iter().any(|i| matches!(i.source, InstanceSource::Assembly { assembly, .. } if assembly == sub_tab)),
-                    _ => false,
-                });
-                if !used_elsewhere && let Some(t) = doc.tab_mut(sub_tab) {
-                    t.content = TabContent::Assembly(Box::default());
-                }
-            }
-        });
+        self.edit_doc(noshape_ops::assembly::DISSOLVE_SUBASSEMBLY, cx, |doc, tab| created = noshape_ops::assembly::dissolve_subassemblies(doc, tab, &ids));
         self.selected = created;
     }
 
@@ -1882,6 +1936,12 @@ impl AssemblyView {
                     m.push(MenuEntry::Sep);
                 }
                 m.push(item("Show all", |t, _, cx| t.show_hidden(cx)));
+                // Live (behaviours "skb (10-24) assembly section" (4)): Show all |
+                // Edit section view… (section icon) | Turn off section view | —.
+                if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_none() && !s.planes.is_empty()) {
+                    m.push(icon_item("Edit section view…", "menu-section-view", |t, _, cx| t.edit_section(cx)));
+                    m.push(item("Turn off section view", |t, w, cx| t.toggle_section(w, cx)));
+                }
                 m.push(MenuEntry::Sep);
                 let tab = self.tab;
                 let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
@@ -3904,68 +3964,395 @@ impl AssemblyView {
         Some(div().absolute().bottom(px(36.)).right(px(40.)).child(panel).into_any_element())
     }
 
-    /// Shift+X: section view on (through the hovered planar face or the
-    /// selected assembly mate connector, else the Front plane) / off.
+    /// Shift+X / Section view…: open the dialog (from the hovered face or the
+    /// selected mate connector, else empty: live part-studio/70); with the
+    /// dialog open it cancels; with a section on and no dialog it turns it off.
     pub(super) fn toggle_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.ui.section.take().is_some() {
-            self.rebuild_scene(false, cx);
-            cx.notify();
-            return;
-        }
-        let units = self.units(cx);
-        let mut plane: Option<(String, DVec3, DVec3)> = None;
-        if let Some(t) = self.hover.as_ref().filter(|t| t.kind == PickKind::Face)
-            && let Some(o) = self.result.occurrences.get(t.occ)
-        {
-            let r = Reference::Implicit { on: Box::new(t.reference.clone()), inference: Inference::Centroid };
-            if let Some(f) = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &r, &units) {
-                let w = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f);
-                plane = Some(("Face".into(), w.origin, w.z()));
+        match &self.ui.section {
+            Some(s) if s.dialog.is_some() => return self.close_section_dialog(false, window, cx),
+            Some(s) if !s.planes.is_empty() => {
+                self.ui.section = None;
+                self.rebuild_scene(false, cx);
+                cx.notify();
+                return;
             }
+            _ => {}
         }
-        if plane.is_none()
+        let saved = self.ui.section.take().map(Box::new);
+        let mut planes = Vec::new();
+        if let Some(t) = self.hover.clone().filter(|t| t.kind == PickKind::Face) {
+            planes.extend(self.section_plane_of(&t, cx));
+        }
+        if planes.is_empty()
             && let Some(id) = self.selected_mate
             && let Some(f) = self.result.connector_frame(id)
         {
-            plane = Some((self.assembly(cx).and_then(|a| a.connector(id).map(|c| c.name.clone())).unwrap_or_default(), f.origin, f.z()));
+            planes.push(AsmSectionPlane::new(f.origin, f.z(), f.x()));
         }
-        let (label, origin, normal) = plane.unwrap_or_else(|| ("Front plane".into(), DVec3::ZERO, DVec3::NEG_Y));
-        let text = noshape_units::format_quantity(noshape_units::Quantity::meters(0.0), &units);
-        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
-        let sub = cx.subscribe_in(&input, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
-            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Change) {
-                let units = this.units(cx);
-                if let Ok(q) = noshape_units::evaluate_as(&st.read(cx).value(), noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope)
-                    && let Some(s) = &mut this.ui.section
-                {
-                    s.offset = q.value;
-                    this.rebuild_scene(false, cx);
-                    cx.notify();
-                }
-            }
-        });
-        self.ui.section = Some(AsmSection { label, origin, normal, offset: 0.0, flipped: false, input, _sub: sub });
+        let active = planes.len().saturating_sub(1);
+        self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, chosen: true, saved }) });
         self.rebuild_scene(false, cx);
         cx.notify();
     }
 
+    /// "Edit section view…": the dialog on the current section, where ✕
+    /// turns the section off (live behaviours "Edit section view…": it does
+    /// not restore it, even with nothing changed).
+    pub(crate) fn edit_section(&mut self, cx: &mut Context<Self>) {
+        let Some(s) = self.ui.section.as_mut().filter(|s| s.dialog.is_none() && !s.planes.is_empty()) else { return };
+        s.dialog = Some(AsmSectionDialog { items_active: false, active: s.planes.len() - 1, chosen: false, saved: None });
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// "Turn off section view" (also with the dialog open).
+    pub(crate) fn turn_off_section(&mut self, cx: &mut Context<Self>) {
+        self.ui.section = None;
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// The plane through a picked face (its centroid frame).
+    fn section_plane_of(&self, t: &AsmPickTarget, cx: &App) -> Option<AsmSectionPlane> {
+        let o = self.result.occurrences.get(t.occ)?;
+        let r = Reference::Implicit { on: Box::new(t.reference.clone()), inference: Inference::Centroid };
+        let f = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &r, &self.units(cx))?;
+        let w = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f);
+        Some(AsmSectionPlane::new(w.origin, w.z(), w.x()))
+    }
+
+    /// ✓ keeps the section, ✕ / Esc restores what was there before.
+    pub(super) fn close_section_dialog(&mut self, accept: bool, _window: &mut Window, cx: &mut Context<Self>) {
+        let Some(s) = &mut self.ui.section else { return };
+        let Some(d) = s.dialog.take() else { return };
+        if !accept {
+            self.ui.section = d.saved.map(|b| *b);
+        } else if s.planes.is_empty() {
+            self.ui.section = None;
+        }
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// A pick while the dialog is open: a face for "Section planes" (up to
+    /// three), an instance for "Items".
+    pub(super) fn section_pick(&mut self, t: AsmPickTarget, cx: &mut Context<Self>) {
+        let Some(items_active) = self.ui.section.as_ref().and_then(|s| s.dialog.as_ref()).map(|d| d.items_active) else { return };
+        if items_active {
+            let top = t.path[0];
+            if let Some(s) = &mut self.ui.section {
+                match s.items.iter().position(|x| *x == top) {
+                    Some(i) => {
+                        s.items.remove(i);
+                    }
+                    None => s.items.push(top),
+                }
+            }
+        } else if t.kind == PickKind::Face
+            && let Some(pl) = self.section_plane_of(&t, cx)
+            && let Some(s) = &mut self.ui.section
+            && s.planes.len() < MAX_SECTION_PLANES
+        {
+            s.planes.push(pl);
+            if let Some(d) = &mut s.dialog {
+                d.active = s.planes.len() - 1;
+                d.chosen = true;
+            }
+        }
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// The plane the dialog's manipulator drives (live: only while the
+    /// dialog is open).
+    fn active_section_plane(&self) -> Option<&AsmSectionPlane> {
+        let s = self.ui.section.as_ref()?;
+        s.planes.get(s.dialog.as_ref()?.active)
+    }
+
+    fn active_section_plane_mut(&mut self) -> Option<&mut AsmSectionPlane> {
+        let s = self.ui.section.as_mut()?;
+        let i = s.dialog.as_ref()?.active;
+        s.planes.get_mut(i)
+    }
+
+    /// A pixel's world size at a point.
+    fn wpp_at(&self, _p: DVec3, cx: &App) -> f64 {
+        let vp = self.viewport.read(cx);
+        vp.camera.world_per_pixel(vp.size().y.max(1.0))
+    }
+
+    /// The manipulator glyph for the scene (live assembly/2368, 2370).
+    pub(super) fn section_glyph(&self, cx: &App) -> Option<crate::assembly_scene::SectionGlyph> {
+        let pl = self.active_section_plane()?;
+        let base = pl.base();
+        let d = self.ui.section_drag.as_ref().filter(|d| d.moved);
+        Some(crate::assembly_scene::SectionGlyph {
+            base,
+            dir: pl.dir(),
+            x: pl.x,
+            y: pl.y(),
+            wpp: self.wpp_at(base, cx),
+            view: self.viewport.read(cx).camera.forward(),
+            hovered: match self.hover_overlay {
+                Some(OverlayPick::Section(h)) => Some(h),
+                _ => None,
+            },
+            dragging: d.map(|d| d.handle),
+            start: d.and_then(|d| match d.handle {
+                SectionHandle::Arrow => Some((d.plane0.base(), false)),
+                SectionHandle::Ring(_) => Some((d.plane0.dir(), true)),
+                SectionHandle::Base => None,
+            }),
+        })
+    }
+
+    /// The arrow's tip and the rings' centre (screen-sized offsets from the base).
+    fn section_tip(&self, cx: &App) -> Option<(DVec3, DVec3)> {
+        let pl = self.active_section_plane()?;
+        let w = self.wpp_at(pl.base(), cx);
+        Some((pl.base() + pl.dir() * crate::assembly_scene::SECTION_TIP_PX * w, pl.base() + pl.dir() * crate::assembly_scene::SECTION_RINGS_PX * w))
+    }
+
+    /// Where the cursor ray passes closest to the line (point, dir): the
+    /// parameter along the line.
+    fn line_param(&self, position: glam::DVec2, point: DVec3, dir: DVec3, cx: &App) -> Option<f64> {
+        let (o, r) = self.viewport.read(cx).ray(position);
+        let w = point - o;
+        let (a, b, c) = (dir.dot(dir), dir.dot(r), r.dot(r));
+        let (dd, e) = (dir.dot(w), r.dot(w));
+        let den = a * c - b * b;
+        (den.abs() > 1e-12).then(|| (b * e - c * dd) / den)
+    }
+
+    /// Where the cursor ray meets the plane (point, normal).
+    fn ray_plane_at(&self, position: glam::DVec2, point: DVec3, normal: DVec3, cx: &App) -> Option<DVec3> {
+        let (o, r) = self.viewport.read(cx).ray(position);
+        let den = r.dot(normal);
+        (den.abs() > 1e-9).then(|| o + r * ((point - o).dot(normal) / den))
+    }
+
+    /// A ring's rotation axis (in the plane: ring 0 about Y, ring 1 about X).
+    fn ring_axis(pl: &AsmSectionPlane, k: usize) -> DVec3 {
+        if k == 0 { pl.y() } else { pl.x }
+    }
+
+    /// The plane after turning `plane0` by `angle` about a ring's axis
+    /// through its manipulator base.
+    fn rotated_plane(plane0: &AsmSectionPlane, k: usize, angle: f64) -> AsmSectionPlane {
+        let q = glam::DQuat::from_axis_angle(Self::ring_axis(plane0, k), angle);
+        let mut pl = plane0.clone();
+        pl.origin = plane0.base();
+        pl.offset = 0.0;
+        pl.normal = (q * plane0.normal).normalize();
+        pl.x = (q * plane0.x).normalize();
+        pl
+    }
+
+    /// A press on a section handle starts its drag.
+    pub(super) fn start_section_drag(&mut self, position: glam::DVec2, cx: &mut Context<Self>) -> bool {
+        let Some(OverlayPick::Section(handle)) = self.hover_overlay else { return false };
+        let Some(pl) = self.active_section_plane().cloned() else { return false };
+        let (mut s0, mut v0, mut grab0) = (0.0, DVec3::ZERO, DVec3::ZERO);
+        match handle {
+            SectionHandle::Arrow => s0 = self.line_param(position, pl.base(), pl.dir(), cx).unwrap_or(0.0),
+            SectionHandle::Ring(k) => {
+                let (_, c) = self.section_tip(cx).unwrap_or((pl.base(), pl.base()));
+                let axis = Self::ring_axis(&pl, k);
+                v0 = self.ray_plane_at(position, c, axis, cx).and_then(|p| (p - c).try_normalize()).unwrap_or(pl.dir());
+            }
+            SectionHandle::Base => grab0 = self.ray_plane_at(position, pl.base(), pl.normal, cx).unwrap_or(pl.base()),
+        }
+        self.ui.section_value = None;
+        self.ui.section_drag = Some(SectionDrag { handle, plane0: pl, s0, v0, grab0, value: 0.0, moved: false });
+        cx.notify();
+        true
+    }
+
+    /// Dragging a handle: the arrow moves the plane along its normal (the
+    /// value is the distance from the drag's start), a ring turns it
+    /// (snapping to 5° near one), the base moves the manipulator over it.
+    pub(super) fn drag_section(&mut self, position: glam::DVec2, cx: &mut Context<Self>) -> bool {
+        let Some(d) = self.ui.section_drag.clone() else { return false };
+        let pl0 = &d.plane0;
+        let new_plane = match d.handle {
+            SectionHandle::Arrow => {
+                let Some(t) = self.line_param(position, pl0.base(), pl0.dir(), cx) else { return true };
+                let v = t - d.s0;
+                let mut pl = pl0.clone();
+                pl.offset = pl0.offset + v * pl0.dir().dot(pl0.normal);
+                Some((pl, v))
+            }
+            SectionHandle::Ring(k) => {
+                let c = pl0.base() + pl0.dir() * crate::assembly_scene::SECTION_RINGS_PX * self.wpp_at(pl0.base(), cx);
+                let axis = Self::ring_axis(pl0, k);
+                let Some(v) = self.ray_plane_at(position, c, axis, cx).and_then(|p| (p - c).try_normalize()) else { return true };
+                let mut angle = d.v0.cross(v).dot(axis).atan2(d.v0.dot(v));
+                // Live: 5° multiples catch the drag near them (UNCONFIRMED
+                // window: 2°; 92.111 and 97.206 were left free).
+                let deg = angle.to_degrees();
+                let near = (deg / 5.0).round() * 5.0;
+                if (deg - near).abs() < 2.0 {
+                    angle = near.to_radians();
+                }
+                Some((Self::rotated_plane(pl0, k, angle), angle))
+            }
+            SectionHandle::Base => {
+                let Some(p) = self.ray_plane_at(position, pl0.base(), pl0.normal, cx) else { return true };
+                let mut pl = pl0.clone();
+                let delta = p - d.grab0;
+                pl.origin += delta - pl0.normal * delta.dot(pl0.normal);
+                Some((pl, 0.0))
+            }
+        };
+        if let Some((pl, v)) = new_plane {
+            if let Some(slot) = self.active_section_plane_mut() {
+                *slot = pl;
+            }
+            if let Some(dd) = &mut self.ui.section_drag {
+                dd.value = v;
+                dd.moved = true;
+            }
+            self.rebuild_scene(false, cx);
+            cx.notify();
+        }
+        true
+    }
+
+    /// The end of a handle drag: an arrow or ring drag leaves its value box
+    /// open, focused and selected (live).
+    pub(super) fn end_section_drag(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(d) = self.ui.section_drag.take() else { return false };
+        if d.moved && d.handle != SectionHandle::Base {
+            self.open_section_value(&d, window, cx);
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+        true
+    }
+
+    /// A section drag's value as live shows it: lengths with 1 decimal,
+    /// angles with up to 3, "deg".
+    fn section_value_text(&self, handle: SectionHandle, v: f64, cx: &App) -> String {
+        let units = self.units(cx);
+        match handle {
+            SectionHandle::Ring(_) => noshape_units::format_quantity_with(noshape_units::Quantity::radians(v), &units, 3).replace('°', " deg"),
+            _ => noshape_units::format_quantity_with(noshape_units::Quantity::meters(v), &units, 1),
+        }
+    }
+
+    fn open_section_value(&mut self, d: &SectionDrag, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::quantity_field::{CommitVia, QuantityEvent, QuantityInput, QuantitySpec};
+        let text = self.section_value_text(d.handle, d.value, cx);
+        let dim = if matches!(d.handle, SectionHandle::Ring(_)) { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH };
+        let units = self.units(cx);
+        let input = cx.new(|cx| QuantityInput::new(text, QuantitySpec::quantity(dim).canvas(), units, window, cx));
+        let sub = cx.subscribe_in(&input, window, |this: &mut Self, _, ev: &QuantityEvent, window, cx| match ev {
+            QuantityEvent::Committed(CommitVia::Enter | CommitVia::Step) => this.apply_section_value(cx),
+            // Live: Esc closes the box only (the plane stays).
+            QuantityEvent::Escape => {
+                this.ui.section_value = None;
+                window.focus(&this.focus, cx);
+                cx.notify();
+            }
+            _ => {}
+        });
+        let state = input.read(cx).state().clone();
+        state.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.ui.section_value = Some(SectionValue { handle: d.handle, plane0: d.plane0.clone(), input, _sub: sub });
+    }
+
+    /// Enter in the value box: the plane at the typed value from where the
+    /// drag started; the box stays open (live).
+    fn apply_section_value(&mut self, cx: &mut Context<Self>) {
+        let Some(sv) = &self.ui.section_value else { return };
+        let Some(v) = sv.input.read(cx).value() else { return };
+        let pl0 = sv.plane0.clone();
+        let pl = match sv.handle {
+            SectionHandle::Arrow => {
+                let mut pl = pl0.clone();
+                pl.offset = pl0.offset + v * pl0.dir().dot(pl0.normal);
+                pl
+            }
+            SectionHandle::Ring(k) => Self::rotated_plane(&pl0, k, v),
+            SectionHandle::Base => return,
+        };
+        if let Some(slot) = self.active_section_plane_mut() {
+            *slot = pl;
+        }
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// The value box at the arrow's tip, upper right (live assembly/2370:
+    /// 75 x 26, about 40 px right and 35 px above the tip): the dragged value
+    /// while dragging, then the canvas field.
+    pub(super) fn render_section_value(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (tip, _) = self.section_tip(cx)?;
+        let s = self.viewport.read(cx).project(tip)?;
+        let at = div().absolute().left(px(s.x as f32 + 40.)).top(px(s.y as f32 - 35.)).w(px(75.)).h(px(26.));
+        if let Some(d) = self.ui.section_drag.as_ref().filter(|d| d.moved && d.handle != SectionHandle::Base) {
+            let text = self.section_value_text(d.handle, d.value, cx);
+            let pal = p();
+            return Some(at.px(px(3.)).flex().items_center().justify_end().border_1().border_color(pal.accent).bg(rgb(0xffffff)).text_size(px(13.33)).text_color(pal.text).child(text).into_any_element());
+        }
+        let sv = self.ui.section_value.as_ref()?;
+        Some(at.id("asm-section-value").occlude().child(sv.input.clone()).into_any_element())
+    }
+
     pub(super) fn render_section(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let s = self.ui.section.as_ref()?;
-        let pal = p();
-        let flipped = s.flipped;
-        let body = v_flex()
-            .p_2()
-            .gap_2()
-            .child(div().text_xs().text_color(pal.text_muted).child(s.label.clone()))
-            .child(h_flex().gap_2().child(div().w(px(60.)).text_xs().text_color(pal.text_muted).child("Offset")).child(div().flex_1().child(Input::new(&s.input).xsmall())))
-            .child(Button::new("asm-sec-flip").icon(Icon::empty().path(icon_path("flip"))).label("Flip").ghost().small().selected(flipped).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                if let Some(s) = &mut this.ui.section {
-                    s.flipped = !s.flipped;
+        let d = s.dialog.as_ref()?;
+        let asm = self.assembly(cx);
+        let items = s.items.iter().map(|id| asm.and_then(|a| a.instance(*id).map(|i| i.name.clone())).unwrap_or_default()).collect();
+        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.direction_name().to_string()).collect(), active: if d.chosen { d.active } else { usize::MAX }, items };
+        Some(crate::section_dialog::render(props, "asm-section", &cx.entity(), Self::on_section_action, cx))
+    }
+
+    fn on_section_action(&mut self, a: crate::section_dialog::Action, w: &mut Window, cx: &mut Context<Self>) {
+        use crate::section_dialog::Action;
+        if matches!(a, Action::Accept | Action::Cancel) {
+            return self.close_section_dialog(a == Action::Accept, w, cx);
+        }
+        let Some(s) = &mut self.ui.section else { return };
+        match a {
+            Action::Include(include) => s.include = include,
+            Action::ItemsActive(items) => {
+                if let Some(d) = &mut s.dialog {
+                    d.items_active = items;
                 }
-                this.rebuild_scene(false, cx);
-                cx.notify();
-            })));
-        Some(Self::panel_frame_moving("Section view", body, cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_section(window, cx)), "asm-sec-close", "asm-section").into_any_element())
+            }
+            Action::RemovePlane(i) => {
+                if i < s.planes.len() {
+                    s.planes.remove(i);
+                }
+                if let Some(d) = &mut s.dialog {
+                    d.active = s.planes.len().saturating_sub(1);
+                }
+            }
+            Action::RemoveItem(i) => {
+                if i < s.items.len() {
+                    s.items.remove(i);
+                }
+            }
+            // The default plane (Front) until Onshape's "Select a plane"
+            // options exist (Help: Select default plane).
+            Action::PlaneButton => {
+                if s.planes.len() < MAX_SECTION_PLANES {
+                    s.planes.push(AsmSectionPlane::new(DVec3::ZERO, DVec3::NEG_Y, DVec3::X));
+                    if let Some(d) = &mut s.dialog {
+                        d.active = s.planes.len() - 1;
+                        d.chosen = true;
+                    }
+                }
+            }
+            Action::Accept | Action::Cancel => {}
+        }
+        self.rebuild_scene(false, cx);
+        cx.notify();
     }
 
     /// Isolate / Make transparent › Expand: switch distance / connectivity
@@ -4028,11 +4415,29 @@ impl AssemblyView {
                 return;
             }
             let file = format!("{name}.{}", s.format.ext());
+            // Options › Store file in a new tab: no download.
+            if s.options == 2 {
+                v.update(cx, |this, cx| {
+                    let parts = this.export_parts(ids.as_deref(), s.hidden);
+                    this.message = Some(match crate::part_studio::export::store_export(&this.doc, this.tab, &file, |p| crate::part_studio::export::write_export(&s, p, parts), cx) {
+                        Ok(f) => (false, format!("Stored {f}")),
+                        Err(e) => (true, format!("Export failed: {e:#}")),
+                    });
+                    cx.notify();
+                });
+                return;
+            }
             crate::files::request_save_path("Export", file, s.format.ext(), window, cx, move |path, cx| {
                 v.update(cx, |this, cx| {
                     let parts = this.export_parts(ids.as_deref(), s.hidden);
                     this.message = Some(match crate::part_studio::export::write_export(&s, &path, parts) {
-                        Ok(p) => (false, format!("Exported {}", p.display())),
+                        Ok(p) => {
+                            // Download and store file in a new tab.
+                            if s.options == 1 {
+                                crate::part_studio::export::store_written(&this.doc, this.tab, &p, cx);
+                            }
+                            (false, format!("Exported {}", p.display()))
+                        }
                         Err(e) => (true, format!("Export failed: {e:#}")),
                     });
                     cx.notify();
