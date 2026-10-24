@@ -38,6 +38,7 @@ mod drawing_insert;
 mod drawing_keys;
 mod drawing_sketch_dim;
 mod drawing_label;
+mod drawing_leaders;
 mod drawing_mbd;
 mod drawing_extra;
 mod drawing_more;
