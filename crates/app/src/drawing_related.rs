@@ -8,7 +8,7 @@
 
 use crate::drawing_scene;
 use crate::drawing_view::*;
-use noshape_model::drawing::PointRef;
+use noshape_model::drawing::{PointRef, ViewId};
 use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::views::ModelEdge;
 use noshape_render::{Drawable, Instance, LineData, LineSegment, PointData, PointSprite, Scene, state};
@@ -68,6 +68,38 @@ impl DrawingEditor {
         out
     }
 
+    /// The edges a note's leaders touch and their attach points (live
+    /// drawing/436–437: the edge #90CEF1 with a dot where the leader ends);
+    /// a callout's leader to the anchor: the dot (429–430).
+    pub fn leader_touches(&self, id: u64) -> (Vec<u32>, Vec<[f64; 2]>) {
+        use noshape_model::drawing::AnnotationKind;
+        let (mut edges, mut dots) = (Vec::new(), Vec::new());
+        let Some(b) = &self.built else { return (edges, dots) };
+        // Resolved: the points follow the model as drawn.
+        let Some(a) = b.resolved.annotations.iter().find(|a| a.id == id) else { return (edges, dots) };
+        let ends: Vec<(ViewId, [f64; 2], bool)> = match &a.kind {
+            AnnotationKind::Note { style, .. } => style.leaders.iter().filter_map(|l| Some((l.view?, l.point, true))).collect(),
+            AnnotationKind::Balloon { view, anchor, callout, .. } if !callout.free => vec![(*view, *anchor, false)],
+            _ => Vec::new(),
+        };
+        for (v, p, with_edge) in ends {
+            let (Some(g), Some(pl)) = (self.geoms.get(&v), self.placement(v)) else { continue };
+            dots.push(pl.to_sheet(p));
+            if !with_edge {
+                continue;
+            }
+            // Leaders snap onto the edge (view units, meters).
+            for (i, e) in g.edges.iter().enumerate() {
+                if e.points.windows(2).any(|w| noshape_scene::drawing_tools::seg_dist(p, w[0], w[1]) < 1e-5)
+                    && let Some(k) = b.picks.iter().position(|t| *t == PickTarget::Edge { view: v, edge: i as u32 })
+                {
+                    edges.push(k as u32);
+                }
+            }
+        }
+        (edges, dots)
+    }
+
     /// Add the related-entity highlights of the hovered / selected
     /// annotations to the scene.
     pub fn push_related_highlights(&self, scene: &mut Scene) {
@@ -103,6 +135,8 @@ impl DrawingEditor {
             return;
         }
         let mut edges: Vec<u32> = anns.iter().flat_map(|a| self.reference_edge_picks(*a)).collect();
+        let touches: Vec<(Vec<u32>, Vec<[f64; 2]>)> = anns.iter().map(|a| self.leader_touches(*a)).collect();
+        edges.extend(touches.iter().flat_map(|(e, _)| e.iter().copied()));
         // A hovered BOM row's callouts (live drawing/421: blue).
         edges.extend(self.table_row_highlight());
         edges.sort_unstable();
@@ -120,7 +154,8 @@ impl DrawingEditor {
                 scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
             }
         }
-        let points: Vec<[f64; 2]> = anns.iter().flat_map(|a| self.reference_vertex_points(*a)).collect();
+        let mut points: Vec<[f64; 2]> = anns.iter().flat_map(|a| self.reference_vertex_points(*a)).collect();
+        points.extend(touches.iter().flat_map(|(_, d)| d.iter().copied()));
         if !points.is_empty() {
             let mut data = PointData::default();
             for p in points {
