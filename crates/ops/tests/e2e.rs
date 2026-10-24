@@ -1760,7 +1760,7 @@ fn drawing_export_formats_and_options() {
     let head = |p: &std::path::Path, n: usize| std::fs::read(p).unwrap()[..n].to_vec();
     for (format, magic) in [("PNG", &[0x89u8, b'P', b'N', b'G'][..]), ("JPEG", &[0xffu8, 0xd8, 0xff][..]), ("TIFF", &[b'I', b'I', 42, 0][..])] {
         let f = scratch(&format!("sheet.{}", format.to_lowercase()));
-        call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": format, "file": f.to_str().unwrap(), "color": "grayscale" }));
+        call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": format, "file": f.to_str().unwrap() }));
         assert_eq!(head(&f, magic.len()), magic, "{format}");
     }
     let dxf = scratch("sheet.dxf");

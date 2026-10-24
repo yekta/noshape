@@ -58,6 +58,18 @@ impl DrawingEditor {
                     s.version = default_version(s.format);
                     s.text = 0;
                 }));
+            // Live dialog-export-drawing-all-formats: each format's note.
+            if f == DrawingFormat::Dwg {
+                body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("In the exported file, dimensions added to a view with a scale different from the active sheet may be out of scale."));
+            }
+            if f == DrawingFormat::Svg || f.raster() {
+                body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("Selected format only supports exporting the active sheet."));
+            }
+            match f {
+                DrawingFormat::InspectionList => body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("Exported csv file will contain an ordered list of all inspection symbols.")),
+                DrawingFormat::DefinitionList => body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("Exported csv file will contain all dimensions and annotations.")),
+                _ => {}
+            }
             if f == DrawingFormat::Pdf {
                 body = body.child(select("ex-version", "Version", strs(&PDF_VERSIONS), s.version, |s, i| s.version = i));
             }
@@ -68,6 +80,9 @@ impl DrawingEditor {
                 if f == DrawingFormat::Dxf && matches!(s.version, 1 | 2) {
                     body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("Model space only"));
                 }
+                if f == DrawingFormat::Dwt {
+                    body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("Primary template is the first sheet.")).child(div().text_size(px(13.33)).child("Continuation template is the first or, if it exists, second sheet."));
+                }
             }
             // Live: only DWG / DXF have Sheets (PDF exports every sheet; DWT,
             // SVG and the rasters the active one), whatever the sheet count.
@@ -77,7 +92,8 @@ impl DrawingEditor {
                     body = body.child(div().pt(px(6.)).child(Input::new(&custom).h(px(34.)).text_size(px(14.))));
                 }
             }
-            if !f.csv() {
+            // DWT has no Overridden dimensions (live).
+            if !f.csv() && f != DrawingFormat::Dwt {
                 body = body.child(select("ex-overridden", "Overridden dimensions", strs(&OVERRIDDEN), s.overridden, |s, i| s.overridden = i));
             }
             match f {
@@ -85,14 +101,16 @@ impl DrawingEditor {
                 DrawingFormat::Dwg | DrawingFormat::Dxf | DrawingFormat::Dwt => body = body.child(select("ex-text", "Text", strs(&DXF_TEXT), s.text, |s, i| s.text = i)),
                 _ => {}
             }
-            if f == DrawingFormat::Pdf || f.raster() {
+            // Only PDF has Color (live: SVG / PNG / JPEG / TIFF have just
+            // Overridden dimensions and Hide inspection items).
+            if f == DrawingFormat::Pdf {
                 body = body.child(select("ex-color", "Color", strs(&COLOR), s.color, |s, i| s.color = i));
             }
             if matches!(f, DrawingFormat::Dwg | DrawingFormat::Dxf) {
                 body = body.child(select("ex-units", "Units", UNITS.iter().map(|u| u.0.to_string()).collect(), s.units, |s, i| s.units = i));
             }
             body = body.child(select("ex-options", "Options", strs(&OPTIONS), s.options, |s, i| s.options = i));
-            if !f.csv() && f != DrawingFormat::Pdf {
+            if f.cad() {
                 body = body.child(div().pt(px(6.)).child(check("ex-splines", "Export splines as polylines", s.splines, |s, v| s.splines = v)));
             }
             if f.cad() {

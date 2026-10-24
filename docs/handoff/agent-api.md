@@ -718,3 +718,8 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
     (1)". Single-part PVZ stays one Part Studio (live).
   - BOM tab: NOT added. Live (kern G38g): "BOM : <assembly>" elements are hidden backing data of the assembly's
     Bill of materials panel, never tabs ("Can't open tab. The tab does not exist…"); reported to the lead.
+  - (10-24 later) Export Drawing as live's dialog: SVG / PNG / JPEG / TIFF export the active sheet only (note
+    "Selected format only supports exporting the active sheet."), Color only for PDF, Overridden dimensions not for
+    DWT, splines checkbox only for DWG / DXF / DWT; the DWG / DWT / CSV notes. Import dialog: no Join for PVZ.
+    Requested live raster samples ("api (10-24) drawing raster export") to check the shared rasterizer, and the IM2
+    mass-property bands ("api (10-24) IM2 bands").

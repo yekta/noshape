@@ -50,7 +50,9 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     // theirs (see the module docs).
     let all_of = |kinds: &[&str]| !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| kinds.contains(&e.to_string_lossy().to_lowercase().as_str())));
     let (native, stl, obj) = (all_of(NATIVE_PARTS), all_of(&["stl"]), all_of(&["obj"]));
-    let (mesh, units_select) = (all_of(&["stl", "obj", "3mf"]), stl || obj);
+    // Mesh files and PVZ (imported as meshes) have no Join adjacent surfaces
+    // (live "qa5 zip import": PVZ shows appearances, Y up and composite only).
+    let (mesh, units_select) = (all_of(&["stl", "obj", "3mf", "pvz"]), stl || obj);
     // Native assemblies (a zip; live G38h) keep the tiles and add Import
     // material density like native parts; STEP and Parasolid files have it
     // too, SAT and PVZ not (live "qa5 zip import", "api (10-23) import parity").

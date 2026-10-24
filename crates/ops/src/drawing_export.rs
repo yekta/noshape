@@ -156,6 +156,8 @@ pub fn export_sheets_of(s: &ExportSettings, count: usize, current: usize) -> Vec
         _ if s.format.csv() => vec![],
         // DWT: sheets 1 and 2 (the second is the continuation template).
         _ if s.format == DrawingFormat::Dwt => (0..count.min(2)).collect(),
+        // Live: "Selected format only supports exporting the active sheet."
+        _ if s.format == DrawingFormat::Svg || s.format.raster() => vec![current.min(count.saturating_sub(1))],
         1 => vec![current],
         2 => parse_sheet_range(&s.custom, count),
         _ => (0..count).collect(),
@@ -240,7 +242,8 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
             explode,
             underline_overrides: s.overridden == 0,
             exclude_off_sheet: s.exclude_off_sheet,
-            color_mode: if f == DrawingFormat::Pdf || f.raster() { s.color as u8 } else { 0 },
+            // Only PDF has a Color choice (live).
+            color_mode: if f == DrawingFormat::Pdf { s.color as u8 } else { 0 },
         };
         let pictures = i == extras.shaded_sheet && !extras.shaded.is_empty() && (f == DrawingFormat::Pdf || f == DrawingFormat::Svg || f.raster());
         // A shaded view's picture replaces its edges.
@@ -345,6 +348,18 @@ mod tests {
         // qa5 D15: z-height to zero on, "Use drawing units".
         assert!(ExportSettings::default().z_zero);
         assert_eq!(UNITS[ExportSettings::default().units].0, "Use drawing units");
+    }
+
+    #[test]
+    fn svg_and_rasters_export_the_active_sheet() {
+        // Live: "Selected format only supports exporting the active sheet."
+        for format in [DrawingFormat::Svg, DrawingFormat::Png, DrawingFormat::Jpeg, DrawingFormat::Tiff] {
+            let s = ExportSettings { format, ..Default::default() };
+            assert_eq!(export_sheets_of(&s, 3, 1), vec![1], "{format:?}");
+        }
+        assert_eq!(export_sheets_of(&ExportSettings::default(), 3, 1), vec![0, 1, 2], "PDF: every sheet");
+        let dwt = ExportSettings { format: DrawingFormat::Dwt, ..Default::default() };
+        assert_eq!(export_sheets_of(&dwt, 3, 2), vec![0, 1]);
     }
 
     #[test]
