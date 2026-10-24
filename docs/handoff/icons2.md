@@ -1129,3 +1129,14 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
 - Next (P1 look, most-used first): sketch toolbar + sketch dimension visuals, feature list / parts list rows,
   viewport overlays (manipulator arrows, previews, selection highlight); then the remaining dialogs' rarer
   rows (Draft, Split, Transform, Helix …) with the same model.
+- (10-24 evening) WORKFLOW 17: ask the lead before editing other agents' files. Parked on agent/icons2 as a
+  WIP commit (NOT in ready, waiting for the lead's OK; part_studio/sketch.rs + mod.rs, skb/ui2 files): the Sketch
+  dialog's Show constraints / expressions / errors rows and diagnostics button before the plane is picked
+  (saved options; toggles before the plane go to `sketch_pending_options`, applied when the editor opens,
+  cleared in `open_dialog`), and the sketch toolbar at 25 % (live #333→#ccc) with an occluding layer while
+  the new sketch has no plane. Verified vs live sketch/00: rows 152/180/207/234 and box x 250 equal.
+  Active sketch toolbar (live sketch/01): all 53 icon columns equal.
+  Asked the lead: parts list header (live: "Parts (N)" row on the divider, text 9 px under it, divider only
+  the 200 px list; ours 13 px, full width) is in part_studio/mod.rs `render_parts_list` — waiting for OK.
+- Done + ready: help ? 1 px right (disc x 449–461 = live in all dialogs). Committed, building: Sketch dialog
+  footer ? 10 px under the footer top (live dom/dialog-sketch-empty).
