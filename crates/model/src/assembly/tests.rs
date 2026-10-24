@@ -2360,11 +2360,14 @@ fn standard_content_parts_regenerate_with_mate_connectors() {
             }
         };
         let d = c.diameter_m(c.size(&spec.size).unwrap());
-        if v <= d * d * d * 0.05 {
+        // (Retaining rings are thin: live's DIN 472 #28 is 0.01 d³.)
+        let floor = if c.shape == standard::Shape::RetainingRing { 0.005 } else { 0.05 };
+        if v <= d * d * d * floor {
             failures.push(format!("{name}: volume {v}"));
         }
-        // Bolts: one connector under the head; nuts and washers: both faces.
-        let want = if c.shape.has_length() { 1 } else { 2 };
+        // Bolts: one connector under the head; nuts and washers: both faces;
+        // retaining rings: live's one mid-plane connector.
+        let want = if c.shape.has_length() || c.shape == standard::Shape::RetainingRing { 1 } else { 2 };
         if r.context.connectors.len() != want {
             failures.push(format!("{name}: {} connectors", r.context.connectors.len()));
             continue;
@@ -3536,4 +3539,152 @@ fn failing_standard_sizes_are_listed_with_live_errors() {
     let k = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
     assert_eq!(k.size_names().last(), Some(&"440mm - 550mm"));
     assert_eq!(k.failure("440mm - 550mm"), Some("com.belmonttech.service.exception.BTBadRequestException: Feature script error: @stringToNumber: String is not a number"));
+}
+
+/// ANSI askew head bolt (live's raw /features): the 9.45° skewed square
+/// head with its 25° corner cone, the shank filleted into it, the end
+/// chamfer, the shank face split at the Thread length. Live's B-rep of 3/8-16
+/// x 1 (thread 1): 15 faces, total area (m²).
+#[test]
+fn askew_head_bolt_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Askew head bolt").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("3/8-16");
+    spec.length = Some("1".into());
+    assert_eq!(c.thread_lengths(spec.size_row().unwrap(), "1.25"), ["1.25", "1"]);
+    let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("askew: {e}"));
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let area: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap()).sum();
+    assert_eq!(b.faces.len(), 15);
+    assert!((area / 1.5118592461752917e-3 - 1.0).abs() < 1e-3, "askew area {area}");
+}
+
+/// B17.1 keys (live's raw /features + FSRules): parallel = the W x L x H box,
+/// tapered = the side profile flat for W at +Y then 1/8 in per foot down to
+/// -Y, extruded symmetric W; Type picks HEIGHT_SQR / HEIGHT_REC (only one
+/// of them for narrow / wide keys). Faces and areas of live's B-rep at the
+/// captures' lengths (8 in / 5 in).
+#[test]
+fn b17_keys_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let cases: [(&str, &str, &str, &str, usize, f64); 3] = [
+        ("B17.1 Standard parallel key", "5/16 - 7/16", "Square", "8", 6, 1.9468207031250015e-3),
+        ("B17.1 Standard parallel key", "26 - 30", "Rectangle", "8", 6, 1.6903192000000006e-1),
+        ("B17.1 Tapered key", "5/16 - 7/16", "Square", "5", 7, 1.0561715809651172e-3),
+    ];
+    for (name, size, kind, length, faces, live_area) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        assert_eq!(spec.param("Type"), kind, "{name} {size}");
+        spec.length = Some(length.into());
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {size}: {e}"));
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let area: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap()).sum();
+        assert_eq!(b.faces.len(), faces, "{name} {size}");
+        assert!((area / live_area - 1.0).abs() < 1e-6, "{name} {size}: area {area} live {live_area}");
+    }
+    let c = CATALOGUE.iter().find(|c| c.name == "B17.1 Tapered key").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("7/16 - 9/16");
+    spec.params.insert("Type".into(), "Rectangle".into());
+    assert_eq!(spec.part_name(), "Tapered key B17.1 0.125 x 0.09375 x 1");
+    assert_eq!(c.failure("26 - 30"), Some("Not found."));
+}
+
+/// Retaining rings from live's raw /features (one sketch extruded symmetric):
+/// faces and total area (m²) of live's B-rep at live's sizes, one mid-plane
+/// connector.
+#[test]
+fn retaining_rings_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let cases: [(&str, &str, usize, f64); 11] = [
+        ("External retaining ring DIN 471", "3", 16, 2.9818272413563026e-5),
+        ("External retaining ring DIN 471", "20", 16, 4.335286134113179e-4),
+        ("External retaining ring DIN 471", "300", 16, 2.9904218621879402e-2),
+        ("External heavy retaining ring DIN 471", "15", 16, 3.8767709584080676e-4),
+        ("External retaining ring ANSI", "1/8", 16, 1.7601329908219825e-5),
+        ("External retaining ring ANSI", "10", 16, 2.9542221674196612e-2),
+        ("Internal retaining ring DIN 472", "8", 12, 9.06039056661354e-5),
+        ("Internal retaining ring DIN 472", "20", 12, 3.530270066208348e-4),
+        ("Internal retaining ring DIN 472", "300", 12, 3.015440638327799e-2),
+        ("Internal retaining ring ANSI", "1/4", 12, 4.179622202617048e-5),
+        ("Internal retaining ring ANSI", "10", 12, 2.6594710422036226e-2),
+    ];
+    for (name, size, faces, live_area) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        assert_eq!(spec.size, size, "{name}: size {size}");
+        let ps = standard::part_studio(&spec).unwrap();
+        assert_eq!(ps.features.iter().filter(|f| f.type_id == "mateConnector").count(), 1, "{name}: one connector");
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {size}: {e}"));
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let area: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap()).sum();
+        assert_eq!(b.faces.len(), faces, "{name} {size}");
+        assert!((area / live_area - 1.0).abs() < 1e-4, "{name} {size}: area {area} live {live_area}");
+    }
+}
+
+/// ANSI internal/external tooth lock washers (live's raw /features): 8
+/// inner slots and 16 (Type A) / 12 (Type B) outer teeth; the Outside
+/// diameter select (FSRules DATA_AI_OUTSIDE_DIAMETER) sets OD and thickness.
+/// Faces and volume (m³) of live's B-rep (bodydetails).
+#[test]
+fn internal_external_tooth_lock_washers_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    type Case<'a> = (&'a str, &'a str, Option<&'a str>, usize, Option<f64>);
+    let cases: [Case; 3] = [
+        ("Type A internal/external tooth lock washer", "#4", None, 98, Some(3.793605138737692e-8)),
+        ("Type A internal/external tooth lock washer", "5/8", Some("1.975"), 98, Some(1.990116153548997e-6)),
+        ("Type B internal/external tooth lock washer", "#4", None, 82, None),
+    ];
+    for (name, size, od, faces, live_volume) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        if let Some(od) = od {
+            spec.params.insert("Outside diameter".into(), od.into());
+        }
+        assert_eq!(spec.param("Outside diameter"), od.unwrap_or("0.475"));
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {size}: {e}"));
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        assert_eq!(b.faces.len(), faces, "{name} {size}");
+        if let Some(v) = live_volume {
+            let vol = b.shape.volume().unwrap();
+            assert!((vol / v - 1.0).abs() < 1e-4, "{name} {size}: volume {vol} live {v}");
+        }
+    }
+}
+
+/// ANSI tooth lock washers from live's recipes (raw /features): straight
+/// slots on radial lines, external from 1.05 (ID + OD) / 2, internal from the
+/// bore to (ID + OD) / 2; faces and total area (m²) at live's sizes.
+#[test]
+fn tooth_lock_washers_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let cases: [(&str, &str, usize, f64); 10] = [
+        ("Type A external tooth lock washer", "#3", 51, 4.713456e-5),
+        ("Type A external tooth lock washer", "1", 51, 1.617386e-3),
+        ("Type B external tooth lock washer", "#3", 43, 4.601603e-5),
+        ("Type B external tooth lock washer", "1", 43, 1.599059e-3),
+        ("Type A internal tooth lock washer", "#2", 43, 4.136907e-5),
+        ("Type A internal tooth lock washer", "1-1/4", 43, 2.327614e-3),
+        ("Type A heavy internal tooth lock washer", "1/4", 43, 2.951435e-4),
+        ("Type A heavy internal tooth lock washer", "7/8", 43, 1.553333e-3),
+        ("Type B internal tooth lock washer", "#2", 39, 4.083287e-5),
+        ("Type B internal tooth lock washer", "1-1/4", 39, 2.313777e-3),
+    ];
+    for (name, size, faces, live_area) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        assert_eq!(spec.size, size, "{name}: size {size}");
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {size}: {e}"));
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let area: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap()).sum();
+        assert_eq!(b.faces.len(), faces, "{name} {size}");
+        assert!((area / live_area - 1.0).abs() < 1e-3, "{name} {size}: area {area} live {live_area}");
+    }
 }
