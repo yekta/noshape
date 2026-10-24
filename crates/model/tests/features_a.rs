@@ -1306,3 +1306,63 @@ fn feature_pattern_of_a_flush_wall_as_live() {
     let (st, msg, _, _) = run(0.025, 0.01, true, "2");
     assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some(SWITCH)));
 }
+
+/// replaceFace.fs: several "Faces to replace with" make one template (the
+/// two sloped faces under a roof), so the replaced top follows both.
+#[test]
+fn replace_face_with_two_faces() {
+    let mut t = T::new();
+    let (_, a) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    // Roof on Front (sketch x = X, y = Z): an inverted V underside at z 20..25.
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts: Vec<_> = [(0.0, 0.02), (0.02, 0.025), (0.04, 0.02), (0.04, 0.03), (0.0, 0.03)].iter().map(|p| sk.add_point(DVec2::new(p.0, p.1))).collect();
+    for i in 0..pts.len() {
+        sk.add_line_between(pts[i], pts[(i + 1) % pts.len()]).unwrap();
+    }
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let r = t.regions(s)[0].clone();
+    let roof = t.extrude(r, "20 mm", "NEW");
+    t.set(roof, "oppositeDirection", b(true));
+    let res = t.ok();
+    let a_body = res.context.bodies.iter().find(|b| b.id.feature == a).unwrap();
+    let top = face_with_normal(a_body, DVec3::Z);
+    let roof_body = res.context.bodies.iter().find(|b| b.id.feature == roof).unwrap();
+    let slopes: Vec<Reference> = roof_body
+        .faces
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| {
+            let f = roof_body.shape.sub_shape(noshape_kernel::ShapeType::Face, *i).unwrap();
+            let n = f.normal_at_point(f.centroid().unwrap()).unwrap();
+            n.z < -0.5 && n.z > -0.999
+        })
+        .map(|(_, n)| Reference::Face((**n).clone()))
+        .collect();
+    assert_eq!(slopes.len(), 2);
+    // replaceFaceEditLogic: the template faces the other way (its normals
+    // point down), so Flip alignment is set, also with several faces.
+    t.add("replaceFace", &[("replaceFaces", q(vec![top])), ("templateFace", q(slopes)), ("oppositeSense", b(true))]);
+    let res = t.ok();
+    let a_body = res.context.bodies.iter().find(|b| b.id.feature == a).unwrap();
+    let v = a_body.shape.volume().unwrap();
+    assert!((v * 1e9 - 18000.0).abs() < 1e-3, "{}", v * 1e9);
+}
+
+/// helix.fs drawConstructionEnds: "Show start and end profiles" gives two
+/// circles (start and end radius) and their centres as debug geometry.
+#[test]
+fn helix_start_end_profiles() {
+    let mut t = T::new();
+    t.add("helix", &[("axisType", en("AXIS")), ("axis", q(vec![edge_axis_z()])), ("startRadius", e("10 mm")), ("height", e("20 mm")), ("showStartEndProfiles", b(true))]);
+    let r = t.ok();
+    let d = &r.display.features.last().unwrap().debug;
+    assert_eq!(d.lines.len(), 2);
+    assert_eq!(d.points.len(), 2);
+    let radius = |pl: &Vec<[f32; 3]>, c: [f32; 3]| ((pl[0][0] - c[0]).powi(2) + (pl[0][1] - c[1]).powi(2)).sqrt();
+    assert!((radius(&d.lines[0], d.points[0]) - 0.01).abs() < 1e-6);
+    assert!((d.points[1][2] - d.points[0][2] - 0.02).abs() < 1e-6);
+    // Off: nothing.
+    let h = t.ps.features.last().unwrap().id;
+    t.set(h, "showStartEndProfiles", b(false));
+    assert!(t.ok().display.features.last().unwrap().debug.lines.is_empty());
+}

@@ -261,6 +261,9 @@ pub struct Context {
     pub sketch_copies: Vec<(FeatureId, FeatureId)>,
     pub planes: Vec<PlaneEntity>,
     pub connectors: Vec<Connector>,
+    /// Mate connectors' owner parts: a connector moves with its owner
+    /// (mateConnector.fs "Owner entity"; a Transform of the part).
+    pub connector_owners: Vec<(Reference, BodyId)>,
     pub points: Vec<PointEntity>,
     pub variables: BTreeMap<String, Quantity>,
     /// Query variables by name (Query variable feature), as persistent references.

@@ -946,6 +946,26 @@ pub fn error_geometry(mesh: &noshape_model::display::MeshBuffers, up: &Uploader)
     out
 }
 
+/// A feature's debug geometry while its dialog is open (FeatureScript
+/// `addDebugEntities`, magenta).
+pub fn debug_geometry(debug: &noshape_model::display::DebugGeometry, up: &Uploader) -> Vec<Instance> {
+    let mut out = Vec::new();
+    let color = lin_to_u8(theme::lin(theme::viewport::DEBUG_MAGENTA));
+    let mut lines = LineData::default();
+    for pl in &debug.lines {
+        lines.push_polyline(pl, color, 0, 2.5, LineSegment::ON_TOP);
+    }
+    if !lines.segments.is_empty() {
+        out.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(12));
+    }
+    if !debug.points.is_empty() {
+        let c = lin_to_u8(theme::lin(theme::viewport::DEBUG_MAGENTA_POINT));
+        let pts = PointData { points: debug.points.iter().map(|p| PointSprite { position: *p, color: c, pick_id: 0, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 }).collect() };
+        out.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(20));
+    }
+    out
+}
+
 /// The boundary edges of `faces` where other geometry hides them, dashed in
 /// the selection color (live "lp wall over" 2258: the seed of a failed
 /// Feature pattern behind the block).
