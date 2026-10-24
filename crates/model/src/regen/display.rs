@@ -42,9 +42,9 @@ fn f3(p: DVec3) -> [f32; 3] {
 /// chord tolerance is smaller (a finer quality must re-mesh). `preview`
 /// meshes (instant feedback while a feature is edited) are Coarse.
 ///
-/// Gated off for now ([`angle_display_mesh`]): bodies get the chord-based
-/// mesh from before live 459 (chord 8e-4 of the body's diagonal, 0.35 rad;
-/// previews 4x the chord, 1.8x the angle).
+/// With `NOSHAPE_DISPLAY_MESH=chord` ([`angle_display_mesh`] off) bodies
+/// get the chord-based mesh from before live 459 (chord 8e-4 of the body's
+/// diagonal, 0.35 rad; previews 4x the chord, 1.8x the angle).
 fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: bool) -> (f64, f64) {
     let diag = shape.bounding_box(false).ok().map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
     if !angle_display_mesh() {
@@ -63,16 +63,15 @@ fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: bool
 static DISPLAY_MESH: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 /// Whether display meshes are Onshape's angle-based ones (live 459, 144
-/// segments per circle in Auto). Off until their GPU cost is down: on the
-/// macOS CI runners orbiting the 1000-pin fixture took 39–64% more GPU time
-/// per frame (perf.yml 2026-10-22, docs/handoff/viewport-performance.md).
-/// `NOSHAPE_DISPLAY_MESH=angle` (or `chord`) decides at start;
+/// segments per circle in Auto): yes unless `NOSHAPE_DISPLAY_MESH=chord`
+/// (the coarser chord-based mesh from before, an escape hatch for slow
+/// GPUs; docs/handoff/viewport-performance.md has the cost) at start;
 /// [`set_angle_display_mesh`] after.
 pub fn angle_display_mesh() -> bool {
     use std::sync::atomic::Ordering;
     match DISPLAY_MESH.load(Ordering::Relaxed) {
         0 => {
-            let angle = std::env::var("NOSHAPE_DISPLAY_MESH").is_ok_and(|v| v == "angle");
+            let angle = std::env::var("NOSHAPE_DISPLAY_MESH").as_deref() != Ok("chord");
             DISPLAY_MESH.store(if angle { 2 } else { 1 }, Ordering::Relaxed);
             angle
         }
@@ -113,6 +112,34 @@ pub fn tessellate_shape(shape: &noshape_kernel::Shape, quality: f64) -> Option<M
 /// [`FeatureState::error_mesh`]: crate::display::FeatureState::error_mesh
 pub(super) fn tessellate_error(shape: &noshape_kernel::Shape, opts: &RegenOptions) -> Arc<MeshBuffers> {
     tessellate_body(shape, "error geometry", 1.0, opts)
+}
+
+/// The Sheet metal flat view's display: the flat solid of `flat` (in the
+/// flat view's place) as one solid body in `color`, its faces and edges
+/// all naming the body (the view only shows it).
+pub fn flat_view_display(flat: &crate::sheetmetal::FlatPattern, color: [f32; 4]) -> Option<StudioDisplay> {
+    let shape = flat.flat_view_solid()?;
+    let mesh = tessellate_body(&shape, "flat pattern", 1.0, &RegenOptions::default());
+    let id = crate::reference::BodyId { feature: crate::reference::FeatureId(0), index: 0 };
+    let me = Reference::Body(id.clone());
+    let body = BodyDisplay {
+        id,
+        name: "Flat pattern".into(),
+        kind: BodyKind::Solid,
+        color,
+        hidden: false,
+        face_refs: vec![me.clone(); mesh.face_ranges.len()],
+        edge_refs: vec![me.clone(); mesh.edges.len()],
+        vertex_refs: vec![me; mesh.vertices.len()],
+        mesh,
+        coarser: Vec::new(),
+        levels_from: 0,
+        bounds: shape.bounding_box(false).ok().map(|b| (b.min, b.max)),
+        composite: None,
+        is_mesh: false,
+        face_colors: Vec::new(),
+    };
+    Some(StudioDisplay { bodies: vec![body], ..Default::default() })
 }
 
 fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts: &RegenOptions) -> Arc<MeshBuffers> {

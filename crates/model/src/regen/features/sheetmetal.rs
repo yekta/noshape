@@ -179,8 +179,15 @@ fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
     }
     let Some(sketch) = sketch else { return err("Select sketch curves to extrude") };
     let frame = ev.ctx.sketch(sketch).map(|s| s.frame).ok_or_else(|| FeatureError::new("The sketch no longer exists"))?;
+    let first = items.first().map(|(e, s)| (e.start(), *s));
     let (path, closed) = chain(items)?;
-    let side = if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
+    // Material on the extruded sheet's normal side, tangent × extrude direction
+    // (std; live "fs (10-23 05:00)": an L drawn (0,0)-(50,0)-(50,30) and extruded
+    // up has its material outside, the y = 0 wall at y -2..0): right of the
+    // sketch's own direction seen along the extrusion, left when the chain runs
+    // the other way or the extrusion goes down; Opposite direction flips it.
+    let reversed = first.is_some_and(|(p, src)| path.iter().find(|e| e.1 == src).is_some_and(|e| (e.0.start() - p).length() > 1e-8 && (e.0.end() - p).length() < 1e-8));
+    let side = if (ev.bool("oppositeDirection") != ev.bool("oppositeExtrudeDirection")) != reversed { 1.0 } else { -1.0 };
     let radius = ev.length("radius")?;
     // Bends at line-line corners.
     let n = path.len();

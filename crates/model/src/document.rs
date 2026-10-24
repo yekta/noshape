@@ -83,6 +83,9 @@ pub struct TabFolder {
     pub name: String,
 }
 
+/// The tab folder live's assembly Mirror puts "-Mirrored" Part Studios in.
+pub const MIRRORED_FOLDER: &str = "Mirrored parts and assemblies";
+
 /// Onshape nests folders at most 10 levels below the root.
 pub const MAX_FOLDER_DEPTH: usize = 10;
 
@@ -145,6 +148,43 @@ impl Document {
         self.settings.tab_order.retain(|t| *t != id);
         self.settings.parents.retain(|(t, _)| *t != id);
         Some(self.tabs.remove(i))
+    }
+
+    // ------------------------------------------------------- mirrored parts
+
+    /// The "<source>-Mirrored" Part Studio of an assembly Mirror's Derived
+    /// action (its one feature a "Derived mirror" of `source`), if made.
+    pub fn mirrored_studio(&self, source: TabId) -> Option<TabId> {
+        let key = source.to_string();
+        self.tabs
+            .iter()
+            .find(|t| matches!(&t.content, TabContent::PartStudio(ps) if ps.features.iter().any(|f| f.type_id == "derivedMirror" && f.params.text("partStudio").trim() == key)))
+            .map(|t| t.id)
+    }
+
+    /// Live's Mirror strategy › Update (behaviours "skb (10-23 15:30)"): the
+    /// existing "<source>-Mirrored" Part Studio, else a new one with one
+    /// "Derived mirror" feature, in the folder "Mirrored parts and
+    /// assemblies" appended at the end of the tab bar (made once; both stay
+    /// when the Mirror is deleted).
+    pub fn ensure_mirrored_studio(&mut self, source: TabId) -> Option<TabId> {
+        if let Some(t) = self.mirrored_studio(source) {
+            return Some(t);
+        }
+        let name = format!("{}-Mirrored", self.tab(source)?.name);
+        let units = self.settings.units;
+        let mut ps = PartStudio::new();
+        let mut f = ps.new_feature("derivedMirror", &units)?;
+        f.name = "Derived mirror".into();
+        f.params.set("partStudio", crate::params::ParamValue::Text(source.to_string()));
+        ps.features.push(f);
+        let folder = match self.settings.folders.iter().find(|f| f.name == MIRRORED_FOLDER && self.parent_of(f.id).is_none()) {
+            Some(f) => f.id,
+            None => self.add_folder(MIRRORED_FOLDER, None),
+        };
+        let id = self.add_tab(&name, TabContent::PartStudio(ps));
+        self.set_parent(id, Some(folder));
+        Some(id)
     }
 
     // ------------------------------------------------------------ tab folders

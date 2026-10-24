@@ -18,14 +18,6 @@ pub struct ImageCache {
     pub placed: Vec<(u64, ImageHandle, [f64; 2], [f64; 2])>,
 }
 
-/// Decode an inserted image to RGB8 (for PDF export).
-pub fn decode_rgb(data_base64: &str) -> Option<(u32, u32, Arc<Vec<u8>>)> {
-    let bytes = noshape_model::sketch_feature::base64_decode(data_base64)?;
-    let img = image::load_from_memory(&bytes).ok()?.to_rgb8();
-    let (w, h) = img.dimensions();
-    Some((w, h, Arc::new(img.into_raw())))
-}
-
 fn decode_rgba(data_base64: &str) -> Option<ImageData> {
     let bytes = noshape_model::sketch_feature::base64_decode(data_base64)?;
     let rgba = image::load_from_memory(&bytes).ok()?.to_rgba8();

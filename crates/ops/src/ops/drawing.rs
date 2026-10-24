@@ -70,14 +70,17 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "create",
             summary: "Create a Drawing tab of a part, Part Studio or assembly",
-            description: "Create Drawing: a Drawing tab with the template's sheet, placed after the source tab. With `suggested_views` (default true) the source's suggested views (Front, Top, Right projections and an isometric, scaled to fit) are laid out, as the dialog's checkbox does. Returns the tab and its views.",
+            description: "Create Drawing: a Drawing tab with the template's sheet, placed after the source tab. With `suggested_views` the source's suggested views (Front, Top, Right projections and an isometric, scaled to fit) are laid out, as the dialog's checkbox does. Returns the tab and its views.",
             fields: vec![
                 doc_field(),
                 opt("source", s(), "Part Studio or assembly tab (name or id). Omit for an empty drawing."),
                 opt("part", s(), "Only this part (`body:…` id from query_parts)."),
-                opt("template", s(), "Template file or setup name (`drawing_templates`), e.g. \"ANSI_A_INCH.dwt\", \"ISO A3\". Default: ISO A3 in metric workspaces, ANSI B (inch) otherwise."),
-                opt("name", s(), "Tab name (default \"<part> Drawing N\" / \"Drawing N\")."),
-                opt("suggested_views", json!({ "type": "boolean", "default": true }), "Lay out the suggested views."),
+                opt("sketch", s(), "Only this sketch of the source Part Studio (feature id or name): Create Drawing of Sketch N."),
+                opt("configuration", json!({ "type": "object" }), "Configuration of the source: {input id: value}."),
+                opt("template", s(), "Existing templates: file or setup name (`drawing_templates`), e.g. \"ANSI_A_INCH.dwt\", \"ISO A3\". Default ANSI_A_INCH.dwt, the dialog's preselected row."),
+                opt("custom_template", json!({ "type": "object" }), CUSTOM_TEMPLATE_DOC),
+                opt("name", s(), "Tab name (default \"<part> Drawing N\" / \"<sketch> Drawing N\" / \"Drawing N\")."),
+                opt("suggested_views", json!({ "type": "boolean", "default": false }), "Suggested views (true) or No views (false, the dialog's default; place views with drawing_insert_view)."),
             ],
             mutates: true,
             destructive: false,
@@ -104,9 +107,18 @@ pub fn ops() -> Vec<Op> {
                 sheet_field(),
                 req("source", s(), "Part Studio or assembly tab."),
                 opt("part", s(), "Only this part (`body:…`)."),
+                opt("sketch", s(), "Insert a sketch of the source Part Studio (a sketch view, facing its plane)."),
+                opt("flat", json!({ "type": "boolean", "default": false }), "A sheet metal part's flat pattern."),
                 opt("orientation", json!({ "type": "string", "enum": ORIENTATIONS.iter().map(|o| o.0).collect::<Vec<_>>(), "default": "front" }), "View orientation."),
+                opt("named_view", s(), "View orientation › a named view of the source Part Studio (instead of `orientation`)."),
                 req("position", point(), "View center on the sheet (mm)."),
                 opt("scale", json!({ "type": "number", "exclusiveMinimum": 0 }), "View scale (paper / model)."),
+                opt("simplification", json!({ "type": "string", "enum": ["none", "auto", "absolute", "ratio_to_studio", "ratio_to_part"], "default": "auto" }), "View simplification: None, Automatic, Absolute size, Ratio to Part Studio / assembly size, Ratio to part size."),
+                opt("simplification_value", s(), "Its value: a length (\"1 mm\", default 1 mm) or a percentage (\"1 %\", default 1 %)."),
+                opt("sketch_appearances", json!({ "type": "boolean", "default": false }), "Show sketch appearances."),
+                opt("model_annotations", json!({ "type": "boolean", "default": true }), "Show annotations from model."),
+                opt("explode_position", s(), "Assemblies: Explode/Position, an exploded view or named position name (default \"Default\")."),
+                opt("display_state", s(), "Assemblies: Display state name (default Show all)."),
             ],
             mutates: true,
             destructive: false,
@@ -158,17 +170,26 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "drawing",
             verb: "export",
-            summary: "Export a drawing to PDF, DWG, DXF, DWT or SVG",
-            description: "The Export Drawing modal: all sheets (or `sheets`: \"current\" or a range like \"1-3, 5\") to one file; PDF and DWT hold every sheet, other formats with several sheets are zipped (one file per sheet).",
+            summary: "Export a drawing (PDF, DWG, DXF, DWT, SVG, PNG, JPEG, TIFF, inspection lists)",
+            description: "The Export Drawing modal with every option. PDF holds every sheet, DWT the first two, DXF / DWG a layout per sheet of `sheets`; SVG and the raster formats (300 dpi) the active sheet. `version` from the format's list (PDF 1.4–1.7, default 1.5; DWG / DXF Release 11-12 … 2018, default 2000 / Release 14; DWT 2013 / 2018). Inspection list / Drawing definition list are the CSV lists.",
             fields: vec![
                 doc_field(),
                 drawing_field(),
-                req("format", json!({ "type": "string", "enum": ["PDF", "DWG", "DXF", "DWT", "SVG"] }), "Format."),
-                req("file", s(), "Output path."),
-                opt("sheets", s(), "\"all\" (default), \"current\" or a range \"1-3, 5\"."),
-                opt("color", json!({ "type": "string", "enum": ["color", "black_and_white", "grayscale"] }), "PDF color (default color)."),
+                req("format", json!({ "type": "string", "enum": crate::drawing_export::DrawingFormat::ALL.iter().map(|f| f.label()).collect::<Vec<_>>() }), "Format."),
+                opt("file", s(), "Output path (required unless `options` is \"store\"; then only its name is used, default \"<drawing>.<ext>\")."),
+                opt("options", json!({ "type": "string", "enum": ["download", "download_and_store", "store"], "default": "download" }), "Options: write `file`, and / or keep the file as a file tab right after the drawing (\"Store <file>\")."),
+                opt("version", s(), "The format's Version (e.g. \"1.7\", \"2018\", \"Release 14\")."),
+                opt("sheets", s(), "DWG / DXF: \"all\" (default), \"current\" or a range \"1-3, 5\" (PDF: every sheet; DWT: the first two; SVG and rasters: the active sheet)."),
+                opt("overridden_dimensions", json!({ "type": "string", "enum": ["show_underlines", "hide_underlines"], "default": "show_underlines" }), "Overridden dimensions."),
+                opt("text", json!({ "type": "string", "enum": ["normal", "selectable", "export_as_text", "explode_notes", "explode_all"] }), "PDF Text (normal / selectable) or DWG / DXF / DWT Text (export_as_text / explode_notes / explode_all)."),
+                opt("color", json!({ "type": "string", "enum": ["color", "black_and_white", "grayscale"] }), "PDF Color (default color; only PDF has it)."),
+                opt("units", json!({ "type": "string", "enum": crate::drawing_export::UNITS.iter().map(|u| u.0).collect::<Vec<_>>() }), "DWG / DXF Units (default \"Use drawing units\")."),
+                opt("splines_as_polylines", json!({ "type": "boolean" }), "Export splines as polylines."),
+                opt("z_zero", json!({ "type": "boolean", "default": true }), "DWG / DXF / DWT: Set z-height to zero and normals to positive."),
+                opt("hide_inspection_items", json!({ "type": "boolean" }), "Hide inspection items."),
+                opt("exclude_off_sheet", json!({ "type": "boolean" }), "DWG / DXF / DWT: Exclude off-sheet content."),
             ],
-            mutates: false,
+            mutates: true,
             destructive: false,
             run: export,
         },
@@ -269,6 +290,28 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             match &v.kind {
                 ViewKind::Base { orientation, .. } => {
                     j["orientation"] = json!(ORIENTATIONS.iter().find(|o| o.1 == *orientation).map(|o| o.0));
+                    // The Insert view panel's choices, when not the defaults.
+                    if let Some(n) = &v.named_view {
+                        j["named_view"] = json!(n);
+                    }
+                    if let Some(k) = v.sketch {
+                        j["sketch"] = json!(k.to_string());
+                    }
+                    if v.flat {
+                        j["flat"] = json!(true);
+                    }
+                    if v.sketch_appearances {
+                        j["sketch_appearances"] = json!(true);
+                    }
+                    if !v.model_annotations {
+                        j["model_annotations"] = json!(false);
+                    }
+                    if let Some(s) = v.simplification.filter(|s| *s != noshape_model::drawing::Simplification::Auto) {
+                        j["simplification"] = json!(format!("{s:?}"));
+                    }
+                    if let Some(d) = &v.display_state {
+                        j["display_state"] = json!(d);
+                    }
                 }
                 ViewKind::Projected { parent, direction } => {
                     let dir = direction.or_else(|| sheet.view(*parent).map(|p| [v.position[0] - p.position[0], v.position[1] - p.position[1]]));
@@ -445,22 +488,47 @@ fn templates(_: &mut Ctx, _: &Args) -> Result<OpOutput, OpError> {
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let source = match a.opt_str("source")? {
-        Some(_) => Some(DrawingSource { tab: source_tab(od, a, "source")?, part: part_arg(a)?, config: Default::default(), sketch: None }),
-        None if a.get("part").is_some() => return Err(OpError::param("part", "give `source` with `part`")),
-        None => None,
+        Some(_) => {
+            let tab = source_tab(od, a, "source")?;
+            let sketch = match a.opt_str("sketch")? {
+                Some(_) => {
+                    let ps = doc::studio(od.doc(), tab).map_err(|e| e.with_param("source"))?;
+                    let id = super::feature_arg(ps, a, "sketch")?;
+                    if ps.feature(id).is_none_or(|f| f.type_id != "sketch") {
+                        return Err(OpError::param("sketch", "not a sketch"));
+                    }
+                    Some(id)
+                }
+                None => None,
+            };
+            if sketch.is_some() && a.get("part").is_some() {
+                return Err(OpError::param("sketch", "give `part` or `sketch`, not both"));
+            }
+            Some(DrawingSource { tab, part: part_arg(a)?, config: super::config_arg(a)?, sketch })
+        }
+        None => {
+            if let Some(k) = ["part", "sketch", "configuration"].into_iter().find(|k| a.get(k).is_some()) {
+                return Err(OpError::param(k, "give `source` with it"));
+            }
+            None
+        }
     };
     let metric = !matches!(od.doc().settings.units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
     let rows = dr::template_rows();
-    let template = match a.opt_str("template")? {
-        Some(t) => rows.iter().find(|r| r.file.eq_ignore_ascii_case(t)).or_else(|| rows.iter().find(|r| r.template.name.eq_ignore_ascii_case(t))).map(|r| r.template).ok_or_else(|| OpError::param("template", "unknown template (see drawing_templates)"))?,
-        None => rows.iter().find(|r| if metric { r.template.name == "ISO A3" } else { r.file == "ANSI_B_INCH.dwt" }).map(|r| r.template).expect("standard template"),
+    let template = match (a.opt_str("template")?, a.object("custom_template")?) {
+        (Some(_), Some(_)) => return Err(OpError::param("custom_template", "give `template` or `custom_template`, not both")),
+        (Some(t), None) => rows.iter().find(|r| r.file.eq_ignore_ascii_case(t)).or_else(|| rows.iter().find(|r| r.template.name.eq_ignore_ascii_case(t))).map(|r| r.template).ok_or_else(|| OpError::param("template", "unknown template (see drawing_templates)"))?,
+        (None, Some(c)) => custom_template(c, metric).map_err(|e| e.under("custom_template"))?,
+        // Live drawing/01, qa5 D1: the dialog preselects ANSI_A_INCH.dwt whatever the units.
+        (None, None) => rows.iter().find(|r| r.file == "ANSI_A_INCH.dwt").map(|r| r.template).expect("standard template"),
     };
-    // Onshape: "<part> Drawing 1" for a part or assembly, else "Drawing 1".
+    // Onshape: "<part> Drawing 1" for a part or assembly, "<sketch> Drawing 1", else "Drawing 1".
     let base = match &source {
         Some(s) => {
-            let label = match &s.part {
-                Some(b) => od.regenerate(s.tab, None).ok().and_then(|r| r.display.bodies.iter().find(|x| &x.id == b).map(|x| x.name.clone())),
-                None => od.doc().tab(s.tab).map(|t| t.name.clone()),
+            let label = match (&s.part, s.sketch) {
+                (Some(b), _) => od.regenerate(s.tab, None).ok().and_then(|r| r.display.bodies.iter().find(|x| &x.id == b).map(|x| x.name.clone())),
+                (None, Some(k)) => doc::studio(od.doc(), s.tab).ok().and_then(|ps| ps.feature(k)).map(|f| f.name.clone()),
+                (None, None) => od.doc().tab(s.tab).map(|t| t.name.clone()),
             };
             label.map(|n| format!("{n} Drawing")).unwrap_or_else(|| "Drawing".into())
         }
@@ -470,13 +538,83 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(n) => n.trim().to_string(),
         None => od.doc().next_tab_name(&base),
     };
-    let mut drawing = dr::new_drawing(od.doc(), &template, source.as_ref(), a.bool_or("suggested_views", true)?);
+    let mut drawing = dr::new_drawing(od.doc(), &template, source.as_ref(), a.bool_or("suggested_views", false)?);
     // The views are made from the document as it is now (see `old_state`).
     drawing.sources_at = od.session.head().ok().map(|m| m.to_string());
     let mut tab = None;
     od.session.edit_document(&format!("Insert tab : {name}"), |d| tab = Some(crate::docedit::insert_drawing_tab(d, &name, drawing, source.as_ref().map(|s| s.tab))))?;
     let tab = tab.expect("inserted");
     Ok(reply(od, tab, 0, false)?.into())
+}
+
+const CUSTOM_TEMPLATE_DOC: &str = "The Custom template tab instead of `template`: {\"standard\": \"ANSI\" | \"ISO\" | \"JIS\" (default ISO in metric workspaces, else ANSI), \"language\": English (default), French, German, Spanish, Italian, Japanese, Korean, ChineseSimplified, ChineseTraditional or the list's own name, \"size\": ANSI A (default), A Portrait, B, C, D; ISO / JIS A4 (default), A4 Portrait, A3, A2, A1, A0, \"units\": Millimeters, Centimeter, Meter, Inches, Feet and inches, Foot, Yard, \"decimal_separator\": \"period\" | \"comma\", \"projection\": \"third_angle\" | \"first_angle\", \"border\": bool (default true), \"horizontal_zones\" / \"vertical_zones\": 0–20 even (default per size), \"start_zones\": \"bottom_right\" (default) | \"top_left\", \"title_block\": bool (default true)}. Choosing a standard sets the units, separator and projection like the dialog (ANSI: Inches, period, third angle; ISO: Millimeters, comma, first angle; JIS: Millimeters, comma, third angle).";
+
+/// Create Drawing › Custom template from its JSON options (the dialog's
+/// choices applied in its order: standard first, then the rest).
+fn custom_template(c: &serde_json::Map<String, Value>, metric: bool) -> Result<noshape_model::drawing::templates::DrawingTemplate, OpError> {
+    use noshape_model::drawing::tb_lang::TitleLanguage;
+    let text = |k: &str| -> Result<Option<&str>, OpError> {
+        match c.get(k) {
+            None => Ok(None),
+            Some(v) => v.as_str().map(Some).ok_or_else(|| OpError::param(k, "a string")),
+        }
+    };
+    let flag = |k: &str| -> Result<Option<bool>, OpError> {
+        match c.get(k) {
+            None => Ok(None),
+            Some(v) => v.as_bool().map(Some).ok_or_else(|| OpError::param(k, "true or false")),
+        }
+    };
+    let mut ct = dr::CustomTemplate::new(metric);
+    if let Some(st) = text("standard")? {
+        let st = ["ANSI", "ISO", "JIS"].into_iter().find(|x| x.eq_ignore_ascii_case(st)).ok_or_else(|| OpError::param("standard", "ANSI, ISO or JIS"))?;
+        ct.set_standard(st);
+    }
+    if let Some(l) = text("language")? {
+        let norm = |x: &str| x.replace([' ', '_', '(', ')'], "").to_lowercase();
+        ct.language = TitleLanguage::ALL.iter().position(|t| norm(&format!("{t:?}")) == norm(l) || t.name() == l).ok_or_else(|| OpError::param("language", "unknown language"))?;
+    }
+    if let Some(sz) = text("size")? {
+        let sizes = dr::custom_sizes(ct.standard);
+        let i = sizes.iter().position(|(name, size)| name.eq_ignore_ascii_case(sz) || size.list_name().eq_ignore_ascii_case(sz)).ok_or_else(|| OpError::param("size", &format!("one of {}", sizes.iter().map(|(_, s)| s.list_name()).collect::<Vec<_>>().join(", "))))?;
+        ct.set_size(i);
+    }
+    if let Some(u) = text("units")? {
+        ct.units = dr::CUSTOM_UNITS.iter().find(|(_, n)| n.eq_ignore_ascii_case(u)).map(|(d, _)| *d).ok_or_else(|| OpError::param("units", &format!("one of {}", dr::CUSTOM_UNITS.map(|(_, n)| n).join(", "))))?;
+    }
+    if let Some(d) = text("decimal_separator")? {
+        ct.comma = match d {
+            "period" => false,
+            "comma" => true,
+            _ => return Err(OpError::param("decimal_separator", "period or comma")),
+        };
+    }
+    if let Some(p) = text("projection")? {
+        ct.first_angle = match p {
+            "third_angle" => false,
+            "first_angle" => true,
+            _ => return Err(OpError::param("projection", "third_angle or first_angle")),
+        };
+    }
+    if let Some(b) = flag("border")? {
+        ct.border = b;
+    }
+    for (i, k) in ["horizontal_zones", "vertical_zones"].into_iter().enumerate() {
+        if let Some(v) = c.get(k) {
+            ct.zones[i] = v.as_u64().map(|n| n as u32).filter(|n| dr::ZONE_COUNTS.contains(n)).ok_or_else(|| OpError::param(k, "an even number 0–20"))?;
+        }
+    }
+    if let Some(s) = text("start_zones")? {
+        ct.top_left = match s {
+            "bottom_right" => false,
+            "top_left" => true,
+            _ => return Err(OpError::param("start_zones", "bottom_right or top_left")),
+        };
+    }
+    if let Some(t) = flag("title_block")? {
+        ct.title_block = t;
+    }
+    Ok(ct.template().expect("size in range"))
 }
 
 fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -517,8 +655,73 @@ fn insert_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         opts.insert.scale = Some(s);
     }
+    insert_panel(od, a, source, &mut opts.insert)?;
     let tool = Tool::InsertView { source, orientation, part };
     place_view(od, a, tool, opts, &[SourceKey::studio(source)], "Insert view")
+}
+
+/// The Insert view panel's options from the arguments.
+fn insert_panel(od: &mut OpenDoc, a: &Args, source: TabId, o: &mut noshape_scene::drawing_tools::InsertOpts) -> Result<(), OpError> {
+    use noshape_model::drawing::Simplification;
+    let doc = od.doc();
+    let is_studio = matches!(doc.tab(source).map(|t| &t.content), Some(TabContent::PartStudio(_)));
+    if a.get("sketch").is_some() {
+        let ps = crate::doc::studio(doc, source).map_err(|_| OpError::param("sketch", "sketch views come from a Part Studio"))?;
+        let id = super::feature_arg(ps, a, "sketch")?;
+        if ps.feature(id).is_none_or(|f| f.type_id != "sketch") {
+            return Err(OpError::param("sketch", "not a sketch"));
+        }
+        if a.get("part").is_some() {
+            return Err(OpError::param("sketch", "give `part` or `sketch`, not both"));
+        }
+        o.sketch = Some(id);
+    }
+    if let Some(n) = a.opt_str("named_view")? {
+        let names: Vec<String> = dr::named_views(doc, source).iter().map(|v| v.name.clone()).collect();
+        let frame = dr::named_view_frame(doc, source, n).ok_or_else(|| OpError::param("named_view", &format!("the source's named views: {}", names.join(", "))))?;
+        if a.get("orientation").is_some() {
+            return Err(OpError::param("named_view", "give `orientation` or `named_view`, not both"));
+        }
+        o.named = Some((n.to_string(), frame));
+    }
+    o.flat = a.bool_or("flat", false)?;
+    if o.flat && !is_studio {
+        return Err(OpError::param("flat", "flat patterns are of Part Studio sheet metal parts"));
+    }
+    o.sketch_appearances = a.bool_or("sketch_appearances", false)?;
+    o.model_annotations = a.bool_or("model_annotations", true)?;
+    let kind = match a.opt_str("simplification")?.unwrap_or("auto") {
+        "none" => Simplification::None,
+        "auto" => Simplification::Auto,
+        "absolute" => Simplification::Absolute(0.001),
+        "ratio_to_studio" => Simplification::RatioToStudio(0.01),
+        "ratio_to_part" => Simplification::RatioToPart(0.01),
+        _ => return Err(OpError::param("simplification", "none, auto, absolute, ratio_to_studio or ratio_to_part")),
+    };
+    o.simplification = match a.opt_str("simplification_value")? {
+        Some(t) => {
+            let mm = !matches!(doc.settings.units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
+            if matches!(kind, Simplification::None | Simplification::Auto) {
+                return Err(OpError::param("simplification_value", "only for absolute and ratio simplifications"));
+            }
+            dr::parse_simplification(kind, t, mm).ok_or_else(|| OpError::param("simplification_value", "a length (\"1 mm\") or a percentage (\"1 %\")"))?
+        }
+        None => kind,
+    };
+    if let Some(p) = a.opt_str("explode_position")? {
+        let Some(TabContent::Assembly(asm)) = doc.tab(source).map(|t| &t.content) else { return Err(OpError::param("explode_position", "assemblies only")) };
+        let choices = dr::asm_positions(asm);
+        o.asm_position = choices.iter().find(|c| c.0 == p).map(|c| c.1).ok_or_else(|| OpError::param("explode_position", &format!("one of {}", choices.iter().map(|c| c.0.as_str()).collect::<Vec<_>>().join(", "))))?;
+    }
+    if let Some(d) = a.opt_str("display_state")? {
+        let Some(TabContent::Assembly(asm)) = doc.tab(source).map(|t| &t.content) else { return Err(OpError::param("display_state", "assemblies only")) };
+        let names: Vec<&str> = asm.display_states.iter().map(|s| s.name.as_str()).collect();
+        if !names.contains(&d) {
+            return Err(OpError::param("display_state", &format!("one of {}", names.join(", "))));
+        }
+        o.display_state = Some(d.to_string());
+    }
+    Ok(())
 }
 
 fn projected_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -593,19 +796,17 @@ fn update(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    use crate::drawing_export::{DrawingFormat, ExportSettings, bundle, export_files, export_sheets_of, zipped};
+    use crate::drawing_export::{self as de, DrawingFormat, ExportExtras, ExportSettings};
     let od = ctx.doc(a.opt_str("doc")?)?;
     let tab = drawing_tab(od, a)?;
     let d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
     let f = a.str("format")?;
-    let format = DrawingFormat::ALL.into_iter().filter(|x| !x.raster() && !x.csv()).find(|x| x.label().eq_ignore_ascii_case(f)).ok_or_else(|| OpError::param("format", "PDF, DWG, DXF, DWT or SVG"))?;
-    // DXF / DWG start at live's Version (Release 14 / 2000).
-    let version = match format {
-        DrawingFormat::Dxf => noshape_model::drawing::cad_export::DEFAULT_DXF,
-        DrawingFormat::Dwg => noshape_model::drawing::cad_export::DEFAULT_DWG,
-        _ => 0,
-    };
-    let mut s = ExportSettings { format, version, ..Default::default() };
+    let format = DrawingFormat::ALL.into_iter().find(|x| x.label().eq_ignore_ascii_case(f) || x.ext().eq_ignore_ascii_case(f)).ok_or_else(|| OpError::param("format", "one of the listed formats"))?;
+    let mut s = ExportSettings { format, version: de::default_version(format), ..Default::default() };
+    if let Some(v) = a.opt_str("version")? {
+        let list = format.versions();
+        s.version = list.iter().position(|x| x.eq_ignore_ascii_case(v)).ok_or_else(|| OpError::param("version", &if list.is_empty() { "this format has no version choice".to_string() } else { format!("one of {}", list.join(", ")) }))?;
+    }
     match a.opt_str("sheets")? {
         None | Some("all") => {}
         Some("current") => s.sheets = 1,
@@ -614,24 +815,70 @@ fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             s.custom = r.to_string();
         }
     }
+    s.overridden = match a.opt_str("overridden_dimensions")? {
+        None | Some("show_underlines") => 0,
+        Some("hide_underlines") => 1,
+        Some(_) => return Err(OpError::param("overridden_dimensions", "show_underlines or hide_underlines")),
+    };
+    s.text = match (a.opt_str("text")?, format.cad()) {
+        (None, _) | (Some("normal"), false) | (Some("export_as_text"), true) => 0,
+        (Some("selectable"), false) => 1,
+        (Some("explode_notes"), true) => 1,
+        (Some("explode_all"), true) => 2,
+        _ => return Err(OpError::param("text", if format.cad() { "export_as_text, explode_notes or explode_all" } else { "normal or selectable" })),
+    };
     s.color = match a.opt_str("color")? {
         None | Some("color") => 0,
         Some("black_and_white") => 1,
         Some("grayscale") => 2,
         Some(_) => return Err(OpError::param("color", "color, black_and_white or grayscale")),
     };
+    if let Some(u) = a.opt_str("units")? {
+        s.units = de::UNITS.iter().position(|x| x.0.eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param("units", "one of the listed units"))?;
+    }
+    s.splines = a.bool_or("splines_as_polylines", false)?;
+    s.z_zero = a.bool_or("z_zero", true)?;
+    s.hide_inspection = a.bool_or("hide_inspection_items", false)?;
+    s.exclude_off_sheet = a.bool_or("exclude_off_sheet", false)?;
     let current = d.active_sheet.min(d.sheets.len().saturating_sub(1));
-    let sheets = export_sheets_of(&s, d.sheets.len(), current);
-    if sheets.is_empty() {
+    let sheets = de::export_sheets_of(&s, d.sheets.len(), current);
+    if !format.csv() && sheets.is_empty() {
         return Err(OpError::param("sheets", "No sheets to export"));
     }
     let versions = |id: &str| od.session.document_at_version(id).ok().flatten();
     let sources = noshape_model::drawing::views::regenerate_sources_with(od.doc(), &d, &versions);
-    let info = dr::sheet_info(&od.session, tab);
-    let files = export_files(&d, &sheets, &s, &sources, &noshape_model::drawing::views::ViewCache::new(), &info).map_err(|e| OpError::new("io", format!("Export failed: {e}")))?;
     let name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_else(|| "Drawing".into());
-    let bytes = bundle(files, &name, format);
-    let path = std::path::Path::new(a.str("file")?);
+    let bytes = if format.csv() {
+        // The inspection panel's rows (hole callouts from the model).
+        let rows = d.inspection_rows_with(&|si, an| noshape_model::drawing::build::hole_callout_lines(&d, &d.sheets[si], &sources, an), format == DrawingFormat::DefinitionList);
+        noshape_model::drawing::inspection::rows_csv(&rows).into_bytes()
+    } else {
+        let info = dr::sheet_info(&od.session, tab);
+        let files = de::export_files(&d, &sheets, &s, &sources, &noshape_model::drawing::views::ViewCache::new(), &info, &ExportExtras::default()).map_err(|e| OpError::new("io", format!("Export failed: {e}")))?;
+        let files = if format.raster() { files.into_iter().map(|(n, svg)| de::rasterize(&svg, format).map(|b| (n, b))).collect::<Result<Vec<_>, String>>().map_err(|e| OpError::new("io", format!("Export failed: {e}")))? } else { files };
+        de::bundle(files, &name, format)
+    };
+    let zip = !format.csv() && de::zipped(format, sheets.len());
+    let (download, store) = super::export::options_arg(a)?;
+    let ext = if zip { "zip" } else { format.ext() };
+    let path = match a.opt_str("file")? {
+        Some(f) if download => std::path::PathBuf::from(f),
+        Some(f) => super::export::store_dir()?.join(std::path::Path::new(f).file_name().unwrap_or_default()),
+        None if !download => super::export::store_dir()?.join(format!("{name}.{ext}")),
+        None => return Err(OpError::param("file", "required (or options \"store\")")),
+    };
+    let path = path.as_path();
     std::fs::write(path, &bytes).map_err(|e| OpError::new("io", format!("writing {}: {e}", path.display())).with_param("file"))?;
-    Ok(json!({ "file": path.display().to_string(), "bytes": bytes.len(), "sheets": sheets.len(), "zip": zipped(format, sheets.len()) }).into())
+    let stored = if store { Some(super::export::store_tab(od, tab, path)?) } else { None };
+    if !download {
+        let _ = std::fs::remove_file(path);
+    }
+    let mut reply = json!({ "bytes": bytes.len(), "sheets": sheets.len(), "zip": zip });
+    if download {
+        reply["file"] = json!(path.display().to_string());
+    }
+    if let Some(t) = stored {
+        reply["stored_tab"] = json!(t);
+    }
+    Ok(reply.into())
 }

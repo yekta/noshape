@@ -11,6 +11,7 @@
 pub mod context;
 pub mod derived;
 mod display;
+pub use display::flat_view_display;
 pub use display::{PART_COLORS, angle_display_mesh, set_angle_display_mesh, tessellate_shape};
 pub mod eval;
 pub mod features;
@@ -197,7 +198,7 @@ impl Regenerator {
             let blob = serde_json::to_vec(&(&f.type_id, &f.name, params, suppressed)).unwrap_or_default();
             key = hash_bytes(key, &blob);
             // Derived features depend on another Part Studio's state.
-            if f.type_id == "importDerived"
+            if crate::features::importing::is_derived(&f.type_id)
                 && let Some(p) = &opts.derived
             {
                 key = hash_bytes(key, &p.version(params.text("partStudio")).to_le_bytes());
@@ -253,9 +254,18 @@ impl Regenerator {
                         ev.custom = opts.custom_features.clone();
                         ev.custom_type = crate::custom::is_custom(&f.type_id).then(|| f.type_id.clone());
                         let specs = f.feature_type().map(|t| t.params.as_slice()).unwrap_or(&[]);
+                        // Every boolean of the feature on this thread stops
+                        // when the run is aborted (not only boolean_into's).
+                        let cancel = opts.cancel.clone();
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            ev.check_bounds(specs)?;
-                            eval_fn(&mut ev)
+                            let mut run = || {
+                                ev.check_bounds(specs)?;
+                                eval_fn(&mut ev)
+                            };
+                            match &cancel {
+                                Some(c) => c.scope(run),
+                                None => run(),
+                            }
                         }));
                         // Stopped part-way: don't cache a half-done feature.
                         if aborted() {

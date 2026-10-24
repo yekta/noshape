@@ -772,6 +772,59 @@ fn std_feature_dialogs_match_builtin_schemas() {
     assert!(lost.is_empty(), "dialogs no longer identical: {lost:?}\n{report}");
 }
 
+/// Labelled selects (`UIHint.SHOW_LABEL`) as the std FeatureScript declares
+/// them: a built-in dialog shows the label where Onshape does (qa5: Fill's
+/// Continuity, Boundary surface's Boundary condition, Bend alignment, Jog's
+/// Bounding type and Jog offset anchor were bare selects).
+#[test]
+fn std_show_label_hints_match_builtin() {
+    use noshape_model::params::{Hints, ParamKind, ParamSpec};
+    fn labelled(specs: &[ParamSpec], prefix: &str, out: &mut Vec<String>) {
+        for p in specs {
+            if p.hints.has(Hints::SHOW_LABEL) && !p.hints.has(Hints::ALWAYS_HIDDEN) {
+                out.push(format!("{prefix}{}", p.id));
+            }
+            if let ParamKind::Array { item, .. } = &p.kind {
+                labelled(item, &format!("{prefix}{}.", p.id), out);
+            }
+        }
+    }
+    let mut report = String::new();
+    for (file, src) in noshape_featurescript::STD_SOURCES {
+        for line in src.lines() {
+            let Some(name) = line.strip_prefix("export const ").and_then(|l| l.split_once(" = defineFeature")).map(|(n, _)| n) else { continue };
+            let Some(builtin) = noshape_model::features::get(name) else { continue };
+            let mut doc = Document::new();
+            let tab = doc.add_tab(file, TabContent::FeatureStudio(FeatureStudio::new(src)));
+            let compiled = custom::compile(tab, src);
+            let Some(def) = compiled.feature(name) else { continue };
+            let (mut fs, mut b) = (Vec::new(), Vec::new());
+            labelled(&def.feature_type.params, "", &mut fs);
+            labelled(&builtin.params, "", &mut b);
+            // Only parameters both dialogs have (ids the built-in renamed or
+            // dropped are std_feature_dialogs_match_builtin_schemas's business).
+            let mut all_fs = Vec::new();
+            let mut all_b = Vec::new();
+            fn ids(specs: &[ParamSpec], prefix: &str, out: &mut Vec<String>) {
+                for p in specs {
+                    out.push(format!("{prefix}{}", p.id));
+                    if let ParamKind::Array { item, .. } = &p.kind {
+                        ids(item, &format!("{prefix}{}.", p.id), out);
+                    }
+                }
+            }
+            ids(&def.feature_type.params, "", &mut all_fs);
+            ids(&builtin.params, "", &mut all_b);
+            let missing: Vec<&String> = fs.iter().filter(|i| all_b.contains(i) && !b.contains(i)).collect();
+            let extra: Vec<&String> = b.iter().filter(|i| all_fs.contains(i) && !fs.contains(i)).collect();
+            if !missing.is_empty() || !extra.is_empty() {
+                report.push_str(&format!("{name}: label missing {missing:?}, label extra {extra:?}\n"));
+            }
+        }
+    }
+    assert!(report.is_empty(), "SHOW_LABEL differs from the std:\n{report}");
+}
+
 /// Standard library features whose generated dialog equals the built-in one.
 const EXPECTED_IDENTICAL_DIALOGS: &[&str] = &[
     "bodyDraft", "booleanBodies", "boundarySurface", "chamfer", "circularPattern", "compositeCurve", "compositePart", "constrainedSurface", "cPlane", "cPoint", "curvePattern",

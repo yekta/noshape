@@ -2168,6 +2168,15 @@ impl FeatureDialog {
                             continue;
                         }
                     }
+                    // A whole sketch in a curve field (its row clicked) reads
+                    // "Edges of Sketch 2" (live Rib: "Edges of Rib sketch").
+                    if let (Reference::Sketch(_), ParamKind::Query { filter, .. }) = (r, &s.kind)
+                        && filter.intersects(QueryFilter::SKETCH_EDGE)
+                        && !filter.intersects(QueryFilter::SKETCH)
+                    {
+                        rows.push((format!("Edges of {}", (self.labeler)(r)), vec![k], r.clone()));
+                        continue;
+                    }
                     rows.push(((self.labeler)(r), vec![k], r.clone()));
                 }
                 // Lists that may be ordered (`ALLOW_QUERY_ORDER`) with 2+ rows get

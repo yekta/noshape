@@ -140,7 +140,7 @@ edges as drawn (lines with end points, circles and arcs with center and radius);
 clicks on a vertex or circle center pick the point, exactly as with the mouse (the drawing tools are the app's).
 
 ```text
-drawing_create    {"source": "Part Studio 1", "template": "ISO A3"}       -> tab "Part 1 Drawing 1" with suggested views
+drawing_create    {"source": "Part Studio 1", "template": "ISO A3", "suggested_views": true}   -> tab "Part 1 Drawing 1" with suggested views
 drawing_get       {"drawing": "Part 1 Drawing 1"}                          -> views [{id, kind, scale, bounds, edges: [...]}]
 drawing_dimension {"drawing": "Part 1 Drawing 1", "kind": "diameter", "picks": [[205.5, 160.0]], "place": [220, 175]}   -> text "Ø10"
 drawing_dimension {"drawing": "Part 1 Drawing 1", "picks": [[180.0, 180.0]], "place": [180, 200]}                         -> text "80"
@@ -246,17 +246,17 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-158 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
+179 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
 - **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete)
-- **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_show_all`](#feature_show_all)
-- **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
+- **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_show_all`](#feature_show_all)
+- **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_reorder_inputs`](#config_reorder_inputs)
-- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step)
-- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table)
+- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard)
+- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
@@ -498,12 +498,75 @@ Features that use them fail with "missing selection" errors, as in Onshape.
 
 Suppress or unsuppress features (edits the document (one undoable history entry)).
 
+Unsuppress also removes a dynamic suppression expression (feature_dynamic_suppression), like the menu's Unsuppress on such a feature.
+
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `features` | array of string | required | Feature ids or names. |
 | `suppressed` | boolean |  | true: suppress, false: unsuppress. |
+
+#### feature_dynamic_suppression
+
+Set or remove a feature's dynamic suppression expression (edits the document (one undoable history entry)).
+
+The Dynamic suppression dialog: the feature is active while `unsuppressed_if` is true (an expression of variables and configuration inputs, e.g. "#holes > 2"). Empty or omitted removes the expression (feature_suppress with suppressed false does too).
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `feature` | string | required | Feature id or name. |
+| `unsuppressed_if` | string |  | Unsuppressed if: expression. |
+
+#### feature_dependencies
+
+Show dependencies: the features a feature uses and the features using it.
+
+Parents are the earlier features whose geometry, sketches, planes or #variables the feature references; children are the later features referencing it. In history order.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `feature` | string | required | Feature id or name. |
+
+#### feature_add_folder
+
+Add features to a new folder (edits the document (one undoable history entry)).
+
+Add selection to folder… (or, without `features`, the list's New folder: an empty folder at the rollback bar). Folders hold a contiguous run: the features gather after the first one. Features all in one folder make a nested folder. feature_list lists folders.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `features` | array of string |  | Feature ids or names. |
+| `name` | string |  | Folder name. |
+
+#### feature_rename_folder
+
+Rename a feature folder (edits the document (one undoable history entry)).
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `folder` | integer or string | required | Folder id or name (feature_list). |
+| `name` | string | required | New name. |
+
+#### feature_unpack_folder
+
+Unpack a feature folder (edits the document (one undoable history entry)).
+
+Removes the folder; its features (and sub-folders) stay in place, in the enclosing folder.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `folder` | integer or string | required | Folder id or name (feature_list). |
 
 #### feature_rollback
 
@@ -578,6 +641,7 @@ Inserts a Sketch feature ("Insert feature : Sketch 1") at the rollback bar. Retu
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `plane` | string | required | Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector. |
 | `name` | string |  | Name (default "Sketch N"). |
+| `disable_imprinting` | boolean |  | The dialog's Disable imprinting (default off). |
 
 #### sketch_draw
 
@@ -711,6 +775,35 @@ Entities with ids and geometry (sketch coordinates, workspace units), constraint
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
+
+#### sketch_paste
+
+Copy a sketch onto another plane (Copy sketch / Paste sketch) (edits the document (one undoable history entry)).
+
+The context menus' Copy sketch then Paste sketch on a plane or planar face: a copy of `sketch` (its entities, constraints and dimensions) on `plane`, at the rollback bar of `to_tab` (default: the sketch's own Part Studio). One edit ("Paste sketch"). Returns the new sketch.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `sketch` | string | required | Sketch feature id or name to copy. |
+| `plane` | string | required | Plane to paste onto: `plane:top`, a Plane feature, a planar face id or a mate connector. |
+| `to_tab` | string |  | Part Studio to paste into (default: the same one). |
+
+#### sketch_export
+
+Export a sketch or a planar face as DXF (Export as DXF/DWG…).
+
+The context menus' Export as DXF/DWG… of a sketch (its curves; construction curves as hidden lines; external references left out) or of a planar face (its boundary), in the plane's coordinates, millimeters. `format` svg writes the same geometry as SVG.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `sketch` | string |  | Sketch feature id or name. |
+| `face` | string |  | Instead: a planar face id (`face:…`). |
+| `file` | string | required | Output path. |
+| `format` | one of `dxf`, `svg` |  | File format. |
 
 #### sketch_trim
 
@@ -1036,7 +1129,7 @@ Inputs (List with its configurations, Checkbox, Variable with default and range)
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 
 #### config_add_input
 
@@ -1047,7 +1140,7 @@ Add a configuration input (List, Checkbox or configuration Variable) (edits the 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `kind` | one of `list`, `checkbox`, `variable` | required | Input kind. |
 | `name` | string |  | Name (default "Configuration", "List 2", "Checkbox 1"...; required for a variable: its #name). |
 | `variable_kind` | one of `LENGTH`, `ANGLE`, `INTEGER`, `REAL`, `TEXT` |  | Variable: kind (default LENGTH). |
@@ -1061,7 +1154,7 @@ Rename a configuration input or change a configuration variable's default and ra
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input id or name. |
 | `name` | string |  | New name. |
 | `value` | string or number |  | Variable input: new default. |
@@ -1074,19 +1167,19 @@ Delete a configuration input and what it configures (edits the document (one und
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input id or name. |
 
 #### config_add_option
 
 Add a configuration to a List input (edits the document (one undoable history entry)).
 
-Configured parameters take the default configuration's value in it until set with config_set_value.
+Returns its id as `option`. Configured parameters take the default configuration's value in it until set with config_set_value.
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | List input id or name. |
 | `name` | string | required | Configuration name (e.g. "Large"). |
 
@@ -1099,7 +1192,7 @@ A List keeps at least one configuration.
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | List input id or name. |
 | `option` | string | required | Configuration id or name. |
 | `name` | string |  | New name. |
@@ -1107,15 +1200,17 @@ A List keeps at least one configuration.
 
 #### config_configure
 
-Make a feature parameter (or a feature's suppression) configured by a List or Checkbox input (edits the document (one undoable history entry)).
+Make a parameter (or suppression) of a feature, assembly instance or mate configured by a List or Checkbox input (edits the document (one undoable history entry)).
 
-Every configuration starts with the current value; then set values with config_set_value. `param` is a parameter id of the feature (see feature_schema) or "suppressed".
+Every configuration starts with the current value; then set values with config_set_value. Part Studio: `feature` and `param`, a parameter id of the feature (see feature_schema) or "suppressed" (Configure suppression). Assembly: `instance` with `param` "suppressed", or `mate` with "suppressed", "offset", "offset_x", "offset_y", "offset_z", "rotation" or "flip_primary".
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
-| `feature` | string | required | Feature id or name. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `feature` | string |  | Feature id or name (Part Studio). |
+| `instance` | string |  | Instance id or name (Assembly). |
+| `mate` | string |  | Mate id or name (Assembly). |
 | `param` | string | required | Parameter id, or "suppressed". |
 | `input` | string | required | List or Checkbox input id or name. |
 
@@ -1128,9 +1223,11 @@ Set a configured parameter's value in one configuration (edits the document (one
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
-| `feature` | string | required | Feature id or name. |
-| `param` | string | required | Parameter id, or "suppressed". |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `feature` | string |  | Feature id or name (Part Studio). |
+| `instance` | string |  | Instance id or name (Assembly). |
+| `mate` | string |  | Mate id or name (Assembly). |
+| `param` | string | required | Parameter id, or "suppressed" (see config_configure). |
 | `configuration` | string or boolean | required | Configuration id/name, or true/false. |
 | `value` | any | required | The value. |
 
@@ -1143,7 +1240,7 @@ Sets the active value of configuration inputs; later regenerations, queries, ren
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `values` | object |  | Input -> value. |
 | `reset` | boolean |  | Start from the default configuration. |
 
@@ -1154,7 +1251,7 @@ Move a configuration input onto another's place (edits the document (one undoabl
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input to move. |
 | `to` | string | required | Input whose place it takes. |
 
@@ -1172,6 +1269,7 @@ The Insert dialog. Inserting the same item again offsets the new instance along 
 | `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
 | `source` | string | required | Part Studio or Assembly tab (name or id) to insert from. |
 | `part` | string |  | A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio as one instance. |
+| `sketch` | string |  | A sketch of that Part Studio (feature id or name): the Insert dialog's sketches. |
 | `configuration` | object |  | Configuration of the source: {input id: value}. |
 
 #### assembly_list
@@ -1216,7 +1314,7 @@ The points Onshape offers while hovering an entity (centroid, vertices, edge mid
 
 #### assembly_mate
 
-Add a mate between two mate connectors (Fastened, Revolute, Slider, Planar, Cylindrical, Pin slot, Ball, Parallel, Tangent, Width) (edits the document (one undoable history entry)).
+Add or edit a mate between mate connectors (Fastened, Revolute, Slider, Planar, Cylindrical, Pin slot, Ball, Parallel, Tangent, Width) (edits the document (one undoable history entry)).
 
 The mate dialog: picks two connectors, solves the mate (the first connector's instance moves to the second, as in Onshape), and commits. A mate connector: {"instance": instance id or name, "entity": a face/edge/vertex id of that instance (from assembly_entities), "inference": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {"instance", "reference", "align"}, or {"origin": true} for the assembly origin, or {"connector": an assembly mate connector id or name}. Optional "flip": true flips that connector's primary axis. Offsets are expressions ("5 mm", "90 deg").
 
@@ -1224,12 +1322,19 @@ The mate dialog: picks two connectors, solves the mate (the first connector's in
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
-| `type` | one of `fastened`, `revolute`, `slider`, `planar`, `cylindrical`, `pinslot`, `ball`, `parallel`, `tangent`, `width` | required | Mate type. |
-| `a` | object | required | First connector (its instance moves). |
-| `b` | object | required | Second connector. |
+| `mate` | string |  | Edit this existing mate (id `mate:…` or name), as its Edit… dialog: fields not given keep their values. Without it a new mate is added (`type`, `a`, `b` required). |
+| `type` | one of `fastened`, `revolute`, `slider`, `planar`, `cylindrical`, `pinslot`, `ball`, `parallel`, `tangent`, `width` |  | Mate type. |
+| `a` | object |  | First connector (its instance moves). Width: the first tab connector. |
+| `b` | object |  | Second connector. Width: the first width connector. |
+| `c` | object |  | Width: the second width connector. |
+| `d` | object |  | Width: the second tab connector (optional). |
 | `name` | string |  | Name (default "Fastened 1", ...). |
-| `flip_primary` | boolean |  | Flip the primary axis (default: keep the moving instance's current orientation, like the dialog). |
-| `offset` | object |  | {"x", "y", "z": length, "rotation": angle} expressions where the mate type allows them. |
+| `flip_primary` | boolean |  | Flip primary axis (default: keep the moving instance's current orientation, like the dialog). |
+| `reorient_secondary` | integer |  | Reorient secondary axis: quarter turns about the primary axis (the dialog's button clicks, 0-3). |
+| `offset` | object |  | Offset: {"x", "y", "z": length, "rotation": angle} expressions where the mate type allows them. |
+| `rotation_axis` | one of `x`, `y`, `z` |  | Axis of the rotation offset. |
+| `limits` | object |  | Limits: {"<axis>": {"min": expr, "max": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone). |
+| `tangent_propagation` | boolean |  | Tangent mates: Tangent propagation. |
 | `solve_all` | boolean |  | Solve every mate (the dialog's Solve) instead of only moving this mate's first instance. |
 
 #### assembly_transform
@@ -1511,6 +1616,192 @@ An explode step of a view: translate the instances `distance` along `direction`,
 | `lines` | boolean |  | Show explode lines. |
 | `step` | integer |  | Edit this step (1-based) instead of adding one. |
 
+#### assembly_move_to_subassembly
+
+Move instances to a new subassembly (edits the document (one undoable history entry)).
+
+Move to new subassembly: a new Assembly tab holds the instances and the mates among them, and one instance of it takes their place. Pattern and mirror copies stay.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instances` | array of string | required | Instance ids or names. |
+
+#### assembly_create_subassembly
+
+Create an empty subassembly (edits the document (one undoable history entry)).
+
+Create empty subassembly: a new, empty Assembly tab and an instance of it here.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+
+#### assembly_dissolve_subassembly
+
+Dissolve subassemblies into this assembly (edits the document (one undoable history entry)).
+
+Dissolve subassembly: the subassembly's instances and mates move up into this assembly; its tab is emptied when nothing else uses it.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instances` | array of string | required | Instance ids or names. |
+
+#### assembly_add_folder
+
+Add instances or mate features to a new folder (edits the document (one undoable history entry)).
+
+Add selection to folder… in the instance list or the Mate features list. Rename it with assembly_rename (`feature`: the folder), unpack it with assembly_unpack_folder.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instances` | array of string |  | Instance ids or names. |
+| `features` | array of string |  | Mate, relation, group, pattern or connector ids or names. |
+| `name` | string |  | Folder name. |
+
+#### assembly_unpack_folder
+
+Unpack an assembly folder (edits the document (one undoable history entry)).
+
+The folder goes; its instances and features stay.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `folder` | string | required | Folder id or name (assembly_list `folders`). |
+
+#### assembly_copy
+
+Copy and paste instances (edits the document (one undoable history entry)).
+
+Copy then Paste (Ctrl+C, Ctrl+V): new instances named "<name> <n>", with the mates and mate connectors among the copied instances; never fixed. `offset` moves the copies (the app places them at the cursor).
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instances` | array of string | required | Instance ids or names. |
+| `to` | string |  | Assembly tab to paste into (default: the same one). |
+| `offset` | array of number or string |  | [x, y, z] lengths (default [0, 0, 0]). |
+
+#### assembly_set_configuration
+
+Change an instance's configuration (edits the document (one undoable history entry)).
+
+Change configuration… of an instance of a configured Part Studio or assembly.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instance` | string | required | Instance id or name. |
+| `configuration` | object | required | {input id: value} (list inputs: the configuration id; checkboxes: true / false). |
+
+#### assembly_lock
+
+Lock a subassembly at a position or let it follow (edits the document (one undoable history entry)).
+
+A subassembly instance's Lock / follow position menu: `flexible` (Unlock), `current` (lock at the current position) or a named position of the subassembly.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instance` | string | required | Subassembly instance id or name. |
+| `lock` | string | required | "flexible", "current" or a named position name. |
+
+#### assembly_instance_properties
+
+Set instance properties: reference designator, tessellation (edits the document (one undoable history entry)).
+
+Instance properties… (Reference designator) and Use best available tessellation / Use automatic tessellation setting.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instances` | array of string | required | Instance ids or names. |
+| `reference_designator` | string |  | Reference designator (one instance; empty clears). |
+| `best_tessellation` | boolean |  | Use best available tessellation (false: automatic). |
+
+#### assembly_dynamic_suppression
+
+Set or remove an instance, mate or folder's dynamic suppression (edits the document (one undoable history entry)).
+
+Dynamic suppression ▸ Add expression…: suppressed unless `unsuppressed_if` is true. Empty or omitted removes it.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instance` | string |  | Instance id or name. |
+| `mate` | string |  | Mate id or name. |
+| `folder` | string |  | Instance folder id or name. |
+| `unsuppressed_if` | string |  | Unsuppressed if: expression. |
+
+#### assembly_standard_content
+
+Browse the standard content catalogue.
+
+The Insert dialog's Standard content pickers. With nothing: the standards; with `standard`: its categories; then classes, components; with a full component: its sizes, lengths, other selects, materials and finishes and the defaults.
+
+| field | type | | description |
+|---|---|---|---|
+| `standard` | string |  | Standard. |
+| `category` | string |  | Category. |
+| `class` | string |  | Class. |
+| `component` | string |  | Component. |
+| `size` | string |  | Size (for its lengths; default the component's default size). |
+
+#### assembly_insert_standard
+
+Insert standard content (bolts, screws, nuts, washers, pins…) (edits the document (one undoable history entry)).
+
+The component: `standard` ("ANSI", "ISO", "DIN"…), `category`, `class` and `component` as the tab's pickers name them (see assembly_standard_content; `component` alone is enough when its name is unique), `size`, `length`, `params` ({label: option} for the component's other selects, e.g. {"Head slot": "checked", "Series": "Wide"}), `material`, `finish`. Missing values are the dialog's defaults.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `standard` | string |  | Standard. |
+| `category` | string |  | Category. |
+| `class` | string |  | Class. |
+| `component` | string |  | Component. |
+| `size` | string |  | Size (default: the component's default, or auto-size from the first hole with `auto_size`). |
+| `length` | string |  | Length (default: the size's first). |
+| `params` | object |  | Other selects: {label: option}. |
+| `material` | string |  | Material. |
+| `finish` | string |  | Finish. |
+| `holes` | array of object |  | Faces or edges to fasten into: [{"instance", "entity"}] (a circular edge or cylindrical face: one hole; a planar face: every hole in it). One instance per hole, each with a Fastened mate. Without holes: one unplaced instance. |
+| `toward` | array of number |  | For an edge or cylinder: the hole end whose face points most this way (assembly coordinates; the dialog uses the view direction). Default [0, 0, 1]. |
+| `auto_size` | boolean |  | Auto-size: the size fitting the first hole (bolts and screws round down, nuts and washers up). |
+| `placement` | one of `insert`, `closest`, `furthest` |  | Insert, Insert closest to selection (against the face, under what is there) or Insert furthest from selection (at the end of the stack). |
+| `flip` | boolean |  | Flip the part on its mate connector (the `a` key). |
+
+#### assembly_edit_standard
+
+Edit standard content instances (size, length, selects, material, finish) (edits the document (one undoable history entry)).
+
+Edit standard content instance…: the instances take the new values and keep their mates.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instances` | array of string | required | Standard content instance ids or names (same component). |
+| `size` | string |  | Size (default: the component's default, or auto-size from the first hole with `auto_size`). |
+| `length` | string |  | Length (default: the size's first). |
+| `params` | object |  | Other selects: {label: option}. |
+| `material` | string |  | Material. |
+| `finish` | string |  | Finish. |
+
 ### drawing
 
 #### drawing_templates
@@ -1523,16 +1814,19 @@ Create Drawing's standard templates: file, sheet setup, standard (ANSI / ISO) an
 
 Create a Drawing tab of a part, Part Studio or assembly (edits the document (one undoable history entry)).
 
-Create Drawing: a Drawing tab with the template's sheet, placed after the source tab. With `suggested_views` (default true) the source's suggested views (Front, Top, Right projections and an isometric, scaled to fit) are laid out, as the dialog's checkbox does. Returns the tab and its views.
+Create Drawing: a Drawing tab with the template's sheet, placed after the source tab. With `suggested_views` the source's suggested views (Front, Top, Right projections and an isometric, scaled to fit) are laid out, as the dialog's checkbox does. Returns the tab and its views.
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `source` | string |  | Part Studio or assembly tab (name or id). Omit for an empty drawing. |
 | `part` | string |  | Only this part (`body:…` id from query_parts). |
-| `template` | string |  | Template file or setup name (`drawing_templates`), e.g. "ANSI_A_INCH.dwt", "ISO A3". Default: ISO A3 in metric workspaces, ANSI B (inch) otherwise. |
-| `name` | string |  | Tab name (default "<part> Drawing N" / "Drawing N"). |
-| `suggested_views` | boolean |  | Lay out the suggested views. |
+| `sketch` | string |  | Only this sketch of the source Part Studio (feature id or name): Create Drawing of Sketch N. |
+| `configuration` | object |  | Configuration of the source: {input id: value}. |
+| `template` | string |  | Existing templates: file or setup name (`drawing_templates`), e.g. "ANSI_A_INCH.dwt", "ISO A3". Default ANSI_A_INCH.dwt, the dialog's preselected row. |
+| `custom_template` | object |  | The Custom template tab instead of `template`: {"standard": "ANSI" \| "ISO" \| "JIS" (default ISO in metric workspaces, else ANSI), "language": English (default), French, German, Spanish, Italian, Japanese, Korean, ChineseSimplified, ChineseTraditional or the list's own name, "size": ANSI A (default), A Portrait, B, C, D; ISO / JIS A4 (default), A4 Portrait, A3, A2, A1, A0, "units": Millimeters, Centimeter, Meter, Inches, Feet and inches, Foot, Yard, "decimal_separator": "period" \| "comma", "projection": "third_angle" \| "first_angle", "border": bool (default true), "horizontal_zones" / "vertical_zones": 0–20 even (default per size), "start_zones": "bottom_right" (default) \| "top_left", "title_block": bool (default true)}. Choosing a standard sets the units, separator and projection like the dialog (ANSI: Inches, period, third angle; ISO: Millimeters, comma, first angle; JIS: Millimeters, comma, third angle). |
+| `name` | string |  | Tab name (default "<part> Drawing N" / "<sketch> Drawing N" / "Drawing N"). |
+| `suggested_views` | boolean |  | Suggested views (true) or No views (false, the dialog's default; place views with drawing_insert_view). |
 
 #### drawing_get
 
@@ -1560,9 +1854,18 @@ Insert view: the view centered at `position` (sheet mm) in the given orientation
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `source` | string | required | Part Studio or assembly tab. |
 | `part` | string |  | Only this part (`body:…`). |
+| `sketch` | string |  | Insert a sketch of the source Part Studio (a sketch view, facing its plane). |
+| `flat` | boolean |  | A sheet metal part's flat pattern. |
 | `orientation` | one of `front`, `back`, `top`, `bottom`, `left`, `right`, `isometric` |  | View orientation. |
+| `named_view` | string |  | View orientation › a named view of the source Part Studio (instead of `orientation`). |
 | `position` | array of number | required | View center on the sheet (mm). |
 | `scale` | number |  | View scale (paper / model). |
+| `simplification` | one of `none`, `auto`, `absolute`, `ratio_to_studio`, `ratio_to_part` |  | View simplification: None, Automatic, Absolute size, Ratio to Part Studio / assembly size, Ratio to part size. |
+| `simplification_value` | string |  | Its value: a length ("1 mm", default 1 mm) or a percentage ("1 %", default 1 %). |
+| `sketch_appearances` | boolean |  | Show sketch appearances. |
+| `model_annotations` | boolean |  | Show annotations from model. |
+| `explode_position` | string |  | Assemblies: Explode/Position, an exploded view or named position name (default "Default"). |
+| `display_state` | string |  | Assemblies: Display state name (default Show all). |
 
 #### drawing_projected_view
 
@@ -1619,18 +1922,27 @@ After the model changes, a drawing's views keep the geometry they were made from
 
 #### drawing_export
 
-Export a drawing to PDF, DWG, DXF, DWT or SVG.
+Export a drawing (PDF, DWG, DXF, DWT, SVG, PNG, JPEG, TIFF, inspection lists) (edits the document (one undoable history entry)).
 
-The Export Drawing modal: all sheets (or `sheets`: "current" or a range like "1-3, 5") to one file; PDF and DWT hold every sheet, other formats with several sheets are zipped (one file per sheet).
+The Export Drawing modal with every option. PDF holds every sheet, DWT the first two, DXF / DWG a layout per sheet of `sheets`; SVG and the raster formats (300 dpi) the active sheet. `version` from the format's list (PDF 1.4–1.7, default 1.5; DWG / DXF Release 11-12 … 2018, default 2000 / Release 14; DWT 2013 / 2018). Inspection list / Drawing definition list are the CSV lists.
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
-| `format` | one of `PDF`, `DWG`, `DXF`, `DWT`, `SVG` | required | Format. |
-| `file` | string | required | Output path. |
-| `sheets` | string |  | "all" (default), "current" or a range "1-3, 5". |
-| `color` | one of `color`, `black_and_white`, `grayscale` |  | PDF color (default color). |
+| `format` | one of `PDF`, `DWG`, `DXF`, `DWT`, `SVG`, `PNG`, `JPEG`, `TIFF`, `Inspection list`, `Drawing definition list` | required | Format. |
+| `file` | string |  | Output path (required unless `options` is "store"; then only its name is used, default "<drawing>.<ext>"). |
+| `options` | one of `download`, `download_and_store`, `store` |  | Options: write `file`, and / or keep the file as a file tab right after the drawing ("Store <file>"). |
+| `version` | string |  | The format's Version (e.g. "1.7", "2018", "Release 14"). |
+| `sheets` | string |  | DWG / DXF: "all" (default), "current" or a range "1-3, 5" (PDF: every sheet; DWT: the first two; SVG and rasters: the active sheet). |
+| `overridden_dimensions` | one of `show_underlines`, `hide_underlines` |  | Overridden dimensions. |
+| `text` | one of `normal`, `selectable`, `export_as_text`, `explode_notes`, `explode_all` |  | PDF Text (normal / selectable) or DWG / DXF / DWT Text (export_as_text / explode_notes / explode_all). |
+| `color` | one of `color`, `black_and_white`, `grayscale` |  | PDF Color (default color; only PDF has it). |
+| `units` | one of `Use drawing units`, `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard` |  | DWG / DXF Units (default "Use drawing units"). |
+| `splines_as_polylines` | boolean |  | Export splines as polylines. |
+| `z_zero` | boolean |  | DWG / DXF / DWT: Set z-height to zero and normals to positive. |
+| `hide_inspection_items` | boolean |  | Hide inspection items. |
+| `exclude_off_sheet` | boolean |  | DWG / DXF / DWT: Exclude off-sheet content. |
 
 #### drawing_section_view
 
@@ -1694,9 +2006,9 @@ The Aligned section view tool: `center` (sheet mm) on the parent view, then `a` 
 
 #### drawing_detail_view
 
-Detail view of a circular region of a view (edits the document (one undoable history entry)).
+Detail view of a region of a view (circle, rectangle, spline or polygon profile) (edits the document (one undoable history entry)).
 
-The Detail view tool: the circle centered at `center` (sheet mm; a vertex or circle center there is snapped) with `radius` (sheet mm) on the parent view, shown at `scale` (default twice the parent's) at `position`. One edit ("Detail view").
+The Detail view tool: the circle centered at `center` (sheet mm; a vertex or circle center there is snapped) with `radius` (sheet mm), or a rectangle / spline / polygon `profile` through `points`, on the parent view, shown at `scale` (default twice the parent's) at `position`. One edit ("Detail view").
 
 | field | type | | description |
 |---|---|---|---|
@@ -1704,8 +2016,10 @@ The Detail view tool: the circle centered at `center` (sheet mm; a vertex or cir
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `parent` | integer | required | View to detail. |
-| `center` | array of number | required | Detail circle center (sheet mm). |
-| `radius` | number | required | Detail circle radius (sheet mm). |
+| `profile` | one of `circle`, `rectangle`, `spline`, `polygon` |  | The dialog's profile tool. |
+| `center` | array of number |  | Circle: the center (sheet mm; a vertex or circle center there is snapped). |
+| `radius` | number |  | Circle: the radius (sheet mm). |
+| `points` | array of array of number |  | Rectangle: two corners; spline / polygon: at least 3 points (sheet mm), closed. |
 | `position` | array of number | required | Where the detail view goes (sheet mm). |
 | `scale` | number |  | View scale (default 2 x the parent's). |
 | `label` | string |  | Detail id (default the sheet's next letter). |
@@ -1865,6 +2179,37 @@ The drawing toolbar's sketch tools on the sheet sketch, on clicks `picks` (sheet
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `tool` | one of `line`, `circle`, `circle_3_point`, `tangent_arc`, `corner_rectangle`, `center_rectangle`, `spline`, `spline_point`, `point`, `trim` | required | Sketch tool. |
 | `picks` | array of array of number | required | Clicks (sheet mm). |
+
+#### drawing_edit_dimension
+
+Edit a dimension or hole callout: text, precision, units, tolerance, dual, parentheses (edits the document (one undoable history entry)).
+
+The dimension palette (double-click a dimension or hole callout): text above / below, prefix, suffix, the value (typing it overrides a linear dimension's text; empty puts the measured value back), precision, units, tolerance and its values, Parentheses, Inspection dimension, Dual dimension, a radial dimension's radius / diameter; hole callouts: Override precision/tolerance. Tolerance values are in the dimension's units (or with units: "0.05 mm"). One edit ("Edit dimension" / "Edit hole callout").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `annotation` | integer | required | Dimension or hole callout id (drawing_get). |
+| `above` | string |  | Text above. |
+| `below` | string |  | Text below. |
+| `prefix` | string |  | Prefix. |
+| `suffix` | string |  | Suffix. |
+| `value` | string |  | Linear dimensions: the value text (an override; empty: the measured value). |
+| `precision` | integer or string |  | Decimals 0–8, or "drawing" (the drawing's). |
+| `units` | string |  | Millimeters, Centimeters, Meters, Inches, Inches fractional, Feet and inches, Feet, Yards, or "drawing". |
+| `tolerance` | string |  | None, Symmetrical, Deviation, Limits, Basic (not hole callouts), MIN, MAX, Fit, Fit with tolerance, Fit (Tolerance only). |
+| `tolerance_value` | number or string |  | Symmetrical: ± value. |
+| `upper` | number or string |  | Deviation / Limits: upper value. |
+| `lower` | number or string |  | Deviation / Limits: lower value. |
+| `hole_class` | string |  | Fits: hole class ("H7"). |
+| `shaft_class` | string |  | Fits: shaft class ("g6"). |
+| `parentheses` | boolean |  | Parentheses (a reference value). |
+| `inspection` | boolean |  | Inspection dimension (oval frame). |
+| `dual` | one of `single`, `drawing`, `dual` |  | Single unit, Single unit (Drawing) or Dual unit. |
+| `diameter` | boolean |  | Radial dimensions: diameter (true) or radius (false). |
+| `override_tolerance` | boolean |  | Hole callouts: Override precision/tolerance. |
 
 #### drawing_format_painter
 
@@ -2441,7 +2786,7 @@ Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look
 
 #### export_parts
 
-Export a Part Studio's parts to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino).
+Export a Part Studio's parts to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino) (edits the document (one undoable history entry)).
 
 Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.
 
@@ -2450,7 +2795,8 @@ Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Optio
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `format` | one of `PARASOLID`, `ACIS`, `STEP`, `IGES`, `PVZ`, `JT`, `RHINO`, `GLTF`, `GLB`, `OBJ`, `3MF`, `STL` | required | File format. |
-| `file` | string | required | Output path; without an extension the format's is added ("part" -> "part.x_t"); individual files go in a .zip. |
+| `file` | string |  | Output path; without an extension the format's is added ("part" -> "part.x_t"); individual files go in a .zip. Required unless `options` is "store" (then only its name is used; default "<tab>.<ext>"). |
+| `options` | one of `download`, `download_and_store`, `store` |  | Options: write `file` (Download), and / or keep the file as a file tab right after the tab (Store file in a new tab; one edit "Store <file>"). |
 | `parts` | array of string |  | Part ids (`body:…`) or names; default all visible parts. |
 | `y_up` | boolean |  | Export models oriented Y axis up. |
 | `version` | string |  | Format version (e.g. "AP214", "35.1", "7"). |

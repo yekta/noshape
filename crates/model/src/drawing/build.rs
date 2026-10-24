@@ -767,58 +767,78 @@ fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &
     // applies (the callout's units always do).
     let format = if opts.override_tol { a.format.clone() } else { super::DimFormat { precision: None, tolerance: super::Tolerance::None, ..a.format.clone() } };
     let a = &Annotation { format, ..a.clone() };
-    let len = |m: f64| format::format_len(drawing, &a.format, m);
-    let count = if n > 1 { format!("{n}{} ", drawing.props.hole_indicator) } else { String::new() };
-    let depth = |d: Option<f64>| match (hole.through, d) {
-        (true, _) => " THRU".to_string(),
-        (false, Some(d)) => format!(" ↧ {}", len(d)),
-        _ => String::new(),
-    };
-    let mut out = Vec::new();
-    match &hole.thread {
-        Some(t) => {
-            let class = hole.thread_class.as_ref().map(|c| format!(" - {c}")).unwrap_or_default();
-            out.push(format!("{count}{t}{class}{}", depth(hole.tapped_depth.or(hole.depth))));
-            if let Some(td) = hole.tap_drill {
-                out.push(format!("⌀{}{}", len(td), depth(hole.depth)));
+    // The callout's lines with lengths written by `len`; `dual`: the dual
+    // block (fit classes and deviations stay on the primary, as live's
+    // dimensions).
+    let build = |len: &dyn Fn(f64) -> String, dual: bool| -> Vec<String> {
+        let count = if n > 1 { format!("{n}{} ", drawing.props.hole_indicator) } else { String::new() };
+        let depth = |d: Option<f64>| match (hole.through, d) {
+            (true, _) => " THRU".to_string(),
+            (false, Some(d)) => format!(" ↧ {}", len(d)),
+            _ => String::new(),
+        };
+        let mut out = Vec::new();
+        match &hole.thread {
+            Some(t) => {
+                let class = hole.thread_class.as_ref().map(|c| format!(" - {c}")).unwrap_or_default();
+                out.push(format!("{count}{t}{class}{}", depth(hole.tapped_depth.or(hole.depth))));
+                if let Some(td) = hole.tap_drill {
+                    out.push(format!("⌀{}{}", len(td), depth(hole.depth)));
+                }
             }
+            None => match &hole.diameter_fit {
+                // Fit tolerances (live, dialogs/hole-35): "⌀6.350 H7 THRU",
+                // "⌀6.350 H7 +0.015/−0.000 THRU" and "⌀6.350 +0.015/−0.000 THRU"
+                // with the deviations stacked; a precision override of the
+                // tolerance applies to the size and the deviations.
+                Some(fit) => {
+                    let f = super::DimFormat { precision: fit.precision.or(a.format.precision).or(drawing.props.fit_tolerance_precision), ..a.format.clone() };
+                    let class = fit.class.as_ref().map(|c| format!(" {c}")).unwrap_or_default();
+                    let dev = fit.deviations.map(|(u, l)| format!(" {}", format::stacked(&format::format_deviation(drawing, &f, u, false), &format::format_deviation(drawing, &f, l, true)))).unwrap_or_default();
+                    if dual {
+                        out.push(format!("{count}⌀{}{}", len(hole.diameter), depth(hole.depth)));
+                    } else {
+                        out.push(format!("{count}⌀{}{class}{dev}{}", format::format_len(drawing, &f, hole.diameter), depth(hole.depth)));
+                    }
+                }
+                None => {
+                    // An overridden tolerance on the diameter (live drawing/465).
+                    let dev = |v: f64, lower: bool| format::format_deviation(drawing, &a.format, v, lower);
+                    let tol = match &a.format.tolerance {
+                        super::Tolerance::Symmetric { value } => format!(" ±{}", len(*value)),
+                        super::Tolerance::Deviation { upper, lower } => format!(" {}", format::stacked(&dev(*upper, false), &dev(*lower, true))),
+                        super::Tolerance::Min => " MIN".into(),
+                        super::Tolerance::Max => " MAX".into(),
+                        super::Tolerance::Fit { hole, .. } if !hole.is_empty() => format!(" {hole}"),
+                        _ => String::new(),
+                    };
+                    let size = match &a.format.tolerance {
+                        super::Tolerance::Limits { upper, lower } => format::stacked(&len(hole.diameter + upper), &len(hole.diameter + lower)),
+                        _ => len(hole.diameter),
+                    };
+                    out.push(format!("{count}⌀{size}{tol}{}", depth(hole.depth)))
+                }
+            },
         }
-        None => match &hole.diameter_fit {
-            // Fit tolerances (live, dialogs/hole-35): "⌀6.350 H7 THRU",
-            // "⌀6.350 H7 +0.015/−0.000 THRU" and "⌀6.350 +0.015/−0.000 THRU"
-            // with the deviations stacked; a precision override of the
-            // tolerance applies to the size and the deviations.
-            Some(fit) => {
-                let f = super::DimFormat { precision: fit.precision.or(a.format.precision).or(drawing.props.fit_tolerance_precision), ..a.format.clone() };
-                let class = fit.class.as_ref().map(|c| format!(" {c}")).unwrap_or_default();
-                let dev = fit.deviations.map(|(u, l)| format!(" {}", format::stacked(&format::format_deviation(drawing, &f, u, false), &format::format_deviation(drawing, &f, l, true)))).unwrap_or_default();
-                out.push(format!("{count}⌀{}{class}{dev}{}", format::format_len(drawing, &f, hole.diameter), depth(hole.depth)));
-            }
-            None => {
-                // An overridden tolerance on the diameter (live drawing/465).
-                let dev = |v: f64, lower: bool| format::format_deviation(drawing, &a.format, v, lower);
-                let tol = match &a.format.tolerance {
-                    super::Tolerance::Symmetric { value } => format!(" ±{}", len(*value)),
-                    super::Tolerance::Deviation { upper, lower } => format!(" {}", format::stacked(&dev(*upper, false), &dev(*lower, true))),
-                    super::Tolerance::Min => " MIN".into(),
-                    super::Tolerance::Max => " MAX".into(),
-                    super::Tolerance::Fit { hole, .. } if !hole.is_empty() => format!(" {hole}"),
-                    _ => String::new(),
-                };
-                let size = match &a.format.tolerance {
-                    super::Tolerance::Limits { upper, lower } => format::stacked(&len(hole.diameter + upper), &len(hole.diameter + lower)),
-                    _ => len(hole.diameter),
-                };
-                out.push(format!("{count}⌀{size}{tol}{}", depth(hole.depth)))
-            }
-        },
-    }
-    if let Some((d, dd)) = hole.cbore {
-        out.push(format!("⌴ ⌀{} ↧ {}", len(d), len(dd)));
-    }
-    if let Some((d, ang)) = hole.csink {
-        out.push(format!("⌵ ⌀{} X {}°", len(d), format::format_number(ang.to_degrees(), None, 1)));
-    }
+        if let Some((d, dd)) = hole.cbore {
+            out.push(format!("⌴ ⌀{} ↧ {}", len(d), len(dd)));
+        }
+        if let Some((d, ang)) = hole.csink {
+            out.push(format!("⌵ ⌀{} X {}°", len(d), format::format_number(ang.to_degrees(), None, 1)));
+        }
+        out
+    };
+    let primary = |m: f64| format::format_len(drawing, &a.format, m);
+    // Dual (live asb 10-24 (3)): Top / Bottom, the bracketed dual block above
+    // / below the primary; Left / Right, each value's bracketed dual before /
+    // after it.
+    let dual = |m: f64| format::dual_len(drawing, &a.format, m);
+    let mut out = match (dual(0.0).is_some(), drawing.props.dual.hole_location) {
+        (false, _) => build(&primary, false),
+        (true, loc @ (super::DualLocation::Top | super::DualLocation::Bottom)) => dual_block(build(&primary, false), build(&|m| dual(m).unwrap_or_default(), true), loc == super::DualLocation::Top),
+        (true, super::DualLocation::Left) => build(&|m| format!("[{}] {}", dual(m).unwrap_or_default(), primary(m)), false),
+        (true, super::DualLocation::Right) => build(&|m| format!("{} [{}]", primary(m), dual(m).unwrap_or_default()), false),
+    };
     // Prefix / suffix around the callout, reference parentheses, the
     // lines above and below.
     let f = &a.format;
@@ -835,6 +855,18 @@ fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &
         out.push(f.below.clone());
     }
     Some(out)
+}
+
+/// A hole callout with its dual block (live asb 10-24 (3)): the dual lines
+/// in one pair of brackets, above (`top`) or below the primary lines.
+pub(crate) fn dual_block(primary: Vec<String>, mut dual: Vec<String>, top: bool) -> Vec<String> {
+    if let Some(first) = dual.first_mut() {
+        first.insert(0, '[');
+    }
+    if let Some(last) = dual.last_mut() {
+        last.push(']');
+    }
+    if top { dual.into_iter().chain(primary).collect() } else { primary.into_iter().chain(dual).collect() }
 }
 
 /// The hole count a callout's Count type gives (the panel's "1X").
@@ -885,6 +917,16 @@ impl AnnotationEnv for Env<'_> {
     }
     fn rotation(&self, view: ViewId) -> f64 {
         self.placements.iter().find(|pl| pl.id == view).map(|pl| pl.rotation).unwrap_or(0.0)
+    }
+    fn dual_cad(&self, a: &Annotation, angular: bool) -> Option<super::cad_objects::CadDual> {
+        let p = &self.drawing.props;
+        if angular || !a.format.dual.unwrap_or(p.dual.show) {
+            return None;
+        }
+        let primary = format::length_units(self.drawing, &a.format);
+        let du = p.dual.units_for(!primary.imperial());
+        let post = if p.dual.show_unit && !du.symbol().is_empty() { format!("[] {}", du.symbol()) } else { "[]".to_string() };
+        Some(super::cad_objects::CadDual { factor: primary.meters() / du.meters(), precision: p.dual.precision.unwrap_or(3), post, below: p.dual.dim_location == super::DualLocation::Bottom })
     }
     fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> DimText {
         let mut f = a.format.clone();

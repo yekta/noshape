@@ -180,6 +180,15 @@ shared tree.
 - **Right panels** (config_panel.rs): 712 px frame, title as one full-width blue tab, `#eee`
   footer with `?`, no ×. Variable table rewritten as Onshape's table (section header, 4 columns,
   "Name" placeholder row and the faint illustration when empty).
+- **Sheet metal table and flat view** (sheet_metal_panel.rs, flat_view.rs; live "qa5 sm" (8),
+  "ui (10-24 a)"): the exception to the title / footer frame. Context row (14 px label, 220 × 28
+  select), collapsible os-table sections (37 px `#eaeaea` title rows, 16 px / 500), 34 px rows,
+  `#aaa` grid, # 60 px + 140 px columns, headers 700; read-only `#f5f5f5`, editable `bg_senary`
+  (white / `#1c1c1c`); hover: cell `#eee`, its row and column headers `#d7d7d7`; Chrome's classic
+  15 px horizontal scrollbar; a 9 px row-resize splitter kept as a share
+  (sheet_metal_split.txt); the flat view is its own `Viewport` (FlatView) with the flat solid in
+  world XY under z 0, DASH_DOT bend lines, a view cube without ▾, and the main window's Measure /
+  Analysis buttons (`eval_buttons`).
 
 - **Feature dialog groups**: a checked, expanded group's params are indented 24 px with a
   `#d7d7d7` guide line (live extrude-24); expanders are `#555` (`⌄`) / `#d7d7d7` (`›`).

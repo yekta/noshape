@@ -39,6 +39,12 @@ pub fn derived() -> FeatureType {
         .describe("Insert parts, sketches or a whole Part Studio from another Part Studio")
 }
 
+/// Features bringing another Part Studio's parts (they depend on its state):
+/// Derived and the assembly Mirror's "Derived mirror".
+pub fn is_derived(type_id: &str) -> bool {
+    type_id == "importDerived" || type_id == "derivedMirror"
+}
+
 /// Internal feature used by Assembly mirror.
 pub fn derived_mirror() -> FeatureType {
     let p = vec![ParamSpec::text("partStudio", "Part Studio", "").hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)];

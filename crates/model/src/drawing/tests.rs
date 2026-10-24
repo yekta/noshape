@@ -1313,8 +1313,8 @@ fn flat_pattern_view_shows_bend_lines_and_notes() {
     let g = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &ViewCache::new(), false);
     assert!(g.error.is_none(), "{:?}", g.error);
     assert_eq!(g.bends.len(), 1);
-    // The developed length: (50 - 5) + (30 - 5) + 90° × (3 + 0.45 × 2) mm.
-    let expected = 0.045 + 0.025 + std::f64::consts::FRAC_PI_2 * (0.003 + 0.45 * 0.002);
+    // The developed length, material outside the L (live's default): (50 - 3) + (30 - 3) + 90° × (3 + 0.45 × 2) mm.
+    let expected = 0.047 + 0.027 + std::f64::consts::FRAC_PI_2 * (0.003 + 0.45 * 0.002);
     let (w, h) = (g.max[0] - g.min[0], g.max[1] - g.min[1]);
     assert!((w.max(h) - expected).abs() < 1e-6 && (w.min(h) - 0.02).abs() < 1e-9, "{w} x {h}");
     let built = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry;
@@ -2340,4 +2340,73 @@ fn note_leaders_land_branch_and_lose_nodes() {
     remove_leader(&mut leaders, 0);
     assert_eq!(leaders.len(), 2);
     assert!(leaders.iter().all(|l| l.start == LeaderStart::Side));
+}
+
+/// Lead decision S28: the drawing Font list is live's 22 families; fonts of
+/// earlier documents not on it load as the nearest one (Liberation Sans →
+/// Arimo, Liberation Serif → Tinos, Liberation Mono → DejaVu Sans Mono).
+#[test]
+fn drawing_fonts_are_lives_and_old_families_migrate() {
+    use super::sheet::{DRAWING_DEFAULT_FONT, FONT_FAMILIES, TextFont};
+    assert_eq!(FONT_FAMILIES.len(), 22);
+    assert_eq!((FONT_FAMILIES[0], FONT_FAMILIES[21]), ("APMONO", "Tinos"));
+    assert!(FONT_FAMILIES.contains(&DRAWING_DEFAULT_FONT));
+    assert!(!FONT_FAMILIES.iter().any(|f| f.starts_with("Liberation")));
+    for (old, new) in [("Liberation Sans", "Arimo"), ("Liberation Serif", "Tinos"), ("Liberation Mono", "DejaVu Sans Mono"), ("Noto Sans", "Noto Sans")] {
+        let f: TextFont = serde_json::from_str(&format!("{{\"family\":\"{old}\",\"bold\":true}}")).unwrap();
+        assert_eq!((f.family.as_str(), f.bold), (new, true));
+    }
+}
+
+/// Live asb 10-24 dual dimensions (3): a hole callout's dual block in one
+/// pair of brackets above (Top) or below (Bottom) the primary lines; each
+/// length's dual with its unit, at the dual precision.
+#[test]
+fn hole_callout_dual_block_like_onshape() {
+    use super::build::dual_block;
+    let prim = vec!["⌀.250 ↧ .472".to_string(), "⌴ ⌀.394 ↧ .197".to_string()];
+    let dual = vec!["⌀6.35 mm ↧ 12.00 mm".to_string(), "⌴ ⌀10.00 mm ↧ 5.00 mm".to_string()];
+    assert_eq!(dual_block(prim.clone(), dual.clone(), true), vec!["[⌀6.35 mm ↧ 12.00 mm", "⌴ ⌀10.00 mm ↧ 5.00 mm]", "⌀.250 ↧ .472", "⌴ ⌀.394 ↧ .197"]);
+    assert_eq!(dual_block(prim, dual, false)[2], "[⌀6.35 mm ↧ 12.00 mm");
+    let mut d = Drawing { units_mm: false, ..Default::default() };
+    d.props.trailing_zeros = true;
+    d.props.dual = DualDims { show: true, show_unit: true, precision: Some(2), ..Default::default() };
+    assert_eq!(super::format::dual_len(&d, &DimFormat::default(), 0.00635).as_deref(), Some("6.35 mm"));
+    assert_eq!(super::format::dual_len(&d, &DimFormat::default(), 0.012).as_deref(), Some("12.00 mm"));
+    assert_eq!(super::format::dual_len(&d, &DimFormat { dual: Some(false), ..Default::default() }, 0.012), None);
+}
+
+/// Live samples/asb-dual-2018: with dual dimensions each DIMENSION's text
+/// override is "[]\P<>" (the alternate units, then the value) and its block
+/// holds one MTEXT "\A1;[…]\P…"; angular dimensions have no dual.
+#[test]
+fn cad_export_dual_dimensions_like_onshape() {
+    use super::cad_export::to_dxf_version;
+    use acadrust::{DxfVersion, EntityType};
+    let (doc, mut drawing) = demo();
+    drawing.props.dual = DualDims { show: true, show_unit: true, ..Default::default() };
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, true).unwrap();
+    let g = export::prepare(&built.geometry, &export::ExportOptions { strokes: true, ..Default::default() });
+    let d = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1032).unwrap())).unwrap().read().unwrap();
+    let dims: Vec<_> = d.entities().filter_map(|e| if let EntityType::Dimension(x) = e { Some(x.clone()) } else { None }).collect();
+    assert!(!dims.is_empty());
+    let mut duals = 0;
+    for x in &dims {
+        let b = x.base();
+        let angular = matches!(&**x, acadrust::entities::Dimension::Angular3Pt(_) | acadrust::entities::Dimension::Angular2Ln(_));
+        if angular {
+            assert!(!b.text.contains("[]"), "{}", b.text);
+            continue;
+        }
+        if b.text == "[]\\P<>" {
+            duals += 1;
+            let texts: Vec<String> = d.entities_in_block(&b.block_name).filter_map(|e| if let EntityType::MText(m) = e { Some(m.value.clone()) } else { None }).collect();
+            if texts.len() == 1 {
+                assert!(texts[0].starts_with("\\A1;[") && texts[0].contains("in]\\P"), "{texts:?}");
+            }
+        }
+    }
+    assert!(duals > 0, "{:?}", dims.iter().map(|x| x.base().text.clone()).collect::<Vec<_>>());
 }

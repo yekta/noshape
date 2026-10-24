@@ -9,7 +9,8 @@ use noshape_model::drawing::build::{BuiltSheet, SheetInfo, assemble_sheet};
 use noshape_model::drawing::create::DrawingSource;
 use noshape_model::drawing::templates::DrawingTemplate;
 use noshape_model::drawing::views::{self, SourceKey, Sources, ViewCache, ViewGeometry};
-use noshape_model::drawing::{Drawing, Projection, SheetSize, TitleBlockStyle, ViewId};
+use noshape_model::drawing::tb_lang::TitleLanguage;
+use noshape_model::drawing::{AsmPosition, DimUnits, Drawing, Projection, SheetFormat, SheetSize, Simplification, TitleBlockStyle, ViewId, ZoneStart};
 use noshape_scene::drawing_tools::{Sel, SheetPick, Tool};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -218,3 +219,229 @@ pub fn template_rows() -> Vec<TemplateRow> {
     });
     ansi.chain(iso).collect()
 }
+
+/// Sheet sizes of the Custom template tab per standard.
+/// (sheet setup name, size); the size label is the name's last word.
+/// Live drawing/800–825: ANSI A (default), A Portrait, B, C, D; ISO and
+/// JIS A4 (default), A4 Portrait, A3, A2, A1, A0.
+pub fn custom_sizes(standard: &str) -> Vec<(&'static str, SheetSize)> {
+    let names: &[&'static str] = match standard {
+        "ISO" => &["ISO A4", "ISO A4 Portrait", "ISO A3", "ISO A2", "ISO A1", "ISO A0"],
+        "JIS" => &["JIS A4", "JIS A4 Portrait", "JIS A3", "JIS A2", "JIS A1", "JIS A0"],
+        _ => &["ANSI A", "ANSI A Portrait", "ANSI B", "ANSI C", "ANSI D"],
+    };
+    names.iter().copied().zip(SheetSize::standard_list(standard == "ANSI").iter().copied()).collect()
+}
+
+/// The Custom template's default zones per size (live: ANSI A and A Portrait
+/// 2 x 2, B and C 4 x 4, D 8 x 4; ISO / JIS A4 0 x 0, A3 6 x 4, A2 8 x 6, A1
+/// 12 x 8, A0 16 x 12).
+pub fn custom_zones(size: SheetSize) -> [u32; 2] {
+    match size {
+        SheetSize::AnsiB | SheetSize::AnsiC => [4, 4],
+        s => s.standard_zones(),
+    }
+}
+
+/// Custom template › Units (help H:custom_drawing_templates; "Feet and
+/// inches" exists only in drawings).
+pub const CUSTOM_UNITS: [(DimUnits, &str); 7] = [
+    (DimUnits::Millimeter, "Millimeters"),
+    (DimUnits::Centimeter, "Centimeter"),
+    (DimUnits::Meter, "Meter"),
+    (DimUnits::Inch, "Inches"),
+    (DimUnits::FeetInches, "Feet and inches"),
+    (DimUnits::Foot, "Foot"),
+    (DimUnits::Yard, "Yard"),
+];
+
+
+/// Zone counts offered by Horizontal / Vertical zones: even numbers 0–20 (live).
+pub const ZONE_COUNTS: [u32; 11] = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
+
+/// The Custom template tab's choices (live drawing/02).
+#[derive(Clone, Copy, Debug)]
+pub struct CustomTemplate {
+    pub standard: &'static str,
+    pub language: usize,
+    pub size: usize,
+    pub units: DimUnits,
+    pub comma: bool,
+    pub first_angle: bool,
+    pub border: bool,
+    pub zones: [u32; 2],
+    pub top_left: bool,
+    pub title_block: bool,
+}
+
+impl CustomTemplate {
+    pub fn new(metric: bool) -> Self {
+        let mut t = Self { standard: "ANSI", language: 2, size: 0, units: DimUnits::Inch, comma: false, first_angle: false, border: true, zones: [2, 2], top_left: false, title_block: true };
+        t.set_standard(if metric { "ISO" } else { "ANSI" });
+        t
+    }
+
+    /// Choosing a standard resets the size (A / A4) and its zones, the
+    /// units, the decimal separator and the projection (live: ANSI Inches,
+    /// Period, Third angle; ISO Millimeters, Comma, First angle; JIS
+    /// Millimeters, Comma, Third angle). Border, start zones and title block
+    /// stay.
+    pub fn set_standard(&mut self, standard: &'static str) {
+        self.standard = standard;
+        let ansi = standard == "ANSI";
+        self.units = if ansi { DimUnits::Inch } else { DimUnits::Millimeter };
+        self.comma = !ansi;
+        self.first_angle = standard == "ISO";
+        self.set_size(0);
+    }
+
+    pub fn set_size(&mut self, i: usize) {
+        self.size = i;
+        if let Some((_, size)) = custom_sizes(self.standard).get(i) {
+            self.zones = custom_zones(*size);
+        }
+    }
+
+    pub fn template(&self) -> Option<DrawingTemplate> {
+        let (name, size) = *custom_sizes(self.standard).get(self.size)?;
+        let style = if !self.title_block {
+            TitleBlockStyle::None
+        } else if self.standard == "ANSI" {
+            TitleBlockStyle::Ansi
+        } else {
+            TitleBlockStyle::Iso
+        };
+        let projection = if self.first_angle { Projection::FirstAngle } else { Projection::ThirdAngle };
+        let mut t = DrawingTemplate::standard(name, size, style, self.units.imperial(), projection);
+        if !matches!(self.units, DimUnits::Millimeter | DimUnits::Inch) {
+            t.units = Some(self.units);
+        }
+        t.decimal_comma = self.comma;
+        t.language = TitleLanguage::ALL.get(self.language).copied().unwrap_or_default();
+        let zones = (self.zones != size.standard_zones()).then_some(self.zones);
+        t.format = SheetFormat { border: self.border, zones, start: if self.top_left { ZoneStart::TopLeft } else { ZoneStart::BottomRight } };
+        Some(t)
+    }
+}
+
+// ------------------------------------------------------------ Insert view panel
+
+/// The five View simplification choices, with Onshape-like default values.
+pub fn simplification_choices(cur: Simplification) -> [Simplification; 5] {
+    let keep = |d: Simplification| if std::mem::discriminant(&d) == std::mem::discriminant(&cur) { cur } else { d };
+    [Simplification::None, Simplification::Auto, keep(Simplification::Absolute(0.001)), keep(Simplification::RatioToStudio(0.01)), keep(Simplification::RatioToPart(0.01))]
+}
+
+/// The value field text of a simplification ("1 mm", "1 %").
+pub fn simplification_text(s: Simplification, mm: bool) -> String {
+    let trim = |v: f64| {
+        let t = format!("{v:.4}");
+        t.trim_end_matches('0').trim_end_matches('.').to_string()
+    };
+    match s {
+        Simplification::Absolute(m) if mm => format!("{} mm", trim(m * 1000.0)),
+        Simplification::Absolute(m) => format!("{} in", trim(m / 0.0254)),
+        Simplification::RatioToStudio(r) | Simplification::RatioToPart(r) => format!("{} %", trim(r * 100.0)),
+        _ => String::new(),
+    }
+}
+
+/// Parse the value field into `kind` (lengths in the drawing units by default).
+pub fn parse_simplification(kind: Simplification, text: &str, mm: bool) -> Option<Simplification> {
+    match kind {
+        Simplification::Absolute(_) => {
+            let prefs = noshape_units::UnitPrefs { length: if mm { noshape_units::LengthUnit::Millimeter } else { noshape_units::LengthUnit::Inch }, ..Default::default() };
+            let q = noshape_units::evaluate_as(text.trim(), noshape_units::Dim::LENGTH, &prefs, &noshape_units::EmptyScope).ok()?;
+            (q.value > 0.0).then_some(Simplification::Absolute(q.value))
+        }
+        Simplification::RatioToStudio(_) | Simplification::RatioToPart(_) => {
+            let v: f64 = text.trim().trim_end_matches('%').trim().parse().ok()?;
+            let r = (v / 100.0).max(0.0);
+            Some(if matches!(kind, Simplification::RatioToStudio(_)) { Simplification::RatioToStudio(r) } else { Simplification::RatioToPart(r) })
+        }
+        other => Some(other),
+    }
+}
+
+/// An assembly's Explode/Position choices in Onshape's order: Default, the
+/// exploded views, then the named positions.
+pub fn asm_positions(asm: &noshape_model::assembly::Assembly) -> Vec<(String, AsmPosition)> {
+    let mut out = vec![("Default".to_string(), AsmPosition::Default)];
+    out.extend(asm.exploded_views.iter().enumerate().map(|(i, e)| (e.name.clone(), AsmPosition::Explode(i))));
+    out.extend(asm.named_positions.iter().enumerate().map(|(i, n)| (n.name.clone(), AsmPosition::Position(i))));
+    out
+}
+
+/// The name shown for an Explode/Position choice.
+pub fn asm_position_name(asm: &noshape_model::assembly::Assembly, p: AsmPosition) -> String {
+    match p {
+        AsmPosition::Default => "Default".into(),
+        AsmPosition::Explode(i) => asm.exploded_views.get(i).map(|e| e.name.clone()).unwrap_or_default(),
+        AsmPosition::Position(i) => asm.named_positions.get(i).map(|n| n.name.clone()).unwrap_or_default(),
+    }
+}
+
+/// The named views a source offers in View orientation (Part Studios).
+pub fn named_views(doc: &noshape_model::document::Document, source: TabId) -> &[noshape_model::partstudio::NamedView] {
+    match doc.tab(source).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) => &ps.named_views,
+        _ => &[],
+    }
+}
+
+/// The frame of the source's named view `name`, if it still exists.
+pub fn named_view_frame(doc: &noshape_model::document::Document, source: TabId, name: &str) -> Option<[[f64; 3]; 2]> {
+    named_views(doc, source).iter().find(|v| v.name == name).map(noshape_model::drawing::views::named_view_frame)
+}
+
+// ------------------------------------------------------------ dimension palette
+
+/// The palette's precision list (label, decimals; None: the drawing's).
+pub const PRECISIONS: [(&str, Option<u8>); 10] = [("0", Some(0)), ("0.1", Some(1)), ("0.12", Some(2)), ("0.123", Some(3)), ("(Drawing)", None), ("0.1234", Some(4)), ("0.12345", Some(5)), ("0.123456", Some(6)), ("0.1234567", Some(7)), ("0.12345678", Some(8))];
+/// Tolerance lists (D35; hole callouts have no Basic).
+pub const DIM_TOLERANCES: [&str; 10] = ["None", "Symmetrical", "Deviation", "Limits", "Basic", "MIN", "MAX", "Fit", "Fit with tolerance", "Fit (Tolerance only)"];
+pub const HOLE_TOLERANCES: [&str; 9] = ["None", "Symmetrical", "Deviation", "Limits", "MIN", "MAX", "Fit", "Fit with tolerance", "Fit (Tolerance only)"];
+
+/// The tolerance list entry of an annotation's format.
+pub fn tolerance_name(a: &noshape_model::drawing::Annotation) -> &'static str {
+    use noshape_model::drawing::Tolerance;
+    match &a.format.tolerance {
+        Tolerance::None => "None",
+        Tolerance::Symmetric { .. } => "Symmetrical",
+        Tolerance::Deviation { .. } => "Deviation",
+        Tolerance::Limits { .. } => "Limits",
+        Tolerance::Basic => "Basic",
+        Tolerance::Min => "MIN",
+        Tolerance::Max => "MAX",
+        Tolerance::Fit { .. } => a.format.fit.mode.name(),
+    }
+}
+
+/// The palette's tolerance entry `name` with its two value fields (meters:
+/// Symmetrical `a`; Deviation / Limits upper `a`, lower `b`). Fits keep
+/// their classes (H7 for a new one).
+pub fn set_tolerance(f: &mut noshape_model::drawing::DimFormat, name: &str, a: f64, b: f64) {
+    use noshape_model::drawing::{FitMode, Tolerance};
+    let classes = match &f.tolerance {
+        Tolerance::Fit { hole, shaft } => (hole.clone(), shaft.clone()),
+        _ => ("H7".into(), String::new()),
+    };
+    f.tolerance = match name {
+        "Symmetrical" => Tolerance::Symmetric { value: a },
+        "Deviation" => Tolerance::Deviation { upper: a, lower: b },
+        "Limits" => Tolerance::Limits { upper: a, lower: b },
+        "Basic" => Tolerance::Basic,
+        "MIN" => Tolerance::Min,
+        "MAX" => Tolerance::Max,
+        "Fit" | "Fit with tolerance" | "Fit (Tolerance only)" => {
+            f.fit.mode = match name {
+                "Fit with tolerance" => FitMode::WithTolerance,
+                "Fit (Tolerance only)" => FitMode::ToleranceOnly,
+                _ => FitMode::Fit,
+            };
+            Tolerance::Fit { hole: classes.0, shaft: classes.1 }
+        }
+        _ => Tolerance::None,
+    };
+}
+

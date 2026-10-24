@@ -88,6 +88,11 @@ struct CachedBody {
 #[derive(Default)]
 pub struct AsmGpuCache {
     bodies: HashMap<usize, (Weak<MeshBuffers>, Arc<CachedBody>)>,
+    /// Per mesh: its sharp and tangent (dash-dot) edges, for Tangent edges
+    /// phantom / removed (camera menu).
+    tangent: HashMap<usize, (Weak<MeshBuffers>, (LinesHandle, LinesHandle))>,
+    /// Per mesh: its edges dashed on top, for Hidden edges visible.
+    hidden_edges: HashMap<usize, (Weak<MeshBuffers>, LinesHandle)>,
     /// The unit cube of the occurrences' lowest level of detail
     /// ([`Instance::lod_box`]).
     lod_box: Option<MeshHandle>,
@@ -109,6 +114,10 @@ pub struct AsmSceneOptions {
     pub ghost_tops: HashSet<noshape_model::assembly::InstanceId>,
     /// Section view planes (normal, d): geometry with dot(normal, p) > d is cut away.
     pub section: Vec<(DVec3, f64)>,
+    /// Instances the section planes don't cut (Section view › Items to exclude).
+    pub section_skip: HashSet<noshape_model::assembly::InstanceId>,
+    /// The section plane being edited (drawn selected, `Scene::clip_selected`).
+    pub section_selected: Option<usize>,
     /// Opacity of transparent instances (Isolate / Make transparent slider).
     pub dim_alpha: Option<f32>,
     /// Dimmed (transparent) instances stay pickable (Isolate › Select
@@ -119,6 +128,12 @@ pub struct AsmSceneOptions {
     /// Reflection analysis environment on the shaded parts.
     pub reflection: Option<noshape_render::Reflection>,
     pub hide_edges: bool,
+    /// Camera menu render choices, as in the Part Studio (`SceneOptions`).
+    pub display_mode: crate::scene_builder::DisplayMode,
+    pub hidden_edges_visible: bool,
+    pub tangent_edges: crate::scene_builder::TangentEdges,
+    /// Line width and phantom edges' color and width.
+    pub graphics: crate::graphics_prefs::GraphicsPrefs,
 }
 
 fn to_mat4(m: &DMat4) -> Mat4 {
@@ -129,6 +144,10 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     let mut scene = Scene::default();
     let mut picks = AsmPickMap::default();
     cache.bodies.retain(|_, (w, _)| w.strong_count() > 0);
+    cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
+    cache.hidden_edges.retain(|_, (w, _)| w.strong_count() > 0);
+    use crate::scene_builder::{DisplayMode, TangentEdges};
+    let mode = opts.display_mode;
     let mut bodies = 0u32;
     for (oi, o) in result.occurrences.iter().enumerate() {
         if o.hidden {
@@ -190,19 +209,77 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                 if dimmed && !opts.pick_dimmed {
                     inst = inst.unpickable();
                 }
+                // The display modes as in the Part Studio (scene_builder): see-through
+                // at 0.48, or unlit faces in the background color (Unshaded).
+                if !sketch {
+                    inst = match mode {
+                        DisplayMode::Translucent => inst.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
+                        DisplayMode::HiddenLine => inst.with_color(theme::lin(0xffffff)).unlit(),
+                        DisplayMode::ShadedWithEdges | DisplayMode::Shaded => inst,
+                    };
+                }
                 scene.instances.push(inst);
             }
             if !dimmed && (!opts.hide_edges || sketch) {
-                let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1);
-                // Each coarser line level, then the full edges (also the pick).
-                for (k, l) in cached.edge_lods.iter().enumerate().filter(|_| is_finest) {
-                    let mut e = edges.clone().line_lod(k as u8 + 2);
-                    e.drawable = Drawable::Lines(l.clone());
-                    scene.instances.push(e);
+                let edge_color = if !sketch && mode == DisplayMode::HiddenLine { theme::lin(theme::viewport::EDGE_UNSHADED) } else { edge_color };
+                let line_w = opts.graphics.line_width;
+                let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).line_scale(line_w).layer(1);
+                if !sketch && mode == DisplayMode::Shaded {
+                    // Shaded without edges: hidden but still pickable.
+                    scene.instances.push(edges.pick_only());
+                } else if !sketch && opts.tangent_edges != TangentEdges::Visible {
+                    // Tangent edges phantom / removed: the sharp edges (and the
+                    // tangent ones dash-dot); all of them stay pickable.
+                    let (sharp, phantom) = match cache.tangent.get(&key) {
+                        Some((_, h)) => h.clone(),
+                        None => {
+                            let smooth = mesh.smooth_edges();
+                            let (mut sharp, mut phantom) = (LineData::default(), LineData::default());
+                            for (ei, pl) in mesh.edges.iter().enumerate() {
+                                if smooth.get(ei).copied().unwrap_or(false) {
+                                    phantom.push_polyline(pl, [0, 0, 0, 255], 0, 1.0, LineSegment::DASH_DOT);
+                                } else {
+                                    sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, 0);
+                                }
+                            }
+                            let h = (up.upload_lines(&sharp), up.upload_lines(&phantom));
+                            cache.tangent.insert(key, (Arc::downgrade(mesh), h.clone()));
+                            h
+                        }
+                    };
+                    scene.instances.push(edges.pick_only());
+                    scene.instances.push(Instance::new(Drawable::Lines(sharp)).with_color(edge_color).with_transform(t).pick_base(edge_base).line_scale(line_w).layer(1));
+                    if opts.tangent_edges == TangentEdges::Phantom {
+                        let c = theme::lin(opts.graphics.phantom_color);
+                        scene.instances.push(Instance::new(Drawable::Lines(phantom)).with_color(c).with_transform(t).unpickable().line_scale(opts.graphics.phantom_width / 0.5).layer(1));
+                    }
+                } else {
+                    // Each coarser line level, then the full edges (also the pick).
+                    for (k, l) in cached.edge_lods.iter().enumerate().filter(|_| is_finest) {
+                        let mut e = edges.clone().line_lod(k as u8 + 2);
+                        e.drawable = Drawable::Lines(l.clone());
+                        scene.instances.push(e);
+                    }
+                    scene.instances.push(edges.line_lod(1));
                 }
-                scene.instances.push(edges.line_lod(1));
-                // A mesh part's triangle lines, as in the Part Studio.
-                if let Some(lines) = cached.mesh_lines.clone() {
+                // Hidden edges visible: every edge dashed on top (per display level).
+                if !sketch && opts.hidden_edges_visible {
+                    let h = match cache.hidden_edges.get(&key) {
+                        Some((_, h)) => h.clone(),
+                        None => {
+                            let mut l = LineData::default();
+                            for pl in &mesh.edges {
+                                l.push_polyline(pl, [90, 90, 90, 140], 0, 1.0, LineSegment::DASHED | LineSegment::ON_TOP);
+                            }
+                            let h = up.upload_lines(&l);
+                            cache.hidden_edges.insert(key, (Arc::downgrade(mesh), h.clone()));
+                            h
+                        }
+                    };
+                    scene.instances.push(Instance::new(Drawable::Lines(h)).per_primitive_color().with_transform(t).unpickable().layer(1));
+                }
+                // A mesh part's triangle lines, as in the Part Studio (not in plain Shaded).
+                if let Some(lines) = cached.mesh_lines.clone().filter(|_| mode != DisplayMode::Shaded) {
                     scene.instances.push(Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).with_transform(t).unpickable().layer(1));
                 }
             }
@@ -225,6 +302,11 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                 scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&dots))).per_primitive_color().with_transform(t).unpickable().layer(2));
             }
         }
+        if opts.section_skip.contains(&o.top()) {
+            for i in &mut scene.instances[first_instance..] {
+                i.ignore_clip = true;
+            }
+        }
         // Onshape's lowest level of detail of the body occurrence: its
         // bounding box.
         bodies += 1;
@@ -243,6 +325,9 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     let clip = |(n, d): &(DVec3, f64)| noshape_render::ClipPlane::new(n.as_vec3(), *d as f32);
     scene.clip = opts.section.first().map(clip);
     scene.clip_extra = opts.section.iter().skip(1).map(clip).collect();
+    if let Some(slot) = opts.section_selected.and_then(|i| scene.clip_selected.get_mut(i)) {
+        *slot = true;
+    }
     AsmBuilt { scene, picks, static_instances }
 }
 
@@ -309,6 +394,10 @@ pub struct Highlights {
     /// triad, one arrow along the move (origin, direction, size), or for a
     /// rotation a ring with an arrowhead around the axis.
     pub step_arrow: Option<(DVec3, DVec3, f64, bool)>,
+    /// The Section view dialog's arrow: its tip, direction (the plane's
+    /// normal), world size of a pixel there, view direction and whether it is
+    /// hovered; dragging it moves the plane (live part-studio/72).
+    pub section_arrow: Option<(DVec3, DVec3, f64, DVec3, bool)>,
     /// Pickable assembly origin triad (size) and whether it is hovered/selected.
     pub origin: Option<(f64, bool)>,
     /// Pickable assembly mate connector triads: (frame, size, highlighted).
@@ -379,6 +468,8 @@ pub enum OverlayPick {
     Connector(usize),
     /// Mate indicator (index into the view's displayed mates).
     Mate(usize),
+    /// The Section view arrow.
+    SectionArrow,
 }
 
 /// Mate indicator state (color).
@@ -407,6 +498,7 @@ pub fn overlay_id(built: &AsmBuilt, o: OverlayPick) -> u32 {
         OverlayPick::Manip(ManipHandle::Center) => b + 10,
         OverlayPick::Connector(i) => b + 11 + i as u32,
         OverlayPick::Mate(i) => b + MATE_PICK_BASE + i as u32,
+        OverlayPick::SectionArrow => b + MATE_PICK_BASE - 1,
     }
 }
 
@@ -423,6 +515,7 @@ pub fn overlay_pick(built: &AsmBuilt, id: u32) -> Option<OverlayPick> {
         k @ 7..=9 => OverlayPick::Manip(ManipHandle::Plane(k as usize - 7)),
         10 => OverlayPick::Manip(ManipHandle::Center),
         k if k >= MATE_PICK_BASE => OverlayPick::Mate((k - MATE_PICK_BASE) as usize),
+        k if k == MATE_PICK_BASE - 1 => OverlayPick::SectionArrow,
         k => OverlayPick::Connector(k as usize - 11),
     })
 }
@@ -761,6 +854,25 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             let (base, tip, w) = (size * 0.62, size * 0.86, size * 0.07);
             stroke(&[o, o + d * base], false);
             stroke(&[o + d * base + side * w, o + d * tip, o + d * base - side * w], true);
+        }
+    }
+    if let Some((tip, dir, wpp, view_dir, hovered)) = h.section_arrow
+        && let Some(d) = dir.try_normalize()
+    {
+        // As the Part Studio's arrow (live part-studio/72, 230): a screen-sized
+        // arrow past the tip, a 1.5 px white shaft and a hollow triangular
+        // head outlined light grey (blue when hovered).
+        let pick_id = overlay_id(built, OverlayPick::SectionArrow);
+        let p3 = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
+        let side = d.cross(view_dir).try_normalize().unwrap_or_else(|| d.any_orthonormal_vector());
+        let base = tip + d * 25.0 * wpp;
+        let apex = base + d * 22.0 * wpp;
+        let (l, r) = (base + side * 22.0 * 0.45 * wpp, base - side * 22.0 * 0.45 * wpp);
+        let outline = if hovered { theme::rgb8(0x3e6eb0) } else { theme::rgb8(0xa8adb2) };
+        for (color, width) in [(outline, if hovered { 4.0 } else { 3.0 }), (theme::rgb8(0xffffff), 1.5)] {
+            for (a, b) in [(tip, base), (l, apex), (apex, r), (r, l)] {
+                ol.segments.push(LineSegment { a: p3(a), b: p3(b), color, pick_id, width, style: LineSegment::ON_TOP });
+            }
         }
     }
     if !ol.segments.is_empty() {

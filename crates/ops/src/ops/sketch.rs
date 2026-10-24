@@ -73,7 +73,7 @@ pub fn ops() -> Vec<Op> {
             verb: "create",
             summary: "Create a sketch on a plane or planar face",
             description: "Inserts a Sketch feature (\"Insert feature : Sketch 1\") at the rollback bar. Returns its id and plane frame: sketch coordinates (x, y) map to world = origin + x*xdir + y*ydir. On `plane:top` x = world X, y = world Y; on `plane:front` x = X, y = Z; on `plane:right` x = Y, y = Z.",
-            fields: vec![doc_field(), tab_field(), req("plane", s(), "Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector."), opt("name", s(), "Name (default \"Sketch N\").")],
+            fields: vec![doc_field(), tab_field(), req("plane", s(), "Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector."), opt("name", s(), "Name (default \"Sketch N\")."), opt("disable_imprinting", json!({ "type": "boolean" }), "The dialog's Disable imprinting (default off).")],
             mutates: true,
             destructive: false,
             run: create,
@@ -189,6 +189,26 @@ pub fn ops() -> Vec<Op> {
             mutates: false,
             destructive: false,
             run: get,
+        },
+        Op {
+            group: "sketch",
+            verb: "paste",
+            summary: "Copy a sketch onto another plane (Copy sketch / Paste sketch)",
+            description: "The context menus' Copy sketch then Paste sketch on a plane or planar face: a copy of `sketch` (its entities, constraints and dimensions) on `plane`, at the rollback bar of `to_tab` (default: the sketch's own Part Studio). One edit (\"Paste sketch\"). Returns the new sketch.",
+            fields: vec![doc_field(), tab_field(), req("sketch", s(), "Sketch feature id or name to copy."), req("plane", s(), "Plane to paste onto: `plane:top`, a Plane feature, a planar face id or a mate connector."), opt("to_tab", s(), "Part Studio to paste into (default: the same one).")],
+            mutates: true,
+            destructive: false,
+            run: paste,
+        },
+        Op {
+            group: "sketch",
+            verb: "export",
+            summary: "Export a sketch or a planar face as DXF (Export as DXF/DWG…)",
+            description: "The context menus' Export as DXF/DWG… of a sketch (its curves; construction curves as hidden lines; external references left out) or of a planar face (its boundary), in the plane's coordinates, millimeters. `format` svg writes the same geometry as SVG.",
+            fields: vec![doc_field(), tab_field(), opt("sketch", s(), "Sketch feature id or name."), opt("face", s(), "Instead: a planar face id (`face:…`)."), req("file", s(), "Output path."), opt("format", json!({ "type": "string", "enum": ["dxf", "svg"], "default": "dxf" }), "File format.")],
+            mutates: false,
+            destructive: false,
+            run: export_sketch,
         },
     ]
 }
@@ -442,6 +462,10 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let Some(n) = a.opt_str("name")? {
         f.name = n.trim().to_string();
         f.custom_name = true;
+    }
+    // The Sketch dialog's "Disable imprinting" (model edges aren't projected).
+    if let Some(b) = a.get("disable_imprinting").and_then(Value::as_bool) {
+        f.params.set("disableImprinting", ParamValue::Bool(b));
     }
     let (id, name) = (f.id, f.name.clone());
     let index = ps.rollback_index();
@@ -741,4 +765,52 @@ fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut v = sketch_state(od, tab, t.id, None)?;
     v["name"] = json!(t.name);
     Ok(v.into())
+}
+
+fn paste(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let id = feature_arg(ps, a, "sketch")?;
+    let f = ps.feature(id).expect("found").clone();
+    if f.type_id != "sketch" {
+        return Err(OpError::param("sketch", &format!("`{}` is a {}, not a sketch", f.name, f.type_id)));
+    }
+    let plane = refs::parse(a.get("plane").expect("required")).map_err(|e| e.with_param("plane"))?;
+    let dest = match a.opt_str("to_tab")? {
+        Some(t) => doc::find_tab(od.doc(), t).map_err(|e| e.with_param("to_tab"))?,
+        None => tab,
+    };
+    doc::studio(od.doc(), dest).map_err(|e| e.with_param("to_tab"))?;
+    let new = edit_studio(od, dest, "Paste sketch", |ps| Ok(crate::studio::paste_sketches_onto(ps, std::slice::from_ref(&f), plane)))?;
+    let Some(new_id) = new.first().copied() else { return Err(OpError::new("internal", "nothing pasted")) };
+    let mut v = sketch_state(od, dest, new_id, None)?;
+    v["name"] = json!(doc::studio(od.doc(), dest)?.feature(new_id).map(|f| f.name.clone()));
+    Ok(v.into())
+}
+
+fn export_sketch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let r = od.regenerate(tab, None)?;
+    let g = match (a.opt_str("sketch")?, a.opt_str("face")?) {
+        (Some(_), _) => {
+            let ps = doc::studio(od.doc(), tab)?;
+            let id = feature_arg(ps, a, "sketch")?;
+            let sk = r.display.sketches.iter().find(|s| s.feature == id).ok_or_else(|| OpError::param("sketch", "the sketch isn't shown (suppressed or after the rollback bar)"))?;
+            crate::sketch_export::sketch_sheet(sk)
+        }
+        (None, Some(fid)) => {
+            let face = refs::parse_str(fid).ok_or_else(|| OpError::param("face", "a face id"))?;
+            crate::sketch_export::face_sheet(&r.context, &r.display, &face).ok_or_else(|| OpError::param("face", "not a planar face of this Part Studio"))?
+        }
+        (None, None) => return Err(OpError::param("sketch", "a sketch or a face")),
+    };
+    let svg = match a.opt_str("format")?.unwrap_or("dxf") {
+        "dxf" => false,
+        "svg" => true,
+        _ => return Err(OpError::param("format", "dxf or svg")),
+    };
+    let data = if svg { noshape_model::drawing::export::to_svg(&g) } else { noshape_model::drawing::export::to_dxf(&g) };
+    let path = std::path::Path::new(a.str("file")?);
+    std::fs::write(path, &data).map_err(|e| OpError::new("io", format!("{}: {e}", path.display())).with_param("file"))?;
+    Ok(json!({ "file": path.display().to_string(), "bytes": data.len(), "curves": g.lines.len() }).into())
 }

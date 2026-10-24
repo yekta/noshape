@@ -1397,6 +1397,16 @@ impl DrawingEditor {
         if self.place_paste_table(cx) {
             return;
         }
+        // Exactly on a note leader: the note with that leader selected.
+        self.leader_sel = None;
+        if let Some(crate::drawing_leaders::LeaderHit::Stroke { id, leader, .. } | crate::drawing_leaders::LeaderHit::Node { id, leader, .. }) = self.leader_hit(self.cursor)
+            && !m.shift
+        {
+            self.selection = vec![Sel::Annotation(id)];
+            self.leader_sel = Some((id, leader));
+            self.redraw(cx);
+            return;
+        }
         let sel = self.sel_at(pick, self.cursor);
         if self.table_cell_click(sel, m.shift, cx) {
             return;
