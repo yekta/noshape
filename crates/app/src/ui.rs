@@ -101,9 +101,23 @@ pub fn text_width(window: &Window, text: &str, size: f32) -> f32 {
 
 pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let text: SharedString = text.into();
+    move |window, cx| styled_tooltip(Tooltip::new(text.clone()), window, cx)
+}
+
+/// [`tooltip`] for user-authored text (a part's or a tab's name): drawn
+/// as is in every UI language (see [`user_text`]).
+pub fn user_tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
+    let text: SharedString = text.into();
     move |window, cx| {
+        let t = text.clone();
+        styled_tooltip(Tooltip::element(move |_, _| user_text(t.clone())), window, cx)
+    }
+}
+
+fn styled_tooltip(tip: Tooltip, window: &mut Window, cx: &mut App) -> AnyView {
+    {
         let pal = p();
-        let tip = Tooltip::new(text.clone())
+        let tip = tip
             .bg(pal.tooltip)
             .text_color(pal.text)
             .border_0()
@@ -234,6 +248,14 @@ impl Render for RichTooltip {
     }
 }
 
+/// User-authored text (names of documents, tabs, parts, features, sketches,
+/// variables, configurations, mates, instances, folders, views, sheets,
+/// layers; notes, properties, comments): drawn as is in every UI language
+/// (the string-table lookup only applies to plain UI text, see `i18n`).
+pub fn user_text(text: impl Into<SharedString>) -> StyledText {
+    StyledText::new(text)
+}
+
 /// A tool description ([`crate::tool_text::blocks`]): its paragraphs, and
 /// list items numbered at the right of the browser's 40 px list indent.
 pub fn tool_description(text: &str) -> Div {
@@ -311,6 +333,8 @@ pub struct PlacedTooltip {
     /// Onshape's `data-bs-expanded-content`: a second, italic block shown
     /// under the title after the hover delay (and whether it shows yet).
     expanded: Option<(SharedString, bool)>,
+    /// The text is user-authored (a list row's name): no translation.
+    user: bool,
 }
 
 impl Render for PlacedTooltip {
@@ -329,7 +353,7 @@ impl Render for PlacedTooltip {
             .items_center()
             .bg(pal.tooltip)
             .whitespace_nowrap()
-            .child(self.text.clone());
+            .map(|d| if self.user { d.child(user_text(self.text.clone())) } else { d.child(self.text.clone()) });
         // Live `.tooltip-expand`: the expanded fill, 4 px padding, at most
         // 400 px wide, under the title.
         let extra = self.expanded.as_ref().filter(|(_, shown)| *shown).map(|(text, _)| div().max_w(px(RICH_TOOLTIP_W)).p(px(4.)).line_height(px(18.)).bg(gpui_kit::rgb(0xffffff)).italic().child(text.clone()));
@@ -374,7 +398,16 @@ impl Render for PlacedTooltip {
 /// button opening its panel) and shows again only after the pointer has left
 /// it (qa4 F22).
 pub fn with_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide) -> Stateful<Div> {
-    let text: SharedString = text.into();
+    tip_with(el, text.into(), side, false)
+}
+
+/// A list row's tooltip, beside the row (live part-studio/16, 95), showing
+/// its stored name (user text, never translated).
+pub fn with_user_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
+    tip_with(row, text.into(), TipSide::Right, true)
+}
+
+fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool) -> Stateful<Div> {
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
     let pressed: std::rc::Rc<std::cell::Cell<bool>> = Default::default();
     let (a2, p2, p3) = (anchor.clone(), pressed.clone(), pressed.clone());
@@ -397,7 +430,7 @@ pub fn with_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide)
         .on_any_mouse_down(move |_, _, _| p3.set(true))
         .tooltip(move |_, cx| {
             let (text, anchor, pressed) = (text.clone(), anchor.get(), pressed.clone());
-            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None }).into()
+            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user }).into()
         })
 }
 
@@ -412,12 +445,7 @@ impl TipExt for Stateful<Div> {
     }
 }
 
-/// A list row's tooltip, beside the row (live part-studio/16, 95).
-pub fn with_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
-    with_tip(row, text, TipSide::Right)
-}
-
-/// [`with_side_tooltip`] with Onshape's expanded content: `extra` (italic)
+/// A list row's side tooltip with Onshape's expanded content: `extra` (italic)
 /// joins the title after the same delay as the toolbar's [`RichTooltip`]
 /// (a custom feature's "Feature from current workspace", live FS4).
 pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedString>, extra: impl Into<SharedString>) -> Stateful<Div> {
@@ -439,19 +467,20 @@ pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedStri
                     });
                 })
                 .detach();
-                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)) }
+                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)), user: false }
             })
             .into()
         })
 }
 
-/// [`with_side_tooltip`] whose text and place are worked out when the
+/// [`with_user_side_tooltip`] whose text and place are worked out when the
 /// tooltip opens, not each time the row renders (a feature row's "Extrude 1
-/// <- Sketch 1"): `anchor` gives the row's bounds then.
+/// <- Sketch 1"): `anchor` gives the row's bounds then. Its text is the row's
+/// name and references: user-authored, never translated.
 pub fn with_lazy_side_tooltip(row: Stateful<Div>, anchor: impl Fn() -> Bounds<Pixels> + 'static, text: impl Fn(&App) -> SharedString + 'static) -> Stateful<Div> {
     row.tooltip(move |_, cx| {
         let (text, anchor) = (text(cx), anchor());
-        cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None }).into()
+        cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None, user: true }).into()
     })
 }
 
@@ -1219,6 +1248,17 @@ pub fn feature_initials(name: &str) -> String {
 /// part-studio/1252): the initials in a 20 px box with a 1 px `#999`
 /// border, in the custom features dropdown and the feature list.
 pub fn initials_icon(name: &str) -> Div {
+    initials_icon_status(name, false)
+}
+
+/// The initials box's border: `#999`, or the error red while the feature
+/// fails to regenerate (live qa5 featurescript (7): "Qc" outlined red).
+pub fn initials_border(failing: bool) -> u32 {
+    if failing { 0xbd3039 } else { 0x999999 }
+}
+
+/// [`initials_icon`] for a feature-list row, red-outlined when it fails.
+pub fn initials_icon_status(name: &str, failing: bool) -> Div {
     div()
         .flex_none()
         .size(px(20.))
@@ -1226,7 +1266,7 @@ pub fn initials_icon(name: &str) -> Div {
         .items_center()
         .justify_center()
         .border_1()
-        .border_color(gpui_kit::rgb(0x999999))
+        .border_color(gpui_kit::rgb(initials_border(failing)))
         .rounded(px(2.))
         .bg(gpui_kit::rgb(0xffffff))
         .text_size(px(12.))
@@ -1245,6 +1285,15 @@ mod tests {
     // `super::*` brings gpui's `test` attribute (via gpui_kit), which would
     // shadow the built-in one and expand forever.
     use super::*;
+
+    #[::core::prelude::v1::test]
+    fn failing_custom_feature_icon_is_outlined_red() {
+        // Live (qa5 featurescript (7)): a failing custom feature's "Qc" box
+        // is outlined red; otherwise #999.
+        assert_eq!(initials_border(true), 0xbd3039);
+        assert_eq!(initials_border(false), 0x999999);
+        assert_eq!(feature_initials("QA cube"), "Qc");
+    }
 
     fn rect(x: f32, y: f32, w: f32, h: f32) -> Bounds<Pixels> {
         Bounds { origin: point(px(x), px(y)), size: size(px(w), px(h)) }

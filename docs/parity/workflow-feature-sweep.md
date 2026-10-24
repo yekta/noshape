@@ -100,7 +100,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | Creation type Solid / Surface / Split (Surface), operations for Solid, flip, Trim to target, anchors, Thickness 2.5 | same | ✅ |
-| 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✗ |
+| 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✅ (fs: the std group, collapsed) |
 | 3 | Filters | Tools planar only; Target cylindrical or conical only; no unwrap | wider, plus unwrap | 🔧 L20 (no unwrap; forced picks fail with live's texts) |
 | 4 | Errors | "Select planar faces or sketch regions to wrap." (source), "Select a cylindrical or conical face to wrap around." (destination), "Source entities must all lie on the same plane.", "Select anchor points.", auto-anchor text, "Failed to imprint edges onto destination face.", ambiguous anchor | own texts, no fields | 🔧 (unwrap keeps its own texts) |
 | 5 | Dialog dump | — | — | 🔧 L21 Position group collapsed (FS compiler lacks the group, dialog comparison excludes wrap) |
@@ -160,7 +160,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 2 | Axis empty | "Select an object with an axis." on axis | own text, no field | 🔧 |
 | 3 | Circle empty | "Select a circle or arc." on edge | own text, no field | 🔧 |
 | 4 | Height | 1e-5–500 m (0 out of range) | 0 allowed, flat spiral | 🔧 L32 "A parameter value is not valid." (any out-of-range value, all features) |
-| 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | ✗ ? L33 |
+| 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | 🔧 L33 start 0 with an end radius makes the conical spiral; both 0 fails |
 | 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | ✗ |
 | 7 | Computed revolutions / pitch | filled | never | ✗ |
 | 8 | Show start and end profiles | magenta circles | nothing | ✗ |
@@ -171,7 +171,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 |---|---|---|---|---|
 | 1 | Fields | Entities, Closed ☐; closed consumes members | same | ✅ |
 | 2 | Empty | "Select entities to create a composite part." (likely) | own text, no field | 🔧 L36 Entities marked |
-| 3 | Overlapping composites | "Cannot create a closed composite part that partially overlaps another composite part." (and open) | no check | ✗ ? L36 |
+| 3 | Overlapping composites | "Cannot create a closed composite part that partially overlaps another composite part." (and open) | no check | 🔧 L36 a part of a closed composite in another closed one fails with live's text; a whole composite nests |
 
 ## Mate connector (Part Studio)
 | # | Area | Onshape | Ours | Status |
@@ -194,10 +194,10 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 5 | Linear second direction empty | error only when its count > 1: "Select a pattern direction." on directionTwo | always, own text | 🔧 |
 | 6 | Reapply failures | "Could not pattern selected features." when all fail; partial failures silent | first failure's text; partial warning; geometric fallback | 🔧 texts and silent partial failures; the geometric fallback when a feature can't be re-run stays ✗ ? L40 |
 | 7 | Sketch in a feature pattern | re-run, info "Sketch dimensions and constraints using the Origin or the default planes as reference will not be reapplied. Learn more" | skipped | 🔧 L41 the sketch is copied to every instance (with or without Reapply; no part), Reapply adds the info |
-| 8 | Face pattern failures | "Failed to create pattern, check input.", "Pattern could not be created on the same part.", mirror "Failed to create face mirror, check input." | own texts; off-part instances become parts | 🔧 texts; off-part instances still become parts ✗ ? L42, L43 |
+| 8 | Face pattern failures | "Failed to create pattern, check input.", "Pattern could not be created on the same part.", mirror "Failed to create face mirror, check input." | own texts; off-part instances become parts | 🔧 texts; L42 any face-pattern instance off the part fails "Pattern could not be created on the same part." (no part made); L40 a Feature pattern (Reapply off) skips one off-part instance and fails when all are off (text pending from live, ours the same) |
 | 9 | Feature selection in Faces to pattern | a feature-list click adds its faces | not supported | ✅ L44 (live adds nothing either; Hole not verified) |
-| 10 | Curve pattern | selection checked first; "Select a path to pattern along." on edges; "Edges do not form a continuous path."; distance-too-large text on distance; closed-path rule; start-point info | own texts, no fields | 🔧 except the start-point info ✗ ? L45 |
-| 11 | Limits and infos | "Cannot have more than 2500 instances in a pattern.", parallel directions info, skip-instance infos | missing | 🔧 2500 limit (linear) and parallel info; skip-instance infos ✗ |
+| 10 | Curve pattern | selection checked first; "Select a path to pattern along." on edges; "Edges do not form a continuous path."; distance-too-large text on distance; closed-path rule; start-point info | own texts, no fields | 🔧 incl. the start point: an open path starts at its end nearer the seed, a closed one at its point nearest the seed (path.fs), and a start outside the seed's box gives "For best results ensure that the path start point and pattern seed are touching." ("…the path and pattern seed…" when closed) |
+| 11 | Limits and infos | "Cannot have more than 2500 instances in a pattern.", parallel directions info, skip-instance infos | missing | 🔧 2500 limit (linear), parallel info, skip infos "Original pattern instance will not be skipped." / "Index is outside patterned instance count." (linear, circular, curve) |
 
 ## Hole
 | # | Area | Onshape | Ours | Status |
@@ -208,9 +208,9 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 4 | Check order | counterbore, countersink, tolerances, tap drill, end, start, then "No hole points selected." | points first | 🔧 |
 | 5 | Counterbore / countersink errors | "The counterbore diameter must be larger than the hole diameter." (marks both), "The counterbore depth must be smaller than the hole depth.", "The countersink diameter must be larger than the hole diameter."; no countersink-depth error | own texts, no fields; countersink depth error | 🔧 texts and fields; the countersink-depth error stays ? L47 |
 | 6 | Up to entity / selected plane empty | "Select an entity or mate connector to terminate the hole." / "Select a start entity." on the field | own texts, late | 🔧 |
-| 7 | Merge scope | auto-filled with the parts the hole reaches, direction flipped toward them; empty: "No target parts selected for hole." | empty = every solid | ✗ ? L56, L57 |
+| 7 | Merge scope | auto-filled with the parts the hole reaches, direction flipped toward them; empty: "No target parts selected for hole." | empty = every solid | 🔧 L56 empty scope: "No target parts selected for hole." on the scope; L57 a new Hole's scope is the parts it reaches and follows the depth until set by hand; holes saved before (ScopeRule 4) keep cutting every part. Direction auto-flip and the flip clearing the scope ✗ |
 | 8 | Misses | "None of the holes intersected a part." (scope); warning "Some selections did not produce holes."; blind hole that misses must fail | own texts; silent; blind miss succeeds | 🔧 |
 | 9 | Tapped hole cut | Diameter, tap drill only with a fastener fit | tap drill always | 🔧 L51 (+ fit info bubble) |
 | 10 | Up to next / entity + Offset from tip | the tip ends at entity − offset | the shaft ends there (one tip too deep) | 🔧 L61 apex at the offset, Depth shows 4.092 |
 | 11 | Depth / Tapped depth / Tap clearance | kept consistent by edit logic; inconsistency warning | independent | 🔧 L49/L50 linked in the dialog (no mismatch warning, as live) |
-| 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | 🔧 500-location text; L52 "Parameters have been overridden. Check input." when Diameter or Tap drill differ from the standard (not for counterbore / countersink); other infos ✗ |
+| 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | 🔧 500-location text; L52 "Parameters have been overridden. Check input." when Diameter or Tap drill differ from the standard (not for counterbore / countersink); "Tapped depth readjusted. …" (tapped depth past the hole's depth in the part) and "Counterbore and countersink values are non standard for tapered holes."; the inconsistent-depth warning stays off as live L49/L50 |

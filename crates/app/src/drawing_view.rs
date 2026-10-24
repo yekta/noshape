@@ -150,7 +150,7 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                     ed.update(cx, |t, cx| act(t, window, cx));
                 });
                 let icon = icon.map(|n| crate::os_menu::MenuIcon::Named(SharedString::from(n)));
-                menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon, checked: *checked, disabled: *disabled, handler: Some(handler), keys: Vec::new() });
+                menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon, checked: *checked, disabled: *disabled, handler: Some(handler), keys: Vec::new(), user: false });
             }
             MenuEntry::Separator => menu = menu.separator(),
             MenuEntry::Submenu(label, children) => {
@@ -1035,7 +1035,7 @@ impl DrawingEditor {
             let (pts, idx) = noshape_model::drawing::font::text_fill_font(&crate::drawing_watermark::geometry(t, w, h), None);
             let mut m = noshape_render::MeshData::default();
             for p in pts {
-                m.positions.push([p[0] as f32, p[1] as f32, -0.5]);
+                m.positions.push([p[0] as f32, p[1] as f32, 0.5]);
                 m.normals.push([0.0, 0.0, 1.0]);
                 m.pick_ids.push(0);
             }
@@ -1100,9 +1100,6 @@ impl DrawingEditor {
         // Onshape: the white sheet sits flat on the gray surround (no shadow).
         if let Some((_shadow, paper, _)) = self.paper.as_ref().filter(|_| self.model_bg.is_none()) {
             scene.instances.push(Instance::new(Drawable::Mesh(paper.clone())).with_color([1.0, 1.0, 1.0, 1.0]).unlit().unpickable().layer(-5));
-            if let Some(m) = &self.watermark_mesh {
-                scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(crate::theme::lin(crate::drawing_watermark::COLOR)).unlit().unpickable().layer(-4));
-            }
         }
         // Inserted images and backdrops, under the sheet geometry.
         scene.instances.extend(self.image_instances());
@@ -1128,6 +1125,11 @@ impl DrawingEditor {
         }
         for (m, color) in &self.colored.1 {
             scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(*color).unlit().layer(2));
+        }
+        // The release watermark, translucent over the sheet's content (live).
+        if let Some(m) = self.watermark_mesh.as_ref().filter(|_| self.paper.is_some() && self.model_bg.is_none()) {
+            let [r, g, b, _] = crate::theme::lin(crate::drawing_watermark::EDITOR_COLOR);
+            scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color([r, g, b, crate::drawing_watermark::EDITOR_ALPHA]).unlit().unpickable().over_lines());
         }
         if let Some((l, pts)) = &self.overlay_handles {
             scene.instances.push(Instance::new(Drawable::Lines(l.clone())).per_primitive_color().unpickable().layer(20));

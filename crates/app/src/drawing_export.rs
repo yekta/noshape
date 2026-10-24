@@ -413,11 +413,11 @@ impl DrawingEditor {
                             }
                         }
                         let mut geo = export::prepare(&g, &opts);
-                        // Release management › Watermarks: under everything,
-                        // after the colour mode (it stays gray), on PDF, the
-                        // raster formats and print; model spaces have none.
+                        // Release management › Watermarks: over everything,
+                        // whatever the colour mode, on PDF, the raster formats
+                        // and print; model spaces have none.
                         if let Some(text) = watermark.as_deref().filter(|_| (f == DrawingFormat::Pdf || f.raster()) && !sheet.imported.as_ref().is_some_and(|m| m.model)) {
-                            geo.backdrops.splice(0..0, crate::drawing_watermark::backdrops(text, geo.width, geo.height));
+                            geo.overlays.extend(crate::drawing_watermark::overlays(text, geo.width, geo.height));
                         }
                         if pictures {
                             for (_, pos, size, png) in &shaded {

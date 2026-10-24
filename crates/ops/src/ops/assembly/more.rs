@@ -215,7 +215,7 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(PatternKind::Circular { axis, angle, count, opposite, equal_spacing, centered }) => {
             o = Old { dir: Some(axis.clone()), dist: Some(angle.text.clone()), count: Some(*count), opposite: *opposite, equal: Some(*equal_spacing), centered: *centered, ..o };
         }
-        Some(PatternKind::Mirror { plane, handed }) => o = Old { dir: Some(plane.clone()), handed: *handed, ..o },
+        Some(PatternKind::Mirror { plane, handed, .. }) => o = Old { dir: Some(plane.clone()), handed: *handed, ..o },
         Some(PatternKind::PartPattern { mate }) => o.mate = Some(*mate),
         Some(PatternKind::Replicate { mate, scope, scope_refs, .. }) => o = Old { mate: Some(*mate), scope: *scope, scope_refs: scope_refs.clone(), ..o },
         None => {}
@@ -257,7 +257,7 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             PatternKind::Linear { direction: axis.ok_or_else(|| OpError::param("direction", "Select a direction (edge, face or mate connector)"))?, distance, count, opposite, equal_spacing: equal, second, centered }
         }
         "circular" => PatternKind::Circular { axis: axis.ok_or_else(|| OpError::param("direction", "Select the axis of pattern"))?, angle: distance, count, opposite, equal_spacing: equal, centered },
-        "mirror" => PatternKind::Mirror { plane: axis.ok_or_else(|| OpError::param("direction", "Select the mirror plane (planar face or mate connector)"))?, handed: a.get("handed").and_then(Value::as_bool).unwrap_or(keep(o_handed)) },
+        "mirror" => PatternKind::Mirror { plane: axis.ok_or_else(|| OpError::param("direction", "Select the mirror plane (planar face or mate connector)"))?, handed: a.get("handed").and_then(Value::as_bool).unwrap_or(keep(o_handed)), derived: Vec::new(), placement: Vec::new() },
         "part_pattern" => PatternKind::PartPattern { mate: mate()? },
         _ => {
             let mate = mate()?;

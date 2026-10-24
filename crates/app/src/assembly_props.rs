@@ -786,7 +786,7 @@ impl AssemblyView {
                             .flex_1()
                             .min_w_0()
                             .pl(px(4.))
-                            .child(div().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(d.name.clone()))
+                            .child(div().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(crate::ui::user_text(d.name.clone())))
                             .child(div().text_size(px(12.)).opacity(0.5).text_color(rgb(0x333333)).truncate().child(format!("{} ⇨ {newest}", d.current))),
                     )
                     .when(tab == 1, |r| {

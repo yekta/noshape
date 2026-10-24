@@ -56,7 +56,7 @@ pub(crate) fn fill_menu(mut m: OsMenu, entries: Vec<MenuEntry>, view: Entity<Ass
                         cx.notify();
                     })
                 });
-                let mut it = OsMenuItem::Item { label: label.into(), icon: None, checked: false, disabled, handler: Some(handler), keys: Vec::new() };
+                let mut it = OsMenuItem::Item { label: label.into(), icon: None, checked: false, disabled, handler: Some(handler), keys: Vec::new(), user: false };
                 if let Some(i) = icon {
                     it = it.icon_name(i);
                 }
@@ -81,7 +81,7 @@ pub(crate) struct InstanceDrag {
 impl Render for InstanceDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(self.label.clone())
+        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(crate::ui::user_text(self.label.clone()))
     }
 }
 
@@ -95,7 +95,7 @@ pub(crate) struct MateDrag {
 impl Render for MateDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(self.label.clone())
+        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(crate::ui::user_text(self.label.clone()))
     }
 }
 
@@ -2976,7 +2976,7 @@ impl AssemblyView {
                     .hover(|d| d.bg(pal.panel_hover))
                     .child(match (renaming, &self.ui.ds_renaming) {
                         (true, Some(st)) => div().flex_1().child(Input::new(st).xsmall()).into_any_element(),
-                        _ => div().flex_1().truncate().child(name.clone()).into_any_element(),
+                        _ => div().flex_1().truncate().child(crate::ui::user_text(name.clone())).into_any_element(),
                     })
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         // Selecting a display state applies it.
@@ -3159,7 +3159,7 @@ impl AssemblyView {
                             .text_color(if error.is_some() { pal.text_invalid } else { pal.text })
                             .truncate()
                             .when_some(error.map(|e| format!("{title} did not regenerate properly: {e}")), |d, t| d.tooltip(crate::ui::tooltip(t)))
-                            .child(title.clone()),
+                            .child(crate::ui::user_text(title.clone())),
                     )
                     .child(
                         // Live: the ✓ at opacity 0.2 while nothing is selected.
@@ -3457,7 +3457,7 @@ impl AssemblyView {
                         }
                     };
                     sel.update(cx, |s, _| s.set_items(items, cur));
-                    col = col.child(h_flex().min_h(px(28.)).items_start().child(div().pl(px(5.)).pt(px(6.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).child(inp.name.clone())).child(div().id(SharedString::from(format!("inscfg-tt-{studio}-{}", id))).flex_1().min_w_0().tooltip(crate::ui::tooltip(inp.name.clone())).child(sel)));
+                    col = col.child(h_flex().min_h(px(28.)).items_start().child(div().pl(px(5.)).pt(px(6.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(inp.name.clone()))).child(div().id(SharedString::from(format!("inscfg-tt-{studio}-{}", id))).flex_1().min_w_0().tooltip(crate::ui::tooltip(inp.name.clone())).child(sel)));
                 }
                 ConfigInputKind::Checkbox { .. } => {
                     let cur = effective.0.get(&inp.id).is_some_and(|v| v == "true");

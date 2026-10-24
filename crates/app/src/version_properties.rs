@@ -290,7 +290,7 @@ impl ItemProperties {
                     .min_w_0()
                     .flex_1()
                     // The version / workspace name is 500, tab names regular (live 73).
-                    .child(div().text_size(px(13.33)).line_height(px(21.)).font_weight(if indent > 0. { FontWeight::NORMAL } else { FontWeight::MEDIUM }).text_color(rgb(0x333333)).truncate().child(name))
+                    .child(div().text_size(px(13.33)).line_height(px(21.)).font_weight(if indent > 0. { FontWeight::NORMAL } else { FontWeight::MEDIUM }).text_color(rgb(0x333333)).truncate().child(crate::ui::user_text(name)))
                     .child(div().text_size(px(12.)).italic().text_color(rgb(0x666666)).truncate().child(kind)),
             )
     }

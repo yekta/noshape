@@ -2640,7 +2640,8 @@ impl<M: InputModeKind> Element for TextElement<M> {
         let multi_line = state.is_multi_line();
         let text = state.text.clone();
         let is_empty = text.len() == 0;
-        let placeholder = self.placeholder.clone();
+        // NOSHAPE PATCH: placeholders are UI text, in the UI language.
+        let placeholder = gpui::translate_ui_text(&self.placeholder).map(SharedString::new_static).unwrap_or_else(|| self.placeholder.clone());
 
         let text_style = window.text_style();
         let disabled = state.disabled;

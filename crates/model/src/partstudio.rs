@@ -42,13 +42,14 @@ impl Feature {
 
 /// Which rules a studio was saved under: 1, an empty merge scope is an error
 /// unless "Merge with all" is on; 2, a Rib with no Parts is an error (live
-/// L22); 3, a Mate connector needs an owner (live L37); 0, older studios.
+/// L22); 3, a Mate connector needs an owner (live L37); 4, a Hole needs a
+/// Merge scope (live L56); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(3)
+        ScopeRule(4)
     }
 }
 
@@ -165,6 +166,19 @@ impl TessQuality {
             TessQuality::Coarse => 24,
             TessQuality::Medium => 48,
             TessQuality::VeryFine => 600,
+        }
+    }
+    /// Onshape's display levels, coarsest first (webgl tessellation
+    /// settings 0..3): a body is drawn at the coarsest one whose chordal
+    /// error stays under a few pixels, up to its best ([`TessQuality::level`]).
+    pub const LEVELS: [TessQuality; 4] = [TessQuality::Coarse, TessQuality::Medium, TessQuality::Fine, TessQuality::VeryFine];
+    /// Index in [`TessQuality::LEVELS`] (Auto is Fine).
+    pub fn level(self) -> usize {
+        match self {
+            TessQuality::Coarse => 0,
+            TessQuality::Medium => 1,
+            TessQuality::Auto | TessQuality::Fine => 2,
+            TessQuality::VeryFine => 3,
         }
     }
     /// Multiplier of Auto's angular deflection (smaller = finer).
@@ -313,6 +327,12 @@ impl PartStudio {
                 f.params.set("legacyNoOwner", ParamValue::Bool(true));
             }
         }
+        // Holes without a Merge scope cut every part they reached.
+        if self.scope_rule.0 < 4 {
+            for f in self.features.iter_mut().filter(|f| f.type_id == "hole" && f.params.query("scope").is_empty()) {
+                f.params.set("legacyAllParts", ParamValue::Bool(true));
+            }
+        }
         self.scope_rule = ScopeRule::default();
     }
 
@@ -322,10 +342,12 @@ impl PartStudio {
     }
 
     /// Default name for a new feature of `ty`: "Extrude 1", "Extrude 2"...
+    /// (in the UI language, [`crate::default_names`]).
     pub fn next_name(&self, ty: &FeatureType) -> String {
+        let base = crate::default_names::base(ty.name);
         let mut n = 1;
         loop {
-            let name = format!("{} {n}", ty.name);
+            let name = format!("{base} {n}");
             if !self.features.iter().any(|f| f.name == name) {
                 return name;
             }

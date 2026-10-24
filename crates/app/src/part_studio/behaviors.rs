@@ -168,6 +168,10 @@ pub struct UiState {
     pub vcolor_cache: Option<((usize, String), Option<super::appearance::VertexColors>)>,
     /// View in high quality (Shift+R).
     pub high_quality: bool,
+    /// View in high quality was on in this session: Onshape keeps the Very
+    /// fine meshes it refined until reload (live 10-23 a3), so the regen
+    /// keeps the level after Shift+R goes off.
+    pub high_quality_seen: bool,
     /// Parts list › Assign material…: the Material panel.
     pub material_panel: Option<super::material_panel::MaterialPanel>,
     /// Where panel dialogs were moved by their title.
@@ -398,6 +402,7 @@ impl UiState {
             analysis: None,
             vcolor_cache: None,
             high_quality: false,
+            high_quality_seen: false,
             create_selection: None,
             material_panel: None,
             panels: Default::default(),
@@ -1438,7 +1443,7 @@ impl PartStudioView {
                             .gap(px(10.))
                             .when(failed, |d| d.text_color(pal.text_invalid))
                             .child(div().flex_none().opacity(0.8).child(crate::assets::icon(&feature_icon(&f.type_id), 16., cx)))
-                            .child(div().flex_1().min_w_0().truncate().child(f.name.clone())),
+                            .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(f.name.clone()))),
                     )
                     .child(cell(COLS[2]).relative().child(crate::ui::regen_time_text(t)).child(div().absolute().left_0().bottom_0().h(px(5.)).w(px(bar)).bg(pal.accent)))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
@@ -2871,7 +2876,7 @@ impl PartStudioView {
                     .into_any_element()
             })
             .collect();
-        let me = h_flex().h(px(26.)).child(div().w(px(25.)).flex().justify_center().child(crate::assets::icon(if matches!(r, Reference::Origin) { "origin" } else { "plane" }, 15., cx))).child(div().px(px(6.)).text_size(px(12.)).text_color(pal.text).child(name.clone()));
+        let me = h_flex().h(px(26.)).child(div().w(px(25.)).flex().justify_center().child(crate::assets::icon(if matches!(r, Reference::Origin) { "origin" } else { "plane" }, 15., cx))).child(div().px(px(6.)).text_size(px(12.)).text_color(pal.text).child(crate::ui::user_text(name.clone())));
         Some(
             v_flex()
                 .id("plane-dependencies")
@@ -3171,6 +3176,31 @@ impl PartStudioView {
                 d.set_value_auto(k, v, cx);
             }
         });
+    }
+
+    /// A new Hole's Merge scope is the parts its holes reach
+    /// (`FeatureState::touched`), and follows a deeper or shallower hole,
+    /// until the user sets it (live L57: Blind 5 into the top of two stacked
+    /// parts gives "Part 2", Depth 15 "Part 1, Part 2").
+    pub(super) fn hole_scope_logic(&mut self, cx: &mut Context<Self>) {
+        let Some(e) = &self.edit else { return };
+        if !e.is_new {
+            return;
+        }
+        let dialog = e.dialog.clone();
+        let (ty, id, user, scope) = {
+            let d = dialog.read(cx);
+            (d.feature.type_id.clone(), d.feature.id, d.user_set.contains("scope"), d.feature.params.query("scope").to_vec())
+        };
+        if ty != "hole" || user {
+            return;
+        }
+        let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
+        let want: Vec<Reference> = touched.into_iter().map(Reference::Body).collect();
+        if want.is_empty() || want == scope {
+            return;
+        }
+        dialog.update(cx, |d, cx| d.set_value_auto("scope", ParamValue::Query(want), cx));
     }
 
     /// Onshape's booleanStepEditLogic (booleanHeuristics.fs) for a new

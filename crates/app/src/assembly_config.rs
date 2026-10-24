@@ -1094,7 +1094,7 @@ impl AssemblyView {
         let mut col = v_flex().pt(px(6.)).child(h_flex().border_l_1().border_t_1().border_color(grid).child(cell(180.).bg(rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD).child("Configuration")).child(cell(180.).bg(rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD).child("Name")));
         if let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = cfg.inputs.first() {
             for o in options {
-                col = col.child(h_flex().border_l_1().border_color(grid).child(cell(180.).child(o.name.clone())).child(cell(180.).child(name.clone())));
+                col = col.child(h_flex().border_l_1().border_color(grid).child(cell(180.).child(crate::ui::user_text(o.name.clone()))).child(cell(180.).child(crate::ui::user_text(name.clone()))));
             }
         }
         col.into_any_element()
@@ -1168,7 +1168,7 @@ impl AssemblyView {
                     let ix = options.iter().position(|o| o.id == current).unwrap_or(0);
                     let ids: Vec<String> = options.iter().map(|o| o.id.clone()).collect();
                     let v = cx.entity();
-                    crate::os_ui::select_field(SharedString::from(format!("acfgbox-sel-{iid}")), options.iter().map(|o| o.name.clone()).collect(), ix, move |i, window, cx| {
+                    crate::os_ui::user_select_field(SharedString::from(format!("acfgbox-sel-{iid}")), options.iter().map(|o| o.name.clone()).collect(), ix, move |i, window, cx| {
                         let (iid, id) = (iid.clone(), ids[i].clone());
                         v.update(cx, |this, cx| this.set_active_config(&iid, id, window, cx));
                     })
@@ -1188,7 +1188,7 @@ impl AssemblyView {
                 h_flex()
                     .min_h(px(28.))
                     .gap(px(4.))
-                    .child(div().flex_none().pl(px(3.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(input.name.clone()))
+                    .child(div().flex_none().pl(px(3.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::user_text(input.name.clone())))
                     .child(div().flex_1().min_w_0().child(control)),
             );
         }

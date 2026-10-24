@@ -58,3 +58,15 @@ the rest pending (REQUESTS.md "qa5 tabs"). Status: ✅ ok, ✗ differs, ? live p
 | TABS5 rename undoable | Ctrl+Z leaves the rename (it undoes the studio's last feature instead) | ✅ **fixed** |
 
 - 10-22 (ui): DOC5 re-checked in the app. + after Part Studio 1 puts the new tab right after it; it stays there after an edit, Ctrl+Z, tab switches and a reopen ✅.
+
+## Re-check on main 88fbf8f5 (qa4, 2026-10-23 18:00–19:00, FRESH=1, /root/qa4-scratch/bin/noshape-m88)
+| Finding | Result |
+|---|---|
+| DOC6 rename with spaces | ✅ "r t x" kept |
+| TABS2 Duplicate name | ✅ "r t x Copy 1", right after the source, not activated |
+| TABS5 rename / duplicate undoable | ✅ Ctrl+Z doesn't revert them |
+| DOC5 new tab after the active middle tab | ✅ stays there after quit / reopen |
+| Row 6 drag look | ✅ ~100 px ghost "r t x Co…", gap placeholder, no drop line |
+| TABS3 folder menu | ✅ Rename, Unpack, Move to document… |
+| TABS4 Unpack | ✅ the tab goes to the end of the tab list, folder removed (CLI document_info order) |
+All ✗ rows of this file are fixed.

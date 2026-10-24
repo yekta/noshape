@@ -3,7 +3,7 @@
 //! labels, associative annotations, tables, border and title block, into
 //! one [`SheetGeometry`] plus a pick table for the editor.
 
-use super::cad_layers::CadLayer;
+use super::cad_layers::{CadLayer, CadTextStyle};
 use super::font;
 use super::format::{self, DimText};
 use super::sheet::{Anchor, AnnotationEnv, Fill2, LineStyle, Polyline2, SheetGeometry, Text2, format_scale};
@@ -990,10 +990,16 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     let fields = |k: &str| field_value(drawing, si, info, sources, k);
     let placeholder = if drawing.props.hide_placeholder { "" } else { "----" };
     let used = std::cell::RefCell::new(Vec::<String>::new());
+    // Texts made from a `{field}` (the title block's property values are
+    // exported in Onshape-Standard-Fields).
+    let field_texts = std::cell::RefCell::new(Vec::<String>::new());
     // Title block values are properties (the drawing's or the part's).
     let expand = |s: &str| {
         let out = format::expand_fields_with(s, &fields, placeholder);
         used.borrow_mut().extend(out.lines().map(str::to_string));
+        if s.contains('{') {
+            field_texts.borrow_mut().extend(out.lines().map(str::to_string));
+        }
         out
     };
 
@@ -1030,6 +1036,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let in_block = in_tb(&g.texts[i].pos);
         if in_block {
             g.texts[i].pick = tb;
+            if field_texts.borrow().contains(&g.texts[i].text) {
+                g.cad_text_styles.push(super::cad_layers::CadTextStyleSpan { texts: i..i + 1, style: CadTextStyle::Fields });
+            }
         }
         let layer = if in_block { SheetLayer::TitleBlock } else { SheetLayer::BorderZones };
         g.layers.push(LayerSpan { lines: 0..0, texts: i..i + 1, fills: 0..0, layer });
@@ -1436,11 +1445,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             let label_pick = picks.id(PickTarget::ViewLabel(v.id));
             let at = v.label_at.unwrap_or_default();
             let mut y = pl.min[1] - 6.0;
+            let label_mark = g.texts.len();
             for (text, height) in label_lines {
                 y -= height;
                 g.texts.push(Text2 { pos: [(pl.min[0] + pl.max[0]) / 2.0 + at[0], y + at[1]], height, text, angle: 0.0, anchor: Anchor::BottomCenter, pick: label_pick });
                 y -= 2.0;
             }
+            g.cad_text_style_since(label_mark, CadTextStyle::ViewLabel);
         }
         // A linked view's parent is on another sheet: its indicator is drawn there.
         if sheet.parent_of(v.id).is_some_and(|p| p.is_ghost()) {
@@ -1579,6 +1590,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     let line_kinds: Vec<Option<CadLayer>> = g.lines[ml..].iter().map(|l| kinds.get(&l.pick).map(|k| k.0)).collect();
     let text_kinds: Vec<Option<CadLayer>> = g.texts[mt..].iter().map(|t| kinds.get(&t.pick).map(|k| k.1)).collect();
     g.cad_runs(ml, &line_kinds, mt, &text_kinds);
+    // Notes' texts in Onshape-Standard-NoteStyle.
+    let notes: std::collections::HashSet<u32> = resolved.annotations.iter().filter(|a| matches!(a.kind, AnnotationKind::Note { .. })).map(|a| (a.id & 0xFFFF_FFFF) as u32).collect();
+    for i in mt..g.texts.len() {
+        if notes.contains(&g.texts[i].pick) {
+            g.cad_text_styles.push(super::cad_layers::CadTextStyleSpan { texts: i..i + 1, style: CadTextStyle::Note });
+        }
+    }
     for l in &mut g.lines[ml..] {
         l.pick = remap.get(&l.pick).copied().unwrap_or(0);
     }
@@ -1645,7 +1663,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let (l0, t0, f0) = (g.lines.len(), g.texts.len(), g.fills.len());
         tables::render(&mut g, t, &data, &layout, pick);
         g.cad_since((l0, t0, f0), CadLayer::Tables);
-        g.add_cad_table((l0, t0, f0), &layout, &data);
+        g.add_cad_table((l0, t0, f0), &layout, &data, &t.kind);
         // Moved to a format layer: its color, locked with the format.
         if !t.layer.is_drawing() {
             let span = LayerSpan { lines: l0..g.lines.len(), texts: t0..g.texts.len(), fills: f0..g.fills.len(), layer: t.layer };
@@ -1672,11 +1690,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             g.texts.push(Text2 { pos: [yt[0] - 0.6, yt[1] + if sy > 0.0 { 1.0 } else { -2.8 }], height: 1.8, text: "Y".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
             g.fills.push(Fill2 { points: circle_points(os, 0.8, 8) });
             g.cad_since(origin_mark, CadLayer::OriginIndicators);
+            let tag_mark = g.texts.len();
             for hrow in tables::hole_rows(geo, o) {
                 let c = pl.to_sheet(hrow.center);
                 let r = pl.len_to_sheet(hrow.diameter / 2.0);
                 g.texts.push(Text2 { pos: [c[0] + r * 0.75 + 0.8, c[1] + r * 0.75 + 0.8], height: 2.5, text: hrow.tag, angle: 0.0, anchor: Anchor::BottomLeft, pick });
             }
+            g.cad_text_style_since(tag_mark, CadTextStyle::HoleTag);
         }
         table_layouts.push((t.id, layout));
     }

@@ -280,7 +280,7 @@ const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
 ];
 
 /// A new Feature Studio (live document/70).
-pub const FS_TEMPLATE: &str = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\n\n";
+pub const FS_TEMPLATE: &str = noshape_ops::docedit::FS_TEMPLATE;
 
 /// "New feature" (live document/72, dom/feature-studio-template-and-error.txt).
 const NEW_FEATURE: &str = "annotation { \"Feature Type Name\" : \"My Feature\", \"Feature Type Description\" : \"\" }\nexport const myFeature = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition\n    {\n        // Define the parameters of the feature type\n    }\n    {\n        // Define the function's action\n    });\n";
@@ -1572,7 +1572,7 @@ impl FeatureStudioView {
                     .border_color(rgb(0xaaaaaa))
                     .rounded(px(3.))
                     .cursor_pointer()
-                    .tooltip(crate::ui::tooltip(monitor_name.clone()))
+                    .tooltip(crate::ui::user_tooltip(monitor_name.clone()))
                     .child(os::glyph(os::GLYPH_PULSE, 18., pal.text))
                     .child(div().min_w_0().pr(px(4.)).truncate().text_size(px(14.)).text_color(pal.text).child(monitor_name))
                     .child(div().w(px(14.)).flex_none().h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))

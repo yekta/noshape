@@ -28,3 +28,9 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 | – | Tab ops (rename, reorder, delete, duplicate) | not undoable | not checked | ? |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+
+## Re-check on main 88fbf8f5 (qa4, 2026-10-23 18:00–19:00, FRESH=1, /root/qa4-scratch/bin/noshape-m88)
+| Finding | Result |
+|---|---|
+| UNDO1 insert + Ctrl+Z | ✅ one Ctrl+Z removes the inserted instance (Instances 4 → 3), no invisible step |
+| UNDO2 drawing "Out of date" after an assembly undo | fix cited in code; not re-run |

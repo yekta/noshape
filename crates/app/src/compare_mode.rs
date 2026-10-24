@@ -500,7 +500,7 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
     let side = |name: String, color: u32, units: String| {
         v_flex()
             .w(px(197.))
-            .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(rgb(color)).child(name))
+            .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(rgb(color)).child(crate::ui::user_text(name)))
             .child(div().text_size(px(12.)).text_color(rgb(0x595959)).child(units))
     };
     // Live cp-920/921: base | marker | target columns, 29 px rows. Changed:
@@ -539,7 +539,7 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
                 };
                 c.when(show, |c| {
                     c.child(svg().path(crate::part_studio::feature_icon(&r.type_id)).size(px(16.)).flex_none().text_color(pal.text))
-                        .child(div().min_w_0().truncate().text_color(if shown { rgb(0x000000) } else { rgb(0xaaaaaa) }).child(r.name.clone()))
+                        .child(div().min_w_0().truncate().text_color(if shown { rgb(0x000000) } else { rgb(0xaaaaaa) }).child(crate::ui::user_text(r.name.clone())))
                 })
             };
             // A moved feature has two rows: ids per row.
@@ -684,7 +684,7 @@ fn config_section(doc: &Entity<DocModel>, a: &noshape_model::partstudio::PartStu
                     .h(px(28.))
                     .gap(px(6.))
                     .text_size(px(12.))
-                    .child(div().flex_none().text_color(pal.text_muted).child(input.name.clone()))
+                    .child(div().flex_none().text_color(pal.text_muted).child(crate::ui::user_text(input.name.clone())))
                     .child(h_flex().w(px(110.)).h(px(24.)).border_b_1().border_color(rgb(0xcccccc)).cursor_pointer().text_size(px(13.)).text_color(pal.text).child(div().flex_1().truncate().child(label)).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 7., rgb(0x666666))))
                     .on_click(move |e: &ClickEvent, window, cx| {
                         let (d, iid, opts, chosen) = (d.clone(), iid.clone(), opts.clone(), chosen.clone());
@@ -777,7 +777,7 @@ fn dialog_column(f: &FeatureCompare, base: bool) -> AnyElement {
         .w(px(197.))
         .flex_none()
         .gap(px(3.))
-        .child(div().h(px(35.)).px(px(6.)).flex().items_center().border_b_1().border_color(rgb(0xd7d7d7)).text_size(px(15.)).text_color(pal.text).child(name))
+        .child(div().h(px(35.)).px(px(6.)).flex().items_center().border_b_1().border_color(rgb(0xd7d7d7)).text_size(px(15.)).text_color(pal.text).child(crate::ui::user_text(name)))
         .children(rows)
         .into_any_element()
 }

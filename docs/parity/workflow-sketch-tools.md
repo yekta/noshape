@@ -53,3 +53,24 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 | Trim hover | only the stub up to the intersection | whole line (k12) | ✗ **TRIM1** (skb) |
 | SLOT1 constraints | 14: COINCIDENT ×6, TANGENT ×4, OFFSET ×3, DIAMETER; glyph hover shows no tooltip | tangent + equal glyphs (k21, z25) | ✗ SLOT1 (detail added) |
 | CH2 chamfer | preview with two distance dimensions labelled "5", hollow arrow; Enter → box "5 mm", 2nd Enter → second distance box | preview dims without values (z29) | ✗ CH2 |
+
+## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
+| SK5 radius edit (pass20/sk5.py + sk5b.py) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065; R8: 25.089 / 33.089 / 22.065 / 14.065 = live exactly | ✅ **fixed** |
+| TRIM1 Trim hover | only the stub up to the rectangle edge highlighted (k40) | ✅ **fixed** |
+| RECT1 corner rectangle constraints | glyphs ⊥ ∥ — on the top edge, ⊥ ∥ left, ∥ right, ∥ bottom (k40) | ✅ **fixed** |
+| SLOT1 slot | pending: Ø20 with a vertical leader + 4 tangent points; committed: coincident ×4, tangent pairs and the 3 offset glyphs at the end cap (k41, k42) | ✅ **fixed** |
+| PAT1 linear pattern preview | hollow arrow manipulators, square handles, "3x" with leader, spacing dimension "25" with extension lines (k43) | ✅ **fixed** |
+| POLY1 polygon | spinner "◀6▶" rotated along the edge ✅; construction circle still drawn **solid** while the side count is pending (k44z) although sketch_mode pushes it as dash-dot | ✗ partly → routed skb |
+| CH2 chamfer preview | two dimensions labelled "5", hollow arrow (k45) | ✅ **fixed** |
+
+## Re-check on main a0e360a3 (qa4, 2026-10-23 19:30–20:40, FRESH=1, /root/qa4-scratch/bin/noshape-main)
+| Finding | Result |
+|---|---|
+| RECT1 corner rectangle | ✅ glyphs ⊥ ∥ — (Perpendicular, Parallel, Horizontal) |
+| FIL1 sketch fillet | ✅ R5 preview, "R5" leader, hollow grey arrow (R5 = live mm default, FIL2 withdrawn) |
+| CH2 sketch chamfer | ✅ preview with two "5" dimensions and a hollow arrow |
+| SLOT1 slot preview | ✅ "Ø20" with a vertical leader, four tangent points |
+| TRIM1 trim hover | ✅ only the stub up to the slot lights up |
+| PAT1 linear pattern | ✅ hollow arrows, square handles, "3x" with a leader, 25 spacing dimension with extension lines |
+| **POLY1** inscribed polygon | ✗ **still** (= qa5 pass 21): construction circle solid while pending (looked before the vertex click, so the spinner wasn't checked) → qa5-routing POLY1 (skb). Evidence /root/qa4-scratch/gate-v047/poly1-main-a0e360a3.png |
+| OFF1, VB1, STB1, SK5 | fixed in earlier passes / code (SK5 matches live's numbers, d1a1d056 test) |

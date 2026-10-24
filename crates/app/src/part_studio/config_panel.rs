@@ -1680,7 +1680,7 @@ impl PartStudioView {
         };
         let mut head = h_flex().border_l_1().border_color(grid);
         for i in &inputs {
-            head = head.child(cell().justify_center().bg(crate::theme::p().table_header).font_weight(FontWeight::BOLD).child(div().truncate().child(i.name.clone())));
+            head = head.child(cell().justify_center().bg(crate::theme::p().table_header).font_weight(FontWeight::BOLD).child(div().truncate().child(crate::ui::user_text(i.name.clone()))));
         }
         for prop in &props {
             let prop = *prop;
@@ -2053,7 +2053,7 @@ impl PartStudioView {
                 h_flex()
                     .min_h(px(26.))
                     .gap(px(4.))
-                    .child(div().w(px(80.)).flex_none().pl(px(4.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(input.name.clone()))
+                    .child(div().w(px(80.)).flex_none().pl(px(4.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::user_text(input.name.clone())))
                     .child(div().flex_1().min_w_0().child(control))
                     // Live part-studio/535: the excluded icon follows the value.
                     .when(input.excluded, |d| {
@@ -2785,7 +2785,7 @@ impl Render for VarTableDrag {
             .bg(gpui_kit::rgb(0x0b3d78))
             .text_size(px(13.))
             .text_color(gpui_kit::rgb_static(0xffffff))
-            .child(self.name.clone())
+            .child(crate::ui::user_text(self.name.clone()))
             .child(canvas(|_, _, _| {}, |_, _, window, _| window.set_window_cursor_style(CursorStyle::ClosedHand)).absolute().size_0())
     }
 }

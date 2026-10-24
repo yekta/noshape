@@ -254,7 +254,7 @@ impl PartStudioView {
         let widths: Vec<f32> = t.columns.iter().map(|c| crate::ui::col_w(&key, &c.id, 140.)).collect();
         let cell = |w: f32, content: AnyElement| div().w(px(w)).h_full().flex_none().border_r_1().border_b_1().border_color(grid).child(content);
         let head = h_flex().h(px(34.)).bg(gpui_kit::rgb(0xeaeaea)).border_l_1().border_color(grid).children(t.columns.iter().zip(&widths).map(|(c, w)| {
-            cell(*w, div().size_full().flex().items_center().justify_center().px(px(3.)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(div().truncate().child(c.name.clone())).into_any_element())
+            cell(*w, div().size_full().flex().items_center().justify_center().px(px(3.)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(div().truncate().child(crate::ui::user_text(c.name.clone()))).into_any_element())
                 .relative()
                 .child(crate::ui::col_grip(&key, &c.id, 140.))
         }));
@@ -508,7 +508,7 @@ impl PartStudioView {
                             .cursor_pointer()
                             .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
                             .child(crate::os_ui::glyph(crate::os_ui::GLYPH_DOCUMENT, 18., pal.text))
-                            .child(div().truncate().text_size(px(14.)).child(name))
+                            .child(div().truncate().text_size(px(14.)).child(crate::ui::user_text(name)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(a) = this.ui.ct.add.as_mut() {
                                     a.doc = doc_at(&path);
@@ -573,7 +573,7 @@ impl PartStudioView {
                     cx.notify();
                 })))
             })
-            .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).child(d.name.clone())).child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).child(crate::ui::glyph("branch", 10., pal.text)).child(version)))
+            .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).child(crate::ui::user_text(d.name.clone()))).child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).child(crate::ui::glyph("branch", 10., pal.text)).child(version)))
             .child(square("cta-create-version", "version", "Create version…", false).on_click(|_, window, cx| window.dispatch_action(Box::new(crate::actions::CreateVersion), cx)))
             .child(square("cta-version-graph", "version-graph", "Version graph", graph).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(a) = this.ui.ct.add.as_mut() {
@@ -596,7 +596,7 @@ impl PartStudioView {
                         .when(on, |r| r.bg(gpui_kit::rgb(0xb8dcf8)))
                         .hover(|r| r.bg(gpui_kit::rgb(0xdef1fb)))
                         .child(div().w(px(140.)).h_full().relative().flex().items_center().justify_center().child(div().absolute().left(px(69.)).w(px(2.)).top_0().bottom_0().bg(blue)).child(div().size(px(9.)).rounded_full().bg(blue)))
-                        .child(div().text_size(px(13.33)).child(v.label.clone()))
+                        .child(div().text_size(px(13.33)).child(crate::ui::user_text(v.label.clone())))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if let Some(a) = this.ui.ct.add.as_mut() {
                                 a.graph = false;
