@@ -136,6 +136,21 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   than LP1's whole fuse (1.25 s debug), and fuse_slabs on the near piece rebuilds the cut face so the join fails.
   Needs a boolean that never visits the far faces (a local face replacement of the touched face: its region minus
   the tools' footprints + the tools' faces, sewn into the shell).
+- **v0.4.8 gate (a), delete LP2 while it regenerates (10-24, lead: 7-9 s in the app):** two causes.
+  (1) ✓ supersedes the dialog's preview (it goes on computing LP2 into the cache), and nothing tracked it after
+  that: a delete aborted only the ✓ run, and the preview kept the Regenerator locked until LP2 was done. Now
+  `regen::runs::Runs` keeps every run whose `RegenCancel` is still held (by the background closure or the task
+  waiting to refine) and a new request aborts each one it doesn't extend (app `schedule_regen`). (2) The display
+  mesh stayed on the model's faces; OCCT's booleans take boxes from a stored triangulation enlarged by its
+  deflection (0.8 mm fine / 4.9 mm preview against 1 mm fins 2 mm apart), so a boolean on a body once shown was
+  ~5× slower and deaf to the abort for seconds (LP2's fuse 2.4 s cold → 13-14 s after the model was shown; also
+  the 20 s open / 18 s undo). `mesh.cpp mesh_prepare` now drops the triangulation once the mesh is copied out
+  (`BRepTools::Clean`, mesh faces keep theirs). Test `pattern_second
+  deleting_the_running_second_pattern_in_the_app_shows_the_first_at_once` (app sequence open → preview → ✓ →
+  delete / suppress on one Regenerator; ×400 7.8 s → 87 ms / 69 ms). Still open: Extrude 3 (one wall under the
+  400-fin plate) 2.7-3 s (kernel fuse 0.8-1.4 s + naming / unify) vs live 55 ms: the same local-face boolean as
+  the LP2 = LP1 follow-up above. Not cancellable yet: `schedule_preview_before` / `schedule_tool_preview` and the
+  sketch `regen_sync` take the same Regenerator lock without a cancel (short when the prefix is cached).
 - **Robustness sweep round 2 (10-23/24, lead: draft, fillet round 2, patterns, hole & rib; live "kern (10-23 20:00)
   draft sweep", "(20:30) fillet round 2", "(22:00) patterns", "(23:00) hole & rib", "(10-24 00:30) curvature section").**
   Tests `kernel_robustness::{draft_sweep, fillet_round_2, patterns, hole_and_rib}_match(es)_onshape`.

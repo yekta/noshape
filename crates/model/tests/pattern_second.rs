@@ -167,3 +167,60 @@ fn deleting_the_running_second_pattern_stops_it_at_once() {
         assert!(done, "every run finished before the abort ({:.0} % into LP2)", frac * 100.0);
     }
 }
+
+/// The app's path (part_studio schedule_regen, model regen::runs): one
+/// shared Regenerator; LP2 added in its dialog (the preview runs it), ✓ (the
+/// final run only extends the preview, which goes on into the cache), then
+/// LP2 deleted (or suppressed) while it still computes: both runs stop and
+/// the model without LP2 shows at once (v0.4.8 gate: it waited 7-9 s for
+/// the superseded preview).
+#[test]
+fn deleting_the_running_second_pattern_in_the_app_shows_the_first_at_once() {
+    use noshape_model::regen::runs::{Run, Runs};
+    use std::sync::{Arc, Mutex};
+    log();
+    let n = count();
+    for how in ["delete", "suppress"] {
+        let (s, _, lp2) = model(n, true);
+        let regen = Arc::new(Mutex::new(Regenerator::new()));
+        let mut runs = Runs::default();
+        // Starts a run the way schedule_regen does (the worker holds its cancel).
+        let mut start = |ps: PartStudio, upto: Option<usize>| {
+            let studio = Arc::new(ps);
+            let cancel = RegenCancel::default();
+            runs.start(Run { cancel: cancel.clone(), studio: studio.clone(), upto, config: ConfigValues::default(), doc_vars: Default::default(), editing_sketch: None });
+            let (regen, units) = (regen.clone(), s.units);
+            let t = Instant::now();
+            std::thread::spawn(move || {
+                let mut g = regen.lock().unwrap();
+                let waited = t.elapsed().as_secs_f64() * 1e3;
+                let r = g.regenerate(&studio, &ConfigValues::default(), &units, &RegenOptions { upto, preview_meshes: true, cancel: Some(cancel), ..Default::default() });
+                eprintln!("run upto {upto:?}: waited {waited:.0} ms for the Regenerator, ran {:.0} ms, cancelled {}", t.elapsed().as_secs_f64() * 1e3 - waited, r.cancelled);
+                (r, t.elapsed().as_secs_f64() * 1e3)
+            })
+        };
+        let mut without = s.ps.clone();
+        without.remove(lp2);
+        let (_, open) = start(without.clone(), None).join().unwrap();
+        // The dialog's preview (rolled to just after LP2), then ✓.
+        let index = s.ps.index_of(lp2).unwrap();
+        let preview = start(s.ps.clone(), Some(index + 1));
+        std::thread::sleep(Duration::from_millis(100));
+        let accepted = start(s.ps.clone(), None);
+        std::thread::sleep(Duration::from_millis(200));
+        let edited = if how == "delete" {
+            without.clone()
+        } else {
+            let mut p = s.ps.clone();
+            p.feature_mut(lp2).unwrap().suppressed = true;
+            p
+        };
+        let (r, shown) = start(edited, None).join().unwrap();
+        let (preview, accepted) = (preview.join().unwrap().0, accepted.join().unwrap().0);
+        eprintln!("×{n} {how}: open {open:.0} ms; preview cancelled {}, ✓ run cancelled {}; shown {shown:.0} ms after the {how}; features {:?}", preview.cancelled, accepted.cancelled, r.display.features.iter().map(|f| (f.status, f.time_ms as u32)).collect::<Vec<_>>());
+        assert!(preview.cancelled && accepted.cancelled && !r.cancelled);
+        assert_eq!(runs.running(), 0);
+        let budget = if cfg!(debug_assertions) { 1000.0 } else { 300.0 };
+        assert!(shown < budget, "{how}: the model without LP2 showed {shown:.0} ms after the {how}");
+    }
+}
