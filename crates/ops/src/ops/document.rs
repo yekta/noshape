@@ -137,7 +137,109 @@ pub fn ops() -> Vec<Op> {
             destructive: true,
             run: tab_delete,
         },
+        Op {
+            group: "tab",
+            verb: "folder_create",
+            summary: "Create a tab folder",
+            description: "The tab bar's \"+\" › Create folder: \"Folder 1\" (next free number) unless `name` is given, inside `folder` (default: the root). Folders nest up to Onshape's depth limit.",
+            fields: vec![doc_field(), opt("name", s(), "Folder name (default: the next \"Folder N\")."), opt("folder", s(), "Folder (name or id) to create it in (default: the root).")],
+            mutates: true,
+            destructive: false,
+            run: tab_folder_create,
+        },
+        Op {
+            group: "tab",
+            verb: "move",
+            summary: "Move a tab or tab folder into a folder, out to its parent, or before another tab",
+            description: "Dragging a tab onto a folder tab (or onto 🏠: the root), Tab › Move to parent folder (`to_parent`), or dragging it along the bar (`before`: it goes in front of that tab, in that tab's folder). Like Onshape, the tab order isn't undoable; moving between folders is. Refused for a folder into itself or past the depth limit.",
+            fields: vec![
+                doc_field(),
+                req("tab", s(), "Tab or folder (name or id) to move."),
+                opt("folder", s(), "Target folder (name or id); omit (without `to_parent` / `before`) for the root."),
+                opt("to_parent", json!({ "type": "boolean" }), "Move to parent folder: out of its folder into the one around it."),
+                opt("before", s(), "Tab or folder (name or id) to put it in front of."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: tab_move,
+        },
+        Op {
+            group: "tab",
+            verb: "folder_unpack",
+            summary: "Unpack a tab folder",
+            description: "Folder › Unpack: the folder goes; its tabs and folders move to its parent, at the end of the tab list (as Onshape).",
+            fields: vec![doc_field(), req("folder", s(), "Folder name or id.")],
+            mutates: true,
+            destructive: false,
+            run: tab_folder_unpack,
+        },
     ]
+}
+
+/// A tab or tab folder by name or id.
+fn find_tab_or_folder(d: &Document, key: &str, param: &'static str) -> Result<noshape_model::document::TabId, OpError> {
+    let k = key.trim();
+    if let Some(f) = d.settings.folders.iter().find(|f| f.id.to_string() == k || f.name == k) {
+        return Ok(f.id);
+    }
+    doc::find_tab(d, k).map_err(|e| e.with_param(param))
+}
+
+fn find_folder(d: &Document, key: &str, param: &'static str) -> Result<noshape_model::document::TabId, OpError> {
+    let k = key.trim();
+    d.settings.folders.iter().find(|f| f.id.to_string() == k || f.name == k).map(|f| f.id).ok_or_else(|| {
+        let names: Vec<&str> = d.settings.folders.iter().map(|f| f.name.as_str()).collect();
+        OpError::not_found(format!("no tab folder `{key}`; folders: {}", names.join(", "))).with_param(param)
+    })
+}
+
+fn tab_folder_create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let parent = a.opt_str("folder")?.map(|f| find_folder(od.doc(), f, "folder")).transpose()?;
+    let name = match a.opt_str("name")? {
+        Some(n) => n.to_string(),
+        None => od.doc().next_folder_name(),
+    };
+    if parent.is_some_and(|p| od.doc().ancestors(p).len() + 2 > noshape_model::document::MAX_FOLDER_DEPTH) {
+        return Err(OpError::invalid("folders don't nest that deep").with_param("folder"));
+    }
+    let id = od.session.edit_document("Create folder", |d| d.add_folder(&name, parent))?;
+    Ok(json!({ "folder": { "id": id.to_string(), "name": name } }).into())
+}
+
+fn tab_move(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let id = find_tab_or_folder(od.doc(), a.str("tab")?, "tab")?;
+    let before = a.opt_str("before")?.map(|b| find_tab_or_folder(od.doc(), b, "before")).transpose()?;
+    let to_parent = a.bool_or("to_parent", false)?;
+    let target = if let Some(b) = before {
+        od.doc().parent_of(b)
+    } else if to_parent {
+        let Some(p) = od.doc().parent_of(id) else { return Err(OpError::invalid("it isn't in a folder").with_param("to_parent")) };
+        od.doc().parent_of(p)
+    } else {
+        a.opt_str("folder")?.map(|f| find_folder(od.doc(), f, "folder")).transpose()?
+    };
+    if od.doc().parent_of(id) != target {
+        let moved = od.session.edit_document("Move to folder", |d| d.set_parent(id, target))?;
+        if !moved {
+            return Err(OpError::invalid("a folder can't go into itself or nest deeper than Onshape allows").with_param("folder"));
+        }
+    }
+    if let Some(b) = before {
+        // Live: a reorder isn't undoable.
+        od.session.edit_document_not_undoable("Reorder tabs", |d| d.move_in_order(id, Some(b)))?;
+    }
+    let folder = target.and_then(|t| od.doc().folder(t)).map(|f| f.name.clone());
+    Ok(json!({ "moved": id.to_string(), "folder": folder }).into())
+}
+
+fn tab_folder_unpack(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let id = find_folder(od.doc(), a.str("folder")?, "folder")?;
+    let name = od.doc().folder(id).map(|f| f.name.clone()).unwrap_or_default();
+    od.session.edit_document("Unpack folder", |d| d.unpack_folder(id))?;
+    Ok(json!({ "unpacked": name }).into())
 }
 
 fn length_unit(s: &str) -> Result<LengthUnit, OpError> {
@@ -150,12 +252,15 @@ fn angle_unit(s: &str) -> Result<AngleUnit, OpError> {
 
 pub(crate) fn describe(od: &OpenDoc) -> Value {
     let d = od.doc();
-    let tabs: Vec<Value> = d.ordered_tabs().iter().map(|t| json!({ "id": t.id.to_string(), "name": t.name, "kind": t.content.kind_name() })).collect();
+    let folder_of = |id| d.parent_of(id).and_then(|p| d.folder(p)).map(|f| f.name.clone());
+    let tabs: Vec<Value> = d.ordered_tabs().iter().map(|t| json!({ "id": t.id.to_string(), "name": t.name, "kind": t.content.kind_name(), "folder": folder_of(t.id) })).collect();
+    let folders: Vec<Value> = d.settings.folders.iter().map(|f| json!({ "id": f.id.to_string(), "name": f.name, "folder": folder_of(f.id) })).collect();
     let u = &d.settings.units;
     json!({
         "path": od.session.path.display().to_string(),
         "name": od.session.name(),
         "tabs": tabs,
+        "folders": folders,
         "units": { "length": u.length.to_string(), "angle": u.angle.to_string(), "length_precision": u.length_precision, "angle_precision": u.angle_precision },
         "can_undo": od.session.can_undo(),
         "can_redo": od.session.can_redo(),
