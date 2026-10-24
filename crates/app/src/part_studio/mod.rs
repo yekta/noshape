@@ -19,6 +19,8 @@ mod scope;
 mod default_tolerances;
 mod pending;
 mod fab_panel;
+mod flat_view;
+mod sheet_metal_panel;
 mod feature_ops;
 mod manipulators;
 mod menus;
@@ -304,9 +306,10 @@ pub struct PartStudioView {
     named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// The Named views dialog's "Select a view" list and the view picked in it.
     named_view_picked: Option<String>,
-    pending_named_view: Option<noshape_model::partstudio::NamedView>,
     flat_cache: Option<fab_panel::FlatCache>,
     flat_task: Option<(usize, Task<()>)>,
+    /// The Sheet metal table and flat view panel's graphics area.
+    flat_view: Option<Entity<flat_view::FlatView>>,
     /// Onshape interaction state (hide/isolate, select other, S toolbar...).
     ui: behaviors::UiState,
     _subs: Vec<Subscription>,
@@ -428,9 +431,9 @@ impl PartStudioView {
             folder_prompt: None,
             named_views: None,
             named_view_picked: None,
-            pending_named_view: None,
             flat_cache: None,
             flat_task: None,
+            flat_view: None,
             ui: behaviors::UiState::new(cx),
             _subs: subs,
         };
@@ -852,6 +855,7 @@ impl PartStudioView {
             accent.extend(hovered);
         }
         accent.extend(self.ui.appearance_hover.iter().cloned());
+        accent.extend(self.sm_hover_refs());
         let cs = self.cs_preview();
         if let Some((seeds, _)) = &cs {
             selection.extend(seeds.iter().cloned());
@@ -1141,6 +1145,10 @@ impl PartStudioView {
         } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_POINT)) {
             // Hole locations: every point of the sketch (Onshape).
             sketch_points(sk)
+        } else if sketch.is_some() && filter.intersects(QueryFilter::SKETCH_EDGE) {
+            // Curve fields (Rib's Sketch profiles, Sweep's path): the whole
+            // sketch, shown as "Edges of Sketch 2" (live "Edges of Rib sketch").
+            vec![Reference::Sketch(id)]
         } else if let Some(pl) = self.display.planes.iter().find(|p| p.reference == Reference::FeaturePlane(id)).filter(|_| filter.intersects(QueryFilter::PLANE)) {
             // A Plane feature's row fills a plane field (Sketch plane, Mirror
             // plane), like the default planes' rows (qa5 ADV1).
@@ -2889,7 +2897,9 @@ impl PartStudioView {
                 // before its ellipsis; part-studio/94, 570). A wider panel
                 // shows it whole (qa4 F16), a narrower one truncates.
                 .child(div().min_w_0().truncate().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match &filtered_count {
-                    _ if errors > 0 && crate::ui::left_panel_w() < crate::ui::LEFT_PANEL_W + 10. => "Features …".to_string(),
+                    // (Other languages: the translated title, truncated where it
+                    // meets the icons, live "フィーチ…".)
+                    _ if errors > 0 && crate::ui::left_panel_w() < crate::ui::LEFT_PANEL_W + 10. && crate::i18n::current() == crate::i18n::DEFAULT => "Features …".to_string(),
                     Some(k) => format!("Features ({k} of {})", n_features + 4),
                     None => format!("Features ({})", n_features + 4),
                 }))
@@ -3125,12 +3135,12 @@ impl PartStudioView {
                 if several_parts {
                     let keep = b.clone();
                     m = m
-                        .item(item("Hide other parts", Box::new(move |this, _, cx| {
+                        .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {
                             let keep = targets(this, &keep);
                             let others: Vec<Reference> = this.display.bodies.iter().filter(|d| !keep.contains(&d.id)).map(|d| Reference::Body(d.id.clone())).collect();
                             this.set_visibility(&others, true, cx);
                         })))
-                        .item(item("Hide all parts", Box::new(|this, _, cx| {
+                        .item(item(&crate::i18n::template("Hide all __label__", &[("label", "parts")]), Box::new(|this, _, cx| {
                             let all: Vec<Reference> = this.display.bodies.iter().map(|d| Reference::Body(d.id.clone())).collect();
                             this.set_visibility(&all, true, cx);
                         })));
@@ -3427,7 +3437,10 @@ impl PartStudioView {
         // The feature being edited shows its draft's name (live: a Hole's
         // row reads "Ø 6.35 mm ↧ 12 mm" while its dialog is open).
         let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.clone()).filter(|d| d.id == f.id);
-        let f = draft.as_ref().unwrap_or(f);
+        // The name shows the active configuration's values (a configured
+        // Variable reads "#w = 80 mm" under L; qa4 round 4 S4-a).
+        let configured = draft.is_none().then(|| self.studio(cx).filter(|s| s.configuration.configured.iter().any(|c| c.feature == f.id)).map(|s| s.configuration.for_editing(f, &self.current_config(s)))).flatten();
+        let f = draft.as_ref().or(configured.as_ref()).unwrap_or(f);
         let name = {
             let computed = self.computed_values(f.id, cx);
             let units = self.doc.read(cx).session.doc.settings.units;
@@ -3751,7 +3764,7 @@ impl PartStudioView {
         let row = crate::ui::with_lazy_side_tooltip(row, anchor, tip);
         let view = cx.entity();
         let is_last = i + 1 >= self.row_ctx.n_features;
-        let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone()))));
+        let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, typed_name(g)))));
         let feature_name = f.name.clone();
         // A Derived feature's source studio ("Switch to qa5 src", live "qa5
         // derived" (6)).
@@ -4528,9 +4541,6 @@ impl Render for PartStudioView {
         if self.compare_gfx.changed(&self.doc, cx) {
             self.refresh_scene(false, cx);
         }
-        if let Some(v) = self.pending_named_view.take() {
-            self.apply_named_view(&v, window, cx);
-        }
         self.ensure_filter_input(window, cx);
         self.ensure_config_box_inputs(window, cx);
         // A feature row's context menu closed: drop its highlight.
@@ -4999,9 +5009,12 @@ fn count_picks(p: &noshape_model::params::ParamValues) -> usize {
 /// feature's type gets the type in brackets (live behaviours "psb … feature
 /// sweep": "Move L5 rotate no axis [Move face] did not regenerate properly:
 /// …", "<- Path [Sketch]"); default names ("Draft 1") stay as they are.
+/// A feature's name as Onshape shows it in tooltips and menus: with its
+/// type in brackets when the name doesn't start with the type as named in
+/// the UI language ("Mount [Extrude]"; German "Sketch 1 [Skizze]", live).
 pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
-    match f.feature_type().map(|t| t.name) {
-        Some(t) if !f.name.starts_with(t) => format!("{} [{t}]", f.name),
+    match f.feature_type().map(|t| crate::i18n::type_name(t.name)) {
+        Some(t) if !f.name.starts_with(t.as_str()) => format!("{} [{t}]", f.name),
         _ => f.name.clone(),
     }
 }

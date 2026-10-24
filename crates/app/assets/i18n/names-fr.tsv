@@ -1,0 +1,222 @@
+2 point circle centerline	Axe de symétrie du cercle en 2 points
+2 point linear centerline	Axe de symétrie linéaire à 2 points
+2 point linear dimension	Cote linéaire entre 2 points
+3 point angular dimension	Cote angulaire à 3 points
+3 point arc	Arc 3 points
+3 point circle	Cercle 3 points
+3 point circle centerline	Axe de symétrie du cercle en 3 points
+Acceleration	Accélération
+Aligned rectangle	Rectangle aligné
+Aligned section view	Vue en coupe alignée
+Angular velocity	Vitesse angulaire
+Animate Mate	Animer la contrainte
+Arc length dimension	Cote de la longueur de l'arc
+Assembly circular pattern	Répétition circulaire d'assemblage
+Assembly linear pattern	Répétition linéaire d'assemblage
+Assembly mirror	Symétrie d'assemblage
+Auxiliary view	Vue auxiliaire
+Ball	Rotatif
+Ball mate	Contrainte rotatif
+Bearing	Palier
+Bezier	Bézier
+Body draft	Corps de dépouille
+Boolean	Booléen
+Boundary condition	Condition du contour!Instances ou faces à contraindre
+Boundary surface	Surface du contour
+Break view	Vue réduite
+Bridging curve	Courbe de jonction
+Broken-out section	Section distincte
+Callout	Légende
+Center point arc	Arc à partir du centre
+Center point circle	Cercle à partir du centre
+Center point rectangle	Rectangle à partir du centre
+Centermark	Centre
+Chamfer	Chanfrein
+Chamfer dimension	Cote du chanfrein
+Circular pattern	Répétition circulaire
+Circumscribed polygon	Polygone circonscrit
+Coincident	Coïncidence
+Commit	Commiter
+Commit all	Commiter tout
+Composite curve	Courbe composite
+Composite part	Pièce composite
+Concentric	Concentrique
+Conic	Conique
+Constrained surface	Surface contrainte
+Corner rectangle	Rectangle par sommet
+Create Part Studio in context	Créer un Part Studio en contexte
+Create generative	Créer un design génératif
+Crop view	Vue recadrée
+Curve pattern	Répétition pilotée par une courbe
+Curved Text	Texte incurvé
+Custom table	Tableau personnalisé
+Cut list	Liste de coupe
+Cut list table	Tableau de liste de coupe
+Cylindrical	Cylindrique
+Cylindrical mate	Liaison pivot-glissant
+Decal	Décalcomanie
+Delete face	Supprimer la face
+Delete part	Supprimer la pièce
+Derived	Dérivé
+Derived mirror	Symétrie dérivée
+Detail view	Vue détaillée
+Diameter dimension	Cote du diamètre
+Dimension	Cote
+Display states	États d'affichage
+Draft	Dépouille
+Edge	Arête
+Edge condition symbol	Symbole de condition d'arête
+Edge point	Arête
+Edge to edge centerline	Axe de symétrie bord à bord
+Edit curve	Modifier la courbe
+Elliptical arc	Arc elliptique
+Enclose	Entourer
+End cap	Embout
+Entity	Entité
+Equal	Égal
+Explode step	Étape d'éclatement
+Extend	Prolonger
+Extend surface	Déplacer le contour
+External thread	Filetage externe
+Extrude	Extruder
+Face blend	Combinaison de faces
+Fastened	Fixe
+Fastened mate	Liaison fixe
+Feature	Fonction
+Fill	Remplir
+Fillet	Congé
+Fillet dimension	Cote de congé
+Fit spline	Spline ajustée en 3D
+Fix	Fixer
+Flange	Bord tombé
+Foreshorten dimension	Cote raccourcie
+Format painter	Reproduire la mise en forme
+Frame	Cadre
+Frame trim	Ajuster le cadre
+Gear relation	Relation de type engrenage
+Geometric tolerance	Tolérance géométrique
+Group	Groupe
+Gusset	Gousset
+Hatch region	Zone hachurée
+Helix	Hélice
+Hide inspection item	Masquer l'élément d'inspection
+Hole	Perçage
+Hole table	Tableau des perçages
+Hole/thread callout	Légende de perçage/filetage
+Import	Importer
+Inscribed polygon	Polygone inscrit
+Insert	Insérer
+Insert BOM	Insérer une nomenclature
+Insert DXF or DWG	Insérer un fichier DXF ou DWG
+Insert image	Insérer une image
+Insert view	Insérer une vue
+Inspection item	Élément d'inspection
+Internal feature	Fonction interne
+Intersection curve	Courbe d'intersection
+Isoparametric curve	Courbe isoparamétrique
+Item	Element
+Line	Ligne
+Line to line angular dimension	Cote angulaire de ligne à ligne
+Line to line linear dimension	Cote linéaire ligne à ligne
+Linear pattern	Répétition linéaire
+Linear relation	Relation linéaire
+Loft	Lisser
+Mass	Masse
+Mate	Contrainte
+Mate connector	Connecteur de positionnement
+Maximum dimension	Cote maximum
+Maximum/minimum dimension	Cote maximum/minimum
+Mesh point	Point de maille
+Midpoint	Milieu
+Midpoint line	Ligne de point milieu
+Minimum dimension	Cote minimum
+Mirror	Miroir
+Modify fillet	Modifier le congé
+Move face	Déplacer la face
+Mutual trim	Ajustement mutuel
+New feature	Nouvelle fonction
+Offset	Décalage
+Offset curve	Courbe de décalage
+Offset surface	Décaler la surface
+Ordinate dimension	Cote de l'ordonnée
+Parallel	Parallèle
+Parallel mate	Contrainte parallèle
+Pattern	Répétition
+Perpendicular	Perpendiculaire
+Pierce	Point de rencontre
+Pin slot	Broche
+Pin slot mate	Contrainte de rainure
+Planar	Planaire
+Planar mate	Contrainte planaire
+Plane	Plan
+Point to line linear dimension	Cote linéaire du point à la ligne
+Pressure	Pression
+Projected curve	Courbe projetée
+Projected view	Vue projetée
+Query variable	Variable de requête
+Rack and pinion relation	Mécanisme à crémaillère
+Radial dimension	Cote du rayon
+Refold	Replier
+Replace face	Remplacer la face
+Replace instance	Remplacer une instance
+Replicate	Répliquer
+Revision table	Table des révisions
+Revolute	Pivot
+Revolute mate	Liaison pivot
+Revolve	Pivoter
+Rib	Nervure
+Rigid body	Corps rigide
+Routing curve	Courbe de routage
+Ruled surface	Surface réglée
+Run generative	Exécution générative
+SMBend	Pli
+SMBendRelief	Grugeage
+SMCorner	Coin
+SMCornerBreak	Grugeage en coin
+SMEndSheetMetal	Modèle de tôlerie de finition
+SMForm	Forme
+SMHem	Bord rabattu
+SMJoint	Point de jonction
+SMLoft	Lissage de tôlerie
+SMMakeJoint	Créer un point de jonction
+SMRip	Déchirure
+SMStartSheetMetal	Modèle de tôlerie
+SMTab	Onglet
+Screw relation	Relation de vissage
+Section view	Vue en coupe
+Shell	Coque
+Show mates mode	Afficher le mode de contrainte
+Sketch	Esquisse
+Sketch Curvature	Courbure
+Sketch Flow	Flux
+Sketch point	Point d'esquisse
+Slider	Glissière
+Slider mate	Liaison glissière
+Slot	Rainure
+Snap mode	Mode accrochage
+Spline control point	Point de contrôle de spline
+Spline handle	Poignée de spline
+Split	Scinder
+Surface finish symbol	Symbole de finition de la surface
+Sweep	Balayer
+Symmetric	Symétrique
+Tag	Identifier
+Tag profile	Profil de balise
+Tangent	Tangente
+Tangent arc	Arc tangent
+Tangent mate	Contrainte tangente
+Text	Texte
+Thicken	Épaissir
+Transform	Transformer
+Trim	Ajuster
+Trim curve	Ajuster la courbe
+Unfold	Déplier
+Update	Mettre à jour
+Update all references to latest versions	Mettre à jour toutes les références à partir des dernières versions
+Use	Utiliser
+Vertex	Sommet
+Virtual sharp	Intersection virtuelle
+Weld symbol	Symbole de soudure
+Width	Largeur
+Width mate	Contrainte de largeur
+Wrap	Emballage

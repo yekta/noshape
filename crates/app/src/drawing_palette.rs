@@ -300,7 +300,15 @@ impl DrawingEditor {
         let mut unit_items: Vec<(String, bool, Act)> = DimUnits::CALLOUT.iter().map(|&u| (u.name().to_string(), units == Some(u), std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.units = Some(u)) as Act)).collect();
         let drawing_units = if self.drawing.units_mm { "Millimeters (Drawing)" } else { "Inches (Drawing)" };
         unit_items.insert(if self.drawing.units_mm { 1 } else { 4 }, (drawing_units.to_string(), units.is_none(), std::rc::Rc::new(|d: &mut PaletteDlg| d.cur.format.units = None) as Act));
-        let dual_items: Vec<(String, bool, Act)> = [("Single unit", Some(false)), ("Single unit (Drawing)", None), ("Dual unit", Some(true))]
+        // Live: the drawing's own entry follows its Dual setting (asb 10-24:
+        // Single unit | Dual unit | Dual unit (Drawing); drawing/461 with dual
+        // off: Single unit | Single unit (Drawing) | Dual unit).
+        let entries: [(&str, Option<bool>); 3] = if self.drawing.props.dual.show {
+            [("Single unit", Some(false)), ("Dual unit", Some(true)), ("Dual unit (Drawing)", None)]
+        } else {
+            [("Single unit", Some(false)), ("Single unit (Drawing)", None), ("Dual unit", Some(true))]
+        };
+        let dual_items: Vec<(String, bool, Act)> = entries
             .iter()
             .map(|&(l, v)| (l.to_string(), fmt.dual == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.dual = v) as Act))
             .collect();

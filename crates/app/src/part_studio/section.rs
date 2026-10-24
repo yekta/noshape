@@ -114,6 +114,24 @@ impl PartStudioView {
         self.apply_section(window, cx);
     }
 
+    /// "Edit section view…" (camera menu, right-click): the dialog on the
+    /// current section, where ✕ turns the section off (live part-studio/2414:
+    /// it does not restore it, even with nothing changed).
+    pub(super) fn edit_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_section_dialog(window, cx);
+        if let Some(d) = &mut self.ui.section_dialog {
+            d.saved = Default::default();
+        }
+    }
+
+    /// "Turn off section view" (also with the dialog open).
+    pub(super) fn turn_off_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_section_dialog(false, window, cx);
+        self.ui.section.clear();
+        self.ui.section_parts = None;
+        self.apply_section(window, cx);
+    }
+
     /// Shift+X: open the dialog; with a section on and no dialog, turn it off.
     pub(super) fn toggle_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // Live (psb 10-21 f, qa4 F14): with a feature dialog open, Shift+X

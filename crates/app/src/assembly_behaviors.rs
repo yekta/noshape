@@ -133,8 +133,11 @@ pub(crate) struct AsmSection {
 pub(crate) struct AsmSectionDialog {
     /// The "Items" field takes picks (else "Section planes").
     pub items_active: bool,
-    /// The plane the dialog edits (its chip is bold, its cap tan).
+    /// The plane the dialog edits (the manipulator's).
     pub active: usize,
+    /// It was picked in this dialog: its chip is bold, its cap tan. Not in
+    /// "Edit section view…" until a plane is picked (live dark-2437, 2403).
+    pub chosen: bool,
     /// The section before the dialog opened (restored by Cancel).
     saved: Option<Box<AsmSection>>,
 }
@@ -312,6 +315,23 @@ pub(crate) struct AsmUi {
     pub section_offset_edit: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// Isolate / Make transparent slider: opacity of the transparent instances.
     pub transparency: Option<f32>,
+    /// Camera menu render choices (Onshape's display modes, hidden and
+    /// tangent edges) and View in high quality.
+    pub display_mode: crate::scene_builder::DisplayMode,
+    pub hidden_edges_visible: bool,
+    pub tangent_edges: crate::scene_builder::TangentEdges,
+    pub high_quality: bool,
+    /// Cameras before each view change, for "Previous view".
+    pub cam_history: Vec<noshape_render::Camera>,
+    /// The open Graphics preferences dialog.
+    pub graphics_dialog: Option<(Entity<crate::graphics_prefs_dialog::GraphicsPrefsDialog>, Subscription)>,
+    /// The open camera menu (its button shows the open state).
+    pub camera_menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
+    /// The open Named views dialog's name field, and the view picked in its list.
+    pub named_views: Option<(Entity<InputState>, Subscription)>,
+    pub named_view_picked: Option<String>,
+    /// The Graphics preferences the scene is built with (kept current).
+    pub graphics: crate::graphics_prefs::GraphicsPrefs,
     /// Isolate dialog › Select transparent geometry; Alt held (pick through
     /// transparent instances).
     pub select_transparent: bool,
@@ -874,8 +894,8 @@ impl AssemblyView {
         let tg = targets.clone();
         m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(tg.clone(), !hidden, cx)));
         let tg = targets.clone();
-        m.push(item("Hide other instances", move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
-        m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
+        m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
+        m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
         let tg = targets.clone();
         let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == targets);
         m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
@@ -1500,8 +1520,8 @@ impl AssemblyView {
             let (a1, a2, a3, a4, a5) = (insts.clone(), insts.clone(), insts.clone(), insts.clone(), insts.clone());
             let hidden = self.assembly(cx).is_some_and(|a| !insts.is_empty() && insts.iter().all(|i| a.instance(*i).is_some_and(|x| x.hidden)));
             m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(a1.clone(), !hidden, cx)));
-            m.push(item("Hide other instances", move |t, _, cx| t.hide_other_instances(a2.clone(), cx)));
-            m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
+            m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(a2.clone(), cx)));
+            m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
             m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, a3.clone(), cx)));
             m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, a4.clone(), cx)));
             let suppressed = self.assembly(cx).is_some_and(|a| !insts.is_empty() && insts.iter().all(|i| a.instance(*i).is_some_and(|x| x.suppressed)));
@@ -3927,7 +3947,24 @@ impl AssemblyView {
             planes.push(AsmSectionPlane { label, origin: f.origin, normal: f.z(), offset: 0.0, flipped: false });
         }
         let active = planes.len().saturating_sub(1);
-        self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, saved }) });
+        self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, chosen: true, saved }) });
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// "Edit section view…": the dialog on the current section, where ✕
+    /// turns the section off (live behaviours "Edit section view…": it does
+    /// not restore it, even with nothing changed).
+    pub(crate) fn edit_section(&mut self, cx: &mut Context<Self>) {
+        let Some(s) = self.ui.section.as_mut().filter(|s| s.dialog.is_none() && !s.planes.is_empty()) else { return };
+        s.dialog = Some(AsmSectionDialog { items_active: false, active: s.planes.len() - 1, chosen: false, saved: None });
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// "Turn off section view" (also with the dialog open).
+    pub(crate) fn turn_off_section(&mut self, cx: &mut Context<Self>) {
+        self.ui.section = None;
         self.rebuild_scene(false, cx);
         cx.notify();
     }
@@ -3977,6 +4014,7 @@ impl AssemblyView {
             s.planes.push(pl);
             if let Some(d) = &mut s.dialog {
                 d.active = s.planes.len() - 1;
+                d.chosen = true;
             }
         }
         self.rebuild_scene(false, cx);
@@ -4122,26 +4160,12 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Edit section view… (right-click with a section on): the dialog again
-    /// over the current section (Cancel keeps it as it was).
-    pub(super) fn edit_section(&mut self, cx: &mut Context<Self>) {
-        let Some(s) = &mut self.ui.section else { return };
-        if s.dialog.is_some() {
-            return;
-        }
-        let saved = Some(Box::new(s.clone()));
-        let active = s.planes.len().saturating_sub(1);
-        s.dialog = Some(AsmSectionDialog { items_active: false, active, saved });
-        self.rebuild_scene(false, cx);
-        cx.notify();
-    }
-
     pub(super) fn render_section(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let s = self.ui.section.as_ref()?;
         let d = s.dialog.as_ref()?;
         let asm = self.assembly(cx);
         let items = s.items.iter().map(|id| asm.and_then(|a| a.instance(*id).map(|i| i.name.clone())).unwrap_or_default()).collect();
-        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.label.clone()).collect(), active: d.active, items };
+        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.label.clone()).collect(), active: if d.chosen { d.active } else { usize::MAX }, items };
         Some(crate::section_dialog::render(props, "asm-section", &cx.entity(), Self::on_section_action, cx))
     }
 
@@ -4178,6 +4202,7 @@ impl AssemblyView {
                     s.planes.push(AsmSectionPlane { label: "Front".into(), origin: DVec3::ZERO, normal: DVec3::NEG_Y, offset: 0.0, flipped: false });
                     if let Some(d) = &mut s.dialog {
                         d.active = s.planes.len() - 1;
+                        d.chosen = true;
                     }
                 }
             }

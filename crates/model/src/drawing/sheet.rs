@@ -283,14 +283,22 @@ pub const DRAWING_DEFAULT_FONT: &str = "Noto Sans";
 
 /// Families of earlier documents not on live's list, as their nearest one
 /// on it (lead decision S28): Liberation Sans → Arimo, Liberation Serif →
-/// Tinos (the same metrics), Liberation Mono → DejaVu Sans Mono.
+/// Tinos (the same metrics), Liberation Mono → DejaVu Sans Mono; any other
+/// unknown name is ARSimp, as live (asb 10-24: unknown fonts render in
+/// ARSimp.shx and re-open as "ARSimp").
 pub fn migrate_font_family(family: &str) -> &str {
     match family {
         "Liberation Sans" => "Arimo",
         "Liberation Serif" => "Tinos",
         "Liberation Mono" => "DejaVu Sans Mono",
-        f => f,
+        f if FONT_FAMILIES.contains(&f) => f,
+        _ => "ARSimp",
     }
+}
+
+/// The SHX shape fonts of the list (live: no Bold / Italic for them).
+pub fn is_shx(family: &str) -> bool {
+    matches!(family, "APMONO" | "ARComp" | "ARIsoP1" | "ARItal" | "ARMono" | "ARSimp" | "ARTxt")
 }
 
 fn migrated_family<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
@@ -2078,6 +2086,13 @@ impl SheetGeometry {
             let (xa, xb, ya, yb) = (x0 - 0.8, x0 + total + 0.8, base - 0.8, base + h + 0.8);
             self.lines.push(Polyline2 { points: vec![loc(xa, ya), loc(xb, ya), loc(xb, yb), loc(xa, yb)], style: LineStyle::Thin, closed: true, pick });
         }
+        // The dual value: a second line, the same height, centred on the
+        // value, above (Top) or below (Bottom) it (live asb 10-24).
+        if let Some(d) = &t.dual {
+            let w = font::text_width(d, h);
+            let y = if t.dual_below { base - h * 1.6 } else { base + h * 1.6 };
+            self.texts.push(Text2 { pos: loc(x0 + (total - w) / 2.0, y), height: h, text: d.clone(), angle, anchor: Anchor::BottomLeft, pick });
+        }
         // Above / below text, centred on the value.
         for (txt, y) in [(&t.above, base + h * 1.5), (&t.below, base - h * 1.5)] {
             if let Some(txt) = txt {
@@ -2167,7 +2182,15 @@ impl SheetGeometry {
             mid = [mid[0] + up[0] * k, mid[1] + up[1] * k];
             angle = 0.0;
         }
-        if text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval {
+        if let Some(dual) = text.dual.clone().filter(|_| text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval) {
+            // Dual (live asb 10-24): the dimension line runs between the two
+            // lines; the dual above it for Top, below it for Bottom.
+            let h = self.style.dim_text;
+            let below = [mid[0] - up[0] * (2.0 * tg + h), mid[1] - up[1] * (2.0 * tg + h)];
+            let (top_text, bottom_text) = if text.dual_below { (text.main.clone(), dual) } else { (dual, text.main.clone()) };
+            self.texts.push(Text2 { pos: mid, height: h, text: top_text, angle, anchor: Anchor::BottomCenter, pick });
+            self.texts.push(Text2 { pos: below, height: h, text: bottom_text, angle, anchor: Anchor::BottomCenter, pick });
+        } else if text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval {
             self.texts.push(Text2 { pos: mid, height: self.style.dim_text, text: text.main.clone(), angle, anchor: Anchor::BottomCenter, pick });
         } else {
             let mid = if text.boxed { [mid[0] + up[0] * 0.8, mid[1] + up[1] * 0.8] } else { mid };
@@ -2391,6 +2414,10 @@ pub trait AnnotationEnv {
         Some(revision.to_string())
     }
     /// Lines of a hole / thread callout (from the Hole feature).
+    /// A dimension's dual units for the DXF / DWG export (None: single).
+    fn dual_cad(&self, _a: &Annotation, _angular: bool) -> Option<super::cad_objects::CadDual> {
+        None
+    }
     fn hole_callout(&self, _a: &Annotation) -> Vec<String> {
         vec!["⌀?".into()]
     }
