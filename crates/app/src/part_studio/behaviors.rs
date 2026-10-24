@@ -237,7 +237,10 @@ pub struct UiState {
     pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
     pub preview_tool_task: Option<Task<()>>,
     /// Measure graphics uploaded for a selection.
-    pub measure_lines: Option<(Vec<Reference>, Option<noshape_render::Instance>)>,
+    pub measure_lines: Option<(Vec<Reference>, Option<String>, Option<noshape_render::Instance>)>,
+    /// The Measure panel's distance row under the pointer (its label): live
+    /// draws that one measurement's dashed line, nothing otherwise.
+    pub measure_hover: Option<String>,
     /// Dynamic suppression editor: feature, expression input.
     pub dyn_suppression: Option<(FeatureId, Entity<InputState>, Subscription)>,
     /// Shortcut map search box.
@@ -245,6 +248,8 @@ pub struct UiState {
     pub shortcut_query: String,
     /// Shortcut sheet tab (General, Part Studio, …).
     pub shortcut_tab: usize,
+    /// The shortcut map's rows (Chrome's scrollbar, live menus/616).
+    pub shortcut_scroll: gpui_kit::ScrollHandle,
     /// Recently started tools, newest first (Search tools with no query).
     pub recent_tools: Vec<&'static str>,
     /// Camera menu "Orient normal to sketch on edit" and its state: an
@@ -436,10 +441,12 @@ impl UiState {
             hole_prev: None,
             preview_tool_task: None,
             measure_lines: None,
+            measure_hover: None,
             dyn_suppression: None,
             shortcut_filter: None,
             shortcut_query: String::new(),
             shortcut_tab: 0,
+            shortcut_scroll: gpui_kit::ScrollHandle::new(),
             recent_tools: Vec::new(),
             orient_on_edit: false,
             orient_pending: false,
@@ -2455,14 +2462,19 @@ impl PartStudioView {
     /// components.
     pub(super) fn measure_overlay(&mut self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineData, LineSegment};
-        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 {
+        // Live (behaviours "ui (10-23 a)"): no measure lines from the
+        // selection alone; hovering a distance row of the open Measure panel
+        // draws that distance as one black dashed line.
+        let hover = self.ui.measure_hover.clone().filter(|_| self.ui.measure_pinned);
+        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 || hover.is_none() {
             return Vec::new();
         }
         let sel = self.selection.clone();
         let Some(ctx) = self.measure_context(&sel, cx) else { return Vec::new() };
-        // Uploaded once per selection (refresh_scene runs on every hover).
-        if let Some((s, inst)) = &self.ui.measure_lines
+        // Uploaded once per selection and row (refresh_scene runs on every hover).
+        if let Some((s, h, inst)) = &self.ui.measure_lines
             && *s == sel
+            && *h == hover
         {
             return inst.iter().cloned().collect();
         }
@@ -2475,25 +2487,18 @@ impl PartStudioView {
             }
         };
         let mut l = LineData::default();
-        for (_, m) in results {
-            if let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m {
+        for (label, m) in results {
+            if Some(&label) == hover.as_ref()
+                && let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m
+            {
                 let f = |v: glam::DVec3| -> [f32; 3] { v.as_vec3().into() };
-                let style = LineSegment::DASHED | LineSegment::ON_TOP;
-                l.segments.push(LineSegment { a: f(a), b: f(b), color: [20, 20, 20, 255], pick_id: 0, width: 2.0, style });
-                let x = glam::DVec3::new(b.x, a.y, a.z);
-                let y = glam::DVec3::new(b.x, b.y, a.z);
-                for (p, q, c) in [(a, x, [220, 40, 40, 255]), (x, y, [40, 170, 60, 255]), (y, b, [40, 90, 220, 255])] {
-                    if p.distance(q) > 1e-9 {
-                        l.segments.push(LineSegment { a: f(p), b: f(q), color: c, pick_id: 0, width: 1.0, style });
-                    }
-                }
+                l.segments.push(LineSegment { a: f(a), b: f(b), color: [20, 20, 20, 255], pick_id: 0, width: 2.0, style: LineSegment::DASHED | LineSegment::ON_TOP });
             }
         }
-        // Out of the scene bounds (qa4 R1): a distance to a default plane ends
-        // far out on it, and the depth range fitted to that let edges show
-        // through the parts.
+        // Out of the scene bounds (qa4 R1): a distance to a default plane can
+        // end far out on it.
         let inst = (!l.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().no_bounds().layer(21));
-        self.ui.measure_lines = Some((self.selection.clone(), inst.clone()));
+        self.ui.measure_lines = Some((self.selection.clone(), hover, inst.clone()));
         inst.into_iter().collect()
     }
 
@@ -3015,7 +3020,7 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector") {
+        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector" | "moveFace") {
             self.direct_edit_logic(&dialog, cx);
             return;
         }
@@ -3072,6 +3077,14 @@ impl PartStudioView {
         // picked the operation (live, qa5 EXT1: Remove fills "Part 1").
         if ty == "thicken" && !hosts.is_empty() && !scope_user && dialog.read(cx).feature.params.query("booleanScope").is_empty() {
             changes.push(("booleanScope", ParamValue::Query(hosts.iter().map(|b| Reference::Body(b.clone())).collect())));
+        }
+        // thickenEditLogic's canSetBooleanFlip: a user-picked Remove points
+        // the wall into the part, Add out of it.
+        if ty == "thicken" && op_user && !flip_user && !hosts.is_empty() && matches!(op.as_str(), "ADD" | "REMOVE") {
+            let into = op == "REMOVE";
+            if flipped != into {
+                changes.push(("oppositeDirection", ParamValue::Bool(into)));
+            }
         }
         if ty == "extrude" && !flip_user && !hosts.is_empty() {
             let into = matches!(op.as_str(), "REMOVE" | "INTERSECT");
@@ -3143,6 +3156,16 @@ impl PartStudioView {
                     changes.push(("healType", ParamValue::Enum("VOID".into())));
                 }
             }
+            // moveFaceEditingLogic: Translate moves along the first planar
+            // face moved.
+            "moveFace" if params.is("moveFaceType", "TRANSLATE") && !user_set.contains("direction") => {
+                let planar = params.query("moveFaces").iter().find(|r| ctx.is_some_and(|c| noshape_model::regen::measure::resolve_shapes(c, r).first().is_some_and(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(_)))))).cloned();
+                if let Some(f) = planar
+                    && params.query("direction").first() != Some(&f)
+                {
+                    changes.push(("direction", ParamValue::Query(vec![f])));
+                }
+            }
             // Live L22: a new Rib's Parts holds the studio's parts.
             "rib" if !user_set.contains("parts") && params.query("parts").is_empty() => {
                 let solids: Vec<Reference> = ctx.map(|c| c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect()).unwrap_or_default();
@@ -3201,16 +3224,27 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        let (ty, id, user, scope) = {
+        let (ty, id, user, scope, flip_user, flipped, located) = {
             let d = dialog.read(cx);
-            (d.feature.type_id.clone(), d.feature.id, d.user_set.contains("scope"), d.feature.params.query("scope").to_vec())
+            let p = &d.feature.params;
+            (d.feature.type_id.clone(), d.feature.id, d.user_set.contains("scope"), p.query("scope").to_vec(), d.user_set.contains("oppositeDirection"), p.bool("oppositeDirection"), !p.query("locations").is_empty())
         };
-        if ty != "hole" || user {
+        if ty != "hole" || !located {
             return;
         }
-        let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
+        let Some((touched, behind)) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| (s.touched.clone(), s.touched_behind.clone())) else { return };
+        // holeScopeFlipHeuristics: more parts behind the locations than in
+        // front flips the hole (until the user sets the flip).
+        if !flip_user && !user && behind.len() > touched.len() {
+            dialog.update(cx, |d, cx| d.set_value_auto("oppositeDirection", ParamValue::Bool(!flipped), cx));
+            return;
+        }
+        if user {
+            return;
+        }
+        // The scope follows; a flip that reaches nothing clears it (live L57).
         let want: Vec<Reference> = touched.into_iter().map(Reference::Body).collect();
-        if want.is_empty() || want == scope {
+        if want == scope {
             return;
         }
         dialog.update(cx, |d, cx| d.set_value_auto("scope", ParamValue::Query(want), cx));

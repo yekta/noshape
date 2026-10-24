@@ -13,7 +13,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{TableCorner, ViewId};
+use noshape_model::drawing::{RenderStyle, TableCorner, ViewId};
 
 /// What "Move to sheet" moves.
 #[derive(Clone, Copy, PartialEq)]
@@ -56,7 +56,11 @@ impl DrawingEditor {
     }
 
     /// Right-click with several entities selected (live drawing/291).
-    pub fn multi_selection_entries(&self) -> Vec<MenuEntry> {
+    pub fn multi_selection_entries(&self, cx: &App) -> Vec<MenuEntry> {
+        let views: Vec<ViewId> = self.selection.iter().filter_map(|s| if let Sel::View(v) = s { Some(*v) } else { None }).collect();
+        if views.len() == self.selection.len() {
+            return self.multi_view_entries(views, cx);
+        }
         vec![
             MenuEntry::item("Copy", |t, _, cx| t.copy_views(None, cx)),
             MenuEntry::item("Paste as table", |t, _, cx| {
@@ -70,6 +74,74 @@ impl DrawingEditor {
             MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
             MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
         ]
+    }
+
+    /// Several views selected (live drw2 10-21 j, drawing/1202): Show/hide ▸,
+    /// Tangent edges ▸, Adjust linestyle..., View properties..., Align
+    /// views ▸, Move to sheet..., Paste, Copy, Paste as table | Clear
+    /// selection, Zoom to fit, Delete; the toggles act on every view (shown
+    /// for the first one's state).
+    fn multi_view_entries(&self, ids: Vec<ViewId>, cx: &App) -> Vec<MenuEntry> {
+        let first = ids[0];
+        let Some(v) = self.current_sheet().view(first).cloned() else { return Vec::new() };
+        let hidden_lines = v.style == RenderStyle::HiddenLinesVisible;
+        let shaded = v.style == RenderStyle::Shaded;
+        let (threads, cl) = (!v.hide_threads, v.show_centerlines);
+        let each = |ids: &[ViewId]| ids.to_vec();
+        let (a, b, c, e) = (each(&ids), each(&ids), each(&ids), each(&ids));
+        let show = vec![
+            MenuEntry::item(if hidden_lines { "Hide hidden lines" } else { "Show hidden lines" }, move |t, _, cx| {
+                t.edit_views("Hidden lines", &a, cx, |v| v.style = if hidden_lines { RenderStyle::HiddenLinesRemoved } else { RenderStyle::HiddenLinesVisible })
+            }),
+            MenuEntry::item(if shaded { "Hide shaded view" } else { "Show shaded view" }, move |t, _, cx| t.edit_views("Shaded view", &b, cx, |v| v.style = if shaded { RenderStyle::HiddenLinesRemoved } else { RenderStyle::Shaded })),
+            MenuEntry::item(if threads { "Hide threads" } else { "Show threads" }, move |t, _, cx| t.edit_views("Threads", &c, cx, |v| v.hide_threads = threads)),
+            MenuEntry::item(if cl { "Hide auto centermarks" } else { "Show auto centermarks" }, move |t, _, cx| {
+                t.edit_views("Centermarks", &e, cx, |v| {
+                    v.show_centerlines = !cl;
+                    v.deleted_centermarks.clear();
+                })
+            }),
+        ];
+        let tm = crate::drawing_props::TangentMode::of(&v);
+        let tangent = [crate::drawing_props::TangentMode::Hidden, crate::drawing_props::TangentMode::Solid, crate::drawing_props::TangentMode::Phantom]
+            .into_iter()
+            .map(|m| {
+                let ids = ids.clone();
+                MenuEntry::check(m.label(), m == tm, move |t, _, cx| t.edit_views("Tangent edges", &ids, cx, |v| m.apply(v)))
+            })
+            .collect();
+        let props_ids = ids.clone();
+        let mut out = vec![
+            MenuEntry::Submenu("Show/hide".into(), show),
+            MenuEntry::Submenu("Tangent edges".into(), tangent),
+            MenuEntry::item("Adjust linestyle...", move |t, w, cx| t.open_linestyle(first, w, cx)),
+            MenuEntry::Separator,
+            MenuEntry::item("View properties...", move |t, w, cx| t.open_view_props_multi(props_ids.clone(), w, cx)),
+            MenuEntry::Submenu(
+                "Align views".into(),
+                vec![
+                    MenuEntry::item("Vertically", move |t, _, cx| t.start_align_views(first, true, cx)),
+                    MenuEntry::item("Horizontally", move |t, _, cx| t.start_align_views(first, false, cx)),
+                ],
+            ),
+            MenuEntry::Separator,
+            MenuEntry::item("Move to sheet...", move |t, _, cx| t.open_move_sheet(MoveTarget::View(first), cx)),
+        ];
+        out.extend(crate::drawing_props::paste_entry(cx));
+        out.extend([
+            MenuEntry::item("Copy", |t, _, cx| t.copy_views(None, cx)),
+            MenuEntry::item("Paste as table", |t, _, cx| {
+                t.start_paste_table(cx);
+            }),
+            MenuEntry::Separator,
+            MenuEntry::item("Clear selection", |t, _, cx| {
+                t.selection.clear();
+                t.redraw(cx);
+            }),
+            MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+            MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
+        ]);
+        out
     }
 
     pub fn open_table_props_corner(&mut self, id: u64, cx: &mut Context<Self>) {

@@ -243,6 +243,7 @@ pub struct AnnTypeStyle {
 /// A text font (Drawing properties › Font): family, bold, italic.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TextFont {
+    #[serde(deserialize_with = "migrated_family")]
     pub family: String,
     #[serde(default)]
     pub bold: bool,
@@ -250,8 +251,52 @@ pub struct TextFont {
     pub italic: bool,
 }
 
-/// Families the drawing fonts offer (bundled; Noto Sans is Onshape's default).
-pub const FONT_FAMILIES: [&str; 4] = ["Noto Sans", "Liberation Sans", "Liberation Serif", "Liberation Mono"];
+/// The drawing Font lists' families (live drawing/161, dom/drawing-
+/// properties-annotations: these 22 in this order).
+pub const FONT_FAMILIES: [&str; 22] = [
+    "APMONO",
+    "ARComp",
+    "ARIsoP1",
+    "ARItal",
+    "ARMono",
+    "ARSimp",
+    "ARTxt",
+    "Arimo",
+    "DejaVu Sans",
+    "DejaVu Sans Mono",
+    "DejaVu Serif",
+    "Noto Sans",
+    "Noto Sans Chinese Simplified",
+    "Noto Sans Chinese Simplified Light",
+    "Noto Sans Chinese Traditional",
+    "Noto Sans Chinese Traditional Light",
+    "Noto Sans Japanese",
+    "Noto Sans Korean",
+    "Noto Sans UI",
+    "Noto Serif",
+    "Open Sans",
+    "Tinos",
+];
+
+/// Onshape's default drawing font.
+pub const DRAWING_DEFAULT_FONT: &str = "Noto Sans";
+
+/// Families of earlier documents not on live's list, as their nearest one
+/// on it (lead decision S28): Liberation Sans → Arimo, Liberation Serif →
+/// Tinos (the same metrics), Liberation Mono → DejaVu Sans Mono.
+pub fn migrate_font_family(family: &str) -> &str {
+    match family {
+        "Liberation Sans" => "Arimo",
+        "Liberation Serif" => "Tinos",
+        "Liberation Mono" => "DejaVu Sans Mono",
+        f => f,
+    }
+}
+
+fn migrated_family<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let f = <String as serde::Deserialize>::deserialize(d)?;
+    Ok(migrate_font_family(&f).to_string())
+}
 
 /// Texts drawn in a font.
 #[derive(Clone, Debug, PartialEq)]
@@ -347,6 +392,9 @@ pub struct SheetStyle {
     /// Ordinate dimensions › Dimension style ISO: a small open circle at the
     /// end of each ordinate leader (live drawing/382).
     pub ordinate_iso: bool,
+    /// An ISO (not ANSI) drawing: the DXF / DWG dimension styles are live's
+    /// Onshape-ISO-25 family.
+    pub iso: bool,
 }
 
 impl SheetStyle {
@@ -358,7 +406,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: false }
     }
 }
 
@@ -1011,22 +1059,15 @@ impl SheetGeometry {
                             self.lines.push(Polyline2 { points: vec![[at[0], at[1] + h * 0.5], [at[0] + w, at[1] + h * 0.5]], style: LineStyle::Thin, closed: false, pick });
                         }
                     }
-                    // Leaders leave the nearer side of the box through a shoulder.
-                    let [x0, y0, x1, y1] = l.bbox;
-                    for ld in &style.leaders {
-                        let t = match ld.view {
-                            Some(v) => env.to_sheet(v, ld.point),
-                            None => ld.point,
-                        };
-                        let right = t[0] > (x0 + x1) / 2.0;
-                        let ym = (y0 + y1) / 2.0;
-                        let start = if right { [x1 + 1.0, ym] } else { [x0 - 1.0, ym] };
-                        let sh = [start[0] + if right { 4.0 } else { -4.0 }, ym];
-                        let mut pts = vec![start, sh];
-                        pts.extend(ld.nodes.iter().copied());
-                        pts.push(t);
-                        let last = pts[pts.len() - 2];
-                        self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                    // Leaders leave a side of the box through a landing, or
+                    // branch off another leader (`note_leader_paths`).
+                    let targets: Vec<[f64; 2]> = style.leaders.iter().map(|ld| match ld.view {
+                        Some(v) => env.to_sheet(v, ld.point),
+                        None => ld.point,
+                    }).collect();
+                    for path in note_leader_paths(l.bbox, &style.leaders, &targets) {
+                        let (t, last) = (path.points[path.points.len() - 1], path.points[path.points.len() - 2]);
+                        self.lines.push(Polyline2 { points: path.points, style: LineStyle::Thin, closed: false, pick });
                         self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
                     }
                     // A rotated note (no leaders) turns about its middle.
@@ -2466,4 +2507,50 @@ pub fn wrap_text(text: &str, h: f64, w: f64) -> Vec<String> {
         lines.push(cur);
     }
     lines
+}
+
+/// A note leader's polyline (sheet mm): `head` points before its nodes (the
+/// side point and the bend, or the one branch point), then the nodes, then
+/// the target.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LeaderPath {
+    pub points: Vec<[f64; 2]>,
+    pub head: usize,
+}
+
+impl LeaderPath {
+    /// The bend: where the landing ends (the branch point of a branch).
+    pub fn bend(&self) -> [f64; 2] {
+        self.points[self.head - 1]
+    }
+}
+
+/// The paths of a note's leaders (live drw2 10-21 g): from the box `bbox`'s
+/// side (`Leader.right`, else the one nearer the target) through a
+/// horizontal landing (`Leader.landing`, 4 mm) to the bend, or from the
+/// bend or a node of an earlier leader; then the nodes, then `targets[i]`.
+pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[f64; 2]]) -> Vec<LeaderPath> {
+    use super::LeaderStart;
+    let [x0, y0, x1, y1] = bbox;
+    let ym = (y0 + y1) / 2.0;
+    let mut out: Vec<LeaderPath> = Vec::new();
+    for (i, ld) in leaders.iter().enumerate() {
+        let t = targets.get(i).copied().unwrap_or(ld.point);
+        let head = match ld.start {
+            LeaderStart::Bend(j) if j < i => vec![out[j].bend()],
+            LeaderStart::Node(j, n) if j < i && n < leaders[j].nodes.len() => vec![leaders[j].nodes[n]],
+            _ => {
+                let right = ld.right.unwrap_or(t[0] > (x0 + x1) / 2.0);
+                let start = if right { [x1 + 1.0, ym] } else { [x0 - 1.0, ym] };
+                let l = ld.landing.unwrap_or(4.0);
+                vec![start, [start[0] + if right { l } else { -l }, ym]]
+            }
+        };
+        let n = head.len();
+        let mut points = head;
+        points.extend(ld.nodes.iter().copied());
+        points.push(t);
+        out.push(LeaderPath { points, head: n });
+    }
+    out
 }

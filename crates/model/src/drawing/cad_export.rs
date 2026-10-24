@@ -10,6 +10,7 @@
 
 use super::export::aci;
 use super::cad_fit::{FitCurve, fit_curve};
+use super::cad_dimstyles;
 use super::cad_layers::{CadLayer, CadTextStyle};
 use super::cad_objects::{CadDim, CadDimKind, CadObject};
 use acadrust::entities::table::Table as AcadTable;
@@ -145,8 +146,6 @@ const STYLE_TABLE: [(&str, &str, &str, bool); 35] = [
 ];
 /// Feature control frames' dimension style.
 const GTOLERANCE_STYLE: &str = "Onshape-Standard-GTolerance";
-/// Dimension styles (live drw2-k-dxf2018): the parent, then per type.
-const DIM_STYLES: [&str; 7] = ["Onshape-Standard", "Onshape-Standard$0", "Onshape-Standard$2", "Onshape-Standard$3", "Onshape-Standard$4", "Onshape-OrdinateStyle", GTOLERANCE_STYLE];
 
 fn color(c: Option<[u8; 3]>) -> Color {
     match c {
@@ -428,6 +427,8 @@ fn document_tables(pages: &[&SheetGeometry], insunits: u8, version: DxfVersion) 
     let text_h = pages.first().map(|g| g.style.dim_text).unwrap_or(3.048) * k;
     for (name, font, family, sized) in STYLE_TABLE {
         let mut st = TextStyle::new(name);
+        // A handle now: the dimension styles point at their text style by it.
+        st.handle = doc.allocate_handle();
         st.font_file = font.to_string();
         st.true_type_font = family.to_string();
         if sized {
@@ -438,15 +439,27 @@ fn document_tables(pages: &[&SheetGeometry], insunits: u8, version: DxfVersion) 
     // R12–R14 write layer names in capitals (live drw2-k-dxfR14).
     let upper = version <= DxfVersion::AC1014;
     let dims = pages.iter().any(|g| g.cad_objects.iter().any(|o| matches!(o, CadObject::Dimension(_))));
-    if pages.iter().any(|g| g.cad_objects.iter().any(|o| !matches!(o, CadObject::Symbol { .. }))) {
-        let (h, ext) = pages.iter().find(|g| !g.cad_objects.is_empty()).map(|g| (g.style.dim_text, g.style.extension)).unwrap_or((3.048, 2.032));
-        for name in DIM_STYLES {
+    // Live's dimension style table (its template's, written whether or not
+    // the drawing has dimensions): ANSI or ISO, the Onshape styles at the
+    // drawing's dimension text height and extension.
+    {
+        let style = pages.first().map(|g| g.style.clone()).unwrap_or_default();
+        let len = cad_dimstyles::table_mm(style.iso) * k;
+        for &(name, vars) in cad_dimstyles::dim_styles(style.iso) {
+            if doc.dim_styles.iter().any(|d| d.name.eq_ignore_ascii_case(name)) {
+                continue;
+            }
             let mut ds = DimStyle::new(name);
-            ds.dimtxt = h * k;
-            ds.dimexe = ext * k;
-            ds.dimtxsty = DIM_TEXT_STYLE.0.into();
-            (ds.dimclrd, ds.dimclre, ds.dimclrt) = (7, 7, 7);
-            (ds.dimlwd, ds.dimlwe) = (13, 13);
+            for &(code, v) in vars {
+                cad_dimstyles::set_dimvar(&mut ds, code, v, len);
+            }
+            if name.starts_with("Onshape-") {
+                (ds.dimtxt, ds.dimexe) = (style.dim_text * k, style.extension * k);
+            }
+            // DIMTXSTY is written from the text style's handle (group 340).
+            if let Some(h) = doc.text_styles.iter().find(|t| t.name == ds.dimtxsty).map(|t| t.handle) {
+                ds.dimtxsty_handle = h;
+            }
             let _ = doc.dim_styles.add(ds);
         }
     }
@@ -579,6 +592,12 @@ struct Sheet<'a> {
 }
 
 impl Sheet<'_> {
+    /// The drawing's Onshape dimension style `suffix` ("$0" linear, "$2"
+    /// angular, "$3" diameter, "$4" radius) of its family (ANSI / ISO).
+    fn dim_style(&self, suffix: &str) -> String {
+        format!("{}{suffix}", cad_dimstyles::family(self.g.style.iso))
+    }
+
     fn p2(&self, p: [f64; 2]) -> Vector2 {
         Vector2::new((p[0] + self.dx) * self.k, p[1] * self.k)
     }
@@ -858,28 +877,28 @@ impl Sheet<'_> {
                 let mut e = DimensionLinear::new(p3(*first), p3(*second));
                 (e.definition_point, e.rotation) = (p3(*line), *rotation);
                 e.base.actual_measurement = d.measurement * unit;
-                (Dimension::Linear(e), vec![*first, *second, *line, *line], "Onshape-Standard$0", "")
+                (Dimension::Linear(e), vec![*first, *second, *line, *line], self.dim_style("$0"), "")
             }
             CadDimKind::Radial { center, point } => {
                 let mut e = DimensionRadius::new(p3(*center), p3(*point));
                 e.base.actual_measurement = d.measurement * unit;
-                (Dimension::Radius(e), vec![*center, *point], "Onshape-Standard$4", "R<>")
+                (Dimension::Radius(e), vec![*center, *point], self.dim_style("$4"), "R<>")
             }
             CadDimKind::Diameter { chord, far } => {
                 let mut e = DimensionDiameter::new(p3(*chord), p3(*far));
                 e.base.actual_measurement = d.measurement * unit;
-                (Dimension::Diameter(e), vec![*chord, *far], "Onshape-Standard$3", "%%c<>")
+                (Dimension::Diameter(e), vec![*chord, *far], self.dim_style("$3"), "%%c<>")
             }
             CadDimKind::Angular { vertex, first, second, arc } => {
                 let mut e = DimensionAngular3Pt::new(p3(*vertex), p3(*first), p3(*second));
                 e.definition_point = p3(*arc);
                 e.base.actual_measurement = d.measurement;
-                (Dimension::Angular3Pt(e), vec![*first, *second, *vertex, *arc], "Onshape-Standard$2", "")
+                (Dimension::Angular3Pt(e), vec![*first, *second, *vertex, *arc], self.dim_style("$2"), "")
             }
             CadDimKind::Ordinate { origin, feature, leader, x } => {
                 let mut e = DimensionOrdinate::new(p3(*feature), p3(*leader), *x);
                 e.definition_point = p3(*origin);
-                (Dimension::Ordinate(e), vec![*feature, *leader], "Onshape-OrdinateStyle", "")
+                (Dimension::Ordinate(e), vec![*feature, *leader], "Onshape-OrdinateStyle".to_string(), "")
             }
         };
         let defpoints = if upper { "DEFPOINTS" } else { "Defpoints" };
@@ -892,7 +911,7 @@ impl Sheet<'_> {
         }
         let base = dim.base_mut();
         base.block_name = name;
-        base.style_name = style.into();
+        base.style_name = style;
         base.text_middle_point = p3(d.text_mid);
         base.text_user_positioned = true;
         base.common.layer = CadLayer::AnnotationText.name(upper).into();
@@ -1399,5 +1418,38 @@ mod tests {
         assert_eq!(hatches[0].common.layer, "VIEW_HATCHES");
         assert_eq!(hatches[0].paths[0].edges.len(), 4);
         assert!(!doc.entities().any(|e| matches!(e, EntityType::Line(_))), "the hatch lines aren't written");
+    }
+
+    /// Live drw2-en-ansi-a / drw2-a-iso-a3-noborder: the template's whole
+    /// DIMSTYLE table (21 ANSI, 23 ISO records in live's order; the
+    /// Onshape-ISO-25 family in ISO drawings), lengths in the export units.
+    #[test]
+    fn dimension_styles_like_onshape() {
+        let read = |g: &SheetGeometry, units: u8| {
+            let dxf = to_dxf_version(g, units, DxfVersion::AC1032).unwrap();
+            acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap()
+        };
+        let mut g = sample();
+        let d = read(&g, 1);
+        let names: Vec<String> = d.dim_styles.iter().map(|s| s.name.clone()).collect();
+        assert_eq!(names.len(), 21, "{names:?}");
+        for n in ["Standard", "Onshape-Standard", "ANSI$SH", "Onshape-Standard$0", "Onshape-Standard$7", "Onshape-Standard-GTolerance", "Onshape-OrdinateStyle", "Onshape-ChamferDimStyle", "Onshape-SketchDrivenDimStyle$4"] {
+            assert!(names.iter().any(|x| x == n), "{n} {names:?}");
+        }
+        let st = |d: &CadDocument, n: &str| d.dim_styles.iter().find(|s| s.name == n).cloned().unwrap();
+        // Inches (INSUNITS 1): live's values as they are, the text height the drawing's.
+        let ord = st(&d, "Onshape-OrdinateStyle");
+        assert!((ord.dimasz - 0.02).abs() < 1e-9 && (ord.dimtxt - g.style.dim_text / 25.4).abs() < 1e-9, "{} {}", ord.dimasz, ord.dimtxt);
+        assert_eq!((ord.dimdec, ord.dimclrd, ord.dimlwd), (3, 7, 13));
+        assert_eq!(st(&d, "Onshape-SketchDrivenDimStyle$0").dimclrt, 251);
+        assert_eq!(st(&d, "Onshape-Standard-GTolerance").dimtxsty, "Onshape-Standard-GTolerance-TextStyle");
+        // ISO, millimetres: the Onshape-ISO-25 family, the dimensions in it.
+        g.style.iso = true;
+        let d = read(&g, 4);
+        let names: Vec<String> = d.dim_styles.iter().map(|s| s.name.clone()).collect();
+        assert_eq!(names.len(), 23, "{names:?}");
+        assert!(names.iter().any(|x| x == "Onshape-ISO-25$3") && !names.iter().any(|x| x.starts_with("Onshape-Standard$")), "{names:?}");
+        let iso = st(&d, "Onshape-ISO-25$0");
+        assert!((iso.dimasz - 2.5).abs() < 1e-9 && (iso.dimgap - 0.625).abs() < 1e-9 && iso.dimdec == 2, "{} {} {}", iso.dimasz, iso.dimgap, iso.dimdec);
     }
 }

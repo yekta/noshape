@@ -48,7 +48,7 @@ impl Shape {
     }
     /// The script's dimension giving the part's height (its top face, where
     /// the second mate connector sits), for parts with no length.
-    fn height_key(self) -> &'static [&'static str] {
+    pub(crate) fn height_key(self) -> &'static [&'static str] {
         match self {
             Shape::Nut => &["m"],
             Shape::Washer => &["h"],
@@ -168,6 +168,11 @@ pub struct Component {
     /// shows the message; see [`Component::failure`].
     #[serde(default)]
     pub failing: Vec<FailingSize>,
+    /// Live's only mate connector is "Near" at the origin (NAS clinch nuts):
+    /// `true` with its Z flipped (into the part), `false` along +Z. `None`:
+    /// the shape's usual connectors.
+    #[serde(default)]
+    pub near_only: Option<bool>,
     /// The size it opens on when not the first (live: the ANSI Type A
     /// washer opens on 3/8).
     #[serde(default)]

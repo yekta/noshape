@@ -261,6 +261,9 @@ pub struct Context {
     pub sketch_copies: Vec<(FeatureId, FeatureId)>,
     pub planes: Vec<PlaneEntity>,
     pub connectors: Vec<Connector>,
+    /// Mate connectors' owner parts: a connector moves with its owner
+    /// (mateConnector.fs "Owner entity"; a Transform of the part).
+    pub connector_owners: Vec<(Reference, BodyId)>,
     pub points: Vec<PointEntity>,
     pub variables: BTreeMap<String, Quantity>,
     /// Query variables by name (Query variable feature), as persistent references.
@@ -295,6 +298,9 @@ pub struct Context {
     /// definition sheets): no part, no display; custom features see them
     /// through attribute queries only.
     pub fs_hidden_bodies: Vec<Arc<Body>>,
+    /// Transient ids FeatureScript stored in attributes that must outlive the
+    /// feature (std Form's tool bodies, kept in the walls' attributes).
+    pub fs_transients: Vec<(Arc<str>, crate::reference::Reference)>,
     /// Parts named from outside the studio (an imported file's names, a
     /// Derived source's): `renumber_default_names` leaves them as they are
     /// (live, qa5 NAME3).

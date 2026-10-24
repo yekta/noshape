@@ -22,24 +22,12 @@ use gpui_kit::component::{WindowExt as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabId;
-use noshape_model::{PartStudio, TabContent};
 use std::cell::Cell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-/// Native part files (their own dialog variant).
-const NATIVE_PARTS: &[&str] = &["sldprt", "par", "psm", "prt", "ipt"];
-/// Mesh files without units: Onshape asks for them (live G35, G35b).
-const MESH_FILES: &[&str] = &["stl", "obj"];
-/// The Units select, as Onshape lists units in its STL dialogs.
-const MESH_UNITS: [(&str, noshape_units::LengthUnit); 6] = [
-    ("Centimeter", noshape_units::LengthUnit::Centimeter),
-    ("Foot", noshape_units::LengthUnit::Foot),
-    ("Inch", noshape_units::LengthUnit::Inch),
-    ("Meter", noshape_units::LengthUnit::Meter),
-    ("Millimeter", noshape_units::LengthUnit::Millimeter),
-    ("Yard", noshape_units::LengthUnit::Yard),
-];
+// Shared with the agent API.
+use noshape_ops::import::{MESH_UNITS, NATIVE_PARTS};
 
 #[derive(Clone, Copy, Default)]
 struct Choice {
@@ -62,11 +50,14 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     // theirs (see the module docs).
     let all_of = |kinds: &[&str]| !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| kinds.contains(&e.to_string_lossy().to_lowercase().as_str())));
     let (native, stl, obj) = (all_of(NATIVE_PARTS), all_of(&["stl"]), all_of(&["obj"]));
-    let (mesh, units_select) = (all_of(&["stl", "obj", "3mf"]), stl || obj);
+    // Mesh files and PVZ (imported as meshes) have no Join adjacent surfaces
+    // (live "qa5 zip import": PVZ shows appearances, Y up and composite only).
+    let (mesh, units_select) = (all_of(&["stl", "obj", "3mf", "pvz"]), stl || obj);
     // Native assemblies (a zip; live G38h) keep the tiles and add Import
-    // material density like native parts.
+    // material density like native parts; STEP and Parasolid files have it
+    // too, SAT and PVZ not (live "qa5 zip import", "api (10-23) import parity").
     let zip = all_of(&["zip"]);
-    let density = native || zip;
+    let density = native || zip || all_of(&["step", "stp", "x_t", "x_b", "xmt_txt", "xmt_bin"]);
     let doc_unit = doc.read(cx).session.doc.settings.units.length;
     let default_unit = if obj { noshape_units::LengthUnit::Meter } else { doc_unit };
     let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);
@@ -186,110 +177,25 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     });
 }
 
-/// Translate the files and add their Part Studio tab(s).
+/// Translate the files and add their tabs (shared with the agent API:
+/// `noshape_ops::import`).
 fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<TabId>, keep_files: bool, cx: &mut App) -> Option<TabId> {
+    use noshape_ops::import as imp;
     let units = doc.read(cx).session.doc.settings.units;
-    let mut read: Vec<(String, String, crate::workspace::Foreign)> = Vec::new();
-    // Native assemblies (a zip named like the root assembly; live G38).
-    let mut assemblies: Vec<noshape_model::native_assembly::AssemblyZip> = Vec::new();
-    for path in paths {
-        if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
-            match noshape_model::native_assembly::read_assembly_zip(path) {
-                Ok(a) => assemblies.push(a),
-                // Onshape keeps the zip as a file tab and reports it.
-                Err(e) if e == noshape_model::native_assembly::STEP_IN_ZIP => {
-                    let msg = format!("{} was not translated. {e}", crate::workspace::import_names(path).1);
-                    doc.update(cx, |_, cx| cx.emit(DocEvent::Error(msg)));
-                }
-                Err(e) => doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("Import failed: {}: {e:#}", path.display())))),
-            }
-            continue;
-        }
-        // Mesh files in the unit chosen in the dialog.
-        let units = if MESH_FILES.iter().any(|e| path.extension().is_some_and(|x| x.eq_ignore_ascii_case(e))) { noshape_units::UnitPrefs { length: MESH_UNITS[c.unit.min(MESH_UNITS.len() - 1)].1, ..units } } else { units };
-        match crate::workspace::read_foreign(path, &units) {
-            Ok(foreign) => {
-                let (name, file) = crate::workspace::import_names(path);
-                read.push((name, file, foreign));
-            }
-            Err(e) => doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("Import failed: {}: {e:#}", path.display())))),
-        }
+    let choice = imp::ImportChoice { combine: c.combine, appearances: c.appearances, density: c.density, y_up: c.y_up, unit: c.unit, composite: c.composite, join: c.join };
+    let (inputs, errors) = imp::read_inputs(paths, &choice, keep_files, &units);
+    for e in errors {
+        doc.update(cx, |_, cx| cx.emit(DocEvent::Error(e)));
     }
     // A file Onshape couldn't translate still gets its file tab.
-    if read.is_empty() && assemblies.is_empty() && !keep_files {
+    if inputs.is_empty() {
         return None;
     }
+    let description = imp::description(&inputs.label);
     let mut first = None;
-    let mut label = read.iter().map(|r| r.1.clone()).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
-    if label.is_empty() {
-        label = paths.iter().map(|p| crate::workspace::import_names(p).1).collect::<Vec<_>>().join(", ");
-    }
-    let mut errors: Vec<String> = Vec::new();
-    let files: Vec<noshape_model::file_tab::FileTab> = if keep_files {
-        paths.iter().filter_map(|p| Some(noshape_model::file_tab::FileTab::new(&crate::workspace::import_names(p).1, &std::fs::read(p).ok()?, noshape_model::file_tab::now()))).collect()
-    } else {
-        Vec::new()
-    };
+    let mut errors = Vec::new();
     doc.update(cx, |doc, cx| {
-        doc.edit_document(&format!("Import {label}"), cx, |d| {
-            // Onshape keeps the imported files in a "CAD Imports" folder.
-            if !files.is_empty() {
-                let folder = crate::file_tab_view::cad_imports_folder(d);
-                for f in files {
-                    crate::file_tab_view::add_file_tab(d, f, Some(folder), None);
-                }
-            }
-            let mut at = after;
-            for a in &assemblies {
-                // Combine: one Part Studio, no Assembly (live G41 (5)).
-                if c.combine {
-                    match noshape_model::native_assembly::add_native_assembly_combined(d, &a.root, &a.components, &a.files, c.appearances, &units) {
-                        Ok(studio) => {
-                            crate::workspace::place_after(d, studio, at);
-                            at = Some(studio);
-                            first.get_or_insert(studio);
-                        }
-                        Err(e) => errors.push(format!("Import failed: {}: {e}", a.root)),
-                    }
-                    continue;
-                }
-                match noshape_model::native_assembly::add_native_zip(d, a, c.appearances, &units) {
-                    Ok(noshape_model::native_assembly::NativeTabs::Assembly { studio, assembly }) => {
-                        crate::workspace::place_after(d, assembly, at);
-                        crate::workspace::place_after(d, studio, Some(assembly));
-                        at = Some(studio);
-                        first.get_or_insert(assembly);
-                    }
-                    Ok(noshape_model::native_assembly::NativeTabs::Studio(studio)) => {
-                        crate::workspace::place_after(d, studio, at);
-                        at = Some(studio);
-                        first.get_or_insert(studio);
-                    }
-                    Err(e) => errors.push(format!("Import failed: {}: {e}", a.root)),
-                }
-            }
-            let groups: Vec<Vec<&(String, String, crate::workspace::Foreign)>> = if c.combine { vec![read.iter().collect()] } else { read.iter().map(|r| vec![r]).collect() };
-            for g in groups {
-                let mut ps = PartStudio::new();
-                for (_, file, foreign) in &g {
-                    crate::workspace::add_import_feature(&mut ps, file, foreign.clone(), &units);
-                    if let Some(f) = ps.features.last_mut() {
-                        f.params.set("importAppearances", noshape_model::ParamValue::Bool(c.appearances));
-                        f.params.set("specifyMaterialData", noshape_model::ParamValue::Bool(c.density));
-                        f.params.set("importMaterialDensity", noshape_model::ParamValue::Bool(c.density));
-                        f.params.set("yAxisIsUp", noshape_model::ParamValue::Bool(c.y_up));
-                        f.params.set("createComposite", noshape_model::ParamValue::Bool(c.composite));
-                        f.params.set("joinAdjacentSurfaces", noshape_model::ParamValue::Bool(c.join));
-                    }
-                }
-                let base = g[0].0.clone();
-                let name = if d.tabs.iter().any(|t| t.name == base) { d.next_tab_name(&base) } else { base };
-                let id = d.add_tab(&name, TabContent::PartStudio(ps));
-                crate::workspace::place_after(d, id, at);
-                at = Some(id);
-                first.get_or_insert(id);
-            }
-        });
+        doc.edit_document(&description, cx, |d| (first, errors) = imp::apply(d, inputs, &choice, after, &units));
         for e in errors {
             cx.emit(DocEvent::Error(e));
         }

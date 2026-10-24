@@ -35,3 +35,6 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 |---|---|---|
 | VS2 reorder Variable below Extrude 1 (CLI feature_reorder on a copy of qa5-vs) | allowed, no error; Extrude 1 OK (w resolved from the in-scope Variable Studio), 2000 mm³ | ✅ **fixed** (UI drag not re-checked) |
 | VS4 4th Variable Studio | "Insert into all…" ☐; inserted right after the active tab (= live) | ✅ **fixed** (v11) |
+
+## Re-run pass 21 (qa5, 2026-10-23, CLI built from agent/qa5 on main 40e23871)
+| API3 | `variable_create` with `tab: "vs all"` (a Variable Studio) creates #w = 12 mm there | ✅ fixed |

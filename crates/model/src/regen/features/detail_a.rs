@@ -242,6 +242,15 @@ fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
         return err("The parting edges must belong to one part");
     }
     let body = ev.ctx.bodies[bi].clone();
+    // draft.fs: an edge running along the pull can't part the faces.
+    for &(_, ei) in &edges {
+        let e = body.shape.sub_shape(ShapeType::Edge, ei)?;
+        let info = e.edge_info()?;
+        let t = e.tangent_at((info.first_param + info.last_param) * 0.5)?.normalize_or_zero();
+        if t.cross(pull).length() < 1e-9 {
+            return crate::regen::eval::err_at(&["partingEdges"], "Parting edge cannot be parallel to pull direction.");
+        }
+    }
     let mut pts = Vec::new();
     for &(_, ei) in &edges {
         let e = body.shape.sub_shape(ShapeType::Edge, ei)?;

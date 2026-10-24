@@ -99,24 +99,48 @@ impl Render for MateDrag {
     }
 }
 
-/// Section view state.
-pub(crate) struct AsmSection {
+/// A section plane (origin, normal, offset along it, flipped).
+#[derive(Clone, Debug)]
+pub(crate) struct AsmSectionPlane {
     pub label: String,
     pub origin: DVec3,
     pub normal: DVec3,
     pub offset: f64,
     pub flipped: bool,
-    pub input: Entity<InputState>,
-    _sub: Subscription,
 }
 
-impl AsmSection {
+impl AsmSectionPlane {
     /// Clip plane (normal, d): geometry with dot(normal, p) > d is removed.
     pub fn clip(&self) -> (DVec3, f64) {
         let n = if self.flipped { -self.normal } else { self.normal };
         (n, n.dot(self.origin + self.normal * self.offset))
     }
 }
+
+/// Section view state (Onshape's Section view dialog, as in the Part Studio).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct AsmSection {
+    pub planes: Vec<AsmSectionPlane>,
+    /// Include tab: only the listed instances are cut (Exclude: they aren't).
+    pub include: bool,
+    /// Instances in "Items to exclude/include".
+    pub items: Vec<InstanceId>,
+    /// The open dialog.
+    pub dialog: Option<AsmSectionDialog>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AsmSectionDialog {
+    /// The "Items" field takes picks (else "Section planes").
+    pub items_active: bool,
+    /// The plane the dialog edits (its chip is bold, its cap tan).
+    pub active: usize,
+    /// The section before the dialog opened (restored by Cancel).
+    saved: Option<Box<AsmSection>>,
+}
+
+/// Most section planes the renderer cuts with.
+const MAX_SECTION_PLANES: usize = 3;
 
 /// Row being renamed inline.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -3904,68 +3928,138 @@ impl AssemblyView {
         Some(div().absolute().bottom(px(36.)).right(px(40.)).child(panel).into_any_element())
     }
 
-    /// Shift+X: section view on (through the hovered planar face or the
-    /// selected assembly mate connector, else the Front plane) / off.
+    /// Shift+X / Section view…: open the dialog (from the hovered face or the
+    /// selected mate connector, else empty: live part-studio/70); with the
+    /// dialog open it cancels; with a section on and no dialog it turns it off.
     pub(super) fn toggle_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.ui.section.take().is_some() {
-            self.rebuild_scene(false, cx);
-            cx.notify();
-            return;
-        }
-        let units = self.units(cx);
-        let mut plane: Option<(String, DVec3, DVec3)> = None;
-        if let Some(t) = self.hover.as_ref().filter(|t| t.kind == PickKind::Face)
-            && let Some(o) = self.result.occurrences.get(t.occ)
-        {
-            let r = Reference::Implicit { on: Box::new(t.reference.clone()), inference: Inference::Centroid };
-            if let Some(f) = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &r, &units) {
-                let w = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f);
-                plane = Some(("Face".into(), w.origin, w.z()));
+        match &self.ui.section {
+            Some(s) if s.dialog.is_some() => return self.close_section_dialog(false, window, cx),
+            Some(s) if !s.planes.is_empty() => {
+                self.ui.section = None;
+                self.rebuild_scene(false, cx);
+                cx.notify();
+                return;
             }
+            _ => {}
         }
-        if plane.is_none()
+        let saved = self.ui.section.take().map(Box::new);
+        let mut planes = Vec::new();
+        if let Some(t) = self.hover.clone().filter(|t| t.kind == PickKind::Face) {
+            planes.extend(self.section_plane_of(&t, cx));
+        }
+        if planes.is_empty()
             && let Some(id) = self.selected_mate
             && let Some(f) = self.result.connector_frame(id)
         {
-            plane = Some((self.assembly(cx).and_then(|a| a.connector(id).map(|c| c.name.clone())).unwrap_or_default(), f.origin, f.z()));
+            let label = self.assembly(cx).and_then(|a| a.connector(id).map(|c| c.name.clone())).unwrap_or_default();
+            planes.push(AsmSectionPlane { label, origin: f.origin, normal: f.z(), offset: 0.0, flipped: false });
         }
-        let (label, origin, normal) = plane.unwrap_or_else(|| ("Front plane".into(), DVec3::ZERO, DVec3::NEG_Y));
-        let text = noshape_units::format_quantity(noshape_units::Quantity::meters(0.0), &units);
-        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
-        let sub = cx.subscribe_in(&input, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
-            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Change) {
-                let units = this.units(cx);
-                if let Ok(q) = noshape_units::evaluate_as(&st.read(cx).value(), noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope)
-                    && let Some(s) = &mut this.ui.section
-                {
-                    s.offset = q.value;
-                    this.rebuild_scene(false, cx);
-                    cx.notify();
+        let active = planes.len().saturating_sub(1);
+        self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, saved }) });
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// The plane through a picked face (its centroid frame).
+    fn section_plane_of(&self, t: &AsmPickTarget, cx: &App) -> Option<AsmSectionPlane> {
+        let o = self.result.occurrences.get(t.occ)?;
+        let r = Reference::Implicit { on: Box::new(t.reference.clone()), inference: Inference::Centroid };
+        let f = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &r, &self.units(cx))?;
+        let w = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f);
+        let name = self.assembly(cx).and_then(|a| a.instance(o.top()).map(|i| i.name.clone())).unwrap_or_else(|| "Part".into());
+        Some(AsmSectionPlane { label: format!("Face of {name}"), origin: w.origin, normal: w.z(), offset: 0.0, flipped: false })
+    }
+
+    /// ✓ keeps the section, ✕ / Esc restores what was there before.
+    pub(super) fn close_section_dialog(&mut self, accept: bool, _window: &mut Window, cx: &mut Context<Self>) {
+        let Some(s) = &mut self.ui.section else { return };
+        let Some(d) = s.dialog.take() else { return };
+        if !accept {
+            self.ui.section = d.saved.map(|b| *b);
+        } else if s.planes.is_empty() {
+            self.ui.section = None;
+        }
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// A pick while the dialog is open: a face for "Section planes" (up to
+    /// three), an instance for "Items".
+    pub(super) fn section_pick(&mut self, t: AsmPickTarget, cx: &mut Context<Self>) {
+        let Some(items_active) = self.ui.section.as_ref().and_then(|s| s.dialog.as_ref()).map(|d| d.items_active) else { return };
+        if items_active {
+            let top = t.path[0];
+            if let Some(s) = &mut self.ui.section {
+                match s.items.iter().position(|x| *x == top) {
+                    Some(i) => {
+                        s.items.remove(i);
+                    }
+                    None => s.items.push(top),
                 }
             }
-        });
-        self.ui.section = Some(AsmSection { label, origin, normal, offset: 0.0, flipped: false, input, _sub: sub });
+        } else if t.kind == PickKind::Face
+            && let Some(pl) = self.section_plane_of(&t, cx)
+            && let Some(s) = &mut self.ui.section
+            && s.planes.len() < MAX_SECTION_PLANES
+        {
+            s.planes.push(pl);
+            if let Some(d) = &mut s.dialog {
+                d.active = s.planes.len() - 1;
+            }
+        }
         self.rebuild_scene(false, cx);
         cx.notify();
     }
 
     pub(super) fn render_section(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let s = self.ui.section.as_ref()?;
-        let pal = p();
-        let flipped = s.flipped;
-        let body = v_flex()
-            .p_2()
-            .gap_2()
-            .child(div().text_xs().text_color(pal.text_muted).child(s.label.clone()))
-            .child(h_flex().gap_2().child(div().w(px(60.)).text_xs().text_color(pal.text_muted).child("Offset")).child(div().flex_1().child(Input::new(&s.input).xsmall())))
-            .child(Button::new("asm-sec-flip").icon(Icon::empty().path(icon_path("flip"))).label("Flip").ghost().small().selected(flipped).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                if let Some(s) = &mut this.ui.section {
-                    s.flipped = !s.flipped;
+        let d = s.dialog.as_ref()?;
+        let asm = self.assembly(cx);
+        let items = s.items.iter().map(|id| asm.and_then(|a| a.instance(*id).map(|i| i.name.clone())).unwrap_or_default()).collect();
+        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.label.clone()).collect(), active: d.active, items };
+        Some(crate::section_dialog::render(props, "asm-section", &cx.entity(), Self::on_section_action, cx))
+    }
+
+    fn on_section_action(&mut self, a: crate::section_dialog::Action, w: &mut Window, cx: &mut Context<Self>) {
+        use crate::section_dialog::Action;
+        if matches!(a, Action::Accept | Action::Cancel) {
+            return self.close_section_dialog(a == Action::Accept, w, cx);
+        }
+        let Some(s) = &mut self.ui.section else { return };
+        match a {
+            Action::Include(include) => s.include = include,
+            Action::ItemsActive(items) => {
+                if let Some(d) = &mut s.dialog {
+                    d.items_active = items;
                 }
-                this.rebuild_scene(false, cx);
-                cx.notify();
-            })));
-        Some(Self::panel_frame_moving("Section view", body, cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_section(window, cx)), "asm-sec-close", "asm-section").into_any_element())
+            }
+            Action::RemovePlane(i) => {
+                if i < s.planes.len() {
+                    s.planes.remove(i);
+                }
+                if let Some(d) = &mut s.dialog {
+                    d.active = s.planes.len().saturating_sub(1);
+                }
+            }
+            Action::RemoveItem(i) => {
+                if i < s.items.len() {
+                    s.items.remove(i);
+                }
+            }
+            // The default plane (Front) until Onshape's "Select a plane"
+            // options exist (Help: Select default plane).
+            Action::PlaneButton => {
+                if s.planes.len() < MAX_SECTION_PLANES {
+                    s.planes.push(AsmSectionPlane { label: "Front".into(), origin: DVec3::ZERO, normal: DVec3::NEG_Y, offset: 0.0, flipped: false });
+                    if let Some(d) = &mut s.dialog {
+                        d.active = s.planes.len() - 1;
+                    }
+                }
+            }
+            Action::Accept | Action::Cancel => {}
+        }
+        self.rebuild_scene(false, cx);
+        cx.notify();
     }
 
     /// Isolate / Make transparent › Expand: switch distance / connectivity
@@ -4028,11 +4122,29 @@ impl AssemblyView {
                 return;
             }
             let file = format!("{name}.{}", s.format.ext());
+            // Options › Store file in a new tab: no download.
+            if s.options == 2 {
+                v.update(cx, |this, cx| {
+                    let parts = this.export_parts(ids.as_deref(), s.hidden);
+                    this.message = Some(match crate::part_studio::export::store_export(&this.doc, this.tab, &file, |p| crate::part_studio::export::write_export(&s, p, parts), cx) {
+                        Ok(f) => (false, format!("Stored {f}")),
+                        Err(e) => (true, format!("Export failed: {e:#}")),
+                    });
+                    cx.notify();
+                });
+                return;
+            }
             crate::files::request_save_path("Export", file, s.format.ext(), window, cx, move |path, cx| {
                 v.update(cx, |this, cx| {
                     let parts = this.export_parts(ids.as_deref(), s.hidden);
                     this.message = Some(match crate::part_studio::export::write_export(&s, &path, parts) {
-                        Ok(p) => (false, format!("Exported {}", p.display())),
+                        Ok(p) => {
+                            // Download and store file in a new tab.
+                            if s.options == 1 {
+                                crate::part_studio::export::store_written(&this.doc, this.tab, &p, cx);
+                            }
+                            (false, format!("Exported {}", p.display()))
+                        }
                         Err(e) => (true, format!("Export failed: {e:#}")),
                     });
                     cx.notify();
