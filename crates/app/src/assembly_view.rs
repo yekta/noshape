@@ -737,7 +737,12 @@ impl AssemblyView {
                 .background_spawn(async move {
                     let mut ev = evaluator.lock();
                     ev.retain_tabs(&doc);
+                    // `NOSHAPE_PERF`: a.eval (evaluate after an edit), a.eval_catalog
+                    // (the Insert catalog), a.eval_apply (UI thread).
+                    let t = std::time::Instant::now();
                     let result = ev.evaluate(&doc, &asm, &opts, explode);
+                    noshape_render::perf::record("a.eval", t.elapsed());
+                    let tc = std::time::Instant::now();
                     let mut catalog = Catalog::default();
                     for t in doc.ordered_tabs() {
                         match &t.content {
@@ -760,6 +765,7 @@ impl AssemblyView {
                             _ => {}
                         }
                     }
+                    noshape_render::perf::record("a.eval_catalog", tc.elapsed());
                     (result, catalog)
                 })
                 .await;
@@ -768,7 +774,9 @@ impl AssemblyView {
                     return;
                 }
                 this.catalog = catalog;
+                let t = std::time::Instant::now();
                 this.apply_result(Arc::new(result), window, cx);
+                noshape_render::perf::record("a.eval_apply", t.elapsed());
             });
         }));
         cx.notify();

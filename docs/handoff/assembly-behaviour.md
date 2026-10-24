@@ -1179,6 +1179,8 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   The drag's "Move" edit re-evaluates them.
 - **Tests:** `chain_drag_follows_in_few_iterations` (exact tracking, ≤ 80 drag-phase iterations over 5 steps; it was
   111) and `drag_moves_only_its_group`.
+- **After an edit** (`a.eval` / `a.eval_apply` / `a.eval_catalog`, same NOSHAPE_PERF run): the 20-link chain re-evaluates in
+  19–33 ms after a drag's "Move" commit, and applying takes 10–11 ms; the Insert catalog takes < 0.3 ms.
 - **Insert:** live doesn't fix any inserted instance (ins-914: all three show the free glyph), and neither do we.
   qa4's open "? both inserted instances show the fixed icon" (core-workflow 6) doesn't reproduce:
   - two free instances fastened together show the free glyph on both (dof 6 each);
