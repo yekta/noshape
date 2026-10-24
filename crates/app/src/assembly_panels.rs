@@ -170,6 +170,8 @@ pub(crate) struct MirrorRow {
     pub placement: noshape_model::assembly::MirrorPlacement,
     /// Update has made the Derived instance's mirrored part.
     pub created: bool,
+    /// The part's detected mirror symmetry (live's Symmetry column), once known.
+    pub symmetric: Option<bool>,
 }
 
 pub(crate) struct ManipValue {
@@ -1052,13 +1054,14 @@ impl AssemblyView {
                 s.equal = *equal_spacing;
                 s.centered = *centered;
             }
-            PatternKind::Mirror { plane, handed, derived, placement } => {
+            PatternKind::Mirror { plane, handed, derived, placement, .. } => {
                 s.axis = Some(plane.clone());
                 for id in &s.seeds {
                     let row = MirrorRow {
                         derived: *handed || derived.contains(id),
                         placement: placement.iter().find(|(i, _)| i == id).map(|(_, p)| *p).unwrap_or_default(),
                         created: true,
+                        symmetric: None,
                     };
                     s.mirror_rows.insert(*id, row);
                 }
@@ -1105,11 +1108,24 @@ impl AssemblyView {
             PatternDialogKind::Circular => PatternKind::Circular { axis: s.axis.clone().ok_or("Select the axis of pattern")?, angle: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, centered: s.centered },
             PatternDialogKind::Mirror => {
                 let rows: Vec<(InstanceId, MirrorRow)> = s.seeds.iter().map(|id| (*id, s.mirror_rows.get(id).copied().unwrap_or_default())).collect();
+                let derived: Vec<InstanceId> = rows.iter().filter(|(_, r)| r.derived && r.created).map(|(id, _)| *id).collect();
+                // The Derived seeds' Part Studios and their "-Mirrored" ones (made by Update).
+                let doc = &self.doc.read(cx).session.doc;
+                let mut mirrored_studios = Vec::new();
+                for id in &derived {
+                    if let Some(InstanceSource::Part { studio, .. }) = asm.instance(*id).map(|i| &i.source)
+                        && let Some(m) = doc.mirrored_studio(*studio)
+                        && !mirrored_studios.contains(&(*studio, m))
+                    {
+                        mirrored_studios.push((*studio, m));
+                    }
+                }
                 PatternKind::Mirror {
                     plane: s.axis.clone().ok_or("Select the mirror plane (planar face or mate connector)")?,
                     handed: false,
-                    derived: rows.iter().filter(|(_, r)| r.derived && r.created).map(|(id, _)| *id).collect(),
+                    derived,
                     placement: rows.iter().filter(|(_, r)| r.placement != noshape_model::assembly::MirrorPlacement::Auto).map(|(id, r)| (*id, r.placement)).collect(),
+                    mirrored_studios,
                 }
             }
             PatternDialogKind::PartPattern => PatternKind::PartPattern { mate: s.mate.ok_or("The seed needs exactly one mate to follow (or select the mate in the list)")? },
@@ -1748,6 +1764,30 @@ impl AssemblyView {
     /// then the status and Update.
     fn render_mirror_strategy(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         use noshape_model::assembly::MirrorPlacement;
+        // The Symmetry column: each listed part's mirror symmetry, detected
+        // once (live: as soon as the instance is listed, no plane needed);
+        // a new row's Mirror action follows it (Non-symmetric -> Derived).
+        if let Some(seeds) = self.pattern.as_ref().filter(|p| p.kind == PatternDialogKind::Mirror && p.strategy_open).map(|p| p.seeds.clone()) {
+            let todo: Vec<InstanceId> = seeds.into_iter().filter(|id| self.pattern.as_ref().and_then(|p| p.mirror_rows.get(id)).is_none_or(|r| r.symmetric.is_none())).collect();
+            if !todo.is_empty()
+                && let Some(asm) = self.assembly(cx).cloned()
+                && let Some(mut ev) = self.evaluator.try_lock()
+            {
+                let doc = &self.doc.read(cx).session.doc;
+                let found: Vec<(InstanceId, bool)> = todo.iter().filter_map(|id| ev.instance_symmetric(doc, &asm, *id).map(|s| (*id, s))).collect();
+                drop(ev);
+                if let Some(p) = &mut self.pattern {
+                    for (id, sym) in found {
+                        let new = !p.mirror_rows.contains_key(&id);
+                        let r = p.mirror_rows.entry(id).or_default();
+                        r.symmetric = Some(sym);
+                        if new && !sym {
+                            r.derived = true;
+                        }
+                    }
+                }
+            }
+        }
         let s = self.pattern.as_ref().filter(|p| p.kind == PatternDialogKind::Mirror && p.strategy_open)?;
         let pal = p();
         let asm = self.assembly(cx)?;
@@ -1817,9 +1857,16 @@ impl AssemblyView {
                     .child(cell(0, true).justify_center().gap(px(4.)).child(crate::assets::icon("part", 16., cx)).child(inst.name.clone()))
                     // Live: the source workspace ("Main").
                     .child(cell(1, true).justify_center().gap(px(4.)).child(crate::assets::icon("branch", 14., cx)).child("Main"))
-                    // Live: the part's detected symmetry (UNCONFIRMED for
-                    // asymmetric parts: asked, REQUESTS "skb (10-23 15:30)").
-                    .child(cell(2, true).id(SharedString::from(format!("ms-sym-{k}"))).justify_center().tooltip(crate::ui::tooltip("Symmetric")).child(crate::assets::icon("symmetric", 18., cx)))
+                    // Live: the part's detected symmetry, "Symmetric" /
+                    // "Non-symmetric" (behaviours "skb (10-23 15:30)" (2)).
+                    .child({
+                        let sym = row.symmetric.unwrap_or(true);
+                        cell(2, true)
+                            .id(SharedString::from(format!("ms-sym-{k}")))
+                            .justify_center()
+                            .tooltip(crate::ui::tooltip(if sym { "Symmetric" } else { "Non-symmetric" }))
+                            .child(crate::assets::icon(if sym { "symmetric" } else { "asymmetric" }, 18., cx))
+                    })
                     .child(cell(3, false).child(div().w_full().child(action)))
                     .child(cell(4, true).child(reference))
                     .child(cell(5, !row.derived).when(!row.derived, |d| d.bg(rgb(0xffffff))).child(div().w_full().child(placement))),
@@ -1892,6 +1939,33 @@ impl AssemblyView {
                                 .when(pending > 0, |d| d.cursor_pointer())
                                 .child("Update")
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    // Live: Update makes (or reuses) each Derived
+                                    // part's "<Part Studio>-Mirrored" Part Studio.
+                                    let sources: Vec<TabId> = match (&this.pattern, this.assembly(cx)) {
+                                        (Some(p), Some(asm)) => p
+                                            .mirror_rows
+                                            .iter()
+                                            .filter(|(_, r)| r.derived && !r.created)
+                                            .filter_map(|(id, _)| match asm.instance(*id).map(|i| &i.source) {
+                                                Some(InstanceSource::Part { studio, .. }) => Some(*studio),
+                                                _ => None,
+                                            })
+                                            .collect(),
+                                        _ => Vec::new(),
+                                    };
+                                    let missing: Vec<TabId> = {
+                                        let doc = &this.doc.read(cx).session.doc;
+                                        sources.into_iter().filter(|s| doc.mirrored_studio(*s).is_none()).collect()
+                                    };
+                                    if !missing.is_empty() {
+                                        this.doc.update(cx, |d, cx| {
+                                            d.edit_document("Create mirrored Part Studio", cx, |doc| {
+                                                for s in &missing {
+                                                    doc.ensure_mirrored_studio(*s);
+                                                }
+                                            })
+                                        });
+                                    }
                                     if let Some(p) = &mut this.pattern {
                                         for r in p.mirror_rows.values_mut() {
                                             if r.derived {

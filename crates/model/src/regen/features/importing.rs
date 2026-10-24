@@ -181,8 +181,29 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     Ok(())
 }
 
-pub fn derived_mirror(_ev: &mut EvalCtx) -> FResult<()> {
-    err("Derived mirror is resolved by the application from the source Part Studio; it can't be evaluated here yet")
+/// Live's "Derived mirror" (the one feature of an assembly Mirror's
+/// "<Part Studio>-Mirrored" Part Studio, behaviours "skb (10-23 15:30)"): every
+/// part of the source mirrored, named "<part>-Mirrored". The mirror plane is
+/// the source's YZ plane (x -> -x; live's isn't captured, UNCONFIRMED); the
+/// parts keep the source's ids so the assembly maps a part to its mirror.
+pub fn derived_mirror(ev: &mut EvalCtx) -> FResult<()> {
+    let tab = ev.params.text("partStudio").trim().to_string();
+    let Some(provider) = ev.derived.clone() else {
+        return err("Derived parts are not available in this context");
+    };
+    let Some(src) = provider.context(&tab) else {
+        return err("Error regenerating.");
+    };
+    let mirror = k::Transform::Mirror(k::Plane::yz());
+    for b in src.bodies.iter().filter(|b| b.kind == BodyKind::Solid) {
+        let shape = b.shape.transformed(&mirror)?;
+        let name = format!("{}-Mirrored", provider.part_name(&tab, &b.id).unwrap_or_else(|| b.name.clone()));
+        let color = ev.ctx.alloc_color();
+        ev.ctx.own_names.insert(b.id.clone());
+        let body = crate::regen::context::Body::new(b.id.clone(), name, b.kind, shape, b.faces.clone(), color, ev.feature);
+        ev.ctx.bodies.push(std::sync::Arc::new(body));
+    }
+    Ok(())
 }
 
 /// Import of a CAD file. `blobData` holds either inline BRep text or an

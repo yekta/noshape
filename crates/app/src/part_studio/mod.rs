@@ -343,7 +343,7 @@ impl PartStudioView {
                     let is_vars = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::VariableStudio(_)));
                     // A changed Part Studio may be the source of our Derived features.
                     let is_source = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::PartStudio(_)))
-                        && this.studio(cx).is_some_and(|s| s.features.iter().any(|f| f.type_id == "importDerived" && f.params.text("partStudio") == t.to_string()));
+                        && this.studio(cx).is_some_and(|s| s.features.iter().any(|f| noshape_model::features::importing::is_derived(&f.type_id) && f.params.text("partStudio") == t.to_string()));
                     // A Feature Studio defining custom features used here.
                     let prefix = noshape_model::custom::type_id(*t, "");
                     let is_fs = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::FeatureStudio(_)));

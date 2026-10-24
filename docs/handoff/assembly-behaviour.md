@@ -1081,8 +1081,27 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
 ## Mirror strategy (skb 10-23, live "skb (10-23 14:30)")
 * `PatternKind::Mirror { derived, placement }` per seed (Derived → `MirroredPart`; `handed` kept for older
   documents = every seed Derived). App: `MirrorRow` per seed in `PatternSession`, `render_mirror_strategy`
-  (781 px table over the dialog), `mirror_pending` (button + title red until Update). Open: live's Update makes a
-  "<Part Studio>-Mirrored" tab (derived mirrored part): recipe asked ("skb (10-23 15:30)"); Placement type stored,
-  not applied; Symmetry always "Symmetric". GUI-checked on :103 (/root/skb-scratch/m45.png).
+  (781 px table over the dialog), `mirror_pending` (button + title red until Update). GUI-checked on :103
+  (/root/skb-scratch/m45.png).
+* Live's follow-up (behaviours "skb (10-23 15:30)"):
+  - Symmetry: `eval::part_symmetry` (part vs its mirror image about each bounding-box mid-plane, common volume to
+    1e-6), cached per regeneration; `AssemblyEvaluator::instance_symmetric` for the dialog (no plane needed),
+    `Prepared::mirror_symmetric` per seed. Column "Symmetric" / "Non-symmetric" (our own `asymmetric` glyph); a
+    newly listed Non-symmetric seed defaults to Derived.
+  - Transform placement (eval.rs Mirror follower): the world reflection completed by a part plane — Bounding box
+    XY / YZ / ZX through the bounds' centre, Origin XY / YZ / ZX through the part origin (live: an L mirrored in x
+    → diag(−1, 1, −1), XY types). Auto position: a symmetry plane of the part (the one across the mirror first),
+    else Bounding box XY (UNCONFIRMED beyond live's one asymmetric sample).
+  - Derived: Update calls `Document::ensure_mirrored_studio` — "<PS>-Mirrored" with one "Derived mirror" feature
+    (regen `importing::derived_mirror`: the source's solid parts mirrored in its YZ plane, "<part>-Mirrored",
+    same part ids; the plane is UNCONFIRMED) in the folder "Mirrored parts and assemblies" at the end of the tab
+    bar, reused afterwards and left when the Mirror is deleted. `PatternKind::Mirror::mirrored_studios` maps
+    source → mirrored studio; Derived copies are those parts (eval completes the reflection with the YZ plane).
+    `features::importing::is_derived` (importDerived + derivedMirror) gates the derived provider, cache keys and
+    source-change refreshes (the assembly evaluator regenerated "-Mirrored" without it: "Failed to resolve
+    instance."). Tests: model `mirror_placement_types_and_symmetry`, `derived_mirror_makes_one_mirrored_studio`;
+    ops `tests/derived_mirror.rs` (parts mirrored with the source's ids; the Derived copy's centre of mass is the
+    seed's reflected). GUI-checked on :103 (/root/skb-scratch/g3.png Non-symmetric → Derived, g5 Update →
+    "Part Studio 1-Mirrored" + folder at the end, g8 its Part Studio, h2 the copy).
 * Replicate / pattern fields carrying the error: `os::query_box_error` (pink, red border, grey label) and the
   error as the label tooltip (`os::query_box_tip`).
