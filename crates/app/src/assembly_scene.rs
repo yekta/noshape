@@ -109,6 +109,10 @@ pub struct AsmSceneOptions {
     pub ghost_tops: HashSet<noshape_model::assembly::InstanceId>,
     /// Section view planes (normal, d): geometry with dot(normal, p) > d is cut away.
     pub section: Vec<(DVec3, f64)>,
+    /// Instances the section planes don't cut (Section view › Items to exclude).
+    pub section_skip: HashSet<noshape_model::assembly::InstanceId>,
+    /// The section plane being edited (drawn selected, `Scene::clip_selected`).
+    pub section_selected: Option<usize>,
     /// Opacity of transparent instances (Isolate / Make transparent slider).
     pub dim_alpha: Option<f32>,
     /// Dimmed (transparent) instances stay pickable (Isolate › Select
@@ -225,6 +229,11 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                 scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&dots))).per_primitive_color().with_transform(t).unpickable().layer(2));
             }
         }
+        if opts.section_skip.contains(&o.top()) {
+            for i in &mut scene.instances[first_instance..] {
+                i.ignore_clip = true;
+            }
+        }
         // Onshape's lowest level of detail of the body occurrence: its
         // bounding box.
         bodies += 1;
@@ -243,6 +252,9 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     let clip = |(n, d): &(DVec3, f64)| noshape_render::ClipPlane::new(n.as_vec3(), *d as f32);
     scene.clip = opts.section.first().map(clip);
     scene.clip_extra = opts.section.iter().skip(1).map(clip).collect();
+    if let Some(slot) = opts.section_selected.and_then(|i| scene.clip_selected.get_mut(i)) {
+        *slot = true;
+    }
     AsmBuilt { scene, picks, static_instances }
 }
 

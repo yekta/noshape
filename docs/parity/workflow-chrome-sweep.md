@@ -108,3 +108,4 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 
 ## qa5 MEAS1 (2026-10-24)
 | MEAS1 / MS1 | Top row alone: ours "Area: 4000000000000.000 mm²" | live (behaviours "ui (10-23 a)", case e): nothing in the status bar; panel "No measurements available for current selection." Fixed on ready/ui 6f16c117 (not on main yet, c59c5af9); re-check when it lands | ui |
+| MEAS1 / MS1 (re-check 2026-10-24 07:20, main 78109ebc, target-lead 07:07) | Top row alone: nothing in the status bar (live case e) | ✅ fixed (ui) |
