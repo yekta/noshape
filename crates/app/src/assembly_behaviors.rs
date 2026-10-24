@@ -716,8 +716,7 @@ impl AssemblyView {
             cx.notify();
             return;
         }
-        let n = clip.instances.len();
-        let ids = self.edit_insert(&if n == 1 { format!("Paste {}", clip.instances[0].name) } else { format!("Paste {n} items") }, cx, |a| clip.paste(a, [0.0; 3])).unwrap_or_default();
+        let ids = self.edit_insert(&noshape_ops::assembly::paste_description(&clip), cx, |a| clip.paste(a, [0.0; 3])).unwrap_or_default();
         self.start_placing(ids, cx);
     }
 
@@ -875,8 +874,8 @@ impl AssemblyView {
         let tg = targets.clone();
         m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(tg.clone(), !hidden, cx)));
         let tg = targets.clone();
-        m.push(item("Hide other instances", move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
-        m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
+        m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
+        m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
         let tg = targets.clone();
         let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == targets);
         m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
@@ -1264,13 +1263,7 @@ impl AssemblyView {
             return;
         }
         let (instances, features) = (d.instances, d.features);
-        let Some(fid) = self.edit("Add selection to folder", cx, |a| {
-            let id = a.add_folder(&instances, &features);
-            if let Some(f) = a.folders.iter_mut().find(|f| f.id == id) {
-                f.name = name.clone();
-            }
-            id
-        }) else {
+        let Some(fid) = self.edit(noshape_ops::assembly::ADD_FOLDER_DESCRIPTION, cx, |a| noshape_ops::assembly::add_folder(a, &instances, &features, &name)) else {
             return;
         };
         if features.is_empty() {
@@ -1507,8 +1500,8 @@ impl AssemblyView {
             let (a1, a2, a3, a4, a5) = (insts.clone(), insts.clone(), insts.clone(), insts.clone(), insts.clone());
             let hidden = self.assembly(cx).is_some_and(|a| !insts.is_empty() && insts.iter().all(|i| a.instance(*i).is_some_and(|x| x.hidden)));
             m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(a1.clone(), !hidden, cx)));
-            m.push(item("Hide other instances", move |t, _, cx| t.hide_other_instances(a2.clone(), cx)));
-            m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
+            m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(a2.clone(), cx)));
+            m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
             m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, a3.clone(), cx)));
             m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, a4.clone(), cx)));
             let suppressed = self.assembly(cx).is_some_and(|a| !insts.is_empty() && insts.iter().all(|i| a.instance(*i).is_some_and(|x| x.suppressed)));
@@ -1558,7 +1551,7 @@ impl AssemblyView {
             t.edit("Delete folder", cx, |a| a.delete_folder(id));
         }));
         m.push(item("Unpack folder", move |t, _, cx| {
-            t.edit("Unpack folder", cx, |a| a.unpack_folder(id));
+            t.edit(noshape_ops::assembly::UNPACK_FOLDER_DESCRIPTION, cx, |a| a.unpack_folder(id));
         }));
         m
     }
@@ -1569,19 +1562,9 @@ impl AssemblyView {
     /// a named position (rigid), or unlock it (flexible).
     pub(super) fn set_sub_lock(&mut self, id: InstanceId, lock: SubassemblyLock, cx: &mut Context<Self>) {
         let name = self.assembly(cx).and_then(|a| a.instance(id).map(|i| i.name.clone())).unwrap_or_default();
-        self.message = Some((
-            false,
-            match &lock {
-                SubassemblyLock::Flexible => "Assembly is unlocked from named position.".to_string(),
-                SubassemblyLock::Current => format!("{name} locked at current position."),
-                SubassemblyLock::Named(n) => format!("{name} locked at named position {n}."),
-            },
-        ));
-        self.edit(&format!("Lock/follow position : {name}"), cx, |a| {
-            if let Some(i) = a.instance_mut(id) {
-                i.lock = lock;
-            }
-        });
+        let (desc, message) = noshape_ops::assembly::lock_description(&name, &lock);
+        self.message = Some((false, message));
+        self.edit(&desc, cx, |a| noshape_ops::assembly::set_lock(a, id, lock));
     }
 
     /// Structural edit touching several tabs, with the solved placements folded in.
@@ -1605,21 +1588,12 @@ impl AssemblyView {
     /// Move to new subassembly: a new Assembly tab holding the instances
     /// (and their mates), inserted here in their place.
     pub(super) fn move_to_new_subassembly(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
-        let ids: Vec<InstanceId> = self.assembly(cx).map(|a| ids.into_iter().filter(|id| a.generated_by(*id).is_none()).collect()).unwrap_or_default();
+        let ids: Vec<InstanceId> = self.assembly(cx).map(|a| noshape_ops::assembly::movable_to_subassembly(a, &ids)).unwrap_or_default();
         if ids.is_empty() {
             return;
         }
         let mut new_id = None;
-        self.edit_doc("Move to new subassembly", cx, |doc, tab| {
-            let name = noshape_model::assembly::ops::next_assembly_tab_name(doc);
-            let sub_tab = doc.add_tab(&name, TabContent::Assembly(Box::default()));
-            let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) else { return };
-            let (sub, sid) = parent.move_to_new_subassembly(&ids, sub_tab, &name);
-            new_id = Some(sid);
-            if let Some(t) = doc.tab_mut(sub_tab) {
-                t.content = TabContent::Assembly(Box::new(sub));
-            }
-        });
+        self.edit_doc(noshape_ops::assembly::MOVE_TO_NEW_SUBASSEMBLY, cx, |doc, tab| new_id = noshape_ops::assembly::move_to_new_subassembly(doc, tab, &ids));
         if let Some(id) = new_id {
             self.selected = vec![id];
             self.selected_mate = None;
@@ -1655,15 +1629,7 @@ impl AssemblyView {
     /// Create empty subassembly: a new, empty Assembly tab inserted here.
     pub(super) fn create_empty_subassembly(&mut self, cx: &mut Context<Self>) {
         let mut new_id = None;
-        self.edit_doc("Create empty subassembly", cx, |doc, tab| {
-            let name = noshape_model::assembly::ops::next_assembly_tab_name(doc);
-            let sub_tab = doc.add_tab(&name, TabContent::Assembly(Box::default()));
-            let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) else { return };
-            let id = InstanceId(parent.next_id());
-            let n = parent.next_instance_name(&name);
-            parent.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: sub_tab, config: Default::default() }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
-            new_id = Some(id);
-        });
+        self.edit_doc(noshape_ops::assembly::CREATE_EMPTY_SUBASSEMBLY, cx, |doc, tab| new_id = noshape_ops::assembly::create_empty_subassembly(doc, tab));
         if let Some(id) = new_id {
             self.selected = vec![id];
         }
@@ -1676,23 +1642,7 @@ impl AssemblyView {
             return;
         }
         let mut created = Vec::new();
-        self.edit_doc("Dissolve subassembly", cx, |doc, tab| {
-            for sid in &ids {
-                let Some(TabContent::Assembly(parent)) = doc.tab(tab).map(|t| &t.content) else { return };
-                let Some(InstanceSource::Assembly { assembly: sub_tab, .. }) = parent.instance(*sid).map(|i| i.source.clone()) else { continue };
-                let Some(TabContent::Assembly(sub)) = doc.tab(sub_tab).map(|t| t.content.clone()) else { continue };
-                if let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) {
-                    created.extend(parent.dissolve_subassembly(*sid, &sub));
-                }
-                let used_elsewhere = doc.tabs.iter().any(|t| match &t.content {
-                    TabContent::Assembly(a) => a.instances.iter().any(|i| matches!(i.source, InstanceSource::Assembly { assembly, .. } if assembly == sub_tab)),
-                    _ => false,
-                });
-                if !used_elsewhere && let Some(t) = doc.tab_mut(sub_tab) {
-                    t.content = TabContent::Assembly(Box::default());
-                }
-            }
-        });
+        self.edit_doc(noshape_ops::assembly::DISSOLVE_SUBASSEMBLY, cx, |doc, tab| created = noshape_ops::assembly::dissolve_subassemblies(doc, tab, &ids));
         self.selected = created;
     }
 

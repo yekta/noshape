@@ -428,20 +428,7 @@ impl Focusable for AssemblyView {
     }
 }
 
-/// Does assembly `tab` (transitively) contain assembly `target`?
-fn contains_assembly(doc: &Document, tab: TabId, target: TabId, depth: usize) -> bool {
-    if tab == target {
-        return true;
-    }
-    if depth > 16 {
-        return true;
-    }
-    let Some(TabContent::Assembly(a)) = doc.tab(tab).map(|t| &t.content) else { return false };
-    a.instances.iter().any(|i| match &i.source {
-        InstanceSource::Assembly { assembly, .. } => contains_assembly(doc, *assembly, target, depth + 1),
-        _ => false,
-    })
-}
+use noshape_ops::assembly::contains_assembly;
 
 impl AssemblyView {
     /// Create Drawing… of this assembly: the Insert view panel starts with the
@@ -1346,15 +1333,10 @@ impl AssemblyView {
     /// Insert › Sketches: a sketch of a Part Studio as an instance.
     fn insert_sketch(&mut self, studio: TabId, sketch: FeatureId, name: String, cx: &mut Context<Self>) {
         let config = self.ui.insert_config.get(&studio).cloned().unwrap_or_default();
-        if self.pick_replacement(InstanceSource::Sketch { studio, sketch, config }, name.clone(), cx) {
+        if self.pick_replacement(InstanceSource::Sketch { studio, sketch, config: config.clone() }, name.clone(), cx) {
             return;
         }
-        let id = self.edit_insert(&format!("Insert : {name}"), cx, |a| {
-            let id = InstanceId(a.next_id());
-            let n = a.next_instance_name(&name);
-            a.instances.push(Instance::new(id, n, InstanceSource::Sketch { studio, sketch, config: ConfigValues::default() }, Placement::default()));
-            id
-        });
+        let id = self.edit_insert(&format!("Insert : {name}"), cx, |a| noshape_ops::assembly::insert_sketch(a, studio, sketch, &name, config));
         if let Some(id) = id {
             self.start_placing(vec![id], cx);
         }
@@ -1512,13 +1494,7 @@ impl AssemblyView {
     /// Instance menu "Use best available tessellation" / "Use automatic
     /// tessellation setting" (the same slot, live assembly/110).
     pub(super) fn set_best_tessellation(&mut self, ids: Vec<InstanceId>, on: bool, cx: &mut Context<Self>) {
-        self.edit(if on { "Use best available tessellation" } else { "Use automatic tessellation setting" }, cx, |a| {
-            for id in &ids {
-                if let Some(i) = a.instance_mut(*id) {
-                    i.best_tessellation = on;
-                }
-            }
-        });
+        self.edit(noshape_ops::assembly::best_tessellation_description(on), cx, |a| noshape_ops::assembly::set_best_tessellation(a, &ids, on));
     }
 
     fn set_hidden(&mut self, ids: Vec<InstanceId>, hidden: bool, cx: &mut Context<Self>) {

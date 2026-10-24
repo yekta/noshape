@@ -1,0 +1,242 @@
+2 point circle centerline	2점 원 중심선
+2 point linear centerline	2점 선형 중심선
+2 point linear dimension	2점 선형 치수
+3 point angular dimension	3점 각도 치수
+3 point arc	3점 호
+3 point circle	3점 원
+3 point circle centerline	3점 원 중심선
+Acceleration	가속
+Aligned rectangle	정렬된 직사각형
+Aligned section view	정렬된 단면도
+Angular velocity	각속도
+Animate Mate	메이트 애니메이트
+Arc length dimension	호 길이 치수
+Assembly circular pattern	어셈블리 원형 패턴
+Assembly linear pattern	어셈블리 선형 패턴
+Assembly mirror	어셈블리 대칭 복사
+Auxiliary view	보조도
+Ball	볼
+Ball mate	볼 메이트
+Bearing	베어링
+Bezier	베지어
+Body draft	바디 구배
+Boolean	합치기
+Boundary condition	경계 조건
+Boundary surface	경계면
+Break view	갈라서 보기
+Bridging curve	브리징 곡선
+Broken-out section	단면도 구분
+Callout	설명선
+Center point arc	중심점 호
+Center point circle	중심점 원
+Center point rectangle	중심점 사각형
+Centermark	센터마크
+Chamfer	챔퍼
+Chamfer dimension	챔퍼 치수
+Circular pattern	원형 패턴
+Circumscribed polygon	외접 다각형
+Coincident	일치
+Commit	실행
+Commit all	모두 실행
+Composite curve	합성 곡선
+Composite part	합성 파트
+Concentric	동심
+Conic	원추형
+Constrained surface	구속된 면
+Construction	보조선
+Corner rectangle	코너 사각형
+Create Part Studio in context	컨텍스트 내에 Part Studio 생성
+Create generative	생성형 만들기
+Crop view	뷰 자르기
+Curve pattern	곡선 패턴
+Curved Text	곡선 텍스트
+Custom table	사용자 지정 테이블
+Cut list	절단 목록
+Cut list table	절단 목록 테이블
+Cylindrical	원통형
+Cylindrical mate	원통형 메이트
+Datum	기준
+Decal	데칼
+Delete face	면 삭제
+Delete part	파트 삭제
+Derived	파생됨
+Derived mirror	파생된 대칭 복사
+Detail view	상세 뷰
+Diameter dimension	지름 치수
+Dimension	치수
+Display states	표시 상태
+Draft	구배
+Driving mate selector	구동 메이트 선택기
+Edge	모서리
+Edge condition symbol	모서리 조건 기호
+Edge point	모서리 점
+Edge to edge centerline	모서리간 중심선
+Edit curve	곡선 편집
+Ellipse	타원
+Elliptical arc	타원형 호
+Enclose	둘러싸기
+End cap	엔드 캡
+Entity	요소
+Equal	같음
+Explode step	분해 단계
+Extend	연장
+Extend surface	경계 이동
+External thread	외부 나사산
+Extrude	돌출
+Face	면
+Face blend	면 블렌드
+Fastened	고정
+Fastened mate	고정 메이트
+Feature	피처
+Fill	채우기
+Fillet	필렛
+Fillet dimension	필렛 치수
+Fit spline	3D 스플라인 맞춤
+Fix	고정
+Flange	플랜지
+Force	힘
+Foreshorten dimension	단축 치수
+Format Studio	포맷 스튜디오
+Format painter	페인터 서식 지정
+Frame	프레임
+Frame trim	프레임 다듬기
+Gear relation	기어 릴레이션
+Geometric tolerance	기하 공차
+Group	그룹
+Gusset	거싯
+Hatch region	해치 영역
+Helix	나선
+Hide inspection item	검사 아이템 숨기기
+Hole	홀
+Hole table	홀 테이블
+Hole/thread callout	홀/나사산 설명선
+Horizontal	수평
+Import	가져오기
+Inscribed polygon	내접 다각형
+Insert	삽입
+Insert BOM	BOM 삽입
+Insert DXF or DWG	DWF 또는 DWG 삽입
+Insert image	이미지 삽입
+Insert view	뷰 삽입
+Inspection item	검사 아이템
+Internal feature	내부 피처
+Intersection	교차점
+Intersection curve	교차점 곡선
+Isocline	등경사선
+Isoparametric curve	아이소파라메트릭 곡선
+Item	아이템
+Line	선
+Line to line angular dimension	선간 각도 치수
+Line to line linear dimension	선간 선형 치수
+Linear pattern	선형 패턴
+Linear relation	선형 릴레이션
+Loft	로프트
+Mass	질량
+Mate	메이트
+Mate connector	메이트 커넥터
+Maximum dimension	최대 치수
+Maximum/minimum dimension	최대/최소 치수
+Mesh point	메쉬 점
+Midpoint	중간점
+Midpoint line	중심점 선
+Minimum dimension	최소 치수
+Mirror	대칭 복사
+Modify fillet	필렛 수정
+Moment	모멘트
+Move face	면 이동
+Mutual trim	공통 잘라내기
+New feature	새 피처
+Normal	직교
+Note	노트
+Offset	오프셋
+Offset curve	오프셋 곡선
+Offset surface	오프셋 면
+Ordinate dimension	세로좌표 치수
+Parallel	평행
+Parallel mate	평행 메이트
+Pattern	패턴
+Perpendicular	수직
+Pierce	피어스
+Pin slot	핀 슬롯
+Pin slot mate	핀 슬롯 메이트
+Planar	평면
+Planar mate	평면 메이트
+Plane	면
+Point	점
+Point to line linear dimension	점대선 선형 치수
+Pressure	압력
+Projected curve	투사된 곡선
+Projected view	투상도
+Query variable	쿼리 변수
+Rack and pinion relation	랙과 피니언 릴레이션
+Radial dimension	반지름 치수
+Refold	다시 접기
+Relation	릴레이션
+Replace face	면 교체
+Replace instance	부품 교체
+Replicate	복제
+Revision table	리비전 테이블
+Revolute	축회전하기
+Revolute mate	회전축 메이트
+Revolve	회전
+Rib	리브
+Rigid body	강체 바디
+Routing curve	경로 곡선
+Ruled surface	측정된 면
+Run generative	생성형 실행
+SMBend	벤드
+SMBendRelief	벤드 릴리프
+SMCorner	코너
+SMCornerBreak	코너 분리
+SMEndSheetMetal	금속 판재 모델 마감
+SMForm	형태
+SMHem	둘러싸기
+SMJoint	결합
+SMLoft	금속 판재 로프트
+SMMakeJoint	조인트 만들기
+SMRip	립
+SMStartSheetMetal	금속 판재 모델
+SMTab	탭
+Screw relation	스크류 릴레이션
+Section view	단면도
+Shell	쉘
+Show mates mode	메이트 모드 표시
+Simulation	시뮬레이션
+Sketch	스케치
+Sketch Curvature	곡률
+Sketch Flow	스케치 흐름
+Sketch point	스케치 점
+Slider	슬라이더
+Slider mate	슬라이더 메이트
+Slot	슬롯
+Snap mode	스냅 모드
+Spline	스플라인
+Spline control point	스플라인 제어점
+Spline handle	스플라인 핸들
+Split	분할
+Surface finish symbol	면 마감 기호
+Sweep	스윕
+Symmetric	대칭
+Table	테이블
+Tag	태그
+Tag profile	태그 프로파일
+Tangent	접선
+Tangent arc	접원호
+Tangent mate	접선 메이트
+Text	텍스트
+Thicken	두껍게 하기
+Transform	변형
+Trim	자르기
+Trim curve	곡선 잘라내기
+Unfold	펼치기
+Update	업데이트
+Update all references to latest versions	모든 참조를 최신 버전으로 업데이트
+Use	사용
+Variable	변수
+Vertex	꼭지점
+Vertical	수직
+Virtual sharp	가상 샤프
+Weld symbol	용접 기호
+Width	폭
+Width mate	폭 메이트
+Wrap	둘러싸기

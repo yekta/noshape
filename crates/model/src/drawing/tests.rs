@@ -2357,3 +2357,21 @@ fn drawing_fonts_are_lives_and_old_families_migrate() {
         assert_eq!((f.family.as_str(), f.bold), (new, true));
     }
 }
+
+/// Live asb 10-24 dual dimensions (3): a hole callout's dual block in one
+/// pair of brackets above (Top) or below (Bottom) the primary lines; each
+/// length's dual with its unit, at the dual precision.
+#[test]
+fn hole_callout_dual_block_like_onshape() {
+    use super::build::dual_block;
+    let prim = vec!["⌀.250 ↧ .472".to_string(), "⌴ ⌀.394 ↧ .197".to_string()];
+    let dual = vec!["⌀6.35 mm ↧ 12.00 mm".to_string(), "⌴ ⌀10.00 mm ↧ 5.00 mm".to_string()];
+    assert_eq!(dual_block(prim.clone(), dual.clone(), true), vec!["[⌀6.35 mm ↧ 12.00 mm", "⌴ ⌀10.00 mm ↧ 5.00 mm]", "⌀.250 ↧ .472", "⌴ ⌀.394 ↧ .197"]);
+    assert_eq!(dual_block(prim, dual, false)[2], "[⌀6.35 mm ↧ 12.00 mm");
+    let mut d = Drawing { units_mm: false, ..Default::default() };
+    d.props.trailing_zeros = true;
+    d.props.dual = DualDims { show: true, show_unit: true, precision: Some(2), ..Default::default() };
+    assert_eq!(super::format::dual_len(&d, &DimFormat::default(), 0.00635).as_deref(), Some("6.35 mm"));
+    assert_eq!(super::format::dual_len(&d, &DimFormat::default(), 0.012).as_deref(), Some("12.00 mm"));
+    assert_eq!(super::format::dual_len(&d, &DimFormat { dual: Some(false), ..Default::default() }, 0.012), None);
+}
