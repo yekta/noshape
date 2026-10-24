@@ -334,6 +334,7 @@ impl Topo {
         // (Parasolid keeps a sheet so; merged sheets can come in facing each
         // other's way, which would put a wall's material on the wrong side).
         let along = |f: &Shape, e: &Shape| f.edges().iter().find(|x| x.is_same(e)).map(|x| x.orientation());
+        // Each connected piece keeps the side most of its area already has.
         let mut seen = vec![false; faces.len()];
         for start in 0..faces.len() {
             if seen[start] {
@@ -341,6 +342,8 @@ impl Topo {
             }
             seen[start] = true;
             let mut queue = vec![start];
+            let mut piece = vec![start];
+            let mut flipped = vec![false; faces.len()];
             while let Some(a) = queue.pop() {
                 for (ei, fs) in edge_faces.iter().enumerate() {
                     let [x, y] = fs[..] else { continue };
@@ -351,9 +354,18 @@ impl Topo {
                     let (oa, ob) = (along(&faces[a], &edges[ei]), along(&faces[b], &edges[ei]));
                     if oa.is_some() && oa == ob {
                         faces[b] = faces[b].reversed().map_err(|e| fe(e.to_string()))?;
+                        flipped[b] = true;
                     }
                     seen[b] = true;
                     queue.push(b);
+                    piece.push(b);
+                }
+            }
+            let area = |f: &Shape| f.area().unwrap_or(0.0);
+            let (moved, total) = piece.iter().fold((0.0, 0.0), |(m, t), &f| (m + if flipped[f] { area(&faces[f]) } else { 0.0 }, t + area(&faces[f])));
+            if moved > total * 0.5 {
+                for &f in &piece {
+                    faces[f] = faces[f].reversed().map_err(|e| fe(e.to_string()))?;
                 }
             }
         }
@@ -1106,8 +1118,8 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     } else {
         k::fuse_all(&solids, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape
     };
-    // Coplanar walls (split by a rip) are one face.
-    let fused = if (0..topo.edges.len()).any(|e| coplanar_rip(&topo, e)) { k::unify_same_domain(&fused).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape } else { fused };
+    // Coplanar walls a rip joins are one face (other coplanar walls stay apart, live sm8).
+    let fused = if def.rips.iter().any(|&e| coplanar_rip(&topo, e)) { k::unify_same_domain(&fused).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape } else { fused };
     Ok(Built { part: fused, pieces, topo, wall_flats, strips })
 }
 
@@ -1744,7 +1756,7 @@ fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: 
             }
         }
         // Coplanar neighbours (a rip splitting a wall) lie where they are.
-        for e in (0..topo.edges.len()).filter(|&e| coplanar_rip(topo, e)) {
+        for e in def.rips.iter().copied().filter(|&e| coplanar_rip(topo, e)) {
             let faces = &topo.edge_faces[e];
             if !faces.contains(&(w1 as u32)) {
                 continue;
