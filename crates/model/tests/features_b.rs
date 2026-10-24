@@ -315,7 +315,7 @@ fn sheet_metal_extrude_l_bracket_volume() {
     let expected = depth * (flats * t + bend);
     let v = r.context.bodies[0].shape.volume().unwrap();
     assert!(near(v, expected, expected * 1e-6), "volume {v} vs {expected}");
-    assert!(near(v * 1e9, 3211.327_412_287_2, 1e-6), "live volume: {}", v * 1e9);
+    assert!(near(v * 1e9, 3_211.327_412_287_2, 1e-6), "live volume: {}", v * 1e9);
 }
 
 #[test]

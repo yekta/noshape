@@ -1313,8 +1313,8 @@ fn flat_pattern_view_shows_bend_lines_and_notes() {
     let g = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &ViewCache::new(), false);
     assert!(g.error.is_none(), "{:?}", g.error);
     assert_eq!(g.bends.len(), 1);
-    // The developed length: (50 - 5) + (30 - 5) + 90° × (3 + 0.45 × 2) mm.
-    let expected = 0.045 + 0.025 + std::f64::consts::FRAC_PI_2 * (0.003 + 0.45 * 0.002);
+    // The developed length, material outside the L (live's default): (50 - 3) + (30 - 3) + 90° × (3 + 0.45 × 2) mm.
+    let expected = 0.047 + 0.027 + std::f64::consts::FRAC_PI_2 * (0.003 + 0.45 * 0.002);
     let (w, h) = (g.max[0] - g.min[0], g.max[1] - g.min[1]);
     assert!((w.max(h) - expected).abs() < 1e-6 && (w.min(h) - 0.02).abs() < 1e-9, "{w} x {h}");
     let built = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry;

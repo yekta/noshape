@@ -199,7 +199,7 @@ fn l_bracket_flat_length() {
     // Live ("fs (10-23 05:00)"): material outside the L by default, the sketch is
     // the inner face, walls lose R each: flat 80.126106 x 20, 3211.3274122872 mm³.
     let expected = (mm(50.0) - rad) + (mm(30.0) - rad) + ba(PI / 2.0, rad, k, t);
-    assert!(near(volume(&r, 0) * 1e9, 3211.327_412_287_2, 1e-6), "volume {}", volume(&r, 0) * 1e9);
+    assert!(near(volume(&r, 0) * 1e9, 3_211.327_412_287_2, 1e-6), "volume {}", volume(&r, 0) * 1e9);
     let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!(near(bb.min.y, -t, 1e-7) && near(bb.max.x, mm(52.0), 1e-7), "material outside: {bb:?}");
     let fp = flat(&r, 0);
@@ -218,7 +218,7 @@ fn l_bracket_flat_length() {
     let mut s = extrude_model(&[(0.0, 0.0), (50.0, 0.0), (50.0, 30.0)]);
     s.ps.features.last_mut().unwrap().params.set("oppositeDirection", ParamValue::Bool(true));
     let r = s.ok();
-    assert!(near(volume(&r, 0) * 1e9, 3051.327_412_287_2, 1e-6), "volume {}", volume(&r, 0) * 1e9);
+    assert!(near(volume(&r, 0) * 1e9, 3_051.327_412_287_2, 1e-6), "volume {}", volume(&r, 0) * 1e9);
     let expected = (mm(50.0) - (rad + t)) + (mm(30.0) - (rad + t)) + ba(PI / 2.0, rad, k, t);
     let (len, _) = sorted_size(&flat(&r, 0));
     assert!(near(len, expected, 1e-7), "flat length {len} vs {expected}");
