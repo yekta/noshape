@@ -5075,7 +5075,7 @@ impl AssemblyView {
         let pal = p();
         let view = cx.entity();
         let perspective = self.viewport.read(cx).camera.projection == noshape_render::Projection::Perspective;
-        let show_mates = self.show_mates;
+        let section = self.ui.section.is_some();
         let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
         Button::new("asm-camera-menu")
             .custom(variant)
@@ -5091,6 +5091,8 @@ impl AssemblyView {
                     m = m.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| this.view(sv, cx))));
                 }
                 let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                // Live ("qa5 assembly camera menu", VC8): no "Show mates" here;
+                // Section view… ends the menu as in the Part Studio.
                 m.separator()
                     .item(crate::os_menu::OsMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx)))))
                     .separator()
@@ -5102,13 +5104,8 @@ impl AssemblyView {
                             })
                         })
                     }))
-                    .item(crate::os_menu::OsMenuItem::new("Show mates").checked(show_mates).on_click(move |_, _, cx| {
-                        v3.update(cx, |this, cx| {
-                            this.show_mates = !this.show_mates;
-                            this.refresh_scene(false, cx);
-                            cx.notify();
-                        })
-                    }))
+                    .separator()
+                    .item(crate::os_menu::OsMenuItem::new(if section { "Turn off section view" } else { "Section view…" }).icon_name("menu-section-view").on_click(move |_, w, cx| v3.update(cx, |this, cx| this.toggle_section(w, cx))))
             })
             .into_any_element()
     }

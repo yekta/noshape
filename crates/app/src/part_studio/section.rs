@@ -8,7 +8,7 @@
 //! plane removes it; the state can be saved in named views.
 
 use super::PartStudioView;
-use crate::theme::{p, with_alpha};
+use crate::theme::p;
 use glam::DVec3;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -84,6 +84,9 @@ impl PartStudioView {
     /// Push the planes and the excluded parts into the scene and rebuild.
     pub(super) fn apply_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.opts.section = self.ui.section.iter().map(|p| p.clip()).collect();
+        // Live part-studio/72-73: while the dialog is open its plane's cap is
+        // drawn selected (tan); after ✓ in the part color (74).
+        self.opts.section_selected = self.ui.section_dialog.as_ref().map(|d| d.active);
         self.opts.section_skip = match &self.ui.section_parts {
             Some((false, items)) => items.clone(),
             Some((true, items)) => self.display.bodies.iter().map(|b| b.id.clone()).filter(|b| !items.contains(b)).collect(),
@@ -267,9 +270,13 @@ impl PartStudioView {
                 .justify_center()
                 .text_size(px(12.))
                 .cursor_pointer()
-                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_1().border_color(pal.accent))
-                .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)))
+                .relative()
+                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM))
+                .when(!on, |d| d.text_color(pal.text))
                 .child(label)
+                // Live part-studio/70: a 2 px blue underline on the active tab, 1 px
+                // #d7d7d7 on the other, over the label's box (both labels on one baseline).
+                .child(div().absolute().left_0().right_0().bottom_0().h(px(if on { 2. } else { 1. })).bg(if on { pal.accent } else { gpui_kit::rgb(0xd7d7d7) }))
                 .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
                     if let Some(d) = &mut this.ui.section_dialog {
                         d.include = include;
@@ -284,11 +291,11 @@ impl PartStudioView {
             h_flex()
                 .id(id.clone())
                 .group("srow")
-                .h(px(23.))
+                .h(px(22.))
                 .px(px(6.))
                 .text_size(px(12.))
                 .text_color(pal.text)
-                .when(bold, |d| d.font_weight(FontWeight::SEMIBOLD))
+                .when(bold, |d| d.font_weight(FontWeight::BOLD))
                 .child(div().flex_1().truncate().child(label))
                 .child(
                     div()
@@ -308,13 +315,15 @@ impl PartStudioView {
             v_flex()
                 .id(id)
                 .flex_1()
-                .min_h(px(26.))
+                // Live part-studio/70-71: 27 px empty, 42 px with one chip.
+                .min_h(px(27.))
+                .when(empty, |d| d.justify_center())
                 .rounded(px(2.))
                 .border_1()
                 .border_color(if on { pal.accent } else { gpui_kit::rgb(0xd7d7d7) })
                 .bg(if on { gpui_kit::rgb(0xdef1fb) } else { gpui_kit::rgb(0xffffff) })
                 .cursor_pointer()
-                .child(div().px(px(6.)).when(empty, |d| d.py(px(5.)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(pal.text_muted).child(caption))
+                .child(div().px(px(6.)).when(empty, |d| d.text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(pal.text_muted).child(caption))
                 .children(rows)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(d) = &mut this.ui.section_dialog {
@@ -376,7 +385,8 @@ impl PartStudioView {
                 .occlude()
                 .child(crate::ui::panel_probe("ps-section"))
                 .absolute()
-                .top(px(0.))
+                // Live part-studio/71: 3 px below the graphics area's top, as feature dialogs.
+                .top(px(3.))
                 .left(px(0.))
                 .w(px(220.))
                 .bg(pal.dialog_bg)
@@ -416,13 +426,15 @@ impl PartStudioView {
                 )
                 .child(h_flex().child(tab("Exclude", !include, false, cx)).child(tab("Include", include, true, cx)))
                 .child(
+                    // Live part-studio/71: fields 3 px in, 7 px under the tabs,
+                    // 5 px apart; the plane button right after the field.
                     v_flex()
-                        .p(px(4.))
-                        .gap(px(6.))
+                        .px(px(3.))
+                        .pt(px(7.))
+                        .gap(px(5.))
                         .child(
                             h_flex()
                                 .items_start()
-                                .gap(px(4.))
                                 .child(planes_field)
                                 .child(
                                     // A plane through the model center, facing the view.
@@ -441,7 +453,7 @@ impl PartStudioView {
                                 ),
                         )
                         .child(items_field)
-                        .child(h_flex().justify_end().child(div().size(px(14.)).rounded_full().bg(with_alpha(pal.text, 0.55)).flex().items_center().justify_center().text_size(px(10.)).text_color(pal.dialog_bg).child("?"))),
+                        .child(h_flex().justify_end().mt(px(4.)).mb(px(2.)).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))),
                 )
                 .into_any_element(),
         )

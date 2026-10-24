@@ -39,3 +39,6 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/x01�
 | EXV3 triad | grey-outlined arrows with rings, no planar handles (x03z) | ✅ **fixed** |
 | EXV4 / EXV5 / NP1 / NP2 / MNU2 | fixed on main (code cites the qa5 IDs; NP1 Delete gated by np_editing, MNU2 separators around the driver item) | ✅ (code-verified; UI spot-check pending) |
 | EXV6 rollback pill | not re-checked (my drag made no step this run) | – |
+
+## Re-run pass 21 (qa5, 2026-10-23, main 40e23871)
+| EXV6 rollback pill | in code (assembly_panels.rs: 100 × 31 blue "Rollback bar" pill under the cursor, live 820); not re-dragged in the app | ✅ (code) |

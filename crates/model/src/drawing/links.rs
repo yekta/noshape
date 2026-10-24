@@ -191,7 +191,7 @@ impl Drawing {
             let mut v = src.view(*old).cloned().expect("listed above");
             // Its scale no longer follows a parent left behind (live: the
             // moved section kept its own scale).
-            if v.scale.is_none() && src.parent_of(*old).is_some() {
+            if v.scale.is_none() && !v.sheet_scale && src.parent_of(*old).is_some() {
                 v.scale = Some(super::views::view_scale(src, *old));
             }
             v.id = *new;

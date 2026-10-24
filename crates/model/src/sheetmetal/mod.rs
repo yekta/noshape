@@ -257,6 +257,10 @@ pub struct SheetMetalData {
     /// Default corner relief style id (SIMPLE, CLOSED, ...).
     pub corner_relief: String,
     pub flip_direction_up: bool,
+    /// Onshape's definition sheet is on the walls' back faces, so the flat is
+    /// seen from them (Thicken: the side away from the thickened faces; live
+    /// fs-smprobe-1 flattens a z 0..2 plate by (0, 0, -2 mm), its top up).
+    pub view_back: bool,
     pub walls: Vec<Wall>,
     pub bends: Vec<Bend>,
     pub rips: Vec<Rip>,
@@ -280,6 +284,7 @@ impl SheetMetalData {
             bend_relief_width_scale: 1.0625,
             corner_relief: "SIMPLE".into(),
             flip_direction_up: false,
+            view_back: false,
             walls: Vec::new(),
             bends: Vec::new(),
             rips: Vec::new(),

@@ -42,3 +42,7 @@ behaviours.md "Frame rate"), so fps numbers below are for the perf owner, not a 
 | Orbit (software rendering on both) | bracket 25.4 fps, big plate 1.3–1.5 fps (SwiftShader); WebGL context lost twice → "Onshape's WebGL rendering context has been lost. Refresh the browser…" | big plate: frame unchanged 0.75 s after mouse-up | – (not comparable) |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+
+## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app)
+| REG1 | times read "617ms" / "1.02s" (ui::regen_time_text), Regeneration times dialog as live | ✅ fixed |
+| PERF1 | not re-measured (debug build; perf's area) | perf |
