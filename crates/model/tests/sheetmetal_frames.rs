@@ -389,9 +389,9 @@ fn hem_straight_and_rolled() {
     let (len, _) = across_along(&fp);
     let expected = (mm(40.0) - (rad + t)) + ba(PI, rad, k, t) + (mm(10.0) - (rad + t));
     assert!(near(len, expected, 1e-7), "hem flat {len} vs {expected}");
-    // The hem folds back over the plate: total height = 2T + gap.
+    // The hem folds back over the plate: total height = 2T + gap (the box is padded by 1e-7).
     let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
-    assert!(near(bb.max.z, 2.0 * t + 2.0 * rad, 1e-7), "{bb:?}");
+    assert!(near(bb.max.z, 2.0 * t + 2.0 * rad, 1e-6), "{bb:?}");
 
     let mut s = plate();
     let r = s.ok();
@@ -439,10 +439,15 @@ fn bend_feature_keeps_flat_length() {
     });
     let r = s.ok();
     assert_eq!(r.context.bodies.len(), 1);
-    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap();
-    assert_eq!(data.walls.len(), 2);
-    assert_eq!(data.bends.len(), 1);
+    // One bend: inner radius 3, outer 5 (T 2).
+    let mut radii: Vec<f64> = r.context.bodies[0].shape.faces().iter().filter_map(|f| match f.face_surface().unwrap() {
+        noshape_kernel::Surface::Cylinder { radius, .. } => Some(radius),
+        _ => None,
+    }).collect();
+    radii.sort_by(f64::total_cmp);
+    assert!(radii.len() == 2 && near(radii[0], mm(3.0), 1e-9) && near(radii[1], mm(5.0), 1e-9), "{radii:?}");
     let fp = flat(&r, 0);
+    assert_eq!(fp.bend_lines.len(), 1);
     let (len, width) = sorted_size(&fp);
     assert!(near(len, mm(60.0), 1e-7), "bent plate flat {len}");
     assert!(near(width, mm(40.0), 1e-9));
