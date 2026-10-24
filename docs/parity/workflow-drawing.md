@@ -122,3 +122,4 @@ Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 
 |---|---|---|
 | D10 PDF | tab › Export… › PDF 1.5 Color: the isometric view is **lines** (not shaded); Detail A keeps its circle and the clipped content, "DETAIL A / SCALE 2:1" (pass23/d10pdf-1.png) | ✅ fixed (api) |
 | D12 DXF | Release 14: CIRCLE ×5, ELLIPSE ×2, MTEXT ×43, LINE, POLYLINE; layers VISIBLE, TITLE_BLOCK, BORDER_ZONES / BORDER_FRAME, DETAIL_VIEW_BORDER / DETAIL_VIEW_PARENT_BORDER, ANNOTATION_TEXT (R14 writes upper-case layer names, behaviours ~6165) | ✅ fixed (api) for this drawing; hatches, dimensions and tables not in it (not checked) |
+| D13 DRAWN name after reopening (pass 24, 2026-10-24) | d10 drawing: "ROOT" in DRAWN before and after closing and reopening the document | ✅ fixed |
