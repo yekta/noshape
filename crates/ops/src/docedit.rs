@@ -21,11 +21,8 @@ pub const TAB_KINDS: [(&str, &str); 6] = [
 ];
 
 /// Base name and empty content of a new tab of `kind` (see [`TAB_KINDS`]).
-/// Also takes the display names `document_info` prints ("Part Studio",
-/// any case or spacing; qa5 API2).
 pub fn new_tab_content(kind: &str) -> Option<(&'static str, TabContent)> {
-    let kind: String = kind.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_ascii_lowercase();
-    Some(match kind.as_str() {
+    Some(match kind {
         "partstudio" => ("Part Studio", TabContent::PartStudio(Default::default())),
         "assembly" => ("Assembly", TabContent::Assembly(Box::default())),
         "drawing" => ("Drawing", TabContent::Drawing(Default::default())),
@@ -125,16 +122,5 @@ mod fs_template_tests {
         let lines: Vec<&str> = super::FS_TEMPLATE.split('\n').collect();
         assert_eq!(lines.len(), 4, "{lines:?}");
         assert!(lines[2].is_empty() && lines[3].is_empty());
-    }
-
-    /// qa5 API2: the display names document_info prints work as kinds.
-    #[test]
-    fn tab_kind_accepts_display_names() {
-        for (id, name) in super::TAB_KINDS {
-            assert_eq!(super::new_tab_content(id).map(|c| c.0), Some(name));
-            assert_eq!(super::new_tab_content(name).map(|c| c.0), Some(name));
-            assert_eq!(super::new_tab_content(&name.to_uppercase()).map(|c| c.0), Some(name));
-        }
-        assert!(super::new_tab_content("sketch").is_none());
     }
 }

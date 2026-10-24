@@ -235,8 +235,6 @@ pub struct UiState {
     pub feature_drop: std::rc::Rc<std::cell::Cell<Option<(usize, bool)>>>,
     /// The open Hole dialog's parameters last time (its linked depths).
     pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
-    /// A new Thicken's operation at the last dialog change (canSetBooleanFlip).
-    pub thicken_prev_op: Option<(noshape_model::FeatureId, String)>,
     pub preview_tool_task: Option<Task<()>>,
     /// Measure graphics uploaded for a selection.
     pub measure_lines: Option<(Vec<Reference>, Option<noshape_render::Instance>)>,
@@ -436,7 +434,6 @@ impl UiState {
             preview_tool: None,
             feature_drop: Default::default(),
             hole_prev: None,
-            thicken_prev_op: None,
             preview_tool_task: None,
             measure_lines: None,
             dyn_suppression: None,
@@ -2175,18 +2172,33 @@ impl PartStudioView {
         acc
     }
 
-    /// What zoom to fit and the standard views frame: Onshape's `getFitBounds`
-    /// = the model node's bounds, which hold the visible planes (default
-    /// planes included) as well as parts and sketches.
+    /// What Zoom to fit and the standard views frame (Onshape, live "Zoom to
+    /// fit (perf 10-23 22:40)"): the visible parts and sketches, the origin
+    /// point when it is shown, and the visible planes (the default ones
+    /// span ±75 mm).
     pub(super) fn zoom_fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
+        let origin = self.opts.show_origin && self.display.show_origin;
+        self.fit_box(origin, |pl| self.opts.show_planes && !pl.hidden)
+    }
+
+    /// The camera a Part Studio opens with frames its parts and the default
+    /// planes' box, also when those are hidden (live, the same capture).
+    pub(super) fn load_fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
+        self.fit_box(true, |pl| matches!(pl.reference, noshape_model::reference::Reference::Plane(_)))
+    }
+
+    /// The parts and sketches ([`Self::fit_bounds`]), the origin point if
+    /// `origin`, and the planes `planes` takes.
+    fn fit_box(&self, origin: bool, planes: impl Fn(&noshape_model::display::PlaneDisplay) -> bool) -> Option<(glam::DVec3, glam::DVec3)> {
         let mut acc = self.fit_bounds();
-        if self.opts.show_planes {
-            for pl in self.display.planes.iter().filter(|p| !p.hidden) {
-                let f = &pl.frame;
-                for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
-                    let q = f.origin + f.x * (sx * pl.half_width) + f.y * (sy * pl.half_height);
-                    acc = Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))));
-                }
+        let mut add = |q: glam::DVec3| acc = Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))));
+        if origin {
+            add(glam::DVec3::ZERO);
+        }
+        for pl in self.display.planes.iter().filter(|p| planes(p)) {
+            let f = &pl.frame;
+            for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
+                add(f.origin + f.x * (sx * pl.half_width) + f.y * (sy * pl.half_height));
             }
         }
         acc
@@ -3003,7 +3015,7 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        if matches!(ty.as_str(), "deleteFace" | "moveFace" | "replaceFace" | "rib" | "mateConnector") {
+        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector" | "moveFace") {
             self.direct_edit_logic(&dialog, cx);
             return;
         }
@@ -3042,26 +3054,6 @@ impl PartStudioView {
             profiles.iter().find_map(host_of).into_iter().collect()
         };
         let mut changes: Vec<(&'static str, ParamValue)> = Vec::new();
-        // thickenEditLogic / canSetBooleanFlip: the user switching between a
-        // positive (New, Add) and a negative (Remove, Intersect) operation
-        // flips the wall, unless the flip, Thickness 2 or the merge scope was
-        // set by hand.
-        if ty == "thicken" {
-            let (id, t2_user) = {
-                let d = dialog.read(cx);
-                (d.feature.id, d.user_set.contains("thickness2"))
-            };
-            let prev = self.ui.thicken_prev_op.replace((id, op.clone()));
-            let negative = |o: &str| matches!(o, "REMOVE" | "INTERSECT");
-            if let Some((pid, old)) = prev
-                && pid == id
-                && op_user
-                && negative(&old) != negative(&op)
-                && !(flip_user || t2_user || scope_user)
-            {
-                changes.push(("oppositeDirection", ParamValue::Bool(!flipped)));
-            }
-        }
         // Extrude, revolve and sweep take their operation and merge scope
         // from the tool's collisions once the preview has them
         // (`boolean_edit_logic`); Thicken follows thickenEditLogic here.
@@ -3080,6 +3072,14 @@ impl PartStudioView {
         // picked the operation (live, qa5 EXT1: Remove fills "Part 1").
         if ty == "thicken" && !hosts.is_empty() && !scope_user && dialog.read(cx).feature.params.query("booleanScope").is_empty() {
             changes.push(("booleanScope", ParamValue::Query(hosts.iter().map(|b| Reference::Body(b.clone())).collect())));
+        }
+        // thickenEditLogic's canSetBooleanFlip: a user-picked Remove points
+        // the wall into the part, Add out of it.
+        if ty == "thicken" && op_user && !flip_user && !hosts.is_empty() && matches!(op.as_str(), "ADD" | "REMOVE") {
+            let into = op == "REMOVE";
+            if flipped != into {
+                changes.push(("oppositeDirection", ParamValue::Bool(into)));
+            }
         }
         if ty == "extrude" && !flip_user && !hosts.is_empty() {
             let into = matches!(op.as_str(), "REMOVE" | "INTERSECT");
@@ -3151,19 +3151,14 @@ impl PartStudioView {
                     changes.push(("healType", ParamValue::Enum("VOID".into())));
                 }
             }
-            // moveFaceEditingLogic: Translate's Direction is the first planar
-            // face to move until the user picks one.
+            // moveFaceEditingLogic: Translate moves along the first planar
+            // face moved.
             "moveFace" if params.is("moveFaceType", "TRANSLATE") && !user_set.contains("direction") => {
-                // Planar in the studio before the feature (the preview has
-                // already moved the face and renamed it).
-                let planar = |r: &Reference| {
-                    let Reference::Face(n) = r else { return false };
-                    ctx.is_some_and(|c| c.bodies.iter().any(|b| b.find_faces(n).first().and_then(|&fi| b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?.face_plane().ok()?).is_some()))
-                };
-                if let Some(f) = params.query("moveFaces").iter().find(|r| planar(r))
-                    && params.query("direction") != std::slice::from_ref(f)
+                let planar = params.query("moveFaces").iter().find(|r| ctx.is_some_and(|c| noshape_model::regen::measure::resolve_shapes(c, r).first().is_some_and(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(_)))))).cloned();
+                if let Some(f) = planar
+                    && params.query("direction").first() != Some(&f)
                 {
-                    changes.push(("direction", ParamValue::Query(vec![f.clone()])));
+                    changes.push(("direction", ParamValue::Query(vec![f])));
                 }
             }
             // Live L22: a new Rib's Parts holds the studio's parts.
@@ -3224,16 +3219,27 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        let (ty, id, user, scope) = {
+        let (ty, id, user, scope, flip_user, flipped, located) = {
             let d = dialog.read(cx);
-            (d.feature.type_id.clone(), d.feature.id, d.user_set.contains("scope"), d.feature.params.query("scope").to_vec())
+            let p = &d.feature.params;
+            (d.feature.type_id.clone(), d.feature.id, d.user_set.contains("scope"), p.query("scope").to_vec(), d.user_set.contains("oppositeDirection"), p.bool("oppositeDirection"), !p.query("locations").is_empty())
         };
-        if ty != "hole" || user {
+        if ty != "hole" || !located {
             return;
         }
-        let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
+        let Some((touched, behind)) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| (s.touched.clone(), s.touched_behind.clone())) else { return };
+        // holeScopeFlipHeuristics: more parts behind the locations than in
+        // front flips the hole (until the user sets the flip).
+        if !flip_user && !user && behind.len() > touched.len() {
+            dialog.update(cx, |d, cx| d.set_value_auto("oppositeDirection", ParamValue::Bool(!flipped), cx));
+            return;
+        }
+        if user {
+            return;
+        }
+        // The scope follows; a flip that reaches nothing clears it (live L57).
         let want: Vec<Reference> = touched.into_iter().map(Reference::Body).collect();
-        if want.is_empty() || want == scope {
+        if want == scope {
             return;
         }
         dialog.update(cx, |d, cx| d.set_value_auto("scope", ParamValue::Query(want), cx));

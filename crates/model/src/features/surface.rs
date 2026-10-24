@@ -44,7 +44,6 @@ pub fn fill() -> FeatureType {
             "Edge",
             vec![
                 ParamSpec::query("entities", "Edges", CURVES),
-                // fillSurface.fs: SHOW_LABEL ("Continuity [Position]").
                 ParamSpec::enum_("continuity", "Continuity", &[("G0", "Position"), ("G1", "Tangency"), ("G2", "Curvature")])
                     .hints(Hints::SHOW_LABEL | Hints::MATCH_LAST_ARRAY_ITEM),
                 ParamSpec::query("adjacentFaces", "Adjacent faces", QueryFilter::ANY_FACE).visible(|v| !v.is("continuity", "G0")),
@@ -98,7 +97,6 @@ fn bsurf_profiles(id: &'static str, label: &'static str, ids: [&'static str; 5])
         "Profile",
         vec![
             ParamSpec::query(entities, "Edges, curves and sketches", CURVES),
-            // bsurf.fs: SHOW_LABEL.
             ParamSpec::enum_(cond, "Boundary condition", LOFT_END_CONDITION).hints(Hints::SHOW_LABEL),
             ParamSpec::num(mag, "Magnitude", CLAMP_MAGNITUDE).visible(move |v| !v.is(cond, "DEFAULT")),
             ParamSpec::query(reference, "Faces", QueryFilter::ANY_FACE).visible(move |v| is_match_condition(v.enum_(cond))),

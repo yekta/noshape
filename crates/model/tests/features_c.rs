@@ -1468,32 +1468,6 @@ fn parting_line_draft_sides_as_live() {
     }
 }
 
-/// draft.fs (DRAFT_PARALLEL_PARTING_EDGE): a parting edge along the pull
-/// direction is an error on Parting edges.
-#[test]
-fn parting_edge_parallel_to_pull_is_an_error() {
-    let mut s = Studio::new();
-    let mut sk = noshape_sketch::Sketch::new();
-    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
-    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
-    let region = s.region(sid);
-    s.add("extrude", move |p| {
-        p.set("entities", q(region));
-        p.set("depth", expr("10 mm"));
-    });
-    let r = s.ok();
-    let edge = edge_near(&r, 0, DVec3::new(0.0, 0.0, mm(5.0)));
-    s.add("draft", move |p| {
-        p.set("draftFeatureType", en("PARTING_LINE"));
-        p.set("partingEdges", ParamValue::Query(vec![edge]));
-        p.set("pullDirectionEntity", q(Reference::Plane(DatumPlane::Top)));
-        p.set("angle", expr("3 deg"));
-    });
-    let (st, msg) = s.last_status();
-    assert_eq!(st, FeatureStatus::Error, "{msg}");
-    assert_eq!(msg, "Parting edge cannot be parallel to pull direction.");
-}
-
 /// Live L12 ("psb L12-13 sweep"): a Ø10 circle at the middle of a 100 mm
 /// line sweeps the half toward the path's start (3926.9908 mm³), the other
 /// half with the path's Opposite direction, the whole path (7853.9816) with

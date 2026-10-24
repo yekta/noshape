@@ -38,18 +38,18 @@ pub fn command() -> Command {
     cmd
 }
 
-fn print(v: &Value) {
-    emit(&format!("{}\n", serde_json::to_string_pretty(v).unwrap_or_default()));
-}
-
-/// Writes to stdout; a closed pipe (`noshape-cli … | head`) ends the
-/// process quietly instead of panicking (qa5 API1).
-fn emit(s: &str) {
+/// Write to stdout; a reader that went away (`| head`) ends the output
+/// quietly instead of a panic.
+fn emit(text: &str) {
     use std::io::Write;
     let mut out = std::io::stdout().lock();
-    if out.write_all(s.as_bytes()).and_then(|_| out.flush()).is_err() {
+    if out.write_all(text.as_bytes()).and_then(|_| out.flush()).is_err() {
         std::process::exit(0);
     }
+}
+
+fn print(v: &Value) {
+    emit(&format!("{}\n", serde_json::to_string_pretty(v).unwrap_or_default()));
 }
 
 fn output_json(out: &OpOutput) -> Value {

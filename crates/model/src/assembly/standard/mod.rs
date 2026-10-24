@@ -439,12 +439,14 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
     for (k, v) in s.dims.iter().filter(|(k, _)| !k.contains('@')) {
         f.params.set(k, mm(v * u));
     }
+    let mut chosen = s.dims.clone();
     for (k, v) in &s.dims {
         if let Some((name, cond)) = k.split_once('@')
             && let Some((param, option)) = cond.split_once('=')
             && spec.param(param) == option
         {
             f.params.set(name, mm(v * u));
+            chosen.insert(name.to_string(), *v);
         }
     }
     for (k, v) in &s.counts {
@@ -454,14 +456,25 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
         && let Some(len) = spec.length.as_deref().and_then(|l| c.length_m(l))
     {
         f.params.set("l", mm(len * 1e3));
+        // The chosen Thread length (where the shank face splits; live's
+        // askew head bolt).
+        if c.shape == Shape::Screw
+            && let Some(lt) = spec.length.as_deref().map(|l| c.thread_lengths(s, l)).and_then(|t| spec.params.get(THREAD_LENGTH).filter(|v| t.contains(*v)).cloned().or_else(|| t.first().cloned()))
+            && let Some(lt) = c.length_m(&lt)
+        {
+            f.params.set("lt", mm(lt * 1e3));
+        }
     }
     ps.features.push(f);
     // Explicit mate connectors with the primary axis out of the contact
     // face (mates oppose the Z axes): under the head pointing down the shank
     // (countersunk: flush with the top), nuts and washers on both faces.
     let mut tops = vec![0.0];
-    if !c.shape.has_length() {
-        tops.push(c.thickness(s) * u);
+    // Retaining rings (extruded symmetric about z = 0): live's one "Near"
+    // connector, mid-plane.
+    if !c.shape.has_length() && c.shape != Shape::RetainingRing {
+        // The chosen option's thickness (a washer's Outside diameter).
+        tops.push(c.shape.height_key().iter().find_map(|k| chosen.get(*k).copied()).unwrap_or(0.0) * u);
     }
     for (i, z) in tops.into_iter().enumerate() {
         let mut m = ps.new_feature("mateConnector", &units)?;

@@ -41,6 +41,7 @@
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 
+#include <algorithm>
 #include <fstream>
 #include <iterator>
 
@@ -338,46 +339,138 @@ void write_pvz(const OcShapeList& shapes, rust::Slice<const rust::String> names,
 // tessellation, placed, nodes within Parasolid's precision (1e-8 m) welded,
 // as mesh bodies (mesh_body.cpp): a compound per instance of its closed
 // solid and open pieces (a loft whose faces' meshes leave gaps). Metres.
-std::unique_ptr<OcShape> read_pvz(rust::Str path)
+namespace
+{
+// A .pvz file's instances (and the product tree's root name).
+std::vector<pvz::MeshInstance> pvz_instances(rust::Str path, std::string* root_name = nullptr)
 {
   const std::string p(path.data(), path.size());
   std::ifstream     in(p, std::ios::binary);
   if (!in)
     fail_io("could not open " + p);
   const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-  std::vector<pvz::MeshInstance> meshes;
   try
   {
-    meshes = pvz::read_meshes(bytes);
+    return pvz::read_meshes(bytes, root_name);
   }
   catch (const std::exception& e)
   {
     fail_io(std::string(e.what()) + " (" + p + ")");
   }
+  return {};
+}
+
+// An instance's mesh bodies (placed when `place`); null without triangles.
+TopoDS_Shape instance_shape(const pvz::MeshInstance& m, bool place)
+{
+  const std::array<double, 12> I{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
+  const auto&         T = place ? m.placement : I;
+  std::vector<gp_Pnt> nodes;
+  for (size_t i = 0; i + 2 < m.positions.size(); i += 3)
+  {
+    const double x = m.positions[i], y = m.positions[i + 1], z = m.positions[i + 2];
+    nodes.emplace_back(T[0] * x + T[1] * y + T[2] * z + T[3], T[4] * x + T[5] * y + T[6] * z + T[7], T[8] * x + T[9] * y + T[10] * z + T[11]);
+  }
+  std::vector<std::array<int, 3>> tris;
+  for (size_t i = 0; i + 2 < m.triangles.size(); i += 3)
+    tris.push_back({(int)m.triangles[i], (int)m.triangles[i + 1], (int)m.triangles[i + 2]});
+  if (tris.empty())
+    return {};
+  return mesh_compound(mesh_bodies(nodes, tris, 1e-8));
+}
+
+// The number Creo View appends to a part file ("Torus_56.ol" -> 56; -1 if none).
+long ol_number(const std::string& ol)
+{
+  const size_t dot = ol.rfind('.'), us = ol.rfind('_');
+  if (us == std::string::npos || dot == std::string::npos || dot <= us + 1)
+    return -1;
+  const std::string n = ol.substr(us + 1, dot - us - 1);
+  return n.find_first_not_of("0123456789") == std::string::npos ? std::atol(n.c_str()) : -1;
+}
+
+// The file's distinct parts (part files) in Onshape's order: by the part
+// file's number, highest first (live qa5 zip import: pvz-shapes' Cylinder_57,
+// Torus_56, Loft_55, Cone_54 come in as Cylinder, Torus, Cone + the Loft's
+// composite), each with its first instance.
+std::vector<const pvz::MeshInstance*> distinct_parts(const std::vector<pvz::MeshInstance>& all)
+{
+  std::vector<const pvz::MeshInstance*> parts;
+  for (const auto& m : all)
+    if (std::none_of(parts.begin(), parts.end(), [&](const pvz::MeshInstance* p) { return p->ol_file == m.ol_file; }))
+      parts.push_back(&m);
+  std::stable_sort(parts.begin(), parts.end(), [](const pvz::MeshInstance* a, const pvz::MeshInstance* b) { return ol_number(a->ol_file) > ol_number(b->ol_file); });
+  return parts;
+}
+} // namespace
+
+std::unique_ptr<OcShape> read_pvz(rust::Str path)
+{
+  const std::vector<pvz::MeshInstance> meshes = pvz_instances(path);
   BRep_Builder    b;
   TopoDS_Compound c;
   b.MakeCompound(c);
   int n = 0;
   for (const auto& m : meshes)
   {
-    const auto&         T = m.placement;
-    std::vector<gp_Pnt> nodes;
-    for (size_t i = 0; i + 2 < m.positions.size(); i += 3)
-    {
-      const double x = m.positions[i], y = m.positions[i + 1], z = m.positions[i + 2];
-      nodes.emplace_back(T[0] * x + T[1] * y + T[2] * z + T[3], T[4] * x + T[5] * y + T[6] * z + T[7], T[8] * x + T[9] * y + T[10] * z + T[11]);
-    }
-    std::vector<std::array<int, 3>> tris;
-    for (size_t i = 0; i + 2 < m.triangles.size(); i += 3)
-      tris.push_back({(int)m.triangles[i], (int)m.triangles[i + 1], (int)m.triangles[i + 2]});
-    if (tris.empty())
+    const TopoDS_Shape s = instance_shape(m, true);
+    if (s.IsNull())
       continue;
-    b.Add(c, mesh_compound(mesh_bodies(nodes, tris, 1e-8)));
+    b.Add(c, s);
     ++n;
   }
   if (n == 0)
-    fail_io("no meshes in " + p);
+    fail_io("no meshes in " + std::string(path.data(), path.size()));
   return wrap(c);
+}
+
+StepImport read_pvz_parts(rust::Str path)
+{
+  const std::vector<pvz::MeshInstance> all = pvz_instances(path);
+  StepImport out;
+  out.shapes = std::make_unique<OcShapeList>();
+  for (const pvz::MeshInstance* m : distinct_parts(all))
+  {
+    const TopoDS_Shape s = instance_shape(*m, false);
+    if (s.IsNull())
+      continue;
+    out.shapes->items.push_back(s);
+    out.names.push_back(rust::String(m->name));
+    for (int k = 0; k < 3; ++k)
+      out.colors.push_back(0);
+    out.has_color.push_back(false);
+    out.opacity.push_back(1);
+  }
+  if (out.shapes->items.empty())
+    fail_io("no meshes in " + std::string(path.data(), path.size()));
+  return out;
+}
+
+rust::Vec<PvzInstance> read_pvz_instances(rust::Str path)
+{
+  std::string                          root;
+  const std::vector<pvz::MeshInstance> all   = pvz_instances(path, &root);
+  const auto                           parts = distinct_parts(all);
+  rust::Vec<PvzInstance>               out;
+  // Index of each part among the parts read_pvz_parts returns (meshless ones dropped).
+  std::vector<std::string> kept;
+  for (const pvz::MeshInstance* p : parts)
+    if (!p->triangles.empty())
+      kept.push_back(p->ol_file);
+  for (const auto& m : all)
+  {
+    const auto it = std::find(kept.begin(), kept.end(), m.ol_file);
+    if (it == kept.end())
+      continue;
+    PvzInstance f;
+    f.part = (uint32_t)(it - kept.begin());
+    f.name = rust::String(m.name);
+    f.root = rust::String(root);
+    for (double v : m.placement)
+      f.transform.push_back(v);
+    out.push_back(std::move(f));
+  }
+  return out;
 }
 
 } // namespace noshape

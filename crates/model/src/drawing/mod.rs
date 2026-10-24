@@ -3408,6 +3408,7 @@ impl Drawing {
 pub mod build;
 pub mod clipboard;
 pub mod create;
+mod cad_dimstyles;
 pub mod cad_export;
 pub mod cad_fit;
 pub mod cad_layers;
