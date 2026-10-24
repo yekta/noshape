@@ -188,6 +188,20 @@ fn assembly_with_mates() {
     assert_eq!(list["dof"], 1, "{list}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Insert : Revolute 1");
+    // Edit it as the mate dialog does: limits, an offset, the secondary axis.
+    let e = call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "limits": { "rz": { "min": "-30 deg", "max": "45 deg" } }, "offset": { "z": "5 mm" }, "reorient_secondary": 1 }));
+    assert_eq!(e["mate"], m["mate"], "{e}");
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Edit : Revolute 1");
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let mj = list["mates"].as_array().unwrap().iter().find(|x| x["name"] == "Revolute 1").unwrap().clone();
+    assert_eq!(mj["limits"]["rz"], json!({ "min": "-30 deg", "max": "45 deg" }), "{mj}");
+    assert_eq!(mj["offset"]["z"], "5 mm", "{mj}");
+    assert_eq!(mj["reorient_secondary"], 1, "{mj}");
+    assert_eq!(mj["type"], "revolute", "the type kept: {mj}");
+    // Limits the mate type doesn't have are refused.
+    let err = try_call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "limits": { "x": { "min": "0 mm" } } })).unwrap_err();
+    assert_eq!(err.param.as_deref(), Some("limits"), "{err:?}");
 }
 
 /// A configured block: a List input sets the extrude depth, a Checkbox
@@ -485,7 +499,7 @@ fn block_with_hole(ctx: &mut Ctx, file: &str) {
 fn new_drawing_goes_out_of_date() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing-stale.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
     assert_eq!(g["out_of_date"], false, "{g}");
@@ -500,7 +514,7 @@ fn drawing_views_and_dimensions() {
     block_with_hole(&mut ctx, "drawing.noshape");
     let t = call(&mut ctx, "drawing_templates", json!({}));
     assert!(t["templates"].as_array().unwrap().iter().any(|r| r["name"] == "ISO A3"));
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     assert!(tab.ends_with("Drawing 1"), "{d}");
     let views = d["views"].as_array().unwrap();
@@ -979,7 +993,7 @@ fn assembly_named_positions_and_exploded_views() {
 fn drawing_section_detail_views_and_annotations() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_tools.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
     // The top view: it shows the hole as a circle.
@@ -1134,7 +1148,7 @@ fn variable_studio_table() {
 fn drawing_callouts_ordinates_and_datums() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_annot.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
     let (top, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().and_then(|es| es.iter().find(|e| e["type"] == "circle").map(|c| (v.clone(), c.clone())))).unwrap();
@@ -1238,7 +1252,7 @@ fn sketch_fillet_radius_default_is_r5_then_sticky() {
 fn drawing_jogged_and_aligned_sections() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_sections.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
     let (top, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().and_then(|es| es.iter().find(|e| e["type"] == "circle").map(|c| (v.clone(), c.clone())))).unwrap();
@@ -1263,7 +1277,7 @@ fn drawing_jogged_and_aligned_sections() {
 fn drawing_out_of_date_until_update() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_update.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     // A drawing edit stamps the state its views are made from.
     call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "A", "position": [30, 30] }));
@@ -1294,7 +1308,7 @@ fn drawing_out_of_date_until_update() {
 fn drawing_broken_out_sections_and_profile_crops() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_broken_out.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
     let views_of = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().clone();
@@ -1336,7 +1350,7 @@ fn drawing_broken_out_sections_and_profile_crops() {
 fn drawing_hatch_regions() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_hatch.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
@@ -1393,7 +1407,7 @@ export const partFaces = defineTable(function(context is Context, definition is 
 "#;
     call(&mut ctx, "featurestudio_edit", json!({ "source": src }));
     call(&mut ctx, "featurestudio_commit", json!({}));
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
     // By display name; the Part Studio the drawing shows.
@@ -1417,7 +1431,7 @@ export const partFaces = defineTable(function(context is Context, definition is 
 fn drawing_insert_image_and_cad() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_insert.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let hist = |ctx: &mut Ctx, n: usize| call(ctx, "history_list", json!({ "limit": n }))["history"].as_array().unwrap().iter().map(|h| h["description"].as_str().unwrap().to_string()).collect::<Vec<_>>();
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -1449,7 +1463,7 @@ fn drawing_insert_image_and_cad() {
 fn drawing_sketch_tools() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_sketch.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
     // A closed triangle: the last click lands on the first point (no new point).
@@ -1482,7 +1496,7 @@ fn drawing_sketch_tools() {
 fn drawing_format_painter_copies_content() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_painter.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let a = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "FROM", "position": [30, 30] }))["annotation"].clone();
     let b = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "TO", "position": [30, 60] }))["annotation"].clone();
@@ -1501,7 +1515,7 @@ fn drawing_format_painter_copies_content() {
 fn drawing_inspection_items() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_inspection.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
     let ids: Vec<Value> = ["A", "B", "C"].iter().enumerate().map(|(i, t)| call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": t, "position": [30, 30 + 15 * i] }))["annotation"].clone()).collect();
@@ -1541,7 +1555,7 @@ fn drawing_inspection_items() {
 fn drawing_properties_get_and_set() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_props.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let p = call(&mut ctx, "drawing_properties", json!({ "drawing": tab }))["properties"].clone();
     assert!(p["inspection_text_height"].is_number(), "{p}");
@@ -1561,7 +1575,7 @@ fn drawing_properties_get_and_set() {
 fn drawing_auxiliary_view_in_line_with_a_sketch_line() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_aux_inline.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let v = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"][0].clone();
     let (x0, y0, x1, y1) = (num(&v["bounds"]["min"][0]), num(&v["bounds"]["min"][1]), num(&v["bounds"]["max"][0]), num(&v["bounds"]["max"][1]));
@@ -1717,7 +1731,7 @@ fn export_store_file_in_a_new_tab() {
     assert!(file.is_file(), "{r}");
     assert!(order(&mut ctx).contains(&"stored.step".to_string()));
     // A drawing's export.
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let name = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().find(|t| t["id"] == tab.as_str() || t["name"] == tab.as_str()).unwrap()["name"].as_str().unwrap().to_string();
     call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "PDF", "options": "store" }));
@@ -1755,7 +1769,7 @@ fn rhino_export_round_trip() {
 fn drawing_export_formats_and_options() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "drawing_export_all.noshape");
-    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let head = |p: &std::path::Path, n: usize| std::fs::read(p).unwrap()[..n].to_vec();
     for (format, magic) in [("PNG", &[0x89u8, b'P', b'N', b'G'][..]), ("JPEG", &[0xffu8, 0xd8, 0xff][..]), ("TIFF", &[b'I', b'I', 42, 0][..])] {
@@ -1773,4 +1787,145 @@ fn drawing_export_formats_and_options() {
     let csv = scratch("insp.csv");
     call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "Inspection list", "file": csv.to_str().unwrap() }));
     assert!(!std::fs::read_to_string(&csv).unwrap().is_empty());
+}
+
+/// Context menus: Copy sketch → Paste sketch on another plane; Export as
+/// DXF/DWG… of a sketch and of a planar face; the Sketch dialog's Disable
+/// imprinting.
+#[test]
+fn sketch_paste_export_and_imprinting() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "sketch_paste.noshape");
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let src = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }));
+    let p = call(&mut ctx, "sketch_paste", json!({ "sketch": "Sketch 1", "plane": "plane:front" }));
+    assert!(last(&mut ctx).ends_with(":: Paste sketch"));
+    assert_eq!(p["entities"].as_array().unwrap().len(), src["entities"].as_array().unwrap().len(), "{p}");
+    assert_ne!(p["sketch"], src["sketch"], "a new sketch: {p}");
+    // Its plane is Front: the frame's normal is ±y.
+    let n = &p["frame"]["normal"];
+    assert!((num(&n[1]).abs() - 1.0).abs() < 1e-9, "{p}");
+    let dxf = scratch("sketch1.dxf");
+    let r = call(&mut ctx, "sketch_export", json!({ "sketch": "Sketch 1", "file": dxf.to_str().unwrap() }));
+    assert!(num(&r["curves"]) >= 5.0, "rectangle + circle: {r}");
+    assert!(std::fs::read_to_string(&dxf).unwrap().contains("LINE"));
+    let svg = scratch("sketch1.svg");
+    call(&mut ctx, "sketch_export", json!({ "sketch": "Sketch 1", "file": svg.to_str().unwrap(), "format": "svg" }));
+    assert!(std::fs::read_to_string(&svg).unwrap().contains("<svg"));
+    // A planar face of the part.
+    let faces = call(&mut ctx, "query_entities", json!({ "kind": "faces" }));
+    let top = faces["faces"].as_array().unwrap().iter().find(|f| f["surface"] == "plane" && num(&f["normal"][2]) > 0.99).unwrap()["id"].as_str().unwrap().to_string();
+    let fd = scratch("face.dxf");
+    let r = call(&mut ctx, "sketch_export", json!({ "face": top, "file": fd.to_str().unwrap() }));
+    assert!(num(&r["curves"]) >= 5.0, "outline + hole: {r}");
+    // Disable imprinting on a new sketch.
+    let s = call(&mut ctx, "sketch_create", json!({ "plane": "plane:right", "disable_imprinting": true }));
+    let f = call(&mut ctx, "feature_get", json!({ "feature": s["sketch"] }));
+    assert_eq!(f["params"]["disableImprinting"], true, "{f}");
+}
+
+#[test]
+fn feature_folders_dependencies_and_dynamic_suppression() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "feature_folders.noshape");
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let f = call(&mut ctx, "feature_add_folder", json!({ "features": ["Sketch 1", "Extrude 1"] }));
+    assert_eq!(f["name"], "New folder", "the dialog's default: {f}");
+    assert_eq!(f["features"].as_array().unwrap().len(), 2, "{f}");
+    assert!(last(&mut ctx).ends_with(":: Add folder"));
+    call(&mut ctx, "feature_rename_folder", json!({ "folder": "New folder", "name": "Base" }));
+    assert!(last(&mut ctx).ends_with(":: Rename folder : Base"));
+    let l = call(&mut ctx, "feature_list", json!({}));
+    assert_eq!(l["folders"][0]["name"], "Base", "{l}");
+    let d = call(&mut ctx, "feature_dependencies", json!({ "feature": "Extrude 1" }));
+    assert_eq!(d["parents"][0]["name"], "Sketch 1", "{d}");
+    assert!(d["children"].as_array().unwrap().is_empty(), "{d}");
+    let d = call(&mut ctx, "feature_dependencies", json!({ "feature": "Sketch 1" }));
+    assert_eq!(d["children"][0]["name"], "Extrude 1", "{d}");
+    call(&mut ctx, "feature_unpack_folder", json!({ "folder": "Base" }));
+    assert!(last(&mut ctx).ends_with(":: Remove folder"));
+    assert!(call(&mut ctx, "feature_list", json!({}))["folders"].as_array().unwrap().is_empty());
+    assert_eq!(try_call(&mut ctx, "feature_unpack_folder", json!({ "folder": "Base" })).unwrap_err().param.as_deref(), Some("folder"));
+    // An empty folder (the list header's New folder).
+    let e = call(&mut ctx, "feature_add_folder", json!({ "name": "Later" }));
+    assert!(e["features"].as_array().unwrap().is_empty(), "{e}");
+    // Dynamic suppression: suppressed while the expression is false.
+    call(&mut ctx, "feature_dynamic_suppression", json!({ "feature": "Extrude 1", "unsuppressed_if": "2 mm < 1 mm" }));
+    assert!(last(&mut ctx).ends_with(":: Dynamic suppression"));
+    let g = call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" }));
+    assert_eq!(g["suppression_expression"], "2 mm < 1 mm", "{g}");
+    assert!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().is_empty(), "Extrude 1 is suppressed");
+    // Unsuppress drops the expression (the menu's Unsuppress).
+    call(&mut ctx, "feature_suppress", json!({ "features": ["Extrude 1"], "suppressed": false }));
+    let g = call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" }));
+    assert!(g.get("suppression_expression").is_none(), "{g}");
+    assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn create_drawing_dialog_options() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "create_drawing_options.noshape");
+    // The dialog's defaults: ANSI_A_INCH.dwt, No views.
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1" }));
+    assert_eq!(d["drawing"], "Part Studio 1 Drawing 1", "{d}");
+    assert!((num(&d["size_mm"][0]) - 279.4).abs() < 0.01 && (num(&d["size_mm"][1]) - 215.9).abs() < 0.01, "ANSI A: {d}");
+    assert!(d["views"].as_array().unwrap().is_empty(), "No views: {d}");
+    // Custom template: ISO A4 Portrait.
+    let c = call(&mut ctx, "drawing_create", json!({ "custom_template": { "standard": "ISO", "size": "A4 Portrait", "projection": "third_angle", "title_block": false, "language": "German" } }));
+    assert!((num(&c["size_mm"][0]) - 210.0).abs() < 0.01 && (num(&c["size_mm"][1]) - 297.0).abs() < 0.01, "{c}");
+    let e = try_call(&mut ctx, "drawing_create", json!({ "custom_template": { "standard": "ISO", "size": "B" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("custom_template.size"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_create", json!({ "custom_template": { "horizontal_zones": 3 } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("custom_template.horizontal_zones"), "{e:?}");
+    // Create Drawing of Sketch 1.
+    let s = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "sketch": "Sketch 1", "suggested_views": true }));
+    assert_eq!(s["drawing"], "Sketch 1 Drawing 1", "{s}");
+    assert!(!s["views"].as_array().unwrap().is_empty(), "{s}");
+    assert_eq!(try_call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "sketch": "Extrude 1" })).unwrap_err().param.as_deref(), Some("sketch"));
+}
+
+/// Live's raster and SVG files (behaviours "api (10-24) drawing raster
+/// export"): 300 px per inch of sheet, opaque white RGB, two colours, all
+/// black; PNG pHYs 3937 px/m, JPEG 4:2:0 at 100 dpi, TIFF uncompressed;
+/// SVG text as outlines.
+#[test]
+fn drawing_raster_export_matches_live() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "raster-export.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI_A_INCH.dwt", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "RASTER TEST NOTE 123", "position": [40, 40] }));
+    let files: Vec<std::path::PathBuf> = ["png", "jpg", "tif", "svg"].iter().map(|e| scratch(&format!("raster.{e}"))).collect();
+    let path = |ext: &str| files.iter().find(|f| f.extension().is_some_and(|x| x == ext)).unwrap().clone();
+    for (format, ext) in [("PNG", "png"), ("JPEG", "jpg"), ("TIFF", "tif"), ("SVG", "svg")] {
+        call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": format, "file": path(ext).to_str().unwrap() }));
+    }
+    let png = std::fs::read(path("png")).unwrap();
+    let mut r = png::Decoder::new(std::io::Cursor::new(&png)).read_info().unwrap();
+    let info = r.info().clone();
+    assert_eq!((info.width, info.height), (3300, 2550), "ANSI A at 300 px/in");
+    assert_eq!(info.color_type, png::ColorType::Rgb, "no alpha");
+    assert_eq!(info.pixel_dims.map(|p| (p.xppu, p.yppu)), Some((3937, 3937)));
+    let mut buf = vec![0; r.output_buffer_size().unwrap()];
+    r.next_frame(&mut buf).unwrap();
+    let colours: std::collections::HashSet<[u8; 3]> = buf.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
+    assert_eq!(colours, [[255, 255, 255], [0, 0, 0]].into_iter().collect(), "white and black only (no antialiasing, no colour)");
+    let jpg = std::fs::read(path("jpg")).unwrap();
+    // JFIF APP0: units 1 (inch), density 100 x 100.
+    assert_eq!(&jpg[6..11], b"JFIF\0");
+    assert_eq!(&jpg[13..18], &[1, 0, 100, 0, 100]);
+    // Baseline SOF0: Y sampled 2 x 2, Cb and Cr 1 x 1 (4:2:0).
+    let sof = jpg.windows(2).position(|w| w == [0xFF, 0xC0]).unwrap();
+    assert_eq!((jpg[sof + 11], jpg[sof + 14], jpg[sof + 17]), (0x22, 0x11, 0x11));
+    let tif = std::fs::read(path("tif")).unwrap();
+    assert!(tif.len() >= 3300 * 2550 * 3, "uncompressed RGB: {}", tif.len());
+    let svg = std::fs::read_to_string(path("svg")).unwrap();
+    assert!(!svg.contains("<text"), "text as outlines");
+    for attr in ["stroke=\"#", "fill=\"#"] {
+        for (i, _) in svg.match_indices(attr) {
+            let c = &svg[i + attr.len()..i + attr.len() + 6];
+            assert!(c.eq_ignore_ascii_case("000000") || c.eq_ignore_ascii_case("ffffff"), "all black: {attr}{c}");
+        }
+    }
 }

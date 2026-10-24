@@ -17,6 +17,10 @@ pub struct DimText {
     pub below: Option<String>,
     /// Inspection dimension: an oval frame.
     pub oval: bool,
+    /// The dual value, bracketed ("[2.36 in]"), and whether it goes below
+    /// the primary (Dual › Dimension location Bottom) rather than above.
+    pub dual: Option<String>,
+    pub dual_below: bool,
 }
 
 impl DimText {
@@ -208,7 +212,8 @@ pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, sym
     let mut t = DimText { main: value_text(value), ..Default::default() };
     match &f.tolerance {
         Tolerance::None => {}
-        Tolerance::Symmetric { value: tol } => t.main = format!("{}{symbol}{} ±{}{units}{}", f.prefix, num(value), tol_num(tol.abs()), f.suffix),
+        // Live "60±0.1": no space before ±.
+        Tolerance::Symmetric { value: tol } => t.main = format!("{}{symbol}{}±{}{units}{}", f.prefix, num(value), tol_num(tol.abs()), f.suffix),
         Tolerance::Deviation { upper, lower } => {
             t.upper = Some(signed(tol_num(*upper)));
             t.lower = Some(signed(tol_num(*lower)));
@@ -274,7 +279,30 @@ pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, sym
     t.above = (!f.above.is_empty()).then(|| f.above.clone());
     t.below = (!f.below.is_empty()).then(|| f.below.clone());
     t.oval = f.inspection_frame;
+    t.dual = dual_text(drawing, f, value, angular);
+    t.dual_below = p.dual.dim_location == super::DualLocation::Bottom;
     t
+}
+
+/// The bracketed dual value of a dimension (live asb 10-24 dual
+/// dimensions): "[2.36 in]", "[2.36±0.004 in]" (the dual tolerance
+/// precision, zeros kept), "[2.36]" without Show dual unit. No Ø / R,
+/// prefix, suffix or fit class; angular dimensions have none. The
+/// palette's Single unit / Dual unit override the drawing's setting.
+fn dual_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool) -> Option<String> {
+    let p = &drawing.props;
+    if angular || !f.dual.unwrap_or(p.dual.show) {
+        return None;
+    }
+    let du = p.dual.units_for(!length_units(drawing, f).imperial());
+    // Unset: live's 0.123 / 0.123.
+    let v = unit_number(drawing, value, du, Some(p.dual.precision.unwrap_or(3)), None, false);
+    let tol = match &f.tolerance {
+        Tolerance::Symmetric { value: t } => format!("±{:.*}", p.dual.tolerance_precision.unwrap_or(3) as usize, t.abs() / du.meters()),
+        _ => String::new(),
+    };
+    let unit = if p.dual.show_unit && !du.symbol().is_empty() { format!(" {}", du.symbol()) } else { String::new() };
+    Some(format!("[{v}{tol}{unit}]"))
 }
 
 // ------------------------------------------------------------ property fields
@@ -615,7 +643,7 @@ mod tests {
         let f = DimFormat { precision: Some(3), ..Default::default() };
         assert_eq!(dim_text(&d, &f, 0.0125, false, "Ø").main, "Ø12.500");
         let f = DimFormat { tolerance: Tolerance::Symmetric { value: 0.00005 }, precision: Some(2), ..Default::default() };
-        assert_eq!(dim_text(&d, &f, 0.01, false, "").main, "10.00 ±0.05");
+        assert_eq!(dim_text(&d, &f, 0.01, false, "").main, "10.00±0.05");
         let f = DimFormat { tolerance: Tolerance::Deviation { upper: 0.0001, lower: -0.00005 }, ..Default::default() };
         let t = dim_text(&d, &f, 0.01, false, "");
         assert_eq!((t.main.as_str(), t.upper.as_deref(), t.lower.as_deref()), ("10", Some("+0.1"), Some("-0.05")));
@@ -668,5 +696,29 @@ mod tests {
         let t = dim_text(&d, &fit(FitMode::ToleranceOnly, FitStacking::WithoutLine), 0.010, false, "");
         assert_eq!(t.main, "10");
         assert!(t.upper.is_some() && t.lower.is_some());
+    }
+
+    /// Live asb 10-24 dual dimensions (mm drawing, dual inches 0.12 /
+    /// tolerance 0.123): "[2.36 in]" over "60"; ±0.1 → "[2.36±0.004 in]";
+    /// no Ø / R in the dual; none on angular dimensions; Show dual unit off
+    /// drops " in"; the palette's Single unit / Dual unit win.
+    #[test]
+    fn dual_dimensions_like_onshape() {
+        let mut d = Drawing { units_mm: true, ..Default::default() };
+        d.props.dual = super::super::DualDims { show: true, show_unit: true, precision: Some(2), ..Default::default() };
+        let f = DimFormat::default();
+        let t = dim_text(&d, &f, 0.060, false, "");
+        assert_eq!((t.main.as_str(), t.dual.as_deref(), t.dual_below), ("60", Some("[2.36 in]"), false));
+        let f = DimFormat { tolerance: Tolerance::Symmetric { value: 0.0001 }, ..Default::default() };
+        assert_eq!(dim_text(&d, &f, 0.060, false, "").dual.as_deref(), Some("[2.36±0.004 in]"));
+        assert_eq!(dim_text(&d, &DimFormat::default(), 0.010, false, "Ø").dual.as_deref(), Some("[0.39 in]"));
+        assert_eq!(dim_text(&d, &DimFormat::default(), 135f64.to_radians(), true, "").dual, None);
+        d.props.dual.show_unit = false;
+        d.props.dual.dim_location = super::super::DualLocation::Bottom;
+        let t = dim_text(&d, &DimFormat::default(), 0.060, false, "");
+        assert_eq!((t.dual.as_deref(), t.dual_below), (Some("[2.36]"), true));
+        assert_eq!(dim_text(&d, &DimFormat { dual: Some(false), ..Default::default() }, 0.060, false, "").dual, None);
+        d.props.dual.show = false;
+        assert_eq!(dim_text(&d, &DimFormat { dual: Some(true), ..Default::default() }, 0.060, false, "").dual.as_deref(), Some("[2.36]"));
     }
 }

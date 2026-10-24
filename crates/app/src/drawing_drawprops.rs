@@ -535,8 +535,8 @@ impl DrawingEditor {
                 .child(row("Dimension location", select("dp-dual-dloc", props.dual.dim_location.name().into(), noshape_model::drawing::DualLocation::ALL.iter().map(|&l| (l.name().to_string(), l == props.dual.dim_location, std::rc::Rc::new(move |p: &mut DrawingProps| p.dual.dim_location = l) as Act)).collect())))
                 .child(row("Hole/thread callout location", select("dp-dual-hloc", props.dual.hole_location.name().into(), noshape_model::drawing::DualLocation::ALL.iter().map(|&l| (l.name().to_string(), l == props.dual.hole_location, std::rc::Rc::new(move |p: &mut DrawingProps| p.dual.hole_location = l) as Act)).collect())))
                 .child(row("Units", select("dp-dual-units", props.dual.units_for(self.drawing.units_mm).name().into(), DimUnits::ALL.iter().map(|&u| (u.name().to_string(), u == props.dual.units_for(self.drawing.units_mm), std::rc::Rc::new(move |p: &mut DrawingProps| p.dual.units = Some(u)) as Act)).collect())))
-                .child(row("Precision", select("dp-dual-prec", shown(props.dual.precision, 2), precision_items(props.dual.precision, 6, |p, v| p.dual.precision = v))))
-                .child(row("Tolerance precision", select("dp-dual-tprec", shown(props.dual.tolerance_precision, 2), precision_items(props.dual.tolerance_precision, 6, |p, v| p.dual.tolerance_precision = v))))
+                .child(row("Precision", select("dp-dual-prec", shown(props.dual.precision, 3), precision_items(props.dual.precision, 6, |p, v| p.dual.precision = v))))
+                .child(row("Tolerance precision", select("dp-dual-tprec", shown(props.dual.tolerance_precision, 3), precision_items(props.dual.tolerance_precision, 6, |p, v| p.dual.tolerance_precision = v))))
                 .child(section("Leading and trailing zeros"))
                 .child(check("dp-lz", "Length leading zeros", props.leading_zeros, |p, v| p.leading_zeros = v, cx))
                 .child(check("dp-tz", "Length trailing zeros", props.trailing_zeros, |p, v| p.trailing_zeros = v, cx))
@@ -912,7 +912,7 @@ impl DrawingEditor {
         let ed = cx.entity();
         let locked = self.drawing.props.locked;
         let dwt = Button::new("dp-dwt").ghost().small().w(px(25.)).h(px(25.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
-            for row in crate::drawing_create::template_rows() {
+            for row in noshape_ops::drawing::template_rows() {
                 let e = ed.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(row.file).on_click(move |_, _, cx| {
                     e.update(cx, |t, cx| {
