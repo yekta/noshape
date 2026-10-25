@@ -85,7 +85,7 @@ impl PartStudioView {
             input,
             move |edited, _, cx| {
                 let _ = view.update(cx, |this, cx| {
-                    this.edit_config("Edit visibility conditions", cx, |ps| {
+                    this.edit_config(noshape_ops::config::EDIT_VISIBILITY, cx, |ps| {
                         for i in &mut ps.configuration.inputs {
                             if let Some(e) = edited.inputs.iter().find(|e| e.id == i.id) {
                                 i.visible_when = e.visible_when.clone();

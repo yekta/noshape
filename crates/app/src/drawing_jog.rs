@@ -6,7 +6,7 @@
 
 use crate::drawing_view::*;
 use noshape_model::drawing::sheet::LinearFrame;
-use noshape_model::drawing::{Annotation, AnnotationKind, ExtJog};
+use noshape_model::drawing::{Annotation, AnnotationKind};
 
 impl DrawingEditor {
     /// A linear dimension's geometry on the sheet (resolved positions).
@@ -43,30 +43,11 @@ impl DrawingEditor {
         }));
         if let Some(k) = self.extension_line_at(&a) {
             if a.jogs[k].is_some() {
-                out.push(MenuEntry::item("Remove jog", move |t, _, cx| t.edit_sheet("Remove jog", cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.jogs[k] = None))));
+                out.push(MenuEntry::item("Remove jog", move |t, _, cx| t.edit_sheet("Remove jog", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_jog(s, id, k))));
             } else {
-                // Live drawing/331–340: a 45° diagonal 0.44 in (11.2 mm)
-                // outward, centered on the line; a line shorter than about
-                // 44.7 mm first moves the dimension line away from the part.
                 let f = self.dimension_frame(&a)?;
-                let along = |p: [f64; 2]| p[0] * f.dir[0] + p[1] * f.dir[1];
-                let (mine, other) = if k == 0 { (f.dp, f.dq) } else { (f.dq, f.dp) };
-                const JOG: f64 = 11.2;
-                const MIN_LEG: f64 = 44.7;
-                let shift = if along(mine) <= along(other) { -JOG } else { JOG };
-                let l = f.legs[k].2;
-                let grow = (MIN_LEG - l).max(0.0);
-                let at = ((l + grow - JOG) / 2.0) / (l + grow).max(1e-9);
-                out.push(MenuEntry::item("Add jog", move |t, _, cx| {
-                    t.edit_sheet("Add jog", cx, |s| {
-                        for x in s.annotations.iter_mut().filter(|x| x.id == id) {
-                            if let AnnotationKind::LinearDimension { offset, .. } = &mut x.kind {
-                                *offset += grow * offset.signum();
-                            }
-                            x.jogs[k] = Some(ExtJog { at, shift, drop: JOG });
-                        }
-                    })
-                }));
+                let (jog, grow) = noshape_scene::drawing_tools::annotation_edit::jog_for(&f, k);
+                out.push(MenuEntry::item("Add jog", move |t, _, cx| t.edit_sheet("Add jog", cx, |s| noshape_scene::drawing_tools::annotation_edit::add_jog(s, id, k, jog, grow))));
             }
         }
         out.push(MenuEntry::Separator);

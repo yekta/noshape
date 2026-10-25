@@ -10,15 +10,7 @@ use gpui_kit::*;
 use noshape_model::drawing::*;
 
 /// Parse "1:2", "2:1", "1/2", "0.5" into a scale factor.
-pub fn parse_scale(s: &str) -> Option<f64> {
-    let s = s.trim();
-    let v = if let Some((a, b)) = s.split_once([':', '/']) {
-        a.trim().parse::<f64>().ok()? / b.trim().parse::<f64>().ok()?
-    } else {
-        s.parse::<f64>().ok()?
-    };
-    (v.is_finite() && v > 0.0).then_some(v)
-}
+pub use noshape_ops::drawing::parse_scale;
 
 impl DrawingEditor {
     pub fn render_status(&mut self, cx: &mut Context<Self>) -> AnyElement {
