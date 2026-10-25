@@ -11,6 +11,45 @@ State 11:10: integration still not landed (the lead's run fails on asb's in-prog
 `drawing::format::tests::numbers_and_tolerances`), so step 2's re-run was done on the 10:03 / 10:45 builds of the
 shared tree; redo the three user reports once it lands. Verifying the input-padding fix proposal on a private
 copy (/root/noshape-qa4; delete it after).
+### R4b (10-25, qa4 paused; **perf takes over from here**): Part Studio keystroke latency on release builds
+Setup: main CI release artifacts (7074e37f: /root/qa4-scratch/rel-main/noshape; 358fcd83: /root/qa4-scratch/rel-358/noshape),
+Xvfb :110 + llvmpipe (no GPU), live's 30-feature part (/tmp/qa4/r5/kl.noshape, built by /root/qa4-scratch/r5/v3s2.py),
+`NOSHAPE_PERF=1 NOSHAPE_PERF_PERIOD=1 RUST_LOG=info`. Tools: /root/qa4-scratch/keylat.sh LABEL "keys" REPS (60 fps x11grab, the
+pointer nudge marks the input frame; first change / settled per rep), keylat2.sh "keysA|keysB" (alternates per rep).
+Details also in qa-round-5.md "Part Studio keystroke latency" and qa5-routing.md "Keystroke latency".
+**Measurements (input → first changed frame, median):**
+- UI-only keystroke (feature-list filter): **83 ms** (67–100). That is the floor on this box; the rest is llvmpipe.
+- Digit in Extrude 1's Depth field (dialog open): **~225 ms** (150–250). Per keystroke: dispatch ≈ 0, regen 4–50 ms
+  (rolled to the edited feature), apply_display 0.4, refresh_scene 0.3, s.build 0.2, GPUI layout/prepaint/paint ≈ 2 ms each,
+  then viewport render `r.gpu_ms` 95–145 ms and `gpui.present` 50–120 ms (both llvmpipe; the viewport renders async, the window
+  doesn't wait on it, they share the CPU).
+- Shift+E / Esc (open a new Extrude / cancel): first change 83 ms (7074e37f), settled ~0.9–1.1 s.
+- Commit / undo / redo of a Depth edit (session 12's "~1.1 s per action" was this settle time): full downstream regen
+  390–490 ms (29 features; live 132 ms) + coarse mesh 20–40 ms + render → preview ~0.7 s; refine fine mesh 450–565 ms + one
+  590–605 ms llvmpipe frame → final ~1.9 s.
+**Suspects / fixes, state at hand-off:**
+1. **EDIT-TYPING-PREVIEW** (the ~140 ms over the floor per digit, and a parity bug: live re-runs the preview only on commit).
+   Patch on branch **qa4/typing-preview** 66563c00 (feature_dialog.rs: number fields keep typed text in the draft, emit
+   DialogEvent::Changed on Tab / Enter / blur / step). Clippy -D warnings clean; verified in a dev build: Depth digit median
+   225 → **83 ms**, Tab / Enter / ✓-without-commit all commit the typed value, no regen while typing. **Not on main**: it edits
+   psb/ui2's file and was waiting for the lead's OK; app crate tests not run.
+2. **Mesh cache evicting levels** (Shift+E / Esc / undo of an unchanged part re-meshed it: coarse 17–23 ms + fine 350–380 ms).
+   perf's 41a57312 (keep meshes of recent runs) already removed the re-meshing on main 358fcd83 (preview and refine regens
+   ~2 ms, no tessellate lines). Still left on main: every such action does **two display passes** (coarse 2092 tris, then fine
+   40072) and two 400–610 ms llvmpipe frames, settled median **850 ms**, and the part flashes faceted for a frame.
+   qa4's patch (branch qa4/mesh-cache, see below) makes `display::body_levels` use the body's cached refined levels in a preview
+   regen, so an unchanged part gets one pass, no refine, the same mesh Arc (GpuCache hit). Test
+   `preview_regen_of_an_unchanged_part_keeps_its_refined_mesh` (display_tessellation.rs) passes with main's tests (4/4).
+   **Not yet measured in the app**: next step is a build of it and keylat2.sh "shift+e|Escape" + count `ps.apply_display` and
+   `r.gpu_ms` per action against main.
+3. **THUMB-REGEN (perf)**: start_thumbnail.rs regenerates the first Part Studio with its own Regenerator 1.5 s after every commit
+   (second full downstream eval + 380–450 ms fine mesh). Render it from the window's latest StudioDisplay instead.
+4. **REFINE-TESS (perf/kern)**: a changed body is re-meshed whole at Fine (450–565 ms, 40 k tris). Mesh only changed faces /
+   cache per-face triangulations.
+5. **REGEN-SPEED (kern)**: 29 downstream features in 390–490 ms vs live 132 ms (Boss 1 59 ms, Fillet 1 65, Hole 1 43).
+6. Environment: on a real GPU `r.gpu_ms` / `gpui.present` are a few ms; measure the remaining items on CI macOS runners, not
+   on this box (llvmpipe dominates every frame here).
+
 ### R4 (14:00–): Part Studio typing latency (lead's task)
 **For perf (b16dc34d, owns viewport.rs presentation / frame pacing, crates/render, gpu.rs):** qa4 changed
 `crates/app/src/viewport.rs` once (in the shared tree, uncommitted, lead-approved): a `scene_bounds:
