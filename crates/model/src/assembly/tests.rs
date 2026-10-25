@@ -3873,3 +3873,35 @@ fn acorn_nut_crown_is_a_torus_like_live() {
         assert!((sphere - nose).abs() < 1e-3, "{name}: nose {sphere} mm, live {nose}");
     }
 }
+
+/// DIN 985 nylon-insert thin nuts (qa: missing from the catalogue): live names
+/// its sizes with the pitch ("M3x0.5", fine "M8x1", "M48X3"); each takes the
+/// published table's row of its diameter (DIN 985:1987). Every size builds;
+/// M8 is s 13 across the flats and 8 high (h max) as the table says.
+#[test]
+fn din_985_nuts_build_every_live_size() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Prevailing torque hex thin nut grade A & B DIN 985").expect("DIN 985 in the catalogue");
+    let names: Vec<&str> = c.sizes.iter().map(|s| s.name.as_str()).collect();
+    for want in ["M3x0.5", "M8x1.25", "M8x1", "M48X3"] {
+        assert!(names.contains(&want), "{want} in {names:?}");
+    }
+    let mut failures = Vec::new();
+    for size in &names {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        match standard::regenerate(&spec) {
+            Ok(r) if r.display.features.iter().all(|f| f.message.is_none()) => {}
+            Ok(r) => failures.push(format!("{size}: {:?}", r.display.features.iter().filter_map(|f| f.message.clone()).collect::<Vec<_>>())),
+            Err(e) => failures.push(format!("{size}: {e}")),
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("M8x1.25");
+    let r = standard::regenerate(&spec).unwrap();
+    let bb = r.context.body(&standard::part_body(&r).unwrap()).unwrap().shape.bounding_box(true).unwrap();
+    let (dx, dz) = ((bb.max.x - bb.min.x).min(bb.max.y - bb.min.y), bb.max.z - bb.min.z);
+    assert!((dx - 0.013).abs() < 1e-6, "across flats {dx}");
+    assert!((dz - 0.008).abs() < 1e-6, "height {dz}");
+}

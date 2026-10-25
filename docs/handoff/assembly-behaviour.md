@@ -1185,3 +1185,15 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   qa4's open "? both inserted instances show the fixed icon" (core-workflow 6) doesn't reproduce:
   - two free instances fastened together show the free glyph on both (dof 6 each);
   - a part fastened to the fixed one shows no glyph, as live 2282 does for Part 2 <3>.
+
+## Standard content: DIN 985 back in the catalogue (skb 10-25, P3)
+- **The problem:** live names DIN 985's sizes with their pitch ("M3x0.5", fine "M8x1", and "M48X3" / "M20x2x2" as typed in
+  live's list). The generator matched none of them to the published table's "M3" rows, so the whole component was dropped.
+- **The fix:** `build_catalogue.py` `candidates` now falls back to the diameter's row for "M<d>x<P>" names, and the pitch comes
+  from the name, case-insensitively. DIN 985 now has 44 sizes, built with the ISO 10511 insert-nut recipe from DIN 985:1987.
+- **Still missing:** M2 and M2.5, which the 1987 table lacks.
+- **Asked live** for DIN 985's geometry (REQUESTS "skb (10-25)" DIN 985): it would confirm Onshape's collar and give M2 / M2.5.
+- **Test:** `din_985_nuts_build_every_live_size` (every size builds; M8 is 13 across the flats and 8 high).
+- **Still in the catalogue report:** 52 PEM and 4 NAS sheet-metal fasteners unmapped. Size gaps remain in ISO 7380 (M2, M2.5,
+  M18), ISO 10511 (M2, M2.5, M18), ISO 10512 fine pitch, ISO 7379 lengths, DIN 7050 / 7051 / 967 / 923 / 6908, and ASME taper /
+  spring pins. Onshape's own tables are captured for all of them (dom/skb-sc-comp), so live() mappings can close them.
