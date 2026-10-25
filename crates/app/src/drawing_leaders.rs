@@ -12,7 +12,7 @@ use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_model::drawing::sheet::LeaderPath;
 use noshape_model::drawing::{Annotation, AnnotationKind, Leader, LeaderStart};
-use noshape_scene::drawing_tools::leaders;
+use noshape_scene::drawing_tools::annotation_edit as ae;
 pub use noshape_scene::drawing_tools::LeaderHit;
 
 /// The note's leaders, mutable.
@@ -27,12 +27,12 @@ impl DrawingEditor {
     /// A note's or callout's leader paths on the sheet, by leader index (a
     /// callout's as last drawn).
     pub fn leader_paths_of(&self, a: &Annotation) -> Vec<(usize, LeaderPath)> {
-        leaders::leader_paths(self.built.as_deref(), a)
+        ae::leader_paths(self.built.as_deref(), a)
     }
 
     /// The note or callout leader under sheet point `c`.
     pub fn leader_hit(&self, c: [f64; 2]) -> Option<LeaderHit> {
-        leaders::leader_hit(self.built.as_deref(), &self.current_sheet().annotations, c, self.tol_mm(5.0), self.tol_mm(3.0))
+        ae::leader_hit(self.built.as_deref(), &self.current_sheet().annotations, c, self.tol_mm(5.0), self.tol_mm(3.0))
     }
 
     /// Edit annotation `id` (one undo step named `what`).
@@ -60,18 +60,16 @@ impl DrawingEditor {
         if let LeaderHit::Node { node, .. } = hit {
             out.push(MenuEntry::item("Add leader", move |t, _, cx| t.start_branch(id, LeaderStart::Node(leader, node), cx)));
         }
-        out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_annotation("Remove leaders", id, cx, |a| {
-            leaders::remove_leaders(a);
-        })));
+        out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| ae::remove_leaders(s, id))));
         match hit {
             LeaderHit::Node { node, .. } => out.push(MenuEntry::item("Remove node", move |t, _, cx| t.edit_annotation("Remove node", id, cx, |a| {
-                leaders::remove_node(a, leader, node);
+                ae::remove_node(a, leader, node);
             }))),
             LeaderHit::Stroke { seg, p, .. } => {
                 let head = self.current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| self.leader_paths_of(a).into_iter().find(|(i, _)| *i == leader).map(|(_, p)| p.head)).unwrap_or(2);
                 out.push(MenuEntry::item("Add node", move |t, _, cx| {
                     t.edit_annotation("Add node", id, cx, |a| {
-                        leaders::add_node(a, leader, seg, head, p);
+                        ae::with_all_leaders(a, |l| ae::add_node(l, leader, seg, head, p));
                     });
                     t.selection = vec![Sel::Annotation(id)];
                     t.leader_sel = Some((id, leader));
@@ -86,7 +84,7 @@ impl DrawingEditor {
         }));
         out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
         out.push(MenuEntry::item("Delete", move |t, _, cx| t.edit_annotation("Delete leader", id, cx, |a| {
-            leaders::delete_leader(a, leader);
+            ae::delete_leader(a, leader);
         })));
         out
     }
@@ -101,14 +99,14 @@ impl DrawingEditor {
     /// The note's Add leader: from the existing landing's bend (live: that
     /// side, wherever the pointer is), else from the note's side.
     pub fn note_add_leader(&mut self, id: u64, cx: &mut Context<Self>) {
-        let from = self.current_sheet().annotations.iter().find(|a| a.id == id).map(leaders::note_leader_start).unwrap_or_default();
+        let from = self.current_sheet().annotations.iter().find(|a| a.id == id).map(ae::note_leader_start).unwrap_or_default();
         self.start_branch(id, from, cx);
     }
 
     /// Where the pending branch of note or callout `id` starts (sheet mm).
     pub fn branch_point(&self, id: u64) -> Option<[f64; 2]> {
         let a = self.current_sheet().annotations.iter().find(|a| a.id == id)?;
-        leaders::branch_point(self.built.as_deref(), a, self.leader_from?)
+        ae::branch_point(self.built.as_deref(), a, self.leader_from?)
     }
 
     /// A drag starting on a leader's bend: the landing's length.
@@ -140,7 +138,7 @@ impl DrawingEditor {
         let mut dr = self.drawing.clone();
         if let Some(a) = dr.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|a| a.id == *id)) {
             *a = orig.clone();
-            leaders::move_leader_end(a, *leader, view, point, r);
+            ae::move_leader_end(a, *leader, view, point, r);
         }
         self.set_preview(Some(dr), cx);
     }
@@ -193,9 +191,7 @@ impl DrawingEditor {
         }));
         out.push(MenuEntry::item("Add leader", move |t, _, cx| t.note_add_leader(id, cx)));
         if !style.leaders.is_empty() {
-            out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_annotation("Remove leaders", id, cx, |a| {
-                leaders::remove_leaders(a);
-            })));
+            out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| ae::remove_leaders(s, id))));
         }
         // Move to ▸ a format layer (or back to the drawing).
         let cur = a.layer;

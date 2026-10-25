@@ -186,46 +186,7 @@ impl DrawingEditor {
             return;
         }
         let sel = std::mem::take(&mut self.selection);
-        self.edit_sheet("Delete", cx, |s| {
-            // Breaks first (indices shift when removed).
-            let mut breaks: Vec<(ViewId, usize)> = sel.iter().filter_map(|x| if let Sel::Break(v, i) = x { Some((*v, *i)) } else { None }).collect();
-            breaks.sort_by_key(|b| std::cmp::Reverse(b.1));
-            for (v, i) in breaks {
-                if let Some(v) = s.view_mut(v)
-                    && i < v.breaks.len()
-                {
-                    v.breaks.remove(i);
-                }
-            }
-            for x in &sel {
-                match x {
-                    // A label's Delete is its view's (live u-944: the view menu).
-                    Sel::View(v) | Sel::ViewLabel(v) | Sel::AuxIndicator(v) => s.remove_view(*v),
-                    // Callouts grouped with the annotation go with it.
-                    // A datum from the model is hidden, not removed (MBD status › Show).
-                    Sel::Annotation(a) if s.annotations.iter().any(|n| n.id == *a && n.model.is_some()) => {
-                        if let Some(m) = s.annotations.iter_mut().find(|n| n.id == *a).and_then(|n| n.model.as_mut()) {
-                            m.hidden = true;
-                        }
-                    }
-                    Sel::Annotation(a) => s.annotations.retain(|n| n.id != *a && n.group != Some(*a) && !matches!(n.kind, AnnotationKind::RevisionCallout { group: Some(g), .. } if g == *a)),
-                    Sel::Table(t) => s.tables.retain(|n| n.id != *t),
-                    Sel::Sketch(e) => {
-                        s.sketch.sketch.remove_entity(noshape_sketch::EntityId(*e));
-                    }
-                    Sel::Hatch(h) => s.sketch.hatches.retain(|x| x.id != *h),
-                    Sel::Image(i) => s.images.retain(|x| x.id != *i),
-                    // Automatic centermarks are deleted one at a time (help H:creating_a_drawing).
-                    Sel::AutoCentermark(v, c) => {
-                        if let Some(v) = s.view_mut(*v) {
-                            v.deleted_centermarks.push(*c);
-                        }
-                    }
-                    Sel::Break(..) => {}
-                }
-            }
-            let _ = s.sketch.sketch.solve();
-        });
+        self.edit_sheet("Delete", cx, |s| dt::delete_selection(s, &sel));
     }
 
     /// Prompt shown in the status bar for the active tool.
@@ -1728,20 +1689,17 @@ impl DrawingEditor {
                         let sel_view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
                         let anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { Some(*x) } else { None }).chain([id]).collect();
                         if a.view_group.is_some() {
-                            out.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.view_group = None))));
+                            out.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_with_view(s, &[id], None))));
                         } else if let Some(v) = sel_view {
                             let ids = anns.clone();
-                            out.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.view_group = Some(v)))));
+                            out.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_with_view(s, &ids, Some(v)))));
                         }
                         if a.ann_group.is_some() {
                             let ids = anns.clone();
-                            out.push(MenuEntry::item("Remove annotation from group", move |t, _, cx| t.edit_sheet("Remove annotation from group", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.ann_group = None))));
+                            out.push(MenuEntry::item("Remove annotation from group", move |t, _, cx| t.edit_sheet("Remove annotation from group", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_annotations(s, &ids, false))));
                         } else if anns.iter().collect::<std::collections::HashSet<_>>().len() >= 2 {
                             let ids = anns.clone();
-                            out.push(MenuEntry::item("Group annotation", move |t, _, cx| {
-                                let g = t.current_sheet().annotations.iter().filter_map(|x| x.ann_group).max().unwrap_or(0) + 1;
-                                t.edit_sheet("Group annotation", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.ann_group = Some(g)));
-                            }));
+                            out.push(MenuEntry::item("Group annotation", move |t, _, cx| t.edit_sheet("Group annotation", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_annotations(s, &ids, true))));
                         }
                     }
                     // Copy (with the rest of the selection).
@@ -1770,11 +1728,7 @@ impl DrawingEditor {
                     }
                     if !a.refs.is_empty() {
                         out.push(MenuEntry::item("Detach from geometry", move |t, _, cx| {
-                            t.edit_sheet("Detach", cx, |s| {
-                                if let Some(x) = s.annotations.iter_mut().find(|x| x.id == id) {
-                                    x.refs.clear();
-                                }
-                            })
+                            t.edit_sheet("Detach", cx, |s| noshape_scene::drawing_tools::annotation_edit::detach(s, id))
                         }));
                     }
                     // Paste as table is in every drawing menu (live drawing/290).

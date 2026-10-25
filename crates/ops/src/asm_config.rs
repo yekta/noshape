@@ -108,3 +108,49 @@ pub fn configure(a: &mut Assembly, input: &str, target: ConfigTarget, param: &st
 pub fn set_cell(a: &mut Assembly, column: usize, key: &str, v: ParamValue) {
     a.set_config_cell(column, key, v);
 }
+
+/// Input propagation… for one instance: None when its source has no input
+/// with `own`'s id and kind (List / Checkbox), else whether it follows the
+/// assembly's input already.
+pub fn propagation_state(a: &Assembly, own: &ConfigInput, theirs: &[ConfigInput], instance: noshape_model::assembly::InstanceId) -> Option<bool> {
+    if !matches!(own.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. }) {
+        return None;
+    }
+    let t = theirs.iter().find(|t| t.id == own.id)?;
+    (std::mem::discriminant(&t.kind) == std::mem::discriminant(&own.kind)).then(|| a.configuration.configured.iter().any(|c| c.target == ConfigTarget::Instance(instance) && c.param == format!("{}{}", acfg::param::INPUT_PREFIX, own.id)))
+}
+
+/// Input propagation… candidates of `input`: the instances whose source
+/// (`source_inputs`) has an input with the same id and kind, and whether
+/// each follows the assembly's already.
+pub fn propagation_candidates(a: &Assembly, input: &str, source_inputs: &dyn Fn(&noshape_model::assembly::Instance) -> Vec<ConfigInput>) -> Vec<(noshape_model::assembly::InstanceId, String, bool)> {
+    let Some(own) = a.configuration.inputs.iter().find(|i| i.id == input) else { return Vec::new() };
+    a.instances.iter().filter_map(|i| propagation_state(a, own, &source_inputs(i), i.id).map(|on| (i.id, i.name.clone(), on))).collect()
+}
+
+/// Input propagation ✓: each picked instance's input follows the
+/// assembly's (each option to the option with the same id; a checkbox to
+/// its state).
+pub fn propagate_inputs(a: &mut Assembly, picks: &[(String, noshape_model::assembly::InstanceId)]) {
+    for (input, iid) in picks {
+        let Some(i) = a.configuration.inputs.iter().find(|i| &i.id == input) else { continue };
+        let keys: Vec<String> = match &i.kind {
+            ConfigInputKind::List { options, .. } => options.iter().map(|o| o.id.clone()).collect(),
+            ConfigInputKind::Checkbox { .. } => vec!["true".into(), "false".into()],
+            _ => continue,
+        };
+        let param = format!("{}{input}", acfg::param::INPUT_PREFIX);
+        if a.configuration.configured.iter().any(|c| c.target == ConfigTarget::Instance(*iid) && c.param == param) {
+            continue;
+        }
+        let values = keys.iter().map(|k| (k.clone(), ParamValue::Text(k.clone()))).collect();
+        a.configuration.configured.push(acfg::AsmConfiguredParam { input: input.clone(), target: ConfigTarget::Instance(*iid), param, values });
+    }
+}
+
+/// Visibility conditions… of one input (None: always shown).
+pub fn set_visibility(a: &mut Assembly, input: &str, v: Option<noshape_model::configuration::Visibility>) {
+    if let Some(i) = a.configuration.inputs.iter_mut().find(|i| i.id == input) {
+        i.visible_when = v;
+    }
+}

@@ -16,7 +16,7 @@ use noshape_model::drawing::{Drawing, ViewId, ViewKind, ViewOrientation};
 use noshape_scene::drawing_tools::{DimTool, Pick, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
 
-const ORIENTATIONS: [(&str, ViewOrientation); 7] = [
+pub(super) const ORIENTATIONS: [(&str, ViewOrientation); 7] = [
     ("front", ViewOrientation::Front),
     ("back", ViewOrientation::Back),
     ("top", ViewOrientation::Top),
@@ -289,16 +289,6 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if !v.model_annotations {
                 j["model_annotations"] = json!(false);
             }
-            // Show/hide ▸ (drawing_show_hide).
-            j["display"] = json!({
-                "hidden_lines": v.style == noshape_model::drawing::RenderStyle::HiddenLinesVisible,
-                "shaded_view": v.style == noshape_model::drawing::RenderStyle::Shaded,
-                "threads": !v.hide_threads,
-                "faulty_parts": v.show_faulty,
-                "offset_cut_lines": v.show_offset_cut_lines,
-                "auto_centermarks": v.show_centerlines,
-                "center_of_mass": v.show_com,
-            });
             // A detail view's circle in its parent (sheet mm) and its label
             // on a leader (drawing_edit_detail).
             if let ViewKind::Detail { parent, center, radius, .. } = &v.kind
@@ -366,6 +356,34 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             }
             if let Some(l) = &v.label {
                 j["label"] = json!(l);
+            }
+            // The view menu's state, when not the defaults.
+            if let Some(n) = &v.name {
+                j["name"] = json!(n);
+            }
+            if v.rotation.abs() > 1e-12 {
+                j["rotation"] = json!(r3(v.rotation.to_degrees()));
+            }
+            j["tangent_edges"] = json!(noshape_scene::drawing_tools::view_edit::TangentMode::of(v).label().to_lowercase());
+            if v.style != noshape_model::drawing::RenderStyle::HiddenLinesRemoved {
+                j["style"] = json!(variant_name(&v.style));
+            }
+            if v.unaligned {
+                j["unaligned"] = json!(true);
+            }
+            if v.flip {
+                j["flipped"] = json!(true);
+            }
+            if v.show_offset_cut_lines {
+                j["offset_cut_lines"] = json!(true);
+            }
+            if v.pinned.is_some() {
+                j["pinned"] = json!(true);
+            }
+            for (k, n) in [("hidden_parts", v.hidden_parts.len()), ("shown_sketches", v.shown_sketches.len()), ("hidden_edges", v.hidden_edges.len()), ("edge_styles", v.edge_styles.len())] {
+                if n > 0 {
+                    j[k] = json!(n);
+                }
             }
             // Crop, breaks and broken-out sections (view tools).
             if let Some(c) = &v.crop {
@@ -448,11 +466,53 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(n) = a.inspection {
                 j["inspection"] = json!(n);
             }
-            // Note and callout leaders as drawn (drawing_leader's indices):
-            // the path from the annotation through the nodes to the target.
-            let paths = noshape_scene::drawing_tools::leaders::leader_paths(m.built.as_deref(), a);
-            if !paths.is_empty() {
-                j["leaders"] = json!(paths.iter().map(|(i, p)| json!({ "leader": i, "path": p.points.iter().map(|q| pt(*q)).collect::<Vec<_>>(), "nodes": p.points[p.head..p.points.len() - 1].iter().map(|q| pt(*q)).collect::<Vec<_>>() })).collect::<Vec<_>>());
+            // The annotation menus' state, when not the defaults.
+            // Follows model geometry (Detach from geometry clears it).
+            if !a.refs.is_empty() {
+                j["attached"] = json!(true);
+            }
+            let jogs: Vec<usize> = (0..2).filter(|k| a.jogs[*k].is_some()).collect();
+            if !jogs.is_empty() {
+                j["jogs"] = json!(jogs);
+            }
+            if a.unbroken {
+                j["unbroken"] = json!(true);
+            }
+            // Each leader's path on the sheet (landing, nodes, point): a
+            // note's in order, a callout's by `all_leaders` (0 = the leader
+            // to its anchor, no path while the callout is in space); other
+            // annotations' added leaders.
+            use noshape_scene::drawing_tools::annotation_edit as ae;
+            let ls = ae::all_leaders(a).or_else(|| ae::leaders(a).cloned()).unwrap_or_default();
+            let paths = ae::leader_paths(m.built.as_deref(), a);
+            // A callout in space without added leaders has none to list.
+            let free_callout = paths.is_empty() && ls.len() == 1 && matches!(a.kind, noshape_model::drawing::AnnotationKind::Balloon { .. });
+            if !ls.is_empty() && !free_callout {
+                j["leaders"] = ls
+                    .iter()
+                    .enumerate()
+                    .map(|(i, l)| {
+                        let mut v = json!({ "leader": i, "nodes": l.nodes.len() });
+                        if let Some((_, p)) = paths.iter().find(|(k, _)| *k == i) {
+                            v["path"] = p.points.iter().map(|q| pt(*q)).collect();
+                        }
+                        v
+                    })
+                    .collect();
+            }
+            if let Some(v) = a.view_group {
+                j["view_group"] = json!(v.0);
+            }
+            if let Some(g) = a.ann_group {
+                j["annotation_group"] = json!(g);
+            }
+            match &a.kind {
+                noshape_model::drawing::AnnotationKind::Centermark { angle, .. } if angle.abs() > 1e-12 => j["angle"] = json!(r3(angle.to_degrees())),
+                noshape_model::drawing::AnnotationKind::Balloon { callout, .. } if !callout.stacked.is_empty() => j["stacked"] = json!(callout.stacked.len()),
+                _ => {}
+            }
+            if a.target.as_ref().is_some_and(|o| o.hide_dims) {
+                j["dimensions_hidden"] = json!(true);
             }
             j
         })
@@ -483,6 +543,32 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             }
             if let Some(ti) = data.title {
                 j["title"] = json!(ti);
+            }
+            // The table menus' state.
+            j["corner"] = json!(variant_name(&t.corner));
+            j["text_height"] = json!(t.text_height);
+            if !t.merges.is_empty() {
+                j["merges"] = t.merges.iter().map(|g| json!({ "row": g.row, "column": g.col, "rows": g.rows, "columns": g.cols })).collect();
+            }
+            if let Some(l) = m.built.as_ref().and_then(|b| b.table_layout(t.id)) {
+                j["column_widths"] = l.xs.windows(2).map(|w| json!(r3(w[1] - w[0]))).collect();
+                j["bounds"] = json!({ "min": pt(l.min()), "max": pt(l.max()) });
+            }
+            if let Some(r) = t.rows {
+                j["part_rows"] = json!(r);
+            }
+            match &t.kind {
+                noshape_model::drawing::TableKind::Bom { structured, bottom_to_top, .. } => {
+                    j["structured"] = json!(structured);
+                    j["bottom_to_top"] = json!(bottom_to_top);
+                }
+                noshape_model::drawing::TableKind::CutList { bottom_to_top, .. } => j["bottom_to_top"] = json!(bottom_to_top),
+                noshape_model::drawing::TableKind::Hole { flip_x, flip_y, precision, .. } => {
+                    j["flip_x"] = json!(flip_x);
+                    j["flip_y"] = json!(flip_y);
+                    j["precision"] = json!(precision);
+                }
+                _ => {}
             }
             j
         })

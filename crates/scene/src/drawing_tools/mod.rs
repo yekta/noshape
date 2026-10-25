@@ -9,7 +9,6 @@
 pub mod geom;
 mod commit;
 mod jog;
-pub mod leaders;
 mod opts;
 mod overlay;
 mod pending;
@@ -17,11 +16,14 @@ mod pick;
 mod smart;
 mod sketch;
 mod types;
+pub mod annotation_edit;
+pub mod table_edit;
+pub mod view_edit;
 
 pub use commit::*;
 pub use overlay::{Overlay, SnapMark};
 pub use jog::{CentermarkArms, seg_dist};
-pub use leaders::LeaderHit;
+pub use annotation_edit::LeaderHit;
 pub use opts::*;
 pub use pending::ToolValues;
 pub use pick::SheetPick;
