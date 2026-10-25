@@ -419,6 +419,27 @@ def main():
     c0, c1 = first_last("touch-roll")
     if c0 and c1:
         ch.check("touch-roll", "roll (deg) for a 30 deg finger turn", angle(c0["camera"]["up"], c1["camera"]["up"]), 30.0, 1.0)
+    # Keys (Onshape's rotateInDirection / animatePan / animateZoom): exact
+    # angles after the 250 ms animations, the pan at the scene centre, ×1.75.
+    for name, deg in (("key-left", 15.0), ("key-up", 15.0), ("key-shift-left", 90.0), ("key-ctrl-left", 5.0)):
+        c0, c1 = first_last(name)
+        if name in by and c1 is None:
+            ch.check(name, "the camera moved", 0.0, 1.0, 0)
+        elif c0 and c1:
+            ch.check(name, f"turn (deg) = {deg:g}", angle(c0["camera"]["forward"], c1["camera"]["forward"]), deg, 1e-6)
+    c0, c1 = first_last("key-ctrl-shift-right")
+    if c0 and c1:
+        # The model moves 150 px right: the target 150 px worth to the left.
+        d = [c1["camera"]["target"][i] - c0["camera"]["target"][i] for i in range(3)]
+        moved = sum(d[i] * c0["camera"]["right"][i] for i in range(3)) / c0["camera"]["world_per_pixel"]
+        ch.check("key-ctrl-shift-right", "target moves (px along right)", moved, -150.0, 1e-3)
+        ch.check("key-ctrl-shift-right", "no rotation (deg)", angle(c0["camera"]["forward"], c1["camera"]["forward"]), 0.0, 1e-6)
+    for name, ratio in (("key-z", 1.75), ("key-shift-z", 1 / 1.75)):
+        c0, c1 = first_last(name)
+        if name in by and c1 is None:
+            ch.check(name, "the camera moved", 0.0, 1.0, 0)
+        elif c0 and c1:
+            ch.check(name, "world per pixel ratio", c1["camera"]["world_per_pixel"] / c0["camera"]["world_per_pixel"], ratio, 1e-9)
     # The pen acts as a finger (Onshape: pointerType "pen" → its touch
     # recognizers): a drag turns 2 turns per diagonal, the first 10 px move
     # only crossing the drag threshold; a tap is a one-finger tap; hovering
