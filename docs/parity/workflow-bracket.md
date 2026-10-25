@@ -85,3 +85,4 @@ Steps 1–7 OK (65431.3275 after the gusset); step 8 feature mirror (Reapply off
 | 1–7 | same as pass 24: 32000 → … → 65431.3275 mm³, 18 faces; each step 0.1–0.3 s | ✅ |
 | 8 ADV9 Feature mirror of the gusset | Error "Could not create all instances as entered…"; app tree shows Mirror 1 red | ✗ still in v0.4.8 (psb) |
 | 8 ADV9 on main 10195656 (target-engine CLI 06:17) | same Error | ✗ still; psb's fix 853cf16b sits in ready/psb, whose queue status is CONFLICT since 21:44 (not re-marked yet) |
+| 8 ADV9 on green 461aefb0 (app, psb 853cf16b) | Mirror 1 regenerates (row not red); the mirrored gusset sits at the wall's right end | ✅ **fixed** |

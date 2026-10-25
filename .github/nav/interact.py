@@ -114,7 +114,7 @@ class Interact(Replay):
         self.step("hover-leave", self.hover((c["origin"][0] / 2, c["origin"][1] + 200)))
         self.step("select-for-space", self.click_at(top))
         self.step("space-clears", self.key_tap(ui.KEY_SPACE))
-        # A small crossing box (right to left) over the Top plane only.
+        # A small crossing box (right to left) over the Top plane: the plane stays out.
         self.step("crossing-box-plane", self.box((plane[0] + 12, plane[1] + 6), (plane[0] - 12, plane[1] - 6)))
         self.step("clear", self.click_at(empty))
         for d in (self.mouse, self.keys, self.pad, self.screen, self.pen):

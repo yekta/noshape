@@ -46,7 +46,6 @@ pub struct NumberField {
 
 /// Drawing properties panel: open, the selected tab and the Inspection
 /// tab's number fields (text height, border size).
-#[derive(Default)]
 pub struct DrawingPropsUi {
     pub open: bool,
     pub tab: usize,
@@ -54,6 +53,15 @@ pub struct DrawingPropsUi {
     pub inspection_inputs: Option<(usize, Vec<NumberField>)>,
     /// The field that had the focus at the last render.
     pub focused: Option<usize>,
+    /// The body's scroll and whether it overflows (Chrome's scrollbar).
+    pub scroll: ScrollHandle,
+    pub overflow: std::rc::Rc<std::cell::Cell<bool>>,
+}
+
+impl Default for DrawingPropsUi {
+    fn default() -> Self {
+        Self { open: false, tab: 0, inspection_inputs: None, focused: None, scroll: ScrollHandle::new(), overflow: Default::default() }
+    }
 }
 
 /// Onshape's tabs (tooltip, icon).
@@ -91,6 +99,65 @@ type Act = std::rc::Rc<dyn Fn(&mut DrawingProps)>;
 /// The panel's select caret (live drawing/1710): 8 px wide, about 5.5 px
 /// down to its point, steeper than the menus' caret.
 const SELECT_CARET: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 2h8L4 7.5z"/></svg>"#;
+/// Its mirror, a spinbox's ▲.
+const SELECT_CARET_UP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 6h8L4 0.5z"/></svg>"#;
+
+/// An arrowhead style as the Arrowhead control shows it (live drawing/1710):
+/// an 18 × 9 px #333 glyph, a shaft from the left to the tip at the right
+/// with the head 12 px long and 7 px wide.
+fn arrowhead_glyph(t: noshape_model::drawing::sheet::ArrowType) -> impl IntoElement {
+    use noshape_model::drawing::sheet::ArrowType;
+    canvas(|_, _, _| {}, move |b, _, window, _| {
+        let ink = gpui_kit::rgb_static(0x333333);
+        let (l, y) = (b.left(), b.top() + px(4.5));
+        let at = |x: f32, dy: f32| point(l + px(x), y + px(dy));
+        let stroke = |window: &mut Window, pts: &[Point<Pixels>]| {
+            let mut pb = PathBuilder::stroke(px(1.));
+            pb.move_to(pts[0]);
+            for q in &pts[1..] {
+                pb.line_to(*q);
+            }
+            if let Ok(path) = pb.build() {
+                window.paint_path(path, ink);
+            }
+        };
+        let shaft_end = match t {
+            ArrowType::Filled | ArrowType::Unfilled => 6.,
+            ArrowType::FilledDot => 11.,
+            _ => 17.,
+        };
+        stroke(window, &[at(0., 0.), at(shaft_end, 0.)]);
+        match t {
+            ArrowType::Filled => {
+                let mut pb = PathBuilder::fill();
+                pb.move_to(at(6., -3.5));
+                pb.line_to(at(18., 0.));
+                pb.line_to(at(6., 3.5));
+                pb.close();
+                if let Ok(path) = pb.build() {
+                    window.paint_path(path, ink);
+                }
+            }
+            ArrowType::Unfilled => stroke(window, &[at(6.5, -3.), at(17., 0.), at(6.5, 3.), at(6.5, -3.)]),
+            ArrowType::Open => stroke(window, &[at(6., -3.5), at(17., 0.), at(6., 3.5)]),
+            ArrowType::Oblique => stroke(window, &[at(13.5, 3.5), at(17.5, -3.5)]),
+            ArrowType::FilledDot => {
+                let mut pb = PathBuilder::fill();
+                let c = at(14., 0.);
+                pb.move_to(point(c.x + px(3.), c.y));
+                pb.arc_to(point(px(3.), px(3.)), px(0.), false, true, point(c.x - px(3.), c.y));
+                pb.arc_to(point(px(3.), px(3.)), px(0.), false, true, point(c.x + px(3.), c.y));
+                pb.close();
+                if let Ok(path) = pb.build() {
+                    window.paint_path(path, ink);
+                }
+            }
+            ArrowType::None => {}
+        }
+    })
+    .w(px(18.))
+    .h(px(9.))
+}
 
 /// Which text a Font row sets.
 #[derive(Clone, Copy)]
@@ -318,23 +385,38 @@ impl DrawingEditor {
                 }
             })
         };
+        // Live 1710: white like the selects, a 1 px #ddd line under it, the
+        // #555 value's ink 7 px in (24 px high with a ▾, 26 as a spinbox).
         // Invalid spinbox: the pale orange fills the field itself.
-        let input = Input::new(&f.state).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.)).when(f.invalid.get(), |i| i.bg(gpui_kit::rgba(INVALID_BG)));
+        let field_h = if matches!(f.kind, FieldKind::Spin { .. }) { 26. } else { 24. };
+        let input = Input::new(&f.state)
+            .appearance(false)
+            .small()
+            .h(px(field_h))
+            .pl(px(6.))
+            .pr(px(if matches!(f.kind, FieldKind::Text) { 6. } else { 20. }))
+            .bg(gpui_kit::rgb(0xffffff))
+            .border_b_1()
+            .border_color(gpui_kit::rgb(0xdddddd))
+            .text_size(px(13.33))
+            .text_color(gpui_kit::rgb(0x555555))
+            .when(f.invalid.get(), |i| i.bg(gpui_kit::rgba(INVALID_BG)));
         let unit = div().w(px(24.)).flex_none().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).opacity(0.65).flex().justify_center().child(if self.drawing.units_mm { "mm" } else { "in" });
         let k = if self.drawing.units_mm { 1.0 } else { 25.4 };
         match f.kind {
             FieldKind::Dropdown => {
                 // ▾: the preset heights (as the Styles panel's list).
                 let val = f.value.clone();
-                // Live: the ▾ sits inside the field's right padding (20 px).
-                let caret = div().id(SharedString::from(format!("dp-wt-dd-{i}"))).w(px(18.)).h(px(24.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("ui-dropdown-arrow", 10., gpui_kit::rgb(0x555555)));
+                // Live: the selects' ▾ 6 px from the field's right, inside
+                // its right padding (20 px).
+                let caret = div().id(SharedString::from(format!("dp-wt-dd-{i}"))).w(px(20.)).h(px(23.)).pr(px(6.)).flex().items_center().justify_end().cursor_pointer().child(crate::os_ui::glyph(SELECT_CARET, 8., gpui_kit::rgb_static(0x777777)));
                 let caret = caret.os_dropdown_menu(SharedString::from(format!("dp-wt-ddm-{i}")), false, move |menu, _, _| {
                     // Live: the list holds only the current value.
                     let v = val.get() / k;
                     let apply = apply.clone();
                     menu.item(crate::os_menu::OsMenuItem::new(show(v)).checked(true).on_click(move |_, window, cx| apply(v, window, cx)))
                 });
-                h_flex().gap(px(6.)).child(div().w(px(141.)).relative().child(input).child(caret.absolute().right(px(1.)).top(px(0.)))).child(unit).into_any_element()
+                h_flex().gap(px(6.)).child(div().w(px(141.)).relative().child(input).child(caret.absolute().right_0().top_0())).child(unit).into_any_element()
             }
             FieldKind::Spin { step_in, step_mm, .. } => {
                 let step_by = if self.drawing.units_mm { step_mm } else { step_in };
@@ -343,9 +425,12 @@ impl DrawingEditor {
                     let (st, val) = (f.state.clone(), f.value.clone());
                     std::rc::Rc::new(move |up: bool, window: &mut Window, cx: &mut App| apply(spin_step(&st.read(cx).value(), val.get() / k, up, step_by), window, cx))
                 };
+                // Live: the select's ▾ and its mirror, 6 px from the right,
+                // their bases 1 px apart at the field's middle.
                 let arrow = |id: String, up: bool| {
                     let step = step.clone();
-                    div().id(SharedString::from(id)).h(px(12.)).w(px(16.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph(if up { "ui-caret-up" } else { "ui-caret-down" }, 8., gpui_kit::rgb(0x555555))).on_click(move |_, window, cx| step(up, window, cx))
+                    let glyph = crate::os_ui::glyph(if up { SELECT_CARET_UP } else { SELECT_CARET }, 8., gpui_kit::rgb_static(0x777777));
+                    div().id(SharedString::from(id)).absolute().right_0().top(px(if up { 0. } else { 12.5 })).h(px(12.5)).w(px(20.)).cursor_pointer().child(div().absolute().right(px(6.)).top(px(if up { 5.5 } else { -1.5 })).child(glyph)).on_click(move |_, window, cx| step(up, window, cx))
                 };
                 let (step_up, step_dn) = (step.clone(), step.clone());
                 let boxed = div()
@@ -362,7 +447,8 @@ impl DrawingEditor {
                         cx.stop_propagation();
                     })
                     .child(input)
-                    .child(v_flex().absolute().right(px(2.)).top(px(1.)).child(arrow(format!("dp-wt-up-{i}"), true)).child(arrow(format!("dp-wt-dn-{i}"), false)));
+                    .child(arrow(format!("dp-wt-up-{i}"), true))
+                    .child(arrow(format!("dp-wt-dn-{i}"), false));
                 h_flex().gap(px(6.)).child(boxed).child(unit).into_any_element()
             }
             FieldKind::Text => div().w(px(160.)).child(input).into_any_element(),
@@ -403,14 +489,15 @@ impl DrawingEditor {
         let ed = cx.entity();
         let props = self.drawing.props.clone();
         let units = props.units.unwrap_or(if self.drawing.units_mm { DimUnits::Millimeter } else { DimUnits::Inch });
-        let select = |id: &'static str, current: String, items: Vec<(String, bool, Act)>| {
+        let sel = |id: &'static str, current: String, items: Vec<(String, bool, Act)>, w: f32| {
             let ed = ed.clone();
-            // Live drawing/1710: a white 164 × 25 field on a 1 px #ddd line,
-            // the #555 value's ink 7 px in, an 8 px #777 caret 6 px from the
-            // right.
+            // Live drawing/1710: a white field 25 px high on a 1 px #ddd line
+            // (164 px wide on Units and precision; the other tabs' widths
+            // follow their table columns), the #555 value's ink 7 px in, an
+            // 8 px #777 caret 6 px from the right.
             h_flex()
                 .id(id)
-                .w(px(164.))
+                .w(px(w))
                 .h(px(26.))
                 .pl(px(6.))
                 .pr(px(6.))
@@ -431,26 +518,26 @@ impl DrawingEditor {
                 })
                 .into_any_element()
         };
-        // Color swatch: its color and name; a click opens the color dialog.
+        let select = |id: &'static str, current: String, items: Vec<(String, bool, Act)>| sel(id, current, items, 164.);
+        // Color swatch (live drawing/1710): a 26 px square of the colour; a
+        // click opens the color dialog.
         let swatch = |id: &'static str, cur: Option<[u8; 3]>, set: crate::drawing_color::ColorSet| -> AnyElement {
             let ed = ed.clone();
             let c = cur.unwrap_or([0, 0, 0]);
-            let name = COLORS.iter().find(|x| x.1 == cur).map(|x| x.0.to_string()).unwrap_or_else(|| format!("#{:02X}{:02X}{:02X}", c[0], c[1], c[2]));
-            h_flex()
+            div()
                 .id(id)
-                .w(px(160.))
-                .gap(px(6.))
+                .size(px(26.))
                 .cursor_pointer()
-                .child(div().w(px(28.)).h(px(16.)).bg(gpui_kit::rgb(((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32)).border_1().border_color(gpui_kit::rgb(0x999999)))
-                .child(div().text_size(px(12.)).child(name))
+                .bg(gpui_kit::rgb_static(((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32))
                 .on_click(move |_, w, cx| {
                     let set = set.clone();
                     ed.update(cx, |t, cx| t.open_color_dialog(cur, set, w, cx))
                 })
                 .into_any_element()
         };
-        // Font row: family, Bold, Italic (the default is the drawing sans).
-        let font_row = |w: FontOf, cur: Option<noshape_model::drawing::sheet::TextFont>, cx: &mut Context<Self>| -> AnyElement {
+        // Font select (the default is the drawing sans; live has no Bold /
+        // Italic here, only in the note editor and the Views tab's labels).
+        let font_row = |w: FontOf, cur: Option<noshape_model::drawing::sheet::TextFont>, width: f32| -> AnyElement {
             use noshape_model::drawing::sheet::{DRAWING_DEFAULT_FONT, FONT_FAMILIES, TextFont};
             // Live (dom/drawing-properties-annotations): "Noto Sans" of the 22
             // families; no separate Default entry.
@@ -464,45 +551,12 @@ impl DrawingEditor {
                     *f = Some(TextFont { family: fam.into(), bold: b, italic: i });
                 }) as Act));
             }
-            let toggle = |id: &'static str, glyph: &'static str, on: bool, f: fn(&mut TextFont), cx: &mut Context<Self>| {
-                div()
-                    .id(id)
-                    .size(px(24.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .text_size(px(13.))
-                    .font_weight(FontWeight::BOLD)
-                    .cursor_pointer()
-                    .rounded(px(2.))
-                    .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
-                    .child(glyph)
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        this.set_drawing_prop(&move |p| {
-                            let slot = font_of(p, w);
-                            let mut font = slot.clone().unwrap_or_else(|| TextFont { family: DRAWING_DEFAULT_FONT.into(), bold: false, italic: false });
-                            f(&mut font);
-                            *slot = Some(font);
-                        }, cx)
-                    }))
-            };
-            let (b, i) = cur.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
-            // Live (asb 10-24): SHX fonts disable Bold and Italic.
-            let shx = cur.as_ref().is_some_and(|f| noshape_model::drawing::sheet::is_shx(&f.family));
             let id = match w {
-                FontOf::Dims => ("dp-dfont", "dp-dfont-b", "dp-dfont-i"),
-                FontOf::Inspection => ("dp-ifont", "dp-ifont-b", "dp-ifont-i"),
-                FontOf::Type(t) => {
-                    let ids = TYPE_IDS[AnnType::ALL.iter().position(|x| *x == t).unwrap_or(0)];
-                    (ids[0], ids[1], ids[2])
-                }
+                FontOf::Dims => "dp-dfont",
+                FontOf::Inspection => "dp-ifont",
+                FontOf::Type(t) => TYPE_IDS[AnnType::ALL.iter().position(|x| *x == t).unwrap_or(0)][0],
             };
-            h_flex()
-                .gap(px(2.))
-                .child(select(id.0, label, items))
-                .child(if shx { div().size(px(24.)).flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).opacity(0.4).child("B").into_any_element() } else { toggle(id.1, "B", b, |f| f.bold = !f.bold, cx).into_any_element() })
-                .child(if shx { div().size(px(24.)).flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).opacity(0.4).child("I").into_any_element() } else { toggle(id.2, "I", i, |f| f.italic = !f.italic, cx).into_any_element() })
-                .into_any_element()
+            sel(id, label, items, width)
         };
         // Live dom drawing-properties-*: labels 13.33 px #666, their ink 15 px
         // in (1710); the field 2 px below the row's top, above the label's
@@ -510,12 +564,39 @@ impl DrawingEditor {
         // with a `#ddd` rule, 500 #333, 8 px above their first row and 4 px
         // below the previous group's last one.
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).flex_none().pl(px(13.)).pr(px(11.)).child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().mb(px(3.)).child(body)).into_any_element();
+        // A table row (live 1710's Dimensions tab): each group lays its
+        // controls out from its own column `col` (px from the panel's
+        // border), the row `h` high, the control `top` px down, the label
+        // centred.
+        let trow = |label: &'static str, col: f32, h: f32, top: f32, body: AnyElement| div().h(px(h)).flex_none().flex().pl(px(13.)).child(div().w(px(col - 14.)).flex_none().h_full().flex().items_center().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().pt(px(top)).child(body)).into_any_element();
+        // The arrowhead control: the style's glyph and a caret, 28 px.
+        let asel = |id: &'static str, cur: noshape_model::drawing::sheet::ArrowType, items: Vec<(String, bool, Act)>| {
+            let ed = ed.clone();
+            h_flex()
+                .id(id)
+                .h(px(26.))
+                .gap(px(2.))
+                .cursor_pointer()
+                .child(arrowhead_glyph(cur))
+                .child(crate::os_ui::glyph(SELECT_CARET, 8., gpui_kit::rgb_static(0x333333)))
+                .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
+                    for (label, checked, f) in &items {
+                        let (e, f) = (ed.clone(), f.clone());
+                        menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, _, cx| e.update(cx, |this, cx| this.set_drawing_prop(&*f, cx))));
+                    }
+                    menu
+                })
+                .into_any_element()
+        };
         let section = |title: &'static str| div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::rgb(0xefefef)).border_t_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mt(px(4.)).mb(px(8.)).child(title).into_any_element();
         let precision_items = |cur: Option<u8>, max: usize, set: fn(&mut DrawingProps, Option<u8>)| -> Vec<(String, bool, Act)> {
             (0..=max).map(|k| (precision_label(k), cur == Some(k as u8), std::rc::Rc::new(move |p: &mut DrawingProps| set(p, Some(k as u8))) as Act)).collect()
         };
         let shown = |cur: Option<u8>, default: usize| precision_label(cur.map(|c| c as usize).unwrap_or(default));
-        let mut body = v_flex().id("dr-dprops-body").flex_1().min_h_0().overflow_y_scroll();
+        // Live 1710: a tab longer than the panel scrolls with Chrome's 15 px
+        // scrollbar at the right, the groups ending before it.
+        let overflow = self.drawing_props.overflow.get();
+        let mut body = v_flex().id("dr-dprops-body").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.drawing_props.scroll).when(overflow, |d| d.pr(px(gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH)));
         if self.drawing_props.tab == 0 {
             let unit_items: Vec<(String, bool, Act)> = DimUnits::ALL
                 .iter()
@@ -588,20 +669,23 @@ impl DrawingEditor {
             let std_name = |ansi: bool| if ansi { "ANSI".to_string() } else { "ISO".to_string() };
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Dimensions"))
+                // Live 1710: the group's column at 123 px (selects 1 px
+                // further, 220 px wide), rows 32 / 32 / 30 / 33 / 33 px.
                 .child(section("All dimensions"))
-                .child(row("Font", font_row(FontOf::Dims, props.dim_font.clone(), cx)))
-                .child(row("Text height", field(0)))
-                .child(row("Color", swatch("dp-dcolor", props.dim_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.dim_color = c))))
-                .child(row("Arrowhead", h_flex().gap(px(4.)).child(field(1)).child(select("dp-darrow", props.dim_arrow_type.name().into(), arrow_items)).into_any_element()))
-                .child(row("Text justification", select("dp-djust", props.dim_justify.name().into(), just_items)))
+                .child(trow("Font", 124., 32., 2., font_row(FontOf::Dims, props.dim_font.clone(), 220.)))
+                .child(trow("Text height", 123., 32., 2., field(0)))
+                .child(trow("Color", 123., 30., 0., swatch("dp-dcolor", props.dim_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.dim_color = c))))
+                .child(trow("Arrowhead", 123., 33., 2., h_flex().items_start().child(field(1)).child(div().ml(px(10.)).mt(px(1.)).child(asel("dp-darrow", props.dim_arrow_type, arrow_items))).into_any_element()))
+                .child(trow("Text justification", 124., 33., 2., sel("dp-djust", props.dim_justify.name().into(), just_items, 220.)))
                 .child(check("dp-dunder", "Underline overridden dimensions", props.underline_overridden, |p, v| p.underline_overridden = v, cx))
                 .child(check("dp-dbreak", "Break dimension by default", props.break_dims, |p, v| p.break_dims = v, cx))
-                .child(row("Fit standard", select("dp-dfit", std_name(fit_ansi), std_items(fit_ansi, |p, v| p.dim_fit_ansi = Some(v)))))
+                .child(trow("Fit standard", 124., 33., 2., sel("dp-dfit", std_name(fit_ansi), std_items(fit_ansi, |p, v| p.dim_fit_ansi = Some(v)), 220.)))
+                // Column 153 (selects 154, 197 px), rows 32 / 32 / 32 / 33 px.
                 .child(section("Gaps and extensions"))
-                .child(row("Text alignment", select("dp-dalign", if horiz { "Horizontal".into() } else { "Align with dimension line".into() }, align_items)))
-                .child(row("Text gap", field(2)))
-                .child(row("Geometry gap", field(3)))
-                .child(row("Extension past line", field(4)))
+                .child(trow("Text alignment", 154., 32., 2., sel("dp-dalign", if horiz { "Horizontal".into() } else { "Align with dimension line".into() }, align_items, 197.)))
+                .child(trow("Text gap", 153., 32., 2., field(2)))
+                .child(trow("Geometry gap", 153., 32., 2., field(3)))
+                .child(trow("Extension past line", 153., 33., 2., field(4)))
                 .child(check("dp-djog45", "Lock the angle of all jogged dimensions to 45 degrees", props.lock_jog_45, |p, v| p.lock_jog_45 = v, cx));
             // Chamfer: 45 degree style / content, the others', precisions.
             let style_items = |cur: bool, set: fn(&mut DrawingProps, bool)| -> Vec<(String, bool, Act)> {
@@ -613,13 +697,14 @@ impl DrawingEditor {
             };
             let style_name = |d: bool| if d { "Dimensions".to_string() } else { "Note".to_string() };
             body = body
+                // Column 165, 186 px selects, 33 px rows.
                 .child(section("Chamfer dimensions"))
-                .child(row("45 degree style", select("dp-ch45s", style_name(props.chamfer_45_dimension), style_items(props.chamfer_45_dimension, |p, v| p.chamfer_45_dimension = v))))
-                .child(row("45 degree content", select("dp-ch45c", props.chamfer_45_content.name().into(), content_items(props.chamfer_45_content, |p, v| p.chamfer_45_content = v, true))))
-                .child(row("Non 45 degree style", select("dp-chs", style_name(props.chamfer_dimension), style_items(props.chamfer_dimension, |p, v| p.chamfer_dimension = v))))
-                .child(row("Non 45 degree content", select("dp-chc", props.chamfer_content.name().into(), content_items(props.chamfer_content, |p, v| p.chamfer_content = v, false))))
-                .child(row("Length precision", select("dp-chlp", shown(props.chamfer_length_precision, default_digits(units)), precision_items(props.chamfer_length_precision, 6, |p, v| p.chamfer_length_precision = v))))
-                .child(row("Angle precision", select("dp-chap", shown(props.chamfer_angle_precision, 0), precision_items(props.chamfer_angle_precision, 4, |p, v| p.chamfer_angle_precision = v))))
+                .child(trow("45 degree style", 165., 33., 2., sel("dp-ch45s", style_name(props.chamfer_45_dimension), style_items(props.chamfer_45_dimension, |p, v| p.chamfer_45_dimension = v), 186.)))
+                .child(trow("45 degree content", 165., 33., 2., sel("dp-ch45c", props.chamfer_45_content.name().into(), content_items(props.chamfer_45_content, |p, v| p.chamfer_45_content = v, true), 186.)))
+                .child(trow("Non 45 degree style", 165., 33., 2., sel("dp-chs", style_name(props.chamfer_dimension), style_items(props.chamfer_dimension, |p, v| p.chamfer_dimension = v), 186.)))
+                .child(trow("Non 45 degree content", 165., 33., 2., sel("dp-chc", props.chamfer_content.name().into(), content_items(props.chamfer_content, |p, v| p.chamfer_content = v, false), 186.)))
+                .child(trow("Length precision", 165., 33., 2., sel("dp-chlp", shown(props.chamfer_length_precision, default_digits(units)), precision_items(props.chamfer_length_precision, 6, |p, v| p.chamfer_length_precision = v), 186.)))
+                .child(trow("Angle precision", 165., 33., 2., sel("dp-chap", shown(props.chamfer_angle_precision, 0), precision_items(props.chamfer_angle_precision, 4, |p, v| p.chamfer_angle_precision = v), 186.)))
                 .child(section("Ordinate dimensions"))
                 .child(row("Dimension style", select("dp-ordstd", std_name(ord_ansi), std_items(ord_ansi, |p, v| p.ordinate_ansi = Some(v)))))
                 .child(section("Diameter and radial dimensions"))
@@ -658,7 +743,7 @@ impl DrawingEditor {
                     let items: Vec<(String, bool, Act)> = [("ANSI", true), ("ISO", false)].iter().map(|&(n, v)| (n.to_string(), ansi == v, std::rc::Rc::new(move |p: &mut DrawingProps| p.weld_ansi = Some(v)) as Act)).collect();
                     body = body.child(row("Standard", select("dp-weld-std", if ansi { "ANSI".into() } else { "ISO".into() }, items)));
                 }
-                body = body.child(row("Font", font_row(FontOf::Type(t), ts.font.clone(), cx)));
+                body = body.child(row("Font", font_row(FontOf::Type(t), ts.font.clone(), 164.)));
                 if t == AnnType::FlagNotes {
                     let shapes = choices(&noshape_model::drawing::note::FlagShape::ALL, props.flag_shape, |s| s.name(), |p, v| p.flag_shape = v);
                     body = body.child(row("Border shape", select("dp-flag-shape", props.flag_shape.name().into(), shapes))).child(color);
@@ -854,7 +939,7 @@ impl DrawingEditor {
                 // Live: one "Inspection items" group, then "Automatic inspection items".
                 .child(section("Inspection items"))
                 .child(row("Item parsing", select("dp-iparse", if props.inspection_row_parsing { "Row".into() } else { "Parameter".into() }, parse_items)))
-                .child(row("Font", font_row(FontOf::Inspection, props.inspection_font.clone(), cx)))
+                .child(row("Font", font_row(FontOf::Inspection, props.inspection_font.clone(), 164.)))
                 .child(row("Text", field(0)))
                 .child(row("Border shape", select("dp-ishape", props.inspection_shape.name().into(), shape_items)))
                 .child(row("Border size", select("dp-isize", border_chars_label(props.inspection_border_chars), border_items)))
@@ -891,6 +976,10 @@ impl DrawingEditor {
                     .tooltip(crate::ui::tooltip(*tip))
                     .child(crate::assets::icon(&crate::assets::icon_path(icon), 20., cx))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if this.drawing_props.tab != i {
+                            // Each tab opens at its top.
+                            this.drawing_props.scroll.set_offset(point(px(0.), px(0.)));
+                        }
                         this.drawing_props.tab = i;
                         cx.notify();
                     })),
@@ -916,7 +1005,37 @@ impl DrawingEditor {
                 // the tabs 42 px down (1710).
                 .child(div().h(px(42.)).flex_none().pt(px(5.)).flex().justify_center().child(div().h(px(25.)).line_height(px(25.)).text_size(px(18.67)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x1b5faa)).child("Drawing properties")))
                 .child(tabs)
-                .child(body)
+                .child({
+                    let (scroll, flag) = (self.drawing_props.scroll.clone(), self.drawing_props.overflow.clone());
+                    div()
+                        .relative()
+                        .flex_1()
+                        .min_h_0()
+                        .flex()
+                        .flex_col()
+                        .child(body)
+                        .when(overflow, |d| d.child(gpui_kit::component::menu::native_scrollbar(&self.drawing_props.scroll, cx)))
+                        .on_drag_move(cx.listener(|this, e: &DragMoveEvent<gpui_kit::component::menu::NativeThumbDrag>, window, cx| {
+                            gpui_kit::component::menu::native_scrollbar_drag(&this.drawing_props.scroll, e.event.position.y);
+                            window.refresh();
+                            cx.notify();
+                        }))
+                        // Known once laid out: draw again with the scrollbar.
+                        .child(
+                            canvas(
+                                move |_, window, _| {
+                                    let o = scroll.max_offset().y > px(0.5);
+                                    if o != flag.get() {
+                                        flag.set(o);
+                                        window.request_animation_frame();
+                                    }
+                                },
+                                |_, _, _, _| {},
+                            )
+                            .absolute()
+                            .size_0(),
+                        )
+                })
                 .child(self.drawing_props_footer(cx))
                 .into_any_element(),
         )

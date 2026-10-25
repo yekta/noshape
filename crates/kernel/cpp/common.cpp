@@ -757,6 +757,11 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
   for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
   {
     const TopoDS_Edge& e = TopoDS::Edge(ee.Current());
+    // Only the boundary counts: an internal edge (a union along a tangent
+    // cylinder leaves one in the face; DIN 985 M48's hex flats) bounds
+    // nothing and would add its line integral once (-0.2165 mm² a flat).
+    if (e.Orientation() == TopAbs_INTERNAL || e.Orientation() == TopAbs_EXTERNAL)
+      continue;
     double             a, b;
     const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, f, a, b);
     if (c.IsNull())

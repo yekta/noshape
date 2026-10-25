@@ -15,11 +15,11 @@ B = Onshape client code (bundle-raw), P = an existing parity row.
 
 | # | Behaviour | Live / source | Status |
 |---|---|---|---|
-| 1.1 | Click a face / edge / vertex / plane / sketch entity selects it; a plain click **adds** to the selection (no modifier needed) | L263; P part-studio 3.1 | 🔧 (P ✅; replay pending) |
+| 1.1 | Click a face / edge / vertex / plane / sketch entity selects it; a plain click **adds** to the selection (no modifier needed) | L263; P part-studio 3.1 | ✅ R (CI replay 10-25, Wayland and X11: click-top, click-front-adds) |
 | 1.2 | A plain click on a selected entity toggles it off (the pointer still hovers it, so its outline stays) | live "nav2 selection" 1 | 🔧 (`pick` toggles) |
 | 1.3 | Shift+click and Meta+click act as a plain click (toggle). **Ctrl+click opens the graphics context menu on release and leaves the selection** (`eventCanBeUsedForContextMenu` = ctrlKey or right button, every platform) | live "nav2 selection" 3 | ✅ (viewport.rs: Ctrl+left release → context menu; checked in the app 10-25) |
 | 1.4 | Click in empty space clears the selection, **a Shift+click there keeps it**; neither clears while Mass properties or a pinned Measure panel is open | L263, L401; live "nav2 selection" 3 | ✅ (part_studio/mod.rs Click arm; checked in the app 10-25) |
-| 1.5 | Space clears the selection; Ctrl+A does nothing | L1199; P 1.8 | 🔧 |
+| 1.5 | Space clears the selection; Ctrl+A does nothing | L1199; P 1.8 | ✅ R (space-clears) |
 | 1.6 | **Esc does not clear the selection** in the Part Studio (graphics focused); Space does | live "nav2 selection" 4 | ✅ (part_studio/mod.rs Cancel: isolate only; checked in the app 10-25) |
 | 1.7 | A part face is picked through planes; a plane only where no part is under the cursor | L406; P 13.8 | ✅ P |
 | 1.8 | Left→right drag: window box (only what is fully inside); right→left: crossing box (everything touched); a window only while it ends strictly right of its start (`point1.x > point0.x`; a vertical box is crossing), a two-finger touch box always a window. Picks on release, back faces on, so **occluded** faces and edges are taken. A Part Studio box takes **faces and edges only: no vertices, part, default planes (enclosed, crossed or over their border), Origin or mate connector** (window round the block → 6 faces + 12 edges; crossing over a corner → 3 faces + 3 edges incl. the hidden bottom face). A box adds, never toggles, and an empty box keeps the selection | L345–347; live "nav2 selection" 5, 6; B `performBoxSelection` | ✅ (box_select.rs from the projected display geometry; behaviors.rs `box_takes`, test `box_takes_no_planes_origin_or_connectors`; window round two cubes takes their faces and edges, not the planes, in the app 10-25) |
@@ -30,7 +30,7 @@ B = Onshape client code (bundle-raw), P = an existing parity row.
 | 1.13 | Selection-count cursor macSelectionCursor-N, -5plus from 6 | L1100–1111 | ✅ P cursors 35/36 |
 | 1.14 | Left drag threshold 2 px / 50 ms (`LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE`, `_TIME_TOLERANCE`) | B | 🔧 |
 
-Replay: `.github/nav/linux-replay.sh <noshape> .github/nav/block.noshape <out> wayland|x11 interact`
+Replay: `.github/nav/linux-replay.sh <noshape> .github/nav/block.noshape <out> wayland|x11 interact` (in the "Navigation replay" workflow's Linux job since 10-25; run 40235651854: 8/8 on Wayland and X11 with the box check as live: no plane)
 (interact.py drives clicks, boxes, hover and keys with uinput; interact_check.py asserts the traced
 selection and hover per step, rows in brackets).
 
@@ -49,12 +49,12 @@ selection and hover per step, rows in brackets).
 
 | # | Behaviour | Live / source | Status |
 |---|---|---|---|
-| 3.1 | Hovered face: boundary only, #FFC685 ~2 px, no fill (light and dark) | L257, L11317 | 🔧 |
+| 3.1 | Hovered face: boundary only, #FFC685 ~2 px, no fill (light and dark) | L257, L11317 | ✅ R hover target (hover-top); look 🔧 |
 | 3.2 | Hovered edge: thickened #FFC685; a 9 px dark hollow ring at its midpoint; near the midpoint (a few px) the midpoint becomes the target (11 px orange ring) | L258, L14599–14612 | ⏳ (ours switches to the midpoint only on click, P 3.10) |
 | 3.3 | Hovered vertex: a light-orange dot | L259 | 🔧 |
 | 3.4 | Hovered plane / mate connector colours | B only (`SECTION_PLANE…`, `MATE_CONNECTOR_PRE_SELECTED_COLOR`) | ❓ |
 | 3.5 | Timing ("reduce mouse hover highlight" on): below 0.15 px/ms the pick runs on every move; faster, the old highlight clears (unless still under the pointer) and the pick waits min(5 × average pick ms, 250 ms) after the pointer pauses (average = EMA 0.8/0.2 of pick times) | live "nav2 pre-highlight" 1–2 | 🔧 (viewport.rs `prehighlight_delay`, GPU hover-pick time as the average; plain selection only; test `prehighlight_waits_for_a_pause_as_live`) |
-| 3.6 | Leaving the graphics area clears the pre-highlight at once (next frame) | live "nav2 pre-highlight" 4; B `onMouseLeave` | 🔧 |
+| 3.6 | Leaving the graphics area clears the pre-highlight at once (next frame) | live "nav2 pre-highlight" 4; B `onMouseLeave` | ✅ R (hover-leave) |
 | 3.7 | Hovering a feature row outlines its geometry | L260 | 🔧 P |
 | 3.8 | Sketch hover #ffc685 / mirrored pair secondary #f2ff80 | L8776–8813 | ✅ P sketch |
 
@@ -79,18 +79,18 @@ selection and hover per step, rows in brackets).
 | 5.1 | Panel 440 px, Part / Face tabs, values = `query_mass_properties` | L403 | 🔧 (P 11.2) |
 | 5.2 | No material: red chip, blank mass / CoM / inertia; a one-time toast "One or more parts do not have a material defined." 3.6 s after opening, hidden 4.6 s later | L6287–6318 | 🔧 |
 | 5.3 | Face tab: Surface area, Perimeter, Lxx/Lxy/Lyx/Lyy, Lzz; non-coplanar faces blank and a red title | L2723–2735 | 🔧 (P 11.5) |
-| 5.4 | "Mate connector for reference frame": a field of its own (click it, then a connector's row or glyph; × clears); with it the centre of mass reads in the connector's frame (block centre 20/10/5 from a connector at its corner (40,20,10): −20/−10/−5) and the inertia is about the connector's origin in its axes, products as tensor entries (Lxy −m·dx·dy); the CoM and inertia Overrides grey out. Mass ☑ Override: ticking keeps the mass and doesn't focus the box; a typed mass + Enter rescales the inertia at once; ✓ (solid once something changed) stores it on the part, unticking restores the computed mass | live "ui (10-25 d) Part Studio Mass properties" (ui-mass/05–15) | 🔧 (menus.rs `mass_reference`, `mass_override_edit`, `accept_mass_dialog`; the document's mass unit (lb live) is not modelled: values read in kg) |
+| 5.4 | "Mate connector for reference frame": a field of its own (click it, then a connector's row or glyph; × clears); with it the centre of mass reads in the connector's frame (block centre 20/10/5 from a connector at its corner (40,20,10): −20/−10/−5) and the inertia is about the connector's origin in its axes, products as tensor entries (Lxy −m·dx·dy); the CoM and inertia Overrides grey out. Mass ☑ Override: ticking keeps the mass and doesn't focus the box; a typed mass + Enter rescales the inertia at once; ✓ (solid once something changed) stores it on the part, unticking restores the computed mass | live "ui (10-25 d) Part Studio Mass properties" (ui-mass/05–15) | ✅ in the app 10-25 (menus.rs `mass_reference`, `mass_override_edit`, `accept_mass_dialog`; numbers to 3 decimals, trailing zeros dropped, tiny ones in e-notation (`mass_number`); Override 1 → inertia 41.667 / 141.667 / 166.667 as live, kept after ✓). Open: the document's mass unit (lb live) is not modelled, values read in kg; our mate connector on that vertex is turned (X = world Y, Z = world X; live: world-aligned), so the reference numbers differ until that is fixed (mate connector feature) |
 | 5.5 | Esc closes Measure and Mass | L6327 | 🔧 |
 
 ## 6. Section view
 
 | # | Behaviour | Live / source | Status |
 |---|---|---|---|
-| 6.1 | Dialog: Exclude / Include tabs, "Section plane 1 (Top)", prompt "Select a plane, planar face, cylinder, cone, or mate connector." | L358, L4955 | ✅ P 10.7 |
+| 6.1 | Dialog: Exclude / Include tabs, "Section plane 1 (Top)" (a chip is named by the plane's nearest default plane, whatever was picked: section.rs `direction_name`), prompt "Select a plane, planar face, cylinder, cone, or mate connector." | L358, L4955 | ✅ P 10.7 |
 | 6.2 | Part Studio manipulator: base ring at the picked face's centre, arrow (hollow head), two rotate handles; only the hovered handle blue ~#4573AE; the glyph's centre highlights nothing; cursor default | L14576–14598 | 🔧 (section_manip.rs; the base starts at the picked face's area centroid or the connector's origin, `SectionPlane::base`; default planes across the model's centre) |
 | 6.3 | Arrow drag shows a value box (75×26, 1 decimal while dragging, from the drag start); Esc closes the box, a second Esc cancels | L11990–12030 | 🔧 |
 | 6.4 | Rotate handles: ring 0 about the plane's Y, ring 1 about its X, through the base; 5° multiples catch the drag near them, else free (up to 3 decimals, "deg") | L12023–12028 | 🔧 (U `ring_drags_catch_five_degree_multiples`, `rotating_turns_the_plane_about_its_base`) |
-| 6.5 | Dragging the base snaps to circle centres, faces, edges (~30–35 px, over the face) and vertices (~22 px); what it snaps to lights up; on release the plane moves through the snapped point and the base returns to its place | L14009–14028 | 🔧 (section_manip.rs `section_snap`, ported from nav2 onto psb's manipulator: hover picks continue during the base drag (`Viewport::tool_hover`), only the snapped entity lights; the snapped look (pale-yellow disc + triad) not drawn yet: needs `asm_scene::push_connector_glyph` public) |
+| 6.5 | Dragging the base snaps to circle centres, faces, edges (~30–35 px, over the face) and vertices (~22 px); what it snaps to lights up; on release the plane moves through the snapped point and the base returns to its place | L14009–14028 | ⏳ in the app 10-25: edge (bottom edge lit), vertex (lit) and release through the snapped point (plane z 10 → 0) as live; an edge lying in the plane doesn't light (clipped), and at z 0 live shows a hatched cap where ours shows none (section_manip.rs `section_snap`, ported from nav2 onto psb's manipulator: hover picks continue during the base drag (`Viewport::tool_hover`), only the snapped entity lights; the snapped look (pale-yellow disc + triad) not drawn yet: needs `asm_scene::push_connector_glyph` public) |
 | 6.6 | Caps: part colour with view-dependent lighting, hatch 0.5× the fill; while the dialog is open caps blend toward #FFA90A @0.8; excluded instances uncut and outlined | L12207–12230, L12291 | ⏳ (flat 0.9×) |
 | 6.7 | With a feature dialog open, Shift+X does nothing and the camera menu has no Section view… | L4955–4961 | 🔧 |
 | 6.8 | A plane feature row accepted as a section plane (ADV1) | workflow-analysis ADV1 | 🔧 (feature row click → `section_pick`) |

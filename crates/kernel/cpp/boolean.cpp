@@ -61,6 +61,8 @@
 #include <TColStd_PackedMapOfInteger.hxx>
 #include <NCollection_DataMap.hxx>
 #include <TopTools_ShapeMapHasher.hxx>
+#include <mutex>
+#include <memory>
 #include <algorithm>
 #include <TopoDS_Compound.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
@@ -1796,6 +1798,85 @@ static gp_Trsf trsf_of(rust::Slice<const double> m)
   return t;
 }
 
+namespace
+{
+// A mirror of a shape (its TShape T at location L): the mirrored copy of T,
+// made once per T and mirror, at M·L·M⁻¹ (a rigid motion). The mirrored
+// instances of a pattern then share one TShape like the pattern's own, so a
+// boolean intersects one pair of congruent instances once (OCCT patch
+// 0001).
+struct MirrorCopy
+{
+  TopoDS_Shape              base; // T at the identity (keeps T alive)
+  gp_Trsf                   m;
+  TopoDS_Shape              copy;
+  ShapeIMap                 subs;     // base's faces, edges, vertices, solids
+  std::vector<TopoDS_Shape> mirrored; // their images in copy
+};
+
+bool same_trsf(const gp_Trsf& a, const gp_Trsf& b)
+{
+  for (int r = 1; r <= 3; ++r)
+    for (int c = 1; c <= 4; ++c)
+      if (std::abs(a.Value(r, c) - b.Value(r, c)) > 1e-12)
+        return false;
+  return true;
+}
+
+std::shared_ptr<const MirrorCopy> mirror_copy(const TopoDS_Shape& base, const gp_Trsf& m)
+{
+  static std::mutex                                     mu;
+  static std::vector<std::shared_ptr<const MirrorCopy>> cache;
+  {
+    std::lock_guard<std::mutex> g(mu);
+    for (const auto& c : cache)
+      if (c->base.IsEqual(base) && same_trsf(c->m, m))
+        return c;
+  }
+  BRepBuilderAPI_Transform tr(base, m, true);
+  if (!tr.IsDone())
+    fail_op("transform failed");
+  auto c  = std::make_shared<MirrorCopy>();
+  c->base = base;
+  c->m    = m;
+  c->copy = tr.Shape();
+  for (TopAbs_ShapeEnum k : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    TopExp::MapShapes(base, k, c->subs);
+  for (int i = 1; i <= c->subs.Extent(); ++i)
+    c->mirrored.push_back(tr.ModifiedShape(c->subs(i)));
+  std::lock_guard<std::mutex> g(mu);
+  if (cache.size() >= 16)
+    cache.erase(cache.begin());
+  cache.push_back(c);
+  return c;
+}
+
+OpOut mirror_instance(const TopoDS_Shape& s, const gp_Trsf& m)
+{
+  const TopLoc_Location             l = s.Location();
+  const std::shared_ptr<const MirrorCopy> c = mirror_copy(s.Located(TopLoc_Location()), m);
+  const TopLoc_Location             k(m * l.Transformation() * m.Inverted());
+  HHist                             hist = new BRepTools_History();
+  for (TopAbs_ShapeEnum t : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+  {
+    ShapeIMap subs;
+    TopExp::MapShapes(s, t, subs);
+    for (int i = 1; i <= subs.Extent(); ++i)
+    {
+      const TopoDS_Shape& x = subs(i);
+      const int           j = c->subs.FindIndex(x.Located(l.Inverted() * x.Location()));
+      if (j == 0)
+        continue;
+      TopoDS_Shape r = c->mirrored[(size_t)j - 1].Moved(k);
+      if (x.Orientation() != c->subs(j).Orientation())
+        r.Reverse();
+      hist->AddModified(x, r);
+    }
+  }
+  return make_result({s}, c->copy.Moved(k), hist.get());
+}
+} // namespace
+
 OpOut op_transform(const OcShape& s, rust::Slice<const double> m, bool copy)
 {
   require_non_null(s.shape, "shape");
@@ -1806,6 +1887,8 @@ OpOut op_transform(const OcShape& s, rust::Slice<const double> m, bool copy)
     const TopoDS_Shape r    = transform_mesh(s.shape, t, *hist);
     return make_result({s.shape}, r, hist.get());
   }
+  if (!copy && t.IsNegative() && std::abs(std::abs(t.ScaleFactor()) - 1.) <= TopLoc_Location::ScalePrec())
+    return mirror_instance(s.shape, t);
   BRepBuilderAPI_Transform tr(s.shape, t, copy);
   if (!tr.IsDone())
     fail_op("transform failed");
