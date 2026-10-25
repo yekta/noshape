@@ -250,9 +250,25 @@ fn clear_status(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn add_debug_entities(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let def = def_arg(i, &a, 1)?;
-    let refs = query::evaluate_refs(i, &cx, def.get("entities"))?;
-    cx.state.lock().debug_entities.extend(refs);
+    let color = debug_color(def.get("color").as_str().as_deref().unwrap_or("RED"));
+    let shapes = query::with_ents(i, &cx, def.get("entities"), |_, q, ents| Ok(ents.iter().filter_map(|e| q.shape(e)).collect::<Vec<_>>()))?;
+    cx.state.lock().debug_entities.extend(shapes.into_iter().map(|s| (s, color)));
     Ok(Value::Undefined)
+}
+
+/// The client's colour of a `DebugColor` (live "fs (10-25 c)": ORANGE is a
+/// pale yellow-green; anything else is red).
+fn debug_color(name: &str) -> [u8; 3] {
+    match name {
+        "GREEN" => [0, 255, 0],
+        "BLUE" => [0, 0, 255],
+        "CYAN" => [0, 255, 255],
+        "MAGENTA" => [255, 0, 255],
+        "YELLOW" => [255, 255, 0],
+        "BLACK" => [0, 0, 0],
+        "ORANGE" => [242, 255, 128],
+        _ => [255, 0, 0],
+    }
 }
 
 fn version_ordinal(v: &Value) -> Option<(noshape_featurescript::value::Tag, u32)> {

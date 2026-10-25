@@ -1,3 +1,6 @@
 /target
 *.noshape-journal
 .DS_Store
+
+# Python bytecode (e.g. .github/nav replay scripts)
+__pycache__/

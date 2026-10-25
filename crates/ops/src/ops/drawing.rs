@@ -217,7 +217,7 @@ pub(super) fn sheet_index(d: &Drawing, a: &Args) -> Result<usize, OpError> {
     }
 }
 
-fn source_tab(od: &OpenDoc, a: &Args, name: &str) -> Result<TabId, OpError> {
+pub(super) fn source_tab(od: &OpenDoc, a: &Args, name: &str) -> Result<TabId, OpError> {
     doc::tab_of_kind(od.doc(), Some(a.str(name)?), "Part Studio or Assembly", |c| matches!(c, TabContent::PartStudio(_) | TabContent::Assembly(_))).map_err(|e| e.with_param(name))
 }
 

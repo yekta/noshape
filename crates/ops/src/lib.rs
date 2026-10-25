@@ -37,5 +37,5 @@ pub mod studio;
 pub mod values;
 pub mod variable_studio;
 
-pub use doc::{Ctx, OpenDoc};
+pub use doc::{Ctx, OpenDoc, UiRequest};
 pub use error::OpError;

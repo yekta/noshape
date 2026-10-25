@@ -120,25 +120,32 @@ func pixels(_ dy: Int32, _ dx: Int32 = 0, phase: Int64, momentum: Int64 = 0) {
     pause(0.016)
 }
 
-func drag(_ button: CGMouseButton, _ dx: Double, _ dy: Double, pause: Double) {
-    let (down, dragged, up): (CGEventType, CGEventType, CGEventType) = button == .right
-        ? (.rightMouseDown, .rightMouseDragged, .rightMouseUp)
-        : (.otherMouseDown, .otherMouseDragged, .otherMouseUp)
+func drag(_ button: CGMouseButton, _ dx: Double, _ dy: Double, still: Double, flags: CGEventFlags = []) {
+    let (down, dragged, up): (CGEventType, CGEventType, CGEventType) = switch button {
+    case .right: (.rightMouseDown, .rightMouseDragged, .rightMouseUp)
+    case .left: (.leftMouseDown, .leftMouseDragged, .leftMouseUp)
+    default: (.otherMouseDown, .otherMouseDragged, .otherMouseUp)
+    }
     var p = point()
     moveTo(p)
-    post(CGEvent(mouseEventSource: nil, mouseType: down, mouseCursorPosition: p, mouseButton: button))
+    let press = CGEvent(mouseEventSource: nil, mouseType: down, mouseCursorPosition: p, mouseButton: button)!
+    press.flags = flags
+    post(press)
     pause(0.05)
     for _ in 0..<20 {
         p = CGPoint(x: p.x + dx / 20, y: p.y + dy / 20)
         let e = CGEvent(mouseEventSource: nil, mouseType: dragged, mouseCursorPosition: p, mouseButton: button)!
         e.setIntegerValueField(.mouseEventDeltaX, value: Int64(dx / 20))
         e.setIntegerValueField(.mouseEventDeltaY, value: Int64(dy / 20))
+        e.flags = flags
         post(e)
         pause(0.016)
     }
-    pause(pause)
-    post(CGEvent(mouseEventSource: nil, mouseType: up, mouseCursorPosition: p, mouseButton: button))
-    pause(pause < 0.05 ? 1.2 : 0.2)
+    pause(still)
+    let release = CGEvent(mouseEventSource: nil, mouseType: up, mouseCursorPosition: p, mouseButton: button)!
+    release.flags = flags
+    post(release)
+    pause(still < 0.05 ? 1.2 : 0.2)
 }
 
 // ------------------------------------------------------------ steps
@@ -175,7 +182,10 @@ step("pad-scroll-sideways") {
     for d: Int32 in [5, 10, 10, 5] { pixels(1, d, phase: 2) }
     pixels(0, phase: 4)
 }
-step("right-drag") { drag(.right, -200, 0, pause: 0.1) }
-step("right-drag-fling") { drag(.right, -200, 0, pause: 0.0) }
-step("middle-drag") { drag(.center, 200, 100, pause: 0.1) }
+step("right-drag") { drag(.right, -200, 0, still: 0.1) }
+step("right-drag-fling") { drag(.right, -200, 0, still: 0.0) }
+step("middle-drag") { drag(.center, 200, 100, still: 0.1) }
+// Chrome on macOS reports a one-finger Ctrl+click as a left button with Ctrl,
+// which never navigates: the drag must do nothing (row 2.9).
+step("ctrl-left-drag") { drag(.left, -200, 0, still: 0.1, flags: .maskControl) }
 print("mac replay done")

@@ -418,6 +418,14 @@ impl Shape {
         Ok(BoundingBox { min: DVec3::new(v[0], v[1], v[2]), max: DVec3::new(v[3], v[4], v[5]) })
     }
 
+    /// Where the line `p + t dir` (t in `[0, len]`, `dir` normalised) crosses
+    /// the shape's faces: `(t, transition, on_boundary)`, the transition +1
+    /// into the material, -1 out of it, 0 tangent. Unsorted.
+    pub fn line_crossings(&self, p: DVec3, dir: DVec3, len: f64) -> Result<Vec<(f64, i8, bool)>> {
+        let v = ck(ffi::line_crossings(self.raw(), p3(p), p3(dir), len))?;
+        Ok(v.as_chunks::<3>().0.iter().map(|c| (c[0], c[1] as i8, c[2] != 0.0)).collect())
+    }
+
     /// Classify a point against a solid.
     pub fn classify_point(&self, p: DVec3, tolerance: f64) -> Result<PointClass> {
         Ok(match ck(ffi::classify_point(self.raw(), p3(p), tolerance))? {

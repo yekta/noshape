@@ -125,3 +125,30 @@ pub fn set_edge_styles(v: &mut DrawingView, edges: &[(noshape_model::BodyId, nos
         }
     }
 }
+
+/// Reference › Replace… (sheets panel, view row): on every sheet, the base
+/// views of `old` showing `old_part` show `new` / `new_part` instead (one
+/// drawing edit "Replace"; help H:sheets).
+pub fn replace_reference(d: &mut Drawing, old: noshape_model::document::TabId, old_part: &Option<noshape_model::BodyId>, new: noshape_model::document::TabId, new_part: Option<noshape_model::BodyId>) {
+    for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
+        if let ViewKind::Base { source: src, part: p, .. } = &mut v.kind
+            && *src == old
+            && p == old_part
+        {
+            *src = new;
+            *p = new_part.clone();
+        }
+    }
+}
+
+/// BOM table › Replace: every base view of `old` on the sheet shows `new`
+/// (one sheet edit "Replace").
+pub fn replace_sheet_source(s: &mut Sheet, old: noshape_model::document::TabId, new: noshape_model::document::TabId) {
+    for v in s.views.iter_mut() {
+        if let ViewKind::Base { source: src, .. } = &mut v.kind
+            && *src == old
+        {
+            *src = new;
+        }
+    }
+}

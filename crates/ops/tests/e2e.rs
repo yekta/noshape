@@ -1519,6 +1519,13 @@ export const partFaces = defineTable(function(context is Context, definition is 
     let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "table": "nope", "position": [10, 10] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
     assert!(e.message.contains("Part faces"), "{e:?}");
+    // Its properties in drawing_table_properties too; its Feature Studio (this document's).
+    call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": id, "bottom_to_top": false }));
+    assert!(last(&mut ctx).ends_with(":: Custom table properties"));
+    let f = call(&mut ctx, "drawing_open_feature_studio", json!({ "drawing": tab, "table": id }));
+    assert_eq!((f["linked"].clone(), f["target"]["kind"].clone()), (json!(false), json!("Feature Studio")), "{f}");
+    let s = call(&mut ctx, "drawing_switch_to_reference", json!({ "drawing": tab, "table": id }));
+    assert_eq!(s["target"]["name"], "Part Studio 1", "{s}");
 }
 
 #[test]
@@ -3475,4 +3482,80 @@ fn agent_usability_pass() {
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": "Part Studio 1 Drawing 1" }));
     let projected: Vec<&Value> = g["views"].as_array().unwrap().iter().filter(|v| v["kind"] == "projected").collect();
     assert!(!projected.is_empty() && projected.iter().all(|v| v["orientation"].is_string()), "{g}");
+}
+
+/// The last drawing menu items: Replicate annotations, Copy / Paste, Paste
+/// as table, table properties, Switch to reference and Replace, each with
+/// the editor's edit text.
+#[test]
+fn drawing_replicate_copy_paste_replace_and_navigation() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_more.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let top_v = g["views"].as_array().unwrap().iter().find(|v| v["orientation"] == "top").unwrap_or_else(|| panic!("{g}")).clone();
+    let top = top_v["id"].as_u64().unwrap();
+    let hole = top_v["edges"].as_array().unwrap().iter().find(|e| e["type"] == "circle").unwrap_or_else(|| panic!("{top_v}")).clone();
+    let (cx, cy, r) = (num(&hole["center"][0]), num(&hole["center"][1]), num(&hole["radius"]));
+    call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "diameter", "picks": [[cx + r, cy]], "place": [cx + r + 15.0, cy + 15.0] }));
+
+    // Replicate the Ø onto a second top view: it shows the same hole.
+    let second = call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "orientation": "top", "position": [330, 90] }))["view"].as_u64().unwrap();
+    let rep = call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": top, "to": second }));
+    assert_eq!(rep["message"], "Successfully replicated 1/1 annotations", "{rep}");
+    assert!(last(&mut ctx).ends_with(":: Replicate annotations"));
+    // Once there, it isn't copied again.
+    let again = call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": top, "to": second }));
+    assert_eq!((again["replicated"].clone(), again["message"].clone()), (json!([]), json!("No annotations replicated")), "{again}");
+    let e = try_call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": top, "to": second, "region": [[0, 0], [1, 1]] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("at"), "{e:?}");
+
+    // Copy the top view (with its Ø) and paste it.
+    let c = call(&mut ctx, "drawing_copy", json!({ "drawing": tab, "views": [top] }));
+    assert_eq!((c["copied"]["views"].clone(), c["message"].clone()), (json!(1), json!("Copied 1 view")), "{c}");
+    assert!(c["copied"]["annotations"].as_u64().unwrap() >= 1, "{c}");
+    let p = call(&mut ctx, "drawing_paste", json!({ "drawing": tab, "position": [100, 70] }));
+    assert_eq!(p["pasted"]["views"].as_array().unwrap().len(), 1, "{p}");
+    assert!(!p["pasted"]["annotations"].as_array().unwrap().is_empty(), "{p}");
+    assert!(last(&mut ctx).ends_with(":: Paste views"));
+
+    // Paste as table, then Table properties… (fixed corner, kept in place).
+    let pt = call(&mut ctx, "drawing_paste_table", json!({ "drawing": tab, "text": "Item\tQty\nBolt\t4", "position": [20, 280] }));
+    assert!(last(&mut ctx).ends_with(":: Paste as table"));
+    let tid = pt["table"].clone();
+    let t = pt["tables"].as_array().unwrap().iter().find(|t| t["id"] == tid).unwrap().clone();
+    assert_eq!(t["corner"], "TopLeft", "{t}");
+    let p2 = call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": tid, "corner": "bottom_left" }));
+    assert!(last(&mut ctx).ends_with(":: Table fixed corner"));
+    let t2 = p2["tables"].as_array().unwrap().iter().find(|t| t["id"] == tid).unwrap().clone();
+    assert_eq!(t2["corner"], "BottomLeft", "{t2}");
+    for k in ["min", "max"] {
+        for i in 0..2 {
+            assert!((num(&t2["bounds"][k][i]) - num(&t["bounds"][k][i])).abs() < 1e-6, "the table stays where it is: {t} {t2}");
+        }
+    }
+    let e = try_call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": tid, "structured": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("structured"), "{e:?}");
+    // Revision table properties.
+    let rid = call(&mut ctx, "drawing_revision_table", json!({ "drawing": tab, "position": [400, 290] }))["table"].clone();
+    call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": rid, "visible_rows": 8, "newest_top": true }));
+    assert!(last(&mut ctx).ends_with(":: Revision table properties"));
+    let e = try_call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": rid, "visible_rows": 0 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("visible_rows"), "{e:?}");
+
+    // Switch to reference: the view's Part Studio (no app open: nothing to switch).
+    let s = call(&mut ctx, "drawing_switch_to_reference", json!({ "drawing": tab, "view": top }));
+    assert_eq!((s["target"]["name"].clone(), s["target"]["kind"].clone(), s["shown_in_app"].clone()), (json!("Part Studio 1"), json!("Part Studio"), json!(false)), "{s}");
+    // Replace…: every base view of Part Studio 1 shows the copy.
+    let dup = call(&mut ctx, "tab_duplicate", json!({ "tab": "Part Studio 1" }))["tab"]["name"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_replace", json!({ "drawing": tab, "view": top, "source": dup }));
+    assert!(last(&mut ctx).ends_with(":: Replace"));
+    for v in [top, second] {
+        let s = call(&mut ctx, "drawing_switch_to_reference", json!({ "drawing": tab, "view": v }));
+        assert_eq!(s["target"]["name"], dup.as_str(), "{s}");
+    }
+    let e = try_call(&mut ctx, "drawing_open_feature_studio", json!({ "drawing": tab, "table": rid })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
 }
