@@ -1110,10 +1110,14 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         // under the datum planes and picked regions, its front faces over
         // them, so a picked region shows through one layer of the preview
         // (live part-studio/230, 231, dialogs/extrude-03).
-        let (previews, others): (Vec<usize>, Vec<usize>) = lists.transparent.iter().partition(|&&i| instances[i].preview);
+        // Translucent `over_transparent` meshes (picked sketch regions) go
+        // last, tinting a preview from above.
+        let (previews, rest): (Vec<usize>, Vec<usize>) = lists.transparent.iter().partition(|&&i| instances[i].preview);
+        let (after, others): (Vec<usize>, Vec<usize>) = rest.into_iter().partition(|&i| instances[i].over_transparent);
         draw(pass, &previews, &pipelines.mesh_transparent_back);
         draw(pass, &others, &pipelines.mesh_transparent);
         draw(pass, &previews, &pipelines.mesh_transparent_front);
+        draw(pass, &after, &pipelines.mesh_transparent);
         draw(pass, &lists.over_transparent, &pipelines.mesh_opaque);
         // Hidden-only geometry right after the meshes, so only faces count
         // as hiding it (not hover outlines or overlays drawn over the same
