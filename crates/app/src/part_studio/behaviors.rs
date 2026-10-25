@@ -889,7 +889,8 @@ impl PartStudioView {
     /// the selection; Ctrl+drag deselects (Onshape).
     pub(super) fn box_select(&mut self, ids: &[u32], deselect: bool, cx: &mut Context<Self>) {
         let Some(built) = &self.built else { return };
-        let targets: Vec<PickTarget> = ids.iter().filter_map(|id| built.picks.get(*id).cloned()).filter(|t| !matches!(t.kind, PickKind::Plane | PickKind::Origin)).collect();
+        // Live (selection/22–23): a box takes the default planes it covers too.
+        let targets: Vec<PickTarget> = ids.iter().filter_map(|id| built.picks.get(*id).cloned()).filter(|t| t.kind != PickKind::Origin).collect();
         if let Some(e) = &self.edit {
             let dialog = e.dialog.clone();
             if let Some((_, filter, _)) = dialog.read(cx).active_filter() {

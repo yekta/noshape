@@ -54,6 +54,8 @@ pub(super) enum Manip {
     Arc(ArcHandle),
     /// Transform ▸ Translate by XYZ (see `triad.rs`).
     Triad(super::triad::Triad),
+    /// The Section view dialog's manipulator (see `section_manip.rs`).
+    Section(super::section_manip::SectionManip),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -65,7 +67,7 @@ pub(super) struct ManipDrag {
 impl PartStudioView {
     /// The manipulator of the feature being edited, if it has one.
     pub(super) fn current_manip(&self, cx: &App) -> Option<Manip> {
-        let Some(e) = self.edit.as_ref() else { return self.section_arrow().map(Manip::Arrow) };
+        let Some(e) = self.edit.as_ref() else { return self.section_manip().map(Manip::Section) };
         match e.dialog.read(cx).feature.type_id.as_str() {
             "extrude" => self.current_arrow(cx).map(Manip::Arrow),
             "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.current_arc(cx).map(Manip::Arc),
@@ -226,6 +228,7 @@ impl PartStudioView {
             // The handle end of the arc (last few degrees) is grabbable.
             Some(Manip::Arc(h)) => vec![(h.point(h.angle * 0.85), h.point(h.angle), 0.0)],
             Some(Manip::Triad(t)) => self.triad_hit_segments(&t, cx),
+            Some(Manip::Section(s)) => self.section_hit_segments(&s, cx),
             None => Vec::new(),
         };
         // Datum boxes can be dragged too.
@@ -264,6 +267,7 @@ impl PartStudioView {
             Some(Manip::Arrow(a)) => a,
             Some(Manip::Arc(h)) => return self.arc_event(h, ev, window, cx),
             Some(Manip::Triad(t)) => return self.triad_event(t, ev, window, cx),
+            Some(Manip::Section(s)) => return self.section_manip_event(s, ev, window, cx),
             None => {
                 self.manip_drag = None;
                 return false;
@@ -285,10 +289,6 @@ impl PartStudioView {
                 }
                 let (o, d) = ray(self, *position, cx);
                 let Some(t) = Self::axis_param(&a, o, d) else { return true };
-                if a.param == super::section::SECTION_PARAM {
-                    self.drag_section_arrow(t - m.grab_offset, window, cx);
-                    return true;
-                }
                 let mut len = t - m.grab_offset;
                 let symmetric = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.params.bool("symmetric"));
                 if symmetric {
@@ -415,6 +415,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
             Manip::Arrow(a) => arrow_glyph(&a, self.arrow_hover, view, up),
             Manip::Arc(h) => arc_glyph(&h, up),
             Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, view, up),
+            Manip::Section(s) => super::section_manip::section_glyph(&s, view, up),
         }
     }
 }

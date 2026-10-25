@@ -23,6 +23,8 @@ pub struct SectionPlane {
     pub label: String,
     pub origin: DVec3,
     pub normal: DVec3,
+    /// In-plane X (the rotate rings turn about it and its Y).
+    pub x: DVec3,
     pub offset: f64,
     pub flipped: bool,
 }
@@ -54,8 +56,10 @@ pub struct SectionDialog {
     pub items: Vec<BodyId>,
     /// The "Items" field takes picks (else "Section planes").
     pub items_active: bool,
-    /// Plane the arrow drives.
+    /// Plane the manipulator drives.
     pub active: usize,
+    /// The manipulator's hover and drag (section_manip.rs).
+    pub manip: super::section_manip::ManipState,
     /// State before the dialog opened (restored by Cancel).
     saved: (Vec<SectionPlane>, Option<(bool, Vec<BodyId>)>),
 }
@@ -87,9 +91,9 @@ impl PartStudioView {
     /// Planes for the given references (or the Front plane).
     fn planes_for(&self, refs: &[Reference], cx: &App) -> Vec<SectionPlane> {
         let labeler = self.labeler(cx);
-        let frames: Vec<(String, PlaneFrame)> = refs.iter().filter_map(|r| self.frame_of_ref(r).map(|f| (labeler(r), f))).collect();
+        let frames: Vec<(String, PlaneFrame)> = refs.iter().filter_map(|r| self.frame_of_ref(r).map(|f| (labeler(r), PlaneFrame { origin: self.section_origin(r, f.origin), ..f }))).collect();
         let frames = if frames.is_empty() { vec![("Front plane".to_string(), PlaneFrame::FRONT)] } else { frames };
-        frames.into_iter().take(MAX_PLANES).map(|(l, f)| plane(&l, f.origin, f.normal)).collect()
+        frames.into_iter().take(MAX_PLANES).map(|(l, f)| plane(&l, f.origin, f.normal, f.x)).collect()
     }
 
     /// Open the dialog (keeping the current planes, or starting from the
@@ -110,7 +114,7 @@ impl PartStudioView {
         }
         let (include, items) = self.ui.section_parts.clone().unwrap_or((false, Vec::new()));
         let active = self.ui.section.len().saturating_sub(1);
-        self.ui.section_dialog = Some(SectionDialog { include, items, items_active: false, active, saved });
+        self.ui.section_dialog = Some(SectionDialog { include, items, items_active: false, active, manip: Default::default(), saved });
         self.apply_section(window, cx);
     }
 
@@ -212,7 +216,7 @@ impl PartStudioView {
                 self.flash_info("Maximum number of section planes reached".into(), cx);
                 return true;
             } else {
-                self.ui.section.push(plane(&label, f.origin, f.normal));
+                self.ui.section.push(plane(&label, self.section_origin(r, f.origin), f.normal, f.x));
                 if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
                     self.message = None;
                 }
@@ -233,32 +237,9 @@ impl PartStudioView {
             .enumerate()
             .map(|(i, s)| {
                 let n = DVec3::new(s[0], s[1], s[2]);
-                plane(&format!("Section plane {}", i + 1), n * s[3], n)
+                plane(&format!("Section plane {}", i + 1), n * s[3], n, DVec3::ZERO)
             })
             .collect();
-        self.apply_section(window, cx);
-    }
-
-    /// The arrow of the active plane while the dialog is open: on the plane
-    /// (where it passes the model's center) along its normal.
-    pub(super) fn section_arrow(&self) -> Option<super::manipulators::Arrow> {
-        let d = self.ui.section_dialog.as_ref()?;
-        let pl = self.ui.section.get(d.active)?;
-        let (lo, hi) = self.fit_bounds()?;
-        let center = (lo + hi) * 0.5;
-        let on_plane = pl.origin + pl.normal * pl.offset;
-        let base = center - pl.normal * pl.normal.dot(center - on_plane);
-        Some(super::manipulators::Arrow { base, dir: pl.normal, length: section_handle(lo, hi), param: SECTION_PARAM, flip: None })
-    }
-
-    /// A drag of the section arrow: its handle end is now at `length`
-    /// along the normal from the current plane position.
-    pub(super) fn drag_section_arrow(&mut self, length: f64, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((lo, hi)) = self.fit_bounds() else { return };
-        let Some(i) = self.ui.section_dialog.as_ref().map(|d| d.active) else { return };
-        if let Some(pl) = self.ui.section.get_mut(i) {
-            pl.offset += length - section_handle(lo, hi);
-        }
         self.apply_section(window, cx);
     }
 
@@ -321,31 +302,25 @@ impl PartStudioView {
         if self.ui.section_offset_edit.is_some() {
             return None;
         }
-        let a = self.section_arrow()?;
-        let d = self.ui.section_dialog.as_ref()?;
-        let pl = self.ui.section.get(d.active)?;
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let text = noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset, noshape_units::Dim::LENGTH), &units);
+        let tip = self.section_tip(cx)?;
+        let text = self.section_box_text(cx)?;
         let pal = p();
-        let b = crate::overlay_labels::ValueBox { text: &text, text_size: 12., text_color: pal.text.into(), background: gpui_kit::rgb(0xffffff).into(), border: Some(pal.accent.into()), pad_x: 4., offset: [12., -10.] };
-        crate::overlay_labels::value_box(window, cx, &b, a.base + a.dir * a.length)
+        let b = crate::overlay_labels::ValueBox { text: &text, text_size: 12., text_color: pal.text.into(), background: gpui_kit::rgb(0xffffff).into(), border: Some(pal.accent.into()), pad_x: 4., offset: [40., -35.] };
+        crate::overlay_labels::value_box(window, cx, &b, tip)
     }
 
-    /// The offset box beside the section arrow (live: e.g. "-0.91 in").
+    /// The offset box beside the section arrow (live: e.g. "-0.91 in"; like
+    /// the assembly's, assembly/2370, about 40 px right of and 35 px above
+    /// the tip, clear of the rotate rings).
     pub(super) fn render_section_value(&self, cx: &App) -> Option<AnyElement> {
-        let a = self.section_arrow()?;
-        let d = self.ui.section_dialog.as_ref()?;
-        let pl = self.ui.section.get(d.active)?;
-        let tip = a.base + a.dir * a.length;
-        let s = self.viewport.read(cx).project(tip)?;
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let text = noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset, noshape_units::Dim::LENGTH), &units);
+        let s = self.viewport.read(cx).project(self.section_tip(cx)?)?;
+        let text = self.section_box_text(cx)?;
         let pal = p();
         Some(
             div()
                 .absolute()
-                .left(px(s.x as f32 + 12.))
-                .top(px(s.y as f32 - 10.))
+                .left(px(s.x as f32 + 40.))
+                .top(px(s.y as f32 - 35.))
                 .px(px(4.))
                 .border_1()
                 .border_color(pal.accent)
@@ -362,13 +337,12 @@ impl PartStudioView {
     /// an input there. Enter or leaving it moves the plane; the click never
     /// reaches the graphics (it would pick the plane under it).
     pub(super) fn section_value_field(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let a = self.section_arrow()?;
         let d = self.ui.section_dialog.as_ref()?;
         let pl = self.ui.section.get(d.active)?;
-        let s = self.viewport.read(cx).project(a.base + a.dir * a.length)?;
+        let s = self.viewport.read(cx).project(self.section_tip(cx)?)?;
         let units = self.doc.read(cx).session.doc.settings.units;
         let text = noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset, noshape_units::Dim::LENGTH), &units);
-        let at = div().absolute().left(px(s.x as f32 + 12.)).top(px(s.y as f32 - 10.)).occlude();
+        let at = div().absolute().left(px(s.x as f32 + 40.)).top(px(s.y as f32 - 35.)).occlude();
         if let Some((input, _)) = &self.ui.section_offset_edit {
             let field = gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(12.));
             return Some(at.id("section-offset-field").w(px(90.)).px(px(4.)).border_1().border_color(p().accent).bg(gpui_kit::rgb(0xffffff)).child(gpui_kit::base::input::input_frame(div().child(field))).into_any_element());
@@ -429,8 +403,8 @@ impl PartStudioView {
             return;
         }
         let center = self.fit_bounds().map(|(lo, hi)| (lo + hi) * 0.5).unwrap_or_default();
-        let n = -self.viewport.read(cx).camera.forward();
-        self.ui.section.push(plane("View", center, n));
+        let camera = self.viewport.read(cx).camera;
+        self.ui.section.push(plane("View", center, -camera.forward(), camera.right()));
         if let Some(d) = &mut self.ui.section_dialog {
             d.active = self.ui.section.len() - 1;
             d.items_active = false;
@@ -439,14 +413,8 @@ impl PartStudioView {
     }
 }
 
-/// Parameter name marking the section arrow among the manipulators.
-pub(super) const SECTION_PARAM: &str = "__section";
-
-fn plane(label: &str, origin: DVec3, normal: DVec3) -> SectionPlane {
-    SectionPlane { label: label.to_string(), origin, normal, offset: 0.0, flipped: false }
-}
-
-/// Length of the section arrow's handle: a fraction of the model size.
-fn section_handle(lo: DVec3, hi: DVec3) -> f64 {
-    ((hi - lo).length() * 0.12).max(1e-3)
+/// A section plane; `x` is made a unit vector in it (any one when it isn't).
+fn plane(label: &str, origin: DVec3, normal: DVec3, x: DVec3) -> SectionPlane {
+    let x = (x - normal * x.dot(normal)).try_normalize().unwrap_or_else(|| normal.any_orthonormal_vector());
+    SectionPlane { label: label.to_string(), origin, normal, x, offset: 0.0, flipped: false }
 }

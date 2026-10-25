@@ -2637,7 +2637,7 @@ impl AssemblyView {
                 }
                 cx.notify();
             }
-            ViewportEvent::BoxSelect { ids, modifiers, crossing } => {
+            ViewportEvent::BoxSelect { ids, modifiers, crossing, .. } => {
                 // Live (behaviours "Assembly selection model" 6): a right→left
                 // (crossing) box selects the instances it touches, a left→right
                 // (window) box the faces, edges and vertices fully inside it.
