@@ -921,9 +921,9 @@ impl PartStudioView {
         if let Some(m) = &error_mesh {
             extra.extend(scene_builder::error_geometry(m, self.gpu.uploader()));
         }
-        // FeatureScript debug geometry of the open feature (Helix profiles).
+        // Debug geometry of the open feature (Helix profiles, FeatureScript debug()).
         if let Some(st) = self.edit.as_ref().and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id))
-            && (!st.debug.lines.is_empty() || !st.debug.points.is_empty())
+            && (!st.debug.lines.is_empty() || !st.debug.points.is_empty() || !st.debug.colored.is_empty())
         {
             extra.extend(scene_builder::debug_geometry(&st.debug, self.gpu.uploader()));
         }

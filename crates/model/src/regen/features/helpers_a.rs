@@ -309,6 +309,9 @@ pub fn by_body(items: Vec<(usize, usize)>) -> BTreeMap<usize, Vec<usize>> {
 /// Parameter intervals `[t0, t1]` along `p + t * dir` (0 <= t <= len) where
 /// the ray is inside `solid`.
 pub fn ray_intervals(solid: &Shape, p: DVec3, dir: DVec3, len: f64) -> Vec<(f64, f64)> {
+    if let Some(iv) = ray_crossings(solid, p, dir, len) {
+        return iv;
+    }
     let Ok(line) = k::make_line(p, p + dir * len) else { return Vec::new() };
     let Ok(res) = k::boolean(k::BooleanOp::Common, &[line], std::slice::from_ref(solid), &k::BooleanOptions::default()) else { return Vec::new() };
     let mut out: Vec<(f64, f64)> = res
@@ -332,6 +335,49 @@ pub fn ray_intervals(solid: &Shape, p: DVec3, dir: DVec3, len: f64) -> Vec<(f64,
         }
     }
     merged
+}
+
+/// [`ray_intervals`] from where the ray crosses the faces of one solid, in
+/// and out (REGEN-SPEED: a Common of the line with the part, per ray, cost
+/// more than the Hole's cut on live's 30-feature part). None where that isn't
+/// clear-cut (a tangent touch, a crossing on a face's edge, crossings that
+/// don't alternate): the Common decides then.
+fn ray_crossings(solid: &Shape, p: DVec3, dir: DVec3, len: f64) -> Option<Vec<(f64, f64)>> {
+    if solid.shape_type() != k::ShapeType::Solid || len <= 0.0 {
+        return None;
+    }
+    let mut hits = solid.line_crossings(p, dir, len).ok()?;
+    if hits.iter().any(|&(_, t, on)| on || t == 0) {
+        return None;
+    }
+    hits.sort_by(|a, b| a.0.total_cmp(&b.0));
+    hits.dedup_by(|b, a| (b.0 - a.0).abs() < 1e-9 && b.1 == a.1);
+    let mut out: Vec<(f64, f64)> = Vec::new();
+    let mut inside: Option<f64> = None;
+    for (i, &(t, tr, _)) in hits.iter().enumerate() {
+        match (tr, inside) {
+            (1, None) => inside = Some(t),
+            // The ray starts inside the solid.
+            (-1, None) if i == 0 => out.push((0.0, t)),
+            (-1, Some(a)) => {
+                out.push((a, t));
+                inside = None;
+            }
+            _ => return None,
+        }
+    }
+    if let Some(a) = inside {
+        out.push((a, len));
+    }
+    out.retain(|(a, b)| b - a > 1e-9);
+    let mut merged: Vec<(f64, f64)> = Vec::new();
+    for iv in out {
+        match merged.last_mut() {
+            Some(last) if iv.0 <= last.1 + 1e-9 => last.1 = last.1.max(iv.1),
+            _ => merged.push(iv),
+        }
+    }
+    Some(merged)
 }
 
 /// Unit vector perpendicular to `n`.

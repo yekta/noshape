@@ -605,3 +605,26 @@ marker on main (each line names the code the fix must change); "pending" = a fix
 | BOX-PREHIGHLIGHT / READOUT-AXES / MIDPOINT-MARKER | psb/ui | ✗ | |
 | SECTION-MANIP (Part Studio) | psb | ✗ | the assembly got live's manipulator (e325430a); the Part Studio section view still draws the arrow only |
 Round 4 fixes (e5e5095b) are on main ✅. My own round-4/5 code fixes (09cdc51e…, ready/qa4) are still in the queue's pending half.
+- **EXPORT-DXF-OPTIONS retracted (asb)**: the DXF dialog has all four checkboxes and scrolls with the wheel at a 900 px window
+  (Hide inspection items, Exclude off-sheet content come into view); not a bug. Re-gate after main 824135c0 (icons2 visual polish
+  only): no routed item changed; ready/kern FAILED in the queue at 04:20.
+
+## CI-GPU (api, top priority: main CI red since ac467453) — qa4 2026-10-25 11:40
+ci.yml "Linux x86_64 › Test" fails on main for 4 runs (40153651281 ac467453 … 40183256345 7074e37f): `crates/ops/tests/e2e.rs`
+part_studio_menu_ops, render_an_assembly, render_image_view_options panic at e2e.rs:9 with `render_failed: no GPU adapter for
+rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner has no Vulkan/GL adapter in the Test step
+(macOS and Windows pass). Either install Mesa lavapipe (`mesa-vulkan-drivers`) in that job or make the render e2e tests skip
+(with a printed reason) when no adapter exists; deterministic ci.yml tests must not depend on the runner's GPU (WORKFLOW 17).
+
+## Keystroke latency (lead 10-25) — qa4 2026-10-25 12:00, details in qa-round-5.md "Part Studio keystroke latency"
+- **EDIT-TYPING-PREVIEW (psb/ui2, now also the main per-keystroke cost)**: patch ready on branch qa4/typing-preview
+  (feature_dialog.rs: number fields keep typed text in the draft and emit DialogEvent::Changed on commit only: Tab, Enter, blur,
+  step); not on ready/qa4 until the lead OKs editing that file. Clippy -D warnings clean; verified in the app: Depth
+  keystroke median 225 → 83 ms (= UI-only floor), Tab / Enter / ✓ all commit the typed value.
+- **THUMB-REGEN (perf)** `start_thumbnail.rs` Job::run regenerates the first Part Studio with a separate Regenerator 1.5 s after
+  every commit: a second full downstream eval + 380–450 ms fine tessellation per edit. Render the thumbnail from the window's
+  latest StudioDisplay (or share its regen cache) instead.
+- **REFINE-TESS (perf/kern)** after an edit the whole body is re-meshed at Fine: 450–565 ms for 40 k triangles (30-feature
+  part); the coarse preview takes 20–40 ms. Mesh only faces that changed, or cache per-face triangulations across regens.
+- **REGEN-SPEED (kern)** unchanged: commit of an Extrude 1 depth edit re-evaluates 29 features in 390–490 ms (live 132 ms).
+
