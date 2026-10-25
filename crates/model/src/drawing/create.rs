@@ -122,14 +122,27 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     // First angle: front top-right, top below, right view to the left.
     let (front_x, other_x) = if third { (x0 + fw * 0.5, x0 + fw + gap + ow * 0.5) } else { (x0 + ow + gap + fw * 0.5, x0 + ow * 0.5) };
     let (front_y, other_y) = if third { (y0 + fh * 0.5, y0 + fh + gap + oh * 0.5) } else { (y0 + oh + gap + fh * 0.5, y0 + oh * 0.5) };
+    // Automatic centermarks as Drawing properties › Views (live asbdt:
+    // the suggested Front view marks its hole); projected views copy the
+    // front view's, like the Projected view tool.
+    let vd = d.props.view_defaults.clone();
     let base = |id: u64, orientation: ViewOrientation, position: [f64; 2]| DrawingView {
         id: ViewId(id),
         kind: ViewKind::Base { source: src.tab, config: src.config.clone(), orientation, part: src.part.clone() },
         position,
         style: RenderStyle::HiddenLinesRemoved,
+        show_centerlines: vd.auto_centermarks,
+        auto_centerlines: Some(vd.auto_centerlines),
         ..Default::default()
     };
-    let projected = |id: u64, dir: [f64; 2], position: [f64; 2]| DrawingView { id: ViewId(id), kind: ViewKind::Projected { parent: ViewId(1), direction: Some(dir) }, position, ..Default::default() };
+    let projected = |id: u64, dir: [f64; 2], position: [f64; 2]| DrawingView {
+        id: ViewId(id),
+        kind: ViewKind::Projected { parent: ViewId(1), direction: Some(dir) },
+        position,
+        show_centerlines: vd.auto_centermarks,
+        auto_centerlines: Some(vd.auto_centerlines),
+        ..Default::default()
+    };
     let sheet = &mut d.sheets[0];
     sheet.views.push(base(1, ViewOrientation::Front, [front_x, front_y]));
     let v = if third { 1.0 } else { -1.0 };
@@ -165,6 +178,8 @@ mod tests {
             for v in &sheet.views {
                 assert!(v.position[0] > 0.0 && v.position[0] < w && v.position[1] > 0.0 && v.position[1] < h, "{name}: {:?}", v.position);
                 assert!(v.label.is_none());
+                // Automatic centermarks (Drawing properties › Views default).
+                assert!(v.show_centerlines, "{name}: {:?}", v.id);
             }
             // A3 fits the plate at 1:1, A4 needs 1:2... at most 1:1 for this small part.
             assert!(sheet.scale <= 1.0 && sheet.scale >= 0.5, "{name}: {}", sheet.scale);
