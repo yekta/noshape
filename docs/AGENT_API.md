@@ -305,7 +305,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image)
-- **view**: [`view_camera`](#view_camera)
+- **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
 - **featurestudio**: [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
@@ -5548,6 +5548,34 @@ Examples:
 | `box` | array of array of number |  | zoom_window: [[x, y], [x, y]] corners in graphics-area pixels from the top left. |
 | `on` | boolean |  | perspective: on or off. |
 | `viewport` | array of number |  | The graphics area's size [width, height] in pixels from now on (default 1280×800). |
+
+#### view_display
+
+Display settings of a Part Studio or Assembly window: isolate, transparent, boundary edges, orient on edit, thickness off, mates, snap mode.
+
+What the view and context menus change without editing the document, kept per tab (`ui_state`; nothing given: read them). `isolate` (Isolate…: these parts, the rest as ghosts) or `transparent` (Make transparent…: these as ghosts) replace the current isolation; `exit_isolate` ends it. Part Studios: `highlight_boundary` (Highlight boundary edges), `orient_on_edit` (Orient normal to sketch on edit), `thickness_analysis: false` (Turn thickness analysis off). Assemblies (instances for isolate / transparent): `show_mates` (Hide/show mates: the mate indicators), `show_mates_mode` (Show mates mode), `snap_mode` (Snap mode). With the app open the window does the same; render_image `view: "window"` draws with them.
+
+Examples:
+
+```json
+{"isolate": ["Part 1"]}
+{"exit_isolate": true, "highlight_boundary": true}
+{"tab": "Assembly 1", "show_mates": true, "snap_mode": false}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the window's tab. |
+| `isolate` | array of string |  | Isolate…: parts (ids or names) or, in an assembly, instances. |
+| `transparent` | array of string |  | Make transparent…: parts or instances. |
+| `exit_isolate` | boolean |  | Exit isolate. |
+| `highlight_boundary` | boolean |  | Part Studio: Highlight boundary edges. |
+| `orient_on_edit` | boolean |  | Part Studio: Orient normal to sketch on edit. |
+| `thickness_analysis` | boolean |  | Part Studio: false = Turn thickness analysis off (run the analysis with analysis_thickness). |
+| `show_mates` | boolean |  | Assembly: Hide/show mates. |
+| `show_mates_mode` | boolean |  | Assembly: Show mates mode. |
+| `snap_mode` | boolean |  | Assembly: Snap mode. |
 
 ### export
 
