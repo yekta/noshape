@@ -215,11 +215,6 @@ pub fn rename(ps: &mut PartStudio, feature: FeatureId, new: &str) -> Result<(), 
             *e = rename_in_expr(e, &old, new);
         }
     }
-    for fd in &mut ps.folders {
-        if let Some(e) = &mut fd.suppression_expr {
-            *e = rename_in_expr(e, &old, new);
-        }
-    }
     for c in &mut ps.configuration.configured {
         for v in c.values.values_mut() {
             fix(v);

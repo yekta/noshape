@@ -805,10 +805,10 @@ mod tests {
         assert_eq!(ps2.features.iter().map(|f| f.id).collect::<Vec<_>>(), order);
     }
 
-    /// A folder's dynamic suppression applies to everything inside it, nested
-    /// folders included; it is saved with the folder and goes with it.
+    /// Live (ui 10-25 c): a folder's Add expression… puts the expression on
+    /// every feature inside it (none on the folder); unpacked, they keep it.
     #[test]
-    fn a_folders_dynamic_suppression_suppresses_its_features() {
+    fn a_folders_dynamic_suppression_goes_on_its_features() {
         use crate::display::FeatureStatus;
         use crate::regen::{RegenOptions, Regenerator};
         let mut ps = crate::demo::plate_studio();
@@ -819,20 +819,16 @@ mod tests {
         };
         let inner = ps.new_folder(&[ext], None);
         let outer = ps.wrap_folder(inner, "Outer".into()).unwrap();
-        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Ok));
-        ps.folder_mut(outer).unwrap().suppression_expr = Some("2 mm < 1 mm".into());
+        ps.set_folder_suppression_expr(outer, Some("2 mm < 1 mm".into()));
+        assert_eq!(ps.feature(ext).and_then(|f| f.suppression_expr.as_deref()), Some("2 mm < 1 mm"));
         assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Suppressed));
-        // Saved with the document.
-        let back: PartStudio = serde_json::from_str(&serde_json::to_string(&ps).unwrap()).unwrap();
-        assert_eq!(back.folder(outer).and_then(|f| f.suppression_expr.clone()).as_deref(), Some("2 mm < 1 mm"));
-        ps.folder_mut(outer).unwrap().suppression_expr = Some("2 mm > 1 mm".into());
-        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Ok));
-        ps.folder_mut(outer).unwrap().suppression_expr = Some("#nope > 1".into());
-        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Error));
-        // Unpacked, the expression goes with the folder.
-        ps.folder_mut(outer).unwrap().suppression_expr = Some("2 mm < 1 mm".into());
         ps.dissolve_folder(outer);
-        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Ok));
+        ps.dissolve_folder(inner);
+        assert_eq!(ps.feature(ext).and_then(|f| f.suppression_expr.as_deref()), Some("2 mm < 1 mm"));
+        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Suppressed));
+        let f = ps.new_folder(&[ext], None);
+        ps.set_folder_suppression_expr(f, None);
+        assert_eq!(ps.feature(ext).and_then(|f| f.suppression_expr.clone()), None);
     }
 
     #[test]

@@ -74,11 +74,24 @@ impl PartStudioView {
         !ids.is_empty() && ids.iter().all(off)
     }
 
-    /// The folder's Unsuppress while it has an expression: drop it (one
-    /// undo step).
+    /// The folder's Edit dynamic suppression ▸ Remove expression: off every
+    /// feature in it (one undo step).
     pub(super) fn clear_folder_dynamic_suppression(&mut self, folder: u32, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(None), cx, |ps| noshape_ops::studio::set_folder_suppression_expr(ps, folder, None));
+            doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(None), cx, |ps| ps.set_folder_suppression_expr(folder, None));
+        });
+    }
+
+    /// Whether any feature in a folder has a dynamic suppression expression
+    /// (its menu then offers Edit dynamic suppression ▸ Remove expression).
+    pub(super) fn folder_has_expr(&self, folder: u32, cx: &App) -> bool {
+        self.studio(cx).is_some_and(|s| s.folder_features(folder).iter().any(|id| s.feature(*id).is_some_and(|f| f.suppression_expr.is_some())))
+    }
+
+    /// A feature's Edit dynamic suppression ▸ Remove expression.
+    pub(super) fn remove_dynamic_suppression(&mut self, id: FeatureId, cx: &mut Context<Self>) {
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(None), cx, |ps| noshape_ops::studio::set_suppression_expr(ps, id, None));
         });
     }
 

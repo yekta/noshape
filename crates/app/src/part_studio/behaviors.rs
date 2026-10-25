@@ -43,8 +43,8 @@ pub struct Isolation {
     pub expand: usize,
 }
 
-/// What the Dynamic suppression dialog sets: a feature's or a folder's
-/// "Unsuppressed if" expression.
+/// What the Dynamic suppression dialog sets: a feature's "Unsuppressed if"
+/// expression, or that of every feature in a folder.
 #[derive(Clone, Copy)]
 pub enum DynTarget {
     Feature(FeatureId),
@@ -1228,8 +1228,8 @@ impl PartStudioView {
         self.open_dynamic_suppression(DynTarget::Feature(id), window, cx);
     }
 
-    /// The same on a folder: the expression belongs to the folder and
-    /// suppresses everything inside it while false.
+    /// The same on a folder: Onshape writes the expression onto every
+    /// feature inside it (live ui 10-25 c); the field starts empty.
     pub(super) fn edit_folder_dynamic_suppression(&mut self, folder: u32, window: &mut Window, cx: &mut Context<Self>) {
         self.open_dynamic_suppression(DynTarget::Folder(folder), window, cx);
     }
@@ -1239,7 +1239,7 @@ impl PartStudioView {
             .studio(cx)
             .and_then(|s| match target {
                 DynTarget::Feature(id) => s.feature(id).and_then(|f| f.suppression_expr.clone()),
-                DynTarget::Folder(fd) => s.folder(fd).and_then(|f| f.suppression_expr.clone()),
+                DynTarget::Folder(_) => None,
             })
             .unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(current));
@@ -1262,7 +1262,7 @@ impl PartStudioView {
             self.doc.update(cx, |doc, cx| {
                 doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(Some(&text)), cx, |ps| match target {
                     DynTarget::Feature(id) => noshape_ops::studio::set_suppression_expr(ps, id, Some(text.clone())),
-                    DynTarget::Folder(fd) => noshape_ops::studio::set_folder_suppression_expr(ps, fd, Some(text.clone())),
+                    DynTarget::Folder(fd) => ps.set_folder_suppression_expr(fd, Some(text.clone())),
                 });
             });
         }

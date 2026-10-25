@@ -3324,7 +3324,10 @@ impl PartStudioView {
         let selected = self.ui.selected_folder == Some(id);
         let fresh = self.ui.fresh_folder == Some(id) && !selected;
         let suppressed = self.folder_suppressed(id, cx);
-        let has_expr = fd.suppression_expr.is_some();
+        let has_expr = self.folder_has_expr(id, cx);
+        // Live (ui 10-25 b (4), 10-25 c): the hover tooltip is the plain name,
+        // "(Suppressed)" after it while everything inside is.
+        let tip = if suppressed { format!("{} (Suppressed)", fd.name) } else { fd.name.clone() };
         let is_last = self.studio(cx).is_some_and(|s| s.folder_features(id).last().is_some_and(|l| s.features.last().is_some_and(|f| f.id == *l)));
         let row = crate::ui::tree_row(SharedString::from(format!("folder-{id}")), selected)
             .mr(px(5.))
@@ -3352,24 +3355,7 @@ impl PartStudioView {
                     .child(crate::ui::user_text(format!("{} ({})", fd.name, self.studio(cx).map(|s| s.folder_count(id)).unwrap_or(0))))
                     .into_any_element(),
             })
-            // The expression marker, as on a feature row (assembly/141).
-            .when(has_expr, |d| {
-                let tip = if suppressed { format!("{} (Suppressed with expression)", fd.name) } else { fd.name.clone() };
-                d.child(
-                    div()
-                        .id(SharedString::from(format!("folder-dyn-{id}")))
-                        .text_xs()
-                        .italic()
-                        .text_color(p().accent)
-                        .cursor_pointer()
-                        .child("ƒx")
-                        .tooltip(crate::ui::tooltip(tip))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
-                            cx.stop_propagation();
-                            this.edit_folder_dynamic_suppression(id, w, cx);
-                        })),
-                )
-            })
+            .tooltip(crate::ui::tooltip(tip))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.select_folder(id, cx)));
         let view = cx.entity();
         row.os_context_menu(move |menu, window, cx| {
@@ -3384,19 +3370,20 @@ impl PartStudioView {
                 .separator()
                 .item(item("Add selection to folder…", Box::new(move |this, w, cx| this.open_folder_prompt_for(FolderTarget::Folder(id), w, cx))))
                 .separator();
-            // As a feature with an expression (live assembly/142): Unsuppress
-            // drops it, "Edit dynamic suppression" replaces the submenu.
-            if has_expr {
-                m = m
-                    .item(item("Unsuppress", Box::new(move |this, _, cx| this.clear_folder_dynamic_suppression(id, cx))))
-                    .item(item("Edit dynamic suppression", Box::new(move |this, w, cx| this.edit_folder_dynamic_suppression(id, w, cx))));
+            m = m.item(item(if suppressed { "Unsuppress" } else { "Suppress" }, Box::new(move |this, _, cx| this.suppress_folder(id, !suppressed, cx))));
+            // Live (ui 10-25 c (2)): with expressions on its features the folder
+            // offers "Edit dynamic suppression ▸ Remove expression" only.
+            m = if has_expr {
+                m.submenu("Edit dynamic suppression", window, cx, move |sm, _, _| {
+                    let v = vd.clone();
+                    sm.item(crate::os_menu::OsMenuItem::new("Remove expression").on_click(move |_, _, cx| v.update(cx, |this, cx| this.clear_folder_dynamic_suppression(id, cx))))
+                })
             } else {
-                m = m.item(item(if suppressed { "Unsuppress" } else { "Suppress" }, Box::new(move |this, _, cx| this.suppress_folder(id, !suppressed, cx))));
-                m = m.submenu("Dynamic suppression", window, cx, move |sm, _, _| {
+                m.submenu("Dynamic suppression", window, cx, move |sm, _, _| {
                     let v = vd.clone();
                     sm.item(crate::os_menu::OsMenuItem::new("Add expression…").on_click(move |_, w, cx| v.update(cx, |this, cx| this.edit_folder_dynamic_suppression(id, w, cx))))
-                });
-            }
+                })
+            };
             if !is_last {
                 m = m.separator().item(item("Roll to here", Box::new(move |this, _, cx| this.roll_to_folder(id, cx))));
             }
@@ -3616,6 +3603,11 @@ impl PartStudioView {
             });
             // A sketch lists no inputs; an under-defined one says so.
             let sketch_tip = (f.type_id == "sketch").then(|| format!("{head}{}", if underdefined { " is not fully defined" } else { "" }));
+            // Live (qa4 r5 s8 (3), ui 10-25 c): a suppressed row reads "Extrude 1
+            // (Suppressed)", one its expression suppresses "Fillet 3 (Suppressed
+            // with expression)".
+            let suppressed_tip = (f.suppressed || state.is_some_and(|s| s.status == FeatureStatus::Suppressed))
+                .then(|| format!("{head} ({})", if f.suppression_expr.is_some() { "Suppressed with expression" } else { "Suppressed" }));
             // Live (ui 10-22 b): a Derived reads "Derived 1 <- <source studio>".
             let derived_source = (f.type_id == "importDerived")
                 .then(|| {
@@ -3625,6 +3617,9 @@ impl PartStudioView {
                 .flatten();
             let view = cx.entity().downgrade();
             move |cx: &App| -> SharedString {
+                if let Some(t) = &suppressed_tip {
+                    return t.clone().into();
+                }
                 if let Some(m) = &msg {
                     return m.clone().into();
                 }
@@ -3755,17 +3750,19 @@ impl PartStudioView {
             })
             // In-context arrow (features referencing an Assembly context).
             .children(self.context_arrow(f, cx))
-            // Onshape's expression icon on dynamically suppressed features.
-            // Live (assembly/141): "<name> (Suppressed with expression)".
-            .when_some(dyn_expr.clone().map(|_| if suppressed { format!("{name} (Suppressed with expression)") } else { name.clone() }), |d, e| {
+            // Onshape's expression glyph on features with dynamic suppression,
+            // suppressed or not (live ui 10-25 c: a grey #888 italic "fx" at the
+            // row's right, tooltip "Dynamic suppression: {#s == 0}").
+            .when_some(dyn_expr.clone().map(|e| format!("Dynamic suppression: {{{e}}}")), |d, e| {
                 d.child(
                     div()
                         .id(SharedString::from(format!("feat-dyn-{id}")))
-                        .text_xs()
+                        .flex_none()
+                        .text_size(px(13.))
                         .italic()
-                        .text_color(pal.accent)
+                        .text_color(gpui_kit::rgb(0x888888))
                         .cursor_pointer()
-                        .child("ƒx")
+                        .child("fx")
                         .tooltip(crate::ui::tooltip(e))
                         .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
                             cx.stop_propagation();
@@ -3918,7 +3915,9 @@ impl PartStudioView {
             // "Unsuppress" (drops the expression) and "Edit dynamic
             // suppression" in place of Suppress and the submenu.
             let has_expr = dyn_expr.is_some();
-            let suppress = if has_expr {
+            // Unsuppress on a feature its expression suppresses drops the
+            // expression (live assembly/142); otherwise Suppress / Unsuppress.
+            let suppress = if has_expr && suppressed {
                 item("Unsuppress", Box::new(move |this, _, cx| this.clear_dynamic_suppression(id, cx)))
             } else {
                 item(if manually_suppressed { "Unsuppress" } else { "Suppress" }, Box::new(move |this, _, cx| {
@@ -3929,9 +3928,14 @@ impl PartStudioView {
             // Dynamic suppression ▸ Add expression… ("Unsuppressed if").
             let vd = view.clone();
             let dynamic = move |m: crate::os_menu::OsMenu, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
+                // Live (ui 10-25 c (2)): Edit dynamic suppression ▸ Edit
+                // expression…, Remove expression.
                 if has_expr {
-                    let v1 = vd.clone();
-                    return m.item(crate::os_menu::OsMenuItem::new("Edit dynamic suppression").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.edit_dynamic_suppression(id, w, cx))));
+                    let (v1, v2) = (vd.clone(), vd.clone());
+                    return m.submenu("Edit dynamic suppression", window, cx, move |sm, _, _| {
+                        sm.item(crate::os_menu::OsMenuItem::new("Edit expression…").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.edit_dynamic_suppression(id, w, cx))))
+                            .item(crate::os_menu::OsMenuItem::new("Remove expression").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.remove_dynamic_suppression(id, cx))))
+                    });
                 }
                 m.submenu("Dynamic suppression", window, cx, move |sm, _, _| {
                     let v1 = vd.clone();
@@ -3990,10 +3994,11 @@ impl PartStudioView {
                 .icon_name("add-appearance");
                 return m.separator().item(add).separator().item(delete);
             }
-            // A suppressed feature (live qa4 r5 s8 (3)): Rename | Add selection
-            // to folder… | Unsuppress, Dynamic suppression | Roll to here |
-            // Delete (Add comment is collaboration, cloud).
-            if manually_suppressed && !has_expr {
+            // A suppressed feature, by hand or by its expression (live qa4 r5
+            // s8 (3), ui 10-25 c (2)): Rename | Add selection to folder… |
+            // Unsuppress, (Edit) dynamic suppression ▸ | Roll to here | Delete
+            // (Add comment is collaboration, cloud).
+            if suppressed {
                 let mut m = menu.item(item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)))).separator().item(folder).separator().item(suppress);
                 m = dynamic(m, window, cx);
                 if !is_last {

@@ -214,9 +214,6 @@ impl Regenerator {
             .collect();
         let aborted = || opts.cancel.as_ref().is_some_and(RegenCancel::aborted);
         let cancelled = || RegenResult { cancelled: true, ..Default::default() };
-        // Folders' dynamic suppression, evaluated once where the folder starts
-        // (its first feature): Ok(active) or the expression's error.
-        let mut folder_active: std::collections::HashMap<u32, Result<bool, String>> = std::collections::HashMap::new();
         for (i, f) in studio.features.iter().enumerate() {
             if aborted() {
                 return cancelled();
@@ -232,18 +229,6 @@ impl Regenerator {
                 match eval_bool(e, &scope) {
                     Ok(b) => suppressed = !b,
                     Err(msg) => expr_error = Some(format!("Suppression expression: {msg}")),
-                }
-            }
-            // An enclosing folder's expression suppresses everything inside it
-            // while it is false (nested folders too).
-            for fid in studio.folder_chain(f.folder) {
-                let Some(e) = studio.folder(fid).and_then(|fd| fd.suppression_expr.as_deref()).filter(|e| !e.trim().is_empty()) else { continue };
-                match folder_active.entry(fid).or_insert_with(|| eval_bool(e, &scope)) {
-                    Ok(true) => {}
-                    Ok(false) => suppressed = true,
-                    Err(msg) => {
-                        expr_error.get_or_insert_with(|| format!("Suppression expression: {msg}"));
-                    }
                 }
             }
             let converted = f.feature_type().and_then(|t| resolve_bool_exprs(params, &t.params, &scope, &mut expr_error));

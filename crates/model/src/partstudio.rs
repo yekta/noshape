@@ -72,10 +72,6 @@ pub struct Folder {
     /// Folders with features are placed by them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub after: Option<FeatureId>,
-    /// Dynamic suppression (Onshape's "Unsuppressed if" on the folder): while
-    /// it is false everything inside is suppressed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub suppression_expr: Option<String>,
 }
 
 /// Appearance of a part (linear RGBA).
@@ -479,7 +475,7 @@ impl PartStudio {
         // Live (part-studio/587–590): a new folder is collapsed; an empty one
         // sits at the rollback bar.
         let after = if ids.is_empty() { self.rollback_index().checked_sub(1).and_then(|i| self.features.get(i)).map(|f| f.id) } else { None };
-        self.folders.push(Folder { id, name, collapsed: !ids.is_empty(), parent, after, suppression_expr: None });
+        self.folders.push(Folder { id, name, collapsed: !ids.is_empty(), parent, after });
         // Live (ui 10-25 b (1)): the folder takes every feature from the
         // first to the last selected one, in place (the ones in between
         // too); folders inside that run move in whole.
@@ -517,11 +513,24 @@ impl PartStudio {
         self.next_folder_id = self.next_folder_id.max(self.folders.iter().map(|f| f.id + 1).max().unwrap_or(0));
         let id = self.next_folder_id;
         self.next_folder_id += 1;
-        self.folders.push(Folder { id, name, collapsed: true, parent, after, suppression_expr: None });
+        self.folders.push(Folder { id, name, collapsed: true, parent, after });
         if let Some(f) = self.folder_mut(folder) {
             f.parent = Some(id);
         }
         Some(id)
+    }
+
+    /// A folder's Dynamic suppression ▸ Add expression… / Remove expression:
+    /// Onshape keeps no expression on the folder; each feature in it gets
+    /// it (live ui 10-25 c: REST has no folder node, the children carry
+    /// `#s == 0`, and keep it when the folder is unpacked).
+    pub fn set_folder_suppression_expr(&mut self, folder: u32, expr: Option<String>) {
+        let expr = expr.filter(|e| !e.trim().is_empty());
+        for id in self.folder_features(folder) {
+            if let Some(f) = self.feature_mut(id) {
+                f.suppression_expr = expr.clone();
+            }
+        }
     }
 
     /// Every feature inside a folder, nested folders included, in order.
