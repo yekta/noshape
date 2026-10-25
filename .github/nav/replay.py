@@ -303,6 +303,18 @@ class Replay:
             time.sleep(0.3)
         return run
 
+    def key_tap(self, code, mods=()):
+        def run():
+            self.keys.tap(code, mods)
+        return run
+
+    def focus_viewport(self):
+        """A left click on empty graphics (selects nothing), so keys go to it."""
+        self.cursor(*self.screen_point(-self.size[0] / 2 + 30, self.size[1] / 2 - 30))
+        self.mouse.button(ui.BTN_LEFT, True)
+        self.mouse.button(ui.BTN_LEFT, False)
+        time.sleep(0.5)
+
     def with_key(self, key, fn):
         def run():
             self.keys.key(key, True)
@@ -335,6 +347,15 @@ class Replay:
         self.step("touch-pinch", self.touch({0: (c[0] - 50, c[1]), 1: (c[0] + 50, c[1])}, {0: (c[0] - 100, c[1]), 1: (c[0] + 100, c[1])}))
         self.step("touch-roll", self.touch({0: (c[0] - 80, c[1]), 1: (c[0] + 80, c[1])},
                                            {0: (c[0] - 80 * 0.866, c[1] - 80 * 0.5), 1: (c[0] + 80 * 0.866, c[1] + 80 * 0.5)}, steps=15))
+        self.focus_viewport()
+        K = ui
+        self.step("key-left", self.key_tap(K.KEY_LEFT))
+        self.step("key-up", self.key_tap(K.KEY_UP))
+        self.step("key-shift-left", self.key_tap(K.KEY_LEFT, (K.KEY_LEFTSHIFT,)))
+        self.step("key-ctrl-left", self.key_tap(K.KEY_LEFT, (K.KEY_LEFTCTRL,)))
+        self.step("key-ctrl-shift-right", self.key_tap(K.KEY_RIGHT, (K.KEY_LEFTCTRL, K.KEY_LEFTSHIFT)))
+        self.step("key-z", self.key_tap(K.KEY_Z))
+        self.step("key-shift-z", self.key_tap(K.KEY_Z, (K.KEY_LEFTSHIFT,)))
         self.step("pen-rotate", self.pen_drag(-200))
         self.step("pen-tap", self.pen_tap())
         self.step("pen-hover", self.pen_hover())

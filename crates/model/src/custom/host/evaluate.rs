@@ -571,6 +571,8 @@ fn ev_mate_connector(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 
 fn ev_curve_definition(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
+    // Live: `{ curveType : OTHER }` alone (no type tag) instead of a B-spline.
+    let other = field(&a, "returnBSplinesAsOther").as_bool() == Some(true);
     let v = on_first(i, &cx, &a, "edge", "INVALID_INPUT", |q, e| {
         let s = q.shape(e)?;
         let info = s.edge_info().ok()?;
@@ -583,6 +585,7 @@ fn ev_curve_definition(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 ("minorRadius", length_value(minor_radius)),
             ])
             .with_tag(std_tag("curveGeometry.fs", "Ellipse")),
+            _ if other => Value::map_from([("curveType", std_enum("curvetype.gen.fs", "CurveType", "OTHER").unwrap_or_else(|| Value::str("OTHER")))]),
             _ => bspline_value(&s.edge_bspline().ok()?),
         })
     })?;
@@ -598,7 +601,8 @@ fn bspline_value(b: &k::BSplineCurveData) -> Value {
             knots.push(Value::num(*kv));
         }
     }
-    let mut entries = vec![("degree", Value::num(b.degree as f64)), ("dimension", Value::num(3.0)), ("isRational", Value::bool(b.weights.is_some())), ("isPeriodic", Value::bool(b.periodic)), ("controlPoints", Value::array(poles)), ("knots", Value::array(knots).with_tag(std_tag("splineUtils.fs", "KnotArray")))];
+    let spline = std_enum("curvetype.gen.fs", "CurveType", "SPLINE").unwrap_or_else(|| Value::str("SPLINE"));
+    let mut entries = vec![("curveType", spline), ("degree", Value::num(b.degree as f64)), ("dimension", Value::num(3.0)), ("isRational", Value::bool(b.weights.is_some())), ("isPeriodic", Value::bool(b.periodic)), ("controlPoints", Value::array(poles)), ("knots", Value::array(knots).with_tag(std_tag("splineUtils.fs", "KnotArray")))];
     if let Some(w) = &b.weights {
         entries.push(("weights", Value::array(w.iter().map(|x| Value::num(*x)).collect())));
     }
@@ -645,6 +649,8 @@ fn with_surface_type(v: Value, name: &str) -> Value {
 
 fn ev_surface_definition(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
+    // Live: `{ surfaceType : OTHER }` alone instead of a B-spline surface.
+    let other = field(&a, "returnBSplinesAsOther").as_bool() == Some(true);
     let v = on_first(i, &cx, &a, "face", "CANNOT_RESOLVE_PLANE", |q, e| {
         if let Some(p) = matches!(e, Ent::Datum(_) | Ent::Plane(_) | Ent::SketchRegion(..)).then(|| q.plane(e)).flatten() {
             return Some(with_surface_type(plane_value(&p), "PLANE"));
@@ -662,7 +668,7 @@ fn ev_surface_definition(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             ),
             k::Surface::Revolution { .. } => Value::map_from([("surfaceType", surface_type("REVOLVED"))]),
             k::Surface::Extrusion { .. } => Value::map_from([("surfaceType", surface_type("EXTRUDED"))]),
-            k::Surface::BSpline { .. } | k::Surface::Bezier { .. } => Value::map_from([("surfaceType", surface_type("SPLINE"))]),
+            k::Surface::BSpline { .. } | k::Surface::Bezier { .. } => Value::map_from([("surfaceType", surface_type(if other { "OTHER" } else { "SPLINE" }))]),
             _ => Value::map_from([("surfaceType", surface_type("OTHER"))]),
         })
     })?;
@@ -821,7 +827,7 @@ fn ev_raycast(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     && dist.distance < 1e-8
                 {
                     let t = (dist.point_b - o).dot(d);
-                    hits.push((t, q.to_ref(e), dist.point_b));
+                    hits.push((t, q.to_ref(e), dist.point_b, param_on(&f, dist.point_b)));
                 }
             }
         }
@@ -830,9 +836,11 @@ fn ev_raycast(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     })?;
     let take = if include_intersections { hits.len() } else { hits.len().min(1) };
     let mut out = Vec::new();
-    for (t, r, p) in hits.into_iter().take(take) {
+    // Live hit keys: distance, entity, entityType, intersection, parameter.
+    let face = std_enum("query.fs", "EntityType", "FACE").unwrap_or_else(|| Value::str("FACE"));
+    for (t, r, p, uv) in hits.into_iter().take(take) {
         let q = super::query::query_of_refs(&cx, &[r]);
-        out.push(Value::map_from([("entity", q), ("intersection", point_value(p)), ("distance", length_value(t))]));
+        out.push(Value::map_from([("entity", q), ("entityType", face.clone()), ("intersection", point_value(p)), ("distance", length_value(t)), ("parameter", uv)]));
     }
     Ok(Value::array(out))
 }
@@ -870,6 +878,9 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let tools = super::query::evaluate_refs(i, &cx, &field(&a, "tools"))?;
     let targets = super::query::evaluate_refs(i, &cx, &field(&a, "targets"))?;
+    // `owners` (std's passOwners): faces, edges and vertices count as their
+    // bodies (live: then the same as body against body).
+    let owners = field(&a, "owners").as_bool() == Some(true);
     // Per face, as live: a body's faces, each with its body (std Tab's
     // editing logic reads `tool`'s plane).
     // (entity, its body, shape, of a solid)
@@ -879,10 +890,18 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let q = QueryCx::new(&st);
         let solid = |b: usize| st.ctx.bodies[b].kind == crate::display::BodyKind::Solid;
         let mut out = Vec::new();
+        let mut seen = std::collections::HashSet::new();
         for r in refs {
             for e in q.from_ref(r) {
+                let (e, r) = match q.owner(&e) {
+                    Some(o @ Ent::Body(_)) if owners && !matches!(e, Ent::Body(_)) => (o.clone(), q.to_ref(&o)),
+                    _ => (e, r.clone()),
+                };
                 match e {
                     Ent::Body(b) => {
+                        if !seen.insert(b) {
+                            continue;
+                        }
                         let body = &st.ctx.bodies[b];
                         for (fi, f) in body.shape.faces().into_iter().enumerate() {
                             out.push((q.to_ref(&Ent::Face(b, fi)), Some(r.clone()), f, solid(b)));

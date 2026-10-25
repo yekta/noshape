@@ -239,6 +239,58 @@ fn entry_radius(dims: &HoleDims) -> f64 {
     d * 0.5
 }
 
+/// The common entry, answered without sectioning the parts: the axis enters
+/// a planar face square to the hole at `first`, the entry circle (radius `r`)
+/// lies inside that face, and no other face reaches into the cylinder above
+/// it. Then every contact is at `first`, as [`entry_contacts`] finds with a
+/// section and rays (REGEN-SPEED: the Hole of live's 30-feature part spent
+/// most of its time there). None when not provably so.
+fn flat_entry(ev: &EvalCtx, bodies: &[usize], p: DVec3, dir: DVec3, r: f64, back: f64, first: f64) -> Option<(f64, f64)> {
+    let q = p + dir * first;
+    let tol = 1e-9 * (1.0 + r);
+    let vertex = k::make_vertex(q).ok()?;
+    let mut entry: Option<(usize, k::Shape)> = None;
+    for &bi in bodies {
+        for f in ev.ctx.bodies[bi].shape.faces() {
+            let Ok(Some(pl)) = f.face_plane() else { continue };
+            if (pl.normal.normalize().dot(dir).abs() - 1.0).abs() > 1e-9 || (q - pl.origin).dot(pl.normal.normalize()).abs() > tol {
+                continue;
+            }
+            if k::distance(&vertex, &f).is_ok_and(|d| d.distance < tol) {
+                entry = Some((bi, f));
+                break;
+            }
+        }
+        if entry.is_some() {
+            break;
+        }
+    }
+    let (_, face) = entry?;
+    // The whole circle on the face: r or more from each of its edges.
+    for e in face.edges() {
+        if k::distance(&vertex, &e).ok()?.distance < r - tol {
+            return None;
+        }
+    }
+    // Nothing else over the entry: no other face's box reaches into the
+    // cylinder's box above the face.
+    let (a, b) = (p - dir * back, p + dir * (first - 1e-7));
+    let ext = DVec3::new((1.0 - dir.x * dir.x).max(0.0).sqrt(), (1.0 - dir.y * dir.y).max(0.0).sqrt(), (1.0 - dir.z * dir.z).max(0.0).sqrt()) * r;
+    let (lo, hi) = (a.min(b) - ext, a.max(b) + ext);
+    for &bi in bodies {
+        for f in ev.ctx.bodies[bi].shape.faces() {
+            if f.is_same(&face) {
+                continue;
+            }
+            let Ok(bb) = f.bounding_box(false) else { return None };
+            if bb.min.x <= hi.x && bb.max.x >= lo.x && bb.min.y <= hi.y && bb.max.y >= lo.y && bb.min.z <= hi.z && bb.max.z >= lo.z {
+                return None;
+            }
+        }
+    }
+    Some((first, first))
+}
+
 /// Where the hole's entry circle (radius `r` about the axis through `p` along
 /// `dir`) meets the parts: (deepest first contact, highest contact) as
 /// parameters along `dir` from `p`. One section of the parts with the entry
@@ -431,7 +483,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
                     // diameter) is in the part: the deepest first contact on
                     // the entry circle (a Ø6 hole on a Ø40 cylinder starts
                     // 0.226 below its top line).
-                    entry = entry_contacts(ev, &candidates, loc.point, dir, entry_radius(&dims), back, extent);
+                    entry = flat_entry(ev, &candidates, loc.point, dir, entry_radius(&dims), back, first).or_else(|| entry_contacts(ev, &candidates, loc.point, dir, entry_radius(&dims), back, extent));
                     entry.map_or(first, |(deep, _)| deep.max(first))
                 } else {
                     0.0
