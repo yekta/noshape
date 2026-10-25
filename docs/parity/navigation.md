@@ -85,7 +85,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.6 | Ctrl+right-drag: 2D pan | help table | ✅ |
 | 1.7 | Middle-drag: 2D pan | help table | ✅ |
 | 1.8 | Pan keeps the point under the cursor under it (perspective: in the plane through the geometry under the cursor) | `pan` | ✅ L: start point ends under the pointer to 1e-4 px; R: (200, 100) drag → 223.607 px |
-| 1.9 | Shift+right-drag rotates (Shift is not bound; it does not pan) | `getClosestMode`, `usesShiftKey` | 🔧 (panned) |
+| 1.9 | Shift+right-drag rotates (Shift is not bound; it does not pan) | `getClosestMode`, `usesShiftKey` | ✅ qa4 10-23 (Front → the Right face comes in, no pan) |
 | 1.10 | Ctrl+middle-drag pans (closest binding) | `getClosestMode` | ✅ |
 | 1.11 | Pressing/releasing Ctrl or Alt mid-drag switches mode (rotate ↔ pan ↔ constrained) without lifting the button | `updateManipulationMode` per drag event | ✅ R: right-drag −100 px, Ctrl held +100 px, released −100 px → the view turns 200 px worth (the Ctrl part pans) |
 | 1.12 | A second button pressed mid-drag re-resolves the mode | `updateInputState` | ✅ R: right-drag, middle pressed (closest binding other than Rotate = Pan, as `getClosestMode`), middle released (Rotate) → turns 200 px worth. Fixed 10-25: on Wayland gpui forgot the right button when the middle one was released, ending the drag |
@@ -119,12 +119,12 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 
 | # | Behaviour | Source | Status |
 |---|---|---|---|
-| 3.1 | Arrow keys rotate 15° about the camera's up (←/→) or right (↑/↓) axis through the camera target; ← from Front brings the Right face in, ↑ the Bottom (= dragging that way) | help; `rotateInDirection`; live navigation/75–80 | 🔧 (was about world Z, opposite sense) |
+| 3.1 | Arrow keys rotate 15° about the camera's up (←/→) or right (↑/↓) axis through the camera target; ← from Front brings the Right face in, ↑ the Bottom (= dragging that way) | help; `rotateInDirection`; live navigation/75–80 | ✅ R: ← turns exactly 15.000°, ↑ 15.000° (Wayland and X11); live navigation/75–80 directions, qa4 in-app |
 | 3.2 | Shift+arrows 90°, Ctrl+arrows 5° | help | ✅ angles / 🔧 axes |
 | 3.3 | Each step animates linearly over 250 ms | `animateRotation`, `CAMERA_SHORT_ANIMATION_TIME_MS` | 🔧 (was 500 ms, eased) |
-| 3.4 | Holding an arrow rotates continuously: every key repeat starts another step that runs alongside the earlier ones (they add up) | help; `setAllowRepeat` for ROTATE_*, `startAnimation`; live navigation/910–921: a 1 s hold (X repeat 660 ms / 25 Hz, 11 keydowns) turns 165° | 🔧 verified: noshape turns 165° for the same hold |
-| 3.5 | Ctrl+Shift+arrows pan: the model moves 150 px toward the arrow (measured at the scene centre), 250 ms smootherstep; ignored while the camera animates | help; `animatePan`, `animateTo` | 🔧 (Part Studio: 500 ms; Assembly: missing) |
-| 3.6 | Z zooms out ×1.75, Shift+Z in ×1.75, about the view centre, 250 ms, clamped to the zoom limits | help; `animateZoom`, `adjustCameraToValidZoom` | 🔧 (was ×1.25 instant) |
+| 3.4 | Holding an arrow rotates continuously: every key repeat starts another step that runs alongside the earlier ones (they add up) | help; `setAllowRepeat` for ROTATE_*, `startAnimation`; live navigation/910–921: a 1 s hold (X repeat 660 ms / 25 Hz, 11 keydowns) turns 165° | ✅ nav 10-19: a 1 s held ← turns 165°, as live navigation/910–921 |
+| 3.5 | Ctrl+Shift+arrows pan: the model moves 150 px toward the arrow (measured at the scene centre), 250 ms smootherstep; ignored while the camera animates | help; `animatePan`, `animateTo` | ✅ R: Ctrl+Shift+→ moves the model exactly 150 px, no rotation |
+| 3.6 | Z zooms out ×1.75, Shift+Z in ×1.75, about the view centre, 250 ms, clamped to the zoom limits | help; `animateZoom`, `adjustCameraToValidZoom` | ✅ R: Z ×1.75 out, Shift+Z ×1/1.75 in (world per pixel, exact) |
 | 3.7 | All of 3.1–3.6 work in Assemblies too | `getIsInPartStudio() \|\| getIsInAssembly()` | 🔧 (Assembly had none) |
 | 3.8 | Up/Down with the rollback bar selected move the bar instead | `handleRotateUp` | ✅ (FeatureList context) |
 | 3.9 | View animations (standard views, fit, N) use Onshape's smootherstep easing | `animateTo` | 🔧 (was smoothstep) |
@@ -133,11 +133,11 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 
 | # | Behaviour | Source | Status |
 |---|---|---|---|
-| 4.1 | Click a face: plane view; a corner/edge: that view — each zoomed to fit at the new orientation | help; `animateToStandardView` → `animateToFrameWithZoomFit` | 🔧 (kept the zoom) |
-| 4.4 | Shift+1–7 standard views zoom to fit too | `handleFrontView` … | 🔧 |
+| 4.1 | Click a face: plane view; a corner/edge: that view — each zoomed to fit at the new orientation | help; `animateToStandardView` → `animateToFrameWithZoomFit` | ✅ qa4 10-23 (Top / Front, each zoomed to fit); R: a tap on the cube lands on a face, edge or corner view |
+| 4.4 | Shift+1–7 standard views zoom to fit too | `handleFrontView` … | ✅ qa4 10-23 (Shift+1 = Front, zoomed to fit) |
 | 4.5 | Zoom to fit (F, double middle click) frames the visible planes as well as parts and sketches (the model node's bounds), their box's projected corners padded ×1.05 | `getFitBounds`, `zoomToFit`, `CAMERA_ZOOM_TO_FIT_PADDING` | 🔧 (parts only, ×1.12: the part looked ~1.39× bigger than in Onshape) |
-| 4.2 | Click the ◀ ▶ ▲ ▼ arrows: rotate 15° (Shift 90°, Ctrl 5°), same animation as the keys | help | 🔧 (axes/animation as 3.1–3.4) |
-| 4.3 | Curved arrows: roll 15° about the line of sight | `rotateInDirection("clockwise")` | 🔧 (animation) |
+| 4.2 | Click the ◀ ▶ ▲ ▼ arrows: rotate 15° (Shift 90°, Ctrl 5°), same animation as the keys | help | ✅ qa4 10-23 (▶ turns 15°, the Right face edge comes in) |
+| 4.3 | Curved arrows: roll 15° about the line of sight | `rotateInDirection("clockwise")` | ✅ qa4 10-23 (the curved arrow rolls 15°) |
 
 ## 5. Mouse controls preference (My account › Preferences)
 
@@ -149,7 +149,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 5.4 | ☐ Reverse scroll wheel zoom direction | live DOM; `isScrollZoomDefault` | 🔧 |
 | 5.5 | Choosing SOLIDWORKS ticks Reverse scroll wheel zoom direction (other presets leave it; switching back does not untick) | `setDefaultMouseScrollDirection`; live navigation/63–64 | 🔧 |
 | 5.6 | ☐ Set default rotation behavior to constrained rotate (Alt then gives free rotate) | live DOM; `axisRotationLock` | 🔧 |
-| 5.7 | ☐ Use pen input as mouse | live DOM | ⏳ (stored; no pen input path in gpui yet) |
+| 5.7 | ☐ Use pen input as mouse | live DOM | ✅ 10-25: stored and applied (`gpui::set_pen_as_mouse`): off = pen contacts are touches on every platform (row 7.10), on = mouse events |
 | 5.8 | "Save mouse controls" (disabled until changed) saves and applies at once; nothing applies before saving | live DOM; live 61 | 🔧 |
 
 ## 6. Drawings (2D: pan and zoom only)
@@ -224,9 +224,9 @@ drives the app through the kernel: a uinput mouse, keyboard, clickpad and touch 
 libinput in a headless sway, the app on Wayland or on X11 through Xwayland. `check.py`
 recomputes every expected number independently (Chromium's rules on the WAYLAND_DEBUG protocol
 log or on the posted events, Onshape's formulas) and compares each camera change.
-Local run 10-25 06:20: **Wayland 495/495, X11 261/261 checks pass** (wheel notches and 120ths,
+Local run 10-25 14:45: **Wayland 485/485, X11 254/254 checks pass** (fewer lines than before: wheel events are now checked by running totals) (wheel notches and 120ths,
 Shift/Ctrl+wheel, horizontal wheel, two-finger scroll up/down/sideways, pinch out/in, right-drag
 with its rotate centre fixed on screen, Alt+right-drag, middle-drag, touch rotate/pan/pinch/roll,
-tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube, a drag released over the feature list, a second button pressed mid-drag, pen drag / tap / hover). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
+tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube, a drag released over the feature list, a second button pressed mid-drag, pen drag / tap / hover, arrow / Shift / Ctrl / Ctrl+Shift arrow keys, Z and Shift+Z). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
 phases and momentum, drags) and Windows (SendInput wheel, InjectTouchInput touch, drags) run in
 `.github/workflows/nav.yml`.

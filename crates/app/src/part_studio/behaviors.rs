@@ -639,7 +639,12 @@ impl PartStudioView {
         let mut out = Vec::new();
         for r in &self.selection {
             match r {
-                Reference::Body(b) => out.extend(self.body_geometry(b)),
+                // The part itself too: the builder gives its faces the
+                // whole-part amber (live selection/09).
+                Reference::Body(b) => {
+                    out.extend(self.body_geometry(b));
+                    out.push(r.clone());
+                }
                 Reference::Sketch(f) | Reference::Feature(f) => out.extend(self.feature_geometry(*f)),
                 _ => out.push(r.clone()),
             }
@@ -2776,7 +2781,7 @@ impl PartStudioView {
             if let Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint } = r
                 && let Some(m) = self.edge_midpoint(on)
             {
-                marker(&mut points, m, [0xfac012, 0xc4960b, 0xffd65b]);
+                marker(&mut points, m, crate::theme::viewport::POINT_SELECTED);
             }
         }
         match &self.hover {
@@ -2785,7 +2790,7 @@ impl PartStudioView {
             // pointer (Onshape suppresses mouse-move picking while it's open).
             Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() && self.ui.select_other.is_none() => {
                 if let Some(m) = self.edge_midpoint(on) {
-                    marker(&mut points, m, [0xf8c488, 0xc49a6a, 0xffd8ac]);
+                    marker(&mut points, m, crate::theme::viewport::POINT_HOVER);
                 }
             }
             // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows a

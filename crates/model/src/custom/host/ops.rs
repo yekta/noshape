@@ -933,13 +933,28 @@ fn op_extract_wires(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn op_polyline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let pts: Vec<DVec3> = def.get("points").as_array().map(|v| v.iter().filter_map(vec3_of).collect()).unwrap_or_default();
+    // Bend i is at point i + 1 (the closing point's last for a closed one).
+    let bends: Option<Vec<f64>> = def.get("bendRadii").as_array().map(|v| v.iter().map(|r| length_of(r).unwrap_or(0.0)).collect());
     run_op(i, &cx, &id, "POLYLINE_CONSECUTIVE_EQUAL_POINTS", |ev| {
         if pts.windows(2).any(|w| (w[0] - w[1]).length() < 1e-12) {
-            return err("Consecutive points are equal");
+            return Err(super::code_error("POLYLINE_CONSECUTIVE_EQUAL_POINTS"));
         }
         let closed = pts.len() > 2 && (pts[0] - pts[pts.len() - 1]).length() < 1e-9;
         let p = if closed { &pts[..pts.len() - 1] } else { &pts[..] };
-        add_wire(ev, k::make_polyline(p, closed)?)
+        let Some(bends) = &bends else { return add_wire(ev, k::make_polyline(p, closed)?) };
+        if bends.len() != if closed { p.len() } else { p.len().saturating_sub(2) } {
+            return Err(super::code_error("POLYLINE_BEND_RADII_INVALID_SIZE"));
+        }
+        if bends.iter().all(|r| *r <= 0.0) {
+            return add_wire(ev, k::make_polyline(p, closed)?);
+        }
+        let mut radii = vec![0.0; p.len()];
+        for (k, r) in bends.iter().enumerate() {
+            radii[(k + 1) % p.len()] = *r;
+        }
+        // The Routing curve's arcs (curves.rs).
+        let wire = crate::regen::features::curves::filleted_polyline(p, &radii, closed).map_err(|_| super::code_error("POLYLINE_INVALID_BEND"))?;
+        add_wire(ev, wire)
     })?;
     Ok(Value::Undefined)
 }
