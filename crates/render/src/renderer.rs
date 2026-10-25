@@ -2023,52 +2023,82 @@ impl Renderer {
         let none = wgpu::DepthBiasState::default();
         let add = wgpu::BlendComponent { src_factor: wgpu::BlendFactor::One, dst_factor: wgpu::BlendFactor::One, operation: wgpu::BlendOperation::Add };
         let (face, priority) = (FACE_DEPTH_BIAS, PICK_PRIORITY_DEPTH_BIAS);
-        let pipelines = Pipelines {
-            background: make(P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }),
-            mesh_opaque: make(P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
-            mesh_solid: make(P { label: "mesh-solid", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }),
-            mesh_outline: make(P { label: "mesh-outline", vs: "vs_outline", fs: "fs_outline", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }),
-            mesh_outline_depth: make_full(
+        // Compiled in parallel (one thread each): a fresh install compiles every
+        // shader (1.6 s on the macOS 14 runners one by one, 4.3 s on 15).
+        let pipelines = std::thread::scope(|s| {
+            let background = s.spawn(|| make(P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }));
+            let mesh_opaque = s.spawn(|| make(P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }));
+            let mesh_solid = s.spawn(|| make(P { label: "mesh-solid", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }));
+            let mesh_outline = s.spawn(|| make(P { label: "mesh-outline", vs: "vs_outline", fs: "fs_outline", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }));
+            let mesh_outline_depth = s.spawn(|| make_full(
                 layout,
                 P { label: "mesh-outline-depth", vs: "vs_mesh", fs: "fs_outline_depth", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa },
                 Extra { writes: wgpu::ColorWrites::empty(), cull: None },
-            ),
+            ));
             // Every kept surface of a cut part adds its color, without depth
             // test or culling.
-            section_mask: make(P { label: "section-mask", vs: "vs_mesh", fs: "fs_section_mask", buffers: &mesh_buffers, format: self.section_caps.mask_format, blend: Some(wgpu::BlendState { color: add, alpha: add }), depth: None, bias: none, samples: 1 }),
+            let section_mask = s.spawn(|| make(P { label: "section-mask", vs: "vs_mesh", fs: "fs_section_mask", buffers: &mesh_buffers, format: self.section_caps.mask_format, blend: Some(wgpu::BlendState { color: add, alpha: add }), depth: None, bias: none, samples: 1 }));
             // No depth bias: the cap sits exactly on its plane, so the datum plane it
             // lies in (transparent, strictly in front only) is hidden over it, as
             // live part-studio/73-74 (the cap keeps its exact color).
-            section_cap: make_in(&self.cap_pipeline_layout, P { label: "section-cap", vs: "vs_section_cap", fs: "fs_section_cap", buffers: &[], format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }),
-            mesh_reflect: make_in(image_layout, P { label: "mesh-reflect", vs: "vs_mesh", fs: "fs_mesh_reflect", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
+            let section_cap = s.spawn(|| make_in(&self.cap_pipeline_layout, P { label: "section-cap", vs: "vs_section_cap", fs: "fs_section_cap", buffers: &[], format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }));
+            let mesh_reflect = s.spawn(|| make_in(image_layout, P { label: "mesh-reflect", vs: "vs_mesh", fs: "fs_mesh_reflect", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }));
             // Strictly in front: a transparent plane coplanar with a sketch
             // image (drawn just before, without bias) doesn't veil it. Opaque
             // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
-            mesh_transparent: make(P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }),
-            line: make(P { label: "line", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }),
+            let mesh_transparent = s.spawn(|| make(P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }));
+            let line = s.spawn(|| make(P { label: "line", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }));
             // Front faces culled, like Onshape's pass (`setOverrideFaceCullingMode(FRONT)`).
-            mesh_backsil: make_full(
+            let mesh_backsil = s.spawn(|| make_full(
                 layout,
                 P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa },
                 Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) },
-            ),
-            silhouette: make(P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: &silhouette_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }),
-            line_hidden: make(P { label: "line-hidden", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: EDGE_DEPTH_BIAS, samples: msaa }),
-            point: make(P { label: "point", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: msaa }),
-            point_hidden: make(P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: POINT_DEPTH_BIAS, samples: msaa }),
-            mesh_pick: make(P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }),
-            mesh_pick_transparent: make(P { label: "mesh-pick-t", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: none, samples: 1 }),
-            mesh_sample: make(P { label: "mesh-sample", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }),
-            mesh_pick_priority: make(P { label: "mesh-pick-p", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: priority, samples: 1 }),
-            line_pick: make(P { label: "line-pick", vs: "vs_line", fs: "fs_line_pick", buffers: &line_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: 1 }),
-            point_pick: make(P { label: "point-pick", vs: "vs_point", fs: "fs_point_pick", buffers: &point_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: 1 }),
-            image_opaque: make_in(image_layout, P { label: "image", vs: "vs_image", fs: "fs_image_opaque", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((true, ge)), bias: none, samples: msaa }),
-            image_soft: make_in(image_layout, P { label: "image-soft", vs: "vs_image", fs: "fs_image_soft", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }),
-            image_blend: make_in(image_layout, P { label: "image-blend", vs: "vs_image", fs: "fs_image_blend", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }),
-            compare_dn: make(P { label: "compare-dn", vs: "vs_mesh", fs: "fs_compare_dn", buffers: &mesh_buffers, format: COMPARE_DN_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }),
-            compare_mix: make(P { label: "compare-mix", vs: "vs_background", fs: "fs_compare_mix", buffers: &[], format: PRESENT_FORMAT, blend: alpha, depth: None, bias: none, samples: 1 }),
-            msaa,
-        };
+            ));
+            let silhouette = s.spawn(|| make(P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: &silhouette_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }));
+            let line_hidden = s.spawn(|| make(P { label: "line-hidden", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: EDGE_DEPTH_BIAS, samples: msaa }));
+            let point = s.spawn(|| make(P { label: "point", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: msaa }));
+            let point_hidden = s.spawn(|| make(P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: POINT_DEPTH_BIAS, samples: msaa }));
+            let mesh_pick = s.spawn(|| make(P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }));
+            let mesh_pick_transparent = s.spawn(|| make(P { label: "mesh-pick-t", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: none, samples: 1 }));
+            let mesh_sample = s.spawn(|| make(P { label: "mesh-sample", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }));
+            let mesh_pick_priority = s.spawn(|| make(P { label: "mesh-pick-p", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: priority, samples: 1 }));
+            let line_pick = s.spawn(|| make(P { label: "line-pick", vs: "vs_line", fs: "fs_line_pick", buffers: &line_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: 1 }));
+            let point_pick = s.spawn(|| make(P { label: "point-pick", vs: "vs_point", fs: "fs_point_pick", buffers: &point_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: 1 }));
+            let image_opaque = s.spawn(|| make_in(image_layout, P { label: "image", vs: "vs_image", fs: "fs_image_opaque", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((true, ge)), bias: none, samples: msaa }));
+            let image_soft = s.spawn(|| make_in(image_layout, P { label: "image-soft", vs: "vs_image", fs: "fs_image_soft", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }));
+            let image_blend = s.spawn(|| make_in(image_layout, P { label: "image-blend", vs: "vs_image", fs: "fs_image_blend", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }));
+            let compare_dn = s.spawn(|| make(P { label: "compare-dn", vs: "vs_mesh", fs: "fs_compare_dn", buffers: &mesh_buffers, format: COMPARE_DN_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }));
+            let compare_mix = s.spawn(|| make(P { label: "compare-mix", vs: "vs_background", fs: "fs_compare_mix", buffers: &[], format: PRESENT_FORMAT, blend: alpha, depth: None, bias: none, samples: 1 }));
+            Pipelines {
+                background: background.join().expect("pipeline compile thread"),
+                mesh_opaque: mesh_opaque.join().expect("pipeline compile thread"),
+                mesh_solid: mesh_solid.join().expect("pipeline compile thread"),
+                mesh_outline: mesh_outline.join().expect("pipeline compile thread"),
+                mesh_outline_depth: mesh_outline_depth.join().expect("pipeline compile thread"),
+                section_mask: section_mask.join().expect("pipeline compile thread"),
+                section_cap: section_cap.join().expect("pipeline compile thread"),
+                mesh_reflect: mesh_reflect.join().expect("pipeline compile thread"),
+                mesh_transparent: mesh_transparent.join().expect("pipeline compile thread"),
+                line: line.join().expect("pipeline compile thread"),
+                mesh_backsil: mesh_backsil.join().expect("pipeline compile thread"),
+                silhouette: silhouette.join().expect("pipeline compile thread"),
+                line_hidden: line_hidden.join().expect("pipeline compile thread"),
+                point: point.join().expect("pipeline compile thread"),
+                point_hidden: point_hidden.join().expect("pipeline compile thread"),
+                mesh_pick: mesh_pick.join().expect("pipeline compile thread"),
+                mesh_pick_transparent: mesh_pick_transparent.join().expect("pipeline compile thread"),
+                mesh_sample: mesh_sample.join().expect("pipeline compile thread"),
+                mesh_pick_priority: mesh_pick_priority.join().expect("pipeline compile thread"),
+                line_pick: line_pick.join().expect("pipeline compile thread"),
+                point_pick: point_pick.join().expect("pipeline compile thread"),
+                image_opaque: image_opaque.join().expect("pipeline compile thread"),
+                image_soft: image_soft.join().expect("pipeline compile thread"),
+                image_blend: image_blend.join().expect("pipeline compile thread"),
+                compare_dn: compare_dn.join().expect("pipeline compile thread"),
+                compare_mix: compare_mix.join().expect("pipeline compile thread"),
+                msaa,
+            }
+        });
         self.pipelines = Some(pipelines);
         if crate::perf::enabled() {
             log::info!(target: "perf", "renderer: pipelines for {msaa}x MSAA built in {:.0} ms ({:.0} ms since start)", built.elapsed().as_secs_f64() * 1e3, crate::perf::process_start().elapsed().as_secs_f64() * 1e3);
@@ -2271,7 +2301,20 @@ impl Renderer {
     /// (shader compilation otherwise delays it).
     pub fn prewarm(&mut self, msaa: u32) {
         let _t = perf::scope("r.prewarm_pipelines");
-        self.ensure_pipelines(msaa_of(&Style { msaa, ..Style::default() }));
+        let msaa = msaa_of(&Style { msaa, ..Style::default() });
+        // The first frame's ambient occlusion pass and overlay (labels, view
+        // cube) too, compiled alongside the pipelines.
+        let device = self.device.clone();
+        let (ao, overlay) = std::thread::scope(|s| {
+            let ao = s.spawn(|| crate::ao::AoPass::new(&device, msaa, COLOR_FORMAT));
+            let overlay = s.spawn(|| crate::overlay_gpu::OverlayGpu::new(&device));
+            self.ensure_pipelines(msaa);
+            (ao.join().expect("ambient occlusion compile thread"), overlay.join().expect("overlay compile thread"))
+        });
+        if self.ao.as_ref().is_none_or(|a| a.msaa != msaa) {
+            self.ao = Some(ao);
+        }
+        self.overlay_gpu.get_or_insert(overlay);
     }
 
     /// Forget a target (its textures are released once in-flight reads finish).
