@@ -774,6 +774,7 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
             bodies[m.b].pose = e.mul(&m.b_local.inverse());
         }
     }
+    orient_axial_mates(bodies, mates);
     if !drags.is_empty() {
         // Phase 1: follow the drag (soft); phase 2: project back onto the
         // constraint manifold exactly, starting from the dragged pose.
@@ -782,6 +783,35 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
         return solve_inner(bodies, mates, relations, &[], dof);
     }
     solve_inner(bodies, mates, relations, drags, dof)
+}
+
+/// Mates that align the Z axes only as lines (Revolute, Cylindrical, Pin
+/// slot, Planar, Parallel: their residual is Z's x and y, which an opposed Z
+/// meets too) start on the requested side: a moving body whose connector Z
+/// points the wrong way is turned 180° about its connector's X axis (live
+/// behaviours "qa4 round 5 s3 mate flip": Flip primary axis turns the pin
+/// over for Revolute, Cylindrical and Planar).
+fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
+    for m in mates {
+        if m.follow.is_some() || !matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel) {
+            continue;
+        }
+        let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        if (relative(&poses, m).rotation * DVec3::Z).z >= 0.0 {
+            continue;
+        }
+        let (moving, local) = if !bodies[m.a].fixed {
+            (m.a, m.a_local)
+        } else if !bodies[m.b].fixed {
+            (m.b, m.b_local)
+        } else {
+            continue;
+        };
+        let c = bodies[moving].pose.mul(&local);
+        let turn = DQuat::from_axis_angle(c.rotation * DVec3::X, std::f64::consts::PI);
+        let p = bodies[moving].pose;
+        bodies[moving].pose = Frame { origin: c.origin + turn * (p.origin - c.origin), rotation: (turn * p.rotation).normalize() };
+    }
 }
 
 fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool) -> SolveResult {
@@ -1086,6 +1116,31 @@ mod tests {
         let p = bodies[1].pose;
         assert!(p.origin.length() < 1e-6, "{:?}", p.origin);
         assert!((p.transform_point(DVec3::new(0.01, 0.0, 0.0)) - DVec3::new(0.0, 0.0, 0.01)).length() < 1e-3);
+    }
+
+    /// Live (behaviours "qa4 round 5 s3 mate flip"): a Ø10×40 pin's top-face
+    /// connector on a fixed plate's top face (z 10). Aligned Z axes (live's
+    /// default) hang the pin through the plate, t (0,0,−30); Flip primary axis
+    /// stands it upside down, t (0,0,50), Z (0,0,−1), for Revolute,
+    /// Cylindrical and Planar alike.
+    #[test]
+    fn flip_primary_turns_axial_mates_over() {
+        let mm = 1e-3;
+        let pin_top = Frame::from_axes(DVec3::new(0.0, 0.0, 40.0 * mm), DVec3::Z, DVec3::X);
+        let plate_top = Frame::from_axes(DVec3::new(0.0, 0.0, 10.0 * mm), DVec3::Z, DVec3::X);
+        for kind in [MateType::Revolute, MateType::Cylindrical, MateType::Planar] {
+            // Internal flip_primary true = Z axes aligned (live primaryAxisAlignment false).
+            for (aligned, z, tz) in [(true, 1.0, -30.0), (false, -1.0, 50.0)] {
+                let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.0, 0.0, -30.0 * mm), false)];
+                let mut m = mate(kind, 1, pin_top, 0, plate_top);
+                m.flip_primary = aligned;
+                let r = solve(&mut bodies, &[m], &[], &[]);
+                assert!(r.converged, "{kind:?} aligned={aligned}");
+                let p = bodies[1].pose;
+                assert!(((p.rotation * DVec3::Z).z - z).abs() < 1e-6, "{kind:?} aligned={aligned}: Z {:?}", p.rotation * DVec3::Z);
+                assert!((p.origin.z - tz * mm).abs() < 1e-6, "{kind:?} aligned={aligned}: t {:?}", p.origin);
+            }
+        }
     }
 
     /// 20 links (60 mm, holes 44 mm apart) chained by revolutes, link 0 fixed.

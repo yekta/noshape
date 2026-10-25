@@ -2140,16 +2140,14 @@ impl AssemblyView {
             dialog.update(cx, |d, cx| d.set_connector(c, cx));
             // Both connectors picked: the heads-up checkmark appears at the cursor.
             if is_new && !dialog.read(cx).awaiting_pick() {
-                // Default primary-axis alignment (live assembly/760–780): the
-                // moving (first) instance keeps its current orientation, so
-                // the Z axes are made to agree when they point the same way
-                // now and opposed otherwise (Onshape's flip = !flip_primary).
+                // Default primary-axis alignment (`default_flip_primary`: the
+                // moving instance keeps its orientation, a tie aligns; Onshape's
+                // flip = !flip_primary).
                 let units = self.units(cx);
                 let (a, b) = { let d = dialog.read(cx); (d.field(0).cloned(), d.field(1).cloned()) };
                 if let (Some(a), Some(b)) = (a, b)
-                    && let (Some(fa), Some(fb)) = (self.result.connector_world(&a, &units), self.result.connector_world(&b, &units))
+                    && let Some(agree) = noshape_ops::assembly::default_flip_primary(&self.result, &a, &b, &units)
                 {
-                    let agree = fa.z().dot(fb.z()) > 0.0;
                     dialog.update(cx, |d, cx| d.set_flip(agree, cx));
                 }
                 let at = self.pointer;
