@@ -186,6 +186,22 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
     run_feature(ev, &def.cell, &def.params, &def.feature_type.params, type_id, Some(&*provider))
 }
 
+/// `debug()` entities for the display: faces as meshes, else edges as
+/// polylines, else vertices as points (live "fs (10-25 c)").
+fn add_debug(out: &mut crate::display::DebugGeometry, entities: Vec<(noshape_kernel::Shape, [u8; 3])>) {
+    use crate::display::ColoredDebug;
+    for (shape, color) in entities {
+        let Some(mesh) = crate::regen::tessellate_shape(&shape, 1.0) else { continue };
+        if !mesh.face_ranges.is_empty() {
+            out.colored.push(ColoredDebug::Faces(Arc::new(mesh), color));
+        } else if !mesh.edges.is_empty() {
+            out.colored.extend(mesh.edges.into_iter().map(|e| ColoredDebug::Line(e, color)));
+        } else {
+            out.colored.extend(mesh.vertices.into_iter().map(|p| ColoredDebug::Point(p, color)));
+        }
+    }
+}
+
 /// Run a feature lambda (`cell`: `(context, id, definition)`) on the Part
 /// Studio context, its definition built from `params` (the precondition's
 /// parameters) and the feature's values (`specs` fill the defaults); used for
@@ -242,10 +258,13 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     OUTPUTS.lock().insert(ev.feature, FeatureOutput { type_id: type_id.clone(), feature_name: ev.name.to_string(), notices, output, line_times });
 
     ev.ctx = cx.take_context();
-    let st = cx.state.lock();
+    let mut st = cx.state.lock();
     let top = vec![Arc::<str>::from(ev.feature.to_string())];
     let status = st.status.get(&top).cloned();
+    let debug = std::mem::take(&mut st.debug_entities);
     drop(st);
+    // Shown while the feature is edited, also when it fails (live).
+    add_debug(&mut ev.debug, debug);
     if let Err(m) = result {
         return err(m);
     }

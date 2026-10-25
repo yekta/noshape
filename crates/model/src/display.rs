@@ -348,6 +348,27 @@ pub struct FeatureState {
 pub struct DebugGeometry {
     pub lines: Vec<Vec<[f32; 3]>>,
     pub points: Vec<[f32; 3]>,
+    /// FeatureScript debug entities in their `DebugColor` (sRGB): faces,
+    /// edges and vertices.
+    pub colored: Vec<ColoredDebug>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ColoredDebug {
+    Faces(Arc<MeshBuffers>, [u8; 3]),
+    Line(Vec<[f32; 3]>, [u8; 3]),
+    Point([f32; 3], [u8; 3]),
+}
+
+impl PartialEq for ColoredDebug {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Faces(a, ca), Self::Faces(b, cb)) => Arc::ptr_eq(a, b) && ca == cb,
+            (Self::Line(a, ca), Self::Line(b, cb)) => a == b && ca == cb,
+            (Self::Point(a, ca), Self::Point(b, cb)) => a == b && ca == cb,
+            _ => false,
+        }
+    }
 }
 
 /// A computed parameter value: a length (meters) or text such as "Multiple".
