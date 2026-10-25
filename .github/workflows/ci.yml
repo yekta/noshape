@@ -8,9 +8,9 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  # main runs are never cancelled: the merge queue pushes faster than a full run, and every
-  # macOS/Windows result on main matters.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Trunk-based (10-25): agents push to main many times a day, so only the newest main commit is built; a newer push
+  # cancels the older run. Releases are cut from the lead's last-green tag and get their own release workflow run.
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
