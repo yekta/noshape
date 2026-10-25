@@ -9,7 +9,7 @@
 
 use crate::drawing_view::*;
 use gpui_kit::*;
-use noshape_model::drawing::sheet::{LeaderPath, note_leader_paths};
+use noshape_model::drawing::sheet::LeaderPath;
 use noshape_model::drawing::{Annotation, AnnotationKind, Leader, LeaderStart, remove_leader, remove_leader_node};
 
 /// What a sheet point hits on a note's leaders.
@@ -45,17 +45,7 @@ fn note_leaders(a: &mut Annotation) -> Option<&mut Vec<Leader>> {
 impl DrawingEditor {
     /// A note's leader paths on the sheet.
     pub fn note_leader_paths_of(&self, a: &Annotation) -> Vec<LeaderPath> {
-        let AnnotationKind::Note { style, .. } = &a.kind else { return Vec::new() };
-        let Some((bbox, _)) = crate::drawing_extra::note_box(a) else { return Vec::new() };
-        let targets: Vec<[f64; 2]> = style
-            .leaders
-            .iter()
-            .map(|ld| match ld.view {
-                Some(v) => self.placement(v).map(|pl| pl.to_sheet(ld.point)).unwrap_or(ld.point),
-                None => ld.point,
-            })
-            .collect();
-        note_leader_paths(bbox, &style.leaders, &targets)
+        self.pk().note_leader_paths(a)
     }
 
     /// The note leader under sheet point `c`: a bend or node first, else a
@@ -118,14 +108,7 @@ impl DrawingEditor {
             LeaderHit::Stroke { seg, p, .. } => {
                 let head = self.current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| self.note_leader_paths_of(a).get(leader).map(|p| p.head)).unwrap_or(2);
                 out.push(MenuEntry::item("Add node", move |t, _, cx| {
-                    t.edit_leaders("Add node", id, cx, |l| {
-                        if let Some(ld) = l.get_mut(leader) {
-                            // Segment `seg` runs from path point `seg` to
-                            // `seg + 1`; the nodes start at path point `head`.
-                            let at = (seg + 1).saturating_sub(head).min(ld.nodes.len());
-                            ld.nodes.insert(at, p);
-                        }
-                    });
+                    t.edit_leaders("Add node", id, cx, |l| noshape_scene::drawing_tools::annotation_edit::add_node(l, leader, seg, head, p));
                     t.selection = vec![Sel::Annotation(id)];
                     t.leader_sel = Some((id, leader));
                 }));
@@ -152,11 +135,8 @@ impl DrawingEditor {
     /// The note's Add leader: from the existing landing's bend (live: that
     /// side, wherever the pointer is), else from the note's side.
     pub fn note_add_leader(&mut self, id: u64, cx: &mut Context<Self>) {
-        let first = self.current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| match &a.kind {
-            AnnotationKind::Note { style, .. } => style.leaders.iter().position(|l| l.start.is_side()),
-            _ => None,
-        });
-        self.start_branch(id, first.map_or(LeaderStart::Side, LeaderStart::Bend), cx);
+        let start = self.current_sheet().annotations.iter().find(|a| a.id == id).map(noshape_scene::drawing_tools::annotation_edit::note_leader_start).unwrap_or_default();
+        self.start_branch(id, start, cx);
     }
 
     /// Where the pending branch of note `id` starts (sheet mm).

@@ -208,12 +208,7 @@ impl DrawingEditor {
         self.update_hover(cx);
         match self.line_pick() {
             Some(Pick::Line { a, b }) => {
-                let angle = (b.p[1] - a.p[1]).atan2(b.p[0] - a.p[0]);
-                self.edit_sheet("Align centermark", cx, |s| {
-                    if let Some(AnnotationKind::Centermark { angle: x, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                        *x = angle;
-                    }
-                });
+                self.edit_sheet("Align centermark", cx, |s| noshape_scene::drawing_tools::annotation_edit::align_centermark(s, id, a.p, b.p));
                 self.status = None;
             }
             _ => self.status = Some("Align centermark cancelled: select a straight edge".into()),

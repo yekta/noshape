@@ -77,6 +77,10 @@ pub struct AssemblyContext {
     /// a different current state means "Update available".
     #[serde(default)]
     pub state: u64,
+    /// Create Part Studio in context: where the Part Studio's origin sits
+    /// in the assembly (Insert and go to assembly places its parts there).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<crate::assembly::Placement>,
 }
 
 impl AssemblyContext {
@@ -143,7 +147,7 @@ pub fn snapshot_with(result: &AssemblyResult, assembly: TabId, id: u32, name: &s
         let Ok(bytes) = shape.to_brep_bytes() else { continue };
         bodies.push(ContextBody { path: path_u64(&o.path), instance: instance_name(&o.path), part: o.body_name.clone(), color: o.color, brep: String::from_utf8_lossy(&bytes).into() });
     }
-    AssemblyContext { id, name: name.to_string(), assembly, primary: primary.map(path_u64).unwrap_or_default(), primary_body: None, bodies, revision: 0, hidden: Vec::new(), state: 0 }
+    AssemblyContext { id, name: name.to_string(), assembly, primary: primary.map(path_u64).unwrap_or_default(), primary_body: None, bodies, revision: 0, hidden: Vec::new(), state: 0, origin: None }
 }
 
 /// Next free context id and its default name ("Context N").

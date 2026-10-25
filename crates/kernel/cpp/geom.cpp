@@ -47,6 +47,33 @@ static SurfaceInfo empty_surface()
   return i;
 }
 
+// A B-surface of degree 1 with two poles across one direction whose pole
+// rows (and weights) are translates of each other: an extrusion of either
+// row along `d`.
+static bool bspline_extrusion(const occ::handle<Geom_BSplineSurface>& b, gp_Vec& d)
+{
+  for (int dir = 0; dir < 2; ++dir)
+  {
+    const bool v = dir == 0;
+    if ((v ? b->VDegree() : b->UDegree()) != 1 || (v ? b->NbVPoles() : b->NbUPoles()) != 2)
+      continue;
+    const int n = v ? b->NbUPoles() : b->NbVPoles();
+    auto      P = [&](int k, int j) { return v ? b->Pole(k, j) : b->Pole(j, k); };
+    auto      W = [&](int k, int j) { return v ? b->Weight(k, j) : b->Weight(j, k); };
+    d           = gp_Vec(P(1, 1), P(1, 2));
+    const double len = d.Magnitude();
+    if (len < 1e-12)
+      continue;
+    bool ok = true;
+    for (int k = 1; k <= n && ok; ++k)
+      ok = (gp_Vec(P(k, 1), P(k, 2)) - d).Magnitude() <= 1e-9 * (1 + len) && std::abs(W(k, 1) - W(k, 2)) <= 1e-12 * std::abs(W(k, 1));
+    if (ok)
+      return true;
+  }
+  return false;
+}
+
+
 SurfaceInfo surface_info(const OcShape& fs)
 {
   const TopoDS_Face& f = as_face(fs.shape, "shape");
@@ -118,6 +145,15 @@ SurfaceInfo surface_info(const OcShape& fs)
     case GeomAbs_BSplineSurface: {
       i.kind                              = 6;
       occ::handle<Geom_BSplineSurface> b = s.BSpline();
+      // Straight in one direction with its rows translates of each other: an
+      // extrusion, as Parasolid reports such a B-surface after import (live:
+      // g50's F8, EXTRUDED).
+      if (gp_Vec d; bspline_extrusion(b, d))
+      {
+        i.kind = 8;
+        i.axis = from_dir(gp_Dir(d));
+        break;
+      }
       i.u_degree                          = b->UDegree();
       i.v_degree                          = b->VDegree();
       i.nb_u_poles                        = b->NbUPoles();

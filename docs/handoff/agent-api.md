@@ -744,3 +744,9 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
     (ops::assembly, ops::asm_config, ops::drawing, scene detail_profile). config_add_option / _edit_option now return
     the configuration id as `option` (it was overwritten by the description). Parts menu: covered (Copy here =
     Transform copy, Copy part = Derived); Release / Revision history have no ops yet.
+  - (10-24) IM2b: face areas and volumes close the (u, v) gaps at tolerant vertices like Parasolid (kernel
+    common.cpp `uv_gaps`, face_moments); with gaps the volume's divergence field is centred on the shape's box. g50 F18
+    and F11 now match live; g50 and McMaster volumes are much closer. Exact-extrusion B-surfaces report as extrusions
+    (EXTRUDED / "extruded"). Open: g50 F8 (Onshape replaces the surface on import) and McMaster F0's helix edges; live
+    request "api (10-24) IM2b follow-up". Tests: kernel export.rs (g50 per-face areas against live, skipped without
+    the samples), features.rs ruled_translate_reports_as_extrusion.

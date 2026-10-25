@@ -365,11 +365,9 @@ impl AssemblyView {
             input,
             move |edited, window, cx| {
                 let _ = view.update(cx, |this, cx| {
-                    this.edit("Edit visibility conditions", cx, |a| {
-                        for i in &mut a.configuration.inputs {
-                            if let Some(e) = edited.inputs.iter().find(|e| e.id == i.id) {
-                                i.visible_when = e.visible_when.clone();
-                            }
+                    this.edit(noshape_ops::config::EDIT_VISIBILITY, cx, |a| {
+                        for e in &edited.inputs {
+                            noshape_ops::asm_config::set_visibility(a, &e.id, e.visible_when.clone());
                         }
                     });
                     this.schedule_eval(window, cx);
@@ -397,6 +395,7 @@ impl AssemblyView {
             return;
         }
         let instances: Vec<(InstanceId, String)> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
+        let Some(asm) = self.assembly(cx).cloned() else { return };
         let mut rows: crate::part_studio::input_propagation::PropagationRows = Vec::new();
         for (iid, name) in instances {
             let theirs = self.instance_source_inputs(iid, cx);
@@ -404,8 +403,7 @@ impl AssemblyView {
                 .iter()
                 .map(|(id, _)| {
                     let own = cfg.inputs.iter().find(|i| &i.id == id)?;
-                    let t = theirs.iter().find(|t| &t.id == id)?;
-                    (std::mem::discriminant(&t.kind) == std::mem::discriminant(&own.kind)).then(|| cfg.configured.iter().any(|c| c.target == ConfigTarget::Instance(iid) && c.param == format!("{}{id}", acfg::param::INPUT_PREFIX)))
+                    noshape_ops::asm_config::propagation_state(&asm, own, &theirs, iid)
                 })
                 .collect();
             if cells.iter().any(|c| c.is_some()) {
@@ -427,30 +425,11 @@ impl AssemblyView {
     /// option to the option with the same id; a checkbox to its state).
     fn propagate_asm_inputs(&mut self, ids: &[String], picked: &[(usize, noshape_model::reference::FeatureId)], cx: &mut Context<Self>) {
         let cfg = self.asm_configuration(cx);
-        let picked: Vec<(String, Vec<String>, InstanceId)> = picked
-            .iter()
-            .filter_map(|(k, f)| {
-                let input = cfg.inputs.iter().find(|i| i.id == ids[*k])?;
-                let keys: Vec<String> = match &input.kind {
-                    ConfigInputKind::List { options, .. } => options.iter().map(|o| o.id.clone()).collect(),
-                    _ => vec!["true".into(), "false".into()],
-                };
-                Some((input.id.clone(), keys, InstanceId(f.0)))
-            })
-            .collect();
+        let picked: Vec<(String, InstanceId)> = picked.iter().filter_map(|(k, f)| cfg.inputs.iter().find(|i| i.id == ids[*k]).map(|i| (i.id.clone(), InstanceId(f.0)))).collect();
         if picked.is_empty() {
             return;
         }
-        self.edit("Input propagation", cx, |a| {
-            for (input, keys, iid) in picked {
-                let param = format!("{}{input}", acfg::param::INPUT_PREFIX);
-                if a.configuration.configured.iter().any(|c| c.target == ConfigTarget::Instance(iid) && c.param == param) {
-                    continue;
-                }
-                let values = keys.iter().map(|k| (k.clone(), ParamValue::Text(k.clone()))).collect();
-                a.configuration.configured.push(acfg::AsmConfiguredParam { input: input.clone(), target: ConfigTarget::Instance(iid), param, values });
-            }
-        });
+        self.edit(noshape_ops::config::INPUT_PROPAGATION, cx, |a| noshape_ops::asm_config::propagate_inputs(a, &picked));
         self.show_cfg_toast("Matching parameters successfully configured.".into(), true, cx);
     }
 

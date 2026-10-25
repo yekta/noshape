@@ -185,6 +185,17 @@ fn assembly(od: &OpenDoc, tab: TabId) -> Result<&Assembly, OpError> {
     }
 }
 
+/// The document and Assembly tab a call names.
+pub(crate) fn asm_target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {
+    target(ctx, a)
+}
+
+/// Solve assembly `asm` (tab `tab`) in its current configuration.
+pub(crate) fn solve_assembly(od: &mut OpenDoc, tab: TabId, asm: &Assembly, opts: &SolveOptions) -> AssemblyResult {
+    let eff = sa::effective(asm, &super::configuration::asm::values(od, tab, asm));
+    od.evaluate_assembly(tab, &eff, opts)
+}
+
 /// Solve the assembly in its default configuration.
 fn solve(od: &mut OpenDoc, tab: TabId, opts: &SolveOptions) -> Result<AssemblyResult, OpError> {
     let a = assembly(od, tab)?;
@@ -237,6 +248,15 @@ fn source_json(s: &InstanceSource, d: &noshape_model::Document) -> Value {
         InstanceSource::Assembly { assembly, .. } => json!({ "assembly": tab(assembly) }),
         InstanceSource::Sketch { studio, sketch, .. } => json!({ "part_studio": tab(studio), "sketch": sketch.to_string() }),
         InstanceSource::Standard { spec } => json!({ "standard_content": spec.part_name() }),
+        // A version of this or another document (Change to version).
+        InstanceSource::External { key, body, .. } if crate::derived::ExternalRef::parse(key).is_some() => {
+            let r = crate::derived::ExternalRef::parse(key).expect("checked");
+            let mut v = json!({ "document": r.path.file_name().map(|f| f.to_string_lossy().to_string()), "microversion": r.microversion.to_string(), "tab": r.tab });
+            if let Some(b) = body {
+                v["part"] = json!(refs::body_id(b));
+            }
+            json!({ "version_of": v })
+        }
         other => json!({ "other": format!("{other:?}").chars().take(80).collect::<String>() }),
     }
 }

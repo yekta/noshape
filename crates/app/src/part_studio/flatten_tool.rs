@@ -148,77 +148,17 @@ impl PartStudioView {
             self.flash_info("Select faces to flatten".into(), cx);
             return;
         }
-        // The faces' display triangles, refined, as one mesh.
-        let mut m = noshape_model::display::MeshBuffers::default();
-        for b in &self.display.bodies {
-            for (fi, r) in b.face_refs.iter().enumerate() {
-                if !faces.contains(r) {
-                    continue;
-                }
-                let Some(&(first, count)) = b.mesh.face_ranges.get(fi) else { continue };
-                let start = m.indices.len() as u32;
-                for &ix in b.mesh.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]) {
-                    m.indices.push(m.positions.len() as u32);
-                    m.positions.push(b.mesh.positions[ix as usize]);
-                    m.normals.push(b.mesh.normals[ix as usize]);
-                }
-                m.face_ranges.push((start, m.indices.len() as u32 - start));
-            }
-        }
-        let mut rip_lines: Vec<Vec<DVec3>> = rips.iter().map(|r| self.curve_points_of(r)).collect();
-        // Faces that close on themselves (a cylinder) open along their seams.
-        if let Some(ctx) = &self.context {
-            rip_lines.extend(noshape_model::flatten::seam_edges(ctx, &faces));
-        }
-        let spacing = noshape_model::thickness::spacing_for(&m, 4000);
-        let sheet = noshape_model::thickness::refine(&m, spacing);
-        let flat = noshape_model::flatten::flatten(&sheet, &rip_lines, 300);
+        let flat = noshape_model::flatten::flatten_faces(&self.display.bodies, &faces, &rips, self.context.as_deref());
         if let Some(s) = &mut self.ui.flatten {
             s.result = Some(Arc::new(flat));
         }
         self.redraw_flatten(cx);
     }
 
-    /// Polyline of a part edge (display tessellation).
-    fn curve_points_of(&self, r: &Reference) -> Vec<DVec3> {
-        let p3 = |p: &[f32; 3]| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
-        self.display.bodies.iter().find_map(|b| b.edge_refs.iter().position(|x| x == r).and_then(|i| b.mesh.edges.get(i)).map(|pl| pl.iter().map(p3).collect())).unwrap_or_default()
-    }
-
-    /// Where each vertex of the sheet lies in 3D: in the Top plane (Onshape),
-    /// turned to match the faces' footprint and centered under them, or
-    /// with the Origin vertex's point right under that vertex; on the chosen
-    /// mate connector's XY plane (offset along its Z, turned about it).
     fn placed_sheet(&self, s: &FlattenState, f: &Flattened) -> Vec<DVec3> {
-        if let Some(c) = s.position.as_ref().and_then(|r| self.display.connectors.iter().find(|c| c.reference == *r)) {
-            let (a, b) = s.angle_deg.to_radians().sin_cos();
-            let x = c.x.normalize_or_zero();
-            let y = c.z.normalize_or_zero().cross(x);
-            let (u, v) = (x * b + y * a, y * b - x * a);
-            let origin = c.origin + c.z.normalize_or_zero() * s.offset;
-            return f.flat.iter().map(|q| origin + u * q.x + v * q.y).collect();
-        }
-        // Rotation (no mirroring; the outer side up) best matching the footprint.
-        let mirror = f.normal.z < 0.0;
-        let q: Vec<DVec2> = f.flat.iter().map(|q| if mirror { DVec2::new(q.x, -q.y) } else { *q }).collect();
-        let foot: Vec<DVec2> = f.positions.iter().map(|p| p.truncate()).collect();
-        let fm = foot.iter().copied().sum::<DVec2>() / foot.len().max(1) as f64;
-        let (mut c, mut s2) = (0.0, 0.0);
-        for (a, b) in q.iter().zip(&foot) {
-            c += a.dot(*b - fm);
-            s2 += a.perp_dot(*b - fm);
-        }
-        let rot = DVec2::from_angle(s2.atan2(c));
-        let mut placed: Vec<DVec2> = q.iter().map(|a| rot.rotate(*a) + fm).collect();
-        if let Some(vtx) = s.origin.as_ref().and_then(|r| self.vertex_position(r))
-            && let Some(i) = (0..f.positions.len()).min_by(|&a, &b| f.positions[a].distance(vtx).total_cmp(&f.positions[b].distance(vtx)))
-        {
-            let shift = vtx.truncate() - placed[i];
-            for p in &mut placed {
-                *p += shift;
-            }
-        }
-        placed.into_iter().map(|p| p.extend(0.0)).collect()
+        let connector = s.position.as_ref().and_then(|r| self.display.connectors.iter().find(|c| c.reference == *r)).map(|c| (c.origin, c.x, c.z));
+        let origin_vertex = s.origin.as_ref().and_then(|r| self.vertex_position(r));
+        noshape_model::flatten::placed_sheet(f, &noshape_model::flatten::SheetPlacement { connector, angle: s.angle_deg.to_radians(), offset: s.offset, origin_vertex })
     }
 
     fn vertex_position(&self, r: &Reference) -> Option<DVec3> {
@@ -517,26 +457,7 @@ impl PartStudioView {
 /// The flat pattern as a planar sheet body at `placed` (one point per
 /// vertex): each patch's longest loop bounds it, the others are holes.
 fn flat_sheet(f: &Flattened, placed: &[DVec3], inner: bool) -> anyhow::Result<noshape_kernel::Shape> {
-    let mut faces = Vec::new();
-    for (_, loops) in f.loops(inner) {
-        let pts: Vec<Vec<DVec3>> = loops.iter().map(|l| l.iter().map(|i| placed[*i as usize]).collect()).collect();
-        // Newell normal of each loop; the largest is the outer one.
-        let newell = |l: &[DVec3]| l.iter().zip(l.iter().cycle().skip(1)).fold(DVec3::ZERO, |n, (a, b)| n + DVec3::new((a.y - b.y) * (a.z + b.z), (a.z - b.z) * (a.x + b.x), (a.x - b.x) * (a.y + b.y)));
-        let Some(outer) = (0..pts.len()).max_by(|a, b| newell(&pts[*a]).length().total_cmp(&newell(&pts[*b]).length())) else { continue };
-        let n = newell(&pts[outer]).normalize_or_zero();
-        if n == DVec3::ZERO {
-            continue;
-        }
-        let plane = noshape_kernel::Plane::from_normal(pts[outer][0], n);
-        let wire = |l: &[DVec3]| noshape_kernel::make_polyline(l, true);
-        let holes = pts.iter().enumerate().filter(|(i, _)| *i != outer).map(|(_, l)| wire(l)).collect::<Result<Vec<_>, _>>()?;
-        faces.push(noshape_kernel::make_face(&plane, &wire(&pts[outer])?, &holes)?);
-    }
-    match faces.len() {
-        0 => anyhow::bail!("the flat pattern has no boundary"),
-        1 => Ok(faces.remove(0)),
-        _ => Ok(noshape_kernel::sew(&faces, 1e-7, false)?.shape),
-    }
+    noshape_model::flatten::flat_sheet(f, placed, inner).map_err(anyhow::Error::msg)
 }
 
 fn toggle(list: &mut Vec<Reference>, r: &Reference) {
