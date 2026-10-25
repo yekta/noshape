@@ -3447,16 +3447,11 @@ impl PartStudioView {
         let dialog = e.dialog.clone();
         let id = dialog.read(cx).feature.id;
         let Some(state) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack) else { return };
-        // std booleanStepEditLogic: when the tool can't be built (Extrude's
-        // Direction ticked with nothing picked) the operation and scope stay
-        // as they are; only a failing boolean (its merge scope) is judged.
-        if state.status == FeatureStatus::Error && !state.faulty.iter().any(|f| f == "booleanScope") {
-            return;
-        }
-        let touched = state.touched.clone();
+        // Shared with the agent API: std booleanStepEditLogic, which leaves
+        // the operation and scope alone when the tool can't be built.
         let changes = {
             let d = dialog.read(cx);
-            noshape_ops::studio::boolean_edit_logic(&d.feature, &|k| d.user_set.contains(k), &touched)
+            noshape_ops::studio::boolean_choices(&d.feature, &|k| d.user_set.contains(k), state)
         };
         if changes.is_empty() {
             return;
