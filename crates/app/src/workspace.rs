@@ -110,6 +110,15 @@ impl Workspace {
                 this.toast = Some((kind, msg.clone()));
                 cx.notify();
             }
+            // An agent's Switch to reference / Open Feature Studio in linked
+            // document (live mode), as the menu items do.
+            DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(tab)) => this.activate(*tab, window, cx),
+            DocEvent::Ui(noshape_ops::UiRequest::OpenDocument(path)) => {
+                if let Err(e) = crate::files::open_document_window(path.clone(), None, this.gpu.clone(), cx) {
+                    this.toast = Some((crate::ui::AlertKind::Error, format!("Could not open the document: {e:#}")));
+                    cx.notify();
+                }
+            }
             _ => cx.notify(),
         })];
         // When the focused element goes away (a menu, a prompt, a closed

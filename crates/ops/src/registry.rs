@@ -197,6 +197,8 @@ pub fn run(ctx: &mut Ctx, op: &'static Op, args: &Value) -> Result<OpOutput, OpE
     if let Some(r) = crate::live::forward(ctx, op, args) {
         return r;
     }
+    // Window actions are the last call's (the app takes them after it).
+    ctx.ui_requests.clear();
     (op.run)(ctx, &Args { op, value: args }).map(|mut out| {
         tidy_numbers(&mut out.value);
         out
