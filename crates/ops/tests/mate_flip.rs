@@ -5,7 +5,9 @@
 //!   hangs through the plate, t (0, 0, −30), Z (0, 0, 1).
 //! - Flip primary axis turns it over: t (0, 0, 50), Z (0, 0, −1).
 //! - The pin laid on its side first (its Z perpendicular to the plate's)
-//!   gets the default result too.
+//!   gets the default result too; started upside down (Z opposed) it keeps
+//!   that pose: the flip is set automatically, t (0, 0, 50), Z (0, 0, −1)
+//!   (live "skb (10-25) axial mate default flip").
 
 use noshape_ops::Ctx;
 use noshape_ops::registry;
@@ -34,10 +36,17 @@ fn face(ctx: &mut Ctx, inst: &str, n: [f64; 3]) -> String {
 }
 
 /// The pin's translation (mm) and Z axis after a mate.
-fn mate(kind: &str, flip: Option<bool>, side: bool) -> ([f64; 3], [f64; 3]) {
+#[derive(Clone, Copy, Debug)]
+enum Start {
+    Upright,
+    Side,
+    UpsideDown,
+}
+
+fn mate(kind: &str, flip: Option<bool>, start: Start) -> ([f64; 3], [f64; 3]) {
     let dir = std::env::temp_dir().join(format!("noshape-mate-flip-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join(format!("{kind}-{flip:?}-{side}.noshape"));
+    let path = dir.join(format!("{kind}-{flip:?}-{start:?}.noshape"));
     let _ = std::fs::remove_file(&path);
     let mut ctx = Ctx::new();
     call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
@@ -47,13 +56,13 @@ fn mate(kind: &str, flip: Option<bool>, side: bool) -> ([f64; 3], [f64; 3]) {
     call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
     call(&mut ctx, "assembly_insert", json!({ "source": "pin", "part": "Part 1" }));
     call(&mut ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
-    let mut t = json!({ "instance": "Part 1 <2>", "translation": [80, 0, 0] });
-    if side {
-        t["axis"] = json!([1, 0, 0]);
-        t["angle"] = json!("90 deg");
-    }
+    let (t, top) = match start {
+        Start::Upright => (json!({ "instance": "Part 1 <2>", "translation": [80, 0, 0] }), [0.0, 0.0, 1.0]),
+        Start::Side => (json!({ "instance": "Part 1 <2>", "translation": [80, 0, 0], "axis": [1, 0, 0], "angle": "90 deg" }), [0.0, -1.0, 0.0]),
+        Start::UpsideDown => (json!({ "instance": "Part 1 <2>", "translation": [80, 0, 40], "axis": [1, 0, 0], "angle": "180 deg" }), [0.0, 0.0, -1.0]),
+    };
     call(&mut ctx, "assembly_transform", t);
-    let a = face(&mut ctx, "Part 1 <2>", if side { [0.0, -1.0, 0.0] } else { [0.0, 0.0, 1.0] });
+    let a = face(&mut ctx, "Part 1 <2>", top);
     let b = face(&mut ctx, "Part 1 <1>", [0.0, 0.0, 1.0]);
     let mut args = json!({ "type": kind, "a": { "instance": "Part 1 <2>", "entity": a, "inference": "centroid" }, "b": { "instance": "Part 1 <1>", "entity": b, "inference": "centroid" } });
     if let Some(f) = flip {
@@ -78,11 +87,17 @@ fn near(a: [f64; 3], b: [f64; 3], tol: f64) -> bool {
 fn axial_mates_default_align_and_flip_turns_over() {
     for kind in ["revolute", "cylindrical", "planar"] {
         // The CLI's flip_primary is the model's: true = Z axes aligned.
-        let (t, z) = mate(kind, None, false);
+        let (t, z) = mate(kind, None, Start::Upright);
         assert!(near(t, [0.0, 0.0, -30.0], 1e-2) && near(z, [0.0, 0.0, 1.0], 1e-6), "{kind} default: t {t:?} Z {z:?}");
-        let (t, z) = mate(kind, Some(false), false);
+        let (t, z) = mate(kind, Some(false), Start::Upright);
         assert!(near(t, [0.0, 0.0, 50.0], 1e-2) && near(z, [0.0, 0.0, -1.0], 1e-6), "{kind} flipped: t {t:?} Z {z:?}");
     }
-    let (t, z) = mate("revolute", None, true);
-    assert!(near(t, [0.0, 0.0, -30.0], 1e-2) && near(z, [0.0, 0.0, 1.0], 1e-6), "revolute from the side: t {t:?} Z {z:?}");
+    for kind in ["revolute", "fastened"] {
+        let (t, z) = mate(kind, None, Start::Side);
+        assert!(near(t, [0.0, 0.0, -30.0], 1e-2) && near(z, [0.0, 0.0, 1.0], 1e-6), "{kind} from the side: t {t:?} Z {z:?}");
+    }
+    for kind in ["revolute", "planar"] {
+        let (t, z) = mate(kind, None, Start::UpsideDown);
+        assert!(near(t, [0.0, 0.0, 50.0], 1e-2) && near(z, [0.0, 0.0, -1.0], 1e-6), "{kind} from upside down: t {t:?} Z {z:?}");
+    }
 }
