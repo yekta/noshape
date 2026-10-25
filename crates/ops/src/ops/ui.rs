@@ -194,6 +194,7 @@ fn state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             v["tab"] = tab_json(od, *t);
             v
         }).collect::<Vec<_>>(),
+        "selection": w.selection.iter().filter(|(_, s)| !s.is_empty()).map(|(t, s)| json!({ "tab": tab_json(od, *t), "selected": s })).collect::<Vec<_>>(),
         "drawing_zoom": w.sheets.iter().map(|(t, sv)| json!({ "tab": tab_json(od, *t), "zoom": sv.zoom, "center": sv.center, "viewport": sv.size })).collect::<Vec<_>>(),
     })
     .into())

@@ -108,8 +108,8 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "dynamic_suppression",
             summary: "Set or remove a feature's dynamic suppression expression",
-            description: "The Dynamic suppression dialog: the feature is active while `unsuppressed_if` is true (an expression of variables and configuration inputs, e.g. \"#holes > 2\"). Empty or omitted removes the expression (feature_suppress with suppressed false does too).",
-            fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name."), opt("unsuppressed_if", s(), "Unsuppressed if: expression.")],
+            description: "The Dynamic suppression dialog (a feature's Edit expression… / Remove expression): the feature is active while `unsuppressed_if` is true (an expression of variables and configuration inputs, e.g. \"#holes > 2\"). Empty or omitted removes the expression (feature_suppress with suppressed false does too). With `folder` instead of `feature`: the folder row's Edit dynamic suppression, written onto every feature in the folder.",
+            fields: vec![doc_field(), tab_field(), opt("feature", s(), "Feature id or name."), opt("folder", s(), "Instead of `feature`: a folder's name (feature_list lists folders)."), opt("unsuppressed_if", s(), "Unsuppressed if: expression.")],
             mutates: true,
             destructive: false,
             run: dynamic_suppression,
@@ -574,8 +574,19 @@ fn show_all(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn dynamic_suppression(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;
-    let id = feature_arg(ps, a, "feature")?;
     let expr = a.opt_str("unsuppressed_if")?.map(str::trim).filter(|e| !e.is_empty()).map(str::to_string);
+    if let Some(name) = a.opt_str("folder")? {
+        if a.get("feature").is_some() {
+            return Err(OpError::param("folder", "give `feature` or `folder`"));
+        }
+        let folder = ps.folders.iter().find(|f| f.name == name || f.name.eq_ignore_ascii_case(name)).map(|f| f.id).ok_or_else(|| OpError::not_found(format!("no folder `{name}`")).with_param("folder"))?;
+        edit_studio(od, tab, studio::suppression_expr_description(expr.as_deref()), |ps| {
+            ps.set_folder_suppression_expr(folder, expr.clone());
+            Ok(())
+        })?;
+        return Ok(json!({ "folder": name, "unsuppressed_if": expr, "regeneration": regen_report(od, tab)? }).into());
+    }
+    let id = feature_arg(ps, a, "feature")?;
     edit_studio(od, tab, studio::suppression_expr_description(expr.as_deref()), |ps| {
         studio::set_suppression_expr(ps, id, expr.clone());
         Ok(())

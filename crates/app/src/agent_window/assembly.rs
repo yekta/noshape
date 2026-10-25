@@ -4,7 +4,7 @@
 
 use super::AssemblyView;
 use gpui_kit::*;
-use noshape_ops::window::DisplaySet;
+use noshape_ops::window::{DisplaySet, Selected};
 
 impl AssemblyView {
     /// A display setting (view_display).
@@ -34,5 +34,15 @@ impl AssemblyView {
             }
             DisplaySet::IsolateParts { .. } | DisplaySet::HighlightBoundary(_) | DisplaySet::OrientOnEdit(_) | DisplaySet::ThicknessOff => {}
         }
+    }
+
+    /// The selection (ui_select): instances, or Clear selection.
+    pub(crate) fn agent_select(&mut self, sel: Selected, cx: &mut Context<Self>) {
+        self.clear_selection();
+        if let Selected::Instances(ids) = sel {
+            self.selected = ids;
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
     }
 }

@@ -1004,6 +1004,15 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!((dv["isolate"][0].clone(), dv["show_mates"].clone(), dv["snap_mode"].clone()), (json!(p), json!(true), json!(true)), "{dv}");
     let e = try_call(&mut ctx, "view_display", json!({ "tab": "Assembly 1", "highlight_boundary": true })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("highlight_boundary"), "{e:?}");
+    // Selection: Select instances with same configuration; Clear selection.
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "same_configuration", "refs": [p] }));
+    assert_eq!(s["selected"], json!([b, p]), "both from Part Studio 1 in its default configuration: {s}");
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "same_configuration", "refs": [p], "same_part": true }));
+    assert_eq!(s["selected"], json!([p]), "{s}");
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "add", "refs": [b] }));
+    assert_eq!(s["selected"], json!([p, b]), "{s}");
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "clear" }));
+    assert_eq!(s["selected"], json!([]), "{s}");
 
     let e = try_call(&mut ctx, "assembly_named_position_drivers", json!({ "drivers": [{ "mate": "Revolute 1", "dof": "tz" }] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("drivers[0].dof"));
@@ -2087,6 +2096,12 @@ fn feature_folders_dependencies_and_dynamic_suppression() {
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" }));
     assert!(g.get("suppression_expression").is_none(), "{g}");
     assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 1);
+    // On a folder: every feature in it; Remove expression clears them.
+    call(&mut ctx, "feature_add_folder", json!({ "features": ["Sketch 1", "Extrude 1"], "name": "Base" }));
+    call(&mut ctx, "feature_dynamic_suppression", json!({ "folder": "Base", "unsuppressed_if": "2 mm < 1 mm" }));
+    assert_eq!(call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" }))["suppression_expression"], "2 mm < 1 mm");
+    call(&mut ctx, "feature_dynamic_suppression", json!({ "folder": "Base" }));
+    assert!(call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" })).get("suppression_expression").is_none());
 }
 
 #[test]
@@ -3846,4 +3861,34 @@ fn view_display_settings() {
     call(&mut ctx, "render_image", json!({ "view": "window", "width": 64, "height": 40 }));
     let d = call(&mut ctx, "view_display", json!({ "exit_isolate": true }));
     assert_eq!(d["transparent"], Value::Null, "{d}");
+}
+
+/// The window's selection (ui_select): set, Select ▸ related, Select
+/// other… under a point, Clear selection; Zoom to selection uses it.
+#[test]
+fn ui_select_related_and_select_other() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "ui_select.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let s = call(&mut ctx, "ui_select", json!({ "action": "set", "refs": [part] }));
+    assert_eq!(s["selected"], json!([part]), "{s}");
+    let z = call(&mut ctx, "view_camera", json!({ "action": "zoom_selection" }));
+    assert_eq!(z["previous_views"], 1, "zooms to the selection: {z}");
+    // Select ▸ All faces of part, from one face.
+    let face = call(&mut ctx, "query_entities", json!({ "kind": "faces" }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "ui_select", json!({ "action": "related", "refs": [face], "criterion": "All faces of part" }));
+    assert!(r["selected"].as_array().unwrap().len() >= 7, "a block with a hole: {r}");
+    // Select other… looking down at the block 20 mm right of its centre:
+    // the top face, then the bottom face.
+    let n = call(&mut ctx, "view_camera", json!({ "action": "normal_to", "refs": ["plane:top"] }));
+    let ppm = 800.0 / num(&n["visible_height"]);
+    let at = json!([640.0 + 20.0 * ppm, 400.0]);
+    let o = call(&mut ctx, "ui_select", json!({ "action": "select_other", "at": at }));
+    assert_eq!(o["under"].as_array().unwrap().len(), 2, "{o}");
+    let o = call(&mut ctx, "ui_select", json!({ "action": "select_other", "at": at, "index": 1 }));
+    assert_eq!(o["selected"], json!([o["under"][1].clone()]), "{o}");
+    let c = call(&mut ctx, "ui_select", json!({ "action": "clear" }));
+    assert_eq!(c["selected"], json!([]), "{c}");
+    let e = try_call(&mut ctx, "view_camera", json!({ "action": "zoom_selection" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("refs"), "nothing selected: {e:?}");
 }

@@ -6,7 +6,7 @@ use super::PartStudioView;
 use super::behaviors::IsolateMode;
 use gpui_kit::*;
 use noshape_model::reference::Reference;
-use noshape_ops::window::DisplaySet;
+use noshape_ops::window::{DisplaySet, Selected};
 
 impl PartStudioView {
     /// A display setting (view_display).
@@ -36,5 +36,16 @@ impl PartStudioView {
             DisplaySet::ThicknessOff => self.thickness_off(cx),
             DisplaySet::IsolateInstances { .. } | DisplaySet::ShowMates(_) | DisplaySet::ShowMatesMode(_) | DisplaySet::SnapMode(_) => {}
         }
+    }
+
+    /// The selection (ui_select): entities, or Clear selection.
+    pub(crate) fn agent_select(&mut self, sel: Selected, cx: &mut Context<Self>) {
+        self.selection = match sel {
+            Selected::Studio(refs) => refs,
+            Selected::Instances(_) | Selected::Clear => Vec::new(),
+        };
+        self.selected_features.clear();
+        self.refresh_scene(false, cx);
+        cx.notify();
     }
 }

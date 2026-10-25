@@ -35,6 +35,19 @@ pub enum UiRequest {
     SheetZoom { tab: TabId, mv: SheetMove },
     /// A Part Studio's or Assembly's display setting (view_display).
     Display { tab: TabId, set: DisplaySet },
+    /// The tab's selection (ui_select).
+    Select { tab: TabId, sel: Selected },
+}
+
+/// What a tab has selected.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Selected {
+    /// Part Studio entities.
+    Studio(Vec<noshape_model::reference::Reference>),
+    /// Assembly instances.
+    Instances(Vec<noshape_model::assembly::InstanceId>),
+    /// Clear selection.
+    Clear,
 }
 
 /// A display setting as the view and context menus change it.
@@ -180,6 +193,8 @@ pub struct WindowState {
     pub sheets: BTreeMap<TabId, SheetView>,
     /// 3D tabs' display settings (set by view_display).
     pub display: BTreeMap<TabId, TabDisplay>,
+    /// Each tab's selection: entity ids, or an assembly's `inst:` ids (ui_select).
+    pub selection: BTreeMap<TabId, Vec<String>>,
 }
 
 impl WindowState {
@@ -198,8 +213,8 @@ impl WindowState {
             }
             UiRequest::Compare(c) => self.compare = c.clone(),
             UiRequest::Repair(r) => self.repair = r.clone(),
-            // view_camera and view_display keep their state themselves.
-            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } => {}
+            // view_camera, view_display and ui_select keep their state themselves.
+            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } => {}
         }
     }
 }
