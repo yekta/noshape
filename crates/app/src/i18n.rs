@@ -213,6 +213,26 @@ fn formatted(code: &'static str, s: &str) -> Option<&'static str> {
     hit
 }
 
+/// Whether a UI text is built from a template around an entity's name
+/// ("Show dependencies of __name__ …", "Create Drawing of __name__…"),
+/// not a fixed label: live context menus cut those with "…" on one line
+/// and wrap the fixed ones (behaviours "ui2 (10-24 08:40)"). Judged by the
+/// German table, the most complete; a label or type value ("Hide all
+/// __label__") doesn't count as a name.
+pub fn names_an_entity(english: &str) -> bool {
+    const CODE: &str = "de";
+    if table(CODE).contains_key(english) || !english.contains(' ') {
+        return false;
+    }
+    let mut all = FORMATTED.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
+    let f = all.entry(CODE).or_insert_with(|| Formatted::new(CODE));
+    let named = |t: &&Template| t.names.iter().any(|n| {
+        let lower = n.to_lowercase();
+        !(lower == "label" || lower.ends_with("label") || lower.contains("type"))
+    });
+    [english.chars().next(), None].iter().filter_map(|k| f.templates.get(k)).flatten().filter(named).any(|t| t.fill_with(english, |_| None).is_some())
+}
+
 /// QA pseudo-locale: every plain text shows as `⟦text⟧` (interned).
 fn pseudo(english: &str) -> Option<&'static str> {
     static SEEN: OnceLock<std::sync::Mutex<HashMap<String, &'static str>>> = OnceLock::new();
@@ -389,6 +409,15 @@ mod tests {
         set_current("xx");
         assert_eq!(current(), "en");
         assert_eq!(LANGUAGES.iter().position(|(c, _)| *c == DEFAULT), Some(2));
+    }
+
+    #[test]
+    fn menu_labels_around_names_are_told_from_fixed_ones() {
+        assert!(names_an_entity("Create Drawing of skb analysis asm…"));
+        assert!(names_an_entity("Show dependencies of Extrude 1…"));
+        assert!(!names_an_entity("Show dependencies…"));
+        assert!(!names_an_entity("Add mate connector to instance origin…"));
+        assert!(!names_an_entity("Hide all instances"));
     }
 
     #[test]

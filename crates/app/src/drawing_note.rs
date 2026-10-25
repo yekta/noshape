@@ -11,9 +11,8 @@
 use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::Input;
-use gpui_kit::component::{Disableable as _, Sizable as _, h_flex};
+use gpui_kit::component::{Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::format::{DATE_FORMATS, DRAWING_FIELDS, SHEET_REF_FIELDS, TEXT_FORMATS, is_date_field, is_field};
@@ -351,7 +350,7 @@ impl DrawingEditor {
                 .child(div().flex_1().whitespace_nowrap().child(label))
                 .child(crate::ui::glyph("ui-select-caret", 8., gpui_kit::rgb(0x777777)))
         };
-        let flag_box = Checkbox::new("note-flag").label("Flag notes").small().checked(flagged).disabled(item.is_none()).on_click(cx.listener(move |this, v: &bool, _, cx| {
+        let flag_box = crate::drawing_chrome::DrCheckbox::new("note-flag").label("Flag notes").checked(flagged).disabled(item.is_none()).on_click(cx.listener(move |this, v: &bool, _, cx| {
             let (v, Some(i)) = (*v, item) else { return };
             this.note_style(&move |s: &mut NoteStyle| {
                 s.flags.retain(|x| *x != i);

@@ -105,7 +105,8 @@ impl PartStudioView {
             let select_menu = |m: OsMenu, r: &Reference, k: PickKind, window: &mut Window, cx: &mut Context<OsMenu>| -> OsMenu {
                 // Select ▸ grows the entity into related ones; Select other… lists what is under the cursor.
                 let criteria: &[noshape_model::select::Criterion] = match k {
-                    PickKind::Face => &noshape_model::select::Criterion::FACE,
+                    // Live "ui (10-24 c)": a default plane gets the face list too.
+                    PickKind::Face | PickKind::Plane => &noshape_model::select::Criterion::FACE,
                     PickKind::Edge => &noshape_model::select::Criterion::SKETCH_EDGE,
                     // Live: a region gets the face set, a line or circle the sketch edge set.
                     PickKind::SketchRegion => &noshape_model::select::Criterion::FACE,
@@ -113,11 +114,12 @@ impl PartStudioView {
                     _ => &[],
                 };
                 let mut m = m;
-                // Live (bundle quickSelect): Select ▸ is there whatever was
-                // clicked; its items each check the entity (faces, edges) and
-                // Create selection… is always offered (a plane or a vertex
-                // gets only that, rmb-ps-edge / rmb-ps-vertex).
-                if !matches!(k, PickKind::Origin | PickKind::Connector) {
+                // Live ("ui (10-24 c)", bundle quickSelect): every entity
+                // has Select ▸ then Select other…; the submenu lists the
+                // face / edge items where they apply (a plane: the face list)
+                // and always Create selection… (a vertex, the origin or a
+                // mate connector: only that).
+                {
                     let (vs, rs) = (v.clone(), r.clone());
                     m = m.submenu("Select", window, cx, move |mut sm, _, _| {
                         for c in criteria {
@@ -135,9 +137,7 @@ impl PartStudioView {
                         })))
                     });
                 }
-                if !matches!(k, PickKind::Origin | PickKind::Connector) {
-                    m = m.item(item("Select other…", Box::new(|this, _, cx| this.select_other(false, cx))));
-                }
+                m = m.item(item("Select other…", Box::new(|this, _, cx| this.select_other_from_menu(cx))));
                 m
             };
             let zoom_fit = || item("Zoom to fit", Box::new(|this, _, cx| this.zoom_fit(cx)));
@@ -262,6 +262,43 @@ impl PartStudioView {
                             .item(item("Edit sketch appearance…", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Feature(id, None), w, cx))).swatch(sketch_swatch.unwrap_or_else(|| rgb(0x999999).into())));
                     }
                 }
+                // Live "ui (10-24 c)": the origin (Add comment is cloud).
+                (Some(r), Some(PickKind::Origin)) => {
+                    let rh = r.clone();
+                    m = m
+                        .item(icon_item("Hide", "eye-off", Box::new(move |this, _, cx| {
+                            this.set_visibility(std::slice::from_ref(&rh), true, cx);
+                            this.hover = None;
+                        })))
+                        .separator();
+                    m = select_menu(m, &r, PickKind::Origin, window, cx).separator().item(zoom_fit());
+                }
+                // Live "ui (10-24 c)": a mate connector.
+                (Some(r), Some(PickKind::Connector)) => {
+                    if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m
+                            .item(item(&format!("Edit {name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx))))
+                            .item(item(&format!("Show dependencies of {name}…"), Box::new(move |this, _, cx| {
+                                this.ui.dependencies = Some(id);
+                                cx.notify();
+                            })))
+                            .separator();
+                    }
+                    let (rh, rs) = (r.clone(), r.clone());
+                    m = m
+                        .item(tool("New sketch…", "sketch", "sketch", &r))
+                        .separator()
+                        .item(icon_item("Hide", "eye-off", Box::new(move |this, _, cx| {
+                            this.set_visibility(std::slice::from_ref(&rh), true, cx);
+                            this.hover = None;
+                        })))
+                        .item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| this.section_through(rs.clone(), w, cx))))
+                        .separator();
+                    m = select_menu(m, &r, PickKind::Connector, window, cx).separator().item(zoom_fit()).item(normal_to(&r));
+                    if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m.separator().item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));
+                    }
+                }
                 // Part faces, edges and vertices.
                 (Some(r), Some(k)) => {
                     if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
@@ -320,7 +357,7 @@ impl PartStudioView {
                                 this.hover = None;
                                 this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
                             })));
-                        if k != PickKind::Edge {
+                        if k == PickKind::Face {
                             let rs = r.clone();
                             m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| {
                                 if this.frame_of_ref(&rs).is_some() {
@@ -356,7 +393,11 @@ impl PartStudioView {
                             cx.notify();
                         })));
                     }
-                    m = select_menu(m, &r, k, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r));
+                    m = select_menu(m, &r, k, window, cx).separator().item(zoom_fit());
+                    // Live "ui (10-24 c)": a vertex has no Zoom to selection.
+                    if k != PickKind::Vertex {
+                        m = m.item(zoom_sel(&r));
+                    }
                     if planar {
                         m = m.item(normal_to(&r));
                     } else if linear_edge {
@@ -858,29 +899,40 @@ impl PartStudioView {
         let mut title = "Measure";
         // Part tab of Mass and section properties, laid out like Onshape's dialog.
         let mut mass_view: Option<MassView> = None;
+        let mut face_view: Option<FaceMassView> = None;
         if self.show_mass && self.ui.mass_faces {
-            // Face tab: area, perimeter and centroid of the selected faces.
+            // Face tab (live skb/851–854): Surface area, Perimeter and, for
+            // coplanar planar faces, the area moments of inertia about their
+            // centroid in the face's plane axes (b·h³/12 for a rectangle) and
+            // the polar moment; faces that aren't coplanar blank everything.
             title = "Mass properties (faces)";
             let faces: Vec<Reference> = self.selection.iter().filter(|r| matches!(r, Reference::Face(_))).cloned().collect();
-            let (mut area, mut perimeter, mut moment) = (0.0f64, 0.0f64, glam::DVec3::ZERO);
-            for f in &faces {
-                for sh in measure::resolve_shapes(&ctx, f) {
-                    let a = sh.area().unwrap_or(0.0);
-                    area += a;
-                    moment += sh.centroid().unwrap_or_default() * a;
-                    perimeter += sh.edges().iter().map(|e| e.length().unwrap_or(0.0)).sum::<f64>();
+            let names: Vec<String> = {
+                let label = self.labeler(cx);
+                faces.iter().map(|r| label(r)).collect()
+            };
+            let shapes: Vec<noshape_kernel::Shape> = faces.iter().flat_map(|f| measure::resolve_shapes(&ctx, f)).collect();
+            let units = self.doc.read(cx).session.doc.settings.units;
+            let mut fv = FaceMassView { faces: names, area: String::new(), perimeter: String::new(), inertia: None, polar: None, coplanar: true, unit: format!("{}⁴", units.length.symbol()) };
+            if !shapes.is_empty() {
+                let planes: Vec<Option<noshape_kernel::Plane>> = shapes.iter().map(|s| s.face_plane().ok().flatten()).collect();
+                let first = planes.first().cloned().flatten();
+                fv.coplanar = shapes.len() == 1
+                    || (planes.iter().all(Option::is_some)
+                        && first.as_ref().is_some_and(|p0| planes.iter().flatten().all(|p| p.normal.cross(p0.normal).length() < 1e-9 && (p.origin - p0.origin).dot(p0.normal).abs() < 1e-9)));
+                if fv.coplanar {
+                    let props: Vec<noshape_kernel::MassProperties> = shapes.iter().filter_map(|s| noshape_kernel::surface_properties(s).ok()).collect();
+                    let area: f64 = props.iter().map(|p| p.mass).sum();
+                    let perimeter: f64 = shapes.iter().map(|s| s.edges().iter().map(|e| e.length().unwrap_or(0.0)).sum::<f64>()).sum();
+                    fv.area = self.fmt(Quantity::new(area, Dim { length: 2, angle: 0 }), cx);
+                    fv.perimeter = self.fmt(Quantity::new(perimeter, Dim::LENGTH), cx);
+                    if let Some(p0) = first.as_ref().filter(|_| area > 0.0) {
+                        fv.inertia = Some(face_area_moments(&props, p0, units.si_factor(Dim::LENGTH)));
+                        fv.polar = fv.inertia.as_ref().map(|m| m.1.clone());
+                    }
                 }
             }
-            if faces.is_empty() {
-                rows.push(("Select faces".into(), String::new()));
-            } else {
-                let c = if area > 0.0 { moment / area } else { glam::DVec3::ZERO };
-                let l = |x: f64| self.fmt(Quantity::new(x, Dim::LENGTH), cx);
-                rows.push(("Faces".into(), faces.len().to_string()));
-                rows.push(("Surface area".into(), self.fmt(Quantity::new(area, Dim { length: 2, angle: 0 }), cx)));
-                rows.push(("Perimeter".into(), l(perimeter)));
-                rows.push(("Centroid".into(), format!("{}, {}, {}", l(c.x), l(c.y), l(c.z))));
-            }
+            face_view = Some(fv);
         } else if self.show_mass {
             title = "Mass properties";
             let bodies = mass_parts(&self.display, self.selection.iter().filter_map(|r| self.owning_body(r)));
@@ -1087,8 +1139,34 @@ impl PartStudioView {
             // Live (part-studio/121): the letter in #999, a coloured arrow glyph.
             let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(6.)).text_size(px(15.)).text_color(gpui_kit::rgb(0x999999)).child(l).child(crate::ui::glyph(glyph, 14., gpui_kit::rgb(c)));
             let mut body = v_flex().w_full().child(h_flex().w_full().mb(px(2.)).child(tab("mass-tab-part", "Part", false, cx)).child(tab("mass-tab-face", "Face", true, cx)));
-            match mass_view {
-                Some(m) => {
+            match (face_view.as_ref(), mass_view) {
+                (Some(fv), _) => {
+                    // Live (skb/851): no Override boxes on this tab; blank
+                    // values while nothing (or nothing coplanar) is measured.
+                    let blank = !fv.coplanar;
+                    body = body
+                        .child(field("Faces to measure", fv.faces.clone(), true, false, false).mt(px(5.)).mb(px(0.)))
+                        .child(field("Mate connector for reference frame", Vec::new(), false, false, false).mt(px(5.)).mb(px(0.)))
+                        .child(div().mt(px(9.)).h(px(27.)).child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", false)))
+                        .child(value_row("Surface area".into(), if blank { String::new() } else { fv.area.clone() }).mt(px(2.)).h(px(26.)))
+                        .child(value_row("Perimeter".into(), if blank { String::new() } else { fv.perimeter.clone() }).mt(px(2.)).h(px(26.)))
+                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Area moment of inertia ({})", fv.unit))));
+                    let cells = |names: &[&'static str], values: Vec<String>| {
+                        let mut row = h_flex().mt(px(2.)).h(px(26.)).px(px(5.)).gap(px(8.));
+                        for (n, v) in names.iter().zip(values) {
+                            row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v)));
+                        }
+                        row
+                    };
+                    let m = fv.inertia.as_ref().map(|m| m.0.clone()).unwrap_or_default();
+                    body = body
+                        .child(cells(&["Lxx", "Lxy"], vec![m[0][0].clone(), m[0][1].clone()]))
+                        .child(cells(&["Lyx", "Lyy"], vec![m[1][0].clone(), m[1][1].clone()]))
+                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Polar moment of inertia ({})", fv.unit))))
+                        // Live: Lzz in the left half of the grid.
+                        .child(cells(&["Lzz"], vec![fv.polar.clone().unwrap_or_default()]).child(div().flex_1()));
+                }
+                (None, Some(m)) => {
                     body = body
                         // Live: 5 px between the tabs and the two fields, 8 under them.
                         .child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, m.parts.clone(), true, m.mass.is_none(), false).mt(px(5.)).mb(px(0.)))
@@ -1116,7 +1194,7 @@ impl PartStudioView {
                         body = body.child(row);
                     }
                 }
-                None => {
+                (None, None) => {
                     body = body.child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, selected_names.clone(), true, false, false));
                     for (k, v) in rows {
                         body = body.child(value_row(k.into(), v));
@@ -1142,7 +1220,13 @@ impl PartStudioView {
                             .bg(pal.panel)
                             .border_b_1()
                             .border_color(pal.border)
-                            .child(crate::ui::panel_title("ps-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties")))
+                            // Live (skb/854): faces that aren't coplanar turn the
+                            // title red; hovering it gives the reason.
+                            .child({
+                                let bad = face_view.as_ref().is_some_and(|f| !f.coplanar);
+                                crate::ui::panel_title("ps-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(bad, |d| d.text_color(pal.text_invalid)).child("Mass and section properties"))
+                                    .when(bad, |d| d.tooltip(crate::ui::tooltip("Face selections are not coplanar")))
+                            })
                             .child(div().size(px(28.)).flex().items_center().justify_center().bg(crate::theme::p().accept).when(true, crate::ui::disabled_accept).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)))
                             .child(close("mass-close", false, cx)),
                     )
@@ -1342,6 +1426,48 @@ impl PartStudioView {
     }
 }
 
+/// The Face tab of Mass and section properties, formatted.
+struct FaceMassView {
+    faces: Vec<String>,
+    area: String,
+    perimeter: String,
+    /// [[Lxx, Lxy], [Lyx, Lyy]] and Lzz (the polar moment).
+    inertia: Option<([[String; 2]; 2], String)>,
+    polar: Option<String>,
+    coplanar: bool,
+    /// "mm⁴".
+    unit: String,
+}
+
+/// The area moments of coplanar faces about their joint centroid, in the
+/// plane `p0`'s axes (x = `unit_x`), in the unit `si` metres long, to 3
+/// decimals (trailing zeros dropped): [[Lxx, Lxy], [Lyx, Lyy]] and Lzz = Lxx + Lyy. Lxx = ∫y² dA,
+/// Lyy = ∫x² dA, Lxy = −∫xy dA (an inertia tensor's off-diagonal).
+fn face_area_moments(props: &[noshape_kernel::MassProperties], p0: &noshape_kernel::Plane, si: f64) -> ([[String; 2]; 2], String) {
+    use glam::{DMat3, DVec3};
+    let area: f64 = props.iter().map(|p| p.mass).sum();
+    let c = props.iter().fold(DVec3::ZERO, |a, p| a + p.center * p.mass) / area.max(f64::MIN_POSITIVE);
+    // OCCT's tensor T = tr(S)·I − S of the second moments S = ∫ r rᵀ dA.
+    let mut s = DMat3::ZERO;
+    for p in props {
+        let t = p.inertia;
+        let tr = t.x_axis.x + t.y_axis.y + t.z_axis.z;
+        let d = p.center - c;
+        s += DMat3::from_diagonal(DVec3::splat(tr / 2.0)) - t + DMat3::from_cols(d * d.x, d * d.y, d * d.z) * p.mass;
+    }
+    let (u, v) = (p0.unit_x(), p0.unit_y());
+    let g = |a: DVec3, b: DVec3| a.dot(s * b);
+    let f4 = si.powi(4);
+    // Live (skb/852): "26666.667", and "0" (not "0.000") for a zero.
+    let fmt = |x: f64| {
+        let t = noshape_units::to_fixed(x / f4, 3);
+        let t = if t.contains('.') { t.trim_end_matches('0').trim_end_matches('.').to_string() } else { t };
+        if t == "-0" { "0".to_string() } else { t }
+    };
+    let (ixx, iyy, ixy) = (g(v, v), g(u, u), -g(u, v));
+    ([[fmt(ixx), fmt(ixy)], [fmt(ixy), fmt(iyy)]], fmt(ixx + iyy))
+}
+
 /// The Part tab of Mass and section properties, formatted.
 struct MassView {
     volume: String,
@@ -1534,5 +1660,25 @@ mod mass_parts_tests {
         assert_eq!(m.inertia_unit, "mm² kg");
         assert!(!m.mass_override_enabled());
         assert!(super::MassView { volume: "48 mm³".into(), ..m }.mass_override_enabled());
+    }
+}
+
+#[cfg(test)]
+mod face_moment_tests {
+    use super::face_area_moments;
+    use glam::{DMat3, DVec3};
+
+    /// Live (skb/852): a 40 × 20 mm planar face gives Lxx 26666.667, Lxy 0,
+    /// Lyy 106666.667, Lzz 133333.333 (mm⁴).
+    #[::core::prelude::v1::test]
+    fn rectangle_moments_match_live() {
+        let (b, h): (f64, f64) = (0.04, 0.02);
+        let (sxx, syy) = (h * b.powi(3) / 12.0, b * h.powi(3) / 12.0);
+        // OCCT's tensor of a face in the XY plane: diag(∫y², ∫x², ∫x² + ∫y²).
+        let props = [noshape_kernel::MassProperties { mass: b * h, center: DVec3::new(0.02, 0.01, 0.0), inertia: DMat3::from_diagonal(DVec3::new(syy, sxx, sxx + syy)) }];
+        let plane = noshape_kernel::Plane { origin: DVec3::ZERO, x_dir: DVec3::X, normal: DVec3::Z };
+        let (m, lzz) = face_area_moments(&props, &plane, 0.001);
+        assert_eq!(m, [["26666.667".to_string(), "0".to_string()], ["0".to_string(), "106666.667".to_string()]]);
+        assert_eq!(lzz, "133333.333");
     }
 }

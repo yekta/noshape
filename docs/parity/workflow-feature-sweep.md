@@ -20,10 +20,22 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 5 | Parting line, no edges | "Select parting edges." on Parting edges | "Select the parting edges", no field | 🔧 |
 | 6 | Kernel failure | "Selected faces could not be drafted." | "Draft failed: <kernel>" | 🔧 |
 | 7 | Parting edge parallel to pull | "Parting edge cannot be parallel to pull direction." on Parting edges | no check | 🔧 checked per edge before the planarity check, on Parting edges |
-| 8 | Parting line scope | any parting line (non-planar, several parts), each edge's faces drafted about the edge | planar lines perpendicular to the pull, one part ("Parting lines must lie in a plane…", "…must belong to one part") | ✗ |
+| 8 | Parting line scope | any parting line (non-planar, several parts), each edge's faces drafted about the edge | planar lines perpendicular to the pull, one part ("Parting lines must lie in a plane…", "…must belong to one part") | 🔧 several parts (each on its own) and stepped / sloped straight parting edges (each edge's own hinge plane) (test `parting_line_draft_on_two_parts_and_steps`); curved non-planar parting lines still refused |
 | 9 | Two sided | first angle on the faces "away" from the pull, second on "along"; Opposite direction doesn't change which side One sided drafts | angle on the +pull side; sides follow the flipped pull | 🔧 live L1/L2: first angle below the parting line, second above, both narrowing toward it; each Opposite flips its side's taper only (test with live's 5 volumes) |
-| 10 | Edit logic | hint faces, focus on Entities to draft / Parting edges when editing | none; focus on Neutral plane | ✗ |
+| 10 | Edit logic | hint faces, focus on Entities to draft / Parting edges when editing | none; focus on Neutral plane | 🔧 INITIAL_FOCUS_ON_EDIT (Entities to draft / Parting edges focused when an existing draft opens); the first parting edge sets "Switch face" to the steeper face (flipAlongPull). Hint faces and the side-change flip adjustment ✗ (our planar parting lines decide the sides geometrically) |
 | 11 | 0° draft, empty Entities to draft | — | — | 🔧 L3 0° = no change; L4 ✅ |
+
+## Body draft
+Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
+| # | Area | Onshape | Ours | Status |
+|---|---|---|---|---|
+| 1 | Parts to draft | the faces turn about their edge away from the parting entity: the top stays 40×20, the bottom grows by 10·tan 5° (8535.1377); Keep material makes no difference here | "not supported yet" | ✅ test `body_draft_as_live` |
+| 2 | Corner type Plane | corners bevelled from the top corner to the drafted faces' feet (8530.0348, 10 faces) | — | ✅ |
+| 3 | Symmetric | both sides narrow toward the parting plane (8265.0174, 10 faces) | — | ✅ (split at the parting plane, each side drafted, fused) |
+| 4 | Faces to draft / Edges to hold | only the picked faces (8174.9773); held top edges = Parts | — | ✅ |
+| 5 | Cylinder | a cone r 10.8749 → 10 (3424.4619) | — | ✅ |
+| 6 | Errors | "Select parts to draft." / "Select faces to draft." / "Select edges to draft." on their field; "Body draft pull direction is invalid." on Pull direction; "Parting entity is invalid." on Parting entity; Draft on self of a block "Selected parts could not be drafted." on Parts | — | ✅ |
+| 7 | Match faces at parting, concave repair, Draft on self that works, Keep material where drafting removes material | — | — | ✗ (no live case yet) |
 
 ## Move face
 | # | Area | Onshape | Ours | Status |
@@ -38,7 +50,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 8 | Offset up to a non-parallel plane | the extended face meets the plane: distance 0 | distance along the normal | 🔧 |
 | 9 | 0 offset / translation | succeeds, part unchanged | went to the kernel | 🔧 |
 | 10 | Kernel failure | "Could not offset selected faces as requested." / "Could not transform selected faces as requested." | "Move face failed: …" | 🔧 |
-| 11 | Reapply fillet | removes and re-rolls fillets touching the moved faces | ignored | ✗ |
+| 11 | Reapply fillet | removes and re-rolls fillets touching the moved faces | ignored | 🔧 on by default: the fillets beside the moved faces are removed, the faces moved, the fillets rolled again at their radii (shared with Draft) |
 
 ## Replace face
 | # | Area | Onshape | Ours | Status |
@@ -68,9 +80,9 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 4 | Path not one chain | "Sweep path curves are not all connected." on path | own text, no field | 🔧 |
 | 5 | Lock direction empty | "Select direction to lock." on lockDirectionQuery | own text, no field | 🔧 |
 | 6 | Pitch revolutions limit | "Computed number of revolutions outside limit (between 0 and 1000). Current value is N." on pitch | no check | 🔧 |
-| 7 | Failure | "Could not create valid swept body, check input." / thin "Failed to thicken swept body, check thickness." | "Sweep failed: …", own thin texts | 🔧 solid/surface; thin wall texts ✗ |
+| 7 | Failure | "Could not create valid swept body, check input." / thin "Failed to thicken swept body, check thickness." | "Sweep failed: …", own thin texts | 🔧 solid/surface; thin ✅ live "psb (10-24 c)" case 6: "Failed to trim result body, try deselecting "Trim ends" option." with Trim ends on an open path, else "Failed to thicken swept body, check thickness." (no field) |
 | 8 | Path opposite direction, Extend to full path | change where the sweep starts / whether it covers the path | ignored | 🔧 L12 (half toward the path's start / end; whole with Extend) |
-| 9 | Thin method | sweep a sheet, thicken it, trim ends to planes | offset the wall, then sweep (scale scales the wall; Trim ends off ignored) | ✗ |
+| 9 | Thin method | sweep a sheet, thicken it, trim ends to planes | offset the wall, then sweep (scale scales the wall; Trim ends off ignored) | 🔧 live "psb (10-24 c)": walls square to the path without scale / twist keep the in-plane offset (identical); otherwise the sheet is swept, thickened normal to it (side 1 outside a closed wall / right of an open one along the path) and, with Trim ends on an open path, swept past the ends and cut to the cap planes; all eight live cases (outward / flip / mid plane / open line on −y / Scale 2 10264.8766 / oblique trimmed 7204.0248 and not 7203.9915 / arc 8685.2519 / region) in test `thin_sweep_as_live` |
 | 10 | Empty profiles texts | — | own texts | 🔧 L13: solid/thin "Select faces or sketch regions to sweep." (field), surface "Select sketch curves to sweep." (no field), disconnected path no field, empty Faces to lock = None |
 
 ## Loft
@@ -78,9 +90,9 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 |---|---|---|---|---|
 | 1 | Fields | order, labels, defaults, End conditions, Path section count 5, Connections, isocurves 10 | same | ✅ |
 | 2 | Empty profiles | "Select profiles in order from start to finish." on profiles | same | ✅ |
-| 3 | Guides, Path | supported | "…not supported yet" | ✗ |
-| 4 | End conditions | applied, with their errors (planar profile, adjacent faces, tangency direction) | warning only | ✗ |
-| 5 | Connections | every connection; "Select a point on each profile to define a connection." | first only | ✗ |
+| 3 | Guides, Path | supported | "…not supported yet" | 🔧 live "psb (10-24 f)". **Path**: the profiles carried along the path, Section count sections cut at even steps, live then runs a natural cubic through them (quarter arc □20: 25100.80 / 25128.64 for 5 / 10 sections); ours still comes out at the exact sweep (25132.6, within 0.13 %; the natural rebuild is rejected for path lofts, P3, test tolerance temporary); the path needn't touch the profiles (live: no error); two profiles only so far. **Guides** through polygon corners: each side face ruled between its corner columns (the guide or a straight line), sewn with the profiles; the guided edge is the guide; live's guided faces bulge a little more (one guide 5634.73 vs ours ~5628.8, four 9511.27 vs ~9511.44); "All guides should intersect each profile boundary." (no field); curved profiles, several guide curves, more than two profiles, guide continuity still "not supported yet" |
+| 4 | End conditions | applied, with their errors (planar profile, adjacent faces, tangency direction) | warning only | 🔧 Normal / Tangent to profile and Normal / Tangent to direction clamp the end derivative (kernel `LoftEnd`, natural_loft): live "psb (10-24) loft end derivative" (+ b): 3·ΔCP1 = m·(0.9 h + 0.1 c) at each corner column, a smoothstep between the corners, natural free end (Parasolid's interior columns carry a small extra bump: volumes within ~1.5e-5); two-profile lofts get a halfway section so OCCT smooths them; the nine live lofts (□→□ shifted / h 40 / Tangent, □→Ø16 m 0.5 / 3 / both ends / end only / Tangent 2) in test `loft_end_conditions_as_live`; texts "Only planar profiles are valid for Normal/Tangent to profile start/end condition.", "Select direction for start/end profile tangency."; Match tangent / curvature still a warning. **Tangent to profile is 🔧**: corners match live, the interior columns don't (3900 vs live 3926.46, 4943.72 vs 4925.19); the test's 30 mm³ tolerance is temporary until live's columns ("psb (10-24 h)") land |
+| 5 | Connections | every connection; "Select a point on each profile to define a connection." | first only | 🔧 the text (on the array); two or more connections split the profiles at their points and loft connection to connection (kernel `connect_sections`); test `loft_between_squares` |
 | 6 | Profile errors | "Point profiles can only exist as first or last profiles.", "Select a single sketch region or face per profile.", "Cannot use faces or regions with inner loops as profiles.", "Could not create valid profiles from selections." | own texts, no field | 🔧 ✅ L14 (no field) |
 | 7 | Failure | "Could not create loft with given information. Check profile order, guide/profile intersections or end conditions." / thin "Failed to thicken lofted body, check thickness." | own texts | 🔧 |
 | 8 | Trim profiles / guides, Thin Trim ends, Show isocurves | applied | ignored | ✗ |
@@ -113,7 +125,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 3 | Empty Parts | "Select parts where the rib will be fitted into." | all solids used | 🔧 L22 (no field); older ribs keep using every part |
 | 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | 🔧 L22 Parts filled with the studio's parts on open |
 | 5 | Closed profile, Parallel | "Only open sketch profiles can be used when rib direction is parallel to sketch plane." | no check | 🔧 ? L23 |
-| 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | Extend 🔧 L22: parallel ribs are built as rib.fs does (swept past the part, split by it, excess removed; ends extended with the checkbox or when they sit on a face they point into), all five live rows match (3692, 3932, 4112, 4562, error). Extend with Normal to sketch plane (L24: error) and Draft stay ✗ |
+| 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | Extend 🔧 L22: parallel ribs are built as rib.fs does (swept past the part, split by it, excess removed; ends extended with the checkbox or when they sit on a face they point into), all five live rows match (3692, 3932, 4112, 4562, error). Draft 🔧 rib.fs applyDraft: the sides drafted about the rib's top (wider into the part, narrower with Opposite), split by the part again; live G33c 27048.155585660817 matched (test `rib_draft_as_live`), Normal to sketch plane drafted the same way (no live number). Extend with Normal to sketch plane (L24: error) stays ✗ |
 | 7 | Errors | "Failed to create a rib from a selected profile.", "None of the ribs intersected a part.", "Failed to merge ribs into parts." | own texts | 🔧 |
 | 8 | One rib per edge | yes (Merge ribs off: one body per edge) | one per chain | ✅ L24: one body per profile chain (live: the L rib is one body); parallel needs one straight edge 🔧; Extend profiles see row 6 |
 
@@ -131,17 +143,17 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 2 | Empty edges | "Select laminar edges or curves as fill surface boundary." on edges | own text, no field | 🔧 |
 | 3 | Continuity label | "Continuity [Position]" label shown (SHOW_LABEL) | no label | 🔧 SHOW_LABEL |
 | 4 | Loop errors | "A boundary edge can have only one type of continuity constraint.", "Cannot create fill surface between multiple loops.", "Boundary edges selected do not form a closed loop.", "Cannot create tangency or curvature constraint for a curve selection." | own texts | 🔧 ? L27 (internal-edge variant) |
-| 5 | Guides | errors and warnings ("Select guide entities." …); exact curves in Precise mode | not checked; always sampled | ✗ |
+| 5 | Guides | live "psb (10-24 d)": Guides on with nothing picked is the plain fill; Precise passes through the guides (≤1.1e-4 mm), each touching the boundary at one end at least, else "Guide entities cannot be used as selected." (no field); arc + vertex: warning "Guide curves and vertices cannot be used in combination in Precise mode. Vertex selections are not used."; Sampled only approximates | not checked; always sampled | 🔧 all those rules (Precise curves as free MakeFilling constraints); test `fill_guides_as_fs`; our surface is OCCT's, so areas differ slightly (live arc 1845.4473) |
 | 6 | Add when the edges are surface edges | automatic (SF7) | no | ✗ (SF7) |
 
 ## Boundary surface
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ |
-| 2 | Profile arrays | driven-query rows "[None] Edge of Sketch 1", max 2 picks each | "Add Profile" UI, no cap | ✗ |
+| 2 | Profile arrays | driven-query rows "[None] Edges of Curve U1" (live L28: no limit, a third row is taken) | "Add Profile" UI | ✅ driven query with the "[#uCondition] #uProfileEntities" item label |
 | 3 | Boundary condition label | SHOW_LABEL | no label | 🔧 SHOW_LABEL |
 | 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 L28; a third profile / mid-span crossing fail with live's texts 🔧; 1U+1V 🔧 builds the sheet the U sweeps along the V (the other two sides are the profiles moved to each other's far end; live 2099) |
-| 5 | Boundary conditions | applied, with their errors | warning only | ✗ |
+| 5 | Boundary conditions | applied, with their errors | warning only | 🔧 rows in one direction: the first / last row's condition is the loft end condition (same rule as Loft 4); live L28's "Only planar profiles are valid for Normal/Tangent to profile start condition." on a part edge (test `boundary_condition_needs_a_planar_profile`); U+V networks still warn |
 | 6 | Failure | "Could not create boundary surface with given information. Check profile order, intersections or end conditions." | own text | 🔧 |
 
 ## Enclose
@@ -198,7 +210,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 9 | Feature selection in Faces to pattern | a feature-list click adds its faces | not supported | ✅ L44 (live adds nothing either; Hole not verified) |
 | 10 | Curve pattern | selection checked first; "Select a path to pattern along." on edges; "Edges do not form a continuous path."; distance-too-large text on distance; closed-path rule; start-point info | own texts, no fields | 🔧 incl. the start point: an open path starts at its end nearer the seed, a closed one at its point nearest the seed (path.fs), and a start outside the seed's box gives "For best results ensure that the path start point and pattern seed are touching." ("…the path and pattern seed…" when closed) |
 | 11 | Limits and infos | "Cannot have more than 2500 instances in a pattern.", parallel directions info, skip-instance infos | missing | 🔧 2500 limit (linear), parallel info, skip infos "Original pattern instance will not be skipped." / "Index is outside patterned instance count." (linear, circular, curve) |
-| 12 | Feature pattern of a wall flush with the part (Reapply off) | live "psb (10-23) flush wall pattern": a wall exactly on the end face fails "Could not create all instances…" from 3 instances; with 2 the end face moves by the distance (19700 mm³); an inward wall that adds nothing fails "Selected features do not create any geometry…"; any overhang fails at 2 | flush walls patterned without error | 🔧 a feature whose faces on the part are only caps across the pattern direction: ≥3 instances fail (ghosts shown), 2 move the caps (face offset); test `feature_pattern_of_a_flush_wall_as_live` |
+| 12 | Feature pattern of a wall flush with the part (Reapply off) | live "psb (10-23) flush wall pattern": a wall exactly on the end face fails "Could not create all instances…" from 3 instances; with 2 the end face moves by the distance (19700 mm³); an inward wall that adds nothing fails "Selected features do not create any geometry…"; any overhang fails at 2; "psb (10-24) flush wall follow-up": W4/W5 ×2 fail, a curve pattern along the same edge is the linear one (W1 ×2 OK 19700), a circular one (2° about Z) fails even at ×2 | flush walls patterned without error | ✅ a feature whose faces on the part are only caps across a pure translation (linear, or curve along a straight edge): ≥3 instances fail (ghosts shown), 2 move the caps (face offset); circular fails by the merged-face rule (a seed face reaching a part face's outline merges into it and is copied along: each copy must land in the plane of another part face facing the same way, as ADV9's mirrored gusset; onto its own plane (G45, W1–W5) or into empty space (the fins' front wall) it fails; a face wholly inside a part face, the narrow rib's bottom, doesn't count); tests `feature_pattern_of_a_flush_wall_as_live`, `feature_mirror_of_a_gusset_as_live` and kern's `pattern_fins` cover every live row |
 
 ## Hole
 | # | Area | Onshape | Ours | Status |

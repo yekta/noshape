@@ -16,16 +16,16 @@ B = Onshape client code (bundle-raw), P = an existing parity row.
 | # | Behaviour | Live / source | Status |
 |---|---|---|---|
 | 1.1 | Click a face / edge / vertex / plane / sketch entity selects it; a plain click **adds** to the selection (no modifier needed) | L263; P part-studio 3.1 | 🔧 (P ✅; replay pending) |
-| 1.2 | Click on an already selected entity: removes it? (sketch: a plain second click toggles off, L14084) | L14084 (sketch); Part Studio graphics ❓ | ❓ |
-| 1.3 | Shift+click / Ctrl+click (Cmd on macOS) on an entity in the graphics | not captured (only sketch, Parts list, feature list, assembly) | ❓ |
-| 1.4 | Click in empty space clears the selection — except while Mass properties or a pinned Measure panel is open | L263, L401 | 🔧 |
+| 1.2 | A plain click on a selected entity toggles it off (the pointer still hovers it, so its outline stays) | live "nav2 selection" 1 | 🔧 (`pick` toggles) |
+| 1.3 | Shift+click and Meta+click act as a plain click (toggle). **Ctrl+click opens the graphics context menu on release and leaves the selection** (`eventCanBeUsedForContextMenu` = ctrlKey or right button, every platform) | live "nav2 selection" 3 | 🔧 (viewport.rs: Ctrl+left release → context menu) |
+| 1.4 | Click in empty space clears the selection, **a Shift+click there keeps it**; neither clears while Mass properties or a pinned Measure panel is open | L263, L401; live "nav2 selection" 3 | ⏳ (Shift+empty click still clears: part_studio/mod.rs Click arm, asked of the lead) |
 | 1.5 | Space clears the selection; Ctrl+A does nothing | L1199; P 1.8 | 🔧 |
-| 1.6 | Esc: does it clear the selection in the Part Studio? (it does not in the sketch L189, the assembly L1325, the lists L14045) | ❓ | ❓ (P 1.7 says it clears: unverified) |
+| 1.6 | **Esc does not clear the selection** in the Part Studio (graphics focused); Space does | live "nav2 selection" 4 | ❌ (ours clears last in the Cancel chain: part_studio/mod.rs, asked of the lead) |
 | 1.7 | A part face is picked through planes; a plane only where no part is under the cursor | L406; P 13.8 | ✅ P |
-| 1.8 | Left→right drag: window box (only what is fully inside); right→left: crossing box (everything touched, planes included); a box is a window only while it ends strictly right of its start (`point1.x > point0.x`; a vertical box is crossing), a two-finger touch box always a window. B: `Viewer.performBoxSelection` runs on release only, picking the rect again and again with what it found hidden (back faces on), so the box also takes **occluded** entities; a window first hides everything crossing its border; Ctrl with an empty selection does nothing | L345–347; B `performContainmentSelection`, `performBoxSelection` | 🔧 (box_select.rs: from the projected display geometry, occluded entities and planes included; which kinds a box keeps waits for live 10-25 c) |
-| 1.9 | Crossing box pre-highlights what it touches while dragging | L347; B: BoxSelector draws only the box while dragging (no pick) | ❓ (live note vs bundle disagree; mid-drag capture requested, 10-25 c) |
+| 1.8 | Left→right drag: window box (only what is fully inside); right→left: crossing box (everything touched); a window only while it ends strictly right of its start (`point1.x > point0.x`; a vertical box is crossing), a two-finger touch box always a window. Picks on release, back faces on, so **occluded** faces and edges are taken. A Part Studio box takes **faces and edges only: no vertices, part, default planes (enclosed, crossed or over their border), Origin or mate connector** (window round the block → 6 faces + 12 edges; crossing over a corner → 3 faces + 3 edges incl. the hidden bottom face). A box adds, never toggles, and an empty box keeps the selection | L345–347; live "nav2 selection" 5, 6; B `performBoxSelection` | 🔧 (box_select.rs from the projected display geometry; behaviors.rs `box_takes`, test `box_takes_no_planes_origin_or_connectors`) |
+| 1.9 | **No pre-highlight while a box is dragged** (only the plane under the press point keeps its ordinary hover); the selection fills in after release | live "nav2 selection" 5 | ✅ (ours draws only the box) |
 | 1.10 | Box look (BoxSelector.updateGraphics): a 1 px loop from the press point, each side stippled from its first corner, over an infill of the line colour at 0.2. Window `--os-box-select-color` (light #1651b0, dark #769fcc) solid; crossing #FFC20E 9 on / 8 off; zoom window rgba(144,206,241,0.7) 10 / 10. Live over white: fill #d0dcef / #fff3cf (= 0.2 exactly), line #7296cf / #ffda6e (= 0.6 of the colour) | L346–347; B | 🔧 (viewport.rs `box_overlay`) |
-| 1.11 | Ctrl(+Cmd)+drag box deselects | P 3.6 | 🔧 |
+| 1.11 | Ctrl+drag box deselects what it encloses / touches; with nothing selected it does nothing; looks as a plain box | P 3.6; live "nav2 selection" 6 | 🔧 |
 | 1.12 | Selection colours: face #e5aa38 + orange boundary, selected+hovered #f0bb58, edge #ffa90a ~3 px, part #c09039..#f0b850, plane fill #fdd385 / border #ffa90a | L256–263 | 🔧 (P) |
 | 1.13 | Selection-count cursor macSelectionCursor-N, -5plus from 6 | L1100–1111 | ✅ P cursors 35/36 |
 | 1.14 | Left drag threshold 2 px / 50 ms (`LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE`, `_TIME_TOLERANCE`) | B | 🔧 |
@@ -42,7 +42,7 @@ selection and hover per step, rows in brackets).
 | 2.2 | Sketch: window / crossing boxes over sketch entities | P sketch | ✅ P |
 | 2.3 | Assembly: plain clicks add; Shift / Ctrl+click on a selected face change nothing; empty click clears; double-click a face clears | L4599–4644 | 🔧 (ours toggles off on a plain click: check) |
 | 2.4 | Assembly window box: faces / edges / vertices fully inside; crossing box: whole instances | L4599–4644 | 🔧 |
-| 2.5 | Assembly box without a modifier: replaces or adds to the selection? (ours clears first) | ❓ | ❓ |
+| 2.5 | Assembly: a box only with an empty selection (it takes whole part occurrences); with something selected a left drag from empty space **moves the selected instance(s)** | live "nav2 selection" 7 | ❌ (assembly_view.rs: ours clears and boxes; owner to fix) |
 | 2.6 | Assembly drag starting on a part moves the instance | L4599–4644 | 🔧 (P) |
 
 ## 3. Hover pre-highlight
@@ -53,8 +53,8 @@ selection and hover per step, rows in brackets).
 | 3.2 | Hovered edge: thickened #FFC685; a 9 px dark hollow ring at its midpoint; near the midpoint (a few px) the midpoint becomes the target (11 px orange ring) | L258, L14599–14612 | ⏳ (ours switches to the midpoint only on click, P 3.10) |
 | 3.3 | Hovered vertex: a light-orange dot | L259 | 🔧 |
 | 3.4 | Hovered plane / mate connector colours | B only (`SECTION_PLANE…`, `MATE_CONNECTOR_PRE_SELECTED_COLOR`) | ❓ |
-| 3.5 | Timing: the pick runs at once on every move unless "reduce mouse hover highlight" is on (then after min(5 × average pick time, 250 ms) once the mouse pauses, or at once below 0.15 px/ms) | B `schedulePreHighlightPick`, `onMouseMove` | 🔧 (ours: at once) |
-| 3.6 | Leaving the graphics area clears the pre-highlight | B `onMouseLeave` | 🔧 |
+| 3.5 | Timing ("reduce mouse hover highlight" on): below 0.15 px/ms the pick runs on every move; faster, the old highlight clears (unless still under the pointer) and the pick waits min(5 × average pick ms, 250 ms) after the pointer pauses (average = EMA 0.8/0.2 of pick times) | live "nav2 pre-highlight" 1–2 | 🔧 (viewport.rs `prehighlight_delay`, GPU hover-pick time as the average; plain selection only; test `prehighlight_waits_for_a_pause_as_live`) |
+| 3.6 | Leaving the graphics area clears the pre-highlight at once (next frame) | live "nav2 pre-highlight" 4; B `onMouseLeave` | 🔧 |
 | 3.7 | Hovering a feature row outlines its geometry | L260 | 🔧 P |
 | 3.8 | Sketch hover #ffc685 / mirrored pair secondary #f2ff80 | L8776–8813 | ✅ P sketch |
 
@@ -65,7 +65,7 @@ selection and hover per step, rows in brackets).
 | 4.1 | Readout per selection: labels and order (Parallel dist, Angle, Perp …, Center dist, Min/Max dist, Diameter, Radius, Center, Point, Area, Length, Curvature deviation) | L399–403; B `setMeasurements` priorityTypes | 🔧 (P 11.1 ✅ partly) |
 | 4.2 | Point–point, edge–face, face–face, min/max distance values equal `query_measure` | L4611, L4618 | 🔧 |
 | 4.3 | Default planes add only angles and distances; a plane alone: "No measurements available for current selection." | L8938–8960; U `default_planes_add_only_angles_and_distances` | ✅ U |
-| 4.4 | A vertex or edge with a plane (AN1): Top + vertical edge reads Perp line and plane angle · Curvature deviation · Min dist · Length (the edge's); vertex / edge midpoint / circle read their Min dist | L8949 (c); U `edge_vertex_midpoint_and_circle_with_the_top_plane` | ✅ U (edge rows exact; vertex / circle rows beyond Min dist not captured live) |
+| 4.4 | A vertex or edge with a plane (AN1): Top + vertical edge reads Perp line and plane angle · Curvature deviation · Min dist · Length (the edge's); vertex / edge midpoint / circle read their Min dist | L8949 (c); U `edge_vertex_midpoint_and_circle_with_the_top_plane` | ✅ U (edge rows exact, Curvature deviation also for a perpendicular line; vertex / circle rows beyond Min dist not captured live) |
 | 4.5 | Units follow the document (mm document: Millimeter) | L14555 (L401 was an inch document) | 🔧 |
 | 4.6 | Status-bar Point readout with red / green / blue axis arrows | L14555–14574 | ❓ (no parity row) |
 | 4.7 | Hovering a distance row draws a black dashed line | L8957 | 🔧 |
@@ -93,7 +93,7 @@ selection and hover per step, rows in brackets).
 | 6.5 | Dragging the base snaps to circle centres, faces, edges (~30–35 px, over the face) and vertices (~22 px); what it snaps to lights up; on release the plane moves through the snapped point and the base returns to its place | L14009–14028 | 🔧 (snapped look: the mate connector disc in the section plane; live turns it with the entity) |
 | 6.6 | Caps: part colour with view-dependent lighting, hatch 0.5× the fill; while the dialog is open caps blend toward #FFA90A @0.8; excluded instances uncut and outlined | L12207–12230, L12291 | ⏳ (flat 0.9×) |
 | 6.7 | With a feature dialog open, Shift+X does nothing and the camera menu has no Section view… | L4955–4961 | 🔧 |
-| 6.8 | A plane feature row accepted as a section plane (ADV1) | workflow-analysis ADV1 ✗ | ❌ |
+| 6.8 | A plane feature row accepted as a section plane (ADV1) | workflow-analysis ADV1 | 🔧 (feature row click → `section_pick`) |
 
 ## Handover (nav2 → psb, 10-25 15:45)
 
@@ -134,3 +134,20 @@ manipulator, the replay suite, the AN1 test) is the **WIP commit on agent/nav2**
   plane filter, model/src/regen/measure.rs); pinned by `edge_vertex_midpoint_and_circle_with_the_top_plane`.
 - **Not started:** pre-highlight timing (3.5, live request "(10-25 d)"), mass properties rows (5.x), the
   midpoint hover (icons2's).
+
+## psb → ui handover (10-25 evening; the list is ui's now)
+
+- Taken from nav2's WIP (agent/psb 086db0dc): box_select.rs, the box look (`box_overlay`), the AN1 test and
+  the replay suite files. **Not taken:** nav2's section_manip.rs, its `asm_scene` glyph refactor and
+  `Viewport::tool_hover`; the Part Studio section manipulator is psb's own section_manip.rs (base ring, arrow,
+  two rotate rings with 2° snapping and the degree box, test `rotation_snaps_and_reads_as_live`).
+- Box kinds, the box's additive / no-toggle rule and no pre-highlight while dragging: answered by live "nav2
+  selection" (rows 1.8, 1.9, 1.11); the box now drops planes again.
+- Ctrl+click → context menu (1.3) and the paused pre-highlight (3.5): viewport.rs.
+- Waiting on the lead (part_studio/mod.rs is ui's): Esc keeps the selection (1.6), Shift+click in empty
+  space keeps it (1.4). Assembly box / drag-moves-selection (2.5) is assembly_view.rs.
+- Section value box (6.3): live's field (75×26, corner +40/−25 px from the rotate glyph's centre, right-aligned,
+  updated while dragging), the distance from the drag start in 0.1 mm steps, open after Enter, Esc closes it
+  before cancelling; the drag start's "⊥" with a 2 px #2861b6 leader; the base circle faces the viewer
+  (section.rs, section_manip.rs). Not yet checked in the app; the rotate drag's "⊢" start mark is not drawn.
+- Status-bar measure readout: nothing for three or more entities (measure.rs `quick_line`).

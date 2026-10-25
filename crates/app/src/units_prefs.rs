@@ -148,7 +148,7 @@ impl UnitsPrefsView {
         rows
     }
 
-    /// A browser `<select>` (live: 34 px, 1 px `#aaa`, radius 5.25, ▼) whose
+    /// A browser `<select>` (live: 34 px, 1 px `#aaa`, radius 5.25, `#777` arrow) whose
     /// list is the native-select menu right under it.
     fn select(&mut self, c: Choice, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
@@ -164,7 +164,7 @@ impl UnitsPrefsView {
             .h(px(34.))
             .flex_none()
             .pl(px(10.))
-            .pr(px(15.))
+            .pr(px(10.))
             .flex()
             .items_center()
             .justify_between()
@@ -175,8 +175,9 @@ impl UnitsPrefsView {
             .cursor_pointer()
             .text_size(px(14.))
             .text_color(pal.text)
-            .child(div().truncate().child(label))
-            .child(div().text_size(px(8.)).text_color(rgb(0x555555)).child("▼"))
+            .child(div().flex_1().min_w_0().truncate().child(label))
+            // Chrome's select arrow: an 8 × 5 `#777` triangle (live prefs/01).
+            .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb_static(0x777777)))
             .child(canvas(move |b, _, _| b2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 let was_open = this.open.take().is_some_and(|(o, _)| o == id);

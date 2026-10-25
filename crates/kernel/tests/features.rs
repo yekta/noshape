@@ -80,6 +80,20 @@ fn loft_rect_to_circle() {
     assert!(close(m.shape.volume().unwrap(), 5.0 / 3.0 * 28.0, 1e-6));
 }
 
+/// Live "psb (10-24) loft end derivative": □20 -> □10 20 up with Start
+/// Normal to profile m1 bulges (live 5476.391496; the ruled frustum is
+/// 4666.67). The corner rule with a natural end gives 5476.310271 exactly;
+/// Parasolid's interior columns carry a small extra bump (1.5e-5).
+#[test]
+fn loft_end_condition_normal() {
+    let a = rect_face(&Plane::xy(), 20.0, 20.0);
+    let b = rect_face(&Plane::xy().offset(20.0), 10.0, 10.0);
+    let l = loft(&[a, b], &LoftOptions { solid: true, start: LoftEnd::Normal(1.0), ..Default::default() }).unwrap();
+    let v = l.shape.volume().unwrap();
+    assert!(close(v, 5476.310270954884, 1e-9), "volume {v}");
+    assert!(l.shape.is_valid());
+}
+
 #[test]
 fn extrude_variants() {
     let f = rect_face(&Plane::xy(), 2.0, 2.0);

@@ -290,14 +290,14 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
-- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
+- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
 - **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_duplicate_input`](#config_duplicate_input), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_animate`](#assembly_animate), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance), [`assembly_switch_to_tab`](#assembly_switch_to_tab), [`assembly_open_linked_document`](#assembly_open_linked_document)
 - **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly), [`context_go_to_assembly`](#context_go_to_assembly)
-- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_open_feature_studio`](#drawing_open_feature_studio), [`drawing_switch_sheet`](#drawing_switch_sheet), [`drawing_sheets_panel`](#drawing_sheets_panel)
+- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_edit_detail`](#drawing_edit_detail), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_edit_hatch`](#drawing_edit_hatch), [`drawing_title_field`](#drawing_title_field), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_open_feature_studio`](#drawing_open_feature_studio), [`drawing_switch_sheet`](#drawing_switch_sheet), [`drawing_sheets_panel`](#drawing_sheets_panel)
 - **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_shortcuts`](#ui_shortcuts)
 - **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
@@ -554,6 +554,64 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string | required | Tab name or id. |
+
+#### tab_folder_create
+
+Create a tab folder (edits the document (one undoable history entry)).
+
+The tab bar's "+" › Create folder: "Folder 1" (next free number) unless `name` is given, inside `folder` (default: the root). Folders nest up to Onshape's depth limit.
+
+Examples:
+
+```json
+{}
+{"name": "Fixtures", "folder": "Folder 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `name` | string |  | Folder name (default: the next "Folder N"). |
+| `folder` | string |  | Folder (name or id) to create it in (default: the root). |
+
+#### tab_move
+
+Move a tab or tab folder into a folder, out to its parent, or before another tab (edits the document (one undoable history entry)).
+
+Dragging a tab onto a folder tab (or onto 🏠: the root), Tab › Move to parent folder (`to_parent`), or dragging it along the bar (`before`: it goes in front of that tab, in that tab's folder). Like Onshape, the tab order isn't undoable; moving between folders is. Refused for a folder into itself or past the depth limit.
+
+Examples:
+
+```json
+{"tab": "Part Studio 1", "folder": "Folder 1"}
+{"tab": "Part Studio 1", "to_parent": true}
+{"tab": "Assembly 1", "before": "Part Studio 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | Tab or folder (name or id) to move. |
+| `folder` | string |  | Target folder (name or id); omit (without `to_parent` / `before`) for the root. |
+| `to_parent` | boolean |  | Move to parent folder: out of its folder into the one around it. |
+| `before` | string |  | Tab or folder (name or id) to put it in front of. |
+
+#### tab_folder_unpack
+
+Unpack a tab folder (edits the document (one undoable history entry)).
+
+Folder › Unpack: the folder goes; its tabs and folders move to its parent, at the end of the tab list (as Onshape).
+
+Examples:
+
+```json
+{"folder": "Folder 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `folder` | string | required | Folder name or id. |
 
 #### tab_activate
 
@@ -3402,6 +3460,35 @@ Examples:
 | `show_profile` | boolean |  | Show the detail profile (default Drawing properties'). |
 | `clip_border` | boolean |  | Clip the border (default Drawing properties'). |
 
+#### drawing_edit_detail
+
+Edit a detail view: move / resize its circle, its label and leader, Edit detail's options (edits the document (one undoable history entry)).
+
+The detail circle's grips and menu and Edit detail... (live asb 10-23 views (1), (2)): `center` moves the circle (sheet mm, in its parent), `radius` resizes it (sheet mm; the detail view grows with it); `leader` true puts the label on a leader with an arrow to the circle (Add leader), false back beside it; `label_at` places the label on its leader (sheet mm); the Detail view panel's `scale`, `label`, `style`, `show_profile` and `clip_border`. One edit ("Edit detail view").
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "view": 5, "center": [208, 160], "radius": 15}
+{"drawing": "Part 1 Drawing 1", "view": 5, "leader": true, "scale": 3}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer | required | The detail view (drawing_get). |
+| `center` | array of number |  | New circle centre (sheet mm). |
+| `radius` | number |  | New circle radius (sheet mm). |
+| `leader` | boolean |  | Label on a leader (Add leader) or beside the circle. |
+| `label_at` | array of number |  | The label's position on its leader (sheet mm). |
+| `scale` | number |  | View scale. |
+| `label` | string |  | View label (detail id). |
+| `style` | one of `in_line`, `connected`, `leader` |  | Profile style. |
+| `show_profile` | boolean |  | Show detail view profile. |
+| `clip_border` | boolean |  | Clip border to geometry. |
+
 #### drawing_auxiliary_view
 
 Auxiliary view: normal to an edge, in line with a sketch line / centerline, or down a hole's axis (edits the document (one undoable history entry)).
@@ -3495,6 +3582,54 @@ Examples:
 | `depth` | string or number |  | Blind depth: a length ("5 mm"; a bare number is in workspace units). |
 | `depth_to` | array of number |  | Up to entity: a model point (vertex, circle center...) of a view of the same model (sheet mm). |
 | `index` | integer |  | Edit the view's broken-out section number `index` (0-based, drawing_get) instead of adding one. |
+
+#### drawing_edit_hatch
+
+Edit hatch section...: restyle one hatch region of a view's cut (edits the document (one undoable history entry)).
+
+The view menu's Edit hatch section... (live asb 10-23 views (4)): the hatch region of view `view`'s cut under `at` (sheet mm) takes `standard` (ansi, iso, general) and `pattern` (its name as listed, e.g. "ANSI32 steel", "ISO02W100", "Solid"; general "None" leaves the region unhatched), `scale` and `angle` ("auto" or numbers; angle in degrees, the pattern's own when auto) and `color` ("#rrggbb", default the drawing's); `reset` puts the region back to the drawing's hatch. Each region is separate. One edit ("Edit hatch").
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "view": 4, "at": [300, 150], "pattern": "ANSI32 steel", "angle": 90}
+{"drawing": "Part 1 Drawing 1", "view": 4, "at": [300, 150], "standard": "general", "pattern": "None"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer | required | The view (drawing_get). |
+| `at` | array of number | required | A point inside the hatch region (sheet mm). |
+| `standard` | one of `ansi`, `iso`, `general` |  | Pattern group (the dialog's tab). |
+| `pattern` | string |  | Pattern name (default the group's first in the dialog's order). |
+| `scale` | string or number |  | Scale (auto = 1). |
+| `angle` | string or number |  | Angle in degrees (auto = the pattern's own). |
+| `color` | string |  | Color "#rrggbb" (default the drawing's). |
+| `reset` | boolean |  | Back to the drawing's section hatch. |
+
+#### drawing_title_field
+
+Edit a title block field: its cell's note (edits the document (one undoable history entry)).
+
+Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. "Title", "Drawn by"; a key the layout lacks is added). Lines split on \n; property codes like {part.name} expand. One edit ("Edit title block").
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "field": "Title", "text": "BRACKET"}
+{"drawing": "Part 1 Drawing 1", "field": "Title", "text": "{part.name}\nBRACKET"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `field` | string | required | The field (drawing_get `title_fields`). |
+| `text` | string | required | Its text. |
 
 #### drawing_hatch_region
 
@@ -4121,6 +4256,7 @@ Examples:
 | `shaded` | boolean |  | Show/Hide shaded view |
 | `threads` | boolean |  | Show/Hide threads |
 | `faulty_parts` | boolean |  | Show/Hide faulty parts |
+| `offset_cut_lines` | boolean |  | Show/Hide offset cut lines (section views: a line across the hatch where the cutting line steps) |
 | `sketch_points` | boolean |  | Show/Hide sketch points (views showing sketches) |
 | `auto_centermarks` | boolean |  | Show/Hide auto centermarks (showing them again brings back deleted ones) |
 | `centerlines` | boolean |  | Show/Hide centerlines (views with cylinder axes seen from the side) |
@@ -4139,7 +4275,7 @@ The view menu's actions, one edit each:
 - `align`: Align views ▸ Vertically / Horizontally (`direction`): the view's center lines up with view `with`'s.
 - `suppress_alignment`: (Un)suppress alignment with parent (`on`, default true); projected, auxiliary and section views; a rotated view can't be re-aligned.
 - `flip_direction`: section views: Flip direction (the view looks the other way across the cutting line).
-- `remove_crop`, `remove_breaks` (Remove all breaks), `remove_broken_out` (Remove section).
+- `remove_crop`, `remove_breaks` (Remove all breaks), `remove_broken_out` (Remove section, broken-out section `index`); a removed crop or broken-out section leaves its boundary on the sheet as a sketch circle, polygon or spline (live).
 - `move_to_sheet`: Move to sheet… `to_sheet` (number or name; omitted: a new sheet); the view moves alone, linked to its parent.
 - `unpin_reference`: Unpin view reference (every view of the same source and part shows the workspace again).
 - `copy`: Copy then Paste: the view with its derived views, annotations and tables, pasted centered `at` (sheet mm) on sheet `to_sheet` (default this one); "Paste views"; the reply's `pasted` lists the new view ids.
@@ -4166,6 +4302,7 @@ Examples:
 | `with` | integer |  | align: the view to line up with. |
 | `on` | boolean |  | suppress_alignment: suppress (true) or unsuppress. |
 | `to_sheet` | integer or string |  | move_to_sheet / copy: the target sheet, number (1 = first) or name. |
+| `index` | integer |  | remove_broken_out: which broken-out section (0-based, drawing_get; default 0). |
 | `at` | array of number |  | copy: where the copy's center goes (sheet mm; default 20 mm right of and below the view). |
 
 #### drawing_view_properties
@@ -4321,8 +4458,8 @@ Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, de
 
 The annotation context menus, one edit each with the menu's edit text:
 - Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).
-- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend, or at `from_node` [leader, node]); `remove_leaders`.
-- Note leaders: `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`), `delete_leader` (`leader`).
+- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).
+- Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).
 - Radial dimensions: `foreshorten`; `remove_foreshorten`.
 - Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).
 - Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.
@@ -4345,12 +4482,12 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `annotation` | integer | required | Annotation id (drawing_get). |
-| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break`, `reset_ordinate` | required | The menu action. |
+| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break`, `reset_ordinate` | required | The menu action. |
 | `line` | one of 0, 1 |  | add_jog / remove_jog: the extension line. |
-| `point` | array of number |  | add_leader: where it points; add_node: on the leader line; align_centermark: on a straight edge (sheet mm). |
-| `leader` | integer |  | add_node / remove_node / delete_leader: the note leader (0 = first). |
+| `point` | array of number |  | add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge (sheet mm). |
+| `leader` | integer |  | add_node / remove_node / delete_leader / move_leader: the leader (a note's 0 = first; a callout's 0 = the one to its anchor). |
 | `node` | integer |  | remove_node: the node (0 = nearest the note). |
-| `from_node` | array of integer |  | add_leader on a note: branch from [leader, node]. |
+| `from_node` | array of integer |  | add_leader on a note or callout: branch from [leader, node]. |
 | `all` | boolean |  | show_dimensions: All targets. |
 | `view` | integer |  | group: the view to group with. |
 | `with` | array of integer |  | group / group_annotation: the other annotations. |

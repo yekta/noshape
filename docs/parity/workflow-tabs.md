@@ -70,3 +70,16 @@ the rest pending (REQUESTS.md "qa5 tabs"). Status: ✅ ok, ✗ differs, ? live p
 | TABS3 folder menu | ✅ Rename, Unpack, Move to document… |
 | TABS4 Unpack | ✅ the tab goes to the end of the tab list, folder removed (CLI document_info order) |
 All ✗ rows of this file are fixed.
+
+## ui2 look pass (2026-10-24, ui2 build of 13:50; live document/1210–1234, dark dk-920)
+qa4's 10-23 re-check covers the behaviour rows above (all fixed); this pass compares the look in both themes.
+
+| Item | Live | Ours | Status |
+|---|---|---|---|
+| Tab bar, light / dark | grey bar, white active tab with blue underline / dark tabs, white text | same | ✅ |
+| Tab right-click menus, per type (live ui2-tabmenu-*, 10-24) | Delete \| Open in new browser tab, Rename, Properties…, (Part Studio) Show code \| Duplicate, Copy to clipboard \| (active Drawing only) Change to version… \| (Assembly) Create Drawing of … \| (Part Studio, Assembly, Drawing) Select as document thumbnail \| Move to document…, (Drawing only) Export…, (Assembly, Drawing, Variable Studio) Release… | had no "Open in new browser tab", Export… on Part Studios and Assemblies, Change to version… on inactive Drawings (fixed: the new-tab item opens another window on the same document with that tab; Export… on Drawings only; Change to version… on the active Drawing) | ✅ ("Upgrade" pill ⊘) |
+| Tab / folder inside a folder | "Move to parent folder" (tabs after Properties…; folders: Rename, Move to parent folder, Unpack) | missing (fixed) | ✅ |
+| + menu | Applications ▸, Create Material Library / Feature Studio, CAM / PCB / Render Studio [Upgrade] \| Part Studio, Assembly, Variable Studio, Drawing…, folder, Import… (1224) | same items and widths, minus Applications and the paid app studios | ✅ (⊘ cloud / paid apps) |
+| Folder tab | folder icon + name, normal tab chrome (1226) | same | ✅ |
+| Opened folder (breadcrumbs) | 🏠 › Folder 1 as chevron crumbs outside the scrolling tabs: 27 high, 🏠 #eaeaea / #1c1c1c, the open folder white / #333 with a #666 / #ccc regular name (≤ 100 px); 8 px points, notched flags, 18 px apart; deeper than one level 🏠 › … › B, "…" (87 px) opens the hidden folders upward; dark: filled folder icons (ui2-crumbs-*) | square crumbs inside the scrolling strip, the folder name bold (fixed) | ✅ TABS6 |
+| Drag ghost / gap, drop on folder | (qa4 10-23) | ✅ | ✅ |

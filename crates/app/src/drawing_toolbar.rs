@@ -46,6 +46,10 @@ fn split(name: SharedString, main: Button, caret: Button) -> Div {
     crate::ui::tool_group(name, main.w(px(CELL)).h(px(CELL)), caret.w(px(CARET_W)).h(px(CELL))).ml(px(1.)).mr(px(2.))
 }
 
+/// The running drawing tool's button (live drawing/20–22, 127: `#d1dde6`,
+/// hovered or not; the Part Studio's is `#eaeaea`).
+const ACTIVE_BG: Rgba = crate::theme::rgb_const(0xd1dde6);
+
 fn tb(id: &'static str, icon: &'static str, tip: &'static str, active: bool, run: impl Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>) + 'static) -> TbTool {
     TbTool { id, icon, tip, active, run: Rc::new(run), more: None, disabled: false }
 }
@@ -75,10 +79,10 @@ impl TbTool {
         let run = self.run.clone();
         let click = cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx));
         match self.more {
-            None => crate::ui::tool_button(self.id, self.icon, self.active, cx).w(px(CELL)).h(px(CELL)).tooltip(self.tip).on_click(click).into_any_element(),
+            None => crate::ui::tool_button(self.id, self.icon, self.active, cx).w(px(CELL)).h(px(CELL)).when(self.active, |b| b.bg(ACTIVE_BG)).tooltip(self.tip).on_click(click).into_any_element(),
             Some((caret, items)) => {
                 let ed = ed.clone();
-                split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).tooltip(self.tip).on_click(click), crate::ui::tool_caret_blue(caret, cx).tooltip(self.tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx))).into_any_element()
+                split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).when(self.active, |b| b.bg(ACTIVE_BG)).tooltip(self.tip).on_click(click), crate::ui::tool_caret_blue(caret, cx).tooltip(self.tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx))).into_any_element()
             }
         }
     }
@@ -120,7 +124,7 @@ fn collapsed(gi: usize, group: Vec<TbTool>, ed: &Entity<DrawingEditor>, cx: &mut
     Some(
         split(
             SharedString::from(format!("drg-c{gi}")),
-            crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, active, cx).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx))),
+            crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, active, cx).when(active, |b| b.bg(ACTIVE_BG)).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx))),
             crate::ui::tool_caret_blue(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)),
         )
         .into_any_element(),
@@ -153,9 +157,9 @@ impl DrawingEditor {
         let is_table = |k: TableTool| matches!(t, Tool::Table { kind, .. } if kind == k);
         let mut groups = vec![
             vec![
-                // Insert view: Onshape opens "Select a part or assembly" (then
-                // the Insert view panel with the view at the cursor).
-                tb("dr-insert", "base-view", "Insert view", matches!(t, Tool::InsertView { .. }) || self.insert.chooser.is_some(), |e, _, cx| e.open_insert_chooser(cx)),
+                // Insert view: Onshape opens its empty panel; [Insert] opens
+                // "Select a part or assembly" (live drawing/122, 170a).
+                tb("dr-insert", "base-view", "Insert view", matches!(t, Tool::InsertView { .. }) || self.insert.chooser.is_some() || self.insert.panel, |e, _, cx| e.open_insert_panel(cx)),
                 tool("dr-proj", "projected-view", "Projected view (p)", matches!(t, Tool::Projected { .. }), || Tool::Projected { parent: None }),
                 tool("dr-aux", "auxiliary-view", "Auxiliary view", matches!(t, Tool::Auxiliary { .. }), || Tool::Auxiliary { parent: None }),
                 tool("dr-sect", "section-view", "Section view", matches!(t, Tool::Section { .. } | Tool::JoggedSection { .. }), || Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }),

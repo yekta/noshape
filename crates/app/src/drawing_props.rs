@@ -7,11 +7,9 @@
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
-use gpui_kit::component::Disableable as _;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabContent;
@@ -905,7 +903,7 @@ impl DrawingEditor {
             div()
                 .pl(px(5.))
                 .py(px(4.))
-                .child(Checkbox::new(id).label(t).small().checked(on).disabled(locked).on_click(cx.listener(move |this, on: &bool, _, cx| {
+                .child(crate::drawing_chrome::DrCheckbox::new(id).label(t).checked(on).disabled(locked).on_click(cx.listener(move |this, on: &bool, _, cx| {
                     if let Some(p) = &mut this.view_props {
                         f(p, *on);
                     }

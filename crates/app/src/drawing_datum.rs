@@ -18,7 +18,6 @@ use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -325,7 +324,7 @@ impl DrawingEditor {
                         .h(px(30.))
                         .px(px(8.))
                         .gap(px(6.))
-                        .child(Checkbox::new("dt-size").label("Area size:").small().checked(area_size).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        .child(crate::drawing_chrome::DrCheckbox::new("dt-size").label("Area size:").checked(area_size).on_click(cx.listener(|this, v: &bool, _, cx| {
                             let v = *v;
                             this.edit_datum(|d| d.area_size = v, cx)
                         })))

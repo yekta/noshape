@@ -6,7 +6,6 @@
 
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -112,13 +111,13 @@ impl DrawingEditor {
                     v_flex()
                         .p(px(3.))
                         .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).pl(px(3.)))))
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("auxe-rev").label("Reverse").small().checked(reverse).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("auxe-rev").label("Reverse").checked(reverse).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some((_, d)) = &mut this.aux_edit {
                                 d.reverse = *v;
                             }
                             cx.notify();
                         }))))
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("auxe-show").label("Show view reference indicator").small().checked(show).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("auxe-show").label("Show view reference indicator").checked(show).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some((_, d)) = &mut this.aux_edit {
                                 d.show_ref = *v;
                             }
@@ -240,7 +239,7 @@ impl DrawingEditor {
                                         })),
                                 ),
                         )
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("aux-show-ref").label("Show view reference indicator").small().checked(show).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("aux-show-ref").label("Show view reference indicator").checked(show).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some(d) = &mut this.aux_dlg {
                                 d.show_ref = *v;
                             }

@@ -183,22 +183,48 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     let mut points = Vec::new();
+    let mut curves = Vec::new();
     if ev.bool("addGuides") {
-        let n = ev.integer("sampleSize")?.max(1) as usize;
-        for r in ev.query("guideEntities") {
+        // Live "psb (10-24 d)": Guides on with nothing picked is a plain fill.
+        let refs = ev.query("guideEntities");
+        let (mut verts, mut guides) = (Vec::new(), Vec::new());
+        for r in refs {
             if let (Reference::Vertex(_) | Reference::SketchEntity { .. }, Some(p)) = (r, ev.resolve_vertex_point(r)) {
-                points.push(p);
+                verts.push(p);
                 continue;
             }
-            for e in curve_edges(ev, std::slice::from_ref(r))? {
-                let pts = super::bshared::sample_edge(&e, n + 1)?;
+            guides.extend(curve_edges(ev, std::slice::from_ref(r))?);
+        }
+        if ev.is("constraintMode", "SAMPLED") {
+            let n = ev.integer("sampleSize")?.max(1) as usize;
+            points = verts;
+            for e in &guides {
+                let pts = super::bshared::sample_edge(e, n + 1)?;
                 // Interior samples (end points touch the boundary).
                 points.extend(pts[1..pts.len() - 1].iter().copied());
             }
+        } else if guides.is_empty() {
+            points = verts;
+        } else {
+            // Precise: the surface passes through the guide curves, each
+            // reaching the boundary at an end at least (live "psb (10-24 d)":
+            // one end is enough, neither fails, no field marked); points
+            // can't be mixed in.
+            if !verts.is_empty() {
+                ev.warnings.push(crate::custom::host::error_text("FILL_CURVE_OR_POINT_CONSTRAINTS"));
+            }
+            let loop_ = Shape::compound(&edges);
+            for w in chain_wires(&guides)? {
+                let touches = w.vertices().iter().any(|v| k::distance(v, &loop_).is_ok_and(|d| d.distance < 1e-6));
+                if !touches {
+                    return err(crate::custom::host::error_text("FILL_SURFACE_BAD_SUPPORT"));
+                }
+            }
+            curves = guides;
         }
     }
     // Onshape's FILL_SURFACE_FAIL text, not the kernel's (qa5 SF5).
-    let res = k::fill_surface(&boundary, &points).map_err(|_| FeatureError::new(crate::custom::host::error_text("FILL_SURFACE_FAIL")))?;
+    let res = k::fill_surface_guided(&boundary, &points, &curves).map_err(|_| FeatureError::new(crate::custom::host::error_text("FILL_SURFACE_FAIL")))?;
     let names = new_face_names(ev, &res.shape);
     surface_result(ev, NamedShape::new(res.shape, names))
 }
@@ -498,7 +524,7 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     if !u.is_empty() && !v.is_empty() && u.iter().any(|pu| v.iter().any(|pv| meets_mid(pu, pv) && meets_mid(pv, pu))) {
         return err(BSURF_ENDS);
     }
-    if cu || cv {
+    if (cu || cv) && !u.is_empty() && !v.is_empty() {
         ev.warnings.push("Boundary conditions are not applied yet; profiles are matched by position".into());
     }
     let shape = if !u.is_empty() && !v.is_empty() {
@@ -520,7 +546,26 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         let profiles = if u.is_empty() { &v } else { &u };
         let sections: Vec<Shape> = profiles.iter().map(|es| k::make_wire(&order_chain(es, 1e-6)?.into_iter().map(|(e, _)| e).collect::<Vec<_>>()).map_err(|_| FeatureError::new(BSURF_FAILED))).collect::<FResult<_>>()?;
-        k::loft(&sections, &k::LoftOptions { solid: false, ruled: false, closed: false, ..Default::default() }).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape
+        // The first and last rows' conditions are the loft's end conditions
+        // (loft.fs createProfileConditions; live L28's planar-profile text).
+        let (array, ents, ids) = if u.is_empty() {
+            ("vProfilesArray", "vProfileEntities", ["vCondition", "vMagnitude", "vDirection"])
+        } else {
+            ("uProfilesArray", "uProfileEntities", ["uCondition", "uMagnitude", "uDirection"])
+        };
+        let items: Vec<crate::params::ParamValues> = ev.params.array(array).iter().filter(|i| !i.query(ents).is_empty()).cloned().collect();
+        let sketch_normal = |ev: &EvalCtx, item: &crate::params::ParamValues| {
+            item.query(ents).iter().find_map(|r| match r {
+                Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => ev.ctx.sketch(*sketch).map(|s| s.frame.normal),
+                _ => None,
+            })
+        };
+        let mut opts = k::LoftOptions::default();
+        if let ([first, last], [s0, s1]) = (items.as_slice(), sections.as_slice()) {
+            opts.start = super::solid_a::loft_end(ev, first, ids, s0, sketch_normal(ev, first), "start")?;
+            opts.end = super::solid_a::loft_end(ev, last, ids, s1, sketch_normal(ev, last), "end")?;
+        }
+        k::loft(&sections, &opts).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape
     };
     let names = new_face_names(ev, &shape);
     surface_result(ev, NamedShape::new(shape, names))

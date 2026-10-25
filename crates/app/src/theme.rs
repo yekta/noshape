@@ -87,7 +87,8 @@ pub struct Palette {
     /// #1c1c1c like every strip button, live dk-929).
     pub strip_inactive: Rgba,
     /// A disabled primary button on the account pages (Save theme…): fill
-    /// and text (live prefs/dk-904: #283f65 with #858585 in dark).
+    /// and text: #1651b0 at 40 % (live prefs/00 #a2b9df; dk-904 #283f65 with
+    /// #858585 in dark).
     pub button_disabled: Rgba,
     pub button_disabled_text: Rgba,
     /// Text links on the account pages ("Learn more about default units.";
@@ -163,7 +164,7 @@ pub const PALETTE: Palette = Palette {
     table_header: rgb_const(0xeaeaea),
     bg_senary: rgb_const(0xffffff),
     strip_inactive: rgb_const(0xeaeaea),
-    button_disabled: rgb_const(0xc6d5ec),
+    button_disabled: rgb_const(0xa2b9df),
     button_disabled_text: rgb_const(0xffffff),
     link: rgb_const(0x0b5394),
     query_active: rgb_const(0xdef1fb),
@@ -185,7 +186,7 @@ pub const PALETTE: Palette = Palette {
 /// Viewport colors (shared with the headless scene builder).
 pub use noshape_scene::palette::{pick, viewport, viewport_dark};
 
-const fn rgb_const(hex: u32) -> Rgba {
+pub(crate) const fn rgb_const(hex: u32) -> Rgba {
     Rgba {
         r: ((hex >> 16) & 0xff) as f32 / 255.0,
         g: ((hex >> 8) & 0xff) as f32 / 255.0,
@@ -289,7 +290,7 @@ pub fn set_dark(on: bool) {
 /// Light theme hex → dark theme hex for literal `rgb()` / `rgba()` colours, sorted by the light value:
 /// for each light value the dark value most of Onshape's themed tokens give it (live
 /// dom/dark-tokens-table.md), with the palette roles deciding ties (backgrounds, text).
-pub static DARK_HEX: [(u32, u32); 50] = [
+pub static DARK_HEX: [(u32, u32); 51] = [
     (0x00007f, 0xdef1fb),
     (0x0000d0, 0x90cef1),
     (0x028502, 0xa2db7d),
@@ -327,6 +328,8 @@ pub static DARK_HEX: [(u32, u32); 50] = [
     (0xd7d7d7, 0x666666),
     (0xdd979b, 0x683232),
     (0xddf6cc, 0x0b450b),
+    // Bootstrap's modal / table rules (live dk-999, dk-pref-create-profile-dialog).
+    (0xdee2e6, 0x495057),
     (0xdef1fb, 0x0a4780),
     (0xeaeaea, 0x666666),
     (0xecf0f4, 0x555555),
@@ -349,6 +352,12 @@ pub static DARK_HEX: [(u32, u32); 50] = [
 /// the dialog background (a knockout in Onshape).
 pub fn help_dot(light: u32) -> Rgba {
     if gpui_kit::hex_theme_active() { rgb_const(0xaeaeae) } else { rgb_const(light) }
+}
+
+/// A colour live gives per theme where the light one has no fitting
+/// `DARK_HEX` mapping (it maps elsewhere to another dark colour).
+pub fn themed(light: u32, dark: u32) -> Rgba {
+    rgb_const(if gpui_kit::hex_theme_active() { dark } else { light })
 }
 
 pub fn with_alpha(c: Rgba, a: f32) -> Rgba {

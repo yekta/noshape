@@ -7,7 +7,6 @@
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
@@ -31,6 +30,9 @@ pub struct InsertViewState {
     /// "Select a part or assembly" chooser: open, and its tab (0 Part
     /// Studios, 1 Assemblies).
     pub chooser: Option<u8>,
+    /// The Insert view tool's empty panel is open without the chooser
+    /// (live drawing/122, 170a: [Insert] opens the chooser).
+    pub panel: bool,
     /// Insert a sketch of the source (a sketch view).
     pub sketch: Option<noshape_model::FeatureId>,
     /// Insert the chosen sheet metal part's flat pattern.
@@ -55,7 +57,7 @@ pub struct InsertViewState {
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None, pinned: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, panel: false, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None, pinned: None }
     }
 }
 
@@ -94,6 +96,15 @@ impl DrawingEditor {
     }
 
     /// Toolbar Insert view / the panel's Insert button: the chooser.
+    /// The Insert view tool: its panel, empty until [Insert] picks a source
+    /// (live drawing/122).
+    pub fn open_insert_panel(&mut self, cx: &mut Context<Self>) {
+        if self.insert.chooser.is_none() && !matches!(self.tool, Tool::InsertView { .. }) {
+            self.insert.panel = true;
+        }
+        cx.notify();
+    }
+
     pub fn open_insert_chooser(&mut self, cx: &mut Context<Self>) {
         self.insert.chooser = Some(self.insert.chooser.unwrap_or(0));
         self.ensure_sources(false, cx);
@@ -125,6 +136,7 @@ impl DrawingEditor {
 
     pub(crate) fn choose_source(&mut self, source: TabId, part: Option<noshape_model::BodyId>, cx: &mut Context<Self>) {
         self.insert.chooser = None;
+        self.insert.panel = false;
         self.insert.pinned = None;
         if let (Some(old), Some(old_part)) = (self.insert.replace, self.insert.replace_part.take()) {
             // Sheets panel reference › Replace: on every sheet (help H:sheets).
@@ -352,7 +364,7 @@ impl DrawingEditor {
                 .child(row("View simplification", select("div-simp", simp.name().to_string(), simp_items, usize::MAX)))
                 .children(self.insert.simp_value.as_ref().filter(|_| !simplification_text(simp, true).is_empty()).map(|(st, _)| row("", Input::new(st).small().into_any_element())))
                 .child(
-                    div().px(px(6.)).py(px(3.)).child(Checkbox::new("div-sketch-app").label("Show sketch appearances").small().checked(self.insert.sketch_appearances).on_click(cx.listener(|this, on: &bool, _, cx| {
+                    div().px(px(6.)).py(px(3.)).child(crate::drawing_chrome::DrCheckbox::new("div-sketch-app").label("Show sketch appearances").checked(self.insert.sketch_appearances).on_click(cx.listener(|this, on: &bool, _, cx| {
                         this.insert.sketch_appearances = *on;
                         cx.notify();
                     }))),
@@ -360,7 +372,7 @@ impl DrawingEditor {
                 // Assemblies have no model annotations (live drawing/1106).
                 .when(is_asm, |d| d.child(div().h(px(3.))))
                 .when(!is_asm, |d| d.child(
-                    div().px(px(6.)).pt(px(3.)).pb(px(6.)).child(Checkbox::new("div-model-ann").label("Show annotations from model").small().checked(self.insert.model_annotations).on_click(cx.listener(|this, on: &bool, _, cx| {
+                    div().px(px(6.)).pt(px(3.)).pb(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("div-model-ann").label("Show annotations from model").checked(self.insert.model_annotations).on_click(cx.listener(|this, on: &bool, _, cx| {
                         this.insert.model_annotations = *on;
                         cx.notify();
                     }))),

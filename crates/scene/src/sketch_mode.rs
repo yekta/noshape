@@ -670,6 +670,14 @@ fn save_sketch_options(o: SketchOptions) {
 const INFERENCE_COLOR: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
 /// Geometry being drawn (`SKETCH_PREVIEW_COLOR`).
 const PREVIEW_COLOR: [u8; 4] = [0x44, 0x9c, 0xcd, 255];
+/// The dash along a rubber band whose direction is inferred (live sketch/51).
+const INFERRED_DASH_COLOR: [u8; 4] = [0xe2, 0xbc, 0x2c, 255];
+
+/// The inference sets the direction of the line being drawn (not a point to
+/// snap to): shown on the rubber band as its dash (live sketch/51–53).
+fn is_direction(k: InferenceKind) -> bool {
+    matches!(k, InferenceKind::Horizontal | InferenceKind::Vertical | InferenceKind::Perpendicular | InferenceKind::Parallel)
+}
 /// Onshape's hollow arrow manipulator in a sketch (live sketch/303, offset):
 /// 11 px past the curve's copy, an 18 px stem, a 31 x 23 px head; outline
 /// #989fa3 (3 px) around a white core.
@@ -1724,7 +1732,9 @@ impl SketchEditor {
                     self.drag = Some(DragState::OffsetArrow { start: p, moved: false });
                     return EditOutcome::redraw();
                 }
-                let ids: Vec<EntityId> = if self.selection.is_empty() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
+                // While an offset is pending a click picks the hovered curve
+                // (the selection then only holds curves the warning selected).
+                let ids: Vec<EntityId> = if self.selection.is_empty() || self.offset_pending.is_some() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
                 if ids.is_empty() {
                     // Clicking empty space accepts a pending offset.
                     return if self.offset_pending.is_some() { self.commit_offset(data) } else { EditOutcome::none() };
@@ -1733,6 +1743,21 @@ impl SketchEditor {
                     // Later clicks offset by the same distance right away.
                     self.start_offset(&data.sketch, ids);
                     return self.commit_offset(data);
+                }
+                // Live (qa4 round 5 s1 follow-up (5)): a curve not connected to
+                // the pending chain is only selected (a second click deselects
+                // it) with a warning; the preview stays.
+                if let Some(p) = &self.offset_pending
+                    && let Some(&e) = ids.iter().find(|e| !p.contains(e) && !chain_touches(&data.sketch, p, **e))
+                {
+                    match self.selection.iter().position(|x| *x == e) {
+                        Some(i) => {
+                            self.selection.remove(i);
+                        }
+                        None => self.selection.push(e),
+                    }
+                    self.message = Some("Can only offset a single chain at once.".into());
+                    return EditOutcome::redraw();
                 }
                 match &mut self.offset_pending {
                     // Add connected curves to the pending offset (chain
@@ -1803,6 +1828,12 @@ impl SketchEditor {
             Tool::Dimension => self.dimension_click(data, p, hovered),
             Tool::Constraint(c) => {
                 let Some(e) = hovered else { return EditOutcome::none() };
+                // Live: a pick the constraint can't take isn't accepted (and
+                // nothing is said).
+                let picked: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
+                if !picked.contains(&e) && !pick_fits(&data.sketch, c, &picked, e) {
+                    return EditOutcome::none();
+                }
                 if !self.picks.iter().any(|(x, _)| *x == e) {
                     self.picks.push((e, p));
                 }
@@ -1815,15 +1846,12 @@ impl SketchEditor {
                     if already_coincident(&data.sketch, c, &ids) {
                         return EditOutcome::redraw();
                     }
-                    match make_constraint(&data.sketch, c, &ids) {
-                        Some(kind) => match data.sketch.add_constraint(kind) {
-                            Ok(_) => {
-                                data.sketch.solve();
-                                return EditOutcome::changed();
-                            }
-                            Err(err) => self.message = Some(format!("Can't add constraint: {err}")),
-                        },
-                        None => self.message = Some("Those entities can't take this constraint".into()),
+                    // Picks that fit but can't take the constraint: nothing is added.
+                    if let Some(kind) = make_constraint(&data.sketch, c, &ids)
+                        && data.sketch.add_constraint(kind).is_ok()
+                    {
+                        solve_after_constraint(&mut data.sketch, c, &ids);
+                        return EditOutcome::changed();
                     }
                 }
                 EditOutcome::redraw()
@@ -3291,6 +3319,8 @@ impl SketchEditor {
             Some(DragState::Geometry { handle }) => {
                 if let (DragHandle::Point(id), Some((target, _, is_pt))) = (handle, self.drag_snap.take()) {
                     let target = if target == noshape_sketch::ORIGIN { origin_point(&mut data.sketch) } else { target };
+                    // The hidden Origin stand-in is constrained to, not merged into.
+                    let is_pt = is_pt && !data.sketch.entity(target).is_some_and(|e| e.reference_only);
                     let ok = if is_pt {
                         // Keep the fixed/external point when merging.
                         let ext = data.sketch.entity(target).is_some_and(|e| e.external);
@@ -3870,11 +3900,10 @@ impl SketchEditor {
             self.message = Some("Could not create the dimension.".into());
             return EditOutcome::redraw();
         };
-        if data.sketch.constraint(cid).is_some_and(|c| c.driving) {
-            self.open_value_box(data, cid);
-        } else {
-            self.message = Some("The dimension over-defines the sketch; it was added as a driven dimension".into());
-        }
+        // Live ("qa4 round 5 s5 driven dims" (1)): a dimension that would
+        // over-define the sketch is added driven and still opens its value
+        // box ("10 mm" selected); no toast, nothing red.
+        self.open_value_box(data, cid);
         EditOutcome::changed()
     }
 
@@ -3980,10 +4009,9 @@ impl SketchEditor {
             { continue; }
             let Some(pos) = self.label_pos(data, c.id, &c.kind) else { continue };
             let value = dim_value_text_tol(&c.kind, v, units, data.dimension_tolerances.get(&c.id.0));
-            let mut text = dimension_label_text(data.dimension_exprs.get(&c.id.0).map(|e| e.text.as_str()), value, self.show_expressions);
-            if !c.driving {
-                text = format!("({text})");
-            }
+            // Live ("qa4 round 5 s5 driven dims"): a driven dimension is the
+            // plain value in grey ("Ø10"), no parentheses.
+            let text = dimension_label_text(data.dimension_exprs.get(&c.id.0).map(|e| e.text.as_str()), value, self.show_expressions);
             out.push((c.id, pos, text, c.driving));
         }
         out
@@ -4209,15 +4237,12 @@ impl SketchEditor {
         if !self.selection.is_empty() && constraint_applicable(&data.sketch, c, &self.selection) {
             match apply_constraint(&mut data.sketch, c, &self.selection) {
                 Ok(n) if n > 0 => {
-                    data.sketch.solve();
+                    solve_after_constraint(&mut data.sketch, c, &self.selection);
                     self.selection.clear();
                     return true;
                 }
-                Ok(_) => {}
-                Err(e) => {
-                    self.message = Some(format!("Can't add constraint: {e}"));
-                    return false;
-                }
+                // Nothing added (or it couldn't be): the tool takes picks instead.
+                Ok(_) | Err(_) => {}
             }
         }
         // Tool-first: each pair of entities picked is constrained.
@@ -4372,6 +4397,8 @@ impl SketchEditor {
         let mut wide: Vec<(Vec<DVec2>, [u8; 4], f32)> = Vec::new();
         // Construction previews, dash-dot (live sketch/91: the polygon's circle).
         let mut dash_dot: Vec<Vec<DVec2>> = Vec::new();
+        // The rubber band's inferred-direction dash (drawn after `poly`'s lines).
+        let mut inferred_dash: Option<(DVec2, DVec2)> = None;
         let mut poly = |pts: &[DVec2], color: [u8; 4], dashed: bool| {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, color, 0, 2.0, on_top | if dashed { LineSegment::DASHED } else { 0 });
@@ -4394,9 +4421,17 @@ impl SketchEditor {
                 }
                 Tool::Line => {
                     if let Some(a) = self.anchor_pos(&data.sketch) {
-                        // A line inferred parallel to another is drawn dotted.
-                        let parallel = self.inference.as_ref().is_some_and(|i| i.kind == InferenceKind::Parallel);
-                        poly(&[a, c], preview_color, parallel);
+                        // Live (sketch/51–54): a 2 px blue line with 6 px blue dots at
+                        // both ends; when its direction is inferred (horizontal,
+                        // vertical, perpendicular, parallel) a 1 px yellow dash runs
+                        // along its middle.
+                        poly(&[a, c], preview_color, false);
+                        if self.inference.as_ref().is_some_and(|i| is_direction(i.kind)) {
+                            inferred_dash = Some((a, c));
+                        }
+                        for q in [a, c] {
+                            points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                        }
                     }
                 }
                 Tool::MidpointLine => {
@@ -4952,13 +4987,21 @@ impl SketchEditor {
             let pts3: Vec<[f32; 3]> = data.sketch.tessellate(e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT), 0, 4.0, on_top);
         }
-        if let Some(inf) = &self.inference
+        // The guide to the point an alignment refers to (a direction
+        // inference of the line being drawn shows as its dash instead).
+        if let Some(inf) = self.inference.as_ref().filter(|i| !(self.tool == Tool::Line && is_direction(i.kind)))
             && let Some(r) = inf.reference
         {
+            // Live (part-studio/1032): a 1 px yellow dash, 4 px on / 4 off, as
+            // on a rubber band.
             let pts3 = [w(r), w(inf.position)];
-            lines.push_polyline(&pts3, guide_color, 0, 1.0, on_top | LineSegment::DASHED);
+            lines.push_polyline(&pts3, INFERRED_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
         }
-        if let Some(inf) = &self.inference {
+        // A point inference marks its point; a direction inference of the
+        // line being drawn shows on the line itself (its dash and end dot),
+        // an alignment by its guide alone (live part-studio/1032).
+        let alignment = |k: InferenceKind| matches!(k, InferenceKind::AlignHorizontal | InferenceKind::AlignVertical | InferenceKind::AlignBoth);
+        if let Some(inf) = self.inference.as_ref().filter(|i| !(self.tool == Tool::Line && is_direction(i.kind)) && !alignment(i.kind)) {
             points.points.push(PointSprite { position: w(inf.position), color: guide_color, pick_id: 0, size: 8.0, style: on_top, _pad: 0 });
         }
         if let Some((_, q, _)) = self.drag_snap {
@@ -5033,6 +5076,9 @@ impl SketchEditor {
             // A negative width marks a 2 px dash-dot guide.
             let (width, style) = if width < 0.0 { (2.0, on_top | LineSegment::DASH_DOT) } else { (width, on_top) };
             lines.push_polyline(&pts3, color, 0, width, style);
+        }
+        if let Some((a, c)) = inferred_dash {
+            lines.push_polyline(&[w(a), w(c)], INFERRED_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
         }
         // Dash-dot laid out along the whole curve here: the line shader's
         // pattern restarts on every segment, so a circle's short segments
@@ -5230,7 +5276,14 @@ fn crosses_box(sk: &Sketch, id: EntityId, lo: DVec2, hi: DVec2, tol: f64) -> boo
 /// The fixed point on the sketch origin (created on first use).
 pub fn origin_point(sk: &mut Sketch) -> EntityId {
     let existing = sk.entities().find(|e| e.external && matches!(e.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12)).map(|e| e.id);
-    existing.unwrap_or_else(|| sk.use_external_point(DVec2::ZERO))
+    existing.unwrap_or_else(|| {
+        // Live (qa5 P1-4): constraints go to the external Origin; no sketch
+        // point is made there (none drawn, picked or used as a hole location).
+        let o = sk.use_external_point(DVec2::ZERO);
+        let _ = sk.set_construction(o, true);
+        let _ = sk.set_reference_only(o, true);
+        o
+    })
 }
 
 /// Entity an automatic constraint refers to.
@@ -6065,7 +6118,11 @@ fn make_constraint(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Option<C
             let b = b?;
             if is_point(sk, a) { ConstraintKind::Midpoint { point: a, curve: b } } else { ConstraintKind::Midpoint { point: b, curve: a } }
         }
-        ConstraintTool::Normal => ConstraintKind::Normal { line: a, curve: b? },
+        // Live: either pick order (the line is the one that is a line).
+        ConstraintTool::Normal => {
+            let b = b?;
+            if sk.kind(a) != Some(EntityKind::Line) && sk.kind(b) == Some(EntityKind::Line) { ConstraintKind::Normal { line: b, curve: a } } else { ConstraintKind::Normal { line: a, curve: b } }
+        }
         ConstraintTool::Pierce => {
             let b = b?;
             let ext = |e: EntityId| sk.entity(e).is_some_and(|x| x.external);
@@ -6111,6 +6168,60 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
         ConstraintTool::Symmetric => n == 3 && count(&line) >= 1,
         ConstraintTool::Fix => true,
         ConstraintTool::Curvature => n == 2 && all(&curve) && kinds.iter().any(|k| k.is_spline()),
+    }
+}
+
+/// Whether curve `e` shares an end with one of `chain`'s curves.
+fn chain_touches(sk: &Sketch, chain: &[EntityId], e: EntityId) -> bool {
+    let ends = |id: EntityId| sk.curve(id).filter(|c| !c.is_periodic()).map(|c| [c.start_point(), c.end_point()]);
+    let Some(mine) = ends(e) else { return false };
+    let b = sk.bbox();
+    let tol = ((b.max - b.min).length() * 1e-9).max(1e-12);
+    chain.iter().filter_map(|c| ends(*c)).any(|theirs| mine.iter().any(|p| theirs.iter().any(|q| (*p - *q).length() <= tol)))
+}
+
+/// Solve after constraint `c` was added on `ids`. Live (qa4 round 5 v3 s6,
+/// CON-TANGENT-APPLY): Tangent between a line and a circle moves the
+/// circle and keeps its radius, so only the circle's centre takes the change.
+pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
+    let centers: Vec<EntityId> = if c == ConstraintTool::Tangent && ids.iter().any(|e| sk.kind(*e) == Some(EntityKind::Line)) {
+        ids.iter().filter(|e| sk.kind(**e) == Some(EntityKind::Circle)).filter_map(|e| sk.entity(*e).and_then(|x| x.center())).collect()
+    } else {
+        Vec::new()
+    };
+    if centers.is_empty() {
+        sk.solve();
+    } else {
+        sk.solve_with(&noshape_sketch::SolveOptions { light: centers, ..Default::default() });
+    }
+}
+
+/// Whether constraint tool `c` takes `e` after `picks` (live: it doesn't
+/// accept a pick it can't use): the full set must be applicable; earlier
+/// picks only need a kind the constraint takes.
+pub fn pick_fits(sk: &Sketch, c: ConstraintTool, picks: &[EntityId], e: EntityId) -> bool {
+    let Some(k) = sk.kind(e) else { return false };
+    let mut ids = picks.to_vec();
+    ids.push(e);
+    let point = k == EntityKind::Point;
+    let complete = match c {
+        // One line, or two points.
+        ConstraintTool::Horizontal | ConstraintTool::Vertical => !(point && ids.len() == 1),
+        _ => ids.len() >= c.arity(),
+    };
+    if complete {
+        return constraint_applicable(sk, c, &ids);
+    }
+    let curve = !point;
+    match c {
+        ConstraintTool::Coincident | ConstraintTool::Fix | ConstraintTool::Symmetric => true,
+        ConstraintTool::Concentric => point || k.is_circular() || k.is_elliptical(),
+        ConstraintTool::Parallel | ConstraintTool::Perpendicular => k == EntityKind::Line,
+        ConstraintTool::Tangent | ConstraintTool::Normal | ConstraintTool::Curvature => curve,
+        ConstraintTool::Equal => k == EntityKind::Line || k.is_circular(),
+        ConstraintTool::Midpoint => point || matches!(k, EntityKind::Line | EntityKind::Arc),
+        ConstraintTool::Pierce => point || sk.entity(e).is_some_and(|x| x.external),
+        ConstraintTool::Horizontal | ConstraintTool::Vertical => point || k == EntityKind::Line || k == EntityKind::Ellipse,
     }
 }
 
@@ -6709,6 +6820,24 @@ mod tests {
         assert_eq!(count(&data, EntityKind::Line), 0);
     }
 
+    /// qa5 P1-4 (live "qa5 (10-25 p1)" (1)): points placed in horizontal
+    /// alignment with the Origin are Horizontal with it, and no sketch point
+    /// appears at the origin (none shown, picked or used by a Hole).
+    #[test]
+    fn points_aligned_with_the_origin_add_no_origin_point() {
+        let (mut ed, mut d) = editor(Tool::Point);
+        click(&mut ed, &mut d, v(0.03, -PX * 3.0));
+        click(&mut ed, &mut d, v(-0.04, PX * 3.0));
+        let shown: Vec<EntityId> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Point && !e.reference_only).map(|e| e.id).collect();
+        assert_eq!(shown.len(), 2, "{:?}", d.sketch.entities().collect::<Vec<_>>());
+        let hidden: Vec<&noshape_sketch::Entity> = d.sketch.entities().filter(|e| e.reference_only).collect();
+        assert!(hidden.iter().all(|e| e.construction && e.external), "{hidden:?}");
+        for p in shown {
+            assert!(d.sketch.point(p).unwrap().y.abs() < 1e-12);
+            assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: Some(o) } if a == p && d.sketch.entity(o).is_some_and(|e| e.reference_only))));
+        }
+    }
+
     #[test]
     fn line_snaps_to_origin_and_infers_horizontal() {
         let (mut ed, mut d) = editor(Tool::Line);
@@ -7089,9 +7218,9 @@ mod tests {
         let (mut ed, mut d) = editor(Tool::Select);
         let p = d.sketch.add_point(v(0.01, 0.01));
         drag(&mut ed, &mut d, v(0.01, 0.01), v(PX, -PX));
-        let survivor = if d.sketch.entity(p).is_some() { p } else { d.sketch.entities().next().unwrap().id };
-        assert_eq!(d.sketch.point(survivor), Some(DVec2::ZERO));
-        assert!(d.sketch.entity(survivor).unwrap().external);
+        // It stays the user's point, Coincident with the (hidden) Origin.
+        assert_eq!(d.sketch.point(p), Some(DVec2::ZERO));
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if a == p && d.sketch.entity(b).is_some_and(|e| e.reference_only))));
         // Shift suppresses the snap
         let (mut ed, mut d) = editor(Tool::Select);
         d.sketch.add_point(v(0.01, 0.01));
@@ -7693,6 +7822,46 @@ mod tests {
         assert_eq!(ed.selection.len(), 1);
         assert_ne!(ed.selection[0], l);
         assert!(!ed.paste_clipboard(&mut d, "hello"));
+    }
+
+    /// qa4 round 5 v3 s6 with live's answers: Normal takes either pick
+    /// order; a pick the constraint can't use isn't taken; Tangent between
+    /// a line and a circle moves the circle and keeps its radius.
+    #[test]
+    fn constraint_picks_and_application_as_live() {
+        let mut sk = Sketch::new();
+        let line = sk.add_line(v(0.0, 0.0), v(0.04, 0.0));
+        let line2 = sk.add_line(v(0.0, 0.02), v(0.04, 0.025));
+        let circle = sk.add_circle(v(0.02, 0.01), 0.004);
+        let p = sk.add_point(v(0.05, 0.05));
+        assert_eq!(make_constraint(&sk, ConstraintTool::Normal, &[circle, line]), Some(ConstraintKind::Normal { line, curve: circle }));
+        assert_eq!(make_constraint(&sk, ConstraintTool::Normal, &[line, circle]), Some(ConstraintKind::Normal { line, curve: circle }));
+        assert!(!pick_fits(&sk, ConstraintTool::Parallel, &[], circle));
+        assert!(pick_fits(&sk, ConstraintTool::Parallel, &[line], line2));
+        assert!(!pick_fits(&sk, ConstraintTool::Parallel, &[line], circle));
+        assert!(!pick_fits(&sk, ConstraintTool::Tangent, &[], p));
+        assert!(pick_fits(&sk, ConstraintTool::Horizontal, &[], p) && !pick_fits(&sk, ConstraintTool::Horizontal, &[p], circle));
+        sk.add_constraint(ConstraintKind::Tangent { a: line, b: circle }).unwrap();
+        solve_after_constraint(&mut sk, ConstraintTool::Tangent, &[line, circle]);
+        let Some(Curve2::Circle { center, radius }) = sk.curve(circle) else { panic!() };
+        assert!((radius - 0.004).abs() < 1e-12, "radius {radius}");
+        assert!((center.y.abs() - 0.004).abs() < 1e-9, "{center:?}");
+        let Some(Curve2::Line { a, b }) = sk.curve(line) else { panic!() };
+        assert!(a.distance(v(0.0, 0.0)) < 1e-12 && b.distance(v(0.04, 0.0)) < 1e-12);
+    }
+
+    /// Live "qa4 round 5 s5 driven dims": a driven dimension reads "Ø10",
+    /// not "(Ø10)".
+    #[test]
+    fn driven_labels_as_live() {
+        let (ed, mut data) = editor(Tool::Select);
+        let c = data.sketch.add_circle(v(0.0, 0.0), 0.005);
+        add_dimension(&mut data, ConstraintKind::Diameter { curve: c, value: 0.01 }, Some(v(0.01, 0.01)), None).unwrap();
+        let driven = add_dimension(&mut data, ConstraintKind::Diameter { curve: c, value: 0.01 }, Some(v(-0.01, 0.01)), None).unwrap();
+        assert!(!data.sketch.constraint(driven).unwrap().driving);
+        for (_, _, text, _) in ed.dimension_labels(&data, &UnitPrefs::default()) {
+            assert!(!text.starts_with('('), "{text}");
+        }
     }
 }
 

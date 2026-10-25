@@ -27,6 +27,8 @@ const CANCEL_HOVER: u32 = 0xeeeeee;
 pub const GLYPH_OWNED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="8.3" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="6.8" r="2.6"/><path d="M3.7 14.7c1.1-2.4 3.5-3.9 6.3-3.9s5.2 1.5 6.3 3.9a7.9 7.9 0 0 1-12.6 0z"/></svg>"#;
 pub const GLYPH_RECENT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor"><circle cx="10" cy="10" r="7.25" stroke-width="1.5"/><path d="M10 6v4.6l3 3" stroke-width="1.1"/></svg>"#;
 pub const GLYPH_FOLDER: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M1.5 3.5h6.6l1.6 2h8.8v11h-17z"/></svg>"#;
+/// The folder filled (the dark theme's tab bar).
+pub const GLYPH_FOLDER_FILLED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" stroke="currentColor" stroke-linejoin="round"><path d="M1.5 3.5h6.6l1.6 2h8.8v11h-17z"/></svg>"#;
 /// Onshape's 10 px section toggles (`svg-icon-expanded` / collapsed).
 pub const GLYPH_EXPANDED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M.95 3 5 6.85 9.05 3"/></svg>"#;
 pub const GLYPH_COLLAPSED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M3 .95 6.85 5 3 9.05"/></svg>"#;
@@ -57,6 +59,8 @@ pub const GLYPH_LABEL_ADD_PLUS: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/s
 pub const GLYPH_CHECK_BOLD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linejoin="round"><path d="M1 7.3 6.5 12.6 15 3.3"/></svg>"#;
 pub const GLYPH_CROSS_BOLD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m1.5 1.5 7 7M8.5 1.5l-7 7"/></svg>"#;
 pub const GLYPH_CLOSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6.3 6.3 7.4 7.4m0-7.4-7.4 7.4"/></svg>"#;
+/// A modal's close ✕: 12 px of 1.5 px strokes in a 16 px box (live 1862, dk-pref-create-profile-dialog).
+pub const GLYPH_MODAL_CLOSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m2 2 12 12M14 2 2 14"/></svg>"#;
 pub const GLYPH_LIST_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-opacity=".8"><path d="M.5 2.5h2.7l1.2.9h3.1v4.1h-7zm0 10h2.7l1.2.9h3.1v4.1h-7zM10 3.5h10M10 6.5h8m-8 7h10m-10 3h8"/></svg>"#;
 pub const GLYPH_GRID_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-opacity=".8"><path d="M1.5 2.5h2.7l1.2.9h3.1v4.1h-7zm10 0h2.7l1.2.9h3.1v4.1h-7zm-10 10h2.7l1.2.9h3.1v4.1h-7zm10 0h2.7l1.2.9h3.1v4.1h-7z"/></svg>"#;
 
@@ -165,7 +169,8 @@ fn modal_with(dialog: Dialog, title: impl Into<SharedString>, width: f32, dark: 
         .p_0()
         .gap_0()
         .rounded(px(4.))
-        .border_color(rgb(MODAL_DIVIDER))
+        // Dark: the frame is a faint #3c3c3c (live dk-999), the rules #495057.
+        .border_color(if noshape_scene::palette::is_dark() { gpui_kit::rgb_static(0x3c3c3c) } else { rgb(MODAL_DIVIDER) })
         .title(
             h_flex()
                 .w(px(width - 2.))
@@ -187,7 +192,7 @@ fn modal_with(dialog: Dialog, title: impl Into<SharedString>, width: f32, dark: 
                         .cursor_pointer()
                         .text_color(pal.text_faint)
                         .hover(|d| d.text_color(pal.text_muted))
-                        .child(Icon::empty().data(GLYPH_CLOSE).size(px(16.))),
+                        .child(Icon::empty().data(GLYPH_MODAL_CLOSE).size(px(16.))),
                 ))),
         )
 }
@@ -544,7 +549,11 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
         .when_some(opts.focus, |d, f| {
             d.track_focus(&f)
                 // Chrome's focus ring on a focused `<select>` (2 px #3e94ff).
-                .focus(|s| s.border_color(rgb(0x3e94ff)).shadow(vec![BoxShadow { color: rgb(0x3e94ff).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.), inset: false }]))
+                // Dark: the ring outside the border is #90cef1 (live dk-pref-select-focused).
+                .focus(|s| {
+                    let outer = if noshape_scene::palette::is_dark() { 0x90cef1 } else { 0x3e94ff };
+                    s.border_color(gpui_kit::rgb_static(0x3e94ff)).shadow(vec![BoxShadow { color: gpui_kit::rgb_static(outer).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.), inset: false }])
+                })
                 .on_key_down(move |ev: &KeyDownEvent, window, cx| {
                     if matches!(ev.keystroke.key.as_str(), "space" | "enter" | "down") {
                         cx.stop_propagation();
@@ -563,7 +572,7 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
         .text_size(px(14.))
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .child(div().flex_1().truncate().map(|d| if current >= user_from { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
-        .child(glyph(GLYPH_CARET, 8., rgb(0x777777))) // live assembly/181-182: `#777`
+        .child(glyph(GLYPH_CARET, 8., gpui_kit::rgb_static(0x777777))) // live assembly/181-182: `#777` (also in dark, prefs/dk-904)
         .on_click(move |_, window, cx| open(window, cx))
 }
 

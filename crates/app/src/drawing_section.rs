@@ -6,7 +6,6 @@
 
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -17,6 +16,10 @@ pub struct SectionDlg {
     /// 0 Vertical, 1 Horizontal, 2 Angular.
     pub mode: u8,
     pub label: Entity<InputState>,
+    /// The label field has the focus (its 2 px underline; set each render).
+    pub label_focused: bool,
+    /// Select the label once the field has the focus (the dialog just opened).
+    select_label: bool,
     /// "Show cut geometry only".
     pub cut_only: bool,
     /// "Section depth" (Blind): the field and its value in meters.
@@ -65,10 +68,18 @@ impl DrawingEditor {
             (None, true) => {
                 let next = self.current_sheet().next_label();
                 let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
-                self.section_dlg = Some(SectionDlg { mode: 0, label, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, exclude: Vec::new(), picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
+                // Live drawing/20: the dialog opens with the label selected.
+                label.update(cx, |s, cx| s.focus(window, cx));
+                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, exclude: Vec::new(), picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
             }
             (Some(_), false) => self.section_dlg = None,
             _ => {}
+        }
+        if let Some(d) = &mut self.section_dlg {
+            d.label_focused = d.label.read(cx).focus_handle(cx).is_focused(window);
+            if d.label_focused && std::mem::take(&mut d.select_label) {
+                d.label.update(cx, |s, cx| s.select_all(window, cx));
+            }
         }
         // Angular: the Cut angle field.
         if let Some(d) = &mut self.section_dlg
@@ -255,7 +266,14 @@ impl DrawingEditor {
                     v_flex()
                         .p(px(3.))
                         .child(h_flex().child(tab("ds-vert", "Vertical", 0, cx)).child(tab("ds-horiz", "Horizontal", 1, cx)).child(tab("ds-ang", "Angular", 2, cx)))
-                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).h(px(26.)).flex().items_end().border_b_1().border_color(pal.accent).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small())))
+                        // Live drawing/20: focused, a 2 px blue underline 2 px higher.
+                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).h(px(25.)).capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                            // The focused label field still lets Esc close the tool.
+                            if e.keystroke.key == "escape" {
+                                cx.stop_propagation();
+                                this.cancel(cx);
+                            }
+                        })).flex().items_end().map(|d0| if d.label_focused { d0.border_b_2() } else { d0.border_b_1() }).border_color(pal.accent).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small())))
                         .child(
                             h_flex()
                                 .mt(px(5.))
@@ -334,7 +352,7 @@ impl DrawingEditor {
                                     ),
                             )
                         })
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("ds-cut-only").label("Show cut geometry only").small().checked(d.cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-only").label("Show cut geometry only").checked(d.cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some(d) = &mut this.section_dlg {
                                 d.cut_only = *v;
                             }
@@ -342,7 +360,7 @@ impl DrawingEditor {
                             cx.notify();
                         }))))
                         .when(of_section, |e| {
-                            e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("ds-cut-from").label("Cut from section").small().checked(d.cut_from).on_click(cx.listener(|this, v: &bool, _, cx| {
+                            e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-from").label("Cut from section").checked(d.cut_from).on_click(cx.listener(|this, v: &bool, _, cx| {
                                 if let Some(d) = &mut this.section_dlg {
                                     d.cut_from = *v;
                                 }
@@ -350,7 +368,7 @@ impl DrawingEditor {
                                 cx.notify();
                             }))))
                         })
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("ds-depth").label("Section depth").small().checked(d.depth.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_depth(*v, w, cx)))))
+                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-depth").label("Section depth").checked(d.depth.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_depth(*v, w, cx)))))
                         .when(d.depth.is_some(), |e| {
                             let tab = |id: &'static str, label: &'static str, on: bool, v: bool, cx: &mut Context<Self>| {
                                 div()

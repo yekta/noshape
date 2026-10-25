@@ -6,7 +6,6 @@
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use noshape_model::drawing::views::{self, SourceKey};
@@ -73,7 +72,7 @@ impl DrawingEditor {
                 let on = keys.iter().all(|k| picked.contains(k));
                 h_flex()
                     .gap(px(4.))
-                    .child(Checkbox::new(("ref-pick", i)).small().checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                    .child(crate::drawing_chrome::DrCheckbox::new(("ref-pick", i)).native().checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                         if let Some(m) = &mut this.ref_manager {
                             m.picked.retain(|x| !keys.contains(x));
                             if *v {

@@ -99,13 +99,14 @@ class Mouse(Device):
 
 KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_LEFTALT = 29, 42, 56
 KEY_Z, KEY_UP, KEY_LEFT, KEY_RIGHT, KEY_DOWN = 44, 103, 105, 106, 108
+KEY_ESC, KEY_SPACE = 1, 57
 
 
 class Keyboard(Device):
-    """Modifiers, the arrows and Z."""
+    """Modifiers, the arrows, Z, Esc and Space."""
 
     def __init__(self):
-        super().__init__("noshape-nav keyboard", keys=(KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_LEFTALT, KEY_Z, KEY_UP, KEY_LEFT, KEY_RIGHT, KEY_DOWN),
+        super().__init__("noshape-nav keyboard", keys=(KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_LEFTALT, KEY_Z, KEY_UP, KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_ESC, KEY_SPACE),
                          product=0x40)
 
     def key(self, code, down):

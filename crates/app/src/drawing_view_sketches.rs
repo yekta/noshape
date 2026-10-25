@@ -5,8 +5,7 @@
 
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::FeatureId;
@@ -53,7 +52,7 @@ impl DrawingEditor {
         let mut rows = v_flex().p(px(6.)).gap(px(2.));
         for (i, (f, name)) in list.into_iter().enumerate() {
             let on = d.picked.contains(&f);
-            rows = rows.child(h_flex().h(px(24.)).child(Checkbox::new(("vs-sketch", i)).label(name).small().checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+            rows = rows.child(h_flex().h(px(24.)).child(crate::drawing_chrome::DrCheckbox::new(("vs-sketch", i)).user().label(name).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                 if let Some(d) = &mut this.view_sketches {
                     d.picked.retain(|x| *x != f);
                     if *v {

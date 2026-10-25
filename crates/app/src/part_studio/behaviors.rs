@@ -43,16 +43,40 @@ pub struct Isolation {
     pub expand: usize,
 }
 
+/// What the Dynamic suppression dialog sets: a feature's "Unsuppressed if"
+/// expression, or that of every feature in a folder.
+#[derive(Clone, Copy)]
+pub enum DynTarget {
+    Feature(FeatureId),
+    Folder(u32),
+}
+
 /// Open "Select other" list: candidates nearest first, highlighted index.
 pub struct SelectOther {
     pub hits: Vec<Reference>,
-    pub index: usize,
-    /// Viewport-local position the list opens at.
+    /// The highlighted entry (bold): none when opened from a menu.
+    pub index: Option<usize>,
+    /// Viewport-local point it was opened for: the click zone's centre.
     pub at: DVec2,
+    /// Where the ray met the nearest entity: a yellow point while the
+    /// pointer is out of the click zone (SELECT_OTHER_POINT_*).
+    pub point: Option<glam::DVec3>,
+    pub in_zone: bool,
+    pub moved_out: bool,
+    pub scroll: ScrollHandle,
 }
 
+/// Onshape's Select other constants (woolsthorpe: SELECTION_DIALOG_OFFSET_X /
+/// _Y, SELECT_OTHER_CLICK_ZONE_RADIUS_PX, _PICK_RADIUS_PX, _MAXIMUM_ELEMENTS)
+/// and the dialog's size (dom/select-other-popup.txt: 220 × 149).
+const SELECT_OTHER_OFFSET: (f32, f32) = (100., -25.);
+const SELECT_OTHER_ZONE_PX: f64 = 8.;
+const SELECT_OTHER_PICK_PX: f64 = 8.;
+const SELECT_OTHER_MAX: usize = 20;
+const SELECT_OTHER_SIZE: (f32, f32) = (220., 149.);
+
 /// Consumed dialog picks: (picks, accent picks, before-model, lines).
-pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, usize, Option<noshape_render::Instance>);
+pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize, Option<noshape_render::Instance>);
 
 /// View state for the behaviors above.
 pub struct UiState {
@@ -97,6 +121,10 @@ pub struct UiState {
     /// The feature list's scroll position and size (qa4: rows out of view
     /// are drawn as empty rows, `render_feature_list`).
     pub list_scroll: ScrollHandle,
+    /// Feature-list autoscroll while a row or the rollback bar is dragged:
+    /// px/s (positive down) and whether its loop is running.
+    pub list_autoscroll: f32,
+    pub list_autoscrolling: bool,
     /// The rollback bar took the keyboard (↑/↓ or a click on it) while these
     /// features were selected; it reads light blue until the selection changes.
     pub rollback_keyboard: Option<Vec<noshape_model::reference::FeatureId>>,
@@ -164,6 +192,17 @@ pub struct UiState {
     pub section_dialog: Option<super::section::SectionDialog>,
     /// The section offset box being typed into (section.rs).
     pub section_offset_edit: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    /// The section manipulator: the last ring drag (its angle shows in the
+    /// value box), the base moved over the plane, a base drag, the hovered handle.
+    pub section_rot: Option<super::section_manip::RingDrag>,
+    pub section_base: Option<glam::DVec3>,
+    pub section_base_drag: bool,
+    /// The section value box (live skb "assembly section" 2–3): shown from
+    /// an arrow or ring drag until Esc; the plane's offset when the arrow
+    /// drag started (the box reads the distance from it).
+    pub section_box: bool,
+    pub section_drag0: Option<f64>,
+    pub section_hover: Option<super::section_manip::SectionHandle>,
     pub section_parts: Option<(bool, Vec<BodyId>)>,
     /// Open Appearance editor, and faces of a hovered appearance row.
     pub appearance_edit: Option<super::appearance::AppearanceEdit>,
@@ -267,7 +306,8 @@ pub struct UiState {
     /// The selected cell (table, row, column; column 0 selects the row).
     pub sm_cell: Option<(u8, usize, usize)>,
     /// Dynamic suppression editor: feature, expression input.
-    pub dyn_suppression: Option<(FeatureId, Entity<InputState>, Subscription)>,
+    /// The Dynamic suppression dialog: what it sets and its input.
+    pub dyn_suppression: Option<(DynTarget, Entity<InputState>, Subscription)>,
     /// Shortcut map search box.
     pub shortcut_filter: Option<(Entity<InputState>, Subscription)>,
     pub shortcut_query: String,
@@ -288,6 +328,14 @@ pub struct UiState {
     pub remembered: std::collections::HashMap<(String, &'static str), ParamValue>,
     /// Feature list: "Default geometry" and "Parts" folders collapsed.
     pub default_geometry_collapsed: bool,
+    /// Folders the user opened (true) or closed (false) in this view, over
+    /// the document's state (a new folder starts closed). View state, not
+    /// an undo step (live qa4 r5 s8 (7)).
+    pub folder_open: std::collections::HashMap<u32, bool>,
+    /// The folder row selected in the feature list (a click on it).
+    pub selected_folder: Option<u32>,
+    /// A folder just made: its row related-highlighted until the next click.
+    pub fresh_folder: Option<u32>,
     /// Entity whose graphics-area context menu is open (kept highlighted).
     pub menu_target: Option<Reference>,
     /// Feature whose list context menu is open: its row and geometry stay
@@ -393,6 +441,8 @@ impl UiState {
             last_click: None,
             list_focus: cx.focus_handle(),
             list_scroll: ScrollHandle::new(),
+            list_autoscroll: 0.0,
+            list_autoscrolling: false,
             rollback_keyboard: None,
             dependencies: None,
             cube_hover: None,
@@ -425,6 +475,12 @@ impl UiState {
             section: Vec::new(),
             section_dialog: None,
             section_offset_edit: None,
+            section_rot: None,
+            section_base: None,
+            section_base_drag: false,
+            section_box: false,
+            section_drag0: None,
+            section_hover: None,
             section_parts: None,
             appearance_edit: None,
             appearance_hover: Vec::new(),
@@ -489,6 +545,9 @@ impl UiState {
             oriented: false,
             remembered: Default::default(),
             default_geometry_collapsed: false,
+            selected_folder: None,
+            fresh_folder: None,
+            folder_open: Default::default(),
             menu_target: None,
             list_menu: None,
             consumed_lines: None,
@@ -528,41 +587,6 @@ impl UiState {
             analysis_tool: None,
             tool_memory: Default::default(),
         }
-    }
-}
-
-/// What a selection field accepts, for the rejection message.
-pub fn filter_description(f: QueryFilter) -> String {
-    let mut kinds: Vec<&str> = Vec::new();
-    let mut add = |q: QueryFilter, s: &'static str| {
-        if f.intersects(q) && !kinds.contains(&s) {
-            kinds.push(s);
-        }
-    };
-    add(QueryFilter::SKETCH_REGION, "sketch regions");
-    if f.intersects(QueryFilter::FACE) {
-        add(QueryFilter::FACE, "faces");
-    } else {
-        add(QueryFilter::PLANAR_FACE, "planar faces");
-        add(QueryFilter::CYLINDRICAL_FACE, "cylindrical faces");
-    }
-    add(QueryFilter::PLANE, "planes");
-    if f.intersects(QueryFilter::EDGE) {
-        add(QueryFilter::EDGE, "edges");
-    } else {
-        add(QueryFilter(QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0), "edges");
-    }
-    add(QueryFilter::SKETCH_EDGE, "sketch curves");
-    add(QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::POINT_BODY.0), "points");
-    add(QueryFilter::BODY, "parts");
-    add(QueryFilter::WIRE_BODY, "curves");
-    add(QueryFilter::MATE_CONNECTOR, "mate connectors");
-    add(QueryFilter::FEATURE, "features");
-    add(QueryFilter::SKETCH, "sketches");
-    match kinds.len() {
-        0 => "That entity can't be used in the active field.".into(),
-        1 => format!("Select {}.", kinds[0]),
-        n => format!("Select {} or {}.", kinds[..n - 1].join(", "), kinds[n - 1]),
     }
 }
 
@@ -632,6 +656,13 @@ impl PartStudioView {
             out.extend(if t.second_active { &t.selection2 } else { &t.selection }.iter().cloned());
         }
         out
+    }
+
+    /// Whether the active dialog field takes `t`: its kind, the region a
+    /// curve bounds or the part a face is on (None: no field is active).
+    pub(super) fn field_takes(&self, t: &PickTarget, cx: &App) -> Option<bool> {
+        let (_, filter, _) = self.edit.as_ref()?.dialog.read(cx).active_filter()?;
+        Some(kind_matches(t.kind, &t.reference, filter) || self.curve_region(&t.reference, filter).is_some() || self.part_for_field(&t.reference, filter).is_some())
     }
 
     /// Hover target in the graphics area, expanded like the selection.
@@ -751,8 +782,9 @@ impl PartStudioView {
                     cx.notify();
                     return;
                 }
-                dialog.update(cx, |d, cx| d.flash_active_field(cx));
-                self.flash_info(filter_description(filter), cx);
+                // Live ("qa4 round 5 s1 follow-up 2" (1)): an entity the
+                // field doesn't take is neither highlighted nor picked, and
+                // nothing tells you so.
                 return;
             }
             dialog.update(cx, |d, cx| {
@@ -787,7 +819,7 @@ impl PartStudioView {
     /// Which pick kinds the graphics area offers: what the active dialog
     /// field or analysis tool can take (Onshape: only acceptable entities
     /// highlight and get picked), `None` for everything.
-    fn pick_kinds(&self, cx: &App) -> Option<Vec<PickKind>> {
+    pub(super) fn pick_kinds(&self, cx: &App) -> Option<Vec<PickKind>> {
         const ALL: [PickKind; 9] = [PickKind::Face, PickKind::Edge, PickKind::Vertex, PickKind::Plane, PickKind::Origin, PickKind::SketchCurve, PickKind::SketchPoint, PickKind::SketchRegion, PickKind::Connector];
         if self.sketch.is_some() {
             return None;
@@ -877,9 +909,8 @@ impl PartStudioView {
         if let Some(e) = &self.edit {
             let dialog = e.dialog.clone();
             let Some((_, filter, _)) = dialog.read(cx).active_filter() else { return };
+            // Live: a pick the field doesn't take does nothing.
             if !filter.intersects(QueryFilter::BODY) {
-                dialog.update(cx, |d, cx| d.flash_active_field(cx));
-                self.flash_info(filter_description(filter), cx);
                 return;
             }
             dialog.update(cx, |d, cx| {
@@ -898,7 +929,7 @@ impl PartStudioView {
     /// the selection; Ctrl+drag deselects (Onshape).
     pub(super) fn box_select(&mut self, ids: &[u32], deselect: bool, cx: &mut Context<Self>) {
         let Some(built) = &self.built else { return };
-        let targets: Vec<PickTarget> = ids.iter().filter_map(|id| built.picks.get(*id).cloned()).filter(|t| !matches!(t.kind, PickKind::Plane | PickKind::Origin)).collect();
+        let targets: Vec<PickTarget> = ids.iter().filter_map(|id| built.picks.get(*id).cloned()).filter(|t| box_takes(t.kind)).collect();
         if let Some(e) = &self.edit {
             let dialog = e.dialog.clone();
             if let Some((_, filter, _)) = dialog.read(cx).active_filter() {
@@ -1190,13 +1221,6 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ dynamic suppression
 
-    pub(super) fn set_suppression_expr(&mut self, id: FeatureId, expr: Option<String>, cx: &mut Context<Self>) {
-        let expr = expr.filter(|e| !e.trim().is_empty());
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(expr.as_deref()), cx, |ps| noshape_ops::studio::set_suppression_expr(ps, id, expr));
-        });
-    }
-
     /// "Unsuppress" on a feature with an expression: drop it and leave the
     /// feature active (one undo step).
     pub(super) fn clear_dynamic_suppression(&mut self, id: FeatureId, cx: &mut Context<Self>) {
@@ -1209,7 +1233,23 @@ impl PartStudioView {
     /// expression (the feature is active while it is true; live
     /// dom/dialog-dynamic-suppression.txt).
     pub(super) fn edit_dynamic_suppression(&mut self, id: FeatureId, window: &mut Window, cx: &mut Context<Self>) {
-        let current = self.studio(cx).and_then(|s| s.feature(id)).and_then(|f| f.suppression_expr.clone()).unwrap_or_default();
+        self.open_dynamic_suppression(DynTarget::Feature(id), window, cx);
+    }
+
+    /// The same on a folder: Onshape writes the expression onto every
+    /// feature inside it (live ui 10-25 c); the field starts empty.
+    pub(super) fn edit_folder_dynamic_suppression(&mut self, folder: u32, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_dynamic_suppression(DynTarget::Folder(folder), window, cx);
+    }
+
+    fn open_dynamic_suppression(&mut self, target: DynTarget, window: &mut Window, cx: &mut Context<Self>) {
+        let current = self
+            .studio(cx)
+            .and_then(|s| match target {
+                DynTarget::Feature(id) => s.feature(id).and_then(|f| f.suppression_expr.clone()),
+                DynTarget::Folder(_) => None,
+            })
+            .unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(current));
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, _, ev: &InputEvent, window, cx| {
             if let InputEvent::PressEnter { .. } = ev {
@@ -1217,17 +1257,22 @@ impl PartStudioView {
             }
         });
         st.update(cx, |s, cx| s.focus(window, cx));
-        self.ui.dyn_suppression = Some((id, st, sub));
+        self.ui.dyn_suppression = Some((target, st, sub));
         cx.notify();
     }
 
     fn accept_dynamic_suppression(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((id, st, _)) = self.ui.dyn_suppression.take() else { return };
+        let Some((target, st, _)) = self.ui.dyn_suppression.take() else { return };
         let text = st.read(cx).value().to_string();
         // An empty field leaves the feature as it was (live: nothing
         // changes until an expression is committed).
         if !text.trim().is_empty() {
-            self.set_suppression_expr(id, Some(text), cx);
+            self.doc.update(cx, |doc, cx| {
+                doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(Some(&text)), cx, |ps| match target {
+                    DynTarget::Feature(id) => noshape_ops::studio::set_suppression_expr(ps, id, Some(text.clone())),
+                    DynTarget::Folder(fd) => ps.set_folder_suppression_expr(fd, Some(text.clone())),
+                });
+            });
         }
         window.focus(&self.focus, cx);
         cx.notify();
@@ -2247,22 +2292,47 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ select other
 
-    /// ` (grave): list the faces and edges under the cursor, nearest first;
-    /// pressing it again moves down the list (Shift+` up).
+    /// ` (grave): list the faces and edges under the cursor, nearest first,
+    /// the second one highlighted (Shift+`: the last); pressing it again in
+    /// the click zone moves down the list (Onshape onSelectOtherCommand).
     pub(super) fn select_other(&mut self, backwards: bool, cx: &mut Context<Self>) {
-        if let Some(so) = &mut self.ui.select_other {
-            let n = so.hits.len().max(1);
-            so.index = if backwards { (so.index + n - 1) % n } else { (so.index + 1) % n };
-            self.hover = so.hits.get(so.index).cloned();
-            self.refresh_scene(false, cx);
-            cx.notify();
+        if self.ui.select_other.as_ref().is_some_and(|so| so.in_zone || !so.moved_out) {
+            self.select_other_step(backwards, cx);
+        } else {
+            self.start_select_other(false, backwards, cx);
+        }
+    }
+
+    /// The next (previous) entry: ` again, ↑ / ↓ (Onshape highlightNext /
+    /// PreviousSelection → setCurrentSelection: bold, pre-highlighted,
+    /// scrolled into view).
+    pub(super) fn select_other_step(&mut self, backwards: bool, cx: &mut Context<Self>) {
+        let Some(so) = &mut self.ui.select_other else { return };
+        let n = so.hits.len();
+        if n == 0 {
             return;
         }
+        let i = if backwards { so.index.map_or(n - 1, |i| (i + n - 1) % n) } else { so.index.map_or(0, |i| (i + 1) % n) };
+        so.index = Some(i);
+        so.scroll.scroll_to_item(i);
+        self.hover = so.hits.get(i).cloned();
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    /// Select other… from a context menu: nothing highlighted yet, the
+    /// point it was opened for marked (Onshape startSelectOther with an
+    /// event).
+    pub(super) fn select_other_from_menu(&mut self, cx: &mut Context<Self>) {
+        self.start_select_other(true, false, cx);
+    }
+
+    fn start_select_other(&mut self, from_menu: bool, backwards: bool, cx: &mut Context<Self>) {
         let Some(at) = self.ui.pointer else { return };
         let (origin, dir, tol) = {
             let vp = self.viewport.read(cx);
             let (o, d) = vp.ray(at);
-            (o, d, vp.camera.world_per_pixel(vp.size().y) * 8.0)
+            (o, d, vp.camera.world_per_pixel(vp.size().y) * SELECT_OTHER_PICK_PX)
         };
         let iso = self.ui.isolate.as_ref().map(|i| (i.mode, i.bodies.clone()));
         let skip = move |b: &BodyId| match &iso {
@@ -2270,61 +2340,106 @@ impl PartStudioView {
             Some((IsolateMode::Transparent, gone)) => gone.contains(b),
             None => false,
         };
-        let hits: Vec<Reference> = interaction::entities_along_ray(&self.display, origin, dir, tol, &skip, 20).into_iter().map(|h| h.reference).collect();
-        if hits.is_empty() {
-            self.flash_info("Nothing under the cursor to select.".into(), cx);
-            return;
+        let found = interaction::entities_along_ray(&self.display, origin, dir, tol, &skip, SELECT_OTHER_MAX);
+        let point = found.first().map(|h| origin + dir.normalize_or_zero() * h.depth);
+        let hits: Vec<Reference> = found.into_iter().map(|h| h.reference).collect();
+        let n = hits.len();
+        let index = (!from_menu && n > 0).then(|| if backwards { n - 1 } else { 1 % n });
+        self.hover = if from_menu { None } else { index.and_then(|i| hits.get(i).cloned()) };
+        let scroll = ScrollHandle::new();
+        if let Some(i) = index {
+            scroll.scroll_to_item(i);
         }
-        // Start on the entry after the highlighted one (Onshape).
-        let start = self.hover.as_ref().and_then(|h| hits.iter().position(|r| r == h)).map(|i| (i + 1) % hits.len()).unwrap_or(0);
-        self.hover = hits.get(start).cloned();
-        self.ui.select_other = Some(SelectOther { hits, index: start, at });
+        self.ui.select_other = Some(SelectOther { hits, index, at, point, in_zone: !from_menu, moved_out: false, scroll });
         self.refresh_scene(false, cx);
         cx.notify();
     }
 
-    /// Pick the highlighted (or clicked) Select other entry.
+    /// The pointer over the graphics while Select other is open: in the
+    /// click zone the highlighted entry is pre-highlighted, out of it the
+    /// point shows instead (Onshape onMouseMove; picking under the pointer
+    /// is off meanwhile).
+    pub(super) fn select_other_pointer(&mut self, position: DVec2, cx: &mut Context<Self>) {
+        let Some(so) = &mut self.ui.select_other else { return };
+        let in_zone = (position - so.at).length() <= SELECT_OTHER_ZONE_PX;
+        if in_zone == so.in_zone {
+            return;
+        }
+        so.moved_out |= !in_zone;
+        so.in_zone = in_zone;
+        self.hover = if in_zone { so.index.and_then(|i| so.hits.get(i).cloned()) } else { None };
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    /// A click on the graphics while Select other is open: in the click zone
+    /// it takes the highlighted entry, elsewhere it only closes the list
+    /// (Onshape onCanvasClick; the click selects nothing else).
+    pub(super) fn select_other_click(&mut self, position: DVec2, cx: &mut Context<Self>) {
+        let Some(so) = &self.ui.select_other else { return };
+        if (position - so.at).length() <= SELECT_OTHER_ZONE_PX && so.index.is_some() {
+            self.choose_select_other(None, cx);
+        } else {
+            self.ui.select_other = None;
+            self.hover = None;
+            self.refresh_scene(false, cx);
+        }
+        cx.notify();
+    }
+
+    /// Pick the highlighted (or clicked) Select other entry; Enter with
+    /// nothing highlighted does nothing.
     pub(super) fn choose_select_other(&mut self, index: Option<usize>, cx: &mut Context<Self>) {
+        let Some(i) = index.or(self.ui.select_other.as_ref().and_then(|so| so.index)) else { return };
         let Some(so) = self.ui.select_other.take() else { return };
-        let Some(r) = so.hits.get(index.unwrap_or(so.index)).cloned() else { return };
+        let Some(r) = so.hits.get(i).cloned() else { return };
         let kind = if matches!(r, Reference::Edge(_)) { PickKind::Edge } else { PickKind::Face };
         self.hover = None;
         self.pick(PickTarget { reference: r, kind, anchor: None }, cx);
     }
 
+    /// The yellow point the list was opened for, while the pointer is out of
+    /// the click zone (SELECT_OTHER_POINT_COLOR rgb(255,194,14), size 9).
+    pub(super) fn select_other_overlay(&self) -> Option<noshape_render::Instance> {
+        let so = self.ui.select_other.as_ref().filter(|so| !so.in_zone)?;
+        let p = so.point?.as_vec3();
+        let pts = noshape_render::PointData { points: vec![noshape_render::PointSprite { position: p.into(), color: [255, 194, 14, 255], pick_id: 0, size: 9.0, style: noshape_render::LineSegment::ON_TOP, _pad: 0 }] };
+        Some(noshape_render::Instance::new(noshape_render::Drawable::Points(self.gpu.uploader().upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(20))
+    }
+
+    /// Live (sketch/230–231, dom/select-other-popup.txt): a 220 px dialog
+    /// 100 px right of and 25 px above the pointer, kept in the graphics
+    /// area: "Select other" (13 px / 500) and the red ✕; the list in a 1 px
+    /// #d7d7d7 box (blue under the pointer), 24 px rows of 13.33 px names,
+    /// every second row 35 % white, the highlighted one bold, a slim
+    /// scrollbar while the pointer is on it; the "?" row.
     pub(super) fn render_select_other(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let so = self.ui.select_other.as_ref()?;
         let pal = p();
         let labeler = self.labeler(cx);
-        let rows: Vec<AnyElement> = so
+        let size = self.viewport.read(cx).size();
+        let left = (so.at.x as f32 + SELECT_OTHER_OFFSET.0).min(size.x as f32 - SELECT_OTHER_SIZE.0).max(0.);
+        let top = (so.at.y as f32 + SELECT_OTHER_OFFSET.1).min(size.y as f32 - SELECT_OTHER_SIZE.1).max(0.);
+        let mut rows: Vec<AnyElement> = so
             .hits
             .iter()
             .enumerate()
             .map(|(i, r)| {
-                let active = i == so.index;
                 let r2 = r.clone();
-                let kind = if matches!(r, Reference::Edge(_)) { "Edge" } else { "Face" };
                 h_flex()
                     .id(SharedString::from(format!("so-{i}")))
-                    .gap_2()
-                    .px_2()
-                    .py_0p5()
-                    .rounded_sm()
-                    .text_xs()
-                    .cursor_pointer()
-                    .when(active, |d| d.bg(pal.accent_soft))
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(div().w(px(32.)).text_color(pal.text_faint).child(kind))
-                    .child(div().text_color(pal.text).child(labeler(r)))
+                    .flex_none()
+                    .h(px(24.))
+                    .pl(px(6.))
+                    .pr(px(20.))
+                    .when(i % 2 == 1, |d| d.bg(gpui_kit::rgba(0xffffff59)))
+                    .child(div().truncate().text_size(px(13.33)).text_color(pal.text).when(so.index == Some(i), |d| d.font_weight(FontWeight::BOLD)).child(labeler(r)))
+                    // Hovering a row pre-highlights its entity (Onshape
+                    // onMouseEnteredSelection); the bold row stays.
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
-                        if *h {
-                            if let Some(so) = &mut this.ui.select_other {
-                                so.index = i;
-                            }
-                            this.hover = Some(r2.clone());
-                            this.refresh_scene(false, cx);
-                            cx.notify();
-                        }
+                        this.hover = if *h { Some(r2.clone()) } else { None };
+                        this.refresh_scene(false, cx);
+                        cx.notify();
                     }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
                         cx.stop_propagation();
@@ -2333,22 +2448,74 @@ impl PartStudioView {
                     .into_any_element()
             })
             .collect();
+        if rows.is_empty() {
+            rows.push(
+                h_flex()
+                    .id("so-none")
+                    .h(px(24.))
+                    .pl(px(6.))
+                    .text_size(px(13.33))
+                    .text_color(pal.text)
+                    .child("(No selections found)")
+                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                        cx.stop_propagation();
+                        this.ui.select_other = None;
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+            );
+        }
+        // The slim scrollbar: 7 px, #333 at 40 %, while the pointer is on the list.
+        let (offset, max) = (f32::from(so.scroll.offset().y), f32::from(so.scroll.max_offset().y));
+        let view_h = 90.;
+        let thumb = (max > 0.5).then(|| {
+            let h = (view_h * view_h / (view_h + max)).max(20.);
+            let y = (-offset / max) * (view_h - h);
+            div().absolute().right(px(1.)).top(px(y)).w(px(7.)).h(px(h)).rounded(px(7.)).bg(gpui_kit::rgb(0x333333)).opacity(0.).group_hover("so-list", |d| d.opacity(0.4))
+        });
+        let close = cx.listener(|this, _: &ClickEvent, _, cx| {
+            this.ui.select_other = None;
+            this.hover = None;
+            this.refresh_scene(false, cx);
+            cx.notify();
+        });
         Some(
             v_flex()
                 .id("select-other")
                 .occlude()
                 .absolute()
-                .left(px(so.at.x as f32 + 14.0))
-                .top(px(so.at.y as f32 + 10.0))
-                .min_w(px(180.))
-                .p_1()
-                .rounded_md()
-                .bg(pal.panel_raised)
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
-                .child(div().px_2().pb_1().text_xs().text_color(pal.text_muted).child("Select other"))
-                .children(rows)
+                .left(px(left))
+                .top(px(top))
+                .w(px(SELECT_OTHER_SIZE.0))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .flex_none()
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .border_b_1()
+                        .border_color(pal.border)
+                        .child(div().flex_1().pl(px(9.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Select other"))
+                        .child(div().id("so-close").size(px(28.)).flex().items_center().justify_center().child(crate::assets::icon("dialog-cancel", 24., cx)).on_click(close)),
+                )
+                .child(
+                    div()
+                        .id("so-list")
+                        .group("so-list")
+                        .relative()
+                        .h(px(92.))
+                        .flex_none()
+                        .border_1()
+                        .border_color(pal.border)
+                        .rounded(px(2.))
+                        .hover(|d| d.border_color(gpui_kit::rgb(0x1651b0)))
+                        .child(v_flex().id("so-rows").size_full().overflow_y_scroll().track_scroll(&so.scroll).children(rows))
+                        .children(thumb),
+                )
+                // Live: 6 px under the list, the help row: its "?" 14 px, 4 px from the right.
+                .child(h_flex().h(px(28.)).flex_none().items_start().justify_end().pt(px(10.)).pr(px(4.)).child(crate::ui::glyph("help-dot", 14., crate::theme::help_dot(0xa0a0a0))))
                 .into_any_element(),
         )
     }
@@ -2365,17 +2532,23 @@ impl PartStudioView {
             return Vec::new();
         };
         let missing = |refs: &[Reference]| -> Vec<Reference> { refs.iter().filter(|r| matches!(r, Reference::Edge(_) | Reference::Face(_)) && built.picks.ids_for(r).is_empty()).cloned().collect() };
-        let (sel, acc) = (missing(selection), missing(accent));
+        let (mut sel, mut acc) = (missing(selection), missing(accent));
+        // Hovering its chip lights the pick the query-hover yellow-green
+        // #f2ff80, consumed or not (live: qa4 round 5 s7, CHIP-HOVER).
+        let hov: Vec<Reference> = self.ui.query_hover.iter().filter(|h| sel.contains(h) || acc.contains(h)).cloned().collect();
+        sel.retain(|r| !hov.contains(r));
+        acc.retain(|r| !hov.contains(r));
         let key = Arc::as_ptr(&before) as usize;
-        if let Some((s, a, k, inst)) = &self.ui.consumed_lines
+        if let Some((s, a, h, k, inst)) = &self.ui.consumed_lines
             && *s == sel
             && *a == acc
+            && *h == hov
             && *k == key
         {
             return inst.iter().cloned().collect();
         }
         let mut lines = LineData::default();
-        for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION)] {
+        for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION), (&hov, 0xf2ff80)] {
             let rgba = [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255];
             for r in refs.iter() {
                 let edges = match r {
@@ -2394,7 +2567,7 @@ impl PartStudioView {
             }
         }
         let inst = (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12));
-        self.ui.consumed_lines = Some((sel, acc, key, inst.clone()));
+        self.ui.consumed_lines = Some((sel, acc, hov, key, inst.clone()));
         inst.into_iter().collect()
     }
 
@@ -2515,7 +2688,9 @@ impl PartStudioView {
         }
         match &self.hover {
             // The hovered midpoint target ([`Self::update_hover`]).
-            Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() => {
+            // Not for Select other's highlight: it isn't a pick under the
+            // pointer (Onshape suppresses mouse-move picking while it's open).
+            Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() && self.ui.select_other.is_none() => {
                 if let Some(m) = self.edge_midpoint(on) {
                     marker(&mut points, m, crate::theme::viewport::POINT_HOVER);
                 }
@@ -2523,7 +2698,7 @@ impl PartStudioView {
             // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows a
             // 9 px dark ring at its midpoint, the edge seen through it.
             Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. }))
-                if self.active_field_filter(cx).is_none_or(field_takes_points) && (self.edit.is_none() || self.active_field_filter(cx).is_some()) && self.sketch.is_none() =>
+                if self.active_field_filter(cx).is_none_or(field_takes_points) && (self.edit.is_none() || self.active_field_filter(cx).is_some()) && self.sketch.is_none() && self.ui.select_other.is_none() =>
             {
                 if let Some(m) = self.edge_midpoint(r) {
                     points.push(sprite(m, 0x000000, 9.0, PointSprite::RING));
@@ -2693,23 +2868,61 @@ impl PartStudioView {
     pub(super) fn click_feature(&mut self, id: FeatureId, shift: bool, cx: &mut Context<Self>) {
         let order: Vec<FeatureId> = self.studio(cx).map(|s| s.features.iter().map(|f| f.id).collect()).unwrap_or_default();
         self.selected_features = interaction::list_click(&order, &self.selected_features, self.ui.anchor.as_ref(), &id, shift);
+        self.ui.selected_folder = None;
+        self.ui.fresh_folder = None;
         self.ui.anchor = Some(id);
         self.refresh_scene(false, cx);
         cx.notify();
     }
 
-    /// Drop of dragged features onto the row at `to`: moves every selected
-    /// feature when the dragged one is selected; refuses moves above a
-    /// feature's dependencies (Onshape) with an error message.
-    pub(super) fn drop_features(&mut self, dragged: FeatureId, to: usize, after: bool, cx: &mut Context<Self>) {
+    /// Drop of dragged features onto a folder row (live qa4 r5 s8 (6)): they
+    /// become its first children, moved to the folder's place in the list
+    /// (an empty folder's: where it is listed). One undo step; the same
+    /// order check as a drop between rows.
+    pub(super) fn drop_into_folder(&mut self, dragged: FeatureId, folder: u32, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
         let moving: Vec<FeatureId> = if self.selected_features.contains(&dragged) { self.selected_features.clone() } else { vec![dragged] };
-        let Some(order) = interaction::reordered_at(&studio.features, &moving, to, after) else { return };
+        let first = studio.folder_features(folder).into_iter().find(|f| !moving.contains(f));
+        let empty_after = studio.folder(folder).and_then(|f| f.after);
+        let (to, after) = match first {
+            Some(f) => (studio.index_of(f), false),
+            None => match empty_after {
+                Some(a) => (studio.index_of(a), true),
+                None => (Some(0), false),
+            },
+        };
+        let current: Vec<FeatureId> = studio.features.iter().map(|f| f.id).collect();
+        let order = to.and_then(|to| interaction::reordered_at(&studio.features, &moving, to, after)).unwrap_or(current);
         if let Err(msg) = interaction::check_order(&studio.features, &order) {
             self.message = Some((FeatureStatus::Error, msg));
             cx.notify();
             return;
         }
+        let n = moving.len();
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, if n == 1 { "Reorder feature" } else { "Reorder features" }, cx, |ps| {
+                interaction::apply_order(ps, &order);
+                for id in &moving {
+                    if let Some(f) = ps.feature_mut(*id) {
+                        f.folder = Some(folder);
+                    }
+                }
+                // A folder with features is placed by them.
+                if let Some(fd) = ps.folder_mut(folder) {
+                    fd.after = None;
+                }
+            });
+        });
+    }
+
+    /// Drop of dragged features onto the row at `to`: moves every selected
+    /// feature when the dragged one is selected. Live (qa4 round 5 v3 s8):
+    /// a move above a feature's dependencies is done all the same; the
+    /// feature then fails on its missing selection.
+    pub(super) fn drop_features(&mut self, dragged: FeatureId, to: usize, after: bool, cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx) else { return };
+        let moving: Vec<FeatureId> = if self.selected_features.contains(&dragged) { self.selected_features.clone() } else { vec![dragged] };
+        let Some(order) = interaction::reordered_at(&studio.features, &moving, to, after) else { return };
         let n = moving.len();
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, if n == 1 { "Reorder feature" } else { "Reorder features" }, cx, |ps| interaction::apply_order(ps, &order));
@@ -2969,7 +3182,7 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector" | "moveFace") {
+        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector" | "moveFace" | "draft") {
             self.direct_edit_logic(&dialog, cx);
             return;
         }
@@ -3066,6 +3279,17 @@ impl PartStudioView {
                     changes.push(("direction", ParamValue::Query(vec![f])));
                 }
             }
+            // draftEditLogic (flipAlongPull): the first parting edge picked
+            // drafts the steeper of its faces.
+            "draft" if params.is("draftFeatureType", "PARTING_LINE") && params.is("partingLineSides", "ONE_SIDED") && params.query("partingEdges").len() == 1 && !user_set.contains("alongPull") => {
+                let units = self.doc.read(cx).session.doc.settings.units;
+                if let Some(c) = ctx
+                    && let Some(want) = noshape_model::interaction::draft_switch_face(c, &params, &units)
+                    && params.bool("alongPull") != want
+                {
+                    changes.push(("alongPull", ParamValue::Bool(want)));
+                }
+            }
             // Live L22: a new Rib's Parts holds the studio's parts.
             "rib" if !user_set.contains("parts") && params.query("parts").is_empty() => {
                 let solids: Vec<Reference> = ctx.map(|c| c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect()).unwrap_or_default();
@@ -3155,10 +3379,12 @@ impl PartStudioView {
         }
         let dialog = e.dialog.clone();
         let id = dialog.read(cx).feature.id;
-        let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
+        let Some(state) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack) else { return };
+        // Shared with the agent API: std booleanStepEditLogic, which leaves
+        // the operation and scope alone when the tool can't be built.
         let changes = {
             let d = dialog.read(cx);
-            noshape_ops::studio::boolean_edit_logic(&d.feature, &|k| d.user_set.contains(k), &touched)
+            noshape_ops::studio::boolean_choices(&d.feature, &|k| d.user_set.contains(k), state)
         };
         if changes.is_empty() {
             return;
@@ -3171,21 +3397,62 @@ impl PartStudioView {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    // The glob import brings GPUI's `test` attribute; use the built-in one.
-    use std::prelude::v1::test;
+/// Whether a box selection takes an entity of this kind (live behaviours
+/// "nav2 selection" 5): never default planes, the Origin or mate connectors,
+/// enclosed or crossed. Vertices and sketch regions only for a dialog field
+/// (`box_select`).
+pub(super) fn box_takes(k: PickKind) -> bool {
+    !matches!(k, PickKind::Plane | PickKind::Origin | PickKind::Connector)
+}
 
-    #[test]
-    fn rejection_messages_name_what_the_field_takes() {
-        assert_eq!(filter_description(QueryFilter::EDGE), "Select edges.");
-        assert_eq!(filter_description(QueryFilter::ANY_EDGE), "Select edges or sketch curves.");
-        let m = filter_description(QueryFilter::SKETCH_REGION | QueryFilter::ANY_FACE);
-        assert_eq!(m, "Select sketch regions or faces.");
-        let m = filter_description(QueryFilter::PLANE_LIKE);
-        assert_eq!(m, "Select planar faces, planes or mate connectors.");
+/// The roll items of a feature row's menu, (Roll to here, Roll to end), for
+/// row `i` with the rollback bar before row `rollback_at` (live "qa4 round 5
+/// s2 rollback follow-up"): Roll to here unless the bar is right below the
+/// feature, Roll to end while the bar isn't at the end.
+pub(super) fn roll_items(i: usize, rollback_at: usize, n_features: usize) -> (bool, bool) {
+    (rollback_at != i + 1, rollback_at < n_features)
+}
+
+/// The feature list's drag autoscroll (live "psb (10-24 k)"): px/s for a
+/// pointer at `y` over a list spanning `top..bottom` (window px), positive
+/// scrolling down. Only the vertical distance counts, also with the pointer
+/// beside the panel. Live's measured speeds (± 15 %), by the distance inside
+/// the edge (negative = past it), mean of the top and bottom edges.
+pub(super) fn list_autoscroll_speed(y: f32, top: f32, bottom: f32) -> f32 {
+    const TABLE: [(f32, f32); 12] = [
+        (-192.0, 600.0),
+        (-40.0, 370.0),
+        (-10.0, 210.0),
+        (0.0, 206.0),
+        (2.0, 205.0),
+        (10.0, 202.0),
+        (20.0, 193.0),
+        (30.0, 191.0),
+        (50.0, 175.0),
+        (58.0, 150.0),
+        (70.0, 33.0),
+        (75.0, 0.0),
+    ];
+    let speed = |d: f32| -> f32 {
+        if d >= TABLE[TABLE.len() - 1].0 {
+            return 0.0;
+        }
+        if d <= TABLE[0].0 {
+            // On past the farthest sample at the last segment's slope.
+            let ((d0, v0), (d1, v1)) = (TABLE[0], TABLE[1]);
+            return v0 + (d - d0) * (v1 - v0) / (d1 - d0);
+        }
+        let k = TABLE.windows(2).position(|w| d >= w[0].0 && d <= w[1].0).unwrap_or(0);
+        let ((d0, v0), (d1, v1)) = (TABLE[k], TABLE[k + 1]);
+        v0 + (d - d0) * (v1 - v0) / (d1 - d0)
+    };
+    if bottom - top <= 0.0 {
+        return 0.0;
     }
+    // The nearer edge decides (a list shorter than two zones: no overlap
+    // issue, the closer edge wins).
+    let (to_top, to_bottom) = (y - top, bottom - y);
+    if to_bottom <= to_top { speed(to_bottom) } else { -speed(to_top) }
 }
 
 /// How the parts left out look at transparency slider position `t` (live
@@ -3286,6 +3553,18 @@ mod field_point_tests {
         assert!(km(PickKind::Edge, &r, QueryFilter::AXIS) && km(PickKind::Edge, &r, QueryFilter::DIRECTION));
         assert!(km(PickKind::Face, &r, QueryFilter::AXIS), "a cylinder gives its axis");
         assert!(km(PickKind::SketchCurve, &r, QueryFilter::ANY_EDGE));
+        // Fillet / Chamfer take part edges only (a sketch line lying on a
+        // part's edge isn't picked); sketch-only fields take no part edges.
+        let fillet = QueryFilter::SOLID_EDGE | QueryFilter::ANY_FACE;
+        assert!(km(PickKind::Edge, &r, fillet) && !km(PickKind::SketchCurve, &r, fillet));
+        assert!(km(PickKind::SketchCurve, &r, QueryFilter::SKETCH_EDGE) && !km(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
+        // HOLE-FACE (live): Hole locations take sketch points and explicit
+        // mate connectors, not a face or a part vertex.
+        let hole = QueryFilter::SKETCH_POINT | QueryFilter::MATE_CONNECTOR;
+        assert!(!km(PickKind::Face, &r, hole) && !km(PickKind::Vertex, &r, hole));
+        assert!(km(PickKind::SketchPoint, &r, hole) && km(PickKind::Connector, &r, hole));
+        // A vertex field still takes part vertices.
+        assert!(km(PickKind::Vertex, &r, QueryFilter::VERTEX | QueryFilter::MATE_CONNECTOR));
     }
 
     #[test]
@@ -3295,5 +3574,62 @@ mod field_point_tests {
         assert!(field_takes_points(QueryFilter::POINT_LIKE));
         assert!(field_takes_points(QueryFilter::MATE_CONNECTOR));
         assert!(field_takes_points(QueryFilter::SKETCH_POINT | QueryFilter::MATE_CONNECTOR));
+    }
+}
+
+#[cfg(test)]
+mod box_take_tests {
+    use super::{PickKind, box_takes};
+    #[test]
+    fn box_takes_no_planes_origin_or_connectors() {
+        for k in [PickKind::Plane, PickKind::Origin, PickKind::Connector] {
+            assert!(!box_takes(k), "{k:?}");
+        }
+        for k in [PickKind::Face, PickKind::Edge, PickKind::SketchCurve, PickKind::SketchPoint] {
+            assert!(box_takes(k), "{k:?}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod roll_item_tests {
+    use super::roll_items;
+    #[test]
+    fn roll_items_as_live() {
+        // 30 features, the bar just under Extrude 1 (row 1).
+        assert_eq!(roll_items(1, 2, 30), (false, true), "Extrude 1: Roll to end only");
+        assert_eq!(roll_items(29, 2, 30), (true, true), "Chamfer 5, rolled back");
+        assert_eq!(roll_items(20, 2, 30), (true, true), "Fillet 5, rolled back");
+        // The bar at the end.
+        assert_eq!(roll_items(29, 30, 30), (false, false), "the last feature: neither");
+        assert_eq!(roll_items(10, 30, 30), (true, false), "a middle feature: Roll to here");
+    }
+}
+
+#[cfg(test)]
+mod autoscroll_tests {
+    use super::list_autoscroll_speed as v;
+    // Live's list: y 144..708.
+    const T: f32 = 144.0;
+    const B: f32 = 708.0;
+    fn within(got: f32, want: f32) -> bool {
+        (got - want).abs() <= 0.15 * want.abs()
+    }
+    #[test]
+    fn autoscroll_speeds_as_live() {
+        // Bottom edge: live px/s by the distance above (+) / below (−) it.
+        for (d, want) in [(70.0, 33.0), (50.0, 172.0), (30.0, 191.0), (20.0, 192.0), (10.0, 201.0), (2.0, 204.0), (-10.0, 203.0), (-40.0, 385.0), (-192.0, 600.0), (58.0, 155.0)] {
+            let got = v(B - d, T, B);
+            assert!(within(got, want), "{d} above the bottom: {got} vs live {want}");
+        }
+        // Top edge (scrolling up).
+        for (d, want) in [(50.0, -177.0), (20.0, -194.0), (10.0, -203.0), (2.0, -207.0), (-10.0, -219.0), (-40.0, -347.0), (56.0, -142.0)] {
+            let got = v(T + d, T, B);
+            assert!(within(got, want), "{d} below the top: {got} vs live {want}");
+        }
+        // No autoscroll mid-list or 100 px inside an edge.
+        for y in [450.0, B - 100.0, B - 150.0, T + 100.0] {
+            assert_eq!(v(y, T, B), 0.0, "y {y}");
+        }
     }
 }

@@ -189,8 +189,7 @@ impl DrawingEditor {
     }
 
     pub fn bom_cell_rows(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        use gpui_kit::component::checkbox::Checkbox;
-        use gpui_kit::component::input::Input;
+                use gpui_kit::component::input::Input;
         use gpui_kit::component::Sizable as _;
         use gpui_kit::prelude::FluentBuilder as _;
         let Some(Panel::BomCell { input, over, enabled, .. }) = &self.panel else { return Vec::new() };
@@ -199,7 +198,7 @@ impl DrawingEditor {
             div().w(px(220.)).when(!over, |d| d.opacity(0.5)).child(Input::new(&input).small()).into_any_element(),
             div()
                 .when(!enabled, |d| d.opacity(0.4))
-                .child(Checkbox::new("bom-override").label("Override").small().checked(over).when(enabled, |c| c.on_click(cx.listener(|this, v: &bool, _, cx| {
+                .child(crate::drawing_chrome::DrCheckbox::new("bom-override").label("Override").checked(over).when(enabled, |c| c.on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(Panel::BomCell { over, .. }) = &mut this.panel {
                         *over = *v;
                     }

@@ -214,7 +214,7 @@ fn loft_through_three_sections_is_natural() {
     let circle = |z: f64| make_wire(&[make_circle(DVec3::new(0.0, 0.0, z), DVec3::Z, 10.0).unwrap()]).unwrap();
     let c = [(-6.0, -6.0), (6.0, -6.0), (6.0, 6.0), (-6.0, 6.0)];
     let square = make_wire(&(0..4).map(|i| make_line(DVec3::new(c[i].0, c[i].1, 15.0), DVec3::new(c[(i + 1) % 4].0, c[(i + 1) % 4].1, 15.0)).unwrap()).collect::<Vec<_>>()).unwrap();
-    let opts = LoftOptions { solid: true, ruled: false, closed: false, start_points: None };
+    let opts = LoftOptions { solid: true, ..Default::default() };
     let r = loft(&[circle(0.0), square, circle(30.0)], &opts).unwrap();
     assert!(r.shape.is_valid());
     let v = volume_properties(&r.shape).unwrap().mass;

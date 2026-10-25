@@ -245,6 +245,41 @@ STATUS IM1 (2026-10-24, qa5): fixed by api (names, "<file> parts", RootAssembly)
 STATUS DOC1 / I5 (2026-10-24, qa5): fixed by api in live's layout with noshape's own product strings; only the Parasolid schema minor version differs (SCH_3801000 vs live 3801231).
 STATUS RHINO1 (2026-10-24, qa5): still "needs openNURBS" on main c59c5af9.
 STATUS MEAS1 (2026-10-24, qa5): answered by live "ui (10-23 a)"; fixed on ready/ui 6f16c117 (not on main yet).
+STATUS PAT-DIR (psb, 2026-10-24): fixed in 03864f82 (cherry-picked onto release/v0.4.7 as 424d0084): the Direction drops SELECTED/ACCENT and draws red.
+STATUS BOOL1b (psb, 2026-10-24): fixed in 39522fd2 (the row tooltip names only the sketches a feature uses), already in 88fbf8f; re-checked on agent/psb f202f693 with a disjoint union (Info): the row tooltip reads "Boolean 1". qa5, please re-run on a current build.
+STATUS ADV9 (psb, 2026-10-24): fixed on agent/psb: a Feature mirror of a gusset whose side merged into the end face no longer fails (the merged-face rule replaces the convex/concave proxy); test feature_mirror_of_a_gusset_as_live.
+STATUS FSW-move (psb, 2026-10-24): Reapply fillet done on agent/psb (fillets beside the moved faces rolled again, on by default); Direction auto-fill done in 7c3821e8.
+STATUS FSW-replace (psb, 2026-10-24): several replace-with faces done in f202f693.
+STATUS FSW-helix (psb, 2026-10-24): start/end point rules and computed revolutions/pitch (7c3821e8), start/end profiles (f202f693).
+STATUS FSW-mc (psb, 2026-10-24): connectors follow their owner part on a Transform (f202f693); To selection, empty was already in.
+STATUS FSW-pattern (psb, 2026-10-24): L40/L42 off-part instances, skip infos, curve start info (f373e2e4), no Reapply fallback (f202f693), flush walls W1–W5 (4173dc6b); circular/curve flush variants pending live.
+STATUS FSW-hole (psb, 2026-10-24): L56/L57 merge scope, auto-flip, flip clears scope, tapped-depth and pipe-tap infos done (a5ea263a, 7c3821e8, f373e2e4).
+STATUS FSW-draft (psb, 2026-10-24): parallel parting edge (7c3821e8), edit logic (focus on edit, Switch face) on agent/psb; non-planar / multi-part parting lines still open.
+STATUS FSW-pattern (psb, 2026-10-24 b): circular/curve flush variants and W4/W5 ×2 match live "psb (10-24) flush wall follow-up" (test feature_pattern_of_a_flush_wall_as_live).
+STATUS FSW-unsupported (psb, 2026-10-24): Rib draft done (live G33c 27048.1556 matched, test rib_draft_as_live); Body draft, Decal, face blend variants still open.
+STATUS FSW-fill (psb, 2026-10-24): guide rules as live "psb (10-24 d)" and Precise curve guides done (test fill_guides_as_fs); Add on surface edges (SF7) still open.
+STATUS FSW-bsurf (psb, 2026-10-24): profile arrays are driven-query rows "[None] Edges of …" (live L28: no 2-pick cap); conditions wait for the loft end-derivative rule.
+STATUS FSW-loft (psb, 2026-10-24): end conditions (Normal/Tangent to profile, Normal/Tangent to direction) applied with live's corner rule and loft.fs texts; every connection used (profiles split at the connection points), "Select a point on each profile to define a connection."; guides, path and trims still open.
+STATUS FSW-draft (psb, 2026-10-24 b): parting edges on several parts (each drafted on its own) and stepped / sloped straight parting lines (each edge's own hinge plane) done (test parting_line_draft_on_two_parts_and_steps); curved non-planar parting lines still refused.
+STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, constant normal thickness with Scale, Trim ends to the cap planes, the two failure texts (test thin_sweep_as_live).
+STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
+STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.
+STATUS FSW-loft (psb, 2026-10-24 b): Path (section-sampled like Parasolid) and guides through polygon corners done; curved-profile guides, guide continuity and trims still open.
+
+## SKV1 — ui2 — Sketch inference glyph and rubber-band end points (P1, sketch feel)
+- Source: psb app check 2026-10-24 (agent/psb build, demo document, Line tool on Top, view normal).
+- Repro: Sketch on Top, L, click, move horizontally (or down for vertical / perpendicular).
+- Expected (live sketch/51, 52): the inference glyph is the bare icon in `#333`, ~14 px, centred ~30 px right / 31 px below the
+  line's end point, no box. Both ends of the line being drawn are ~6 px `#449ccd` dots. Dashes are 1 px `#449ccd` / `#e2bc2c`.
+- Actual: the glyph sits in an 18 px light-blue box with a yellow `#ffc20e` border and a white icon at +12/+10
+  (`part_studio/sketch.rs`, "inference icon next to the cursor"); no dot at the start; a 9 px `#ffc20e` dot at the end;
+  2 px dashes reading blue / tan.
+
+## INP1 — ui — Selected text in inputs (P1)
+- Source: psb app check 2026-10-24 (extrude depth after dragging its arrow; live dialogs/extrude-06, -07).
+- Expected (live): selected text in a focused field is strong blue `rgb(51,103,209)` with white text.
+- Actual: the input selection uses `theme.selection` = `#b2ddf6` (list blue) with dark text (`main.rs` theme). Note:
+  gpui-base paints input selections only while the window is active, so it doesn't show on a bare Xvfb at all.
 STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty status bar, as live).
 STATUS BOOL1b (2026-10-24 15:3x, qa5): fixed on main; disjoint Union row tooltip reads "Boolean 1".
 STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF iso view as lines, detail clip kept; DXF R14 with CIRCLE / ELLIPSE / MTEXT and live's layer names. Hatch / dimension / table entities not covered by this drawing.
@@ -286,6 +321,7 @@ STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF i
   Part 1, each at its **own product position** (the assembly places the instances). Ours: one Part Studio "qa4-s5-asm", parts
   Part 1, Part 3, Part 2 at the assembly's positions, no assembly. (PVZ: IM1, kern row, is the same gap.)
 - Export details (minor): STL binary header "noshape-kernel st…" (live 80 zero bytes); STEP product order; Parasolid header = EXP-HDR.
+STATUS KS1 (2026-10-25, ui): the ↗ page has been on main since 97c4895c (two columns, legend, footer; the modal stays open). ready/ui adds the opener's size and live's lock spacing.
 STATUS SF2 (kern, 2026-10-24): fixed: a New extrude of several regions fuses them and unifies the faces left on one
 surface (eval.rs `fuse_named`); test kernel_robustness `adjacent_regions_extrude_without_a_seam` (8000 mm³, 6 faces).
 STATUS SF5 (kern, 2026-10-24): fixed: Move boundary on some edges of a planar straight-edged surface moves only those

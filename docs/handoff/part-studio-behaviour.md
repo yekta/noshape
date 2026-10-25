@@ -1480,3 +1480,60 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   2 parts (the slabs only touch along an edge). Needed: a shell thicken with an intersection join (e.g.
   `MakeThickSolidByJoin(shell, {}, t, tol, BRepOffset_Skin, false, false, GeomAbs_Intersection)`), then the model can pass
   the sewn shell again. Test to extend: `features_c.rs::thicken_as_live`.
+
+### Batch 5 (10-24): flush-wall variants, Rib draft, Fill guides, Boundary rows
+- **Flush wall follow-up** (live "psb (10-24) flush wall follow-up"): `flush_caps_step` takes any pure translation
+  (the instance matrix's linear part is the identity), so a curve pattern along a straight edge behaves as the linear
+  one (W1 ×2 OK 19700, ×5 fails). Circular (2° about Z) fails at ×2 through the merged-face rule. W4/W5 ×2 fail.
+- **Rib draft** (rib.fs applyDraft, live G33c 27048.155585660817): `draft_rib` drafts each rib piece's thicken caps
+  (the faces parallel to the sketch plane, or the sides along the profile for Normal to sketch plane) about the plane
+  through the rib top normal to the rib direction, pull −dir (+dir with Opposite), then cuts the part again and keeps
+  what touches the profile. Uses `detail_a::draft_robust` (OCCT draft, wedge fallback).
+- **Fill guides** (live "psb (10-24 d) fill guides"): Guides on with nothing picked is the plain fill. Precise mode
+  passes the guide curves to `BRepOffsetAPI_MakeFilling` as free curve constraints (`k::fill_surface_guided`); each
+  chain must reach the boundary at one end at least, else "Guide entities cannot be used as selected." (no field);
+  vertices mixed with curves are dropped with the FILL_CURVE_OR_POINT_CONSTRAINTS warning. Vertices alone stay point
+  constraints; Sampled samples the curves as before.
+- **Boundary surface rows:** U/V profile arrays are driven queries labelled "[None] Edges of Curve U1" (live L28: no row
+  limit). Conditions still wait for the loft end-derivative rule ("psb (10-24 b)").
+- **Loft end derivative** (live "psb (10-24) loft end derivative" + "(10-24 b)"): at every corner column 3·(CP1−CP0) =
+  m·(0.9·h + 0.1·chord)·n̂, at either end; interior columns blend the two corner values smoothly (flat at the corners);
+  a free end is natural (CP2 = mid of CP1, CP3). Tangent to profile: CP1 in the profile plane toward the matching end
+  point, 3·|ΔCP1| = m·(the chord's in-plane part) at the corners.
+- **Loft end conditions** (kernel `LoftOptions.start/end`, `LoftEnd`): natural_loft now also runs for two profiles
+  when a condition is set; `natural_bezier` clamps the end derivative. Normal (live "psb (10-24 b)"): at each face's
+  corner columns m·(0.9·h + 0.1·c)·n̂ (c, h of that column), blended between the corners with a smoothstep in the rows'
+  polar form (rows raised to cubic); Tangent: m × the column chord's in-plane part. The vector is the
+  profile's plane normal (or its sketch's), or the picked direction, turned to point along the loft. Boundary surface
+  rows in one direction use the same helper (`solid_a::loft_end`).
+- **Loft connections:** two or more connections go to the kernel as `LoftOptions.connections`; `connect_sections`
+  splits each profile at its connection points, turns it like the first, starts it at the first connection and
+  evens out the edge counts between consecutive connections, so ThruSections pairs the connections.
+- **Parting line draft:** each part separately; level edges hinge about their plane ⊥ pull, a straight edge elsewhere
+  about the plane through it closest to ⊥ pull (a stepped line hinges each face at its own height).
+- **Thin sides** (live "psb (10-24 c/e)"): an open wall's Thickness 1 lies on d × D (d the first edge as drawn, D the
+  feature's positive direction at the wall: Extrude the sketch normal, Revolve the turning direction about the axis
+  as its edge runs, Sweep along the path; Opposite direction never changes it): `thin_profiles_sided(..,
+  WallSide::Along(..))`. Extrude used the left side before (wrong: live E1 puts a +x line's wall on −y). The
+  offset-wire operation keeps `WallSide::Left`.
+- **Sweep thin** (live "psb (10-24 c) thin sweep"):
+  With Scale, Twist or a path that leaves the wall obliquely, `thin_sheet_sweep` does sweep.fs's thinSweep: sheet
+  sweep, `k::thicken` (sides from the sheet normal at a wall point), and for Trim ends on an open path a sweep past
+  both ends (one longer line with the scale / twist laws carried on for a straight path; tangent lines otherwise,
+  no laws) cut by the start plane (the wall's) and the end plane (the end cap's, or the wall plane turned as the
+  path turns). Failures read "Failed to trim result body, …" / "Failed to thicken swept body, check thickness.".
+- **Body draft** (live "psb (10-24 g)"): `detail_a::body_draft`. Faces (Parts minus excluded / picked faces / faces next to
+  held edges, caps square to the pull skipped) are drafted with `draft_robust` about the plane through the piece's far
+  end from the parting entity (or the held edges), so material is added toward the parting entity. Symmetric splits
+  the part at the parting plane, drafts each side toward it and fuses. Plane corners: `bevel_corners` cuts each
+  straight corner along the pull with the plane through its far vertex and the drafted faces' feet. Names survive a
+  plain draft (draft history); symmetric / plane corners get new names.
+- **Loft path** (live "psb (10-24 f)"): kernel `path_sections` carries the matched profiles along the path
+  (MakePipeShell), cuts Section count sections at even arc-length steps between the profiles' places on the path,
+  aligns each to the previous one (direction, start vertex) and the loft runs through all of them. Parasolid's 5 / 10
+  section volumes fit a natural cubic through those sections; ours still falls back from `natural_loft` for path lofts
+  (rows don't sit at the iso-parametric v even with Approx_IsoParametric) and comes out at the exact sweep (P3, open).
+  `LoftOptions.path`; two profiles only.
+- **Loft guides** (live "psb (10-24 f)"): `solid_a::loft_guided` for two polygon profiles and one-curve guides through
+  corners: side faces ruled between corner columns (guide or straight line, arc-length pairing), sewn with the caps.
+  Unit test `solid_a::tests::guided_loft_as_live` (kernel shapes; the live guide arcs lie in x = ±y planes).

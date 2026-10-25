@@ -289,6 +289,9 @@ fn seed_box(ev: &EvalCtx) -> Option<(DVec3, DVec3)> {
     Some(boxes.iter().fold((first.min, first.max), |(lo, hi), b| (lo.min(b.min), hi.max(b.max))))
 }
 
+/// `TOLERANCE.zeroLength` (meters).
+const ZERO_LENGTH: f64 = 1e-8;
+
 fn curve_instances(ev: &EvalCtx) -> FResult<(Vec<Instance>, Option<&'static str>)> {
     let edges = resolve_curves(ev, ev.query("edges"))?;
     if edges.is_empty() {
@@ -330,13 +333,18 @@ fn curve_instances(ev: &EvalCtx) -> FResult<(Vec<Instance>, Option<&'static str>
     }
     let spacing = if ev.is("spacingType", "DISTANCE") {
         let d = ev.length("distance")?;
-        // A closed path needs room for the gap back to the start.
-        let (need, have) = if closed { (d * n as f64, len - d) } else { (d * (n - 1) as f64, len) };
-        if n > 1 && have - need < -1e-9 {
+        // curvePattern.fs: evPathLength (the edges' exact length; the sampled
+        // path is a little shorter). A closed path keeps a gap of d back to
+        // the start, and instance i sits at path parameter d·i / (L − d) of
+        // the whole path (L for an open one), so 25 mm × 3 on a 100 mm circle
+        // lands at 120° / 240° (live L45) but 10 mm × 3 at 40° / 80°.
+        let exact = edges.iter().map(|e| e.shape.length()).sum::<Result<f64, _>>().unwrap_or(len);
+        let room = if closed { exact - d } else { exact };
+        let need = d * if closed { n as f64 } else { (n - 1) as f64 };
+        if n > 1 && room - need < -ZERO_LENGTH {
             return crate::regen::eval::err_at(&["distance"], "Cannot create a curve pattern when the entered distance is larger than the path length.");
         }
-        // Live L45: on a closed path the instances are spread equally.
-        if closed { len / n as f64 } else { d }
+        if room > 0.0 { d / room * len } else { 0.0 }
     } else if closed {
         len / n as f64
     } else if n > 1 {
@@ -832,8 +840,9 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
                 ev.replace_body(bi, res.shape, names);
                 continue;
             }
+            let merged = index_of_body(ev, &id).and_then(|bi| seed_tool(ev, f).map(|tool| merged_faces(&tool, &ev.ctx.bodies[bi], &fs)));
             if let Some(bi) = index_of_body(ev, &id)
-                && face_pattern_fails(&ev.ctx.bodies[bi], &fs, instances)
+                && face_pattern_fails(&ev.ctx.bodies[bi], &fs, instances, merged.as_deref())
             {
                 let body = ev.ctx.bodies[bi].clone();
                 ev.error_shapes = failed_instances(ev, f, &body, &fs, instances);
@@ -854,43 +863,62 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
 /// into (a coplanar face of the part running on into the tool is the
 /// feature's face too in Parasolid: the user's flush side) moved likewise.
 fn failed_instances(ev: &EvalCtx, f: FeatureId, body: &Body, fs: &[usize], instances: &[Instance]) -> Vec<Shape> {
-    let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
     let mut ghost: Vec<Shape> = Vec::new();
     match seed_tool(ev, f) {
         Some(tool) => {
-            let tool_planes: Vec<(k::Plane, DVec3, f64)> = tool
-                .faces()
-                .iter()
-                .filter_map(|t| match (t.face_surface(), t.centroid(), t.area()) {
-                    (Ok(k::Surface::Plane(pl)), Ok(c), Ok(a)) => Some((pl, c, a)),
-                    _ => None,
-                })
-                .collect();
-            for i in (0..body.faces.len()).filter(|i| !fs.contains(i)) {
-                let Ok(face) = body.shape.sub_shape(ShapeType::Face, i) else { continue };
-                let Ok(k::Surface::Plane(pl)) = face.face_surface() else { continue };
-                let n = pl.normal.normalize_or_zero();
-                // Only a face reaching past the tool's own face: one that is
-                // just the tool face (the wall's end, merged with the block's
-                // smaller end) is already in the ghost, and a second layer
-                // made the ghost too dark (qa4 gate v0.4.7).
-                let area = face.area().unwrap_or(0.0);
-                let merged = tool_planes.iter().any(|(tp, c, ta)| {
-                    tp.normal.normalize_or_zero().dot(n).abs() > 1.0 - 1e-9
-                        && (tp.origin - pl.origin).dot(n).abs() < tol
-                        && area > ta * (1.0 + 1e-6)
-                        && k::make_vertex(*c).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
-                });
-                if merged {
-                    ghost.push(face);
-                }
-            }
+            ghost.extend(merged_faces(&tool, body, fs).into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()));
             ghost.push(tool);
         }
         None => ghost.extend(fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok())),
     }
     let seed = Shape::compound(&ghost);
     instances.iter().filter_map(|inst| k::transform(&seed, &inst.t, true).ok().map(|r| r.shape)).collect()
+}
+
+/// The body's faces (not the feature's own `fs`) that carry on a face of the
+/// seed's tool: in the same plane, facing the same way, reaching past it and
+/// sharing part of its outline (Parasolid merges them; the merged face is
+/// the feature's too). A tool face wholly inside a face of the part (a rib
+/// sketched on the block's bottom plane) leaves that face as it was.
+fn merged_faces(tool: &Shape, body: &Body, fs: &[usize]) -> Vec<usize> {
+    let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
+    let tool_planes: Vec<(DVec3, DVec3, DVec3, f64, Vec<DVec3>)> = tool
+        .faces()
+        .iter()
+        .filter_map(|t| {
+            let k::Surface::Plane(pl) = t.face_surface().ok()? else { return None };
+            let c = t.centroid().ok()?;
+            // Points along its outline: line midpoints, other edges' ends.
+            let outline = t
+                .edges()
+                .iter()
+                .filter_map(|e| e.edge_info().ok())
+                .flat_map(|i| match i.curve {
+                    k::Curve::Line { .. } => vec![(i.start + i.end) * 0.5],
+                    _ => vec![i.start, i.end],
+                })
+                .collect();
+            Some((pl.origin, t.normal_at_point(c).ok()?.normalize_or_zero(), c, t.area().ok()?, outline))
+        })
+        .collect();
+    (0..body.faces.len())
+        .filter(|i| !fs.contains(i))
+        .filter(|&i| {
+            let Ok(face) = body.shape.sub_shape(ShapeType::Face, i) else { return false };
+            let Ok(k::Surface::Plane(_)) = face.face_surface() else { return false };
+            let (Ok(c), Ok(area)) = (face.centroid(), face.area()) else { return false };
+            let Ok(n) = face.normal_at_point(c) else { return false };
+            let n = n.normalize_or_zero();
+            let on_edge = |p: &DVec3| k::make_vertex(*p).is_ok_and(|v| face.edges().iter().any(|e| k::distance(e, &v).is_ok_and(|d| d.distance < tol)));
+            tool_planes.iter().any(|(o, tn, tc, ta, outline)| {
+                tn.dot(n) > 1.0 - 1e-9
+                    && (*o - c).dot(n).abs() < tol
+                    && area > ta * (1.0 + 1e-6)
+                    && k::make_vertex(*tc).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
+                    && outline.iter().any(on_edge)
+            })
+        })
+        .collect()
 }
 
 /// The solid a feature adds or removes, evaluated as New where it stands.
@@ -917,7 +945,14 @@ fn seed_tool(ev: &EvalCtx, f: FeatureId) -> Option<Shape> {
 /// with the part), the offset that moves those caps by one step (negative:
 /// into the part). None otherwise.
 fn flush_caps_step(body: &Body, faces: &[usize], instances: &[Instance]) -> Option<f64> {
-    let k::Transform::Translate(v) = instances.first()?.t else { return None };
+    // A pure translation (a curve pattern along a straight edge is one too,
+    // live "psb (10-24) flush wall follow-up").
+    let m = instances.first()?.t.matrix();
+    let rigid = glam::DMat3::from_mat4(m);
+    if !rigid.abs_diff_eq(glam::DMat3::IDENTITY, 1e-9) {
+        return None;
+    }
+    let v = m.w_axis.truncate();
     let d = v.try_normalize()?;
     let mut step = None;
     for &i in faces {
@@ -927,8 +962,9 @@ fn flush_caps_step(body: &Body, faces: &[usize], instances: &[Instance]) -> Opti
         if n.dot(d).abs() < 1.0 - 1e-9 {
             return None;
         }
-        // The cap's outward normal: an offset along it by −v·n moves it by v.
-        let s = -v.dot(n);
+        // The cap's outward normal: an offset along it by v·n moves it by v
+        // (live: a curve pattern into the part moves the end cap in).
+        let s = v.dot(n);
         if step.is_some_and(|x: f64| (x - s).abs() > 1e-12) {
             return None;
         }
@@ -959,11 +995,40 @@ const NO_GEOMETRY_FROM_FEATURES: &str = "Selected features do not create any geo
 /// - an instance's boundary leaves the surfaces it has to attach to (a hole
 ///   on the block's corner, its edges on the side planes, patterned along
 ///   them: qa4 F12).
-fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance]) -> bool {
+fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance], merged: Option<&[usize]>) -> bool {
     let sel: BTreeSet<u32> = faces.iter().map(|f| *f as u32).collect();
     let Ok(ef) = body.shape.edge_faces() else { return false };
     let probes: Vec<DMat4> = [instances.first(), instances.last()].into_iter().flatten().map(|i| i.t.matrix()).collect();
     let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
+    // A face the seed merged into is the feature's too, so the copies carry
+    // it along: each must land in the plane of another face of the part,
+    // facing the same way, to merge into it (qa5 ADV9: a gusset on the
+    // bracket's end mirrored to the other end). Onto its own plane (G45's
+    // full-width rib patterned along the block, "lp wall over"'s floor,
+    // the fins' sides) or into empty space (the fins' front wall moved
+    // back) it can't be placed.
+    let merged = merged.filter(|m| !m.is_empty());
+    let planes: Vec<(usize, DVec3, DVec3)> = match merged {
+        Some(_) => (0..body.faces.len())
+            .filter_map(|i| {
+                let face = body.shape.sub_shape(ShapeType::Face, i).ok()?;
+                let k::Surface::Plane(_) = face.face_surface().ok()? else { return None };
+                let c = face.centroid().ok()?;
+                Some((i, c, face.normal_at_point(c).ok()?.normalize_or_zero()))
+            })
+            .collect(),
+        None => Vec::new(),
+    };
+    for &m in merged.unwrap_or_default() {
+        let Some(&(_, c, n)) = planes.iter().find(|p| p.0 == m) else { continue };
+        let lands = |t: &DMat4| {
+            let (c2, n2) = (t.transform_point3(c), t.transform_vector3(n).normalize_or_zero());
+            planes.iter().any(|&(i, o, nf)| i != m && nf.dot(n2) > 1.0 - 1e-9 && (o - c2).dot(n2).abs() < tol)
+        };
+        if !probes.iter().all(lands) {
+            return true;
+        }
+    }
     let (mut convex, mut concave) = (false, false);
     for (e, fs) in ef.iter().enumerate() {
         let [a, b] = fs[..] else { continue };
@@ -972,13 +1037,21 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance]) -> b
             (false, true) => (b, a),
             _ => continue,
         };
-        match edge_convexity(body, e, s as usize, o as usize) {
-            1 => convex = true,
-            -1 => concave = true,
-            _ => {}
+        // Merged faces are judged above.
+        if merged.is_some_and(|m| m.contains(&(o as usize))) {
+            continue;
         }
-        if convex && concave {
-            return true;
+        // Without the seed's tool, merged faces show as a boss meeting the
+        // part along concave edges and its continuations along convex ones.
+        if merged.is_none() {
+            match edge_convexity(body, e, s as usize, o as usize) {
+                1 => convex = true,
+                -1 => concave = true,
+                _ => {}
+            }
+            if convex && concave {
+                return true;
+            }
         }
         // The edge, moved by the instances, still on the other face's surface.
         let (Ok(edge), Ok(other)) = (body.shape.sub_shape(ShapeType::Edge, e), body.shape.sub_shape(ShapeType::Face, o as usize)) else { continue };

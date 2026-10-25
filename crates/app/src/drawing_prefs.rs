@@ -56,7 +56,7 @@ impl DrawingPrefsView {
             .w(px(SELECT_W))
             .h(px(34.))
             .pl(px(10.))
-            .pr(px(9.))
+            .pr(px(10.))
             .flex()
             .items_center()
             .justify_between()
@@ -67,8 +67,8 @@ impl DrawingPrefsView {
             .cursor_pointer()
             .text_size(px(14.))
             .text_color(pal.text)
-            .child(div().truncate().child(label))
-            .child(div().text_size(px(8.)).text_color(rgb(0x555555)).child("▼"))
+            .child(div().flex_1().min_w_0().truncate().child(label))
+            .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb_static(0x777777)))
             .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 if this.open.take().is_some() || this.closed_at.is_some_and(|t| t.elapsed().as_millis() < 300) {
