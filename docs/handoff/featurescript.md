@@ -783,3 +783,20 @@ FILLET_FAILED). Host: `opFillet` now runs the Fillet evaluator (every option: cr
 partial, variable), so the std route's fillet geometry equals native by construction; the oracle there compares
 std's preprocessing and errors. Built-in evaluators' Onshape messages map back to their ErrorStringEnum member in
 FS ops (`host::error_code`). filletEditLogic runs in the dialog (`fillet_editing_logic_runs_std`).
+
+**Hole (done, pending checks):** dialog identical to std hole.fs in the V3 dialog (tests/std_oracle.rs `sync` keeps std's
+legacy mirrors style/endStyle/showThreadClass = the V2 fields; std params no state shows are its V1 fields and are
+skipped; large dialogs sample single changes + 1500 random states instead of all pairs). Fixes: tap drill default =
+std's (5 mm / 0.25 in; the table sets the real one), computed depth's bounds, std's row order (computed depth before
+blind depth). Lookup tables compared as cascades (`table_tree`): FS "Lookup Table" annotations now keep the
+source order of the table literals (studio.rs `dyn_level` + `source_entries`, constants followed across imports),
+which is Onshape's dropdown order (live L58) and gives levels without a default their first source entry; the
+custom_features lookup test now expects source order. `hole_regenerates_as_std` (12 cases) passes; host fixes:
+evAxis `allowSketchPoints` (sketch point -> its sketch normal), opHole failures thrown as the bare ErrorStringEnum
+(hole.fs catches them as such). Known std-route gap: a hole that hits nothing — live flags Merge scope (native does),
+std throws bare HOLE_NO_HITS (faulty field not compared in those 2 cases). Tapped depth linkage now follows std's
+adjustDepthAndThreadParameters exactly (`hole_tables::link_tapped_depths`: of the two fields not edited, the later
+one in Depth / Tapped depth / Tap clearance whose new value stays positive; live L49/L50 still hold);
+`hole_tapped_depths_link_as_std` runs std's holeEditLogic against it. Hole's other editing logic stays native.
+App: the native boolean edit logic is skipped at its caller (part_studio/mod.rs) for std-editing-logic features,
+so api's shared `noshape_ops::studio::boolean_edit_logic` refactor merges cleanly.

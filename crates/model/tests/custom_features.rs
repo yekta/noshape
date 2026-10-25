@@ -866,7 +866,8 @@ export const boltSize = defineFeature(function(context is Context, id is Id, def
     let noshape_model::params::ParamKind::Lookup { table } = &t.params[0].kind else { panic!("{:?}", t.params[0].id) };
     use noshape_model::features::hole_tables as ht;
     assert_eq!(ht::table_level_name(table, &[]), Some("Standard"));
-    assert_eq!(ht::table_levels(table, &[]).iter().map(|o| o.0.as_str()).collect::<Vec<_>>(), ["ANSI", "ISO"]);
+    // Source order, as Onshape's dropdowns (live L58), not the map's sorted keys.
+    assert_eq!(ht::table_levels(table, &[]).iter().map(|o| o.0.as_str()).collect::<Vec<_>>(), ["ISO", "ANSI"]);
     assert_eq!(ht::complete_path(table, &[]), ["ISO", "M4"]);
     assert_eq!(ht::complete_path(table, &["ANSI".to_string()]), ["ANSI", "#8"]);
 

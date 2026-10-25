@@ -365,7 +365,8 @@ pub fn hole() -> FeatureType {
             .hints(rem | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showThreadClassV2") && v.is("threadStandard", "ISO")),
         ParamSpec::num("holeDiameterV3", "Diameter", NumSpec::positive_length(5.0, 0.25).bounded(1e-5, 500.0)).hints(rem | Hints::CAN_BE_TOLERANT_DIAMETER),
-        ParamSpec::num("tapDrillDiameterV3", "Tap drill diameter", NumSpec::positive_length(4.2, 0.201).bounded(1e-5, 500.0))
+        // hole.fs HOLE_DIAMETER_BOUNDS; the standard's value comes from the table.
+        ParamSpec::num("tapDrillDiameterV3", "Tap drill diameter", NumSpec::positive_length(5.0, 0.25).bounded(1e-5, 500.0))
             .hints(rem | Hints::CAN_BE_TOLERANT)
             .visible(|v| v.bool("hasClearance")),
         ParamSpec::enum_(
@@ -404,12 +405,13 @@ pub fn hole() -> FeatureType {
         ParamSpec::num("cSinkAngleV3", "Countersink angle", NumSpec::angle(90.0, 0.1, 179.9))
             .hints(rem | Hints::CAN_BE_TOLERANT)
             .visible(|v| v.is("styleV2", "C_SINK")),
+        // hole.fs order: the computed depth (Up to …) before the blind one.
+        ParamSpec::num("holeDepthComputedV3", "Depth", NumSpec::positive_length(12.0, 0.5).bounded(1e-5, 500.0))
+            .hints(Hints::READ_ONLY | Hints::CAN_BE_TOLERANT | Hints::UNCONFIGURABLE)
+            .visible(up_to),
         ParamSpec::num("holeDepthV3", "Depth", NumSpec::positive_length(12.0, 0.5).bounded(1e-5, 500.0))
             .hints(rem | Hints::CAN_BE_TOLERANT)
             .visible(|v| v.is("endStyleV2", "BLIND")),
-        ParamSpec::num("holeDepthComputedV3", "Depth", NumSpec::positive_length(12.0, 0.5))
-            .hints(Hints::READ_ONLY | Hints::CAN_BE_TOLERANT | Hints::UNCONFIGURABLE)
-            .visible(up_to),
         ParamSpec::enum_("tipAngleStyle", "Tip angle style", &[("DEGREE118", "118 deg"), ("DEGREE135", "135 deg"), ("FLAT", "Flat"), ("CUSTOM", "Custom")])
             .hints(Hints::SHOW_LABEL)
             .visible(move |v| !through(v)),

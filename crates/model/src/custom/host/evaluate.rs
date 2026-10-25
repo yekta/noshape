@@ -89,10 +89,17 @@ fn ev_line(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 
 fn ev_axis(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
+    // `allowSketchPoints` (std hole.fs computeAxes): a sketch point's axis
+    // runs along its sketch's normal.
+    let points = field(&a, "allowSketchPoints").as_bool() == Some(true);
     let (o, d) = on_first(i, &cx, &a, "axis", "NO_ROTATION_AXIS", |q, e| match e {
         Ent::Connector(c) => {
             let c = &q.st.ctx.connectors[*c];
             Some((c.origin, c.z))
+        }
+        Ent::SketchVertex(s, id) if points => {
+            let sk = &q.st.ctx.sketches[*s];
+            Some((sk.frame.to_world(sk.sketch.point(noshape_sketch::EntityId(*id))?), sk.frame.normal))
         }
         Ent::Datum(_) | Ent::Plane(_) => q.plane(e).map(|p| (p.origin, p.normal)),
         _ => entity_axis(q, e).map(|(o, d)| {

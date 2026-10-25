@@ -15,7 +15,7 @@ use noshape_model::sketch_feature::SketchData;
 use noshape_units::{ExprValue, UnitPrefs};
 
 /// Core features whose dialogs equal std's in every state.
-const STRICT: &[&str] = &["extrude", "fillet"];
+const STRICT: &[&str] = &["extrude", "fillet", "hole"];
 
 /// Hints only built-in dialogs carry (UI behaviour the std expresses
 /// elsewhere, e.g. `GROUP_LABEL` for std's collapsible groups).
@@ -24,6 +24,44 @@ const BUILTIN_ONLY_HINTS: Hints = Hints(Hints::GROUP_LABEL.0 | Hints::DRIVEN_QUE
 
 fn std_dialog(name: &str) -> Vec<ParamSpec> {
     custom::std_feature::std_dialog(name).unwrap_or_else(|| panic!("{name}: no std dialog"))
+}
+
+/// A lookup table's levels (names, options, defaults) as a digest: the
+/// built-in tables and std's own must be the same cascade.
+fn table_tree(table: &str) -> String {
+    let s = table_text(table);
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    s.hash(&mut h);
+    format!("{:016x} ({} bytes)", h.finish(), s.len())
+}
+
+/// Where two tables' cascades first differ (for the report).
+fn table_diff(a: &str, b: &str) -> String {
+    let (x, y) = (table_text(a), table_text(b));
+    let i = x.bytes().zip(y.bytes()).position(|(p, q)| p != q).unwrap_or(x.len().min(y.len()));
+    let w = |s: &str| s.get(i.saturating_sub(120)..(i + 80).min(s.len())).unwrap_or("").to_string();
+    format!("    std:     …{}…\n    builtin: …{}…\n", w(&x), w(&y))
+}
+
+fn table_text(table: &str) -> String {
+    use noshape_model::features::hole_tables as ht;
+    fn walk(table: &str, path: &mut Vec<String>, out: &mut String) {
+        let opts = ht::table_levels(table, path);
+        if opts.is_empty() {
+            return;
+        }
+        out.push_str(&format!("{:?}:{:?}={:?}[", ht::table_level_name(table, path), opts.iter().map(|o| &o.0).collect::<Vec<_>>(), ht::table_level_default(table, path)));
+        for (o, _) in opts {
+            path.push(o);
+            walk(table, path, out);
+            path.pop();
+        }
+        out.push(']');
+    }
+    let mut s = String::new();
+    walk(table, &mut Vec::new(), &mut s);
+    s
 }
 
 /// Everything about a parameter except its visibility.
@@ -39,11 +77,15 @@ fn describe(p: &ParamSpec) -> String {
         // QueryFilterCompound); filters are compared by reading the std.
         ParamKind::Query { max_picks, .. } => format!("query max {max_picks:?}"),
         ParamKind::Array { item, item_label } => format!("array {item_label:?} [{}]", item.iter().map(describe).collect::<Vec<_>>().join(", ")),
-        ParamKind::Lookup { table } => format!("lookup {table}"),
+        ParamKind::Lookup { table } => format!("lookup {}", table_tree(table)),
         ParamKind::Sketch => "sketch".into(),
         ParamKind::Reference { kind } => format!("reference {kind:?}"),
     };
-    let hints = Hints(p.hints.0 & !BUILTIN_ONLY_HINTS.0);
+    let mut hints = Hints(p.hints.0 & !BUILTIN_ONLY_HINTS.0);
+    // A read-only field can't be configured either way.
+    if hints.has(Hints::READ_ONLY) {
+        hints = Hints(hints.0 & !Hints::UNCONFIGURABLE.0);
+    }
     format!("{} {:?} {kind} hints {:#x} {:?} {:?}", p.id, p.label, hints.0, p.description, p.item_template)
 }
 
@@ -67,12 +109,18 @@ fn states(t: &[ParamSpec]) -> Vec<ParamValues> {
             _ => None,
         })
         .collect();
+    // Every pair while that stays cheap (each state evaluates std's
+    // conditions in the interpreter); big dialogs (Hole) get more random states.
+    let pairs = choices.len() <= 24;
     let mut out = vec![base.clone()];
     for (i, (a, av)) in choices.iter().enumerate() {
         for x in av {
             let mut v = base.clone();
             v.set(a, x.clone());
             out.push(v.clone());
+            if !pairs {
+                continue;
+            }
             for (b, bv) in &choices[i + 1..] {
                 for y in bv {
                     let mut w = v.clone();
@@ -83,7 +131,7 @@ fn states(t: &[ParamSpec]) -> Vec<ParamValues> {
         }
     }
     let mut seed = 0x9e37_79b9_7f4a_7c15_u64;
-    for _ in 0..400 {
+    for _ in 0..if pairs { 400 } else { 1500 } {
         let mut v = base.clone();
         for (id, vals) in &choices {
             seed ^= seed << 13;
@@ -96,19 +144,61 @@ fn states(t: &[ParamSpec]) -> Vec<ParamValues> {
     out
 }
 
+/// std's own invariants between definition fields a dialog state must
+/// keep (hole.fs syncHoleDefinitionV2Params: the legacy fields follow the
+/// V2 ones).
+fn sync(name: &str, v: &mut ParamValues) {
+    if name == "hole" {
+        for (legacy, v2) in [("style", "styleV2"), ("endStyle", "endStyleV2"), ("showThreadClass", "showThreadClassV2")] {
+            if let Some(x) = v.get(v2).cloned() {
+                v.set(legacy, x);
+            }
+        }
+    }
+}
+
 fn compare(name: &str) -> String {
     let std = std_dialog(name);
     let builtin = &noshape_model::features::get(name).unwrap_or_else(|| panic!("{name}: no built-in")).params;
     let mut report = String::new();
+    // Visibility in every state; std's parameters that no state shows are
+    // its internal or legacy fields (hole.fs V1 values), not dialog rows.
+    let mut ever = std::collections::HashSet::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut states_report = String::new();
+    for mut v in states(&std) {
+        sync(name, &mut v);
+        let (a, b) = (shown(&std, &v), shown(builtin, &v));
+        ever.extend(a.iter().copied());
+        if a != b && seen.insert((a.clone(), b.clone())) && seen.len() <= 12 {
+            let state: Vec<String> = v.0.iter().filter_map(|(k, x)| match x {
+                ParamValue::Bool(true) => Some(k.clone()),
+                ParamValue::Enum(e) => Some(format!("{k}={e}")),
+                _ => None,
+            }).collect();
+            let only_std: Vec<_> = a.iter().filter(|i| !b.contains(i)).collect();
+            let only_b: Vec<_> = b.iter().filter(|i| !a.contains(i)).collect();
+            states_report.push_str(&format!("  in {state:?}: shown only by std {only_std:?}, only by builtin {only_b:?}\n"));
+        }
+    }
+    let in_builtin = |p: &ParamSpec| builtin.iter().any(|b| b.id == p.id && !b.hints.has(Hints::ALWAYS_HIDDEN));
     // Always-hidden parameters (std's `domain`) aren't part of the dialog.
-    let visible = |p: &&ParamSpec| !p.hints.has(Hints::ALWAYS_HIDDEN);
-    let fs_all: Vec<String> = std.iter().filter(visible).map(describe).collect();
-    let b_all: Vec<String> = builtin.iter().filter(visible).map(describe).collect();
+    let fs_all: Vec<String> = std.iter().filter(|p| !p.hints.has(Hints::ALWAYS_HIDDEN) && (ever.contains(p.id) || in_builtin(p))).map(describe).collect();
+    let b_all: Vec<String> = builtin.iter().filter(|p| !p.hints.has(Hints::ALWAYS_HIDDEN)).map(describe).collect();
     let id = |s: &String| s.split(' ').next().unwrap_or_default().to_string();
     for x in &fs_all {
         match b_all.iter().find(|y| id(y) == id(x)) {
             None => report.push_str(&format!("  only std:     {x}\n")),
-            Some(y) if y != x => report.push_str(&format!("  std:     {x}\n  builtin: {y}\n")),
+            Some(y) if y != x => {
+                report.push_str(&format!("  std:     {x}\n  builtin: {y}\n"));
+                let table = |specs: &[ParamSpec]| specs.iter().find(|p| p.id == id(x)).and_then(|p| match &p.kind {
+                    ParamKind::Lookup { table } => Some(*table),
+                    _ => None,
+                });
+                if let (Some(a), Some(b)) = (table(&std), table(builtin)) {
+                    report.push_str(&table_diff(a, b));
+                }
+            }
             _ => {}
         }
     }
@@ -119,20 +209,7 @@ fn compare(name: &str) -> String {
     if report.is_empty() && ids(&fs_all) != ids(&b_all) {
         report.push_str(&format!("  order std:     {:?}\n  order builtin: {:?}\n", ids(&fs_all), ids(&b_all)));
     }
-    let mut seen = std::collections::HashSet::new();
-    for v in states(&std) {
-        let (a, b) = (shown(&std, &v), shown(builtin, &v));
-        if a != b && seen.insert((a.clone(), b.clone())) && seen.len() <= 12 {
-            let state: Vec<String> = v.0.iter().filter_map(|(k, x)| match x {
-                ParamValue::Bool(true) => Some(k.clone()),
-                ParamValue::Enum(e) => Some(format!("{k}={e}")),
-                _ => None,
-            }).collect();
-            let only_std: Vec<_> = a.iter().filter(|i| !b.contains(i)).collect();
-            let only_b: Vec<_> = b.iter().filter(|i| !a.contains(i)).collect();
-            report.push_str(&format!("  in {state:?}: shown only by std {only_std:?}, only by builtin {only_b:?}\n"));
-        }
-    }
+    report.push_str(&states_report);
     if report.is_empty() { report } else { format!("== {name}\n{report}") }
 }
 
@@ -253,11 +330,12 @@ fn body_ref(r: &RegenResult, i: usize) -> Reference {
 
 /// What the last feature did: its status, message, faulty fields and the
 /// bodies afterwards (kind, faces, edges, volume or area).
-fn outcome(r: &RegenResult) -> String {
+fn outcome(r: &RegenResult, faulty: bool) -> String {
     let s = r.display.features.last().expect("a feature");
     let status = match s.status {
         FeatureStatus::Ok => "ok".to_string(),
-        other => format!("{other:?} {:?} {:?}", s.message.clone().unwrap_or_default(), s.faulty),
+        other if faulty => format!("{other:?} {:?} {:?}", s.message.clone().unwrap_or_default(), s.faulty),
+        other => format!("{other:?} {:?}", s.message.clone().unwrap_or_default()),
     };
     let mut bodies: Vec<String> = r
         .context
@@ -283,13 +361,18 @@ fn only(case: &str) -> bool {
 
 /// Regenerate natively and by std; the outcomes must agree.
 fn same_as_std(case: &str, ty: &str, s: &Studio) -> Option<String> {
+    same_as_std_but(case, ty, s, true)
+}
+
+/// [`same_as_std`]; `faulty`: compare the fields marked at fault too.
+fn same_as_std_but(case: &str, ty: &str, s: &Studio, faulty: bool) -> Option<String> {
     let _g = ROUTE.lock().unwrap_or_else(|e| e.into_inner());
     custom::std_feature::set_std_route(&[]);
-    let native = outcome(&s.regen());
+    let native = outcome(&s.regen(), faulty);
     custom::std_feature::set_std_route(&[ty]);
     let r = s.regen();
     custom::std_feature::set_std_route(&[]);
-    let std = outcome(&r);
+    let std = outcome(&r, faulty);
     if native == std {
         return None;
     }
@@ -768,5 +851,128 @@ fn fillet_editing_logic_runs_std() {
     let item = got.iter().find(|x| x.starts_with("vertexSettings=")).unwrap_or_else(|| panic!("{got:?}"));
     for want in ["vertexRadius", "Expr", "0.007", "vertexOtherRadius", "0.009", "vertexFlipAsymmetric\": Bool(true)", "variableRho", "0.3"] {
         assert!(item.contains(want), "{want}: {item}");
+    }
+}
+
+/// Hole scenarios: a sketch point on the 40 mm cube's top face at (20, 20)
+/// (or on Top, under the cube), the cube as merge scope.
+fn hole_cases() -> Vec<(&'static str, Studio)> {
+    let mut cases = Vec::new();
+    let hole = |name: &'static str, on_top: bool, set: fn(&mut ParamValues)| {
+        let mut s = Studio::new();
+        s.cube();
+        let r = s.regen();
+        let plane = if on_top { face_at(&r, DVec3::new(20.0, 20.0, 40.0)) } else { Reference::Plane(DatumPlane::Top) };
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = sk.add_point(DVec2::new(0.02, 0.02));
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![plane]));
+            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        });
+        let cube = body_ref(&r, 0);
+        s.add("hole", |pv| {
+            pv.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));
+            pv.set("scope", ParamValue::Query(vec![cube]));
+            pv.set("unitsSystem", en("METRIC"));
+            set(pv);
+            noshape_model::features::hole_tables::apply_table_to_params(pv);
+        });
+        (name, s)
+    };
+    cases.push(hole("simple blind", true, |_| {}));
+    cases.push(hole("simple blind, flat tip", true, |p| p.set("tipAngleStyle", en("FLAT"))));
+    cases.push(hole("through all", true, |p| p.set("endStyleV2", en("THROUGH"))));
+    cases.push(hole("up to next", true, |p| p.set("endStyleV2", en("UP_TO_NEXT"))));
+    cases.push(hole("counterbore", true, |p| {
+        p.set("styleV2", en("C_BORE"));
+        p.set("cBoreDiameterV3", expr("12 mm"));
+        p.set("cBoreDepthV3", expr("4 mm"));
+    }));
+    cases.push(hole("countersink", true, |p| {
+        p.set("styleV2", en("C_SINK"));
+        p.set("cSinkDiameterV3", expr("12 mm"));
+    }));
+    cases.push(hole("counterbore too narrow", true, |p| {
+        p.set("styleV2", en("C_BORE"));
+        p.set("cBoreDiameterV3", expr("4 mm"));
+    }));
+    cases.push(hole("tapped M5", true, |p| p.set("isoHoleTableEx", ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M5".into(), "0.8 mm".into()]))));
+    cases.push(hole("from the sketch plane below", false, |p| p.set("startStyle", en("SKETCH"))));
+    cases.push(hole("from the part, sketch below", false, |_| {}));
+    cases.push(hole("opposite direction", true, |p| p.set("oppositeDirection", ParamValue::Bool(true))));
+    let mut s = Studio::new();
+    s.cube();
+    s.add("hole", |p| p.set("unitsSystem", en("METRIC")));
+    cases.push(("nothing selected", s));
+    cases
+}
+
+#[test]
+fn hole_regenerates_as_std() {
+    // A hole that hits nothing: live flags Merge scope (behaviours.md
+    // "Hole" 2154, native too); std's opHole throws the bare HOLE_NO_HITS
+    // and the field is marked outside FeatureScript.
+    let no_hits = ["from the part, sketch below", "opposite direction"];
+    let report: String = hole_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std_but(name, "hole", s, !no_hits.contains(name))).collect();
+    assert!(report.is_empty(), "native Hole differs from std:\n{report}");
+}
+
+/// std's holeEditLogic keeps a blind tapped hole's Depth, Tapped depth and
+/// Tap clearance linked (adjustDepthAndThreadParameters); the native rule
+/// (hole_tables::link_tapped_depths, live L49/L50) must pick the same field.
+#[test]
+fn hole_tapped_depths_link_as_std() {
+    use noshape_model::features::hole_tables::link_tapped_depths;
+    let units = UnitPrefs::default();
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.02, 0.02));
+    let top = face_at(&r, DVec3::new(20.0, 20.0, 40.0));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![top]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let cube = body_ref(&r, 0);
+    let base = move |depth: &str, tapped: &str, clearance: &str| {
+        let mut v = ParamValues::default();
+        fill_defaults(&noshape_model::features::get("hole").expect("hole").params, &mut v, &UnitPrefs::default());
+        v.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));
+        v.set("scope", ParamValue::Query(vec![cube.clone()]));
+        v.set("unitsSystem", en("METRIC"));
+        v.set("isoHoleTableEx", ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M6".into(), "1.00 mm".into()]));
+        noshape_model::features::hole_tables::apply_table_to_params(&mut v);
+        v.set("holeDepthV3", expr(depth));
+        v.set("tappedDepthV3", expr(tapped));
+        v.set("tapClearance", expr(clearance));
+        // As the previous run of holeEditLogic left them (syncHoleDefinitionV3Params).
+        v.set("holeDepth", expr(depth));
+        v.set("tappedDepth", expr(tapped));
+        v
+    };
+    let num = |p: &ParamValue| match p {
+        ParamValue::Expr(e) => e.cached.map(|q| q.value).unwrap_or_else(|| noshape_units::evaluate_as(&e.text, if e.text.ends_with("mm") { noshape_units::Dim::LENGTH } else { noshape_units::Dim::UNITLESS }, &units, &std::collections::BTreeMap::new()).unwrap().value),
+        other => panic!("{other:?}"),
+    };
+    // (field edited, its new value) from Depth 20, Tapped depth 5, clearance 15.
+    for (field, value) in [("holeDepthV3", "25 mm"), ("holeDepthV3", "3 mm"), ("tapClearance", "2"), ("tappedDepthV3", "8 mm"), ("tappedDepthV3", "30 mm")] {
+        let old = base("20 mm", "5 mm", "15");
+        let mut new = old.clone();
+        new.set(field, expr(value));
+        let native: Vec<(String, f64)> = link_tapped_depths(&old, &new, &units).into_iter().map(|(k, v)| (k.to_string(), num(&v))).collect();
+        s.ps.features.retain(|f| f.type_id != "hole");
+        s.add("hole", |pv| *pv = new.clone());
+        let index = s.ps.features.len() - 1;
+        let spec: Vec<String> = ["locations", "scope", "unitsSystem", "isoHoleTableEx", "holeDepthV3", "tappedDepthV3", "tapClearance"].iter().map(|x| x.to_string()).collect();
+        let out = custom::std_feature::editing_logic(&s.ps, index, &ConfigValues::default(), &s.units, &RegenOptions::default(), &old, &new, &spec, false).expect("holeEditLogic ran");
+        let std: Vec<(String, f64)> = ["holeDepthV3", "tappedDepthV3", "tapClearance"]
+            .iter()
+            .filter(|k| **k != field)
+            .filter_map(|k| out.get(k).map(|v| (k.to_string(), num(v))))
+            .filter(|(k, v)| (v - num(new.get(k).unwrap())).abs() > 1e-9)
+            .collect();
+        let close = native.len() == std.len() && native.iter().zip(&std).all(|(a, b)| a.0 == b.0 && (a.1 - b.1).abs() < 1e-9);
+        assert!(close, "{field} = {value}: native {native:?}, std {std:?}");
     }
 }
