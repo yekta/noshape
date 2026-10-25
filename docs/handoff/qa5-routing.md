@@ -465,3 +465,16 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - Pending live s11: auto-update vs Update button, title block editing, iso angular value, live PDF/DXF for comparison.
 - **DRAG-RUNAWAY confirmed by live (skb)**: Onshape moves only the dragged instance; all others keep their exact pose (live REST
   before/after for 10- and 19-cube Planar stacks); server ≈ 21 ms per drag step regardless of stack size.
+## PCB-CONVERT — fs — Flex PCB model › Convert of a thin plate makes 6 parts (P3)
+- api, 2026-10-24 (e2e `flex_pcb_model_features`): a 60 × 20 × 1 mm plate (sketch rectangle, Extrude 1 mm), then Flex PCB model with
+  Process Convert, Parts and surfaces to convert = the plate, other fields default → 6 solid parts "Part 1" … "Part 6"
+  (`body:<pcbStart>.2114097152` … `.2114097157`); Finish flex PCB model (Unfold none) then reports its Info note. Expected (live,
+  to be checked): one flex PCB part. Priority P3 (lead). Repro: `cargo test -p noshape-ops --test e2e flex_pcb_model_features`
+  and print `query_parts` after the pcbStart call.
+
+## FLAT-HOLE — model (lead to assign) — Flatten surfaces of a planar face with a hole is wrong
+- api, 2026-10-25: an 80 × 40 × 20 mm block with a Ø10 through hole; Flatten surfaces of its top (or bottom) face → 20 boundary
+  loops, flat area 4396 mm² for 3121.5 mm² in 3D, strain up to 24, flat size 59 × 84 mm. The same block without the hole, and every
+  hole-free face, flattens exactly (1 loop, areas equal, 40 × 80 mm). Expected: an identical flat face (no strain), 2 loops.
+  `noshape_model::flatten::flatten_faces` (moved verbatim from the app's flatten_tool.rs; the app's Flatten surfaces is the same).
+  Repro: `analysis_flatten {"faces": [<top face id>]}` on `block_with_hole` (ops e2e).

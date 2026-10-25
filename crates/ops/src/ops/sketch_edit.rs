@@ -45,6 +45,13 @@ fn op(verb: &'static str, summary: &'static str, description: &'static str, fiel
 pub fn ops() -> Vec<Op> {
     vec![
         op(
+            "copy_entities",
+            "Copy sketch entities and paste them into this or another sketch",
+            "Copy sketch entities (the curve menu), then Paste sketch entities in the target sketch: the curves with the constraints among them, moved by `offset` (sketch coordinates of the target; the app pastes where they were and lets you drag them). Returns the pasted entities as `created`.",
+            vec![req("entities", ids(), "Entity ids (`entity:…`) to copy."), opt("to", s(), "Sketch to paste into (default: the same one)."), opt("offset", point(), "[x, y] move (lengths; default [0, 0]).")],
+            copy_entities,
+        ),
+        op(
             "trim",
             "Trim sketch curves (the Trim tool)",
             "Each click in `points` removes the piece of the curve under it, up to the nearest intersections (a curve crossing nothing is deleted; a lone point is deleted). With `path`, the pointer is dragged along the points instead and every curve the path crosses is trimmed. Give `entities` (same length as `points`) to say which curve each click is on; otherwise the curve within 6 µm of the click is used.",
@@ -542,6 +549,32 @@ fn circular_pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         Ok(())
     })
+}
+
+fn copy_entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let mut src = target(od, tab, a)?;
+    let ids = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut src, false, false).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
+    let clip = src.data.sketch.extract(&ids);
+    let mut t = match a.opt_str("to")? {
+        Some(to) => {
+            let v = json!({ "sketch": to });
+            target(od, tab, &Args { op: a.op, value: &v }).map_err(|e| e.with_param("to"))?
+        }
+        None => src,
+    };
+    let offset = match a.get("offset") {
+        Some(o) => point_value(o, &t.units).map_err(|e| e.with_param("offset"))?,
+        None => DVec2::ZERO,
+    };
+    let before = existing(&t);
+    let mut ed = editor(&t);
+    if !ed.paste_entities(&mut t.data, &clip, offset) {
+        return Err(OpError::param("entities", "nothing to copy (no curves of the sketch)"));
+    }
+    let (id, tab) = (t.id, t.tab);
+    commit(od, t)?;
+    Ok(sketch_state(od, tab, id, Some(&before))?.into())
 }
 
 fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -61,6 +61,15 @@ pub fn markdown() -> String {
             if !op.description.is_empty() {
                 out.push_str(&format!("\n{}\n", op.description.trim()));
             }
+            let examples = crate::examples::of(&op.tool_name());
+            if !examples.is_empty() {
+                out.push_str("\nExamples:\n\n```json\n");
+                for e in examples {
+                    out.push_str(e);
+                    out.push('\n');
+                }
+                out.push_str("```\n");
+            }
             if !op.fields.is_empty() {
                 out.push_str("\n| field | type | | description |\n|---|---|---|---|\n");
                 for f in &op.fields {

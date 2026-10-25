@@ -76,7 +76,7 @@ impl PartStudioView {
     /// Apply new ids: the configuration and the chosen values follow.
     fn change_config_ids(&mut self, old: &str, new_id: &str, renames: &[(String, String)], cx: &mut Context<Self>) {
         let (o, n, r) = (old.to_string(), new_id.to_string(), renames.to_vec());
-        self.edit_config("Edit FeatureScript IDs", cx, |ps| ps.configuration.change_ids(&o, &n, &r));
+        self.edit_config(noshape_ops::config::EDIT_IDS, cx, |ps| ps.configuration.change_ids(&o, &n, &r));
         if let Some(v) = self.config_values.0.remove(old) {
             let v = renames.iter().find(|(a, _)| *a == v).map(|(_, b)| b.clone()).unwrap_or(v);
             self.config_values.0.insert(new_id.to_string(), v);

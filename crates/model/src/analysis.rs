@@ -729,3 +729,106 @@ mod tests {
         assert!((k[mid].0 - 0.5).abs() < 0.05 && k[mid].1.abs() < 0.05, "{:?}", k[mid]);
     }
 }
+
+/// What the curvature color map shows (its Curvature menu).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CurvatureKind {
+    #[default]
+    Gaussian,
+    Mean,
+    MaxRadius,
+    MinRadius,
+}
+
+impl CurvatureKind {
+    pub const ALL: [CurvatureKind; 4] = [CurvatureKind::Gaussian, CurvatureKind::Mean, CurvatureKind::MaxRadius, CurvatureKind::MinRadius];
+
+    pub fn label(self, unit: &str) -> String {
+        match self {
+            CurvatureKind::Gaussian => format!("Gaussian (1/{unit}^2)"),
+            CurvatureKind::Mean => format!("Mean (1/{unit})"),
+            CurvatureKind::MaxRadius => format!("Max radius ({unit})"),
+            CurvatureKind::MinRadius => format!("Min radius ({unit})"),
+        }
+    }
+
+    /// The value at a point with principal curvatures k1, k2 (1/m), in
+    /// display units (`m`: meters per unit); `None` where nothing curves.
+    pub fn value(self, (k1, k2): (f64, f64), m: f64, flat: f64) -> Option<f64> {
+        if k1.abs() < flat && k2.abs() < flat {
+            return None;
+        }
+        Some(match self {
+            CurvatureKind::Gaussian => k1 * k2 * m * m,
+            CurvatureKind::Mean => (k1 + k2) * 0.5 * m,
+            CurvatureKind::MaxRadius => 1.0 / k1.abs().min(k2.abs()).max(flat) / m,
+            CurvatureKind::MinRadius => 1.0 / k1.abs().max(k2.abs()) / m,
+        })
+    }
+}
+
+/// Per mesh vertex: the curvature color map's value (`kind`, display units
+/// with `meters_per_unit`), `None` where the part is flat. Flat means both
+/// principal curvatures under 1e-3 / the part's box diagonal.
+pub fn curvature_values(mesh: &crate::display::MeshBuffers, size: f64, kind: CurvatureKind, meters_per_unit: f64) -> Vec<Option<f64>> {
+    principal_curvatures(&mesh.positions, &mesh.normals, &mesh.indices).into_iter().map(|k| kind.value(k, meters_per_unit, 1e-3 / size.max(1e-9))).collect()
+}
+
+
+/// Draft analysis: how a mesh vertex draws from the mold (Onshape's legend).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DraftClass {
+    /// Draft angle under the minimum.
+    Steep,
+    /// Material in the way when pulling the face out.
+    Undercut,
+    /// Draft at least the minimum toward the pull direction.
+    Side1,
+    /// Draft at least the minimum away from it.
+    Side2,
+}
+
+/// Each vertex's draft angle (radians, asin(n · pull)) and class, for
+/// pull direction `pull`, minimum draft `min_angle` (radians) and, with
+/// `undercut`, undercut detection (rays along the pull hitting the part).
+/// `size`: the part's size (ray offsets).
+pub fn draft_classes(mesh: &crate::display::MeshBuffers, size: f64, pull: DVec3, min_angle: f64, undercut: bool) -> Vec<(f64, DraftClass)> {
+    let p3 = |v: [f32; 3]| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64);
+    let d = pull.normalize_or(DVec3::Z);
+    let lim = min_angle.sin();
+    let size = size.max(1e-9);
+    let blocked: Vec<bool> = if undercut {
+        let tris: Vec<[DVec3; 3]> = mesh.indices.as_chunks::<3>().0.iter().filter_map(|t| Some([p3(*mesh.positions.get(t[0] as usize)?), p3(*mesh.positions.get(t[1] as usize)?), p3(*mesh.positions.get(t[2] as usize)?)])).collect();
+        let rays: Vec<(DVec3, DVec3)> = mesh
+            .positions
+            .iter()
+            .zip(&mesh.normals)
+            .map(|(p, n)| {
+                let n = p3(*n).normalize_or_zero();
+                let dir = if n.dot(d) >= 0.0 { d } else { -d };
+                // Start just off the surface so the face itself isn't hit.
+                (p3(*p) + n * size * 1e-5, dir)
+            })
+            .collect();
+        crate::thickness::cast_rays(tris, &rays, size * 1e-5).into_iter().map(|h| h.is_some()).collect()
+    } else {
+        vec![false; mesh.positions.len()]
+    };
+    mesh.normals
+        .iter()
+        .zip(blocked)
+        .map(|(n, blocked)| {
+            let s = p3(*n).normalize_or_zero().dot(d);
+            let class = if s.abs() < lim - 1e-9 {
+                DraftClass::Steep
+            } else if blocked {
+                DraftClass::Undercut
+            } else if s > 0.0 {
+                DraftClass::Side1
+            } else {
+                DraftClass::Side2
+            };
+            (s.clamp(-1.0, 1.0).asin(), class)
+        })
+        .collect()
+}

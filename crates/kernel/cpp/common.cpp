@@ -22,6 +22,8 @@
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepTools.hxx>
+#include <BRepTools_WireExplorer.hxx>
+#include <TopoDS.hxx>
 #include <BRep_Builder.hxx>
 #include <ShapeFix_Shape.hxx>
 #include <TopExp_Explorer.hxx>
@@ -613,7 +615,7 @@ namespace {
 
 // Ten moments: ∫1, ∫x, ∫y, ∫z, ∫x², ∫y², ∫z², ∫xy, ∫yz, ∫zx (over the
 // volume, by the divergence theorem, or over the area). The McMaster screw:
-// 254.42322 mm³ (Onshape 254.40378; OCCT Gauss 268.69, adaptive 254.1–255.7).
+// 254.418923 mm³ (Onshape 254.40378; OCCT Gauss 268.69, adaptive 254.1–255.7).
 using Moments = std::array<double, 10>;
 
 constexpr double kGaussX[8] = {-0.9602898564975363, -0.7966664774136267, -0.5255324099163290, -0.1834346424956498,
@@ -637,13 +639,13 @@ bool hard_to_integrate(const TopoDS_Face& f)
 
 // g(u, v): the moments' integrands times the area element (volume: F·(Su×Sv)
 // with div F the moment's function; area: the function times |Su×Sv|).
-void integrand(const BRepAdaptor_Surface& s, double u, double v, bool volume, Moments& g)
+void integrand(const BRepAdaptor_Surface& s, double u, double v, bool volume, const gp_XYZ& o, Moments& g)
 {
   gp_Pnt p;
   gp_Vec su, sv;
   s.D1(u, v, p, su, sv);
   const gp_Vec n = su.Crossed(sv);
-  const double x = p.X(), y = p.Y(), z = p.Z();
+  const double x = p.X() - o.X(), y = p.Y() - o.Y(), z = p.Z() - o.Z();
   if (volume)
   {
     g = {(x * n.X() + y * n.Y() + z * n.Z()) / 3, x * x / 2 * n.X(), y * y / 2 * n.Y(), z * z / 2 * n.Z(), x * x * x / 3 * n.X(),
@@ -655,7 +657,7 @@ void integrand(const BRepAdaptor_Surface& s, double u, double v, bool volume, Mo
 }
 
 // ∫ g(u, v) du over [a, b] in segments of at most `step`.
-Moments inner(const BRepAdaptor_Surface& s, double a, double b, double v, double step, bool volume)
+Moments inner(const BRepAdaptor_Surface& s, double a, double b, double v, double step, bool volume, const gp_XYZ& o)
 {
   Moments   out{};
   const int n = std::max(1, (int)std::ceil(std::abs(b - a) / step));
@@ -665,9 +667,54 @@ Moments inner(const BRepAdaptor_Surface& s, double a, double b, double v, double
     for (int i = 0; i < 8; ++i)
     {
       Moments g;
-      integrand(s, s0 + h * (kGaussX[i] + 1) / 2, v, volume, g);
+      integrand(s, s0 + h * (kGaussX[i] + 1) / 2, v, volume, o, g);
       for (int j = 0; j < 10; ++j)
         out[(size_t)j] += g[(size_t)j] * kGaussW[i] * h / 2;
+    }
+  }
+  return out;
+}
+
+// Gaps in a face's boundary: where an edge's pcurve ends away from where
+// the next edge's starts (a tolerant vertex of an import: g50's shell, 0.02
+// mm). Parasolid closes them with straight (u, v) segments, so face areas
+// and volumes count the sliver between; OCCT's integrators skip them and
+// get a result that depends on where u is measured from (F18 of g50:
+// -0.0617 mm², live 82.8478429). Each gap: from the end (u, v) of one edge
+// to the start of the next, in the face's forward orientation. Gaps that
+// are no gap in space (ends a period apart) are not counted.
+std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> uv_gaps(const TopoDS_Face& face)
+{
+  std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> out;
+  const TopoDS_Face f = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
+  TopLoc_Location   loc;
+  const occ::handle<Geom_Surface> S = BRep_Tool::Surface(f, loc);
+  if (S.IsNull())
+    return out;
+  const double uper = S->IsUPeriodic() ? S->UPeriod() : 0, vper = S->IsVPeriodic() ? S->VPeriod() : 0;
+  for (TopExp_Explorer w(f, TopAbs_WIRE); w.More(); w.Next())
+  {
+    std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> ends;
+    for (BRepTools_WireExplorer we(TopoDS::Wire(w.Current()), f); we.More(); we.Next())
+    {
+      const TopoDS_Edge& e = we.Current();
+      double             a, b;
+      const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, f, a, b);
+      if (c.IsNull())
+        return {};
+      if (e.Orientation() == TopAbs_REVERSED)
+        std::swap(a, b);
+      ends.emplace_back(c->Value(a), c->Value(b));
+    }
+    for (size_t i = 0; i < ends.size() && ends.size() > 1; ++i)
+    {
+      const gp_Pnt2d p = ends[i].second, q = ends[(i + 1) % ends.size()].first;
+      const double   du = std::abs(q.X() - p.X()), dv = std::abs(q.Y() - p.Y());
+      if ((uper > 0 && du > uper / 4) || (vper > 0 && dv > vper / 4))
+        continue;
+      const double gap = S->Value(p.X(), p.Y()).Distance(S->Value(q.X(), q.Y()));
+      if (gap > 1e-9 && gap < 1e-3)
+        out.emplace_back(p, q);
     }
   }
   return out;
@@ -676,7 +723,7 @@ Moments inner(const BRepAdaptor_Surface& s, double a, double b, double v, double
 // The face's moments by Green's formula: ∬ g du dv = ∮ G dv, G(u, v) = ∫ g du
 // from the face's lowest u (on a u-periodic surface whole periods once, then
 // the remainder). Segments: a sixteenth of a period, or half a knot span.
-Moments face_moments(const TopoDS_Face& face, bool volume)
+Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_XYZ())
 {
   const TopoDS_Face   f = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
   BRepAdaptor_Surface s(f, false);
@@ -697,10 +744,10 @@ Moments face_moments(const TopoDS_Face& face, bool volume)
   const double vst   = std::min(vstep, std::max(v1 - v0, 1e-300) / 4) / 2;
   const auto G = [&](double u, double v) {
     const double turns = uper ? std::floor((u - u0) / period) : 0;
-    Moments      out   = inner(s, u0, u - turns * period, v, ust, volume);
+    Moments      out   = inner(s, u0, u - turns * period, v, ust, volume, o);
     if (turns != 0)
     {
-      const Moments full = inner(s, u0, u0 + period, v, ust, volume);
+      const Moments full = inner(s, u0, u0 + period, v, ust, volume, o);
       for (int j = 0; j < 10; ++j)
         out[(size_t)j] += turns * full[(size_t)j];
     }
@@ -759,6 +806,15 @@ Moments face_moments(const TopoDS_Face& face, bool volume)
       }
     }
   }
+  // The boundary's gaps, closed with straight (u, v) segments.
+  for (const auto& [p, q] : uv_gaps(f))
+    for (int i = 0; i < 8; ++i)
+    {
+      const double  t = (kGaussX[i] + 1) / 2;
+      const Moments g = G(p.X() + (q.X() - p.X()) * t, p.Y() + (q.Y() - p.Y()) * t);
+      for (int j = 0; j < 10; ++j)
+        total[(size_t)j] += g[(size_t)j] * (q.Y() - p.Y()) * kGaussW[i] / 2;
+    }
   if (volume && face.Orientation() == TopAbs_REVERSED)
     for (double& m : total)
       m = -m;
@@ -766,6 +822,22 @@ Moments face_moments(const TopoDS_Face& face, bool volume)
     for (double& m : total)
       m = -m;
   return total;
+}
+
+// Moments about `o` as moments about the origin.
+Moments unshift(const Moments& m, const gp_XYZ& o)
+{
+  const double x = o.X(), y = o.Y(), z = o.Z(), v = m[0];
+  return {v,
+          m[1] + x * v,
+          m[2] + y * v,
+          m[3] + z * v,
+          m[4] + 2 * x * m[1] + x * x * v,
+          m[5] + 2 * y * m[2] + y * y * v,
+          m[6] + 2 * z * m[3] + z * z * v,
+          m[7] + x * m[2] + y * m[1] + x * y * v,
+          m[8] + y * m[3] + z * m[2] + y * z * v,
+          m[9] + z * m[1] + x * m[3] + z * x * v};
 }
 
 // Moments as properties (inertia about the origin, as BRepGProp keeps it).
@@ -787,7 +859,7 @@ bool split_wrapping(const TopoDS_Shape& s, TopoDS_Compound& rest, std::vector<To
   for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
   {
     const TopoDS_Face& f = TopoDS::Face(e.Current());
-    if (hard_to_integrate(f))
+    if (hard_to_integrate(f) || !uv_gaps(f).empty())
       wrapping.push_back(f);
     else
       B.Add(rest, f);
@@ -804,15 +876,27 @@ GProp_GProps volume_props(const TopoDS_Shape& s)
   if (!has_mesh_faces(s) && split_wrapping(s, rest, wrapping))
   {
     // Every face by the same divergence field: OCCT's per-face terms use
-    // other fields, so they can't be mixed with these.
+    // other fields, so they can't be mixed with these. The field is centred
+    // on the shape's box: with gaps between faces (a tolerant import) the
+    // result depends on that centre, and so doesn't change when the part
+    // moves.
+    Bnd_Box box;
+    BRepBndLib::Add(s, box);
+    gp_XYZ o;
+    if (!box.IsVoid())
+    {
+      double a0, b0, c0, a1, b1, c1;
+      box.Get(a0, b0, c0, a1, b1, c1);
+      o = gp_XYZ((a0 + a1) / 2, (b0 + b1) / 2, (c0 + c1) / 2);
+    }
     Moments m{};
     for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
     {
-      const Moments f = face_moments(TopoDS::Face(e.Current()), true);
+      const Moments f = face_moments(TopoDS::Face(e.Current()), true, o);
       for (int j = 0; j < 10; ++j)
         m[(size_t)j] += f[(size_t)j];
     }
-    return MomentProps(m);
+    return MomentProps(unshift(m, o));
   }
   // OCCT's two integrators fail on different surfaces: plain Gauss on rational
   // B-splines (a NURBS cylinder: +0.9 %), the adaptive one on strongly

@@ -58,7 +58,15 @@ impl Op {
     }
 
     pub fn full_description(&self) -> String {
-        if self.description.is_empty() { self.summary.to_string() } else { format!("{}\n\n{}", self.summary, self.description) }
+        let mut s = if self.description.is_empty() { self.summary.to_string() } else { format!("{}\n\n{}", self.summary, self.description) };
+        let examples = crate::examples::of(&self.tool_name());
+        if !examples.is_empty() {
+            s.push_str("\n\nExamples (arguments; ids like \"edge:…\" come from the query and sketch tools):");
+            for e in examples {
+                s.push_str(&format!("\n  {e}"));
+            }
+        }
+        s
     }
 
     pub fn input_schema(&self) -> Value {
