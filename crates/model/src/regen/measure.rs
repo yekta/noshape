@@ -377,6 +377,8 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
                 let t = angle.unwrap_or_else(|| std::f64::consts::FRAC_PI_2 - d.angle_between(n).min(std::f64::consts::PI - d.angle_between(n)));
                 if is_right_angle(t) {
                     out.push(("Perp line and plane angle".into(), Measurement::Angle(t)));
+                    // Live (AN1 c): a perpendicular line reads it too.
+                    out.push(("Curvature deviation".into(), Measurement::Percent(0.0)));
                     out.extend(min());
                     out.extend(face_area());
                     out.extend(max());

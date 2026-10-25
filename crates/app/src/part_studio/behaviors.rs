@@ -913,8 +913,7 @@ impl PartStudioView {
     /// the selection; Ctrl+drag deselects (Onshape).
     pub(super) fn box_select(&mut self, ids: &[u32], deselect: bool, cx: &mut Context<Self>) {
         let Some(built) = &self.built else { return };
-        // Live (selection/22–23): a box takes the default planes it covers too.
-        let targets: Vec<PickTarget> = ids.iter().filter_map(|id| built.picks.get(*id).cloned()).filter(|t| t.kind != PickKind::Origin).collect();
+        let targets: Vec<PickTarget> = ids.iter().filter_map(|id| built.picks.get(*id).cloned()).filter(|t| box_takes(t.kind)).collect();
         if let Some(e) = &self.edit {
             let dialog = e.dialog.clone();
             if let Some((_, filter, _)) = dialog.read(cx).active_filter() {
@@ -3477,6 +3476,14 @@ impl PartStudioView {
     }
 }
 
+/// Whether a box selection takes an entity of this kind (live behaviours
+/// "nav2 selection" 5): never default planes, the Origin or mate connectors,
+/// enclosed or crossed. Vertices and sketch regions only for a dialog field
+/// (`box_select`).
+pub(super) fn box_takes(k: PickKind) -> bool {
+    !matches!(k, PickKind::Plane | PickKind::Origin | PickKind::Connector)
+}
+
 /// The roll items of a feature row's menu, (Roll to here, Roll to end), for
 /// row `i` with the rollback bar before row `rollback_at` (live "qa4 round 5
 /// s2 rollback follow-up"): Roll to here unless the bar is right below the
@@ -3623,6 +3630,20 @@ mod field_point_tests {
         assert!(field_takes_points(QueryFilter::POINT_LIKE));
         assert!(field_takes_points(QueryFilter::MATE_CONNECTOR));
         assert!(field_takes_points(QueryFilter::SKETCH_POINT | QueryFilter::MATE_CONNECTOR));
+    }
+}
+
+#[cfg(test)]
+mod box_take_tests {
+    use super::{PickKind, box_takes};
+    #[test]
+    fn box_takes_no_planes_origin_or_connectors() {
+        for k in [PickKind::Plane, PickKind::Origin, PickKind::Connector] {
+            assert!(!box_takes(k), "{k:?}");
+        }
+        for k in [PickKind::Face, PickKind::Edge, PickKind::SketchCurve, PickKind::SketchPoint] {
+            assert!(box_takes(k), "{k:?}");
+        }
     }
 }
 

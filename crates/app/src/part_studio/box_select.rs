@@ -5,8 +5,8 @@
 //! crosses its border, so it takes only what lies wholly inside; a crossing
 //! box everything drawn in it. Here the same from the display geometry
 //! projected to the screen: faces by their triangles, edges and sketch
-//! curves by their polylines, vertices and points, planes by their
-//! rectangles, sketch regions by their triangles.
+//! curves by their polylines, vertices and points, sketch regions by
+//! their triangles. Default planes are never taken (live "nav2 selection").
 
 use super::PartStudioView;
 use glam::{DVec2, DVec3};
@@ -90,14 +90,11 @@ impl PartStudioView {
         let rect = Rect { lo: a.min(b), hi: a.max(b) };
         let s = |p: DVec3| vp.project(p);
         let p3 = |a: &[f32; 3]| DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
-        // A polyline (closed or not) and a triangle list in world space.
-        let shape = |pts: &[DVec3], tris: &[[DVec3; 3]], closed: bool| -> Option<Shape> {
+        // A polyline and a triangle list in world space.
+        let shape = |pts: &[DVec3], tris: &[[DVec3; 3]]| -> Option<Shape> {
             let points: Option<Vec<DVec2>> = pts.iter().map(|p| s(*p)).collect();
             let points = points?;
-            let mut segments: Vec<(DVec2, DVec2)> = points.windows(2).map(|w| (w[0], w[1])).collect();
-            if closed && points.len() > 2 {
-                segments.push((points[points.len() - 1], points[0]));
-            }
+            let segments: Vec<(DVec2, DVec2)> = points.windows(2).map(|w| (w[0], w[1])).collect();
             let triangles: Option<Vec<[DVec2; 3]>> = tris.iter().map(|t| Some([s(t[0])?, s(t[1])?, s(t[2])?])).collect();
             let mut points = points;
             let triangles = triangles?;
@@ -118,36 +115,30 @@ impl PartStudioView {
             for (fi, r) in body.face_refs.iter().enumerate() {
                 let Some(&(first, count)) = m.face_ranges.get(fi) else { continue };
                 let Some(idx) = m.indices.get(first as usize..(first + count) as usize) else { continue };
-                keep(r, shape(&[], &tris_of(&m.positions, idx), false), &mut out);
+                keep(r, shape(&[], &tris_of(&m.positions, idx)), &mut out);
             }
             for (ei, r) in body.edge_refs.iter().enumerate() {
                 let pts: Vec<DVec3> = m.edges.get(ei).map(|e| e.iter().map(p3).collect()).unwrap_or_default();
-                keep(r, shape(&pts, &[], false), &mut out);
+                keep(r, shape(&pts, &[]), &mut out);
             }
             for (vi, r) in body.vertex_refs.iter().enumerate() {
                 let pts: Vec<DVec3> = m.vertices.get(vi).map(p3).into_iter().collect();
-                keep(r, shape(&pts, &[], false), &mut out);
+                keep(r, shape(&pts, &[]), &mut out);
             }
-        }
-        for pl in self.display.planes.iter().filter(|p| !p.hidden) {
-            let f = &pl.frame;
-            let (x, y) = (f.x * pl.half_width, f.y * pl.half_height);
-            let c = [f.origin - x - y, f.origin + x - y, f.origin + x + y, f.origin - x + y];
-            keep(&pl.reference, shape(&c, &[[c[0], c[1], c[2]], [c[0], c[2], c[3]]], true), &mut out);
         }
         for sk in self.display.sketches.iter().filter(|s| !s.hidden) {
             for c in &sk.curves {
                 let pts: Vec<DVec3> = c.points.iter().map(p3).collect();
-                keep(&Reference::SketchEntity { sketch: sk.feature, entity: c.entity }, shape(&pts, &[], false), &mut out);
+                keep(&Reference::SketchEntity { sketch: sk.feature, entity: c.entity }, shape(&pts, &[]), &mut out);
             }
             for r in super::sketch_points(sk) {
                 if let Some(p) = built.picks.ids_for(&r).iter().find_map(|id| built.picks.get(*id)?.anchor) {
-                    keep(&r, shape(&[p], &[], false), &mut out);
+                    keep(&r, shape(&[p], &[]), &mut out);
                 }
             }
             for g in &sk.regions {
                 let r = Reference::SketchRegion { sketch: sk.feature, key: g.key.clone() };
-                keep(&r, shape(&[], &tris_of(&g.positions, &g.indices), false), &mut out);
+                keep(&r, shape(&[], &tris_of(&g.positions, &g.indices)), &mut out);
             }
         }
         let mut ids: Vec<u32> = out.iter().flat_map(|r| built.picks.ids_for(r).iter().copied()).collect();
