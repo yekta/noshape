@@ -10,13 +10,7 @@ use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::{Table, TableCorner, TableKind};
 
 /// BOM / cut list tables showing the same rows (same kind and view).
-fn same_list(a: &TableKind, b: &TableKind) -> bool {
-    match (a, b) {
-        (TableKind::Bom { view: x, .. }, TableKind::Bom { view: y, .. }) | (TableKind::CutList { view: x, .. }, TableKind::CutList { view: y, .. }) => x == y,
-        (TableKind::Custom { .. }, TableKind::Custom { .. }) => noshape_model::drawing::tables::CustomTableKey::of(a) == noshape_model::drawing::tables::CustomTableKey::of(b),
-        _ => false,
-    }
-}
+use noshape_scene::drawing_tools::table_edit as te;
 
 /// Selected cells of a table: two corners (row, column), rows counted below
 /// the title (the header is row 0), like `TableLayout::cell_at`.
@@ -121,53 +115,18 @@ impl DrawingEditor {
         let mut out = Vec::new();
         let id = t.id;
         let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return out };
-        // Data rows shown (the header is one displayed row).
-        let shown = l.ys.len().saturating_sub(1 + l.title as usize + 1);
-        let [a, b] = t.rows.unwrap_or([0, shown]);
-        let header_bottom = matches!(t.kind, TableKind::Bom { bottom_to_top: true, .. } | TableKind::CutList { bottom_to_top: true, .. } | TableKind::Custom { bottom_to_top: true, .. });
-        // Live custom-tables-14: "Split custom table below".
-        let split_label = match t.kind {
-            TableKind::Custom { .. } => "Split custom table below",
-            TableKind::Bom { .. } => "Split BOM table below",
-            TableKind::CutList { .. } => "Split cut list",
-            _ => "Split table below",
-        };
-        if let Some((r, _)) = cell {
-            let data_r = if header_bottom { r } else { r.wrapping_sub(1) };
-            if data_r < shown && data_r + 1 < shown {
-                let split = a + data_r + 1;
-                let width = l.xs.last().copied().unwrap_or(0.0) - l.xs.first().copied().unwrap_or(0.0);
-                out.push(MenuEntry::item(split_label, move |t, _, cx| {
-                    let Some(orig) = t.current_sheet().table(id).cloned() else { return };
-                    let nid = t.current_sheet().next_table_id();
-                    let mut second = orig.clone();
-                    second.id = nid;
-                    second.rows = Some([split, b]);
-                    // Beside the first part: to the right, else to the left.
-                    let (sw, _) = t.current_sheet().size.size_mm();
-                    let right_edge = l.xs.last().copied().unwrap_or(0.0) + width + 6.0;
-                    second.position[0] += if right_edge <= sw { width + 6.0 } else { -(width + 6.0) };
-                    t.edit_sheet("Split table", cx, |s| {
-                        if let Some(x) = s.table_mut(id) {
-                            x.rows = Some([a, split]);
-                        }
-                        s.tables.push(second);
-                    });
-                }));
-            }
+        if let Some(split) = cell.and_then(|(r, _)| te::split_at(t, &l, r)) {
+            let l = l.clone();
+            out.push(MenuEntry::item(te::split_label(&t.kind), move |t, _, cx| {
+                t.edit_sheet("Split table", cx, |s| {
+                    te::split_table(s, id, &l, split);
+                });
+            }));
         }
-        if a > 0 {
-            let kind = t.kind.clone();
+        if t.rows.is_some_and(|r| r[0] > 0) {
             out.push(MenuEntry::item("Unsplit table", move |t, _, cx| {
-                let kind = kind.clone();
                 t.edit_sheet("Unsplit table", cx, |s| {
-                    // A later part continues after this one?
-                    let more = s.tables.iter().any(|x| x.id != id && same_list(&x.kind, &kind) && x.rows.is_some_and(|r| r[0] == b));
-                    if let Some(prev) = s.tables.iter_mut().find(|x| x.id != id && same_list(&x.kind, &kind) && x.rows.is_some_and(|r| r[1] == a)) {
-                        let start = prev.rows.map(|r| r[0]).unwrap_or(0);
-                        prev.rows = if start == 0 && !more { None } else { Some([start, b]) };
-                    }
-                    s.tables.retain(|x| x.id != id);
+                    te::unsplit_table(s, id, &l);
                 });
             }));
         }

@@ -5,6 +5,7 @@
 //! sheets, templates and title block layouts.
 
 use crate::drawing_scene::Overlay;
+use noshape_scene::drawing_tools::table_edit as te;
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -175,19 +176,9 @@ impl DrawingEditor {
                 }
             }
             Tool::GdtLeader { id } => {
-                let leader = match self.snap_at(c).or_else(|| self.any_point(c)) {
-                    Some(p) => Leader { view: Some(p.view), point: p.p, nodes: Vec::new(), ..Default::default() },
-                    None => Leader { view: None, point: c, nodes: Vec::new(), ..Default::default() },
-                };
+                let leader = noshape_scene::drawing_tools::annotation_edit::leader_to(&self.pk(), c);
                 let start = self.leader_from.take().unwrap_or_default();
-                self.edit_sheet("Add leader", cx, |s| match s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
-                    Some(AnnotationKind::Gdt { leaders, .. }) => leaders.push(leader),
-                    Some(AnnotationKind::Note { style, .. }) => style.leaders.push(Leader { start, ..leader }),
-                    Some(AnnotationKind::Weld { spec, .. }) => spec.leaders.push(leader),
-                    Some(AnnotationKind::Balloon { callout, .. }) => callout.leaders.push(leader),
-                    Some(AnnotationKind::SurfaceFinish { leaders, .. }) => leaders.push(leader),
-                    _ => {}
-                });
+                self.edit_sheet("Add leader", cx, |s| noshape_scene::drawing_tools::annotation_edit::add_leader(s, id, leader, start));
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Annotation(id)];
             }
@@ -297,13 +288,7 @@ impl DrawingEditor {
             AnnotationKind::Gdt { leaders, .. } => {
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
-                        t.edit_sheet("Remove leaders", cx, |s| {
-                            if let Some(AnnotationKind::Gdt { leaders, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                leaders.clear();
-                            }
-                        })
-                    }));
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
             // Callouts and surface finish symbols (help callout_balloon,
@@ -311,47 +296,31 @@ impl DrawingEditor {
             AnnotationKind::Balloon { callout, .. } => {
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !callout.leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
-                        t.edit_sheet("Remove leaders", cx, |s| {
-                            if let Some(AnnotationKind::Balloon { callout, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                callout.leaders.clear();
-                            }
-                        })
-                    }));
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
             AnnotationKind::SurfaceFinish { leaders, .. } => {
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
-                        t.edit_sheet("Remove leaders", cx, |s| {
-                            if let Some(AnnotationKind::SurfaceFinish { leaders, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                leaders.clear();
-                            }
-                        })
-                    }));
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
             AnnotationKind::Weld { spec, .. } => {
                 out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_weld_edit(id, w, cx)));
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !spec.leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
-                        t.edit_sheet("Remove leaders", cx, |s| {
-                            if let Some(AnnotationKind::Weld { spec, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                spec.leaders.clear();
-                            }
-                        })
-                    }));
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
-            &AnnotationKind::RadialDimension { view, center, radius, angle, .. } => {
-                let (d, w) = ([angle.cos(), angle.sin()], [-angle.sin(), angle.cos()]);
-                let jog = [center[0] + d[0] * radius * 0.55 + w[0] * radius * 0.2, center[1] + d[1] * radius * 0.55 + w[1] * radius * 0.2];
-                out.push(MenuEntry::item("Foreshorten", move |t, _, cx| set_kind(t, "Foreshorten", AnnotationKind::ForeshortenedRadial { view, center, radius, angle, jog }, cx)));
+            AnnotationKind::RadialDimension { .. } => {
+                if let Some(k) = noshape_scene::drawing_tools::annotation_edit::foreshortened(&a.kind) {
+                    out.push(MenuEntry::item("Foreshorten", move |t, _, cx| set_kind(t, "Foreshorten", k.clone(), cx)));
+                }
             }
-            &AnnotationKind::ForeshortenedRadial { view, center, radius, angle, .. } => {
-                out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| set_kind(t, "Remove foreshorten", AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle, dim_line: false }, cx)));
+            AnnotationKind::ForeshortenedRadial { .. } => {
+                if let Some(k) = noshape_scene::drawing_tools::annotation_edit::unforeshortened(&a.kind) {
+                    out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| set_kind(t, "Remove foreshorten", k.clone(), cx)));
+                }
             }
             &AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct } => {
                 let label = if direct { "Display as foreshortened diameter" } else { "Display as direct diameter" };
@@ -398,13 +367,7 @@ impl DrawingEditor {
                 let opts = a.target.as_deref().cloned().unwrap_or_default();
                 let set = |hide: bool, all: bool| {
                     move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
-                        t.edit_sheet(if hide { "Hide dimension" } else { "Show dimensions" }, cx, |s| {
-                            for x in s.annotations.iter_mut().filter(|x| (all || x.id == id) && matches!(x.kind, AnnotationKind::DatumTarget { .. })) {
-                                if let Some(o) = x.target.as_mut() {
-                                    o.hide_dims = hide;
-                                }
-                            }
-                        })
+                        t.edit_sheet(if hide { "Hide dimension" } else { "Show dimensions" }, cx, |s| noshape_scene::drawing_tools::annotation_edit::set_target_dims_hidden(s, id, hide, all))
                     }
                 };
                 if opts.origin.is_some() && !opts.hide_dims {
@@ -425,18 +388,21 @@ impl DrawingEditor {
         let id = t.id;
         let Some((r, c)) = cell.map(|(r, c)| t.anchor_cell(r, c)) else { return out };
         out.push(MenuEntry::item("Format cell...", move |t, w, cx| t.open_cell_format_panel(id, r, c, w, cx)));
+        let layout = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned();
         let m = t.merge_at(r, c).unwrap_or(CellMerge { row: r, col: c, rows: 1, cols: 1 });
-        let ncols = self.built.as_ref().and_then(|b| b.table_layout(id)).map(|l| l.xs.len() - 1).unwrap_or(1);
-        let nrows = self.built.as_ref().and_then(|b| b.table_layout(id)).map(|l| l.ys.len() - 1 - l.title as usize).unwrap_or(1);
-        if m.col + m.cols < ncols {
-            out.push(MenuEntry::item("Merge with cell right", move |t, _, cx| t.edit_table(id, "Merge cells", cx, |t| {
-                t.merge_cells((m.row, m.col), (m.row + m.rows - 1, m.col + m.cols));
-            })));
-        }
-        if m.row + m.rows < nrows {
-            out.push(MenuEntry::item("Merge with cell below", move |t, _, cx| t.edit_table(id, "Merge cells", cx, |t| {
-                t.merge_cells((m.row, m.col), (m.row + m.rows, m.col + m.cols - 1));
-            })));
+        let (nrows, ncols) = layout.as_ref().map(te::counts).unwrap_or((1, 1));
+        if let Some(l) = layout.clone() {
+            if m.col + m.cols < ncols {
+                let l = l.clone();
+                out.push(MenuEntry::item("Merge with cell right", move |t, _, cx| t.edit_table(id, "Merge cells", cx, |t| {
+                    te::merge_right(t, &l, r, c);
+                })));
+            }
+            if m.row + m.rows < nrows {
+                out.push(MenuEntry::item("Merge with cell below", move |t, _, cx| t.edit_table(id, "Merge cells", cx, |t| {
+                    te::merge_below(t, &l, r, c);
+                })));
+            }
         }
         if t.merge_at(r, c).is_some() {
             out.push(MenuEntry::item("Unmerge cells", move |t, _, cx| t.edit_table(id, "Unmerge cells", cx, |t| {
@@ -444,16 +410,13 @@ impl DrawingEditor {
             })));
         }
         // Size › Columns equally / Rows equally; Resize… (column width, row height).
-        let layout = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned();
         if let Some(l) = layout {
-            let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
-            let tallest = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).fold(0.0, f64::max);
-            let avg = widths.iter().sum::<f64>() / widths.len().max(1) as f64;
+            let (l1, l2) = (l.clone(), l.clone());
             out.push(MenuEntry::Submenu(
                 "Size".into(),
                 vec![
-                    MenuEntry::item("Columns equally", move |t, _, cx| t.edit_table(id, "Size columns equally", cx, |t| t.col_widths = vec![avg; widths.len()])),
-                    MenuEntry::item("Rows equally", move |t, _, cx| t.edit_table(id, "Size rows equally", cx, |t| t.row_height = tallest)),
+                    MenuEntry::item("Columns equally", move |t, _, cx| t.edit_table(id, "Size columns equally", cx, |t| te::columns_equally(t, &l1))),
+                    MenuEntry::item("Rows equally", move |t, _, cx| t.edit_table(id, "Size rows equally", cx, |t| te::rows_equally(t, &l2))),
                 ],
             ));
             let (w, h) = (l.xs.get(c + 1).zip(l.xs.get(c)).map(|(b, a)| b - a).unwrap_or(20.0), t.row_height);
@@ -648,40 +611,16 @@ impl DrawingEditor {
             Panel::CellFormat { table, row, col, scope, align, bold, height } => {
                 let h = num(val(&height, cx)).filter(|h| *h > 0.5);
                 let layout = self.built.as_ref().and_then(|b| b.table_layout(table)).cloned();
-                let (nrows, ncols) = layout.map(|l| (l.ys.len() - 1 - l.title as usize, l.xs.len() - 1)).unwrap_or((row + 1, col + 1));
-                let cells: Vec<(usize, usize)> = match scope {
-                    1 => (0..ncols).map(|c| (row, c)).collect(),
-                    2 => (0..nrows).map(|r| (r, col)).collect(),
-                    3 => (0..nrows).flat_map(|r| (0..ncols).map(move |c| (r, c))).collect(),
-                    _ => vec![(row, col)],
-                };
-                self.edit_table(table, "Format cells", cx, |t| {
-                    for (r, c) in cells {
-                        let f = CellFormat { align, height: h, bold, ..t.shown_cell_format(r, c) };
-                        t.set_cell_format(r, c, f);
-                    }
-                    t.col_widths.clear();
-                });
+                let scope = [te::FormatScope::Cell, te::FormatScope::Row, te::FormatScope::Column, te::FormatScope::Table][scope.min(3)];
+                self.edit_table(table, "Format cells", cx, |t| te::format_cells(t, layout.as_ref(), row, col, scope, te::FormatFields { align, bold, height: h }));
             }
             Panel::CellResize { table, col, width, height } => {
                 // Can't exceed the sheet.
-                let (sw, sh) = self.current_sheet().size.size_mm();
-                let w = num(val(&width, cx).trim_end_matches("mm").to_string()).filter(|v| *v > 0.5).map(|v| v.min(sw));
-                let h = num(val(&height, cx).trim_end_matches("mm").to_string()).filter(|v| *v > 0.5).map(|v| v.min(sh));
-                let widths: Vec<f64> = self.built.as_ref().and_then(|b| b.table_layout(table)).map(|l| l.xs.windows(2).map(|x| x[1] - x[0]).collect()).unwrap_or_default();
-                self.edit_table(table, "Resize cell", cx, |t| {
-                    if let Some(w) = w {
-                        if t.col_widths.len() != widths.len() {
-                            t.col_widths = widths.clone();
-                        }
-                        if let Some(x) = t.col_widths.get_mut(col) {
-                            *x = w;
-                        }
-                    }
-                    if let Some(h) = h {
-                        t.row_height = h;
-                    }
-                });
+                let size = self.current_sheet().size.size_mm();
+                let w = num(val(&width, cx).trim_end_matches("mm").to_string()).filter(|v| *v > 0.5);
+                let h = num(val(&height, cx).trim_end_matches("mm").to_string()).filter(|v| *v > 0.5);
+                let layout = self.built.as_ref().and_then(|b| b.table_layout(table)).cloned();
+                self.edit_table(table, "Resize cell", cx, |t| te::resize_cell(t, layout.as_ref(), size, col, w, h));
             }
             Panel::DatumTarget { id, label, area, width, height } => {
                 let (w, h) = (num(val(&width, cx)).unwrap_or(0.0) * u, num(val(&height, cx)).unwrap_or(0.0) * u);

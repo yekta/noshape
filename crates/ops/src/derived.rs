@@ -35,6 +35,7 @@ pub fn studio_options(cache: StudioCache) -> noshape_model::assembly::eval::Stud
 pub fn assembly_evaluator(cache: StudioCache) -> noshape_model::assembly::eval::AssemblyEvaluator {
     let mut ev = noshape_model::assembly::eval::AssemblyEvaluator::new();
     ev.set_studio_options(studio_options(cache));
+    ev.set_external(Arc::new(ExternalDocs));
     ev
 }
 
@@ -371,5 +372,23 @@ impl DerivedProvider for DocStudios {
             }
         }
         h.finish()
+    }
+}
+
+/// Resolves instances of other documents, or of versions of this one
+/// (`InstanceSource::External`, Change to version), from their stores.
+pub struct ExternalDocs;
+
+impl noshape_model::assembly::eval::ExternalStudios for ExternalDocs {
+    fn studio(&self, key: &str) -> Option<(Arc<Document>, noshape_model::document::TabId)> {
+        let r = ExternalRef::parse(key)?;
+        let doc = external_snapshot(&r.path, r.microversion).ok()?;
+        let tab = doc.tabs.iter().find(|t| t.id.to_string() == r.tab)?.id;
+        Some((doc, tab))
+    }
+
+    fn sibling(&self, key: &str, tab: noshape_model::document::TabId) -> Option<String> {
+        let r = ExternalRef::parse(key)?;
+        Some(ExternalRef { tab: tab.to_string(), ..r }.key())
     }
 }

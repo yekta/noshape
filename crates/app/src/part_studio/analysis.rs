@@ -3,10 +3,8 @@
 //! legend panel. View in high quality (Shift+R) refines the tessellation.
 
 use super::PartStudioView;
-use crate::theme::{p, with_alpha};
 use glam::DVec3;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::h_flex;
 use gpui_kit::*;
 use noshape_model::display::BodyDisplay;
 
@@ -44,49 +42,20 @@ pub const DRAFT_SIDE2: [u8; 4] = [0x00, 0x6f, 0xff, 255];
 /// Per-vertex colors of a body for an analysis.
 pub fn analysis_colors(b: &BodyDisplay, a: &Analysis) -> Vec<[u8; 4]> {
     let m = &b.mesh;
-    let p3 = |v: [f32; 3]| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64);
     match a {
         Analysis::Draft { pull, angle_deg, undercut, parts } => {
             if !parts.is_empty() && !parts.contains(&b.id) {
                 // Not checked: the part's own color.
                 return vec![[0, 0, 0, 0]; m.positions.len()];
             }
-            let d = DVec3::from_array(*pull).normalize_or(DVec3::Z);
-            let lim = angle_deg.to_radians().sin();
-            // Undercuts: material in the way when pulling the face out.
-            let blocked: Vec<bool> = if *undercut {
-                let tris: Vec<[DVec3; 3]> = m.indices.as_chunks::<3>().0.iter().filter_map(|t| Some([p3(*m.positions.get(t[0] as usize)?), p3(*m.positions.get(t[1] as usize)?), p3(*m.positions.get(t[2] as usize)?)])).collect();
-                let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1).max(1e-9);
-                let rays: Vec<(DVec3, DVec3)> = m
-                    .positions
-                    .iter()
-                    .zip(&m.normals)
-                    .map(|(p, n)| {
-                        let n = p3(*n).normalize_or_zero();
-                        let dir = if n.dot(d) >= 0.0 { d } else { -d };
-                        // Start just off the surface so the face itself isn't hit.
-                        (p3(*p) + n * size * 1e-5, dir)
-                    })
-                    .collect();
-                noshape_model::thickness::cast_rays(tris, &rays, size * 1e-5).into_iter().map(|h| h.is_some()).collect()
-            } else {
-                vec![false; m.positions.len()]
-            };
-            m.normals
-                .iter()
-                .zip(blocked)
-                .map(|(n, blocked)| {
-                    // Draft angle = asin(n · pull).
-                    let s = p3(*n).normalize_or_zero().dot(d);
-                    if s.abs() < lim - 1e-9 {
-                        DRAFT_STEEP
-                    } else if blocked {
-                        DRAFT_UNDERCUT
-                    } else if s > 0.0 {
-                        DRAFT_SIDE1
-                    } else {
-                        DRAFT_SIDE2
-                    }
+            let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1);
+            noshape_model::analysis::draft_classes(m, size, DVec3::from_array(*pull), angle_deg.to_radians(), *undercut)
+                .into_iter()
+                .map(|(_, c)| match c {
+                    noshape_model::analysis::DraftClass::Steep => DRAFT_STEEP,
+                    noshape_model::analysis::DraftClass::Undercut => DRAFT_UNDERCUT,
+                    noshape_model::analysis::DraftClass::Side1 => DRAFT_SIDE1,
+                    noshape_model::analysis::DraftClass::Side2 => DRAFT_SIDE2,
                 })
                 .collect()
         }
@@ -116,9 +85,8 @@ pub fn curvature_colors(bodies: &[BodyDisplay], map: Option<&super::thickness::C
         .iter()
         .filter(|b| !b.hidden)
         .map(|b| {
-            let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1).max(1e-9);
-            let k = noshape_model::analysis::principal_curvatures(&b.mesh.positions, &b.mesh.normals, &b.mesh.indices);
-            (b, k.into_iter().map(|k| kind.value(k, meters_per_unit, 1e-3 / size)).collect())
+            let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1);
+            (b, noshape_model::analysis::curvature_values(&b.mesh, size, kind, meters_per_unit))
         })
         .collect();
     let (mut lo, mut hi) = (f64::MAX, f64::MIN);
@@ -211,35 +179,44 @@ impl PartStudioView {
         self.schedule_regen(window, cx);
     }
 
-    /// The "View in high quality" notice (the analyses show their legends
-    /// at the top of the graphics area).
+    /// The "View in high quality" notice. Live (part-studio/lod4-fill-shiftR):
+    /// a 433 x 28 #90cef1 bar flush with the graphics area's top, centred,
+    /// square; 13 px #333 text 12 px in (cap height 10, 288 px long); a white
+    /// 65 x 21 "Disable" button (1 px #aaa, 3 px radius) 4 px from the top and
+    /// 8 px from the right end.
     pub(super) fn render_analysis_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if !self.ui.high_quality {
             return None;
         }
-        let pal = p();
-        Some(
-            v_flex()
-                .id("analysis-panel")
-                .occlude()
-                .absolute()
-                .bottom(px(46.))
-                .left_3()
-                .w(px(230.))
-                .p_2()
-                .gap_1()
-                .rounded_md()
-                .bg(with_alpha(pal.panel_raised, 0.96))
-                .border_1()
-                .border_color(pal.border_strong)
-                .child(
-                    h_flex()
-                        .gap_2()
-                        .child(div().flex_1().text_xs().text_color(pal.info).child("Viewing in high quality. Performance can decrease."))
-                        .child(Button::new("hq-off").icon(IconName::Close).xsmall().ghost().on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_high_quality(w, cx)))),
-                )
-                .into_any_element(),
-        )
+        let bar = h_flex()
+            .id("analysis-panel")
+            .occlude()
+            .w(px(433.))
+            .h(px(28.))
+            .pl(px(12.))
+            .pr(px(8.))
+            .pt(px(1.))
+            .bg(gpui_kit::rgb(0x90cef1))
+            .text_size(px(13.))
+            .text_color(gpui_kit::rgb(0x333333))
+            .child(div().flex_1().relative().top(px(-1.)).child("Viewing in high quality. Performance can decrease."))
+            .child(
+                div()
+                    .id("hq-off")
+                    .w(px(65.))
+                    .h(px(21.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .bg(gpui_kit::rgb(0xffffff))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xaaaaaa))
+                    .rounded(px(3.))
+                    .cursor_pointer()
+                    .child(div().relative().top(px(-1.)).child("Disable"))
+                    .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_high_quality(w, cx))),
+            );
+        Some(div().absolute().top_0().left_0().right_0().flex().justify_center().child(bar).into_any_element())
     }
 }
 

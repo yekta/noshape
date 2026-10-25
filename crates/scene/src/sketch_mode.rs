@@ -3991,7 +3991,13 @@ impl SketchEditor {
     pub fn paste_clipboard(&mut self, data: &mut SketchData, text: &str) -> bool {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return false };
         let Some(clip) = v.get("noshape_sketch_entities").and_then(|c| serde_json::from_value::<Sketch>(c.clone()).ok()) else { return false };
-        let created = data.sketch.paste(&clip, DVec2::ZERO);
+        self.paste_entities(data, &clip, DVec2::ZERO)
+    }
+
+    /// Paste sketch entities (copied with [`Sketch::extract`]) moved by
+    /// `offset`; the pasted entities become the selection.
+    pub fn paste_entities(&mut self, data: &mut SketchData, clip: &Sketch, offset: DVec2) -> bool {
+        let created = data.sketch.paste(clip, offset);
         if created.is_empty() {
             return false;
         }
@@ -4900,7 +4906,7 @@ impl SketchEditor {
             lines.push_polyline(&pts3, crate::palette::rgb8(SKETCH_BOX_COLOR), 0, 1.0, 0);
         }
         for sg in &dim_preview {
-            lines.segments.push(LineSegment { a: w(sg[0]), b: w(sg[1]), color: crate::palette::rgb8(crate::palette::pick(crate::palette::viewport::SKETCH_FULL, crate::palette::viewport_dark::SKETCH_FULL)), pick_id: 0, width: 1.0, style: on_top });
+            lines.segments.push(LineSegment { a: w(sg[0]), b: w(sg[1]), color: crate::palette::rgb8(crate::palette::pick(crate::palette::viewport::SKETCH_FULL, crate::palette::viewport_dark::SKETCH_FULL)), pick_id: 0, width: 1.5, style: on_top });
         }
         // Dimension graphics. The dimension line is broken around its value
         // (Onshape draws no box behind the text).
@@ -4929,7 +4935,9 @@ impl SketchEditor {
             } else {
                 rgb8(vc::DIM_DRIVEN)
             };
-            let width = if selected { 2.0 } else { 1.0 };
+            // Live (sketch/17, 24): ~1.1 px of ink, ~1.6 px selected; our
+            // line AA puts about width − 0.4 px of ink down.
+            let width = if selected { 2.0 } else { 1.5 };
             for s in &g.segments {
                 lines.segments.push(LineSegment { a: w(s[0]), b: w(s[1]), color, pick_id: 0, width, style: on_top });
             }

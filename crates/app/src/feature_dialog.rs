@@ -154,6 +154,9 @@ pub struct FeatureDialog {
     pub faulty: Vec<String>,
     labeler: RefLabeler,
     collapsed_groups: std::collections::HashSet<String>,
+    /// Where live's layout is in the parameter list, unrounded (see
+    /// `live_h`); reset on each render.
+    live_y: std::cell::Cell<f32>,
     /// Focus handles of the controls Tab reaches besides the text fields
     /// (checkboxes, tolerance buttons, help), by control key.
     tab_stops: HashMap<String, FocusHandle>,
@@ -321,6 +324,7 @@ impl FeatureDialog {
             faulty: Vec::new(),
             labeler,
             collapsed_groups,
+            live_y: Default::default(),
             tab_stops: HashMap::new(),
             tol_open: Default::default(),
             focus: cx.focus_handle(),
@@ -1469,6 +1473,22 @@ impl FeatureDialog {
 
     // ------------------------------------------------------------ render helpers
 
+    /// The pixel height of a row live lays out `h` px tall. Chrome keeps
+    /// fractional rows (17.33 px label lines: 26.33 px empty selection
+    /// fields, 27.33 px checkbox rows) and snaps each top to the pixel grid;
+    /// gpui rounds an authored length first. Placing every fractional row
+    /// from the running unrounded position gives live's 27/28 px steps
+    /// (dom/dialog-extrude-new: checkbox rows at 254.3, 281.7, 309, 336.3,
+    /// 363.7 → tops 254, 282, 309, 336, 364). Whole-pixel rows don't move the
+    /// phase, so only fractional rows call this, in render order.
+    /// Heights in Chrome's layout units (1/64 px): 17.33 px lines floor to
+    /// 17.328125.
+    fn live_h(&self, h: f32) -> f32 {
+        let y = self.live_y.get();
+        self.live_y.set(y + h);
+        (y + h).round() - y.round()
+    }
+
     fn render_params(&mut self, specs: &'static [ParamSpec], prefix: Option<(&'static str, usize)>, window: &mut Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
         // Array items see the feature's values too (FeatureScript reads
         // `definition.isAsymmetric` inside its item loops); theirs win.
@@ -1485,15 +1505,15 @@ impl FeatureDialog {
         };
         // Items of a driven array show their query in the array's field.
         let driven = prefix.is_some_and(|(arr, _)| self.ty.params.iter().any(|p| p.id == arr && p.hints.has(Hints::DRIVEN_QUERY)));
-        let mut rows: Vec<AnyElement> = Vec::new();
+        // Rows with their group depth (indented once the next row is known).
+        let mut rows: Vec<(AnyElement, usize)> = Vec::new();
         let mut i = 0;
-        // Open groups, outermost first: the header, whether it is expanded,
-        // and whether it is a plain group title (Onshape "Group Name").
+        // Open groups, outermost first: the header and whether it is expanded.
         // Groups nest (Sheet metal model's Selections holds Extrude's
         // Second end position group); a param belongs to a group while
         // turning the header off would hide it.
-        let mut groups: Vec<(&'static str, bool, bool)> = Vec::new();
-        let mut prev_query = false;
+        let mut groups: Vec<(&'static str, bool)> = Vec::new();
+        let (mut prev_query, mut prev_depth) = (false, 0);
         while i < specs.len() {
             let s = &specs[i];
             i += 1;
@@ -1519,7 +1539,7 @@ impl FeatureDialog {
             if groups.iter().any(|g| !g.1) {
                 continue;
             }
-            let levels: Vec<bool> = groups.iter().map(|g| g.2).collect();
+            let depth = groups.len();
             // Gather trailing flip toggles that belong on this row.
             let mut trailing: Vec<&'static ParamSpec> = Vec::new();
             let mut companion: Option<&'static ParamSpec> = None;
@@ -1614,35 +1634,44 @@ impl FeatureDialog {
                 el.into_any_element()
             });
             if s.hints.has(Hints::GROUP_HEADER) {
-                groups.push((s.id, values.bool(s.id) && !self.collapsed_groups.contains(&path), s.hints.has(Hints::GROUP_LABEL)));
+                groups.push((s.id, values.bool(s.id) && !self.collapsed_groups.contains(&path)));
             }
-            // Onshape (dialogs/extrude-24): a group's params are indented 24 px
-            // with a 1 px `#d7d7d7` guide line under the expander; under a
-            // plain group title 20 px (dom/dialog-sheet-metal-model.txt,
-            // os-param-group-indent).
-            let row = row.map(|r| {
-                levels.iter().rev().fold(r, |r, label| {
-                    let (w, line) = if *label { (20., 8.) } else { (24., 13.) };
-                    div().relative().pl(px(w)).child(div().absolute().left(px(line)).top_0().bottom_0().w(px(1.)).bg(p().border)).child(r).into_any_element()
-                })
-            });
             if let Some(row) = row {
                 let is_query = matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY);
                 if prev_query && !is_query {
-                    // Live: 5 px down to a checkbox row, 4 px to a select (End type).
-                    let select = matches!(s.kind, ParamKind::Enum { .. }) && !s.hints.has(Hints::HORIZONTAL_ENUM);
-                    rows.push(div().h(px(if select { 4. } else { 5. })).flex_none().into_any_element());
+                    // Live (`os-param-requires-margin`): 5 px under the last
+                    // field, inside its group.
+                    rows.push((div().h(px(5.)).flex_none().into_any_element(), prev_depth));
                 }
-                prev_query = is_query;
-                rows.push(row);
+                (prev_query, prev_depth) = (is_query, depth);
+                rows.push((row, depth));
             }
         }
         // Live (dialogs/mirror, delete-part): a query field ending the
-        // dialog keeps its bottom margin.
+        // dialog keeps its 5 px bottom margin.
         if prev_query && prefix.is_none() {
-            rows.push(div().h(px(4.)).flex_none().into_any_element());
+            rows.push((div().h(px(5.)).flex_none().into_any_element(), prev_depth));
         }
-        rows
+        // Live (extrude-24, dom/dialog-fillet-partial `os-param-group-indent`):
+        // each group level indents its params 20 px with a 1 px `#d7d7d7`
+        // guide 8 px in, under the expander; on the group's last row the
+        // guide ends in a 10 px foot (`node-indent-line-end`).
+        let depths: Vec<usize> = rows.iter().map(|r| r.1).collect();
+        rows.into_iter()
+            .enumerate()
+            .map(|(k, (row, depth))| {
+                let next = depths.get(k + 1).copied().unwrap_or(0);
+                (0..depth).rev().fold(row, |r, level| {
+                    div()
+                        .relative()
+                        .pl(px(20.))
+                        .child(div().absolute().left(px(8.)).top_0().bottom_0().w(px(1.)).bg(p().border))
+                        .when(level >= next, |d| d.child(div().absolute().left(px(3.)).bottom_0().w(px(10.)).h(px(1.)).bg(p().border)))
+                        .child(r)
+                        .into_any_element()
+                })
+            })
+            .collect()
     }
 
     /// Mate connector's axis row: the primary axis flip (its arrow shows the
@@ -1840,7 +1869,8 @@ impl FeatureDialog {
                     .id(SharedString::from(format!("grp-{path}")))
                     .w_full()
                     .ml(px(-2.))
-                    .min_h(px(27.))
+                    // Live: 17.33 px line + 5 px padding each side.
+                    .min_h(px(self.live_h(LIVE_CHECKBOX_ROW)))
                     .cursor_pointer()
                     .child(div().w(px(20.)).flex_none().flex().justify_center().child(crate::ui::glyph(if on { "expander-down" } else { "expander-right" }, 14., if error { color } else { gpui_kit::rgb(0x555555) })))
                     .child(div().px(px(4.)).py(px(5.)).text_size(px(13.33)).line_height(px(17.33)).text_color(color).child(crate::ui::spec_text(s.label)))
@@ -1879,7 +1909,9 @@ impl FeatureDialog {
                     .w_full()
                     .ml(px(-2.))
                     .pr(px(12.))
-                    .min_h(px(27.))
+                    // Live (dom/dialog-extrude-new): 27.33 px rows (17.33 px
+                    // label line + 5 px padding each side).
+                    .min_h(px(self.live_h(LIVE_CHECKBOX_ROW)))
                     .children(chevron)
                     .child({
                         let view = cx.entity();
@@ -1938,7 +1970,10 @@ impl FeatureDialog {
                         Some((arr, idx)) => item_path(arr, idx, c.id),
                     };
                     if let Some(e) = self.render_inline_value(c, &cpath, values, window, cx) {
-                        row = row.child(div().flex_1().child(e));
+                        // Live (extrude-21 "Draft  3 deg ↻"): the value runs to
+                        // the 194 px column like a quantity row; its flip sits
+                        // in the 26 px right column.
+                        row = row.pr(px(if flips.is_empty() { 26. } else { 0. })).child(div().flex_1().child(e));
                     }
                 }
                 row.children(flips).into_any_element()
@@ -1984,11 +2019,15 @@ impl FeatureDialog {
                     // Live: Tab skips the dropdowns (Shift+Tab from Depth lands on the flip button).
                     let dd = self.os_select(path, items, &cur, move |this, id, cx| this.set_value(&path_s, ParamValue::Enum(id.to_string()), cx), cx);
                     // Live (div.select-input tip=…): the select's tooltip is its label.
-                    let dd = div().id(SharedString::from(format!("sel-{path}"))).flex_1().min_w_0().tooltip(crate::ui::user_tooltip(crate::i18n::spec(s.label))).child(dd);
+                    // Live (dom/dialog-hole.txt "Tip angle"): next to a 26 px icon
+                    // the select sits 3 px down in a 31 px row.
+                    let icon_row = s.hints.has(Hints::SHOW_LABEL) && param_icon(self.ty.id, s.id).is_some();
+                    let dd = div().id(SharedString::from(format!("sel-{path}"))).flex_1().min_w_0().when(icon_row, |d| d.mt(px(3.))).tooltip(crate::ui::user_tooltip(crate::i18n::spec(s.label))).child(dd);
                     // Live (dom/dialog-extrude-new.txt): the select fills the dialog's
                     // first 194 px column flush with its left edge (the body has 2 px
                     // padding); flips sit in the 26 px right column.
-                    let mut row = h_flex().mx(px(-2.)).pt(px(1.)).min_h(px(28.)).items_start().when(flips.is_empty(), |d| d.pr(px(26.)));
+                    // Live: a 28 px row, the 26 px select on its top line.
+                    let mut row = h_flex().mx(px(-2.)).min_h(px(if icon_row { 31. } else { 28. })).items_start().when(flips.is_empty(), |d| d.pr(px(26.)));
                     // Live (dom/dialog-chamfer.txt): label and select wrap like
                     // inline boxes. When the label (12 px, 5 px padding) and
                     // the current value (14 px, 6 + 20 px padding) don't fit
@@ -2006,7 +2045,9 @@ impl FeatureDialog {
                             v_flex()
                                 .w_full()
                                 .child(div().mx(px(-2.)).px(px(5.)).pt(px(7.)).text_size(px(12.)).line_height(px(16.)).text_color(pal.text_muted).child(crate::ui::spec_text(s.label)))
-                                .child(row.child(dd).children(flips))
+                                // Live: label 23 px + the select's 25 px box (48; the
+                                // 26 px select overflows it by 1).
+                                .child(row.min_h(px(25.)).h(px(25.)).child(dd).children(flips))
                                 .into_any_element(),
                         );
                     }
@@ -2016,7 +2057,7 @@ impl FeatureDialog {
                         row = row.child(match param_icon(self.ty.id, s.id) {
                             Some(icon) => div().flex_none().child(crate::assets::icon(icon, 26., cx)).into_any_element(),
                             // Live: the label's baseline is the value's (label 7 px down).
-                            None => div().px(px(5.)).pt(px(6.)).max_w(px(110.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::spec_text(s.label)).into_any_element(),
+                            None => div().px(px(5.)).pt(px(7.)).max_w(px(110.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::spec_text(s.label)).into_any_element(),
                         });
                     }
                     row.child(dd).children(flips).into_any_element()
@@ -2027,6 +2068,9 @@ impl FeatureDialog {
                 let e = self.render_inline_value(s, path, values, window, cx)?;
                 // Tolerance options on tolerant quantities (Onshape ± icon).
                 let tolerant = matches!(s.kind, ParamKind::Num(_)) && s.hints.has(Hints::CAN_BE_TOLERANT) && !path.contains('.');
+                // Live (dom/dialog-hole.txt): a row with a 26 px icon for its
+                // label is 29 px and its controls sit 1 px lower.
+                let icon_dy = if param_icon(self.ty.id, s.id).is_some() { 1. } else { 0. };
                 let tol_key = format!("{path}__tolerance");
                 let tol = tolerant.then(|| Tolerance::parse(self.get_value(&tol_key))).flatten();
                 let tol_focus = if tolerant { Some(self.tab_stop(&format!("tol:{path}"), cx)) } else { None };
@@ -2045,7 +2089,8 @@ impl FeatureDialog {
                     // options stay collapsed until it is clicked).
                     div()
                         .id(SharedString::from(format!("tolbtn-{path}")))
-                        .mt(px(3.))
+                        // Live (extrude-01): the icon's ink 8 px under the row top.
+                        .mt(px(6. + icon_dy))
                         .ml(px(5.))
                         // Live (dom/dialog-extrude-new): 5 px after the toggle
                         // before the 26 px right column.
@@ -2074,6 +2119,8 @@ impl FeatureDialog {
                         .id(SharedString::from(format!("tolexp-{path}")))
                         .w(px(20.))
                         .h(px(26.))
+                        // Live (extrude-01): the › 1 px under the row's middle.
+                        .pt(px(1. + icon_dy))
                         .flex_none()
                         .flex()
                         .items_center()
@@ -2096,20 +2143,20 @@ impl FeatureDialog {
                 let row = h_flex()
                     .mr(px(-1.))
                     .ml(px(-2.))
-                    .min_h(px(26.))
+                    .min_h(px(26. + 3. * icon_dy))
                     .items_start()
                     .children(expander)
                     // Live (dom/dialog-hole.txt): hole sizes show a 26 px icon
                     // instead of their label.
                     .child(match param_icon(self.ty.id, s.id) {
                         Some(icon) => div().flex_none().child(crate::assets::icon(icon, 26., cx)).into_any_element(),
-                        None => div().pl(px(5.)).pr(px(5.)).pt(px(if tolerant { 4. } else { 6. })).max_w(px(125.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::spec_text(s.label)).into_any_element(),
+                        None => div().pl(px(5.)).pr(px(5.)).pt(px(6.)).max_w(px(125.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::spec_text(s.label)).into_any_element(),
                     })
                     // Live: the value's baseline 1 px under the label's, the
                     // underline on the row's bottom line.
                     // (Rows are 26 px like live: tolerance rows are set by
                     // their 26 px expander, the others by the field.)
-                    .child(div().flex_1().min_w_0().pt(px(if tolerant { 5. } else { 4. })).child(e))
+                    .child(div().flex_1().min_w_0().pt(px(4. + icon_dy)).child(e))
                     .children(tol_btn)
                     // The first column is 194 px; flips sit in the 26 px right one.
                     .when(flips.is_empty(), |d| d.pr(px(26.)))
@@ -2214,8 +2261,17 @@ impl FeatureDialog {
                                     // Live (dialogs/extrude-13, fillet-02): the × is always shown.
                                     .group("field-x")
                                     .cursor_pointer()
-                                    // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                    .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
+                                    // Live (fillet-04, extrude-03): centred in a 24 px box
+                                    // (ink 12–19 px in from the row's right end), 1 px
+                                    // under the row's middle.
+                                    .w(px(24.))
+                                    .pl(px(2.))
+                                    .flex()
+                                    .justify_center()
+                                    .relative()
+                                    .top(px(1.))
+                                    // Live (dialogs/extrude-03): Onshape's × glyph, 8 x 7 px ink, #666.
+                                    .child(crate::ui::glyph("ui-clear", 8., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         cx.stop_propagation();
                                         cx.emit(DialogEvent::HoverRef(None));
@@ -2282,8 +2338,9 @@ impl FeatureDialog {
                 let caption = div()
                     .px(px(6.))
                     // Live (dom/dialog-extrude-new): the empty field is 26 px
-                    // with its border (label 24 px).
-                    .when(empty, |d| d.pt(px(7.)).pb(px(4.)).text_size(px(12.)).line_height(px(13.)).text_color(gpui_kit::rgb(0x555555)))
+                    // with its border (label 24 px), #555 while active, #666
+                    // otherwise (dom/dialog-circular-pattern "Axis of pattern").
+                    .when(empty, |d| d.pt(px(7.)).pb(px(4.)).text_size(px(12.)).line_height(px(13.)).text_color(gpui_kit::rgb(if active { 0x555555 } else { 0x666666 })))
                     .when(!empty, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.)).text_color(pal.text_muted))
                     .truncate()
                     .child(crate::ui::spec_text(s.label));
@@ -2311,7 +2368,14 @@ impl FeatureDialog {
                             .track_focus(&q_focus)
                             .flex_1()
                             .min_w_0()
-                            .min_h(px(26.))
+                            // Live: empty = 13.33 px label line + 6/5 px padding + border.
+                            // A filled field (its caption line) carries the same
+                            // fraction (extrude-03: the rows after it step as
+                            // after an empty one).
+                            .min_h(px({
+                                let h = self.live_h(LIVE_EMPTY_FIELD);
+                                if empty { h } else { 26. }
+                            }))
                             .max_h(px(160.))
                             .overflow_y_scroll()
                             .rounded(px(2.))
@@ -2426,7 +2490,10 @@ impl FeatureDialog {
                     let mut field = v_flex()
                         .id(SharedString::from(format!("q-{path}")))
                         .flex_1()
-                        .min_h(px(26.))
+                        .min_h(px({
+                            let h = self.live_h(LIVE_EMPTY_FIELD);
+                            if items == 0 { h } else { 26. }
+                        }))
                         .rounded(px(2.))
                         .border_1()
                         .border_color(if active { pal.accent } else { pal.border })
@@ -2462,8 +2529,15 @@ impl FeatureDialog {
                                         .id(SharedString::from(format!("dqx-{path}-{k}")))
                                         .cursor_pointer()
                                         .group("field-x")
-                                        // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                        .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
+                                        // As a selection row's × (fillet-04).
+                                        .w(px(24.))
+                                        .pl(px(2.))
+                                        .flex()
+                                        .justify_center()
+                                        .relative()
+                                        .top(px(1.))
+                                        // Live (dialogs/extrude-03): Onshape's × glyph, 8 x 7 px ink, #666.
+                                        .child(crate::ui::glyph("ui-clear", 8., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                         .on_click(cx.listener(remove(k))),
                                 )
                             });
@@ -2604,7 +2678,7 @@ impl FeatureDialog {
                 // with its name right-aligned (12 px #999) in an 88 px column and an
                 // underline select ("Hole type ▾ Drilled", "Drill size ▾ 1/4"); the
                 // first underline 27 px under the field above.
-                let mut row = v_flex().w_full().pt(px(3.));
+                let mut row = v_flex().w_full();
                 let mut prefix_path: Vec<String> = Vec::new();
                 let mut level = 0;
                 loop {
@@ -3017,7 +3091,9 @@ impl Render for FeatureDialog {
         let pal = p();
         let help_focus = self.tab_stop("help", cx);
         let params: &'static [ParamSpec] = self.ty.params.as_slice();
+        self.live_y.set(0.);
         let mut rows = self.render_params(params, None, window, cx);
+        let footer_pad = if self.feature.type_id == "sketch" { 0. } else { self.live_h(24.5) - 24. };
         let (extra_rows, footer_extra) = match self.extra.clone() {
             Some(f) => f(window, cx),
             None => (Vec::new(), None),
@@ -3218,9 +3294,13 @@ impl Render for FeatureDialog {
             .child(div().id("dialog-grip").absolute().top_0().bottom_0().right_0().w(px(3.)).cursor(CursorStyle::ResizeLeftRight).on_drag(DialogResize, |d, _, _, cx| cx.new(|_| d.clone())))
             .child(
                 // Footer (live): no band; a 112 px preview slider at the
-                // left and the round ? help button at the right.
+                // left and the round ? help button at the right. Live
+                // (dom/dialog-extrude-new): the frame ends 24.5 px under the
+                // list (22 px slider row + 2.5): 20 px after our 4 px body
+                // padding, its controls on the same line.
                 h_flex()
-                    .h(px(if sketch { 25. } else { 22. }))
+                    .h(px(if sketch { 25. } else { 20. }))
+                    .when(!sketch, |d| d.pt(px(2.)))
                     .flex_none()
                     .pl(px(7.))
                     .pr(px(4.))
@@ -3257,11 +3337,13 @@ impl Render for FeatureDialog {
                             cx,
                         )
                             // Live: a 12 px `#a0a0a0` disc, its centre 1 px
-                            // above the slider track.
+                            // above the slider track, 11 px from the frame's
+                            // right edge (dialogs/*-01-open: disc x 449–461).
                             .size(px(12.))
-                            .mr(px(1.))
                             .relative()
-                            .top(px(-2.))
+                            // Live (dom/dialog-sketch-empty): in the Sketch
+                            // dialog's 25 px footer the help sits 10 px down.
+                            .top(px(if sketch { 1. } else { -2. }))
                             .rounded_full()
                             .flex()
                             .items_center()
@@ -3278,6 +3360,9 @@ impl Render for FeatureDialog {
                             })),
                     ),
             )
+            // Live: the frame ends 24.5 px under the list's unrounded end
+            // (one more pixel when that rounds up, e.g. Fillet).
+            .when(footer_pad > 0., |d| d.child(div().flex_none().h(px(footer_pad))))
             .when(self.show_help && !self.ty.description.is_empty(), |d| {
                 d.child(div().mx_3().mb_2().p_2().rounded_md().bg(pal.app_bg).text_xs().text_color(pal.text_muted).child(format!("{}: {}.", self.ty.name, self.ty.description)))
             })
@@ -3306,6 +3391,12 @@ enum Focus {
     /// The `?` help link.
     Ring,
 }
+
+/// Live row heights in Chrome layout units (1/64 px, see `live_h`): a
+/// 17.33 px label line + 10 px padding; an empty selection field's 13.33 px
+/// line + 11 px padding + 2 px border.
+const LIVE_CHECKBOX_ROW: f32 = 27.328125;
+const LIVE_EMPTY_FIELD: f32 = 26.328125;
 
 /// Where Onshape's preview slider handle rests (live: 69% of the track).
 /// From there to the right end the feature shows fully; to the left it fades.
