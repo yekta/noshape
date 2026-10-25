@@ -115,6 +115,16 @@ pub fn ops() -> Vec<Op> {
             destructive: false,
             run: interference,
         },
+        Op {
+            group: "assembly",
+            verb: "change_to_version",
+            summary: "Change to version: instances show a version of this document",
+            description: "Instance › Change to version… (the Reference manager): the `instances` (default all) that reference this document's workspace (parts, Part Studios, subassemblies) show version `version` instead (\"Change to version : V1\"); instances already showing a version of this document move to `version` (\"Update to V1\"). Versions: history_create_version. Sketch, mirrored and standard content instances are left alone.",
+            fields: vec![doc_field(), asm_field(), req("version", s(), "Version name."), opt("instances", json!({ "type": "array", "items": { "type": "string" } }), "Instance ids or names (default all).")],
+            mutates: true,
+            destructive: false,
+            run: change_to_version,
+        },
     ]
 }
 
@@ -459,4 +469,66 @@ struct Old {
     mate: Option<MateId>,
     scope: Option<ReplicateScope>,
     scope_refs: Vec<ScopeEntity>,
+}
+
+fn change_to_version(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::derived::ExternalRef;
+    use noshape_model::assembly::InstanceSource;
+    let (od, tab) = target(ctx, a)?;
+    let asm = assembly(od, tab)?.clone();
+    let name = a.str("version")?;
+    let versions = od.session.store.list_versions().map_err(|e| OpError::new("store", e.to_string()))?;
+    let v = versions.iter().find(|v| v.name == name).ok_or_else(|| OpError::param("version", &format!("this document's versions: {}", if versions.is_empty() { "none (history_create_version)".to_string() } else { versions.iter().map(|v| v.name.clone()).collect::<Vec<_>>().join(", ") })))?;
+    let scope: Option<Vec<InstanceId>> = match a.opt_array("instances")? {
+        Some(list) => Some(list.iter().enumerate().map(|(i, x)| find_instance(&asm, x.as_str().unwrap_or_default(), &format!("instances[{i}]"))).collect::<Result<_, _>>()?),
+        None => None,
+    };
+    let in_scope = |i: &noshape_model::assembly::Instance| scope.as_ref().is_none_or(|s| s.contains(&i.id));
+    let path = od.session.path.clone();
+    let result = solve(od, tab, &SolveOptions::default())?;
+    let own_version = |key: &str| ExternalRef::parse(key).filter(|r| r.path == path);
+    // Workspace references of this document become version references.
+    let workspace = asm.instances.iter().filter(|i| in_scope(i)).any(|i| matches!(i.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Assembly { .. }));
+    let mut changed = 0usize;
+    if workspace {
+        changed += commit(od, tab, &format!("Change to version : {}", v.name), &result, |x| {
+            let mut n = 0;
+            for i in x.instances.iter_mut().filter(|i| in_scope(i)) {
+                let (t, body, config) = match &i.source {
+                    InstanceSource::Part { studio, body, config } => (*studio, Some(body.clone()), config.clone()),
+                    InstanceSource::PartStudio { studio, config } => (*studio, None, config.clone()),
+                    // A subassembly: that version of the Assembly (evaluated as a linked assembly).
+                    InstanceSource::Assembly { assembly, config } => (*assembly, None, config.clone()),
+                    _ => continue,
+                };
+                let key = ExternalRef { path: path.clone(), microversion: v.microversion, tab: t.to_string() }.key();
+                i.source = InstanceSource::External { key, body, config };
+                n += 1;
+            }
+            n
+        })?;
+    }
+    // References to another version of this document: to this one.
+    let versioned = asm.instances.iter().filter(|i| in_scope(i)).any(|i| matches!(&i.source, InstanceSource::External { key, .. } if own_version(key).is_some_and(|r| r.microversion != v.microversion)));
+    if versioned {
+        let result = solve(od, tab, &SolveOptions::default())?;
+        changed += commit(od, tab, &format!("Update to {}", v.name), &result, |x| {
+            let mut n = 0;
+            for i in x.instances.iter_mut().filter(|i| in_scope(i)) {
+                if let InstanceSource::External { key, .. } = &mut i.source
+                    && let Some(r) = own_version(key).filter(|r| r.microversion != v.microversion)
+                {
+                    *key = ExternalRef { microversion: v.microversion, ..r }.key();
+                    n += 1;
+                }
+            }
+            n
+        })?;
+    }
+    if changed == 0 {
+        return Err(OpError::invalid("no instance references this document's workspace or another of its versions"));
+    }
+    let mut out = describe(od, tab)?;
+    out["changed"] = json!(changed);
+    Ok(out.into())
 }

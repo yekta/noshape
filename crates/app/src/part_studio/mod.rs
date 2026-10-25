@@ -28,7 +28,7 @@ mod section;
 mod sketch;
 pub(crate) mod shortcut_cmds;
 mod analysis_tools;
-pub(crate) mod environment_maps;
+pub(crate) use noshape_scene::environment_maps;
 pub(crate) mod reflection;
 mod thickness;
 mod flatten_tool;

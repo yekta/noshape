@@ -241,6 +241,81 @@ pub fn current(ps: &PartStudio, chosen: &noshape_model::configuration::ConfigVal
     v
 }
 
+// ------------------------------------------------------------ inputs between studios
+
+pub const PASTE_INPUTS: &str = "Paste configuration inputs";
+
+/// Paste inputs: the copied inputs whose ids this studio doesn't have yet;
+/// visibility conditions needing missing inputs are repaired. Returns the
+/// pasted inputs' names and whether conditions were repaired.
+pub fn paste_inputs(ps: &mut PartStudio, copied: Vec<ConfigInput>) -> (Vec<String>, bool) {
+    let mut pasted = Vec::new();
+    for i in copied {
+        if !ps.configuration.inputs.iter().any(|x| x.id == i.id) {
+            pasted.push(i.name.clone());
+            ps.configuration.inputs.push(i);
+        }
+    }
+    let repaired = !ps.configuration.repair_visibility().is_empty();
+    (pasted, repaired)
+}
+
+pub const INPUT_PROPAGATION: &str = "Input propagation";
+
+/// Input propagation: the Derived features of `ps` whose source Part Studio
+/// (in `doc`) has a List / Checkbox input with `input`'s id and kind, with
+/// whether each is propagated already.
+pub fn propagation_candidates(doc: &noshape_model::Document, ps: &PartStudio, input: &str) -> Vec<(FeatureId, String, bool)> {
+    use noshape_model::regen::features::importing::DERIVED_CONFIG_PREFIX;
+    let Some(own) = ps.configuration.inputs.iter().find(|i| i.id == input) else { return Vec::new() };
+    if !matches!(own.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. }) {
+        return Vec::new();
+    }
+    let source_input = |tab: &str| -> Option<ConfigInput> {
+        doc.tabs.iter().find(|t| t.id.to_string() == tab).and_then(|t| match &t.content {
+            noshape_model::document::TabContent::PartStudio(s) => s.configuration.inputs.iter().find(|i| i.id == input).cloned(),
+            _ => None,
+        })
+    };
+    let param = format!("{DERIVED_CONFIG_PREFIX}{input}");
+    ps.features
+        .iter()
+        .filter(|f| f.type_id == "importDerived")
+        .filter(|f| source_input(f.params.text("partStudio")).is_some_and(|s| std::mem::discriminant(&s.kind) == std::mem::discriminant(&own.kind)))
+        .map(|f| (f.id, f.name.clone(), ps.configuration.configured.iter().any(|c| c.feature == f.id && c.param == param)))
+        .collect()
+}
+
+/// Propagate inputs to Derived features: each (input, feature) gets a
+/// configured column mapping every option to the same option of the source.
+pub fn propagate_inputs(ps: &mut PartStudio, picks: &[(String, FeatureId)]) {
+    use noshape_model::regen::features::importing::DERIVED_CONFIG_PREFIX;
+    for (input, f) in picks {
+        let Some(i) = ps.configuration.inputs.iter().find(|i| &i.id == input) else { continue };
+        let keys: Vec<String> = match &i.kind {
+            ConfigInputKind::List { options, .. } => options.iter().map(|o| o.id.clone()).collect(),
+            ConfigInputKind::Checkbox { .. } => vec!["true".into(), "false".into()],
+            _ => continue,
+        };
+        let param = format!("{DERIVED_CONFIG_PREFIX}{input}");
+        if ps.configuration.configured.iter().any(|c| c.feature == *f && c.param == param) {
+            continue;
+        }
+        let values = keys.iter().map(|k| (k.clone(), ParamValue::Text(k.clone()))).collect();
+        ps.configuration.configured.push(ConfiguredParam { input: input.clone(), feature: *f, param, values });
+    }
+}
+
+pub const EDIT_IDS: &str = "Edit FeatureScript IDs";
+pub const EDIT_VISIBILITY: &str = "Edit visibility conditions";
+
+/// Visibility conditions… of one input (None: always shown).
+pub fn set_visibility(ps: &mut PartStudio, input: &str, v: Option<noshape_model::configuration::Visibility>) {
+    if let Some(i) = ps.configuration.inputs.iter_mut().find(|i| i.id == input) {
+        i.visible_when = v;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
