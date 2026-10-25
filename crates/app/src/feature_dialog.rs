@@ -2272,8 +2272,17 @@ impl FeatureDialog {
                                     // Live (dialogs/extrude-13, fillet-02): the × is always shown.
                                     .group("field-x")
                                     .cursor_pointer()
-                                    // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                    .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
+                                    // Live (fillet-04, extrude-03): centred in a 24 px box
+                                    // (ink 12–19 px in from the row's right end), 1 px
+                                    // under the row's middle.
+                                    .w(px(24.))
+                                    .pl(px(2.))
+                                    .flex()
+                                    .justify_center()
+                                    .relative()
+                                    .top(px(1.))
+                                    // Live (dialogs/extrude-03): Onshape's × glyph, 8 x 7 px ink, #666.
+                                    .child(crate::ui::glyph("ui-clear", 8., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         cx.stop_propagation();
                                         cx.emit(DialogEvent::HoverRef(None));
@@ -2531,8 +2540,15 @@ impl FeatureDialog {
                                         .id(SharedString::from(format!("dqx-{path}-{k}")))
                                         .cursor_pointer()
                                         .group("field-x")
-                                        // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                        .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
+                                        // As a selection row's × (fillet-04).
+                                        .w(px(24.))
+                                        .pl(px(2.))
+                                        .flex()
+                                        .justify_center()
+                                        .relative()
+                                        .top(px(1.))
+                                        // Live (dialogs/extrude-03): Onshape's × glyph, 8 x 7 px ink, #666.
+                                        .child(crate::ui::glyph("ui-clear", 8., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                         .on_click(cx.listener(remove(k))),
                                 )
                             });
