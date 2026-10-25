@@ -34,7 +34,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | # | What | Live | Ours | Status |
 |---|---|---|---|---|
 | TS1 | "Section", "Reflection", "analysis", "Zebra", "Measure", "Mass" | Part Studio: only "Section" finds anything ("Intersection curve", fuzzy); the rest say "No items match your search". Assembly: nothing for all six | the same (checked in the app 10-22) | ✅ matches (icons2's Round 14 note was wrong) |
-| TS2 | Tool descriptions (right pane; also the expanded toolbar tooltip) | e.g. Intersection curve: "Create a curve at the intersection of 2 or more surfaces or faces. The selections must intersect." | `tool_text.rs`, partly paraphrased from the help glossary ("Create a curve where two or more surfaces or faces intersect.") | ? exact texts for every tool asked (REQUESTS "ui (10-22 e)"); then replace them all |
+| TS2 | Tool descriptions (right pane; also the expanded toolbar tooltip) | e.g. Intersection curve: "Create a curve at the intersection of 2 or more surfaces or faces. The selections must intersect." | `tool_text.rs`, partly paraphrased from the help glossary | ✅ word for word from live (b79c7655; 153 of 157 single-line texts match dom/ui-e-tool-descriptions-live.json verbatim, the 4 frame tools' numbered lists as lists) |
 
 
 ## 3. Keyboard shortcuts modal (Shift+/; live ui 10-22 c, menus/616–619)
