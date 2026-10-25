@@ -21,11 +21,12 @@ use serde_json::{Value, json};
 const TANGENTS: [(&str, TangentMode); 3] = [("hidden", TangentMode::Hidden), ("solid", TangentMode::Solid), ("phantom", TangentMode::Phantom)];
 
 /// Show/hide ▸ toggles: (field, menu text, edit text).
-const SHOW_HIDE: [(&str, &str, &str); 10] = [
+const SHOW_HIDE: [(&str, &str, &str); 11] = [
     ("hidden_lines", "Show/Hide hidden lines", "Hidden lines"),
     ("shaded", "Show/Hide shaded view", "Shaded view"),
     ("threads", "Show/Hide threads", "Threads"),
     ("faulty_parts", "Show/Hide faulty parts", "Faulty parts"),
+    ("offset_cut_lines", "Show/Hide offset cut lines (section views: a line across the hatch where the cutting line steps)", "Offset cut lines"),
     ("sketch_points", "Show/Hide sketch points (views showing sketches)", "Sketch points"),
     ("auto_centermarks", "Show/Hide auto centermarks (showing them again brings back deleted ones)", "Centermarks"),
     ("centerlines", "Show/Hide centerlines (views with cylinder axes seen from the side)", "Centerlines"),
@@ -62,7 +63,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "view_edit",
             summary: "Rotate, order, align, move to sheet or copy a view; remove its crop, breaks or broken-out sections",
-            description: "The view menu's actions, one edit each:\n- `rotate`: `by` degrees counter-clockwise (Rotate ▸ 90° counter-clockwise = 90, clockwise = -90, 180°) or `to` an absolute angle (Custom angle…; 0 = Reset rotation). \"Rotate view\".\n- `rotate_to_edge`: Rotate view ▸ Vertical to… / Horizontal to… (`direction`): turn by the smallest angle so the straight edge of the view at `edge` (sheet mm) is vertical / horizontal; views without a parent or children.\n- `order`: Order ▸ Bring to front / Send to back (`to`: front | back).\n- `align`: Align views ▸ Vertically / Horizontally (`direction`): the view's center lines up with view `with`'s.\n- `suppress_alignment`: (Un)suppress alignment with parent (`on`, default true); projected, auxiliary and section views; a rotated view can't be re-aligned.\n- `flip_direction`: section views: Flip direction (the view looks the other way across the cutting line).\n- `remove_crop`, `remove_breaks` (Remove all breaks), `remove_broken_out` (Remove section).\n- `move_to_sheet`: Move to sheet… `to_sheet` (number or name; omitted: a new sheet); the view moves alone, linked to its parent.\n- `unpin_reference`: Unpin view reference (every view of the same source and part shows the workspace again).\n- `copy`: Copy then Paste: the view with its derived views, annotations and tables, pasted centered `at` (sheet mm) on sheet `to_sheet` (default this one); \"Paste views\"; the reply's `pasted` lists the new view ids.",
+            description: "The view menu's actions, one edit each:\n- `rotate`: `by` degrees counter-clockwise (Rotate ▸ 90° counter-clockwise = 90, clockwise = -90, 180°) or `to` an absolute angle (Custom angle…; 0 = Reset rotation). \"Rotate view\".\n- `rotate_to_edge`: Rotate view ▸ Vertical to… / Horizontal to… (`direction`): turn by the smallest angle so the straight edge of the view at `edge` (sheet mm) is vertical / horizontal; views without a parent or children.\n- `order`: Order ▸ Bring to front / Send to back (`to`: front | back).\n- `align`: Align views ▸ Vertically / Horizontally (`direction`): the view's center lines up with view `with`'s.\n- `suppress_alignment`: (Un)suppress alignment with parent (`on`, default true); projected, auxiliary and section views; a rotated view can't be re-aligned.\n- `flip_direction`: section views: Flip direction (the view looks the other way across the cutting line).\n- `remove_crop`, `remove_breaks` (Remove all breaks), `remove_broken_out` (Remove section, broken-out section `index`); a removed crop or broken-out section leaves its boundary on the sheet as a sketch circle, polygon or spline (live).\n- `move_to_sheet`: Move to sheet… `to_sheet` (number or name; omitted: a new sheet); the view moves alone, linked to its parent.\n- `unpin_reference`: Unpin view reference (every view of the same source and part shows the workspace again).\n- `copy`: Copy then Paste: the view with its derived views, annotations and tables, pasted centered `at` (sheet mm) on sheet `to_sheet` (default this one); \"Paste views\"; the reply's `pasted` lists the new view ids.",
             fields: with(
                 common(),
                 vec![
@@ -74,6 +75,7 @@ pub fn ops() -> Vec<Op> {
                     opt("with", json!({ "type": "integer" }), "align: the view to line up with."),
                     opt("on", json!({ "type": "boolean", "default": true }), "suppress_alignment: suppress (true) or unsuppress."),
                     opt("to_sheet", json!({ "type": ["integer", "string"] }), "move_to_sheet / copy: the target sheet, number (1 = first) or name."),
+                    opt("index", json!({ "type": "integer", "minimum": 0 }), "remove_broken_out: which broken-out section (0-based, drawing_get; default 0)."),
                     opt("at", point(), "copy: where the copy's center goes (sheet mm; default 20 mm right of and below the view)."),
                 ],
             ),
@@ -226,6 +228,8 @@ fn view_display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }),
             "centerlines" if !axes => return refuse("the view has no cylinder axes seen from the side"),
             "centerlines" => Box::new(move |v| v.auto_centerlines = Some(on)),
+            "offset_cut_lines" if !matches!(v.kind, ViewKind::Section { .. }) => return refuse("section views only"),
+            "offset_cut_lines" => Box::new(move |v| v.show_offset_cut_lines = on),
             "center_of_mass" if v.sketch.is_some() || v.flat => return refuse("part views only, not flat patterns or sketch views"),
             "center_of_mass" => Box::new(move |v| v.show_com = on),
             "bend_lines" | "bend_notes" if !v.flat => return refuse("flat pattern views only"),
@@ -327,7 +331,10 @@ fn view_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             if v.crop.is_none() {
                 return Err(OpError::param("view", "the view is not cropped"));
             }
-            edit_view(&mut t, id, |v| v.crop = None);
+            // Live asb 10-23 views (3): the boundary stays as a sketch entity.
+            let pl = t.m.built.as_ref().and_then(|b| b.placement(id).cloned());
+            let si = t.sheet;
+            noshape_scene::drawing_tools::remove_crop(&mut t.d.sheets[si], pl.as_ref(), id);
             "Remove crop"
         }
         "remove_breaks" => {
@@ -341,8 +348,16 @@ fn view_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             if v.broken_out.is_empty() {
                 return Err(OpError::param("view", "the view has no broken-out sections"));
             }
-            edit_view(&mut t, id, |v| v.broken_out.clear());
-            "Remove broken-out sections"
+            // Live asb 10-23 views (3): Remove section on one broken-out
+            // section (`index`, default 0); its profile stays as a sketch spline.
+            let index = a.opt_u64("index")?.unwrap_or(0) as usize;
+            if index >= v.broken_out.len() {
+                return Err(OpError::param("index", &format!("the view has {} broken-out section(s)", v.broken_out.len())));
+            }
+            let pl = t.m.built.as_ref().and_then(|b| b.placement(id).cloned());
+            let si = t.sheet;
+            noshape_scene::drawing_tools::remove_broken_out(&mut t.d.sheets[si], pl.as_ref(), id, index);
+            "Remove section"
         }
         "move_to_sheet" => {
             let to = match to_sheet(&t, a.get("to_sheet"), "to_sheet")? {

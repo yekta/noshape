@@ -75,3 +75,22 @@ pub fn camera(camera: &Camera, viewport: DVec2, origin: DVec2) {
         "origin": [origin.x, origin.y],
     }));
 }
+
+/// A studio's highlight state when it changes: its selection and the single
+/// hovered entity (each as its `Debug` form, e.g. `Face(..)`), for the
+/// interaction replay checks (docs/parity/interaction.md).
+pub fn highlights<T: std::fmt::Debug>(studio: &str, selection: &[T], hover: Option<&T>) {
+    if !enabled() {
+        return;
+    }
+    /// Studio, selection, hover: the state last written.
+    type State = (String, Vec<String>, Option<String>);
+    static LAST: Mutex<Option<State>> = Mutex::new(None);
+    let state = (studio.to_string(), selection.iter().map(|r| format!("{r:?}")).collect::<Vec<_>>(), hover.map(|r| format!("{r:?}")));
+    let Ok(mut last) = LAST.lock() else { return };
+    if last.as_ref() == Some(&state) {
+        return;
+    }
+    write(json!({ "highlights": { "studio": state.0, "selection": state.1, "hover": state.2 } }));
+    *last = Some(state);
+}

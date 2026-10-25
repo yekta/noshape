@@ -921,12 +921,13 @@ impl PartStudioView {
         if let Some(m) = &error_mesh {
             extra.extend(scene_builder::error_geometry(m, self.gpu.uploader()));
         }
-        // FeatureScript debug geometry of the open feature (Helix profiles).
+        // Debug geometry of the open feature (Helix profiles, FeatureScript debug()).
         if let Some(st) = self.edit.as_ref().and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id))
-            && (!st.debug.lines.is_empty() || !st.debug.points.is_empty())
+            && (!st.debug.lines.is_empty() || !st.debug.points.is_empty() || !st.debug.colored.is_empty())
         {
             extra.extend(scene_builder::debug_geometry(&st.debug, self.gpu.uploader()));
         }
+        crate::nav_trace::highlights("part_studio", &selection, single_hover.as_ref());
         let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
         // Live (lp wall over 2258): the pattern's other inputs (its
         // Direction) are drawn red; the seed keeps the selection colors.
@@ -1305,14 +1306,10 @@ impl PartStudioView {
         match ev {
             ViewportEvent::PointerMove { position, .. } => {
                 self.ui.pointer = Some(*position);
-                // Moving along a hovered edge: its midpoint becomes (or stops
-                // being) the target without a new pick.
-                if self.sketch.is_none() && self.hover.is_some() && self.ui.hover_pick.as_ref().is_some_and(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)) {
-                    let r = self.hover_target(cx);
-                    if r != self.hover {
-                        self.hover = r;
-                        self.refresh_scene(false, cx);
-                    }
+                // Near a hovered edge's midpoint the midpoint becomes (or
+                // stops being) the target without a new pick.
+                if self.sketch.is_none() && self.hover.is_some() && (self.ui.midpoint_armed.is_some() || self.ui.hover_pick.as_ref().is_some_and(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve))) && self.update_hover(cx) {
+                    self.refresh_scene(false, cx);
                 }
                 // Hovering a manipulator arrow outlines it (Onshape).
                 let on_manip = vp.read(cx).manipulator_at(*position);
@@ -1355,9 +1352,7 @@ impl PartStudioView {
         match ev {
             ViewportEvent::Hover(id) => {
                 self.ui.hover_pick = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
-                let r = self.hover_target(cx);
-                if r != self.hover {
-                    self.hover = r;
+                if self.update_hover(cx) {
                     self.refresh_scene(false, cx);
                 }
             }
@@ -1389,13 +1384,14 @@ impl PartStudioView {
                     Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.pick_through_transparent(t, *position, modifiers.alt, cx),
                     other => other,
                 };
-                // Clicking near a hovered edge's midpoint picks the midpoint,
-                // unless the active field takes no points (Onshape: picks
-                // follow the field's filter).
-                let takes_points = self.active_field_filter(cx).is_none_or(behaviors::field_takes_points);
-                let target = match target {
-                    Some(t) if matches!(t.kind, PickKind::Edge | PickKind::SketchCurve) && takes_points => Some(self.midpoint_pick(t, *position, cx)),
-                    other => other,
+                // A click picks the hovered midpoint target (update_hover:
+                // only once its edge is hovered, with a field that takes
+                // points).
+                let target = match &self.hover {
+                    Some(r @ Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() => {
+                        Some(scene_builder::PickTarget { reference: r.clone(), kind: PickKind::Vertex, anchor: self.edge_midpoint(on) })
+                    }
+                    _ => target,
                 };
                 match target {
                     // Double-clicking a sketch in the graphics area edits it.
@@ -4244,8 +4240,10 @@ pub(super) fn sketch_points(sk: &noshape_model::display::SketchDisplay) -> Vec<R
     own().filter(|p| !p.handle).map(|p| Reference::SketchEntity { sketch: sk.feature, entity: p.entity }).collect()
 }
 
-/// Every edge-like filter bit (edges, linear / circular edges, sketch edges).
-const EDGES: QueryFilter = QueryFilter(QueryFilter::ANY_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
+/// The model-edge filter bits (edges, linear / circular edges). A sketch
+/// curve needs SKETCH_EDGE: fields the std marks `SketchObject.NO` (Fillet,
+/// Chamfer) don't take one (qa5 SEL1).
+const MODEL_EDGES: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
 
 pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     // A parts field that also takes mate connectors or point bodies
@@ -4259,11 +4257,11 @@ pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
         PickKind::Face => want(QueryFilter::ANY_FACE) || want(QueryFilter::PLANE_LIKE),
         // Edge bits only: AXIS also holds cylindrical faces (their axis), so
         // a face field would take edges (qa5 I2: a hole wall in Move face).
-        PickKind::Edge => want(EDGES),
+        PickKind::Edge => want(MODEL_EDGES),
         PickKind::Vertex => want(QueryFilter::POINT_LIKE),
         PickKind::Plane => want(QueryFilter::PLANE),
         PickKind::Origin => want(QueryFilter::POINT_LIKE),
-        PickKind::SketchCurve => want(EDGES),
+        PickKind::SketchCurve => want(QueryFilter::SKETCH_EDGE),
         PickKind::SketchPoint => want(QueryFilter::SKETCH_POINT) || want(QueryFilter::POINT_LIKE),
         PickKind::SketchRegion => want(QueryFilter::SKETCH_REGION),
         PickKind::Connector => want(QueryFilter::MATE_CONNECTOR),
@@ -5095,5 +5093,23 @@ mod default_row_tests {
         assert!(default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Isolate))));
         // Make transparent keeps the planes, so their rows stay black.
         assert!(!default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Transparent))));
+    }
+
+    /// qa5 SEL1: a sketch curve goes only into fields that take sketch
+    /// curves (fillet.fs / chamfer.fs say `SketchObject.NO`); a model edge
+    /// only into fields that take model edges.
+    #[test]
+    fn sketch_curves_and_model_edges_pick_into_their_own_fields() {
+        let r = Reference::SketchEntity { sketch: FeatureId(1), entity: 0 };
+        let field = |ty: &str, id: &str| match noshape_model::features::get(ty).and_then(|t| t.params.iter().find(|p| p.id == id)).map(|p| &p.kind) {
+            Some(noshape_model::params::ParamKind::Query { filter, .. }) => *filter,
+            _ => panic!("{ty}.{id} is not a query field"),
+        };
+        for (ty, id) in [("fillet", "entities"), ("chamfer", "entities")] {
+            assert!(!kind_matches(PickKind::SketchCurve, &r, field(ty, id)), "{ty}.{id} takes a sketch curve");
+            assert!(kind_matches(PickKind::Edge, &r, field(ty, id)), "{ty}.{id} refuses a model edge");
+        }
+        assert!(kind_matches(PickKind::SketchCurve, &r, field("helix", "edge")));
+        assert!(!kind_matches(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
     }
 }

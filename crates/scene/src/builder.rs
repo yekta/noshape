@@ -842,7 +842,9 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             let flat = |p: [f32; 3]| -> [f32; 3] { (glam::Vec3::from(p) - down).into() };
             let outline = region_outline(&reg.positions, &reg.indices);
             for &(a, b) in &outline {
-                overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 2.0, style: 0 });
+                // Live (dialogs/extrude-02, 03): 3 rows of colour on a 30°
+                // edge (~2.6 px), hovered or picked.
+                overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 3.0, style: 0 });
             }
             // Live part-studio/2028: a picked region shows its corners as
             // small grey dots.
@@ -862,18 +864,42 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                 overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, fill, !error));
             }
         }
+        // A selected datum plane: a solid amber fill and border over the
+        // plane (live selection/01) instead of tinting its faint fill.
+        let plane_selected = flag == state::SELECTED
+            && built.picks.ids_for(r).iter().any(|&id| built.picks.get(id).is_some_and(|t| t.kind == PickKind::Plane));
+        if plane_selected && let Some(pl) = display.planes.iter().find(|p| !p.hidden && &p.reference == r) {
+            let f = &pl.frame;
+            let c = |u: f64, v: f64| -> [f32; 3] { (f.origin + f.x * u * pl.half_width + f.y * v * pl.half_height).as_vec3().into() };
+            let corners = [c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)];
+            let n: [f32; 3] = f.normal.as_vec3().into();
+            let k = theme::lin(theme::viewport::PLANE_SELECTED_FILL);
+            overlay_regions.push((MeshData { positions: corners.to_vec(), normals: vec![n; 4], pick_ids: vec![0; 4], indices: vec![0, 1, 2, 0, 2, 3] }, [k[0], k[1], k[2], theme::viewport::PLANE_SELECTED_ALPHA], true));
+            for i in 0..4 {
+                overlay_lines.segments.push(LineSegment { a: corners[i], b: corners[(i + 1) % 4], color: lin_to_u8(sel_color), pick_id: 0, width: 2.4, style: 0 });
+            }
+        }
         for &id in built.picks.ids_for(r) {
             let t = built.picks.get(id);
-            // An erroring input face shows only its red outline.
-            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) {
+            // An erroring input face shows only its red outline; a selected
+            // plane its overlay above.
+            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) && !plane_selected {
                 scene.add_flag(id, flag);
             }
             let Some(t) = t else { continue };
             match t.kind {
                 PickKind::Vertex => {
                     if let Some(a) = t.anchor {
-                        let c = if flag == state::HOVER { hov_color } else { sel_color };
-                        overlay_pts.points.push(PointSprite { position: a.as_vec3().into(), color: lin_to_u8(c), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+                        let p: [f32; 3] = a.as_vec3().into();
+                        if flag == state::ERROR {
+                            overlay_pts.points.push(PointSprite { position: p, color: lin_to_u8(sel_color), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+                        } else {
+                            // Live (selection/08): the point marker.
+                            let cols = if flag == state::HOVER { theme::viewport::POINT_HOVER } else { theme::viewport::POINT_SELECTED };
+                            for (c, size, style) in [(cols[0], 11.0, 0), (cols[1], 8.0, PointSprite::RING), (cols[2], 5.0, 0)] {
+                                overlay_pts.points.push(PointSprite { position: p, color: lin_to_u8(theme::lin(c)), pick_id: 0, size, style: LineSegment::ON_TOP | style, _pad: 0 });
+                            }
+                        }
                     }
                 }
                 PickKind::Face if flag & (state::HOVER | state::SELECTED | state::ERROR) != 0 => {
@@ -901,6 +927,18 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             state::SELECTED
         };
         mark(r, flag, &mut scene);
+        // A part given by reference (its faces listed beside it): its faces
+        // take the whole-part amber.
+        if !error
+            && let Reference::Body(b) = r
+            && let Some(body) = display.body(b)
+        {
+            for f in &body.face_refs {
+                for &id in built.picks.ids_for(f) {
+                    scene.add_flag(id, state::BODY);
+                }
+            }
+        }
     }
     if let Some(h) = hover {
         mark(h, state::HOVER, &mut scene);
@@ -960,14 +998,35 @@ pub fn error_geometry(mesh: &noshape_model::display::MeshBuffers, up: &Uploader)
     out
 }
 
-/// A feature's debug geometry while its dialog is open (FeatureScript
-/// `addDebugEntities`, magenta).
+/// A feature's debug geometry while its dialog is open: Helix's profiles
+/// (magenta) and FeatureScript `debug()` entities in their colours (live "fs
+/// (10-25 c)": faces lit at half opacity, edges 2 px and points 6 px drawn
+/// through the model).
 pub fn debug_geometry(debug: &noshape_model::display::DebugGeometry, up: &Uploader) -> Vec<Instance> {
+    use noshape_model::display::ColoredDebug;
     let mut out = Vec::new();
     let color = lin_to_u8(theme::lin(theme::viewport::DEBUG_MAGENTA));
     let mut lines = LineData::default();
     for pl in &debug.lines {
         lines.push_polyline(pl, color, 0, 2.5, LineSegment::ON_TOP);
+    }
+    let mut points = Vec::new();
+    for item in &debug.colored {
+        match item {
+            ColoredDebug::Faces(mesh, [r, g, b]) => {
+                // 1 µm off the face, so a debugged part face shows over it.
+                let positions = mesh.positions.iter().zip(&mesh.normals).map(|(p, n)| std::array::from_fn(|i| p[i] + n[i] * 1e-6)).collect();
+                let m = MeshData { positions, normals: mesh.normals.clone(), pick_ids: vec![0; mesh.positions.len()], indices: mesh.indices.clone() };
+                let mut fill = noshape_render::srgb(*r, *g, *b);
+                fill[3] = 0.5;
+                out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(fill).unpickable().ignore_clip().layer(8));
+            }
+            ColoredDebug::Line(pl, [r, g, b]) => lines.push_polyline(pl, [*r, *g, *b, 255], 0, 2.0, LineSegment::ON_TOP),
+            ColoredDebug::Point(p, [r, g, b]) => points.push(PointSprite { position: *p, color: [*r, *g, *b, 255], pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 }),
+        }
+    }
+    if !points.is_empty() {
+        out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(20));
     }
     if !lines.segments.is_empty() {
         out.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(12));

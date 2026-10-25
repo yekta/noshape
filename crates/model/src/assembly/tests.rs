@@ -3873,3 +3873,68 @@ fn acorn_nut_crown_is_a_torus_like_live() {
         assert!((sphere - nose).abs() < 1e-3, "{name}: nose {sphere} mm, live {nose}");
     }
 }
+
+/// DIN 985 nylon-insert thin nuts (qa: missing from the catalogue): live names
+/// its sizes with the pitch ("M3x0.5", fine "M8x1", "M48X3"); each takes the
+/// published table's row of its diameter (DIN 985:1987). Every size builds;
+/// M8 is s 13 across the flats and 8 high (h max) as the table says.
+#[test]
+fn din_985_nuts_build_every_live_size() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Prevailing torque hex thin nut grade A & B DIN 985").expect("DIN 985 in the catalogue");
+    let names: Vec<&str> = c.sizes.iter().map(|s| s.name.as_str()).collect();
+    for want in ["M3x0.5", "M8x1.25", "M8x1", "M48X3"] {
+        assert!(names.contains(&want), "{want} in {names:?}");
+    }
+    let mut failures = Vec::new();
+    for size in &names {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        match standard::regenerate(&spec) {
+            Ok(r) if r.display.features.iter().all(|f| f.message.is_none()) => {}
+            Ok(r) => failures.push(format!("{size}: {:?}", r.display.features.iter().filter_map(|f| f.message.clone()).collect::<Vec<_>>())),
+            Err(e) => failures.push(format!("{size}: {e}")),
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("M8x1.25");
+    let r = standard::regenerate(&spec).unwrap();
+    let bb = r.context.body(&standard::part_body(&r).unwrap()).unwrap().shape.bounding_box(true).unwrap();
+    let (dx, dz) = ((bb.max.x - bb.min.x).min(bb.max.y - bb.min.y), bb.max.z - bb.min.z);
+    assert!((dx - 0.013).abs() < 1e-6, "across flats {dx}");
+    assert!((dz - 0.008).abs() < 1e-6, "height {dz}");
+}
+
+/// ISO 7380 socket button head M6 x 20 against live's B-rep (dom/skb-sc-geom):
+/// 19 faces; every face but the dome sphere and the six hex walls (which end
+/// on it) matches live exactly: the bearing face 53.4071, under-head fillet
+/// 7.6264, shank 362.0761, point chamfer 13.1271 and end 18.9921, the 140
+/// degree drill point 13.3729 and six ledges 0.2150 mm² (sum 469.8914 mm²).
+/// The dome's rule is asked of live (REQUESTS "skb (10-25) ISO 7380 dome").
+#[test]
+fn iso_7380_button_head_matches_live_but_the_dome() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::Surface;
+    let c = CATALOGUE.iter().find(|c| c.name == "Socket button head screw ISO 7380").unwrap();
+    // Live's table brings M2, M2.5 and M18 too.
+    for size in ["M2", "M2.5", "M18"] {
+        assert!(c.size(size).is_some(), "{size}");
+    }
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("M6");
+    spec.length = Some("20".into());
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    assert_eq!(b.faces.len(), 19);
+    let mut rest = 0.0;
+    for i in 0..b.faces.len() {
+        let f = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+        let bb = f.bounding_box(true).unwrap();
+        let wall = matches!(f.face_surface().unwrap(), Surface::Plane(_)) && bb.max.z - bb.min.z > 1e-6;
+        if !matches!(f.face_surface().unwrap(), Surface::Sphere { .. }) && !wall {
+            rest += f.area().unwrap();
+        }
+    }
+    assert!((rest * 1e6 - 469.8914).abs() < 1e-3, "{} mm²", rest * 1e6);
+}

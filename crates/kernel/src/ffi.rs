@@ -350,6 +350,7 @@ pub(crate) mod ffi {
         fn min_distance(a: &OcShape, b: &OcShape) -> Result<DistanceF>;
         fn angle_between(a: &OcShape, b: &OcShape) -> Result<f64>;
         fn classify_point(solid: &OcShape, p: P3, tol: f64) -> Result<i8>;
+        fn line_crossings(s: &OcShape, p: P3, dir: P3, len: f64) -> Result<Vec<f64>>;
 
         // ---- construction
         fn make_vertex(p: P3) -> Result<UniquePtr<OcShape>>;
@@ -502,6 +503,7 @@ pub(crate) mod ffi {
         ) -> Result<OpOut>;
 
         // ---- booleans etc.
+        fn set_memory_budget_mb(mb: u64);
         fn op_boolean(
             op: u8,
             args: &OcShapeList,

@@ -207,6 +207,7 @@ PropsF                   props_linear(const OcShape& s);
 DistanceF                min_distance(const OcShape& a, const OcShape& b);
 double                   angle_between(const OcShape& a, const OcShape& b);
 int8_t                   classify_point(const OcShape& solid, P3 p, double tol);
+rust::Vec<double>        line_crossings(const OcShape& s, P3 p, P3 dir, double len);
 
 // ---- construction (build.cpp)
 std::unique_ptr<OcShape> make_vertex(P3 p);
@@ -284,6 +285,7 @@ OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane,
              P3 d1, P3 d2, bool fuse);
 
 // ---- booleans, split, transform, section (boolean.cpp)
+void                     set_memory_budget_mb(uint64_t mb);
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts);
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts);

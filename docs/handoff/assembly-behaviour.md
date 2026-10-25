@@ -1154,3 +1154,66 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   panel [1264, 311, 310×51]) centres the panel on the pick with its bottom edge on it. Assembly/93 shows it pushed in from
   the right edge. Ours now does both (`render_mate_hud`). The note "just below-right" in behaviours.md is not what the
   coordinates show.
+
+## P2 drag/solve speed (skb 10-24, PRIORITIES.md item 2)
+- **How to measure:** run the app with `NOSHAPE_PERF=1 NOSHAPE_PERF_PERIOD=3`. Each drag step logs `a.drag_solve` (the
+  background solve), `a.drag_apply` (apply + scene rebuild on the UI thread) and `a.drag_step` (pointer target to
+  applied). Scripts are in /root/skb-scratch/perf:
+  - `mk_chain.py` + `mate_chain.py`: 20 links chained by 19 revolutes.
+  - `mk_pins.py`: plate + revolute pin + 18 free pins, 20 parts.
+  - `run.sh <doc>`, then `drag.sh X Y DX DY STEPS` (125 Hz pointer moves).
+- **Before:** dragging the chain's last link took **≈600 ms per solve** (p50 580–655 ms).
+- **After:** **≈39 ms** p50 for the chain, and **0.2 ms** for the mated pin among 20 parts.
+- `a.drag_step` latency beyond the solve is the UI thread waiting on Xvfb's software GPU (r.gpu_ms ≈ 300 ms per
+  frame on :103), not ours to fix here.
+- **Solver changes (`solver.rs`):**
+  - **Phase 1 (follow the drag) starts nearly undamped.** The damping λ·(1+diag) used to start at λ = 1e-3. Along the
+    mates' free directions the only curvature is the drag term (DRAG_WEIGHT² = 1e-4), so each step followed ≈10 % of
+    the drag and needed 14–48 iterations. It now starts at 1e-9 (7–13 iterations, exact tracking).
+  - **Bodies are solved in connected groups.** Union of the free bodies each term reads; fixed bodies link nothing.
+    The LM and the DOF eigen-analysis run per group, so a drag only solves its own group, and the dense algebra
+    scales with the group, not the assembly.
+  - **Sparse finite-difference Jacobian.** A body's columns re-evaluate only the terms that read it.
+  - **No DOF analysis in phase 1.** It ran twice per drag step before.
+- **`SolveOptions::skip_dof`:** the app's drag steps skip the DOF analysis and keep the previous instance-list glyphs.
+  The drag's "Move" edit re-evaluates them.
+- **Tests:** `chain_drag_follows_in_few_iterations` (exact tracking, ≤ 80 drag-phase iterations over 5 steps; it was
+  111) and `drag_moves_only_its_group`.
+- **After an edit** (`a.eval` / `a.eval_apply` / `a.eval_catalog`, same NOSHAPE_PERF run): the 20-link chain re-evaluates in
+  19–33 ms after a drag's "Move" commit, and applying takes 10–11 ms; the Insert catalog takes < 0.3 ms.
+- **Insert:** live doesn't fix any inserted instance (ins-914: all three show the free glyph), and neither do we.
+  qa4's open "? both inserted instances show the fixed icon" (core-workflow 6) doesn't reproduce:
+  - two free instances fastened together show the free glyph on both (dof 6 each);
+  - a part fastened to the fixed one shows no glyph, as live 2282 does for Part 2 <3>.
+
+## Standard content: DIN 985 back in the catalogue (skb 10-25, P3)
+- **The problem:** live names DIN 985's sizes with their pitch ("M3x0.5", fine "M8x1", and "M48X3" / "M20x2x2" as typed in
+  live's list). The generator matched none of them to the published table's "M3" rows, so the whole component was dropped.
+- **The fix:** `build_catalogue.py` `candidates` now falls back to the diameter's row for "M<d>x<P>" names, and the pitch comes
+  from the name, case-insensitively. DIN 985 now has 44 sizes, built with the ISO 10511 insert-nut recipe from DIN 985:1987.
+- **Still missing:** M2 and M2.5, which the 1987 table lacks.
+- **Asked live** for DIN 985's geometry (REQUESTS "skb (10-25)" DIN 985): it would confirm Onshape's collar and give M2 / M2.5.
+- **Test:** `din_985_nuts_build_every_live_size` (every size builds; M8 is 13 across the flats and 8 high).
+- **Still in the catalogue report:** 52 PEM and 4 NAS sheet-metal fasteners unmapped. Size gaps remain in ISO 7380 (M2, M2.5,
+  M18), ISO 10511 (M2, M2.5, M18), ISO 10512 fine pitch, ISO 7379 lengths, DIN 7050 / 7051 / 967 / 923 / 6908, and ASME taper /
+  spring pins. Onshape's own tables are captured for all of them (dom/skb-sc-comp), so live() mappings can close them.
+
+## Standard content: hex socket screws against live's B-rep (skb 10-25)
+- **The gap:** none of our socket screws had been checked against live. For the 8 captured in dom/skb-sc-geom (ISO 4762, 10642,
+  7380, 4026–4029 M6; ANSI 1/4-20 socket head), ours were 2–18 % off in area, with 10–23 extra faces.
+- **Socket (all screws):** a hex to the depth t, then a drill point from the flats' circle, ISO 140°, inch 120° (`drill` param,
+  set by `mod.rs` from `c.inch`). This leaves six flat ledges in the hex corners, as live does. The old 118° cone from the
+  corners left ~18 sliver faces.
+- **Point chamfer:** socket screws end at the basic minor diameter d − 1.0825 P (`minor_basic_live` for ISO 7380 and the ANSI
+  SOCKET_LIVE family), as every live socket screw does.
+- **Under-head fillet:** new `ru` param (ISO 7380 HEAD_FILLET).
+- **ISO 7380:** now takes live's own table, which adds M2, M2.5 and M18. Every face but the dome matches live exactly (test
+  `iso_7380_button_head_matches_live_but_the_dome`). Live's dome is a sphere through the rim (new `rimDome` flag), but its radius
+  doesn't follow from M6's row (it reaches the head height at r 1.30, while HEAD_TOP_DIA is 6.0); asked live (REQUESTS "skb
+  (10-25) ISO 7380 dome").
+- **Next:**
+  - ISO 4762: a HeadFillet on the head top edge and an under-head transition cone (AverageDiameter, TransitionLength), with
+    UnderHeadFillet at both ends.
+  - ISO 10642.
+  - Set screws: live's socket is a 0.7 mm flat-bottomed hex in the one capture, against table depths of 2 / 3.5; asked live
+    (REQUESTS "skb (10-25) set screw sockets").

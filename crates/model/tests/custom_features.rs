@@ -825,6 +825,50 @@ fn std_show_label_hints_match_builtin() {
     assert!(report.is_empty(), "SHOW_LABEL differs from the std:\n{report}");
 }
 
+/// Edge selection fields take sketch curves exactly where the std
+/// FeatureScript's "Filter" allows them, and model edges exactly where it
+/// does (qa5 SEL1: Fillet and Chamfer took a sketch line though fillet.fs and
+/// chamfer.fs say `SketchObject.NO`). Every feature, every query parameter.
+#[test]
+fn std_edge_filters_match_builtin() {
+    use noshape_model::params::{Hints, ParamKind, ParamSpec, QueryFilter};
+    const MODEL_EDGES: u32 = QueryFilter::EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0;
+    fn filters(specs: &[ParamSpec], prefix: &str, out: &mut Vec<(String, QueryFilter)>) {
+        for p in specs {
+            match &p.kind {
+                // Hidden fields (set by editing logic) are never picked into.
+                ParamKind::Query { .. } if p.hints.has(Hints::ALWAYS_HIDDEN) => {}
+                ParamKind::Query { filter, .. } => out.push((format!("{prefix}{}", p.id), *filter)),
+                ParamKind::Array { item, .. } => filters(item, &format!("{prefix}{}.", p.id), out),
+                _ => {}
+            }
+        }
+    }
+    let mut report = String::new();
+    for (file, src) in noshape_featurescript::STD_SOURCES {
+        for line in src.lines() {
+            let Some(name) = line.strip_prefix("export const ").and_then(|l| l.split_once(" = defineFeature")).map(|(n, _)| n) else { continue };
+            let Some(builtin) = noshape_model::features::get(name) else { continue };
+            let mut doc = Document::new();
+            let tab = doc.add_tab(file, TabContent::FeatureStudio(FeatureStudio::new(src)));
+            let compiled = custom::compile(tab, src);
+            let Some(def) = compiled.feature(name) else { continue };
+            let (mut fs, mut b) = (Vec::new(), Vec::new());
+            filters(&def.feature_type.params, "", &mut fs);
+            filters(&builtin.params, "", &mut b);
+            for (id, std_f) in &fs {
+                let Some((_, ours)) = b.iter().find(|(i, _)| i == id) else { continue };
+                let edges = |f: &QueryFilter| (f.0 & MODEL_EDGES != 0, f.0 & QueryFilter::SKETCH_EDGE.0 != 0);
+                let (s, o) = (edges(std_f), edges(ours));
+                if (s.0 || s.1 || o.0 || o.1) && s != o {
+                    report.push_str(&format!("{name}.{id}: std (model edges, sketch curves) {s:?}, ours {o:?}\n"));
+                }
+            }
+        }
+    }
+    assert!(report.is_empty(), "edge filters differ from the std:\n{report}");
+}
+
 /// Standard library features whose generated dialog equals the built-in one.
 const EXPECTED_IDENTICAL_DIALOGS: &[&str] = &[
     "bodyDraft", "booleanBodies", "boundarySurface", "chamfer", "circularPattern", "compositeCurve", "compositePart", "constrainedSurface", "cPlane", "cPoint", "curvePattern",
@@ -977,6 +1021,108 @@ export const pinnedHelix = defineFeature(function(context is Context, id is Id, 
     assert!(compiled.diagnostics.iter().any(|d| d.message.contains("HelixType")), "{:?}", compiled.diagnostics);
 }
 
+/// FeatureScript debug() entities reach the feature's display state in
+/// their colours, also from aborted sub-features and when the feature fails
+/// (live "fs (10-25 c)": shown while its dialog is open).
+#[test]
+fn debug_entities_in_their_colors() {
+    use noshape_model::display::ColoredDebug;
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Debug probe" }
+export const debugProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "cube", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(20, 20, 20) * millimeter });
+        const cube = qCreatedBy(id + "cube", EntityType.BODY);
+        debug(context, qNthElement(qCreatedBy(id + "cube", EntityType.FACE), 0));
+        debug(context, qNthElement(qCreatedBy(id + "cube", EntityType.EDGE), 0), DebugColor.GREEN);
+        debug(context, qNthElement(qCreatedBy(id + "cube", EntityType.VERTEX), 0), DebugColor.BLUE);
+        debug(context, vector(30, 0, 0) * millimeter, DebugColor.MAGENTA);
+        debug(context, vector(30, 0, 0) * millimeter, vector(30, 20, 10) * millimeter, DebugColor.ORANGE);
+        throw regenError("Intentional failure after debug");
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("debugProbe"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    let st = r.display.feature_state(fid).expect("state");
+    assert_eq!(st.status, FeatureStatus::Error);
+    let kinds: Vec<(&str, [u8; 3])> = st
+        .debug
+        .colored
+        .iter()
+        .map(|d| match d {
+            ColoredDebug::Faces(_, c) => ("face", *c),
+            ColoredDebug::Line(_, c) => ("line", *c),
+            ColoredDebug::Point(_, c) => ("point", *c),
+        })
+        .collect();
+    assert_eq!(kinds, [("face", [255, 0, 0]), ("line", [0, 255, 0]), ("point", [0, 0, 255]), ("point", [255, 0, 255]), ("line", [242, 255, 128])]);
+}
+
+/// opPolyline's bendRadii (std Routing curve): a tangent arc at each corner,
+/// bend i at point i + 1; the wrong number of radii is
+/// POLYLINE_BEND_RADII_INVALID_SIZE.
+#[test]
+fn polyline_bend_radii() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Polyline probe" }
+export const polylineProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        const mm = function(xs) { return mapArray(xs, function(x) { return x * millimeter; }); };
+        const points = mm([vector(0, 0, 0), vector(50, 0, 0), vector(50, 40, 0), vector(50, 40, 30)]);
+        // Live (fs 10-25 d): a tangent arc trimming both segments at each
+        // bend; 0 leaves the corner sharp; a closed polyline bends its
+        // closing corner too; two bends need only fit a segment together (5 + 25
+        // of the 40 mm one, where half of it each would not do).
+        const cases = [
+            { "points" : points, "bendRadii" : mm([10, 5]), "edges" : 5, "length" : 113.5619449 },
+            { "points" : points, "bendRadii" : mm([0, 5]), "edges" : 4, "length" : 117.8539816 },
+            { "points" : mm([vector(0, 0, 0), vector(40, 0, 0), vector(40, 30, 0), vector(0, 30, 0), vector(0, 0, 0)]),
+              "bendRadii" : mm([5, 5, 5, 5]), "edges" : 8, "length" : 131.4159265 },
+            { "points" : points, "bendRadii" : mm([5, 25]), "edges" : 5, "length" : 120 - 60 + 30 * PI / 2 }];
+        for (var i, c in cases)
+        {
+            opPolyline(context, id + ("case" ~ i), { "points" : c.points, "bendRadii" : c.bendRadii });
+            const edges = qCreatedBy(id + ("case" ~ i), EntityType.EDGE);
+            const length = evLength(context, { "entities" : edges });
+            if (size(evaluateQuery(context, edges)) != c.edges || abs(length - c.length * millimeter) > 1e-6 * millimeter)
+                throw regenError("case " ~ i ~ ": " ~ size(evaluateQuery(context, edges)) ~ " edges, " ~ toString(length));
+        }
+        for (var i, wrong in [{ "radii" : mm([10]), "error" : ErrorStringEnum.POLYLINE_BEND_RADII_INVALID_SIZE },
+                              { "radii" : mm([30, 30]), "error" : ErrorStringEnum.POLYLINE_INVALID_BEND }])
+        {
+            try silent
+            {
+                opPolyline(context, id + ("wrong" ~ i), { "points" : points, "bendRadii" : wrong.radii });
+                throw regenError("an error expected");
+            }
+            catch (e)
+            {
+                if (e.message != wrong.error)
+                    throw e;
+            }
+        }
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("polylineProbe"), &fx.units).unwrap();
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+}
+
 /// Evaluation options the natives used to ignore (found by the native
 /// argument audit): evOwnerSketchPlane's `checkAllEntities` (std Sweep and
 /// Loft profiles) and evRaycast's `includeIntersectionsBehind`.
@@ -1018,6 +1164,25 @@ export const optionsProbe = defineFeature(function(context is Context, id is Id,
         const behind = evRaycast(context, { "entities" : faces, "ray" : ray, "closest" : false, "includeIntersectionsBehind" : true });
         if (size(ahead) != 0 || size(behind) != 2)
             throw regenError("raycast hits: " ~ size(ahead) ~ " ahead, " ~ size(behind) ~ " with those behind");
+        // Live: farthest behind first, negative distances, the face and its parameter.
+        if (abs(behind[0].distance + 20 * millimeter) > 1e-9 * meter || abs(behind[1].distance + 10 * millimeter) > 1e-9 * meter
+            || behind[0].entityType != EntityType.FACE || norm(behind[0].parameter - vector(0.5, 0.5)) > 1e-9)
+            throw regenError("raycast behind: " ~ toString(behind));
+
+        // Live: `returnBSplinesAsOther` gives only `{ curveType : OTHER }`.
+        opFitSpline(context, id + "spline", { "points" : [vector(0, 0, 30) * millimeter, vector(10, 5, 30) * millimeter, vector(20, 0, 30) * millimeter] });
+        const spline = qCreatedBy(id + "spline", EntityType.EDGE);
+        const asOther = evCurveDefinition(context, { "edge" : spline, "returnBSplinesAsOther" : true });
+        const asSpline = evCurveDefinition(context, { "edge" : spline });
+        if (asOther != { "curveType" : CurveType.OTHER } || !(asSpline is BSplineCurve) || asSpline.curveType != CurveType.SPLINE)
+            throw regenError("curve definitions: " ~ toString(asOther) ~ " / " ~ toString(asSpline.curveType));
+
+        // Live: with passOwners, faces collide as their bodies.
+        fCuboid(context, id + "next", { "corner1" : vector(10, 0, 0) * millimeter, "corner2" : vector(20, 10, 10) * millimeter });
+        const bodies = evCollision(context, { "tools" : qCreatedBy(id + "box", EntityType.BODY), "targets" : qCreatedBy(id + "next", EntityType.BODY) });
+        const owners = evCollision(context, { "tools" : faces, "targets" : qCreatedBy(id + "next", EntityType.FACE), "passOwners" : true });
+        if (size(bodies) == 0 || size(owners) != size(bodies))
+            throw regenError("collisions: " ~ size(bodies) ~ " body against body, " ~ size(owners) ~ " faces as their owners");
     });
 "#,
     );

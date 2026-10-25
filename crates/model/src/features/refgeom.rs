@@ -179,7 +179,7 @@ pub fn query_variable() -> FeatureType {
             ],
         )
         .visible(move |v| created(v) && v.bool("filterByBodyType")),
-        ParamSpec::query("seedQuery", "Entities", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE | QueryFilter::VERTEX).visible(adjacent),
+        ParamSpec::query("seedQuery", "Entities", QueryFilter::ANY_FACE | QueryFilter::EDGE | QueryFilter::VERTEX).visible(adjacent),
         ParamSpec::enum_("adjacencyType", "Shared", &[("VERTEX", "Vertex"), ("EDGE", "Edge")]).hints(Hints::SHOW_LABEL).visible(adjacent),
         ParamSpec::enum_("edgeAdjacentEntityType", "Select", &[("EDGES_AND_FACES", "Edges and faces"), ("EDGES", "Only edges"), ("FACES", "Only faces")]).hints(Hints::SHOW_LABEL)
             .visible(move |v| adjacent(v) && v.is("adjacencyType", "EDGE")),

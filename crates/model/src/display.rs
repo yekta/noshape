@@ -348,6 +348,27 @@ pub struct FeatureState {
 pub struct DebugGeometry {
     pub lines: Vec<Vec<[f32; 3]>>,
     pub points: Vec<[f32; 3]>,
+    /// FeatureScript debug entities in their `DebugColor` (sRGB): faces,
+    /// edges and vertices.
+    pub colored: Vec<ColoredDebug>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ColoredDebug {
+    Faces(Arc<MeshBuffers>, [u8; 3]),
+    Line(Vec<[f32; 3]>, [u8; 3]),
+    Point([f32; 3], [u8; 3]),
+}
+
+impl PartialEq for ColoredDebug {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Faces(a, ca), Self::Faces(b, cb)) => Arc::ptr_eq(a, b) && ca == cb,
+            (Self::Line(a, ca), Self::Line(b, cb)) => a == b && ca == cb,
+            (Self::Point(a, ca), Self::Point(b, cb)) => a == b && ca == cb,
+            _ => false,
+        }
+    }
 }
 
 /// A computed parameter value: a length (meters) or text such as "Multiple".
@@ -382,6 +403,9 @@ pub struct StudioDisplay {
     /// The shown Assembly context's bodies (translucent, pickable for
     /// references; not parts of this Part Studio, see `crate::in_context`).
     pub context_bodies: Vec<BodyDisplay>,
+    /// Their kernel bodies, for tools that take context geometry outside a
+    /// feature's regeneration (sketch Use on a context face, qa5 CTX-USE).
+    pub context_shapes: Vec<Arc<crate::regen::context::Body>>,
     /// Bodies that are rigidly moved copies of one shape (pattern instances
     /// sharing a TShape, `Shape::partner_hash`): the renderer uploads the
     /// shared mesh once and draws each copy placed by its transform.

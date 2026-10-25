@@ -456,6 +456,10 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
     for (k, v) in &s.counts {
         f.params.set(k, ParamValue::Expr(ExprValue::new(format!("{v}"))));
     }
+    // Hex sockets' drill point (live: ISO 140, inch 120 degrees).
+    if c.shape == Shape::Screw {
+        f.params.set("drill", ParamValue::Expr(ExprValue::new(if c.inch { "120" } else { "140" })));
+    }
     if c.shape.has_length()
         && let Some(len) = spec.length.as_deref().and_then(|l| c.length_m(l))
     {

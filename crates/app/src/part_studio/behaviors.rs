@@ -73,8 +73,11 @@ pub struct UiState {
     /// Last pointer position over the viewport (viewport-local).
     pub pointer: Option<DVec2>,
     /// The pick under the pointer before midpoint snapping
-    /// ([`PartStudioView::hover_target`]).
+    /// ([`PartStudioView::update_hover`]).
     pub hover_pick: Option<PickTarget>,
+    /// The hovered edge whose midpoint marker shows: its midpoint can
+    /// become the hover target ([`PartStudioView::update_hover`]).
+    pub midpoint_armed: Option<Reference>,
     pub select_other: Option<SelectOther>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
@@ -379,6 +382,7 @@ impl UiState {
             cam_history: Vec::new(),
             pointer: None,
             hover_pick: None,
+            midpoint_armed: None,
             select_other: None,
             mini_toolbar: None,
             camera_menu: None,
@@ -603,7 +607,12 @@ impl PartStudioView {
         let mut out = Vec::new();
         for r in &self.selection {
             match r {
-                Reference::Body(b) => out.extend(self.body_geometry(b)),
+                // The part itself too: the builder gives its faces the
+                // whole-part amber (live selection/09).
+                Reference::Body(b) => {
+                    out.extend(self.body_geometry(b));
+                    out.push(r.clone());
+                }
                 Reference::Sketch(f) | Reference::Feature(f) => out.extend(self.feature_geometry(*f)),
                 _ => out.push(r.clone()),
             }
@@ -2554,7 +2563,7 @@ impl PartStudioView {
         self.open_section_dialog(window, cx);
     }
 
-    fn edge_midpoint(&self, r: &Reference) -> Option<glam::DVec3> {
+    pub(super) fn edge_midpoint(&self, r: &Reference) -> Option<glam::DVec3> {
         let p3 = |a: [f32; 3]| glam::DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
         // Open sketch curves have a midpoint too (circles have their center instead).
         let sketch_curve = match r {
@@ -2598,14 +2607,14 @@ impl PartStudioView {
             if let Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint } = r
                 && let Some(m) = self.edge_midpoint(on)
             {
-                marker(&mut points, m, [0xfac012, 0xc4960b, 0xffd65b]);
+                marker(&mut points, m, crate::theme::viewport::POINT_SELECTED);
             }
         }
         match &self.hover {
-            // The hovered midpoint target ([`Self::hover_target`]).
+            // The hovered midpoint target ([`Self::update_hover`]).
             Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() => {
                 if let Some(m) = self.edge_midpoint(on) {
-                    marker(&mut points, m, [0xf8c488, 0xc49a6a, 0xffd8ac]);
+                    marker(&mut points, m, crate::theme::viewport::POINT_HOVER);
                 }
             }
             // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows a
@@ -2626,31 +2635,33 @@ impl PartStudioView {
         vec![Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22)]
     }
 
-    /// The hover target (Onshape, part-studio/qa4-r5-s9-6c/6d): near a
-    /// hovered edge's midpoint the midpoint itself is hovered (orange marker,
-    /// the edge loses its highlight), within the radius a click picks it
-    /// ([`Self::midpoint_pick`]); fields that take no points keep the edge.
-    pub(super) fn hover_target(&self, cx: &App) -> Option<Reference> {
-        let t = self.ui.hover_pick.clone()?;
-        match self.ui.pointer {
-            Some(p) if matches!(t.kind, PickKind::Edge | PickKind::SketchCurve) && self.active_field_filter(cx).is_none_or(field_takes_points) => Some(self.midpoint_pick(t, p, cx).reference),
-            _ => Some(t.reference),
+    /// Sets the hover target from the pick under the pointer and returns
+    /// whether it changed. Live (behaviours "icons2 midpoint radius"): once
+    /// an edge is hovered (its dark midpoint marker showing), its midpoint
+    /// is the target while the pointer stays in the 9 px square around the
+    /// marker, over the adjacent faces too (orange marker, the edge loses
+    /// its highlight); arriving straight on the midpoint gives the edge.
+    /// Not in sketch mode, nor with a field that takes no points.
+    pub(super) fn update_hover(&mut self, cx: &App) -> bool {
+        let raw = self.ui.hover_pick.as_ref().map(|t| t.reference.clone());
+        let raw_edge = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)).map(|t| t.reference.clone());
+        let points_ok = self.sketch.is_none() && self.active_field_filter(cx).is_none_or(field_takes_points);
+        let in_window = points_ok
+            && match (&self.ui.midpoint_armed, self.ui.pointer) {
+                (Some(e), Some(p)) => self.edge_midpoint(e).and_then(|m| self.viewport.read(cx).project(m)).is_some_and(|s| in_midpoint_window(s, p)),
+                _ => false,
+            };
+        let (snap, armed) = midpoint_hover_step(self.ui.midpoint_armed.is_some(), points_ok && raw_edge.is_some(), in_window);
+        let target = match self.ui.midpoint_armed.clone().filter(|_| snap) {
+            Some(e) => Some(Reference::Implicit { on: Box::new(e), inference: noshape_model::reference::Inference::Midpoint }),
+            None => raw,
+        };
+        if !snap {
+            self.ui.midpoint_armed = if armed { raw_edge } else { None };
         }
-    }
-
-    /// An edge click within ~8 px of its midpoint selects the midpoint.
-    /// (Only for fields that take points, [`field_takes_points`].)
-    pub(super) fn midpoint_pick(&self, t: PickTarget, position: DVec2, cx: &App) -> PickTarget {
-        if self.sketch.is_some() {
-            return t;
-        }
-        let Some(m) = self.edge_midpoint(&t.reference) else { return t };
-        let Some(s) = self.viewport.read(cx).project(m) else { return t };
-        if !targets_midpoint(s, position, true) {
-            return t;
-        }
-        let r = Reference::Implicit { on: Box::new(t.reference.clone()), inference: noshape_model::reference::Inference::Midpoint };
-        PickTarget { reference: r, kind: PickKind::Vertex, anchor: Some(m) }
+        let changed = target != self.hover;
+        self.hover = target;
+        changed
     }
 
     // ------------------------------------------------------------ S toolbar
@@ -3296,14 +3307,24 @@ pub(super) fn iso_look(t: f32) -> IsoLook {
     }
 }
 
-/// The pick radius around an edge midpoint, in screen px (hover and click).
-pub(super) const MIDPOINT_PICK_PX: f64 = 8.0;
+/// Half the side of the square window around an edge midpoint marker in
+/// which the midpoint is the target (live: |dx|, |dy| ≤ 9 px; (9, −9) hits,
+/// (10, 0) and (0, −10) miss).
+pub(super) const MIDPOINT_WINDOW_PX: f64 = 9.0;
 
-/// Whether the pointer at `pointer` targets the edge midpoint drawn at `mid`
-/// rather than the edge (Onshape): within [`MIDPOINT_PICK_PX`], when the
-/// active field (if any) takes points.
-pub(super) fn targets_midpoint(mid: DVec2, pointer: DVec2, takes_points: bool) -> bool {
-    takes_points && mid.distance(pointer) <= MIDPOINT_PICK_PX
+/// Whether `pointer` is in the midpoint window around the marker at `mid`.
+pub(super) fn in_midpoint_window(mid: DVec2, pointer: DVec2) -> bool {
+    let d = (pointer - mid).abs();
+    d.x <= MIDPOINT_WINDOW_PX && d.y <= MIDPOINT_WINDOW_PX
+}
+
+/// One hover update near an edge midpoint: (the midpoint is the target,
+/// an edge stays armed). `armed`: an edge's midpoint marker already shows;
+/// `on_edge`: the pick under the pointer is an edge; `in_window`: the
+/// pointer is in the armed midpoint's window.
+pub(super) fn midpoint_hover_step(armed: bool, on_edge: bool, in_window: bool) -> (bool, bool) {
+    let snap = armed && in_window;
+    (snap, snap || on_edge)
 }
 
 /// A field takes an edge's midpoint (Onshape's implicit point): it takes
@@ -3316,19 +3337,32 @@ pub(super) fn field_takes_points(f: QueryFilter) -> bool {
 
 #[cfg(test)]
 mod midpoint_target_tests {
-    use super::{MIDPOINT_PICK_PX, targets_midpoint};
+    use super::{in_midpoint_window, midpoint_hover_step};
     use glam::DVec2;
 
     #[test]
-    fn hovering_near_an_edge_midpoint_targets_the_midpoint() {
+    fn the_midpoint_window_is_a_9px_square() {
         let m = DVec2::new(300.0, 200.0);
-        assert!(targets_midpoint(m, m, true));
-        assert!(targets_midpoint(m, m + DVec2::new(MIDPOINT_PICK_PX - 1.0, 0.0), true));
-        assert!(targets_midpoint(m, m + DVec2::new(3.0, -4.0), true));
-        // Farther along the edge: the edge stays the target.
-        assert!(!targets_midpoint(m, m + DVec2::new(MIDPOINT_PICK_PX + 2.0, 0.0), true));
-        // A field that takes no points (Fillet's edges) keeps the edge.
-        assert!(!targets_midpoint(m, m, false));
+        for d in [(0.0, 0.0), (9.0, -9.0), (8.0, 8.0), (-8.0, 8.0), (9.0, 0.0), (0.0, -9.0)] {
+            assert!(in_midpoint_window(m, m + DVec2::from(d)), "{d:?}");
+        }
+        for d in [(10.0, 0.0), (0.0, -10.0), (10.0, -10.0)] {
+            assert!(!in_midpoint_window(m, m + DVec2::from(d)), "{d:?}");
+        }
+    }
+
+    #[test]
+    fn hovering_near_an_edge_midpoint_targets_the_midpoint() {
+        // Arriving straight on the midpoint: the edge (its marker appears).
+        assert_eq!(midpoint_hover_step(false, true, false), (false, true));
+        // Then within the window: the midpoint.
+        assert_eq!(midpoint_hover_step(true, true, true), (true, true));
+        // Over the adjacent face, still in the window: the midpoint.
+        assert_eq!(midpoint_hover_step(true, false, true), (true, true));
+        // Along the edge, out of the window: the edge, still armed.
+        assert_eq!(midpoint_hover_step(true, true, false), (false, true));
+        // Over a face out of the window: the face, disarmed.
+        assert_eq!(midpoint_hover_step(true, false, false), (false, false));
     }
 }
 

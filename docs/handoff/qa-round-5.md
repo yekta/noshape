@@ -32,6 +32,30 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## Part Studio keystroke latency on a release build (lead 10-25; main 7074e37f CI release artifact, r5/v3s2.py 30-feature part, Xvfb + llvmpipe, load 14–24)
+Input → first changed frame from 60 fps x11grab (r5/../keylat.sh), phases from `NOSHAPE_PERF=1 NOSHAPE_PERF_PERIOD=1`.
+- **UI-only keystroke** (feature-list filter box, no regen): first change **67–100 ms** (median 83).
+- **Digit in Extrude 1's Depth field** (dialog open): first frame with the digit **150–250 ms** (median ~225). Per keystroke:
+  event dispatch ≈ 0; regen 4–50 ms (preview + refine, rolled to the edited feature; 0.8 ms when unchanged); `ps.apply_display`
+  0.4 ms, `ps.refresh_scene` 0.3, `s.build` 0.2; GPUI layout / prepaint / paint ≈ 2 ms each (~5 ms UI CPU per frame); then
+  **viewport render `r.gpu_ms` 95–145 ms** (llvmpipe) and **window `gpui.present` 50–120 ms** (llvmpipe). The viewport renders
+  asynchronously (render worker, frames in flight), so the window frame doesn't wait on it, but both rasterize on the same
+  llvmpipe threads; the extra ~140 ms over the filter box is the per-keystroke preview re-render = **EDIT-TYPING-PREVIEW**
+  (live: the preview re-runs only when the field commits). Patch: branch qa4/typing-preview (feature_dialog.rs, psb/ui2 file;
+  lead to OK).
+  **Verified (dev build of qa4/typing-preview 66563c00 on the same part):** typing "40" keeps the 12 mm preview, Tab → "40 mm" and the
+  preview follows; Enter applies 25 mm with the text selected; typing 8 then ✓ (no commit) commits 8 mm; no regen in the perf log
+  while typing. Depth digit → first frame **50–117 ms, median 83** (was 150–250, median ~225) = the filter-box floor.
+- **Commit / undo / redo of that edit** (= session 12's "~1.1 s per action", a settle time): full downstream regen
+  **390–490 ms** (29 features re-evaluated: Boss 1 59 ms, Fillet 1 65, Hole 1 43, others 11–25; live 132 ms = REGEN-SPEED) +
+  coarse tessellation 20–40 ms + render 100–190 ms → preview on screen after ~0.7 s; then refine **fine tessellation
+  450–565 ms** (40 k triangles, whole body re-meshed) + **one 590–605 ms llvmpipe frame** → final after ~1.9 s.
+- **THUMB-REGEN**: 1.5 s after each commit `start_thumbnail.rs` regenerates the whole studio again with its own Regenerator
+  (cold for the edited feature) and fine-tessellates again (380–450 ms more, the second "tessellate (fine)" with no regen line):
+  every commit pays kernel + mesh twice on a loaded box.
+- On a real GPU `r.gpu_ms` / `gpui.present` are a few ms, so there the costs left are REGEN-SPEED, refine tessellation and
+  THUMB-REGEN; on this box llvmpipe dominates every frame.
+
 ## v3 Session 12 on v0.4.8 (release tarball): P0 robustness, a long editing session on the 30-feature part (r5/s12.sh, r5/s12b.sh; expected geometry by CLI)
 **152 UI actions, no crash, no wrong geometry, no slowdown, memory bounded.**
 - Batch 1 (r5/s12.sh, 6 + 90 actions): cycles of edit Extrude 1 depth / Boss 1 depth / Boss 3 depth (double-click, type, ✓), Ctrl+Z,

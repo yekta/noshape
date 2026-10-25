@@ -689,3 +689,14 @@ changes. I write the renderer part first (my files) and show crops before touchi
   meshed once. CI release (run 40174188764, macOS 14 / 15): open shown 4.6 / 7.2 s after start (one regen 2.7 /
   4.2 s incl. its mesh, first frame 3.6 / 6.2 s; was ~7 s on macOS 14), delete shown 0.36 / 0.33 s, undo shown
   0.07 / 0.08 s (nothing evaluated or meshed).
+- **2026-10-25 (perf): app startup.** Milestones (NOSHAPE_PERF=1) from process start; perf.yml's summary has a
+  startup table per launch (the job's first launch has cold shader caches). Before: macOS 14 / 15 runners, first
+  launch 3.0 / 7.6 s to the first viewport frame (the 26 pipelines compiled one by one: 1.55 / 4.3 s), window drawn
+  1.2 / 3.3 s; later launches 0.56 / 0.94 s (pipelines 20-40 ms from the system shader cache). Now (runs
+  40184938764 .. 40195996620): pipelines compiled in parallel (one thread each), AO pass and overlay prewarmed with
+  them, the device made early on single-GPU Macs, the compile held until the first window has drawn
+  (`worker::hold_prewarm` / `release_prewarm`; compiled earlier it queued ahead of GPUI's own shaders and held the
+  window back to 2.3-2.7 s). First launch: window 1.8 / 1.25 s, viewport 3.4 / 2.9 s (pipelines 1.3 / 1.25 s);
+  later launches: window ~0.4 s, viewport 0.56-0.73 s. Cold app init varies a lot between runs (0.25-0.72 s on
+  macOS 14). Next: compile the first frame's pipelines first and the rest (pick, compare, section, reflection,
+  outline) after it.
