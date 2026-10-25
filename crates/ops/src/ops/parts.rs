@@ -14,7 +14,7 @@ pub fn ops() -> Vec<Op> {
             verb: "rename",
             summary: "Rename a part (Parts list › Rename)",
             description: "The part's name in the parts list, BOMs and drawings (\"Rename : <name>\").",
-            fields: vec![doc_field(), tab_field(), req("part", s(), "Part id (`body:…` from query_parts)."), req("name", s(), "New name.")],
+            fields: vec![doc_field(), tab_field(), req("part", s(), "Part id (`body:…` from query_parts) or name."), req("name", s(), "New name.")],
             mutates: true,
             destructive: false,
             run: rename,
@@ -27,7 +27,7 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 doc_field(),
                 tab_field(),
-                req("part", s(), "Part id (`body:…`)."),
+                req("part", s(), "Part id (`body:…`) or name."),
                 opt("name", s(), "Name."),
                 opt("description", s(), "Description."),
                 opt("part_number", s(), "Part number."),
@@ -52,7 +52,7 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 doc_field(),
                 tab_field(),
-                req("part", s(), "Part id (`body:…`)."),
+                req("part", s(), "Part id (`body:…`) or name."),
                 opt("action", json!({ "type": "string", "enum": ["add_property", "set", "delete_column", "delete_table"] }), "What to do (default: read the table)."),
                 opt("property", json!({ "type": "string", "enum": noshape_model::configured_properties::PROPERTIES }), "The property (column)."),
                 opt("value", s(), "set: the value (\"true\" / \"false\" for checkboxes)."),
@@ -82,16 +82,19 @@ pub fn ops() -> Vec<Op> {
     ]
 }
 
-fn part_arg(a: &Args) -> Result<BodyId, OpError> {
-    match refs::parse_str(a.str("part")?) {
-        Some(Reference::Body(b)) => Ok(b),
-        _ => Err(OpError::param("part", "a part id (`body:…` from query_parts)")),
+/// The `part` argument: a `body:…` id or the name the parts list shows.
+fn part_arg(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, a: &Args) -> Result<BodyId, OpError> {
+    let key = a.str("part")?;
+    if let Some(Reference::Body(b)) = refs::parse_str(key) {
+        return Ok(b);
     }
+    let r = od.regenerate(tab, None)?;
+    Ok(super::query::find_part(&r, key)?.id.clone())
 }
 
 fn rename(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
-    let body = part_arg(a)?;
+    let body = part_arg(od, tab, a)?;
     let name = a.str("name")?.trim().to_string();
     if name.is_empty() {
         return Err(OpError::param("name", "a name"));
@@ -108,7 +111,7 @@ fn rename(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
-    let body = part_arg(a)?;
+    let body = part_arg(od, tab, a)?;
     let r = od.regenerate(tab, None)?;
     let shown = r.display.bodies.iter().find(|b| b.id == body).map(|b| b.name.clone()).ok_or_else(|| OpError::param("part", "no such part in the Part Studio"))?;
     let config = od.current_config(tab)?;
@@ -172,7 +175,7 @@ fn table_json(ps: &noshape_model::PartStudio, body: &BodyId) -> serde_json::Valu
 fn configured_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     use noshape_model::configured_properties as cp;
     let (od, tab) = studio_target(ctx, a)?;
-    let body = part_arg(a)?;
+    let body = part_arg(od, tab, a)?;
     let r = od.regenerate(tab, None)?;
     let part_name = r.display.bodies.iter().find(|b| b.id == body).map(|b| b.name.clone()).ok_or_else(|| OpError::param("part", "no such part in the Part Studio"))?;
     let ps = crate::doc::studio(od.doc(), tab)?.clone();

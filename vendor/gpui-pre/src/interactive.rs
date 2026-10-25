@@ -136,6 +136,23 @@ pub struct TouchEvent {
     pub force: Option<f32>,
 }
 
+// NOSHAPE PATCH (agent nav2): Onshape's "Use pen input as mouse". Browsers
+// report a pen as `pointerType` "pen", which Onshape's graphics treat like a
+// finger unless the preference is on; the platform layers turn pen contacts
+// into [`TouchEvent`]s unless it is set.
+static PEN_AS_MOUSE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// NOSHAPE PATCH: set "Use pen input as mouse" (see [`pen_as_mouse`]).
+pub fn set_pen_as_mouse(on: bool) {
+    PEN_AS_MOUSE.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// NOSHAPE PATCH: whether pen contacts reach the app as mouse events instead
+/// of touches.
+pub fn pen_as_mouse() -> bool {
+    PEN_AS_MOUSE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 impl Sealed for TouchEvent {}
 impl InputEvent for TouchEvent {
     fn to_platform_input(self) -> PlatformInput {

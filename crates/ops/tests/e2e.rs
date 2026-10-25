@@ -3314,6 +3314,11 @@ fn agent_usability_pass() {
     let t = call(&mut ctx, "feature_types", json!({ "search": "move face" }));
     assert_eq!(t["feature_types"].as_array().unwrap().iter().map(|x| x["type"].as_str().unwrap()).collect::<Vec<_>>(), ["moveFace"], "{t}");
 
+    // Parts by the name the parts list shows, in the part tools and drawings too.
+    call(&mut ctx, "part_rename", json!({ "part": "Part 1", "name": "Bracket" }));
+    assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"][0]["name"], "Bracket");
+    call(&mut ctx, "part_set_properties", json!({ "part": "bracket", "part_number": "BR-1" }));
+
     // Projected views name what they look along.
     call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": "Part Studio 1 Drawing 1" }));

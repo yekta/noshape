@@ -7,6 +7,8 @@
 /// (MCP tool name, examples: JSON argument objects).
 pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("ops_list", &[r##"{}"##, r##"{"group": "sketch"}"##]),
+    ("ops_describe", &[r##"{"tools": ["drawing_section_view"]}"##]),
+    ("ops_call", &[r##"{"tool": "drawing_section_view", "args": {"drawing": "Part 1 Drawing 1", "parent": 1, "point": [205.5, 160], "position": [300, 160]}}"##]),
     // document / tab
     ("document_create", &[r##"{"path": "/tmp/bracket.noshape", "length_unit": "mm"}"##]),
     ("document_open", &[r##"{"path": "/tmp/bracket.noshape"}"##]),

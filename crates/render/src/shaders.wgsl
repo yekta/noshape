@@ -315,6 +315,11 @@ fn fs_compare_mix(i: BgOut) -> @location(0) vec4<f32> {
 fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
     let st = state_of(i.pick);
     if ((st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    return mesh_shade(i, front, st);
+}
+
+// `mesh_color` past the hidden / clipped test.
+fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
     // Per-primitive instances color each vertex (analysis maps, face
     // appearances); vertices with alpha 0 keep the instance color.
     var own = inst.color.rgb;
@@ -353,6 +358,14 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
 fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     return mesh_color(i, front);
+}
+
+// `fs_mesh` for meshes nothing hides or clips (renderer `DrawLists::solid`):
+// no `discard`, so tile-based GPUs shade only the visible fragments.
+@fragment
+fn fs_mesh_solid(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
+    return mesh_shade(i, front, state_of(i.pick));
 }
 
 // Onshape's image-based silhouettes (`vs-backfacesil-faces`): back faces

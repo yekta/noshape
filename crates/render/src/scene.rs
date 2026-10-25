@@ -247,7 +247,8 @@ pub struct Instance {
     pub hidden_only: bool,
     /// Opaque meshes drawn after the transparent ones (color pass), so
     /// see-through parts around them don't tint them: the red overlaps of
-    /// Interference detection.
+    /// Interference detection. Translucent ones go after the other
+    /// translucent meshes and previews (picked sketch regions).
     pub over_transparent: bool,
     /// Translucent meshes drawn after the lines and points (color pass): a
     /// drawing's release watermark lies over the ink.
@@ -363,7 +364,9 @@ impl Instance {
         self.compare = layer;
         self
     }
-    /// Draw an opaque mesh after the transparent meshes ([`Instance::over_transparent`]).
+    /// Draw an opaque mesh after the transparent meshes, a translucent one
+    /// after the other translucent ones and feature previews
+    /// ([`Instance::over_transparent`]).
     pub fn over_transparent(mut self) -> Self {
         self.over_transparent = true;
         self

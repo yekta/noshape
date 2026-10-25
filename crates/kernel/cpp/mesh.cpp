@@ -7,6 +7,8 @@
 #include <BRepMesh_Context.hxx>
 #include <BRepMesh_FaceDiscret.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepTools.hxx>
+#include <TopExp_Explorer.hxx>
 #include <BRepMesh_MeshAlgoFactory.hxx>
 #include <BRepTools.hxx>
 #include <BRepMesh_ShapeTool.hxx>
@@ -477,6 +479,27 @@ void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float>
     vertices[3 * (vi - 1) + 1] = (float)p.Y();
     vertices[3 * (vi - 1) + 2] = (float)p.Z();
   }
+  // The buffers are filled: drop the triangulations BRepMesh stored on the
+  // shape's faces and edges. The shape lives on (a regeneration's cached
+  // context), and OCCT's booleans on a meshed shape are several times slower
+  // (fins x400, undoing the delete of Linear pattern 2: its fuse took 12 s on
+  // the shown body against 2.5 s; docs/handoff/viewport-performance.md).
+  // Faces whose triangulation is their only geometry (mesh bodies) keep it
+  // (BRepTools::Clean).
+  std::lock_guard<std::mutex> lock(mesh_mutex());
+  BRepTools::Clean(m.shape);
+}
+
+bool has_triangulation(const OcShape& s)
+{
+  for (TopExp_Explorer e(s.shape, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(e.Current());
+    TopLoc_Location    loc;
+    if (!is_mesh_face(f) && !BRep_Tool::Triangulation(f, loc).IsNull())
+      return true;
+  }
+  return false;
 }
 
 } // namespace noshape

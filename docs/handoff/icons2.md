@@ -1163,3 +1163,10 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   orange) — the preview draws front+back faces over it; look at back-face handling for preview bodies.
   Test docs (CLI-built, /root/icons2-scratch/docs): dim-in (sketch/17 dims), box-mm (40x30x10 mm box: hover
   its front bottom edge (1087,598), midpoint (1122,608); vertex (1190,627)).
+- (10-25) Preview layering done (5b85de94): renderer draws preview back faces → other transparent meshes
+  (planes, picked-region fill at layer 8) → preview front faces (culled pipelines mesh_transparent_back/front).
+  Open: the picked-region fill (scene builder overlay_regions: SELECTION #ffa90a, alpha 0.4, lit) is too orange
+  / not yellow enough. Live: over the Top plane (221,209,179) (dialogs/extrude-endtype-up-to-part: sRGB model =
+  orange×0.64 at α≈0.29); through the preview front face (156,150,124) (part-studio/230), ours (149,141,140).
+  Alpha/unlit sweeps (env override, not committed) only reach (155,141,135): the green is short, so the fill
+  hue needs to be yellower than #ffa90a — derive the colour, then calibrate (one build per try).

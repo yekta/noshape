@@ -74,3 +74,24 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 | PAT1 linear pattern | ✅ hollow arrows, square handles, "3x" with a leader, 25 spacing dimension with extension lines |
 | **POLY1** inscribed polygon | ✗ **still** (= qa5 pass 21): construction circle solid while pending (looked before the vertex click, so the spinner wasn't checked) → qa5-routing POLY1 (skb). Evidence /root/qa4-scratch/gate-v047/poly1-main-a0e360a3.png |
 | OFF1, VB1, STB1, SK5 | fixed in earlier passes / code (SK5 matches live's numbers, d1a1d056 test) |
+
+| FIL2 CLI default (pass 21, 10-23) | `sketch_fillet` documents and uses 5 mm (0.5 in in inch documents) at first, then the tab's last radius | ✅ fixed |
+
+## Re-run pass 24 (qa5, 2026-10-24 ~23:30, main 538981d5, target-lead 23:22; doc sk24)
+| Row | Ours | Status |
+|---|---|---|
+| 2 corner rectangle | ⊥ ⫽ — glyphs (live: horizontal / vertical / parallel / perpendicular, behaviours ~149) | ✅ |
+| 3 Trim the line's stub | hover highlights the stub only; removed back to the rectangle edge, coincident glyph | ✅ |
+| 4–5 Offset | light-blue copy at 5 mm, hollow grey arrow, no value box; Esc cancels | ✅ |
+| 6–8 sketch fillet | R5 + hollow arrow + R leader; Enter → value box clear of glyphs; R3 applied | ✅ |
+| 9–10 Slot on the line | Ø20 preview with vertical leader + 4 tangent points; commits filled, Ø20, coincident / tangent glyphs, centre line solid | ✅ |
+| 11 Linear pattern on a circle | 3x / 1x with leaders, hollow arrows, square handles, 25 dimension with extension lines | ✅ |
+| 18 sketch Chamfer (tool search "chamfer" → 2nd row) | preview, two "5" dimensions, hollow arrow | ✅ |
+| (new) Tool search in a sketch | "chamfer" lists the Part Studio **Chamfer** first and **"Sketch chamfer"** second; Enter on the first confirms the sketch and opens the feature (live names the sketch tool "Chamfer", behaviours ~7819; Part Studio features in sketch-mode search not captured) | ? live requested "qa5 (10-24, sketch tool search)" |
+| (new) **SEL1** Fillet / Chamfer take sketch curves | with Fillet or Chamfer open, clicking a sketch line adds "Sketch 1 line" (live: SketchObject.NO in fillet.fs / chamfer.fs) | ✗ SEL1 (cross-area fix proposed to the lead) |
+
+## Release re-check v0.4.8 (qa5, 2026-10-25 02:20, release asset noshape-cli 0.4.8 linux-x86_64)
+| Row | Ours | Status |
+|---|---|---|
+| SK5 fillet radius edit (pass20/sk5.py + sk5b.py) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065; R8: 25.089 / 33.089 / 22.065 / 14.065 = live | ✅ |
+| POLY1 dash-dot along the whole polygon preview | not in v0.4.8 (fix eb764d1b is in ready/qa5) | — |

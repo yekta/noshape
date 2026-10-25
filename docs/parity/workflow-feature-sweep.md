@@ -245,3 +245,11 @@ std_show_label_hints_match_builtin (custom_features.rs) found 10 dialogs with se
 bridgingCurve Method, constrainedSurface Optimize, endcap Treatment type, frame Default corner type / Corner type, gusset Gusset type /
 Gusset position, isoparametricCurve Direction, offsetCurveOnFace Offset type / Gap fill, queryVariable Shared / Select ×2, routingCurve
 Reference / Coordinate system, ruledSurface type / vertex override / corner type. All 🔧 fixed (qa5); the test keeps them aligned.
+
+## Release re-check v0.4.8 (qa5, 2026-10-25 02:45, release asset noshape-cli 0.4.8 and target-engine 00:45; v048/tools/fsw.py)
+| Row | Ours | Status |
+|---|---|---|
+| L56 Hole, Merge scope cleared (point on the block's top) | Error "No target parts selected for hole.", Merge scope flagged | ✅ |
+| L45 Curve pattern, closed 100 mm path, Distance 25 × 4 | Error "Cannot create a curve pattern when the entered distance is larger than the path length.", Distance flagged | ✅ |
+| L45 Distance 25 × 3 | **Error** (same text); live OK with copies at 120° / 240° | ✗ **L45b** (psb; limit check on the sampled path length) |
+| L45b Distance 10 × 3 | copies at 120° / 240°; curvePattern.fs: 40° / 80° | ✗ **L45b** (psb; std spacing d·L / (L − d) on closed paths) |

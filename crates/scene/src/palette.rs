@@ -15,6 +15,14 @@ pub mod viewport {
     pub const PREHIGHLIGHT: u32 = 0xffc685;
     /// Selection (`ENTITY_HIGHLIGHT_COLOR_BORDER`).
     pub const SELECTION: u32 = 0xffa90a;
+    /// The fill of a picked sketch region, flat at `PICKED_REGION_ALPHA`
+    /// over everything see-through, a feature preview included (live
+    /// part-studio/230: the region tints the preview from above). Fitted in
+    /// the app to live's (156,150,124) / (176,177,154) where the region shows
+    /// through the preview's front-left / right faces (ours (162,152,121) /
+    /// (173,169,149)).
+    pub const PICKED_REGION: u32 = 0xb69d4c;
+    pub const PICKED_REGION_ALPHA: f32 = 0.34;
     /// Bodies a feature creates, while its dialog is open (shaded, seen
     /// through; live part-studio/230 reads `#8494a0` on the lit faces).
     pub const FEATURE_PREVIEW: u32 = 0x92aec5;

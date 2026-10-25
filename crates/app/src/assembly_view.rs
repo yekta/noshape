@@ -5633,6 +5633,8 @@ impl AssemblyView {
             .on_action(cx.listener(|this, _: &ViewBottom, _, cx| this.view(StandardView::Bottom, cx)))
             .on_action(cx.listener(|this, _: &ViewIsometric, _, cx| this.view(StandardView::Isometric, cx)))
             .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))))
+            // Shift+R, a "3D view" shortcut: assemblies too (qa5 VC8).
+            .on_action(cx.listener(|this, _: &ViewHighQuality, w, cx| this.on_camera_action(crate::camera_menu::Action::HighQuality, w, cx)))
             // View navigation keys, as in the Part Studio (navigation.rs).
             .on_action(cx.listener(|this, _: &ZoomIn, _, cx| this.viewport.update(cx, |vp, cx| vp.zoom_step(true, cx))))
             .on_action(cx.listener(|this, _: &ZoomOut, _, cx| this.viewport.update(cx, |vp, cx| vp.zoom_step(false, cx))))

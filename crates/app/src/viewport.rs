@@ -357,6 +357,8 @@ struct OrbitBench {
     cpu_at_present: Option<Duration>,
     /// The camera was fitted to the model before the run.
     fitted: bool,
+    /// When the last tick ran (`v.bench_tick`: the timer's real period).
+    last_tick: Option<Instant>,
 }
 
 static BENCH_CLAIMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -366,7 +368,7 @@ fn orbit_bench_from_env() -> Option<OrbitBench> {
     if BENCH_CLAIMED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         return None;
     }
-    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, zoom: false, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, fitted: false })
+    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, zoom: false, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, fitted: false, last_tick: None })
 }
 
 impl EventEmitter<ViewportEvent> for Viewport {}
@@ -885,6 +887,9 @@ impl Viewport {
     }
 
     fn submit(&mut self, cx: &mut Context<Self>) {
+        if let Some(t) = self.presented_at.filter(|_| self.bench.as_ref().is_some_and(|b| b.started.is_some())) {
+            noshape_render::perf::record("v.present_to_submit", t.elapsed());
+        }
         let size = self.bounds.size;
         let scale = self.scale;
         let w = (f32::from(size.width) * scale).round() as u32;
@@ -1304,6 +1309,10 @@ impl Viewport {
             return false;
         }
         b.ticks += 1;
+        let now = Instant::now();
+        if let Some(t) = b.last_tick.replace(now) {
+            noshape_render::perf::record("v.bench_tick", now - t);
+        }
         if b.zoom {
             // Scroll-wheel zoom in and out around the viewport centre.
             let factor = if (b.ticks / 15) % 2 == 0 { 1.04 } else { 1.0 / 1.04 };
@@ -1548,6 +1557,9 @@ impl Viewport {
         let p = self.local(e.position);
         self.buttons.set(e.button, true);
         cx.stop_propagation();
+        // A real mouse press: no touch is in progress (the platforms don't
+        // emulate presses for touches), so drop any whose end was missed.
+        self.touch_ids.clear();
         if self.drag == Drag::Nav {
             // Another button joined the drag.
             self.update_nav_mode(e.modifiers, p);
@@ -1608,6 +1620,12 @@ impl Viewport {
         if crate::nav_trace::enabled() {
             let local = self.local(e.position);
             crate::nav_trace::input("mouse_move", serde_json::json!({ "at": [local.x, local.y], "debug": format!("{e:?}") }));
+        }
+        // While fingers or a pen touch the viewport the mouse doesn't move
+        // the view (a compositor may still move the pointer to the pen; a
+        // page gets no compatibility mouse events during a pointer contact).
+        if !self.touch_ids.is_empty() {
+            return;
         }
         let p = self.local(e.position);
         // Another element's drag over the graphics (the dimension box by its
