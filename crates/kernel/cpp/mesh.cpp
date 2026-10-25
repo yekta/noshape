@@ -18,6 +18,8 @@
 #include <IMeshData_Wire.hxx>
 #include <IMeshTools_MeshAlgo.hxx>
 #include <IMeshTools_MeshAlgoFactory.hxx>
+#include <IMeshData_Model.hxx>
+#include <IMeshTools_ModelAlgo.hxx>
 #include <IMeshTools_Parameters.hxx>
 #include <Precision.hxx>
 #include <Standard_Failure.hxx>
@@ -380,6 +382,89 @@ private:
   occ::handle<IMeshTools_MeshAlgoFactory> myDefault = new BRepMesh_MeshAlgoFactory();
 };
 
+// BRepMesh's model post-processing without its deflection estimate
+// (BRepLib::UpdateDeflection per face, ~5 % of the 400-hole plate's display
+// meshing): the edges' polygons on the new triangulations (or 3D polygons of
+// free edges), as BRepMesh_ModelPostProcessor commits them. The display only
+// reads the triangles and these polygons, and mesh_fill drops both right
+// after. NOSHAPE_MESH_BREPMESH_POST=1 uses BRepMesh's own (tests compare).
+class DisplayPostProcessor : public IMeshTools_ModelAlgo
+{
+protected:
+  bool performInternal(const occ::handle<IMeshData_Model>& model, const IMeshTools_Parameters&, const Message_ProgressRange&) override
+  {
+    if (model.IsNull())
+      return false;
+    for (int e = 0; e < model->EdgesNb(); ++e)
+      commit(model->GetEdge(e));
+    return true;
+  }
+
+private:
+  static occ::handle<Poly_PolygonOnTriangulation> polygon(const IMeshData::IPCurveHandle& P, double deflection)
+  {
+    NCollection_Array1<int>    nodes(1, P->ParametersNb());
+    NCollection_Array1<double> params(1, P->ParametersNb());
+    for (int i = 1; i <= P->ParametersNb(); ++i)
+    {
+      nodes(i)  = P->GetIndex(i - 1);
+      params(i) = P->GetParameter(i - 1);
+    }
+    occ::handle<Poly_PolygonOnTriangulation> poly = new Poly_PolygonOnTriangulation(nodes, params);
+    poly->Deflection(deflection);
+    return poly;
+  }
+
+  static void commit(const IMeshData::IEdgeHandle& E)
+  {
+    const IMeshData::ICurveHandle& C = E->GetCurve();
+    if (C->ParametersNb() == 0)
+      return;
+    if (E->IsFree())
+    {
+      if (E->IsSet(IMeshData_Reused))
+        return;
+      NCollection_Array1<gp_Pnt> points(1, C->ParametersNb());
+      NCollection_Array1<double> params(1, C->ParametersNb());
+      for (int i = 1; i <= C->ParametersNb(); ++i)
+      {
+        points(i) = C->GetPoint(i - 1);
+        params(i) = C->GetParameter(i - 1);
+      }
+      occ::handle<Poly_Polygon3D> poly = new Poly_Polygon3D(points, params);
+      poly->Deflection(E->GetDeflection());
+      BRepMesh_ShapeTool::UpdateEdge(E->GetEdge(), poly);
+      return;
+    }
+    // The edge's pcurves per face (two on a seam), in their order.
+    std::vector<std::pair<IMeshData::IFacePtr, std::vector<IMeshData::IPCurveHandle>>> faces;
+    for (int i = 0; i < E->PCurvesNb(); ++i)
+    {
+      const IMeshData::IPCurveHandle& P    = E->GetPCurve(i);
+      const IMeshData::IFacePtr&      fptr = P->GetFace();
+      const IMeshData::IFaceHandle    F    = fptr;
+      if (F->IsSet(IMeshData_Failure) || F->IsSet(IMeshData_Reused))
+        continue;
+      auto it = std::find_if(faces.begin(), faces.end(), [&](const auto& g) { return g.first == fptr; });
+      if (it == faces.end())
+        faces.push_back({fptr, {P}});
+      else
+        it->second.push_back(P);
+    }
+    for (const auto& [fptr, pcurves] : faces)
+    {
+      TopLoc_Location                        loc;
+      const occ::handle<Poly_Triangulation>& tri = BRep_Tool::Triangulation(fptr->GetFace(), loc);
+      if (tri.IsNull())
+        continue;
+      if (pcurves.size() == 2)
+        BRepMesh_ShapeTool::UpdateEdge(E->GetEdge(), polygon(pcurves.front(), E->GetDeflection()), polygon(pcurves.back(), E->GetDeflection()), tri, loc);
+      else
+        BRepMesh_ShapeTool::UpdateEdge(E->GetEdge(), polygon(pcurves.front(), E->GetDeflection()), tri, loc);
+    }
+  }
+};
+
 struct FaceTri
 {
   occ::handle<Poly_Triangulation> tri;
@@ -427,6 +512,8 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     // v0.4.6 CI run 39827462890).
     occ::handle<BRepMesh_Context> ctx = new BRepMesh_Context();
     ctx->SetFaceDiscret(new BRepMesh_FaceDiscret(new PlanarCdtAlgoFactory()));
+    if (std::getenv("NOSHAPE_MESH_BREPMESH_POST") == nullptr)
+      ctx->SetPostProcessor(new DisplayPostProcessor());
     BRepMesh_IncrementalMesh mesher;
     mesher.SetShape(s.shape);
     mesher.ChangeParameters() = prm;

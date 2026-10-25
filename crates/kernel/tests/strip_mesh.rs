@@ -2,8 +2,9 @@
 //! (mesh.cpp `StripAlgo`) instead of BRepMesh's Delaunay: the same edges
 //! (silhouette ends, drawn edges), the same angular sampling (every strip
 //! node is one of BRepMesh's), no more deviation from the surface than
-//! BRepMesh's mesh and no more triangles. One test in this file: it switches
-//! NOSHAPE_MESH_NO_STRIPS.
+//! BRepMesh's mesh and no more triangles. The display's own post-processing
+//! (no deflection estimate) gives the same mesh as BRepMesh's. One test in
+//! this file: it switches NOSHAPE_MESH_NO_STRIPS and NOSHAPE_MESH_BREPMESH_POST.
 
 use glam::DVec3;
 use noshape_kernel::*;
@@ -86,4 +87,12 @@ fn strips_keep_brepmeshs_edges_sampling_and_tolerance() {
         assert!(sg <= dg * 1.0001 + 1e-9, "face {f}: strip deviation {sg:e} vs BRepMesh {dg:e}");
     }
     assert_eq!(checked, 2, "the hole and the countersink");
+
+    // BRepMesh's own post-processing: the same triangles and edge polygons.
+    // SAFETY: as in `mesh`.
+    unsafe { std::env::set_var("NOSHAPE_MESH_BREPMESH_POST", "1") };
+    let theirs = mesh(&s, true);
+    unsafe { std::env::remove_var("NOSHAPE_MESH_BREPMESH_POST") };
+    assert_eq!((theirs.positions.len(), &theirs.indices), (strip.positions.len(), &strip.indices));
+    assert_eq!((theirs.edges.len(), &theirs.edge_points), (strip.edges.len(), &strip.edge_points));
 }
