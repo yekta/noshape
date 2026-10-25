@@ -65,7 +65,8 @@ impl Tessellation {
         let r = self.faces[i];
         &self.indices[r.first_index as usize..(r.first_index + r.index_count) as usize]
     }
-    /// Polyline of edge `i` (empty for degenerated edges).
+    /// Polyline of edge `i` (empty for degenerated edges and seams, which
+    /// Onshape has not: see [`Shape::shown_topology`]).
     pub fn edge_polyline(&self, i: usize) -> &[[f32; 3]] {
         let r = self.edges[i];
         &self.edge_points[r.first_point as usize..(r.first_point + r.point_count) as usize]

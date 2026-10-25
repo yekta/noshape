@@ -645,10 +645,11 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     {
       const TopoDS_Edge& e    = TopoDS::Edge(m->edges(i));
       auto&              poly = m->edge_polys[i - 1];
-      if (BRep_Tool::Degenerated(e))
+      const NCollection_List<TopoDS_Shape>* fl = edgeFaces.Seek(e);
+      // Not edges in Onshape: not drawn, so not pickable (shown_topology).
+      if (BRep_Tool::Degenerated(e) || is_seam(e, fl))
         continue;
-      bool                                done = false;
-      const NCollection_List<TopoDS_Shape>* fl   = edgeFaces.Seek(e);
+      bool done = false;
       if (fl != nullptr)
       {
         for (NCollection_List<TopoDS_Shape>::Iterator it(*fl); it.More() && !done; it.Next())
