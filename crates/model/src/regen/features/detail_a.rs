@@ -118,13 +118,56 @@ fn fillet_radius(shape: &Shape, faces: &[Shape], names: &[Name], ef: &[Vec<u32>]
     tangent.then_some(r)
 }
 
+/// A blend for Reapply fillet (Parasolid recognises them from the
+/// geometry, so an imported part's fillets count too): a fillet by name, or
+/// a cylinder, torus or sphere tangent to two faces of other surfaces.
+/// Returns its radius.
+fn blend_radius(shape: &Shape, faces: &[Shape], names: &[Name], ef: &[Vec<u32>], f: usize) -> Option<f64> {
+    if let Some(r) = fillet_radius(shape, faces, names, ef, f) {
+        return Some(r);
+    }
+    let surf = faces[f].face_surface().ok()?;
+    let r = match surf {
+        k::Surface::Cylinder { radius, .. } => radius,
+        k::Surface::Torus { minor_radius, .. } => minor_radius,
+        k::Surface::Sphere { radius, .. } => radius,
+        _ => return None,
+    };
+    let mut tangent: Vec<u32> = Vec::new();
+    for (ei, fs) in ef.iter().enumerate() {
+        if fs.len() != 2 || !fs.contains(&(f as u32)) {
+            continue;
+        }
+        let other = if fs[0] as usize == f { fs[1] } else { fs[0] };
+        if tangent.contains(&other) || faces[other as usize].face_surface().is_ok_and(|o| o == surf) {
+            continue;
+        }
+        if edge_normals(shape, faces, ef, ei).is_some_and(|(a, b)| a.dot(b) > 0.999) {
+            tangent.push(other);
+        }
+    }
+    (tangent.len() >= 2).then_some(r)
+}
+
+/// A corner patch between fillets (a vertex blend): a curved face smooth
+/// along every edge it shares (its degenerate and seam edges aside).
+fn corner_patch(shape: &Shape, faces: &[Shape], ef: &[Vec<u32>], f: usize) -> bool {
+    if faces[f].is_planar() {
+        return false;
+    }
+    let shared: Vec<usize> = ef.iter().enumerate().filter(|(_, fs)| fs.len() == 2 && fs[0] != fs[1] && fs.contains(&(f as u32))).map(|(ei, _)| ei).collect();
+    shared.len() >= 3 && shared.iter().all(|&ei| edge_normals(shape, faces, ef, ei).is_some_and(|(a, b)| a.dot(b) > 0.999))
+}
+
 /// Fillets to remove and roll again around a draft (see `draft`): blends
 /// beside the drafted faces (and, with Reapply fillet, those among them),
 /// plus blends touching those (corner patches).
 pub(super) fn blends_to_reapply(shape: &Shape, names: &[Name], drafted: &[usize], refillet: bool) -> FResult<Vec<usize>> {
     let faces = shape.faces();
     let ef = shape.edge_faces()?;
-    let is_blend: Vec<bool> = (0..faces.len()).map(|f| fillet_radius(shape, &faces, names, &ef, f).is_some()).collect();
+    let radius: Vec<Option<f64>> = (0..faces.len()).map(|f| blend_radius(shape, &faces, names, &ef, f)).collect();
+    // Corner patches go with the fillets they join (rolled again with them).
+    let is_blend: Vec<bool> = (0..faces.len()).map(|f| radius[f].is_some() || corner_patch(shape, &faces, &ef, f)).collect();
     let drafted: BTreeSet<usize> = drafted.iter().copied().collect();
     let eligible = |f: usize| is_blend[f] && (refillet || !drafted.contains(&f));
     let mut set: BTreeSet<usize> = BTreeSet::new();
@@ -182,7 +225,7 @@ pub(super) fn reblend(ev: &mut EvalCtx, bi: usize, modified: &[usize], blends: &
     // Support pairs (non-removed tangent neighbours) and radius of each removed fillet.
     let mut supports: Vec<(usize, usize, f64, Name)> = Vec::new();
     for &bf in blends {
-        let Some(r) = fillet_radius(&body.shape, &faces, &body.faces, &ef, bf) else { continue };
+        let Some(r) = blend_radius(&body.shape, &faces, &body.faces, &ef, bf) else { continue };
         let mut tangent: Vec<usize> = Vec::new();
         for (ei, fs) in ef.iter().enumerate() {
             if fs.len() != 2 || !fs.contains(&(bf as u32)) {

@@ -396,6 +396,10 @@ NAUO order on export is a fixed internal order that follows no recoverable key (
   the part grows 5 mm on every side but the bottom (bbox −5…45 × −5…25 × 0…15, 18739.63 mm³ from 7582.71), status Ok. On a
   plain 40 × 20 × 10 box the same call gives x 0…45, 9000 mm³ (right). Expected (Onshape): only the end face moves, the
   fillets touching it are re-rolled ("Reapply fillet", default on). Same area as FSW-move.
+STATUS MOVEFACE-TANGENT (psb, 2026-10-25): fixed. The fillets' corner patches (vertex blends) weren't counted, so the fillets
+  stayed and OCCT's offset ran along the tangent chain; imported fillets (no history) weren't recognised at all. Reapply fillet
+  now takes the whole tangent blend network (fillets by name or by geometry, plus corner patches), moves the face and rolls the
+  fillets again (test move_face_beside_tangent_fillets_moves_one_face, native and imported).
 
 ## BBOX-TOL — kern — query bounding boxes of imported parts grow by the shape tolerance
 - api, 2026-10-25: the imported g47-1part block reports bbox 0…40.0001 × 0…20.0001 × 0…10.0001 (`Shape::bounding_box(true)`
