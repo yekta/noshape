@@ -6721,6 +6721,28 @@ mod tests {
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: None } if a == line)));
     }
 
+    /// Live (behaviours "qa4 round 5 s1 follow-up 2" (2)): a line chained to
+    /// the origin from a point a hair (0.66°) off vertical gets only the
+    /// Coincident there, no Vertical, and keeps its tilt.
+    #[test]
+    fn line_ending_on_a_point_off_vertical_adds_no_vertical() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.015, 0.005));
+        click(&mut ed, &mut d, v(0.015, 0.0227));
+        // Shift: no snap to x 0 for the third point.
+        let c = v(PX * 2.6, 0.0227);
+        ed.pointer_move(&mut d, c, true, false);
+        ed.tool_down(&mut d, c, None, true, false);
+        ed.tool_up(&mut d, c);
+        click(&mut ed, &mut d, v(PX * 0.5, PX * 0.5));
+        let last = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).last().unwrap().id;
+        let (s, e) = d.sketch.endpoints(last).unwrap();
+        assert_eq!(d.sketch.point(e).unwrap(), DVec2::ZERO, "ends on the origin");
+        let kinds: Vec<ConstraintKind> = d.sketch.constraints().map(|c| c.kind.clone()).collect();
+        assert!(!kinds.iter().any(|k| matches!(k, ConstraintKind::Vertical { a, .. } if *a == last)), "{kinds:?}");
+        assert!(d.sketch.point(s).unwrap().x > PX, "keeps its tilt: {}", d.sketch.point(s).unwrap());
+    }
+
     #[test]
     fn shift_suppresses_inference_and_drop_snap_without_pointer_movement() {
         let (mut ed, mut data) = editor(Tool::Line);
