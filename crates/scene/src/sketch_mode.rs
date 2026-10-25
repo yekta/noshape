@@ -1329,10 +1329,10 @@ impl SketchEditor {
         self.alt_held = alt;
         self.external_snap = None;
         if self.tool.draws() {
-            // Curves the cursor passes over wake up their inferences.
-            if let Some(h) = self.hover
-                && !is_point(&data.sketch, h)
-            {
+            // Curves and points the cursor passes over wake up their
+            // inferences (a point: alignment, live "skb (10-25) sketch
+            // inference").
+            if let Some(h) = self.hover {
                 self.woken.retain(|e| *e != h);
                 self.woken.insert(0, h);
                 self.woken.truncate(10);
@@ -6741,6 +6741,72 @@ mod tests {
         let kinds: Vec<ConstraintKind> = d.sketch.constraints().map(|c| c.kind.clone()).collect();
         assert!(!kinds.iter().any(|k| matches!(k, ConstraintKind::Vertical { a, .. } if *a == last)), "{kinds:?}");
         assert!(d.sketch.point(s).unwrap().x > PX, "keeps its tilt: {}", d.sketch.point(s).unwrap());
+    }
+
+    /// Live (behaviours "skb (10-25) sketch inference", 6.175 px/mm): Line
+    /// strokes a few px off their targets. Midpoint start + Vertical; no
+    /// alignment snap to a free point 1.9 px away (Horizontal only) unless
+    /// the cursor passed over it first (then Horizontal + Vertical with it);
+    /// an end near a circle's top gets Coincident + Tangent (no quadrant, no
+    /// Horizontal); an end at a circle centre is Coincident with it.
+    #[test]
+    fn line_inference_matches_live_strokes() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let (mut ed, mut d) = editor(Tool::Select);
+        ed.world_per_px = 1e-3 / 6.175;
+        let h = d.sketch.add_line(mm(0.0, 0.0), mm(40.0, 0.0));
+        let c = d.sketch.add_circle(mm(70.0, 20.0), 0.01);
+        let pt = d.sketch.add_point(mm(20.0, 30.0));
+        let line = |ed: &mut SketchEditor, d: &mut SketchData, a: DVec2, b: DVec2| {
+            ed.set_tool(Tool::Line);
+            for p in [a, b] {
+                ed.pointer_move(d, p, false, false);
+                let hv = d.sketch.pick(p, ed.world_per_px * 4.0);
+                ed.hover = hv;
+                ed.tool_down(d, p, hv, false, false);
+                ed.tool_up(d, p);
+            }
+            ed.cancel();
+            d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).last().unwrap().id
+        };
+        let kinds = |d: &SketchData, l: EntityId| -> Vec<String> {
+            let (s, e) = d.sketch.endpoints(l).unwrap();
+            let mut k: Vec<String> = d.sketch.constraints().filter(|c| c.kind.entities().iter().any(|x| [l, s, e].contains(x))).map(|c| format!("{:?}", c.kind).split([' ', '{']).next().unwrap().to_string()).collect();
+            k.sort();
+            k
+        };
+        let at = |d: &SketchData, l: EntityId| {
+            let (s, e) = d.sketch.endpoints(l).unwrap();
+            (d.sketch.point(s).unwrap() * 1e3, d.sketch.point(e).unwrap() * 1e3)
+        };
+        let l1 = line(&mut ed, &mut d, mm(20.3, 0.2), mm(20.3, 12.0));
+        assert_eq!(kinds(&d, l1), ["Midpoint", "Vertical"], "{:?}", at(&d, l1));
+        assert!((at(&d, l1).0 - DVec2::new(20.0, 0.0)).length() < 1e-6, "{:?}", at(&d, l1));
+        let l2 = line(&mut ed, &mut d, mm(40.0, 45.0), mm(20.3, 45.3));
+        assert_eq!(kinds(&d, l2), ["Horizontal"], "{:?}", at(&d, l2));
+        assert!((at(&d, l2).1.x - 20.3).abs() < 0.05, "no snap to the point's x: {:?}", at(&d, l2));
+        // Passing over the point first wakes it: the end snaps to its x
+        // and gets a Vertical with it.
+        ed.set_tool(Tool::Line);
+        for (p, hv) in [(mm(40.0, 60.0), None), (mm(20.0, 30.0), Some(pt)), (mm(20.3, 60.3), None)] {
+            ed.hover = hv;
+            ed.pointer_move(&mut d, p, false, false);
+            if hv.is_none() {
+                ed.tool_down(&mut d, p, None, false, false);
+                ed.tool_up(&mut d, p);
+            }
+        }
+        ed.cancel();
+        let lw = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).last().unwrap().id;
+        assert!((at(&d, lw).1.x - 20.0).abs() < 1e-6, "{:?}", at(&d, lw));
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { b: Some(b), .. } if b == pt) || matches!(c.kind, ConstraintKind::Vertical { a, .. } if a == pt)), "vertical with the point");
+        let l3 = line(&mut ed, &mut d, mm(50.0, 30.3), mm(70.3, 30.2));
+        assert_eq!(kinds(&d, l3), ["Coincident", "Tangent"], "{:?}", at(&d, l3));
+        let l4 = line(&mut ed, &mut d, mm(85.0, 3.0), mm(70.3, 20.3));
+        assert_eq!(kinds(&d, l4), ["Coincident"], "{:?}", at(&d, l4));
+        let Some(Curve2::Circle { center, .. }) = d.sketch.curve(c) else { panic!() };
+        assert!((at(&d, l4).1 - center * 1e3).length() < 1e-6, "on the centre: {:?} {center}", at(&d, l4));
+        let _ = h;
     }
 
     #[test]
