@@ -126,7 +126,7 @@ impl PartStudioView {
 
     /// "Turn off section view" (also with the dialog open).
     pub(super) fn turn_off_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.close_section_dialog(false, window, cx);
+        self.end_section_dialog(false, window, cx);
         self.ui.section.clear();
         self.ui.section_parts = None;
         self.apply_section(window, cx);
@@ -140,7 +140,7 @@ impl PartStudioView {
             return;
         }
         if self.ui.section_dialog.is_some() {
-            self.close_section_dialog(false, window, cx);
+            self.end_section_dialog(false, window, cx);
         } else if !self.ui.section.is_empty() {
             self.ui.section.clear();
             self.ui.section_parts = None;
@@ -167,8 +167,20 @@ impl PartStudioView {
         }
     }
 
-    /// ✓ keeps the section, ✕ restores the state before the dialog.
+    /// Enter accepts; Esc closes the value box first (live: "Esc closes
+    /// only the value box", then cancels the dialog).
     pub(super) fn close_section_dialog(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if !accept && std::mem::take(&mut self.ui.section_box) {
+            self.ui.section_offset_edit = None;
+            window.focus(&self.focus, cx);
+            cx.notify();
+            return;
+        }
+        self.end_section_dialog(accept, window, cx);
+    }
+
+    /// ✓ keeps the section, ✕ restores the state before the dialog.
+    pub(super) fn end_section_dialog(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(d) = self.ui.section_dialog.take() else { return };
         self.ui.section_offset_edit = None;
         self.reset_section_manip();
@@ -262,27 +274,46 @@ impl PartStudioView {
         let Some(i) = self.ui.section_dialog.as_ref().map(|d| d.active) else { return };
         if let Some(pl) = self.ui.section.get_mut(i) {
             pl.offset += length - section_handle(lo, hi);
+            // Live: the plane moves in 0.1 mm (0.01 in) steps from the drag
+            // start ("2.6 mm", "-8.5 mm").
+            if let Some(s0) = self.ui.section_drag0 {
+                let units = self.doc.read(cx).session.doc.settings.units;
+                let imperial = matches!(units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
+                let step = if imperial { 0.000254 } else { 0.0001 };
+                pl.offset = s0 + ((pl.offset - s0) / step).round() * step;
+            }
         }
-        // The box shows the offset again.
         self.ui.section_rot = None;
         self.apply_section(window, cx);
     }
 
-    /// The value box's text: the last ring drag's angle ("15 deg"), else
-    /// the plane's offset.
+    /// The value box's text, shown from a drag on (live): the last ring
+    /// drag's angle ("15 deg"), else the distance from the arrow drag's start.
     fn section_value_text(&self, cx: &App) -> Option<String> {
+        if !self.ui.section_box {
+            return None;
+        }
         if let Some(r) = self.ui.section_rot {
             return Some(super::section_manip::deg_text(r.deg));
         }
         let d = self.ui.section_dialog.as_ref()?;
         let pl = self.ui.section.get(d.active)?;
         let units = self.doc.read(cx).session.doc.settings.units;
-        Some(noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset, noshape_units::Dim::LENGTH), &units))
+        Some(noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset - self.ui.section_drag0.unwrap_or(0.0), noshape_units::Dim::LENGTH), &units))
+    }
+
+    /// The value box after a drag: a field with its value selected (live).
+    pub(super) fn open_section_box(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(text) = self.section_value_text(cx) {
+            self.open_section_offset_edit(text, window, cx);
+        }
     }
 
     /// Forget the manipulator's rotation and moved base (another plane).
     fn reset_section_manip(&mut self) {
         self.ui.section_rot = None;
+        self.ui.section_box = false;
+        self.ui.section_drag0 = None;
         self.ui.section_base = None;
     }
 
@@ -299,7 +330,7 @@ impl PartStudioView {
         use crate::section_dialog::Action;
         match a {
             Action::Accept => self.close_section_dialog(true, w, cx),
-            Action::Cancel => self.close_section_dialog(false, w, cx),
+            Action::Cancel => self.end_section_dialog(false, w, cx),
             Action::Include(include) => {
                 if let Some(d) = &mut self.ui.section_dialog {
                     d.include = include;
@@ -410,7 +441,7 @@ impl PartStudioView {
         let sub = cx.subscribe_in(&input, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let typed = st.read(cx).value().to_string();
-                this.commit_section_offset(&typed, window, cx);
+                this.commit_section_offset(&typed, matches!(ev, InputEvent::PressEnter { .. }), window, cx);
             }
         });
         input.update(cx, |s, cx| {
@@ -421,9 +452,11 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// A typed offset (a bare number in the workspace unit) moves the active
-    /// plane; text that doesn't evaluate leaves it.
-    fn commit_section_offset(&mut self, typed: &str, window: &mut Window, cx: &mut Context<Self>) {
+    /// A typed offset (a bare number in the workspace unit, from the arrow
+    /// drag's start) moves the active plane; text that doesn't evaluate
+    /// leaves it. After Enter the box stays open with its value selected
+    /// (live: "5" + Enter → "5 mm").
+    fn commit_section_offset(&mut self, typed: &str, enter: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.ui.section_offset_edit = None;
         let units = self.doc.read(cx).session.doc.settings.units;
         let vars = self.scope_variables(None, cx);
@@ -433,8 +466,7 @@ impl PartStudioView {
             if let Ok(q) = noshape_units::evaluate_as(&text, noshape_units::Dim::ANGLE, &units, &vars) {
                 self.set_section_rotation(super::section_manip::RingDrag { deg: q.value.to_degrees(), dragging: false, ..r }, window, cx);
             }
-            window.focus(&self.focus, cx);
-            cx.notify();
+            self.after_section_commit(enter, window, cx);
             return;
         }
         let text = noshape_model::quantity_text::commit_text(typed, noshape_units::Dim::LENGTH, &units, &vars);
@@ -442,10 +474,18 @@ impl PartStudioView {
             && let Some(active) = self.ui.section_dialog.as_ref().map(|d| d.active)
             && let Some(pl) = self.ui.section.get_mut(active)
         {
-            pl.offset = q.value;
+            pl.offset = self.ui.section_drag0.unwrap_or(0.0) + q.value;
             self.apply_section(window, cx);
         }
-        window.focus(&self.focus, cx);
+        self.after_section_commit(enter, window, cx);
+    }
+
+    fn after_section_commit(&mut self, enter: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if enter {
+            self.open_section_box(window, cx);
+        } else {
+            window.focus(&self.focus, cx);
+        }
         cx.notify();
     }
 

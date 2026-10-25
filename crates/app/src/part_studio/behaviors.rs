@@ -194,6 +194,11 @@ pub struct UiState {
     pub section_rot: Option<super::section_manip::RingDrag>,
     pub section_base: Option<glam::DVec3>,
     pub section_base_drag: bool,
+    /// The section value box (live skb "assembly section" 2–3): shown from
+    /// an arrow or ring drag until Esc; the plane's offset when the arrow
+    /// drag started (the box reads the distance from it).
+    pub section_box: bool,
+    pub section_drag0: Option<f64>,
     pub section_hover: Option<super::section_manip::SectionHandle>,
     pub section_parts: Option<(bool, Vec<BodyId>)>,
     /// Open Appearance editor, and faces of a hovered appearance row.
@@ -469,6 +474,8 @@ impl UiState {
             section_rot: None,
             section_base: None,
             section_base_drag: false,
+            section_box: false,
+            section_drag0: None,
             section_hover: None,
             section_parts: None,
             appearance_edit: None,

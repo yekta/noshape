@@ -175,6 +175,9 @@ impl PartStudioView {
             ViewportEvent::ToolDown { position, .. } => match self.section_handle_at(s, *position, cx)? {
                 SectionHandle::Arrow => {
                     self.ui.section_rot = None;
+                    self.ui.section_offset_edit = None;
+                    self.ui.section_box = true;
+                    self.ui.section_drag0 = self.ui.section_dialog.as_ref().and_then(|d| self.ui.section.get(d.active)).map(|p| p.offset);
                     None
                 }
                 SectionHandle::Base => {
@@ -185,6 +188,9 @@ impl PartStudioView {
                     let axis = s.axes[k];
                     let pivot = s.arrow.base;
                     let from = on_plane(self, *position, axis, pivot, cx)? - pivot;
+                    self.ui.section_offset_edit = None;
+                    self.ui.section_box = true;
+                    self.ui.section_drag0 = None;
                     self.ui.section_rot = Some(RingDrag { ring: k, axis, pivot, normal0: s.arrow.dir, from, deg: 0.0, dragging: true });
                     cx.notify();
                     Some(true)
@@ -212,9 +218,15 @@ impl PartStudioView {
                 if std::mem::take(&mut self.ui.section_base_drag) {
                     return Some(true);
                 }
-                let r = self.ui.section_rot.filter(|r| r.dragging)?;
+                // Live: the box then takes typing, its value selected.
+                let Some(r) = self.ui.section_rot.filter(|r| r.dragging) else {
+                    if self.manip_drag.is_some() {
+                        self.open_section_box(window, cx);
+                    }
+                    return None;
+                };
                 self.ui.section_rot = Some(RingDrag { dragging: false, ..r });
-                cx.notify();
+                self.open_section_box(window, cx);
                 Some(true)
             }
             _ => None,
