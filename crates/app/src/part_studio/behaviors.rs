@@ -3176,8 +3176,9 @@ impl PartStudioView {
     pub(super) fn auto_operation(&mut self, cx: &mut Context<Self>) {
         let Some(e) = &self.edit else { return };
         // Live L49/L50: a tapped hole's Depth, Tapped depth and Tap
-        // clearance stay linked, new or edited.
-        if e.dialog.read(cx).feature.type_id == "hole" {
+        // clearance stay linked, new or edited (std's holeEditLogic does it
+        // where it runs).
+        if e.dialog.read(cx).feature.type_id == "hole" && !noshape_model::custom::std_feature::has_editing_logic("hole") {
             let dialog = e.dialog.clone();
             let (id, now) = {
                 let d = dialog.read(cx);
@@ -3584,7 +3585,7 @@ mod field_point_tests {
         assert!(km(PickKind::SketchCurve, &r, QueryFilter::ANY_EDGE));
         // Fillet / Chamfer take part edges only (a sketch line lying on a
         // part's edge isn't picked); sketch-only fields take no part edges.
-        let fillet = QueryFilter::SOLID_EDGE | QueryFilter::ANY_FACE;
+        let fillet = QueryFilter::EDGE | QueryFilter::ANY_FACE;
         assert!(km(PickKind::Edge, &r, fillet) && !km(PickKind::SketchCurve, &r, fillet));
         assert!(km(PickKind::SketchCurve, &r, QueryFilter::SKETCH_EDGE) && !km(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
         // HOLE-FACE (live): Hole locations take sketch points and explicit

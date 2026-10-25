@@ -202,9 +202,11 @@ pub fn editing_logic(
 /// std Loft: Add and the merge scope as Extrude, profiles kept across a
 /// creation type change, adjacent faces for matched end conditions; Revolve,
 /// Sweep, Mirror: the same boolean step; Plane: its type from the picks;
+/// Hole: Merge scope and flip from an opHole probe, standard tables, tapped
+/// depths (holeEditLogic);
 /// Draft: parting-line hint faces and flips; Split: Keep tools for a face or
 /// plane tool, live "Split").
-const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart"];
+const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart", "hole"];
 
 /// Whether std has editing logic for built-in feature `type_id` and the
 /// dialog runs it (std runs the feature, or it is in STD_EDITING_LOGIC).

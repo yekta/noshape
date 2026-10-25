@@ -444,7 +444,8 @@ pub fn boolean_choices(f: &Feature, user_set: &dyn Fn(&str) -> bool, state: &nos
 pub fn hole_scope_logic(f: &Feature, user_set: &dyn Fn(&str) -> bool, touched: &[BodyId], behind: &[BodyId]) -> AutoChanges {
     use noshape_model::params::ParamValue;
     let p = &f.params;
-    if f.type_id != "hole" || p.query("locations").is_empty() {
+    // std's holeEditLogic decides them where it runs (the dialog, dialog_logic).
+    if f.type_id != "hole" || p.query("locations").is_empty() || noshape_model::custom::std_feature::has_editing_logic("hole") {
         return Vec::new();
     }
     let user = user_set("scope");

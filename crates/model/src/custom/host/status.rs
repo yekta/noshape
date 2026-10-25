@@ -222,12 +222,29 @@ fn abort_feature(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn report_status(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let id = id_arg(i, &a, 1)?;
-    let status = a.get(2).cloned().unwrap_or_default();
+    let mut status = a.get(2).cloned().unwrap_or_default();
     let mut st = cx.state.lock();
     let ok = status.get("statusType").as_str().is_some_and(|s| &*s == "OK");
     if ok {
         st.status.remove(&id);
     } else {
+        // Live "fs (10-25 e)": a report replaces the type and message but
+        // faulty parameters accumulate, newest first (a bare HOLE_NO_HITS
+        // thrown after opHole's mapped status keeps Merge scope red).
+        let old: Vec<Value> = st.status.get(&id).and_then(|o| o.get("faultyParameters").as_array().map(|a| a.to_vec())).unwrap_or_default();
+        if !old.is_empty()
+            && let Value::Map(m, t) = &status
+        {
+            let mut faulty: Vec<Value> = status.get("faultyParameters").as_array().map(|a| a.to_vec()).unwrap_or_default();
+            for f in old {
+                if !faulty.contains(&f) {
+                    faulty.push(f);
+                }
+            }
+            let mut m = (**m).clone();
+            m.insert(Value::str("faultyParameters"), Value::array(faulty));
+            status = Value::Map(std::sync::Arc::new(m), *t);
+        }
         st.status.insert(id, status);
     }
     Ok(Value::Undefined)

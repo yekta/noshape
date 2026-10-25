@@ -208,6 +208,8 @@ fn bspline_surface_from_featurescript_definition() {
     assert!((b.min.x + 2.0 * inch).abs() < 1e-6 && (b.max.y - 2.0 * inch).abs() < 1e-6 && (b.min.y + 2.0 * inch).abs() < 1e-6, "{b:?}");
     assert!(b.max.z > 0.1 * inch && b.max.z < inch, "{b:?}");
     let full = area(&sheet);
+    // face_bspline gives the surface back in the same form (open).
+    same_surface(&sheet.faces()[0].face_bspline().unwrap(), &bump);
 
     // Inside a square loop of four lines in (u, v): a smaller sheet.
     let line = |a: DVec2, b: DVec2| BSplineCurve2dData { poles: vec![a, b], weights: None, knots: vec![0.0, 0.0, 1.0, 1.0], degree: 1, periodic: false };
@@ -246,6 +248,8 @@ fn bspline_surface_from_featurescript_definition() {
         v_periodic: false,
     };
     let t = make_bspline_surface(&tube, &[], true).unwrap();
+    // Periodic in u: the overlapping rows and the unrolled knots come back.
+    same_surface(&t.faces()[0].face_bspline().unwrap(), &tube);
     // Closed round u: one face with a seam (two end loops + the seam), and no
     // solid since its ends are open.
     assert!(t.is_valid());
@@ -306,4 +310,13 @@ fn wrapped_straight_sides_are_lines_and_arcs() {
         }
     }
     assert_eq!((lines, arcs), (2, 2), "{kinds:?}");
+}
+
+/// Two B-spline surfaces in FeatureScript's form, equal to 1e-9.
+fn same_surface(got: &BSplineSurfaceData, want: &BSplineSurfaceData) {
+    let near = |a: &[f64], b: &[f64]| a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-9);
+    assert_eq!((got.nu, got.nv, got.u_degree, got.v_degree, got.u_periodic, got.v_periodic), (want.nu, want.nv, want.u_degree, want.v_degree, want.u_periodic, want.v_periodic));
+    assert!(near(&got.u_knots, &want.u_knots) && near(&got.v_knots, &want.v_knots), "knots {:?} {:?}", got.u_knots, got.v_knots);
+    assert!(got.poles.iter().zip(&want.poles).all(|(a, b)| a.distance(*b) < 1e-9), "poles {:?}", got.poles);
+    assert_eq!(got.weights.is_some(), want.weights.is_some());
 }

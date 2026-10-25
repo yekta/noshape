@@ -597,6 +597,7 @@ struct DrawLists {
     /// Prefix counts of HIDDEN or DIM states by pick id (empty: none).
     masked_prefix: Vec<u32>,
     solid_scratch: Vec<(i32, bool, usize)>,
+    on_top: Vec<usize>,
     lines: Vec<usize>,
     /// Color pass only: silhouette candidates (`GpuLines::silhouette`) and
     /// backface silhouette meshes (`Instance::back_silhouette`).
@@ -813,6 +814,7 @@ impl DrawLists {
         self.reflective.clear();
         self.over_transparent.clear();
         self.over_lines.clear();
+        self.on_top.clear();
         self.lines.clear();
         self.silhouettes.clear();
         self.back_silhouettes.clear();
@@ -941,6 +943,11 @@ impl DrawLists {
                 Drawable::Mesh(_) if pick && inst.pick_only => self.pick_priority.push(i),
                 Drawable::Mesh(_) if !pick && inst.reflection.is_some() && inst.color[3] >= 0.999 => self.reflective.push(i),
                 Drawable::Mesh(_) if !pick && inst.over_transparent && inst.color[3] >= 0.999 => self.over_transparent.push(i),
+                Drawable::Mesh(_) if inst.on_top => {
+                    if !pick {
+                        self.on_top.push(i);
+                    }
+                }
                 Drawable::Mesh(_) if inst.over_lines => {
                     if !pick {
                         self.over_lines.push(i);
@@ -978,13 +985,14 @@ impl DrawLists {
                 self.opaque.clear();
                 self.transparent.clear();
                 self.over_lines.clear();
+                self.on_top.clear();
                 self.reflective.clear();
             }
         }
         self.order_solid(scene, pick);
         let inst = &scene.instances;
-        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
-        let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden];
+        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, on_top, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
+        let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, on_top, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden];
         slots.clear();
         slot_of.clear();
         slot_of.resize(inst.len(), u32::MAX);
@@ -1191,6 +1199,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         if outline {
             draw(pass, &lists.opaque, &pipelines.mesh_outline);
         }
+        draw(pass, &lists.on_top, &pipelines.mesh_on_top);
         // Hidden-only geometry right after the meshes, so only faces count
         // as hiding it (not hover outlines or overlays drawn over the same
         // curves); the visible lines come after.
@@ -1448,6 +1457,8 @@ struct Pipelines {
     /// transparent meshes, their front faces after (`draw_lists`).
     mesh_transparent_back: wgpu::RenderPipeline,
     mesh_transparent_front: wgpu::RenderPipeline,
+    /// Translucent meshes through everything ([`Instance::on_top`]).
+    mesh_on_top: wgpu::RenderPipeline,
     /// Opaque meshes mirroring an environment map (image bind group 2).
     mesh_reflect: wgpu::RenderPipeline,
     line: wgpu::RenderPipeline,
@@ -2075,6 +2086,7 @@ impl Renderer {
                 P { label: "mesh-t-front", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa },
                 Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back) },
             ));
+            let mesh_on_top = s.spawn(|| make(P { label: "mesh-top", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }));
             let line = s.spawn(|| make(P { label: "line", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }));
             // Front faces culled, like Onshape's pass (`setOverrideFaceCullingMode(FRONT)`).
             let mesh_backsil = s.spawn(|| make_full(
@@ -2109,6 +2121,7 @@ impl Renderer {
                 mesh_transparent: mesh_transparent.join().expect("pipeline compile thread"),
                 mesh_transparent_back: mesh_transparent_back.join().expect("pipeline compile thread"),
                 mesh_transparent_front: mesh_transparent_front.join().expect("pipeline compile thread"),
+                mesh_on_top: mesh_on_top.join().expect("pipeline compile thread"),
                 line: line.join().expect("pipeline compile thread"),
                 mesh_backsil: mesh_backsil.join().expect("pipeline compile thread"),
                 silhouette: silhouette.join().expect("pipeline compile thread"),

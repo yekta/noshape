@@ -1463,3 +1463,36 @@ fn faces_without_discard_match_the_discarding_pipeline() {
     assert!(drawn > 1000, "both boxes drawn");
     assert_eq!(differ, 0);
 }
+
+/// `Instance::on_top`: a translucent mesh inside an opaque box shows through
+/// it (FeatureScript debug faces behind the model), while an ordinary
+/// translucent one stays hidden.
+#[test]
+fn on_top_meshes_show_through_the_model() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let outer = r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 1));
+    let inner = r.upload_mesh(&primitives::box_mesh([-0.003, -0.003, -0.003], [0.003, 0.003, 0.003], 2));
+    let cam = iso_camera();
+    let style = Style::default();
+    // (red, green) at the centre, the inner box drawn on top or not.
+    let mut centre = |on_top: bool| {
+        let mut scene = Scene::default();
+        scene.instances.push(Instance::new(Drawable::Mesh(outer.clone())).with_color([0.5, 0.5, 0.5, 1.0]));
+        let red = Instance::new(Drawable::Mesh(inner.clone())).with_color([1.0, 0.0, 0.0, 0.5]).unlit();
+        scene.instances.push(if on_top { red.on_top() } else { red });
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: 400, height: 300, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap();
+        let px = &f.bgra[(150 * 400 + 200) * 4..][..4];
+        (px[2] as i32, px[1] as i32)
+    };
+    let (hidden_r, hidden_g) = centre(false);
+    let (shown_r, shown_g) = centre(true);
+    assert!((hidden_r - hidden_g).abs() < 30, "hidden: ({hidden_r}, {hidden_g})");
+    assert!(shown_r > shown_g + 60, "on top: ({shown_r}, {shown_g})");
+}

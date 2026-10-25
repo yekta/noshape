@@ -192,6 +192,7 @@ rust::String                 dump_shape(const OcShape& s);
 SurfaceInfo              surface_info(const OcShape& face);
 CurveInfo                curve_info(const OcShape& edge);
 BSplineF                 edge_bspline(const OcShape& edge);
+BSplineSurfF             face_bspline(const OcShape& face);
 P3    face_normal_at_uv(const OcShape& face, double u, double v);
 P3    face_point_at_uv(const OcShape& face, double u, double v);
 ProjPoint                face_project_point(const OcShape& face, P3 p);
@@ -214,6 +215,7 @@ std::unique_ptr<OcShape> make_vertex(P3 p);
 std::unique_ptr<OcShape> make_edge_2d(const PlaneF& plane, const Seg2d& seg);
 std::unique_ptr<OcShape> make_wire_2d(const PlaneF& plane, rust::Slice<const Seg2d> segs);
 std::unique_ptr<OcShape> make_wire(const OcShapeList& edges);
+std::unique_ptr<OcShape> wire_with_edge_order(const OcShape& wire, rust::Slice<const uint32_t> order);
 std::unique_ptr<OcShape> make_face_on_plane(const PlaneF& plane, const OcShape& outer,
                                             const OcShapeList& holes);
 std::unique_ptr<OcShape> make_face_from_wire(const OcShape& wire, bool only_plane);
