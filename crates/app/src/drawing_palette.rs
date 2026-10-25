@@ -23,7 +23,6 @@ use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -36,6 +35,13 @@ pub const SYMBOLS: [&str; 14] = ["°", "Ø", "℄", "⌵", "↧", "⌴", "▢", 
 pub use noshape_ops::drawing::PRECISIONS;
 /// Tolerance lists (D35; hole callouts have no Basic).
 pub use noshape_ops::drawing::{DIM_TOLERANCES, HOLE_TOLERANCES};
+
+impl PaletteDlg {
+    /// Open it at `at` (editor px; the launcher puts it over itself).
+    pub fn set_at(&mut self, at: [f32; 2]) {
+        self.at = Some(at);
+    }
+}
 
 /// The open palette.
 pub struct PaletteDlg {
@@ -168,6 +174,7 @@ impl DrawingEditor {
     }
 
     pub fn close_palette(&mut self, accept: bool, cx: &mut Context<Self>) {
+        self.launcher.opened = false;
         let Some(d) = self.palette.take() else { return };
         self.set_preview(None, cx);
         if accept && d.cur != d.orig {
@@ -430,7 +437,7 @@ impl DrawingEditor {
         let mut toggles = h_flex().gap(px(if hole { 4. } else { 2. })).child(symbols);
         if hole {
             toggles = toggles.child(toggle("dp-ref", "(XX)", "Parentheses", fmt.reference, |d| d.cur.format.reference = !d.cur.format.reference, cx)).child(menu("dp-dual", small("[XX] x.xx".into()), 80., dual_items)).child(
-                div().pl(px(8.)).child(Checkbox::new("dp-override").label("Override precision/tolerance").small().checked(opts.override_tol).tooltip("Click to override the precision and tolerance from the hole feature").on_click(cx.listener(|this, v: &bool, _, cx| {
+                div().pl(px(8.)).child(crate::drawing_chrome::DrCheckbox::new("dp-override").label("Override precision/tolerance").checked(opts.override_tol).tooltip("Click to override the precision and tolerance from the hole feature").on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.edit_palette(|d| d.cur.hole.get_or_insert_with(Default::default).override_tol = v, cx)
                 }))),
@@ -544,6 +551,12 @@ impl DrawingEditor {
                     if e.keystroke.key == "escape" {
                         this.close_palette(false, cx);
                         cx.stop_propagation();
+                    }
+                }))
+                // Opened from the launcher: leaving it closes it (live).
+                .on_hover(cx.listener(|this, hovered: &bool, _, cx| {
+                    if !*hovered {
+                        this.launcher_palette_left(cx);
                     }
                 }))
                 .absolute()

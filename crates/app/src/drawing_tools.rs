@@ -81,7 +81,7 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
-        if self.insert.chooser.take().is_some() {
+        if self.insert.chooser.take().is_some() | std::mem::take(&mut self.insert.panel) {
             cx.notify();
             return;
         }

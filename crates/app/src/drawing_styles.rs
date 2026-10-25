@@ -11,7 +11,6 @@ use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
@@ -354,11 +353,11 @@ impl DrawingEditor {
                 .child(row("Text justification", select("st-just", jl, 220., justs)))
                 .child(row("Text alignment", select("st-align", al, 220., aligns)))
                 .child(row("Text gap", h_flex().gap(px(10.)).child(spin).child(div().text_size(px(13.33)).text_color(ink).child(u.symbol())).into_any_element()))
-                .child(div().h(px(33.)).px(px(10.)).flex().items_center().child(Checkbox::new("st-break").label("Break dimension").checked(broken).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                .child(div().h(px(33.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("st-break").native().label("Break dimension").checked(broken).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.unbroken = !v), cx);
                 }))))
-                .child(div().h(px(33.)).px(px(10.)).flex().items_center().child(Checkbox::new("st-dimline").label("Show dimension line").checked(dim_line).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                .child(div().h(px(33.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("st-dimline").native().label("Show dimension line").checked(dim_line).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     if !radial {
                         return;
                     }

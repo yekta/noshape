@@ -207,6 +207,7 @@ PropsF                   props_linear(const OcShape& s);
 DistanceF                min_distance(const OcShape& a, const OcShape& b);
 double                   angle_between(const OcShape& a, const OcShape& b);
 int8_t                   classify_point(const OcShape& solid, P3 p, double tol);
+rust::Vec<double>        line_crossings(const OcShape& s, P3 p, P3 dir, double len);
 
 // ---- construction (build.cpp)
 std::unique_ptr<OcShape> make_vertex(P3 p);

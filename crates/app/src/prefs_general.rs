@@ -72,9 +72,10 @@ fn help(id: &'static str, text: &'static str, cx: &App) -> AnyElement {
     div().id(id).child(crate::assets::icon("help-gray", 18., cx)).tooltip(crate::ui::tooltip(tr(text))).into_any_element()
 }
 
-/// A label over a control (14 px, 6 px apart).
+/// A label over a control (14 px; the control's top 25 px under the
+/// label's, live prefs/00, 02).
 fn labelled(label: &str, control: impl IntoElement) -> Div {
-    v_flex().gap(px(6.)).child(div().text_size(px(14.)).text_color(p().text).child(tr(label))).child(control)
+    v_flex().gap(px(9.)).child(div().text_size(px(14.)).text_color(p().text).child(tr(label))).child(control)
 }
 
 /// A 250 × 34 browser select, or its greyed look when `enabled` is false.
@@ -90,12 +91,13 @@ fn select(id: &'static str, options: Vec<String>, at: usize, enabled: bool, w: f
         .pr(px(10.))
         .rounded(px(5.25))
         .border_1()
-        .border_color(rgb(0xaaaaaa))
+        // Dark (live dk-pref-y1800): a #ccc border on #666, the caret #777 as in light.
+        .border_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xcccccc } else { 0xaaaaaa }))
         .bg(rgb(0xeaeaea))
         .text_size(px(14.))
         .text_color(pal.text)
         .child(div().flex_1().truncate().child(options.get(at).cloned().unwrap_or_default()))
-        .child(os::glyph(os::GLYPH_CARET, 8., rgb(0x777777)))
+        .child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb_static(0x777777)))
         .into_any_element()
 }
 
@@ -162,18 +164,17 @@ impl Default for ThemingPrefsView {
     }
 }
 
-/// A browser radio button: 13 px, blue when on.
+/// Onshape's (Bootstrap) radio, live prefs/00 and dk-904: 14 px; off a 1 px
+/// `#ababab` ring (`#878787` in dark).
 fn radio(on: bool) -> Div {
-    div()
-        .size(px(13.))
-        .flex_none()
-        .rounded_full()
-        .border_1()
-        .border_color(if on { rgb(0x0075ff) } else { rgb(0x767676) })
-        .flex()
-        .items_center()
-        .justify_center()
-        .when(on, |d| d.child(div().size(px(7.)).rounded_full().bg(rgb(0x0075ff))))
+    let dark = noshape_scene::palette::is_dark();
+    let d = div().size(px(14.)).flex_none().rounded_full().flex().items_center().justify_center();
+    if on {
+        // Bootstrap's checked radio, both themes: a #0d6efd disc, white dot.
+        d.bg(gpui_kit::rgb_static(0x0d6efd)).child(div().size(px(6.)).rounded_full().bg(gpui_kit::rgb_static(0xffffff)))
+    } else {
+        d.border_1().border_color(gpui_kit::rgb_static(if dark { 0x878787 } else { 0xababab }))
+    }
 }
 
 impl Render for ThemingPrefsView {
@@ -199,7 +200,7 @@ impl Render for ThemingPrefsView {
                             cx.notify();
                         })),
                 )
-                .child(div().pl(px(21.)).text_size(px(11.)).text_color(pal.text).child(tr(note)))
+                .child(div().pl(px(22.)).pt(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xbbbbbb } else { 0x777777 })).child(tr(note)))
         };
         // Live dk-900: a blue "beta" pill and a (?) after "Dark mode".
         let beta = h_flex()
@@ -215,7 +216,7 @@ impl Render for ThemingPrefsView {
                 .gap(px(16.))
                 .child(option("pref-light", false, "Light mode", "Default color scheme for Onshape featuring dark elements on light backgrounds.", None, cx))
                 .child(option("pref-dark", true, "Dark mode", "Low luminance color scheme mainly featuring light elements on dark backgrounds.", Some(beta), cx))
-                .child(h_flex().mt(px(4.)).child(PreferencesView::save_button("pref-theme-save", tr("Save theme"), changed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                .child(h_flex().child(PreferencesView::save_button("pref-theme-save", tr("Save theme"), changed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     if this.edited == this.saved {
                         return;
                     }
@@ -309,7 +310,8 @@ impl EnvProfilePrefsView {
                         .pt(px(3.))
                         .gap(px(2.))
                         .child(os::input_h(Input::new(&name), 34.))
-                        .when_some(error, |d, e| d.child(div().text_size(px(14.)).text_color(rgb(0xaa252d)).child(tr(e)))),
+                        // Dark: Bootstrap's invalid-feedback #ff6b6b (live dk-pref-create-profile-dialog).
+                        .when_some(error, |d, e| d.child(div().text_size(px(14.)).text_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xff6b6b } else { 0xaa252d })).child(tr(e)))),
                 )
                 .footer(
                     os::modal_footer()
@@ -438,22 +440,34 @@ impl LabsPrefsView {
     fn consent_dialog(window: &mut Window, cx: &mut App) {
         window.open_dialog(cx, move |dialog, _, cx| {
             let pal = p();
-            // Live 1873: 12 px body text, 14 px semibold subheadings, a disc list.
-            let para = |t: &str| div().text_size(px(12.)).line_height(px(17.)).text_color(pal.text).child(tr(t));
-            let bold = |t: &str| div().mt(px(4.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(tr(t));
-            let bullet = |t: &str| h_flex().items_start().pl(px(10.)).gap(px(8.)).child(div().text_size(px(12.)).line_height(px(17.)).child("●")).child(para(t));
+            // Live 1873 / dk-pref-labs-modal-top (the same in both themes): 24 px
+            // in, 13 px text on 19.5 px lines, paragraphs 10.5 px apart, 16 px
+            // semibold subheadings, 5 px bullets 23.5 px apart.
+            let para = |t: &str| div().mt(px(10.5)).text_size(px(13.)).line_height(px(19.5)).text_color(pal.text).child(tr(t));
+            let heading = |t: &str| div().mt(px(17.)).mb(px(-4.5)).text_size(px(16.)).line_height(px(19.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(tr(t));
+            let bullet = |t: &str, first: bool| {
+                h_flex()
+                    .items_start()
+                    .mt(px(if first { 10.5 } else { 4. }))
+                    .pl(px(5.))
+                    .child(div().w(px(16.)).h(px(19.5)).flex_none().flex().items_center().child(div().size(px(5.)).rounded_full().bg(pal.text)))
+                    .child(div().text_size(px(13.)).line_height(px(19.5)).text_color(pal.text).child(tr(t)))
+            };
             os::modal_doc_page(dialog, tr("Enable access to Onshape Labs features?"), 600.)
                 .child(
                     os::modal_body()
-                        .gap(px(8.))
-                        .child(h_flex().gap(px(4.)).child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(tr("Onshape Labs"))).child(div().text_size(px(12.)).italic().child(tr("Experimental features — opt-in preview"))))
+                        .px(px(24.))
+                        .pt(px(18.))
+                        .pb(px(16.))
+                        .gap_0()
+                        .child(h_flex().gap(px(4.)).items_baseline().child(div().text_size(px(15.)).font_weight(FontWeight::SEMIBOLD).child(tr("Onshape Labs"))).child(div().text_size(px(13.)).italic().text_color(pal.text_muted).child(tr("Experimental features — opt-in preview"))))
                         .child(para("Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion."))
-                        .child(bold("How Onshape Labs features use your data"))
+                        .child(heading("How Onshape Labs features use your data"))
                         .child(para("When you enable a Labs feature, it may:"))
-                        .child(bullet("Read or write data within your Onshape documents, only in response to your actions."))
-                        .child(bullet("Perform actions within Onshape on your behalf during an active session."))
-                        .child(bullet("Transmit relevant data to third-party AI providers to generate outputs, where applicable."))
-                        .child(bold("Limitations of experimental AI features"))
+                        .child(bullet("Read or write data within your Onshape documents, only in response to your actions.", true))
+                        .child(bullet("Perform actions within Onshape on your behalf during an active session.", false))
+                        .child(bullet("Transmit relevant data to third-party AI providers to generate outputs, where applicable.", false))
+                        .child(heading("Limitations of experimental AI features"))
                         .child(para("Some Onshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct."))
                         .child(para("You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Onshape Labs features should not be used as a substitute for professional judgment or established controls."))
                         .child(para("Onshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose."))
@@ -492,8 +506,8 @@ impl Render for LabsPrefsView {
         };
         section(
             "Onshape Labs",
-            // Live 1900: the blue flask once Labs is on.
-            on.then(|| crate::assets::icon("onshape-labs-blue", 20., cx).into_any_element()),
+            // Live 1870, 1919: the blue flask, Labs on or off.
+            Some(crate::assets::icon("onshape-labs-blue", 20., cx).into_any_element()),
             v_flex()
                 .child(
                     check_row("pref-labs", on, tr("Enable users to access experimental, proof of concept features."))

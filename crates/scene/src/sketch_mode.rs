@@ -639,6 +639,14 @@ fn save_sketch_options(o: SketchOptions) {
 const INFERENCE_COLOR: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
 /// Geometry being drawn (`SKETCH_PREVIEW_COLOR`).
 const PREVIEW_COLOR: [u8; 4] = [0x44, 0x9c, 0xcd, 255];
+/// The dash along a rubber band whose direction is inferred (live sketch/51).
+const INFERRED_DASH_COLOR: [u8; 4] = [0xe2, 0xbc, 0x2c, 255];
+
+/// The inference sets the direction of the line being drawn (not a point to
+/// snap to): shown on the rubber band as its dash (live sketch/51–53).
+fn is_direction(k: InferenceKind) -> bool {
+    matches!(k, InferenceKind::Horizontal | InferenceKind::Vertical | InferenceKind::Perpendicular | InferenceKind::Parallel)
+}
 /// Onshape's hollow arrow manipulator in a sketch (live sketch/303, offset):
 /// 11 px past the curve's copy, an 18 px stem, a 31 x 23 px head; outline
 /// #989fa3 (3 px) around a white core.
@@ -4347,6 +4355,8 @@ impl SketchEditor {
         let mut wide: Vec<(Vec<DVec2>, [u8; 4], f32)> = Vec::new();
         // Construction previews, dash-dot (live sketch/91: the polygon's circle).
         let mut dash_dot: Vec<Vec<DVec2>> = Vec::new();
+        // The rubber band's inferred-direction dash (drawn after `poly`'s lines).
+        let mut inferred_dash: Option<(DVec2, DVec2)> = None;
         let mut poly = |pts: &[DVec2], color: [u8; 4], dashed: bool| {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, color, 0, 2.0, on_top | if dashed { LineSegment::DASHED } else { 0 });
@@ -4369,9 +4379,17 @@ impl SketchEditor {
                 }
                 Tool::Line => {
                     if let Some(a) = self.anchor_pos(&data.sketch) {
-                        // A line inferred parallel to another is drawn dotted.
-                        let parallel = self.inference.as_ref().is_some_and(|i| i.kind == InferenceKind::Parallel);
-                        poly(&[a, c], preview_color, parallel);
+                        // Live (sketch/51–54): a 2 px blue line with 6 px blue dots at
+                        // both ends; when its direction is inferred (horizontal,
+                        // vertical, perpendicular, parallel) a 1 px yellow dash runs
+                        // along its middle.
+                        poly(&[a, c], preview_color, false);
+                        if self.inference.as_ref().is_some_and(|i| is_direction(i.kind)) {
+                            inferred_dash = Some((a, c));
+                        }
+                        for q in [a, c] {
+                            points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                        }
                     }
                 }
                 Tool::MidpointLine => {
@@ -4927,13 +4945,21 @@ impl SketchEditor {
             let pts3: Vec<[f32; 3]> = data.sketch.tessellate(e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT), 0, 4.0, on_top);
         }
-        if let Some(inf) = &self.inference
+        // The guide to the point an alignment refers to (a direction
+        // inference of the line being drawn shows as its dash instead).
+        if let Some(inf) = self.inference.as_ref().filter(|i| !(self.tool == Tool::Line && is_direction(i.kind)))
             && let Some(r) = inf.reference
         {
+            // Live (part-studio/1032): a 1 px yellow dash, 4 px on / 4 off, as
+            // on a rubber band.
             let pts3 = [w(r), w(inf.position)];
-            lines.push_polyline(&pts3, guide_color, 0, 1.0, on_top | LineSegment::DASHED);
+            lines.push_polyline(&pts3, INFERRED_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
         }
-        if let Some(inf) = &self.inference {
+        // A point inference marks its point; a direction inference of the
+        // line being drawn shows on the line itself (its dash and end dot),
+        // an alignment by its guide alone (live part-studio/1032).
+        let alignment = |k: InferenceKind| matches!(k, InferenceKind::AlignHorizontal | InferenceKind::AlignVertical | InferenceKind::AlignBoth);
+        if let Some(inf) = self.inference.as_ref().filter(|i| !(self.tool == Tool::Line && is_direction(i.kind)) && !alignment(i.kind)) {
             points.points.push(PointSprite { position: w(inf.position), color: guide_color, pick_id: 0, size: 8.0, style: on_top, _pad: 0 });
         }
         if let Some((_, q, _)) = self.drag_snap {
@@ -5008,6 +5034,9 @@ impl SketchEditor {
             // A negative width marks a 2 px dash-dot guide.
             let (width, style) = if width < 0.0 { (2.0, on_top | LineSegment::DASH_DOT) } else { (width, on_top) };
             lines.push_polyline(&pts3, color, 0, width, style);
+        }
+        if let Some((a, c)) = inferred_dash {
+            lines.push_polyline(&[w(a), w(c)], INFERRED_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
         }
         // Dash-dot laid out along the whole curve here: the line shader's
         // pattern restarts on every segment, so a circle's short segments

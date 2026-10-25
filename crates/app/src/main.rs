@@ -76,6 +76,7 @@ mod drawing_ruler;
 mod drawing_table_dlg;
 mod drawing_custom_table;
 mod drawing_chrome;
+mod drawing_launcher;
 mod drawing_jog;
 mod drawing_related;
 mod drawing_move_sheet;

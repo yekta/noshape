@@ -332,3 +332,17 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 14.45 | Esc with that menu open: first Esc exits the tool (menu stays), second Esc closes the menu | Live sketch/405–408 | ✅ (GUI :103 s4–s5; `OsMenu::on_first_escape`) |
 | 14.46 | Choosing a drawing tool (L) clears the selection | Live sketch/401–402 | ✅ (T:sm `choosing_a_drawing_tool_clears_the_selection`) |
 | 14.47 | A dimension's value box shows the value with the document unit, selected: lengths with 6 decimals ("3.51041 in", "1.725582 in"), angles with 7 ("35.5376823 deg"), zeros trimmed; a value typed as a plain number reopens with its unit ("80" → "80 mm") | Live sketch/13, 141, 143; QA3 | ✅ (`dimension_edit_text`; Enter on the untouched box keeps the exact value (`commit_dimension`); T:sm `reopening_ellipse_and_rho_dimensions_preserves_the_displayed_value` extended; test passes; GUI :103 dm3 shows "16.825693 mm". Visual left for ui2: our field shows the text left-aligned and clips the unit's last letter, while live right-aligns it inside the 100 px field) |
+
+## Constraint glyph layout (ui2, 2026-10-25; live sketch/27, 28 vs ours at 1× / 2×)
+| Item | Live | Ours before | Status |
+|---|---|---|---|
+| Line glyphs | a row centred on the line's midpoint, 20.5 px out (below a horizontal line, left of a vertical one), 20 px white boxes 22 px apart | started at the midpoint and ran right, 6 px off the line | ✅ (box 11 px under a horizontal line, as live) |
+| Point glyphs | up-left of the point (box top-left −27, −26) with a 1 px `#a8b2bb` leader | up-right, no leader | ✅ |
+| Box | plain white square, no border, radius or shadow | radius 2 + shadow | ✅ |
+| Icon | spans 14 px of the box | 11 px | ✅ (18 px icon) |
+| Hovered glyph `#fcda7f`, toolbar, inference glyph | | | ✅ |
+| Rectangle corner coincident glyphs | four, at the corners | none: our corners share points, no coincident constraints | → skb (model) |
+| Hovered / selected sketch line | `#fec788` / `#feab10` ~80 % over the black line (darker core `#ca9e6b` / `#ca870b`) | the line recoloured, solid | → render owner (the line stays under a translucent highlight) |
+| Dimension value box (hover / selected) | 27 px high, centred on the value (sketch/24) | 22 px | ✅ |
+| Inference glyph box | 20 px of 40 % white behind the icon, seen over a face (part-studio/1032) | none | ✅ |
+| Alignment guide | 1 px yellow, 4 px on / 4 off, no dot at the pointer (part-studio/1032) | 7 px `#ffc20e` dash + 8 px yellow dot | ✅ |

@@ -964,14 +964,35 @@ pub fn error_geometry(mesh: &noshape_model::display::MeshBuffers, up: &Uploader)
     out
 }
 
-/// A feature's debug geometry while its dialog is open (FeatureScript
-/// `addDebugEntities`, magenta).
+/// A feature's debug geometry while its dialog is open: Helix's profiles
+/// (magenta) and FeatureScript `debug()` entities in their colours (live "fs
+/// (10-25 c)": faces lit at half opacity, edges 2 px and points 6 px drawn
+/// through the model).
 pub fn debug_geometry(debug: &noshape_model::display::DebugGeometry, up: &Uploader) -> Vec<Instance> {
+    use noshape_model::display::ColoredDebug;
     let mut out = Vec::new();
     let color = lin_to_u8(theme::lin(theme::viewport::DEBUG_MAGENTA));
     let mut lines = LineData::default();
     for pl in &debug.lines {
         lines.push_polyline(pl, color, 0, 2.5, LineSegment::ON_TOP);
+    }
+    let mut points = Vec::new();
+    for item in &debug.colored {
+        match item {
+            ColoredDebug::Faces(mesh, [r, g, b]) => {
+                // 1 µm off the face, so a debugged part face shows over it.
+                let positions = mesh.positions.iter().zip(&mesh.normals).map(|(p, n)| std::array::from_fn(|i| p[i] + n[i] * 1e-6)).collect();
+                let m = MeshData { positions, normals: mesh.normals.clone(), pick_ids: vec![0; mesh.positions.len()], indices: mesh.indices.clone() };
+                let mut fill = noshape_render::srgb(*r, *g, *b);
+                fill[3] = 0.5;
+                out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(fill).unpickable().ignore_clip().layer(8));
+            }
+            ColoredDebug::Line(pl, [r, g, b]) => lines.push_polyline(pl, [*r, *g, *b, 255], 0, 2.0, LineSegment::ON_TOP),
+            ColoredDebug::Point(p, [r, g, b]) => points.push(PointSprite { position: *p, color: [*r, *g, *b, 255], pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 }),
+        }
+    }
+    if !points.is_empty() {
+        out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(20));
     }
     if !lines.segments.is_empty() {
         out.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(12));

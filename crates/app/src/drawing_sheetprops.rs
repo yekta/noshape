@@ -355,7 +355,7 @@ impl DrawingEditor {
                 div()
                     .pl(px(8.))
                     .py(px(6.))
-                    .child(gpui_kit::component::checkbox::Checkbox::new("sp-border").label("Include border").small().checked(border).on_click(cx.listener(move |this, on: &bool, _, cx| {
+                    .child(crate::drawing_chrome::DrCheckbox::new("sp-border").label("Include border").checked(border).on_click(cx.listener(move |this, on: &bool, _, cx| {
                         let on = *on;
                         this.edit("Sheet border", cx, |d| d.sheets[si].format.border = on);
                     })))

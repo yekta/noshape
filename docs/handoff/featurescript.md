@@ -844,9 +844,10 @@ exist changes (`MISSING`, 18: evFaults, evTolerances, opCreateBSplineSurface, op
 `IGNORES_MAP` lists the natives that need none of their map (no-ops, constants). `NATIVE_ARGS_REPORT=1` prints keys
 read only in part; most are the probe's undefined values making a native stop early. Options found ignored and fixed:
 evOwnerSketchPlane `checkAllEntities` (Sweep/Loft profiles), evRaycast `includeIntersectionsBehind`
-(`evaluation_options_std_passes`). Still ignored: opPolyline `bendRadii` (Routing curve; reuse curves.rs
-`filleted_polyline`), evCurveDefinition/evSurfaceDefinition `returnBSplinesAsOther` and evCollisionDetection `owners`
-(live request "fs (10-25 b)"), addDebugEntities `color` (debug entities are not drawn at all), skConicSegment
+(`evaluation_options_std_passes`). Since done (live "fs (10-25 b/c/d)"): opPolyline `bendRadii` (curves.rs
+`filleted_polyline`, a segment holds both its bends' trims), `returnBSplinesAsOther` (`{ curveType/surfaceType : OTHER }`),
+evCollisionDetection `owners` (faces as their bodies), evRaycast `entityType`/`parameter`, debug() entities (below).
+Still ignored: skConicSegment
 `fixedRho`, skInterpolatedSpline `splinePointCount`, skSpline `guess`, evFacePeriodicity `trimmed`,
 evFaceTangentPlanes `returnUndefinedOutsideFace` (no std caller passes the last five). Regression test for the helix:
 `std_helix_from_a_circle_edge` (Turns and Pitch around a cylinder's circular edge).
@@ -866,3 +867,11 @@ computePitchValue / buildPitchAnnotation (now take context), getToleranceInfo, v
 (isCreating), helixManipulatorChange (full list: /root/fs-scratch/export-diff.txt). Tests:
 `std_1963_pinned_helix_types` (custom_features), `natives_read_the_maps_older_std_passes` (the native audit on 1963).
 To add a version: export it like live/std-1963 into std-versions/<version>/ and extend `MISSING_<version>`.
+
+**debug() display (25 Oct, live "fs (10-25 c)"):** `addDebugEntities` snapshots the entities' shapes and colour at the
+call (std debugs points/lines/arrows of sub-features it aborts); run.rs `add_debug` turns them into the feature's
+`DebugGeometry.colored` (faces → meshes, else edges → polylines, else vertices → points), kept when the feature fails.
+The Part Studio draws them only while that feature's dialog is open (scene builder `debug_geometry`): faces lit at
+alpha 0.5, edges 2 px and points 6 px on top, colours from the client's table (ORANGE = 242, 255, 128). Gap: live draws
+debug faces through the model too; our meshes have no on-top pipeline (render crate), so faces are depth-tested.
+Test: `debug_entities_in_their_colors`.

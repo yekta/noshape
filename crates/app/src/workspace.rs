@@ -930,11 +930,8 @@ impl Workspace {
             let h = window.viewport_size().height;
             crate::os_menu::open_anchored(point(px(crate::ui::RAIL_W), h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
         });
-        // The active tab's place among the strip's children (home, the
-        // breadcrumb tab and the open folder come first inside a folder).
-        let lead = if open_name.is_some() { 2 + usize::from(!crumbs.is_empty()) } else { 0 };
         if let Some(ix) = items.iter().position(|(id, _, _)| self.active == Some(*id)).filter(|_| self.reveal_active_tab) {
-            self.tab_scroll.scroll_to_item(lead + ix);
+            self.tab_scroll.scroll_to_item(ix);
             self.reveal_active_tab = false;
         }
         // Live (qa5 TABS1): while a tab is dragged it leaves the bar, the
@@ -962,13 +959,18 @@ impl Workspace {
                 }
             }))
             .on_drop(cx.listener(|this, _: &TabDrag, _, cx| this.drop_tab(cx)));
-        if let Some(name) = open_name {
+        // Live (behaviours "tab-bar folder breadcrumbs"): with a folder open,
+        // chevron crumbs between "+" and the tabs (they don't scroll): 🏠 ›
+        // (deeper than one level: …, its dropdown lists the folders between)
+        // › the open folder, white (#333 in dark).
+        let crumbs_el = open_name.map(|name| {
             let folder = open.unwrap_or(TabId(0));
-            // "All tabs" (home): back to every tab; dropping here moves to the root.
-            strip = strip.child(
-                tab_chip("tab-home", false)
-                    .px(px(8.))
-                    .child(os::glyph(os::GLYPH_HOME, 18., pal.text_muted))
+            let grey = pal.tab_inactive;
+            let mut row = h_flex().flex_none().h_full().items_start().child(
+                breadcrumb("tab-home", grey, None, false)
+                    .pl(px(8.))
+                    .pr(px(5.))
+                    .child(div().size(px(20.)).flex().items_center().justify_center().child(os::glyph(os::GLYPH_HOME, 18., pal.text_muted)))
                     .tooltip(crate::ui::tooltip("All tabs"))
                     .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
                     .on_drop(cx.listener(|this, drag: &TabDrag, _, cx| this.move_into(drag.id, None, cx)))
@@ -977,16 +979,20 @@ impl Workspace {
                         cx.notify();
                     })),
             );
-            // More than one level deep: an overflow tab lists the parent folders.
             if !crumbs.is_empty() {
                 let v = cx.entity();
-                strip = strip.child(tab_chip("tab-crumbs", false).px(px(10.)).child("…").on_click(move |e, window, cx| {
+                let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+                let probe = bounds.clone();
+                // Live: 87 wide, "…" centred left of the 12 px padding and 2 px
+                // high; its dropdown opens upward from the crumb's left edge.
+                let crumb = breadcrumb("tab-crumbs", grey, Some(grey), false).w(px(87.)).pr(px(12.)).pb(px(8.)).justify_center();
+                row = row.child(crumb.child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()).child("…").on_click(move |_, window, cx| {
                     let (crumbs, v) = (crumbs.clone(), v.clone());
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                         m = m.dropdown();
                         for (id, name) in crumbs {
                             let v = v.clone();
-                            m = m.item(crate::os_menu::OsMenuItem::new(name).icon(os::glyph(os::GLYPH_FOLDER, 20., p().text)).on_click(move |_, _, cx| {
+                            m = m.item(crate::os_menu::OsMenuItem::new(name).user().icon(folder_glyph(20., p().text)).on_click(move |_, _, cx| {
                                 v.update(cx, |t, cx| {
                                     t.open_folder = Some(id);
                                     cx.notify();
@@ -996,11 +1002,11 @@ impl Workspace {
                         m
                     });
                     let h = window.viewport_size().height;
-                    crate::os_menu::open_anchored(point(e.position().x, h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
+                    crate::os_menu::open_anchored(point(bounds.get().left(), h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
                 }));
             }
-            strip = strip.child(self.folder_tab(folder, name, true, cx));
-        }
+            row.child(self.folder_crumb(folder, name, grey, cx)).into_any_element()
+        });
         let order: Vec<TabId> = items.iter().map(|(id, ..)| *id).filter(|id| gap.is_none_or(|(d, _)| d != *id)).collect();
         for (id, name, kind) in items {
             if gap.is_some_and(|(d, _)| d == id) {
@@ -1024,7 +1030,7 @@ impl Workspace {
                 }
             });
             let Some(kind) = kind else {
-                strip = strip.child(self.folder_tab(id, name, false, cx).on_drag_move(gap_here));
+                strip = strip.child(self.folder_tab(id, name, cx).on_drag_move(gap_here));
                 continue;
             };
             let active = self.active == Some(id);
@@ -1119,13 +1125,21 @@ impl Workspace {
                                 cx.set_global(dd::CopiedTab(t));
                             }));
                         }
-                        // Onshape (live menus/rmb-tab-*): ⊗ Delete | Rename,
-                        // Properties…, Show code | Duplicate, Copy to clipboard |
+                        // Onshape (live ui2-tabmenu-*): ⊗ Delete | Open in new browser
+                        // tab, Rename, Properties…, Show code | Duplicate, Copy to
+                        // clipboard | (active Drawing) Change to version… |
                         // (Assembly) Create Drawing of <tab>… | Select as document
-                        // thumbnail | Move to document…, Export…, Release….
+                        // thumbnail | Move to document…, (Drawing) Export…, Release….
+                        let v13 = view.clone();
                         let menu = menu
                             .item(I::new("Delete").icon_name("menu-delete").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.delete_tab(id, w, cx))))
                             .separator()
+                            .item(I::new("Open in new browser tab").on_click(move |_, _, cx| {
+                                let (doc, gpu) = (v13.read(cx).doc.clone(), v13.read(cx).gpu.clone());
+                                if let Err(e) = crate::files::open_tab_window(doc, id, gpu, cx) {
+                                    log::warn!("Could not open a window: {e}");
+                                }
+                            }))
                             .item(I::new("Rename").on_click(move |_, w, cx| v5.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
                             .item(I::new("Properties…").on_click(move |_, w, cx| {
                                 let doc = v6.read(cx).doc.clone();
@@ -1139,6 +1153,13 @@ impl Workspace {
                         } else {
                             menu
                         };
+                        // In a folder: Move to parent folder (live STEP tab in CAD Imports).
+                        let menu = if view.read(cx).doc.read(cx).session.doc.parent_of(id).is_some() {
+                            let v14 = view.clone();
+                            menu.item(I::new("Move to parent folder").on_click(move |_, _, cx| v14.update(cx, |t, cx| t.move_to_parent(id, cx))))
+                        } else {
+                            menu
+                        };
                         let menu = menu
                             .separator()
                             .item(I::new("Duplicate").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.duplicate_tab(id, cx))))
@@ -1147,9 +1168,10 @@ impl Workspace {
                                 cx.set_global(dd::CopiedTab(t));
                             }))
                             .separator();
-                        // Drawings: Change to version… (live tab menu, after Copy to
-                        // clipboard): point every view at a version of the document.
-                        let menu = if kind == "drawing" {
+                        // The active Drawing: Change to version… (live tab menu, after
+                        // Copy to clipboard; not on an inactive Drawing tab): point
+                        // every view at a version of the document.
+                        let menu = if kind == "drawing" && active {
                             let v12 = view.clone();
                             menu.item(I::new("Change to version…").icon_name("change-version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
                         } else {
@@ -1179,7 +1201,9 @@ impl Workspace {
                                 let doc = v10.read(cx).doc.clone();
                                 dd::move_to_document(doc, vec![id], w, cx)
                             }));
-                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
+                        // Only Drawings export from the tab (live 10-24: parts export
+                        // from their own menu, assemblies from the instance list).
+                        let menu = if kind == "drawing" { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         // Release management (help image Release_highlighted2, live
                         // rmb-tab-assembly / -drawing: the last entry, after Export…):
                         // Release… for Assemblies, Drawings, Variable Studios and files
@@ -1256,7 +1280,7 @@ impl Workspace {
         .size(px(1.));
         // Full width: inside the cached slice nothing stretches the row, and
         // the strip must overflow (and scroll) within the window.
-        (tab_list.into_any_element(), h_flex().relative().w_full().min_w_0().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(add).child(strip).children(arrows).child(watch).children(ghost).into_any_element())
+        (tab_list.into_any_element(), h_flex().relative().w_full().min_w_0().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(add).children(crumbs_el).child(strip).children(arrows).child(watch).children(ghost).into_any_element())
     }
 
     /// Live (behaviours "Document tab bar scroll buttons"): ‹ › at the right
@@ -1367,8 +1391,8 @@ enum DocPanel {
 /// "File tabs" and "Imported DWG/DXF drawings"): Delete | Rename,
 /// Properties… | (CAD) Import…, (DXF / DWG) Create Drawing of <file>…,
 /// Update… | (images) Select as document thumbnail | Move to document… |
-/// Release… | Download. No Translate…; "Open in new browser tab" is the
-/// browser's.
+/// Release… | Download (and Open in new browser tab, as every tab). No
+/// Translate….
 fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: TabId, tab_name: &str, cx: &App) -> crate::os_menu::OsMenu {
     use crate::doc_dialogs as dd;
     use crate::os_menu::OsMenuItem as I;
@@ -1380,12 +1404,22 @@ fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: Tab
     };
     let (v1, v2, v3, v4, v5) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
     let (d1, d2, d3, d4) = (doc.clone(), doc.clone(), doc.clone(), doc.clone());
+    let (d0, gpu) = (doc.clone(), view.read(cx).gpu.clone());
     let mut menu = menu
         .item(I::new("Delete").icon_name("menu-delete").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.delete_tab(id, w, cx))))
         .separator()
+        .item(I::new("Open in new browser tab").on_click(move |_, _, cx| {
+            if let Err(e) = crate::files::open_tab_window(d0.clone(), id, gpu.clone(), cx) {
+                log::warn!("Could not open a window: {e}");
+            }
+        }))
         .item(I::new("Rename").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
-        .item(I::new("Properties…").on_click(move |_, w, cx| dd::tab_properties(d1.clone(), id, w, cx)))
-        .separator();
+        .item(I::new("Properties…").on_click(move |_, w, cx| dd::tab_properties(d1.clone(), id, w, cx)));
+    if doc.read(cx).session.doc.parent_of(id).is_some() {
+        let v6 = view.clone();
+        menu = menu.item(I::new("Move to parent folder").on_click(move |_, _, cx| v6.update(cx, |t, cx| t.move_to_parent(id, cx))));
+    }
+    menu = menu.separator();
     match file_kind {
         Some(FileKind::Cad) => menu = menu.item(I::new("Import…").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.translate_file(id, w, cx)))),
         Some(FileKind::Drawing2d) => menu = menu.item(I::new(format!("Create Drawing of {tab_name}…")).icon_name("menu-create-drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.create_cad_drawing(id, w, cx)))),
@@ -1797,19 +1831,15 @@ impl Workspace {
 
     /// A folder on the tab bar: click opens it, double-click renames;
     /// right-click: Rename, Unpack, Move to document… (live qa5 TABS3).
-    fn folder_tab(&self, id: TabId, name: String, current: bool, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn folder_tab(&self, id: TabId, name: String, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
-        let view = cx.entity();
-        tab_chip(SharedString::from(format!("folder-{id}")), current)
+        tab_chip(SharedString::from(format!("folder-{id}")), false)
             .min_w(px(60.))
             .max_w(px(200.))
             .px(px(10.))
-            .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
-            .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
-                Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
-                None => div().truncate().when(current, |d| d.font_weight(FontWeight::SEMIBOLD)).child(crate::ui::user_text(name.clone())).into_any_element(),
-            })
-            .when(!current, |d| d.on_drag(TabDrag { id, name: name.clone(), icon: None }, start_tab_drag(cx.entity().downgrade())))
+            .child(folder_glyph(20., pal.text_muted))
+            .child(self.folder_label(id, &name))
+            .on_drag(TabDrag { id, name: name.clone(), icon: None }, start_tab_drag(cx.entity().downgrade()))
             .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
             .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_into(drag.id, Some(id), cx)))
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
@@ -1820,25 +1850,73 @@ impl Workspace {
                     cx.notify();
                 }
             }))
-            .os_context_menu(move |menu, _, _| {
-                use crate::os_menu::OsMenuItem as I;
-                let (v1, v3, v4) = (view.clone(), view.clone(), view.clone());
-                menu.item(I::new("Rename").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
-                    .item(I::new("Unpack").on_click(move |_, _, cx| {
-                        v3.update(cx, |t, cx| {
-                            if t.open_folder == Some(id) {
-                                t.open_folder = t.doc.read(cx).session.doc.parent_of(id);
-                            }
-                            t.doc.update(cx, |doc, cx| doc.edit_document("Unpack folder", cx, |d| d.unpack_folder(id)));
-                            cx.notify();
-                        })
-                    }))
-                    .separator()
-                    .item(I::new("Move to document…").on_click(move |_, w, cx| {
-                        let doc = v4.read(cx).doc.clone();
-                        crate::doc_dialogs::move_to_document(doc, vec![id], w, cx)
-                    }))
-            })
+            .os_context_menu(self.folder_menu(id, cx))
+    }
+
+    /// The open folder's crumb (live: padding 2 12 4 0, the folder icon and
+    /// the name in at most 100 px, white / `#333` in dark; `prev`: the crumb
+    /// before it, whose point it draws over its own notch).
+    fn folder_crumb(&self, id: TabId, name: String, prev: Rgba, cx: &mut Context<Self>) -> Stateful<Div> {
+        let pal = p();
+        breadcrumb(SharedString::from(format!("crumb-{id}")), pal.panel, Some(prev), true)
+            .pr(px(12.))
+            .child(h_flex().max_w(px(100.)).overflow_hidden().gap(px(5.)).child(div().flex_none().child(folder_glyph(20., pal.text_muted))).child(self.folder_label(id, &name)))
+            .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
+            .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_into(drag.id, Some(id), cx)))
+            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                if e.click_count() >= 2 {
+                    this.start_tab_rename(id, window, cx);
+                }
+            }))
+            .os_context_menu(self.folder_menu(id, cx))
+    }
+
+    /// A folder's name, or its rename field.
+    fn folder_label(&self, id: TabId, name: &str) -> AnyElement {
+        let pal = p();
+        match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
+            Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
+            None => div().min_w_0().truncate().child(crate::ui::user_text(name.to_string())).into_any_element(),
+        }
+    }
+
+    /// A folder's right-click menu: Rename, (in a folder) Move to parent
+    /// folder, Unpack | Move to document… (live TABS3 and behaviours
+    /// "tab-bar folder breadcrumbs").
+    fn folder_menu(&self, id: TabId, cx: &mut Context<Self>) -> impl Fn(crate::os_menu::OsMenu, &mut Window, &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu + 'static {
+        let view = cx.entity();
+        let nested = self.doc.read(cx).session.doc.parent_of(id).is_some();
+        move |menu, _, _| {
+            use crate::os_menu::OsMenuItem as I;
+            let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+            let menu = menu.item(I::new("Rename").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.start_tab_rename(id, w, cx))));
+            let menu = if nested { menu.item(I::new("Move to parent folder").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.move_to_parent(id, cx)))) } else { menu };
+            menu.item(I::new("Unpack").on_click(move |_, _, cx| {
+                v3.update(cx, |t, cx| {
+                    if t.open_folder == Some(id) {
+                        t.open_folder = t.doc.read(cx).session.doc.parent_of(id);
+                    }
+                    t.doc.update(cx, |doc, cx| doc.edit_document("Unpack folder", cx, |d| d.unpack_folder(id)));
+                    cx.notify();
+                })
+            }))
+            .separator()
+            .item(I::new("Move to document…").on_click(move |_, w, cx| {
+                let doc = v4.read(cx).doc.clone();
+                crate::doc_dialogs::move_to_document(doc, vec![id], w, cx)
+            }))
+        }
+    }
+
+    /// Tab › Move to parent folder: out of its folder into the one around it.
+    fn move_to_parent(&mut self, id: TabId, cx: &mut Context<Self>) {
+        let d = &self.doc.read(cx).session.doc;
+        let Some(parent) = d.parent_of(id) else { return };
+        let to = d.parent_of(parent);
+        if self.open_folder == Some(id) {
+            self.open_folder = to;
+        }
+        self.move_into(id, to, cx);
     }
 
     /// Open (or focus) the Search Feature Studios pane.
@@ -2092,6 +2170,58 @@ fn tab_chip(id: impl Into<ElementId>, active: bool) -> Stateful<Div> {
         .cursor_pointer()
         .bg(if active { pal.panel } else { pal.tab_inactive })
         .text_color(if active { pal.text } else { pal.text_muted })
+}
+
+/// A tab-bar breadcrumb (live `.os-tab-bar-breadcrumb`): 27 high in
+/// `bg`, a 2 px shadow down-left, an 8 px point on the right (CSS border
+/// triangle). After the first (`prev`: the crumb before it) its 17 px flag
+/// reaches 16 px back with the bar's colour cut in as a notch, and the
+/// previous crumb's point is drawn over it 2 px left of the notch. Crumbs
+/// are 18 px apart, the `last` none.
+fn breadcrumb(id: impl Into<ElementId>, bg: Rgba, prev: Option<Rgba>, last: bool) -> Stateful<Div> {
+    let pal = p();
+    let shadow = || vec![BoxShadow { color: hsla(0., 0., 0., 0.247), offset: point(px(-1.), px(1.)), blur_radius: px(2.), spread_radius: px(-1.), inset: false }];
+    let point_at = |color: Rgba| {
+        canvas(|_, _, _| {}, move |b, _, window, _| {
+            let (l, t) = (b.left(), b.top());
+            let mut pb = PathBuilder::fill();
+            pb.move_to(point(l, t));
+            pb.line_to(point(l + px(8.), t + px(13.)));
+            pb.line_to(point(l + px(8.), t + px(14.)));
+            pb.line_to(point(l, t + px(27.)));
+            pb.close();
+            if let Ok(path) = pb.build() {
+                window.paint_path(path, color);
+            }
+        })
+        .absolute()
+        .top_0()
+        .w(px(8.))
+        .h(px(27.))
+    };
+    h_flex()
+        .id(id)
+        .relative()
+        .flex_none()
+        .h(px(27.))
+        .pt(px(2.))
+        .pb(px(4.))
+        .when(!last, |d| d.mr(px(18.)))
+        .bg(bg)
+        .shadow(shadow())
+        .text_size(px(14.))
+        .text_color(pal.text_muted)
+        .cursor_pointer()
+        .when_some(prev, |d, prev| {
+            d.child(div().absolute().top_0().left(px(-16.)).w(px(17.)).h(px(27.)).bg(bg).shadow(shadow()).child(point_at(pal.tab_bar).left_0()))
+                .child(point_at(prev).left(px(-18.)))
+        })
+        .child(point_at(bg).right(px(-8.)))
+}
+
+/// The folder icon: an outline, filled in dark (live tab bar).
+fn folder_glyph(size: f32, color: impl Into<Hsla>) -> gpui_kit::component::Icon {
+    os::glyph(if noshape_scene::palette::is_dark() { os::GLYPH_FOLDER_FILLED } else { os::GLYPH_FOLDER }, size, color)
 }
 
 // Importing is shared with the agent API (crates/ops/src/import.rs).

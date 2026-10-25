@@ -2098,6 +2098,47 @@ fn drawing_insert_view_options() {
     assert_eq!(e.param.as_deref(), Some("simplification_value"));
 }
 
+/// Tab folders as the tab bar makes them: create (nested), move a tab in,
+/// Move to parent folder, reorder, unpack; the document lists them.
+#[test]
+fn tab_folders() {
+    let mut ctx = Ctx::new();
+    let path = scratch("folders.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let f = call(&mut ctx, "tab_folder_create", json!({}));
+    assert_eq!(f["folder"]["name"], "Folder 1", "{f}");
+    call(&mut ctx, "tab_folder_create", json!({ "name": "B", "folder": "Folder 1" }));
+    call(&mut ctx, "tab_move", json!({ "tab": "Part Studio 1", "folder": "B" }));
+    let tab_folder = |ctx: &mut Ctx, name: &str| {
+        let d = call(ctx, "document_info", json!({}));
+        d["tabs"].as_array().unwrap().iter().find(|t| t["name"] == name).unwrap()["folder"].clone()
+    };
+    assert_eq!(tab_folder(&mut ctx, "Part Studio 1"), "B");
+    let d = call(&mut ctx, "document_info", json!({}));
+    let b = d["folders"].as_array().unwrap().iter().find(|f| f["name"] == "B").unwrap().clone();
+    assert_eq!(b["folder"], "Folder 1", "{d}");
+    // Move to parent folder: B → Folder 1, then out to the root.
+    call(&mut ctx, "tab_move", json!({ "tab": "Part Studio 1", "to_parent": true }));
+    assert_eq!(tab_folder(&mut ctx, "Part Studio 1"), "Folder 1");
+    call(&mut ctx, "tab_move", json!({ "tab": "Part Studio 1", "to_parent": true }));
+    assert!(tab_folder(&mut ctx, "Part Studio 1").is_null());
+    let e = try_call(&mut ctx, "tab_move", json!({ "tab": "Part Studio 1", "to_parent": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("to_parent"));
+    // A folder can't go into itself.
+    let e = try_call(&mut ctx, "tab_move", json!({ "tab": "Folder 1", "folder": "B" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("folder"));
+    // Before a tab inside a folder: it joins that folder in front of it.
+    call(&mut ctx, "tab_move", json!({ "tab": "Assembly 1", "folder": "B" }));
+    call(&mut ctx, "tab_move", json!({ "tab": "Part Studio 1", "before": "Assembly 1" }));
+    assert_eq!(tab_folder(&mut ctx, "Part Studio 1"), "B");
+    // Unpack: its tabs go to the parent.
+    call(&mut ctx, "tab_folder_unpack", json!({ "folder": "B" }));
+    assert_eq!(tab_folder(&mut ctx, "Part Studio 1"), "Folder 1");
+    assert_eq!(tab_folder(&mut ctx, "Assembly 1"), "Folder 1");
+    let d = call(&mut ctx, "document_info", json!({}));
+    assert_eq!(d["folders"].as_array().unwrap().len(), 1, "{d}");
+}
+
 /// feature_add makes the dialog's own choices for fields not given: an
 /// Extrude from a sketch on a part's face adds to that part (merge scope
 /// the part); Remove there cuts into it.

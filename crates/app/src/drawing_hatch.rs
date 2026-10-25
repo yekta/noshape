@@ -14,7 +14,6 @@ use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -372,7 +371,7 @@ impl DrawingEditor {
             .gap(px(8.))
             .child(div().w(px(48.)).text_size(px(11.5)).child("Color"))
             .child(swatch)
-            .child(Checkbox::new("hd-dcolor").label("Drawing properties").small().checked(drawing_color).on_click(cx.listener(|this, v: &bool, _, cx| {
+            .child(crate::drawing_chrome::DrCheckbox::new("hd-dcolor").label("Drawing properties").checked(drawing_color).on_click(cx.listener(|this, v: &bool, _, cx| {
                 let v = *v;
                 this.set_hatch(|d| d.drawing_color = v, cx)
             })));

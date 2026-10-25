@@ -931,9 +931,9 @@ impl PartStudioView {
         if let Some(m) = &error_mesh {
             extra.extend(scene_builder::error_geometry(m, self.gpu.uploader()));
         }
-        // FeatureScript debug geometry of the open feature (Helix profiles).
+        // Debug geometry of the open feature (Helix profiles, FeatureScript debug()).
         if let Some(st) = self.edit.as_ref().and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id))
-            && (!st.debug.lines.is_empty() || !st.debug.points.is_empty())
+            && (!st.debug.lines.is_empty() || !st.debug.points.is_empty() || !st.debug.colored.is_empty())
         {
             extra.extend(scene_builder::debug_geometry(&st.debug, self.gpu.uploader()));
         }
@@ -1715,7 +1715,6 @@ impl PartStudioView {
             // Assembly context geometry is never missing (snapshot).
             r => r.depends_on().is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
         });
-        let dialog_width = self.ui.dialog_width;
         let (configured, configurable_inputs) = self.configured_of(feature_id, cx);
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
         let vertex_sets: std::collections::HashMap<FeatureId, Vec<Reference>> = self.display.sketches.iter().map(|s| (s.feature, sketch_points(s))).collect();
@@ -1731,7 +1730,7 @@ impl PartStudioView {
             d.configurable_inputs = configurable_inputs;
             d.sketch_region_count = Arc::new(move |id| region_counts.get(&id).copied().unwrap_or(0));
             d.sketch_vertices = Arc::new(move |id| vertex_sets.get(&id).cloned().unwrap_or_default());
-            d.width = dialog_width;
+            d.width = crate::preferences_window::ListPrefs::load().feature_dialog_widths.get(&d.feature.type_id).map(|w| px(*w as f32));
             d.variables = vars;
             d.final_available = later;
             window.focus(&d.focus_handle(cx), cx);
@@ -4175,7 +4174,12 @@ impl PartStudioView {
             let rename = item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)));
             let mut m = menu.item(rename).separator().item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
             if let Some((sid, sname)) = source_sketch.clone() {
-                m = m.item(item(&format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))));
+                // Live (de-sc-4): „Sketch 1 [Skizze]“ bearbeiten …, the sketch's
+                // type in brackets when its name doesn't start with it (in the
+                // UI language; English "Edit Sketch 1…").
+                let sketch_type = crate::i18n::type_name("Sketch");
+                let shown = if sname.starts_with(sketch_type.as_str()) { sname.clone() } else { format!("{sname} [{sketch_type}]") };
+                m = m.item(item(&format!("Edit {shown}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))));
             }
             if is_sketch {
                 m = m.item(item("Copy sketch", Box::new(move |this, _, cx| this.copy_sketch(id, cx))));
@@ -5206,11 +5210,18 @@ impl Render for PartStudioView {
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::feature_dialog::DialogResize>, _, cx| {
                                 let origin = this.ui.dialog_pos.unwrap_or(point(px(0.), px(3.)));
                                 let p = e.event.position - e.bounds.origin - origin;
-                                let width = p.x.max(px(220.));
+                                let width = p.x.max(px(220.)).round();
+                                let changed = this.ui.dialog_width != Some(width);
                                 this.ui.dialog_width = Some(width);
                                 if let Some(ed) = &this.edit {
                                     ed.dialog.update(cx, |d, cx| {
                                         d.width = Some(width);
+                                        // Live writes the width as the edge moves, per feature type.
+                                        if changed {
+                                            let mut prefs = crate::preferences_window::ListPrefs::load();
+                                            prefs.feature_dialog_widths.insert(d.feature.type_id.clone(), f32::from(width) as u32);
+                                            prefs.save();
+                                        }
                                         cx.notify();
                                     });
                                 }

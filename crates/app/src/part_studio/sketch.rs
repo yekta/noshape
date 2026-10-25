@@ -513,8 +513,10 @@ impl PartStudioView {
             let v = vp.read(cx);
             v.camera.world_per_pixel(v.size().y)
         };
+        // The pointer stands for its pixel's centre (live sketch/51: a point
+        // placed at a pointer pixel draws centred on that pixel row).
         let to_plane = |this: &Self, pos: DVec2, cx: &App| -> Option<DVec2> {
-            let (o, d) = vp.read(cx).ray(pos);
+            let (o, d) = vp.read(cx).ray(pos + DVec2::splat(0.5));
             this.sketch.as_ref()?.plane_point(o, d)
         };
         let wpp_changed = self.sketch.as_ref().is_some_and(|ed| (ed.world_per_px - wpp).abs() > wpp * 1e-6);
@@ -2529,12 +2531,14 @@ impl PartStudioView {
             let b = crate::overlay_labels::RowBox {
                 leaves,
                 text_size: 16.0,
-                height: 22.0,
+                // Live sketch/24: the hover / selected box is 27 px high,
+                // centred on the value.
+                height: 27.0,
                 pad_x: 4.0,
                 radius: 4.0,
                 background: bg.map(Into::into),
                 border: configured.then(|| rgb(0xffc20e).into()),
-                offset: [shift - est_w * 0.5, -11.0],
+                offset: [shift - est_w * 0.5, -13.5],
             };
             if let Some(l) = crate::overlay_labels::row_box(window, cx, &b, anchor, dim_label_hit(cid)) {
                 out.push(l);
@@ -2930,8 +2934,9 @@ impl PartStudioView {
                     .id(SharedString::from(format!("dim-{}", cid.0)))
                     .absolute()
                     .left(px(x - est_w * 0.5))
-                    .top(px(y - 11.0))
-                    .h(px(22.))
+                    // Live sketch/24: 27 px high, centred on the value.
+                    .top(px(y - 13.5))
+                    .h(px(27.))
                     .px(px(4.))
                     .flex()
                     .items_center()
@@ -3021,18 +3026,43 @@ impl PartStudioView {
         // ---- constraint glyphs
         let show_all = ed.show_constraints || ed.shift_held;
         let recent = ed.glyph_entity.filter(|(_, t)| t.elapsed().as_millis() < 750).map(|(e, _)| e);
-        let mut per_entity: HashMap<u32, usize> = HashMap::new();
-        for g in ed.constraint_glyphs(&data) {
-            let visible = show_all
-                || ed.hover == Some(g.entity)
-                || recent == Some(g.entity)
-                || ed.selection.contains(&g.entity)
-                || ed.selected_constraints.contains(&g.constraint)
-                || ed.hover_constraint == Some(g.constraint);
-            if !visible {
-                continue;
+        let glyphs: Vec<_> = ed
+            .constraint_glyphs(&data)
+            .into_iter()
+            .filter(|g| {
+                show_all
+                    || ed.hover == Some(g.entity)
+                    || recent == Some(g.entity)
+                    || ed.selection.contains(&g.entity)
+                    || ed.selected_constraints.contains(&g.constraint)
+                    || ed.hover_constraint == Some(g.constraint)
+            })
+            .collect();
+        // Glyphs per entity laid out next to it (dragged ones aside).
+        let mut counts: HashMap<u32, usize> = HashMap::new();
+        for g in glyphs.iter().filter(|g| g.offset.is_none()) {
+            *counts.entry(g.entity.0).or_default() += 1;
+        }
+        // A line's side for its glyphs (screen unit normal): below a
+        // horizontal line, left of a vertical one (live sketch/28).
+        let line_side = |e: noshape_sketch::EntityId| -> Option<(f32, f32)> {
+            let noshape_sketch::Curve2::Line { a, b } = data.sketch.curve(e)? else { return None };
+            let ((ax, ay), (bx, by)) = (project(a)?, project(b)?);
+            let (dx, dy) = (bx - ax, by - ay);
+            let len = (dx * dx + dy * dy).sqrt();
+            if len < 1e-3 {
+                return None;
             }
-            // Dragged glyphs sit centered on their stored offset; others stack next to the entity.
+            let (nx, ny) = (-dy / len, dx / len);
+            Some(if ny < -1e-3 || (ny.abs() <= 1e-3 && nx > 0.0) { (-nx, -ny) } else { (nx, ny) })
+        };
+        let mut per_entity: HashMap<u32, usize> = HashMap::new();
+        for g in glyphs {
+            // Dragged glyphs sit centered on their stored offset. Live
+            // (sketch/28): 20 px white boxes 22 px apart; a line's row is
+            // centred 20.5 px off its midpoint, a point's glyph sits up-left
+            // of it (top-left at -27, -26) with a leader.
+            let mut leader = false;
             let (x, y, dx, dy) = match g.offset {
                 Some(o) => {
                     let Some((x, y)) = project(g.anchor + o) else { continue };
@@ -3041,11 +3071,41 @@ impl PartStudioView {
                 None => {
                     let Some((x, y)) = project(g.anchor) else { continue };
                     let k = per_entity.entry(g.entity.0).or_default();
-                    let d = if g.on_point { (7.0 + 19.0 * *k as f32, -25.0) } else { (6.0 + 19.0 * *k as f32, 6.0) };
+                    let n = counts.get(&g.entity.0).copied().unwrap_or(1) as f32;
+                    let kf = *k as f32;
                     *k += 1;
-                    (x, y, d.0, d.1)
+                    if g.on_point {
+                        leader = true;
+                        (x, y, -27.0 - 22.0 * kf, -26.0)
+                    } else if let Some((nx, ny)) = line_side(g.entity) {
+                        (x + nx * 20.5, y + ny * 20.5, -10.0 - 11.0 * (n - 1.0) + 22.0 * kf, -10.0)
+                    } else {
+                        (x, y, 6.0 + 22.0 * kf, 6.0)
+                    }
                 }
             };
+            if leader {
+                // Live: a 1 px #a8b2bb line from the box's corner to the point.
+                out.push(
+                    canvas(
+                        |_, _, _| {},
+                        |b, _, window, _| {
+                            let mut pb = PathBuilder::stroke(px(1.));
+                            pb.move_to(b.origin);
+                            pb.line_to(b.origin + point(b.size.width, b.size.height));
+                            if let Ok(path) = pb.build() {
+                                window.paint_path(path, gpui_kit::rgb_static(0xa8b2bb));
+                            }
+                        },
+                    )
+                    .absolute()
+                    .left(px(x - 7.0))
+                    .top(px(y - 6.0))
+                    .w(px(7.))
+                    .h(px(6.))
+                    .into_any_element(),
+                );
+            }
             let cid = g.constraint;
             let gent = g.entity;
             let selected = ed.selected_constraints.contains(&cid);
@@ -3075,11 +3135,10 @@ impl PartStudioView {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .rounded(px(2.))
                     .bg(bg)
-                    .shadow_xs()
                     .cursor_pointer()
-                    .child(icon_px(g.icon, 14.0, fg))
+                    // Live sketch/28: the icon spans 14 px of the 20 px box (ours at 18 px).
+                    .child(icon_px(g.icon, 18.0, fg))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         if let Some(ed) = &mut this.sketch {
                             let new = if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
@@ -3159,13 +3218,17 @@ impl PartStudioView {
             && let Some((x, y)) = project(inf.position)
         {
             let icons: Vec<&'static str> = if inf.kind == noshape_sketch::InferenceKind::AlignBoth { vec!["horizontal", "vertical"] } else { vec![crate::sketch_mode::inference_icon(inf.kind)] };
+            // Live (sketch/51, 52; part-studio/1032): the constraint icon in
+            // `#333` on a 20 px box of 40 % white (unseen on the white plane),
+            // centred 30 px right of and 31 px below the point (at 18 px our
+            // icons give live's 14 px horizontal bar and 16 px perpendicular base).
             out.push(
                 h_flex()
                     .absolute()
-                    .left(px(x + 12.0))
-                    .top(px(y + 10.0))
+                    .left(px(x + 19.0))
+                    .top(px(y + 21.0))
                     .gap_0p5()
-                    .children(icons.into_iter().map(|i| div().size(px(18.)).flex().items_center().justify_center().rounded(px(3.)).bg(with_alpha(rgb(0x27aae1), 0.35)).border_1().border_color(rgb(0xffc20e)).child(icon_px(i, 13.0, rgb(0xffffff)))))
+                    .children(icons.into_iter().map(|i| div().size(px(20.)).flex().items_center().justify_center().bg(gpui_kit::rgba_static(0xffffff66)).child(icon_px(i, 18.0, gpui_kit::rgb_static(0x333333)))))
                     .into_any_element(),
             );
         }

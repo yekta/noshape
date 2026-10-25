@@ -384,6 +384,8 @@ impl Regenerator {
                                 state.faulty = e.faulty.iter().map(|s| s.to_string()).collect();
                                 state.touched = std::mem::take(&mut ev.touched);
                                 state.touched_behind = std::mem::take(&mut ev.touched_behind);
+                                // A failed custom feature's debug() still shows (live).
+                                state.debug = std::mem::take(&mut ev.debug);
                                 if !ev.error_shapes.is_empty() {
                                     state.error_mesh = Some(display::tessellate_error(&noshape_kernel::Shape::compound(&ev.error_shapes), opts));
                                 }

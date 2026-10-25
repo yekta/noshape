@@ -14,7 +14,6 @@ use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState, Textarea, TextareaState};
 use gpui_kit::component::radio::Radio;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
@@ -241,7 +240,7 @@ impl DrawingEditor {
         let set = weld_set;
         let ink = gpui_kit::rgb(0x333333);
         let check = |id: &'static str, label: &'static str, on: bool, enabled: bool, f: fn(&mut WeldSpec), cx: &mut Context<Self>| {
-            div().when(!enabled, |d| d.opacity(0.45)).child(Checkbox::new(id).label(label).small().checked(on).when(enabled, |c| c.on_click(set(std::rc::Rc::new(f), cx))))
+            div().when(!enabled, |d| d.opacity(0.45)).child(crate::drawing_chrome::DrCheckbox::new(id).label(label).checked(on).when(enabled, |c| c.on_click(set(std::rc::Rc::new(f), cx))))
         };
         // A 50 × 30 dropdown showing an icon (joints, spacers) or a name.
         let dropdown = |id: SharedString, icon: Option<String>, label: String, items: Vec<(Option<String>, String, bool, SetSpec)>| {
@@ -358,7 +357,7 @@ impl DrawingEditor {
             .w(px(WIDTH))
             .h(px(84.))
             .child(div().absolute().left(px(11.)).top(px(0.)).w(px(100.)).h(px(60.)).child(Textarea::new(&reference).w(px(100.)).h(px(60.))))
-            .child(div().absolute().left(px(11.)).top(px(66.)).child(Checkbox::new("weld-ref").label("Reference").small().checked(s.reference.is_some()).on_click(set(std::rc::Rc::new(|s: &mut WeldSpec| s.reference = if s.reference.is_some() { None } else { Some(String::new()) }), cx))))
+            .child(div().absolute().left(px(11.)).top(px(66.)).child(crate::drawing_chrome::DrCheckbox::new("weld-ref").label("Reference").checked(s.reference.is_some()).on_click(set(std::rc::Rc::new(|s: &mut WeldSpec| s.reference = if s.reference.is_some() { None } else { Some(String::new()) }), cx))))
             .child(div().absolute().left(px(153.)).top(px(42.)).w(px(252.)).h(px(1.)).bg(ink))
             .when(iso && !s.symmetric, |m| m.child(div().absolute().left(px(153.)).top(px(if s.flip_id_line { 38. } else { 46. })).w(px(252.)).h(px(1.)).border_t_1().border_dashed().border_color(ink)))
             .child(div().absolute().left(px(405.)).top(px(42.)).child(crate::ui::glyph("weld-arrow", 40., ink)))

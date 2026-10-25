@@ -9,7 +9,6 @@ use noshape_scene::drawing_tools::table_edit as te;
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::Input;
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex};
@@ -533,7 +532,7 @@ impl DrawingEditor {
                         Self::label_row("Apply to", Button::new("dr-cf-scope").label(SCOPES[scope]).small().outline().dropdown_caret(true).os_dropdown_menu("dr-cf-scope-dd", true, move |m, w, cx| fill_os_menu(m, &scope_entries, &ed, w, cx)).into_any_element()),
                         Self::label_row("Alignment", h_flex().gap_1().child(align_btn("dr-cf-l", "Left", CellAlign::Left)).child(align_btn("dr-cf-c", "Center", CellAlign::Center)).child(align_btn("dr-cf-r", "Right", CellAlign::Right)).into_any_element()),
                         Self::label_row("Text height", h_flex().gap_2().child(Input::new(height).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).xsmall().w(px(60.))).child(div().text_xs().text_color(pal.text_faint).child("mm (empty = table)")).into_any_element()),
-                        Checkbox::new("dr-cf-bold")
+                        crate::drawing_chrome::DrCheckbox::new("dr-cf-bold")
                             .label("Bold")
                             .checked(bold)
                             .on_change(cx.listener(|this, v: &bool, _, cx| {
