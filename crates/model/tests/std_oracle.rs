@@ -1574,3 +1574,32 @@ fn more_editing_logic_runs_std() {
     let got = edit_logic(&s, &ParamValues::default(), &["entities", "axis"]);
     assert!(got.contains(&"operationType=Enum(\"ADD\")".to_string()), "{got:?}");
 }
+
+/// std's holeEditLogic through the host natives: a new hole's Merge scope is
+/// the part it reaches, and one sketched below the part flips into it
+/// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,
+/// live "fs (10-25 f)"; the native dialog logic does the same, live L57).
+#[test]
+fn hole_editing_logic_runs_std() {
+    for on_top in [true, false] {
+        let mut s = Studio::new();
+        s.cube();
+        let r = s.regen();
+        let plane = if on_top { face_at(&r, DVec3::new(20.0, 20.0, 40.0)) } else { Reference::Plane(DatumPlane::Top) };
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = sk.add_point(DVec2::new(0.02, 0.02));
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![plane]));
+            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        });
+        s.add("hole", |pv| {
+            pv.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));
+            pv.set("unitsSystem", en("METRIC"));
+            noshape_model::features::hole_tables::apply_table_to_params(pv);
+        });
+        let got = edit_logic(&s, &ParamValues::default(), &["locations"]);
+        let scope = format!("scope={:?}", ParamValue::Query(vec![body_ref(&r, 0)]));
+        let want = if on_top { vec![scope] } else { vec!["oppositeDirection=Bool(true)".to_string(), scope] };
+        assert_eq!(got, want, "hole sketched {}", if on_top { "on the top face" } else { "below the part" });
+    }
+}
