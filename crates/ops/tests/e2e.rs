@@ -999,6 +999,11 @@ fn assembly_named_positions_and_exploded_views() {
     let n = call(&mut ctx, "view_camera", json!({ "tab": "Assembly 1", "action": "normal_to", "refs": [{ "instance": b, "entity": face }] }));
     let d = &n["view_direction"];
     assert!((0..3).any(|i| num(&d[i]).abs() > 1.0 - 1e-9), "normal to an axis-aligned face: {n}");
+    // Display: isolate the pin, show the mates, snap mode.
+    let dv = call(&mut ctx, "view_display", json!({ "tab": "Assembly 1", "isolate": [p], "show_mates": true, "snap_mode": true }));
+    assert_eq!((dv["isolate"][0].clone(), dv["show_mates"].clone(), dv["snap_mode"].clone()), (json!(p), json!(true), json!(true)), "{dv}");
+    let e = try_call(&mut ctx, "view_display", json!({ "tab": "Assembly 1", "highlight_boundary": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("highlight_boundary"), "{e:?}");
 
     let e = try_call(&mut ctx, "assembly_named_position_drivers", json!({ "drivers": [{ "mate": "Revolute 1", "dof": "tz" }] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("drivers[0].dof"));
@@ -3818,4 +3823,27 @@ fn view_camera_menus() {
     assert!((num(&zi["zoom"]) - 2.0 * num(&fit["zoom"])).abs() < 1e-9, "{zi}");
     let again = cam(&mut ctx, json!({ "tab": tab, "action": "zoom_sheet" }));
     assert_eq!(again["zoom"], fit["zoom"], "{again}");
+}
+
+/// Display settings kept by the window (view_display): isolate,
+/// transparent, boundary edges; render_image `view: "window"` uses them.
+#[test]
+fn view_display_settings() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "view_display.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let d = call(&mut ctx, "view_display", json!({ "isolate": ["Part 1"] }));
+    assert_eq!((d["isolate"].clone(), d["transparent"].clone()), (json!([part]), Value::Null), "{d}");
+    let d = call(&mut ctx, "view_display", json!({ "transparent": [part], "highlight_boundary": true }));
+    assert_eq!((d["isolate"].clone(), d["transparent"].clone(), d["highlight_boundary"].clone()), (Value::Null, json!([part]), json!(true)), "{d}");
+    let e = try_call(&mut ctx, "view_display", json!({ "show_mates": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("show_mates"), "an Assembly's: {e:?}");
+    let e = try_call(&mut ctx, "view_display", json!({ "isolate": ["nope"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("isolate[0]"), "{e:?}");
+    let ui = call(&mut ctx, "ui_state", json!({}));
+    assert_eq!(ui["display"][0]["transparent"], json!([part]), "{ui}");
+    call(&mut ctx, "view_camera", json!({ "action": "zoom_fit" }));
+    call(&mut ctx, "render_image", json!({ "view": "window", "width": 64, "height": 40 }));
+    let d = call(&mut ctx, "view_display", json!({ "exit_isolate": true }));
+    assert_eq!(d["transparent"], Value::Null, "{d}");
 }

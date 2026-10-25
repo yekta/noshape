@@ -1,7 +1,8 @@
 //! What an agent's call asks of the window (live mode): each
 //! [`noshape_ops::UiRequest`] done the way its menu item or shortcut does
 //! it. A child module of `workspace` (it works on the window's views);
-//! the views' files only open what it calls.
+//! what a Part Studio or Assembly does is in `agent_window/studio.rs` and
+//! `agent_window/assembly.rs`, child modules of those views.
 
 use super::{TabView, Workspace, request_activate_tab};
 use crate::viewport::Viewport;
@@ -99,6 +100,11 @@ impl Workspace {
                 }),
                 _ => {}
             },
+            R::Display { tab, set } => match self.views.get(&tab) {
+                Some(TabView::PartStudio(v)) => v.update(cx, |v, cx| v.agent_display(set, window, cx)),
+                Some(TabView::Assembly(v)) => v.update(cx, |v, cx| v.agent_display(set, window, cx)),
+                _ => {}
+            },
             R::SheetZoom { tab, mv } => {
                 if let Some(TabView::Drawing(v)) = self.views.get(&tab) {
                     v.update(cx, |v, cx| {
@@ -143,3 +149,4 @@ fn camera_move(vp: &Entity<Viewport>, mv: CameraMove, cx: &mut App) {
         CameraMove::Previous => {}
     });
 }
+

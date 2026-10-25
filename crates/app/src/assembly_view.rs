@@ -138,6 +138,9 @@ mod positions;
 mod bom_panel;
 #[path = "assembly_mass.rs"]
 mod mass;
+// What an agent's call asks of this view (live mode).
+#[path = "agent_window/assembly.rs"]
+mod agent_window;
 #[path = "assembly_reflection.rs"]
 mod reflection;
 #[path = "assembly_config.rs"]

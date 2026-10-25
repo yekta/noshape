@@ -4,6 +4,9 @@
 mod analysis;
 mod appearance;
 mod behaviors;
+// What an agent's call asks of this view (live mode).
+#[path = "../agent_window/studio.rs"]
+mod agent_window;
 mod create_selection;
 mod hole_callout;
 mod triad;

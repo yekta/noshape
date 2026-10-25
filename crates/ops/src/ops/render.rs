@@ -74,6 +74,16 @@ pub fn ops() -> Vec<Op> {
 }
 
 fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    // `view: "window"`: the window's display settings where the call gives none.
+    let merged = window_display_args(ctx, a)?;
+    let held;
+    let a = match &merged {
+        Some(v) => {
+            held = Args { op: a.op, value: v };
+            &held
+        }
+        None => a,
+    };
     let width = a.opt_u64("width")?.unwrap_or(800).clamp(16, 4096) as u32;
     let height = a.opt_u64("height")?.unwrap_or(600).clamp(16, 4096) as u32;
     let mode = match a.opt_str("display_mode")? {
@@ -318,6 +328,35 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
         v["file"] = json!(f);
     }
     Ok(OpOutput { value: v, images: vec![Image { png }] })
+}
+
+/// The call's arguments with the window's isolate / transparent and
+/// boundary edges (view_display) for those it doesn't give; None when not
+/// `view: "window"` or nothing to add.
+fn window_display_args(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Value>, OpError> {
+    if a.opt_str("view")? != Some("window") {
+        return Ok(None);
+    }
+    let assembly = super::configuration::asm::is_assembly(ctx, a)?;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = if assembly {
+        crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", |c| matches!(c, noshape_model::document::TabContent::Assembly(_)))?
+    } else {
+        crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Part Studio", crate::doc::is_part_studio)?
+    };
+    let Some(d) = od.window.display.get(&tab) else { return Ok(None) };
+    let mut v = a.value.clone();
+    let Some(m) = v.as_object_mut() else { return Ok(None) };
+    if let Some(iso) = &d.isolate
+        && !m.contains_key("isolate")
+        && !m.contains_key("transparent")
+    {
+        m.insert(if iso.transparent { "transparent" } else { "isolate" }.into(), json!(iso.ids));
+    }
+    if !assembly && d.highlight_boundary && !m.contains_key("boundary_edges") {
+        m.insert("boundary_edges".into(), json!(true));
+    }
+    Ok(Some(v))
 }
 
 /// `view: "window"`: the window's camera for the tab (view_camera).

@@ -189,6 +189,11 @@ fn state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             v["tab"] = tab_json(od, *t);
             v
         }).collect::<Vec<_>>(),
+        "display": w.display.iter().map(|(t, d)| {
+            let mut v = super::display::display_json(d, matches!(od.doc().tab(*t).map(|t| &t.content), Some(noshape_model::document::TabContent::Assembly(_))));
+            v["tab"] = tab_json(od, *t);
+            v
+        }).collect::<Vec<_>>(),
         "drawing_zoom": w.sheets.iter().map(|(t, sv)| json!({ "tab": tab_json(od, *t), "zoom": sv.zoom, "center": sv.center, "viewport": sv.size })).collect::<Vec<_>>(),
     })
     .into())

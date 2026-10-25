@@ -33,6 +33,50 @@ pub enum UiRequest {
     Camera { tab: TabId, mv: CameraMove },
     /// A drawing's zoom.
     SheetZoom { tab: TabId, mv: SheetMove },
+    /// A Part Studio's or Assembly's display setting (view_display).
+    Display { tab: TabId, set: DisplaySet },
+}
+
+/// A display setting as the view and context menus change it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DisplaySet {
+    /// Isolate… / Make transparent… on these parts (Part Studio).
+    IsolateParts { transparent: bool, parts: Vec<noshape_model::BodyId> },
+    /// Isolate… / Make transparent… on these instances (Assembly).
+    IsolateInstances { transparent: bool, instances: Vec<noshape_model::assembly::InstanceId> },
+    /// Exit isolate.
+    ExitIsolate,
+    /// View › Highlight boundary edges.
+    HighlightBoundary(bool),
+    /// View › Orient normal to sketch on edit.
+    OrientOnEdit(bool),
+    /// Analysis › Turn thickness analysis off.
+    ThicknessOff,
+    /// Assembly: Hide/show mates (the mate indicators).
+    ShowMates(bool),
+    /// Assembly: Show mates mode.
+    ShowMatesMode(bool),
+    /// Assembly: Snap mode.
+    SnapMode(bool),
+}
+
+/// Make isolate / Make transparent: which, and the parts' (`body:…`) or
+/// instances' (`inst:…`) ids.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Isolation {
+    pub transparent: bool,
+    pub ids: Vec<String>,
+}
+
+/// A 3D tab's display settings as the agent set them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TabDisplay {
+    pub isolate: Option<Isolation>,
+    pub highlight_boundary: bool,
+    pub orient_on_edit: bool,
+    pub show_mates: bool,
+    pub show_mates_mode: bool,
+    pub snap_mode: bool,
 }
 
 /// A camera move as the view menus do it.
@@ -134,6 +178,8 @@ pub struct WindowState {
     pub cameras: BTreeMap<TabId, ViewCamera>,
     /// Drawings' zoom (set by view_camera).
     pub sheets: BTreeMap<TabId, SheetView>,
+    /// 3D tabs' display settings (set by view_display).
+    pub display: BTreeMap<TabId, TabDisplay>,
 }
 
 impl WindowState {
@@ -152,8 +198,8 @@ impl WindowState {
             }
             UiRequest::Compare(c) => self.compare = c.clone(),
             UiRequest::Repair(r) => self.repair = r.clone(),
-            // view_camera keeps the cameras itself.
-            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } => {}
+            // view_camera and view_display keep their state themselves.
+            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } => {}
         }
     }
 }

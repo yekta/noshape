@@ -21,6 +21,7 @@ mod meta;
 mod parts;
 mod query;
 mod camera;
+mod display;
 mod render;
 mod sketch;
 mod sketch_edit;
@@ -58,6 +59,7 @@ pub fn all() -> Vec<Op> {
     v.extend(analysis::ops());
     v.extend(render::ops());
     v.extend(camera::ops());
+    v.extend(display::ops());
     v.extend(export::ops());
     v.extend(import::ops());
     v.extend(featurestudio::ops());
