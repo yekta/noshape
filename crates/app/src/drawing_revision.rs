@@ -9,7 +9,6 @@ use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -352,7 +351,7 @@ impl DrawingEditor {
                         .child(row("Visible rows", div().w(px(130.)).child(Input::new(&d.rows_input).small()).into_any_element()))
                         .child(row("Order", order.into_any_element()))
                         .child(
-                            div().px(px(6.)).py(px(4.)).child(Checkbox::new("rev-hide").label("Hide revision callouts no longer shown in the table").small().checked(hide).on_click(cx.listener(|this, v: &bool, _, cx| {
+                            div().px(px(6.)).py(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("rev-hide").label("Hide revision callouts no longer shown in the table").checked(hide).on_click(cx.listener(|this, v: &bool, _, cx| {
                                 if let Some(d) = &mut this.revision_dlg {
                                     d.hide_callouts = *v;
                                 }

@@ -9,7 +9,6 @@
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
@@ -516,7 +515,7 @@ impl DrawingEditor {
                 ("Comma".into(), props.decimal_comma, std::rc::Rc::new(|p: &mut DrawingProps| p.decimal_comma = true) as Act),
             ];
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -558,7 +557,7 @@ impl DrawingEditor {
                 ("Horizontal".into(), horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = true) as Act),
             ];
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -617,7 +616,7 @@ impl DrawingEditor {
                 .map(|&t| (t.name().to_string(), t == props.ann_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.ann_arrow_type = t) as Act))
                 .collect();
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -694,7 +693,7 @@ impl DrawingEditor {
             }
         } else if self.drawing_props.tab == 3 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -782,7 +781,7 @@ impl DrawingEditor {
             let vt = props.view_tab.clone();
             let field = |i: usize| self.wt_field(i, &ed);
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -802,7 +801,7 @@ impl DrawingEditor {
             let locked = props.formats_locked;
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Formats"))
-                .child(div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new("dp-flock").label("Locked").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
+                .child(div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("dp-flock").native().label("Locked").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| p.formats_locked = v, cx);
                 }))))
@@ -821,7 +820,7 @@ impl DrawingEditor {
                 .child(row("Vertical padding", field(1)));
         } else if self.drawing_props.tab == 7 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -947,7 +946,7 @@ impl DrawingEditor {
                     .h(px(34.))
                     .pl(px(5.))
                     .pr(px(9.))
-                    .child(div().flex_1().text_size(px(12.)).child(Checkbox::new("dp-lock").label("Lock drawing properties").small().checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
+                    .child(div().flex_1().text_size(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("dp-lock").native().label("Lock drawing properties").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
                         let v = *v;
                         this.set_drawing_prop(&move |p| p.locked = v, cx)
                     }))))

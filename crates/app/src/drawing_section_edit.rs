@@ -7,8 +7,7 @@
 
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::*;
 use noshape_model::drawing::{ViewId, ViewKind};
 
@@ -137,7 +136,7 @@ impl DrawingEditor {
                         .child(div().id("se-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(false, cx)))),
                 )
                 .child(div().px(px(10.)).h(px(26.)).flex().items_center().text_size(px(12.)).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(label))
-                .child(div().px(px(10.)).pt(px(6.)).child(Checkbox::new("se-cut-only").label("Show cut geometry only").small().checked(cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
+                .child(div().px(px(10.)).pt(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("se-cut-only").label("Show cut geometry only").checked(cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(e) = &mut this.section_edit {
                         e.cut_only = *v;
                     }

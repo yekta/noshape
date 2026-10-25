@@ -9,7 +9,6 @@
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
@@ -256,7 +255,7 @@ impl DrawingEditor {
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(26.)).pl(px(5.)).child(div().flex_1().text_size(px(12.)).child(label)).child(body).into_any_element();
         let field = |w: f32| div().w(px(w)).h(px(26.)).flex_none().bg(crate::theme::light().panel).border_b_1().border_color(gpui_kit::rgb(0xdddddd));
         let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DetailDlg, bool), cx: &mut Context<Self>| {
-            div().h(px(26.)).flex().items_center().pl(px(4.)).child(Checkbox::new(id).label(label).small().checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+            div().h(px(26.)).flex().items_center().pl(px(7.)).child(crate::drawing_chrome::DrCheckbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                 if let Some(d) = &mut this.detail_dlg {
                     f(d, *v);
                 }
@@ -303,7 +302,8 @@ impl DrawingEditor {
                 // rectangle / closed profile / closed polygon until the profile
                 // exists, then "Profile created" (`#dbf1fa`, 1 px `#1b5faa`,
                 // radius 2, 12 px `#616b73`).
-                .child(div().mx(px(3.)).mt(px(1.)).mb(px(2.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(if placed {
+                // Live drawing/127: 5 px under the field to the View scale row.
+                .child(div().mx(px(3.)).mt(px(1.)).mb(px(5.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(if placed {
                     "Profile created"
                 } else {
                     match shape {
@@ -316,7 +316,8 @@ impl DrawingEditor {
                 .child(div().px(px(3.)).child(row("View scale", field(106.).child(scale_btn).into_any_element())))
                 .child(div().px(px(3.)).child(row("View label", gpui_kit::base::input::input_frame(field(110.).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()).into_any_element()).into_any_element())))
                 .child(div().px(px(3.)).child(row("Profile style", field(117.).child(style_btn).into_any_element())))
-                .child(check("det-show", "Show detail view profile", show, |d, v| d.show_profile = v, cx))
+                // Live drawing/127: the checkbox rows start 3 px into the last field row.
+                .child(div().mt(px(-3.)).child(check("det-show", "Show detail view profile", show, |d, v| d.show_profile = v, cx)))
                 .child(check("det-clip", "Clip border to geometry", clip, |d, v| d.clip_border = v, cx))
                 .when(shape >= 2, |e| e.child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Click points; double-click to close the profile")))
                 .into_any_element(),

@@ -6,8 +6,7 @@
 
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::*;
@@ -120,7 +119,7 @@ impl DrawingEditor {
                 }))
         };
         let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut CentermarkDlg, bool), cx: &mut Context<Self>| {
-            div().h(px(26.)).px(px(4.)).flex().items_center().child(Checkbox::new(id).label(label).small().checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+            div().h(px(26.)).px(px(4.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                 if let Some(d) = &mut this.centermark_dlg {
                     f(d, *v);
                 }

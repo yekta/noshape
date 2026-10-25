@@ -5,7 +5,6 @@
 
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -168,13 +167,13 @@ impl DrawingEditor {
                 .child(div().h(px(4.)))
                 .child(row("Rows", &d.rows))
                 .child(row("Columns", &d.cols))
-                .child(div().pl(px(9.)).h(px(26.)).flex().items_center().child(Checkbox::new("tt-title").label("Title row").small().checked(title_row).on_click(cx.listener(|this, v: &bool, _, cx| {
+                .child(div().pl(px(9.)).h(px(26.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("tt-title").label("Title row").checked(title_row).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(d) = &mut this.table_tool {
                         d.title_row = *v;
                     }
                     cx.notify();
                 }))))
-                .child(div().pl(px(9.)).h(px(26.)).flex().items_center().child(Checkbox::new("tt-header").label("Header row").small().checked(header_row).on_click(cx.listener(|this, v: &bool, _, cx| {
+                .child(div().pl(px(9.)).h(px(26.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("tt-header").label("Header row").checked(header_row).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(d) = &mut this.table_tool {
                         d.header_row = *v;
                     }

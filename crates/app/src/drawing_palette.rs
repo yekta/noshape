@@ -23,7 +23,6 @@ use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -438,7 +437,7 @@ impl DrawingEditor {
         let mut toggles = h_flex().gap(px(if hole { 4. } else { 2. })).child(symbols);
         if hole {
             toggles = toggles.child(toggle("dp-ref", "(XX)", "Parentheses", fmt.reference, |d| d.cur.format.reference = !d.cur.format.reference, cx)).child(menu("dp-dual", small("[XX] x.xx".into()), 80., dual_items)).child(
-                div().pl(px(8.)).child(Checkbox::new("dp-override").label("Override precision/tolerance").small().checked(opts.override_tol).tooltip("Click to override the precision and tolerance from the hole feature").on_click(cx.listener(|this, v: &bool, _, cx| {
+                div().pl(px(8.)).child(crate::drawing_chrome::DrCheckbox::new("dp-override").label("Override precision/tolerance").checked(opts.override_tol).tooltip("Click to override the precision and tolerance from the hole feature").on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.edit_palette(|d| d.cur.hole.get_or_insert_with(Default::default).override_tol = v, cx)
                 }))),

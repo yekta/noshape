@@ -28,11 +28,13 @@ asked, → owner.
 | DL2 | Empty Insert view panel | fields greyed with grey ▼; View scale focused (2 px blue underline, dark ▼) | all alike, blue carets | ✅ |
 | DL3 | Active drawing tool button | `#d1dde6` (drawing/20–22, 127) | `#eaeaea` (the Part Studio's) | ✅ |
 | DL4 | Section view dialog label | focused with "A" selected, 2 px underline (drawing/20) | not focused, 1 px, 2 px lower | 🔧 focus + 2 px ✅; the selection and Esc (the focused field swallowed it) fixed after the 17:19 build |
-| DL5 | Section view dialog checkboxes | `#ddd` 12 px boxes 2 px up / left | the kit's darker box | ✅ Section view (`drawing_chrome::DrCheckbox`, pixel-checked); the other 21 drawing dialogs keep the kit's until asb is clear (asked the lead) |
+| DL5 | Section view dialog checkboxes | `#ddd` 12 px boxes 2 px up / left | the kit's darker box | ✅ every drawing dialog and panel (`drawing_chrome::DrCheckbox`): the floating dialogs, view and sheet properties the 12 px `#ddd` box (live hides the native input: dom drawing-section/detail/weld/note/flat-view-properties); the Drawing properties and styles panels and the Reference manager Chrome's native 13 px box (`#767676` / `#0075ff`, live 240, 294) |
 | DL6 | Dimension "±0.1" launcher | a small button beside a placed / selected dimension (drawing/12) | none | ✅ (live answer "ui2 (10-24 15:25) dimension launcher"): shows 0.8 s after a dimension is selected, bottom-left at the text ink's top-right + (14, −14) (measured +15/−14), 0.6 s hover or click opens the palette at its top-left + (−15, +9), leaving that palette closes it and deselects; our own 32 px icon after live's layout (its anti-aliased strokes not copied: 113 of 1024 px differ) |
-| DL8 | Detail view dialog | rows: View scale 3 px lower after the field; checkbox rows 29 px apart (drawing/127) | 3 px higher; 27 px | ✗ with the checkbox swap (one pixel check) |
+| DL8 | Detail view dialog | rows: View scale 3 px lower after the field; checkbox rows 29 px apart (drawing/127) | 3 px higher; the checkboxes 2 px left | ✅ rows at live's 181 / 207 / 233, boxes at 254 / 280 and x 47, labels at x 68 (pixel-checked) |
 | DL7 | Title block field double-click | Note editor on that note (drawing/726) | nothing (17:19 build too) | ✗ → asb (behaviour) |
 
 ## For skb
 
 - A Revolute between the two top faces of two plates (asm1: Part 1 <1> fixed, Part 1 <2>) previews with the dialog title red and "Mate error" on the Mate features folder and the assembly row, also on the 13:51 build (not from the look changes); live shows a valid preview for such picks (assembly/2220).
+
+- DL9 Drawing properties panel: its rows sit ~3 px lower and ~3 px right of live's (1710) — panel layout, open.

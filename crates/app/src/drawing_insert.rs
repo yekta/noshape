@@ -7,7 +7,6 @@
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
@@ -383,7 +382,7 @@ impl DrawingEditor {
                 .child(row("View simplification", select("div-simp", simp.name().to_string(), simp_items, usize::MAX)))
                 .children(self.insert.simp_value.as_ref().filter(|_| !simplification_text(simp, true).is_empty()).map(|(st, _)| row("", Input::new(st).small().into_any_element())))
                 .child(
-                    div().px(px(6.)).py(px(3.)).child(Checkbox::new("div-sketch-app").label("Show sketch appearances").small().checked(self.insert.sketch_appearances).on_click(cx.listener(|this, on: &bool, _, cx| {
+                    div().px(px(6.)).py(px(3.)).child(crate::drawing_chrome::DrCheckbox::new("div-sketch-app").label("Show sketch appearances").checked(self.insert.sketch_appearances).on_click(cx.listener(|this, on: &bool, _, cx| {
                         this.insert.sketch_appearances = *on;
                         cx.notify();
                     }))),
@@ -391,7 +390,7 @@ impl DrawingEditor {
                 // Assemblies have no model annotations (live drawing/1106).
                 .when(is_asm, |d| d.child(div().h(px(3.))))
                 .when(!is_asm, |d| d.child(
-                    div().px(px(6.)).pt(px(3.)).pb(px(6.)).child(Checkbox::new("div-model-ann").label("Show annotations from model").small().checked(self.insert.model_annotations).on_click(cx.listener(|this, on: &bool, _, cx| {
+                    div().px(px(6.)).pt(px(3.)).pb(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("div-model-ann").label("Show annotations from model").checked(self.insert.model_annotations).on_click(cx.listener(|this, on: &bool, _, cx| {
                         this.insert.model_annotations = *on;
                         cx.notify();
                     }))),
