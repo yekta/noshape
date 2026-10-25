@@ -103,6 +103,8 @@ pub(crate) struct GpuMesh {
     index_count: u32,
     /// `Uint16` when every vertex index fits.
     index_format: wgpu::IndexFormat,
+    /// The largest local pick id of its vertices (0: none).
+    max_pick: u32,
     /// Fixed-point vertex positions → mesh coordinates (see [`MeshVertex`]),
     /// folded into the instance's model matrix.
     dequant: Mat4,
@@ -588,6 +590,13 @@ struct DrawLists {
     over_transparent: Vec<usize>,
     /// Color pass only: translucent meshes drawn after the lines and points.
     over_lines: Vec<usize>,
+    /// Color pass: `opaque` split in runs drawn without (`true`) or with
+    /// the face shader's `discard` (hidden faces, section clipping), as
+    /// (end index in `opaque`, solid); see [`DrawLists::order_solid`].
+    opaque_runs: Vec<(usize, bool)>,
+    /// Prefix counts of HIDDEN or DIM states by pick id (empty: none).
+    masked_prefix: Vec<u32>,
+    solid_scratch: Vec<(i32, bool, usize)>,
     lines: Vec<usize>,
     /// Color pass only: silhouette candidates (`GpuLines::silhouette`) and
     /// backface silhouette meshes (`Instance::back_silhouette`).
@@ -737,6 +746,61 @@ impl DrawLists {
         if !detail.backface_silhouettes {
             self.back_silhouettes.clear();
         }
+    }
+
+    /// Whether opaque mesh `inst` can be drawn without the face shader's
+    /// `discard` and without blending (same pixels): fully opaque, no
+    /// section plane clips it and none of its faces is hidden or dimmed
+    /// (the shader's `clipped` / HIDDEN tests are then always false and its
+    /// alpha 1).
+    fn solid(&self, scene: &Scene, inst: &Instance) -> bool {
+        if inst.color[3] < 1.0 || (scene.clip.is_some() && !inst.ignore_clip) {
+            return false;
+        }
+        let Drawable::Mesh(m) = &inst.drawable else { return false };
+        if self.masked_prefix.is_empty() || m.0.max_pick == 0 {
+            return true;
+        }
+        // Global pick ids pick_base + 1 ..= pick_base + max_pick (`global_pick`).
+        let n = self.masked_prefix.len() - 1;
+        let lo = (inst.pick_base as usize + 1).min(n);
+        let hi = (inst.pick_base as usize + m.0.max_pick as usize + 1).min(n);
+        self.masked_prefix[hi] == self.masked_prefix[lo]
+    }
+
+    /// Color pass: put the [`Self::solid`] opaque meshes first within each
+    /// layer, so they are drawn by the discard-free face pipeline (tile-based
+    /// GPUs only remove hidden surfaces before shading for shaders that never
+    /// discard), and record the runs in `opaque_runs`.
+    fn order_solid(&mut self, scene: &Scene, pick: bool) {
+        self.opaque_runs.clear();
+        self.masked_prefix.clear();
+        if pick || perf_overrides().no_solid {
+            self.opaque_runs.push((self.opaque.len(), false));
+            return;
+        }
+        let masked = crate::scene::state::HIDDEN | crate::scene::state::DIM;
+        if scene.states.iter().any(|s| s & masked != 0) {
+            let mut n = 0;
+            self.masked_prefix.push(0);
+            for s in &scene.states {
+                n += (s & masked != 0) as u32;
+                self.masked_prefix.push(n);
+            }
+        }
+        let mut keyed = std::mem::take(&mut self.solid_scratch);
+        keyed.clear();
+        keyed.extend(self.opaque.iter().map(|&i| (scene.instances[i].layer, !self.solid(scene, &scene.instances[i]), i)));
+        keyed.sort_by_key(|&(layer, discard, _)| (layer, discard));
+        self.opaque.clear();
+        for &(_, discard, i) in &keyed {
+            match self.opaque_runs.last_mut() {
+                Some((end, solid)) if *solid == !discard => *end += 1,
+                _ => self.opaque_runs.push((self.opaque.len() + 1, !discard)),
+            }
+            self.opaque.push(i);
+        }
+        self.solid_scratch = keyed;
     }
 
     /// Partition the scene's visible instances by pass, sorted by layer.
@@ -917,6 +981,7 @@ impl DrawLists {
                 self.reflective.clear();
             }
         }
+        self.order_solid(scene, pick);
         let inst = &scene.instances;
         let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
         let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden];
@@ -1087,7 +1152,11 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         // (drawn after the faces it cost up to 37 % more GPU time on the
         // macOS runners, docs/handoff/viewport-performance.md).
         draw(pass, &lists.back_silhouettes, &pipelines.mesh_backsil);
-        draw(pass, &lists.opaque, &pipelines.mesh_opaque);
+        let mut start = 0;
+        for &(end, solid) in &lists.opaque_runs {
+            draw(pass, &lists.opaque[start..end], if solid { &pipelines.mesh_solid } else { &pipelines.mesh_opaque });
+            start = end;
+        }
         if outline {
             draw(pass, &lists.opaque, &pipelines.mesh_outline);
         }
@@ -1142,13 +1211,15 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
 /// the color pass (`backsil`: the backface silhouette meshes alone,
 /// `silhouettes`: the edge silhouettes alone, `ao`: ambient occlusion),
 /// `instancing` draws every copy with its own call and its own buffers, see
-/// [`instancing_disabled`]). Unset in normal use.
+/// [`instancing_disabled`]; `solid` draws every opaque face with the
+/// discarding pipeline, see [`DrawLists::solid`]). Unset in normal use.
 struct PerfOverrides {
     msaa: Option<u32>,
     skip_lines: bool,
     skip_meshes: bool,
     skip_instancing: bool,
     skip_backsil: bool,
+    no_solid: bool,
     skip_silhouettes: bool,
     skip_ao: bool,
 }
@@ -1170,6 +1241,7 @@ fn perf_overrides() -> &'static PerfOverrides {
             skip_meshes: skip.contains("meshes"),
             skip_instancing: skip.contains("instancing"),
             skip_backsil: skip.split(',').any(|t| t == "backsil"),
+            no_solid: skip.split(',').any(|t| t == "solid"),
             skip_silhouettes: skip.split(',').any(|t| t == "silhouettes"),
             skip_ao: skip.split(',').any(|t| t == "ao"),
         }
@@ -1382,6 +1454,8 @@ struct Pipelines {
     line_hidden: wgpu::RenderPipeline,
     silhouette: wgpu::RenderPipeline,
     mesh_backsil: wgpu::RenderPipeline,
+    /// `mesh_opaque` without `discard` ([`DrawLists::solid`] meshes).
+    mesh_solid: wgpu::RenderPipeline,
     point_hidden: wgpu::RenderPipeline,
     mesh_pick: wgpu::RenderPipeline,
     mesh_pick_transparent: wgpu::RenderPipeline,
@@ -1965,6 +2039,7 @@ impl Renderer {
         let pipelines = Pipelines {
             background: make(P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }),
             mesh_opaque: make(P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
+            mesh_solid: make(P { label: "mesh-solid", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }),
             mesh_outline: make(P { label: "mesh-outline", vs: "vs_outline", fs: "fs_outline", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }),
             mesh_outline_depth: make_full(
                 layout,
@@ -3203,7 +3278,8 @@ impl Uploader {
             usage: wgpu::BufferUsages::INDEX,
         });
         let dequant = Mat4::from_translation(lo) * Mat4::from_scale(ext / POS_STEPS);
-        MeshHandle(Arc::new(GpuMesh { vertices, indices: indices_buf, index_count: indices.len() as u32, index_format, dequant, bounds }))
+        let max_pick = pick_ids.iter().copied().max().unwrap_or(0);
+        MeshHandle(Arc::new(GpuMesh { vertices, indices: indices_buf, index_count: indices.len() as u32, index_format, max_pick, dequant, bounds }))
     }
 
     pub fn upload_lines(&self, lines: &LineData) -> LinesHandle {
