@@ -151,6 +151,13 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   400-fin plate) 2.7-3 s (kernel fuse 0.8-1.4 s + naming / unify) vs live 55 ms: the same local-face boolean as
   the LP2 = LP1 follow-up above. Not cancellable yet: `schedule_preview_before` / `schedule_tool_preview` and the
   sketch `regen_sync` take the same Regenerator lock without a cancel (short when the prefix is cached).
+- **qa4 r5 blends (10-25, lead):** FILLET-OVERFLOW was retracted (live: R21-R45 on a top edge of a 60x40x20
+  block are OK, the same clipped quarter cylinder as ours; nothing changed). CHAMFER-OVERFLOW fixed: a chamfer wider
+  than a face it runs over (25 mm on that block's 20 mm face, live OK 30000 mm3) is the part cut by the chamfer's
+  plane (`features.cpp chamfer_as_cut`, OCCT's failure path; straight convex edges between planes, ends capped
+  square, as `fillet_as_cut`); live F1's "Distance of chamfer on face too large." cases are unchanged. Test
+  kernel_robustness `chamfer_wider_than_its_face_overflows_like_onshape`. Backlog (P3, lead): FLAT-HOLE, Flatten
+  surfaces of a face with a hole (80x40 face, Ø10 hole: 20 loops, 4396 mm2 flat vs 3121 in 3D; `model::flatten`).
 - **Robustness sweep round 2 (10-23/24, lead: draft, fillet round 2, patterns, hole & rib; live "kern (10-23 20:00)
   draft sweep", "(20:30) fillet round 2", "(22:00) patterns", "(23:00) hole & rib", "(10-24 00:30) curvature section").**
   Tests `kernel_robustness::{draft_sweep, fillet_round_2, patterns, hole_and_rib}_match(es)_onshape`.

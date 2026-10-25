@@ -2587,3 +2587,24 @@ fn loft_square_to_circle_matches_onshape() {
     assert_eq!(sides.len(), 4, "{sides:?}");
     assert!(sides.iter().all(|a| (a - 324.6214685).abs() < 1e-3), "{sides:?}");
 }
+
+/// qa4 r5 CHAMFER-OVERFLOW (live "v3 Session 8"): a chamfer on a top edge
+/// of a 60 × 40 × 20 block wider than the 20 mm front face runs over it, the
+/// part cut by the chamfer's plane and clipped by the bottom face: 25 mm →
+/// 30000 mm³ (live OK). Within the faces the chamfer is exact.
+#[test]
+fn chamfer_wider_than_its_face_overflows_like_onshape() {
+    let mut base = T::new();
+    base.block(60.0, 40.0, 20.0);
+    let front_top = base.edges_where(|i| i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && i.start.z > 0.01999 && i.end.z > 0.01999);
+    assert_eq!(front_top.len(), 1);
+    for (d, want) in [(5.0, 48000.0 - 12.5 * 60.0), (20.0, 48000.0 - 200.0 * 60.0), (25.0, 30000.0)] {
+        let mut t = base.fork();
+        let f = t.chamfer(front_top.clone(), &format!("{d} mm"));
+        let (st, msg, v) = status(&mut t, f);
+        assert_eq!(st, FeatureStatus::Ok, "{d} mm: {msg:?}");
+        // 20 mm (the chamfer reaching the bottom edge): OCCT's chamfer is
+        // 1.6e-3 mm³ over the exact solid.
+        assert!((v - want).abs() < 5e-3, "{d} mm: volume {v}, want {want}");
+    }
+}
