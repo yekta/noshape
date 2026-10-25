@@ -119,7 +119,11 @@ def main():
         for i, r in enumerate(started):
             lines.append(f"| {'first' if i == 0 and r['log'] == 'texture-orbit.log' else 'later'}: {r['log'][:-4]} | {ms(r.get('window_ms'))} | {ms(r.get('frame_ms'))} | {ms(r.get('pipelines_ms'))} |")
     failures = []
-    if args.stills:
+    ran = {r["mode"] for r in rows if not r.get("missing")}
+    if args.stills and not {"texture", "readback"} <= ran:
+        # perf.yml `modes` with one presentation mode: nothing to compare.
+        lines += ["", f"Zero-copy correctness: skipped (only {', '.join(sorted(ran)) or 'no'} runs)"]
+    elif args.stills:
         ok, msg = compare_stills(args.out)
         lines += ["", f"Zero-copy correctness: {'OK' if ok else 'FAILED'} ({msg})"]
         if not ok:
