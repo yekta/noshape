@@ -293,6 +293,13 @@ enum SidePanel {
     Variables,
 }
 
+/// A selectable instance-list row (Shift+click ranges).
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ListItem {
+    Instance(InstanceId),
+    Pattern(MateId),
+}
+
 pub struct AssemblyView {
     pub tab: TabId,
     doc: Entity<DocModel>,
@@ -2846,6 +2853,7 @@ impl AssemblyView {
     /// Clear the instance and entity selection.
     fn clear_selection(&mut self) {
         self.selected.clear();
+        self.ui.range_patterns.clear();
         self.selected_mate = None;
         self.ui.entity_sel.clear();
         self.update_entity_measure();
@@ -3360,8 +3368,12 @@ impl AssemblyView {
                 this.selected_mate = None;
                 // Clicks are additive (a selected row toggles off); Shift+click
                 // adds the visible rows from the last clicked one.
-                let order = this.visible_instance_order(cx);
-                this.selected = noshape_model::interaction::list_click(&order, &this.selected, this.ui.list_anchor.as_ref(), &top, ev.modifiers().shift);
+                let order = this.visible_list_order(cx);
+                let current: Vec<ListItem> = this.selected.iter().copied().map(ListItem::Instance).chain(this.ui.range_patterns.iter().copied().map(ListItem::Pattern)).collect();
+                let anchor = this.ui.list_anchor.map(ListItem::Instance);
+                let picked = noshape_model::interaction::list_click(&order, &current, anchor.as_ref(), &ListItem::Instance(top), ev.modifiers().shift);
+                this.selected = picked.iter().filter_map(|i| if let ListItem::Instance(id) = i { Some(*id) } else { None }).collect();
+                this.ui.range_patterns = picked.iter().filter_map(|i| if let ListItem::Pattern(id) = i { Some(*id) } else { None }).collect();
                 this.ui.list_anchor = Some(top);
                 this.refresh_scene(false, cx);
                 cx.notify();
@@ -3707,32 +3719,42 @@ impl AssemblyView {
         }
     }
 
-    /// Top-level instances in the order their rows show in the list (as
+    /// The instance and pattern rows in the order they show in the list (as
     /// `render_list` lays them out): folders' and patterns' instances where
     /// expanded. Subassembly children select their top-level instance, so
-    /// they add nothing here.
-    fn visible_instance_order(&self, cx: &App) -> Vec<InstanceId> {
+    /// they add nothing here; folder rows aren't selectable (live: a Shift
+    /// range onto "Mate features" adds nothing).
+    fn visible_list_order(&self, cx: &App) -> Vec<ListItem> {
         let Some(asm) = self.assembly(cx) else { return Vec::new() };
         let filtering = !self.ui.filter.is_empty();
         let mut out = Vec::new();
         let mut shown_folders: HashSet<MateId> = HashSet::new();
         let mut shown_patterns: HashSet<MateId> = HashSet::new();
+        let pattern = |p: &InstancePattern, out: &mut Vec<ListItem>| {
+            out.push(ListItem::Pattern(p.id));
+            if self.expanded.contains(&vec![InstanceId(p.id.0)]) {
+                out.extend(p.generated.iter().map(|g| g.instance).filter(|id| asm.instance(*id).is_some()).map(ListItem::Instance));
+            }
+        };
         for inst in &asm.instances {
             if let Some(p) = asm.generated_by(inst.id) {
-                if shown_patterns.insert(p.id) && self.expanded.contains(&vec![InstanceId(p.id.0)]) {
-                    out.extend(p.generated.iter().map(|g| g.instance).filter(|id| asm.instance(*id).is_some()));
+                if shown_patterns.insert(p.id) {
+                    pattern(p, &mut out);
                 }
                 continue;
             }
             if !filtering && let Some(folder) = asm.folder_of_instance(inst.id) {
                 if shown_folders.insert(folder.id) && self.expanded.contains(&vec![InstanceId(folder.id.0)]) {
-                    out.extend(folder.instances.iter().copied().filter(|m| asm.instance(*m).is_some()));
+                    out.extend(folder.instances.iter().copied().filter(|m| asm.instance(*m).is_some()).map(ListItem::Instance));
                 }
                 continue;
             }
             if self.instance_passes(inst, self.result.node(&[inst.id]), cx) {
-                out.push(inst.id);
+                out.push(ListItem::Instance(inst.id));
             }
+        }
+        for p in asm.patterns.iter().filter(|p| !shown_patterns.contains(&p.id)) {
+            pattern(p, &mut out);
         }
         out
     }

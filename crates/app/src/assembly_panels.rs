@@ -858,7 +858,7 @@ impl AssemblyView {
             PatternKind::Mirror { .. } => "mirror",
             PatternKind::Replicate { .. } => "replicate",
         };
-        let selected = self.selected_mate == Some(id);
+        let selected = self.selected_mate == Some(id) || self.ui.range_patterns.contains(&id);
         let suppressed = pat.suppressed;
         let row = h_flex()
             .id(SharedString::from(format!("pat-{}", id.0)))
@@ -900,7 +900,12 @@ impl AssemblyView {
                     this.edit_mate(id, window, cx);
                     return;
                 }
-                this.selected_mate = if this.selected_mate == Some(id) { None } else { Some(id) };
+                // A click on a range-selected pattern row deselects it.
+                if let Some(i) = this.ui.range_patterns.iter().position(|p| *p == id) {
+                    this.ui.range_patterns.remove(i);
+                } else {
+                    this.selected_mate = if this.selected_mate == Some(id) { None } else { Some(id) };
+                }
                 this.refresh_scene(false, cx);
                 cx.notify();
             }));

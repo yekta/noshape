@@ -249,6 +249,9 @@ pub(crate) struct AsmUi {
     pub list_hover: Option<InstanceId>,
     /// Last clicked instance row: the anchor of Shift+click ranges.
     pub list_anchor: Option<InstanceId>,
+    /// Pattern rows a Shift+click range ran over (selected with the
+    /// instances; live: "Linear pattern 1" is in the range).
+    pub range_patterns: Vec<MateId>,
     /// The face a graphics context menu was opened on (its Section view…
     /// cuts parallel to it).
     pub menu_face: Option<AsmPickTarget>,
