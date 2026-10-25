@@ -440,6 +440,9 @@ impl PartStudioView {
         // Graphics preferences apply live (camera and render options dialog).
         this._subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| this.apply_graphics_prefs(cx)));
         this.apply_graphics_prefs(cx);
+        // The document thumbnail draws this view's display while it is open.
+        let path = this.doc.read(cx).session.path.clone();
+        cx.on_release(move |this: &mut Self, cx: &mut App| crate::start_thumbnail::view_closed(&path, this.tab, cx)).detach();
         this.schedule_regen(window, cx);
         this
     }
@@ -502,6 +505,8 @@ impl PartStudioView {
             return;
         }
         let Some((studio, upto)) = self.effective_studio(cx) else { return };
+        let path = self.doc.read(cx).session.path.clone();
+        crate::start_thumbnail::regen_started(&path, self.tab, cx);
         let units = self.doc.read(cx).session.doc.settings.units;
         let config = self.current_config(&studio);
         let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
@@ -517,6 +522,9 @@ impl PartStudioView {
             log::info!(target: "perf", "schedule_regen #{seq} from {caller} (upto {upto:?}, {} features)", studio.features.len());
         }
         let editing_sketch = self.sketch.as_ref().map(|s| s.feature).or_else(|| self.editing_sketch_id(cx));
+        // The studio's head as the document thumbnail draws it.
+        let head = upto.is_none() && editing_sketch.is_none() && config == studio.configuration.defaults();
+        let shown_vars = doc_vars.clone();
         // The newest request wins (pending.rs): the running one is aborted, or
         // finishes its features into the cache when this one only extends it.
         let studio = Arc::new(studio);
@@ -562,7 +570,12 @@ impl PartStudioView {
                 }
                 this.context = Some(result.context.clone());
                 scene_builder::log_regen_perf(if refine { "preview" } else { "full" }, &result.display, &studio);
-                this.apply_display(Arc::new(result.display), window, cx);
+                let display = Arc::new(result.display);
+                if !refine {
+                    let made = head.then(|| (studio.clone(), shown_vars.clone(), display.clone()));
+                    crate::start_thumbnail::regen_done(&path, this.tab, made, cx);
+                }
+                this.apply_display(display, window, cx);
                 // Remove / Intersect: the see-through tool body follows.
                 this.schedule_tool_preview(window, cx);
             });
@@ -588,7 +601,9 @@ impl PartStudioView {
                     this.end_pending(seq, cx);
                     this.context = Some(fine.context.clone());
                     scene_builder::log_regen_perf("refine", &fine.display, &studio);
-                    this.apply_display(Arc::new(fine.display), window, cx);
+                    let display = Arc::new(fine.display);
+                    crate::start_thumbnail::regen_done(&path, this.tab, head.then(|| (studio.clone(), shown_vars, display.clone())), cx);
+                    this.apply_display(display, window, cx);
                 });
             }
         }));
