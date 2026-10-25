@@ -1479,6 +1479,10 @@ impl Workspace {
 
 impl Render for Workspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if noshape_render::perf::enabled() {
+            static FIRST: std::sync::Once = std::sync::Once::new();
+            FIRST.call_once(|| noshape_render::perf::milestone("first workspace render"));
+        }
         let pal = p();
         crate::assets::set_scale_factor(_window.scale_factor());
         let count = self.selection_cursor_count(cx);

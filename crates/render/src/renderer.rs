@@ -1708,6 +1708,7 @@ impl Renderer {
         let float_stencil = device.features().contains(wgpu::Features::DEPTH32FLOAT_STENCIL8);
         DEPTH_FORMAT_CHOICE.get_or_init(|| if float_stencil { wgpu::TextureFormat::Depth32FloatStencil8 } else { wgpu::TextureFormat::Depth24PlusStencil8 });
 
+        crate::perf::milestone("renderer: device ready");
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("noshape-shaders"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders.wgsl").into()),
@@ -1924,6 +1925,7 @@ impl Renderer {
         if self.pipelines.as_ref().is_some_and(|p| p.msaa == msaa) {
             return;
         }
+        let built = std::time::Instant::now();
         let d = &self.device;
         let sh = &self.shader;
         let layout = &self.pipeline_layout;
@@ -2068,6 +2070,9 @@ impl Renderer {
             msaa,
         };
         self.pipelines = Some(pipelines);
+        if crate::perf::enabled() {
+            log::info!(target: "perf", "renderer: pipelines for {msaa}x MSAA built in {:.0} ms ({:.0} ms since start)", built.elapsed().as_secs_f64() * 1e3, crate::perf::process_start().elapsed().as_secs_f64() * 1e3);
+        }
     }
 
     fn rebuild_bind_groups(&mut self) {

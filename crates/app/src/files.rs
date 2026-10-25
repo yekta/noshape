@@ -149,13 +149,16 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
         && h.update(cx, |_, window, _| window.activate_window()).is_ok() {
             return Ok(());
         }
+    noshape_render::perf::milestone("opening document");
     let session = if path.exists() {
         session::Session::open(&path)?
     } else {
         session::Session::create(&path, create_with.unwrap_or_else(crate::units_prefs::new_document))?
     };
+    noshape_render::perf::milestone("document session opened");
     add_recent(&path);
     let (handle, _) = open_session_window(session, gpu, cx)?;
+    noshape_render::perf::milestone("document window opened");
     if cx.has_global::<OpenDocs>() {
         cx.global_mut::<OpenDocs>().0.insert(canonical(&path), handle);
     }

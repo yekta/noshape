@@ -320,6 +320,7 @@ fn spawn_worker(on_done: impl Fn(Completed) + Send + 'static) -> Result<(RenderW
                 None => std::thread::sleep(std::time::Duration::from_millis(5)),
             }
         };
+        noshape_render::perf::milestone("GPU: GPUI's window GPU known");
         let renderer = match gpui_gpu.and_then(metal::device_name) {
             Some(name) => noshape_render::Renderer::new_matching(|info| info.backend == noshape_render::wgpu::Backend::Metal && info.name == name),
             None => noshape_render::Renderer::new(),
