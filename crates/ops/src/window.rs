@@ -37,6 +37,38 @@ pub enum UiRequest {
     Display { tab: TabId, set: DisplaySet },
     /// The tab's selection (ui_select).
     Select { tab: TabId, sel: Selected },
+    /// The feature or instance list (ui_list).
+    List { tab: TabId, act: ListAct },
+}
+
+/// A list change as the list's menus make it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ListAct {
+    /// Expand all / Collapse all (in list).
+    All(bool),
+    /// A Part Studio's folders opened or closed.
+    Folders { ids: Vec<u32>, open: bool },
+    /// Filter feature list ("" clears).
+    Filter(String),
+    /// Expand selected / Collapse selected: top-level subassemblies.
+    Instances { tops: Vec<noshape_model::assembly::InstanceId>, expand: bool },
+    /// A mate row's Expand / Collapse.
+    Mates { mates: Vec<noshape_model::assembly::MateId>, expand: bool },
+    /// Find in instance list.
+    Find(noshape_model::assembly::InstanceId),
+}
+
+/// A tab's list state as the agent set it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ListState {
+    /// Part Studio folders opened (true) or closed in this window.
+    pub folders_open: BTreeMap<u32, bool>,
+    /// The feature list's filter text.
+    pub filter: String,
+    /// Expanded instance-tree rows (instance id paths).
+    pub expanded: BTreeSet<Vec<u64>>,
+    /// Expanded mate rows (mate ids).
+    pub expanded_mates: BTreeSet<u64>,
 }
 
 /// What a tab has selected.
@@ -195,6 +227,8 @@ pub struct WindowState {
     pub display: BTreeMap<TabId, TabDisplay>,
     /// Each tab's selection: entity ids, or an assembly's `inst:` ids (ui_select).
     pub selection: BTreeMap<TabId, Vec<String>>,
+    /// Each tab's list state (ui_list).
+    pub lists: BTreeMap<TabId, ListState>,
 }
 
 impl WindowState {
@@ -213,8 +247,8 @@ impl WindowState {
             }
             UiRequest::Compare(c) => self.compare = c.clone(),
             UiRequest::Repair(r) => self.repair = r.clone(),
-            // view_camera, view_display and ui_select keep their state themselves.
-            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } => {}
+            // view_camera, view_display, ui_select and ui_list keep their state themselves.
+            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } | UiRequest::List { .. } => {}
         }
     }
 }

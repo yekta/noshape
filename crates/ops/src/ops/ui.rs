@@ -195,6 +195,7 @@ fn state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             v
         }).collect::<Vec<_>>(),
         "selection": w.selection.iter().filter(|(_, s)| !s.is_empty()).map(|(t, s)| json!({ "tab": tab_json(od, *t), "selected": s })).collect::<Vec<_>>(),
+        "lists": w.lists.iter().map(|(t, l)| json!({ "tab": tab_json(od, *t), "filter": l.filter, "folders_open": l.folders_open.iter().map(|(k, v)| (k.to_string(), json!(v))).collect::<serde_json::Map<_, _>>(), "expanded": l.expanded, "expanded_mates": l.expanded_mates })).collect::<Vec<_>>(),
         "drawing_zoom": w.sheets.iter().map(|(t, sv)| json!({ "tab": tab_json(od, *t), "zoom": sv.zoom, "center": sv.center, "viewport": sv.size })).collect::<Vec<_>>(),
     })
     .into())
