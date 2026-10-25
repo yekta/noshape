@@ -832,7 +832,7 @@ fn std_show_label_hints_match_builtin() {
 #[test]
 fn std_edge_filters_match_builtin() {
     use noshape_model::params::{Hints, ParamKind, ParamSpec, QueryFilter};
-    const MODEL_EDGES: u32 = QueryFilter::EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0;
+    const MODEL_EDGES: u32 = QueryFilter::EDGE.0 | QueryFilter::SOLID_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0;
     fn filters(specs: &[ParamSpec], prefix: &str, out: &mut Vec<(String, QueryFilter)>) {
         for p in specs {
             match &p.kind {
