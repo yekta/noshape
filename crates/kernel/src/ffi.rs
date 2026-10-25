@@ -242,6 +242,15 @@ pub(crate) mod ffi {
         face_colors: Vec<f32>,
     }
 
+    /// A STEP assembly: its distinct parts (own coordinates, OCCT mm) and
+    /// the placed leaf instances (`PvzInstance` layout, metres); no
+    /// instances when the file's root is not one assembly.
+    struct StepTree {
+        root: String,
+        parts: StepImport,
+        instances: Vec<PvzInstance>,
+    }
+
     #[derive(Debug, Clone, Copy)]
     struct BoolOpts {
         fuzzy: f64,
@@ -542,6 +551,7 @@ pub(crate) mod ffi {
         fn bin_to_bytes(s: &OcShape, with_triangles: bool) -> Result<Vec<u8>>;
         fn bin_from_bytes(bytes: &[u8]) -> Result<UniquePtr<OcShape>>;
         fn read_step(path: &str) -> Result<StepImport>;
+        fn read_step_tree(path: &str) -> Result<StepTree>;
         fn write_step(
             shapes: &OcShapeList,
             names: &[String],

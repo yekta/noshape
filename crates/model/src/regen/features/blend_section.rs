@@ -54,6 +54,8 @@ pub enum Bound {
     Fraction(f64),
     /// Distance along the chain.
     Offset(f64),
+    /// Distance back from the chain's end (a second bound's offset).
+    OffsetFromEnd(f64),
     /// The chain point nearest this point (a vertex, or a face's nearest point).
     Point(DVec3),
 }
@@ -116,6 +118,51 @@ fn chain(shape: &Shape, edges: &[usize]) -> FResult<Vec<ChainEdge>> {
         out.push(ChainEdge { index, shape, start: s, end: e, length, forward });
     }
     Ok(out)
+}
+
+/// Std fillet.fs's partial fillet checks (getPath and the bounds), with
+/// its messages: one open chain (or a closed one with two bounds), offsets
+/// within the chain, two distinct bounds.
+pub fn check_partial(shape: &Shape, edges: &[usize], p: &Partial) -> FResult<()> {
+    let tol = 1e-9;
+    let mut ends = Vec::new();
+    for &i in edges {
+        let info = shape.sub_shape(ShapeType::Edge, i)?.edge_info()?;
+        ends.extend([info.start, info.end]);
+    }
+    if ends.iter().any(|a| ends.iter().filter(|b| (**b - *a).length() < tol).count() > 2) {
+        return Err(FeatureError::new("Edges do not form a continuous path."));
+    }
+    let chain = chain(shape, edges)?;
+    if chain.windows(2).any(|w| (w[0].end - w[1].start).length() > tol) {
+        return Err(FeatureError::new("Only one edge or one chain of tangent edges can be partially fillet."));
+    }
+    let closed = chain.first().zip(chain.last()).is_some_and(|(a, b)| (a.start - b.end).length() < tol);
+    if closed && p.second.is_none() {
+        return Err(FeatureError::new("Closed entity requires a second boundary point."));
+    }
+    let total: f64 = chain.iter().map(|c| c.length).sum();
+    let parameter = |b: Bound, second: bool| -> FResult<Option<f64>> {
+        let t = match b {
+            Bound::Fraction(f) => f,
+            Bound::Offset(d) => d / total,
+            Bound::OffsetFromEnd(d) => (total - d) / total,
+            Bound::Point(_) => return Ok(None),
+        };
+        if matches!(b, Bound::Offset(_) | Bound::OffsetFromEnd(_)) && !(0.0..=1.0).contains(&t) {
+            let field = if second { "endPartialOffset" } else { "startPartialOffset" };
+            return Err(FeatureError { faulty: vec![field], ..FeatureError::new("Enter a value less than the length of the selected edge(s).") });
+        }
+        Ok(Some(t))
+    };
+    let a = parameter(p.first, false)?;
+    if let Some(sb) = p.second
+        && let (Some(a), Some(b)) = (a, parameter(sb, true)?)
+        && ((a - b) * total).abs() < 1e-8
+    {
+        return Err(FeatureError::new("Boundary points cannot be equal."));
+    }
+    Ok(())
 }
 
 /// Directions at a point of an edge: into each face (perpendicular to the
@@ -285,6 +332,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         Ok(match bd {
             Bound::Fraction(f) => f.clamp(0.0, 1.0) * total,
             Bound::Offset(d) => d.clamp(0.0, total),
+            Bound::OffsetFromEnd(d) => (total - d).clamp(0.0, total),
             Bound::Point(q) => {
                 let (mut best, mut acc, mut where_) = (f64::INFINITY, 0.0, 0.0);
                 for c in &chain {

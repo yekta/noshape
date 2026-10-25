@@ -111,7 +111,7 @@ fn parasolid_versions() {
     let (_, s) = xt_parts().into_iter().find(|p| p.0 == "rounded block").expect("rounded block");
     let want = volume_properties(&s).unwrap().mass;
     // Schema per version, as Onshape's files name it (samples/g36-g24b-v*.x_t).
-    let schemas = [("38.1", "_38101"), ("33.0", "_32001"), ("29.0", "_28101"), ("26.1", "_26105"), ("25.0", "_25001"), ("12.0", "_12006")];
+    let schemas = [("38.1", "SCH_3801231_38101"), ("33.0", "SCH_3300000_32001"), ("29.0", "SCH_2900000_28101"), ("26.1", "SCH_2601000_26105"), ("25.0", "SCH_2500000_25001"), ("12.0", "SCH_1200000_12006")];
     for v in PARASOLID_VERSIONS {
         for binary in [false, true] {
             let path = dir.join(format!("v{v}.{}", if binary { "x_b" } else { "x_t" }));
@@ -125,13 +125,14 @@ fn parasolid_versions() {
             }
             let text = std::fs::read_to_string(&path).unwrap();
             let (head, body) = text.split_once("**END_OF_HEADER").unwrap();
-            for key in ["**PART1;\nMC=unknown;\n", "\nFORMAT=text;\nGUISE=transmit;\n", &format!("\nFILE=v{v}.x_t;\n"), "**PART2;\nSCH=SCH_3801000_38101;\nUSFLD_SIZE=0;\n**PART3;\n"] {
+            for key in ["**PART1;\nMC=unknown;\n", "\nFORMAT=text;\nGUISE=transmit;\n", &format!("\nFILE=v{v}.x_t;\n"), "**PART2;\nSCH=SCH_3801231_38101;\nUSFLD_SIZE=0;\n**PART3;\n"] {
                 assert!(head.contains(key), "{v}: header lacks {key:?}: {head}");
             }
             let first = body.lines().nth(1).unwrap();
-            assert!(first.starts_with("T51 : TRANSMIT FILE created by modeller version "), "{v}: {first}");
+            // The modeller is 38.1.231's in every version (live: "… version 3801231" + "17" + "SCH_2500000_25001").
+            assert!(first.starts_with("T51 : TRANSMIT FILE created by modeller version 3801231"), "{v}: {first}");
             if let Some((_, sch)) = schemas.iter().find(|x| x.0 == v) {
-                assert!(first.contains(sch), "{v}: {first}");
+                assert!(first.starts_with(&format!("T51 : TRANSMIT FILE created by modeller version 3801231{} {sch}", sch.len())), "{v}: {first}");
             }
         }
     }
@@ -898,4 +899,15 @@ fn parasolid_offset_patch_and_wire_circles_from_onshape() {
             assert_eq!((p.shape.count(ShapeType::Edge), p.shape.count(ShapeType::Face)), (1, 0), "{:?}", p.name);
         }
     }
+}
+
+#[test]
+fn binary_stl_header_is_zeros() {
+    let path = std::env::temp_dir().join(format!("noshape-stl-header-{}.stl", std::process::id()));
+    write_stl(&part(), &path, 0.0005, StlFormat::Binary).unwrap();
+    let bytes = std::fs::read(&path).unwrap();
+    std::fs::remove_file(&path).ok();
+    assert!(bytes[..80].iter().all(|&b| b == 0), "header {:?}", &bytes[..24]);
+    let n = u32::from_le_bytes(bytes[80..84].try_into().unwrap()) as usize;
+    assert!(n > 0 && bytes.len() == 84 + 50 * n);
 }

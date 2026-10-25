@@ -336,7 +336,8 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     };
     // Live L15: no profile marks the field; one profile has its own text.
     if sections.is_empty() {
-        return crate::regen::eval::err_at(&["sheetProfilesArray", "wireProfilesArray"], "Select profiles in order from start to finish.");
+        // std loft.fs: the profiles field of the creation type.
+        return crate::regen::eval::err_at(if solid { &["sheetProfilesArray"] } else { &["wireProfilesArray"] }, "Select profiles in order from start to finish.");
     }
     if sections.len() < 2 {
         return err("Select at least two profiles, a closed guide curve or a closed path.");

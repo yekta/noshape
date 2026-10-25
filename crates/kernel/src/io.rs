@@ -78,6 +78,11 @@ fn face_colors_of(r: &ffi::StepImport, i: usize) -> Vec<(usize, [f32; 3])> {
 /// available (STEPCAFControl / XCAF). Shapes are converted to `unit`.
 pub fn read_step(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
     let r = ck(ffi::read_step(path_str(path)?))?;
+    step_shapes(&r, unit)
+}
+
+/// A STEP reader's shapes (OCCT millimetres) in `unit`, with names and colours.
+fn step_shapes(r: &ffi::StepImport, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
     let shapes = list_to_vec(&r.shapes);
     let f = 1.0 / unit.mm_per_unit();
     shapes
@@ -87,9 +92,25 @@ pub fn read_step(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
             let name = r.names.get(i).filter(|n| !n.is_empty()).cloned();
             let color = (r.has_color.get(i).copied().unwrap_or(false))
                 .then(|| [r.colors[3 * i], r.colors[3 * i + 1], r.colors[3 * i + 2]]);
-            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, opacity: r.opacity.get(i).copied().filter(|&o| o < 1.0), face_colors: face_colors_of(&r, i) })
+            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, opacity: r.opacity.get(i).copied().filter(|&o| o < 1.0), face_colors: face_colors_of(r, i) })
         })
         .collect()
+}
+
+/// A STEP assembly: the root product's name, its distinct parts and its
+/// placed instances (see [`read_step_assembly`]).
+pub type StepAssembly = (String, Vec<ImportedShape>, Vec<PvzInstance>);
+
+/// A STEP file whose root product is an assembly: the root's name, its
+/// distinct parts (each in its own coordinates, in `unit`) and every placed
+/// leaf instance (file order, metres). `None` for any other STEP file
+/// (single parts, several top-level products).
+pub fn read_step_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAssembly>> {
+    let t = ck(ffi::read_step_tree(path_str(path)?))?;
+    if t.instances.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some((t.root.clone(), step_shapes(&t.parts, unit)?, pvz_instances_of(&t.instances))))
 }
 
 /// A shape to export with optional name and color.
@@ -127,6 +148,55 @@ pub struct StepOptions {
 
 /// [`write_step`] with the schema and the file's length unit.
 pub fn write_step_with(path: &Path, shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> Result<()> {
+    let parts = step_parts(shapes, unit, opts)?;
+    let file_name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let text = crate::step_out::write(&parts, &file_name, &step_timestamp(), step_schema(opts))?;
+    std::fs::write(path, text).map_err(|e| KernelError::Io(format!("could not write STEP file {}: {e}", path.display())))
+}
+
+/// A placed part of an assembly written by [`write_step_assembly`]: the
+/// index of its part and its placement (`unit`).
+#[derive(Debug, Clone, Copy)]
+pub struct StepInstance {
+    pub part: usize,
+    pub transform: glam::DMat4,
+}
+
+/// Write an assembly as STEP the way Onshape exports an Assembly: the root
+/// product `root`, each part (in its own coordinates, `unit`) once as a
+/// component, and each instance placing one (live qa4 r4 s5).
+pub fn write_step_assembly(path: &Path, root: &str, parts: &[ExportShape], instances: &[StepInstance], unit: LengthUnit, opts: &StepOptions) -> Result<()> {
+    let written = step_parts(parts, unit, opts)?;
+    let to_m = unit.mm_per_unit() * 1e-3;
+    let placed: Vec<crate::step_out::AsmInstance> = instances
+        .iter()
+        .map(|i| {
+            let m = i.transform;
+            let row = |r: usize| [m.x_axis[r], m.y_axis[r], m.z_axis[r], m.w_axis[r] * to_m];
+            crate::step_out::AsmInstance { part: i.part, transform: [row(0), row(1), row(2)] }
+        })
+        .collect();
+    let file_name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let text = crate::step_out::write_assembly(root, &written, &placed, &file_name, &step_timestamp(), step_schema(opts))?;
+    std::fs::write(path, text).map_err(|e| KernelError::Io(format!("could not write STEP file {}: {e}", path.display())))
+}
+
+fn step_schema(opts: &StepOptions) -> crate::step_out::Schema {
+    match opts.schema {
+        StepSchema::Ap214 => crate::step_out::Schema::Ap214,
+        StepSchema::Ap203 => crate::step_out::Schema::Ap203,
+        _ => crate::step_out::Schema::Ap242,
+    }
+}
+
+fn step_timestamp() -> String {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    crate::step_out::timestamp(now)
+}
+
+/// Each shape written by OCCT on its own (Onshape's layout is rebuilt from
+/// those), with its name and colour.
+fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> Result<Vec<crate::step_out::Part>> {
     let f = unit.mm_per_unit();
     let mut v = Vec::with_capacity(shapes.len());
     for s in shapes {
@@ -163,19 +233,7 @@ pub fn write_step_with(path: &Path, shapes: &[ExportShape], unit: LengthUnit, op
         let name = shapes[i].name.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| format!("Part {}", i + 1));
         parts.push(crate::step_out::Part { name, color: shapes[i].color, occt: text? });
     }
-    let file_name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-    let text = crate::step_out::write(
-        &parts,
-        &file_name,
-        &crate::step_out::timestamp(now),
-        match opts.schema {
-            StepSchema::Ap214 => crate::step_out::Schema::Ap214,
-            StepSchema::Ap203 => crate::step_out::Schema::Ap203,
-            _ => crate::step_out::Schema::Ap242,
-        },
-    )?;
-    std::fs::write(path, text).map_err(|e| KernelError::Io(format!("could not write STEP file {}: {e}", path.display())))
+    Ok(parts)
 }
 
 /// Convenience: write plain shapes to STEP.
@@ -310,15 +368,19 @@ pub struct PvzInstance {
 pub fn read_pvz_instances(path: &Path) -> Result<(String, Vec<PvzInstance>)> {
     let list = ck(ffi::read_pvz_instances(path_str(path)?))?;
     let root = list.first().map(|i| i.root.clone()).unwrap_or_default();
-    let instances = list
-        .iter()
+    let instances = pvz_instances_of(&list);
+    Ok((root, instances))
+}
+
+/// Placed instances from the reader's row-major 3 x 4 placements (metres).
+fn pvz_instances_of(list: &[ffi::PvzInstance]) -> Vec<PvzInstance> {
+    list.iter()
         .map(|i| {
             let t = &i.transform;
             let m = glam::DMat4::from_cols_array(&[t[0], t[4], t[8], 0.0, t[1], t[5], t[9], 0.0, t[2], t[6], t[10], 0.0, t[3], t[7], t[11], 1.0]);
             PvzInstance { part: i.part as usize, name: i.name.clone(), transform: m }
         })
-        .collect();
-    Ok((root, instances))
+        .collect()
 }
 
 /// Read an STL or OBJ file as Onshape imports it: mesh bodies (a compound of
@@ -524,9 +586,8 @@ pub fn write_stl_mesh(mesh: &Tessellation, path: &Path, format: StlFormat) -> Re
     let n = mesh.triangle_count();
     match format {
         StlFormat::Binary => {
-            let mut header = [0u8; 80];
-            header[..17].copy_from_slice(b"noshape-kernel st");
-            w.write_all(&header)?;
+            // An all-zero header, as Onshape's (live G35, qa4 s5).
+            w.write_all(&[0u8; 80])?;
             w.write_all(&(n as u32).to_le_bytes())?;
             for i in 0..n {
                 let (a, b, c) = tri(i);
@@ -538,20 +599,23 @@ pub fn write_stl_mesh(mesh: &Tessellation, path: &Path, format: StlFormat) -> Re
                 w.write_all(&[0, 0])?;
             }
         }
+        // Onshape's text layout (live "api (10-25 b)"): one solid "Mesh",
+        // 2 / 4 / 6 space indents, numbers in shortest form ("20", "-1"),
+        // never "-0".
         StlFormat::Ascii => {
-            writeln!(w, "solid noshape")?;
+            let xyz = |v: [f32; 3]| format!("{} {} {}", v[0] + 0.0, v[1] + 0.0, v[2] + 0.0);
+            writeln!(w, "solid Mesh")?;
             for i in 0..n {
                 let (a, b, c) = tri(i);
-                let nn = tri_normal(a, b, c);
-                writeln!(w, "facet normal {} {} {}", nn[0], nn[1], nn[2])?;
-                writeln!(w, " outer loop")?;
+                writeln!(w, "  facet normal {}", xyz(tri_normal(a, b, c)))?;
+                writeln!(w, "    outer loop")?;
                 for v in [a, b, c] {
-                    writeln!(w, "  vertex {} {} {}", v[0], v[1], v[2])?;
+                    writeln!(w, "      vertex {}", xyz(v))?;
                 }
-                writeln!(w, " endloop")?;
-                writeln!(w, "endfacet")?;
+                writeln!(w, "    endloop")?;
+                writeln!(w, "  endfacet")?;
             }
-            writeln!(w, "endsolid noshape")?;
+            writeln!(w, "endsolid Mesh")?;
         }
     }
     w.flush()?;
