@@ -1140,3 +1140,15 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   the 200 px list; ours 13 px, full width) is in part_studio/mod.rs `render_parts_list` — waiting for OK.
 - Done + ready: help ? 1 px right (disc x 449–461 = live in all dialogs). Committed, building: Sketch dialog
   footer ? 10 px under the footer top (live dom/dialog-sketch-empty).
+- (10-25) Feature dialog, more states checked vs live (all row/underline/checkbox/guide pixels equal):
+  Extrude with a picked region (extrude-03) + Symmetric/Draft/Second end/Direction/Starting offset (20–24),
+  Fillet with 3 edges (fillet-04) + Asymmetric/Partial/Smooth corners (10, 11, 13). Fixes: a filled field
+  advances the fractional phase like an empty one; group indent 20 px, guide 8 px in, 10 px foot on each
+  group's last row (rows are wrapped after the loop, from their depth and the next row's); inline values
+  (Draft) run to the 194 px column; selection-row × = 8 px glyph in a 24 px box (pl 2), 1 px low.
+  Known 1 px: glyphs inside rows whose live top is fractional (Fillet Radius ±, some chevrons) — live draws
+  them unrounded. Test docs (CLI-built): docs/sk-in.noshape (rectangle sketch), docs/fil-in.noshape
+  (+ extrude + 3-edge fillet; double-click Fillet 1 at (95,339)).
+- For the lead (other areas): ticking a group (Direction, Smooth fillet corners) makes its first field
+  active in live (blue) + red expander while empty; ours doesn't. model features/common.rs end_condition():
+  the second end's depth has CAN_BE_TOLERANT (live: no ± on the second Depth).
