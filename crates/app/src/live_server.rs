@@ -89,5 +89,9 @@ fn run(ctx: &mut Option<Ctx>, path: &Path, dm: &mut DocModel, tool: &str, args: 
     for req in std::mem::take(&mut ctx.ui_requests) {
         cx.emit(DocEvent::Ui(req));
     }
+    // Preferences an agent changed apply to every window, as the dialogs' do.
+    if std::mem::take(&mut ctx.reload_prefs) {
+        crate::graphics_prefs::init(cx);
+    }
     r
 }

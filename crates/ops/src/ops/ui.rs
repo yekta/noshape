@@ -32,6 +32,16 @@ pub fn ops() -> Vec<Op> {
             run: state,
         },
         Op {
+            group: "ui",
+            verb: "preferences",
+            summary: "Graphics preferences (the camera menu's Graphics preferences…)",
+            description: "The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors \"#rrggbb\", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once.",
+            fields: vec![opt("graphics", json!({ "type": "object" }), "Preferences to change, by name (see the reply).")],
+            mutates: false,
+            destructive: false,
+            run: preferences,
+        },
+        Op {
             group: "tab",
             verb: "activate",
             summary: "Show a tab (click it in the tab bar)",
@@ -156,6 +166,16 @@ fn state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         "repair": w.repair.as_ref().map(|r| json!({ "at": r.0.to_string(), "label": r.1 })),
     })
     .into())
+}
+
+fn preferences(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let mut prefs = crate::prefs::load_graphics();
+    if let Some(set) = a.object("graphics")?.filter(|m| !m.is_empty()) {
+        prefs = crate::prefs::graphics_with(&prefs, set).map_err(|(field, why)| OpError::param(&format!("graphics.{field}"), &why))?;
+        crate::prefs::save_graphics(&prefs);
+        ctx.reload_prefs = true;
+    }
+    Ok(json!({ "graphics": crate::prefs::graphics_json(&prefs), "shown_in_app": ctx.serving }).into())
 }
 
 fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

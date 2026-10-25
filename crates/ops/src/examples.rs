@@ -10,6 +10,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("ops_describe", &[r##"{"tools": ["drawing_section_view"]}"##]),
     ("ops_call", &[r##"{"tool": "drawing_section_view", "args": {"drawing": "Part 1 Drawing 1", "parent": 1, "point": [205.5, 160], "position": [300, 160]}}"##]),
     ("ui_state", &[r##"{}"##]),
+    ("ui_preferences", &[r##"{}"##, r##"{"graphics": {"fov_deg": 60, "line_width": 1.5, "sketch_constrained": "#202020"}}"##]),
     ("tab_activate", &[r##"{"tab": "Assembly 1"}"##]),
     ("tab_manager", &[r##"{"search": "bracket"}"##, r##"{"kinds": ["drawing"], "sort": "name_asc"}"##, r##"{"open": false}"##]),
     ("assembly_switch_to_tab", &[r##"{"instance": "Bracket <1>"}"##]),
