@@ -635,9 +635,18 @@ pub struct Problem<'a> {
     pub drags: &'a [DragTarget],
     /// The residual terms solved together (one group of connected bodies).
     terms: Vec<Term>,
+    /// Characteristic length (rotation residuals in length units).
+    scale: f64,
 }
 
 const DRAG_WEIGHT: f64 = 1e-2;
+/// Pull of an undragged body toward its pose before the drag step (least
+/// change): 10⁴× weaker than the drag, so a linkage the drag must move still
+/// follows it to a fraction of a micrometre (near-straight chains move many
+/// links far for a little end motion), but it
+/// pins the free directions the drag doesn't ask for (qa4 DRAG-RUNAWAY: a
+/// Planar stack's cubes flung millions of mm away).
+const STAY_WEIGHT: f64 = 1e-6;
 
 /// One block of residual rows: a mate (with its held values), a relation or
 /// a drag, in the order `residuals` writes them.
@@ -646,6 +655,8 @@ enum Term {
     Mate(usize),
     Relation(usize),
     Drag(usize),
+    /// A body's change from its pose at the start of a drag step.
+    Stay(usize),
 }
 
 fn all_terms(mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget]) -> impl Iterator<Item = Term> {
@@ -666,6 +677,7 @@ fn term_bodies(p: &Problem, t: Term) -> Vec<usize> {
         Term::Mate(i) => mate_bodies(&p.mates[i]).collect(),
         Term::Relation(i) => mate_bodies(&p.mates[p.relations[i].mate_a]).chain(mate_bodies(&p.mates[p.relations[i].mate_b])).collect(),
         Term::Drag(i) => vec![p.drags[i].body],
+        Term::Stay(b) => vec![b],
     }
 }
 
@@ -686,6 +698,12 @@ fn term_residuals(p: &Problem, poses: &[Frame], t: Term, out: &mut Vec<f64>) {
             let d = &p.drags[i];
             let w = poses[d.body].transform_point(d.local_point) - d.target;
             out.extend_from_slice(&[w.x * DRAG_WEIGHT, w.y * DRAG_WEIGHT, w.z * DRAG_WEIGHT]);
+        }
+        Term::Stay(b) => {
+            let (s, c) = (p.bodies[b].pose, poses[b]);
+            let t = (c.origin - s.origin) * STAY_WEIGHT;
+            let r = log_rot(s.rotation.inverse() * c.rotation) * (STAY_WEIGHT * p.scale);
+            out.extend_from_slice(&[t.x, t.y, t.z, r.x, r.y, r.z]);
         }
     }
 }
@@ -775,6 +793,11 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
         }
     }
     orient_axial_mates(bodies, mates);
+    if !drags.is_empty()
+        && let Some(r) = solve_dragged_only(bodies, mates, relations, drags, dof)
+    {
+        return r;
+    }
     if !drags.is_empty() {
         // Phase 1: follow the drag (soft); phase 2: project back onto the
         // constraint manifold exactly, starting from the dragged pose.
@@ -783,6 +806,82 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
         return solve_inner(bodies, mates, relations, &[], dof);
     }
     solve_inner(bodies, mates, relations, drags, dof)
+}
+
+/// Least change first (live DRAG-RUNAWAY: dragging the top cube of a Planar
+/// stack moves only that cube; Onshape answers each step in ≈20 ms whatever
+/// the stack's size): the dragged bodies alone are solved, every other body
+/// held. Taken when the mates hold and the drag points reach their targets;
+/// otherwise (a linkage the drag has to move) the whole group is solved.
+fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool) -> Option<SolveResult> {
+    let moving: Vec<usize> = drags.iter().map(|d| d.body).filter(|&b| !bodies[b].fixed).collect();
+    if moving.is_empty() {
+        return None;
+    }
+    let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || !moving.contains(&i) }).collect();
+    solve_inner(&mut trial, mates, relations, drags, false);
+    let r = solve_inner(&mut trial, mates, relations, &[], false);
+    let reached = drags.iter().all(|d| trial[d.body].pose.transform_point(d.local_point).distance(d.target) < 1e-7);
+    // The dragged bodies' mates must hold (a failing mate elsewhere isn't
+    // this step's business); with relations, everything must.
+    let held = if relations.is_empty() { mates.iter().enumerate().filter(|(_, m)| mate_bodies(m).any(|b| moving.contains(&b))).all(|(i, _)| r.mate_ok[i]) } else { r.converged };
+    if !held {
+        return None;
+    }
+    // A target off what the dragged bodies alone can reach (the usual case:
+    // the pointer moves in the view plane) is still their answer unless
+    // moving the rest of their group gets the drag closer: one damped
+    // Gauss-Newton step on the whole group must find (almost) nothing.
+    if !reached {
+        let poses: Vec<Frame> = trial.iter().map(|b| b.pose).collect();
+        let scale = characteristic_length(&poses, mates).max(1e-3);
+        let held_bodies: &[SolverBody] = bodies;
+        let (groups, _) = group_terms(held_bodies, mates, relations, drags, false);
+        for (free, terms) in groups.iter().filter(|(_, ts)| ts.iter().any(|t| matches!(t, Term::Drag(_)))) {
+            let problem = Problem { bodies: held_bodies, mates, relations, drags, terms: terms.clone(), scale };
+            let mut res = Vec::new();
+            residuals(&problem, &poses, &mut res);
+            // The mates near rigid (the drag rows a further 1000× softer: a
+            // soft mate would let the step "help" the drag by bending every
+            // mate a little, a gain growing with the group), and a constant,
+            // tiny damping: relative damping would smother a coupled motion
+            // the mates make stiff on the diagonal (a gear).
+            let mut jac = jacobian(&problem, &poses, free, &res, scale, 1e-7);
+            let drag_rows = 3 * terms.iter().filter(|t| matches!(t, Term::Drag(_))).count();
+            for row in res.len() - drag_rows..res.len() {
+                res[row] *= 1e-3;
+                for c in 0..jac.ncols() {
+                    jac[(row, c)] *= 1e-3;
+                }
+            }
+            let cost: f64 = res.iter().map(|v| v * v).sum();
+            // Predicted cost drop of one Gauss-Newton step over `cols`.
+            let gain = |cols: &[usize]| -> Option<f64> {
+                let j = jac.select_columns(cols.iter());
+                let jt = j.transpose();
+                let mut a = &jt * &j;
+                for i in 0..a.nrows() {
+                    a[(i, i)] += 1e-16;
+                }
+                let g = &jt * DVector::from_column_slice(&res);
+                let delta = a.cholesky()?.solve(&(-&g));
+                Some(-g.dot(&delta))
+            };
+            let all: Vec<usize> = (0..jac.ncols()).collect();
+            let own: Vec<usize> = free.iter().enumerate().filter(|(_, b)| moving.contains(b)).flat_map(|(k, _)| k * 6..k * 6 + 6).collect();
+            let (Some(g_all), Some(g_own)) = (gain(&all), gain(&own)) else { return None };
+            if g_all - g_own > 1e-3 * cost {
+                return None;
+            }
+        }
+    }
+    for (b, t) in bodies.iter_mut().zip(&trial) {
+        if !b.fixed {
+            b.pose = t.pose;
+        }
+    }
+    // The degrees of freedom are the whole assembly's (nothing held).
+    Some(if dof { solve_inner(bodies, mates, relations, &[], true) } else { r })
 }
 
 /// Mates that align the Z axes only as lines (Revolute, Cylindrical, Pin
@@ -814,13 +913,13 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
     }
 }
 
-fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool) -> SolveResult {
-    let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
-    let scale = characteristic_length(&poses, mates).max(1e-3);
-    let mut result = SolveResult { mate_ok: vec![false; mates.len()], body_dof: vec![0; bodies.len()], ..Default::default() };
-    // Free bodies linked by a term (fixed bodies link nothing: they don't
-    // move) form groups solved one by one: a drag moves only its group, and
-    // the dense linear algebra scales with the group, not the assembly.
+/// Free bodies linked by a term (fixed bodies link nothing: they don't move)
+/// form groups solved one by one: a drag moves only its group, and the dense
+/// linear algebra scales with the group, not the assembly. With `stays`
+/// (following a drag) every other free body also gets its stay term. Returns
+/// the groups (free bodies, terms in residual order: mates, relations, drags,
+/// stays) and the free bodies no term reads.
+fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], stays: bool) -> (Vec<(Vec<usize>, Vec<Term>)>, Vec<usize>) {
     let mut parent: Vec<usize> = (0..bodies.len()).collect();
     fn root(parent: &mut [usize], mut i: usize) -> usize {
         while parent[i] != i {
@@ -829,10 +928,11 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
         }
         i
     }
-    let probe = Problem { bodies, mates, relations, drags, terms: Vec::new() };
+    let probe = Problem { bodies, mates, relations, drags, terms: Vec::new(), scale: 1.0 };
     let mut groups: Vec<(Vec<usize>, Vec<Term>)> = Vec::new();
     let mut term_root: Vec<(Term, Option<usize>)> = Vec::new();
-    for t in all_terms(mates, relations, drags) {
+    let stay_terms: Vec<Term> = if stays && !drags.is_empty() { (0..bodies.len()).filter(|&b| !bodies[b].fixed && !drags.iter().any(|d| d.body == b)).map(Term::Stay).collect() } else { Vec::new() };
+    for t in all_terms(mates, relations, drags).chain(stay_terms) {
         let free: Vec<usize> = term_bodies(&probe, t).into_iter().filter(|&b| !bodies[b].fixed).collect();
         for w in free.windows(2) {
             let (a, b) = (root(&mut parent, w[0]), root(&mut parent, w[1]));
@@ -849,24 +949,36 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
         });
         groups[g].1.push(t);
     }
+    let mut loose = Vec::new();
     for (i, b) in bodies.iter().enumerate() {
         if b.fixed {
             continue;
         }
         match group_of.get(&root(&mut parent, i)) {
             Some(&g) => groups[g].0.push(i),
-            // Unconstrained and not dragged: free in all 6 directions.
-            None if dof => {
-                result.dof += 6;
-                result.body_dof[i] = 6;
-            }
-            None => {}
+            None => loose.push(i),
+        }
+    }
+    (groups, loose)
+}
+
+fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool) -> SolveResult {
+    let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+    let scale = characteristic_length(&poses, mates).max(1e-3);
+    let mut result = SolveResult { mate_ok: vec![false; mates.len()], body_dof: vec![0; bodies.len()], ..Default::default() };
+    let probe = Problem { bodies, mates, relations, drags, terms: Vec::new(), scale };
+    let (groups, loose) = group_terms(bodies, mates, relations, drags, true);
+    if dof {
+        // Unconstrained and not dragged: free in all 6 directions.
+        for i in loose {
+            result.dof += 6;
+            result.body_dof[i] = 6;
         }
     }
 
     let eps = 1e-7;
     for (free, terms) in &groups {
-        let problem = Problem { bodies, mates, relations, drags, terms: terms.clone() };
+        let problem = Problem { bodies, mates, relations, drags, terms: terms.clone(), scale };
         let dragged = terms.iter().any(|t| matches!(t, Term::Drag(_)));
         result.iterations = result.iterations.max(levenberg_marquardt(&problem, &mut poses, free, scale, dragged));
     }
@@ -887,7 +999,7 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
     // evaluated at the final poses: null space of JᵀJ via a symmetric
     // eigendecomposition.
     for (free, terms) in groups.iter().filter(|_| dof) {
-        let nodrag = Problem { bodies, mates, relations, drags, terms: terms.iter().copied().filter(|t| !matches!(t, Term::Drag(_))).collect() };
+        let nodrag = Problem { bodies, mates, relations, drags, terms: terms.iter().copied().filter(|t| !matches!(t, Term::Drag(_) | Term::Stay(_))).collect(), scale };
         let n = free.len() * 6;
         if nodrag.terms.is_empty() {
             result.dof += n;
@@ -941,6 +1053,10 @@ fn levenberg_marquardt(problem: &Problem, poses: &mut Vec<Frame>, free: &[usize]
     // so a drag starts nearly undamped (else each step follows ~10 % of it).
     let mut lambda = if dragged { 1e-9 } else { 1e-3 };
     let mut cost: f64 = r.iter().map(|v| v * v).sum();
+    // The stay rows (last in a group's terms) aren't progress: stalling is
+    // judged on the drag and mate rows alone.
+    let stay_rows = 6 * problem.terms.iter().filter(|t| matches!(t, Term::Stay(_))).count();
+    let core = |v: &[f64]| v[..v.len() - stay_rows].iter().map(|x| x * x).sum::<f64>();
     let mut iterations = 0;
     let mut r2 = Vec::new();
     for it in 0..100 {
@@ -978,7 +1094,8 @@ fn levenberg_marquardt(problem: &Problem, poses: &mut Vec<Frame>, free: &[usize]
                 // Following a drag, the soft target may be out of reach
                 // (Gauss-Newton then converges only linearly): stop once a
                 // step gains less than 1e-6 of the cost.
-                stalled = dragged && cost - c2 < 1e-6 * cost;
+                let (c0, c1) = (core(&r), core(&r2));
+                stalled = dragged && c0 - c1 < 1e-6 * c0;
                 *poses = trial;
                 std::mem::swap(&mut r, &mut r2);
                 cost = c2;
@@ -1151,6 +1268,84 @@ mod tests {
         let bot = Frame::from_axes(DVec3::new(8.0 * mm, 6.0 * mm, 0.0), DVec3::NEG_Z, DVec3::X);
         let mates = (1..n).map(|i| mate(MateType::Revolute, i, bot, i - 1, top)).collect();
         (bodies, mates)
+    }
+
+    /// qa4 DRAG-RUNAWAY (round 5 v3 session 10): 19 cubes (20 mm) stacked by
+    /// Planar mates on a fixed plate; dragging the top one must leave the
+    /// others where they are (least change: their in-plane freedom isn't
+    /// the drag's business), not fling them away.
+    #[test]
+    fn planar_stack_drag_moves_only_the_dragged_cube() {
+        let mm = 1e-3;
+        let n = 19;
+        let mut bodies = vec![body(DVec3::ZERO, true)];
+        bodies.extend((0..n).map(|i| body(DVec3::new(0.0, 0.0, (10.0 + 20.0 * i as f64) * mm), false)));
+        let top = |z: f64| Frame::from_axes(DVec3::new(10.0 * mm, 10.0 * mm, z * mm), DVec3::Z, DVec3::X);
+        let bot = Frame::from_axes(DVec3::new(10.0 * mm, 10.0 * mm, 0.0), DVec3::NEG_Z, DVec3::X);
+        let mates: Vec<SolverMate> = (1..=n).map(|i| mate(MateType::Planar, i, bot, i - 1, if i == 1 { top(10.0) } else { top(20.0) })).collect();
+        assert!(solve(&mut bodies, &mates, &[], &[]).converged);
+        let before: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let lp = DVec3::new(10.0 * mm, 10.0 * mm, 20.0 * mm);
+        for step in 1..=10 {
+            let target = before[n].transform_point(lp) + DVec3::new(5.0, 3.0, 0.0) * mm * step as f64;
+            let drags = vec![DragTarget { body: n, local_point: lp, target }];
+            let r = solve_with(&mut bodies, &mates, &[], &drags, false);
+            assert!(r.converged);
+        }
+        for i in 1..n {
+            let d = bodies[i].pose.origin.distance(before[i].origin);
+            let a = bodies[i].pose.rotation.angle_between(before[i].rotation);
+            assert!(d < 1e-6 && a < 1e-6, "cube {i} moved {d} m, turned {a} rad");
+        }
+        let moved = bodies[n].pose.transform_point(lp).distance(before[n].transform_point(lp) + DVec3::new(50.0, 30.0, 0.0) * mm);
+        assert!(moved < 1e-6, "dragged cube off its target by {moved} m");
+        // A target off the cube's plane can't be reached by the cube alone, so
+        // the whole stack is solved: the others still stay put.
+        let start: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        for step in 1..=5 {
+            let target = start[n].transform_point(lp) + DVec3::new(-4.0, 2.0, 3.0) * mm * step as f64;
+            let drags = vec![DragTarget { body: n, local_point: lp, target }];
+            assert!(solve_with(&mut bodies, &mates, &[], &drags, false).converged);
+        }
+        for i in 1..n {
+            let d = bodies[i].pose.origin.distance(start[i].origin);
+            assert!(d < 1e-6, "cube {i} moved {d} m on the out-of-plane drag");
+        }
+        let moved = bodies[n].pose.transform_point(lp) - start[n].transform_point(lp);
+        assert!((moved - DVec3::new(-20.0, 10.0, 0.0) * mm).length() < 1e-6, "dragged cube moved {moved:?}");
+    }
+
+    /// The whole group must move (a 3-link revolute chain, its end dragged)
+    /// while 10 cubes ride Planar-stacked on the last link: the cubes' free
+    /// in-plane motion stays unused (least change), the chain follows.
+    #[test]
+    fn coupled_drag_leaves_free_bodies_put() {
+        let mm = 1e-3;
+        let (mut bodies, mut mates) = chain(4);
+        let cube0 = bodies.len();
+        let top = |z: f64| Frame::from_axes(DVec3::new(30.0 * mm, 6.0 * mm, z * mm), DVec3::Z, DVec3::X);
+        let bot = Frame::from_axes(DVec3::new(10.0 * mm, 10.0 * mm, 0.0), DVec3::NEG_Z, DVec3::X);
+        for i in 0..10 {
+            let link_top = bodies[3].pose.origin.z / mm + 5.0;
+            bodies.push(body(DVec3::new(bodies[3].pose.origin.x + 20.0 * mm, bodies[3].pose.origin.y - 4.0 * mm, (link_top + 20.0 * i as f64) * mm), false));
+            let below = if i == 0 { 3 } else { cube0 + i - 1 };
+            mates.push(mate(MateType::Planar, cube0 + i, bot, below, if i == 0 { top(5.0) } else { Frame::from_axes(DVec3::new(10.0 * mm, 10.0 * mm, 20.0 * mm), DVec3::Z, DVec3::X) }));
+        }
+        assert!(solve(&mut bodies, &mates, &[], &[]).converged);
+        let before: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let lp = DVec3::new(0.03, 0.006, 0.0);
+        for step in 1..=5 {
+            let target = before[3].transform_point(lp) + DVec3::new(-1.0, 2.0, 0.0) * mm * step as f64;
+            let drags = vec![DragTarget { body: 3, local_point: lp, target }];
+            assert!(solve_with(&mut bodies, &mates, &[], &drags, false).converged);
+            assert!((bodies[3].pose.transform_point(lp) - target).length() < 1e-6, "step {step}: the chain end lags");
+        }
+        // The links turn about Z, so the plane the cubes sit on keeps its
+        // height: nothing asks them to move at all.
+        for i in cube0..bodies.len() {
+            let d = bodies[i].pose.origin.distance(before[i].origin);
+            assert!(d < 1e-6, "cube {} moved {d} m", i - cube0);
+        }
     }
 
     /// Dragging the free end of a 20-link revolute chain: each step follows
