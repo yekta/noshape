@@ -148,8 +148,8 @@ pub struct FeatureDialog {
     pub cs_target: Option<String>,
     subs: Vec<Subscription>,
     parse_errors: HashMap<String, String>,
-    /// Typed text not yet passed on to the preview (it waits for the
-    /// field's commit, `flush_typed`).
+    /// A number field typed into but not yet passed on to the preview (it
+    /// waits for the field's commit, `flush_typed`).
     typed_pending: bool,
     pub status: Option<(FeatureStatus, String)>,
     /// Parameters the regeneration error points at (Onshape paints those
@@ -1099,9 +1099,15 @@ impl FeatureDialog {
         let sub = cx.subscribe_in(&state, window, move |this: &mut FeatureDialog, state, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
                 let text = state.read(cx).value().to_string();
-                if this.set_text_value(&path_s, text) {
-                    this.typed_pending = true;
-                    cx.notify();
+                // Number fields wait for their commit before the preview
+                // re-runs (live s2; as qa4's 66563c00); other text applies.
+                if this.spec_for_path(&path_s).is_some_and(|s| matches!(s.kind, ParamKind::Num(_))) {
+                    if this.set_text_value(&path_s, text) {
+                        this.typed_pending = true;
+                        cx.notify();
+                    }
+                } else {
+                    this.on_text_changed(&path_s, text, cx);
                 }
                 // Number fields: units of the field's kind are offered too.
                 let dim = this.spec_for_path(&path_s).and_then(|s| match &s.kind {

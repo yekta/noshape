@@ -197,6 +197,10 @@ pub struct UiState {
     pub section_rot: Option<super::section_manip::RingDrag>,
     pub section_base: Option<glam::DVec3>,
     pub section_base_drag: bool,
+    /// What a base drag snaps to (point, entity lit) and the drag's last
+    /// position (a hover pick arriving later re-snaps there).
+    pub section_snap: Option<(glam::DVec3, Reference)>,
+    pub section_snap_pos: Option<glam::DVec2>,
     /// The section value box (live skb "assembly section" 2–3): shown from
     /// an arrow or ring drag until Esc; the plane's offset when the arrow
     /// drag started (the box reads the distance from it).
@@ -245,6 +249,16 @@ pub struct UiState {
     pub list_collapsed: bool,
     /// Mass properties panel on its Face tab.
     pub mass_faces: bool,
+    /// Mass properties: "Mate connector for reference frame" is the active
+    /// field (a mate connector picked in the list or graphics fills it), and
+    /// the connector it holds.
+    pub mass_ref_active: bool,
+    pub mass_reference: Option<Reference>,
+    /// Mass Override changed in the open dialog (live ui-mass/10–15): the
+    /// part, and its mass (kg; None = unticked, the computed mass). ✓
+    /// stores it on the part; the mass box while it is typed into.
+    pub mass_override_edit: Option<(BodyId, Option<f64>)>,
+    pub mass_override_input: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// Measure type filter (None = Show all).
     pub measure_type: Option<&'static str>,
     /// The Measure panel's Length / Angle unit selects (None = workspace units).
@@ -478,6 +492,8 @@ impl UiState {
             section_rot: None,
             section_base: None,
             section_base_drag: false,
+            section_snap: None,
+            section_snap_pos: None,
             section_box: false,
             section_drag0: None,
             section_hover: None,
@@ -505,6 +521,10 @@ impl UiState {
             show_part_props: crate::preferences_window::parts_list_properties(),
             list_collapsed: false,
             mass_faces: false,
+            mass_ref_active: false,
+            mass_reference: None,
+            mass_override_edit: None,
+            mass_override_input: None,
             measure_type: None,
             measure_length_unit: None,
             measure_angle_unit: None,
@@ -2866,6 +2886,15 @@ impl PartStudioView {
 
     /// Feature list click with Onshape's additive / Shift-range rules.
     pub(super) fn click_feature(&mut self, id: FeatureId, shift: bool, cx: &mut Context<Self>) {
+        // Mass properties' reference field takes a mate connector's row
+        // (live ui-mass/07).
+        if self.show_mass && self.ui.mass_ref_active {
+            if let Some(c) = self.display.connectors.iter().find(|c| matches!(c.reference, Reference::MateConnector { feature, .. } if feature == id)) {
+                self.ui.mass_reference = Some(c.reference.clone());
+                cx.notify();
+            }
+            return;
+        }
         let order: Vec<FeatureId> = self.studio(cx).map(|s| s.features.iter().map(|f| f.id).collect()).unwrap_or_default();
         self.selected_features = interaction::list_click(&order, &self.selected_features, self.ui.anchor.as_ref(), &id, shift);
         self.ui.selected_folder = None;

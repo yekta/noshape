@@ -759,7 +759,10 @@ function driveCut(context is Context, id is Id, target is Query, def is map, top
         const half = (def.drill != undefined && def.drill > 0 ? def.drill : 140) / 2 * degree;
         const r = def.sd / 2;
         prismZ(context, id + "hex", top - def.t, def.t + reach, polygonPoints(6, def.sd, 0));
-        revolveProfile(context, id + "cone", [{ "p" : rz(Z, top - def.t - r / tan(half)) }, { "p" : rz(r, top - def.t) }, { "p" : rz(Z, top - def.t) }]);
+        // Live's metric set screws: a flat floor, no drill point.
+        const flatFloor = def.head == HEAD_NONE && def.dm != undefined && def.dm > EPS;
+        if (!flatFloor)
+            revolveProfile(context, id + "cone", [{ "p" : rz(Z, top - def.t - r / tan(half)) }, { "p" : rz(r, top - def.t) }, { "p" : rz(Z, top - def.t) }]);
         tool = qCreatedBy(id, EntityType.BODY);
     }
     else if (kind == DRIVE_SLOT)
@@ -864,6 +867,10 @@ function shankProfile(def is map, top is ValueWithUnits) returns array
     const l = def.l;
     const rp = def.dp / 2;
     var pts = [{ "p" : rz(Z, top) }, { "p" : rz(r, top) }];
+    // Live's metric set screws (behaviours "skb (10-25) set screw sockets"):
+    // a 30 degree chamfer from the minor diameter dm on top out to d.
+    if (def.dm != undefined && def.dm > EPS && def.dm < def.d - EPS)
+        pts = [{ "p" : rz(Z, top) }, { "p" : rz(def.dm / 2, top) }, { "p" : rz(r, top - (r - def.dm / 2) * tan(30 * degree)) }];
     const kind = def.point;
     if (kind == POINT_FLAT || (kind == POINT_CHAMFER && def.dp <= EPS))
         return join(pts, [{ "p" : rz(r, -l) }, { "p" : rz(Z, -l) }]);
@@ -877,8 +884,9 @@ function shankProfile(def is map, top is ValueWithUnits) returns array
         return join(pts, [{ "p" : rz(r, -l + def.z) }, { "p" : rz(Z, -l) }]);
     if (kind == POINT_CUP)
     {
-        // 45 degree chamfer to the cup diameter dp; a 118 degree cup.
-        const depth = rp * 0.6;
+        // 45 degree chamfer to the cup diameter dp; a 120 degree cup (live
+        // ISO 4029 M6: 0.866 deep).
+        const depth = rp / tan(60 * degree);
         return join(pts, [{ "p" : rz(r, -l + (r - rp)) }, { "p" : rz(rp, -l) }, { "p" : rz(Z, -l + depth) }]);
     }
     if (kind == POINT_DOG)
@@ -1005,6 +1013,8 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isInteger(definition.drill, { (unitless) : [0, 0, 180] } as IntegerBoundSpec);
         annotation { "Name" : "Under-head fillet" }
         isLength(definition.ru, LENGTH_0);
+        annotation { "Name" : "Top chamfer diameter" }
+        isLength(definition.dm, LENGTH_0);
         annotation { "Name" : "Transition diameter" }
         isLength(definition.da, LENGTH_0);
         annotation { "Name" : "Transition length" }

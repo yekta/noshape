@@ -118,10 +118,15 @@ pub enum Func {
     Exp,
     Ln,
     Log10,
+    Clamp,
+    Hypot,
+    IsInteger,
+    RoundToPrecision,
+    TolerantEquals,
 }
 
 impl Func {
-    pub const ALL: [Func; 17] = [
+    pub const ALL: [Func; 22] = [
         Func::Sin,
         Func::Cos,
         Func::Tan,
@@ -139,6 +144,11 @@ impl Func {
         Func::Exp,
         Func::Ln,
         Func::Log10,
+        Func::Clamp,
+        Func::Hypot,
+        Func::IsInteger,
+        Func::RoundToPrecision,
+        Func::TolerantEquals,
     ];
 
     pub fn name(self) -> &'static str {
@@ -160,6 +170,11 @@ impl Func {
             Func::Exp => "exp",
             Func::Ln => "ln",
             Func::Log10 => "log10",
+            Func::Clamp => "clamp",
+            Func::Hypot => "hypot",
+            Func::IsInteger => "isInteger",
+            Func::RoundToPrecision => "roundToPrecision",
+            Func::TolerantEquals => "tolerantEquals",
         }
     }
 
@@ -174,7 +189,8 @@ impl Func {
     /// Allowed argument counts as (min, max); `max == None` is variadic.
     pub fn arity(self) -> (usize, Option<usize>) {
         match self {
-            Func::Atan2 => (2, Some(2)),
+            Func::Atan2 | Func::Hypot | Func::RoundToPrecision | Func::TolerantEquals => (2, Some(2)),
+            Func::Clamp => (3, Some(3)),
             Func::Floor | Func::Ceil | Func::Round => (1, Some(2)),
             Func::Min | Func::Max => (1, None),
             _ => (1, Some(1)),
@@ -361,6 +377,11 @@ fn angle_arg(func: &'static str, q: Quantity) -> Result<f64, EvalError> {
     }
 }
 
+/// FeatureScript's `round`: `floor(x + 0.5)` (halves up, also below zero).
+fn round_half_up(x: f64) -> f64 {
+    (x + 0.5).floor()
+}
+
 fn unitless_arg(func: &'static str, q: Quantity) -> Result<f64, EvalError> {
     if q.is_unitless() {
         Ok(q.value)
@@ -413,10 +434,11 @@ fn eval_call(f: Func, args: &[Quantity]) -> Result<Quantity, EvalError> {
         Func::Sqrt => a.sqrt(),
         Func::Abs => Ok(a.abs()),
         Func::Floor | Func::Ceil | Func::Round => {
+            // Live (FeatureScript): halves round up, `round(-2.5)` is -2.
             let op = |x: f64| match f {
                 Func::Floor => x.floor(),
                 Func::Ceil => x.ceil(),
-                _ => x.round(),
+                _ => round_half_up(x),
             };
             match args.get(1) {
                 None => Ok(Quantity::unitless(op(unitless_arg(name, a)?))),
@@ -456,6 +478,62 @@ fn eval_call(f: Func, args: &[Quantity]) -> Result<Quantity, EvalError> {
             Ok(best)
         }
         Func::Exp => checked(name, unitless_arg(name, a)?.exp(), Dim::UNITLESS),
+        // Live's FeatureScript semantics (behaviours "skb (10-25) expression
+        // functions"): arguments of one kind; results keep it.
+        Func::Clamp => {
+            let (lo, hi) = (args[1], args[2]);
+            for b in [lo, hi] {
+                if b.dim != a.dim {
+                    return Err(EvalError::DimensionMismatch { op: name, left: a.dim, right: b.dim });
+                }
+            }
+            if lo.value > hi.value {
+                return Err(EvalError::Domain { func: name });
+            }
+            Ok(if a.value < lo.value {
+                lo
+            } else if a.value > hi.value {
+                hi
+            } else {
+                a
+            })
+        }
+        Func::Hypot => {
+            let b = args[1];
+            if b.dim != a.dim {
+                return Err(EvalError::DimensionMismatch { op: name, left: a.dim, right: b.dim });
+            }
+            checked(name, a.value.hypot(b.value), a.dim)
+        }
+        // A number with units is never an integer (live: `isInteger(3 mm)`
+        // is false).
+        Func::IsInteger => Ok(Quantity::unitless(f64::from(a.is_unitless() && a.value.is_finite() && a.value.fract() == 0.0))),
+        Func::RoundToPrecision => {
+            let x = unitless_arg(name, a)?;
+            let p = unitless_arg(name, args[1])?;
+            if p.fract() != 0.0 {
+                return Err(EvalError::Domain { func: name });
+            }
+            let m = 10f64.powf(p);
+            checked(name, round_half_up(x * m) / m, Dim::UNITLESS)
+        }
+        Func::TolerantEquals => {
+            let b = args[1];
+            if b.dim != a.dim {
+                return Err(EvalError::DimensionMismatch { op: name, left: a.dim, right: b.dim });
+            }
+            // Live's tolerances: numbers 1e-13 (inclusive), lengths 1e-8 m,
+            // angles 1e-11 rad, anything else 1e-8.
+            let diff = (a.value - b.value).abs();
+            let equal = if a.is_unitless() {
+                diff <= 1e-13
+            } else if a.dim == Dim::ANGLE {
+                diff < 1e-11
+            } else {
+                diff < 1e-8
+            };
+            Ok(Quantity::unitless(f64::from(equal)))
+        }
         Func::Ln => {
             let x = unitless_arg(name, a)?;
             if x <= 0.0 {

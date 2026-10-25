@@ -1432,6 +1432,13 @@ impl PartStudioView {
             ViewportEvent::Click { position, .. } if self.ui.datum_edit.is_some() => {
                 self.datum_pick(*position, cx);
             }
+            // Mass properties' reference field takes a picked mate connector.
+            ViewportEvent::Click { pick, .. } if self.show_mass && self.ui.mass_ref_active => {
+                if let Some(t) = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned()).filter(|t| t.kind == PickKind::Connector) {
+                    self.ui.mass_reference = Some(t.reference);
+                    cx.notify();
+                }
+            }
             // Section view dialog: picks fill its fields.
             ViewportEvent::Click { pick, .. } if self.ui.section_dialog.is_some() => {
                 if let Some(t) = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned()) {
@@ -1468,7 +1475,8 @@ impl PartStudioView {
                     // dialog's chips (live qa5 pass 7: neither a feature
                     // dialog's fields nor Mass properties' "Parts to measure"
                     // or Measure's entities, which show the selection).
-                    None if self.edit.is_none() && !self.show_mass && !self.ui.measure_pinned => {
+                    // Shift+click on empty space keeps it (live "nav2 selection" (3)).
+                    None if self.edit.is_none() && !self.show_mass && !self.ui.measure_pinned && !modifiers.shift => {
                         self.selection.clear();
                         self.selected_features.clear();
                         self.refresh_scene(false, cx);
@@ -2540,7 +2548,7 @@ impl PartStudioView {
             for (depth, fid) in chain.iter().enumerate().skip(common) {
                 let ancestors_open = chain[..depth].iter().all(|a| studio.folder(*a).is_some_and(|fd| !self.folder_collapsed(fd)));
                 if let (Some(fd), true) = (studio.folder(*fid), ancestors_open || filtered.is_some()) {
-                    items.push(ListItem::Folder(12.0 * depth as f32, fd.clone()));
+                    items.push(ListItem::Folder(FOLDER_INDENT * depth as f32, fd.clone()));
                     if prompt_folder == Some(fd.id) {
                         items.push(ListItem::Prompt);
                     }
@@ -2551,13 +2559,13 @@ impl PartStudioView {
             if collapsed && editing_id != Some(f.id) && filtered.is_none() {
                 continue;
             }
-            items.push(ListItem::Feature(12.0 * chain.len() as f32, f.id));
+            items.push(ListItem::Feature(FOLDER_INDENT * chain.len() as f32, f.id));
             // Live (qa5 derived, part-studio/1582): an open Derived row lists
             // the sketches it brought in.
             if self.ui.derived_open.contains(&f.id) {
                 // Live (ui 10-22 b): one row per location's copy ("Sketch 1" twice).
                 for (k, (_, sk)) in self.display.derived_sketches.iter().filter(|(d, _)| *d == f.id).enumerate() {
-                    items.push(ListItem::DerivedSketch(12.0 * chain.len() as f32, *sk, k));
+                    items.push(ListItem::DerivedSketch(FOLDER_INDENT * chain.len() as f32, *sk, k));
                 }
             }
             if prompt_anchor == Some(Some(f.id)) {
@@ -2787,7 +2795,17 @@ impl PartStudioView {
         }
 
         let ellipsis = || div().h(px(26.)).flex_none().pl(px(5.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element();
-        let indent = |indent: f32, row: AnyElement| if indent > 0. { div().pl(px(indent)).child(row).into_any_element() } else { row };
+        // Live (qa4 r5 s8 (6), ui 10-25 c): rows in a folder are indented
+        // 19 px per level, with a 1 px #d7d7d7 guide under each enclosing
+        // folder's chevron (9 px in from its row).
+        let indent = |indent: f32, row: AnyElement| {
+            if indent <= 0. {
+                return row;
+            }
+            let levels = (indent / FOLDER_INDENT).round() as usize;
+            let guides = (0..levels).map(|k| div().absolute().top_0().bottom_0().left(px(9. + FOLDER_INDENT * k as f32)).w(px(1.)).bg(gpui_kit::rgb(0xd7d7d7)));
+            div().relative().pl(px(indent)).child(row).children(guides).into_any_element()
+        };
         // Rows out of the list's view (with 2 rows to spare) are left out,
         // each run of them replaced by one empty block of their height: a
         // filter key that brings back every feature builds and lays out only
@@ -3507,8 +3525,10 @@ impl PartStudioView {
                 Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.))).into_any_element(),
                 // Live 587, 590: "New folder (0)" — the name and its feature count;
                 // a suppressed folder grey, italic and struck through (2d).
+                // Live (ui 10-25 c): the name 20 px after the folder glyph.
                 None => div()
                     .flex_1()
+                    .ml(px(-2.))
                     .truncate()
                     .when(suppressed, |d| d.italic().line_through().text_color(p().text_faint))
                     .child(crate::ui::user_text(format!("{} ({})", fd.name, self.studio(cx).map(|s| s.folder_count(id)).unwrap_or(0))))
@@ -4676,6 +4696,9 @@ pub(super) fn plane_text(text: &str) -> std::rc::Rc<PlaneText> {
     })
 }
 
+/// A feature list level's indent (live qa4 r5 s8 (6): 19 px).
+const FOLDER_INDENT: f32 = 19.;
+
 /// A list item's indent (feature and folder rows in folders).
 fn item_indent(item: &ListItem) -> f32 {
     match item {
@@ -4955,7 +4978,7 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {
                 // Esc closes transient UI first (S toolbar, Select other,
                 // zoom to window, dependencies), then the tool or dialog,
-                // then isolate / make transparent, then the selection.
+                // then isolate / make transparent; never the selection.
                 if this.show_shortcuts {
                     this.toggle_shortcut_sheet(window, cx);
                     return;
@@ -5011,11 +5034,10 @@ impl Render for PartStudioView {
                 if this.edit.is_some() {
                     this.cancel_edit(window, cx);
                 } else if this.close_tool_panel(window, cx) {
-                } else if !this.exit_isolate(window, cx) {
-                    this.selection.clear();
-                    this.selected_features.clear();
-                    this.refresh_scene(false, cx);
-                    cx.notify();
+                } else {
+                    // Live ("nav2 selection" (4)): Esc never clears the
+                    // selection in the graphics (Space does).
+                    this.exit_isolate(window, cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &Accept, window, cx| {

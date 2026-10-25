@@ -298,7 +298,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_animate`](#assembly_animate), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance), [`assembly_switch_to_tab`](#assembly_switch_to_tab), [`assembly_open_linked_document`](#assembly_open_linked_document)
 - **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly), [`context_go_to_assembly`](#context_go_to_assembly)
 - **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_edit_detail`](#drawing_edit_detail), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_edit_hatch`](#drawing_edit_hatch), [`drawing_title_field`](#drawing_title_field), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_open_feature_studio`](#drawing_open_feature_studio), [`drawing_switch_sheet`](#drawing_switch_sheet), [`drawing_sheets_panel`](#drawing_sheets_panel)
-- **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_shortcuts`](#ui_shortcuts)
+- **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_shortcuts`](#ui_shortcuts), [`ui_select`](#ui_select), [`ui_list`](#ui_list)
 - **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
@@ -816,7 +816,7 @@ Examples:
 
 Set or remove a feature's dynamic suppression expression (edits the document (one undoable history entry)).
 
-The Dynamic suppression dialog: the feature is active while `unsuppressed_if` is true (an expression of variables and configuration inputs, e.g. "#holes > 2"). Empty or omitted removes the expression (feature_suppress with suppressed false does too).
+The Dynamic suppression dialog (a feature's Edit expression… / Remove expression): the feature is active while `unsuppressed_if` is true (an expression of variables and configuration inputs, e.g. "#holes > 2"). Empty or omitted removes the expression (feature_suppress with suppressed false does too). With `folder` instead of `feature`: the folder row's Edit dynamic suppression, written onto every feature in the folder.
 
 Examples:
 
@@ -829,7 +829,8 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
-| `feature` | string | required | Feature id or name. |
+| `feature` | string |  | Feature id or name. |
+| `folder` | string |  | Instead of `feature`: a folder's name (feature_list lists folders). |
 | `unsuppressed_if` | string |  | Unsuppressed if: expression. |
 
 #### feature_dependencies
@@ -4781,6 +4782,55 @@ Examples:
 | `tab` | one of `General`, `Part Studio`, `Assembly`, `3D view`, `Sketch`, `Feature Studio`, `Drawing` |  | Only this tab. |
 | `search` | string |  | Search text (names and keys). |
 
+#### ui_select
+
+The window's selection: select, clear, Select ▸ related entities, Select other…, same configuration.
+
+What is selected in a Part Studio, Assembly or Drawing window (per tab; `get` reads it). Part Studios: `set` / `add` / `remove` entity ids (query_entities: parts, faces, edges, vertices, sketches, planes), `clear` (Clear selection), `related` (the context menu's Select ▸ item `criterion` grown from the first of `refs`; Bounded faces stops at the other `refs`, which stay selected), `select_other` (Select other…: the faces under graphics-area point `at` [x, y] through the window's camera (view_camera), nearest first; `index` picks one, else the list is returned). Assemblies: `set` / `add` / `remove` instances (ids or names), `clear`, `same_configuration` (Select instances with same configuration as the first of `refs`; `same_part` for same part and same configuration). Drawings: `clear`. With the app open the window selects the same.
+
+Examples:
+
+```json
+{"action": "set", "refs": ["body:…"]}
+{"action": "related", "refs": ["face:…"], "criterion": "Tangent connected faces"}
+{"action": "select_other", "at": [640, 400], "index": 1}
+{"tab": "Assembly 1", "action": "same_configuration", "refs": ["Part 1 <1>"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio, Assembly or Drawing tab, by name or id. Default: the window's tab. |
+| `action` | one of `get`, `set`, `add`, `remove`, `clear`, `related`, `select_other`, `same_configuration` | required | What to do. |
+| `refs` | array of string |  | Entity ids, or in an assembly instance ids or names. |
+| `criterion` | one of `Tangent connected faces`, `Loop/chain connected edges`, `Tangent connected edges`, `Parallel edges`, `Equal length/radius edges`, `All faces of part`, `Protrusion faces`, `Pocket faces`, `Hole faces`, `Fillet faces`, `Loop/chain connected edges`, `Bounded faces` |  | related: the Select ▸ item. |
+| `at` | array of number |  | select_other: the point [x, y] in graphics-area pixels. |
+| `index` | integer |  | select_other: select the index-th entity under the point (0 = nearest). |
+| `same_part` | boolean |  | same_configuration: same part and same configuration. |
+
+#### ui_list
+
+The feature and instance lists: expand / collapse folders, subassemblies and mates, filter the feature list, find an instance.
+
+View state of a tab's lists (`get` reads it). Part Studios: `expand_all` / `collapse_all` (Expand all in list / Collapse all in list: the folders), `expand` / `collapse` folders `items` (names), `filter` (Filter feature list: `text` as the list's search box takes it — names and type names, or `:errors`, `:suppressed`, `:variable "name"`, `:type x`, …; "" clears; returns the features shown). Assemblies: `expand_all` / `collapse_all` (the instance tree, patterns and mates), `expand` / `collapse` `items`: subassembly instances (Expand selected / Collapse selected) or mates (a mate row's Expand / Collapse), `find` (Find in instance list: selects the instance, its list row shown). With the app open the window shows the same.
+
+Examples:
+
+```json
+{"action": "collapse_all"}
+{"action": "filter", "text": ":variable \"width\""}
+{"tab": "Assembly 1", "action": "expand", "items": ["Subassembly 1 <1>"]}
+{"tab": "Assembly 1", "action": "find", "items": ["Part 1 <2>"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the window's tab. |
+| `action` | one of `get`, `expand_all`, `collapse_all`, `expand`, `collapse`, `filter`, `find` | required | What to do. |
+| `items` | array of string |  | expand / collapse / find: folder names (Part Studio); instance or mate ids or names (Assembly). |
+| `text` | string |  | filter: the feature list's search text. |
+
 ### history
 
 #### history_view
@@ -5528,7 +5578,7 @@ Examples:
 
 Move the graphics area's camera as the view menus do (zoom to fit / selection / window, zoom in / out, previous view, standard views, view normal to, align vertical, perspective).
 
-The camera of a Part Studio's or Assembly's graphics area, or a drawing's zoom, as the window has it (kept per tab for the session; `get` reads it). 3D tabs: `zoom_fit` (Zoom to fit: the shown parts, sketches, planes and origin; an assembly's instances), `view` (a standard view zoomed to fit; `view`, default isometric), `zoom_selection` (the `refs`: parts, faces, edges, vertices, sketches, planes; an assembly's instances), `zoom_in` / `zoom_out` (Z / Shift+Z: ×1.75 about the centre, within Onshape's limits), `zoom_window` (`box`: two corners in graphics-area pixels), `previous` (Previous view: back one change), `normal_to` (View normal to the first of `refs`: a planar face, plane, sketch or mate connector; in an assembly a planar face {"instance", "entity"}; again on the same plane turns to its back), `normal_to_sketch` (View normal to sketch plane: `refs` [the sketch]), `align_vertical` (Align view with vertical axis: `refs` [a straight edge]), `perspective` (`on`). Drawings: `zoom_fit` / `zoom_sheet`, `zoom_in` / `zoom_out` (×2 / ×½), `zoom_window`. The graphics area is 1280×800 px until `viewport` sets it. With the app open the window does the same move at its own size. Returns the camera: the viewing direction and up (world), the target point and the visible height (document units), projection; a drawing's zoom (px per mm) and the sheet point at the centre (mm).
+The camera of a Part Studio's or Assembly's graphics area, or a drawing's zoom, as the window has it (kept per tab for the session; `get` reads it). 3D tabs: `zoom_fit` (Zoom to fit: the shown parts, sketches, planes and origin; an assembly's instances), `view` (a standard view zoomed to fit; `view`, default isometric), `zoom_selection` (the `refs`, else the window's selection (ui_select): parts, faces, edges, vertices, sketches, planes; an assembly's instances), `zoom_in` / `zoom_out` (Z / Shift+Z: ×1.75 about the centre, within Onshape's limits), `zoom_window` (`box`: two corners in graphics-area pixels), `previous` (Previous view: back one change), `normal_to` (View normal to the first of `refs`: a planar face, plane, sketch or mate connector; in an assembly a planar face {"instance", "entity"}; again on the same plane turns to its back), `normal_to_sketch` (View normal to sketch plane: `refs` [the sketch]), `align_vertical` (Align view with vertical axis: `refs` [a straight edge]), `perspective` (`on`). Drawings: `zoom_fit` / `zoom_sheet`, `zoom_in` / `zoom_out` (×2 / ×½), `zoom_window`. The graphics area is 1280×800 px until `viewport` sets it. With the app open the window does the same move at its own size. Returns the camera: the viewing direction and up (world), the target point and the visible height (document units), projection; a drawing's zoom (px per mm) and the sheet point at the centre (mm).
 
 Examples:
 
