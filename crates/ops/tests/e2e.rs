@@ -977,6 +977,22 @@ fn assembly_named_positions_and_exploded_views() {
     call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": p, "entity": pf }, "b": { "instance": b, "entity": hole } }));
     let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
 
+    // Animate…: the dialog's defaults (a full turn in 300 steps); a quarter
+    // of the run turns the pin 90°, and nothing is saved.
+    let before = last(&mut ctx);
+    let start = call(&mut ctx, "assembly_animate", json!({ "frame": 0 }));
+    let an = call(&mut ctx, "assembly_animate", json!({ "mate": "Revolute 1", "frame": 75 }));
+    assert_eq!((an["dofs"].clone(), an["dof"].clone(), an["start"].clone(), an["end"].clone(), an["steps"].clone()), (json!(["rz"]), json!("rz"), json!("0 deg"), json!("360 deg"), json!(300)), "{an}");
+    assert!((num(&an["value"]) - 90.0).abs() < 1e-9, "{an}");
+    let rot = |v: &Value, i: &str| v["instances"].as_array().unwrap().iter().find(|x| x["id"] == i).unwrap()["rotation"].clone();
+    assert_ne!(rot(&start, &p), rot(&an, &p), "the pin turns: {an}");
+    assert_eq!(rot(&start, &b), rot(&an, &b), "the fixed block stays");
+    assert_eq!(last(&mut ctx), before, "animation is not saved");
+    let e = try_call(&mut ctx, "assembly_animate", json!({ "dof": "tz" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("dof"), "{e:?}");
+    let e = try_call(&mut ctx, "assembly_animate", json!({ "steps": 10, "frame": 11 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("frame"), "{e:?}");
+
     let e = try_call(&mut ctx, "assembly_named_position_drivers", json!({ "drivers": [{ "mate": "Revolute 1", "dof": "tz" }] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("drivers[0].dof"));
     call(&mut ctx, "assembly_named_position_drivers", json!({ "drivers": [{ "mate": "Revolute 1", "dof": "rz" }] }));

@@ -2449,13 +2449,9 @@ impl AnimState {
     }
 }
 
-/// A mate's degrees of freedom in live's Animate chooser order: the
-/// rotation first, then X, Y, Z translations ("⟳ - z", "↹ - x", …).
-pub(super) fn anim_dofs(t: MateType) -> Vec<usize> {
-    let mut v: Vec<usize> = noshape_model::assembly::eval::mate_dofs(t).iter().map(|(ix, _)| *ix).collect();
-    v.sort_by_key(|ix| (*ix != 0, *ix));
-    v
-}
+/// A mate's degrees of freedom in live's Animate chooser order (shared
+/// with the agent API's assembly_animate).
+pub(super) use noshape_ops::assembly::anim_dofs;
 
 /// Full turns of the mate dialog's Animate preview (one degree per frame).
 const PREVIEW_TURNS: f64 = 2.0;
@@ -2522,34 +2518,7 @@ pub(super) fn solver_values_for(a: &noshape_model::assembly::solver::Frame, b: &
 
 impl AssemblyView {
     fn anim_defaults(&self, m: &Mate, dof: usize, cx: &App) -> (String, String) {
-        let units = self.units(cx);
-        let key = match dof {
-            0 => "rz",
-            1 => "x",
-            2 => "y",
-            _ => "z",
-        };
-        let fmt = |v: f64| {
-            if dof == 0 {
-                // Onshape's angle fields read "360 deg".
-                let d = noshape_units::to_fixed(v.to_degrees(), 3);
-                format!("{} deg", d.trim_end_matches('0').trim_end_matches('.'))
-            } else {
-                noshape_units::format_quantity(noshape_units::Quantity::meters(v), &units)
-            }
-        };
-        // Start / End default to the mate's limits (Onshape), else a full turn / a span.
-        if let Some(l) = m.limits.iter().find(|(k, _)| k == key).map(|(_, l)| l.clone())
-            && let (Some(a), Some(b)) = (l.min, l.max)
-        {
-            return (a.text, b.text);
-        }
-        if dof == 0 {
-            (fmt(0.0), fmt(std::f64::consts::TAU))
-        } else {
-            // Live (2287/2288): 0 mm → 25 mm.
-            (fmt(0.0), fmt(0.025))
-        }
+        noshape_ops::assembly::anim_defaults(m, dof, &self.units(cx))
     }
 
     /// Mate (or mate indicator) context menu > Animate: open the Animate

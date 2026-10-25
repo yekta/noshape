@@ -186,6 +186,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_replace", &[r##"{"instance": "Bolt <1>", "source": "Part Studio 2", "part": "Long bolt"}"##]),
     ("assembly_rename", &[r##"{"instance": "Part 1 <1>", "name": "Base"}"##, r##"{"feature": "Revolute 1", "name": "Hinge"}"##]),
     ("assembly_set_feature_state", &[r##"{"features": ["Slider 1"], "suppressed": true}"##]),
+    ("assembly_animate", &[r##"{"mate": "Revolute 1", "frame": 75}"##, r##"{"tab": "Assembly 1", "mate": "Cylindrical 1", "dof": "tz", "start": "0 mm", "end": "40 mm", "steps": 40, "frame": 10}"##]),
     ("assembly_named_position", &[r##"{"action": "add", "name": "Open"}"##, r##"{"action": "apply", "position": "Open"}"##]),
     ("assembly_named_position_drivers", &[r##"{"drivers": [{"mate": "Revolute 1", "dof": "rz"}]}"##]),
     ("assembly_exploded_view", &[r##"{"action": "add", "name": "Exploded 1"}"##]),

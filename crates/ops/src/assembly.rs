@@ -484,6 +484,43 @@ pub fn driven_dofs(t: noshape_model::assembly::MateType) -> &'static [u8] {
     }
 }
 
+/// A mate's degrees of freedom in the Animate dialog's "Select degree of
+/// freedom" order: the rotation first, then X, Y, Z translations ("⟳ - z",
+/// "↹ - x", …); value indices as in `Solved::mate_values`.
+pub fn anim_dofs(t: MateType) -> Vec<usize> {
+    let mut v: Vec<usize> = noshape_model::assembly::eval::mate_dofs(t).iter().map(|(ix, _)| *ix).collect();
+    v.sort_by_key(|ix| (*ix != 0, *ix));
+    v
+}
+
+/// The Animate dialog's Start / End defaults for value `dof` of mate `m`:
+/// the mate's limits, else a full turn ("0 deg" → "360 deg") or a span
+/// (live 2287/2288: 0 mm → 25 mm).
+pub fn anim_defaults(m: &Mate, dof: usize, units: &noshape_units::UnitPrefs) -> (String, String) {
+    let key = match dof {
+        0 => "rz",
+        1 => "x",
+        2 => "y",
+        _ => "z",
+    };
+    let fmt = |v: f64| {
+        if dof == 0 {
+            // Onshape's angle fields read "360 deg".
+            let d = noshape_units::to_fixed(v.to_degrees(), 3);
+            format!("{} deg", d.trim_end_matches('0').trim_end_matches('.'))
+        } else {
+            noshape_units::format_quantity(noshape_units::Quantity::meters(v), units)
+        }
+    };
+    // Start / End default to the mate's limits (Onshape), else a full turn / a span.
+    if let Some(l) = m.limits.iter().find(|(k, _)| k == key).map(|(_, l)| l.clone())
+        && let (Some(a), Some(b)) = (l.min, l.max)
+    {
+        return (a.text, b.text);
+    }
+    if dof == 0 { (fmt(0.0), fmt(std::f64::consts::TAU)) } else { (fmt(0.0), fmt(0.025)) }
+}
+
 /// Add named position's default name: "Named position N".
 pub fn next_named_position_name(a: &Assembly) -> String {
     let mut k = a.named_positions.len() + 1;

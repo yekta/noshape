@@ -88,6 +88,25 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "assembly",
+            verb: "animate",
+            summary: "Animate a mate: the assembly at a step of the Animate dialog's run (not saved)",
+            description: "The mate context menu's Animate… dialog: the mate's degree of freedom `dof` runs from `start` to `end` in `steps` steps (defaults as the dialog fills them: the mate's limits, else 0 → 360 deg or 0 → 25 mm; 300 steps). Returns the chooser's degrees of freedom, the run's values and the instances' placements at step `frame` (value = start + (end − start)·frame/steps; Single playback stops on the last step, Loop and Reciprocate repeat these). Like the dialog, nothing is saved: the assembly goes back to its positions when the dialog closes.",
+            fields: vec![
+                doc_field(),
+                asm_field(),
+                opt("mate", s(), "The mate (id or name); default the first unsuppressed mate with degrees of freedom."),
+                opt("dof", json!({ "type": "string", "enum": DOFS }), "The degree of freedom (\"Select degree of freedom\"): rz = rotation about Z, tx / ty / tz = translation; needed when the mate has several."),
+                opt("start", json!({ "type": ["string", "number"] }), "Start value (angle or length expression)."),
+                opt("end", json!({ "type": ["string", "number"] }), "End value."),
+                opt("steps", json!({ "type": "integer", "minimum": 2, "default": 300 }), "Steps."),
+                opt("frame", json!({ "type": "integer", "minimum": 0 }), "The step to show (0 = start; default the last step, the end)."),
+            ],
+            mutates: false,
+            destructive: false,
+            run: animate,
+        },
+        Op {
+            group: "assembly",
             verb: "display_state",
             summary: "Display states: add, apply, update, rename, remove",
             description: "The Display states panel: `add` saves which instances and mates are hidden now as a new state `name` (\"Add display state : Front\"); `apply` shows and hides them as the state says (instances added since keep theirs); `update` saves the current visibility into the state; `rename` to `name`; `remove`. One edit each with the panel's text.",
@@ -136,6 +155,71 @@ fn quantity(v: &Value, dim: Dim, units: &UnitPrefs, field: &str) -> Result<f64, 
 pub(super) fn commit_solved(od: &mut OpenDoc, tab: TabId, desc: &str, mut result: AssemblyResult, solved: noshape_model::assembly::eval::Solved, f: impl FnOnce(&mut Assembly)) -> Result<(), OpError> {
     result.solved = solved;
     commit(od, tab, desc, &result, f)
+}
+
+fn animate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let asm = assembly(od, tab)?.clone();
+    let mate = match a.opt_str("mate")? {
+        Some(k) => asm.mate(find_mate(&asm, k).map_err(|e| e.with_param("mate"))?),
+        None => asm.mates.iter().find(|m| !m.suppressed && !sa::anim_dofs(m.mate_type).is_empty()),
+    }
+    .cloned()
+    .ok_or_else(|| OpError::invalid("Select a mate with degrees of freedom to animate.").with_param("mate"))?;
+    let dofs = sa::anim_dofs(mate.mate_type);
+    let names = || dofs.iter().map(|d| DOFS[*d]).collect::<Vec<_>>().join(", ");
+    if dofs.is_empty() {
+        return Err(OpError::invalid(format!("{} has no degrees of freedom to animate", mate.name)).with_param("mate"));
+    }
+    let dof = match a.opt_str("dof")? {
+        Some(d) => DOFS.iter().position(|x| *x == d).filter(|ix| dofs.contains(ix)).ok_or_else(|| OpError::param("dof", &format!("{} moves along: {}", mate.name, names())))?,
+        None if dofs.len() == 1 => dofs[0],
+        None => return Err(OpError::param("dof", &format!("Select degree of freedom: {}", names()))),
+    };
+    let (start_text, end_text) = sa::anim_defaults(&mate, dof, &units);
+    let dim = if dof == 0 { Dim::ANGLE } else { Dim::LENGTH };
+    // The dialog runs up to 100 revolutions.
+    let lim = |v: f64| if dof == 0 { v.clamp(-100.0 * std::f64::consts::TAU, 100.0 * std::f64::consts::TAU) } else { v };
+    let value = |field: &str, default: String| -> Result<(String, f64), OpError> {
+        let v = a.get(field).cloned().unwrap_or(Value::String(default));
+        let q = quantity(&v, dim, &units, field)?;
+        Ok((v.as_str().map_or_else(|| v.to_string(), str::to_string), lim(q)))
+    };
+    let (start_text, start) = value("start", start_text)?;
+    let (end_text, end) = value("end", end_text)?;
+    let steps = a.get("steps").map(|v| v.as_u64().filter(|n| *n >= 2).ok_or_else(|| OpError::param("steps", "a whole number, 2 or more"))).transpose()?.unwrap_or(300);
+    let frame = a.get("frame").map(|v| v.as_u64().filter(|n| *n <= steps).ok_or_else(|| OpError::param("frame", &format!("0 to {steps}")))).transpose()?.unwrap_or(steps);
+    let v = start + (end - start) * frame as f64 / steps as f64;
+    let result = solve(od, tab, &SolveOptions::default())?;
+    let at: std::collections::HashMap<_, _> = result.solved.placements.iter().cloned().collect();
+    let solved = result.prepared.solve(&SolveOptions { hold_values: vec![(mate.id, dof, v)], start: Some(at), nested_start: Some(result.solved.nested.clone()), ..Default::default() });
+    let k = len_scale(&units);
+    let shown = |x: f64| if dof == 0 { x.to_degrees() } else { x * k };
+    let instances: Vec<Value> = asm
+        .instances
+        .iter()
+        .map(|i| {
+            let p = solved.placement(i.id).unwrap_or(i.placement);
+            let t = DVec3::from(p.translation) * k;
+            json!({ "id": format!("inst:{}", i.id.0), "name": i.name, "translation": [t.x, t.y, t.z], "rotation": p.rotation })
+        })
+        .collect();
+    Ok(json!({
+        "mate": format!("mate:{}", mate.id.0),
+        "mate_name": mate.name,
+        "dofs": dofs.iter().map(|d| DOFS[*d]).collect::<Vec<_>>(),
+        "dof": DOFS[dof],
+        "start": start_text,
+        "end": end_text,
+        "steps": steps,
+        "frame": frame,
+        "value": shown(v),
+        "value_unit": if dof == 0 { "deg".to_string() } else { units.length.symbol().to_string() },
+        "converged": solved.converged,
+        "instances": instances,
+    })
+    .into())
 }
 
 fn named_position(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -225,7 +225,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Add expression…", Op("assembly_dynamic_suppression")),
     ("assembly:Add mate connector to instance origin…", Op("assembly_mate_connector")),
     ("assembly:Add selection to folder…", Op("assembly_add_folder")),
-    ("assembly:Animate…", Ui("animation playback; no model change")),
+    ("assembly:Animate…", Op("assembly_animate")),
     ("assembly:Apply named position", Op("assembly_named_position")),
     ("assembly:Change configuration…", Op("assembly_set_configuration")),
     ("assembly:Change to version…", Op("assembly_change_to_version")),
