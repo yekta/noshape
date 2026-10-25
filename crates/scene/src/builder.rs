@@ -901,6 +901,18 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             state::SELECTED
         };
         mark(r, flag, &mut scene);
+        // A part given by reference (its faces listed beside it): its faces
+        // take the whole-part amber.
+        if !error
+            && let Reference::Body(b) = r
+            && let Some(body) = display.body(b)
+        {
+            for f in &body.face_refs {
+                for &id in built.picks.ids_for(f) {
+                    scene.add_flag(id, state::BODY);
+                }
+            }
+        }
     }
     if let Some(h) = hover {
         mark(h, state::HOVER, &mut scene);
