@@ -2911,6 +2911,22 @@ fn edit_in_context_and_part_studio_in_context() {
     assert!(contexts(&mut ctx, "Part Studio 1").is_empty());
 }
 
+/// qa5 CTX-USE: Use on the context face a sketch lies on projects its
+/// edges (live: the face's outer edges), as on an ordinary face.
+#[test]
+fn use_on_the_context_face_a_sketch_lies_on() {
+    let mut ctx = Ctx::new();
+    let (block, _pin) = two_part_assembly(&mut ctx, "ctx_use.noshape");
+    call(&mut ctx, "assembly_edit_in_context", json!({ "instance": block }));
+    let faces = call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "context": true, "surface": "plane", "normal": [0, 0, 1] }));
+    let top = faces["faces"][0]["id"].as_str().unwrap_or_else(|| panic!("{faces}")).to_string();
+    let sk = call(&mut ctx, "sketch_create", json!({ "tab": "Part Studio 1", "plane": top, "name": "On pin" }))["sketch"].as_str().unwrap().to_string();
+    let r = try_call(&mut ctx, "sketch_use", json!({ "tab": "Part Studio 1", "sketch": sk, "references": [top] }));
+    assert!(r.is_ok(), "{r:?}");
+    let got = call(&mut ctx, "sketch_get", json!({ "tab": "Part Studio 1", "sketch": sk }));
+    assert!(!got["entities"].as_array().map(|e| e.is_empty()).unwrap_or(true), "{got}");
+}
+
 /// The annotation menus: jogs, break, leaders and note nodes, foreshorten,
 /// groups, detach, align centermark, stacked callouts, add to an ordinate
 /// group, and Adjust linestyle.

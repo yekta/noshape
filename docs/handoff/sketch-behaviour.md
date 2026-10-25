@@ -81,15 +81,16 @@ Implemented and compiling, mostly covered by crate tests; GUI not yet re-verifie
 * 11.15 / 11.17 / 11.18 Patterns and Transform: click in empty space or Enter accepts, Esc
   cancels, no Apply button; patterns recorded in `SketchData.patterns`, pattern glyph
   (hover / Show constraints) with right-click "Edit pattern" (re-creates instances).
-  Instances are not constrained to the seed (Onshape links them): open item.
+  Instances are linked to the seed (linear: `PatternLink` + spacing dimension, second
+  direction too; circular: seed / center / size links), checked 10-25 by skb.
 
 ## Remaining items (priority order)
 
 1. Diff against the live Onshape capture (`/root/onshape-research/live/`).
 2. The ⏳ rows of the checklist (implemented, GUI not re-verified): 6.14, 8.8, 8.16, 9.5,
    9.7, 11.10, 11.20, 12.5, 13.3.
-3. Circular pattern instances are not linked to the seed (needs a rotation pattern
-   constraint: nonlinear, center/angle unknowns).
+3. (Done) Circular pattern instances are linked to the seed (`circular_pattern_*` tests
+   in sketch/tests/onshape_ux.rs).
 4. 1.9 Restore bubble after cancelling a sketch (feature dialog / mod.rs, other agent).
 5. 3.13 a preferences page for sketch shortcuts (file-based works).
 6. 4.38 DWG reader (DXF only); images are drawn only when the box is upright on screen.
@@ -459,3 +460,18 @@ DIAMETER on the endCap. Ours (k21) adds tangent + EQUAL pairs and no coincident/
   kept, icons2's orientation (◀/▶ axis = that edge's outward normal, measured -33.6° vs edge 56°) and rotated digit.
 - Chamfer preview (live 1960b): the two distance dims are black with filled arrowheads; ours draw light grey with
   small ticks. The arrow (push_hollow_arrow) matches.
+
+## skb (10-25) sketch leftovers re-checked
+
+- 14.15 Text: the second click stages a box and the confirm/cancel dialog; more than 250
+  characters is refused ("Text is limited to 250 characters"). Done.
+- 14.16 Fillet / chamfer: the preview stays staged until Enter, which commits and opens the
+  radius box (scene test `fillet_two_curves`). Done.
+- 14.17 Linear pattern: second direction with its own count / spacing / angle, linked to
+  the seed rows (`linear_grid_pattern`). Done.
+- Offset (qa4 OFF-CONSTR, OFF-CORNER, OFF-BOX, OFF-SIDE, OFF-TOAST): copies tied to their
+  sources with live's DISTANCE on the first pair + one OFFSET per other pair (a lone line
+  or circle: one OFFSET on itself); two lines meet at a sharp corner; Enter creates the
+  offset and opens the distance box; the first side is away from the region the first
+  curve bounds (a circle outward) and the flip resets per offset; a curve off the chain
+  is not added and warns "Can only offset a single chain at once.".

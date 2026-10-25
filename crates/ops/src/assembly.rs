@@ -215,10 +215,17 @@ pub fn delete_mate(a: &mut Assembly, id: MateId) {
 
 /// Default primary-axis alignment of a new mate (live assembly/760–780):
 /// the moving (first) instance keeps its orientation, so the Z axes agree
-/// when they point the same way now and are opposed otherwise.
+/// when they point the same way now and are opposed otherwise. Perpendicular
+/// axes (a tie) align them (live "qa4 round 5 s3 mate flip" (4): a pin laid
+/// on its side gets the aligned Revolute of the upright pin).
 pub fn default_flip_primary(result: &AssemblyResult, a: &noshape_model::assembly::MateConnectorRef, b: &noshape_model::assembly::MateConnectorRef, units: &noshape_units::UnitPrefs) -> Option<bool> {
     let (fa, fb) = (result.connector_world(a, units)?, result.connector_world(b, units)?);
-    Some(fa.z().dot(fb.z()) > 0.0)
+    Some(flip_for_axes(fa.z(), fb.z()))
+}
+
+/// [`default_flip_primary`] for two connector Z axes (true: aligned).
+pub fn flip_for_axes(za: glam::DVec3, zb: glam::DVec3) -> bool {
+    za.dot(zb) > -1e-9
 }
 
 /// Targets of a part pattern / replicate: (code, target connector, initial placement).
@@ -544,6 +551,17 @@ pub fn next_exploded_view_name(a: &Assembly) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// Live (behaviours "qa4 round 5 s3 mate flip" (4), assembly/760–780): the
+    /// Z axes agree when they point the same way and when they are
+    /// perpendicular; opposed ones flip.
+    #[test]
+    fn default_flip_ties_align() {
+        use glam::DVec3;
+        assert!(flip_for_axes(DVec3::Z, DVec3::Z));
+        assert!(flip_for_axes(DVec3::NEG_Y, DVec3::Z));
+        assert!(!flip_for_axes(DVec3::NEG_Z, DVec3::Z));
+    }
+
     use super::*;
     use glam::DVec3;
 

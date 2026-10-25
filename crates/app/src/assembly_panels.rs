@@ -858,7 +858,7 @@ impl AssemblyView {
             PatternKind::Mirror { .. } => "mirror",
             PatternKind::Replicate { .. } => "replicate",
         };
-        let selected = self.selected_mate == Some(id);
+        let selected = self.selected_mate == Some(id) || self.ui.range_patterns.contains(&id);
         let suppressed = pat.suppressed;
         let row = h_flex()
             .id(SharedString::from(format!("pat-{}", id.0)))
@@ -900,7 +900,12 @@ impl AssemblyView {
                     this.edit_mate(id, window, cx);
                     return;
                 }
-                this.selected_mate = if this.selected_mate == Some(id) { None } else { Some(id) };
+                // A click on a range-selected pattern row deselects it.
+                if let Some(i) = this.ui.range_patterns.iter().position(|p| *p == id) {
+                    this.ui.range_patterns.remove(i);
+                } else {
+                    this.selected_mate = if this.selected_mate == Some(id) { None } else { Some(id) };
+                }
                 this.refresh_scene(false, cx);
                 cx.notify();
             }));
@@ -1276,6 +1281,7 @@ impl AssemblyView {
                             cx.stop_propagation();
                             remove(this);
                             this.update_pattern_preview(cx);
+                            this.refresh_scene(false, cx);
                             cx.notify();
                         })),
                 )
@@ -1295,6 +1301,10 @@ impl AssemblyView {
                         if let Some(p) = &mut this.pattern {
                             p.seeds.retain(|x| *x != id);
                         }
+                        // The field follows the selection (above): the chip's
+                        // instance is deselected too, or it would come back
+                        // (qa4 CHIP-X-SELECTED).
+                        this.selected.retain(|x| *x != id);
                     }),
                 )
             })
@@ -1312,10 +1322,18 @@ impl AssemblyView {
             let rows: Vec<AnyElement> = value
                 .as_ref()
                 .map(|c| {
-                    let label = (this.labeler(cx))(c);
+                    // Live (dom/dialog-asm-{linear,circular}-pattern-filled,
+                    // -mirror-filled): Direction / Axis name the picked
+                    // entity ("Edge of Part 1 <2>", "Face of Part 2 <1>"); a
+                    // mirror plane picked on geometry reads "Mate connector".
+                    let text = match (&c.reference, c.connector) {
+                        (noshape_model::reference::Reference::Implicit { .. }, None) if label == "Mirror plane" => "Mate connector".to_string(),
+                        (noshape_model::reference::Reference::Implicit { on, .. }, None) => (this.labeler(cx))(&MateConnectorRef { reference: (**on).clone(), ..c.clone() }),
+                        _ => (this.labeler(cx))(c),
+                    };
                     vec![chip(
                         SharedString::from(format!("{id}-v")),
-                        label,
+                        text,
                         cx,
                         Box::new(move |this: &mut Self| {
                             if let Some(p) = &mut this.pattern {

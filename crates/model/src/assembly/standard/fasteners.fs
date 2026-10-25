@@ -335,6 +335,17 @@ function screwHead(context is Context, id is Id, def is map) returns array
             cylinderZ(context, id + "flange", Z, def.c + EPS, def.dc / 2);
         return [qCreatedBy(id, EntityType.BODY), def.k];
     }
+    if (kind == HEAD_ROUND && def.rimDome != undefined && def.rimDome == 1)
+    {
+        // Live's ISO 7380 button head: a sphere of radius rf centred on the
+        // axis through the rim (dk at the bearing face); it rises above the
+        // head height k, where the socket cuts it (dom/skb-sc-geom M6).
+        const rb = def.dk / 2;
+        const zc = -sqrt(max(def.rf * def.rf - rb * rb, Z * Z));
+        const rm = rb / 2;
+        revolveProfile(context, id + "round", [{ "p" : rz(Z, Z) }, { "p" : rz(rb, Z) }, { "p" : rz(Z, zc + def.rf), "mid" : rz(rm, zc + sqrt(def.rf * def.rf - rm * rm)) }]);
+        return [qCreatedBy(id, EntityType.BODY), def.k];
+    }
     if (kind == HEAD_ROUND)
     {
         // A collar (dc, c) under the head (DIN 967) lifts it by c.
@@ -684,10 +695,14 @@ function driveCut(context is Context, id is Id, target is Query, def is map, top
     var tool = qNothing();
     if (kind == DRIVE_HEX_SOCKET)
     {
-        const e = def.sd / cos(30 * degree);
+        // Live (dom/skb-sc-geom ISO 4762 / 10642 / 7380 M6, ANSI 1/4-20): the
+        // hex to the depth t, then a drill point from the flats' circle
+        // (`drill`: ISO 140, inch 120 degrees), which leaves six flat ledges
+        // in the hex corners.
+        const half = (def.drill != undefined && def.drill > 0 ? def.drill : 140) / 2 * degree;
+        const r = def.sd / 2;
         prismZ(context, id + "hex", top - def.t, def.t + reach, polygonPoints(6, def.sd, 0));
-        // The drill point cone at the bottom of the socket (118 degrees).
-        revolveProfile(context, id + "cone", [{ "p" : rz(Z, top - def.t - e / 2 * tan(31 * degree)) }, { "p" : rz(e / 2, top - def.t + EPS) }, { "p" : rz(Z, top - def.t + EPS) }]);
+        revolveProfile(context, id + "cone", [{ "p" : rz(Z, top - def.t - r / tan(half)) }, { "p" : rz(r, top - def.t) }, { "p" : rz(Z, top - def.t) }]);
         tool = qCreatedBy(id, EntityType.BODY);
     }
     else if (kind == DRIVE_SLOT)
@@ -929,6 +944,12 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isInteger(definition.neck, { (unitless) : [0, 0, 100] } as IntegerBoundSpec);
         annotation { "Name" : "Point" }
         isInteger(definition.point, { (unitless) : [0, 0, 100] } as IntegerBoundSpec);
+        annotation { "Name" : "Drill point angle" }
+        isInteger(definition.drill, { (unitless) : [0, 0, 180] } as IntegerBoundSpec);
+        annotation { "Name" : "Under-head fillet" }
+        isLength(definition.ru, LENGTH_0);
+        annotation { "Name" : "Dome through the rim" }
+        isInteger(definition.rimDome, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
         annotation { "Name" : "d" }
         isLength(definition.d, NONNEGATIVE_LENGTH_BOUNDS);
         annotation { "Name" : "l" }
@@ -1057,6 +1078,16 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
             // In the flange or collar (c) under the head, else in the head.
             inside = def.c > EPS && below == Z ? def.c / 2 : below + (head[1] - below) / 4;
         revolveProfile(context, id + "shank", shankProfile(def, inside));
+        // An under-head fillet `ru` between the shank and a flat bearing face
+        // (live's ISO 7380 HEAD_FILLET: a torus); the region reaches into the
+        // head and the shank so the union never rests on touching faces.
+        if (def.ru != undefined && def.ru > EPS && def.head != HEAD_NONE && below == Z && neck[1] >= below - EPS)
+        {
+            const r = def.d / 2;
+            const q = def.ru * sqrt(0.5);
+            revolveProfile(context, id + "underFillet", [{ "p" : rz(r - def.ru, def.ru) }, { "p" : rz(r + def.ru, def.ru) }, { "p" : rz(r + def.ru, Z) },
+                    { "p" : rz(r, -def.ru), "mid" : rz(r + def.ru - q, -def.ru + q) }, { "p" : rz(r - def.ru, -def.ru) }]);
+        }
         uniteAll(context, id);
         // Live's indented hex heads: a flat dish of diameter 0.9 s, a sixth
         // of the hex height deep, before any slot or recess.

@@ -465,6 +465,12 @@ pub struct SketchEditor {
     pub fillet_radius: f64,
     pub offset_distance: f64,
     pub offset_flip: bool,
+    /// The pending offset's default side needs a negative distance (live
+    /// qa4 OFF-SIDE: the first side is away from the region the first curve
+    /// bounds, so a circle offsets outward).
+    pub offset_out: bool,
+    /// A warning toast for the host to show (taken once shown).
+    pub toast: Option<String>,
     /// Curves of the offset being set up (preview, arrow and distance box).
     pub offset_pending: Option<Vec<EntityId>>,
     /// An offset was made: later curve clicks repeat it with the same distance.
@@ -584,6 +590,31 @@ impl EditOutcome {
     fn changed() -> Self {
         Self { changed: true, redraw: true }
     }
+}
+
+/// Two curves share an end point (one offset chain).
+fn curves_touch(sk: &Sketch, a: EntityId, b: EntityId) -> bool {
+    let (Some((a0, a1)), Some((b0, b1))) = (sk.endpoints(a), sk.endpoints(b)) else { return false };
+    let at = |p: EntityId, q: EntityId| p == q || sk.point(p).zip(sk.point(q)).is_some_and(|(x, y)| (x - y).length() < 1e-9);
+    [a0, a1].iter().any(|&p| at(p, b0) || at(p, b1))
+}
+
+/// Whether a positive offset of the chain `ids` goes, at its first curve,
+/// into a region that curve bounds and not out of another: live's default
+/// side is away from the region.
+fn offset_goes_in(sk: &Sketch, ids: &[EntityId]) -> bool {
+    let Some(&first) = ids.first() else { return false };
+    let Some(c) = sk.curve(first) else { return false };
+    let (t0, t1) = c.domain();
+    let mid = c.point((t0 + t1) * 0.5);
+    let mut tmp = sk.clone();
+    let eps = c.bbox().size().max_element().max(1e-9) * 1e-3;
+    let Ok(r) = tmp.offset(ids, eps) else { return false };
+    let Some(q) = r.created.iter().filter_map(|e| tmp.curve(*e)).map(|c| c.closest(mid).1).min_by(|x, y| (*x - mid).length().total_cmp(&(*y - mid).length())) else { return false };
+    let dir = q - mid;
+    let regions: Vec<_> = sk.regions().into_iter().filter(|r| r.entities().contains(&first)).collect();
+    let inside = |p: DVec2| regions.iter().any(|r| r.contains(p));
+    inside(mid + dir) && !inside(mid - dir)
 }
 
 fn is_point(sk: &Sketch, id: EntityId) -> bool {
@@ -772,6 +803,7 @@ fn hatched_text(text: &str, at: DVec2, dir: DVec2, px: f64, em_px: f64) -> Vec<[
 fn constraint_masters(kind: &ConstraintKind, sk: &Sketch) -> Vec<EntityId> {
     match kind {
         ConstraintKind::Offset { master_ref, master, .. } => vec![*master_ref, *master],
+        ConstraintKind::OffsetPair { master_source, master_copy, .. } => vec![*master_source, *master_copy],
         ConstraintKind::Symmetric { a, b, .. } if is_point(sk, *a) && is_point(sk, *b) => sk
             .entities()
             .filter(|e| e.kind() == EntityKind::Line && e.endpoints().is_some_and(|(s, en)| [s, en].iter().any(|p| p == a || p == b)))
@@ -958,7 +990,7 @@ pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
         Pierce { .. } => "pierce",
         Quadrant { .. } => "coincident",
         // Live (qa5 sketch tools): the slot's three offsets, an arch glyph.
-        Offset { .. } => "offset",
+        Offset { .. } | OffsetPair { .. } => "offset",
         _ => return None,
     })
 }
@@ -1015,6 +1047,8 @@ impl SketchEditor {
             fillet_radius: 0.005,
             offset_distance: 0.005,
             offset_flip: false,
+            offset_out: false,
+            toast: None,
             offset_pending: None,
             offset_repeat: false,
             conic_rho: 0.5,
@@ -1150,7 +1184,7 @@ impl SketchEditor {
             Tool::Offset => {
                 let ids: Vec<EntityId> = std::mem::take(&mut self.selection).into_iter().filter(|e| !is_point(&data.sketch, *e)).collect();
                 if !ids.is_empty() {
-                    self.offset_pending = Some(ids);
+                    self.start_offset(&data.sketch, ids);
                     self.message = Some("Set the offset distance (drag or click the arrow), then press Enter".into());
                 }
                 EditOutcome::redraw()
@@ -1697,19 +1731,29 @@ impl SketchEditor {
                 }
                 if self.offset_repeat && self.offset_pending.is_none() {
                     // Later clicks offset by the same distance right away.
-                    self.offset_pending = Some(ids);
+                    self.start_offset(&data.sketch, ids);
                     return self.commit_offset(data);
                 }
                 match &mut self.offset_pending {
-                    // Add curves to the pending offset (chain selection).
+                    // Add connected curves to the pending offset (chain
+                    // selection). Live (qa4 OFF-TOAST): a curve off the chain
+                    // is not added, only warned about.
                     Some(p) => {
                         for e in ids {
-                            if !p.contains(&e) {
-                                p.push(e);
+                            if p.contains(&e) {
+                                continue;
                             }
+                            if !p.iter().any(|q| curves_touch(&data.sketch, *q, e)) {
+                                self.toast = Some("Can only offset a single chain at once.".into());
+                                return EditOutcome::redraw();
+                            }
+                            p.push(e);
                         }
+                        // A longer chain may run the other way: the default
+                        // side stays away from the region.
+                        self.offset_out = offset_goes_in(&data.sketch, p);
                     }
-                    None => self.offset_pending = Some(ids),
+                    None => self.start_offset(&data.sketch, ids),
                 }
                 self.message = Some("Set the offset distance (drag or click the arrow), then press Enter".into());
                 EditOutcome::redraw()
@@ -1924,10 +1968,24 @@ impl SketchEditor {
             .collect()
     }
 
+    /// A new pending offset: the arrow flip is not remembered from the
+    /// last one, and the default side goes away from the region the first
+    /// curve bounds (live, qa4 OFF-SIDE).
+    fn start_offset(&mut self, sk: &Sketch, ids: Vec<EntityId>) {
+        self.offset_flip = false;
+        self.offset_out = offset_goes_in(sk, &ids);
+        self.offset_pending = Some(ids);
+    }
+
+    /// The pending offset's signed distance for `Sketch::offset`.
+    fn offset_signed(&self) -> f64 {
+        if self.offset_flip != self.offset_out { -self.offset_distance } else { self.offset_distance }
+    }
+
     /// Offset curves of the pending offset with the current distance (preview / commit).
     fn offset_result(&self, sk: &Sketch) -> Option<(Sketch, Vec<EntityId>)> {
         let ids = self.offset_pending.as_ref()?;
-        let d = if self.offset_flip { -self.offset_distance } else { self.offset_distance };
+        let d = self.offset_signed();
         let mut tmp = sk.clone();
         let r = tmp.offset(ids, d).ok()?;
         let created = r.created.into_iter().filter(|e| tmp.kind(*e).is_some_and(|k| k != EntityKind::Point)).collect();
@@ -1943,13 +2001,13 @@ impl SketchEditor {
         Some((c.point(t), c.tangent(t).try_normalize()?.perp()))
     }
 
-    /// Whether a positive offset of the first pending curve goes against its
-    /// left normal (closed curves offset inward).
+    /// Whether a positive offset of the pending chain goes against its first
+    /// curve's left normal.
     fn offset_flip_base(&self, sk: &Sketch) -> bool {
-        let Some(first) = self.offset_pending.as_ref().and_then(|p| p.first().copied()) else { return false };
+        let Some(ids) = self.offset_pending.as_ref() else { return false };
         let Some((mid, n)) = self.offset_frame(sk) else { return false };
         let mut tmp = sk.clone();
-        let Ok(r) = tmp.offset(&[first], self.world_per_px.max(1e-9)) else { return false };
+        let Ok(r) = tmp.offset(ids, self.world_per_px.max(1e-9)) else { return false };
         let probe = r.created.iter().filter_map(|e| tmp.curve(*e)).map(|c| c.closest(mid).1).min_by(|x, y| (*x - mid).length().total_cmp(&(*y - mid).length()));
         probe.is_some_and(|q| (q - mid).dot(n) < 0.0)
     }
@@ -1970,7 +2028,7 @@ impl SketchEditor {
     /// (start of the 18 px stem, apex of the 31 px head).
     pub fn offset_arrow(&self, sk: &Sketch) -> Option<(DVec2, DVec2)> {
         let (mid, n) = self.offset_frame(sk)?;
-        let sign = if self.offset_flip != self.offset_flip_base(sk) { -1.0 } else { 1.0 };
+        let sign = if (self.offset_flip != self.offset_out) != self.offset_flip_base(sk) { -1.0 } else { 1.0 };
         let (dir, px) = (n * sign, self.world_per_px);
         let start = mid + dir * (self.offset_distance + px * OFFSET_ARROW_GAP_PX);
         Some((start, start + dir * px * (OFFSET_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX)))
@@ -1986,19 +2044,25 @@ impl SketchEditor {
             return None;
         }
         let (mid, n) = self.offset_frame(sk)?;
-        let sign = if self.offset_flip != self.offset_flip_base(sk) { -1.0 } else { 1.0 };
+        let sign = if (self.offset_flip != self.offset_out) != self.offset_flip_base(sk) { -1.0 } else { 1.0 };
         Some((mid + n * sign * self.offset_distance * 0.5, self.offset_distance))
     }
 
     /// Create the pending offset (Enter / click in space); later clicks repeat it.
     pub fn commit_offset(&mut self, data: &mut SketchData) -> EditOutcome {
+        let d = self.offset_signed();
         let Some(ids) = self.offset_pending.take() else { return EditOutcome::none() };
-        let d = if self.offset_flip { -self.offset_distance } else { self.offset_distance };
         match data.sketch.offset(&ids, d) {
             Ok(r) => {
                 self.offset_repeat = true;
                 self.finish_create(data, &r.created);
                 self.message = Some("Click more curves to offset them by the same distance".into());
+                // Live (qa4 OFF-BOX): Enter creates the offset and opens its
+                // distance's value box, the value pre-selected.
+                let dist = r.constraints_added.iter().copied().find(|c| matches!(data.sketch.constraint(*c).map(|c| &c.kind), Some(ConstraintKind::Distance { .. })));
+                if let Some(cid) = dist {
+                    self.open_value_box(data, cid);
+                }
                 EditOutcome::changed()
             }
             Err(e) => {
@@ -3041,7 +3105,7 @@ impl SketchEditor {
                     let d = (p - mid).dot(n);
                     if d.abs() > self.world_per_px {
                         self.offset_distance = d.abs();
-                        self.offset_flip = (d < 0.0) != self.offset_flip_base(&data.sketch);
+                        self.offset_flip = ((d < 0.0) != self.offset_flip_base(&data.sketch)) != self.offset_out;
                     }
                 }
                 EditOutcome::redraw()
@@ -5828,6 +5892,7 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
         Fix { entity } => vec![entity],
         // Live: the slot's three offset glyphs sit together at the end cap.
         Offset { reference, .. } => vec![reference],
+        OffsetPair { copy, .. } => vec![copy],
         Normal { line, curve } => vec![line, curve],
         // Live draws a tangent's glyph once, on its first entity (the line of
         // a fillet, the cap of a slot; qa5 sketch tools).
@@ -6656,6 +6721,28 @@ mod tests {
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: None } if a == line)));
     }
 
+    /// Live (behaviours "qa4 round 5 s1 follow-up 2" (2)): a line chained to
+    /// the origin from a point a hair (0.66°) off vertical gets only the
+    /// Coincident there, no Vertical, and keeps its tilt.
+    #[test]
+    fn line_ending_on_a_point_off_vertical_adds_no_vertical() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.015, 0.005));
+        click(&mut ed, &mut d, v(0.015, 0.0227));
+        // Shift: no snap to x 0 for the third point.
+        let c = v(PX * 2.6, 0.0227);
+        ed.pointer_move(&mut d, c, true, false);
+        ed.tool_down(&mut d, c, None, true, false);
+        ed.tool_up(&mut d, c);
+        click(&mut ed, &mut d, v(PX * 0.5, PX * 0.5));
+        let last = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).last().unwrap().id;
+        let (s, e) = d.sketch.endpoints(last).unwrap();
+        assert_eq!(d.sketch.point(e).unwrap(), DVec2::ZERO, "ends on the origin");
+        let kinds: Vec<ConstraintKind> = d.sketch.constraints().map(|c| c.kind.clone()).collect();
+        assert!(!kinds.iter().any(|k| matches!(k, ConstraintKind::Vertical { a, .. } if *a == last)), "{kinds:?}");
+        assert!(d.sketch.point(s).unwrap().x > PX, "keeps its tilt: {}", d.sketch.point(s).unwrap());
+    }
+
     #[test]
     fn shift_suppresses_inference_and_drop_snap_without_pointer_movement() {
         let (mut ed, mut data) = editor(Tool::Line);
@@ -6700,6 +6787,9 @@ mod tests {
         // A plain number reopens with the document unit (QA3: "80" → "80 mm").
         ed.apply_dimension(&mut data, cid, "40", &units, &noshape_units::EmptyScope).unwrap();
         assert_eq!(dimension_edit_text(&data, cid, &units).as_deref(), Some("40 mm"));
+        // A bare expression too (live, qa4 DIM-EXPR-UNIT: "2*5" → "(2*5) mm").
+        ed.apply_dimension(&mut data, cid, "2*5", &units, &noshape_units::EmptyScope).unwrap();
+        assert_eq!(dimension_edit_text(&data, cid, &units).as_deref(), Some("(2*5) mm"));
         let conic = data.sketch.add_conic(v(0.05, 0.01), v(0.06, 0.02), v(0.07, 0.01), 0.7).unwrap();
         let rho = data.sketch.add_constraint(ConstraintKind::Rho { conic, value: 0.7 }).unwrap();
         let text = dimension_edit_text(&data, rho, &units).unwrap();
@@ -7223,12 +7313,58 @@ mod tests {
         assert!((ed.offset_distance - 0.004).abs() < 1e-9);
         let _ = base;
         assert!(ed.commit_offset(&mut d).changed);
+        let cid = ed.dim_edit.as_ref().expect("Enter opens the distance box").constraint;
+        assert!(matches!(d.sketch.constraint(cid).map(|c| &c.kind), Some(ConstraintKind::Distance { .. })));
+        ed.dim_edit = None;
         let below = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).filter_map(|e| d.sketch.curve(e.id)).any(|c| (c.start_point().y - 0.006).abs() < 1e-9);
         assert!(below, "offset toward the dragged side");
         // later clicks repeat the offset right away
         click(&mut ed, &mut d, v(0.02, 0.03));
         assert_eq!(count(&d, EntityKind::Line), 4);
         let _ = l1;
+    }
+
+    /// Live (behaviours "qa4 round 5 s1 follow-up 2" (3)-(4), qa4 OFF-SIDE,
+    /// OFF-TOAST, OFF-BOX): the first side is away from the region (a
+    /// rectangle's top edge up, its bottom down, a circle out); a flip is not
+    /// remembered by the next offset; a curve off the chain only warns.
+    #[test]
+    fn offset_side_away_from_the_region_and_one_chain() {
+        let (mut ed, mut d) = editor(Tool::Offset);
+        d.sketch.corner_rectangle(v(0.0, 0.0), v(0.03, 0.02));
+        let circle = d.sketch.add_circle(v(0.1, 0.0), 0.01);
+        let copy_y = |ed: &SketchEditor, d: &SketchData| {
+            let (tmp, created) = ed.offset_result(&d.sketch).unwrap();
+            tmp.curve(created[0]).unwrap().start_point().y
+        };
+        click(&mut ed, &mut d, v(0.015, 0.02));
+        assert!(copy_y(&ed, &d) > 0.02, "top edge: up, out of the rectangle");
+        // A curve off the chain: warned, not added.
+        click(&mut ed, &mut d, v(0.1, 0.01));
+        assert_eq!(ed.toast.take().as_deref(), Some("Can only offset a single chain at once."));
+        assert_eq!(ed.offset_pending.as_ref().map(Vec::len), Some(1));
+        // A connected edge joins the chain and the side stays out.
+        click(&mut ed, &mut d, v(0.03, 0.01));
+        assert_eq!(ed.offset_pending.as_ref().map(Vec::len), Some(2));
+        assert!(ed.toast.is_none());
+        let (tmp, created) = ed.offset_result(&d.sketch).unwrap();
+        let bb = created.iter().filter_map(|e| tmp.curve(*e)).fold(noshape_sketch::geom::BBox::from_points([]), |b, c| b.union(&c.bbox()));
+        assert!((bb.max.y - 0.025).abs() < 1e-9 && (bb.max.x - 0.035).abs() < 1e-9, "outside the corner: {bb:?}");
+        ed.offset_flip = true;
+        assert!(ed.cancel());
+        ed.set_tool(Tool::Offset);
+        click(&mut ed, &mut d, v(0.015, 0.0));
+        assert!(!ed.offset_flip, "the flip is not remembered");
+        assert!(copy_y(&ed, &d) < 0.0, "bottom edge: down, out of the rectangle");
+        assert!(ed.commit_offset(&mut d).changed);
+        assert!(ed.dim_edit.is_some(), "Enter opens the value box");
+        ed.dim_edit = None;
+        ed.offset_repeat = false;
+        click(&mut ed, &mut d, v(0.11, 0.0));
+        let (tmp, created) = ed.offset_result(&d.sketch).unwrap();
+        let Some(Curve2::Circle { radius, .. }) = tmp.curve(created[0]) else { panic!() };
+        assert!(radius > 0.01, "a circle offsets outward: {radius}");
+        let _ = circle;
     }
 
     #[test]

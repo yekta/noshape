@@ -564,6 +564,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Zoom to fit", Ui("view / camera; no model change")),
     ("partStudio:Zoom to selection", Ui("view / camera; no model change")),
     ("partStudio:sk-dim-delete", Op("sketch_delete")),
+    ("partStudio:Delete dimension", Op("sketch_delete")),
     ("partStudio:sk-dim-driving", Op("sketch_dimension_options")),
     ("partStudio:sk-dim-tol", Op("sketch_dimension_options")),
     ("partStudio:sk-dim-unconf", Op("sketch_dimension_options")),

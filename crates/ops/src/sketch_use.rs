@@ -26,9 +26,21 @@ pub struct Model<'a> {
 }
 
 impl Model<'_> {
+    /// Kernel shapes of a reference: the regenerated model's, else the shown
+    /// Assembly context's (its bodies join only the features referencing
+    /// them, so a sketch on a context face can still Use them, qa5 CTX-USE).
+    pub fn shapes(&self, r: &Reference) -> Vec<noshape_kernel::Shape> {
+        let found = resolve_shapes(self.context, r);
+        if !found.is_empty() || self.display.context_shapes.is_empty() {
+            return found;
+        }
+        let ctx = Context { bodies: self.display.context_shapes.clone(), ..Default::default() };
+        resolve_shapes(&ctx, r)
+    }
+
     /// Is the referenced face curved (not planar)?
     pub fn curved_face(&self, r: &Reference) -> bool {
-        resolve_shapes(self.context, r).first().is_some_and(|f| !f.is_planar())
+        self.shapes(r).first().is_some_and(|f| !f.is_planar())
     }
 
     /// Plane frame of a plane-like reference (datum / feature plane, planar face).
@@ -36,7 +48,7 @@ impl Model<'_> {
         match r {
             Reference::Plane(_) | Reference::FeaturePlane(_) => self.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
             Reference::Face(_) => {
-                let f = resolve_shapes(self.context, r).into_iter().next()?;
+                let f = self.shapes(r).into_iter().next()?;
                 let pl = f.face_plane().ok()??;
                 let (n, x) = (pl.unit_normal(), pl.unit_x());
                 Some(PlaneFrame { origin: pl.origin, x, y: n.cross(x), normal: n })
@@ -51,9 +63,10 @@ impl Model<'_> {
         match r {
             Reference::Edge(_) => refs.push(r.clone()),
             Reference::Face(_) => {
-                if let Some(b) = self.display.bodies.iter().find(|b| b.face_refs.contains(r)) {
+                let shown = self.display.bodies.iter().chain(&self.display.context_bodies);
+                if let Some(b) = shown.into_iter().find(|b| b.face_refs.contains(r)) {
                     let fi = b.face_refs.iter().position(|x| x == r).unwrap_or(0);
-                    if let Some(body) = self.context.body(&b.id)
+                    if let Some(body) = self.context.body(&b.id).or_else(|| self.display.context_shapes.iter().find(|x| x.id == b.id))
                         && let Ok(face) = body.shape.sub_shape(noshape_kernel::ShapeType::Face, fi)
                     {
                         for e in face.edges() {
@@ -78,14 +91,14 @@ impl Model<'_> {
         let mut out = Vec::new();
         // A curved face previews its silhouettes.
         if matches!(r, Reference::Face(_)) && self.curved_face(r) {
-            if let Some(face) = resolve_shapes(self.context, r).into_iter().next() {
+            if let Some(face) = self.shapes(r).into_iter().next() {
                 out.extend(sk_feat::face_silhouettes(&face, frame).iter().map(|c| c.tessellate(tol)));
             }
             return out;
         }
         let refs = if matches!(r, Reference::SketchEntity { .. }) { vec![r.clone()] } else { self.edge_refs(r) };
         for er in refs {
-            let shapes = resolve_shapes(self.context, &er);
+            let shapes = self.shapes(&er);
             match shapes.first().and_then(|e| sk_feat::project_edge_any(e, frame)) {
                 Some(sk_feat::SectionCurve::Exact(c)) => out.push(c.tessellate(tol)),
                 Some(sk_feat::SectionCurve::Sampled(p)) => out.push(p),
@@ -115,7 +128,7 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
         }
         return Some(id);
     }
-    let shape = resolve_shapes(model.context, r).into_iter().next();
+    let shape = model.shapes(r).into_iter().next();
     enum Made {
         Point(DVec2),
         Curves(Vec<sk_feat::SectionCurve>),
@@ -193,7 +206,7 @@ pub fn intersect_face(ed: &mut SketchEditor, data: &mut SketchData, model: Model
     if !matches!(r, Reference::Face(_)) {
         return Err("Click a model face that crosses the sketch plane".into());
     }
-    let shapes = resolve_shapes(model.context, r);
+    let shapes = model.shapes(r);
     let face = shapes.first().ok_or_else(|| "Click a model face that crosses the sketch plane".to_string())?;
     let curves = sk_feat::section_face(face, model.frame).map_err(|e| format!("Intersection failed: {e}"))?;
     if curves.is_empty() {

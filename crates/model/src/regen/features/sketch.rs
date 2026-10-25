@@ -188,6 +188,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     }
     changed.sort();
     changed.dedup();
+    let last_solved = sk.clone();
     let report = match changed.as_slice() {
         [one] => {
             let opts = sk.dimension_edit_options(*one);
@@ -195,6 +196,11 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         }
         _ => sk.solve(),
     };
+    // Live (qa4 DIM-UNSOLVED-GEOM): a sketch that can't be solved keeps its
+    // last solved shape, not the rest solved around the conflict.
+    if matches!(report.status, noshape_sketch::SolveStatus::Overconstrained { .. }) {
+        sk = last_solved;
+    }
     // Text glyph outlines follow their (solved) text boxes.
     data.add_text_outlines(&mut sk);
     let regions = sk.regions();
@@ -712,6 +718,38 @@ mod text_expression_tests {
         let solved = &r.context.sketches[0].sketch;
         let v = solved.constraint(cid).unwrap().kind.value().unwrap();
         assert!((v - 0.015).abs() < 1e-12, "stored radius = typed diameter / 2, got {v}");
+    }
+
+    /// Live (qa4 DIM-UNSOLVED-GEOM): a dimension set against an Equal keeps
+    /// the last solved shape and is listed with the conflict (red).
+    #[test]
+    fn unsolvable_sketch_keeps_its_last_solved_shape() {
+        use crate::configuration::ConfigValues;
+        use crate::partstudio::PartStudio;
+        use crate::reference::{DatumPlane, Reference};
+        use crate::regen::{RegenOptions, Regenerator};
+        use crate::sketch_feature::SketchData;
+        let units = noshape_units::UnitPrefs::default();
+        let mut sk = noshape_sketch::Sketch::new();
+        let a = sk.add_line(glam::DVec2::new(0.0, 0.0), glam::DVec2::new(0.0, 0.032));
+        let b = sk.add_line(glam::DVec2::new(0.02, 0.0), glam::DVec2::new(0.02, 0.032));
+        let lb = sk.add_constraint(ConstraintKind::Length { curve: b, value: 0.032 }).unwrap();
+        sk.add_constraint(ConstraintKind::Vertical { a, b: None }).unwrap();
+        sk.add_constraint(ConstraintKind::Vertical { a: b, b: None }).unwrap();
+        sk.add_constraint(ConstraintKind::Length { curve: a, value: 0.032 }).unwrap();
+        sk.add_constraint(ConstraintKind::Equal { a, b }).unwrap();
+        assert!(sk.solve().is_solved());
+        sk.set_dimension_value(lb, 0.05).unwrap();
+        let mut ps = PartStudio::new();
+        let mut f = ps.new_feature("sketch", &units).unwrap();
+        f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        ps.features.push(f);
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+        let res = &r.context.sketches[0];
+        assert!(res.report.conflicting().contains(&lb), "{:?}", res.report.status);
+        let len = res.sketch.curve(b).unwrap().length();
+        assert!((len - 0.032).abs() < 1e-12, "the last solved shape stays: {len}");
     }
 
     #[test]
