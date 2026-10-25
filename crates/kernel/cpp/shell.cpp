@@ -574,7 +574,13 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
       n.Reverse();
     if (f.Orientation() == TopAbs_REVERSED)
       n.Reverse();
-    const gp_Pnt o  = a.Plane().Location().Translated(gp_Vec(n) * -t);
+    // The offset plane, about the solid's centre: the plane's own origin may
+    // lie far from the face (an extruded sketch's caps keep the sketch's
+    // origin; fs's std_reference shellTop at x = 900 lost its floor when the
+    // half-space was centred there, 2220 vs live 2653.5 mm3).
+    const gp_Pnt mid(0.5 * (x0 + x1), 0.5 * (y0 + y1), 0.5 * (z0 + z1));
+    const gp_Pnt on = a.Plane().Location().Translated(gp_Vec(n) * -t);
+    const gp_Pnt o  = mid.Translated(gp_Vec(n) * gp_Vec(mid, on).Dot(gp_Vec(n)));
     gp_Ax3       ax(o, n);
     gp_Pnt       c0 = o.Translated(gp_Vec(ax.XDirection()) * -big + gp_Vec(ax.YDirection()) * -big);
     TopoDS_Shape hs = BRepPrimAPI_MakeBox(gp_Ax2(c0, n, ax.XDirection()), 2 * big, 2 * big, big).Shape();
