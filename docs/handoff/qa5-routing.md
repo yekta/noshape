@@ -434,3 +434,9 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - **MULTI-MENU (psb)** multi-row menu: add "Edit sketch appearance…" when a sketch is selected.
 - Pending live s8: invalid reorder handling (ours: red toast "Cannot reorder: … depends on …"), folder expand as an undo step,
   geometry-hover → row highlight, folder menu.
+
+## qa4 QA round 5 v3 s9: interaction (P1; v0.4.8) — qa-round-5.md "v3 Session 9"
+- **BOX-PREHIGHLIGHT (psb)** crossing box: pre-highlight everything it touches while dragging (live).
+- **SELECT-OTHER (psb/ui2)** popup: header ✕, no type column, no preselected row, hovered row bold, "?" footer (live sketch/231).
+- Pending live s9: global selection filter, parts-row "Hide other/all parts", Measure panel default unit, Point readout axis
+  icons, section manipulator, edge midpoint marker.

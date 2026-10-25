@@ -32,6 +32,29 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 9 on v0.4.8 (release tarball): interaction (r5/v3s9.py: Part 1 = block 60×40×20 with a Ø10 hole and an R5 vertical fillet, 46321.903 mm³; Part 2 = cylinder Ø16×30, 6031.858 mm³; live "Selection colours", "Box select", "Right-click menus", "Measure & mass properties", "Section view", "Isolate / Make transparent")
+Nothing felt slow: hover, picks, box selection, Select other, menus and panels were all immediate; section drag updated live.
+Same as live ✅: face hover = light-orange boundary only (hole loop too); edge hover = thick light orange; vertex hover = dot;
+edge click → amber + "Length: 60.000 mm"; click at the edge midpoint selects the point ("Point: 30.000 mm 0.000 mm 20.000 mm");
+window box (light-blue fill, blue border) selects only what's fully inside (whole block); crossing box (light-yellow fill,
+dashed amber border) selects what it touches; face and edge right-click menus = live's lists (Add comment = cloud); Measure:
+"Min dist: 22.000 mm" readout, panel with chips, Measure type / units / reference CS and rows (Area 3824.060 mm² = top face
+2316.1 + cylinder side 1508.0 ✓); Mass and section properties (Part | Face, fields, "One or more parts do not have a material
+defined." toast, Volume 52353.761 = both parts); Section view from a face's menu: "Section plane 1 (Face of Extrude 1)", tan
+hatched preview cut on both parts, drag → inline "-18.543 mm" box, ✓ → hatched in the part colour, empty-space menu gains
+"Edit section view…" (reopens with the plane and offset) and "Turn off section view"; Isolate / Make transparent dialog (✕ only,
+Transparency controls + checkbox + slider, Component controls "Expand: distance" + slider, ?), Isolate ghosts the rest and the
+planes, Make transparent ghosts the picked part; Hide → eye-slash + grey row, "Show all" in the empty-space menu.
+- **R5v3-S9-a → BOX-PREHIGHLIGHT (psb)** while dragging a crossing (right→left) box nothing it touches is pre-highlighted;
+  live pre-highlights everything it touches light orange (planes included).
+- **R5v3-S9-b → SELECT-OTHER (psb/ui2)** ours: header "Select other" without ✕, a grey type column ("Edge"/"Face") before each
+  name, a row preselected blue, hover = grey row background, no footer; live (sketch/231): bold header + red ✕, bordered list
+  with plain rows ("Edge of Sketch 2", "Face of Sketch 2", …), the hovered row **bold** (no fill), "?" footer.
+- Pending live ("qa4 round 5 s9 interaction"): a global selection filter (ours has none), "Hide other parts" / "Hide all parts" in
+  the parts-row menu (ours has both; live's recorded list doesn't), the Measure panel's default unit in a mm document (ours
+  Millimeter; live's notes say Inch), axis icons in the Point readout (ours none), the section manipulator (ours: arrow only;
+  live notes: arrow + rotate glyph + ring), the edge midpoint marker (ours shows a filled dot anywhere along the hovered edge).
+
 ## v3 Session 8 on the published v0.4.8 (tag 2bf78a67 = gate c7d9d454 + two CI-test commits; release tarball, not a local build): the feature list on the 30-feature part (r5/v3s2.py; live "Feature-list row states", "ui (10-22 d) feature-row tooltips")
 Timings (spinner gone): Suppress Extrude 1 0.56 s, Unsuppress 0.50 s, valid drag reorder (Plane 1 above Sketch 1) 0.62 s,
 undo / redo / undo of it 0.37 / 0.55 / 0.57 s, Delete Boss sketch 1 0.41 s and its undo 0.63 s, folder Suppress 0.54 s and its
