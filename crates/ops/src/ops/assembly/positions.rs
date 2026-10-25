@@ -132,7 +132,7 @@ fn quantity(v: &Value, dim: Dim, units: &UnitPrefs, field: &str) -> Result<f64, 
 
 /// Commit with `solved` in place of the current solution (the app's
 /// apply_solved followed by an edit).
-fn commit_solved(od: &mut OpenDoc, tab: TabId, desc: &str, mut result: AssemblyResult, solved: noshape_model::assembly::eval::Solved, f: impl FnOnce(&mut Assembly)) -> Result<(), OpError> {
+pub(super) fn commit_solved(od: &mut OpenDoc, tab: TabId, desc: &str, mut result: AssemblyResult, solved: noshape_model::assembly::eval::Solved, f: impl FnOnce(&mut Assembly)) -> Result<(), OpError> {
     result.solved = solved;
     commit(od, tab, desc, &result, f)
 }

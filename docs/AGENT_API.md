@@ -1610,6 +1610,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
+| `copy` | boolean |  | Part Studio: the Variables panel's Copy table, `copied` being the text it puts on the clipboard (a header row, then name, type, value, description per variable, tab-separated). A row's Copy copies its description (`description` here). |
 
 #### variable_create
 
@@ -2015,7 +2016,7 @@ Examples:
 | `source` | string | required | Part Studio or Assembly tab (name or id) to insert from. |
 | `part` | string |  | A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio as one instance. |
 | `sketch` | string |  | A sketch of that Part Studio (feature id or name): the Insert dialog's sketches. |
-| `configuration` | object |  | Configuration of the source: {input id: value}. |
+| `configuration` | object or string |  | Configuration of the source: {input id: value}, or the Insert dialog's "default" (Reset to default) / "last_viewed" (Set to last viewed: the configuration the source shows). |
 
 #### assembly_list
 
@@ -2112,6 +2113,7 @@ Examples:
 | `limits` | object |  | Limits: {"<axis>": {"min": expr, "max": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone). |
 | `tangent_propagation` | boolean |  | Tangent mates: Tangent propagation. |
 | `solve_all` | boolean |  | Solve every mate (the dialog's Solve) instead of only moving this mate's first instance. |
+| `reset` | boolean |  | With `mate`: the mate menu's Reset, its degrees of freedom back to 0 ("Reset : <mate>"; not Fastened, Tangent or Width). |
 
 #### assembly_transform
 
@@ -2245,6 +2247,7 @@ Examples:
 | `show_excluded` | boolean |  | Show excluded and suppressed items. |
 | `show_top_level` | boolean |  | Show the top level assembly row. |
 | `csv` | string |  | Write the table to this CSV file. |
+| `copy` | boolean |  | Copy table (the BOM's ⋯ menu): `copied` is the text it puts on the clipboard (tab-separated rows), with its toast message. |
 
 #### assembly_bom_settings
 

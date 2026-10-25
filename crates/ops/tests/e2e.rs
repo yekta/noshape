@@ -198,6 +198,10 @@ fn assembly_with_mates() {
     assert_eq!(mj["limits"]["rz"], json!({ "min": "-30 deg", "max": "45 deg" }), "{mj}");
     assert_eq!(mj["offset"]["z"], "5 mm", "{mj}");
     assert_eq!(mj["reorient_secondary"], 1, "{mj}");
+    // Mate menu › Reset: its rotation back to 0, one edit.
+    call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "reset": true }));
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Reset : Revolute 1");
     assert_eq!(mj["type"], "revolute", "the type kept: {mj}");
     // Limits the mate type doesn't have are refused.
     let err = try_call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "limits": { "x": { "min": "0 mm" } } })).unwrap_err();
@@ -724,6 +728,10 @@ fn assembly_patterns_bom_interference() {
     let qty: Vec<u64> = bom["rows"].as_array().unwrap().iter().map(|r| r["quantity"].as_u64().unwrap()).collect();
     assert_eq!(qty, vec![1, 3], "{bom}");
     assert!(std::fs::read_to_string(&csv).unwrap().starts_with("Item,Quantity"));
+    // ⋯ › Copy table: the clipboard text, tab-separated.
+    let copy = call(&mut ctx, "assembly_bom", json!({ "copy": true }));
+    assert!(copy["copied"].as_str().unwrap().starts_with("Item\tQuantity"), "{copy}");
+    assert!(copy["message"].as_str().unwrap().ends_with("BOM table copied to clipboard."), "{copy}");
     let s = call(&mut ctx, "assembly_bom_settings", json!({ "columns": ["Item", "Quantity", "Material", "Part number", "Description"] }));
     assert_eq!(s["columns"], json!(["Item", "Quantity", "Material", "Part number", "Description"]), "{s}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 3 }));
@@ -3444,4 +3452,23 @@ fn window_navigation() {
     let p = call(&mut ctx, "drawing_sheets_panel", json!({ "drawing": tab, "open": false }));
     assert_eq!(p["sheets"][1]["shown"], true, "{p}");
     assert!(state(&mut ctx)["sheets_panel_open"].as_array().unwrap().is_empty());
+}
+
+/// The Insert dialog's configuration menu (Reset to default, Set to last
+/// viewed) and the Variables panel's Copy table.
+#[test]
+fn insert_configuration_menu_and_variable_table_copy() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "insert_config_menu.noshape");
+    for c in ["default", "last_viewed"] {
+        let r = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "configuration": c }));
+        assert!(r["instance"].is_string(), "{c}: {r}");
+    }
+    let e = try_call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "configuration": "nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("configuration"), "{e:?}");
+    call(&mut ctx, "variable_create", json!({ "name": "w", "value": "20 mm", "description": "Width" }));
+    let v = call(&mut ctx, "variable_list", json!({ "copy": true }));
+    let text = v["copied"].as_str().unwrap();
+    assert!(text.starts_with("Name\tVariable type\tValue\tDescription\n"), "{v}");
+    assert!(text.lines().any(|l| l.starts_with("w\tLength\t") && l.ends_with("\tWidth")), "{v}");
 }

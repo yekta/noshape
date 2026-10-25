@@ -89,3 +89,22 @@ pub fn kind_label(k: VarKind) -> &'static str {
         VarKind::FromImport => "From import",
     }
 }
+
+/// A Part Studio variable table's Copy table (the Variables panel's menu):
+/// a header row, then each active variable's name, type, value and
+/// description, tab-separated. Shared by the panel and the agent API.
+pub fn part_studio_table_text(ps: &noshape_model::partstudio::PartStudio) -> String {
+    let kind = |k: &str| match k {
+        "ANGLE" => "Angle",
+        "NUMBER" => "Number",
+        "ANY" => "Any",
+        "MEASURED" => "Measured",
+        "TABLE" => "From import",
+        _ => "Length",
+    };
+    let mut lines = vec!["Name\tVariable type\tValue\tDescription".to_string()];
+    for r in noshape_model::variable_table::active_rows(ps) {
+        lines.push(format!("{}\t{}\t{}\t{}", r.name, kind(&r.kind), r.value, r.description));
+    }
+    lines.join("\n")
+}

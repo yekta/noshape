@@ -77,6 +77,7 @@ pub fn ops() -> Vec<Op> {
                 opt("show_excluded", json!({ "type": "boolean" }), "Show excluded and suppressed items."),
                 opt("show_top_level", json!({ "type": "boolean" }), "Show the top level assembly row."),
                 opt("csv", s(), "Write the table to this CSV file."),
+                opt("copy", json!({ "type": "boolean" }), "Copy table (the BOM's ⋯ menu): `copied` is the text it puts on the clipboard (tab-separated rows), with its toast message."),
             ],
             mutates: false,
             destructive: false,
@@ -378,6 +379,10 @@ fn bom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         })
         .collect();
     let mut out = json!({ "type": settings.bom_type.label(), "columns": settings.columns.iter().map(|c| c.label()).collect::<Vec<_>>(), "rows": rows });
+    if a.bool_or("copy", false)? {
+        out["copied"] = json!(bom::table_text(d, &result, &lines, &settings, false));
+        out["message"] = json!(format!("{} BOM table copied to clipboard.", settings.bom_type.label()));
+    }
     if let Some(path) = a.opt_str("csv")? {
         let text = bom::table_text(d, &result, &lines, &settings, true);
         std::fs::write(path, text).map_err(|e| OpError::param("csv", &e.to_string()))?;

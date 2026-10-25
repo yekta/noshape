@@ -39,7 +39,7 @@ pub fn ops() -> Vec<Op> {
                 req("source", s(), "Part Studio or Assembly tab (name or id) to insert from."),
                 opt("part", s(), "A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio as one instance."),
                 opt("sketch", s(), "A sketch of that Part Studio (feature id or name): the Insert dialog's sketches."),
-                opt("configuration", json!({ "type": "object" }), "Configuration of the source: {input id: value}."),
+                opt("configuration", json!({ "type": ["object", "string"] }), "Configuration of the source: {input id: value}, or the Insert dialog's \"default\" (Reset to default) / \"last_viewed\" (Set to last viewed: the configuration the source shows)."),
             ],
             mutates: true,
             destructive: false,
@@ -109,6 +109,7 @@ pub fn ops() -> Vec<Op> {
                 opt("limits", json!({ "type": "object" }), "Limits: {\"<axis>\": {\"min\": expr, \"max\": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone)."),
                 opt("tangent_propagation", json!({ "type": "boolean", "default": true }), "Tangent mates: Tangent propagation."),
                 opt("solve_all", json!({ "type": "boolean" }), "Solve every mate (the dialog's Solve) instead of only moving this mate's first instance."),
+                opt("reset", json!({ "type": "boolean" }), "With `mate`: the mate menu's Reset, its degrees of freedom back to 0 (\"Reset : <mate>\"; not Fastened, Tangent or Width)."),
             ],
             mutates: true,
             destructive: false,
@@ -354,7 +355,13 @@ fn instance_extras(v: &mut Value, i: &noshape_model::assembly::Instance) {
 fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let src = doc::find_tab(od.doc(), a.str("source")?).map_err(|e| e.with_param("source"))?;
-    let config = super::config_arg(a)?;
+    // The Insert dialog's configuration menu: Reset to default / Set to last viewed (the source's chosen one).
+    let config = match a.get("configuration") {
+        Some(Value::String(s)) if s == "default" => Default::default(),
+        Some(Value::String(s)) if s == "last_viewed" => od.active_config.get(&src).cloned().unwrap_or_default(),
+        Some(Value::String(_)) => return Err(OpError::param("configuration", "{input id: value}, \"default\" or \"last_viewed\"")),
+        _ => super::config_arg(a)?,
+    };
     let src_name = od.doc().tab(src).map(|t| t.name.clone()).unwrap_or_default();
     let result = solve(od, tab, &SolveOptions::default())?;
     let id = match &od.doc().tab(src).map(|t| &t.content) {
@@ -642,6 +649,19 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(key) => Some(find_mate(&asm, key)?),
         None => None,
     };
+    // Mate menu › Reset: solved with its values held at 0 (as the view's reset_mate).
+    if a.bool_or("reset", false)? {
+        let id = editing.ok_or_else(|| OpError::param("mate", "required with `reset`"))?;
+        let m = asm.mates.iter().find(|m| m.id == id).cloned().expect("found");
+        if matches!(m.mate_type, MateType::Fastened | MateType::Tangent | MateType::Width) {
+            return Err(OpError::param("reset", "Fastened, Tangent and Width mates have no values to reset"));
+        }
+        let solved = before.prepared.solve(&SolveOptions { locks: vec![(id, [0.0; 4])], ..Default::default() });
+        positions::commit_solved(od, tab, &format!("Reset : {}", m.name), before, solved, |_| {})?;
+        let mut v = describe(od, tab)?;
+        v["mate"] = json!(format!("mate:{}", id.0));
+        return Ok(v.into());
+    }
     let old = editing.and_then(|id| asm.mates.iter().find(|m| m.id == id).cloned());
     let mate_type = match (a.opt_str("type")?, &old) {
         (Some(ty), _) => MateType::ALL.into_iter().find(|t| mate_type_id(*t) == ty.to_lowercase().replace([' ', '_'], "")).ok_or_else(|| OpError::param("type", "unknown mate type"))?,
