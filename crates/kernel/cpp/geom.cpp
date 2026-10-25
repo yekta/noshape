@@ -35,6 +35,8 @@
 #include <gp_Cylinder.hxx>
 #include <gp_Elips.hxx>
 #include <gp_Lin.hxx>
+#include <IntCurvesFace_ShapeIntersector.hxx>
+#include <IntCurveSurface_TransitionOnCurve.hxx>
 #include <gp_Sphere.hxx>
 #include <gp_Torus.hxx>
 
@@ -635,6 +637,31 @@ double angle_between(const OcShape& a, const OcShape& b)
     ang = std::abs(M_PI / 2.0 - ang);
   }
   return ang;
+}
+
+// The line p + t dir (t in [0, len]) against the faces of s: per crossing
+// t, the transition (1 into the material, -1 out of it, 0 tangent) and
+// whether it is on a face's boundary (1) or inside the face (0).
+rust::Vec<double> line_crossings(const OcShape& s, P3 p, P3 dir, double len)
+{
+  require_non_null(s.shape, "shape");
+  const gp_Vec d(dir.x, dir.y, dir.z);
+  if (d.Magnitude() < 1e-12 || !(len > 0))
+    fail_invalid("line needs a direction and a length");
+  IntCurvesFace_ShapeIntersector it;
+  it.Load(s.shape, Precision::Confusion());
+  it.Perform(gp_Lin(to_pnt(p), gp_Dir(d)), 0.0, len);
+  if (!it.IsDone())
+    fail_op("line intersection failed");
+  rust::Vec<double> out;
+  for (int i = 1; i <= it.NbPnt(); ++i)
+  {
+    out.push_back(it.WParameter(i));
+    const IntCurveSurface_TransitionOnCurve t = it.Transition(i);
+    out.push_back(t == IntCurveSurface_In ? 1.0 : t == IntCurveSurface_Out ? -1.0 : 0.0);
+    out.push_back(it.State(i) == TopAbs_ON ? 1.0 : 0.0);
+  }
+  return out;
 }
 
 int8_t classify_point(const OcShape& solid, P3 p, double tol)

@@ -1216,7 +1216,7 @@ fn point_at_fraction(samples: &[DVec3], t: f64) -> DVec3 {
 }
 
 /// Polyline with tangent fillet arcs of radius `r[i]` at corner i (0 = sharp).
-fn filleted_polyline(pts: &[DVec3], r: &[f64], closed: bool) -> FResult<Shape> {
+pub(crate) fn filleted_polyline(pts: &[DVec3], r: &[f64], closed: bool) -> FResult<Shape> {
     let n = pts.len();
     // Corner geometry: (tangent-in point, arc mid, tangent-out point).
     let mut corners: Vec<Option<(DVec3, DVec3, DVec3)>> = vec![None; n];
@@ -1237,12 +1237,19 @@ fn filleted_polyline(pts: &[DVec3], r: &[f64], closed: bool) -> FResult<Shape> {
             continue;
         }
         let dist = rad / (theta * 0.5).tan();
-        if dist > (a - p).length() * 0.5 + 1e-12 || dist > (b - p).length() * 0.5 + 1e-12 {
-            return err("Bend radius is too large for the routing curve segments");
-        }
         let bis = (u1 + u2).normalize();
         let c = p + bis * (rad / (theta * 0.5).sin());
         corners[i] = Some((p + u1 * dist, c - bis * rad, p + u2 * dist));
+    }
+    // A segment must hold the trims of the bends at both its ends (a bend
+    // trims both its segments by the same length; live opPolyline: [30, 30]
+    // on a 40 mm segment is POLYLINE_INVALID_BEND, [5, 25] fits).
+    let trim = |i: usize| corners[i].map_or(0.0, |(t0, _, _)| (t0 - pts[i]).length());
+    for i in 0..if closed { n } else { n - 1 } {
+        let j = (i + 1) % n;
+        if trim(i) + trim(j) > (pts[j] - pts[i]).length() + 1e-12 {
+            return err("Bend radius is too large for the routing curve segments");
+        }
     }
     let mut edges = Vec::new();
     let segs = if closed { n } else { n - 1 };

@@ -121,8 +121,10 @@ pub struct CtxState {
     /// FeatureScript-only variables (values that are not quantities).
     pub variables: BTreeMap<String, Value>,
     pub attributes: Vec<(Reference, Value)>,
-    /// `debug()` entities (shown highlighted while the feature is edited).
-    pub debug_entities: Vec<Reference>,
+    /// `debug()` entities as they were when debugged (std debugs points,
+    /// lines and arrows of sub-features it then aborts) and their colours
+    /// (sRGB), shown while the feature is edited.
+    pub debug_entities: Vec<(noshape_kernel::Shape, [u8; 3])>,
     /// Sketches being built (`newSketch` .. `skSolve`), by sketch id.
     pub sketches: HashMap<FsId, sketch::SketchBuild>,
     /// String entity ids of FeatureScript sketches.
