@@ -330,19 +330,12 @@ impl AssemblyView {
     /// assembly as it is now around the context's primary instance (or
     /// this one); features referencing it regenerate.
     pub(super) fn update_context(&mut self, top: InstanceId, studio: TabId, id: u32, cx: &mut Context<Self>) {
-        let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let name_of = |p: &noshape_model::assembly::eval::InstancePath| names.get(&p[0]).cloned().unwrap_or_default();
+        let Some(asm) = self.assembly(cx).cloned() else { return };
         let Some(TabContent::PartStudio(ps)) = self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) else { return };
         let Some(old) = ps.contexts.iter().find(|c| c.id == id).cloned() else { return };
-        let primary: Vec<InstanceId> = match old.primary.first() {
-            Some(p) if names.contains_key(&InstanceId(*p)) => old.primary.iter().map(|i| InstanceId(*i)).collect(),
-            _ => vec![top],
-        };
-        let Some(mut fresh) = noshape_model::in_context::snapshot(&self.result, self.tab, id, &old.name, &primary, &name_of) else { return };
-        fresh.revision = old.revision + 1;
-        fresh.hidden = old.hidden.clone();
+        let Some(fresh) = noshape_ops::in_context::refreshed(&old, &self.result, &asm, Some(top)) else { return };
         self.doc.update(cx, |d, cx| {
-            d.edit_document(&format!("Update context : {}", old.name), cx, |doc| {
+            d.edit_document(&noshape_ops::in_context::update_description(&old.name), cx, |doc| {
                 if let Some(TabContent::PartStudio(ps)) = doc.tab_mut(studio).map(|t| &mut t.content)
                     && let Some(c) = ps.contexts.iter_mut().find(|c| c.id == id)
                 {
@@ -486,7 +479,7 @@ impl AssemblyView {
             _ => None,
         };
         let camera = Some(self.camera_in(to_studio, cx));
-        let context = self.add_assembly_context(studio, Some(top), existing, to_studio, cx);
+        let context = self.add_assembly_context(studio, Some(top), existing, to_studio, None, cx);
         cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::part_studio::AssemblyContext { assembly: self.tab, assembly_name, part, occurrences, insert_at: None, camera, context })));
     }
 
@@ -494,44 +487,19 @@ impl AssemblyView {
     /// context: the one of this assembly with the same primary instance, or
     /// a new "Context N". Not undoable (Onshape keeps it only once a
     /// feature references it, see `PartStudioView::exit_context`).
-    fn add_assembly_context(&mut self, studio: TabId, primary: Option<InstanceId>, existing: Option<u32>, to_studio: glam::DMat4, cx: &mut Context<Self>) -> Option<u32> {
+    fn add_assembly_context(&mut self, studio: TabId, primary: Option<InstanceId>, existing: Option<u32>, to_studio: glam::DMat4, origin: Option<Placement>, cx: &mut Context<Self>) -> Option<u32> {
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
         let name_of = |p: &noshape_model::assembly::eval::InstancePath| names.get(&p[0]).cloned().unwrap_or_default();
-        let asm_tab = self.tab;
         let primary_path = primary.map(|p| vec![p]);
-        let existing = match self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) {
-            Some(TabContent::PartStudio(ps)) => existing.filter(|id| ps.contexts.iter().any(|c| c.id == *id && c.assembly == asm_tab)),
-            _ => return None,
-        };
-        let new_context = match existing {
-            Some(_) => None,
-            None => {
-                let (id, name) = match self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) {
-                    Some(TabContent::PartStudio(ps)) => {
-                        let referenced = noshape_model::in_context::referenced_contexts(&ps.features);
-                        let kept: Vec<_> = ps.contexts.iter().filter(|c| referenced.contains(&c.id)).cloned().collect();
-                        noshape_model::in_context::next_context(&kept)
-                    }
-                    _ => return None,
-                };
-                Some(match &primary_path {
-                    Some(p) => noshape_model::in_context::snapshot(&self.result, asm_tab, id, &name, p, &name_of)?,
-                    None => noshape_model::in_context::snapshot_with(&self.result, asm_tab, id, &name, to_studio, None, &name_of),
-                })
-            }
-        };
-        let id = existing.or(new_context.as_ref().map(|c| c.id))?;
+        let Some(TabContent::PartStudio(ps)) = self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) else { return None };
+        let (id, mut new_context) = noshape_ops::in_context::context_for(ps, &self.result, self.tab, primary_path.as_ref(), existing, to_studio, &name_of)?;
+        if let Some(c) = &mut new_context {
+            c.origin = origin;
+        }
         self.doc.update(cx, |d, cx| {
             d.edit_document_not_undoable("Edit in context", cx, |doc| {
                 if let Some(TabContent::PartStudio(ps)) = doc.tab_mut(studio).map(|t| &mut t.content) {
-                    if let Some(c) = new_context {
-                        // Contexts no feature references don't persist
-                        // (Onshape); a new one replaces them.
-                        let referenced = noshape_model::in_context::referenced_contexts(&ps.features);
-                        ps.contexts.retain(|c| referenced.contains(&c.id));
-                        ps.contexts.push(c);
-                    }
-                    ps.active_context = Some(id);
+                    noshape_ops::in_context::install(ps, id, new_context);
                 }
             })
         });
@@ -901,17 +869,25 @@ impl AssemblyView {
 // ---------------------------------------------------------------- Create Part Studio in context
 
 impl AssemblyView {
-    /// Toolbar / Origin row › Create Part Studio in context…: the "Origin
-    /// of new Part Studio" dialog, its field pre-filled with the Origin.
-    pub(super) fn open_ps_in_context(&mut self, cx: &mut Context<Self>) {
-        self.ui.ps_in_context = Some(None);
+    /// Toolbar (empty field) / Origin row › Create Part Studio in context…
+    /// (prefilled with the Origin): the "Origin of new Part Studio" dialog.
+    pub(super) fn open_ps_in_context(&mut self, prefill_origin: bool, cx: &mut Context<Self>) {
+        self.ui.ps_in_context = Some(if prefill_origin { behaviors::PsOrigin::Origin } else { behaviors::PsOrigin::Unset });
         cx.notify();
     }
 
     /// ✓: a new Part Studio whose origin sits at the chosen connector, opened
     /// with the assembly as context graphics.
     pub(super) fn accept_ps_in_context(&mut self, cx: &mut Context<Self>) {
-        let Some(origin) = self.ui.ps_in_context.take() else { return };
+        let origin = match self.ui.ps_in_context.take() {
+            // Live: ✓ with nothing picked just closes the dialog.
+            None | Some(behaviors::PsOrigin::Unset) => {
+                cx.notify();
+                return;
+            }
+            Some(behaviors::PsOrigin::Origin) => None,
+            Some(behaviors::PsOrigin::Connector(id)) => Some(id),
+        };
         let frame = origin.and_then(|id| self.result.connector_frame(id)).unwrap_or_default();
         let to_studio = noshape_model::assembly::eval::frame_matrix(&frame).inverse();
         let after = self.tab;
@@ -941,7 +917,7 @@ impl AssemblyView {
         let assembly_name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
         let insert_at = Some(frame_to_placement(&frame));
         let camera = Some(self.camera_in(to_studio, cx));
-        let context = self.add_assembly_context(studio, None, None, to_studio, cx);
+        let context = self.add_assembly_context(studio, None, None, to_studio, insert_at, cx);
         cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::part_studio::AssemblyContext { assembly: self.tab, assembly_name, part: None, occurrences, insert_at, camera, context })));
         cx.notify();
     }
@@ -954,16 +930,13 @@ impl AssemblyView {
             Some(noshape_model::TabContent::PartStudio(ps)) => ps.features.iter().map(|f| (f.id, f.name.clone())).collect(),
             _ => HashMap::new(),
         };
+        let parts: Vec<(BodyId, String)> = parts.into_iter().map(|b| {
+            let n = names.get(&b).cloned().unwrap_or_else(|| "Part".into());
+            (b, n)
+        }).collect();
+        let sketches: Vec<(FeatureId, String)> = sketches.into_iter().map(|f| (f, sketch_names.get(&f).cloned().unwrap_or_else(|| "Sketch".into()))).collect();
         self.edit("Insert and go to assembly", cx, |a| {
-            let sources = parts.iter().map(|b| (names.get(b).map(|s| s.as_str()).unwrap_or("Part"), InstanceSource::Part { studio, body: b.clone(), config: ConfigValues::default() }));
-            let sketch_sources = sketches.iter().map(|f| (sketch_names.get(f).map(|s| s.as_str()).unwrap_or("Sketch"), InstanceSource::Sketch { studio, sketch: *f, config: ConfigValues::default() }));
-            for (base, source) in sources.chain(sketch_sources) {
-                let id = InstanceId(a.next_id());
-                let name = a.next_instance_name(base);
-                let mut inst = Instance::new(id, name, source, at);
-                inst.hidden = false;
-                a.instances.push(inst);
-            }
+            noshape_ops::in_context::insert_from_context(a, studio, &parts, &sketches, at);
         });
         self.refresh_scene(true, cx);
     }
@@ -972,11 +945,8 @@ impl AssemblyView {
     pub(super) fn render_ps_in_context_dialog(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let origin = *self.ui.ps_in_context.as_ref()?;
         let pal = p();
-        let label = match origin {
-            None => "Origin".to_string(),
-            Some(id) => self.assembly(cx).and_then(|a| a.connector(id).map(|c| c.name.clone())).unwrap_or_else(|| "Origin".into()),
-        };
-        let chip = h_flex()
+        let label = origin.chip(|id| self.assembly(cx).and_then(|a| a.connector(id).map(|c| c.name.clone())));
+        let chip = label.map(|label| h_flex()
             .h(px(24.))
             .pl(px(6.))
             .pr(px(5.))
@@ -993,10 +963,10 @@ impl AssemblyView {
                     .tooltip(crate::ui::tooltip(format!("Delete {label}")))
                     .child("×")
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.ui.ps_in_context = Some(None);
+                        this.ui.ps_in_context = Some(behaviors::PsOrigin::Unset);
                         cx.notify();
                     })),
-            );
+            ));
         Some(
             v_flex()
                 .w(px(220.))
@@ -1045,7 +1015,7 @@ impl AssemblyView {
                             .border_color(rgb(0x1651b0))
                             .bg(rgb(0xdef1fb))
                             .child(div().px(px(6.)).pt(px(6.)).pb(px(2.)).text_size(px(12.)).text_color(rgb(0x555555)).child("Select origin/mate connector"))
-                            .child(chip),
+                            .children(chip),
                     ),
                 )
                 .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(help_dot()))

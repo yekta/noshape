@@ -1,7 +1,7 @@
 //! Every UI command has an agent operation (or is listed as planned or
 //! UI-only), checked against the app's own command registries.
 
-use noshape_ops::coverage::{Cover, SHORTCUTS};
+use noshape_ops::coverage::{Cover, MENUS, SHORTCUTS};
 use noshape_ops::{registry, values};
 use std::collections::BTreeSet;
 
@@ -72,10 +72,113 @@ fn every_ui_command_is_listed() {
     }
 }
 
-/// Coverage only goes up: lower `PLANNED_CEILING` as operations land.
+/// The menu item labels of the app's sources, by area (see
+/// `coverage::MENUS`): `item("…")`, `icon_item("…")`, `OsMenuItem::new("…")`.
+fn menu_labels() -> BTreeSet<String> {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../app/src");
+    let mut files: Vec<(String, std::path::PathBuf)> = Vec::new();
+    for e in std::fs::read_dir(&src).expect("app sources").flatten() {
+        let name = e.file_name().to_string_lossy().to_string();
+        let area = if name.starts_with("assembly_") {
+            "assembly"
+        } else if name.starts_with("drawing_") {
+            "drawing"
+        } else if name.starts_with("variable_") || name == "history_panel.rs" {
+            "document"
+        } else if name == "feature_dialog.rs" {
+            "partStudio"
+        } else if name == "camera_menu.rs" {
+            "view"
+        } else {
+            continue;
+        };
+        files.push((area.into(), e.path()));
+    }
+    for e in std::fs::read_dir(src.join("part_studio")).expect("part studio sources").flatten() {
+        files.push(("partStudio".into(), e.path()));
+    }
+    let mut out = BTreeSet::new();
+    for (area, path) in files {
+        let text = std::fs::read_to_string(&path).expect("read source");
+        for pat in ["item(\"", "OsMenuItem::new(\""] {
+            let mut from = 0;
+            while let Some(k) = text[from..].find(pat) {
+                let at = from + k;
+                from = at + pat.len();
+                // `item(` alone or as `icon_item(`, not inside another name.
+                if pat.starts_with("item") {
+                    let before = text[..at].chars().next_back().unwrap_or(' ');
+                    if (before.is_alphanumeric() || before == '_') && !text[..at].ends_with("icon_") {
+                        continue;
+                    }
+                }
+                let rest = &text[from..];
+                let mut end = 0;
+                let b = rest.as_bytes();
+                while end < b.len() && !(b[end] == b'"' && (end == 0 || b[end - 1] != b'\\')) {
+                    end += 1;
+                }
+                out.insert(format!("{area}:{}", &rest[..end]));
+            }
+        }
+    }
+    out
+}
+
+/// Every operation of the required groups has examples; each is a JSON
+/// object naming only the operation's fields, with every required one.
+#[test]
+fn every_operation_has_examples() {
+    use noshape_ops::examples;
+    for (tool, list) in examples::EXAMPLES {
+        let op = registry::by_tool_name(tool).unwrap_or_else(|| panic!("examples for unknown operation {tool}"));
+        for e in *list {
+            let v: serde_json::Value = serde_json::from_str(e).unwrap_or_else(|err| panic!("{tool}: example {e} isn't JSON: {err}"));
+            let o = v.as_object().unwrap_or_else(|| panic!("{tool}: example {e} isn't an object"));
+            for k in o.keys() {
+                assert!(op.fields.iter().any(|f| f.name == k), "{tool}: example {e} names `{k}`, not a field");
+            }
+            for f in op.fields.iter().filter(|f| f.required) {
+                assert!(o.contains_key(f.name), "{tool}: example {e} lacks required `{}`", f.name);
+            }
+        }
+    }
+    let missing: Vec<String> = registry::all().iter().filter(|o| examples::REQUIRED_GROUPS.contains(&o.group) && examples::of(&o.tool_name()).is_empty()).map(|o| o.tool_name()).collect();
+    assert!(missing.is_empty(), "operations without examples (crates/ops/src/examples.rs): {missing:?}");
+}
+
+#[test]
+fn every_menu_item_is_listed() {
+    let labels = menu_labels();
+    assert!(labels.len() > 300, "parsed {} menu labels; did the menus change shape?", labels.len());
+    let listed: BTreeSet<&str> = MENUS.iter().map(|(id, _)| *id).collect();
+    let missing: Vec<&String> = labels.iter().filter(|l| !listed.contains(l.as_str())).collect();
+    assert!(missing.is_empty(), "menu items with no entry in crates/ops/src/coverage.rs MENUS: {missing:?}");
+    let stale: Vec<&&str> = listed.iter().filter(|l| !labels.contains(**l)).collect();
+    assert!(stale.is_empty(), "MENUS lists items the UI no longer has: {stale:?}");
+    for (id, c) in MENUS {
+        if let Cover::Op(t) = c {
+            assert!(tool_exists(t), "{id}: no operation `{t}`");
+        }
+    }
+}
+
+/// Planned menu items, per area: these only go down (lower them as ops land).
+#[test]
+fn menu_coverage_report() {
+    const CEILINGS: [(&str, usize); 4] = [("partStudio", 2), ("assembly", 1), ("drawing", 13), ("document", 23)];
+    for (area, ceiling) in CEILINGS {
+        let all: Vec<&(&str, Cover)> = MENUS.iter().filter(|(id, _)| id.starts_with(&format!("{area}:"))).collect();
+        let planned: Vec<&str> = all.iter().filter(|c| matches!(c.1, Cover::Planned)).map(|c| c.0).collect();
+        eprintln!("{area} menus: {} items, {} planned", all.len(), planned.len());
+        assert!(planned.len() <= ceiling, "{area}: {} planned menu items ({planned:?}), ceiling {ceiling}", planned.len());
+    }
+}
+
+/// Every toolbar / shortcut command has an operation or a UI-only reason:
+/// none is left Planned.
 #[test]
 fn coverage_report() {
-    const PLANNED_CEILING: usize = 21;
     let features = feature_shortcuts().len();
     let ops = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Op(_))).count();
     let planned = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Planned)).count();
@@ -89,7 +192,8 @@ fn coverage_report() {
         features,
         registry::all().len()
     );
-    assert!(planned <= PLANNED_CEILING, "more planned commands ({planned}) than before ({PLANNED_CEILING})");
+    let left: Vec<&str> = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Planned)).map(|c| c.0).collect();
+    assert!(left.is_empty(), "shortcut commands without an operation: {left:?}");
 }
 
 /// Every built-in feature type's dialog defaults convert to the API's JSON
