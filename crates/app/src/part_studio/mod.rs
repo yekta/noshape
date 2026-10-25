@@ -949,6 +949,26 @@ impl PartStudioView {
                 scene.add_flag(id, noshape_render::scene::state::NO_PICK);
             }
         }
+        // Live (selection/10): a feature hovered in the list outlines its
+        // part's silhouette in the hover orange; its faces keep their
+        // shading and its edges stay black.
+        if let Some(f) = self.ui.list_hover.or(self.ui.list_menu).or(self.ui.insp.hover_feature) {
+            use noshape_render::state;
+            for g in self.feature_geometry(f) {
+                let face = matches!(g, Reference::Face(_));
+                if !face && !matches!(g, Reference::Edge(_)) {
+                    continue;
+                }
+                for &id in built.picks.ids_for(&g) {
+                    if let Some(s) = scene.states.get_mut(id as usize) {
+                        *s &= !state::ACCENT;
+                        if face {
+                            *s |= state::OUTLINE | state::HOVER;
+                        }
+                    }
+                }
+            }
+        }
         // Live (lp wall over 2258): the pattern's other inputs (its
         // Direction) are drawn red; the seed keeps the selection colors.
         if error_mesh.is_some()
