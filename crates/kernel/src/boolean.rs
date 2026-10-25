@@ -89,6 +89,10 @@ pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolean
     };
     let a = vec_to_list(objects);
     let t = vec_to_list(tools);
+    // The memory budget (NOSHAPE_BOOLEAN_MEMORY_MB, MB of growth; the kernel's
+    // default 4096 otherwise): read here, where the process environment is
+    // current on every platform.
+    ffi::set_memory_budget_mb(std::env::var("NOSHAPE_BOOLEAN_MEMORY_MB").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0));
     Ok(OpResult::from_ffi(ck(ffi::op_boolean(code, &a, &t, &opts.ffi()))?))
 }
 

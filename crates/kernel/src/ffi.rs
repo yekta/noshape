@@ -503,6 +503,7 @@ pub(crate) mod ffi {
         ) -> Result<OpOut>;
 
         // ---- booleans etc.
+        fn set_memory_budget_mb(mb: u64);
         fn op_boolean(
             op: u8,
             args: &OcShapeList,
