@@ -132,7 +132,7 @@ pub fn thin_profiles_sided(ev: &EvalCtx, refs: &[Reference], side: WallSide) -> 
         }
     }
     if out.is_empty() {
-        return err("Select edges or faces to define the path of the thin wall");
+        return err("Select edges or faces to define the path of the thin wall.");
     }
     Ok(out)
 }

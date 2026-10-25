@@ -981,3 +981,98 @@ fn mate_connector_follows_its_owner() {
     let after = s.ok().context.connectors[0].origin;
     assert!(vnear(after - before, DVec3::new(0.01, 0.0, 0.0)), "{:?}", after - before);
 }
+
+/// qa5 SF5: Move boundary on one edge of a planar surface moves only that
+/// edge (live: 800 + 200 mm² for one 20 mm edge of a 40 × 20 fill, 10 mm).
+#[test]
+fn move_boundary_of_one_edge_moves_only_it() {
+    let mut s = block();
+    let r = s.ok();
+    let top = top_face(&r);
+    let off = s.add("offsetSurface", move |p| {
+        p.set("surfacesAndFaces", ParamValue::Query(vec![top]));
+        p.set("offset", expr("10 mm"));
+    });
+    let r = s.ok();
+    let sf = r.context.bodies.iter().position(|b| b.id.feature == off).unwrap();
+    let b = &r.context.bodies[sf];
+    // The 100 mm edge at y = 0.
+    let e = b.shape.edges().iter().position(|e| {
+        let (a, c) = e.endpoints().unwrap();
+        a.y.abs() < 1e-9 && c.y.abs() < 1e-9
+    });
+    let edge = Reference::Edge((*b.edges[e.unwrap()]).clone());
+    s.add("extendSurface", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("extendDistance", expr("5 mm"));
+    });
+    let r = s.ok();
+    let sf = r.context.bodies.iter().position(|b| b.kind == BodyKind::Surface).unwrap();
+    assert!(near(surface_area(&r, sf), 0.1 * 0.055, 1e-9), "area {}", surface_area(&r, sf));
+    let bb = r.context.bodies[sf].shape.bounding_box(true).unwrap();
+    assert!(near(bb.min.y, -0.005, 1e-9) && near(bb.max.y, 0.05, 1e-9) && near(bb.min.x, 0.0, 1e-9) && near(bb.max.x, 0.1, 1e-9), "{bb:?}");
+}
+
+/// qa5 SF6: Move boundary on the straight edge of a planar surface between
+/// two arcs (40 mm chords, 10 mm sagitta, 30 mm apart: 1200 mm²), 10 mm out:
+/// the arcs run on along their tangents (live's default, Maintain curvature
+/// off), 1200 + 300 mm², one face. 10 mm in: the arcs are trimmed on their
+/// circles, 1200 - 300 mm².
+#[test]
+fn move_boundary_between_arcs_extends_them() {
+    for (dist, want) in [("10 mm", 1500e-6), ("-10 mm", 900e-6)] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = |sk: &mut noshape_sketch::Sketch, x: f64, y: f64| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3));
+        let (a, b, c, d) = (p(&mut sk, 0.0, 0.0), p(&mut sk, 40.0, 0.0), p(&mut sk, 40.0, 30.0), p(&mut sk, 0.0, 30.0));
+        let (c1, c2) = (p(&mut sk, 20.0, 15.0), p(&mut sk, 20.0, 45.0));
+        // Both arcs bulge towards -y (through (20, -10) and (20, 20)).
+        sk.add_arc_between(c1, a, b).unwrap();
+        sk.add_line_between(b, c).unwrap();
+        sk.add_arc_between(c2, d, c).unwrap();
+        sk.add_line_between(d, a).unwrap();
+        let id = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        s.extrude_largest(id, "10 mm");
+        let r = s.ok();
+        assert!(near(r.context.bodies[0].shape.volume().unwrap(), 1200e-6 * 0.01, 1e-12));
+        let top = top_face(&r);
+        let off = s.add("offsetSurface", move |p| {
+            p.set("surfacesAndFaces", ParamValue::Query(vec![top]));
+            p.set("offset", expr("10 mm"));
+        });
+        let r = s.ok();
+        let sf = r.context.bodies.iter().position(|b| b.id.feature == off).unwrap();
+        let b = &r.context.bodies[sf];
+        // The straight edge at x = 40 mm.
+        let e = b.shape.edges().iter().position(|e| {
+            let (a, c) = e.endpoints().unwrap();
+            (a.x - 0.04).abs() < 1e-9 && (c.x - 0.04).abs() < 1e-9
+        });
+        let edge = Reference::Edge((*b.edges[e.unwrap()]).clone());
+        let d = dist.to_string();
+        let again = edge.clone();
+        s.add("extendSurface", move |p| {
+            p.set("entities", ParamValue::Query(vec![edge]));
+            p.set("extendDistance", expr(&d));
+        });
+        let r = s.ok();
+        let sf = r.context.bodies.iter().position(|b| b.kind == BodyKind::Surface).unwrap();
+        assert_eq!(r.context.bodies[sf].shape.faces().len(), 1);
+        assert!(near(surface_area(&r, sf), want, 1e-10), "{dist}: area {} mm²", surface_area(&r, sf) * 1e6);
+        let bb = r.context.bodies[sf].shape.bounding_box(true).unwrap();
+        let x = if want > 1200e-6 { 0.05 } else { 0.03 };
+        assert!(near(bb.max.x, x, 1e-9), "{dist}: {bb:?}");
+        // The moved edge keeps its name: a second Move boundary of the same
+        // edge (qa5's doc: Move boundary 1, then 3) moves it on.
+        if want > 1200e-6 {
+            s.add("extendSurface", move |p| {
+                p.set("entities", ParamValue::Query(vec![again]));
+                p.set("extendDistance", expr("10 mm"));
+            });
+            let r = s.ok();
+            let sf = r.context.bodies.iter().position(|b| b.kind == BodyKind::Surface).unwrap();
+            assert!(near(surface_area(&r, sf), 1800e-6, 1e-10), "again: area {} mm²", surface_area(&r, sf) * 1e6);
+            assert!(near(r.context.bodies[sf].shape.bounding_box(true).unwrap().max.x, 0.06, 1e-9));
+        }
+    }
+}

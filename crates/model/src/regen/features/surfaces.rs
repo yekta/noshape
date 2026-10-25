@@ -237,11 +237,23 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
     }
     let refs = ev.query("entities");
     let mut bodies: Vec<usize> = Vec::new();
+    // Edges picked per body (a whole body picked: all its boundary edges).
+    let mut picked: std::collections::BTreeMap<usize, Vec<usize>> = std::collections::BTreeMap::new();
+    let mut whole: Vec<usize> = Vec::new();
     for r in refs {
         let one = std::slice::from_ref(r);
         match r {
-            Reference::Body(_) => bodies.extend(ev.resolve_bodies(one)),
-            Reference::Edge(_) => bodies.extend(ev.resolve_edges(one).into_iter().map(|(bi, _)| bi)),
+            Reference::Body(_) => {
+                let bs = ev.resolve_bodies(one);
+                whole.extend(bs.iter().copied());
+                bodies.extend(bs);
+            }
+            Reference::Edge(_) => {
+                for (bi, ei) in ev.resolve_edges(one) {
+                    bodies.push(bi);
+                    picked.entry(bi).or_default().push(ei);
+                }
+            }
             _ => {}
         }
     }
@@ -265,12 +277,196 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
         // A kernel failure reads as Onshape's EXTEND_FAILED ("Unable to move
         // selected entities."), not the kernel's own text (qa5 SF5).
         let failed = |_| FeatureError::new(crate::custom::host::error_text("EXTEND_FAILED"));
-        let moved = k::offset_wire_2d(&outer, d, k::JoinType::Intersection, false).map_err(failed)?;
-        let wire = moved.wires().into_iter().next().unwrap_or(moved);
-        let new_face = k::make_face_from_wire(&wire, true).map_err(failed)?;
+        // Only some edges picked (qa5 SF5: one edge of a 40 × 20 fill, 10 mm:
+        // only that edge moves, 1000 mm²): the picked straight edges move out
+        // in the plane, their neighbours run on to meet them.
+        let some = !whole.contains(&bi) && picked.get(&bi).is_some_and(|es| es.len() < outer.edges().len());
+        let (new_face, from) = if some {
+            let chosen: Vec<Shape> = picked[&bi].iter().filter_map(|&ei| b.shape.sub_shape(ShapeType::Edge, ei).ok()).collect();
+            let (f, from) = move_polygon_edges(face, &outer, &chosen, d, ev.bool("maintainCurvature"))?.ok_or_else(|| FeatureError::new("Move boundary currently supports straight edges of planar surfaces only"))?;
+            (f, Some(from))
+        } else {
+            let moved = k::offset_wire_2d(&outer, d, k::JoinType::Intersection, false).map_err(failed)?;
+            let wire = moved.wires().into_iter().next().unwrap_or(moved);
+            (k::make_face_from_wire(&wire, true).map_err(failed)?, None)
+        };
         let names = vec![b.faces[0].clone()];
-        let body = Body::new(b.id.clone(), b.name.clone(), b.kind, new_face, names, b.color, ev.feature);
+        let mut body = Body::new(b.id.clone(), b.name.clone(), b.kind, new_face, names, b.color, ev.feature);
+        if let Some(from) = from {
+            keep_edge_names(&mut body, &b, &from)?;
+        }
         ev.ctx.bodies[bi] = Arc::new(body);
+    }
+    Ok(())
+}
+
+/// A boundary edge of a planar face, in the boundary's direction.
+enum Side {
+    /// Through the point, along the unit direction.
+    Line(DVec3, DVec3),
+    /// On the circle (centre, radius), turning by `turn` (+1 / -1) about the
+    /// plane normal from its start to its end.
+    Arc { c: DVec3, r: f64, turn: f64 },
+}
+
+/// A planar face bounded by straight edges and circular arcs with `chosen`
+/// straight edges moved out by `d` in its plane; their neighbours run on (or
+/// back) to meet them: lines along themselves, arcs along their tangent
+/// (along their circle with `curvature`, and when trimmed) (qa5 SF5, SF6: a
+/// boundary surface's straight B-spline edge between two arcs). None when the face
+/// has another kind of boundary edge or a chosen edge isn't straight.
+/// The new face, and per new edge its middle and the boundary edge it comes
+/// from (None for an arc's tangent extension).
+type MovedFace = (Shape, Vec<(DVec3, Option<Shape>)>);
+
+fn move_polygon_edges(face: &Shape, outer: &Shape, chosen: &[Shape], d: f64, curvature: bool) -> FResult<Option<MovedFace>> {
+    let Some(pl) = face.face_plane()? else { return Ok(None) };
+    let n = pl.normal.normalize();
+    let chain = order_chain(&outer.edges(), 1e-7)?;
+    let mut sides: Vec<Side> = Vec::new();
+    let mut pts: Vec<DVec3> = Vec::new();
+    let mut moved: Vec<bool> = Vec::new();
+    for (e, reversed) in &chain {
+        let info = e.edge_info()?;
+        // In the chain's direction (order_chain walks endpoints()).
+        let (s, t) = e.endpoints()?;
+        let (a, b) = if *reversed { (t, s) } else { (s, t) };
+        // Straight: a line, or any curve on its chord within 0.1 µm (a
+        // boundary surface's straight B-spline edge).
+        let chord = info.end - info.start;
+        let straight = matches!(info.curve, k::Curve::Line { .. })
+            || chord.length() > 1e-12 && {
+                let off = |i: u32| -> FResult<f64> { Ok((e.point_at(info.first_param + (info.last_param - info.first_param) * i as f64 / 8.0)? - info.start).cross(chord.normalize()).length()) };
+                (1..8).map(off).collect::<FResult<Vec<f64>>>()?.iter().all(|&o| o < 1e-7)
+            };
+        let is_chosen = chosen.iter().any(|c| c.is_same(e));
+        let side = match info.curve {
+            _ if straight => Side::Line(a, (b - a).normalize()),
+            k::Curve::Circle { center, radius, .. } if !is_chosen && !info.closed => {
+                let mid = e.point_at((info.first_param + info.last_param) * 0.5)?;
+                let turn = if (a - center).cross(mid - center).dot(n) >= 0.0 { 1.0 } else { -1.0 };
+                Side::Arc { c: center, r: radius, turn }
+            }
+            _ => return Ok(None),
+        };
+        pts.push(a);
+        sides.push(side);
+        moved.push(is_chosen);
+    }
+    let centre = pts.iter().copied().sum::<DVec3>() / pts.len() as f64;
+    for (i, side) in sides.iter_mut().enumerate() {
+        if let (true, Side::Line(a, t)) = (moved[i], &*side) {
+            let mut out = t.cross(n).normalize();
+            if (*a - centre).dot(out) < 0.0 {
+                out = -out;
+            }
+            *side = Side::Line(*a + out * d, *t);
+        }
+    }
+    // Corner i, where side i-1 meets side i (in the plane): the end of side
+    // i-1, the start of side i, and a straight piece between them where an
+    // arc is extended along its tangent (live's default, "Maintain
+    // curvature" off) to a line moved out.
+    let m = sides.len();
+    let (mut ends, mut starts, mut bridges) = (vec![DVec3::ZERO; m], vec![DVec3::ZERO; m], vec![None; m]);
+    let line_meets_circle = |p: DVec3, u: DVec3, c: DVec3, r: f64, near: DVec3| -> Option<DVec3> {
+        let f = p - c;
+        let (bq, cq) = (f.dot(u), f.length_squared() - r * r);
+        let disc = bq * bq - cq;
+        (disc >= 0.0).then(|| {
+            let [x, y] = [-bq - disc.sqrt(), -bq + disc.sqrt()].map(|s| p + u * s);
+            if x.distance(near) <= y.distance(near) { x } else { y }
+        })
+    };
+    let line_meets_line = |p: DVec3, u: DVec3, q: DVec3, v: DVec3| -> Option<DVec3> {
+        let w = u.cross(v);
+        (w.length() >= 1e-12).then(|| p + u * ((q - p).cross(v).dot(w) / w.length_squared()))
+    };
+    for i in 0..m {
+        let j = (i + m - 1) % m;
+        let v = pts[i];
+        let (end, start, bridge) = if !moved[i] && !moved[j] {
+            (v, v, None)
+        } else {
+            match (&sides[j], &sides[i]) {
+                // Collinear neighbours: the corner stays on the moved line.
+                (Side::Line(p, u), Side::Line(q, w)) => {
+                    let x = line_meets_line(*p, *u, *q, *w).unwrap_or(if moved[i] { *q } else { *p });
+                    (x, x, None)
+                }
+                (Side::Arc { c, r, turn }, Side::Line(q, w)) | (Side::Line(q, w), Side::Arc { c, r, turn }) => {
+                    let arc_first = matches!(sides[j], Side::Arc { .. });
+                    // Out: past the arc's end, along its tangent there (or on
+                    // round its circle with Maintain curvature). In: back
+                    // along the circle.
+                    let tangent = n.cross(v - *c).normalize() * *turn;
+                    let along = line_meets_line(v, tangent, *q, *w);
+                    let outward = d > 0.0;
+                    if outward && !curvature {
+                        let Some(t) = along else { return Ok(None) };
+                        if arc_first { (v, t, Some((v, t))) } else { (t, v, Some((t, v))) }
+                    } else {
+                        let Some(x) = line_meets_circle(*q, *w, *c, *r, v) else { return Ok(None) };
+                        (x, x, None)
+                    }
+                }
+                _ => (v, v, None),
+            }
+        };
+        ends[j] = end;
+        starts[i] = start;
+        bridges[i] = bridge;
+    }
+    // In the face's plane, so that consecutive pieces share their vertices.
+    let at = |p: DVec3| pl.to_local(p);
+    let mut segs = Vec::with_capacity(2 * m);
+    let mut from = Vec::with_capacity(2 * m);
+    for i in 0..m {
+        if let Some((a, b)) = bridges[i] {
+            segs.push(k::Segment2d::Line { a: at(a), b: at(b) });
+            from.push(((a + b) * 0.5, None));
+        }
+        let (a, b) = (starts[i], ends[i]);
+        segs.push(match &sides[i] {
+            Side::Line(..) => {
+                from.push(((a + b) * 0.5, Some(chain[i].0.clone())));
+                k::Segment2d::Line { a: at(a), b: at(b) }
+            }
+            Side::Arc { c, turn, .. } => {
+                // The arc's middle, turning the same way as the original.
+                let (x, y) = ((a - *c).normalize(), n.cross((a - *c).normalize()) * *turn);
+                let mut sweep = ((b - *c).dot(y)).atan2((b - *c).dot(x));
+                if sweep <= 0.0 {
+                    sweep += std::f64::consts::TAU;
+                }
+                let h = sweep * 0.5;
+                let mid = *c + (x * h.cos() + y * h.sin()) * (a - *c).length();
+                from.push((mid, Some(chain[i].0.clone())));
+                k::Segment2d::Arc3 { a: at(a), mid: at(mid), b: at(b) }
+            }
+        });
+    }
+    let wire = k::make_wire_2d(&pl, &segs)?;
+    Ok(Some((k::make_face(&pl, &wire, &[])?, from)))
+}
+
+/// The moved surface's edges keep the names of the edges they come from (a
+/// later Move boundary of the same edge still finds it, qa5 SF6); an arc's
+/// tangent extension is named after them.
+fn keep_edge_names(body: &mut Body, old: &Body, from: &[(DVec3, Option<Shape>)]) -> FResult<()> {
+    let old_edges = old.shape.edges();
+    let mut extra = old.edges.len() as u16;
+    for (k, e) in body.shape.edges().iter().enumerate() {
+        let info = e.edge_info()?;
+        let mid = e.point_at((info.first_param + info.last_param) * 0.5)?;
+        let Some((_, src)) = from.iter().min_by(|a, b| a.0.distance(mid).total_cmp(&b.0.distance(mid))) else { continue };
+        match src.as_ref().and_then(|s| old_edges.iter().position(|o| o.is_same(s))) {
+            Some(i) => body.edges[k] = old.edges[i].clone(),
+            None => {
+                body.edges[k] = Arc::new(TopoName::Boundary { face: old.faces[0].clone(), ordinal: extra });
+                extra += 1;
+            }
+        }
     }
     Ok(())
 }

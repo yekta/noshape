@@ -673,7 +673,8 @@ fn cancelled_regeneration_is_discarded_and_superseded_one_is_reused() {
 }
 
 #[test]
-fn aborted_pattern_regeneration_stops_quickly() {
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_aborted_pattern_regeneration_stops_quickly() {
     use noshape_model::regen::RegenCancel;
     use std::time::{Duration, Instant};
     // A 1000-instance Feature pattern (Reapply features, which patterns

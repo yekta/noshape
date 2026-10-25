@@ -250,8 +250,9 @@ pub struct PartStudioView {
     regen: Arc<Mutex<Regenerator>>,
     regen_seq: u64,
     regen_task: Option<Task<()>>,
-    /// The running regeneration (pending.rs: a newer request retires it).
-    regen_inflight: Option<pending::InFlight>,
+    /// The running regenerations (model regen::runs: a newer request
+    /// aborts or supersedes each).
+    regen_runs: noshape_model::regen::runs::Runs,
     /// A regeneration whose result isn't shown yet, its overlay timer and
     /// spinner.
     pending: Option<pending::Pending>,
@@ -399,7 +400,7 @@ impl PartStudioView {
             regen: Arc::new(Mutex::new(Regenerator::new())),
             regen_seq: 0,
             regen_task: None,
-            regen_inflight: None,
+            regen_runs: Default::default(),
             pending: None,
             pending_timer: None,
             pending_spinner: None,
@@ -521,10 +522,7 @@ impl PartStudioView {
         // finishes its features into the cache when this one only extends it.
         let studio = Arc::new(studio);
         let cancel = noshape_model::regen::RegenCancel::default();
-        if let Some(old) = self.regen_inflight.take() {
-            old.retire(&studio, &config, &doc_vars, editing_sketch);
-        }
-        self.regen_inflight = Some(pending::InFlight { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
+        self.regen_runs.start(noshape_model::regen::runs::Run { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
         self.begin_pending(seq, window, cx);
         let cancel2 = cancel.clone();
         // View in high quality (Shift+R, kept for the session once used):
@@ -554,7 +552,6 @@ impl PartStudioView {
                     p.opening = None;
                 }
                 if !refine {
-                    this.regen_inflight = None;
                     this.end_pending(seq, cx);
                 }
                 this.context = Some(result.context.clone());
@@ -581,7 +578,6 @@ impl PartStudioView {
                     if seq != this.regen_seq {
                         return;
                     }
-                    this.regen_inflight = None;
                     this.end_pending(seq, cx);
                     this.context = Some(fine.context.clone());
                     scene_builder::log_regen_perf("refine", &fine.display, &studio);
@@ -750,8 +746,12 @@ impl PartStudioView {
             self.message = None;
         }
         // A new Extrude / Revolve / Sweep / Loft: operation and merge scope
-        // from what the previewed tool touches.
-        self.boolean_edit_logic(cx);
+        // from what the previewed tool touches (unless std's editing logic
+        // decides them, `std_edit_logic`).
+        let std_logic = self.edit.as_ref().is_some_and(|e| noshape_model::custom::std_feature::has_editing_logic(&e.dialog.read(cx).feature.type_id));
+        if !std_logic {
+            self.boolean_edit_logic(cx);
+        }
         self.hole_scope_logic(cx);
         self.orient_for_sketch(cx);
         self.refresh_scene(true, cx);

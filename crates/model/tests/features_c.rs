@@ -1283,6 +1283,32 @@ fn thicken_as_live() {
         p.set("thickness2", expr("0 mm"));
     });
     assert_eq!(s2.last_status(), (FeatureStatus::Error, "Invalid input selections.".to_string()));
+
+    // Live L17: the top and front faces of a 40 × 20 × 10 block, New, 2 mm:
+    // one part, the slabs and a 40 × 2 × 2 square corner between them
+    // (1600 + 800 + 160 = 2560 mm³), 8 faces.
+    let mut s3 = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s3.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s3.region(sid);
+    s3.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s3.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(20.0), mm(10.0), mm(10.0)));
+    let front = face_at(&r, 0, DVec3::new(mm(20.0), 0.0, mm(5.0)));
+    s3.add("thicken", move |p| {
+        p.set("entities", ParamValue::Query(vec![top, front]));
+        p.set("thickness1", expr("2 mm"));
+        p.set("operationType", ParamValue::Enum("NEW".into()));
+    });
+    let r = s3.ok();
+    assert_eq!(r.context.bodies.len(), 2, "the block and one thickened part");
+    let v = volume(&r, 1) * 1e9;
+    assert!((v - 2560.0).abs() < 1e-6, "{v} mm³");
+    assert_eq!(r.context.bodies[1].shape.count(noshape_kernel::ShapeType::Face), 8);
 }
 
 /// Live L7: Flip alignment against a plane facing the same way as the

@@ -56,6 +56,10 @@
 #include <Geom_BSplineSurface.hxx>
 #include <BRepOffset_MakeOffset.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
+#include <memory>
+#include <BRepAlgoAPI_Fuse.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <BRepPrimAPI_MakeCone.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
@@ -3269,6 +3273,144 @@ std::optional<std::pair<TopoDS_Shape, HHist>> chamfer_into_fillet_corners(const 
 
 } // namespace
 
+// A chamfer wider than a face it runs over, which OCCT can't build (qa4 r5
+// CHAMFER-OVERFLOW: 25 mm on a top edge of a 60 x 40 x 20 mm block; live OK,
+// 30000 mm3). Onshape cuts the part by the chamfer's plane: the triangle
+// between the edge and its offset lines on the two planes, along the edge,
+// clipped by whatever the plane runs past. Only straight convex edges
+// between two planes, each end closed by a plane square to the edge, no two
+// edges sharing a vertex (as fillet_as_cut). Null when it doesn't apply.
+static std::optional<std::pair<TopoDS_Shape, HHist>> chamfer_as_cut(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
+                                                                    const std::vector<TopoDS_Face>& fs, uint8_t mode, double d1, double d2)
+{
+  ShapeAncMap e2f, v2f;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  TopExp::MapShapesAndAncestors(input, TopAbs_VERTEX, TopAbs_FACE, v2f);
+  auto outward = [](const TopoDS_Face& f, gp_Vec& n) {
+    BRepAdaptor_Surface a(f, false);
+    if (a.GetType() != GeomAbs_Plane)
+      return false;
+    gp_Dir d = a.Plane().Axis().Direction();
+    if (!a.Plane().Position().Direct())
+      d.Reverse();
+    if (f.Orientation() == TopAbs_REVERSED)
+      d.Reverse();
+    n = gp_Vec(d);
+    return true;
+  };
+  ShapeIMap used;
+  ShapeList tools;
+  // Per edge: two points on its chamfer plane (the offset lines).
+  std::vector<std::pair<gp_Pnt, gp_Pnt>> planes;
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    const TopoDS_Edge& E = es[i];
+    BRepAdaptor_Curve  c(E);
+    const ShapeList*   fl = e2f.Seek(E);
+    if (c.GetType() != GeomAbs_Line || fl == nullptr || fl->Extent() != 2)
+      return std::nullopt;
+    TopoDS_Face f1 = TopoDS::Face(fl->First()), f2 = TopoDS::Face(fl->Last());
+    // Face 1 carries the first distance (the reference face, two distances
+    // or distance and angle).
+    if (mode != 0 && !fs[i].IsNull() && fs[i].IsSame(f2))
+      std::swap(f1, f2);
+    gp_Vec n1, n2;
+    if (f1.IsSame(f2) || !outward(f1, n1) || !outward(f2, n2))
+      return std::nullopt;
+    TopoDS_Edge in1;
+    for (TopExp_Explorer x(f1, TopAbs_EDGE); x.More(); x.Next())
+      if (x.Current().IsSame(E))
+        in1 = TopoDS::Edge(x.Current());
+    if (in1.IsNull())
+      return std::nullopt;
+    TopoDS_Vertex va, vb;
+    TopExp::Vertices(in1, va, vb, true);
+    if (va.IsNull() || vb.IsNull() || va.IsSame(vb) || used.Contains(va) || used.Contains(vb))
+      return std::nullopt;
+    used.Add(va);
+    used.Add(vb);
+    const gp_Pnt a = BRep_Tool::Pnt(va), b = BRep_Tool::Pnt(vb);
+    const gp_Vec t(a, b);
+    const double L = t.Magnitude();
+    // Convex: (n1 x n2) . t > 0, t the edge's direction as face 1 runs it.
+    if (L < Precision::Confusion() || n1.Crossed(n2).Dot(t) <= 1e-9 * L)
+      return std::nullopt;
+    const gp_Vec u = t / L;
+    for (const TopoDS_Vertex& v : {va, vb})
+    {
+      const ShapeList* at = v2f.Seek(v);
+      ShapeIMap        faces;
+      if (at != nullptr)
+        for (ShapeList::Iterator it(*at); it.More(); it.Next())
+          faces.Add(it.Value());
+      if (faces.Extent() != 3)
+        return std::nullopt;
+      bool capped = false;
+      for (int k = 1; k <= 3; ++k)
+      {
+        gp_Vec n;
+        capped = capped || (!faces(k).IsSame(f1) && !faces(k).IsSame(f2) && outward(TopoDS::Face(faces(k)), n) && std::abs(std::abs(n.Dot(u)) - 1) < 1e-9);
+      }
+      if (!capped)
+        return std::nullopt;
+    }
+    // Across the (convex) edge, each face's direction away from it.
+    const gp_Vec w1 = (-n2 + n1 * n2.Dot(n1)).Normalized(), w2 = (-n1 + n2 * n1.Dot(n2)).Normalized();
+    double s1 = d1, s2 = mode == 1 ? d2 : d1;
+    if (mode == 2)
+    {
+      // Distance d1 on face 1, the chamfer at angle d2 to it: the triangle's
+      // third side by the law of sines (d1 tan d2 on a square edge).
+      const double theta = std::acos(std::max(-1.0, std::min(1.0, w1.Dot(w2))));
+      const double far   = M_PI - theta - d2;
+      if (far <= 1e-9)
+        return std::nullopt;
+      s2 = d1 * std::sin(d2) / std::sin(far);
+    }
+    const gp_Pnt p1 = a.Translated(w1 * s1), p2 = a.Translated(w2 * s2);
+    BRepBuilderAPI_MakePolygon sec(a, p1, p2, true);
+    if (!sec.IsDone())
+      return std::nullopt;
+    tools.Append(BRepPrimAPI_MakePrism(BRepBuilderAPI_MakeFace(sec.Wire(), true).Face(), t).Shape());
+    planes.emplace_back(p1, p2);
+  }
+  BRepAlgoAPI_Cut cut;
+  ShapeList       args;
+  args.Append(input);
+  cut.SetArguments(args);
+  cut.SetTools(tools);
+  cut.Build();
+  if (!cut.IsDone() || cut.HasErrors() || !valid_shape(cut.Shape()))
+    return std::nullopt;
+  HHist h = history_of({input}, cut);
+  // The faces the cut made: from the chamfer plane they lie on, generated by
+  // its edge (the chamfer's face).
+  ShapeIMap old;
+  for (TopExp_Explorer f(input, TopAbs_FACE); f.More(); f.Next())
+  {
+    const ShapeList& m = h->Modified(f.Current());
+    for (ShapeList::Iterator it(m); it.More(); it.Next())
+      old.Add(it.Value());
+    if (m.IsEmpty() && !h->IsRemoved(f.Current()))
+      old.Add(f.Current());
+  }
+  for (TopExp_Explorer f(cut.Shape(), TopAbs_FACE); f.More(); f.Next())
+  {
+    if (old.Contains(f.Current()))
+      continue;
+    BRepAdaptor_Surface a(TopoDS::Face(f.Current()), false);
+    if (a.GetType() != GeomAbs_Plane)
+      continue;
+    for (size_t i = 0; i < planes.size(); ++i)
+    {
+      const double tol = 1e-9 * (1 + planes[i].first.Distance(planes[i].second));
+      if (a.Plane().Distance(planes[i].first) < tol && a.Plane().Distance(planes[i].second) < tol)
+        h->AddGenerated(es[i], f.Current());
+    }
+  }
+  return std::make_pair(cut.Shape(), h);
+}
+
 OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& faces,
                  uint8_t mode, double d1, double d2, bool checked)
 {
@@ -3373,6 +3515,10 @@ OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& 
   }
   catch (const std::runtime_error&)
   {
+    // Over the faces of a plain edge: the part cut by the chamfer's plane.
+    if (checked)
+      if (auto past = chamfer_as_cut(s.shape, es, fs, mode, d1, d2))
+        return make_result({s.shape}, past->first, past->second.get());
     // Onshape reports a chamfer wider than a face it runs over (or than the
     // radius of an arc it follows) separately.
     // Also a chamfer wider than a fillet its edge ends on (live G46: 5 mm on
@@ -3411,6 +3557,196 @@ OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& 
 
 // ---------------------------------------------------------------- draft
 
+// The one solid of `s` (null when there are none or several).
+static TopoDS_Shape only_solid(const TopoDS_Shape& s)
+{
+  TopoDS_Shape one;
+  int          n = 0;
+  for (TopExp_Explorer x(s, TopAbs_SOLID); x.More(); x.Next(), ++n)
+    one = x.Current();
+  return n == 1 ? one : TopoDS_Shape();
+}
+
+// A box filling the half space behind the plane through `o` with normal `n`.
+static TopoDS_Shape half_space_box(const gp_Pnt& o, const gp_Dir& n, double size)
+{
+  gp_Ax3 ax(o, n);
+  TopoDS_Face f = BRepBuilderAPI_MakeFace(gp_Pln(ax), -size, size, -size, size).Face();
+  return BRepPrimAPI_MakePrism(f, gp_Vec(n) * -2 * size).Shape();
+}
+
+// One sloped plane drafted (live N3: the face of a 45° chamfer, 5°): Parasolid
+// turns it about its line on the neutral plane; where it no longer bounds the
+// part its neighbours run on and meet (N3: the turned plane lies outside, the
+// chamfer vanishes, 48000 mm³). A draft that would turn the face over against
+// the pull fails (N3 the other way). The part without the face, its
+// neighbours extended, behind the turned plane. Null when it doesn't apply.
+static std::optional<std::pair<TopoDS_Shape, HHist>> draft_sloped_plane(const TopoDS_Shape& input, const TopoDS_Face& f,
+                                                                       const gp_Dir& P, const gp_Pln& neutral, double angle)
+{
+  BRepAdaptor_Surface a(f, false);
+  if (a.GetType() != GeomAbs_Plane)
+    return std::nullopt;
+  gp_Dir n = a.Plane().Axis().Direction();
+  if (!a.Plane().Position().Direct())
+    n.Reverse();
+  if (f.Orientation() == TopAbs_REVERSED)
+    n.Reverse();
+  const double np = n.Dot(P);
+  if (std::abs(np) < 1e-7 || std::abs(np) > 1 - 1e-7)
+    return std::nullopt;
+  const gp_Vec nh = gp_Vec(n) - gp_Vec(P) * np;
+  const gp_Dir n2(gp_Vec(gp_Dir(nh)) * std::cos(angle) + gp_Vec(P) * std::sin(angle));
+  if (np * n2.Dot(P) < 0)
+    fail_op("draft would turn the face over");
+  // A point of the face's plane on the neutral plane: up the plane's slope.
+  GProp_GProps g;
+  BRepGProp::SurfaceProperties(f, g);
+  const gp_Pnt q = g.CentreOfMass();
+  const gp_Vec u = gp_Vec(P) - gp_Vec(n) * np;
+  const double h = gp_Vec(neutral.Location(), q).Dot(gp_Vec(neutral.Axis().Direction())) / neutral.Axis().Direction().Dot(P);
+  const gp_Pnt Q0 = q.Translated(u * (-h / u.Dot(gp_Vec(P))));
+  Bnd_Box box;
+  BRepBndLib::Add(input, box);
+  const double size = std::sqrt(box.SquareExtent()) * 4 + 1 + gp_Vec(Q0, q).Magnitude();
+  BRepAlgoAPI_Defeaturing df;
+  df.SetShape(input);
+  ShapeList fl;
+  fl.Append(f);
+  df.AddFacesToRemove(fl);
+  df.SetToFillHistory(true);
+  df.Build();
+  if (!df.IsDone() || df.HasErrors())
+    return std::nullopt;
+  const TopoDS_Shape healed = df.Shape();
+  HHist              h1     = history_of({input}, df);
+  BRepAlgoAPI_Common cm(healed, half_space_box(Q0, n2, size));
+  cm.SetToFillHistory(true);
+  cm.Build();
+  if (!cm.IsDone() || cm.HasErrors())
+    return std::nullopt;
+  const TopoDS_Shape out = only_solid(cm.Shape());
+  if (out.IsNull() || !valid_shape(out))
+    return std::nullopt;
+  HHist h2 = history_of({healed}, cm);
+  return std::make_pair(out, compose(input, h1, h2));
+}
+
+// A drafted cylinder that closes inside the part (live S3: a Ø10 hole through
+// 20 mm narrowing upward 30°): OCCT's cone runs on through its apex into a
+// second nappe; Parasolid's face ends at the apex (a conical pocket, solid
+// above it). Built again from the input: the hole filled and the cone up to
+// its apex cut (a boss: the cylinder cut and the cone added); fusing the far
+// nappe back onto OCCT's result leaves two solids on the shared cone. One
+// drafted face only; the cone face is the drafted face's image.
+static TopoDS_Shape end_cone_at_apex(const TopoDS_Shape& input, const TopoDS_Face& drafted, const TopoDS_Shape& r0,
+                                     const gp_Pln& neutral, HHist& h)
+{
+  Bnd_Box box;
+  BRepBndLib::Add(r0, box);
+  const double tol = 1e-7 * std::sqrt(box.SquareExtent());
+  BRepAdaptor_Surface cyl(drafted, false);
+  if (cyl.GetType() != GeomAbs_Cylinder)
+    return r0;
+  const ShapeList& images = h->Modified(drafted);
+  if (images.Extent() != 1 || images.First().ShapeType() != TopAbs_FACE)
+    return r0;
+  const TopoDS_Face   f = TopoDS::Face(images.First());
+  BRepAdaptor_Surface s(f);
+  if (s.GetType() != GeomAbs_Cone)
+    return r0;
+  const gp_Cone cone = s.Cone();
+  const gp_Pnt  apex = cone.Apex();
+  const gp_Dir  ax   = cone.Axis().Direction();
+  double        lo = 1e300, hi = -1e300;
+  for (TopExp_Explorer v(f, TopAbs_VERTEX); v.More(); v.Next())
+  {
+    const double t = gp_Vec(apex, BRep_Tool::Pnt(TopoDS::Vertex(v.Current()))).Dot(gp_Vec(ax));
+    lo = std::min(lo, t), hi = std::max(hi, t);
+  }
+  if (!(lo < -tol && hi > tol))
+    return r0;
+  const double an = ax.Dot(neutral.Axis().Direction());
+  if (std::abs(an) < 1e-9)
+    return r0;
+  const double tn   = gp_Vec(apex, neutral.Location()).Dot(gp_Vec(neutral.Axis().Direction())) / an;
+  const double near = tn > 0 ? hi : lo;
+  const double rn   = std::abs(near) * std::tan(std::abs(cone.SemiAngle()));
+  // Material side of the original face: a hole's face looks at its axis.
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(drafted, u0, u1, v0, v1);
+  gp_Pnt p;
+  gp_Vec du, dv;
+  cyl.D1(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, du, dv);
+  gp_Vec nf = du.Crossed(dv);
+  if (drafted.Orientation() == TopAbs_REVERSED)
+    nf.Reverse();
+  const gp_Ax1 cax  = cyl.Cylinder().Axis();
+  const gp_Pnt foot = cax.Location().Translated(gp_Vec(cax.Direction()) * gp_Vec(cax.Location(), p).Dot(gp_Vec(cax.Direction())));
+  const bool   hole = nf.Dot(gp_Vec(foot, p)) < 0;
+  // The original cylinder's solid over the face's extent along its axis.
+  double c0 = 1e300, c1 = -1e300;
+  for (TopExp_Explorer v(drafted, TopAbs_VERTEX); v.More(); v.Next())
+  {
+    const double t = gp_Vec(cax.Location(), BRep_Tool::Pnt(TopoDS::Vertex(v.Current()))).Dot(gp_Vec(cax.Direction()));
+    c0 = std::min(c0, t), c1 = std::max(c1, t);
+  }
+  if (!(c1 - c0 > tol))
+    return r0;
+  const TopoDS_Shape body = BRepPrimAPI_MakeCylinder(gp_Ax2(cax.Location().Translated(gp_Vec(cax.Direction()) * c0), cax.Direction()),
+                                                     cyl.Cylinder().Radius(), c1 - c0).Shape();
+  const gp_Pnt       base = apex.Translated(gp_Vec(ax) * near);
+  const TopoDS_Shape tip  = BRepPrimAPI_MakeCone(gp_Ax2(base, near > 0 ? ax.Reversed() : ax), rn, 0, std::abs(near)).Shape();
+  try
+  {
+    std::unique_ptr<BRepAlgoAPI_BooleanOperation> first, second;
+    if (hole)
+      first = std::make_unique<BRepAlgoAPI_Fuse>(input, body);
+    else
+      first = std::make_unique<BRepAlgoAPI_Cut>(input, body);
+    if (!first->IsDone() || first->HasErrors())
+      return r0;
+    const TopoDS_Shape mid = first->Shape();
+    if (hole)
+      second = std::make_unique<BRepAlgoAPI_Cut>(mid, tip);
+    else
+      second = std::make_unique<BRepAlgoAPI_Fuse>(mid, tip);
+    if (!second->IsDone() || second->HasErrors())
+      return r0;
+    ShapeUpgrade_UnifySameDomain usd(second->Shape(), true, true, false);
+    usd.Build();
+    const TopoDS_Shape out = only_solid(usd.Shape());
+    if (out.IsNull() || !valid_shape(out))
+      return r0;
+    HHist all = compose(input, compose(input, history_of({input}, *first), history_of({mid}, *second)), usd.History());
+    // The new cone face stands for the drafted face.
+    HHist r = new BRepTools_History();
+    for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    {
+      ShapeIMap in;
+      TopExp::MapShapes(input, k, in);
+      for (int i = 1; i <= in.Extent(); ++i)
+      {
+        const TopoDS_Shape& x = in(i);
+        if (x.IsSame(drafted))
+          continue;
+        add_images(all, x, x, r);
+        if (all->IsRemoved(x) && r->Modified(x).IsEmpty() && r->Generated(x).IsEmpty())
+          r->Remove(x);
+      }
+    }
+    for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
+      if (BRepAdaptor_Surface(TopoDS::Face(x.Current()), false).GetType() == GeomAbs_Cone)
+        r->AddModified(drafted, x.Current());
+    h = r;
+    return out;
+  }
+  catch (const Standard_Failure&)
+  {
+    return r0;
+  }
+}
+
 OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF& neutral,
                double angle)
 {
@@ -3422,19 +3758,28 @@ OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF&
   check_faces_in(s.shape, faces.items);
   gp_Dir                   pull = to_dir(dir, "pull direction");
   gp_Pln                   pln  = to_pln(neutral);
+  std::vector<TopoDS_Shape> args{s.shape};
+  auto sloped = [&]() -> OpOut {
+    if (faces.items.size() == 1)
+      if (auto r = draft_sloped_plane(s.shape, TopoDS::Face(faces.items[0]), pull, pln, angle))
+        return make_result(args, r->first, r->second.get());
+    fail_op("draft failed");
+  };
   BRepOffsetAPI_DraftAngle mk(s.shape);
   for (const auto& f : faces.items)
   {
     mk.Add(TopoDS::Face(f), pull, angle, pln, true);
     if (!mk.AddDone())
-      fail_op("draft cannot be applied to one of the faces");
+      return sloped();
   }
   mk.Build();
   if (!mk.IsDone())
-    fail_op("draft failed");
-  std::vector<TopoDS_Shape> args{s.shape};
-  HHist                     h = modifier_history(s.shape, mk);
-  return make_result(args, mk.Shape(), h.get());
+    return sloped();
+  HHist        h = modifier_history(s.shape, mk);
+  TopoDS_Shape r = mk.Shape();
+  if (faces.items.size() == 1)
+    r = end_cone_at_apex(s.shape, TopoDS::Face(faces.items[0]), r, pln, h);
+  return make_result(args, r, h.get());
 }
 
 // ---------------------------------------------------------------- defeature / offsets

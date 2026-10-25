@@ -212,14 +212,51 @@ fn filter_names(f: QueryFilter) -> Vec<&'static str> {
     NAMES.iter().filter(|(q, _)| f.intersects(*q)).map(|(_, n)| *n).collect()
 }
 
-/// JSON schema of one parameter.
-pub fn spec_schema(s: &ParamSpec, units: &UnitPrefs) -> Value {
+/// When a parameter with a visibility rule is shown: with the feature's
+/// defaults, and which single enum / boolean change from them flips it
+/// ("shown; hidden when endStyleV2 is THROUGH"). `None` (array items, whose
+/// rules read their item's values): the general note.
+fn visibility_note(s: &ParamSpec, all: &[ParamSpec], defaults: Option<&ParamValues>) -> String {
+    let Some(defaults) = defaults else { return " (shown only for some values of the other parameters; ignored while hidden)".into() };
+    let shown = s.is_visible(defaults);
+    let mut flips: Vec<(&str, Vec<String>)> = Vec::new();
+    for p in all.iter().filter(|p| p.id != s.id) {
+        let alternatives: Vec<(String, ParamValue)> = match (&p.kind, defaults.get(p.id)) {
+            (ParamKind::Enum { options, .. }, Some(ParamValue::Enum(cur))) => options.iter().filter(|(id, _)| id != cur).map(|(id, _)| (id.to_string(), ParamValue::Enum(id.to_string()))).collect(),
+            (ParamKind::Bool { .. }, Some(ParamValue::Bool(b))) => vec![((!b).to_string(), ParamValue::Bool(!b))],
+            _ => continue,
+        };
+        let changed: Vec<String> = alternatives
+            .into_iter()
+            .filter(|(_, v)| {
+                let mut probe = defaults.clone();
+                probe.set(p.id, v.clone());
+                s.is_visible(&probe) != shown
+            })
+            .map(|(name, _)| name)
+            .collect();
+        if !changed.is_empty() {
+            flips.push((p.id, changed));
+        }
+    }
+    let when = flips.iter().map(|(id, vs)| format!("{id} is {}", vs.join(" or "))).collect::<Vec<_>>().join(", or when ");
+    match (shown, when.is_empty()) {
+        (true, true) => " (shown with the defaults; hidden for some other combinations of the other parameters, and ignored while hidden)".into(),
+        (true, false) => format!(" (shown with the defaults; hidden, and ignored, when {when})"),
+        (false, true) => " (hidden with the defaults, and ignored while hidden; shown only for some combinations of the other parameters)".into(),
+        (false, false) => format!(" (hidden with the defaults, and ignored while hidden; shown when {when})"),
+    }
+}
+
+/// JSON schema of one parameter (`all` and `defaults`: its feature's
+/// parameters and default values, to say when it is shown).
+pub fn spec_schema(s: &ParamSpec, units: &UnitPrefs, all: &[ParamSpec], defaults: Option<&ParamValues>) -> Value {
     let mut desc = s.label.to_string();
     if !s.description.is_empty() {
         desc = format!("{desc}. {}", s.description);
     }
     if s.visible.is_some() {
-        desc.push_str(" (shown only for some values of the other parameters; ignored while hidden)");
+        desc.push_str(&visibility_note(s, all, defaults));
     }
     let mut v = match &s.kind {
         ParamKind::Bool { default } => json!({ "type": "boolean", "default": default }),
@@ -251,7 +288,7 @@ pub fn spec_schema(s: &ParamSpec, units: &UnitPrefs) -> Value {
         ParamKind::Array { item, item_label } => {
             let mut props = serde_json::Map::new();
             for it in item.iter() {
-                props.insert(it.id.into(), spec_schema(it, units));
+                props.insert(it.id.into(), spec_schema(it, units, item, None));
             }
             desc = format!("{desc}. List of {item_label} items");
             json!({ "type": "array", "items": { "type": "object", "properties": props, "additionalProperties": false } })
@@ -270,11 +307,12 @@ pub fn spec_schema(s: &ParamSpec, units: &UnitPrefs) -> Value {
     v
 }
 
-/// JSON schema of a feature's parameter object.
-pub fn feature_schema(specs: &[ParamSpec], units: &UnitPrefs) -> Value {
+/// JSON schema of a feature's parameter object (`defaults`: a new
+/// feature's values).
+pub fn feature_schema(specs: &[ParamSpec], units: &UnitPrefs, defaults: Option<&ParamValues>) -> Value {
     let mut props = serde_json::Map::new();
     for s in specs.iter().filter(|s| !matches!(s.kind, ParamKind::Sketch)) {
-        props.insert(s.id.into(), spec_schema(s, units));
+        props.insert(s.id.into(), spec_schema(s, units, specs, defaults));
     }
     json!({ "type": "object", "properties": props, "additionalProperties": false })
 }

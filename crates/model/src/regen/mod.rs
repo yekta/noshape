@@ -11,6 +11,7 @@
 pub mod context;
 pub mod derived;
 mod display;
+pub mod runs;
 pub use display::flat_view_display;
 pub use display::{PART_COLORS, angle_display_mesh, set_angle_display_mesh, tessellate_shape};
 pub mod eval;
@@ -64,6 +65,16 @@ pub struct RegenCancel(Arc<CancelFlags>);
 struct CancelFlags {
     superseded: std::sync::atomic::AtomicBool,
     aborted: std::sync::atomic::AtomicBool,
+    hook: std::sync::OnceLock<EvaluateHook>,
+}
+
+/// [`RegenCancel::on_evaluate`]'s callback.
+struct EvaluateHook(Arc<dyn Fn(FeatureId) + Send + Sync>);
+
+impl std::fmt::Debug for EvaluateHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("EvaluateHook")
+    }
 }
 
 impl RegenCancel {
@@ -82,6 +93,25 @@ impl RegenCancel {
 
     pub fn superseded(&self) -> bool {
         self.0.superseded.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Test hook: `f` runs on the regenerating thread before each feature
+    /// this run evaluates (not the cached ones), e.g. to hold the run at a
+    /// barrier while a newer request retires it. Set once.
+    pub fn on_evaluate(&self, f: impl Fn(FeatureId) + Send + Sync + 'static) {
+        let _ = self.0.hook.set(EvaluateHook(Arc::new(f)));
+    }
+
+    fn evaluating(&self, id: FeatureId) {
+        if let Some(h) = self.0.hook.get() {
+            (h.0)(id);
+        }
+    }
+
+    /// Another handle than this one exists: a regeneration (or the task
+    /// that starts its refine pass) still holds it.
+    pub fn held_elsewhere(&self) -> bool {
+        Arc::strong_count(&self.0) > 1
     }
 
     /// Run `f` (kernel work) so that an abort stops its booleans inside the
@@ -123,6 +153,8 @@ pub struct Regenerator {
     entries: HashMap<FeatureId, CacheEntry>,
     meshes: HashMap<u64, (u64, bool, Arc<MeshBuffers>)>,
     contexts: ContextCache,
+    /// Features evaluated so far (not taken from the cache).
+    evaluations: u64,
 }
 
 fn hash_bytes(prev: u64, data: &[u8]) -> u64 {
@@ -135,6 +167,12 @@ fn hash_bytes(prev: u64, data: &[u8]) -> u64 {
 impl Regenerator {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// How many features this Regenerator has evaluated rather than taken
+    /// from its cache (tests: a run reuses what it should).
+    pub fn evaluations(&self) -> u64 {
+        self.evaluations
     }
 
     pub fn regenerate(&mut self, studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opts: &RegenOptions) -> RegenResult {
@@ -234,6 +272,10 @@ impl Regenerator {
                         state.message = Some(format!("{} is not available in this build yet", f.feature_type().map(|t| t.name).unwrap_or(&f.type_id)));
                     }
                     Some(eval_fn) => {
+                        self.evaluations += 1;
+                        if let Some(c) = &opts.cancel {
+                            c.evaluating(f.id);
+                        }
                         // Query variables (`#name` selections) expand against the upstream context.
                         let expanded = eval::expand_query_variables(params, &ctx);
                         let params = expanded.as_ref().unwrap_or(params);

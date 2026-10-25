@@ -211,6 +211,85 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
     Ok(path.to_path_buf())
 }
 
+/// An Assembly to export: the root's name, each distinct part once in its
+/// own coordinates (meters; linear RGBA), and the instances placing them.
+pub struct AssemblyExport {
+    pub root: String,
+    pub parts: Vec<(String, k::Shape, [f32; 4])>,
+    /// (part index, instance name, placement in meters).
+    pub instances: Vec<(usize, String, glam::DMat4)>,
+}
+
+impl AssemblyExport {
+    /// The solved assembly's part occurrences (`ids`: those instances, None:
+    /// all; hidden ones only with "Include hidden instances in export").
+    pub fn of(root: &str, result: &noshape_model::assembly::eval::AssemblyResult, ids: Option<&[noshape_model::assembly::InstanceId]>, include_hidden: bool) -> Self {
+        let mut keys: Vec<(noshape_model::document::TabId, noshape_model::BodyId, noshape_model::configuration::ConfigValues)> = Vec::new();
+        let mut out = AssemblyExport { root: root.to_string(), parts: Vec::new(), instances: Vec::new() };
+        for o in result.occurrences.iter().filter(|o| (include_hidden || !o.hidden) && ids.is_none_or(|ids| ids.contains(&o.top()))) {
+            let key = (o.studio, o.body.clone(), o.config.clone());
+            let part = match keys.iter().position(|k| *k == key) {
+                Some(i) => i,
+                None => {
+                    let Some(b) = o.context.bodies.iter().find(|b| b.id == o.body) else { continue };
+                    let c = o.color;
+                    out.parts.push((o.body_name.clone(), b.shape.clone(), [c[0], c[1], c[2], 1.0]));
+                    keys.push(key);
+                    keys.len() - 1
+                }
+            };
+            out.instances.push((part, o.instance_name.clone(), o.transform));
+        }
+        out
+    }
+
+    /// Each instance as a placed part, named after it (formats without
+    /// assemblies).
+    pub fn placed(&self) -> anyhow::Result<Vec<(String, k::Shape, [f32; 4])>> {
+        self.instances.iter().map(|(p, name, t)| Ok((name.clone(), self.parts[*p].1.transformed(&k::Transform::Matrix(*t))?, self.parts[*p].2))).collect()
+    }
+}
+
+/// Write an Assembly's export: STEP keeps the assembly (Onshape: the root
+/// product with each part once, placed by its instances); the other formats
+/// and individual files get the placed parts.
+pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &AssemblyExport) -> anyhow::Result<std::path::PathBuf> {
+    anyhow::ensure!(!a.instances.is_empty(), "There are no parts to export");
+    if s.format != PartFormat::Step || s.individual {
+        return write_export(s, path, a.placed()?);
+    }
+    // Y axis up: the model's +Z becomes +Y.
+    let up = if s.y_up { glam::DMat4::from_rotation_x(-std::f64::consts::FRAC_PI_2) } else { glam::DMat4::IDENTITY };
+    let shapes: Vec<k::ExportShape> = a.parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect();
+    let instances: Vec<k::StepInstance> = a.instances.iter().map(|(p, _, t)| k::StepInstance { part: *p, transform: up * *t }).collect();
+    k::write_step_assembly(path, &a.root, &shapes, &instances, k::LengthUnit::Meter, &step_options(s))?;
+    Ok(path.to_path_buf())
+}
+
+/// A part as the STEP writer takes it: Onshape writes the colour's 8-bit sRGB values.
+fn step_shape(n: &str, sh: &k::Shape, c: &[f32; 4]) -> k::ExportShape {
+    let srgb = |v: f32| crate::appearance::lin_to_srgb(v) as f32 / 255.0;
+    k::ExportShape { shape: sh.clone(), name: Some(n.to_string()), color: Some([srgb(c[0]), srgb(c[1]), srgb(c[2])]) }
+}
+
+/// The dialog's STEP version and units.
+fn step_options(s: &ExportSettings) -> k::StepOptions {
+    let schema = if s.latest { k::StepSchema::Ap242 } else { [k::StepSchema::Ap242, k::StepSchema::Ap214, k::StepSchema::Ap203].get(s.version).copied().unwrap_or(k::StepSchema::Ap242) };
+    let file_unit = if s.custom_units {
+        match UNITS[s.units].0 {
+            "Centimeter" => Some(k::LengthUnit::Centimeter),
+            "Foot" => Some(k::LengthUnit::Foot),
+            "Inch" => Some(k::LengthUnit::Inch),
+            "Meter" => Some(k::LengthUnit::Meter),
+            "Yard" => Some(k::LengthUnit::Yard),
+            _ => Some(k::LengthUnit::Millimeter),
+        }
+    } else {
+        None
+    };
+    k::StepOptions { schema, file_unit }
+}
+
 pub fn set_part_format(s: &mut ExportSettings, i: usize) {
     s.format = PartFormat::ALL[i];
     s.version = 0;
@@ -250,23 +329,8 @@ fn deflection(s: &ExportSettings, parts: &[(String, k::Shape, [f32; 4])]) -> f64
 fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::Shape, [f32; 4])]) -> anyhow::Result<()> {
     match s.format {
         PartFormat::Step => {
-            // Onshape writes the part colour's 8-bit sRGB values.
-            let srgb = |v: f32| crate::appearance::lin_to_srgb(v) as f32 / 255.0;
-            let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, c)| k::ExportShape { shape: sh.clone(), name: Some(n.clone()), color: Some([srgb(c[0]), srgb(c[1]), srgb(c[2])]) }).collect();
-            let schema = if s.latest { k::StepSchema::Ap242 } else { [k::StepSchema::Ap242, k::StepSchema::Ap214, k::StepSchema::Ap203].get(s.version).copied().unwrap_or(k::StepSchema::Ap242) };
-            let file_unit = if s.custom_units {
-                match UNITS[s.units].0 {
-                    "Centimeter" => Some(k::LengthUnit::Centimeter),
-                    "Foot" => Some(k::LengthUnit::Foot),
-                    "Inch" => Some(k::LengthUnit::Inch),
-                    "Meter" => Some(k::LengthUnit::Meter),
-                    "Yard" => Some(k::LengthUnit::Yard),
-                    _ => Some(k::LengthUnit::Millimeter),
-                }
-            } else {
-                None
-            };
-            k::write_step_with(path, &shapes, k::LengthUnit::Meter, &k::StepOptions { schema, file_unit })?;
+            let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect();
+            k::write_step_with(path, &shapes, k::LengthUnit::Meter, &step_options(s))?;
         }
         PartFormat::Iges => k::write_iges(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
         // Text transmit file in the chosen version (live G36: the body in that

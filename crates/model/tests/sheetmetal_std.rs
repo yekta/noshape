@@ -368,7 +368,7 @@ fn tab_editing_logic_fills_merge_face_and_offset() {
     s.add("sheetMetalTab", |p| p.set("tabFaces", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }])));
     let index = s.ps.features.len() - 1;
     let new = s.ps.features[index].params.clone();
-    let changed = noshape_model::custom::std_feature::editing_logic(&s.ps, index, &ConfigValues::default(), &s.units, &RegenOptions::default(), &ParamValues::default(), &new, &["tabFaces".to_string()]).expect("editing logic");
+    let changed = noshape_model::custom::std_feature::editing_logic(&s.ps, index, &ConfigValues::default(), &s.units, &RegenOptions::default(), &ParamValues::default(), &new, &["tabFaces".to_string()], true).expect("editing logic");
     assert!(matches!(changed.get("booleanUnionScope"), Some(ParamValue::Query(q)) if !q.is_empty()), "{changed:?}");
     match changed.get("booleanOffset") {
         Some(ParamValue::Expr(e)) => assert_eq!(e.text, "0.02 mm"),

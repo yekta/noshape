@@ -112,7 +112,8 @@ pub struct PointSprite {
     /// Diameter in logical pixels.
     pub size: f32,
     /// Bit 1: always on top. Bit 2: ring with a center dot. Bit 3
-    /// ([`PointSprite::HOLLOW`]): white center inside a colored ring.
+    /// ([`PointSprite::HOLLOW`]): white center inside a colored ring. Bit 4
+    /// ([`PointSprite::RING`]): the ring alone.
     pub style: u32,
     pub _pad: u32,
 }
@@ -141,6 +142,8 @@ impl ImageData {
 impl PointSprite {
     /// A hollow point: white center, ring in the point color.
     pub const HOLLOW: u32 = 8;
+    /// A ring alone (inner radius 0.6 of the outer), see-through inside.
+    pub const RING: u32 = 16;
 }
 
 /// The axis-aligned bounds of `it` (`None` when empty).

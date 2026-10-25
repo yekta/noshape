@@ -4,7 +4,7 @@
 use crate::display::BodyKind;
 use crate::features::common::is_up_to;
 use crate::reference::Reference;
-use crate::regen::eval::{EvalCtx, FResult, NamedShape, Profile, err, names_for, sweep_names};
+use crate::regen::eval::{EvalCtx, FResult, NamedShape, Profile, err, err_at, names_for, sweep_names};
 use glam::DVec3;
 use noshape_kernel as k;
 
@@ -37,7 +37,8 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
     };
     let refs = ev.query(if thin { "wallShape" } else { "entities" });
     if refs.is_empty() {
-        return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall" } else { "Select face or sketch region to extrude." });
+        // std extrude.fs: OFFSET_WIRE_SELECT_WALL_PATH / EXTRUDE_NO_SELECTED_REGION.
+        return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall." } else { "Select face or sketch region to extrude." });
     }
     let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&|f, _| f.normal))? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
@@ -65,18 +66,17 @@ pub fn scope(ev: &EvalCtx) -> Option<Vec<usize>> {
 fn direction(ev: &EvalCtx, p: &Profile, thin: bool) -> FResult<DVec3> {
     let mut d = p.frame.normal;
     // A custom direction is not available for Thin (Onshape).
-    if ev.bool("hasExtrudeDirection")
-        && !thin
-        && let Some(r) = ev.query("extrudeDirection").first()
-    {
+    // std extrude.fs processExtrudeDirection.
+    if ev.bool("hasExtrudeDirection") && !thin {
+        let Some(r) = ev.query("extrudeDirection").first() else { return err_at(&["extrudeDirection"], "Select Extrude direction.") };
         match ev.resolve_direction(r) {
             Some(x) => {
                 if x.dot(p.frame.normal).abs() < 1e-9 {
-                    return err("Extrude direction can't be parallel to the profile");
+                    return err_at(&["extrudeDirection"], "Extrude direction cannot be parallel to selected profile.");
                 }
                 d = if x.dot(p.frame.normal) < 0.0 { -x } else { x };
             }
-            None => return err("Select an extrude direction"),
+            None => return err_at(&["extrudeDirection"], "Extrude direction entity is invalid."),
         }
     }
     if ev.bool("oppositeDirection") {
@@ -88,7 +88,7 @@ fn direction(ev: &EvalCtx, p: &Profile, thin: bool) -> FResult<DVec3> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &str, body_id: &str, vertex_id: &str, has_off: &str, off_id: &str, off_flip: &str, dir: DVec3) -> FResult<End> {
+fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, body_id: &'static str, vertex_id: &'static str, has_off: &str, off_id: &str, off_flip: &str, dir: DVec3) -> FResult<End> {
     let off = if is_up_to(bound) && ev.bool(has_off) {
         let o = ev.length(off_id)?;
         if ev.bool(off_flip) { -o } else { o }
@@ -97,9 +97,13 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &str, body_id: &s
     };
     match bound {
         "BLIND" => Ok(End::Distance(ev.length(depth_id)?)),
-        "THROUGH_ALL" => Ok(End::Distance(ev.model_extent())),
+        "THROUGH_ALL" => {
+            require_parts(ev)?;
+            Ok(End::Distance(ev.model_extent()))
+        }
+        // std extrudeCommon.fs: EXTRUDE_SELECT_TERMINATING_*.
         "UP_TO_SURFACE" => {
-            let Some(r) = ev.query(face_id).first() else { return err("Select a face to extrude up to") };
+            let Some(r) = ev.query(face_id).first() else { return err_at(&[face_id], "Select a face to terminate the extrude.") };
             let target = match r {
                 Reference::Face(_) => {
                     let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Up to face no longer exists"))?;
@@ -115,26 +119,76 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &str, body_id: &s
             Ok(End::UpTo(target))
         }
         "UP_TO_BODY" => {
-            let Some(r) = ev.query(body_id).first() else { return err("Select a part to extrude up to") };
+            let Some(r) = ev.query(body_id).first() else { return err_at(&[body_id], "Select a part to terminate the extrude.") };
             let bi = *ev.resolve_bodies(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Up to part no longer exists"))?;
             let s = ev.ctx.bodies[bi].shape.clone();
             Ok(End::UpTo(if off != 0.0 { s.translated(-dir * off)? } else { s }))
         }
         "UP_TO_NEXT" => {
-            let solids: Vec<k::Shape> = ev.ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.shape.clone()).collect();
-            if solids.is_empty() {
-                return err("Nothing to extrude up to");
-            }
-            let c = k::Shape::compound(&solids);
+            require_parts(ev)?;
+            let c = next_parts(ev)?;
             Ok(End::UpTo(if off != 0.0 { c.translated(-dir * off)? } else { c }))
         }
         "UP_TO_VERTEX" => {
-            let Some(r) = ev.query(vertex_id).first() else { return err("Select a vertex to extrude up to") };
+            let Some(r) = ev.query(vertex_id).first() else { return err_at(&[vertex_id], "Select a vertex or mate connector to terminate the extrude.") };
             let p = ev.resolve_vertex_point(r).ok_or_else(|| crate::regen::eval::FeatureError::new("Up to vertex no longer exists"))?;
             Ok(End::UpToPoint(p - dir * off))
         }
         other => err(format!("Unsupported end type {other}")),
     }
+}
+
+/// A point of the starting offset entity at its height above the profile
+/// plane (normal `n`), checked as std's checkStartOffsetEntity: lines must
+/// lie parallel to the profile, other edges and faces must be planar and
+/// parallel to it; vertices, mate connectors take their point.
+fn start_offset_point(ev: &EvalCtx, r: &Reference, n: DVec3) -> FResult<DVec3> {
+    const NOT_PLANAR: &str = "Selected start offset bound entity is not planar.";
+    const NOT_PARALLEL: &str = "Start offset bound entity must be parallel to extruded entities.";
+    let parallel = |m: DVec3| m.normalize_or_zero().cross(n).length() < 1e-9;
+    let edge = match r {
+        Reference::Edge(_) => ev.resolve_edges(std::slice::from_ref(r)).first().map(|&(b, e)| ev.edge_shape(b, e)).transpose()?,
+        Reference::SketchEntity { sketch, entity } => match ev.ctx.sketch(*sketch).and_then(|s| Some((s.frame, s.sketch.curve(noshape_sketch::EntityId(*entity))?))) {
+            Some((frame, c)) => curve_to_segment(&c).map(|seg| k::make_edge_2d(&crate::regen::eval::kernel_plane(&frame), &seg)).transpose()?,
+            None => None,
+        },
+        _ => None,
+    };
+    if let Some(e) = edge {
+        let info = e.edge_info()?;
+        return match info.curve {
+            k::Curve::Line { direction, .. } if direction.normalize_or_zero().dot(n).abs() > 1e-9 => err_at(&["startOffsetEntity"], NOT_PARALLEL),
+            k::Curve::Line { .. } => Ok(info.start),
+            k::Curve::Circle { axis, .. } | k::Curve::Ellipse { axis, .. } if parallel(axis) => Ok(info.start),
+            k::Curve::Circle { .. } | k::Curve::Ellipse { .. } => err_at(&["startOffsetEntity"], NOT_PARALLEL),
+            _ => err_at(&["startOffsetEntity"], NOT_PLANAR),
+        };
+    }
+    if matches!(r, Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_)) {
+        let Some(f) = ev.resolve_plane(r) else { return err_at(&["startOffsetEntity"], NOT_PLANAR) };
+        return if parallel(f.normal) { Ok(f.origin) } else { err_at(&["startOffsetEntity"], NOT_PARALLEL) };
+    }
+    ev.resolve_vertex_point(r).ok_or_else(|| crate::regen::eval::FeatureError { faulty: vec!["startOffsetEntity"], ..crate::regen::eval::FeatureError::new("Select a valid entity.") })
+}
+
+/// Through all and Up to next need parts or surfaces to reach (live: the
+/// dialog's "Parts or Surfaces must be present in the Part Studio.",
+/// std's CANNOT_COMPUTE_BBOX).
+pub fn require_parts(ev: &EvalCtx) -> FResult<()> {
+    if ev.ctx.bodies.iter().any(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface)) {
+        Ok(())
+    } else {
+        err("Parts or Surfaces must be present in the Part Studio.")
+    }
+}
+
+/// What Up to next extrudes up to: the parts.
+pub fn next_parts(ev: &EvalCtx) -> FResult<k::Shape> {
+    let solids: Vec<k::Shape> = ev.ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.shape.clone()).collect();
+    if solids.is_empty() {
+        return err("Parts or Surfaces must be present in the Part Studio.");
+    }
+    Ok(k::Shape::compound(&solids))
 }
 
 /// One extrusion of `profile` from its plane along `dir` to `end`.
@@ -160,7 +214,9 @@ fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<NamedShape>
     let symmetric = ev.bool("symmetric") && matches!(bound.as_str(), "BLIND" | "THROUGH_ALL");
     let draft = if ev.bool("hasDraft") {
         let a = ev.angle("draftAngle")?;
-        if ev.bool("draftPullDirection") { -a } else { a }
+        // std extrude.fs: unticked drafts outwards (the part grows away
+        // from the profile; std's opDraft pulls against the direction).
+        if ev.bool("draftPullDirection") { a } else { -a }
     } else {
         0.0
     };
@@ -170,38 +226,49 @@ fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<NamedShape>
         if ev.is("startOffsetBound", "BLIND") {
             let d = ev.length("startOffsetDistance")?;
             start_shift = dir * if ev.bool("startOffsetOppositeDirection") { -d } else { d };
-        } else if let Some(r) = ev.query("startOffsetEntity").first() {
-            let target = ev.resolve_plane(r).map(|f| f.origin).or_else(|| ev.resolve_vertex_point(r));
-            if let Some(t) = target {
-                start_shift = dir * (t - p.frame.origin).dot(dir);
-            }
+        } else {
+            let Some(r) = ev.query("startOffsetEntity").first() else { return err_at(&["startOffsetEntity"], "Select a valid entity.") };
+            let t = start_offset_point(ev, r, p.frame.normal)?;
+            // std processStartOffsetData: along the extrude direction to the
+            // entity's height above the profile plane.
+            start_shift = dir * ((t - p.frame.origin).dot(p.frame.normal) / dir.dot(p.frame.normal));
         }
     }
     let profile = if start_shift.length() > 0.0 { p.shape.translated(start_shift)? } else { p.shape.clone() };
     let named = |res: k::OpResult| NamedShape::new(res.shape.clone(), sweep_names(ev, p, &res, true, true));
 
-    if symmetric {
+    // std splits a drafted symmetric extrude at the profile plane and drafts
+    // both halves away from it.
+    let (end, d2, end2, draft2) = if symmetric {
         let End::Distance(depth) = end else { unreachable!("symmetric is only offered for blind / through all") };
-        return Ok(named(k::extrude_between(&profile, -dir * depth * 0.5, dir * depth * 0.5, draft)?));
-    }
-    if !ev.bool("hasSecondDirection") {
-        return Ok(named(one_side(&profile, dir, end, draft)?));
-    }
-    let bound2 = ev.enum_("secondDirectionBound").to_string();
-    let sign = if ev.bool("secondDirectionOppositeDirection") { -1.0 } else { 1.0 };
-    let d2 = dir * sign;
-    let end2 = end_for(ev, &bound2, "secondDirectionDepth", "secondDirectionBoundEntityFace", "secondDirectionBoundEntityBody", "secondDirectionBoundEntityVertex", "hasSecondDirectionOffset", "secondDirectionOffsetDistance", "secondDirectionOffsetOppositeDirection", d2)?;
-    let draft2 = if ev.bool("hasSecondDirectionDraft") {
-        let a = ev.angle("secondDirectionDraftAngle")?;
-        if ev.bool("secondDirectionDraftPullDirection") { -a } else { a }
+        if draft == 0.0 {
+            return Ok(named(k::extrude_between(&profile, -dir * depth * 0.5, dir * depth * 0.5, 0.0)?));
+        }
+        (End::Distance(depth * 0.5), -dir, End::Distance(depth * 0.5), draft)
     } else {
-        draft
+        if !ev.bool("hasSecondDirection") {
+            return Ok(named(one_side(&profile, dir, end, draft)?));
+        }
+        let bound2 = ev.enum_("secondDirectionBound").to_string();
+        let sign = if ev.bool("secondDirectionOppositeDirection") { -1.0 } else { 1.0 };
+        let d2 = dir * sign;
+        let end2 = end_for(ev, &bound2, "secondDirectionDepth", "secondDirectionBoundEntityFace", "secondDirectionBoundEntityBody", "secondDirectionBoundEntityVertex", "hasSecondDirectionOffset", "secondDirectionOffsetDistance", "secondDirectionOffsetOppositeDirection", d2)?;
+        // std: the second side has only its own draft (unticked: away from
+        // the profile plane, like the first).
+        let draft2 = if ev.bool("hasSecondDirectionDraft") && d2.dot(dir) < 0.0 {
+            let a = ev.angle("secondDirectionDraftAngle")?;
+            if ev.bool("secondDirectionDraftPullDirection") { a } else { -a }
+        } else {
+            0.0
+        };
+        (end, d2, end2, draft2)
     };
     if let (End::Distance(x1), End::Distance(x2)) = (&end, &end2)
-        && draft2 == draft
+        && draft == 0.0
+        && draft2 == 0.0
     {
         let (a, b) = (d2 * *x2, dir * *x1);
-        return Ok(named(if a.length() < 1e-12 && draft == 0.0 { k::extrude(&profile, b)? } else { k::extrude_between(&profile, a, b, draft)? }));
+        return Ok(named(if a.length() < 1e-12 { k::extrude(&profile, b)? } else { k::extrude_between(&profile, a, b, 0.0)? }));
     }
     // Two separately bounded halves, fused.
     let r1 = one_side(&profile, dir, end, draft)?;
@@ -233,7 +300,7 @@ fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<NamedShape>
 fn surface(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("surfaceEntities");
     if refs.is_empty() {
-        return err("Select sketch curves to extrude");
+        return err_at(&["surfaceEntities"], "Select sketch curves to extrude.");
     }
     let mut tools = Vec::new();
     for r in refs {

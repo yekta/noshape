@@ -58,7 +58,19 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
     let refillet = ev.bool("reFillet");
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
-        let faces = if ev.bool("tangentPropagation") { propagate_tangent_faces(&body.shape, &faces, pull, angle) } else { faces };
+        let faces = if ev.bool("tangentPropagation") {
+            propagate_tangent_faces(&body.shape, &faces, pull, angle)
+        } else if !refillet {
+            // Without Reapply, steep fillets beside the drafted faces are
+            // drafted with them, into cones (live N4: R5 vertical fillets,
+            // the 4 sides drafted 5° without propagation, 50984.27 mm³).
+            let all = propagate_tangent_faces(&body.shape, &faces, pull, angle);
+            let shapes = body.shape.faces();
+            let ef = body.shape.edge_faces()?;
+            all.into_iter().filter(|f| faces.contains(f) || fillet_radius(&body.shape, &shapes, &body.faces, &ef, *f).is_some()).collect()
+        } else {
+            faces
+        };
         // Fillets touching the drafted faces are rolled again afterwards, like
         // Parasolid: with Reapply fillet, also the drafted fillets themselves
         // (removed, their neighbours drafted, then re-filleted); without, the
