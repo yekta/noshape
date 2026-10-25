@@ -48,6 +48,9 @@ pub enum EditTarget {
     Faces(Vec<Reference>, Option<usize>),
     /// A feature's faces or a sketch's curves.
     Feature(FeatureId, Option<usize>),
+    /// Several features at once (the list's multi-selection menu, live
+    /// ui 10-25 b (1): "Add appearance to 2 features…").
+    Features(Vec<FeatureId>),
     /// Configured properties: a part's Appearance cell (part, row).
     ConfiguredCell(BodyId, usize),
 }
@@ -319,6 +322,15 @@ impl PartStudioView {
                     match index.or_else(|| ps.appearances.iter().position(|x| x.target == a.target)).and_then(|i| ps.appearances.get_mut(i)) {
                         Some(slot) => *slot = a,
                         None => ps.appearances.push(a),
+                    }
+                }
+                EditTarget::Features(fs) => {
+                    for f in fs {
+                        let a = FaceAppearance { target: AppearanceTarget::Feature(*f), color };
+                        match ps.appearances.iter_mut().find(|x| x.target == a.target) {
+                            Some(slot) => *slot = a,
+                            None => ps.appearances.push(a),
+                        }
                     }
                 }
             });

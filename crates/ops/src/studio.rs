@@ -86,6 +86,14 @@ pub fn set_suppression_expr(ps: &mut PartStudio, id: FeatureId, expr: Option<Str
     }
 }
 
+/// A folder's dynamic suppression ("Unsuppressed if" on the folder; None
+/// removes it): while false everything inside is suppressed at regen.
+pub fn set_folder_suppression_expr(ps: &mut PartStudio, folder: u32, expr: Option<String>) {
+    if let Some(f) = ps.folder_mut(folder) {
+        f.suppression_expr = expr.filter(|e| !e.trim().is_empty());
+    }
+}
+
 /// The "Folder name" popup's default (live part-studio/586).
 pub const NEW_FOLDER_NAME: &str = "New folder";
 pub const ADD_FOLDER_DESCRIPTION: &str = "Add folder";

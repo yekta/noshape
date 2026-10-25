@@ -72,6 +72,10 @@ pub struct Folder {
     /// Folders with features are placed by them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub after: Option<FeatureId>,
+    /// Dynamic suppression (Onshape's "Unsuppressed if" on the folder): while
+    /// it is false everything inside is suppressed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suppression_expr: Option<String>,
 }
 
 /// Appearance of a part (linear RGBA).
@@ -475,18 +479,63 @@ impl PartStudio {
         // Live (part-studio/587–590): a new folder is collapsed; an empty one
         // sits at the rollback bar.
         let after = if ids.is_empty() { self.rollback_index().checked_sub(1).and_then(|i| self.features.get(i)).map(|f| f.id) } else { None };
-        self.folders.push(Folder { id, name, collapsed: !ids.is_empty(), parent, after });
-        // Folders hold a contiguous run: gather members after the first one.
-        let mut idx: Vec<usize> = ids.iter().filter_map(|i| self.index_of(*i)).collect();
-        idx.sort_unstable();
-        if let Some(&first) = idx.first() {
-            let moved: Vec<Feature> = idx.iter().rev().map(|&i| self.features.remove(i)).collect::<Vec<_>>().into_iter().rev().collect();
-            for (at, mut f) in (first..).zip(moved) {
-                f.folder = Some(id);
-                self.features.insert(at, f);
+        self.folders.push(Folder { id, name, collapsed: !ids.is_empty(), parent, after, suppression_expr: None });
+        // Live (ui 10-25 b (1)): the folder takes every feature from the
+        // first to the last selected one, in place (the ones in between
+        // too); folders inside that run move in whole.
+        let idx: Vec<usize> = ids.iter().filter_map(|i| self.index_of(*i)).collect();
+        if let (Some(&lo), Some(&hi)) = (idx.iter().min(), idx.iter().max()) {
+            let mut sub: Vec<u32> = Vec::new();
+            for i in lo..=hi {
+                let folder = self.features[i].folder;
+                if folder == parent {
+                    self.features[i].folder = Some(id);
+                    continue;
+                }
+                // The feature's folder one level under the new one's parent.
+                let chain = self.folder_chain(folder);
+                let below = match parent {
+                    None => chain.first().copied(),
+                    Some(p) => chain.iter().position(|c| *c == p).and_then(|k| chain.get(k + 1)).copied(),
+                };
+                if let Some(c) = below.filter(|c| *c != id && !sub.contains(c)) {
+                    sub.push(c);
+                }
+            }
+            for fd in self.folders.iter_mut().filter(|fd| sub.contains(&fd.id)) {
+                fd.parent = Some(id);
             }
         }
         id
+    }
+
+    /// Add selection to folder… on a folder alone: a new folder around it,
+    /// in its place (its parent's child); returns the new folder's id.
+    pub fn wrap_folder(&mut self, folder: u32, name: String) -> Option<u32> {
+        let inner = self.folder(folder)?;
+        let (parent, after) = (inner.parent, inner.after);
+        self.next_folder_id = self.next_folder_id.max(self.folders.iter().map(|f| f.id + 1).max().unwrap_or(0));
+        let id = self.next_folder_id;
+        self.next_folder_id += 1;
+        self.folders.push(Folder { id, name, collapsed: true, parent, after, suppression_expr: None });
+        if let Some(f) = self.folder_mut(folder) {
+            f.parent = Some(id);
+        }
+        Some(id)
+    }
+
+    /// Every feature inside a folder, nested folders included, in order.
+    pub fn folder_features(&self, folder: u32) -> Vec<FeatureId> {
+        self.features.iter().filter(|f| self.folder_chain(f.folder).contains(&folder)).map(|f| f.id).collect()
+    }
+
+    /// Delete a folder with everything in it (features and nested folders).
+    pub fn delete_folder_tree(&mut self, folder: u32) {
+        for id in self.folder_features(folder) {
+            self.remove(id);
+        }
+        let gone: Vec<u32> = self.folders.iter().map(|f| f.id).filter(|f| self.folder_chain(Some(*f)).contains(&folder)).collect();
+        self.folders.retain(|f| !gone.contains(&f.id));
     }
 
     /// Features directly in a folder (the "(n)" after its name in the list).

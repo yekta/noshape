@@ -805,6 +805,36 @@ mod tests {
         assert_eq!(ps2.features.iter().map(|f| f.id).collect::<Vec<_>>(), order);
     }
 
+    /// A folder's dynamic suppression applies to everything inside it, nested
+    /// folders included; it is saved with the folder and goes with it.
+    #[test]
+    fn a_folders_dynamic_suppression_suppresses_its_features() {
+        use crate::display::FeatureStatus;
+        use crate::regen::{RegenOptions, Regenerator};
+        let mut ps = crate::demo::plate_studio();
+        let ext = ps.features.iter().find(|f| f.type_id == "extrude").map(|f| f.id).expect("extrude");
+        let run = |ps: &PartStudio| {
+            let mut r = Regenerator::new();
+            r.regenerate(ps, &Default::default(), &noshape_units::UnitPrefs::default(), &RegenOptions::default()).display
+        };
+        let inner = ps.new_folder(&[ext], None);
+        let outer = ps.wrap_folder(inner, "Outer".into()).unwrap();
+        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Ok));
+        ps.folder_mut(outer).unwrap().suppression_expr = Some("2 mm < 1 mm".into());
+        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Suppressed));
+        // Saved with the document.
+        let back: PartStudio = serde_json::from_str(&serde_json::to_string(&ps).unwrap()).unwrap();
+        assert_eq!(back.folder(outer).and_then(|f| f.suppression_expr.clone()).as_deref(), Some("2 mm < 1 mm"));
+        ps.folder_mut(outer).unwrap().suppression_expr = Some("2 mm > 1 mm".into());
+        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Ok));
+        ps.folder_mut(outer).unwrap().suppression_expr = Some("#nope > 1".into());
+        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Error));
+        // Unpacked, the expression goes with the folder.
+        ps.folder_mut(outer).unwrap().suppression_expr = Some("2 mm < 1 mm".into());
+        ps.dissolve_folder(outer);
+        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Ok));
+    }
+
     #[test]
     fn dynamic_suppression_and_boolean_expressions() {
         use crate::display::FeatureStatus;
@@ -846,6 +876,40 @@ mod tests {
         let wrap = ps.new_folder(&[FeatureId(1003)], Some("New folder".into()));
         assert_eq!(ps.folder_count(wrap), 1);
         assert!(ps.folder(wrap).unwrap().collapsed);
+    }
+
+    /// Live (ui 10-25 b (1)): Boss 1 and Boss 2 selected → "New folder (3)"
+    /// with Boss sketch 2 in between, in place.
+    #[test]
+    fn a_new_folder_takes_the_run_between_the_selected_features() {
+        let mut ps = studio();
+        let order: Vec<FeatureId> = ps.features.iter().map(|f| f.id).collect();
+        let f = ps.new_folder(&[order[1], order[3]], None);
+        assert_eq!(ps.features.iter().map(|f| f.id).collect::<Vec<_>>(), order);
+        assert_eq!(ps.folder_count(f), 3);
+        assert!(ps.features[1..=3].iter().all(|x| x.folder == Some(f)));
+        // A folder inside the run moves in whole.
+        let inner = ps.new_folder(&[order[2]], None);
+        let outer_parent = ps.folder(inner).and_then(|x| x.parent);
+        assert_eq!(outer_parent, Some(f));
+        ps.dissolve_folder(f);
+        let g = ps.new_folder(&[order[1], order[3]], None);
+        assert_eq!(ps.folder(inner).and_then(|x| x.parent), Some(g));
+        assert_eq!(ps.folder_count(g), 2);
+    }
+
+    /// Live (ui 10-25 b (2)): a folder's Add selection to folder… wraps it;
+    /// Delete takes the folder with everything in it.
+    #[test]
+    fn folders_wrap_and_delete_with_their_contents() {
+        let mut ps = studio();
+        let inner = ps.new_folder(&[FeatureId(1003), FeatureId(1004)], None);
+        let outer = ps.wrap_folder(inner, "New folder".into()).unwrap();
+        assert_eq!(ps.folder(inner).and_then(|f| f.parent), Some(outer));
+        assert_eq!(ps.folder_features(outer), vec![FeatureId(1003), FeatureId(1004)]);
+        ps.delete_folder_tree(outer);
+        assert!(ps.folders.is_empty());
+        assert_eq!(ps.features.iter().map(|f| f.id).collect::<Vec<_>>(), vec![FeatureId(1001), FeatureId(1002), FeatureId(1005)]);
     }
 
     #[test]

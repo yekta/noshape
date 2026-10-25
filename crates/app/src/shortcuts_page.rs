@@ -26,8 +26,9 @@ pub struct ShortcutsPage {
     scroll: ScrollHandle,
 }
 
-/// Opens the page, or brings an open one to the front.
-pub fn show(cx: &mut App) {
+/// Opens the page, or brings an open one to the front. Live opens it as a
+/// new browser tab, so at the opener's size and place (live 2460: 1919×1079).
+pub fn show(opener: &Window, cx: &mut App) {
     if let Some(g) = cx.try_global::<ShortcutsWindow>() {
         let handle = g.handle;
         if handle.update(cx, |_, window, _| window.activate_window()).is_ok() {
@@ -35,7 +36,7 @@ pub fn show(cx: &mut App) {
         }
     }
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1280.), px(900.)), cx))),
+        window_bounds: Some(opener.window_bounds()),
         window_min_size: Some(size(px(800.), px(480.))),
         #[cfg(target_os = "linux")]
         window_decorations: Some(WindowDecorations::Client),
@@ -80,19 +81,19 @@ fn section(tab: Tab, custom: &shortcuts::Shortcuts, cx: &App) -> Div {
             .child(
                 h_flex()
                     .flex_1()
-                    .gap_1()
                     .text_size(px(14.))
                     .text_color(pal.text)
                     .child(r.name)
+                    // Live: the lock's 20 px box right after the name (4 px blank before the glyph).
                     .when(r.locked, |d| d.child(crate::assets::icon("lock", 20., cx)))
-                    .when(r.conflict, |d| d.child(crate::assets::icon("shortcut-conflict", 16., cx))),
+                    .when(r.conflict, |d| d.child(div().ml_1().child(crate::assets::icon("shortcut-conflict", 16., cx)))),
             )
     });
     v_flex()
         .pt(px(2.))
         .pb(px(16.))
         // Live: the title over the actions' column, blue, 16 px, 34 px above the first row.
-        .child(h_flex().h(px(30.)).gap(px(13.)).child(div().w(relative(0.396)).flex_none()).child(div().text_size(px(16.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.accent).child(tab.label())))
+        .child(h_flex().h(px(30.)).gap(px(13.)).child(div().w(relative(0.396)).flex_none()).child(div().text_size(px(16.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.emphasis).child(tab.label())))
         .children(rows)
 }
 
@@ -133,7 +134,7 @@ impl Render for ShortcutsPage {
             .text_color(pal.text)
             // The window's own bar (moving, closing); live is a browser popup.
             .child(gpui_kit::component::TitleBar::new().bg(pal.panel_inactive).border_b_1().border_color(pal.border).child(div().pl(px(8.)).text_size(px(12.)).text_color(pal.text_muted).child("Keyboard shortcuts — noshape")))
-            .child(div().flex_none().h(px(45.)).px(px(10.)).flex().items_center().text_size(px(19.)).text_color(gpui_kit::rgb(0x555555)).child(div().relative().top(px(3.)).child("Keyboard shortcuts")))
+            .child(div().flex_none().h(px(45.)).px(px(10.)).flex().items_center().text_size(px(19.)).text_color(crate::theme::themed(0x555555, 0xd7d7d7)).child(div().relative().top(px(3.)).child("Keyboard shortcuts")))
             // Chrome's scrollbar on the page's right edge (live: the columns are half of what is left).
             .child(
                 div()
@@ -150,6 +151,6 @@ impl Render for ShortcutsPage {
             )
             // Live: the legend 10 px under the bar's top line (not centred).
             .child(div().flex_none().h(px(72.)).pt(px(10.)).border_t_1().border_color(pal.border).flex().items_start().justify_center().child(legend))
-            .child(h_flex().flex_none().h(px(29.)).border_t_1().border_color(pal.border).px(px(240.)).justify_end().text_size(px(11.)).text_color(pal.text_muted).child(format!("({})", crate::VERSION)))
+            .child(h_flex().flex_none().h(px(29.)).border_t_1().border_color(crate::theme::themed(0xd0dbe5, 0x555555)).px(px(240.)).justify_end().text_size(px(11.)).text_color(pal.text_muted).child(format!("({})", crate::VERSION)))
     }
 }

@@ -43,16 +43,40 @@ pub struct Isolation {
     pub expand: usize,
 }
 
+/// What the Dynamic suppression dialog sets: a feature's or a folder's
+/// "Unsuppressed if" expression.
+#[derive(Clone, Copy)]
+pub enum DynTarget {
+    Feature(FeatureId),
+    Folder(u32),
+}
+
 /// Open "Select other" list: candidates nearest first, highlighted index.
 pub struct SelectOther {
     pub hits: Vec<Reference>,
-    pub index: usize,
-    /// Viewport-local position the list opens at.
+    /// The highlighted entry (bold): none when opened from a menu.
+    pub index: Option<usize>,
+    /// Viewport-local point it was opened for: the click zone's centre.
     pub at: DVec2,
+    /// Where the ray met the nearest entity: a yellow point while the
+    /// pointer is out of the click zone (SELECT_OTHER_POINT_*).
+    pub point: Option<glam::DVec3>,
+    pub in_zone: bool,
+    pub moved_out: bool,
+    pub scroll: ScrollHandle,
 }
 
+/// Onshape's Select other constants (woolsthorpe: SELECTION_DIALOG_OFFSET_X /
+/// _Y, SELECT_OTHER_CLICK_ZONE_RADIUS_PX, _PICK_RADIUS_PX, _MAXIMUM_ELEMENTS)
+/// and the dialog's size (dom/select-other-popup.txt: 220 × 149).
+const SELECT_OTHER_OFFSET: (f32, f32) = (100., -25.);
+const SELECT_OTHER_ZONE_PX: f64 = 8.;
+const SELECT_OTHER_PICK_PX: f64 = 8.;
+const SELECT_OTHER_MAX: usize = 20;
+const SELECT_OTHER_SIZE: (f32, f32) = (220., 149.);
+
 /// Consumed dialog picks: (picks, accent picks, before-model, lines).
-pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, usize, Option<noshape_render::Instance>);
+pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize, Option<noshape_render::Instance>);
 
 /// View state for the behaviors above.
 pub struct UiState {
@@ -261,7 +285,8 @@ pub struct UiState {
     /// The selected cell (table, row, column; column 0 selects the row).
     pub sm_cell: Option<(u8, usize, usize)>,
     /// Dynamic suppression editor: feature, expression input.
-    pub dyn_suppression: Option<(FeatureId, Entity<InputState>, Subscription)>,
+    /// The Dynamic suppression dialog: what it sets and its input.
+    pub dyn_suppression: Option<(DynTarget, Entity<InputState>, Subscription)>,
     /// Shortcut map search box.
     pub shortcut_filter: Option<(Entity<InputState>, Subscription)>,
     pub shortcut_query: String,
@@ -282,6 +307,14 @@ pub struct UiState {
     pub remembered: std::collections::HashMap<(String, &'static str), ParamValue>,
     /// Feature list: "Default geometry" and "Parts" folders collapsed.
     pub default_geometry_collapsed: bool,
+    /// Folders the user opened (true) or closed (false) in this view, over
+    /// the document's state (a new folder starts closed). View state, not
+    /// an undo step (live qa4 r5 s8 (7)).
+    pub folder_open: std::collections::HashMap<u32, bool>,
+    /// The folder row selected in the feature list (a click on it).
+    pub selected_folder: Option<u32>,
+    /// A folder just made: its row related-highlighted until the next click.
+    pub fresh_folder: Option<u32>,
     /// Entity whose graphics-area context menu is open (kept highlighted).
     pub menu_target: Option<Reference>,
     /// Feature whose list context menu is open: its row and geometry stay
@@ -481,6 +514,9 @@ impl UiState {
             oriented: false,
             remembered: Default::default(),
             default_geometry_collapsed: false,
+            selected_folder: None,
+            fresh_folder: None,
+            folder_open: Default::default(),
             menu_target: None,
             list_menu: None,
             consumed_lines: None,
@@ -1177,13 +1213,6 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ dynamic suppression
 
-    pub(super) fn set_suppression_expr(&mut self, id: FeatureId, expr: Option<String>, cx: &mut Context<Self>) {
-        let expr = expr.filter(|e| !e.trim().is_empty());
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(expr.as_deref()), cx, |ps| noshape_ops::studio::set_suppression_expr(ps, id, expr));
-        });
-    }
-
     /// "Unsuppress" on a feature with an expression: drop it and leave the
     /// feature active (one undo step).
     pub(super) fn clear_dynamic_suppression(&mut self, id: FeatureId, cx: &mut Context<Self>) {
@@ -1196,7 +1225,23 @@ impl PartStudioView {
     /// expression (the feature is active while it is true; live
     /// dom/dialog-dynamic-suppression.txt).
     pub(super) fn edit_dynamic_suppression(&mut self, id: FeatureId, window: &mut Window, cx: &mut Context<Self>) {
-        let current = self.studio(cx).and_then(|s| s.feature(id)).and_then(|f| f.suppression_expr.clone()).unwrap_or_default();
+        self.open_dynamic_suppression(DynTarget::Feature(id), window, cx);
+    }
+
+    /// The same on a folder: the expression belongs to the folder and
+    /// suppresses everything inside it while false.
+    pub(super) fn edit_folder_dynamic_suppression(&mut self, folder: u32, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_dynamic_suppression(DynTarget::Folder(folder), window, cx);
+    }
+
+    fn open_dynamic_suppression(&mut self, target: DynTarget, window: &mut Window, cx: &mut Context<Self>) {
+        let current = self
+            .studio(cx)
+            .and_then(|s| match target {
+                DynTarget::Feature(id) => s.feature(id).and_then(|f| f.suppression_expr.clone()),
+                DynTarget::Folder(fd) => s.folder(fd).and_then(|f| f.suppression_expr.clone()),
+            })
+            .unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(current));
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, _, ev: &InputEvent, window, cx| {
             if let InputEvent::PressEnter { .. } = ev {
@@ -1204,17 +1249,22 @@ impl PartStudioView {
             }
         });
         st.update(cx, |s, cx| s.focus(window, cx));
-        self.ui.dyn_suppression = Some((id, st, sub));
+        self.ui.dyn_suppression = Some((target, st, sub));
         cx.notify();
     }
 
     fn accept_dynamic_suppression(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((id, st, _)) = self.ui.dyn_suppression.take() else { return };
+        let Some((target, st, _)) = self.ui.dyn_suppression.take() else { return };
         let text = st.read(cx).value().to_string();
         // An empty field leaves the feature as it was (live: nothing
         // changes until an expression is committed).
         if !text.trim().is_empty() {
-            self.set_suppression_expr(id, Some(text), cx);
+            self.doc.update(cx, |doc, cx| {
+                doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(Some(&text)), cx, |ps| match target {
+                    DynTarget::Feature(id) => noshape_ops::studio::set_suppression_expr(ps, id, Some(text.clone())),
+                    DynTarget::Folder(fd) => noshape_ops::studio::set_folder_suppression_expr(ps, fd, Some(text.clone())),
+                });
+            });
         }
         window.focus(&self.focus, cx);
         cx.notify();
@@ -2307,22 +2357,47 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ select other
 
-    /// ` (grave): list the faces and edges under the cursor, nearest first;
-    /// pressing it again moves down the list (Shift+` up).
+    /// ` (grave): list the faces and edges under the cursor, nearest first,
+    /// the second one highlighted (Shift+`: the last); pressing it again in
+    /// the click zone moves down the list (Onshape onSelectOtherCommand).
     pub(super) fn select_other(&mut self, backwards: bool, cx: &mut Context<Self>) {
-        if let Some(so) = &mut self.ui.select_other {
-            let n = so.hits.len().max(1);
-            so.index = if backwards { (so.index + n - 1) % n } else { (so.index + 1) % n };
-            self.hover = so.hits.get(so.index).cloned();
-            self.refresh_scene(false, cx);
-            cx.notify();
+        if self.ui.select_other.as_ref().is_some_and(|so| so.in_zone || !so.moved_out) {
+            self.select_other_step(backwards, cx);
+        } else {
+            self.start_select_other(false, backwards, cx);
+        }
+    }
+
+    /// The next (previous) entry: ` again, ↑ / ↓ (Onshape highlightNext /
+    /// PreviousSelection → setCurrentSelection: bold, pre-highlighted,
+    /// scrolled into view).
+    pub(super) fn select_other_step(&mut self, backwards: bool, cx: &mut Context<Self>) {
+        let Some(so) = &mut self.ui.select_other else { return };
+        let n = so.hits.len();
+        if n == 0 {
             return;
         }
+        let i = if backwards { so.index.map_or(n - 1, |i| (i + n - 1) % n) } else { so.index.map_or(0, |i| (i + 1) % n) };
+        so.index = Some(i);
+        so.scroll.scroll_to_item(i);
+        self.hover = so.hits.get(i).cloned();
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    /// Select other… from a context menu: nothing highlighted yet, the
+    /// point it was opened for marked (Onshape startSelectOther with an
+    /// event).
+    pub(super) fn select_other_from_menu(&mut self, cx: &mut Context<Self>) {
+        self.start_select_other(true, false, cx);
+    }
+
+    fn start_select_other(&mut self, from_menu: bool, backwards: bool, cx: &mut Context<Self>) {
         let Some(at) = self.ui.pointer else { return };
         let (origin, dir, tol) = {
             let vp = self.viewport.read(cx);
             let (o, d) = vp.ray(at);
-            (o, d, vp.camera.world_per_pixel(vp.size().y) * 8.0)
+            (o, d, vp.camera.world_per_pixel(vp.size().y) * SELECT_OTHER_PICK_PX)
         };
         let iso = self.ui.isolate.as_ref().map(|i| (i.mode, i.bodies.clone()));
         let skip = move |b: &BodyId| match &iso {
@@ -2330,61 +2405,106 @@ impl PartStudioView {
             Some((IsolateMode::Transparent, gone)) => gone.contains(b),
             None => false,
         };
-        let hits: Vec<Reference> = interaction::entities_along_ray(&self.display, origin, dir, tol, &skip, 20).into_iter().map(|h| h.reference).collect();
-        if hits.is_empty() {
-            self.flash_info("Nothing under the cursor to select.".into(), cx);
-            return;
+        let found = interaction::entities_along_ray(&self.display, origin, dir, tol, &skip, SELECT_OTHER_MAX);
+        let point = found.first().map(|h| origin + dir.normalize_or_zero() * h.depth);
+        let hits: Vec<Reference> = found.into_iter().map(|h| h.reference).collect();
+        let n = hits.len();
+        let index = (!from_menu && n > 0).then(|| if backwards { n - 1 } else { 1 % n });
+        self.hover = if from_menu { None } else { index.and_then(|i| hits.get(i).cloned()) };
+        let scroll = ScrollHandle::new();
+        if let Some(i) = index {
+            scroll.scroll_to_item(i);
         }
-        // Start on the entry after the highlighted one (Onshape).
-        let start = self.hover.as_ref().and_then(|h| hits.iter().position(|r| r == h)).map(|i| (i + 1) % hits.len()).unwrap_or(0);
-        self.hover = hits.get(start).cloned();
-        self.ui.select_other = Some(SelectOther { hits, index: start, at });
+        self.ui.select_other = Some(SelectOther { hits, index, at, point, in_zone: !from_menu, moved_out: false, scroll });
         self.refresh_scene(false, cx);
         cx.notify();
     }
 
-    /// Pick the highlighted (or clicked) Select other entry.
+    /// The pointer over the graphics while Select other is open: in the
+    /// click zone the highlighted entry is pre-highlighted, out of it the
+    /// point shows instead (Onshape onMouseMove; picking under the pointer
+    /// is off meanwhile).
+    pub(super) fn select_other_pointer(&mut self, position: DVec2, cx: &mut Context<Self>) {
+        let Some(so) = &mut self.ui.select_other else { return };
+        let in_zone = (position - so.at).length() <= SELECT_OTHER_ZONE_PX;
+        if in_zone == so.in_zone {
+            return;
+        }
+        so.moved_out |= !in_zone;
+        so.in_zone = in_zone;
+        self.hover = if in_zone { so.index.and_then(|i| so.hits.get(i).cloned()) } else { None };
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    /// A click on the graphics while Select other is open: in the click zone
+    /// it takes the highlighted entry, elsewhere it only closes the list
+    /// (Onshape onCanvasClick; the click selects nothing else).
+    pub(super) fn select_other_click(&mut self, position: DVec2, cx: &mut Context<Self>) {
+        let Some(so) = &self.ui.select_other else { return };
+        if (position - so.at).length() <= SELECT_OTHER_ZONE_PX && so.index.is_some() {
+            self.choose_select_other(None, cx);
+        } else {
+            self.ui.select_other = None;
+            self.hover = None;
+            self.refresh_scene(false, cx);
+        }
+        cx.notify();
+    }
+
+    /// Pick the highlighted (or clicked) Select other entry; Enter with
+    /// nothing highlighted does nothing.
     pub(super) fn choose_select_other(&mut self, index: Option<usize>, cx: &mut Context<Self>) {
+        let Some(i) = index.or(self.ui.select_other.as_ref().and_then(|so| so.index)) else { return };
         let Some(so) = self.ui.select_other.take() else { return };
-        let Some(r) = so.hits.get(index.unwrap_or(so.index)).cloned() else { return };
+        let Some(r) = so.hits.get(i).cloned() else { return };
         let kind = if matches!(r, Reference::Edge(_)) { PickKind::Edge } else { PickKind::Face };
         self.hover = None;
         self.pick(PickTarget { reference: r, kind, anchor: None }, cx);
     }
 
+    /// The yellow point the list was opened for, while the pointer is out of
+    /// the click zone (SELECT_OTHER_POINT_COLOR rgb(255,194,14), size 9).
+    pub(super) fn select_other_overlay(&self) -> Option<noshape_render::Instance> {
+        let so = self.ui.select_other.as_ref().filter(|so| !so.in_zone)?;
+        let p = so.point?.as_vec3();
+        let pts = noshape_render::PointData { points: vec![noshape_render::PointSprite { position: p.into(), color: [255, 194, 14, 255], pick_id: 0, size: 9.0, style: noshape_render::LineSegment::ON_TOP, _pad: 0 }] };
+        Some(noshape_render::Instance::new(noshape_render::Drawable::Points(self.gpu.uploader().upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(20))
+    }
+
+    /// Live (sketch/230–231, dom/select-other-popup.txt): a 220 px dialog
+    /// 100 px right of and 25 px above the pointer, kept in the graphics
+    /// area: "Select other" (13 px / 500) and the red ✕; the list in a 1 px
+    /// #d7d7d7 box (blue under the pointer), 24 px rows of 13.33 px names,
+    /// every second row 35 % white, the highlighted one bold, a slim
+    /// scrollbar while the pointer is on it; the "?" row.
     pub(super) fn render_select_other(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let so = self.ui.select_other.as_ref()?;
         let pal = p();
         let labeler = self.labeler(cx);
-        let rows: Vec<AnyElement> = so
+        let size = self.viewport.read(cx).size();
+        let left = (so.at.x as f32 + SELECT_OTHER_OFFSET.0).min(size.x as f32 - SELECT_OTHER_SIZE.0).max(0.);
+        let top = (so.at.y as f32 + SELECT_OTHER_OFFSET.1).min(size.y as f32 - SELECT_OTHER_SIZE.1).max(0.);
+        let mut rows: Vec<AnyElement> = so
             .hits
             .iter()
             .enumerate()
             .map(|(i, r)| {
-                let active = i == so.index;
                 let r2 = r.clone();
-                let kind = if matches!(r, Reference::Edge(_)) { "Edge" } else { "Face" };
                 h_flex()
                     .id(SharedString::from(format!("so-{i}")))
-                    .gap_2()
-                    .px_2()
-                    .py_0p5()
-                    .rounded_sm()
-                    .text_xs()
-                    .cursor_pointer()
-                    .when(active, |d| d.bg(pal.accent_soft))
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(div().w(px(32.)).text_color(pal.text_faint).child(kind))
-                    .child(div().text_color(pal.text).child(labeler(r)))
+                    .flex_none()
+                    .h(px(24.))
+                    .pl(px(6.))
+                    .pr(px(20.))
+                    .when(i % 2 == 1, |d| d.bg(gpui_kit::rgba(0xffffff59)))
+                    .child(div().truncate().text_size(px(13.33)).text_color(pal.text).when(so.index == Some(i), |d| d.font_weight(FontWeight::BOLD)).child(labeler(r)))
+                    // Hovering a row pre-highlights its entity (Onshape
+                    // onMouseEnteredSelection); the bold row stays.
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
-                        if *h {
-                            if let Some(so) = &mut this.ui.select_other {
-                                so.index = i;
-                            }
-                            this.hover = Some(r2.clone());
-                            this.refresh_scene(false, cx);
-                            cx.notify();
-                        }
+                        this.hover = if *h { Some(r2.clone()) } else { None };
+                        this.refresh_scene(false, cx);
+                        cx.notify();
                     }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
                         cx.stop_propagation();
@@ -2393,22 +2513,74 @@ impl PartStudioView {
                     .into_any_element()
             })
             .collect();
+        if rows.is_empty() {
+            rows.push(
+                h_flex()
+                    .id("so-none")
+                    .h(px(24.))
+                    .pl(px(6.))
+                    .text_size(px(13.33))
+                    .text_color(pal.text)
+                    .child("(No selections found)")
+                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                        cx.stop_propagation();
+                        this.ui.select_other = None;
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+            );
+        }
+        // The slim scrollbar: 7 px, #333 at 40 %, while the pointer is on the list.
+        let (offset, max) = (f32::from(so.scroll.offset().y), f32::from(so.scroll.max_offset().y));
+        let view_h = 90.;
+        let thumb = (max > 0.5).then(|| {
+            let h = (view_h * view_h / (view_h + max)).max(20.);
+            let y = (-offset / max) * (view_h - h);
+            div().absolute().right(px(1.)).top(px(y)).w(px(7.)).h(px(h)).rounded(px(7.)).bg(gpui_kit::rgb(0x333333)).opacity(0.).group_hover("so-list", |d| d.opacity(0.4))
+        });
+        let close = cx.listener(|this, _: &ClickEvent, _, cx| {
+            this.ui.select_other = None;
+            this.hover = None;
+            this.refresh_scene(false, cx);
+            cx.notify();
+        });
         Some(
             v_flex()
                 .id("select-other")
                 .occlude()
                 .absolute()
-                .left(px(so.at.x as f32 + 14.0))
-                .top(px(so.at.y as f32 + 10.0))
-                .min_w(px(180.))
-                .p_1()
-                .rounded_md()
-                .bg(pal.panel_raised)
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
-                .child(div().px_2().pb_1().text_xs().text_color(pal.text_muted).child("Select other"))
-                .children(rows)
+                .left(px(left))
+                .top(px(top))
+                .w(px(SELECT_OTHER_SIZE.0))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .flex_none()
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .border_b_1()
+                        .border_color(pal.border)
+                        .child(div().flex_1().pl(px(9.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Select other"))
+                        .child(div().id("so-close").size(px(28.)).flex().items_center().justify_center().child(crate::assets::icon("dialog-cancel", 24., cx)).on_click(close)),
+                )
+                .child(
+                    div()
+                        .id("so-list")
+                        .group("so-list")
+                        .relative()
+                        .h(px(92.))
+                        .flex_none()
+                        .border_1()
+                        .border_color(pal.border)
+                        .rounded(px(2.))
+                        .hover(|d| d.border_color(gpui_kit::rgb(0x1651b0)))
+                        .child(v_flex().id("so-rows").size_full().overflow_y_scroll().track_scroll(&so.scroll).children(rows))
+                        .children(thumb),
+                )
+                // Live: 6 px under the list, the help row: its "?" 14 px, 4 px from the right.
+                .child(h_flex().h(px(28.)).flex_none().items_start().justify_end().pt(px(10.)).pr(px(4.)).child(crate::ui::glyph("help-dot", 14., crate::theme::help_dot(0xa0a0a0))))
                 .into_any_element(),
         )
     }
@@ -2425,17 +2597,23 @@ impl PartStudioView {
             return Vec::new();
         };
         let missing = |refs: &[Reference]| -> Vec<Reference> { refs.iter().filter(|r| matches!(r, Reference::Edge(_) | Reference::Face(_)) && built.picks.ids_for(r).is_empty()).cloned().collect() };
-        let (sel, acc) = (missing(selection), missing(accent));
+        let (mut sel, mut acc) = (missing(selection), missing(accent));
+        // Hovering its chip lights the pick the query-hover yellow-green
+        // #f2ff80, consumed or not (live: qa4 round 5 s7, CHIP-HOVER).
+        let hov: Vec<Reference> = self.ui.query_hover.iter().filter(|h| sel.contains(h) || acc.contains(h)).cloned().collect();
+        sel.retain(|r| !hov.contains(r));
+        acc.retain(|r| !hov.contains(r));
         let key = Arc::as_ptr(&before) as usize;
-        if let Some((s, a, k, inst)) = &self.ui.consumed_lines
+        if let Some((s, a, h, k, inst)) = &self.ui.consumed_lines
             && *s == sel
             && *a == acc
+            && *h == hov
             && *k == key
         {
             return inst.iter().cloned().collect();
         }
         let mut lines = LineData::default();
-        for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION)] {
+        for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION), (&hov, 0xf2ff80)] {
             let rgba = [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255];
             for r in refs.iter() {
                 let edges = match r {
@@ -2454,7 +2632,7 @@ impl PartStudioView {
             }
         }
         let inst = (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12));
-        self.ui.consumed_lines = Some((sel, acc, key, inst.clone()));
+        self.ui.consumed_lines = Some((sel, acc, hov, key, inst.clone()));
         inst.into_iter().collect()
     }
 
@@ -2597,7 +2775,9 @@ impl PartStudioView {
                 marker(&mut points, m, [0xfac012, 0xc4960b, 0xffd65b]);
             }
         }
-        if self.active_field_filter(cx).is_none_or(field_takes_points) && (self.edit.is_none() || self.active_field_filter(cx).is_some()) && self.sketch.is_none() {
+        // Not for Select other's highlight: it isn't a pick under the pointer
+        // (Onshape suppresses mouse-move picking while the list is open).
+        if self.active_field_filter(cx).is_none_or(field_takes_points) && (self.edit.is_none() || self.active_field_filter(cx).is_some()) && self.sketch.is_none() && self.ui.select_other.is_none() {
             match &self.hover {
                 Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) => {
                     if let Some(m) = self.edge_midpoint(on) {
@@ -2762,6 +2942,8 @@ impl PartStudioView {
     pub(super) fn click_feature(&mut self, id: FeatureId, shift: bool, cx: &mut Context<Self>) {
         let order: Vec<FeatureId> = self.studio(cx).map(|s| s.features.iter().map(|f| f.id).collect()).unwrap_or_default();
         self.selected_features = interaction::list_click(&order, &self.selected_features, self.ui.anchor.as_ref(), &id, shift);
+        self.ui.selected_folder = None;
+        self.ui.fresh_folder = None;
         self.ui.anchor = Some(id);
         self.refresh_scene(false, cx);
         cx.notify();
@@ -3224,7 +3406,14 @@ impl PartStudioView {
         }
         let dialog = e.dialog.clone();
         let id = dialog.read(cx).feature.id;
-        let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
+        let Some(state) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack) else { return };
+        // std booleanStepEditLogic: when the tool can't be built (Extrude's
+        // Direction ticked with nothing picked) the operation and scope stay
+        // as they are; only a failing boolean (its merge scope) is judged.
+        if state.status == FeatureStatus::Error && !state.faulty.iter().any(|f| f == "booleanScope") {
+            return;
+        }
+        let touched = state.touched.clone();
         let changes = {
             let d = dialog.read(cx);
             noshape_ops::studio::boolean_edit_logic(&d.feature, &|k| d.user_set.contains(k), &touched)

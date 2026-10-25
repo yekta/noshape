@@ -231,6 +231,14 @@ impl DraftHistory {
 /// Measurements of the current selection: (selection, labelled results).
 type MeasureCache = (Vec<Reference>, Vec<(String, noshape_model::regen::measure::Measurement)>);
 
+/// What a new folder from the "Folder name" popup wraps: features (Add
+/// selection to folder…, the header's New folder) or a folder (its row's
+/// Add selection to folder…, live ui 10-25 b (2)).
+enum FolderTarget {
+    Features(Vec<FeatureId>),
+    Folder(u32),
+}
+
 pub struct PartStudioView {
     pub tab: TabId,
     doc: Entity<DocModel>,
@@ -305,8 +313,8 @@ pub struct PartStudioView {
     dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     manip_drag: Option<manipulators::ManipDrag>,
     folder_renaming: Option<(u32, Entity<gpui_kit::component::input::InputState>, Subscription)>,
-    /// The header's "Folder name" popup: its input and the features it wraps.
-    folder_prompt: Option<(Entity<gpui_kit::component::input::InputState>, Vec<FeatureId>, Subscription)>,
+    /// The "Folder name" popup: its input and what the new folder wraps.
+    folder_prompt: Option<(Entity<gpui_kit::component::input::InputState>, FolderTarget, Subscription)>,
     named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// The Named views dialog's "Select a view" list and the view picked in it.
     named_view_picked: Option<String>,
@@ -870,6 +878,7 @@ impl PartStudioView {
         let manip: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = self.manipulator_geometry(cx).into_iter().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>).collect();
         self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
         extra.extend(self.consumed_picks_overlay(&selection, &accent));
+        extra.extend(self.select_other_overlay());
         extra.extend(self.measure_overlay(cx));
         extra.extend(self.midpoint_overlay(cx));
         extra.extend(self.shown_dims_overlay(cx));
@@ -1274,6 +1283,7 @@ impl PartStudioView {
         match ev {
             ViewportEvent::PointerMove { position, .. } => {
                 self.ui.pointer = Some(*position);
+                self.select_other_pointer(*position, cx);
                 // Hovering a manipulator arrow outlines it (Onshape).
                 let on_manip = vp.read(cx).manipulator_at(*position);
                 if on_manip != self.ui.manip_hover {
@@ -1291,8 +1301,13 @@ impl PartStudioView {
             }
             ViewportEvent::Click { position, .. } | ViewportEvent::ToolDown { position, .. } => {
                 self.ui.pointer = Some(*position);
-                // A click elsewhere closes the S toolbar and Select other.
-                if self.ui.mini_toolbar.take().is_some() || self.ui.select_other.take().is_some() {
+                // Select other takes the click (its entry or closing).
+                if self.ui.select_other.is_some() {
+                    self.select_other_click(*position, cx);
+                    return;
+                }
+                // A click elsewhere closes the S toolbar.
+                if self.ui.mini_toolbar.take().is_some() | self.ui.selected_folder.take().is_some() | self.ui.fresh_folder.take().is_some() {
                     cx.notify();
                 }
             }
@@ -1313,6 +1328,8 @@ impl PartStudioView {
             return;
         }
         match ev {
+            // Picking under the pointer is off while Select other is open.
+            ViewportEvent::Hover(_) if self.ui.select_other.is_some() => {}
             ViewportEvent::Hover(id) => {
                 let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
                 if r != self.hover {
@@ -1546,7 +1563,9 @@ impl PartStudioView {
         let is_derived = feature.type_id == "importDerived";
         let dialog = cx.new(|cx| {
             let mut d = FeatureDialog::new(feature, units, labeler, cx);
-            if !is_new {
+            if is_new {
+                d.release_prefilled_single_pick();
+            } else {
                 d.focus_for_edit();
             }
             d
@@ -2356,7 +2375,15 @@ impl PartStudioView {
         let editing_new_at = self.edit.as_ref().filter(|e| e.is_new).map(|e| e.index);
         // The Folder name popup sits beside the first selected feature, or
         // the rollback bar (live 586, 589).
-        let prompt_anchor = self.folder_prompt.as_ref().map(|(_, ids, _)| ids.first().copied());
+        let prompt_anchor = self.folder_prompt.as_ref().and_then(|(_, t, _)| match t {
+            FolderTarget::Features(ids) => Some(ids.first().copied()),
+            FolderTarget::Folder(_) => None,
+        });
+        // Wrapping a folder: the popup sits under the folder's row.
+        let prompt_folder = self.folder_prompt.as_ref().and_then(|(_, t, _)| match t {
+            FolderTarget::Folder(f) => Some(*f),
+            FolderTarget::Features(_) => None,
+        });
         let mut items: Vec<ListItem> = Vec::new();
         let mut open_folder: Vec<u32> = Vec::new();
         if filtered.is_none() {
@@ -2385,13 +2412,16 @@ impl PartStudioView {
             let chain = studio.folder_chain(f.folder);
             let common = open_folder.iter().zip(&chain).take_while(|(a, b)| a == b).count();
             for (depth, fid) in chain.iter().enumerate().skip(common) {
-                let ancestors_open = chain[..depth].iter().all(|a| studio.folder(*a).is_some_and(|fd| !fd.collapsed));
+                let ancestors_open = chain[..depth].iter().all(|a| studio.folder(*a).is_some_and(|fd| !self.folder_collapsed(fd)));
                 if let (Some(fd), true) = (studio.folder(*fid), ancestors_open || filtered.is_some()) {
                     items.push(ListItem::Folder(12.0 * depth as f32, fd.clone()));
+                    if prompt_folder == Some(fd.id) {
+                        items.push(ListItem::Prompt);
+                    }
                 }
             }
             open_folder = chain.clone();
-            let collapsed = chain.iter().any(|c| studio.folder(*c).is_some_and(|fd| fd.collapsed));
+            let collapsed = chain.iter().any(|c| studio.folder(*c).is_some_and(|fd| self.folder_collapsed(fd)));
             if collapsed && editing_id != Some(f.id) && filtered.is_none() {
                 continue;
             }
@@ -2684,9 +2714,11 @@ impl PartStudioView {
                 .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
                 .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(None, cx)))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    // Clicking empty list space clears the feature selection.
-                    if !this.selected_features.is_empty() {
+                    // Clicking empty list space clears the feature selection
+                    // (and a new folder's highlight).
+                    if !this.selected_features.is_empty() || this.ui.selected_folder.is_some() || this.ui.fresh_folder.take().is_some() {
                         this.selected_features.clear();
+                        this.ui.selected_folder = None;
                         this.refresh_scene(false, cx);
                         cx.notify();
                     }
@@ -3181,6 +3213,10 @@ impl PartStudioView {
     /// The header's New folder: the "Folder name" popup, "New folder"
     /// selected (live 586).
     fn open_folder_prompt(&mut self, ids: Vec<FeatureId>, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_folder_prompt_for(FolderTarget::Features(ids), window, cx);
+    }
+
+    fn open_folder_prompt_for(&mut self, target: FolderTarget, window: &mut Window, cx: &mut Context<Self>) {
         let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(noshape_ops::studio::NEW_FOLDER_NAME));
         st.update(cx, |s, cx| {
             s.focus(window, cx);
@@ -3191,19 +3227,28 @@ impl PartStudioView {
                 this.commit_folder_prompt(window, cx);
             }
         });
-        self.folder_prompt = Some((st, ids, sub));
+        self.folder_prompt = Some((st, target, sub));
         cx.notify();
     }
 
     /// ✓ / Enter: an empty folder at the rollback bar, or the selection wrapped.
     fn commit_folder_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((st, ids, _)) = self.folder_prompt.take() else { return };
+        let Some((st, target, _)) = self.folder_prompt.take() else { return };
         let name = st.read(cx).value().to_string();
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, noshape_ops::studio::ADD_FOLDER_DESCRIPTION, cx, |ps| {
-                noshape_ops::studio::add_folder(ps, &ids, &name);
-            });
+        let made = self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, noshape_ops::studio::ADD_FOLDER_DESCRIPTION, cx, |ps| match &target {
+                FolderTarget::Features(ids) => Some(noshape_ops::studio::add_folder(ps, ids, &name)),
+                FolderTarget::Folder(f) => {
+                    let name = name.trim();
+                    ps.wrap_folder(*f, if name.is_empty() { noshape_ops::studio::NEW_FOLDER_NAME } else { name }.to_string())
+                }
+            })
         });
+        // Live (ui 10-25 b (1)): the new folder's row replaces the selection,
+        // nothing selected, the row related-highlighted until the next click.
+        self.selected_features.clear();
+        self.ui.selected_folder = None;
+        self.ui.fresh_folder = made.flatten();
         let fh = self.focus.clone();
         window.focus(&fh, cx);
         cx.notify();
@@ -3269,51 +3314,119 @@ impl PartStudioView {
             .into_any_element()
     }
 
+    /// A folder row (live ui 10-25 b): a click selects it, only the chevron
+    /// opens or closes it, a double-click does nothing; its menu is Rename |
+    /// Add selection to folder… | Suppress, Dynamic suppression ▸ | Roll to
+    /// here | Expand ▸, Collapse ▸ | Delete, Unpack folder.
     fn render_folder_row(&self, fd: &noshape_model::partstudio::Folder, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
         let id = fd.id;
-        let collapsed = fd.collapsed;
-        let _ = pal;
-        let row = crate::ui::tree_row(SharedString::from(format!("folder-{id}")), false)
+        let collapsed = self.folder_collapsed(fd);
+        let selected = self.ui.selected_folder == Some(id);
+        let fresh = self.ui.fresh_folder == Some(id) && !selected;
+        let suppressed = self.folder_suppressed(id, cx);
+        let has_expr = fd.suppression_expr.is_some();
+        let is_last = self.studio(cx).is_some_and(|s| s.folder_features(id).last().is_some_and(|l| s.features.last().is_some_and(|f| f.id == *l)));
+        let row = crate::ui::tree_row(SharedString::from(format!("folder-{id}")), selected)
             .mr(px(5.))
-            .child(crate::ui::caret(!collapsed))
-            .child(crate::ui::tree_icon("folder", false, cx))
+            // Live `related-highlight`: #ECF0F4 with a 1 px #90CEF1 line under it.
+            .when(fresh, |d| d.bg(p().row_related).border_b_1().border_color(gpui_kit::rgb(0x90cef1)))
+            .child(
+                div()
+                    .id(SharedString::from(format!("folder-chev-{id}")))
+                    .flex_none()
+                    .child(crate::ui::caret(!collapsed))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        cx.stop_propagation();
+                        this.toggle_folder(id, cx);
+                    })),
+            )
+            .child(crate::ui::tree_icon("folder", suppressed, cx))
             .child(match self.folder_renaming.as_ref().filter(|(fid, _, _)| *fid == id) {
                 Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.))).into_any_element(),
-                // Live 587, 590: "New folder (0)" — the name and its feature count.
-                None => div().flex_1().truncate().child(crate::ui::user_text(format!("{} ({})", fd.name, self.studio(cx).map(|s| s.folder_count(id)).unwrap_or(0)))).into_any_element(),
+                // Live 587, 590: "New folder (0)" — the name and its feature count;
+                // a suppressed folder grey, italic and struck through (2d).
+                None => div()
+                    .flex_1()
+                    .truncate()
+                    .when(suppressed, |d| d.italic().line_through().text_color(p().text_faint))
+                    .child(crate::ui::user_text(format!("{} ({})", fd.name, self.studio(cx).map(|s| s.folder_count(id)).unwrap_or(0))))
+                    .into_any_element(),
             })
-            .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
-                if ev.click_count() >= 2 {
-                    this.start_folder_rename(id, window, cx);
-                } else {
-                    this.toggle_folder(id, cx);
-                }
-            }));
+            // The expression marker, as on a feature row (assembly/141).
+            .when(has_expr, |d| {
+                let tip = if suppressed { format!("{} (Suppressed with expression)", fd.name) } else { fd.name.clone() };
+                d.child(
+                    div()
+                        .id(SharedString::from(format!("folder-dyn-{id}")))
+                        .text_xs()
+                        .italic()
+                        .text_color(p().accent)
+                        .cursor_pointer()
+                        .child("ƒx")
+                        .tooltip(crate::ui::tooltip(tip))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
+                            cx.stop_propagation();
+                            this.edit_folder_dynamic_suppression(id, w, cx);
+                        })),
+                )
+            })
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.select_folder(id, cx)));
         let view = cx.entity();
-        row.os_context_menu(move |menu, _, _| {
-            let v = view.clone();
-            let v2 = view.clone();
-            let v3 = view.clone();
-            let v4 = view.clone();
-            let v5 = view.clone();
-            let v6 = view.clone();
-            menu.item(crate::os_menu::OsMenuItem::new(if collapsed { "Expand" } else { "Collapse" }).on_click(move |_, _, cx| v.update(cx, |this, cx| this.toggle_folder(id, cx))))
-                .item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, window, cx| v2.update(cx, |this, cx| this.start_folder_rename(id, window, cx))))
+        row.os_context_menu(move |menu, window, cx| {
+            view.update(cx, |this, cx| this.select_folder(id, cx));
+            let item = |label: &str, f: ViewAction| {
+                let v = view.clone();
+                crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+            };
+            let (ve, vc, vd) = (view.clone(), view.clone(), view.clone());
+            let mut m = menu
+                .item(item("Rename", Box::new(move |this, w, cx| this.start_folder_rename(id, w, cx))))
                 .separator()
-                // Onshape: suppressing a folder suppresses everything in it.
-                .item(crate::os_menu::OsMenuItem::new("Suppress").on_click(move |_, _, cx| v4.update(cx, |this, cx| this.suppress_folder(id, true, cx))))
-                .item(crate::os_menu::OsMenuItem::new("Unsuppress").on_click(move |_, _, cx| v5.update(cx, |this, cx| this.suppress_folder(id, false, cx))))
-                .separator()
-                .item(crate::os_menu::OsMenuItem::new("Expand all").on_click({
-                    let v = v6.clone();
-                    move |_, _, cx| v.update(cx, |this, cx| this.set_all_folders_collapsed(false, cx))
-                }))
-                .item(crate::os_menu::OsMenuItem::new("Collapse all").on_click(move |_, _, cx| v6.update(cx, |this, cx| this.set_all_folders_collapsed(true, cx))))
-                .separator()
-                .item(crate::os_menu::OsMenuItem::new("Unpack folder").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.dissolve_folder(id, cx))))
+                .item(item("Add selection to folder…", Box::new(move |this, w, cx| this.open_folder_prompt_for(FolderTarget::Folder(id), w, cx))))
+                .separator();
+            // As a feature with an expression (live assembly/142): Unsuppress
+            // drops it, "Edit dynamic suppression" replaces the submenu.
+            if has_expr {
+                m = m
+                    .item(item("Unsuppress", Box::new(move |this, _, cx| this.clear_folder_dynamic_suppression(id, cx))))
+                    .item(item("Edit dynamic suppression", Box::new(move |this, w, cx| this.edit_folder_dynamic_suppression(id, w, cx))));
+            } else {
+                m = m.item(item(if suppressed { "Unsuppress" } else { "Suppress" }, Box::new(move |this, _, cx| this.suppress_folder(id, !suppressed, cx))));
+                m = m.submenu("Dynamic suppression", window, cx, move |sm, _, _| {
+                    let v = vd.clone();
+                    sm.item(crate::os_menu::OsMenuItem::new("Add expression…").on_click(move |_, w, cx| v.update(cx, |this, cx| this.edit_folder_dynamic_suppression(id, w, cx))))
+                });
+            }
+            if !is_last {
+                m = m.separator().item(item("Roll to here", Box::new(move |this, _, cx| this.roll_to_folder(id, cx))));
+            }
+            m = m.separator();
+            m = m.submenu("Expand", window, cx, move |sm, _, _| {
+                let (v1, v2) = (ve.clone(), ve.clone());
+                sm.item(crate::os_menu::OsMenuItem::new("Expand selected").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.set_folder_collapsed(id, false, cx))))
+                    .item(crate::os_menu::OsMenuItem::new("Expand all").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_all_folders_collapsed(false, cx))))
+            });
+            m = m.submenu("Collapse", window, cx, move |sm, _, _| {
+                let (v1, v2) = (vc.clone(), vc.clone());
+                sm.item(crate::os_menu::OsMenuItem::new("Collapse selected").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.set_folder_collapsed(id, true, cx))))
+                    .item(crate::os_menu::OsMenuItem::new("Collapse all").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_all_folders_collapsed(true, cx))))
+            });
+            m.separator()
+                .item(item("Delete", Box::new(move |this, _, cx| this.delete_folder(id, cx))).icon_name("menu-delete"))
+                .item(item("Unpack folder", Box::new(move |this, _, cx| this.dissolve_folder(id, cx))))
         })
         .into_any_element()
+    }
+
+    /// A click on a folder row selects it alone (live ui 10-25 b (4)).
+    fn select_folder(&mut self, id: u32, cx: &mut Context<Self>) {
+        self.ui.fresh_folder = None;
+        if self.ui.selected_folder != Some(id) || !self.selected_features.is_empty() {
+            self.ui.selected_folder = Some(id);
+            self.selected_features.clear();
+            self.refresh_scene(false, cx);
+            cx.notify();
+        }
     }
 
     /// The top of Onshape's cursor stack over the graphics area
@@ -3485,11 +3598,12 @@ impl PartStudioView {
             // Live (ui 10-22 d, behaviours "Feature-row hover tooltips"): the
             // row tooltip reads `<name>[ [Type]][ (Hidden)][ is not fully
             // defined | did not regenerate properly: <msg>]`, or `<head> <-
-            // <inputs>`. The [Type] tag shows when the name doesn't start with
-            // the type's name ("MC to hide [Mate connector]", a Hole's callout
-            // "… [Hole]"). Infos stay out of it (qa5 BOOL1: the graphics bubble).
+            // <inputs>`. The [Type] tag shows unless the name contains the
+            // type's name, case-insensitively (as `typed_name`: "MC to hide
+            // [Mate connector]", a Hole's callout "… [Hole]"). Infos stay out
+            // of it (qa5 BOOL1: the graphics bubble).
             fn typed(name: &str, type_name: &str) -> String {
-                if type_name.is_empty() || name.starts_with(type_name) { name.to_string() } else { format!("{name} [{type_name}]") }
+                if needs_type_tag(name, type_name) { format!("{name} [{type_name}]") } else { name.to_string() }
             }
             let head = format!("{}{}", typed(&name, f.feature_type().map(|t| t.name).unwrap_or("")), if f.hidden { " (Hidden)" } else { "" });
             let msg = state.and_then(|s| {
@@ -3867,7 +3981,25 @@ impl PartStudioView {
                     this.refresh_scene(false, cx);
                     cx.notify();
                 })));
-                return appearance(m.separator()).separator().item(delete);
+                // Live (ui 10-25 b (1)): "Add appearance to 2 features…".
+                let n = view.read(cx).selected_features.len();
+                let add = item(&format!("Add appearance to {n} features…"), Box::new(move |this, w, cx| {
+                    let t = targets(this);
+                    this.edit_appearance(appearance::EditTarget::Features(t), w, cx);
+                }))
+                .icon_name("add-appearance");
+                return m.separator().item(add).separator().item(delete);
+            }
+            // A suppressed feature (live qa4 r5 s8 (3)): Rename | Add selection
+            // to folder… | Unsuppress, Dynamic suppression | Roll to here |
+            // Delete (Add comment is collaboration, cloud).
+            if manually_suppressed && !has_expr {
+                let mut m = menu.item(item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)))).separator().item(folder).separator().item(suppress);
+                m = dynamic(m, window, cx);
+                if !is_last {
+                    m = m.separator().item(item("Roll to here", Box::new(move |this, _, cx| this.set_rollback(Some(i + 1), cx))));
+                }
+                return m.separator().item(delete);
             }
             let mut m = menu.item(item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)))).separator().item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
             if let Some((sid, sname)) = source_sketch.clone() {
@@ -4184,6 +4316,9 @@ impl Render for FeatureDragPill {
 fn edge_creator(n: &TopoName) -> Option<FeatureId> {
     match n {
         TopoName::Edge { faces, .. } => faces[1].creator().or_else(|| faces[0].creator()),
+        // A part corner: its faces' feature, as for edges (live "ui (10-24 c)":
+        // a vertex's menu starts Edit Extrude 1…, Edit Sketch 1…).
+        TopoName::Vertex { faces, .. } => faces.iter().rev().find_map(|f| f.creator()),
         TopoName::Boundary { face, .. } => face.creator(),
         other => other.creator(),
     }
@@ -4781,8 +4916,9 @@ impl Render for PartStudioView {
             }))
             .on_action(cx.listener(|this, a: &RotateLeft, _, cx| this.rotate_by(a, -15.0, 0.0, cx)))
             .on_action(cx.listener(|this, a: &RotateRight, _, cx| this.rotate_by(a, 15.0, 0.0, cx)))
-            .on_action(cx.listener(|this, a: &RotateUp, _, cx| this.rotate_by(a, 0.0, -15.0, cx)))
-            .on_action(cx.listener(|this, a: &RotateDown, _, cx| this.rotate_by(a, 0.0, 15.0, cx)))
+            // Select other takes ↑ / ↓ first (Onshape listenToFirst KEYDOWN).
+            .on_action(cx.listener(|this, a: &RotateUp, _, cx| if this.ui.select_other.is_some() { this.select_other_step(true, cx) } else { this.rotate_by(a, 0.0, -15.0, cx) }))
+            .on_action(cx.listener(|this, a: &RotateDown, _, cx| if this.ui.select_other.is_some() { this.select_other_step(false, cx) } else { this.rotate_by(a, 0.0, 15.0, cx) }))
             .on_action(cx.listener(|this, a: &RotateLeftFine, _, cx| this.rotate_by(a, -5.0, 0.0, cx)))
             .on_action(cx.listener(|this, a: &RotateRightFine, _, cx| this.rotate_by(a, 5.0, 0.0, cx)))
             .on_action(cx.listener(|this, a: &RotateUpFine, _, cx| this.rotate_by(a, 0.0, -5.0, cx)))
@@ -5021,17 +5157,39 @@ fn count_picks(p: &noshape_model::params::ParamValues) -> usize {
         .sum()
 }
 
-/// A feature's name for tooltips: a custom name that doesn't start with the
-/// feature's type gets the type in brackets (live behaviours "psb … feature
-/// sweep": "Move L5 rotate no axis [Move face] did not regenerate properly:
-/// …", "<- Path [Sketch]"); default names ("Draft 1") stay as they are.
 /// A feature's name as Onshape shows it in tooltips and menus: with its
-/// type in brackets when the name doesn't start with the type as named in
-/// the UI language ("Mount [Extrude]"; German "Sketch 1 [Skizze]", live).
+/// type in brackets unless the name contains the type, case-insensitively
+/// (the bundle: `-1 === (" " + name.toLowerCase() + " ").indexOf(type
+/// .toLowerCase())`), the type as named in the UI language. Live: "Mount
+/// [Extrude]", "<- Path [Sketch]", but "<- Boss sketch 2" (qa4 r5 s8);
+/// German "Sketch 1 [Skizze]"; default names ("Draft 1") stay as they are.
 pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
     match f.feature_type().map(|t| crate::i18n::type_name(t.name)) {
-        Some(t) if !f.name.starts_with(t.as_str()) => format!("{} [{t}]", f.name),
+        Some(t) if needs_type_tag(&f.name, &t) => format!("{} [{t}]", f.name),
         _ => f.name.clone(),
+    }
+}
+
+/// Whether a name gets its feature type in brackets (see [`typed_name`]).
+fn needs_type_tag(name: &str, type_name: &str) -> bool {
+    !type_name.is_empty() && !format!(" {} ", name.to_lowercase()).contains(&type_name.to_lowercase())
+}
+
+#[cfg(test)]
+mod type_tag_tests {
+    use super::needs_type_tag;
+    use std::prelude::v1::test;
+
+    #[test]
+    fn the_type_tag_shows_unless_the_name_contains_the_type() {
+        // Live: "Boss 2 [Extrude] <- Boss sketch 2" (qa4 r5 s8), "<- Path [Sketch]",
+        // "Move L5 rotate no axis [Move face]", "Sketch 1".
+        assert!(needs_type_tag("Boss 2", "Extrude"));
+        assert!(!needs_type_tag("Boss sketch 2", "Sketch"));
+        assert!(needs_type_tag("Path", "Sketch"));
+        assert!(needs_type_tag("Move L5 rotate no axis", "Move face"));
+        assert!(!needs_type_tag("Sketch 1", "Sketch"));
+        assert!(!needs_type_tag("Draft 1", ""));
     }
 }
 

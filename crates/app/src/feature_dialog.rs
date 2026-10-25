@@ -372,6 +372,18 @@ impl FeatureDialog {
             .map(|s| s.id.to_string())
     }
 
+    /// A new feature whose first selection field is a single pick the
+    /// preselection already filled lets that field go, as a pick does (live
+    /// sketch/01: Top selected, then Sketch — "Top plane" in an inactive
+    /// field).
+    pub fn release_prefilled_single_pick(&mut self) {
+        let Some(id) = self.active_query.clone() else { return };
+        let single = self.ty.params.iter().any(|s| s.id == id && matches!(s.kind, ParamKind::Query { max_picks: Some(1), .. }));
+        if single && !self.feature.params.query(&id).is_empty() {
+            self.advance_query_focus(&id);
+        }
+    }
+
     /// Editing an existing feature: the first visible selection field marked
     /// INITIAL_FOCUS_ON_EDIT is the active one (uihint.gen.fs), else the
     /// first visible one as for a new feature.
@@ -455,7 +467,44 @@ impl FeatureDialog {
 
     pub fn set_value(&mut self, path: &str, v: ParamValue, cx: &mut Context<Self>) {
         self.user_set.insert(path.to_string());
+        let shown = self.visible_selection_fields();
         self.set_value_auto(path, v, cx);
+        self.focus_new_empty_field(&shown);
+    }
+
+    /// The selection fields (and selection-driven arrays) shown now, in
+    /// dialog order.
+    fn visible_selection_fields(&self) -> Vec<&'static str> {
+        let params = &self.feature.params;
+        self.ty
+            .params
+            .iter()
+            .filter(|s| s.is_visible(params) && !s.hints.has(Hints::ALWAYS_HIDDEN))
+            .filter(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY))
+            .map(|s| s.id)
+            .collect()
+    }
+
+    fn selection_empty(&self, path: &str) -> bool {
+        match self.get_value(path) {
+            Some(ParamValue::Array(items)) => items.is_empty(),
+            Some(ParamValue::Query(q)) => q.is_empty(),
+            _ => true,
+        }
+    }
+
+    /// Onshape (updateParameterVisibility / setNewQLVFocus): after an edit,
+    /// the first newly shown selection field that is empty becomes the
+    /// active one (ticking Extrude's Direction: live dialogs/extrude-23),
+    /// unless the active field is itself empty or in error.
+    fn focus_new_empty_field(&mut self, shown_before: &[&'static str]) {
+        let keep = self.active_query.as_deref().is_some_and(|a| self.selection_empty(a) || self.field_error(a).is_some());
+        if keep {
+            return;
+        }
+        if let Some(id) = self.visible_selection_fields().into_iter().find(|id| !shown_before.contains(id) && self.selection_empty(id)) {
+            self.active_query = Some(id.to_string());
+        }
     }
 
     /// Set a value on the user's behalf (automatic defaults): the field is
@@ -518,7 +567,14 @@ impl FeatureDialog {
             match &s.kind {
                 // Live (psb 10-19 h): a dialog opens with the focus on its
                 // first selection list.
-                ParamKind::Query { .. } if first.is_none() => {
+                ParamKind::Query { max_picks, .. } if first.is_none() => {
+                    // A single pick the preselection filled has let go
+                    // (`release_prefilled_single_pick`): it doesn't take the
+                    // focus back, which would make it active again (live
+                    // sketch/01: no field active).
+                    if *max_picks == Some(1) && !params.query(s.id).is_empty() && self.active_query.as_deref() != Some(s.id) {
+                        return false;
+                    }
                     let h = self.tab_stop(&format!("q:{}", s.id), cx);
                     window.focus(&h, cx);
                     return true;
@@ -574,9 +630,9 @@ impl FeatureDialog {
         } else {
             q.push(r);
         }
-        let single = max == Some(1);
-        // Single-pick fields advance focus to the next empty selection field.
-        if single {
+        // A single-pick field that got its pick passes the focus on
+        // (Onshape: autoAdvanceToNextControl when the maximum is selected).
+        if max == Some(1) && !q.is_empty() {
             self.advance_query_focus(&path);
         }
         cx.emit(DialogEvent::Changed);
@@ -879,19 +935,26 @@ impl FeatureDialog {
     }
 
     fn advance_query_focus(&mut self, from: &str) {
-        let visible: Vec<&ParamSpec> = self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params)).collect();
-        let pos = visible.iter().position(|s| s.id == from);
-        if let Some(pos) = pos {
-            for s in &visible[pos + 1..] {
-                if matches!(s.kind, ParamKind::Query { .. }) && self.feature.params.query(s.id).is_empty() {
-                    self.active_query = Some(s.id.to_string());
-                    return;
-                }
-            }
+        // Onshape (getNextFocusableParameter): the next visible selection
+        // field or selection-driven array, filled or not (live qa4 r5 s7:
+        // Extrude direction picked → Merge scope "Part 1" active).
+        let params = &self.feature.params;
+        let next = self
+            .ty
+            .params
+            .iter()
+            .filter(|s| s.is_visible(params) && !s.hints.has(Hints::ALWAYS_HIDDEN))
+            .skip_while(|s| s.id != from)
+            .skip(1)
+            .find(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY));
+        match next {
+            Some(s) => self.active_query = Some(s.id.to_string()),
+            // Sketch lets its filled plane field go (defocusFilledSketchPlaneQLV;
+            // live sketch/01: "Top plane" picked, the field no longer active).
+            None if self.feature.type_id == "sketch" => self.active_query = None,
+            // Elsewhere the focus stays where it is.
+            None => {}
         }
-        // Nothing left to pick: the filled field lets go (live sketch/01:
-        // "Top plane" picked, the Sketch plane field no longer active).
-        self.active_query = None;
     }
 
     /// An array item's label from its template (FeatureScript "Item label
@@ -1902,6 +1965,16 @@ impl FeatureDialog {
                 // folds the group's parameters (indented 20 px below).
                 let collapsed = self.collapsed_groups.contains(path);
                 let path_c = path.to_string();
+                // Onshape (os-param-group-expander is-error =
+                // getIsAnyParameterInErrorState): a ticked group whose shown
+                // fields include one in error (Direction ticked, nothing
+                // picked: live dialogs/extrude-23, #bd3039) has a red chevron;
+                // otherwise #666 when ticked (extrude-22), #d7d7d7 when not.
+                let error = header && on && {
+                    let mut off = values.clone();
+                    off.set(s.id, ParamValue::Bool(false));
+                    self.ty.params.iter().any(|q| q.is_visible(values) && !q.is_visible(&off) && self.field_error(q.id).is_some())
+                };
                 let chevron = header.then(|| {
                     div()
                         .id(SharedString::from(format!("chev-{path}")))
@@ -1910,7 +1983,7 @@ impl FeatureDialog {
                         .flex()
                         .justify_center()
                         .cursor_pointer()
-                        .child(crate::ui::glyph(if on && !collapsed { "expander-down" } else { "expander-right" }, 14., if on { gpui_kit::rgb(0x555555) } else { pal.border }))
+                        .child(crate::ui::glyph(if on && !collapsed { "expander-down" } else { "expander-right" }, 14., if error { pal.error } else if on { gpui_kit::rgb(0x666666) } else { pal.border }))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if !this.collapsed_groups.remove(&path_c) {
                                 this.collapsed_groups.insert(path_c.clone());
@@ -2269,6 +2342,15 @@ impl FeatureDialog {
                             .when(!reorder_on, |d| d.child(
                                 div()
                                     .id(SharedString::from(format!("chipx-{path}-{row}")))
+                                    // Live (woolsthorpe.css .os-param-selection-list-entry-delete:
+                                    // a 20 px cell, 5 px padding, 5 px in): the ink 12 px from
+                                    // the field's border (extrude-03, sketch/01).
+                                    .w(px(20.))
+                                    .h(px(24.))
+                                    .mr(px(1.))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
                                     // Live (dialogs/extrude-13, fillet-02): the × is always shown.
                                     .group("field-x")
                                     .cursor_pointer()
@@ -2538,6 +2620,15 @@ impl FeatureDialog {
                                 d.child(
                                     div()
                                         .id(SharedString::from(format!("dqx-{path}-{k}")))
+                                    // Live (woolsthorpe.css .os-param-selection-list-entry-delete:
+                                    // a 20 px cell, 5 px padding, 5 px in): the ink 12 px from
+                                    // the field's border (extrude-03, sketch/01).
+                                    .w(px(20.))
+                                    .h(px(24.))
+                                    .mr(px(1.))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
                                         .cursor_pointer()
                                         .group("field-x")
                                         // As a selection row's × (fillet-04).
