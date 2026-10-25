@@ -82,20 +82,29 @@ $o = New-Object Nav+POINT; [Nav]::ClientToScreen($hwnd, [ref]$o) | Out-Null
 # The viewport (wait for its first traced camera; nudge it with a wheel).
 $cam = $null
 for ($i = 0; $i -lt 120 -and -not $cam; $i++) {
-  $cam = Read-Trace | Where-Object { $_.camera } | Select-Object -Last 1
-  if (-not $cam) { [Nav]::SetCursorPos($o.x + 800, $o.y + 500) | Out-Null; [Nav]::Mouse(0x800, 120); Start-Sleep 0.3; [Nav]::Mouse(0x800, -120); Start-Sleep 2 }
+  $cam = Read-Trace | Where-Object { $_.camera -and $_.viewport[0] -gt 100 } | Select-Object -Last 1
+  if (-not $cam) { [Nav]::SetCursorPos(($o.x + 500), ($o.y + 400)) | Out-Null; [Nav]::Mouse(0x800, 120); Start-Sleep 0.3; [Nav]::Mouse(0x800, -120); Start-Sleep 2 }
 }
 if (-not $cam) { throw 'noshape never traced a camera' }
 Start-Sleep 8
 $origin = $cam.origin; $size = $cam.viewport
-# Calibrate logical pixels -> screen pixels with two probes.
+# Calibrate logical pixels -> screen pixels with two probes inside the
+# viewport (each waits for the mouse move it causes to be traced). Note:
+# in PowerShell `@($a + 1, $b)` is `$a + (1, $b)`: parenthesise elements.
 function Probe($sx, $sy) {
-  [Nav]::SetCursorPos($sx, $sy) | Out-Null; Start-Sleep 0.4
-  (Read-Trace | Where-Object { $_.input -eq 'mouse_move' } | Select-Object -Last 1).data.at
+  $before = @(Read-Trace | Where-Object { $_.input -eq 'mouse_move' }).Count
+  [Nav]::SetCursorPos($sx, $sy) | Out-Null
+  for ($k = 0; $k -lt 30; $k++) {
+    Start-Sleep 0.1
+    $moves = @(Read-Trace | Where-Object { $_.input -eq 'mouse_move' })
+    if ($moves.Count -gt $before) { return , $moves[-1].data.at }
+  }
+  throw "no mouse move traced for the probe at ($sx, $sy)"
 }
-$s0 = @($o.x + 400, $o.y + 300); $s1 = @($o.x + 800, $o.y + 600)
+$s0 = @(($o.x + [int]($origin[0] + $size[0] * 0.3)), ($o.y + [int]($origin[1] + $size[1] * 0.3)))
+$s1 = @(($o.x + [int]($origin[0] + $size[0] * 0.6)), ($o.y + [int]($origin[1] + $size[1] * 0.6)))
 $a0 = Probe $s0[0] $s0[1]; $a1 = Probe $s1[0] $s1[1]
-$scale = 400 / ($a1[0] - $a0[0])
+$scale = ($s1[0] - $s0[0]) / ($a1[0] - $a0[0])
 function Screen($dx, $dy) {
   $lx = $size[0] / 2 + $dx; $ly = $size[1] / 2 + $dy
   @([int]($s0[0] + ($lx - $a0[0]) * $scale), [int]($s0[1] + ($ly - $a0[1]) * $scale))

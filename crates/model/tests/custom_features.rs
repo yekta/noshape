@@ -939,6 +939,44 @@ export const helixProbe = defineFeature(function(context is Context, id is Id, d
     assert_ok(&r);
 }
 
+/// A Feature Studio pinned to an older standard library gets that library
+/// (a user's knurling script: `FeatureScript 1963;` and helix() with std
+/// 1963's exported HelixType, private in 3095).
+#[test]
+fn std_1963_pinned_helix_types() {
+    let body = r#"
+annotation { "Feature Type Name" : "Pinned helix" }
+export const pinnedHelix = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "cyl", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 30) * millimeter, "radius" : 10 * millimeter });
+        const circle = qNthElement(qGeometry(qCreatedBy(id + "cyl", EntityType.EDGE), GeometryType.CIRCLE), 0);
+        const common = { "initEntities" : qNothing(), "edge" : circle, "oppositeDirection" : false, "handedness" : Direction.CW,
+                         "startAngle" : 0 * degree, "height" : 20 * millimeter };
+        helix(context, id + "pitch", mergeMaps(common, { "helixType" : HelixType.HEIGHT_PITCH, "helicalPitch" : 5 * millimeter }));
+        helix(context, id + "turns", mergeMaps(common, { "helixType" : HelixType.HEIGHT_TURNS, "revolutions" : 4 }));
+        const expected = 4 * sqrt((2 * PI * 10 * millimeter) ^ 2 + (5 * millimeter) ^ 2);
+        for (var name in ["pitch", "turns"])
+        {
+            const length = evLength(context, { "entities" : qCreatedBy(id + name, EntityType.EDGE) });
+            if (abs(length - expected) > 1e-3 * millimeter)
+                throw regenError(name ~ ": helix length " ~ toString(length) ~ ", expected " ~ toString(expected));
+        }
+    });
+"#;
+    let pinned = |v: u32| format!("FeatureScript {v};\nimport(path : \"onshape/std/geometry.fs\", version : \"{v}.0\");\n{body}");
+    let fx = Fixture::new(&pinned(1963));
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("pinnedHelix"), &fx.units).unwrap();
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    // As in Onshape, std 3095 does not export HelixType.
+    let compiled = custom::compile(fx.fs, &pinned(3095));
+    assert!(compiled.diagnostics.iter().any(|d| d.message.contains("HelixType")), "{:?}", compiled.diagnostics);
+}
+
 /// Evaluation options the natives used to ignore (found by the native
 /// argument audit): evOwnerSketchPlane's `checkAllEntities` (std Sweep and
 /// Loft profiles) and evRaycast's `includeIntersectionsBehind`.

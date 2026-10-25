@@ -120,3 +120,14 @@ fn preview_regen_of_an_unchanged_part_keeps_its_refined_mesh() {
     assert!(std::sync::Arc::ptr_eq(&again.display.bodies[0].mesh, &fine.display.bodies[0].mesh));
     assert_eq!(circle_segments(&again), 144);
 }
+
+/// A curved body's preview mesh is the coarse one (a refine pass follows).
+#[test]
+fn curved_bodies_get_a_coarse_preview_first() {
+    noshape_model::regen::set_angle_display_mesh(true);
+    let ps = cylinder(0.02);
+    let opts = RegenOptions { preview_meshes: true, ..Default::default() };
+    let preview = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &UnitPrefs::default(), &opts);
+    assert!(preview.needs_refine);
+    assert!(circle_segments(&preview) < circle_segments(&regen(&ps)), "the preview circle is coarser");
+}

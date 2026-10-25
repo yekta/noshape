@@ -850,3 +850,19 @@ evOwnerSketchPlane `checkAllEntities` (Sweep/Loft profiles), evRaycast `includeI
 `fixedRho`, skInterpolatedSpline `splinePointCount`, skSpline `guess`, evFacePeriodicity `trimmed`,
 evFaceTangentPlanes `returnUndefinedOutsideFace` (no std caller passes the last five). Regression test for the helix:
 `std_helix_from_a_circle_edge` (Turns and Pitch around a cylinder's circular edge).
+
+**Pinned standard library versions (25 Oct, user's knurl script):** Onshape runs a Feature Studio against the std
+version its imports pin. `crates/featurescript/std-versions/<version>/` holds older libraries (1963.0 so far, exported
+unmodified from the public std document, MIT, live/std-1963), embedded by build.rs as `STD_VERSIONS`. An import of
+`onshape/std/x.fs` pinned to v loads the nearest embedded version (`std_version_for`, the newer on a tie); an older
+library's own imports stay in that version (`compile::load_std`, cache keyed by (version, module)). Types share tags
+across versions by declaration key (`onshape/std/query.fs#Query`), except enums whose members changed (QueryType,
+ErrorStringEnum, UIHint, FeatureScriptVersionNumber, ToleranceType, …): those get a tag per version and compare by
+member name (`Value` equality, `is`, `value::map_get` for `{ … }[enum]` lookups); the host still makes 3095 values
+(std_tag/std_enum), and isAtVersionOrLater compares the version number in the member name across versions. Exports of
+1963 that 3095 dropped: HelixType, RevolveType, helixLogic, tagProfile, getIncrementingId, getFaceSweptData,
+mutualTrimMaipulatorChange, the `*FromBuiltin` geometry constructors; signatures that changed include parsePitch /
+computePitchValue / buildPitchAnnotation (now take context), getToleranceInfo, verifyVariableName, sweepEditLogic
+(isCreating), helixManipulatorChange (full list: /root/fs-scratch/export-diff.txt). Tests:
+`std_1963_pinned_helix_types` (custom_features), `natives_read_the_maps_older_std_passes` (the native audit on 1963).
+To add a version: export it like live/std-1963 into std-versions/<version>/ and extend `MISSING_<version>`.

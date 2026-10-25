@@ -31,6 +31,7 @@ input type:touchpad {
   dwt disabled
 }
 input type:touch map_to_output HEADLESS-1
+input type:tablet_tool map_to_output HEADLESS-1
 default_border none
 default_floating_border none
 gaps inner 0
