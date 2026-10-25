@@ -26,11 +26,14 @@ pub struct OpenDoc {
     /// default for the next fillet (5 mm on a fresh page, then sticky per
     /// tab until the page reloads; here, while the document is open).
     pub sketch_fillet_radius: HashMap<TabId, f64>,
+    /// The document window's state (tab shown, panels, compare…; see
+    /// [`crate::window`]).
+    pub window: crate::window::WindowState,
 }
 
 impl OpenDoc {
     pub fn new(session: Session) -> Self {
-        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: HashMap::new(), active_config: HashMap::new(), sketch_fillet_radius: HashMap::new() }
+        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: HashMap::new(), active_config: HashMap::new(), sketch_fillet_radius: HashMap::new(), window: Default::default() }
     }
 
     pub fn doc(&self) -> &Document {
@@ -128,16 +131,7 @@ pub struct Ctx {
     pub ui_requests: Vec<UiRequest>,
 }
 
-/// A window action an operation asks for (navigation items like Switch to
-/// reference). Without the app open there is no window: the reply carries
-/// the target instead.
-#[derive(Clone, Debug, PartialEq)]
-pub enum UiRequest {
-    /// Show this tab.
-    ActivateTab(TabId),
-    /// Open this document in a window.
-    OpenDocument(PathBuf),
-}
+pub use crate::window::UiRequest;
 
 fn canonical(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())

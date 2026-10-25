@@ -36,6 +36,8 @@ pub mod sketch_use;
 pub mod studio;
 pub mod values;
 pub mod variable_studio;
+pub mod window;
 
-pub use doc::{Ctx, OpenDoc, UiRequest};
+pub use doc::{Ctx, OpenDoc};
+pub use window::UiRequest;
 pub use error::OpError;

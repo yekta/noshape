@@ -9,6 +9,17 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("ops_list", &[r##"{}"##, r##"{"group": "sketch"}"##]),
     ("ops_describe", &[r##"{"tools": ["drawing_section_view"]}"##]),
     ("ops_call", &[r##"{"tool": "drawing_section_view", "args": {"drawing": "Part 1 Drawing 1", "parent": 1, "point": [205.5, 160], "position": [300, 160]}}"##]),
+    ("ui_state", &[r##"{}"##]),
+    ("tab_activate", &[r##"{"tab": "Assembly 1"}"##]),
+    ("tab_manager", &[r##"{"search": "bracket"}"##, r##"{"kinds": ["drawing"], "sort": "name_asc"}"##, r##"{"open": false}"##]),
+    ("assembly_switch_to_tab", &[r##"{"instance": "Bracket <1>"}"##]),
+    ("assembly_open_linked_document", &[r##"{"instance": "Motor <1>"}"##]),
+    ("context_go_to_assembly", &[r##"{"tab": "Part Studio 2"}"##]),
+    ("history_view", &[r##"{"to": "V1"}"##, r##"{"to": "workspace"}"##]),
+    ("history_compare", &[r##"{"target": "V1"}"##, r##"{"stop": true}"##]),
+    ("history_repair_view", &[r##"{"at": "V1"}"##, r##"{"close": true}"##]),
+    ("drawing_switch_sheet", &[r##"{"drawing": "Part 1 Drawing 1", "step": "next"}"##, r##"{"drawing": "Part 1 Drawing 1", "sheet": "Sheet2"}"##]),
+    ("drawing_sheets_panel", &[r##"{"drawing": "Part 1 Drawing 1"}"##]),
     // document / tab
     ("document_create", &[r##"{"path": "/tmp/bracket.noshape", "length_unit": "mm"}"##]),
     ("document_open", &[r##"{"path": "/tmp/bracket.noshape"}"##]),
@@ -269,7 +280,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
 ];
 
 /// The groups whose every operation must have examples (the coverage test).
-pub const REQUIRED_GROUPS: &[&str] = &["ops", "document", "tab", "feature", "sketch", "variable", "config", "part", "material", "query", "analysis", "render", "export", "import", "featurestudio", "history", "assembly", "context", "drawing"];
+pub const REQUIRED_GROUPS: &[&str] = &["ops", "document", "tab", "feature", "sketch", "variable", "config", "part", "material", "query", "analysis", "render", "export", "import", "featurestudio", "history", "assembly", "context", "drawing", "ui"];
 
 /// Examples of an operation (MCP tool name).
 pub fn of(tool: &str) -> &'static [&'static str] {

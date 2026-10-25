@@ -257,7 +257,7 @@ fn pt(p: [f64; 2]) -> Value {
     json!([r3(p[0]), r3(p[1])])
 }
 
-fn kind_name(k: &ViewKind) -> &'static str {
+pub(super) fn kind_name(k: &ViewKind) -> &'static str {
     match k {
         ViewKind::Base { .. } => "base",
         ViewKind::Projected { .. } => "projected",
@@ -269,7 +269,7 @@ fn kind_name(k: &ViewKind) -> &'static str {
 }
 
 /// The annotation kind's name (`LinearDimension`, `Note`...).
-fn variant_name<T: std::fmt::Debug>(v: &T) -> String {
+pub(super) fn variant_name<T: std::fmt::Debug>(v: &T) -> String {
     let s = format!("{v:?}");
     s.split([' ', '{', '(']).next().unwrap_or("").to_string()
 }

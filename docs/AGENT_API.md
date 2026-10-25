@@ -290,14 +290,16 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
-- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete)
+- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
 - **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_duplicate_input`](#config_duplicate_input), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
-- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance)
-- **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly)
-- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_open_feature_studio`](#drawing_open_feature_studio)
+- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance), [`assembly_switch_to_tab`](#assembly_switch_to_tab), [`assembly_open_linked_document`](#assembly_open_linked_document)
+- **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly), [`context_go_to_assembly`](#context_go_to_assembly)
+- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_open_feature_studio`](#drawing_open_feature_studio), [`drawing_switch_sheet`](#drawing_switch_sheet), [`drawing_sheets_panel`](#drawing_sheets_panel)
+- **ui**: [`ui_state`](#ui_state)
+- **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
@@ -306,7 +308,6 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
 - **featurestudio**: [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
-- **history**: [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 
 ### ops
 
@@ -553,6 +554,46 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string | required | Tab name or id. |
+
+#### tab_activate
+
+Show a tab (click it in the tab bar).
+
+The tab the window shows (`ui_state` › active_tab); with the app open (live mode) its window switches to it.
+
+Examples:
+
+```json
+{"tab": "Assembly 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | Tab name or id. |
+
+#### tab_manager
+
+The Tab manager: the tabs matching a search and type filters, sorted.
+
+The Tab manager (Alt+T) as it lists the tabs: `search` (in the names, case-insensitive), `kinds` (type filters: partstudio, assembly, drawing, variables, featurestudio, materiallibrary, file), `sort` (tab_order with folders, name_asc, name_desc, type). `open` (default true) opens it in the window (live mode) with that search; false closes it. `activate` shows one of the rows (Enter on it).
+
+Examples:
+
+```json
+{"search": "bracket"}
+{"kinds": ["drawing"], "sort": "name_asc"}
+{"open": false}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `search` | string |  | Search text. |
+| `kinds` | array of string |  | Type filters. |
+| `sort` | one of `tab_order`, `name_asc`, `name_desc`, `type` |  | Sort order (default tab_order). |
+| `open` | boolean |  | Open (true) or close the panel. |
+| `activate` | string |  | Show this tab (name or id). |
 
 ### feature
 
@@ -2849,6 +2890,42 @@ Examples:
 | `instance` | string | required | Another instance of the context's part. |
 | `context` | string | required | Context name ("Context 1") or id (context_list). |
 
+#### assembly_switch_to_tab
+
+The Part Studio or Assembly an instance comes from (instance menu › Switch to …).
+
+Instance (or BOM row) menu › Switch to <Part Studio> / <Assembly>: the source tab (id, name, kind), the part and the configuration the instance shows; the window shows the tab (live mode). Instances from another document: assembly_open_linked_document.
+
+Examples:
+
+```json
+{"instance": "Bracket <1>"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instance` | string | required | Instance id or name. |
+
+#### assembly_open_linked_document
+
+The document version an instance comes from (instance menu › Open linked document).
+
+For an instance inserted from another document: its path, the version and the tab; with the app open (live mode) that version opens in a window on the tab, as the menu item does.
+
+Examples:
+
+```json
+{"instance": "Motor <1>"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instance` | string | required | Instance id or name. |
+
 ### context
 
 #### context_list
@@ -2977,6 +3054,23 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name or id. Default: the first Part Studio. |
 | `parts` | array of string |  | Part names (query_parts). |
 | `sketches` | array of string |  | Sketch names. |
+
+#### context_go_to_assembly
+
+The assembly of the Assembly context a Part Studio shows (in-context banner › Go to assembly).
+
+Modeling in context: the shown context's assembly tab; the window switches to it (live mode).
+
+Examples:
+
+```json
+{"tab": "Part Studio 2"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab (default: the first). |
 
 ### drawing
 
@@ -4410,6 +4504,250 @@ Examples:
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `table` | integer | required | A custom table. |
 
+#### drawing_switch_sheet
+
+Show another sheet (sheet tabs; First / Last / Next / Previous sheet) (edits the document (one undoable history entry)).
+
+The sheet the drawing shows: `sheet` (number or name) or `step` first | last | next | previous (Home / End / Page down / Page up). As in Onshape a sheet switch is an undoable change ("Switch sheet"); the window follows it (live mode).
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "step": "next"}
+{"drawing": "Part 1 Drawing 1", "sheet": "Sheet2"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `step` | one of `first`, `last`, `next`, `previous` |  | Instead of `sheet`. |
+
+#### drawing_sheets_panel
+
+The Sheets panel: every sheet with its views and tables (Ctrl+S, Display sheet menu).
+
+What the Sheets panel lists: each sheet (number, name, the one shown) with its views (id, kind, label) and tables (id, kind). `open` (default true) opens it in the window (live mode); false closes it.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `open` | boolean |  | Open (true) or close the panel. |
+
+### ui
+
+#### ui_state
+
+The document window's state: the tab shown, panels, the version viewed, compare and repair.
+
+What the window shows besides the model: the tab shown (`active_tab`), the version viewed (`viewing`, null: the workspace), the Tab manager (open, search), the drawings whose Sheets panel is open, compare mode (base and target) and the Repair panel. Set by the window tools (tab_activate, tab_manager, history_view, history_compare, history_repair_view, drawing_sheets_panel…); with the app open (live mode) they change its window too.
+
+Examples:
+
+```json
+{}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+
+### history
+
+#### history_view
+
+View the document at a version or history entry (Versions and history › Open), or return to the workspace (edits the document (one undoable history entry)).
+
+Open a version or change read-only, as the history panel's Open does: every later call reads the document as it was then, edits are refused ("This is a read-only view of history…") until `to` "workspace". Replies with what the version holds (tabs; Part Studios' features and parts). With the app open (live mode) its window shows it.
+
+Examples:
+
+```json
+{"to": "V1"}
+{"to": "workspace"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `to` | string | required | A version name or id, a microversion id (history_list), or "workspace". |
+
+#### history_compare
+
+Compare two history points (Versions and history › Compare).
+
+Compare mode between `base` (default: what the window shows, the workspace or the version viewed) and `target` (a version, a change or "workspace"): each tab's state (differs, same, not_supported for drawings, only_in_base) and, per Part Studio that differs, its features' changes (added, removed, modified, moved; parameters changed). `stop` leaves compare mode. With the app open (live mode) the window enters compare mode.
+
+Examples:
+
+```json
+{"target": "V1"}
+{"stop": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `target` | string |  | Version name or id, microversion, or "workspace". |
+| `base` | string |  | The other side (default: what the window shows). |
+| `stop` | boolean |  | Leave compare mode. |
+
+#### history_repair_view
+
+View a history entry in the Repair panel (Versions and history › View in repair).
+
+The Part Studios as they were at `at` (a version or a change), to repair references broken since: their features (with status) and parts. With the app open (live mode) the Repair panel opens on it. `close` closes it.
+
+Examples:
+
+```json
+{"at": "V1"}
+{"close": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `at` | string |  | Version name or id, or microversion. |
+| `close` | boolean |  | Close the Repair panel. |
+
+#### history_undo
+
+Undo the last edit (edits the document (one undoable history entry)).
+
+With `tab`, undoes the last edit of that tab (Onshape's undo is per tab); otherwise the last edit of the document. `description` names the edit undone.
+
+Examples:
+
+```json
+{}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Tab whose edit to undo. |
+
+#### history_redo
+
+Redo the last undone edit (edits the document (one undoable history entry)).
+
+Examples:
+
+```json
+{}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Tab whose edit to redo. |
+
+#### history_list
+
+The edit history of the current branch, newest first.
+
+Microversions with their description ("Part Studio 1 :: Insert feature : Extrude 1"), author and time, plus versions and branches.
+
+Examples:
+
+```json
+{"limit": 10}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `limit` | integer |  | At most this many entries (default 50). |
+
+#### history_create_version
+
+Create a named version of the current state (edits the document (one undoable history entry)).
+
+Examples:
+
+```json
+{"name": "V1", "description": "First prototype"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `name` | string | required | Version name ("V1"). |
+| `description` | string |  | Description. |
+
+#### history_create_branch
+
+Create a branch (workspace) from the current state and switch to it (edits the document (one undoable history entry)).
+
+Examples:
+
+```json
+{"name": "experiment"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `name` | string | required | Branch name. |
+
+#### history_switch_branch
+
+Switch to another branch (edits the document (one undoable history entry)).
+
+Examples:
+
+```json
+{"branch": "experiment"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `branch` | string | required | Branch name or id. |
+
+#### history_merge
+
+Merge another branch into the current one (edits the document (one undoable history entry)).
+
+Part Studios merge feature by feature.
+
+Examples:
+
+```json
+{"branch": "experiment"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `branch` | string | required | Branch to merge from (name or id). |
+
+#### history_restore
+
+Restore the document to an earlier microversion or version (edits the document (one undoable history entry)).
+
+Adds a new microversion with that state (history is kept).
+
+Examples:
+
+```json
+{"to": "V1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `to` | string | required | Microversion id or version name/id (from history_list). |
+
 ### part
 
 #### part_rename
@@ -5102,135 +5440,4 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `part_studio` | string |  | Part Studio tab (name or id); default: the first. |
-
-### history
-
-#### history_undo
-
-Undo the last edit (edits the document (one undoable history entry)).
-
-With `tab`, undoes the last edit of that tab (Onshape's undo is per tab); otherwise the last edit of the document. `description` names the edit undone.
-
-Examples:
-
-```json
-{}
-```
-
-| field | type | | description |
-|---|---|---|---|
-| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Tab whose edit to undo. |
-
-#### history_redo
-
-Redo the last undone edit (edits the document (one undoable history entry)).
-
-Examples:
-
-```json
-{}
-```
-
-| field | type | | description |
-|---|---|---|---|
-| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Tab whose edit to redo. |
-
-#### history_list
-
-The edit history of the current branch, newest first.
-
-Microversions with their description ("Part Studio 1 :: Insert feature : Extrude 1"), author and time, plus versions and branches.
-
-Examples:
-
-```json
-{"limit": 10}
-```
-
-| field | type | | description |
-|---|---|---|---|
-| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `limit` | integer |  | At most this many entries (default 50). |
-
-#### history_create_version
-
-Create a named version of the current state (edits the document (one undoable history entry)).
-
-Examples:
-
-```json
-{"name": "V1", "description": "First prototype"}
-```
-
-| field | type | | description |
-|---|---|---|---|
-| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `name` | string | required | Version name ("V1"). |
-| `description` | string |  | Description. |
-
-#### history_create_branch
-
-Create a branch (workspace) from the current state and switch to it (edits the document (one undoable history entry)).
-
-Examples:
-
-```json
-{"name": "experiment"}
-```
-
-| field | type | | description |
-|---|---|---|---|
-| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `name` | string | required | Branch name. |
-
-#### history_switch_branch
-
-Switch to another branch (edits the document (one undoable history entry)).
-
-Examples:
-
-```json
-{"branch": "experiment"}
-```
-
-| field | type | | description |
-|---|---|---|---|
-| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `branch` | string | required | Branch name or id. |
-
-#### history_merge
-
-Merge another branch into the current one (edits the document (one undoable history entry)).
-
-Part Studios merge feature by feature.
-
-Examples:
-
-```json
-{"branch": "experiment"}
-```
-
-| field | type | | description |
-|---|---|---|---|
-| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `branch` | string | required | Branch to merge from (name or id). |
-
-#### history_restore
-
-Restore the document to an earlier microversion or version (edits the document (one undoable history entry)).
-
-Adds a new microversion with that state (history is kept).
-
-Examples:
-
-```json
-{"to": "V1"}
-```
-
-| field | type | | description |
-|---|---|---|---|
-| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `to` | string | required | Microversion id or version name/id (from history_list). |
 <!-- END GENERATED REFERENCE -->

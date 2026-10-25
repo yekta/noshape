@@ -112,13 +112,7 @@ impl Workspace {
             }
             // An agent's Switch to reference / Open Feature Studio in linked
             // document (live mode), as the menu items do.
-            DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(tab)) => this.activate(*tab, window, cx),
-            DocEvent::Ui(noshape_ops::UiRequest::OpenDocument(path)) => {
-                if let Err(e) = crate::files::open_document_window(path.clone(), None, this.gpu.clone(), cx) {
-                    this.toast = Some((crate::ui::AlertKind::Error, format!("Could not open the document: {e:#}")));
-                    cx.notify();
-                }
-            }
+            DocEvent::Ui(req) => this.agent_request(req.clone(), window, cx),
             _ => cx.notify(),
         })];
         // When the focused element goes away (a menu, a prompt, a closed
@@ -2013,6 +2007,80 @@ impl Workspace {
 }
 
 impl Workspace {
+    /// What an agent's call asked the window to do (live mode), as the menu
+    /// items and shortcuts do it.
+    fn agent_request(&mut self, req: noshape_ops::UiRequest, window: &mut Window, cx: &mut Context<Self>) {
+        use noshape_ops::UiRequest as R;
+        match req {
+            R::ActivateTab(tab) => self.activate(tab, window, cx),
+            R::OpenDocument { path, version, external_key } => {
+                let opened = match version {
+                    Some(mv) => crate::files::open_version_window(path, mv, self.gpu.clone(), cx).map(|(handle, _)| Some(handle)),
+                    None => crate::files::open_document_window(path, None, self.gpu.clone(), cx).map(|_| None),
+                };
+                match opened {
+                    Ok(handle) => {
+                        // The referenced tab in the opened version (Open linked document).
+                        use noshape_model::assembly::eval::ExternalStudios as _;
+                        if let (Some(handle), Some(key)) = (handle, external_key)
+                            && let Some((_, tab)) = noshape_ops::derived::ExternalDocs.studio(&key)
+                        {
+                            let _ = handle.update(cx, |_, window, cx| window.defer(cx, move |window, cx| request_activate_tab(tab, window, cx)));
+                        }
+                    }
+                    Err(e) => {
+                        self.toast = Some((crate::ui::AlertKind::Error, format!("Could not open the document: {e:#}")));
+                        cx.notify();
+                    }
+                }
+            }
+            R::TabManager(search) => {
+                if search.is_some() != self.tab_manager.is_some() {
+                    self.toggle_tab_manager(window, cx);
+                }
+                if let (Some(text), Some((tm, _))) = (search, &self.tab_manager) {
+                    tm.update(cx, |tm, cx| tm.set_search(text, window, cx));
+                }
+            }
+            R::SheetsPanel { tab, open } => {
+                if let Some(TabView::Drawing(v)) = self.views.get(&tab) {
+                    v.update(cx, |v, cx| {
+                        v.sheets_open = open;
+                        cx.notify();
+                    });
+                }
+            }
+            R::Compare(c) => {
+                let doc = self.doc.clone();
+                match c {
+                    Some(c) => {
+                        let side = |s: noshape_ops::window::CompareSide| match s {
+                            noshape_ops::window::CompareSide::Workspace(b) => crate::compare_mode::Side::Workspace(b),
+                            noshape_ops::window::CompareSide::Entry(mv) => crate::compare_mode::Side::Entry(mv),
+                        };
+                        if let Err(e) = crate::compare_mode::compare(&doc, (side(c.base), c.base_label), (side(c.target), c.target_label), cx) {
+                            self.toast = Some((crate::ui::AlertKind::Error, format!("{e:#}")));
+                        }
+                    }
+                    None => crate::compare_mode::stop(&doc, cx),
+                }
+                cx.notify();
+            }
+            R::Repair(r) => {
+                let doc = self.doc.clone();
+                match r {
+                    Some((mv, label)) => {
+                        if let Err(e) = crate::repair_mode::open(&doc, mv, label, cx) {
+                            self.toast = Some((crate::ui::AlertKind::Error, format!("{e:#}")));
+                        }
+                    }
+                    None => crate::repair_mode::close(&doc, cx),
+                }
+                cx.notify();
+            }
+        }
+    }
+
     fn toggle_tab_manager(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         use crate::tab_manager::{TabManager as Panel, TabManagerEvent};
         self.reveal_active_tab = true;

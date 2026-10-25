@@ -3367,3 +3367,81 @@ fn drawing_replicate_copy_paste_replace_and_navigation() {
     let e = try_call(&mut ctx, "drawing_open_feature_studio", json!({ "drawing": tab, "table": rid })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
 }
+
+/// The window's navigation (UI-only sweep, batch 1): the tab shown, the Tab
+/// manager, instance and in-context navigation, viewing / comparing /
+/// repairing history, the drawing's sheets. Each is read back in ui_state.
+#[test]
+fn window_navigation() {
+    let mut ctx = Ctx::new();
+    let (block, _pin) = two_part_assembly(&mut ctx, "window_nav.noshape");
+    let state = |ctx: &mut Ctx| call(ctx, "ui_state", json!({}));
+    let shown = |ctx: &mut Ctx| state(ctx)["active_tab"]["name"].as_str().unwrap().to_string();
+    assert_eq!(shown(&mut ctx), "Part Studio 1");
+    let t = call(&mut ctx, "tab_activate", json!({ "tab": "Assembly 1" }));
+    assert_eq!((t["tab"]["kind"].clone(), t["shown_in_app"].clone()), (json!("Assembly"), json!(false)), "{t}");
+    assert_eq!(shown(&mut ctx), "Assembly 1");
+
+    // Tab manager: search, type filter, close.
+    let m = call(&mut ctx, "tab_manager", json!({ "search": "assem" }));
+    assert_eq!(m["rows"].as_array().unwrap().iter().map(|r| r["name"].as_str().unwrap()).collect::<Vec<_>>(), ["Assembly 1"], "{m}");
+    assert_eq!(state(&mut ctx)["tab_manager"], json!({ "open": true, "search": "assem" }));
+    let m = call(&mut ctx, "tab_manager", json!({ "kinds": ["drawing"], "open": false }));
+    assert!(m["rows"].as_array().unwrap().is_empty(), "{m}");
+    assert_eq!(state(&mut ctx)["tab_manager"]["open"], false);
+    let e = try_call(&mut ctx, "tab_manager", json!({ "kinds": ["nope"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("kinds[0]"), "{e:?}");
+
+    // Instance menu › Switch to Part Studio.
+    let s = call(&mut ctx, "assembly_switch_to_tab", json!({ "instance": block }));
+    assert_eq!((s["target"]["name"].clone(), s["part"]["name"].clone()), (json!("Part Studio 1"), json!("Part 1")), "{s}");
+    assert_eq!(shown(&mut ctx), "Part Studio 1");
+    let e = try_call(&mut ctx, "assembly_open_linked_document", json!({ "instance": block })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("instance"), "{e:?}");
+    let e = try_call(&mut ctx, "context_go_to_assembly", json!({})).unwrap_err();
+    assert!(e.message.contains("context"), "{e:?}");
+
+    // History: compare with a version, view it read-only, repair from it.
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    call(&mut ctx, "feature_rename", json!({ "feature": "Extrude 1", "name": "Plate" }));
+    let c = call(&mut ctx, "history_compare", json!({ "target": "V1" }));
+    let ps = c["tabs"].as_array().unwrap().iter().find(|t| t["name"] == "Part Studio 1").unwrap().clone();
+    assert_eq!(ps["status"], "differs", "{c}");
+    assert!(ps["features"].as_array().unwrap().iter().any(|f| f["status"] == "modified"), "{ps}");
+    assert_eq!(c["target"], "V1", "{c}");
+    assert_eq!(state(&mut ctx)["compare"]["target"], "V1");
+    call(&mut ctx, "history_compare", json!({ "stop": true }));
+    assert!(state(&mut ctx)["compare"].is_null());
+    let v = call(&mut ctx, "history_view", json!({ "to": "V1" }));
+    assert_eq!(v["label"], "V1", "{v}");
+    assert!(v["tabs"].as_array().unwrap().iter().any(|t| t["features"].as_array().is_some_and(|f| f.iter().any(|f| f["name"] == "Extrude 1"))), "{v}");
+    let e = try_call(&mut ctx, "feature_rename", json!({ "feature": "Extrude 1", "name": "X" })).unwrap_err();
+    assert!(e.message.contains("read-only"), "{e:?}");
+    assert!(state(&mut ctx)["viewing"].is_string());
+    call(&mut ctx, "history_view", json!({ "to": "workspace" }));
+    assert!(state(&mut ctx)["viewing"].is_null());
+    let r = call(&mut ctx, "history_repair_view", json!({ "at": "V1" }));
+    assert_eq!(r["label"], "V1", "{r}");
+    assert_eq!(state(&mut ctx)["repair"]["label"], "V1");
+    call(&mut ctx, "history_repair_view", json!({ "close": true }));
+    assert!(state(&mut ctx)["repair"].is_null());
+
+    // A drawing's sheets: the panel, then First / Next / Last sheet.
+    let tab = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }))["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "action": "add" }));
+    let p = call(&mut ctx, "drawing_sheets_panel", json!({ "drawing": tab }));
+    let sheets = p["sheets"].as_array().unwrap();
+    assert_eq!(sheets.len(), 2, "{p}");
+    assert!(!sheets[0]["views"].as_array().unwrap().is_empty(), "{p}");
+    assert_eq!(state(&mut ctx)["sheets_panel_open"][0]["name"], tab.as_str());
+    let first = call(&mut ctx, "drawing_switch_sheet", json!({ "drawing": tab, "step": "first" }));
+    assert_eq!(first["shown_sheet"], 1, "{first}");
+    let next = call(&mut ctx, "drawing_switch_sheet", json!({ "drawing": tab, "step": "next" }));
+    assert_eq!(next["shown_sheet"], 2, "{next}");
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.ends_with("Switch sheet"), "{last}");
+    assert_eq!(call(&mut ctx, "drawing_switch_sheet", json!({ "drawing": tab, "step": "last" }))["shown_sheet"], 2);
+    let p = call(&mut ctx, "drawing_sheets_panel", json!({ "drawing": tab, "open": false }));
+    assert_eq!(p["sheets"][1]["shown"], true, "{p}");
+    assert!(state(&mut ctx)["sheets_panel_open"].as_array().unwrap().is_empty());
+}
