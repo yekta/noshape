@@ -28,6 +28,15 @@ SUMMARY = re.compile(
 COMPARED = [("fps", "fps", True), ("p95", "frame-interval p95", False), ("cpup95", "UI CPU p95", False), ("gpup95", "GPU p95", False)]
 
 
+# Startup milestones (NOSHAPE_PERF=1 logs), ms from process start; the
+# pipelines' compile time in ms.
+STARTUP = {
+    "window_ms": re.compile(r"first workspace render: ([\d.]+) ms since start"),
+    "frame_ms": re.compile(r"first viewport frame presented: ([\d.]+) ms since start"),
+    "pipelines_ms": re.compile(r"pipelines for \d+x MSAA built in ([\d.]+) ms"),
+}
+
+
 def runs(out):
     rows = []
     for log in sorted(glob.glob(os.path.join(out, "*-*.log"))):
@@ -36,6 +45,10 @@ def runs(out):
         m = SUMMARY.search(text)
         adapter = re.search(r"GPU: (.*)", text)
         row = {"mode": mode, "log": os.path.basename(log), "adapter": adapter.group(1).strip() if adapter else "?"}
+        for key, pat in STARTUP.items():
+            s = pat.search(text)
+            if s:
+                row[key] = float(s.group(1))
         if m:
             row.update({k: (float(v) if v and re.fullmatch(r"[\d.]+", v) else v) for k, v in m.groupdict().items()})
         else:
@@ -96,6 +109,15 @@ def main():
                      f"{int(r['o8'])} ({int(r['o8p'])}%) | {int(r['o16'])} ({int(r['o16p'])}%) | {r['cpu']:.2f}, {r['cpup95']:.2f} ms | {gpu} | {renders} |")
     if rows:
         lines += ["", f"GPU: {rows[0]['adapter']}"]
+    # Launch order: texture orbit (the job's first: cold shader caches), then
+    # the rest.
+    started = sorted((r for r in rows if r.get("frame_ms") is not None), key=lambda r: (r["log"] != "texture-orbit.log", r["log"]))
+    if started:
+        ms = lambda v: f"{v:.0f} ms" if v is not None else "n/a"
+        lines += ["", "Startup (from process start; the first launch compiles every shader):", "",
+                  "| launch | window drawn | first viewport frame | shader compile |", "|---|---|---|---|"]
+        for i, r in enumerate(started):
+            lines.append(f"| {'first' if i == 0 and r['log'] == 'texture-orbit.log' else 'later'}: {r['log'][:-4]} | {ms(r.get('window_ms'))} | {ms(r.get('frame_ms'))} | {ms(r.get('pipelines_ms'))} |")
     failures = []
     if args.stills:
         ok, msg = compare_stills(args.out)
