@@ -29,6 +29,9 @@ pub(super) struct SectionManip {
     pub arrow: Arrow,
     /// The rings' rotation axes, in the plane.
     pub axes: [DVec3; 2],
+    /// The arrow base where the last arrow drag started, while its value
+    /// box is shown (live: a "⊥" there, led to the base).
+    pub start: Option<DVec3>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -83,7 +86,7 @@ impl SectionManip {
         self.arrow.base + self.arrow.dir * self.arrow.length
     }
 
-    fn ring_center(&self, wpp: f64) -> DVec3 {
+    pub(super) fn ring_center(&self, wpp: f64) -> DVec3 {
         self.tip() + self.arrow.dir * (ARROW_PX + RING_GAP_PX + RING_PX) * wpp
     }
 
@@ -99,9 +102,11 @@ impl SectionManip {
         (pts.collect(), [c - ax * r * 1.6, c + ax * r * 1.6])
     }
 
-    fn base_circle(&self, wpp: f64) -> Vec<DVec3> {
-        let n = self.arrow.dir;
-        let (u, v) = (self.axes[0], n.cross(self.axes[0]));
+    /// The base circle faces the viewer (`view` its direction; live: round
+    /// in any view).
+    fn base_circle(&self, wpp: f64, view: DVec3) -> Vec<DVec3> {
+        let u = view.any_orthonormal_vector();
+        let v = view.cross(u).normalize();
         let r = BASE_PX * wpp;
         (0..=24)
             .map(|i| {
@@ -113,6 +118,14 @@ impl SectionManip {
 }
 
 impl PartStudioView {
+    /// The rotate glyph's centre in the viewport, where the value box sits
+    /// (live asm/2370–2371: 40 px right of it, its bottom level with it).
+    pub(super) fn section_box_anchor(&self, cx: &App) -> Option<(DVec3, DVec2)> {
+        let s = self.section_manip()?;
+        let c = s.ring_center(self.section_wpp(s.tip(), cx)?);
+        Some((c, self.viewport.read(cx).project(c)?))
+    }
+
     /// World size of a screen pixel at `p`.
     fn section_wpp(&self, p: DVec3, cx: &App) -> Option<f64> {
         let vp = self.viewport.read(cx);
@@ -124,7 +137,12 @@ impl PartStudioView {
     /// The manipulator of the active section plane while the dialog is open.
     pub(super) fn section_manip(&self) -> Option<SectionManip> {
         let arrow = self.section_arrow()?;
-        Some(SectionManip { arrow, axes: ring_axes(arrow.dir) })
+        let offset = self.ui.section_dialog.as_ref().and_then(|d| self.ui.section.get(d.active)).map(|p| p.offset);
+        let start = match (self.ui.section_box, self.ui.section_rot, self.ui.section_drag0, offset) {
+            (true, None, Some(s0), Some(o)) => Some(arrow.base - arrow.dir * (o - s0)),
+            _ => None,
+        };
+        Some(SectionManip { arrow, axes: ring_axes(arrow.dir), start })
     }
 
     /// Segments the viewport hit-tests (all handles).
@@ -137,7 +155,7 @@ impl PartStudioView {
             out.extend(pts.windows(2).map(|w| (w[0], w[1], 0.0)));
             out.push((axis[0], axis[1], 0.0));
         }
-        let base = s.base_circle(self.section_wpp(s.arrow.base, cx).unwrap_or(wpp));
+        let base = s.base_circle(self.section_wpp(s.arrow.base, cx).unwrap_or(wpp), self.viewport.read(cx).camera.forward());
         out.extend(base.windows(2).map(|w| (w[0], w[1], 0.0)));
         out
     }
@@ -160,7 +178,7 @@ impl PartStudioView {
             best.push((SectionHandle::Ring(k), near(&pts).min(seg(axis[0], axis[1]).unwrap_or(f64::INFINITY))));
         }
         let bw = self.section_wpp(s.arrow.base, cx).unwrap_or(wpp);
-        best.push((SectionHandle::Base, near(&s.base_circle(bw))));
+        best.push((SectionHandle::Base, near(&s.base_circle(bw, self.viewport.read(cx).camera.forward()))));
         best.into_iter().filter(|(_, d)| *d < 8.0).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(h, _)| h)
     }
 
@@ -212,6 +230,7 @@ impl PartStudioView {
                 let a = r.axis.dot(r.from.cross(w)).atan2(r.from.dot(w));
                 let deg = snap_deg(a.to_degrees());
                 self.set_section_rotation(RingDrag { deg, ..r }, window, cx);
+                self.open_section_box(window, cx);
                 Some(true)
             }
             ViewportEvent::ToolUp { .. } => {
@@ -273,11 +292,22 @@ pub(super) fn section_glyph(s: &SectionManip, hover: Option<SectionHandle>, drag
         back.push_polyline(&p, edge, 0, 3.0, LineSegment::ON_TOP);
         front.push_polyline(&p, core, 0, 1.5, LineSegment::ON_TOP);
     };
-    draw(&s.base_circle(bw), SectionHandle::Base);
+    draw(&s.base_circle(bw, view.direction()), SectionHandle::Base);
     for k in 0..2 {
         let (pts, axis) = s.ring(k, wpp);
         draw(&pts, SectionHandle::Ring(k));
         draw(&axis, SectionHandle::Ring(k));
+    }
+    // The drag start (live asm/2370–2371): a 2 px #2861b6 leader from the
+    // base and a 30 px tick across it.
+    if let Some(st) = s.start
+        && let Some(sw) = view.world_per_px(st)
+        && st.distance(s.arrow.base) > 1e-9
+    {
+        let c = crate::theme::rgb8(0x2861b6);
+        let across = (st - s.arrow.base).cross(view.direction()).try_normalize().unwrap_or_else(|| s.axes[0]) * 15.0 * sw;
+        front.push_polyline(&[f(s.arrow.base), f(st)], c, 0, 2.0, LineSegment::ON_TOP);
+        front.push_polyline(&[f(st - across), f(st + across)], c, 0, 2.0, LineSegment::ON_TOP);
     }
     vec![
         Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),
