@@ -12,8 +12,7 @@ use super::drawing_tools::{CORNERS, Target, done, enum_arg, pt_arg, target, view
 use super::{doc_field, s};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
-use crate::{Ctx, OpenDoc, UiRequest};
-use noshape_model::document::{TabContent, TabId};
+use crate::{Ctx, UiRequest};
 use noshape_model::drawing::clipboard::ViewClipboard;
 use noshape_model::drawing::{TableKind, ViewId};
 use noshape_scene::drawing_tools::{self as dt, Tool, replicate, table_edit as te, view_edit as ve};
@@ -354,28 +353,6 @@ fn replicate_op(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 // ------------------------------------------------------------ navigation
 
-fn kind_name(c: &TabContent) -> &'static str {
-    match c {
-        TabContent::PartStudio(_) => "Part Studio",
-        TabContent::Assembly(_) => "Assembly",
-        TabContent::FeatureStudio(_) => "Feature Studio",
-        TabContent::Drawing(_) => "Drawing",
-        _ => "tab",
-    }
-}
-
-/// A tab as the navigation replies give it.
-fn tab_json(od: &OpenDoc, tab: TabId) -> Value {
-    let t = od.doc().tab(tab);
-    json!({ "id": tab.to_string(), "name": t.map(|t| t.name.clone()), "kind": t.map(|t| kind_name(&t.content)) })
-}
-
-/// Go to `tab` in the app (live mode), and say whether that happened.
-fn go_to(ctx: &mut Ctx, req: UiRequest) -> bool {
-    ctx.ui_requests.push(req);
-    ctx.serving
-}
-
 fn switch_to_reference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let t: Target = target(od, a)?;
@@ -389,7 +366,7 @@ fn switch_to_reference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             let v = view_arg(&t, a, "view")?;
             let (key, part) = noshape_model::drawing::views::view_source(sheet, v).ok_or_else(|| OpError::param("view", "the view shows no model"))?;
-            let mut o = json!({ "target": tab_json(od, key.tab) });
+            let mut o = json!({ "target": super::tab_json(od, key.tab) });
             if let Some(p) = part {
                 let name = od.regenerate(key.tab, None).ok().and_then(|r| r.display.bodies.iter().find(|b| b.id == p).map(|b| b.name.clone()));
                 o["part"] = json!({ "id": crate::refs::body_id(&p), "name": name });
@@ -405,16 +382,16 @@ fn switch_to_reference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                     return Err(OpError::param("feature_studio", "custom tables only"));
                 }
                 let (key, _) = noshape_model::drawing::views::view_source(sheet, view).ok_or_else(|| OpError::param("table", "the table's view shows no model"))?;
-                (key.tab, json!({ "target": tab_json(od, key.tab) }))
+                (key.tab, json!({ "target": super::tab_json(od, key.tab) }))
             }
             Some(TableKind::Custom { studio, fs, fs_version, .. }) => {
                 if want_fs {
                     if fs_version.as_deref().and_then(crate::derived::ExternalRef::parse).is_some() {
                         return Err(OpError::param("feature_studio", "the table's Feature Studio is in a linked document: drawing_open_feature_studio"));
                     }
-                    (fs, json!({ "target": tab_json(od, fs) }))
+                    (fs, json!({ "target": super::tab_json(od, fs) }))
                 } else {
-                    (studio, json!({ "target": tab_json(od, studio) }))
+                    (studio, json!({ "target": super::tab_json(od, studio) }))
                 }
             }
             Some(_) => return Err(OpError::param("table", "a BOM or custom table (other tables refer to no tab)")),
@@ -422,7 +399,7 @@ fn switch_to_reference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         },
         (None, None) => return Err(OpError::param("view", "give `view` or `table`")),
     };
-    out["shown_in_app"] = json!(go_to(ctx, UiRequest::ActivateTab(tab)));
+    out["shown_in_app"] = json!(super::show(ctx, a.opt_str("doc")?, UiRequest::ActivateTab(tab))?);
     Ok(out.into())
 }
 
@@ -436,12 +413,12 @@ fn open_feature_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     match fs_version.as_deref().and_then(crate::derived::ExternalRef::parse) {
         Some(e) => {
             let mut out = json!({ "linked": true, "document": e.path.display().to_string(), "version": e.microversion.to_string(), "feature_studio": e.tab, "table": name });
-            out["shown_in_app"] = json!(go_to(ctx, UiRequest::OpenDocument(e.path)));
+            out["shown_in_app"] = json!(super::show(ctx, a.opt_str("doc")?, UiRequest::OpenDocument { path: e.path, version: None, external_key: None })?);
             Ok(out.into())
         }
         None => {
-            let mut out = json!({ "linked": false, "target": tab_json(od, fs), "table": name });
-            out["shown_in_app"] = json!(go_to(ctx, UiRequest::ActivateTab(fs)));
+            let mut out = json!({ "linked": false, "target": super::tab_json(od, fs), "table": name });
+            out["shown_in_app"] = json!(super::show(ctx, a.opt_str("doc")?, UiRequest::ActivateTab(fs))?);
             Ok(out.into())
         }
     }

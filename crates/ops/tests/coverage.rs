@@ -262,3 +262,13 @@ fn schema_says_when_parameters_show() {
     let faces = desc("moveFace", "moveFaces");
     assert!(faces.contains("shown with the defaults") && faces.contains("outputType is CREATE"), "{faces}");
 }
+
+/// Everything a user can do in the window an agent can do too (navigation
+/// and view actions included): the UI-only entries only go down (98 before
+/// the sweep), and none may be added.
+#[test]
+fn ui_only_entries_only_go_down() {
+    const CEILING: usize = 85;
+    let ui: Vec<&str> = SHORTCUTS.iter().chain(MENUS.iter()).filter(|(_, c)| matches!(c, Cover::Ui(_))).map(|(id, _)| *id).collect();
+    assert!(ui.len() <= CEILING, "{} UI-only entries (at most {CEILING}): give the new ones an operation\n{}", ui.len(), ui.join("\n"));
+}

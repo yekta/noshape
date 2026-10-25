@@ -13,7 +13,7 @@ use noshape_model::document::{TabContent, TabId};
 use noshape_model::reference::Reference;
 use serde_json::{Value, json};
 
-fn asm_field() -> crate::registry::Field {
+pub(super) fn asm_field() -> crate::registry::Field {
     opt("tab", s(), "Assembly tab, by name or id. Default: the first Assembly.")
 }
 
@@ -176,13 +176,13 @@ fn is_assembly(c: &TabContent) -> bool {
     matches!(c, TabContent::Assembly(_))
 }
 
-fn target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {
+pub(super) fn target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let tab = doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", is_assembly)?;
     Ok((od, tab))
 }
 
-fn assembly(od: &OpenDoc, tab: TabId) -> Result<&Assembly, OpError> {
+pub(super) fn assembly(od: &OpenDoc, tab: TabId) -> Result<&Assembly, OpError> {
     match od.doc().tab(tab).map(|t| &t.content) {
         Some(TabContent::Assembly(a)) => Ok(a),
         _ => Err(OpError::param("tab", "not an Assembly")),

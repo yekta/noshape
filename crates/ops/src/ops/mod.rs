@@ -23,6 +23,7 @@ mod query;
 mod render;
 mod sketch;
 mod sketch_edit;
+mod ui;
 mod variables;
 
 use crate::doc::{self, OpenDoc};
@@ -49,6 +50,7 @@ pub fn all() -> Vec<Op> {
     v.extend(drawing_table::ops());
     v.extend(drawing_annotation::ops());
     v.extend(drawing_more::ops());
+    v.extend(ui::ops());
     v.extend(parts::ops());
     v.extend(appearance::ops());
     v.extend(query::ops());
@@ -149,6 +151,30 @@ pub(crate) fn regen_report(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpErro
         .map(|b| json!({ "id": crate::refs::body_id(&b.id), "name": b.name, "kind": format!("{:?}", b.kind), "hidden": b.hidden }))
         .collect();
     Ok(json!({ "features": features, "parts": parts, "failed": failed, "rollback_index": ps.rollback_index() }))
+}
+
+/// A tab as navigation replies give it: id, name and kind.
+pub(crate) fn tab_json(od: &OpenDoc, tab: TabId) -> Value {
+    let t = od.doc().tab(tab);
+    let kind = t.map(|t| match &t.content {
+        TabContent::PartStudio(_) => "Part Studio",
+        TabContent::Assembly(_) => "Assembly",
+        TabContent::FeatureStudio(_) => "Feature Studio",
+        TabContent::Drawing(_) => "Drawing",
+        TabContent::VariableStudio(_) => "Variable Studio",
+        TabContent::MaterialLibrary(_) => "Material Library",
+        TabContent::File(_) => "File",
+    });
+    json!({ "id": tab.to_string(), "name": t.map(|t| t.name.clone()), "kind": kind })
+}
+
+/// Do `req` in the document `doc`'s window: its [`crate::window::WindowState`]
+/// changes, and with the app open (live mode, this context serving) the
+/// window does it after the call. Returns whether the app's window did.
+pub(crate) fn show(ctx: &mut crate::Ctx, doc: Option<&str>, req: crate::UiRequest) -> Result<bool, OpError> {
+    ctx.doc(doc)?.window.apply(&req);
+    ctx.ui_requests.push(req);
+    Ok(ctx.serving)
 }
 
 /// One FeatureScript notice as the Monitor shows it: the message, its
