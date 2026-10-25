@@ -15,7 +15,10 @@ const INK: [u8; 4] = [0, 0, 0, 255];
 /// The paper's outline in the editor (live: about rgb 89 on the 1 px edge).
 const PAPER_EDGE: [u8; 4] = [89, 89, 89, 255];
 const TANGENT_INK: [u8; 4] = [70, 70, 78, 255];
-const DANGLING_INK: [u8; 4] = [220, 40, 40, 255];
+/// A dangling annotation's ink: live's orange-red #DD5228 (qa4 round 5 s1,
+/// drawing/qa4-r5-s1-c-dim-2x).
+pub const DANGLING_RGB: u32 = 0xdd5228;
+const DANGLING_INK: [u8; 4] = [(DANGLING_RGB >> 16) as u8, (DANGLING_RGB >> 8) as u8, DANGLING_RGB as u8, 255];
 
 /// Pixel width of a line style at a zoom (pixels per mm). Onshape's lines
 /// are hairlines at the fitted zoom (1 px for visible edges, frame and
@@ -311,5 +314,13 @@ mod tests {
         assert!((d[0][1][0] - 3.0).abs() < 1e-9);
         assert!((d[1][0][0] - 4.5).abs() < 1e-9);
         assert_eq!(dash(&[[0.0, 0.0], [1.0, 0.0]], false, &[]).len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod dangling_tests {
+    #[::core::prelude::v1::test]
+    fn dangling_annotations_are_live_orange_red() {
+        assert_eq!(super::DANGLING_INK, [0xdd, 0x52, 0x28, 255]);
     }
 }

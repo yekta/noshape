@@ -899,3 +899,14 @@ fn parasolid_offset_patch_and_wire_circles_from_onshape() {
         }
     }
 }
+
+#[test]
+fn binary_stl_header_is_zeros() {
+    let path = std::env::temp_dir().join(format!("noshape-stl-header-{}.stl", std::process::id()));
+    write_stl(&part(), &path, 0.0005, StlFormat::Binary).unwrap();
+    let bytes = std::fs::read(&path).unwrap();
+    std::fs::remove_file(&path).ok();
+    assert!(bytes[..80].iter().all(|&b| b == 0), "header {:?}", &bytes[..24]);
+    let n = u32::from_le_bytes(bytes[80..84].try_into().unwrap()) as usize;
+    assert!(n > 0 && bytes.len() == 84 + 50 * n);
+}
