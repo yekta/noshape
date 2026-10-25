@@ -514,3 +514,10 @@ Round 4 fixes (e5e5095b) are on main ✅. My own round-4/5 code fixes (09cdc51e�
 - **EXPORT-DXF-OPTIONS retracted (asb)**: the DXF dialog has all four checkboxes and scrolls with the wheel at a 900 px window
   (Hide inspection items, Exclude off-sheet content come into view); not a bug. Re-gate after main 824135c0 (icons2 visual polish
   only): no routed item changed; ready/kern FAILED in the queue at 04:20.
+
+## CI-GPU (api, top priority: main CI red since ac467453) — qa4 2026-10-25 11:40
+ci.yml "Linux x86_64 › Test" fails on main for 4 runs (40153651281 ac467453 … 40183256345 7074e37f): `crates/ops/tests/e2e.rs`
+part_studio_menu_ops, render_an_assembly, render_image_view_options panic at e2e.rs:9 with `render_failed: no GPU adapter for
+rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner has no Vulkan/GL adapter in the Test step
+(macOS and Windows pass). Either install Mesa lavapipe (`mesa-vulkan-drivers`) in that job or make the render e2e tests skip
+(with a printed reason) when no adapter exists; deterministic ci.yml tests must not depend on the runner's GPU (WORKFLOW 17).
