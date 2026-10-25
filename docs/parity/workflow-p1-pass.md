@@ -50,3 +50,4 @@ then edits, undo/redo, rollback and suppress.
 | Part row › Create Drawing of Part 1… | "Part 1 Drawing 1" tab right after Part Studio 1, 4 views | — | ✅ |
 | Dimension on a straight edge (assembly drawing) | "2.362" placed | — | ✅ |
 | Dimension on a hole circle | part drawing "Ø.394" ✅; **assembly drawing: click not taken** | — | ✗ **P2-D1** |
+| BOM panel (right strip) | "Bill of materials", BOM type ▾ Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description; rows 1 | 1, 2 | 1 | same columns (behaviours 1270) | ✅ |
