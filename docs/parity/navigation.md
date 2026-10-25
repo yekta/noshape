@@ -184,7 +184,7 @@ Wayland (`wl_touch`). Gestures are `touch.rs` (Onshape's recognizers).
 | 7.7 | Two-finger rotate rolls the view about the fingers' centre | help; `rotateAboutCanvasPoint` | ✅ L 30.0000°; R 29.993° |
 | 7.8 | Taps: lifted within 200 ms; reported 200 ms after the last (double tap); fingers overlapping in time are one multi-finger tap | tap recognizer | ✅ fixed 10-24: a tap is reported 200 ms after the lift even while the long-press timer runs (it waited 750 ms after the touch); R |
 | 7.9 | Touches on overlays above the graphics area (view cube, dialogs) stay normal taps | — | ✅ R: a tap on the view cube turns the view to a standard view; the viewport recognizer sees nothing |
-| 7.10 | Pen acts as a finger unless "Use pen input as mouse" | Preferences | 🔧 Windows; ⏳ Linux (tablet pens arrive as pointer devices) |
+| 7.10 | Pen acts as a finger unless "Use pen input as mouse" | Preferences | ✅ 10-25: Onshape sends `pointerType` "pen" to its touch recognizers unless "Use pen input as mouse" (`handlesEvent`). Windows (WM_POINTER PT_PEN), macOS (tablet-point mouse events), X11 (stylus devices: an "Abs Pressure" valuator) and Wayland (`zwp_tablet_v2`, new) now deliver pen contacts as touches; hovering moves the mouse. R: a pen drag of 200 px turns 190 px at 2 turns/diagonal, a pen tap is a one-finger tap, hovering moves nothing (Wayland and X11) |
 | 7.11 | Trimetric / plane views from the view cube menu, 3D Rotate Lock | help (mobile apps) | ❌ mobile apps only |
 
 ## Re-check of the 🔧 rows (qa4, 2026-10-23 23:30–00:30, app /root/qa4-scratch/bin/noshape-a0e = main a0e360a3, Xvfb 1600×1000, demo plate; screenshots /tmp/qa4/cw)
@@ -224,9 +224,9 @@ drives the app through the kernel: a uinput mouse, keyboard, clickpad and touch 
 libinput in a headless sway, the app on Wayland or on X11 through Xwayland. `check.py`
 recomputes every expected number independently (Chromium's rules on the WAYLAND_DEBUG protocol
 log or on the posted events, Onshape's formulas) and compares each camera change.
-Local run 10-25 03:10: **Wayland 491/491, X11 257/257 checks pass** (wheel notches and 120ths,
+Local run 10-25 06:20: **Wayland 495/495, X11 261/261 checks pass** (wheel notches and 120ths,
 Shift/Ctrl+wheel, horizontal wheel, two-finger scroll up/down/sideways, pinch out/in, right-drag
 with its rotate centre fixed on screen, Alt+right-drag, middle-drag, touch rotate/pan/pinch/roll,
-tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube, a drag released over the feature list, a second button pressed mid-drag). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
+tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube, a drag released over the feature list, a second button pressed mid-drag, pen drag / tap / hover). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
 phases and momentum, drags) and Windows (SendInput wheel, InjectTouchInput touch, drags) run in
 `.github/workflows/nav.yml`.

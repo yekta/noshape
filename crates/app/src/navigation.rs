@@ -845,11 +845,11 @@ impl MouseControls {
         c
     }
 
-    /// "Use pen input as mouse": the Windows platform turns pen contacts into
-    /// touches unless it is set (vendor/gpui-pre-windows).
+    /// "Use pen input as mouse": the platform layers turn pen contacts into
+    /// touches unless it is set (`gpui::set_pen_as_mouse`; Windows pointer
+    /// messages, macOS tablet-point events, X11 stylus devices).
     fn apply_to_platform(self) {
-        #[cfg(target_os = "windows")]
-        gpui_windows::set_pen_as_mouse(self.pen_as_mouse);
+        gpui_kit::set_pen_as_mouse(self.pen_as_mouse);
     }
 
     /// "Save mouse controls".

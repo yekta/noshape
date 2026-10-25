@@ -110,6 +110,33 @@ class Keyboard(Device):
         self.emit((EV_KEY, code, 1 if down else 0))
 
 
+BTN_TOOL_PEN, BTN_STYLUS, BTN_STYLUS2 = 0x140, 0x14B, 0x14C
+ABS_PRESSURE = 0x18
+
+
+class Pen(Device):
+    """A screen tablet's pen (libinput tablet tool), 10 units per output pixel."""
+
+    def __init__(self, size=(16000, 10000)):
+        w, h = size
+        super().__init__("noshape-nav pen", keys=(BTN_TOOL_PEN, BTN_TOUCH, BTN_STYLUS, BTN_STYLUS2),
+                         abs_axes={ABS_X: (0, w, 50), ABS_Y: (0, h, 50), ABS_PRESSURE: (0, 4096, 0)},
+                         props=(INPUT_PROP_DIRECT,), product=0x50)
+
+    def near(self, x, y):
+        """Bring the pen into proximity at window pixel (x, y)."""
+        self.emit((EV_KEY, BTN_TOOL_PEN, 1), (EV_ABS, ABS_X, int(x * 10)), (EV_ABS, ABS_Y, int(y * 10)))
+
+    def move(self, x, y):
+        self.emit((EV_ABS, ABS_X, int(x * 10)), (EV_ABS, ABS_Y, int(y * 10)))
+
+    def tip(self, down):
+        self.emit((EV_KEY, BTN_TOUCH, 1 if down else 0), (EV_ABS, ABS_PRESSURE, 2000 if down else 0))
+
+    def away(self):
+        self.emit((EV_KEY, BTN_TOOL_PEN, 0))
+
+
 class MultiTouch(Device):
     """Shared multi-touch protocol B handling (slots + tracking ids)."""
 

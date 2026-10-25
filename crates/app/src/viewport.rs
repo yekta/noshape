@@ -1548,6 +1548,9 @@ impl Viewport {
         let p = self.local(e.position);
         self.buttons.set(e.button, true);
         cx.stop_propagation();
+        // A real mouse press: no touch is in progress (the platforms don't
+        // emulate presses for touches), so drop any whose end was missed.
+        self.touch_ids.clear();
         if self.drag == Drag::Nav {
             // Another button joined the drag.
             self.update_nav_mode(e.modifiers, p);
@@ -1608,6 +1611,12 @@ impl Viewport {
         if crate::nav_trace::enabled() {
             let local = self.local(e.position);
             crate::nav_trace::input("mouse_move", serde_json::json!({ "at": [local.x, local.y], "debug": format!("{e:?}") }));
+        }
+        // While fingers or a pen touch the viewport the mouse doesn't move
+        // the view (a compositor may still move the pointer to the pen; a
+        // page gets no compatibility mouse events during a pointer contact).
+        if !self.touch_ids.is_empty() {
+            return;
         }
         let p = self.local(e.position);
         // Another element's drag over the graphics (the dimension box by its

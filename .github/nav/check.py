@@ -296,6 +296,13 @@ def main():
         cams = [r for r in by.get(name, []) if "camera" in r]
         return (by[name][0]["camera0"], cams[-1]) if cams else (None, None)
 
+    # Steps that must move the camera: a missing camera change must fail,
+    # not skip their checks.
+    for name in ("right-drag", "right-drag-fling", "middle-drag", "alt-right-drag", "ctrl-mid-drag", "second-button-mid-drag",
+                 "release-outside", "touch-rotate", "touch-pan", "touch-pinch", "touch-roll", "touch-view-cube", "pen-rotate"):
+        if name in by and first_last(name)[1] is None:
+            ch.check(name, "the camera moved", 0.0, 1.0, 0)
+
     c0, c1 = first_last("right-drag")
     if c0 and c1:
         w, h = c1["viewport"]
@@ -389,6 +396,21 @@ def main():
     c0, c1 = first_last("touch-roll")
     if c0 and c1:
         ch.check("touch-roll", "roll (deg) for a 30 deg finger turn", angle(c0["camera"]["up"], c1["camera"]["up"]), 30.0, 1.0)
+    # The pen acts as a finger (Onshape: pointerType "pen" → its touch
+    # recognizers): a drag turns 2 turns per diagonal, the first 10 px move
+    # only crossing the drag threshold; a tap is a one-finger tap; hovering
+    # moves nothing.
+    c0, c1 = first_last("pen-rotate")
+    if c0 and c1:
+        w, h = c1["viewport"]
+        ch.check("pen-rotate", "turn (deg) = 190 px at 2 turns/diagonal", angle(c0["camera"]["forward"], c1["camera"]["forward"]), 2 * 360 * 190 / math.hypot(w, h), 0.5)
+    if "pen-tap" in by:
+        actions = [r["data"]["debug"] for r in by["pen-tap"] if r.get("input") == "touch_action"]
+        ch.check("pen-tap", "recognized as a one-finger tap", float(any("fingers: 1" in x for x in actions)), 1.0, 0)
+    if "pen-hover" in by:
+        recs = by["pen-hover"]
+        ch.check("pen-hover", "camera unchanged", float(len([r for r in recs if "camera" in r])), 0.0, 0)
+        ch.check("pen-hover", "hover moves reach the viewport", float(len([r for r in recs if r.get("input") == "mouse_move"]) > 0), 1.0, 0)
     # Taps and the two-finger long press (Onshape's tap recognizer): what the
     # recognizer reported, and that the camera did not move.
     for name, want in (("touch-tap", "fingers: 1"), ("touch-two-finger-tap", "fingers: 2"), ("touch-long-press", "BoxStart")):
