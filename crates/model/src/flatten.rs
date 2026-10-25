@@ -527,3 +527,110 @@ mod tests {
         assert!(halves.iter().all(|(_, l)| l.len() == 1 && l[0].len() == 12), "{halves:?}");
     }
 }
+
+// ------------------------------------------------------------ Flatten surfaces dialog
+
+/// The display polyline of a part edge (display tessellation).
+pub fn edge_polyline(bodies: &[crate::display::BodyDisplay], r: &crate::reference::Reference) -> Vec<DVec3> {
+    let p3 = |p: &[f32; 3]| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
+    bodies.iter().find_map(|b| b.edge_refs.iter().position(|x| x == r).and_then(|i| b.mesh.edges.get(i)).map(|pl| pl.iter().map(p3).collect())).unwrap_or_default()
+}
+
+/// The Flatten button: the faces' display triangles as one mesh, refined,
+/// opened along the rip edges and the closed faces' seams, flattened.
+pub fn flatten_faces(bodies: &[crate::display::BodyDisplay], faces: &[crate::reference::Reference], rips: &[crate::reference::Reference], ctx: Option<&crate::regen::context::Context>) -> Flattened {
+    let mut m = crate::display::MeshBuffers::default();
+    for b in bodies {
+        for (fi, r) in b.face_refs.iter().enumerate() {
+            if !faces.contains(r) {
+                continue;
+            }
+            let Some(&(first, count)) = b.mesh.face_ranges.get(fi) else { continue };
+            let start = m.indices.len() as u32;
+            for &ix in b.mesh.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]) {
+                m.indices.push(m.positions.len() as u32);
+                m.positions.push(b.mesh.positions[ix as usize]);
+                m.normals.push(b.mesh.normals[ix as usize]);
+            }
+            m.face_ranges.push((start, m.indices.len() as u32 - start));
+        }
+    }
+    let mut rip_lines: Vec<Vec<DVec3>> = rips.iter().map(|r| edge_polyline(bodies, r)).collect();
+    // Faces that close on themselves (a cylinder) open along their seams.
+    if let Some(ctx) = ctx {
+        rip_lines.extend(seam_edges(ctx, faces));
+    }
+    let spacing = crate::thickness::spacing_for(&m, 4000);
+    let sheet = crate::thickness::refine(&m, spacing);
+    flatten(&sheet, &rip_lines, 300)
+}
+
+/// Where the flattened sheet is placed: at a mate connector (origin, x, z),
+/// turned by `angle` (radians) and offset along its z; else on the XY
+/// plane, turned to best match the faces' footprint (the outer side up),
+/// with `origin_vertex`'s nearest sheet point on it.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SheetPlacement {
+    pub connector: Option<(DVec3, DVec3, DVec3)>,
+    pub angle: f64,
+    pub offset: f64,
+    pub origin_vertex: Option<DVec3>,
+}
+
+/// The sheet's vertices placed in 3D.
+pub fn placed_sheet(f: &Flattened, p: &SheetPlacement) -> Vec<DVec3> {
+    if let Some((origin, x, z)) = p.connector {
+        let (a, b) = p.angle.sin_cos();
+        let x = x.normalize_or_zero();
+        let y = z.normalize_or_zero().cross(x);
+        let (u, v) = (x * b + y * a, y * b - x * a);
+        let origin = origin + z.normalize_or_zero() * p.offset;
+        return f.flat.iter().map(|q| origin + u * q.x + v * q.y).collect();
+    }
+    // Rotation (no mirroring; the outer side up) best matching the footprint.
+    let mirror = f.normal.z < 0.0;
+    let q: Vec<DVec2> = f.flat.iter().map(|q| if mirror { DVec2::new(q.x, -q.y) } else { *q }).collect();
+    let foot: Vec<DVec2> = f.positions.iter().map(|p| p.truncate()).collect();
+    let fm = foot.iter().copied().sum::<DVec2>() / foot.len().max(1) as f64;
+    let (mut c, mut s2) = (0.0, 0.0);
+    for (a, b) in q.iter().zip(&foot) {
+        c += a.dot(*b - fm);
+        s2 += a.perp_dot(*b - fm);
+    }
+    let rot = DVec2::from_angle(s2.atan2(c));
+    let mut placed: Vec<DVec2> = q.iter().map(|a| rot.rotate(*a) + fm).collect();
+    if let Some(vtx) = p.origin_vertex
+        && let Some(i) = (0..f.positions.len()).min_by(|&a, &b| f.positions[a].distance(vtx).total_cmp(&f.positions[b].distance(vtx)))
+    {
+        let shift = vtx.truncate() - placed[i];
+        for p in &mut placed {
+            *p += shift;
+        }
+    }
+    placed.into_iter().map(|p| p.extend(0.0)).collect()
+}
+
+/// Export as Parasolid: a planar sheet where the flat pattern is placed,
+/// one face per flattened face with `inner` (Export inner edges).
+pub fn flat_sheet(f: &Flattened, placed: &[DVec3], inner: bool) -> Result<noshape_kernel::Shape, String> {
+    let mut faces = Vec::new();
+    for (_, loops) in f.loops(inner) {
+        let pts: Vec<Vec<DVec3>> = loops.iter().map(|l| l.iter().map(|i| placed[*i as usize]).collect()).collect();
+        // Newell normal of each loop; the largest is the outer one.
+        let newell = |l: &[DVec3]| l.iter().zip(l.iter().cycle().skip(1)).fold(DVec3::ZERO, |n, (a, b)| n + DVec3::new((a.y - b.y) * (a.z + b.z), (a.z - b.z) * (a.x + b.x), (a.x - b.x) * (a.y + b.y)));
+        let Some(outer) = (0..pts.len()).max_by(|a, b| newell(&pts[*a]).length().total_cmp(&newell(&pts[*b]).length())) else { continue };
+        let n = newell(&pts[outer]).normalize_or_zero();
+        if n == DVec3::ZERO {
+            continue;
+        }
+        let plane = noshape_kernel::Plane::from_normal(pts[outer][0], n);
+        let wire = |l: &[DVec3]| noshape_kernel::make_polyline(l, true);
+        let holes = pts.iter().enumerate().filter(|(i, _)| *i != outer).map(|(_, l)| wire(l)).collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+        faces.push(noshape_kernel::make_face(&plane, &wire(&pts[outer]).map_err(|e| e.to_string())?, &holes).map_err(|e| e.to_string())?);
+    }
+    match faces.len() {
+        0 => Err("the flat pattern has no boundary".into()),
+        1 => Ok(faces.remove(0)),
+        _ => Ok(noshape_kernel::sew(&faces, 1e-7, false).map_err(|e| e.to_string())?.shape),
+    }
+}

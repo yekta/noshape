@@ -394,6 +394,142 @@ pub fn named_view_frame(doc: &noshape_model::document::Document, source: TabId, 
     named_views(doc, source).iter().find(|v| v.name == name).map(noshape_model::drawing::views::named_view_frame)
 }
 
+// ------------------------------------------------------------ View properties
+
+/// A typed scale: "1:2", "2/1" or a number.
+pub fn parse_scale(s: &str) -> Option<f64> {
+    let s = s.trim();
+    let v = if let Some((a, b)) = s.split_once([':', '/']) {
+        a.trim().parse::<f64>().ok()? / b.trim().parse::<f64>().ok()?
+    } else {
+        s.parse::<f64>().ok()?
+    };
+    (v.is_finite() && v > 0.0).then_some(v)
+}
+
+
+/// The View properties dialog's values for one view (live drawing/177).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewPropValues {
+    /// Base views: View orientation (a standard one) …
+    pub orientation: Option<noshape_model::drawing::ViewOrientation>,
+    /// … or a named view of the source.
+    pub named: Option<String>,
+    /// The view's own scale (None: inherited).
+    pub scale: Option<f64>,
+    /// Inherited from the sheet ("(Sheet)") rather than the parent.
+    pub sheet_scale: bool,
+    /// Rotation angle, degrees counter-clockwise (None: unchanged).
+    pub rotation_deg: Option<f64>,
+    pub tangent: noshape_scene::drawing_tools::view_edit::TangentMode,
+    pub best_quality: bool,
+    pub asm_position: Option<AsmPosition>,
+    pub display: Option<noshape_model::drawing::DisplayChoice>,
+    pub unaligned: bool,
+    pub cut_from_section: bool,
+    pub sketch_appearances: bool,
+    pub model_annotations: bool,
+    pub simplification: Option<Simplification>,
+    pub name: String,
+    pub view_label: bool,
+    pub label: String,
+    pub scale_label: bool,
+}
+
+impl ViewPropValues {
+    /// The dialog as it opens on view `id` of `sheet`.
+    pub fn of(d: &Drawing, sheet: usize, id: ViewId) -> Option<Self> {
+        use noshape_model::drawing::{DisplayChoice, ViewKind};
+        let s = d.sheets.get(sheet)?;
+        let v = s.view(id)?;
+        let base = matches!(v.kind, ViewKind::Base { .. });
+        let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
+        Some(ViewPropValues {
+            orientation: match &v.kind {
+                ViewKind::Base { orientation, .. } => Some(*orientation),
+                _ => None,
+            },
+            named: v.named_view.clone(),
+            scale: v.scale,
+            sheet_scale: v.sheet_scale,
+            rotation_deg: None,
+            tangent: noshape_scene::drawing_tools::view_edit::TangentMode::of(v),
+            best_quality: v.best_quality,
+            asm_position: if base { Some(v.asm_position()) } else { v.own_position },
+            display: if base { Some(v.display_state.clone().map_or(DisplayChoice::ShowAll, DisplayChoice::State)) } else { v.own_display.clone() },
+            unaligned: v.unaligned,
+            cut_from_section: v.cut_from_section,
+            sketch_appearances: v.sketch_appearances,
+            model_annotations: v.model_annotations,
+            simplification: v.simplification,
+            name: v.name.clone().unwrap_or_else(|| noshape_scene::drawing_tools::view_edit::default_view_name(d, s, v)),
+            view_label: auto_label || v.label.as_ref().is_some_and(|l| !l.is_empty()),
+            label: match &v.kind {
+                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } | ViewKind::Detail { label, .. } => label.clone(),
+                _ => v.label.clone().unwrap_or_default(),
+            },
+            scale_label: v.scale_label.unwrap_or(v.label.is_some() && v.scale.is_some()),
+        })
+    }
+}
+
+/// View properties ✓ on one view (the sheet move is the caller's).
+pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewId, p: &ViewPropValues) {
+    use noshape_model::drawing::{DisplayChoice, ViewKind};
+    use noshape_scene::drawing_tools::view_edit::{default_view_name, set_standard_orientation};
+    let Some(old) = d.sheets.get(sheet).and_then(|s| s.view(id)).cloned() else { return };
+    let default_name = default_view_name(d, &d.sheets[sheet], &old);
+    let Some(v) = d.sheets[sheet].view_mut(id) else { return };
+    v.scale = p.scale;
+    v.sheet_scale = p.sheet_scale && p.scale.is_none();
+    if let Some(r) = p.rotation_deg {
+        v.rotation = r.to_radians();
+    }
+    p.tangent.apply(v);
+    v.best_quality = p.best_quality;
+    if matches!(v.kind, ViewKind::Base { .. }) {
+        v.set_asm_position(p.asm_position.unwrap_or(AsmPosition::Default));
+        v.display_state = match &p.display {
+            Some(DisplayChoice::State(n)) => Some(n.clone()),
+            _ => None,
+        };
+    } else if !matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. }) {
+        v.own_position = p.asm_position;
+        v.own_display = p.display.clone();
+    }
+    v.unaligned = p.unaligned;
+    v.cut_from_section = p.cut_from_section;
+    v.sketch_appearances = p.sketch_appearances;
+    v.model_annotations = p.model_annotations;
+    v.simplification = p.simplification;
+    let name = p.name.trim();
+    v.name = (!name.is_empty() && name != default_name).then(|| name.to_string());
+    v.scale_label = Some(p.scale_label);
+    let label = p.label.trim().to_string();
+    match &mut v.kind {
+        ViewKind::Section { label: l, .. } | ViewKind::AlignedSection { label: l, .. } | ViewKind::Detail { label: l, .. } => {
+            if !label.is_empty() {
+                *l = label;
+            }
+        }
+        _ => v.label = (p.view_label && !label.is_empty()).then_some(label).or_else(|| p.view_label.then(|| v.name.clone().unwrap_or(default_name.clone()).to_uppercase())),
+    }
+    if let (ViewKind::Base { orientation: o, source, .. }, Some(n)) = (&mut v.kind, p.orientation) {
+        let source = *source;
+        if p.named != old.named_view {
+            match p.named.as_ref().and_then(|name| named_view_frame(doc, source, name)) {
+                Some(frame) => {
+                    v.custom_frame = Some(frame);
+                    v.named_view = p.named.clone();
+                }
+                None => set_standard_orientation(v, n),
+            }
+        } else if *o != n {
+            set_standard_orientation(v, n);
+        }
+    }
+}
+
 // ------------------------------------------------------------ dimension palette
 
 /// The palette's precision list (label, decimals; None: the drawing's).

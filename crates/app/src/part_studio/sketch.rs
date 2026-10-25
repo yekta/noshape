@@ -163,7 +163,7 @@ fn entity_name(sk: &noshape_sketch::Sketch, e: noshape_sketch::EntityId) -> Stri
 
 /// Configuration parameter id of a sketch dimension.
 fn configured_dim_key(cid: noshape_sketch::ConstraintId) -> String {
-    format!("{}{}", noshape_model::regen::features::sketch::CONFIGURED_DIMENSION_PREFIX, cid.0)
+    noshape_ops::studio::configured_dim_key(cid.0)
 }
 
 /// A sketch context menu entry's action on the view.
@@ -2405,11 +2405,10 @@ impl PartStudioView {
                 }
             }
             "unconfigure" => {
-                let (feature, key) = (self.sketch.as_ref().map(|s| s.feature), configured_dim_key(cid));
-                if let Some(feature) = feature {
+                if let Some(feature) = self.sketch.as_ref().map(|s| s.feature) {
                     let tab = self.tab;
                     self.doc.update(cx, |doc, cx| {
-                        doc.edit_studio(tab, "Unconfigure dimension", cx, |ps| ps.configuration.configured.retain(|c| !(c.feature == feature && c.param == key)));
+                        doc.edit_studio(tab, noshape_ops::studio::UNCONFIGURE_DIMENSION, cx, |ps| noshape_ops::studio::unconfigure_dimension(ps, feature, cid.0));
                     });
                 }
             }
@@ -2426,29 +2425,13 @@ impl PartStudioView {
     /// with the dimension's current value (edit them in the configuration
     /// table, or edit the dimension with that configuration active).
     fn configure_dimension(&mut self, cid: noshape_sketch::ConstraintId, input: &str, cx: &mut Context<Self>) {
-        use noshape_model::configuration::{ConfigInputKind, ConfiguredParam};
-        use noshape_model::params::ParamValue;
         let Some(feature) = self.sketch.as_ref().map(|s| s.feature) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
-        let Some(text) = self.sketch_data(cx).and_then(|d| {
-            d.dimension_exprs.get(&cid.0).map(|e| e.text.clone()).or_else(|| {
-                let c = d.sketch.constraint(cid)?;
-                Some(noshape_units::format_quantity_exact(Quantity::new(c.kind.value()?, crate::sketch_mode::dim_unit(&c.kind)), &units))
-            })
-        }) else {
-            return;
-        };
-        let (input, key, tab) = (input.to_string(), configured_dim_key(cid), self.tab);
+        let Some(text) = self.sketch_data(cx).and_then(|d| noshape_ops::studio::dimension_text(&d, cid.0, &units)) else { return };
+        let (input, tab) = (input.to_string(), self.tab);
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(tab, "Configure dimension", cx, |ps| {
-                let keys: Vec<String> = match ps.configuration.inputs.iter().find(|i| i.id == input).map(|i| &i.kind) {
-                    Some(ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
-                    Some(ConfigInputKind::Checkbox { .. }) => vec!["true".into(), "false".into()],
-                    _ => return,
-                };
-                ps.configuration.configured.retain(|c| !(c.feature == feature && c.param == key));
-                let values = keys.into_iter().map(|k| (k, ParamValue::Expr(noshape_units::ExprValue::new(text.clone())))).collect();
-                ps.configuration.configured.push(ConfiguredParam { input, feature, param: key, values });
+            doc.edit_studio(tab, noshape_ops::studio::CONFIGURE_DIMENSION, cx, |ps| {
+                noshape_ops::studio::configure_dimension(ps, feature, cid.0, &input, &text);
             });
         });
     }

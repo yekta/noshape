@@ -18,71 +18,7 @@ use noshape_model::document::TabContent;
 use noshape_model::drawing::views;
 use noshape_model::drawing::*;
 
-/// Tangent edges display (Onshape: Hidden / Solid / Phantom).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TangentMode {
-    Hidden,
-    Solid,
-    Phantom,
-}
-
-impl TangentMode {
-    pub fn of(v: &DrawingView) -> Self {
-        match (v.show_tangent_edges, v.tangent_phantom) {
-            (false, _) => TangentMode::Hidden,
-            (true, false) => TangentMode::Solid,
-            (true, true) => TangentMode::Phantom,
-        }
-    }
-    pub(crate) fn label(self) -> &'static str {
-        match self {
-            TangentMode::Hidden => "Hidden",
-            TangentMode::Solid => "Solid",
-            TangentMode::Phantom => "Phantom",
-        }
-    }
-    pub(crate) fn apply(self, v: &mut DrawingView) {
-        v.show_tangent_edges = self != TangentMode::Hidden;
-        v.tangent_phantom = self == TangentMode::Phantom;
-    }
-}
-
-const ORIENTATIONS: [(ViewOrientation, &str); 7] = [
-    (ViewOrientation::Top, "Top"),
-    (ViewOrientation::Left, "Left"),
-    (ViewOrientation::Right, "Right"),
-    (ViewOrientation::Front, "Front"),
-    (ViewOrientation::Back, "Back"),
-    (ViewOrientation::Bottom, "Bottom"),
-    (ViewOrientation::Isometric, "Isometric"),
-];
-
-fn orientation_name(o: ViewOrientation) -> &'static str {
-    ORIENTATIONS.iter().find(|(x, _)| *x == o).map(|(_, n)| *n).unwrap_or("Front")
-}
-
-/// A base view back on a standard orientation (no named view; a sketch
-/// view keeps facing its sketch).
-fn set_standard_orientation(v: &mut DrawingView, o: ViewOrientation) {
-    if let ViewKind::Base { orientation, .. } = &mut v.kind {
-        *orientation = o;
-    }
-    if v.named_view.take().is_some() || v.sketch.is_none() {
-        v.custom_frame = None;
-    }
-}
-
-/// Default view name: the orientation of a base view or the standard
-/// orientation a projected view shows ("Right"), else the view type.
-pub fn default_view_name(drawing: &Drawing, sheet: &Sheet, v: &DrawingView) -> String {
-    match &v.kind {
-        ViewKind::Base { orientation, .. } => v.named_view.clone().unwrap_or_else(|| orientation_name(*orientation).to_string()),
-        ViewKind::Projected { .. } => views::standard_orientation(drawing, sheet, v.id).map(|o| orientation_name(o).to_string()).unwrap_or_else(|| "Projected view".into()),
-        ViewKind::Auxiliary { .. } => "Auxiliary view".into(),
-        ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => format!("Section {label}-{label}"),
-        ViewKind::Detail { label, .. } => format!("Detail {label}"),
-    }
-}
+pub use noshape_scene::drawing_tools::view_edit::{ORIENTATIONS, TangentMode, default_view_name, orientation_name, set_standard_orientation};
 
 /// Views on the system clipboard (Copy in the view menu / Ctrl+C).
 pub fn view_clipboard(cx: &App) -> Option<clipboard::ViewClipboard> {
@@ -434,16 +370,7 @@ impl DrawingEditor {
 
     /// Order ▸ Bring to front / Send to back (the view list is the layer stack).
     fn order_view(&mut self, id: ViewId, front: bool, cx: &mut Context<Self>) {
-        self.edit_sheet(if front { "Bring to front" } else { "Send to back" }, cx, |s| {
-            if let Some(i) = s.views.iter().position(|v| v.id == id) {
-                let v = s.views.remove(i);
-                if front {
-                    s.views.push(v);
-                } else {
-                    s.views.insert(0, v);
-                }
-            }
-        });
+        self.edit_sheet(if front { "Bring to front" } else { "Send to back" }, cx, |s| noshape_scene::drawing_tools::view_edit::order_view(s, id, front));
     }
 
     /// Align views ▸ Vertically / Horizontally: the next view clicked keeps
@@ -461,13 +388,7 @@ impl DrawingEditor {
         let target = self.sel_at(self.hover, self.cursor).and_then(|s| if let Sel::View(v) = s { Some(v) } else { None });
         match target.and_then(|t| self.current_sheet().view(t)).map(|t| t.position) {
             Some(to) if target != Some(id) => {
-                self.edit_view("Align views", id, cx, |v| {
-                    if vertical {
-                        v.position[0] = to[0];
-                    } else {
-                        v.position[1] = to[1];
-                    }
-                });
+                self.edit_view("Align views", id, cx, |v| noshape_scene::drawing_tools::view_edit::align_view(v, to, vertical));
                 self.status = None;
             }
             _ => self.status = Some("Align views cancelled".into()),
@@ -490,15 +411,7 @@ impl DrawingEditor {
         let pick = self.line_pick().and_then(|p| if let Pick::Line { a, b } = p { Some((a, b)) } else { None });
         match pick.filter(|(a, _)| a.view == id).and_then(|(a, b)| self.placement(id).map(|pl| (pl.to_sheet(a.p), pl.to_sheet(b.p)))) {
             Some((pa, pb)) => {
-                let angle = (pb[1] - pa[1]).atan2(pb[0] - pa[0]);
-                let target = if vertical { std::f64::consts::FRAC_PI_2 } else { 0.0 };
-                // Lines have no direction: turn by the smallest angle (mod 180°).
-                let pi = std::f64::consts::PI;
-                let mut delta = (target - angle).rem_euclid(pi);
-                if delta > pi / 2.0 {
-                    delta -= pi;
-                }
-                self.edit_view(if vertical { "Rotate view vertically" } else { "Rotate view horizontally" }, id, cx, |v| v.rotation += delta);
+                self.edit_view(if vertical { "Rotate view vertically" } else { "Rotate view horizontally" }, id, cx, |v| noshape_scene::drawing_tools::view_edit::rotate_to_line(v, pa, pb, vertical));
                 self.status = None;
             }
             None => self.status = Some("Rotate view cancelled: select a straight edge of the view".into()),
@@ -664,66 +577,29 @@ impl DrawingEditor {
         let sheet_scale = if typed.ends_with("(Sheet)") { true } else if typed.ends_with("(Parent)") { false } else { p.sheet_scale && scale.is_none() };
         // Rotation angle: 0–360; the reverse button turns it clockwise.
         let rotation = p.rotation.read(cx).value().trim().trim_end_matches('°').parse::<f64>().ok().filter(|a| (0.0..=360.0).contains(a)).map(|a| if p.rot_reverse { -a } else { a });
-        let (unaligned, parent_cut) = (p.unaligned, p.parent_cut);
-        let (sketch_appearances, model_annotations) = (p.sketch_appearances, p.model_annotations);
-        let name = p.name.read(cx).value().trim().to_string();
-        let label = p.label.read(cx).value().trim().to_string();
-        let (view_label, scale_label, tangent, orientation) = (p.view_label, p.scale_label, p.tangent, p.orientation);
-        let named = p.named.clone();
-        let best_quality = p.best_quality;
-        let (asm_position, display) = (p.asm_position, p.display.clone());
         let simplification = p.simplification.map(|k| crate::drawing_insert::parse_simplification(k, &p.simp_value.read(cx).value(), self.drawing.units_mm).unwrap_or(k));
-        let Some(old) = self.current_sheet().view(id).cloned() else { return };
-        let default_name = default_view_name(&self.drawing, self.current_sheet(), &old);
+        let values = noshape_ops::drawing::ViewPropValues {
+            orientation: p.orientation,
+            named: p.named.clone(),
+            scale,
+            sheet_scale,
+            rotation_deg: rotation,
+            tangent: p.tangent,
+            best_quality: p.best_quality,
+            asm_position: p.asm_position,
+            display: p.display.clone(),
+            unaligned: p.unaligned,
+            cut_from_section: p.parent_cut,
+            sketch_appearances: p.sketch_appearances,
+            model_annotations: p.model_annotations,
+            simplification,
+            name: p.name.read(cx).value().trim().to_string(),
+            view_label: p.view_label,
+            label: p.label.read(cx).value().trim().to_string(),
+            scale_label: p.scale_label,
+        };
         let mut d = self.drawing.clone();
-        if let Some(v) = d.sheets[self.sheet].view_mut(id) {
-            v.scale = scale;
-            v.sheet_scale = sheet_scale && scale.is_none();
-            if let Some(r) = rotation {
-                v.rotation = r.to_radians();
-            }
-            tangent.apply(v);
-            v.best_quality = best_quality;
-            if matches!(v.kind, ViewKind::Base { .. }) {
-                v.set_asm_position(asm_position.unwrap_or(AsmPosition::Default));
-                v.display_state = match display {
-                    Some(DisplayChoice::State(n)) => Some(n),
-                    _ => None,
-                };
-            } else if !matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. }) {
-                v.own_position = asm_position;
-                v.own_display = display;
-            }
-            v.unaligned = unaligned;
-            v.cut_from_section = parent_cut;
-            v.sketch_appearances = sketch_appearances;
-            v.model_annotations = model_annotations;
-            v.simplification = simplification;
-            v.name = (!name.is_empty() && name != default_name).then_some(name);
-            v.scale_label = Some(scale_label);
-            match &mut v.kind {
-                ViewKind::Section { label: l, .. } | ViewKind::AlignedSection { label: l, .. } | ViewKind::Detail { label: l, .. } => {
-                    if !label.is_empty() {
-                        *l = label;
-                    }
-                }
-                _ => v.label = (view_label && !label.is_empty()).then_some(label).or_else(|| view_label.then(|| v.name.clone().unwrap_or(default_name.clone()).to_uppercase())),
-            }
-            if let (ViewKind::Base { orientation: o, source, .. }, Some(n)) = (&mut v.kind, orientation) {
-                let source = *source;
-                if named != old.named_view {
-                    match named.as_ref().and_then(|name| crate::drawing_insert::named_view_frame(&self.doc.read(cx).session.doc, source, name)) {
-                        Some(frame) => {
-                            v.custom_frame = Some(frame);
-                            v.named_view = named;
-                        }
-                        None => set_standard_orientation(v, n),
-                    }
-                } else if *o != n {
-                    set_standard_orientation(v, n);
-                }
-            }
-        }
+        noshape_ops::drawing::apply_view_props(&self.doc.read(cx).session.doc, &mut d, self.sheet, id, &values);
         if p.sheet != self.sheet {
             // Live (behaviours "Views linked across sheets"): the view moves alone, linked to its parent.
             match d.move_views_to_sheet_linked(self.sheet, &[id], p.sheet) {

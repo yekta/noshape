@@ -291,3 +291,226 @@ pub fn paste_sketches_onto(ps: &mut PartStudio, sketches: &[noshape_model::parts
     }
     ids
 }
+
+// ------------------------------------------------------------ new-feature dialog logic
+
+/// Parameter changes a new feature's dialog makes on its own.
+pub type AutoChanges = Vec<(&'static str, noshape_model::params::ParamValue)>;
+
+/// Onshape's automatic choices in a new Extrude / Revolve / Sweep / Thicken
+/// from the parts its profiles lie on: Thicken's operation, merge scope and
+/// flip (thickenEditLogic); a Remove / Intersect Extrude on a part points
+/// into it. `user_set`: the fields the user set (left alone). `display`: the
+/// Part Studio before the feature.
+pub fn auto_operation(ps: &PartStudio, display: &noshape_model::display::StudioDisplay, f: &Feature, user_set: &dyn Fn(&str) -> bool) -> AutoChanges {
+    use noshape_model::params::ParamValue;
+    let ty = f.type_id.as_str();
+    if !matches!(ty, "extrude" | "revolve" | "sweep" | "thicken") {
+        return Vec::new();
+    }
+    // Sweep's profiles are `profiles` (sweep.fs); the others' `entities`.
+    let profiles_id = if ty == "sweep" { "profiles" } else { "entities" };
+    let p = &f.params;
+    let (op_user, flip_user, scope_user) = (user_set("operationType"), user_set("oppositeDirection"), user_set("booleanScope"));
+    let (op, flipped) = (p.enum_("operationType").to_string(), p.bool("oppositeDirection"));
+    // thickenEditLogic counts only faces of solids (live L18: a surface's
+    // face leaves the operation on New).
+    let solid = |b: &BodyId| ty != "thicken" || display.bodies.iter().find(|x| &x.id == b).is_some_and(|x| x.kind == noshape_model::display::BodyKind::Solid);
+    // Parts the profiles lie on: a picked face, or the face a sketch was
+    // drawn on.
+    let host_of = |r: &Reference| match r {
+        Reference::Face(_) => body_of(display, r).filter(|b| solid(b)),
+        Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) if ty != "thicken" => {
+            let plane = ps.feature(*sketch)?.params.query("sketchPlane").first().cloned()?;
+            body_of(display, &plane)
+        }
+        _ => None,
+    };
+    let profiles = p.query(profiles_id);
+    let hosts: Vec<BodyId> = if ty == "thicken" {
+        let mut v: Vec<BodyId> = Vec::new();
+        for b in profiles.iter().filter_map(host_of) {
+            if !v.contains(&b) {
+                v.push(b);
+            }
+        }
+        v
+    } else {
+        profiles.iter().find_map(host_of).into_iter().collect()
+    };
+    let mut changes: AutoChanges = Vec::new();
+    if !op_user && ty == "thicken" {
+        // thickenEditLogic: Remove when the wall points into the part.
+        let want = match (hosts.is_empty(), flipped) {
+            (true, _) => "NEW",
+            (false, true) => "REMOVE",
+            _ => "ADD",
+        };
+        if op != want {
+            changes.push(("operationType", ParamValue::Enum(want.into())));
+        }
+    }
+    // The merge scope starts as the profiles' part, also when the user
+    // picked the operation (live, qa5 EXT1: Remove fills "Part 1").
+    if ty == "thicken" && !hosts.is_empty() && !scope_user && p.query("booleanScope").is_empty() {
+        changes.push(("booleanScope", ParamValue::Query(hosts.iter().map(|b| Reference::Body(b.clone())).collect())));
+    }
+    // thickenEditLogic's canSetBooleanFlip: a user-picked Remove points the
+    // wall into the part, Add out of it.
+    if ty == "thicken" && op_user && !flip_user && !hosts.is_empty() && matches!(op.as_str(), "ADD" | "REMOVE") {
+        let into = op == "REMOVE";
+        if flipped != into {
+            changes.push(("oppositeDirection", ParamValue::Bool(into)));
+        }
+    }
+    if ty == "extrude" && !flip_user && !hosts.is_empty() {
+        let into = matches!(op.as_str(), "REMOVE" | "INTERSECT");
+        if flipped != into {
+            changes.push(("oppositeDirection", ParamValue::Bool(into)));
+        }
+    }
+    changes
+}
+
+/// Onshape's booleanStepEditLogic (booleanHeuristics.fs) for a new
+/// Extrude / Revolve / Sweep / Loft, from the parts its tool touches in the
+/// preview: one part → Add into it; none or several → New with an empty
+/// scope. Nothing once the user set the scope or "Merge with all"; a
+/// user-picked operation keeps it and only an empty scope is filled (live:
+/// an Add over three parts starts with an empty scope and fails "No merge
+/// scope selected.", qa5 BOOL4; a Remove over Part 1 gets "Part 1",
+/// part-studio/234).
+pub fn boolean_edit_logic(f: &Feature, user_set: &dyn Fn(&str) -> bool, touched: &[BodyId]) -> AutoChanges {
+    use noshape_model::params::ParamValue;
+    if !matches!(f.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft") {
+        return Vec::new();
+    }
+    let p = &f.params;
+    if user_set("booleanScope") || user_set("defaultScope") || p.enum_("bodyType") == "SURFACE" {
+        return Vec::new();
+    }
+    let (op, scope, op_user) = (p.enum_("operationType").to_string(), p.query("booleanScope").to_vec(), user_set("operationType"));
+    if op_user && op == "NEW" {
+        return Vec::new();
+    }
+    let can_scope = !op_user || scope.is_empty();
+    let (want_op, want_scope): (&str, Vec<Reference>) = match touched {
+        [one] => ("ADD", vec![Reference::Body(one.clone())]),
+        _ => ("NEW", Vec::new()),
+    };
+    let mut changes: AutoChanges = Vec::new();
+    // Remove / Intersect picked by the flip logic stay (canSetBooleanFlip).
+    if !op_user && op != want_op && !matches!(op.as_str(), "REMOVE" | "INTERSECT") {
+        changes.push(("operationType", ParamValue::Enum(want_op.into())));
+    }
+    if can_scope && scope != want_scope && !(op_user && want_scope.is_empty()) {
+        changes.push(("booleanScope", ParamValue::Query(want_scope)));
+    }
+    changes
+}
+
+/// A new Hole's Merge scope is the parts its holes reach and follows a
+/// deeper or shallower hole until the user sets it (live L57); more parts
+/// behind the locations than in front flips it (holeScopeFlipHeuristics)
+/// until the user sets the flip. Returns the changes (a flip alone first).
+pub fn hole_scope_logic(f: &Feature, user_set: &dyn Fn(&str) -> bool, touched: &[BodyId], behind: &[BodyId]) -> AutoChanges {
+    use noshape_model::params::ParamValue;
+    let p = &f.params;
+    if f.type_id != "hole" || p.query("locations").is_empty() {
+        return Vec::new();
+    }
+    let user = user_set("scope");
+    if !user_set("oppositeDirection") && !user && behind.len() > touched.len() {
+        return vec![("oppositeDirection", ParamValue::Bool(!p.bool("oppositeDirection")))];
+    }
+    if user {
+        return Vec::new();
+    }
+    let want: Vec<Reference> = touched.iter().cloned().map(Reference::Body).collect();
+    if want.as_slice() == p.query("scope") {
+        return Vec::new();
+    }
+    vec![("scope", ParamValue::Query(want))]
+}
+
+// ------------------------------------------------------------ configured sketch dimensions
+
+pub const CONFIGURE_DIMENSION: &str = "Configure dimension";
+pub const UNCONFIGURE_DIMENSION: &str = "Unconfigure dimension";
+
+/// The configured-parameter key of sketch dimension `cid`.
+pub fn configured_dim_key(cid: u32) -> String {
+    format!("{}{}", noshape_model::regen::features::sketch::CONFIGURED_DIMENSION_PREFIX, cid)
+}
+
+/// Sketch dimension menu › Configure dimension with a List or Checkbox
+/// input: every option starts with the dimension's current value `text`.
+pub fn configure_dimension(ps: &mut PartStudio, sketch: FeatureId, cid: u32, input: &str, text: &str) -> bool {
+    use noshape_model::configuration::{ConfigInputKind, ConfiguredParam};
+    use noshape_model::params::ParamValue;
+    let key = configured_dim_key(cid);
+    let keys: Vec<String> = match ps.configuration.inputs.iter().find(|i| i.id == input).map(|i| &i.kind) {
+        Some(ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
+        Some(ConfigInputKind::Checkbox { .. }) => vec!["true".into(), "false".into()],
+        _ => return false,
+    };
+    ps.configuration.configured.retain(|c| !(c.feature == sketch && c.param == key));
+    let values = keys.into_iter().map(|k| (k, ParamValue::Expr(noshape_units::ExprValue::new(text)))).collect();
+    ps.configuration.configured.push(ConfiguredParam { input: input.to_string(), feature: sketch, param: key, values });
+    true
+}
+
+/// Sketch dimension menu › Unconfigure dimension.
+pub fn unconfigure_dimension(ps: &mut PartStudio, sketch: FeatureId, cid: u32) {
+    let key = configured_dim_key(cid);
+    ps.configuration.configured.retain(|c| !(c.feature == sketch && c.param == key));
+}
+
+/// A sketch dimension's value as its value box shows it: the expression
+/// typed, else the measured value in the workspace units.
+pub fn dimension_text(data: &noshape_model::sketch_feature::SketchData, cid: u32, units: &noshape_units::UnitPrefs) -> Option<String> {
+    data.dimension_exprs.get(&cid).map(|e| e.text.clone()).or_else(|| {
+        let c = data.sketch.constraint(noshape_sketch::ConstraintId(cid))?;
+        Some(noshape_units::format_quantity_exact(noshape_units::Quantity::new(c.kind.value()?, noshape_scene::sketch_mode::dim_unit(&c.kind)), units))
+    })
+}
+
+pub const SIZE_PLANE_DESCRIPTION: &str = "Size to Part Studio";
+
+/// Plane menu › Size to Part Studio: the plane's half width and height that
+/// cover the shown parts' boxes, 10 % over. None without parts.
+pub fn plane_size_to_studio(display: &noshape_model::display::StudioDisplay, r: &Reference) -> Option<(f64, f64)> {
+    let f = display.planes.iter().find(|p| &p.reference == r)?.frame;
+    let (mut hw, mut hh) = (0.0f64, 0.0f64);
+    for (lo, hi) in display.bodies.iter().filter(|b| !b.hidden).filter_map(|b| b.bounds) {
+        for k in 0..8 {
+            let c = glam::DVec3::new(if k & 1 == 0 { lo.x } else { hi.x }, if k & 2 == 0 { lo.y } else { hi.y }, if k & 4 == 0 { lo.z } else { hi.z }) - f.origin;
+            hw = hw.max(c.dot(f.x).abs());
+            hh = hh.max(c.dot(f.y).abs());
+        }
+    }
+    (hw > 0.0 && hh > 0.0).then_some((hw * 1.1, hh * 1.1))
+}
+
+pub fn set_plane_size(ps: &mut PartStudio, r: &Reference, half_width: f64, half_height: f64) {
+    ps.plane_sizes.retain(|(x, ..)| x != r);
+    ps.plane_sizes.push((r.clone(), half_width, half_height));
+}
+
+/// Plane frame of a plane, planar face, sketch or mate connector (a section
+/// view's or a sketch's plane).
+pub fn frame_of_ref(display: &noshape_model::display::StudioDisplay, ctx: Option<&noshape_model::regen::context::Context>, r: &Reference) -> Option<noshape_model::display::PlaneFrame> {
+    use noshape_model::display::PlaneFrame;
+    match r {
+        Reference::Plane(_) | Reference::FeaturePlane(_) => display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
+        Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => display.sketches.iter().find(|s| s.feature == *sketch).map(|s| s.frame),
+        Reference::MateConnector { .. } => display.connectors.iter().find(|c| &c.reference == r).map(|c| PlaneFrame { origin: c.origin, x: c.x, y: c.z.cross(c.x), normal: c.z }),
+        Reference::Face(n) => ctx?.bodies.iter().find_map(|b| {
+            let fi = *b.find_faces(n).first()?;
+            let pl = b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?.face_plane().ok()??;
+            let (normal, x) = (pl.unit_normal(), pl.unit_x());
+            Some(PlaneFrame { origin: pl.origin, x, y: normal.cross(x), normal })
+        }),
+        _ => None,
+    }
+}

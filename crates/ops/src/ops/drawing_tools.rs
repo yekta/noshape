@@ -308,6 +308,27 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "delete",
+            summary: "Delete views, annotations, tables, images, hatches, sketch entities or view breaks",
+            description: "Select and Delete on the sheet (ids from drawing_get). Deleting a view deletes its projected / section / detail children's link and its label; deleting an annotation deletes the callouts grouped with it; a datum shown from the model is hidden instead. One edit (\"Delete\").",
+            fields: with(
+                common(),
+                vec![
+                    opt("views", json!({ "type": "array", "items": { "type": "integer" } }), "View ids."),
+                    opt("annotations", json!({ "type": "array", "items": { "type": "integer" } }), "Annotation ids (dimensions, notes, callouts...)."),
+                    opt("tables", json!({ "type": "array", "items": { "type": "integer" } }), "Table ids."),
+                    opt("images", json!({ "type": "array", "items": { "type": "integer" } }), "Image ids."),
+                    opt("hatches", json!({ "type": "array", "items": { "type": "integer" } }), "Hatch region ids."),
+                    opt("sketch_entities", json!({ "type": "array", "items": { "type": "integer" } }), "Drawing sketch entity ids."),
+                    opt("breaks", json!({ "type": "array", "items": { "type": "object" } }), "View breaks: [{\"view\": id, \"index\": n}] (drawing_get lists a view's breaks)."),
+                ],
+            ),
+            mutates: true,
+            destructive: true,
+            run: delete,
+        },
+        Op {
+            group: "drawing",
             verb: "edit_dimension",
             summary: "Edit a dimension or hole callout: text, precision, units, tolerance, dual, parentheses",
             description: "The dimension palette (double-click a dimension or hole callout): text above / below, prefix, suffix, the value (typing it overrides a linear dimension's text; empty puts the measured value back), precision, units, tolerance and its values, Parentheses, Inspection dimension, Dual dimension, a radial dimension's radius / diameter; hole callouts: Override precision/tolerance. Tolerance values are in the dimension's units (or with units: \"0.05 mm\"). One edit (\"Edit dimension\" / \"Edit hole callout\").",
@@ -454,10 +475,15 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "ordinate",
             summary: "Ordinate dimensions from a datum point",
-            description: "The Ordinate dimension tool: `origin` is the datum (a vertex or circle center, sheet mm), `side` a click that sets the measured direction (beside the origin: horizontal values; above or below: vertical), then each of `points` adds an ordinate to the group. One edit per click, as with the mouse (\"Ordinate dimension\", then \"Add to ordinate group\").",
+            description: "The Ordinate dimension tool: `origin` is the datum (a vertex or circle center, sheet mm), `side` a click that sets the measured direction (beside the origin: horizontal values; above or below: vertical), then each of `points` adds an ordinate to the group. One edit per click, as with the mouse (\"Ordinate dimension\", then \"Add to ordinate group\"). With `group` (an ordinate dimension's id: its menu's Add to ordinate group), `points` go into that group, measured from its origin.",
             fields: with(
                 common(),
-                vec![req("origin", point(), "The datum point (sheet mm)."), req("side", point(), "Where the values line up (sheet mm)."), opt("points", points(0, 64), "Points to dimension (vertices, circle centers; sheet mm).")],
+                vec![
+                    opt("origin", point(), "The datum point (sheet mm); required without `group`."),
+                    opt("side", point(), "Where the values line up (sheet mm); required without `group`."),
+                    opt("points", points(0, 64), "Points to dimension (vertices, circle centers; sheet mm)."),
+                    opt("group", json!({ "type": "integer" }), "An existing ordinate dimension to add `points` to."),
+                ],
             ),
             mutates: true,
             destructive: false,
@@ -655,14 +681,14 @@ pub fn ops() -> Vec<Op> {
 
 // ------------------------------------------------------------ helpers
 
-struct Target {
-    tab: noshape_model::document::TabId,
-    sheet: usize,
-    d: Drawing,
-    m: SheetModel,
+pub(super) struct Target {
+    pub(super) tab: noshape_model::document::TabId,
+    pub(super) sheet: usize,
+    pub(super) d: Drawing,
+    pub(super) m: SheetModel,
 }
 
-fn target(od: &mut OpenDoc, a: &Args) -> Result<Target, OpError> {
+pub(super) fn target(od: &mut OpenDoc, a: &Args) -> Result<Target, OpError> {
     let tab = drawing_tab(od, a)?;
     let d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
     let sheet = sheet_index(&d, a)?;
@@ -670,11 +696,11 @@ fn target(od: &mut OpenDoc, a: &Args) -> Result<Target, OpError> {
     Ok(Target { tab, sheet, d, m })
 }
 
-fn pt_arg(a: &Args, name: &str) -> Result<[f64; 2], OpError> {
+pub(super) fn pt_arg(a: &Args, name: &str) -> Result<[f64; 2], OpError> {
     point_value(a.get(name).ok_or_else(|| OpError::param(name, "required"))?, name)
 }
 
-fn view_arg(t: &Target, a: &Args, name: &str) -> Result<ViewId, OpError> {
+pub(super) fn view_arg(t: &Target, a: &Args, name: &str) -> Result<ViewId, OpError> {
     let id = ViewId(a.opt_u64(name)?.ok_or_else(|| OpError::param(name, "a view id (drawing_get)"))?);
     t.d.sheets[t.sheet].view(id).map(|_| id).ok_or_else(|| OpError::param(name, "no such view on the sheet"))
 }
@@ -694,7 +720,7 @@ fn enum_arg<T: Copy>(a: &Args, name: &str, options: &[(&str, T)], default: T) ->
 }
 
 /// Commit, then reply with the sheet and the new item's id under `key`.
-fn done(od: &mut OpenDoc, t: Target, description: &str, key: &str, id: u64) -> Result<OpOutput, OpError> {
+pub(super) fn done(od: &mut OpenDoc, t: Target, description: &str, key: &str, id: u64) -> Result<OpOutput, OpError> {
     commit(od, t.tab, t.sheet, t.d, description)?;
     let mut out = reply(od, t.tab, t.sheet, false)?;
     out[key] = json!(id);
@@ -916,7 +942,7 @@ fn profile(t: &Target, a: &Args, view: Option<ViewId>) -> Result<(ViewId, Vec<[f
 
 /// Edit view `id` of the sheet (a mirror of a view on another sheet: the
 /// real view), as the drawing editor does.
-fn edit_view(t: &mut Target, id: ViewId, f: impl FnOnce(&mut noshape_model::drawing::DrawingView)) {
+pub(super) fn edit_view(t: &mut Target, id: ViewId, f: impl FnOnce(&mut noshape_model::drawing::DrawingView)) {
     let (si, id) = t.d.real_view_of(t.sheet, id);
     if let Some(v) = t.d.sheets.get_mut(si).and_then(|s| s.view_mut(id)) {
         f(v);
@@ -964,7 +990,7 @@ fn clicks(a: &Args) -> Result<Vec<[f64; 2]>, OpError> {
 
 /// A straight edge under click `i`: its ends and (for virtual sharps) its
 /// model edge.
-fn edge_at(t: &Target, tool: &Tool, c: [f64; 2], i: usize) -> Result<(PickedPoint, PickedPoint, Option<dt::EdgeRef>), OpError> {
+pub(super) fn edge_at(t: &Target, tool: &Tool, c: [f64; 2], i: usize) -> Result<(PickedPoint, PickedPoint, Option<dt::EdgeRef>), OpError> {
     let pk = t.m.pick(tool, &[], c);
     match (pk.line_pick(), pk.hovered_edge()) {
         (Some(Pick::Line { a, b }), Some((_, me))) => Ok((a, b, Some((me.body.clone(), (*me.name).clone())))),
@@ -1116,15 +1142,33 @@ fn callout(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn ordinate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let t = target(od, a)?;
-    let o = pt_arg(a, "origin")?;
-    let origin = t.m.pick(&Tool::Ordinate { origin: None, horizontal: None, group: None }, &[], o).any_point(o).ok_or_else(|| OpError::param("origin", "not a point of a view"))?;
-    let tool = Tool::Ordinate { origin: Some(origin.clone()), horizontal: None, group: None };
-    let group = t.m.pick(&tool, &[], pt_arg(a, "side")?).pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param("side", "at least 3 mm from the origin"))?;
-    let AnnotationKind::OrdinateGroup { horizontal, .. } = group.kind else { return Err(OpError::new("internal", "not an ordinate group")) };
-    let (gid, mut sheet, tab) = (group.id, t.sheet, t.tab);
-    let mut t = t;
-    t.d.sheets[sheet].annotations.push(group);
-    commit(od, tab, sheet, t.d, "Ordinate dimension")?;
+    let (origin, horizontal, gid, mut sheet, tab) = match a.opt_u64("group")? {
+        // The group's menu › Add to ordinate group: its origin and direction.
+        Some(g) => {
+            if a.get("origin").is_some() || a.get("side").is_some() {
+                return Err(OpError::param("group", "give `group` or `origin` and `side`, not both"));
+            }
+            let x = t.d.sheets[t.sheet].annotations.iter().find(|x| x.id == g).ok_or_else(|| OpError::param("group", "no such annotation on the sheet"))?;
+            let AnnotationKind::OrdinateGroup { view, origin, horizontal, .. } = x.kind else { return Err(OpError::param("group", "not an ordinate dimension")) };
+            if a.opt_array("points")?.is_none_or(|p| p.is_empty()) {
+                return Err(OpError::param("points", "the points to add to the group"));
+            }
+            let r = x.refs.iter().find(|x| x.slot == 0).map(|x| x.point.clone());
+            (PickedPoint { view, p: origin, r }, horizontal, g, t.sheet, t.tab)
+        }
+        None => {
+            let o = pt_arg(a, "origin")?;
+            let origin = t.m.pick(&Tool::Ordinate { origin: None, horizontal: None, group: None }, &[], o).any_point(o).ok_or_else(|| OpError::param("origin", "not a point of a view"))?;
+            let tool = Tool::Ordinate { origin: Some(origin.clone()), horizontal: None, group: None };
+            let group = t.m.pick(&tool, &[], pt_arg(a, "side")?).pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param("side", "at least 3 mm from the origin"))?;
+            let AnnotationKind::OrdinateGroup { horizontal, .. } = group.kind else { return Err(OpError::new("internal", "not an ordinate group")) };
+            let (gid, sheet, tab) = (group.id, t.sheet, t.tab);
+            let mut t = t;
+            t.d.sheets[sheet].annotations.push(group);
+            commit(od, tab, sheet, t.d, "Ordinate dimension")?;
+            (origin, horizontal, gid, sheet, tab)
+        }
+    };
     // Each further click adds a point to the group (one edit each).
     for (i, p) in a.opt_array("points")?.cloned().unwrap_or_default().iter().enumerate() {
         let param = format!("points[{i}]");
@@ -1954,4 +1998,64 @@ fn edit_dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
     }
     done(od, t, if hole { "Edit hole callout" } else { "Edit dimension" }, "annotation", id)
+}
+
+fn delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use dt::Sel;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let sheet = &t.d.sheets[t.sheet];
+    let mut sel = Vec::new();
+    let ids = |k: &str| -> Result<Vec<u64>, OpError> {
+        a.opt_array(k)?.cloned().unwrap_or_default().iter().enumerate().map(|(i, v)| v.as_u64().ok_or_else(|| OpError::param(&format!("{k}[{i}]"), "an id"))).collect()
+    };
+    for (i, v) in ids("views")?.into_iter().enumerate() {
+        sheet.view(ViewId(v)).ok_or_else(|| OpError::param(&format!("views[{i}]"), "no such view on the sheet"))?;
+        sel.push(Sel::View(ViewId(v)));
+    }
+    for (i, v) in ids("annotations")?.into_iter().enumerate() {
+        if !sheet.annotations.iter().any(|x| x.id == v) {
+            return Err(OpError::param(&format!("annotations[{i}]"), "no such annotation on the sheet"));
+        }
+        sel.push(Sel::Annotation(v));
+    }
+    for (i, v) in ids("tables")?.into_iter().enumerate() {
+        if !sheet.tables.iter().any(|x| x.id == v) {
+            return Err(OpError::param(&format!("tables[{i}]"), "no such table on the sheet"));
+        }
+        sel.push(Sel::Table(v));
+    }
+    for (i, v) in ids("images")?.into_iter().enumerate() {
+        if !sheet.images.iter().any(|x| x.id == v) {
+            return Err(OpError::param(&format!("images[{i}]"), "no such image on the sheet"));
+        }
+        sel.push(Sel::Image(v));
+    }
+    for (i, v) in ids("hatches")?.into_iter().enumerate() {
+        if !sheet.sketch.hatches.iter().any(|x| x.id == v) {
+            return Err(OpError::param(&format!("hatches[{i}]"), "no such hatch region on the sheet"));
+        }
+        sel.push(Sel::Hatch(v));
+    }
+    for (i, v) in ids("sketch_entities")?.into_iter().enumerate() {
+        if sheet.sketch.sketch.entity(noshape_sketch::EntityId(v as u32)).is_none() {
+            return Err(OpError::param(&format!("sketch_entities[{i}]"), "no such sketch entity on the sheet"));
+        }
+        sel.push(Sel::Sketch(v as u32));
+    }
+    for (i, b) in a.opt_array("breaks")?.cloned().unwrap_or_default().iter().enumerate() {
+        let field = format!("breaks[{i}]");
+        let (v, k) = (b.get("view").and_then(Value::as_u64), b.get("index").and_then(Value::as_u64));
+        let (Some(v), Some(k)) = (v, k) else { return Err(OpError::param(&field, "{\"view\": id, \"index\": n}")) };
+        if sheet.view(ViewId(v)).is_none_or(|x| (k as usize) >= x.breaks.len()) {
+            return Err(OpError::param(&field, "no such break"));
+        }
+        sel.push(Sel::Break(ViewId(v), k as usize));
+    }
+    if sel.is_empty() {
+        return Err(OpError::invalid("nothing to delete: give views, annotations, tables, images, hatches, sketch_entities or breaks"));
+    }
+    dt::delete_selection(&mut t.d.sheets[t.sheet], &sel);
+    let n = sel.len() as u64;
+    done(od, t, "Delete", "deleted", n)
 }
