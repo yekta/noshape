@@ -123,11 +123,28 @@ fn ev_plane(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 
 fn ev_owner_sketch_plane(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
-    let p = on_first(i, &cx, &a, "entity", "CANNOT_RESOLVE_PLANE", |q, e| match e {
+    let frame = |q: &QueryCx, e: &Ent| match e {
         Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) => Some(q.st.ctx.sketches[*s].frame),
         _ => None,
-    })?;
+    };
+    // `checkAllEntities`: a plane only when every entity's sketch plane is
+    // coplanar with the first's (std Sweep and Loft profiles), else the
+    // first entity's.
+    if field(&a, "checkAllEntities").as_bool() == Some(true) {
+        let frames = with_ents(i, &cx, &field(&a, "entity"), |_, q, ents| Ok(ents.iter().map(|e| frame(q, e)).collect::<Option<Vec<_>>>().map(|f| (ents.is_empty(), f))))?;
+        return match frames {
+            Some((true, _)) => Err(raise_faulty(i, "CANNOT_RESOLVE_ENTITIES", &["entity"])),
+            Some((false, f)) if f.iter().all(|g| coplanar(&f[0], g)) => Ok(plane_value(&f[0])),
+            _ => Err(raise_error(i, "CANNOT_RESOLVE_PLANE", None)),
+        };
+    }
+    let p = on_first(i, &cx, &a, "entity", "CANNOT_RESOLVE_PLANE", frame)?;
     Ok(plane_value(&p))
+}
+
+/// Two sketch planes on one plane (either facing).
+fn coplanar(a: &crate::display::PlaneFrame, b: &crate::display::PlaneFrame) -> bool {
+    a.normal.cross(b.normal).length() < 1e-9 && (b.origin - a.origin).dot(a.normal).abs() < 1e-8
 }
 
 /// Edge parameter (0..1) to curve parameter, by arc length when asked.
@@ -792,8 +809,10 @@ fn ev_raycast(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let Some((o, d)) = line_of(&field(&a, "ray")) else { return Err(i.error("evRaycast: ray should be a Line")) };
     let include_intersections = field(&a, "closest").as_bool().map(|c| !c).unwrap_or(false);
+    // Hits behind the origin too (negative distances) when asked.
+    let behind = field(&a, "includeIntersectionsBehind").as_bool() == Some(true);
     let hits = with_ents(i, &cx, &field(&a, "entities"), |_, q, ents| {
-        let ray = k::make_line(o, o + d * 1e4).ok();
+        let ray = k::make_line(if behind { o - d * 1e4 } else { o }, o + d * 1e4).ok();
         let mut hits = Vec::new();
         for e in &ents {
             let (Some(s), Some(r)) = (q.shape(e), &ray) else { continue };

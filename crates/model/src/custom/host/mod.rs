@@ -19,6 +19,8 @@ pub mod hole;
 mod sheetmetal;
 mod sm_flat;
 mod loft;
+#[cfg(test)]
+mod native_args;
 mod edge_change;
 mod offsets;
 mod packed;

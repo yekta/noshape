@@ -833,3 +833,20 @@ Draft, Split are in `STRICT` (dialog in every state) with regeneration oracles (
   (`more_editing_logic_runs_std`: Split keeps a plane tool (live), Plane type from picks, Mirror/Revolve Add).
 - Loft end conditions: psb's kernel support (3c25e9c9) is on ready/psb, not main yet; the two loft cases stay
   listed as a gap in `loft_regenerates_as_std` until it lands.
+
+**Native argument audit (25 Oct, lead request after the knurl helix bug):** `custom/host/native_args.rs`
+(`natives_read_the_maps_std_passes`) finds every `@native(…)` call in std (469 sites) and, where std passes a map (a
+literal, or a `map` parameter it passes on), calls the native with a map of those keys and records the keys it reads
+(`value::record_key_reads`: `Value::get`, `as_map` and `natives::map_arg` note reads while recording). It fails when a
+native reads none of a map std passes (alignCanonically read argument 2 as the plane itself; fixed by the lead in
+3fdf0b6a), when it reads only keys std never passes (a misspelt key), or when the set of natives std calls that do not
+exist changes (`MISSING`, 18: evFaults, evTolerances, opCreateBSplineSurface, opImportForeign, opBooleanedPattern, …).
+`IGNORES_MAP` lists the natives that need none of their map (no-ops, constants). `NATIVE_ARGS_REPORT=1` prints keys
+read only in part; most are the probe's undefined values making a native stop early. Options found ignored and fixed:
+evOwnerSketchPlane `checkAllEntities` (Sweep/Loft profiles), evRaycast `includeIntersectionsBehind`
+(`evaluation_options_std_passes`). Still ignored: opPolyline `bendRadii` (Routing curve; reuse curves.rs
+`filleted_polyline`), evCurveDefinition/evSurfaceDefinition `returnBSplinesAsOther` and evCollisionDetection `owners`
+(live request "fs (10-25 b)"), addDebugEntities `color` (debug entities are not drawn at all), skConicSegment
+`fixedRho`, skInterpolatedSpline `splinePointCount`, skSpline `guess`, evFacePeriodicity `trimmed`,
+evFaceTangentPlanes `returnUndefinedOutsideFace` (no std caller passes the last five). Regression test for the helix:
+`std_helix_from_a_circle_edge` (Turns and Pitch around a cylinder's circular edge).
