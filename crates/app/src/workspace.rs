@@ -944,7 +944,9 @@ impl Workspace {
             self.tab_gap = None;
         }
         let gap = self.tab_gap.as_ref().map(|g| (g.dragged, g.before));
-        let placeholder = || div().flex_none().w(px(198.)).h(px(27.));
+        // The gap is the dragged tab's own width (live tabs size to their name).
+        let gap_w = self.tab_gap.as_ref().map(|g| g.width).filter(|w| *w > px(0.)).unwrap_or(px(200.));
+        let placeholder = || div().flex_none().w(gap_w).h(px(27.));
         let mut strip = h_flex()
             .id("tab-strip")
             .flex_1()
@@ -952,7 +954,7 @@ impl Workspace {
             .h_full()
             .items_start()
             .pl(px(5.))
-            .gap(px(3.))
+            .gap(px(2.))
             .overflow_x_scroll()
             .track_scroll(&self.tab_scroll)
             .on_drag_move::<TabDrag>(cx.listener(|this, e: &DragMoveEvent<TabDrag>, _, cx| {
@@ -1042,9 +1044,16 @@ impl Workspace {
                     .id(SharedString::from(format!("tab-{id}")))
                     .relative()
                     .flex_none()
-                    // Live (part-studio/00, behaviours "Tab bar"): fixed-width
-                    // tabs, 198 px, 3 px apart; long names truncate.
-                    .w(px(198.))
+                    // Live (computed .os-tab-bar-tab: flex 1 0 auto, min-width
+                    // 60 px, max-width 200 px, padding 3 10 0, margin-right
+                    // 2 px): a tab is its icon and name, grown to share the
+                    // bar's free space up to 200 px (two tabs in a new
+                    // document: 200 px each); a full bar scrolls instead of
+                    // shrinking them (ui-1025b-0: "Base" 74 px).
+                    .flex_grow_1()
+                    .flex_shrink_0()
+                    .min_w(px(60.))
+                    .max_w(px(200.))
                     .h(px(if active { 28. } else { 27. }))
                     .pl(px(10.))
                     .pr(px(10.))
@@ -1060,7 +1069,7 @@ impl Workspace {
                     .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
                         // Tab › Rename / double-click: the name becomes a field.
                         Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
-                        None => div().truncate().when(compare_off, |d| d.opacity(0.5)).child(crate::ui::user_text(name)).into_any_element(),
+                        None => div().min_w_0().truncate().when(compare_off, |d| d.opacity(0.5)).child(crate::ui::user_text(name)).into_any_element(),
                     })
                     .children(compare_dot.map(|dot| div().flex_none().ml(px(3.)).when(compare_off, |d| d.opacity(0.55)).child(dot)))
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
@@ -1076,7 +1085,7 @@ impl Workspace {
                     })
                     // Drag to reorder (the strip drops it in the gap); drop a
                     // tab on a folder to file it.
-                    .on_drag(TabDrag { id, name: tab_name.clone(), icon: Some(tab_icon(kind)) }, start_tab_drag(cx.entity().downgrade()))
+                    .on_drag(TabDrag { id, name: tab_name.clone(), icon: Some(tab_icon(kind)), width: bounds.get().size.width }, start_tab_drag(cx.entity().downgrade()))
                     .on_drag_move(gap_here)
                     .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                         if compare_off {
@@ -1809,7 +1818,7 @@ impl Workspace {
                 Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
                 None => div().truncate().when(current, |d| d.font_weight(FontWeight::SEMIBOLD)).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
-            .when(!current, |d| d.on_drag(TabDrag { id, name: name.clone(), icon: None }, start_tab_drag(cx.entity().downgrade())))
+            .when(!current, |d| d.on_drag(TabDrag { id, name: name.clone(), icon: None, width: px(0.) }, start_tab_drag(cx.entity().downgrade())))
             .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
             .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_into(drag.id, Some(id), cx)))
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
@@ -2040,6 +2049,8 @@ struct TabDrag {
     name: String,
     /// Tab icon; None: a folder.
     icon: Option<&'static str>,
+    /// The tab's width when the drag started (its gap in the bar).
+    width: Pixels,
 }
 
 impl Render for TabDrag {
@@ -2060,6 +2071,8 @@ struct TabGap {
     grab: Pixels,
     icon: Option<&'static str>,
     name: String,
+    /// The dragged tab's width: the gap it leaves.
+    width: Pixels,
 }
 
 /// The drag start of a tab or folder chip: records the drag on the
@@ -2070,7 +2083,7 @@ fn start_tab_drag(ws: WeakEntity<Workspace>) -> impl Fn(&TabDrag, Point<Pixels>,
         let _ = ws.update(cx, |w, cx| {
             let order = w.doc.read(cx).session.doc.children(w.open_folder);
             let next = order.iter().position(|t| *t == d.id).and_then(|i| order.get(i + 1)).copied();
-            w.tab_gap = Some(TabGap { dragged: d.id, before: Some(next), x, grab: offset.x, icon: d.icon, name: d.name.clone() });
+            w.tab_gap = Some(TabGap { dragged: d.id, before: Some(next), x, grab: offset.x, icon: d.icon, name: d.name.clone(), width: d.width });
             cx.notify();
         });
         cx.new(|_| d.clone())
