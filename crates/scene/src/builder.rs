@@ -872,8 +872,16 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             match t.kind {
                 PickKind::Vertex => {
                     if let Some(a) = t.anchor {
-                        let c = if flag == state::HOVER { hov_color } else { sel_color };
-                        overlay_pts.points.push(PointSprite { position: a.as_vec3().into(), color: lin_to_u8(c), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+                        let p: [f32; 3] = a.as_vec3().into();
+                        if flag == state::ERROR {
+                            overlay_pts.points.push(PointSprite { position: p, color: lin_to_u8(sel_color), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+                        } else {
+                            // Live (selection/08): the point marker.
+                            let cols = if flag == state::HOVER { theme::viewport::POINT_HOVER } else { theme::viewport::POINT_SELECTED };
+                            for (c, size, style) in [(cols[0], 11.0, 0), (cols[1], 8.0, PointSprite::RING), (cols[2], 5.0, 0)] {
+                                overlay_pts.points.push(PointSprite { position: p, color: lin_to_u8(theme::lin(c)), pick_id: 0, size, style: LineSegment::ON_TOP | style, _pad: 0 });
+                            }
+                        }
                     }
                 }
                 PickKind::Face if flag & (state::HOVER | state::SELECTED | state::ERROR) != 0 => {
@@ -901,6 +909,18 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             state::SELECTED
         };
         mark(r, flag, &mut scene);
+        // A part given by reference (its faces listed beside it): its faces
+        // take the whole-part amber.
+        if !error
+            && let Reference::Body(b) = r
+            && let Some(body) = display.body(b)
+        {
+            for f in &body.face_refs {
+                for &id in built.picks.ids_for(f) {
+                    scene.add_flag(id, state::BODY);
+                }
+            }
+        }
     }
     if let Some(h) = hover {
         mark(h, state::HOVER, &mut scene);
