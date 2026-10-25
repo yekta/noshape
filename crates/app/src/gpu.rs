@@ -312,22 +312,31 @@ fn spawn_worker(on_done: impl Fn(Completed) + Send + 'static) -> Result<(RenderW
         // draw with the same GPU (`compositor_shares_gpu`). Apple silicon has
         // one; on Intel Macs with two, GPUI draws with the integrated one, so
         // render on the GPU GPUI reports when its first window opens.
-        // With one GPU that is GPUI's: no need to wait for its first window
-        // (the renderer and its shaders get going while the window opens).
+        // With one GPU that is GPUI's, the device is made while the first
+        // window opens; the shaders still compile after GPUI's own (below):
+        // compiled first, ours held the window back (macOS 14 runners: drawn
+        // at 2.3 s instead of 1.2 s).
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
-        let gpui_gpu = metal::only_device().or_else(|| loop {
+        let window_gpu = || loop {
             match gpui_kit::renderer_gpus().first() {
                 Some(id) => break Some(*id),
                 None if std::time::Instant::now() >= deadline => break None,
                 None => std::thread::sleep(std::time::Duration::from_millis(5)),
             }
-        });
-        noshape_render::perf::milestone("GPU: GPUI's window GPU known");
+        };
+        let only = metal::only_device();
+        let gpui_gpu = only.or_else(&window_gpu);
+        noshape_render::perf::milestone("GPU: chosen");
         let renderer = match gpui_gpu.and_then(metal::device_name) {
             Some(name) => noshape_render::Renderer::new_matching(|info| info.backend == noshape_render::wgpu::Backend::Metal && info.name == name),
             None => noshape_render::Renderer::new(),
         }
         .map_err(|e| e.to_string())?;
+        if only.is_some() {
+            // The render worker compiles its shaders first thing.
+            let _ = window_gpu();
+            noshape_render::perf::milestone("GPU: GPUI's window up");
+        }
         if let Some(id) = metal::registry_id(renderer.device()) {
             let _ = metal::RENDERER_GPU.set(id);
             return Ok((RenderWorker::spawn_with(renderer, on_done), Present::Texture));
