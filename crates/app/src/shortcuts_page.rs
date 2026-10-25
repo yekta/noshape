@@ -26,8 +26,16 @@ pub struct ShortcutsPage {
     scroll: ScrollHandle,
 }
 
-/// Opens the page, or brings an open one to the front.
-pub fn show(cx: &mut App) {
+/// The page's window size: the opener's (live ↗ is a plain link, so the new
+/// tab has the browser window's size, behaviours "icons2 (10-23) keyboard
+/// shortcuts POP-OUT page"), else 1280 × 900.
+pub fn page_size(opener: Option<Size<Pixels>>) -> Size<Pixels> {
+    opener.filter(|s| s.width > px(0.) && s.height > px(0.)).unwrap_or(size(px(1280.), px(900.)))
+}
+
+/// Opens the page at the opener window's size, or brings an open one to the
+/// front.
+pub fn show(opener: Option<Size<Pixels>>, cx: &mut App) {
     if let Some(g) = cx.try_global::<ShortcutsWindow>() {
         let handle = g.handle;
         if handle.update(cx, |_, window, _| window.activate_window()).is_ok() {
@@ -35,7 +43,7 @@ pub fn show(cx: &mut App) {
         }
     }
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1280.), px(900.)), cx))),
+        window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, page_size(opener), cx))),
         window_min_size: Some(size(px(800.), px(480.))),
         #[cfg(target_os = "linux")]
         window_decorations: Some(WindowDecorations::Client),
@@ -151,5 +159,19 @@ impl Render for ShortcutsPage {
             // Live: the legend 10 px under the bar's top line (not centred).
             .child(div().flex_none().h(px(72.)).pt(px(10.)).border_t_1().border_color(pal.border).flex().items_start().justify_center().child(legend))
             .child(h_flex().flex_none().h(px(29.)).border_t_1().border_color(pal.border).px(px(240.)).justify_end().text_size(px(11.)).text_color(pal.text_muted).child(format!("({})", crate::VERSION)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Not `super::*`: gpui's `test` attribute would shadow the built-in one.
+    use super::page_size;
+    use gpui_kit::{px, size};
+
+    #[test]
+    fn page_opens_at_the_openers_size() {
+        assert_eq!(page_size(Some(size(px(1919.), px(1079.)))), size(px(1919.), px(1079.)));
+        assert_eq!(page_size(None), size(px(1280.), px(900.)));
+        assert_eq!(page_size(Some(size(px(0.), px(0.)))), size(px(1280.), px(900.)));
     }
 }

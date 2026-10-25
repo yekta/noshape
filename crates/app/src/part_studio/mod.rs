@@ -18,6 +18,7 @@ mod annotations_ui;
 mod scope;
 mod default_tolerances;
 mod pending;
+mod perf_script;
 mod fab_panel;
 mod flat_view;
 mod sheet_metal_panel;
@@ -249,8 +250,9 @@ pub struct PartStudioView {
     regen: Arc<Mutex<Regenerator>>,
     regen_seq: u64,
     regen_task: Option<Task<()>>,
-    /// The running regeneration (pending.rs: a newer request retires it).
-    regen_inflight: Option<pending::InFlight>,
+    /// The running regenerations (model regen::runs: a newer request
+    /// aborts or supersedes each).
+    regen_runs: noshape_model::regen::runs::Runs,
     /// A regeneration whose result isn't shown yet, its overlay timer and
     /// spinner.
     pending: Option<pending::Pending>,
@@ -315,6 +317,8 @@ pub struct PartStudioView {
     flat_view: Option<Entity<flat_view::FlatView>>,
     /// Onshape interaction state (hide/isolate, select other, S toolbar...).
     ui: behaviors::UiState,
+    /// `NOSHAPE_PERF_SCRIPT` (benchmarks).
+    perf_script: Option<perf_script::Script>,
     _subs: Vec<Subscription>,
 }
 
@@ -398,7 +402,7 @@ impl PartStudioView {
             regen: Arc::new(Mutex::new(Regenerator::new())),
             regen_seq: 0,
             regen_task: None,
-            regen_inflight: None,
+            regen_runs: Default::default(),
             pending: None,
             pending_timer: None,
             pending_spinner: None,
@@ -439,11 +443,15 @@ impl PartStudioView {
             flat_task: None,
             flat_view: None,
             ui: behaviors::UiState::new(cx),
+            perf_script: perf_script::from_env(),
             _subs: subs,
         };
         // Graphics preferences apply live (camera and render options dialog).
         this._subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| this.apply_graphics_prefs(cx)));
         this.apply_graphics_prefs(cx);
+        // The document thumbnail draws this view's display while it is open.
+        let path = this.doc.read(cx).session.path.clone();
+        cx.on_release(move |this: &mut Self, cx: &mut App| crate::start_thumbnail::view_closed(&path, this.tab, cx)).detach();
         this.schedule_regen(window, cx);
         this
     }
@@ -495,7 +503,9 @@ impl PartStudioView {
         Some((ps, upto))
     }
 
+    #[track_caller]
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let caller = std::panic::Location::caller();
         // Paused regeneration (Onshape): edits wait until "Regenerate".
         if self.ui.regen_paused.is_some() && !std::mem::take(&mut self.ui.force_regen) {
             // Nothing starts: an "Opening…" waiting for this run goes.
@@ -504,6 +514,8 @@ impl PartStudioView {
             return;
         }
         let Some((studio, upto)) = self.effective_studio(cx) else { return };
+        let path = self.doc.read(cx).session.path.clone();
+        crate::start_thumbnail::regen_started(&path, self.tab, cx);
         let units = self.doc.read(cx).session.doc.settings.units;
         let config = self.current_config(&studio);
         let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
@@ -515,15 +527,18 @@ impl PartStudioView {
         let regen2 = self.regen.clone();
         self.regen_seq += 1;
         let seq = self.regen_seq;
+        if noshape_render::perf::enabled() {
+            log::info!(target: "perf", "schedule_regen #{seq} from {caller} (upto {upto:?}, {} features)", studio.features.len());
+        }
         let editing_sketch = self.sketch.as_ref().map(|s| s.feature).or_else(|| self.editing_sketch_id(cx));
+        // The studio's head as the document thumbnail draws it.
+        let head = upto.is_none() && editing_sketch.is_none() && config == studio.configuration.defaults();
+        let shown_vars = doc_vars.clone();
         // The newest request wins (pending.rs): the running one is aborted, or
         // finishes its features into the cache when this one only extends it.
         let studio = Arc::new(studio);
         let cancel = noshape_model::regen::RegenCancel::default();
-        if let Some(old) = self.regen_inflight.take() {
-            old.retire(&studio, &config, &doc_vars, editing_sketch);
-        }
-        self.regen_inflight = Some(pending::InFlight { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
+        self.regen_runs.start(noshape_model::regen::runs::Run { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
         self.begin_pending(seq, window, cx);
         let cancel2 = cancel.clone();
         // View in high quality (Shift+R, kept for the session once used):
@@ -542,6 +557,9 @@ impl PartStudioView {
             let (result, studio, config, units, upto, editing_sketch, doc_vars) = result;
             // A newer request took over.
             if result.cancelled {
+                if noshape_render::perf::enabled() {
+                    log::info!(target: "perf", "regen #{seq} cancelled (preview pass)");
+                }
                 return;
             }
             let refine = result.needs_refine;
@@ -553,12 +571,19 @@ impl PartStudioView {
                     p.opening = None;
                 }
                 if !refine {
-                    this.regen_inflight = None;
                     this.end_pending(seq, cx);
                 }
                 this.context = Some(result.context.clone());
                 scene_builder::log_regen_perf(if refine { "preview" } else { "full" }, &result.display, &studio);
-                this.apply_display(Arc::new(result.display), window, cx);
+                let display = Arc::new(result.display);
+                if !refine {
+                    let made = head.then(|| (studio.clone(), shown_vars.clone(), display.clone()));
+                    crate::start_thumbnail::regen_done(&path, this.tab, made, cx);
+                }
+                this.apply_display(display, window, cx);
+                if !refine {
+                    this.perf_script_step(cx);
+                }
                 // Remove / Intersect: the see-through tool body follows.
                 this.schedule_tool_preview(window, cx);
             });
@@ -580,11 +605,13 @@ impl PartStudioView {
                     if seq != this.regen_seq {
                         return;
                     }
-                    this.regen_inflight = None;
                     this.end_pending(seq, cx);
                     this.context = Some(fine.context.clone());
                     scene_builder::log_regen_perf("refine", &fine.display, &studio);
-                    this.apply_display(Arc::new(fine.display), window, cx);
+                    let display = Arc::new(fine.display);
+                    crate::start_thumbnail::regen_done(&path, this.tab, head.then(|| (studio.clone(), shown_vars, display.clone())), cx);
+                    this.apply_display(display, window, cx);
+                    this.perf_script_step(cx);
                 });
             }
         }));
@@ -749,8 +776,12 @@ impl PartStudioView {
             self.message = None;
         }
         // A new Extrude / Revolve / Sweep / Loft: operation and merge scope
-        // from what the previewed tool touches.
-        self.boolean_edit_logic(cx);
+        // from what the previewed tool touches (unless std's editing logic
+        // decides them, `std_edit_logic`).
+        let std_logic = self.edit.as_ref().is_some_and(|e| noshape_model::custom::std_feature::has_editing_logic(&e.dialog.read(cx).feature.type_id));
+        if !std_logic {
+            self.boolean_edit_logic(cx);
+        }
         self.hole_scope_logic(cx);
         self.orient_for_sketch(cx);
         self.refresh_scene(true, cx);

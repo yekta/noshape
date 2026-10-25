@@ -51,29 +51,45 @@ impl TypeInfo {
 
 struct Registry {
     types: Vec<Arc<TypeInfo>>,
-    by_key: std::collections::HashMap<String, Tag>,
+    /// Every tag of a key: one per member list (an enum changed by an edit,
+    /// or by a standard library version).
+    by_key: std::collections::HashMap<String, Vec<Tag>>,
 }
 
 static REGISTRY: LazyLock<RwLock<Registry>> = LazyLock::new(|| RwLock::new(Registry { types: Vec::new(), by_key: Default::default() }));
 
-/// Register (or find) a type declaration; enum members must not change for
-/// a given key.
+/// Register (or find) a type declaration: the tag of `key` with these enum
+/// members (a new tag when the members differ).
 pub fn register_type(key: String, name: &str, is_enum: bool, members: Vec<Arc<str>>) -> Tag {
-    if let Some(t) = REGISTRY.read().by_key.get(&key)
-        && type_info(*t).members == members
-    {
-        return *t;
+    let find = |r: &Registry| r.by_key.get(&key).and_then(|tags| tags.iter().copied().find(|t| r.types[t.0 as usize - 1].members == members));
+    if let Some(t) = find(&REGISTRY.read()) {
+        return t;
     }
     let mut r = REGISTRY.write();
-    if let Some(t) = r.by_key.get(&key)
-        && r.types[t.0 as usize - 1].members == members
-    {
-        return *t;
+    if let Some(t) = find(&r) {
+        return t;
     }
     r.types.push(Arc::new(TypeInfo { name: name.into(), members, is_enum, key: key.clone() }));
     let tag = Tag(r.types.len() as u32);
-    r.by_key.insert(key, tag);
+    r.by_key.entry(key).or_default().push(tag);
     tag
+}
+
+/// `m[key]`; an enum key also finds the same member of its declaration in
+/// another standard library version (`{ QueryType.UNION : … }[q.queryType]`
+/// in std 1963 with a query the host made).
+pub fn map_get<'a>(m: &'a Map, key: &Value) -> Option<&'a Value> {
+    m.get(key).or_else(|| match key {
+        Value::Enum(..) => m.iter().find(|(k, _)| matches!(k, Value::Enum(..)) && *k == key).map(|(_, v)| v),
+        _ => None,
+    })
+}
+
+/// Two tags of one type declaration (`onshape/std/query.fs#QueryType`)
+/// from two standard library versions: an enum whose members changed gets
+/// a tag per version, and values from either compare by member name.
+pub fn same_declaration(a: Tag, b: Tag) -> bool {
+    !a.is_none() && !b.is_none() && type_info(a).key == type_info(b).key
 }
 
 pub fn type_info(tag: Tag) -> Arc<TypeInfo> {
@@ -105,6 +121,31 @@ const SHOWN_BITS: u32 = 24;
 thread_local! {
     /// Next printed number of a builtin and of a box on this thread.
     static SHOWN: std::cell::Cell<(u64, u64)> = const { std::cell::Cell::new((0, 0)) };
+}
+
+thread_local! {
+    /// Map keys read through [`Value::get`] (`"*"`: the whole map through
+    /// [`Value::as_map`]) by map address, while recording.
+    static KEY_READS: std::cell::RefCell<Option<Vec<(usize, String)>>> = const { std::cell::RefCell::new(None) };
+}
+
+pub(crate) fn note_key_read(m: &Arc<Map>, key: &str) {
+    KEY_READS.with(|r| {
+        if let Some(reads) = r.borrow_mut().as_mut() {
+            reads.push((Arc::as_ptr(m) as usize, key.to_string()));
+        }
+    });
+}
+
+/// Start recording the map keys natives read on this thread (the check that
+/// every native reads the map std passes it, not a positional argument).
+pub fn record_key_reads() {
+    KEY_READS.with(|r| *r.borrow_mut() = Some(Vec::new()));
+}
+
+/// Stop recording: the keys read as (map address, key).
+pub fn take_key_reads() -> Vec<(usize, String)> {
+    KEY_READS.with(|r| r.borrow_mut().take()).unwrap_or_default()
 }
 
 /// Restart the printed numbers (at the start of each feature run).
@@ -401,7 +442,10 @@ impl Value {
     }
     pub fn as_map(&self) -> Option<&Arc<Map>> {
         match self {
-            Value::Map(m, _) => Some(m),
+            Value::Map(m, _) => {
+                note_key_read(m, "*");
+                Some(m)
+            }
             _ => None,
         }
     }
@@ -409,7 +453,10 @@ impl Value {
     pub fn get(&self, key: &str) -> &Value {
         static UNDEF: Value = Value::Undefined;
         match self {
-            Value::Map(m, _) => m.get(&Value::Str(key.into(), Tag::NONE)).unwrap_or(&UNDEF),
+            Value::Map(m, _) => {
+                note_key_read(m, key);
+                m.get(&Value::Str(key.into(), Tag::NONE)).unwrap_or(&UNDEF)
+            }
             _ => &UNDEF,
         }
     }
@@ -499,7 +546,7 @@ impl PartialEq for Value {
         match (self, other) {
             (Value::Number(a, ta), Value::Number(b, tb)) => a == b && ta == tb,
             (Value::Str(a, ta), Value::Str(b, tb)) => ta == tb && a == b,
-            (Value::Enum(ta, a), Value::Enum(tb, b)) => ta == tb && a == b,
+            (Value::Enum(ta, a), Value::Enum(tb, b)) => (ta == tb && a == b) || (ta != tb && same_declaration(*ta, *tb) && enum_name(*ta, *a) == enum_name(*tb, *b)),
             _ => self.cmp(other) == Ordering::Equal,
         }
     }

@@ -315,19 +315,90 @@ pub(crate) fn defined_lambda<'a>(e: &'a ast::Expr, define: &str) -> Option<&'a a
 
 /// `definition.x` -> "x" (and `item.x` inside array parameter loops).
 /// A FeatureScript lookup table (`{ "name", "displayName", "default",
-/// "entries" : { key : sub-table or leaf } }`) as a run-time table.
-fn dyn_level(v: &Value) -> Option<crate::features::hole_tables::DynLevel> {
+/// "entries" : { key : sub-table or leaf } }`) as a run-time table. `expr`
+/// (the table's source, when known) gives the entries' source order, which
+/// is Onshape's dropdown order (live L58; the evaluated map sorts its keys)
+/// and the default of a level without one.
+fn dyn_level(module: &Arc<CompiledModule>, v: &Value, expr: Option<&ast::Expr>) -> Option<crate::features::hole_tables::DynLevel> {
     let entries = v.get("entries").as_map()?;
+    let source = expr.and_then(|e| source_entries(module, e));
+    let all = v.get("entries");
+    // (key, sub-table, its source expression and module)
+    type Entry = (Value, Value, Option<(Arc<CompiledModule>, ast::Expr)>);
+    let ordered: Vec<Entry> = match &source {
+        // The source's keys are exactly the evaluated ones.
+        Some((m, list)) if list.len() == entries.len() && list.iter().all(|(k, _)| !all.get(k.as_str()).is_undefined()) => {
+            list.iter().map(|(k, x)| (Value::str(k.as_str()), all.get(k.as_str()).clone(), Some((m.clone(), x.clone())))).collect()
+        }
+        _ => entries.iter().map(|(k, x)| (k.clone(), x.clone(), None)).collect(),
+    };
     let mut out = Vec::new();
-    for (k, sub) in entries.iter() {
+    for (k, sub, sub_expr) in &ordered {
         let key = k.as_str()?.to_string();
-        let child = if sub.get("entries").as_map().is_some() { dyn_level(sub).map(Arc::new) } else { None };
+        let child = if sub.get("entries").as_map().is_some() {
+            let (m, x) = match sub_expr {
+                Some((m, x)) => (m.clone(), Some(x)),
+                None => (module.clone(), None),
+            };
+            dyn_level(&m, sub, x).map(Arc::new)
+        } else {
+            None
+        };
         out.push((key, child));
     }
     let default = v.get("default").as_str().map(|s| s.to_string()).or_else(|| out.first().map(|e| e.0.clone()))?;
     let key = v.get("name").as_str().map(|s| s.to_string()).unwrap_or_default();
     let name = intern(&v.get("displayName").as_str().map(|s| s.to_string()).unwrap_or_else(|| key.clone()));
     Some(crate::features::hole_tables::DynLevel { key, name, default, entries: out })
+}
+
+/// The value of `key` in a map literal expression.
+fn map_entry<'a>(e: &'a ast::Expr, key: &str) -> Option<&'a ast::Expr> {
+    let ExprKind::Map(entries) = &*e.kind else { return None };
+    entries.iter().find(|(k, _)| matches!(k, ast::MapKey::Str(s) if &**s == key)).map(|(_, v)| v)
+}
+
+/// A constant's definition: the module declaring it and its initializer.
+fn const_source(module: &Arc<CompiledModule>, name: &str) -> Option<(Arc<CompiledModule>, ast::Expr)> {
+    let cell = module.constant(name)?;
+    let mut todo = vec![module.clone()];
+    let mut seen = std::collections::HashSet::new();
+    while let Some(m) = todo.pop() {
+        if !seen.insert(m.path.clone()) {
+            continue;
+        }
+        if m.path == cell.module {
+            return m.ast.items.iter().find_map(|it| match &it.kind {
+                TopKind::Const { name: n, init, .. } if &**n == name => Some((m.clone(), init.clone())),
+                _ => None,
+            });
+        }
+        todo.extend(m.imports.iter().cloned());
+    }
+    None
+}
+
+/// A table expression's "entries" in source order: (key, value expression),
+/// with the module the expressions belong to. `None` unless every key is a
+/// literal (constants are followed to their definitions).
+#[allow(clippy::type_complexity)]
+fn source_entries(module: &Arc<CompiledModule>, e: &ast::Expr) -> Option<(Arc<CompiledModule>, Vec<(String, ast::Expr)>)> {
+    let resolve = |m: &Arc<CompiledModule>, e: &ast::Expr| -> Option<(Arc<CompiledModule>, ast::Expr)> {
+        match &*e.kind {
+            ExprKind::Ident(q) if q.ns.is_none() => const_source(m, &q.name),
+            ExprKind::Map(_) => Some((m.clone(), e.clone())),
+            _ => None,
+        }
+    };
+    let (m, table) = resolve(module, e)?;
+    let (m, entries) = resolve(&m, map_entry(&table, "entries")?)?;
+    let ExprKind::Map(list) = &*entries.kind else { return None };
+    let mut out = Vec::new();
+    for (k, x) in list {
+        let ast::MapKey::Str(k) = k else { return None };
+        out.push((k.to_string(), x.clone()));
+    }
+    Some((m, out))
 }
 
 fn value_hash(v: &Value) -> u64 {
@@ -400,7 +471,8 @@ pub(crate) fn collect_params(module: &Arc<CompiledModule>, s: &ast::Stmt, out: &
     collect_in(module, s, &[], None, &[], out)
 }
 
-fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<CompiledFn>], ann: Option<&Ann>, roots: &[&str], out: &mut Vec<ParamDecl>) {
+/// `ann`: the annotation on `s` (evaluated, and its expression).
+fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<CompiledFn>], ann: Option<(&Ann, &ast::Expr)>, roots: &[&str], out: &mut Vec<ParamDecl>) {
     let root = "definition";
     match &s.kind {
         StmtKind::Block(stmts) => {
@@ -476,7 +548,15 @@ fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<Compiled
                 collect_in(module, stmt, &with, None, roots, out);
                 return;
             }
-            collect_in(module, stmt, conds, Some(&a), roots, out);
+            // A "Driving Parameter" group: its boolean heads the group (a
+            // checkbox title over the group's fields, as built-in dialogs).
+            if a.str("Group Name").is_some()
+                && let Some(driver) = a.str("Driving Parameter")
+                && let Some(p) = out.iter_mut().rev().find(|p| p.id == driver)
+            {
+                p.hints = p.hints | Hints::GROUP_HEADER;
+            }
+            collect_in(module, stmt, conds, Some((&a, annotation)), roots, out);
         }
         StmtKind::If { cond, then, otherwise } => {
             let r = roots.first().copied().unwrap_or(root);
@@ -492,7 +572,7 @@ fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<Compiled
             }
         }
         StmtKind::Expr(e) => {
-            let Some(a) = ann else {
+            let Some((a, ann_expr)) = ann else {
                 // A predicate holding parameters: `myParameters(definition);`.
                 if let ExprKind::Call(f, args) = &*e.kind
                     && let ExprKind::Ident(q) = &*f.kind
@@ -511,7 +591,7 @@ fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<Compiled
                 }
                 return;
             };
-            if let Some(p) = param_decl(module, e, a, roots) {
+            if let Some(p) = param_decl(module, e, a, ann_expr, roots) {
                 out.push(ParamDecl { conditions: conds.to_vec(), ..p });
             }
         }
@@ -564,6 +644,9 @@ fn hints(a: &Ann) -> Hints {
             "CAN_BE_TOLERANT" => Hints::CAN_BE_TOLERANT,
             "CAN_BE_TOLERANT_DIAMETER" => Hints::CAN_BE_TOLERANT_DIAMETER,
             "ALWAYS_HIDDEN" => Hints::ALWAYS_HIDDEN,
+            "SHOW_CREATE_SELECTION" => Hints::SHOW_CREATE_SELECTION,
+            "PRIMARY_AXIS" => Hints::PRIMARY_AXIS,
+            "MATE_CONNECTOR_AXIS_TYPE" => Hints::MATE_CONNECTOR_AXIS_TYPE,
             "FOCUS_INNER_QUERY" | "PREVENT_CREATING_NEW_MATE_CONNECTORS" => Hints::NONE,
             _ => Hints::NONE,
         };
@@ -656,7 +739,7 @@ fn default_bounds(kind: NumKind) -> &'static str {
     }
 }
 
-fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, roots: &[&str]) -> Option<ParamDecl> {
+fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, ann_expr: &ast::Expr, roots: &[&str]) -> Option<ParamDecl> {
     let (id, kind): (String, ParamKindFs) = match &*e.kind {
         // definition.x is Query / boolean / string / SomeEnum
         ExprKind::Is(x, q) => {
@@ -680,7 +763,7 @@ fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, roots: &[&st
                 }
                 "LookupTablePath" => {
                     let Some(annot::Ann::Value(table)) = a.get("Lookup Table") else { return None };
-                    let level = dyn_level(table)?;
+                    let level = dyn_level(module, table, map_entry(ann_expr, "Lookup Table"))?;
                     let name = intern(&format!("fs:{}:{id}:{:x}", module.path, value_hash(table)));
                     crate::features::hole_tables::register_dynamic_table(name, level);
                     ParamKindFs::Lookup { table: name }

@@ -232,6 +232,10 @@ pub struct X11ClientState {
     pub(crate) cursor_hidden_window: Option<xproto::Window>,
 
     pointer_device_states: BTreeMap<xinput::DeviceId, PointerDeviceState>,
+    // NOSHAPE PATCH (agent nav2): pen (stylus) devices, and the buttons held
+    // and id counter of the current pen contact (`X11Client::stylus_phase`).
+    styluses: std::collections::HashSet<xinput::DeviceId>,
+    stylus_contact: (u32, u64),
 
     pub(crate) supports_xinput_gestures: bool,
 
@@ -414,6 +418,7 @@ impl X11Connection {
 
         let pointer_device_states =
             current_pointer_device_states(&xcb_connection, &BTreeMap::new()).unwrap_or_default();
+        let styluses = stylus_devices(&xcb_connection);
 
         let atoms = XcbAtoms::new(&xcb_connection)
             .context("Failed to get XCB atoms")?
@@ -553,6 +558,8 @@ impl X11Connection {
                 invisible_cursor_cache: None,
 
                 pointer_device_states,
+                styluses,
+                stylus_contact: (0, 0),
 
                 supports_xinput_gestures,
 
@@ -586,6 +593,53 @@ impl X11Client {
         );
         window.handle_input(PlatformInput::Touch(gpui::TouchEvent {
             id: gpui::TouchId(detail as u64),
+            phase,
+            position,
+            predicted_position: None,
+            force: None,
+        }));
+        Some(())
+    }
+
+    /// NOSHAPE PATCH (agent nav2): a pen in contact is a touch, as in Chrome
+    /// (`pointerType` "pen", which Onshape's graphics treat like a finger),
+    /// unless the app treats the pen as a mouse (`gpui::set_pen_as_mouse`).
+    /// The contact lasts from the first button press to the last release; a
+    /// hovering pen and its scroll buttons stay a mouse. `None`: not a pen
+    /// contact event; `Some(None)`: swallowed.
+    fn stylus_phase(&self, source: xinput::DeviceId, flags: xinput::PointerEventFlags, event: StylusEvent) -> Option<Option<gpui::TouchPhase>> {
+        let mut state = self.0.borrow_mut();
+        if gpui::pen_as_mouse() || flags.contains(xinput::PointerEventFlags::POINTER_EMULATED) || !state.styluses.contains(&source) {
+            return None;
+        }
+        let (held, contact) = state.stylus_contact;
+        let (phase, held, contact) = match event {
+            StylusEvent::Press(4..=7) | StylusEvent::Release(4..=7) => return None,
+            StylusEvent::Press(_) if held == 0 => (gpui::TouchPhase::Started, 1, contact + 1),
+            StylusEvent::Press(_) => (gpui::TouchPhase::Moved, held + 1, contact),
+            StylusEvent::Release(_) | StylusEvent::Motion if held == 0 => {
+                return if matches!(event, StylusEvent::Motion) { None } else { Some(None) };
+            }
+            StylusEvent::Release(_) => (if held == 1 { gpui::TouchPhase::Ended } else { gpui::TouchPhase::Moved }, held - 1, contact),
+            StylusEvent::Motion => (gpui::TouchPhase::Moved, held, contact),
+        };
+        state.stylus_contact = (held, contact);
+        Some(Some(phase))
+    }
+
+    /// NOSHAPE PATCH (agent nav2): deliver a pen contact as a touch.
+    fn handle_stylus_touch(&self, event_window: xproto::Window, event_x: xinput::Fp1616, event_y: xinput::Fp1616, phase: Option<gpui::TouchPhase>) -> Option<()> {
+        let Some(phase) = phase else { return Some(()) };
+        let contact = self.0.borrow().stylus_contact.1;
+        let window = self.get_window(event_window)?;
+        let scale_factor = self.0.borrow().scale_factor;
+        let position = point(
+            px(event_x as f32 / u16::MAX as f32 / scale_factor),
+            px(event_y as f32 / u16::MAX as f32 / scale_factor),
+        );
+        window.handle_input(PlatformInput::Touch(gpui::TouchEvent {
+            // Above the X server's touch ids.
+            id: gpui::TouchId((1 << 48) + contact),
             phase,
             position,
             predicted_position: None,
@@ -1255,6 +1309,9 @@ impl X11Client {
                 window.handle_input(PlatformInput::KeyUp(gpui::KeyUpEvent { keystroke }));
             }
             Event::XinputButtonPress(event) => {
+                if let Some(phase) = self.stylus_phase(event.sourceid, event.flags, StylusEvent::Press(event.detail)) {
+                    return self.handle_stylus_touch(event.event, event.event_x, event.event_y, phase);
+                }
                 let window = self.get_window(event.event)?;
                 let mut state = self.0.borrow_mut();
 
@@ -1332,6 +1389,9 @@ impl X11Client {
                 }
             }
             Event::XinputButtonRelease(event) => {
+                if let Some(phase) = self.stylus_phase(event.sourceid, event.flags, StylusEvent::Release(event.detail)) {
+                    return self.handle_stylus_touch(event.event, event.event_x, event.event_y, phase);
+                }
                 let window = self.get_window(event.event)?;
                 let mut state = self.0.borrow_mut();
                 let modifiers = modifiers_from_xinput_info(event.mods);
@@ -1357,6 +1417,9 @@ impl X11Client {
                 }
             }
             Event::XinputMotion(event) => {
+                if let Some(phase) = self.stylus_phase(event.sourceid, event.flags, StylusEvent::Motion) {
+                    return self.handle_stylus_touch(event.event, event.event_x, event.event_y, phase);
+                }
                 let window = self.get_window(event.event)?;
                 let mut state = self.0.borrow_mut();
                 state.restore_cursor_after_hide();
@@ -1461,6 +1524,7 @@ impl X11Client {
                 ) {
                     state.pointer_device_states = pointer_device_states;
                 }
+                state.styluses = stylus_devices(&state.xcb_connection);
             }
             Event::XinputDeviceChanged(event) => {
                 let mut state = self.0.borrow_mut();
@@ -2545,6 +2609,40 @@ fn current_pointer_device_states(
 }
 
 /// Returns true if the device is a pointer device. Does not include pointer device groups.
+/// NOSHAPE PATCH (agent nav2): what a pen device does (`stylus_phase`).
+enum StylusEvent {
+    Press(u32),
+    Release(u32),
+    Motion,
+}
+
+/// NOSHAPE PATCH (agent nav2): the pen devices: Chrome counts a device with
+/// an "Abs X/Y", "Abs Pressure" or "Abs Tilt" valuator as a stylus
+/// (DeviceDataManagerX11); this requires the pressure valuator, which every
+/// pen has, so absolute mice (VM tablets) stay mice. Touch screens (a touch
+/// class) are not pens.
+fn stylus_devices(xcb_connection: &XCBConnection) -> std::collections::HashSet<xinput::DeviceId> {
+    let pressure = xcb_connection
+        .intern_atom(true, b"Abs Pressure")
+        .ok()
+        .and_then(|cookie| cookie.reply().ok())
+        .map(|reply| reply.atom)
+        .unwrap_or(0);
+    let Some(devices) = get_reply(|| "Failed to query XInput devices", xcb_connection.xinput_xi_query_device(XINPUT_ALL_DEVICES)).log_err() else {
+        return Default::default();
+    };
+    if pressure == 0 {
+        return Default::default();
+    }
+    devices
+        .infos
+        .iter()
+        .filter(|info| info.classes.iter().all(|class| class.data.as_touch().is_none()))
+        .filter(|info| info.classes.iter().any(|class| class.data.as_valuator().is_some_and(|v| v.label == pressure)))
+        .map(|info| info.deviceid)
+        .collect()
+}
+
 fn is_pointer_device(type_: xinput::DeviceType) -> bool {
     type_ == xinput::DeviceType::SLAVE_POINTER
 }
@@ -2624,6 +2722,12 @@ fn make_scroll_wheel_event(
         delta: ScrollDelta::Lines(delta),
         modifiers,
         touch_phase: TouchPhase::default(),
+        // NOSHAPE PATCH (agent nav2): Chromium's ticks are the valuator's
+        // increments (120 per wheel button press), unswapped by Shift.
+        wheel_ticks: Some(Point {
+            x: scroll_delta.x / SCROLL_LINES,
+            y: scroll_delta.y / SCROLL_LINES,
+        }),
     }
 }
 

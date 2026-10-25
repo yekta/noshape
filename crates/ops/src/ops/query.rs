@@ -28,7 +28,7 @@ pub fn ops() -> Vec<Op> {
             group: "query",
             verb: "entities",
             summary: "Faces, edges or vertices with stable ids and their geometry, to select for features",
-            description: "Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `created_by` (feature id or name), `near` (closest first, max `limit`). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.",
+            description: "Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `direction` (line edges along it, either way, or circles around it), `created_by` (feature id or name), `near` (closest first, max `limit`). `at` picks several entities in one call: for each point, the closest entity that passes the filters (in the points' order). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.",
             fields: vec![
                 doc_field(),
                 tab_field(),
@@ -38,7 +38,9 @@ pub fn ops() -> Vec<Op> {
                 opt("curve", json!({ "type": "string", "enum": ["line", "circle", "ellipse", "bspline", "other"] }), "Edges: only this curve type."),
                 opt("normal", json!({ "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }), "Faces: outward normal direction, e.g. [0,0,1] for faces facing +Z."),
                 opt("created_by", s(), "Only entities made by this feature (id or name)."),
+                opt("direction", json!({ "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }), "Edges: lines parallel to this direction (either way) or circles whose axis it is, within 1°; e.g. [0,0,1] for vertical edges."),
                 opt("near", json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }), "Sort by distance from this point (workspace units)."),
+                opt("at", json!({ "type": "array", "items": { "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }, "minItems": 1 }), "Points (workspace units): the closest entity to each, in order (replaces `near` / `limit`)."),
                 opt("limit", json!({ "type": "integer", "minimum": 1 }), "At most this many results (default 200)."),
                 opt("context", json!({ "type": "boolean", "default": false }), "The shown Assembly context's instances instead of the parts."),
             ],
@@ -102,7 +104,7 @@ fn dir(d: DVec3) -> Value {
 
 /// A part by id or by the name the parts list shows (a renamed part's
 /// name included).
-fn find_part<'a>(r: &'a noshape_model::regen::RegenResult, key: &str) -> Result<&'a Body, OpError> {
+pub(crate) fn find_part<'a>(r: &'a noshape_model::regen::RegenResult, key: &str) -> Result<&'a Body, OpError> {
     let id = refs::parse_str(key);
     let shown = |b: &Body| r.display.bodies.iter().find(|d| d.id == b.id).map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone());
     let bodies = &r.context.bodies;
@@ -304,10 +306,35 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         None => None,
     };
+    let direction = match a.opt_array("direction")? {
+        Some(n) => {
+            let v: Vec<f64> = n.iter().filter_map(Value::as_f64).collect();
+            if v.len() != 3 || DVec3::new(v[0], v[1], v[2]).length() == 0.0 {
+                return Err(OpError::param("direction", "three numbers, not all 0"));
+            }
+            Some(DVec3::new(v[0], v[1], v[2]).normalize())
+        }
+        None => None,
+    };
+    let at: Option<Vec<DVec3>> = match a.opt_array("at")? {
+        Some(points) => Some(
+            points
+                .iter()
+                .map(|p| {
+                    let c = p.as_array().filter(|c| c.len() == 3).ok_or_else(|| OpError::param("at", "points of three coordinates"))?;
+                    let v: Vec<f64> = c.iter().map(|x| crate::ops::sketch::length_value(x, &units).map(|m| m * k)).collect::<Result<_, _>>().map_err(|e| e.with_param("at"))?;
+                    Ok(DVec3::new(v[0], v[1], v[2]) / k)
+                })
+                .collect::<Result<_, OpError>>()?,
+        ),
+        None => None,
+    };
     let surface = a.opt_str("surface")?;
     let curve = a.opt_str("curve")?;
     let limit = a.opt_u64("limit")?.unwrap_or(200) as usize;
-    let mut out: Vec<(f64, Value)> = Vec::new();
+    // (distance from `near`, the entity's point, its JSON, its shape for `at`)
+    let mut out: Vec<(f64, DVec3, Value, Option<noshape_kernel::Shape>)> = Vec::new();
+    let shape_of = |b: &Body, t: ShapeType, i: usize| if at.is_some() { b.shape.sub_shape(t, i).ok() } else { None };
     for b in bodies {
         match kind {
             "faces" => {
@@ -324,7 +351,7 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                     {
                         continue;
                     }
-                    out.push((near.map(|p| p.distance(c)).unwrap_or(0.0), v));
+                    out.push((near.map(|p| p.distance(c)).unwrap_or(0.0), c, v, shape_of(b, ShapeType::Face, i)));
                 }
             }
             "edges" => {
@@ -336,7 +363,14 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                     if curve.is_some_and(|c| c != ck) {
                         continue;
                     }
-                    out.push((near.map(|p| p.distance(m)).unwrap_or(0.0), v));
+                    if let Some(want) = direction {
+                        let along = |x: &Value| x.as_array().map(|c| DVec3::new(c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0), c[2].as_f64().unwrap_or(0.0)));
+                        let d = along(&v["direction"]).or_else(|| along(&v["axis"]));
+                        if !d.is_some_and(|d| d.length() > 0.0 && d.angle_between(want).min(d.angle_between(-want)) < 1f64.to_radians()) {
+                            continue;
+                        }
+                    }
+                    out.push((near.map(|p| p.distance(m)).unwrap_or(0.0), m, v, shape_of(b, ShapeType::Edge, i)));
                 }
             }
             "vertices" => {
@@ -344,17 +378,33 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                     let Ok(vx) = b.shape.sub_shape(ShapeType::Vertex, i) else { continue };
                     let Ok(p) = vx.vertex_point() else { continue };
                     let v = json!({ "id": refs::to_id(&Reference::Vertex((*b.vertices[i]).clone())), "part": refs::body_id(&b.id), "position": pt(p, k) });
-                    out.push((near.map(|q| q.distance(p)).unwrap_or(0.0), v));
+                    out.push((near.map(|q| q.distance(p)).unwrap_or(0.0), p, v, None));
                 }
             }
             _ => return Err(OpError::param("kind", "faces, edges or vertices")),
         }
     }
+    if let Some(points) = at {
+        // The entity closest to each point; between entities it touches
+        // alike (a point on an edge touches both faces), the one whose
+        // centroid / midpoint is closer.
+        let mut list = Vec::new();
+        for p in &points {
+            let probe = noshape_kernel::make_vertex(*p).map_err(|e| OpError::new("kernel", e.to_string()))?;
+            let gap = |x: &(f64, DVec3, Value, Option<noshape_kernel::Shape>)| match &x.3 {
+                Some(sh) => noshape_kernel::distance(sh, &probe).map(|d| d.distance).unwrap_or(f64::INFINITY),
+                None => x.1.distance(*p),
+            };
+            let best = out.iter().map(|x| ((gap(x) / 1e-7).round(), x.1.distance(*p), x)).min_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+            list.push(best.map(|(_, _, x)| x.2.clone()).unwrap_or(Value::Null));
+        }
+        return Ok(json!({ "units": units_json(&units), "count": list.len(), kind: list }).into());
+    }
     if near.is_some() {
         out.sort_by(|x, y| x.0.total_cmp(&y.0));
     }
     let total = out.len();
-    let list: Vec<Value> = out.into_iter().take(limit).map(|(_, v)| v).collect();
+    let list: Vec<Value> = out.into_iter().take(limit).map(|(_, _, v, _)| v).collect();
     Ok(json!({ "units": units_json(&units), "count": total, kind: list }).into())
 }
 

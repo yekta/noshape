@@ -19,7 +19,8 @@ impl TypeRef {
     pub fn matches(self, v: &Value) -> bool {
         match self {
             TypeRef::Std(t) => v.std_type() == t,
-            TypeRef::Tag(t) => v.tag() == t,
+            // Only enums get a tag per library version (other types share one).
+            TypeRef::Tag(t) => v.tag() == t || (matches!(v, Value::Enum(..)) && crate::value::same_declaration(v.tag(), t)),
         }
     }
     /// Overload specificity: tag > standard type > unconstrained (0).

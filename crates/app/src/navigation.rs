@@ -10,7 +10,7 @@
 //! The parity checklist is docs/parity/navigation.md.
 
 use glam::{DQuat, DVec2, DVec3};
-use gpui_kit::ScrollDelta;
+use gpui_kit::{PinchEvent, ScrollDelta, ScrollWheelEvent, TouchPhase};
 use noshape_render::{Camera, Projection};
 use serde::{Deserialize, Serialize};
 use std::sync::RwLock;
@@ -96,43 +96,74 @@ fn wheel_scroll_lines() -> f32 {
     3.0
 }
 
-/// The browser's `wheelDelta` (120 per notch, positive = wheel up / two
-/// fingers moving toward "scroll up") for a gpui scroll delta, per platform:
-/// * macOS: Chrome reports 120 per line, and 3 per precise (trackpad) pixel
-///   (40 px per tick).
-/// * Windows: gpui reports `notches × wheel scroll lines`; precision touchpad
-///   pixels (DirectManipulation) are 100 px per notch.
-/// * Linux: gpui reports 3 lines per notch (X11 and Wayland); Wayland touchpad
-///   pixels are libinput units ×3, 15 units per notch.
-pub fn wheel_delta(delta: ScrollDelta, platform: Platform) -> DVec2 {
-    match (delta, platform) {
+/// The browser's legacy `wheelDelta` (x, y) that Onshape reads, for a gpui
+/// wheel event. Chromium computes it as `trunc(120 × wheel_ticks)` (Blink
+/// `WheelEvent`, in f32) from the platform's wheel ticks, which the vendored
+/// platform layers report exactly as Chromium derives them
+/// (`ScrollWheelEvent::wheel_ticks`):
+/// * macOS: notched wheels ±1 per notch (raw `DeltaAxis`, no acceleration);
+///   trackpads and Magic Mouse their point deltas / 40, so 3 per pixel.
+/// * Windows: `WHEEL_DELTA` units / 120 (Shift keeps it vertical); precision
+///   touchpad whole pixels / 120 (DirectManipulation).
+/// * X11: valuator increments (120 per notch, touchpads fractions of their
+///   scroll increment). Wayland: `value120` / 120, finger scroll units / 10.
+///
+/// Events without ticks (synthesized ones) fall back to an estimate from
+/// gpui's delta, in the platform's units.
+pub fn wheel_delta(e: &ScrollWheelEvent, platform: Platform) -> DVec2 {
+    if let Some(t) = e.wheel_ticks {
+        return DVec2::new((t.x * 120.0).trunc() as f64, (t.y * 120.0).trunc() as f64);
+    }
+    let w = match (e.delta, platform) {
         (ScrollDelta::Lines(l), Platform::Mac) => DVec2::new(l.x as f64, l.y as f64) * 120.0,
         (ScrollDelta::Lines(l), Platform::Windows) => DVec2::new(l.x as f64, l.y as f64) * (120.0 / wheel_scroll_lines() as f64),
         (ScrollDelta::Lines(l), Platform::Linux) => DVec2::new(l.x as f64, l.y as f64) * 40.0,
         (ScrollDelta::Pixels(p), platform) => {
             let per_px = match platform {
                 Platform::Mac => 3.0,
-                Platform::Windows => 1.2,
-                Platform::Linux => 120.0 / 45.0,
+                Platform::Windows => 1.0,
+                // Wayland finger scroll: gpui reports −3 × the axis value,
+                // Chromium −12 ×.
+                Platform::Linux => 4.0,
             };
             DVec2::new(f64::from(f32::from(p.x)), f64::from(f32::from(p.y))) * per_px
         }
-    }
+    };
+    // gpui turns Shift+wheel horizontal on Windows and Linux; Chromium keeps
+    // the DOM event vertical (it swaps only for page scrolling, after the
+    // page saw it). macOS itself makes Shift+wheel horizontal.
+    if e.modifiers.shift && platform != Platform::Mac && w.y == 0.0 { DVec2::new(0.0, w.x) } else { w }
 }
 
 /// Onshape's zoom amount for a wheel event (`zoomOnMouseWheelScroll`):
+/// `0.5 / 120 × wheelDelta`, ×3 on Windows (`navigator.platform` "Win");
 /// positive zooms in. Every scroll zooms (mouse wheel, two-finger trackpad
-/// scroll, its momentum, Ctrl+wheel); mostly horizontal scrolls are ignored.
-/// 0.5 per notch, ×3 on Windows; "Reverse scroll wheel zoom direction" flips
-/// it. Shift+wheel: gpui turns it horizontal on Linux, but Chrome on Linux
-/// keeps it vertical and Onshape zooms (live: Shift+wheel = plain wheel), so
-/// the swap is undone there; macOS (the OS) and Chrome on Windows make it
-/// horizontal themselves, and Onshape ignores it.
-pub fn wheel_zoom_amount(delta: ScrollDelta, platform: Platform, reverse: bool, shift: bool) -> Option<f64> {
-    let mut w = wheel_delta(delta, platform);
-    if shift && platform == Platform::Linux && w.y == 0.0 {
-        w = DVec2::new(0.0, w.x);
+/// scroll and its momentum, Shift / Ctrl+wheel); events with no vertical
+/// part, or a larger horizontal one, are ignored. "Reverse scroll wheel zoom
+/// direction" flips it.
+pub fn wheel_zoom_amount(e: &ScrollWheelEvent, platform: Platform, reverse: bool) -> Option<f64> {
+    browser_wheel_amount(wheel_delta(e, platform), platform, reverse)
+}
+
+/// The drawing editor's wheel zoom (its own `procWheelDelta`, live nav2
+/// drawing wheel): the same law about the pointer, but where `wheelDelta` is 0
+/// it uses −1.2 × the DOM `deltaY` (Chromium's pixel delta, 120 × the ticks
+/// for the sub-unit Linux touchpad deltas that truncate to 0), so those still
+/// zoom a little in a drawing while the Part Studio ignores them.
+pub fn drawing_wheel_zoom_amount(e: &ScrollWheelEvent, platform: Platform, reverse: bool) -> Option<f64> {
+    let mut w = wheel_delta(e, platform);
+    if let Some(t) = e.wheel_ticks {
+        if w.x == 0.0 {
+            w.x = 1.2 * 120.0 * t.x as f64;
+        }
+        if w.y == 0.0 {
+            w.y = 1.2 * 120.0 * t.y as f64;
+        }
     }
+    browser_wheel_amount(w, platform, reverse)
+}
+
+fn browser_wheel_amount(w: DVec2, platform: Platform, reverse: bool) -> Option<f64> {
     if w.y == 0.0 || (w.x != 0.0 && w.x.abs() > w.y.abs()) {
         return None;
     }
@@ -142,6 +173,21 @@ pub fn wheel_zoom_amount(delta: ScrollDelta, platform: Platform, reverse: bool, 
     }
     let i = n * w.y;
     Some(if reverse { -i } else { i })
+}
+
+/// A touchpad pinch reaches Onshape the way Chromium delivers it
+/// (components/input/touchpad_pinch_event_queue.cc): every pinch update is a
+/// Ctrl+wheel event of one tick, `wheelDelta` +120 if its scale is above 1
+/// and −120 otherwise, whatever the size of the step. So each update zooms
+/// one wheel notch about the pointer. macOS magnify, Windows precision
+/// touchpad and Wayland pinches do this; Chromium on X11 has no touchpad
+/// pinch at all (`x11`), and the begin / end events zoom nothing.
+pub fn pinch_zoom_amount(e: &PinchEvent, platform: Platform, x11: bool, reverse: bool) -> Option<f64> {
+    if x11 || e.phase != TouchPhase::Moved {
+        return None;
+    }
+    let ticks = if 1.0 + e.delta > 1.0 { 1.0 } else { -1.0 };
+    browser_wheel_amount(DVec2::new(0.0, 120.0 * ticks), platform, reverse)
 }
 
 /// Scale of the visible region for a zoom amount (`2^(-i/6)`; < 1 zooms in).
@@ -159,11 +205,10 @@ pub enum Zoom {
     Pinch(f64),
 }
 
-/// The pinch ratio for a gpui [`gpui_kit::PinchEvent`] delta (macOS
-/// magnification, Windows DirectManipulation and Linux gesture scale deltas
-/// are all `ratio - 1`).
-pub fn pinch_ratio(delta: f32) -> f64 {
-    (1.0 + delta as f64).max(0.05)
+/// Whether `window` is an X11 window (Chromium on X11 has no touchpad pinch).
+pub fn is_x11(window: &gpui_kit::Window) -> bool {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    HasWindowHandle::window_handle(window).is_ok_and(|h| matches!(h.as_raw(), RawWindowHandle::Xlib(_) | RawWindowHandle::Xcb(_)))
 }
 
 /// Pixel size (world units per logical pixel) at a world point.
@@ -800,11 +845,11 @@ impl MouseControls {
         c
     }
 
-    /// "Use pen input as mouse": the Windows platform turns pen contacts into
-    /// touches unless it is set (vendor/gpui-pre-windows).
+    /// "Use pen input as mouse": the platform layers turn pen contacts into
+    /// touches unless it is set (`gpui::set_pen_as_mouse`; Windows pointer
+    /// messages, macOS tablet-point events, X11 stylus devices).
     fn apply_to_platform(self) {
-        #[cfg(target_os = "windows")]
-        gpui_windows::set_pen_as_mouse(self.pen_as_mouse);
+        gpui_kit::set_pen_as_mouse(self.pen_as_mouse);
     }
 
     /// "Save mouse controls".
@@ -1074,42 +1119,95 @@ mod tests {
         assert_eq!(creo.resolve(b(true, false), k(true, false, false), Mode::None), Mode::Zoom);
     }
 
-    #[test]
-    fn wheel_notch_zoom_per_platform() {
-        let notch = |lines: f32| ScrollDelta::Lines(point(0.0, lines));
-        // macOS: one line = one notch = 0.5.
-        assert_eq!(wheel_zoom_amount(notch(1.0), Platform::Mac, false, false), Some(0.5));
-        // Linux: gpui reports 3 lines per notch.
-        assert_eq!(wheel_zoom_amount(notch(3.0), Platform::Linux, false, false), Some(0.5));
-        assert_eq!(wheel_zoom_amount(notch(-3.0), Platform::Linux, false, false), Some(-0.5));
-        // Windows: ×3.
-        assert!((wheel_zoom_amount(notch(wheel_scroll_lines()), Platform::Windows, false, false).unwrap() - 1.5).abs() < 1e-9);
-        // A notch scales the view by 2^(-1/12) (≈ 5.6 %).
-        assert!((zoom_scale(0.5) - 0.943_874).abs() < 1e-6);
-        // Reverse preference.
-        assert_eq!(wheel_zoom_amount(notch(1.0), Platform::Mac, true, false), Some(-0.5));
+    fn wheel(ticks: Option<(f32, f32)>, delta: ScrollDelta, shift: bool) -> ScrollWheelEvent {
+        let modifiers = gpui_kit::Modifiers { shift, ..Default::default() };
+        ScrollWheelEvent { delta, modifiers, wheel_ticks: ticks.map(|(x, y)| point(x, y)), ..Default::default() }
     }
 
     #[test]
-    fn trackpad_scroll_zooms_and_horizontal_is_ignored() {
-        let px2 = |x: f32, y: f32| ScrollDelta::Pixels(point(px(x), px(y)));
-        // macOS trackpad: 40 px = one notch.
-        assert!((wheel_zoom_amount(px2(0.0, 40.0), Platform::Mac, false, false).unwrap() - 0.5).abs() < 1e-9);
-        // Momentum events are ordinary deltas: small ones zoom a little.
-        let tiny = wheel_zoom_amount(px2(0.0, 0.5), Platform::Mac, false, false).unwrap();
-        assert!(tiny > 0.0 && tiny < 0.01);
-        // Mostly horizontal (Shift+wheel on every OS, sideways swipes): nothing.
-        assert_eq!(wheel_zoom_amount(px2(10.0, 3.0), Platform::Mac, false, false), None);
-        assert_eq!(wheel_zoom_amount(ScrollDelta::Lines(point(3.0, 0.0)), Platform::Linux, false, false), None);
-        assert_eq!(wheel_zoom_amount(px2(0.0, 0.0), Platform::Windows, false, false), None);
-        // Shift+wheel: zooms on Linux (gpui's horizontal swap undone), not
-        // on Windows / macOS where the browser sees a horizontal scroll.
-        let shifted = ScrollDelta::Lines(point(3.0, 0.0));
-        assert_eq!(wheel_zoom_amount(shifted, Platform::Linux, false, true), Some(0.5));
-        assert_eq!(wheel_zoom_amount(shifted, Platform::Windows, false, true), None);
-        assert_eq!(wheel_zoom_amount(ScrollDelta::Lines(point(1.0, 0.0)), Platform::Mac, false, true), None);
-        // Diagonal but mostly vertical still zooms.
-        assert!(wheel_zoom_amount(px2(3.0, 10.0), Platform::Mac, false, false).is_some());
+    fn wheel_notch_zoom_per_platform() {
+        let notch = |ticks: f32, lines: f32| wheel(Some((0.0, ticks)), ScrollDelta::Lines(point(0.0, lines)), false);
+        // One notch: wheelDelta 120 → 0.5 (×3 on Windows), whatever gpui's
+        // lines say (macOS accelerates fast spins; Chromium uses the raw notch).
+        assert_eq!(wheel_zoom_amount(&notch(1.0, 1.0), Platform::Mac, false), Some(0.5));
+        assert_eq!(wheel_zoom_amount(&notch(1.0, 5.3), Platform::Mac, false), Some(0.5));
+        assert_eq!(wheel_zoom_amount(&notch(1.0, 3.0), Platform::Linux, false), Some(0.5));
+        assert_eq!(wheel_zoom_amount(&notch(-1.0, -3.0), Platform::Linux, false), Some(-0.5));
+        assert_eq!(wheel_zoom_amount(&notch(1.0, 3.0), Platform::Windows, false), Some(1.5));
+        // A notch scales the view by 2^(-1/12) (≈ 5.6 %): live ×1.060 per notch.
+        assert!((zoom_scale(0.5) - 0.943_874).abs() < 1e-6);
+        // Reverse preference.
+        assert_eq!(wheel_zoom_amount(&notch(1.0, 1.0), Platform::Mac, true), Some(-0.5));
+        // Synthesized events without ticks: gpui's lines per notch.
+        let lines = |x: f32, y: f32| wheel(None, ScrollDelta::Lines(point(x, y)), false);
+        assert_eq!(wheel_zoom_amount(&lines(0.0, 1.0), Platform::Mac, false), Some(0.5));
+        assert_eq!(wheel_zoom_amount(&lines(0.0, 3.0), Platform::Linux, false), Some(0.5));
+        assert!((wheel_zoom_amount(&lines(0.0, wheel_scroll_lines()), Platform::Windows, false).unwrap() - 1.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn trackpad_scroll_zooms_by_chromium_wheel_delta() {
+        let ticks = |x: f32, y: f32, shift| wheel(Some((x, y)), ScrollDelta::Pixels(point(px(0.0), px(0.0))), shift);
+        let amount = |e: &ScrollWheelEvent, p| wheel_zoom_amount(e, p, false).unwrap();
+        // macOS trackpad: 7 px of point delta = wheelDelta 21 (3 per px).
+        assert!((amount(&ticks(0.0, 7.0 / 40.0, false), Platform::Mac) - 21.0 * 0.5 / 120.0).abs() < 1e-12);
+        // Windows precision touchpad: 13 whole px = wheelDelta 13, ×3.
+        assert!((amount(&ticks(0.0, 13.0 / 120.0, false), Platform::Windows) - 13.0 * 1.5 / 120.0).abs() < 1e-12);
+        // Wayland finger scroll: axis value 2.5 down = −12 × 2.5 = wheelDelta −30.
+        assert!((amount(&ticks(0.0, -0.25, false), Platform::Linux) + 30.0 * 0.5 / 120.0).abs() < 1e-12);
+        // X11 touchpad: half a scroll increment = 60.
+        assert!((amount(&ticks(0.0, 0.5, false), Platform::Linux) - 0.25).abs() < 1e-12);
+        // Blink keeps whole units: 1.5 is wheelDelta 1, 0.48 nothing.
+        assert!((amount(&ticks(0.0, 0.0125, false), Platform::Mac) - 0.5 / 120.0).abs() < 1e-12);
+        assert_eq!(wheel_zoom_amount(&ticks(0.0, 0.004, false), Platform::Mac, false), None);
+        // Mostly horizontal: nothing; mostly vertical: zooms.
+        assert_eq!(wheel_zoom_amount(&ticks(0.5, 0.25, false), Platform::Mac, false), None);
+        assert!(wheel_zoom_amount(&ticks(0.25, 0.5, false), Platform::Mac, false).is_some());
+        assert_eq!(wheel_zoom_amount(&ticks(0.0, 0.0, false), Platform::Windows, false), None);
+        // Shift+wheel zooms on Windows and Linux (the ticks stay vertical);
+        // macOS moves a notched wheel's Shift scroll to the horizontal axis.
+        let shifted = wheel(Some((0.0, 1.0)), ScrollDelta::Lines(point(3.0, 0.0)), true);
+        assert_eq!(wheel_zoom_amount(&shifted, Platform::Windows, false), Some(1.5));
+        assert_eq!(wheel_zoom_amount(&shifted, Platform::Linux, false), Some(0.5));
+        assert_eq!(wheel_zoom_amount(&ticks(1.0, 0.0, true), Platform::Mac, false), None);
+        // Without ticks: Wayland pixels are 4 each; gpui's Shift swap undone.
+        let pixels = wheel(None, ScrollDelta::Pixels(point(px(0.0), px(30.0))), false);
+        assert!((amount(&pixels, Platform::Linux) - 120.0 * 0.5 / 120.0).abs() < 1e-12);
+        let swapped = wheel(None, ScrollDelta::Lines(point(3.0, 0.0)), true);
+        assert_eq!(wheel_zoom_amount(&swapped, Platform::Linux, false), Some(0.5));
+    }
+
+    #[test]
+    fn drawing_wheel_uses_delta_y_when_wheel_delta_is_zero() {
+        let ticks = |y: f32| wheel(Some((0.0, y)), ScrollDelta::Pixels(point(px(0.0), px(0.0))), false);
+        // Wayland finger scroll of 0.05 units: wheelDelta trunc(0.6) = 0 →
+        // the Part Studio ignores it, the drawing zooms by 1.2 × 0.6.
+        let e = ticks(0.05 * 12.0 / 120.0);
+        assert_eq!(wheel_zoom_amount(&e, Platform::Linux, false), None);
+        assert!((drawing_wheel_zoom_amount(&e, Platform::Linux, false).unwrap() - 0.5 / 120.0 * 1.2 * 0.6).abs() < 1e-9);
+        // Whole wheelDelta values: the same as the Part Studio.
+        assert_eq!(drawing_wheel_zoom_amount(&ticks(1.0), Platform::Windows, false), Some(1.5));
+    }
+
+    #[test]
+    fn pinch_updates_zoom_one_notch_each() {
+        let pinch = |delta: f32, phase| PinchEvent { delta, phase, ..Default::default() };
+        let moved = |delta| pinch(delta, TouchPhase::Moved);
+        // Spreading by 30 % or by 0.1 %: one notch in each; pinching: out.
+        assert_eq!(pinch_zoom_amount(&moved(0.3), Platform::Mac, false, false), Some(0.5));
+        assert_eq!(pinch_zoom_amount(&moved(0.001), Platform::Mac, false, false), Some(0.5));
+        assert_eq!(pinch_zoom_amount(&moved(-0.2), Platform::Mac, false, false), Some(-0.5));
+        // A scale of exactly 1 is "not above 1": a notch out.
+        assert_eq!(pinch_zoom_amount(&moved(0.0), Platform::Mac, false, false), Some(-0.5));
+        assert_eq!(pinch_zoom_amount(&moved(1e-9), Platform::Mac, false, false), Some(-0.5));
+        // Windows: a notch is ×3 (×1.19); Wayland like macOS; X11 nothing.
+        assert_eq!(pinch_zoom_amount(&moved(0.05), Platform::Windows, false, false), Some(1.5));
+        assert_eq!(pinch_zoom_amount(&moved(0.05), Platform::Linux, false, false), Some(0.5));
+        assert_eq!(pinch_zoom_amount(&moved(0.05), Platform::Linux, true, false), None);
+        // Begin / end zoom nothing; reverse flips.
+        assert_eq!(pinch_zoom_amount(&pinch(0.0, TouchPhase::Started), Platform::Mac, false, false), None);
+        assert_eq!(pinch_zoom_amount(&pinch(0.0, TouchPhase::Ended), Platform::Mac, false, false), None);
+        assert_eq!(pinch_zoom_amount(&moved(0.3), Platform::Mac, false, true), Some(-0.5));
     }
 
     fn bounds() -> Option<(DVec3, DVec3)> {
@@ -1144,15 +1242,44 @@ mod tests {
         assert!((c.distance / d - zoom_scale(0.5)).abs() < 1e-12);
         // Pinch: the fingers spread by 10 % → the model is 10 % bigger.
         let d = c.distance;
-        zoom_at(&mut c, Zoom::Pinch(pinch_ratio(0.1)), DVec2::new(300.0, 700.0), vp, bounds());
+        zoom_at(&mut c, Zoom::Pinch(1.1), DVec2::new(300.0, 700.0), vp, bounds());
         assert!((d / c.distance - 1.1).abs() < 1e-6);
         // A full pinch in and out returns to the same zoom (no drift).
         let d0 = c.distance;
-        for delta in [0.05f32, 0.05, -0.0952381, 0.2, -1.0 / 6.0] {
-            zoom_at(&mut c, Zoom::Pinch(pinch_ratio(delta)), DVec2::new(300.0, 700.0), vp, bounds());
+        for delta in [0.05, 0.05, -0.0952381, 0.2, -1.0 / 6.0] {
+            zoom_at(&mut c, Zoom::Pinch(1.0 + delta), DVec2::new(300.0, 700.0), vp, bounds());
         }
         let fingers = 1.05 * 1.05 * (1.0 - 0.0952381) * 1.2 * (1.0 - 1.0 / 6.0);
         assert!((d0 / c.distance - fingers).abs() < 1e-6);
+    }
+
+    /// Live "nav2 perspective zoom" (10-25): Onshape's numbers for the default
+    /// planes' ±75 mm box in Isometric on a 1673 × 973 canvas, 45° FOV.
+    #[test]
+    fn perspective_wheel_matches_live_onshape() {
+        let vp = DVec2::new(1673.0, 973.0);
+        let (lo, hi) = (DVec3::splat(-0.075), DVec3::splat(0.075));
+        let bounds = Some((lo, hi));
+        let fitted = || {
+            let mut c = Camera { projection: Projection::Perspective, fov_y: 45f64.to_radians(), ..Camera::default() };
+            c.set_view(noshape_render::StandardView::Isometric);
+            c.fit_box(lo, hi, vp.x / vp.y);
+            c
+        };
+        // Shift+7, F: distanceToCenter 446.8626 mm.
+        let mut c = fitted();
+        assert!((c.distance - 0.4468626).abs() < 1e-6, "{}", c.distance);
+        // The pointer at canvas (986, 566); Onshape's ray goes ½ px right and up.
+        let at = DVec2::new(986.5, 565.5);
+        let mut steps = Vec::new();
+        for w in [120.0, 120.0, -120.0, -120.0, 360.0, 30.0, 30.0, 30.0, 30.0] {
+            assert!(zoom_at(&mut c, Zoom::Amount(0.5 / 120.0 * w), at, vp, bounds));
+            steps.push(c.distance);
+        }
+        let live = [0.4100060, 0.3761893, 0.4072168, 0.4408035, 0.3317330, 0.3248928, 0.3181936, 0.3116326, 0.3052068];
+        for (got, want) in steps.iter().zip(live) {
+            assert!((got - want).abs() < 2e-6, "{got} vs {want}");
+        }
     }
 
     #[test]

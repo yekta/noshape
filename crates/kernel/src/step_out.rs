@@ -605,8 +605,210 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
         }
     }
 
-    // Onshape's numbering (ST-Developer's renumber hook): entities grouped by
-    // type, the type created last first, each group in creation order, from #10.
+    Ok(numbered(&b, file_name, timestamp, schema))
+}
+
+/// One placed part of an assembly: the index of its part and its placement
+/// (rows of a 3 x 4 matrix, translation in metres).
+pub(crate) struct AsmInstance {
+    pub part: usize,
+    pub transform: [[f64; 4]; 3],
+}
+
+/// An assembly in Onshape's layout (live qa4 r4 s5, an Assembly exported as
+/// STEP): one application context and unit set; the root product, whose
+/// shape representation lists the identity placement and one placement per
+/// instance; each part once, as a component product in its own coordinates;
+/// per instance a NEXT_ASSEMBLY_USAGE_OCCURRENCE ("NAUO1"…, named after its
+/// part) with its transformation and context dependent shape representation;
+/// the colours in one presentation on the assembly's context.
+pub(crate) fn write_assembly(root: &str, parts: &[Part], instances: &[AsmInstance], file_name: &str, timestamp: &str, schema: Schema) -> Result<String> {
+    let mut b = Builder::default();
+    let (app_context, protocol, year) = schema.application();
+    let srcs: Vec<HashMap<u32, Ent>> = parts.iter().map(|p| parse(&p.occt)).collect::<Result<_>>()?;
+    let first = srcs.first().ok_or_else(|| bad("no parts"))?;
+    let ac = b.add(Ent::simple("APPLICATION_CONTEXT", vec![s(app_context)]));
+    b.add(Ent::simple("APPLICATION_PROTOCOL_DEFINITION", vec![s("international standard"), s(protocol), V::Int(year.into()), V::Ref(ac)]));
+    // Product data: the root, then each part in the order instances use them,
+    // each NAUO's shape right after its part's.
+    let product = |b: &mut Builder, name: &str| -> (u32, u32) {
+        let pc = b.add(Ent::simple(if schema == Schema::Ap203 { "MECHANICAL_CONTEXT" } else { "PRODUCT_CONTEXT" }, vec![s(""), V::Ref(ac), s("mechanical")]));
+        b.add(Ent::simple("PRODUCT_CATEGORY", vec![s(""), s("")]));
+        let prod = b.add(Ent::simple("PRODUCT", vec![s(name), s(name), s(name), list(&[pc])]));
+        b.add(Ent::simple("PRODUCT_RELATED_PRODUCT_CATEGORY", vec![s(""), s(""), list(&[prod])]));
+        let pdf = b.add(Ent::simple("PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE", vec![s(""), s(""), V::Ref(prod), V::Enum("NOT_KNOWN".into())]));
+        let pdc = b.add(Ent::simple(if schema == Schema::Ap203 { "DESIGN_CONTEXT" } else { "PRODUCT_DEFINITION_CONTEXT" }, vec![s(""), V::Ref(ac), s("design")]));
+        let pd = b.add(Ent::simple("PRODUCT_DEFINITION", vec![s(""), s(""), V::Ref(pdf), V::Ref(pdc)]));
+        let pds = b.add(Ent::simple("PRODUCT_DEFINITION_SHAPE", vec![s(""), s(""), V::Ref(pd)]));
+        (pd, pds)
+    };
+    let (root_pd, root_pds) = product(&mut b, root);
+    let mut order: Vec<usize> = Vec::new();
+    for i in instances {
+        if i.part >= parts.len() {
+            return Err(bad("instance part"));
+        }
+        if !order.contains(&i.part) {
+            order.push(i.part);
+        }
+    }
+    let mut part_pd: HashMap<usize, (u32, u32)> = HashMap::new();
+    let mut nauo_pds: Vec<u32> = Vec::new();
+    for (k, i) in instances.iter().enumerate() {
+        if let std::collections::hash_map::Entry::Vacant(e) = part_pd.entry(i.part) {
+            e.insert(product(&mut b, &parts[i.part].name));
+        }
+        // Its NAUO is made below; the shape refers to it.
+        nauo_pds.push(b.add(Ent::simple("PRODUCT_DEFINITION_SHAPE", vec![s(" "), s("NAUO PRDDFN"), V::Int(format!("__nauo{k}"))])));
+    }
+
+    // Units (OCCT's, from the first part), one uncertainty and context per product.
+    // A part's representation (its id) and its solids.
+    let rep_items = |src: &HashMap<u32, Ent>| -> Result<(Vec<u32>, u32)> {
+        let sdr = src.values().find(|e| e.ty() == "SHAPE_DEFINITION_REPRESENTATION").ok_or_else(|| bad("no shape representation"))?;
+        let Some(V::Ref(rep_id)) = sdr.args().get(1) else { return Err(bad("shape representation")) };
+        let rep = src.get(rep_id).ok_or_else(|| bad("representation"))?;
+        let Some(V::List(items)) = rep.args().get(1) else { return Err(bad("representation items")) };
+        let items: Vec<u32> = items.iter().filter_map(|v| if let V::Ref(r) = v { Some(*r) } else { None }).filter(|r| src.get(r).is_some_and(|e| e.ty() != "AXIS2_PLACEMENT_3D")).collect();
+        Ok((items, *rep_id))
+    };
+    let units: Vec<u32> = {
+        let sdr = first.values().find(|e| e.ty() == "SHAPE_DEFINITION_REPRESENTATION").ok_or_else(|| bad("no shape representation"))?;
+        let Some(V::Ref(rep_id)) = sdr.args().get(1) else { return Err(bad("shape representation")) };
+        let Some(V::Ref(ctx_id)) = first.get(rep_id).and_then(|r| r.args().get(2)) else { return Err(bad("context")) };
+        match first.get(ctx_id).and_then(|c| c.rec("GLOBAL_UNIT_ASSIGNED_CONTEXT")).and_then(|a| a.first()) {
+            Some(V::List(l)) => l.iter().filter_map(|v| if let V::Ref(r) = v { Some(*r) } else { None }).collect(),
+            _ => return Err(bad("units")),
+        }
+    };
+    let mut cp0 = Copier { src: first, map: HashMap::new() };
+    let unit_ids: Vec<u32> = units.iter().map(|&u| cp0.visit(&mut b, u, &mut |_, _| {})).collect::<Result<_>>()?;
+    let len_unit = *unit_ids.first().ok_or_else(|| bad("length unit"))?;
+    let metres = {
+        let e = &b.ents[len_unit as usize];
+        match (e.rec("SI_UNIT"), e.rec("CONVERSION_BASED_UNIT")) {
+            (Some([V::Enum(p), _]), _) => match p.as_str() {
+                "MILLI" => 1e-3,
+                "CENTI" => 1e-2,
+                "KILO" => 1e3,
+                _ => 1.0,
+            },
+            (_, Some([V::Str(n), ..])) => match n.as_str() {
+                "INCH" => 0.0254,
+                "FOOT" => 0.3048,
+                "YARD" => 0.9144,
+                _ => 1.0,
+            },
+            _ => 1.0,
+        }
+    };
+    let context = |b: &mut Builder, name: &str, kind: &str| -> u32 {
+        let unc = b.add(Ent::simple("UNCERTAINTY_MEASURE_WITH_UNIT", vec![V::Typed("LENGTH_MEASURE".into(), vec![V::Real(1e-8 / metres)]), V::Ref(len_unit), s("DISTANCE_ACCURACY_VALUE"), s("Maximum Tolerance applied to model")]));
+        b.add(Ent {
+            recs: vec![
+                ("GEOMETRIC_REPRESENTATION_CONTEXT".into(), vec![V::Int("3".into())]),
+                ("GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT".into(), vec![list(&[unc])]),
+                ("GLOBAL_UNIT_ASSIGNED_CONTEXT".into(), vec![list(&unit_ids)]),
+                ("REPRESENTATION_CONTEXT".into(), vec![s(name), s(kind)]),
+            ],
+            complex: true,
+        })
+    };
+    let root_ctx = context(&mut b, root, "TOP_LEVEL_ASSEMBLY_PART");
+    let part_ctx: HashMap<usize, u32> = order.iter().map(|&p| (p, context(&mut b, &parts[p].name, "COMPONENT_PART"))).collect();
+    let mdgpr = b.reserve();
+
+    // The identity placement every representation shares, the root's
+    // representation (its placements filled in below) and the parts'.
+    let p0 = b.add(Ent::simple("CARTESIAN_POINT", vec![s(""), V::List(vec![V::Real(0.0), V::Real(0.0), V::Real(0.0)])]));
+    let dz = b.add(Ent::simple("DIRECTION", vec![s(""), V::List(vec![V::Real(0.0), V::Real(0.0), V::Real(1.0)])]));
+    let dx = b.add(Ent::simple("DIRECTION", vec![s(""), V::List(vec![V::Real(1.0), V::Real(0.0), V::Real(0.0)])]));
+    let ax = b.add(Ent::simple("AXIS2_PLACEMENT_3D", vec![s(""), V::Ref(p0), V::Ref(dz), V::Ref(dx)]));
+    let root_sr = b.reserve();
+    b.add(Ent::simple("SHAPE_DEFINITION_REPRESENTATION", vec![V::Ref(root_pds), V::Ref(root_sr)]));
+    let mut part_sr: HashMap<usize, u32> = HashMap::new();
+    for &p in &order {
+        let sr = b.add(Ent::simple("SHAPE_REPRESENTATION", vec![s(&parts[p].name), list(&[ax]), V::Ref(part_ctx[&p])]));
+        b.add(Ent::simple("SHAPE_DEFINITION_REPRESENTATION", vec![V::Ref(part_pd[&p].1), V::Ref(sr)]));
+        part_sr.insert(p, sr);
+    }
+
+    // Each part's solids with their colour, then each of its instances' placement.
+    let mut styled = Vec::new();
+    let mut placements: Vec<u32> = vec![0; instances.len()];
+    for &p in &order {
+        let src = &srcs[p];
+        let (items, rep_id) = rep_items(src)?;
+        let rep = src.get(&rep_id).ok_or_else(|| bad("representation"))?.clone();
+        let mut cp = if p == 0 { Copier { src, map: cp0.map.clone() } } else { Copier { src, map: HashMap::new() } };
+        let rgb: Option<Vec<V>> = parts[p].color.map(|c| std::iter::once(s("")).chain(c.iter().map(|&x| V::Real((f64::from(x.clamp(0.0, 1.0)) * 255.0).round() / 255.0))).collect());
+        let mut solids = Vec::new();
+        for &it in &items {
+            let i = cp.visit(&mut b, it, &mut |b, item| {
+                let Some(rgb) = &rgb else { return };
+                let col = b.add(Ent::simple("COLOUR_RGB", rgb.clone()));
+                let fasc = b.add(Ent::simple("FILL_AREA_STYLE_COLOUR", vec![s(""), V::Ref(col)]));
+                let fas = b.add(Ent::simple("FILL_AREA_STYLE", vec![s(""), list(&[fasc])]));
+                let ssfa = b.add(Ent::simple("SURFACE_STYLE_FILL_AREA", vec![V::Ref(fas)]));
+                let sss = b.add(Ent::simple("SURFACE_SIDE_STYLE", vec![s(""), list(&[ssfa])]));
+                let ssu = b.add(Ent::simple("SURFACE_STYLE_USAGE", vec![V::Enum("BOTH".into()), V::Ref(sss)]));
+                let psa = b.add(Ent::simple("PRESENTATION_STYLE_ASSIGNMENT", vec![list(&[ssu])]));
+                styled.push(b.add(Ent::simple("STYLED_ITEM", vec![s(""), list(&[psa]), V::Ref(item)])));
+            })?;
+            if let Some(V::Str(n)) = b.ents[i as usize].recs[0].1.first_mut() {
+                *n = parts[p].name.replace('\'', "''");
+            }
+            solids.push(i);
+        }
+        for (k, inst) in instances.iter().enumerate().filter(|(_, i)| i.part == p) {
+            let t = &inst.transform;
+            let at = b.add(Ent::simple("CARTESIAN_POINT", vec![s(""), V::List((0..3).map(|r| V::Real(t[r][3] / metres)).collect())]));
+            let z = b.add(Ent::simple("DIRECTION", vec![s(""), V::List((0..3).map(|r| V::Real(t[r][2])).collect())]));
+            let x = b.add(Ent::simple("DIRECTION", vec![s(""), V::List((0..3).map(|r| V::Real(t[r][0])).collect())]));
+            placements[k] = b.add(Ent::simple("AXIS2_PLACEMENT_3D", vec![s(""), V::Ref(at), V::Ref(z), V::Ref(x)]));
+        }
+        let mut rep_o = rep;
+        rep_o.recs[0].1 = vec![s(""), list(&solids), V::Ref(part_ctx[&p])];
+        let absr = b.add(rep_o);
+        b.add(Ent::simple("SHAPE_REPRESENTATION_RELATIONSHIP", vec![s(""), s(""), V::Ref(part_sr[&p]), V::Ref(absr)]));
+    }
+    let mut root_items = vec![ax];
+    root_items.extend(&placements);
+    b.set(root_sr, Ent::simple("SHAPE_REPRESENTATION", vec![s(root), list(&root_items), V::Ref(root_ctx)]));
+
+    // The instances: transformation, relationship, usage, its shape.
+    for (k, inst) in instances.iter().enumerate() {
+        let idt = b.add(Ent::simple("ITEM_DEFINED_TRANSFORMATION", vec![s(" "), s(" "), V::Ref(ax), V::Ref(placements[k])]));
+        let rr = b.add(Ent {
+            recs: vec![
+                ("REPRESENTATION_RELATIONSHIP".into(), vec![s(" "), s(" "), V::Ref(part_sr[&inst.part]), V::Ref(root_sr)]),
+                ("REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION".into(), vec![V::Ref(idt)]),
+                ("SHAPE_REPRESENTATION_RELATIONSHIP".into(), vec![]),
+            ],
+            complex: true,
+        });
+        let name = &parts[inst.part].name;
+        let nauo = b.add(Ent::simple("NEXT_ASSEMBLY_USAGE_OCCURRENCE", vec![s(&format!("NAUO{}", k + 1)), s(name), s(name), V::Ref(root_pd), V::Ref(part_pd[&inst.part].0), s("")]));
+        b.ents[nauo_pds[k] as usize].recs[0].1[2] = V::Ref(nauo);
+        b.add(Ent::simple("CONTEXT_DEPENDENT_SHAPE_REPRESENTATION", vec![V::Ref(rr), V::Ref(nauo_pds[k])]));
+    }
+    b.set(mdgpr, Ent::simple("MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION", vec![s(""), list(&styled), V::Ref(root_ctx)]));
+    // AP214 / AP203: Onshape's PMI validation properties, on the root.
+    if schema != Schema::Ap242 {
+        for what in ["number of annotations", "number of views"] {
+            let vri = b.add(Ent::simple("VALUE_REPRESENTATION_ITEM", vec![s(what), V::Typed("COUNT_MEASURE".into(), vec![V::Real(0.0)])]));
+            let def = b.add(Ent::simple("PROPERTY_DEFINITION", vec![s("pmi validation property"), s(""), V::Ref(root_pds)]));
+            let rep = b.add(Ent::simple("REPRESENTATION", vec![s(""), list(&[vri]), V::Ref(root_ctx)]));
+            b.add(Ent::simple("PROPERTY_DEFINITION_REPRESENTATION", vec![V::Ref(def), V::Ref(rep)]));
+        }
+    }
+    Ok(numbered(&b, file_name, timestamp, schema))
+}
+
+/// Onshape's numbering (ST-Developer's renumber hook): entities grouped by
+/// type, the type created last first, each group in creation order, from
+/// #10; then the file text.
+fn numbered(b: &Builder, file_name: &str, timestamp: &str, schema: Schema) -> String {
     let keys: Vec<String> = b.ents.iter().map(Ent::key).collect();
     let mut first: HashMap<&str, usize> = HashMap::new();
     for (i, k) in keys.iter().enumerate() {
@@ -628,7 +830,7 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
         out.entity(num[i] as usize, &e);
     }
     out.text.push_str("ENDSEC;\nEND-ISO-10303-21;\n");
-    Ok(out.text)
+    out.text
 }
 
 /// A header line ending in a string, split like [`Out::string`].

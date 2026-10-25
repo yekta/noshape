@@ -407,6 +407,15 @@ fn op_hole(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
         }
         Ok(out)
+    })
+    // std hole.fs catches opHole's failure as an ErrorStringEnum
+    // (displayToolErrorEntities, `error == HOLE_TARGETS_DO_NOT_DIFFER`):
+    // the member itself, not a regenError map.
+    .map_err(|mut e| {
+        if e.value.as_map().is_some_and(|m| m.len() == 1) {
+            e.value = e.value.get("message").clone();
+        }
+        e
     })?;
     let mut st = cx.state.lock();
     let mut values = Vec::new();

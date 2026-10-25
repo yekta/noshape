@@ -149,6 +149,7 @@ struct HlrOut;
 struct StepImport;
 struct AsmNodeF;
 struct PvzInstance;
+struct StepTree;
 struct BoolOpts;
 struct SweepOpts;
 struct FillOpts;
@@ -316,6 +317,7 @@ std::unique_ptr<OcShape> brep_from_bytes(rust::Slice<const uint8_t> bytes);
 rust::Vec<uint8_t>       bin_to_bytes(const OcShape& s, bool with_triangles);
 std::unique_ptr<OcShape> bin_from_bytes(rust::Slice<const uint8_t> bytes);
 StepImport               read_step(rust::Str path);
+StepTree                 read_step_tree(rust::Str path);
 void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                 rust::Slice<const float> colors, rust::Slice<const bool> has_color,
                 rust::Str path, uint8_t schema, uint8_t file_unit);
@@ -342,6 +344,7 @@ StepImport               read_pvz_parts(rust::Str path);
 rust::Vec<PvzInstance>   read_pvz_instances(rust::Str path);
 std::unique_ptr<OcShape> read_mesh_bodies(rust::Str path);
 bool                     is_mesh(const OcShape& s);
+bool                     has_triangulation(const OcShape& s);
 
 // ---- HLR (hlr.cpp)
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up,

@@ -588,6 +588,12 @@ impl WindowsWindowInner {
             }),
             modifiers,
             touch_phase: TouchPhase::Moved,
+            // NOSHAPE PATCH (agent nav2): the raw notches (Chromium:
+            // `GET_WHEEL_DELTA_WPARAM / WHEEL_DELTA`, kept vertical with Shift).
+            wheel_ticks: Some(Point {
+                x: 0.0,
+                y: wparam.signed_hiword() as f32 / WHEEL_DELTA as f32,
+            }),
         });
         let handled = !func(input).propagate;
         self.state.callbacks.input.set(Some(func));
@@ -626,6 +632,11 @@ impl WindowsWindowInner {
             }),
             modifiers: current_modifiers(),
             touch_phase: TouchPhase::Moved,
+            // NOSHAPE PATCH (agent nav2): Chromium negates WM_MOUSEHWHEEL.
+            wheel_ticks: Some(Point {
+                x: -wparam.signed_hiword() as f32 / WHEEL_DELTA as f32,
+                y: 0.0,
+            }),
         });
         let handled = !func(event).propagate;
         self.state.callbacks.input.set(Some(func));
@@ -1315,7 +1326,7 @@ impl WindowsWindowInner {
     }
 
     /// NOSHAPE PATCH: touch-screen contacts (and pen contacts unless the
-    /// app treats the pen as a mouse, [`crate::set_pen_as_mouse`]) become
+    /// app treats the pen as a mouse, `gpui::set_pen_as_mouse`) become
     /// `PlatformInput::Touch` events. Handling the message keeps Windows from
     /// promoting the contact to emulated mouse input; mouse and touchpad
     /// pointers fall through to `DefWindowProc` as before.
@@ -1326,7 +1337,7 @@ impl WindowsWindowInner {
         if unsafe { GetPointerType(pointer_id, &mut pointer_type) }.is_err() {
             return None;
         }
-        let as_touch = pointer_type == PT_TOUCH || (pointer_type == PT_PEN && !PEN_AS_MOUSE.load(Ordering::Relaxed));
+        let as_touch = pointer_type == PT_TOUCH || (pointer_type == PT_PEN && !gpui::pen_as_mouse());
         if !as_touch {
             return None;
         }

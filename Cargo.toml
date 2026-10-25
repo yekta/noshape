@@ -66,11 +66,25 @@ debug = "line-tables-only"
 # "NOSHAPE PATCH" differ from the published 0.3.9; see
 # vendor/gpui-pre-linux/src/custom_cursor.rs.
 [patch.crates-io]
+# NOSHAPE PATCH (agent nav2): wheel events carry Chromium's wheel ticks
+# (`ScrollWheelEvent::wheel_ticks`): X11 valuator increments
+# (src/linux/x11/client.rs `make_scroll_wheel_event`), Wayland value120 or
+# axis values summed per frame as Chromium does (src/linux/wayland/client.rs
+# `chrome_axis`).
+# NOSHAPE PATCH (agent nav2): pens as Chrome reports them: X11 stylus devices
+# (an "Abs Pressure" valuator) and Wayland graphics tablets (new
+# src/linux/wayland/tablet.rs, zwp_tablet_v2) become touches unless
+# `gpui::set_pen_as_mouse`; Wayland keeps every held mouse button.
 gpui-pre-linux = { path = "vendor/gpui-pre-linux" }
 # NOSHAPE PATCH (agent nav): gpui's macOS platform exposes whether a right
 # press was a converted Ctrl+left click (`last_right_press_was_ctrl_click`),
 # so the viewport can treat it as Chrome on macOS does. Only the lines marked
 # "NOSHAPE PATCH" in src/window.rs and src/gpui_macos.rs differ from 0.3.9.
+# NOSHAPE PATCH (agent nav2): wheel ticks from the CGEvent's DeltaAxis /
+# PointDeltaAxis fields, and a cancelled magnify ends the pinch
+# (src/events.rs `wheel_ticks`).
+# NOSHAPE PATCH (agent nav2): tablet-point (pen) mouse events become touches
+# unless `gpui::set_pen_as_mouse` (src/events.rs `pen_touch`).
 gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
 # NOSHAPE PATCH (agent nav): gpui core routes raw multi-touch to elements:
 # `TouchEvent` is a mouse event for `Window::on_mouse_event`, and a listener
@@ -85,10 +99,17 @@ gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
 # NOSHAPE PATCH (agent qa4): shaped text lines are kept across frames
 # (`RecentLines` in src/text_system/line_layout.rs), so text drawn again after
 # a frame without it (a list row shown again after filtering) isn't reshaped.
+# NOSHAPE PATCH (agent nav2): `ScrollWheelEvent::wheel_ticks`, the wheel
+# notches as a browser counts them (src/interactive.rs).
+# NOSHAPE PATCH (agent nav2): `set_pen_as_mouse` / `pen_as_mouse`, shared by
+# the platform layers (src/interactive.rs).
 gpui-pre = { path = "vendor/gpui-pre" }
 # NOSHAPE PATCH (agent nav): gpui's Windows platform turns touch-screen (and
 # pen) pointer messages into raw touches instead of emulated mouse input
 # (src/events.rs `handle_pointer_msg`, src/gpui_windows.rs `set_pen_as_mouse`).
+# NOSHAPE PATCH (agent nav2): wheel ticks from WHEEL_DELTA (src/events.rs),
+# and the precision touchpad works in whole pixels like Chromium's
+# DirectManipulation handler (src/direct_manipulation.rs).
 gpui-pre-windows = { path = "vendor/gpui-pre-windows" }
 # NOSHAPE PATCH (agent ui): gpui-base's text input paints a plain input's
 # selection like the browser (Chrome `#3367d1`, white selected text) when the

@@ -5,6 +5,70 @@ platform (mouse, trackpad incl. pinch, keyboard, view cube, touchscreen,
 Preferences › Mouse controls) in Part Studio, Assembly and Drawing.
 Checklist: `docs/parity/navigation.md`.
 
+## nav2 (2026-10-24): exact input numbers without hardware
+
+Worktree /root/wt/nav2 (branch agent/nav2, codegen-units 237), scratch
+/root/nav2-scratch (Chromium sources in chromium/, test fixture fix/).
+
+* **Chrome mapping**: Onshape reads `wheelDelta` only; how each OS's input
+  becomes it is in docs/parity/navigation.md "Chrome's input mapping"
+  (Chromium source, quoted file by file). Consequences fixed here: pinch =
+  one wheel notch per update (not the finger ratio), Windows Shift+wheel
+  zooms, macOS notched wheels use the raw notch (no acceleration), Wayland
+  finger scroll 12 per axis unit (was 8), Windows precision touchpad 1 per
+  whole pixel (was 1.2), X11 has no touchpad pinch.
+* **gpui patch**: `ScrollWheelEvent::wheel_ticks` (Chromium's wheel_ticks,
+  before any Shift swap) filled by every platform layer (macOS CGEvent
+  fields, Windows WHEEL_DELTA / DirectManipulation whole pixels, X11
+  valuator increments, Wayland value120 / axis); macOS magnify Cancelled =
+  Ended. `navigation::wheel_delta` / `wheel_zoom_amount` / `pinch_zoom_amount`.
+  Cross-checks: `cargo +stable check --target aarch64-apple-darwin -p
+  gpui-pre-macos` and `--target x86_64-pc-windows-msvc -p gpui-pre-windows`
+  with CARGO_TARGET_DIR=/root/target-shared/cross (macOS: touch the
+  placeholder `…/gpui-pre-apple-*/out/stitched_shaders.metal`; Windows:
+  PATH=/root/nav2-scratch/fakebin for a stub `llvm-rc`). The pinned 1.98.1
+  toolchain has no cross std; stable (also 1.98.1) does.
+* **Replay harness** `.github/nav/` + `.github/workflows/nav.yml`
+  (workflow_dispatch): `NOSHAPE_NAV_TRACE=<file>` makes the viewport write
+  every input and camera as JSON lines (`nav_trace.rs`). Linux: uinput
+  mouse/keyboard/touchpad/touchscreen (`uinput.py`, no deps) under a headless
+  sway (`WLR_BACKENDS=headless,libinput LIBSEAT_BACKEND=noop`, root) →
+  `replay.py` → `check.py` recomputes Chrome+Onshape from WAYLAND_DEBUG and
+  checks each camera change. macOS: `mac-replay.swift` (CGEvents). Windows:
+  `win-replay.ps1` (SendInput, InjectTouchInput; touchpads can't be injected).
+  Local run 10-24 (Xwayland installed with apt): Wayland 468/468 and X11
+  240/240 checks pass. Run it as root:
+  `.github/nav/linux-replay.sh <bin> .github/nav/block.noshape <out> wayland|x11`.
+* **Later fixes (10-24 evening):** rotate moves wait for the visible-depth
+  centre (`pending_rotate`, `flush_pending_rotate`; capped at 30 moves / 250
+  ms of held inertia), Alt+drag held moves keep their times
+  (`axis_rotate_step(delta, at)`), touch timers reschedule for the earliest
+  deadline (`touch_tick_at`), drawings use −1.2·deltaY when wheelDelta is 0
+  (`drawing_wheel_zoom_amount`). Replay: Wayland 477/477, X11 249/249.
+* **Rules (WORKFLOW 17):** replay checks assert per-event numbers only (no
+  timing); vendored gpui and drawing_tools.rs are shared files: ask the lead
+  before more edits there.
+* **Next:** run nav.yml on macOS/Windows runners once main has the branch
+  (`gh workflow run nav.yml -f ref=main`), fix what it finds; then 1.11–1.13,
+  1.18 (perspective), 1.21, 2.9, 7.9/7.10 (pen) with replay steps.
+* **10-25:** pens act as a finger everywhere (`gpui::set_pen_as_mouse` in
+  core; macOS tablet-point events, X11 stylus = "Abs Pressure" valuator,
+  Wayland `zwp_tablet_v2` in new wayland/tablet.rs); Wayland keeps every held
+  button; drags follow the pointer over the window (capture-phase listener);
+  rotate moves wait for the depth centre; touch timers fire before the next
+  touch event. Replay: Wayland 495/495, X11 261/261 locally.
+* **CI** `gh workflow run nav.yml --repo yekta/noshape --ref main -f ref=<main
+  sha>` (builds from source, ~45 min). First run 40167921463: Linux passed all
+  but merged-wheel pairing (check fixed), Windows failed on PowerShell comma
+  precedence, macOS on `sleep` ambiguity (both fixed in 9452f51c). Re-run after
+  that merges.
+* **Open:** perspective zoom-out stop (ours 2993.9 mm, live 3240.83 mm): live
+  `canZoom` values requested (REQUESTS "nav2 (P1) (10-25 b"); then add the
+  stop asserts back to `perspective_wheel_matches_live_onshape`.
+* **Live request** REQUESTS.md "nav2 (P1)": DOM WheelEvent wheelDelta sweep,
+  CDP synthesizePinchGesture (real touchpad-pinch pipeline), drags with the
+  camera read from the view controller, CDP touch gestures.
+
 ## Where the truth comes from
 
 Onshape's own client code is in `/root/onshape-research/bundle-raw/`:
@@ -25,7 +89,8 @@ Key facts derived from it:
 * Browser `wheelDelta` per platform is emulated in `navigation::wheel_delta`
   (macOS 120/line, 3/px; Windows 120/notch from gpui lines ÷ system wheel
   lines, 1.2/px; Linux 40/gpui line, 120/45 per Wayland px).
-* Pinch: the model scales by the finger ratio about the pinch centre.
+* Touchpad pinch: one wheel notch per pinch update (Chrome sends ±120
+  Ctrl+wheel events); touch-screen pinch: the finger ratio (`pinchZoom`).
 * Right-drag rotate is free (camera axes), 3 turns per viewport diagonal;
   Alt = constrained (levels the view, then about world Z).
 * Bindings: flags MMB=1 RMB=2 SHIFT=4 CTRL=8 ALT=16; left button has no

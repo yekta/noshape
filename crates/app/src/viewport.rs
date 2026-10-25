@@ -115,6 +115,27 @@ struct CameraAnimation {
     duration: Duration,
 }
 
+/// A rotate move waiting for the rotate centre ([`Viewport::pending_rotate`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PendingRotate {
+    Mouse,
+    Touch,
+    Axis,
+}
+
+/// Moves held for the rotate centre before they are applied about the
+/// fallback centre (the samples normally land within a frame or two).
+const MAX_PENDING_ROTATE: usize = 30;
+
+/// See [`Viewport::axis_tag`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AxisTag {
+    None,
+    /// Animating to the levelled view; tagged when it lands.
+    Levelling,
+    Tagged,
+}
+
 pub struct Viewport {
     gpu: Gpu,
     target_id: u64,
@@ -136,6 +157,8 @@ pub struct Viewport {
     /// texture of that size for that camera needs no re-render (overlays
     /// such as the view cube follow the camera), only a present.
     rendered: Option<(Camera, (u32, u32))>,
+    /// The camera last written to the navigation trace (`nav_trace`).
+    traced_camera: Option<Camera>,
     /// Screen overlays drawn into the frame (`noshape_render::overlay`): the view
     /// cube's hover cell (`None`: no cube), the plane names, the X/Y/Z masks
     /// rasterized for a scale factor, and the overlay last sent.
@@ -247,6 +270,13 @@ pub struct Viewport {
     depth_pivot: Option<(u64, Option<DVec3>)>,
     depth_pivot_asked: Option<u64>,
     pivot_awaits_depth: bool,
+    /// Rotate moves (delta, kind, time) made while the rotate centre waits for the
+    /// visible-depth samples: Onshape finds the centre before rotating
+    /// (`getRotateCenterForCanvasLocation` reads the depths at once), so they
+    /// are applied about it when it lands.
+    pending_rotate: Vec<(DVec2, PendingRotate, Instant)>,
+    /// Since when the release inertia waits for the rotate centre.
+    inertia_held_since: Option<Instant>,
     /// macOS: the pending right press is a Ctrl+left click converted by the
     /// platform (Chrome reports it as a left click with Ctrl, which never
     /// navigates: clicking still opens the context menu, dragging does nothing).
@@ -257,7 +287,8 @@ pub struct Viewport {
     touch: crate::touch::TouchRecognizer,
     touch_ids: std::collections::HashSet<u64>,
     touch_epoch: Instant,
-    touch_tick_scheduled: bool,
+    /// The recognizer deadline a timer is set for (`touch.next_deadline`).
+    touch_tick_at: Option<Duration>,
     touch_drag: TouchDrag,
     /// Rotation speed, last rotate step time, and the post-release inertia
     /// with the time of its last step.
@@ -287,6 +318,11 @@ pub struct Viewport {
     pub fit_inset_left: f64,
     box_rect: Option<(DVec2, DVec2)>,
     anim: Option<CameraAnimation>,
+    /// Onshape's canvas view tag for constrained rotate
+    /// (`data-view-shown` = `axisRotateCanvasTag`): the view has been levelled
+    /// for it, so Alt+drags turn it. Free rotation, view animations and key
+    /// steps clear it; pan and zoom keep it.
+    axis_tag: AxisTag,
     _frames: Task<()>,
     _picks: Task<()>,
     /// Frames presented so far.
@@ -321,6 +357,8 @@ struct OrbitBench {
     cpu_at_present: Option<Duration>,
     /// The camera was fitted to the model before the run.
     fitted: bool,
+    /// When the last tick ran (`v.bench_tick`: the timer's real period).
+    last_tick: Option<Instant>,
 }
 
 static BENCH_CLAIMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -330,7 +368,7 @@ fn orbit_bench_from_env() -> Option<OrbitBench> {
     if BENCH_CLAIMED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         return None;
     }
-    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, zoom: false, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, fitted: false })
+    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, zoom: false, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, fitted: false, last_tick: None })
 }
 
 impl EventEmitter<ViewportEvent> for Viewport {}
@@ -391,6 +429,7 @@ impl Viewport {
             shown_texture: None,
             retired_textures: Vec::new(),
             rendered: None,
+            traced_camera: None,
             cube: None,
             cube_origin: None,
             plane_labels: Vec::new(),
@@ -447,11 +486,13 @@ impl Viewport {
             depth_pivot: None,
             depth_pivot_asked: None,
             pivot_awaits_depth: false,
+            pending_rotate: Vec::new(),
+            inertia_held_since: None,
             ctrl_click_press: false,
             touch: Default::default(),
             touch_ids: Default::default(),
             touch_epoch: Instant::now(),
-            touch_tick_scheduled: false,
+            touch_tick_at: None,
             touch_drag: TouchDrag::None,
             rotation_speed: RotationSpeed::default(),
             last_rotation: None,
@@ -465,6 +506,7 @@ impl Viewport {
             fit_inset_left: 0.0,
             box_rect: None,
             anim: None,
+            axis_tag: AxisTag::None,
             _frames: frames,
             _picks: picks,
             frames_presented: 0,
@@ -640,8 +682,14 @@ impl Viewport {
 
     /// Animate to `to` over `duration` with Onshape's easing (smootherstep).
     pub fn animate_to_with(&mut self, to: Camera, duration: Duration, cx: &mut Context<Self>) {
+        self.animate_from(to, duration, Instant::now(), cx);
+    }
+
+    /// [`Self::animate_to_with`] as if started at `start` (a held move's time).
+    fn animate_from(&mut self, to: Camera, duration: Duration, start: Instant, cx: &mut Context<Self>) {
         self.inertia = None;
-        self.anim = Some(CameraAnimation { from: self.camera, to, start: Instant::now(), duration });
+        self.axis_tag = AxisTag::None;
+        self.anim = Some(CameraAnimation { from: self.camera, to, start, duration });
         self.dirty = true;
         cx.notify();
     }
@@ -677,10 +725,19 @@ impl Viewport {
     }
 
     fn camera_changed(&mut self, cx: &mut Context<Self>) {
+        self.trace_camera();
         self.pick_dirty = true;
         self.pick_changed_at = Instant::now();
         cx.emit(ViewportEvent::CameraChanged);
         self.request_frame(cx);
+    }
+
+    fn trace_camera(&mut self) {
+        if crate::nav_trace::enabled() && self.traced_camera != Some(self.camera) {
+            let origin = DVec2::new(f64::from(f32::from(self.bounds.origin.x)), f64::from(f32::from(self.bounds.origin.y)));
+            crate::nav_trace::camera(&self.camera, self.size(), origin);
+            self.traced_camera = Some(self.camera);
+        }
     }
 
     fn local(&self, p: Point<Pixels>) -> DVec2 {
@@ -808,14 +865,15 @@ impl Viewport {
                 }
                 // A drag that started meanwhile picks the centre up now (the
                 // samples show the view at the press; a world point stays valid).
-                if std::mem::take(&mut self.pivot_awaits_depth)
-                    && self.drag == Drag::Nav
-                    && let Some(p) = pivot
-                {
-                    self.orbit_pivot = Some(p);
-                    if let Some((inertia, _)) = &mut self.inertia {
-                        inertia.pivot = p;
+                if self.pivot_awaits_depth {
+                    if let Some(p) = pivot {
+                        self.orbit_pivot = Some(p);
+                        crate::nav_trace::input("pivot", serde_json::json!({ "depth_samples": true, "pivot": [p.x, p.y, p.z] }));
+                        if let Some((inertia, _)) = &mut self.inertia {
+                            inertia.pivot = p;
+                        }
                     }
+                    self.flush_pending_rotate(cx);
                 }
             }
         }
@@ -829,6 +887,9 @@ impl Viewport {
     }
 
     fn submit(&mut self, cx: &mut Context<Self>) {
+        if let Some(t) = self.presented_at.filter(|_| self.bench.as_ref().is_some_and(|b| b.started.is_some())) {
+            noshape_render::perf::record("v.present_to_submit", t.elapsed());
+        }
         let size = self.bounds.size;
         let scale = self.scale;
         let w = (f32::from(size.width) * scale).round() as u32;
@@ -1248,6 +1309,10 @@ impl Viewport {
             return false;
         }
         b.ticks += 1;
+        let now = Instant::now();
+        if let Some(t) = b.last_tick.replace(now) {
+            noshape_render::perf::record("v.bench_tick", now - t);
+        }
         if b.zoom {
             // Scroll-wheel zoom in and out around the viewport centre.
             let factor = if (b.ticks / 15) % 2 == 0 { 1.04 } else { 1.0 / 1.04 };
@@ -1322,6 +1387,10 @@ impl Viewport {
         if nav::needs_new_pivot(prev, mode) {
             let perspective_pan = mode == Mode::Pan && self.camera.projection == noshape_render::Projection::Perspective;
             self.orbit_pivot = (mode != Mode::Pan || perspective_pan).then(|| self.pivot_at(at));
+            if crate::nav_trace::enabled() {
+                let p = self.orbit_pivot.map(|p| [p.x, p.y, p.z]);
+                crate::nav_trace::input("pivot", serde_json::json!({ "mode": format!("{mode:?}"), "at": [at.x, at.y], "pivot": p }));
+            }
         }
         if mode == Mode::Rotate {
             self.last_rotation = Some(Instant::now());
@@ -1377,28 +1446,25 @@ impl Viewport {
         match self.nav_mode {
             Mode::None => return,
             Mode::Rotate => {
-                nav::drag_rotate(&mut self.camera, delta, size, pivot, false);
+                if self.pivot_awaits_depth {
+                    self.hold_rotate(delta, PendingRotate::Mouse, cx);
+                } else {
+                    nav::drag_rotate(&mut self.camera, delta, size, pivot, false);
+                }
                 if let Some(l) = &mut self.rotate_log {
                     l.1 += delta.length();
                 }
                 self.rotation_speed.push(delta);
                 self.last_rotation = Some(Instant::now());
+                self.axis_tag = AxisTag::None;
             }
             Mode::AxisRotate => {
-                // The view is first animated to the nearest floor-down view
-                // (drags wait for that), then turns about world Z.
-                if self.anim.is_some() {
+                if self.pivot_awaits_depth {
+                    self.hold_rotate(delta, PendingRotate::Axis, cx);
                     return;
                 }
-                match nav::level_view(&self.camera, pivot) {
-                    (level, None) => {
-                        self.camera = level;
-                        nav::drag_axis_rotate(&mut self.camera, delta, size, pivot);
-                    }
-                    (level, Some(duration)) => {
-                        self.animate_to_with(level, duration, cx);
-                        return;
-                    }
+                if !self.axis_rotate_step(delta, Instant::now(), cx) {
+                    return;
                 }
             }
             Mode::Pan => nav::pan(&mut self.camera, delta, size, self.orbit_pivot),
@@ -1414,10 +1480,86 @@ impl Viewport {
         self.camera_changed(cx);
     }
 
+    /// One constrained-rotate drag event (Onshape's `isAxisRotating` branch):
+    /// the view is first levelled to the nearest floor-down view (snapped, or
+    /// animated while drag events are ignored), which tags the canvas; only
+    /// events on a tagged view turn it about world Z, so the levelling event
+    /// itself adds no rotation. Returns whether the camera changed.
+    fn axis_rotate_step(&mut self, delta: DVec2, at: Instant, cx: &mut Context<Self>) -> bool {
+        if let Some(anim) = &self.anim {
+            // Events while the camera animates are ignored; a held event from
+            // after the animation's end finds it finished.
+            if at < anim.start + anim.duration {
+                return false;
+            }
+            self.camera = anim.to;
+            self.anim = None;
+            if self.axis_tag == AxisTag::Levelling {
+                self.axis_tag = AxisTag::Tagged;
+            }
+        }
+        let pivot = self.orbit_pivot.unwrap_or(self.camera.target);
+        if self.axis_tag == AxisTag::Tagged {
+            let size = self.size();
+            nav::drag_axis_rotate(&mut self.camera, delta, size, pivot);
+            return true;
+        }
+        match nav::level_view(&self.camera, pivot) {
+            (level, None) => {
+                self.camera = level;
+                self.axis_tag = AxisTag::Tagged;
+                true
+            }
+            (level, Some(duration)) => {
+                self.animate_from(level, duration, at, cx);
+                self.axis_tag = AxisTag::Levelling;
+                false
+            }
+        }
+    }
+
+    /// Hold a rotate move until the rotate centre is known; give up waiting
+    /// (fallback centre) after [`MAX_PENDING_ROTATE`] moves.
+    fn hold_rotate(&mut self, delta: DVec2, kind: PendingRotate, cx: &mut Context<Self>) {
+        self.pending_rotate.push((delta, kind, Instant::now()));
+        if self.pending_rotate.len() >= MAX_PENDING_ROTATE {
+            self.flush_pending_rotate(cx);
+        }
+    }
+
+    /// Stop waiting for the rotate centre and apply the held moves about the
+    /// current one, in order.
+    fn flush_pending_rotate(&mut self, cx: &mut Context<Self>) {
+        self.pivot_awaits_depth = false;
+        self.inertia_held_since = None;
+        let pending = std::mem::take(&mut self.pending_rotate);
+        if pending.is_empty() {
+            return;
+        }
+        let (size, pivot) = (self.size(), self.orbit_pivot.unwrap_or(self.camera.target));
+        for (d, kind, at) in pending {
+            match kind {
+                PendingRotate::Mouse => nav::drag_rotate(&mut self.camera, d, size, pivot, false),
+                PendingRotate::Touch => nav::drag_rotate(&mut self.camera, d, size, pivot, true),
+                PendingRotate::Axis => {
+                    self.axis_rotate_step(d, at, cx);
+                }
+            }
+        }
+        self.camera_changed(cx);
+    }
+
     fn on_mouse_down(&mut self, e: &MouseDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        if crate::nav_trace::enabled() {
+            let local = self.local(e.position);
+            crate::nav_trace::input("mouse_down", serde_json::json!({ "at": [local.x, local.y], "debug": format!("{e:?}") }));
+        }
         let p = self.local(e.position);
         self.buttons.set(e.button, true);
         cx.stop_propagation();
+        // A real mouse press: no touch is in progress (the platforms don't
+        // emulate presses for touches), so drop any whose end was missed.
+        self.touch_ids.clear();
         if self.drag == Drag::Nav {
             // Another button joined the drag.
             self.update_nav_mode(e.modifiers, p);
@@ -1462,7 +1604,29 @@ impl Viewport {
         }
     }
 
+    /// Moves over the viewport while no drag of its own is in progress (a
+    /// drag's moves come through the window listener, [`Self::on_mouse_move`]).
+    fn on_hover_move(&mut self, e: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.drag == Drag::None {
+            self.on_mouse_move(e, window, cx);
+        }
+    }
+
+    /// Every mouse move of a press that started here, wherever the pointer is
+    /// (Onshape's `dragHelper` is jQuery UI's `mouse`, which follows the drag
+    /// on the whole document: rotating on over the feature list keeps
+    /// rotating), and hover moves over the viewport.
     fn on_mouse_move(&mut self, e: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if crate::nav_trace::enabled() {
+            let local = self.local(e.position);
+            crate::nav_trace::input("mouse_move", serde_json::json!({ "at": [local.x, local.y], "debug": format!("{e:?}") }));
+        }
+        // While fingers or a pen touch the viewport the mouse doesn't move
+        // the view (a compositor may still move the pointer to the pen; a
+        // page gets no compatibility mouse events during a pointer contact).
+        if !self.touch_ids.is_empty() {
+            return;
+        }
         let p = self.local(e.position);
         // Another element's drag over the graphics (the dimension box by its
         // strip, a dialog by its title): no hover, tool or cursor follows it.
@@ -1503,7 +1667,7 @@ impl Viewport {
                 self.nav_resolver = Some(resolver);
                 self.nav_keys = keys;
                 self.zoom_anchor = self.press_pos;
-                self.pivot_awaits_depth = false;
+                self.flush_pending_rotate(cx);
                 self.set_nav_mode(mode, self.press_pos);
             } else {
                 // Dragging from geometry with no tool is a box select too
@@ -1543,6 +1707,10 @@ impl Viewport {
     }
 
     fn on_mouse_up(&mut self, e: &MouseUpEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        if crate::nav_trace::enabled() {
+            let local = self.local(e.position);
+            crate::nav_trace::input("mouse_up", serde_json::json!({ "at": [local.x, local.y], "debug": format!("{e:?}") }));
+        }
         let p = self.local(e.position);
         self.buttons.set(e.button, false);
         if self.drag == Drag::Nav {
@@ -1632,27 +1800,50 @@ impl Viewport {
     /// the cursor, never pan (Onshape's `zoomOnMouseWheelScroll`).
     fn on_scroll(&mut self, e: &ScrollWheelEvent, _window: &mut Window, cx: &mut Context<Self>) {
         cx.stop_propagation();
+        if crate::nav_trace::enabled() {
+            let (kind, d) = match e.delta {
+                ScrollDelta::Pixels(p) => ("pixels", (f32::from(p.x), f32::from(p.y))),
+                ScrollDelta::Lines(l) => ("lines", (l.x, l.y)),
+            };
+            let local = self.local(e.position);
+            crate::nav_trace::input("scroll", serde_json::json!({
+                "at": [local.x, local.y], "unit": kind, "delta": [d.0, d.1],
+                "ticks": e.wheel_ticks.map(|t| [t.x, t.y]), "phase": format!("{:?}", e.touch_phase),
+                "shift": e.modifiers.shift, "control": e.modifiers.control,
+            }));
+        }
         if self.drag == Drag::Box {
             return;
         }
         let reverse = MouseControls::current().reverse_scroll;
-        let Some(amount) = nav::wheel_zoom_amount(e.delta, nav::Platform::current(), reverse, e.modifiers.shift) else { return };
-        let (p, size, bounds) = (self.local(e.position), self.size(), self.zoom_bounds());
-        if nav::zoom_at(&mut self.camera, Zoom::Amount(amount), p, size, bounds) {
-            self.anim = None;
-            self.camera_changed(cx);
-        }
+        let Some(amount) = nav::wheel_zoom_amount(e, nav::Platform::current(), reverse) else { return };
+        self.wheel_zoom(amount, e.position, cx);
     }
 
-    /// Trackpad pinch (macOS magnify, Windows precision touchpad, Linux
-    /// gestures): the model scales with the fingers about the pinch centre.
-    fn on_pinch(&mut self, e: &PinchEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    /// Trackpad pinch (macOS magnify, Windows precision touchpad, Wayland
+    /// gestures): one wheel notch per pinch update, as Chromium sends them
+    /// to Onshape (`nav::pinch_zoom_amount`).
+    fn on_pinch(&mut self, e: &PinchEvent, window: &mut Window, cx: &mut Context<Self>) {
         cx.stop_propagation();
-        if self.drag == Drag::Box || e.delta == 0.0 {
+        if crate::nav_trace::enabled() {
+            let local = self.local(e.position);
+            crate::nav_trace::input("pinch", serde_json::json!({ "at": [local.x, local.y], "delta": e.delta, "phase": format!("{:?}", e.phase) }));
+        }
+        if self.drag == Drag::Box {
             return;
         }
-        let (p, size, bounds) = (self.local(e.position), self.size(), self.zoom_bounds());
-        if nav::zoom_at(&mut self.camera, Zoom::Pinch(nav::pinch_ratio(e.delta)), p, size, bounds) {
+        let reverse = MouseControls::current().reverse_scroll;
+        let Some(amount) = nav::pinch_zoom_amount(e, nav::Platform::current(), nav::is_x11(window), reverse) else { return };
+        self.wheel_zoom(amount, e.position, cx);
+    }
+
+    /// `zoomOnCanvasPoint`: zoom by a wheel amount about a window point.
+    /// Onshape's ray (`camera.getRay`) goes through the canvas point +½
+    /// device pixel right and up (`unproject([x + .5, (h − y) + .5])`).
+    fn wheel_zoom(&mut self, amount: f64, position: Point<Pixels>, cx: &mut Context<Self>) {
+        let half = 0.5 / self.scale.max(0.1) as f64;
+        let (p, size, bounds) = (self.local(position) + DVec2::new(half, -half), self.size(), self.zoom_bounds());
+        if nav::zoom_at(&mut self.camera, Zoom::Amount(amount), p, size, bounds) {
             self.anim = None;
             self.camera_changed(cx);
         }
@@ -1663,9 +1854,18 @@ impl Viewport {
     /// A raw touch (vendor/gpui-pre routes them here): fed to Onshape's
     /// gesture recognizer (`touch.rs`) in device pixels.
     fn on_touch(&mut self, e: &TouchEvent, hitbox: HitboxId, window: &mut Window, cx: &mut Context<Self>) {
+        if crate::nav_trace::enabled() {
+            crate::nav_trace::input("touch", serde_json::json!({ "debug": format!("{e:?}") }));
+        }
         let id = e.id.0;
         let now = self.touch_epoch.elapsed();
         let at = self.local(e.position) * self.scale as f64;
+        // Timers already due fire before this event (a busy UI thread can run
+        // the timer late; the gesture must not depend on that).
+        if self.touch.next_deadline().is_some_and(|d| d <= now) {
+            let due = self.touch.tick(now);
+            self.touch_actions(due, cx);
+        }
         let actions = match e.phase {
             TouchPhase::Started => {
                 if window.topmost_hitbox_at(e.position) != Some(hitbox) {
@@ -1688,16 +1888,21 @@ impl Viewport {
 
     /// Run the recognizer's timers (tap report, two-finger long press).
     fn schedule_touch_tick(&mut self, cx: &mut Context<Self>) {
-        if self.touch_tick_scheduled {
+        let Some(deadline) = self.touch.next_deadline() else { return };
+        // A timer for this deadline or an earlier one is already set (an
+        // earlier one reschedules when it fires); a two-finger tap's report
+        // (200 ms after the lift) must not wait for the long-press timer.
+        if self.touch_tick_at.is_some_and(|at| at <= deadline) {
             return;
         }
-        let Some(deadline) = self.touch.next_deadline() else { return };
-        self.touch_tick_scheduled = true;
+        self.touch_tick_at = Some(deadline);
         let wait = deadline.saturating_sub(self.touch_epoch.elapsed());
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(wait).await;
             let _ = this.update(cx, |this: &mut Viewport, cx| {
-                this.touch_tick_scheduled = false;
+                if this.touch_tick_at == Some(deadline) {
+                    this.touch_tick_at = None;
+                }
                 let actions = this.touch.tick(this.touch_epoch.elapsed());
                 this.touch_actions(actions, cx);
                 this.schedule_touch_tick(cx);
@@ -1716,6 +1921,9 @@ impl Viewport {
             if self.touch.boxing() && !matches!(action, A::Box { .. } | A::BoxStart { .. } | A::BoxStop) {
                 continue;
             }
+            if crate::nav_trace::enabled() && !matches!(action, A::Drag { .. } | A::Pan { .. } | A::Rotate { .. } | A::Pinch { .. } | A::Box { .. }) {
+                crate::nav_trace::input("touch_action", serde_json::json!({ "debug": format!("{action:?}") }));
+            }
             match action {
                 A::DragStart { at } => {
                     let p = at / s;
@@ -1726,6 +1934,7 @@ impl Viewport {
                         self.drag = Drag::Tool;
                         cx.emit(ViewportEvent::ToolDown { position: p, modifiers: Modifiers::default(), click_count: 1 });
                     } else {
+                        self.flush_pending_rotate(cx);
                         self.touch_drag = TouchDrag::Rotate;
                         self.drag = Drag::Nav;
                         self.nav_mode = Mode::Rotate;
@@ -1739,9 +1948,14 @@ impl Viewport {
                     TouchDrag::Rotate => {
                         let d = delta / s;
                         let pivot = self.orbit_pivot.unwrap_or(self.camera.target);
-                        nav::drag_rotate(&mut self.camera, d, size, pivot, true);
+                        self.axis_tag = AxisTag::None;
                         self.rotation_speed.push(d);
                         self.last_rotation = Some(Instant::now());
+                        if self.pivot_awaits_depth {
+                            self.hold_rotate(d, PendingRotate::Touch, cx);
+                            continue;
+                        }
+                        nav::drag_rotate(&mut self.camera, d, size, pivot, true);
                         self.camera_changed(cx);
                     }
                     TouchDrag::None => {}
@@ -1821,6 +2035,7 @@ impl Viewport {
             self.step_clock = Some(Instant::now());
         }
         self.step_rotations.push(StepRotation::new(axis, angle, self.camera.target));
+        self.axis_tag = AxisTag::None;
         self.dirty = true;
         cx.notify();
     }
@@ -1931,6 +2146,9 @@ impl Render for Viewport {
             self.pick_dirty = true;
             if t >= 1.0 {
                 self.anim = None;
+                if self.axis_tag == AxisTag::Levelling {
+                    self.axis_tag = AxisTag::Tagged;
+                }
                 cx.emit(ViewportEvent::CameraChanged);
             } else {
                 window.request_animation_frame();
@@ -1938,7 +2156,20 @@ impl Render for Viewport {
         }
         // Rotation inertia (Onshape's post-rotation animation: ×0.77 per
         // 60 Hz frame until under a pixel per step).
-        if let Some((mut inertia, last)) = self.inertia.take() {
+        if let Some((inertia, _)) = self.inertia
+            && self.pivot_awaits_depth
+        {
+            // The coast starts once the rotate centre is known (or after
+            // 250 ms without it, about the fallback centre).
+            let now = Instant::now();
+            let since = *self.inertia_held_since.get_or_insert(now);
+            self.inertia = Some((inertia, now));
+            if now - since > Duration::from_millis(250) {
+                self.flush_pending_rotate(cx);
+            }
+            window.request_animation_frame();
+        } else if let Some((mut inertia, last)) = self.inertia.take() {
+            self.inertia_held_since = None;
             let now = Instant::now();
             match inertia.step(now - last) {
                 Some(d) => {
@@ -1972,6 +2203,7 @@ impl Render for Viewport {
             self.dirty = true;
             self.pick_dirty = true;
         }
+        self.trace_camera();
         self.scale = window.scale_factor();
         self.submit_if_ready(cx);
 
@@ -2016,9 +2248,20 @@ impl Render for Viewport {
                             // Touchscreen: raw touches that start on this
                             // viewport (nothing in front of it) are claimed
                             // from gpui's portable recognizer.
-                            window.on_mouse_event(move |e: &TouchEvent, phase, window, cx| {
-                                if phase == DispatchPhase::Bubble {
-                                    entity.update(cx, |this, cx| this.on_touch(e, hitbox.id, window, cx));
+                            window.on_mouse_event({
+                                let entity = entity.clone();
+                                move |e: &TouchEvent, phase, window, cx| {
+                                    if phase == DispatchPhase::Bubble {
+                                        entity.update(cx, |this, cx| this.on_touch(e, hitbox.id, window, cx));
+                                    }
+                                }
+                            });
+                            // A press that started here follows the pointer
+                            // over the rest of the window (capture phase: no
+                            // panel under it can swallow the move).
+                            window.on_mouse_event(move |e: &MouseMoveEvent, phase, window, cx| {
+                                if phase == DispatchPhase::Capture && entity.read(cx).drag != Drag::None {
+                                    entity.update(cx, |this, cx| this.on_mouse_move(e, window, cx));
                                 }
                             });
                         }
@@ -2048,7 +2291,7 @@ impl Render for Viewport {
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Right, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Middle, cx.listener(Self::on_mouse_down))
-            .on_mouse_move(cx.listener(Self::on_mouse_move))
+            .on_mouse_move(cx.listener(Self::on_hover_move))
             .on_hover(cx.listener(Self::on_hover_change))
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Right, cx.listener(Self::on_mouse_up))
