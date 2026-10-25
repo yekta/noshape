@@ -101,3 +101,22 @@ fn coarser_levels_stay_coarse_after_finer_meshing() {
         assert_eq!(level_segments(&run(&ps)), want, "{q:?}");
     }
 }
+
+#[test]
+fn preview_regen_of_an_unchanged_part_keeps_its_refined_mesh() {
+    noshape_model::regen::set_angle_display_mesh(true);
+    let ps = cylinder(0.02);
+    let (config, units) = (ConfigValues::default(), UnitPrefs::default());
+    let preview = RegenOptions { preview_meshes: true, ..Default::default() };
+    let mut regen = Regenerator::new();
+    // An edit: coarse preview first, then the refine (the app's progressive meshing).
+    assert!(regen.regenerate(&ps, &config, &units, &preview).needs_refine);
+    let fine = regen.regenerate(&ps, &config, &units, &RegenOptions::default());
+    assert!(!fine.needs_refine);
+    // Opening or cancelling a dialog regenerates the unchanged part: the
+    // refined mesh is drawn again, with no coarse step and no refine.
+    let again = regen.regenerate(&ps, &config, &units, &preview);
+    assert!(!again.needs_refine);
+    assert!(std::sync::Arc::ptr_eq(&again.display.bodies[0].mesh, &fine.display.bodies[0].mesh));
+    assert_eq!(circle_segments(&again), 144);
+}
