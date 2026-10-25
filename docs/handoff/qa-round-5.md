@@ -76,6 +76,16 @@ planes, Make transparent ghosts the picked part; Hide → eye-slash + grey row, 
   Millimeter; live's notes say Inch), axis icons in the Point readout (ours none), the section manipulator (ours: arrow only;
   live notes: arrow + rotate glyph + ring), the edge midpoint marker (ours shows a filled dot anywhere along the hovered edge).
 
+- **Live answers (behaviours "qa4 round 5 s9 interaction")**: no global selection filter in live either (= ours ✅); "Hide other
+  parts" / "Hide all parts" are in live's parts-row menu too (= ours ✅); the Measure panel defaults to **Millimeter** in a mm
+  document (= ours ✅; the older live note saying Inch was wrong). **READOUT-AXES (ui/psb)**: live's status-bar "Point:" shows a grey
+  letter + coloured axis arrow before each value (X red ↘, Y green ↗, Z blue ↑, values dotted-underlined); ours shows bare values.
+  **SECTION-MANIP (psb)**: live's section-plane manipulator = ring at the plane point + shaft + hollow arrowhead + two crossing
+  rotate handles at the tip (each highlights blue on its own); ours draws the arrow only. **MIDPOINT-MARKER (psb/ui)**: hovering an
+  edge anywhere shows a small **dark hollow ring** at its midpoint; near the midpoint it becomes an **orange hollow ring** and the
+  edge **loses** its highlight; a selected midpoint is a yellow-orange ring (#FAC012 / #FFD65B centre); ours draws a filled
+  orange dot and keeps the edge highlighted.
+
 ## v3 Session 8 on the published v0.4.8 (tag 2bf78a67 = gate c7d9d454 + two CI-test commits; release tarball, not a local build): the feature list on the 30-feature part (r5/v3s2.py; live "Feature-list row states", "ui (10-22 d) feature-row tooltips")
 Timings (spinner gone): Suppress Extrude 1 0.56 s, Unsuppress 0.50 s, valid drag reorder (Plane 1 above Sketch 1) 0.62 s,
 undo / redo / undo of it 0.37 / 0.55 / 0.57 s, Delete Boss sketch 1 0.41 s and its undo 0.63 s, folder Suppress 0.54 s and its

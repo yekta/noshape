@@ -453,3 +453,7 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
   cubes are flung ±2.5e6 mm in X/Y (mates still ok). Undragged bodies need a pull toward their current pose / minimal-norm steps.
   Repro r5/v3s10n.py (NCUBES=19). Drag rate 3.9 updates/s at 20 instances vs 10.0 at 7 (software GL; r5/dragfps.sh).
 - **CHIP-X-SELECTED (skb)** pattern dialog seed chip × is undone while the instance stays selected (re-captured from selection).
+- **Live s9 answers**: **READOUT-AXES (ui/psb)** Point readout needs X↘/Y↗/Z↑ coloured axis arrows; **SECTION-MANIP (psb)** section
+  plane manipulator = ring + shaft + arrowhead + two rotate handles; **MIDPOINT-MARKER (psb/ui)** dark hollow ring on edge hover,
+  orange hollow ring near the midpoint (edge un-highlighted), yellow-orange ring when selected. No global selection filter,
+  parts-row Hide other/all parts and the Measure unit are live-like.
