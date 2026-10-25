@@ -261,6 +261,9 @@ STATUS FSW-fill (psb, 2026-10-24): guide rules as live "psb (10-24 d)" and Preci
 STATUS FSW-bsurf (psb, 2026-10-24): profile arrays are driven-query rows "[None] Edges of …" (live L28: no 2-pick cap); conditions wait for the loft end-derivative rule.
 STATUS FSW-loft (psb, 2026-10-24): end conditions (Normal/Tangent to profile, Normal/Tangent to direction) applied with live's corner rule and loft.fs texts; every connection used (profiles split at the connection points), "Select a point on each profile to define a connection."; guides, path and trims still open.
 STATUS FSW-draft (psb, 2026-10-24 b): parting edges on several parts (each drafted on its own) and stepped / sloped straight parting lines (each edge's own hinge plane) done (test parting_line_draft_on_two_parts_and_steps); curved non-planar parting lines still refused.
+STATUS FSW-draft (psb, 2026-10-25): curved parting lines tried with the curve's own plane as the hinge (a 30° ellipse on a
+  cylinder): OCCT's draft and the wedge fallback both fail, since the drafted face becomes a general ruled surface (not a cone).
+  Needs our own ruled-surface construction; left refused ("Parting lines must lie in a plane perpendicular to the pull direction").
 STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, constant normal thickness with Scale, Trim ends to the cap planes, the two failure texts (test thin_sweep_as_live).
 STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.
