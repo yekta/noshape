@@ -289,6 +289,9 @@ fn seed_box(ev: &EvalCtx) -> Option<(DVec3, DVec3)> {
     Some(boxes.iter().fold((first.min, first.max), |(lo, hi), b| (lo.min(b.min), hi.max(b.max))))
 }
 
+/// `TOLERANCE.zeroLength` (meters).
+const ZERO_LENGTH: f64 = 1e-8;
+
 fn curve_instances(ev: &EvalCtx) -> FResult<(Vec<Instance>, Option<&'static str>)> {
     let edges = resolve_curves(ev, ev.query("edges"))?;
     if edges.is_empty() {
@@ -330,13 +333,18 @@ fn curve_instances(ev: &EvalCtx) -> FResult<(Vec<Instance>, Option<&'static str>
     }
     let spacing = if ev.is("spacingType", "DISTANCE") {
         let d = ev.length("distance")?;
-        // A closed path needs room for the gap back to the start.
-        let (need, have) = if closed { (d * n as f64, len - d) } else { (d * (n - 1) as f64, len) };
-        if n > 1 && have - need < -1e-9 {
+        // curvePattern.fs: evPathLength (the edges' exact length; the sampled
+        // path is a little shorter). A closed path keeps a gap of d back to
+        // the start, and instance i sits at path parameter d·i / (L − d) of
+        // the whole path (L for an open one), so 25 mm × 3 on a 100 mm circle
+        // lands at 120° / 240° (live L45) but 10 mm × 3 at 40° / 80°.
+        let exact = edges.iter().map(|e| e.shape.length()).sum::<Result<f64, _>>().unwrap_or(len);
+        let room = if closed { exact - d } else { exact };
+        let need = d * if closed { n as f64 } else { (n - 1) as f64 };
+        if n > 1 && room - need < -ZERO_LENGTH {
             return crate::regen::eval::err_at(&["distance"], "Cannot create a curve pattern when the entered distance is larger than the path length.");
         }
-        // Live L45: on a closed path the instances are spread equally.
-        if closed { len / n as f64 } else { d }
+        if room > 0.0 { d / room * len } else { 0.0 }
     } else if closed {
         len / n as f64
     } else if n > 1 {
