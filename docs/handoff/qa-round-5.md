@@ -79,6 +79,12 @@ Drag rate (software GL on Xvfb, so absolute numbers are low): 7 instances, a Pla
   is still selected in the instance list (the field re-captures it from the selection); after clearing the selection the × works.
 - Note: "Explode" isn't in tool search (exploded views are a right-panel feature; live likely the same, not asked).
 
+- **Live answer (behaviours "qa4 round 5 s10 drag")**: DRAG-RUNAWAY confirmed. In Onshape **only the dragged cube moves**, in the 10
+  and the 19 stack; REST before/after: every other cube unchanged (e.g. 19 stack: <2>…<19> at (0,0,10…350) unchanged, <20> (0,0,370) →
+  (49.827, 0.165, 370)); dragging back returns it exactly. Minimal-motion solve, not chain-following. Server reply per drag step ≈ 21 ms
+  median (p90 57 ms), the same for 10 and 19 cubes; live's own client rendered only ≈ 4.4 frames/s on this loaded software-GL box, so
+  frame rates here say little about real hardware.
+
 ## v3 Session 9 on v0.4.8 (release tarball): interaction (r5/v3s9.py: Part 1 = block 60×40×20 with a Ø10 hole and an R5 vertical fillet, 46321.903 mm³; Part 2 = cylinder Ø16×30, 6031.858 mm³; live "Selection colours", "Box select", "Right-click menus", "Measure & mass properties", "Section view", "Isolate / Make transparent")
 Nothing felt slow: hover, picks, box selection, Select other, menus and panels were all immediate; section drag updated live.
 Same as live ✅: face hover = light-orange boundary only (hole loop too); edge hover = thick light orange; vertex hover = dot;

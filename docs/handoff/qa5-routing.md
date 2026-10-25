@@ -463,3 +463,5 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
   39.26 / 64.26 instead of 15 / 40 / 65; 15.39 when clicked outside).
 - **EXPORT-DXF-OPTIONS (asb)** DXF/DWG export: add ☐ Hide inspection items and ☐ Exclude off-sheet content (live).
 - Pending live s11: auto-update vs Update button, title block editing, iso angular value, live PDF/DXF for comparison.
+- **DRAG-RUNAWAY confirmed by live (skb)**: Onshape moves only the dragged instance; all others keep their exact pose (live REST
+  before/after for 10- and 19-cube Planar stacks); server ≈ 21 ms per drag step regardless of stack size.
