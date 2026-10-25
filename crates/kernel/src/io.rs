@@ -599,20 +599,23 @@ pub fn write_stl_mesh(mesh: &Tessellation, path: &Path, format: StlFormat) -> Re
                 w.write_all(&[0, 0])?;
             }
         }
+        // Onshape's text layout (live "api (10-25 b)"): one solid "Mesh",
+        // 2 / 4 / 6 space indents, numbers in shortest form ("20", "-1"),
+        // never "-0".
         StlFormat::Ascii => {
-            writeln!(w, "solid noshape")?;
+            let xyz = |v: [f32; 3]| format!("{} {} {}", v[0] + 0.0, v[1] + 0.0, v[2] + 0.0);
+            writeln!(w, "solid Mesh")?;
             for i in 0..n {
                 let (a, b, c) = tri(i);
-                let nn = tri_normal(a, b, c);
-                writeln!(w, "facet normal {} {} {}", nn[0], nn[1], nn[2])?;
-                writeln!(w, " outer loop")?;
+                writeln!(w, "  facet normal {}", xyz(tri_normal(a, b, c)))?;
+                writeln!(w, "    outer loop")?;
                 for v in [a, b, c] {
-                    writeln!(w, "  vertex {} {} {}", v[0], v[1], v[2])?;
+                    writeln!(w, "      vertex {}", xyz(v))?;
                 }
-                writeln!(w, " endloop")?;
-                writeln!(w, "endfacet")?;
+                writeln!(w, "    endloop")?;
+                writeln!(w, "  endfacet")?;
             }
-            writeln!(w, "endsolid noshape")?;
+            writeln!(w, "endsolid Mesh")?;
         }
     }
     w.flush()?;

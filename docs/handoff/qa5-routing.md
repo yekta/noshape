@@ -303,3 +303,11 @@ product>" (" (1)" when taken) + Part Studio "<file> parts" with the parts in the
 file's order, the Assembly placing them as the file does (e2e step_assembly_import_matches_live on samples/qa4-s5-asm.step). An
 Assembly exported as STEP now keeps the assembly (root product, each part once, NAUO placements; export_parts on an Assembly tab).
 The BOM element ("BOM : Assembly 1 (1)") stays hidden (IM1b). Part order in assemblies rests on this one file: live request filed.
+STATUS STEP-ASM (api, 2026-10-25 b): the STEP/PVZ assembly import matches instances to parts by the file's product (no longer
+by name: two parts named "Part" keep their own geometry; e2e step_assembly_parts_sharing_a_name_keep_their_geometry); parts
+ordered as live walks a STEP assembly (occurrences from the file's last, one part per product at its first occurrence; e2e
+step_assembly_import_order_matches_live on samples/stepord-ABCD / ABBCD). Export details: binary STL header 80 zero bytes;
+Parasolid modeller 3801231 in every version and SCH_3801231_38101 (EXP-HDR / I5 closed); STEP products already follow their
+first NAUO as live; text STL as live's UI file ("solid Mesh", 2/4/6 indents, shortest numbers). Not reproducible: live's
+NAUO order on export is a fixed internal order that follows no recoverable key (not insertion, ids, hashes or part ids; "api
+(10-25 b)"), so ours keeps the insertion order.

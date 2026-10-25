@@ -265,6 +265,12 @@ fn step_round_trip() {
     // Onshape's binary STL header is 80 zero bytes (live G35).
     assert!(std::fs::read(dir.join("b.stl")).unwrap()[..80].iter().all(|&x| x == 0));
     write_stl(&b, &dir.join("b_ascii.stl"), 0.1, StlFormat::Ascii).unwrap();
+    // Onshape's text layout (live "api (10-25 b)").
+    let text = std::fs::read_to_string(dir.join("b_ascii.stl")).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!((lines[0], lines[lines.len() - 1], lines.len()), ("solid Mesh", "endsolid Mesh", 2 + 7 * 12), "{text}");
+    assert!(lines[1].starts_with("  facet normal ") && lines[2] == "    outer loop" && lines[3].starts_with("      vertex ") && lines[6] == "    endloop" && lines[7] == "  endfacet", "{text}");
+    assert!(text.ends_with('\n') && !text.contains("-0 ") && !text.contains("-0\n") && !text.contains('E'), "{text}");
     write_obj(&c, &dir.join("c.obj"), 0.1).unwrap();
     assert!(read_step(&dir.join("missing.step"), LengthUnit::Millimeter).is_err());
     // IGES round trip.

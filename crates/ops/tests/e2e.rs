@@ -3194,9 +3194,10 @@ fn step_assembly_import_order_matches_live() {
         ("stepord-ABBCD.step", &["B", "A", "C", "D"][..], &["B <1>", "A <1>", "C <1>", "D <1>", "B <2>"][..]),
     ] {
         let Some(step) = live_sample(file) else { return };
-        let mut ctx = Ctx::new();
-        let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
         let stem = file.trim_end_matches(".step");
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": scratch(&format!("{stem}.noshape")).to_str().unwrap() }));
+        let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
         let parts = call(&mut ctx, "query_parts", json!({ "tab": format!("{stem} parts") }));
         let names: Vec<&str> = parts["parts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
         assert_eq!(names, want_parts, "{file}: {parts}");
