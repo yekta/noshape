@@ -952,9 +952,12 @@ fn op_polyline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         for (k, r) in bends.iter().enumerate() {
             radii[(k + 1) % p.len()] = *r;
         }
-        // The Routing curve's arcs (curves.rs).
+        // The Routing curve's arcs (curves.rs); Onshape lists the lines
+        // before the arcs (live "fs (10-25 d)"), each in path order.
         let wire = crate::regen::features::curves::filleted_polyline(p, &radii, closed).map_err(|_| super::code_error("POLYLINE_INVALID_BEND"))?;
-        add_wire(ev, wire)
+        let is_line: Vec<bool> = wire.edges().iter().map(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, k::Curve::Line { .. }))).collect();
+        let order: Vec<u32> = (0..is_line.len() as u32).filter(|i| is_line[*i as usize]).chain((0..is_line.len() as u32).filter(|i| !is_line[*i as usize])).collect();
+        add_wire(ev, k::wire_with_edge_order(&wire, &order)?)
     })?;
     Ok(Value::Undefined)
 }

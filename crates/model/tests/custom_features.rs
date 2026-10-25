@@ -1182,6 +1182,15 @@ export const polylineProbe = defineFeature(function(context is Context, id is Id
             if (size(evaluateQuery(context, edges)) != c.edges || abs(length - c.length * millimeter) > 1e-6 * millimeter)
                 throw regenError("case " ~ i ~ ": " ~ size(evaluateQuery(context, edges)) ~ " edges, " ~ toString(length));
         }
+        // Live: the lines come first, then the arcs, each in path order.
+        var lengths = [];
+        for (var edge in evaluateQuery(context, qCreatedBy(id + "case0", EntityType.EDGE)))
+        {
+            const kind = evCurveDefinition(context, { "edge" : edge }) is Line ? "line" : "arc";
+            lengths = append(lengths, kind ~ " " ~ roundToPrecision(evLength(context, { "entities" : edge }) / millimeter, 3));
+        }
+        if (lengths != ["line 40", "line 25", "line 25", "arc 15.708", "arc 7.854"])
+            throw regenError("edge order: " ~ toString(lengths));
         for (var i, wrong in [{ "radii" : mm([10]), "error" : ErrorStringEnum.POLYLINE_BEND_RADII_INVALID_SIZE },
                               { "radii" : mm([30, 30]), "error" : ErrorStringEnum.POLYLINE_INVALID_BEND }])
         {

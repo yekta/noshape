@@ -357,6 +357,7 @@ pub(crate) mod ffi {
         fn make_edge_2d(plane: &PlaneF, seg: &Seg2d) -> Result<UniquePtr<OcShape>>;
         fn make_wire_2d(plane: &PlaneF, segs: &[Seg2d]) -> Result<UniquePtr<OcShape>>;
         fn make_wire(edges: &OcShapeList) -> Result<UniquePtr<OcShape>>;
+        fn wire_with_edge_order(wire: &OcShape, order: &[u32]) -> Result<UniquePtr<OcShape>>;
         fn make_face_on_plane(
             plane: &PlaneF,
             outer: &OcShape,

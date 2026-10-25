@@ -846,7 +846,8 @@ exist changes (`MISSING`, 18: evFaults, evTolerances, opCreateBSplineSurface, op
 read only in part; most are the probe's undefined values making a native stop early. Options found ignored and fixed:
 evOwnerSketchPlane `checkAllEntities` (Sweep/Loft profiles), evRaycast `includeIntersectionsBehind`
 (`evaluation_options_std_passes`). Since done (live "fs (10-25 b/c/d)"): opPolyline `bendRadii` (curves.rs
-`filleted_polyline`, a segment holds both its bends' trims), `returnBSplinesAsOther` (`{ curveType/surfaceType : OTHER }`),
+`filleted_polyline`, a segment holds both its bends' trims; lines listed before the arcs as live, kernel
+`wire_with_edge_order`; the built-in Routing curve (psb's curves.rs) still lists path order), `returnBSplinesAsOther` (`{ curveType/surfaceType : OTHER }`),
 evCollisionDetection `owners` (faces as their bodies), evRaycast `entityType`/`parameter`, debug() entities (below).
 Still ignored: skConicSegment
 `fixedRho`, skInterpolatedSpline `splinePointCount`, skSpline `guess`, evFacePeriodicity `trimmed`,
