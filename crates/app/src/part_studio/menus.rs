@@ -715,8 +715,20 @@ impl PartStudioView {
         for (label, m) in line {
             let item = h_flex().gap(px(4.)).child(format!("{label}:"));
             row = row.child(match m {
-                // Live: "Point: 0.000 mm 5.000 mm 20.000 mm".
-                Measurement::Point(pt) => item.child(value(l(pt.x))).child(value(l(pt.y))).child(value(l(pt.z))),
+                // Live (part-studio/qa4-r5-s9-4): "Point:  X↘ 40.000 mm
+                // Y↗ 0.000 mm  Z↑ 10.000 mm": each value after a grey letter
+                // and its axis arrow (the measure panel's glyphs and colours).
+                Measurement::Point(pt) => {
+                    let axis = |i: usize, v: f64| {
+                        let (name, color, arrow) = [("X", 0xbd3039, "axis-arrow-x"), ("Y", 0x009400, "axis-arrow-y"), ("Z", 0x1651b0, "axis-arrow-z")][i];
+                        h_flex()
+                            .ml(px(if i == 0 { 6. } else { 12. }))
+                            .child(div().text_size(px(15.)).text_color(gpui_kit::rgb(0x999999)).child(name))
+                            .child(div().ml(px(-1.)).child(crate::ui::glyph(arrow, 14., gpui_kit::rgb(color))))
+                            .child(div().ml(px(2.)).child(value(l(v))))
+                    };
+                    item.child(axis(0, pt.x)).child(axis(1, pt.y)).child(axis(2, pt.z))
+                }
                 m => {
                     let text = match m {
                         Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => l(x),

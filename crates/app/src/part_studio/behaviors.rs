@@ -2579,37 +2579,46 @@ impl PartStudioView {
     /// with a dialog open only when its field takes points, like Onshape).
     pub(super) fn midpoint_overlay(&self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineSegment, PointData, PointSprite};
-        let (mut points, mut rings) = (Vec::new(), Vec::new());
-        let sprite = |m: glam::DVec3, color: [u8; 4], size: f32| PointSprite { position: m.as_vec3().into(), color, pick_id: 0, size, style: LineSegment::ON_TOP, _pad: 0 };
-        // Selected midpoints.
+        let mut points = Vec::new();
+        let sprite = |m: glam::DVec3, color: u32, size: f32, style: u32| PointSprite { position: m.as_vec3().into(), color: [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255], pick_id: 0, size, style: LineSegment::ON_TOP | style, _pad: 0 };
+        // Live (part-studio/qa4-r5-s9-6d, 6e): the midpoint target is an
+        // 11 px disc with a thin darker ring 3–4 px out and a light centre:
+        // orange while hovered (#f8c488, #c49a6a, #ffd8ac), yellow-orange once
+        // selected (#fac012, #c4960b, #ffd65b).
+        let marker = |points: &mut Vec<PointSprite>, m: glam::DVec3, [disc, ring, centre]: [u32; 3]| {
+            points.push(sprite(m, disc, 11.0, 0));
+            points.push(sprite(m, ring, 8.0, PointSprite::RING));
+            points.push(sprite(m, centre, 5.0, 0));
+        };
         for r in &self.selection {
             if let Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint } = r
                 && let Some(m) = self.edge_midpoint(on)
             {
-                points.push(sprite(m, [255, 169, 10, 255], 11.0));
+                marker(&mut points, m, [0xfac012, 0xc4960b, 0xffd65b]);
             }
         }
-        if self.active_field_filter(cx).is_none_or(field_takes_points)
-            && (self.edit.is_none() || self.active_field_filter(cx).is_some())
-            && self.sketch.is_none()
-            && let Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. })) = &self.hover
-            && let Some(m) = self.edge_midpoint(r)
-        {
-            // Live (selection/06): an 8 px black ring filled #ffd3a0. (Live's
-            // hovered edge also covers the ring where it crosses; ours draws
-            // points after lines, so the ring stays whole.)
-            rings.push(sprite(m, [0, 0, 0, 255], 8.0));
-            points.push(sprite(m, [255, 211, 160, 255], 5.5));
+        if self.active_field_filter(cx).is_none_or(field_takes_points) && (self.edit.is_none() || self.active_field_filter(cx).is_some()) && self.sketch.is_none() {
+            match &self.hover {
+                Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) => {
+                    if let Some(m) = self.edge_midpoint(on) {
+                        marker(&mut points, m, [0xf8c488, 0xc49a6a, 0xffd8ac]);
+                    }
+                }
+                // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows
+                // a 9 px dark ring at its midpoint, the edge seen through it.
+                Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. })) => {
+                    if let Some(m) = self.edge_midpoint(r) {
+                        points.push(sprite(m, 0x000000, 9.0, PointSprite::RING));
+                    }
+                }
+                _ => {}
+            }
+        }
+        if points.is_empty() {
+            return Vec::new();
         }
         let up = self.gpu.uploader();
-        let mut out = Vec::new();
-        if !rings.is_empty() {
-            out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points: rings }))).per_primitive_color().unpickable().ignore_clip().layer(11));
-        }
-        if !points.is_empty() {
-            out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22));
-        }
-        out
+        vec![Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22)]
     }
 
     /// An edge click within ~8 px of its midpoint selects the midpoint.
