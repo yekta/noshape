@@ -12,7 +12,6 @@
 use crate::gpu::{FrameImage, Gpu};
 use crate::navigation::{self as nav, Buttons, Inertia, Keys, Mode, ModeResolver, MouseControls, RotateDir, RotationSpeed, StepRotation, Zoom};
 use gpui_kit::*;
-use gpui_kit::prelude::FluentBuilder as _;
 use glam::{DVec2, DVec3};
 use noshape_render::{Camera, Frame, PickBuffer, PickRect, PresentTexture, Projection, Scene, StandardView, Style, worker::RenderJob};
 use std::collections::{HashMap, VecDeque};
@@ -52,8 +51,9 @@ pub enum ViewportEvent {
     /// Right click without drag.
     ContextMenu { pick: Option<u32>, position: Point<Pixels> },
     /// Box selection finished; ids are unique.
-    /// `crossing`: dragged right→left (touched ids), else window (inside).
-    BoxSelect { ids: Vec<u32>, modifiers: Modifiers, crossing: bool },
+    /// `crossing`: dragged right→left (touched ids), else window (inside);
+    /// `rect` the box's corners (viewport-local).
+    BoxSelect { ids: Vec<u32>, modifiers: Modifiers, crossing: bool, rect: (DVec2, DVec2) },
     /// Left-button press/drag/release while a tool captured the pointer.
     ToolDown { position: DVec2, modifiers: Modifiers, click_count: usize },
     ToolDrag { position: DVec2 },
@@ -316,7 +316,8 @@ pub struct Viewport {
     /// Logical pixels at the left of the viewport covered by an overlay (the
     /// feature dialog): zoom to fit centers the model in the rest.
     pub fit_inset_left: f64,
-    box_rect: Option<(DVec2, DVec2)>,
+    /// The box being dragged: press point, pointer, crossing.
+    box_rect: Option<(DVec2, DVec2, bool)>,
     anim: Option<CameraAnimation>,
     /// Onshape's canvas view tag for constrained rotate
     /// (`data-view-shown` = `axisRotateCanvasTag`): the view has been levelled
@@ -851,7 +852,7 @@ impl Viewport {
                     Some(buf) => box_ids(buf, a, b, s, crossing),
                     None => Vec::new(),
                 };
-                cx.emit(ViewportEvent::BoxSelect { ids, modifiers, crossing });
+                cx.emit(ViewportEvent::BoxSelect { ids, modifiers, crossing, rect: (a, b) });
             }
             PickPurpose::DepthPivot => {
                 let frame = buf.as_ref().map(|b| (b.frame_width, b.frame_height)).unwrap_or_default();
@@ -1689,7 +1690,9 @@ impl Viewport {
                 self.nav_drag(delta, cx);
             }
             Drag::Box => {
-                self.box_rect = Some((self.press_pos, p));
+                // BoxSelector.performContainmentSelection: a window box
+                // only while the pointer is right of the press.
+                self.box_rect = Some((self.press_pos, p, p.x <= self.press_pos.x));
                 self.ctrl_in_box = e.modifiers.control;
                 cx.notify();
             }
@@ -1731,8 +1734,7 @@ impl Viewport {
             Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, cx),
             Drag::Pending(MouseButton::Right) => self.context_menu_at(p, e.position, cx),
             Drag::Box => {
-                if let Some((a, b)) = self.box_rect.take() {
-                    let crossing = b.x < a.x;
+                if let Some((a, b, crossing)) = self.box_rect.take() {
                     self.finish_box(a, b, crossing, e.modifiers, cx);
                 }
             }
@@ -1995,14 +1997,12 @@ impl Viewport {
                     }
                 }
                 A::BoxStart { a, b } | A::Box { a, b } => {
-                    // A window box (drawn left to right) whichever finger is left.
-                    let (a, b) = if a.x <= b.x { (a, b) } else { (b, a) };
-                    self.box_rect = Some((a / s, b / s));
+                    // Onshape's two-finger box always selects what lies inside.
+                    self.box_rect = Some((a / s, b / s, false));
                     cx.notify();
                 }
                 A::BoxStop => {
-                    // Onshape's two-finger box always selects what lies inside.
-                    if let Some((a, b)) = self.box_rect.take() {
+                    if let Some((a, b, _)) = self.box_rect.take() {
                         self.finish_box(a, b, false, Modifiers::default(), cx);
                     }
                 }
@@ -2075,6 +2075,64 @@ fn converted_ctrl_click() -> bool {
 #[cfg(not(target_os = "macos"))]
 fn converted_ctrl_click() -> bool {
     false
+}
+
+/// How [`box_overlay`] draws a box.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum BoxStyle {
+    Window,
+    Crossing,
+    Zoom,
+}
+
+/// Onshape's box (BoxSelector.updateGraphics): an infill of the line color
+/// at `BOX_SELECT_INFILL_OPACITY` 0.2 under a 1 px line loop from the press
+/// point, each side stippled from its first corner. Window:
+/// `--os-box-select-color` (light #1651b0, dark #769fcc), solid; crossing
+/// `CROSS_SELECT_COLOR` #FFC20E, 9 on 8 off; zoom to window
+/// `BOX_ZOOM_COLOR` rgba(144, 206, 241, 0.7), 10 on 10 off. Live, the line
+/// shows at 0.6 of its color over white (#7296cf, #ffda6e), the infill
+/// exactly at 0.2 (#d0dcef, #fff3cf).
+fn box_overlay(a: DVec2, b: DVec2, style: BoxStyle) -> Div {
+    let (color, alpha, on, off) = match style {
+        BoxStyle::Window => (noshape_scene::palette::pick(0x1651b0, 0x769fcc), 1.0, f32::INFINITY, 0.0),
+        BoxStyle::Crossing => (0xffc20e, 1.0, 9.0, 8.0),
+        BoxStyle::Zoom => (0x90cef1, 0.7, 10.0, 10.0),
+    };
+    let (a, b) = (a.as_vec2(), b.as_vec2());
+    let (x0, y0, x1, y1) = (a.x.min(b.x), a.y.min(b.y), a.x.max(b.x), a.y.max(b.y));
+    let (w, h) = (x1 - x0, y1 - y0);
+    let mut out = div().absolute().left(px(x0)).top(px(y0)).w(px(w)).h(px(h)).bg(rgb(color).opacity(0.2));
+    // The loop a → (b.x, a.y) → b → (a.x, b.y) → a in box coordinates. The
+    // line covers the pixel row or column just inside each side; the
+    // sides along x own the corners.
+    let (a, b) = (a - glam::vec2(x0, y0), b - glam::vec2(x0, y0));
+    let corners = [a, glam::vec2(b.x, a.y), b, glam::vec2(a.x, b.y), a];
+    for side in corners.windows(2) {
+        let (from, to) = (side[0], side[1]);
+        let len = from.distance(to);
+        if len == 0.0 {
+            continue;
+        }
+        let along_x = from.y == to.y;
+        let mut t = 0.0;
+        while t < len {
+            let (p, q) = (from.lerp(to, t / len), from.lerp(to, (t + on).min(len) / len));
+            t += on + off;
+            let rect = if along_x {
+                let x = p.x.min(q.x);
+                (x, from.y.min(h - 1.0).max(0.0), (p.x.max(q.x) - x).max(1.0), 1.0)
+            } else {
+                let (y, end) = (p.y.min(q.y).max(1.0), p.y.max(q.y).min(h - 1.0));
+                if end <= y {
+                    continue;
+                }
+                (from.x.min(w - 1.0).max(0.0), y, 1.0, end - y)
+            };
+            out = out.child(div().absolute().left(px(rect.0)).top(px(rect.1)).w(px(rect.2)).h(px(rect.3)).bg(rgb(color).opacity(alpha * 0.6)));
+        }
+    }
+    out
 }
 
 /// Distinct ids for a box selection from a pick rectangle: crossing selects
@@ -2211,7 +2269,7 @@ impl Render for Viewport {
         self.submit_if_ready(cx);
 
         let entity = cx.entity();
-        let box_rect = self.box_rect;
+        let box_rect = self.box_rect.map(|(a, b, crossing)| (a, b, if self.zoom_window { BoxStyle::Zoom } else if crossing { BoxStyle::Crossing } else { BoxStyle::Window }));
         let image = self.image.clone();
         let texture_id = self.texture_id;
         self.rendered = self.shown_texture.as_ref().map(|t| (self.camera, (t.width, t.height)));
@@ -2274,23 +2332,7 @@ impl Render for Viewport {
                 .size_full(),
             )
             .children(image.map(|img| gpui_kit::img(img).absolute().top_0().left_0().size_full()))
-            .children(box_rect.map(|(a, b)| {
-                let crossing = b.x < a.x;
-                let (x0, y0) = (a.x.min(b.x) as f32, a.y.min(b.y) as f32);
-                let (w, h) = ((a.x - b.x).abs() as f32, (a.y - b.y).abs() as f32);
-                // Onshape box select: window #789ad1 / #d0dcef, crossing #ffdc74 / #fff3cf.
-                let color = if crossing { rgb(0xffdc74) } else { rgb(0x789ad1) };
-                div()
-                    .absolute()
-                    .left(px(x0))
-                    .top(px(y0))
-                    .w(px(w))
-                    .h(px(h))
-                    .border_1()
-                    .when(crossing, |d| d.border_dashed())
-                    .border_color(color)
-                    .bg(if crossing { rgb(0xfff3cf) } else { rgb(0xd0dcef) }.opacity(0.5))
-            }))
+            .children(box_rect.map(|(a, b, style)| box_overlay(a, b, style)))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Right, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Middle, cx.listener(Self::on_mouse_down))

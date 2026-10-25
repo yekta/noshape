@@ -4,14 +4,16 @@
 # exactly like a laptop's mouse, touchpad and touchscreen, and noshape runs
 # under it on Wayland (`wayland`) or through Xwayland on X11 (`x11`).
 #
-#   linux-replay.sh <noshape binary> <document> <output dir> <wayland|x11>
+#   linux-replay.sh <noshape binary> <document> <output dir> <wayland|x11> [nav|interact]
 #
 # replay.py drives the devices; the app writes every input event and camera
 # (NOSHAPE_NAV_TRACE) and its Wayland protocol traffic (WAYLAND_DEBUG); then
 # check.py recomputes from the protocol events what Chrome + Onshape would do
 # (navigation.md "Chrome's input mapping") and compares it with the camera.
+# The `interact` suite (interact.py, interact_check.py) clicks, drags boxes
+# and hovers instead and checks the traced selection (interaction.md).
 set -u
-BIN=$1; DOC=$2; OUT=$3; MODE=${4:-wayland}
+BIN=$1; DOC=$2; OUT=$3; MODE=${4:-wayland}; SUITE=${5:-nav}
 HERE=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
@@ -47,7 +49,8 @@ export WAYLAND_DISPLAY=$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-? | head -1)"
 export SWAYSOCK=$(ls "$XDG_RUNTIME_DIR"/sway-ipc.* | head -1)
 work=$(mktemp -d)
 cp "$DOC" "$work/nav.noshape"
-TRACE="$OUT/trace-$MODE.jsonl"
+TAG=$MODE; [[ $SUITE == nav ]] || TAG=$SUITE-$MODE
+TRACE="$OUT/trace-$TAG.jsonl"
 rm -f "$TRACE"
 if [[ $MODE == x11 ]]; then
   # Sway's children get its Xwayland display; ask one for it.
@@ -57,16 +60,21 @@ if [[ $MODE == x11 ]]; then
   DISPLAY=$(cat "$OUT/display" 2>/dev/null)
   [[ -n $DISPLAY ]] || { echo "no Xwayland display"; kill "$SWAY"; exit 1; }
   export DISPLAY
-  env -u WAYLAND_DISPLAY NOSHAPE_NAV_TRACE="$TRACE" RUST_LOG=info "$BIN" "$work/nav.noshape" > "$OUT/app-$MODE.log" 2>&1 &
+  env -u WAYLAND_DISPLAY NOSHAPE_NAV_TRACE="$TRACE" RUST_LOG=info "$BIN" "$work/nav.noshape" > "$OUT/app-$TAG.log" 2>&1 &
 else
-  env -u DISPLAY NOSHAPE_NAV_TRACE="$TRACE" WAYLAND_DEBUG=client RUST_LOG=info "$BIN" "$work/nav.noshape" > "$OUT/app-$MODE.log" 2>&1 &
+  env -u DISPLAY NOSHAPE_NAV_TRACE="$TRACE" WAYLAND_DEBUG=client RUST_LOG=info "$BIN" "$work/nav.noshape" > "$OUT/app-$TAG.log" 2>&1 &
 fi
 APP=$!
-python3 -I "$HERE/replay.py" --trace "$TRACE" --mode "$MODE" --out "$OUT"
+SCRIPT=replay.py; [[ $SUITE == interact ]] && SCRIPT=interact.py
+python3 -I "$HERE/$SCRIPT" --trace "$TRACE" --mode "$MODE" --out "$OUT"
 status=$?
 kill "$APP" 2>/dev/null; sleep 1; kill -9 "$APP" 2>/dev/null
 kill "$SWAY" 2>/dev/null; sleep 1; kill -9 "$SWAY" 2>/dev/null
 rm -rf "$work"
 [[ $status == 0 ]] || exit $status
-python3 -I "$HERE/check.py" --trace "$TRACE" --wayland-log "$OUT/app-$MODE.log" --mode "$MODE" | tee "$OUT/check-$MODE.txt"
-exit "${PIPESTATUS[0]}"
+if [[ $SUITE == interact ]]; then
+  python3 -I "$HERE/interact_check.py" --trace "$TRACE" | tee "$OUT/check-$TAG.txt"; rc=${PIPESTATUS[0]}
+else
+  python3 -I "$HERE/check.py" --trace "$TRACE" --wayland-log "$OUT/app-$TAG.log" --mode "$MODE" | tee "$OUT/check-$TAG.txt"; rc=${PIPESTATUS[0]}
+fi
+exit "$rc"

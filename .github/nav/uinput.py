@@ -98,16 +98,28 @@ class Mouse(Device):
 
 
 KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_LEFTALT = 29, 42, 56
+KEY_Z, KEY_UP, KEY_LEFT, KEY_RIGHT, KEY_DOWN = 44, 103, 105, 106, 108
+KEY_ESC, KEY_SPACE = 1, 57
 
 
 class Keyboard(Device):
-    """Modifier keys only."""
+    """Modifiers, the arrows, Z, Esc and Space."""
 
     def __init__(self):
-        super().__init__("noshape-nav keyboard", keys=(KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_LEFTALT), product=0x40)
+        super().__init__("noshape-nav keyboard", keys=(KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_LEFTALT, KEY_Z, KEY_UP, KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_ESC, KEY_SPACE),
+                         product=0x40)
 
     def key(self, code, down):
         self.emit((EV_KEY, code, 1 if down else 0))
+
+    def tap(self, code, mods=()):
+        """Press and release `code` (no auto-repeat) with modifiers held."""
+        for m in mods:
+            self.key(m, True)
+        self.key(code, True)
+        self.key(code, False)
+        for m in mods:
+            self.key(m, False)
 
 
 BTN_TOOL_PEN, BTN_STYLUS, BTN_STYLUS2 = 0x140, 0x14B, 0x14C
