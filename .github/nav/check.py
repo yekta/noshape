@@ -341,12 +341,13 @@ def main():
             ch.check("alt-right-drag", "right vector stays horizontal", abs(c1["camera"]["right"][2]), 0.0, 1e-9)
         else:
             ch.check("alt-right-drag", "view levelled", 0.0, 1.0, 0)
-    c0, c1 = first_last("ctrl-mid-drag")
-    if c0 and c1:
-        # -100 px rotate, +100 px pan (Ctrl held), -100 px rotate: the view
-        # turns by 200 px worth (100 px worth if Ctrl were ignored).
-        w, h = c1["viewport"]
-        ch.check("ctrl-mid-drag", "turn (deg) = 200 px of rotate moves", angle(c0["camera"]["forward"], c1["camera"]["forward"]), 3 * 360 * 200 / math.hypot(w, h), 0.5)
+    for name in ("ctrl-mid-drag", "second-button-mid-drag"):
+        c0, c1 = first_last(name)
+        if c0 and c1:
+            # -100 px rotate, +100 px pan (Ctrl / middle held), -100 px rotate:
+            # the view turns by 200 px worth (100 px if the switch were ignored).
+            w, h = c1["viewport"]
+            ch.check(name, "turn (deg) = 200 px of rotate moves", angle(c0["camera"]["forward"], c1["camera"]["forward"]), 3 * 360 * 200 / math.hypot(w, h), 0.5)
     if "wheel-during-box" in by:
         n = len([r for r in by["wheel-during-box"] if r.get("input") == "scroll"])
         cams = [r for r in by["wheel-during-box"] if "camera" in r]

@@ -175,27 +175,36 @@ class Replay:
             time.sleep(1.2 if pause < 0.05 else 0.2)
         return run
 
-    def ctrl_mid_drag(self):
-        """Right-drag left, press Ctrl and drag right (pan), release Ctrl and
-        drag left again: Onshape re-resolves the mode on every drag event."""
+    def mid_drag_switch(self, press, release):
+        """Right-drag left; then `press()` (Ctrl, or a second button) and drag
+        right (pan); `release()` and drag left again: Onshape re-resolves the
+        mode on every drag event (`updateManipulationMode`)."""
         def run():
             self.cursor(*self.screen_point())
             self.mouse.button(ui.BTN_RIGHT, True)
             time.sleep(0.05)
             for phase, dx in (("rotate", -10), ("pan", 10), ("rotate", -10)):
                 if phase == "pan":
-                    self.keys.key(ui.KEY_LEFTCTRL, True)
+                    press()
                     time.sleep(0.05)
                 for _ in range(10):
                     self.mouse.move(dx, 0)
                     time.sleep(0.016)
                 if phase == "pan":
-                    self.keys.key(ui.KEY_LEFTCTRL, False)
+                    release()
                     time.sleep(0.05)
             time.sleep(0.1)
             self.mouse.button(ui.BTN_RIGHT, False)
             time.sleep(0.3)
         return run
+
+    def ctrl_mid_drag(self):
+        return self.mid_drag_switch(lambda: self.keys.key(ui.KEY_LEFTCTRL, True), lambda: self.keys.key(ui.KEY_LEFTCTRL, False))
+
+    def second_button_mid_drag(self):
+        # Right + middle: no exact binding; the closest one other than the
+        # current Rotate is the middle button's Pan (`getClosestMode`).
+        return self.mid_drag_switch(lambda: self.mouse.button(ui.BTN_MIDDLE, True), lambda: self.mouse.button(ui.BTN_MIDDLE, False))
 
     def release_outside(self):
         """Right-drag from the viewport out over the panel at its left, release
@@ -261,6 +270,7 @@ class Replay:
         self.step("middle-drag", self.drag(ui.BTN_MIDDLE, 200, 100))
         self.step("alt-right-drag", self.with_key(ui.KEY_LEFTALT, self.drag(ui.BTN_RIGHT, -200, 0)))
         self.step("ctrl-mid-drag", self.ctrl_mid_drag())
+        self.step("second-button-mid-drag", self.second_button_mid_drag())
         self.step("wheel-during-box", self.wheel_during_box())
         self.step("release-outside", self.release_outside())
         self.step("touch-rotate", self.touch({0: c}, {0: (c[0] - 200, c[1])}))

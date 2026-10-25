@@ -406,6 +406,10 @@ pub(crate) struct WaylandClientState {
     scroll_event_received: bool,
     enter_token: Option<()>,
     button_pressed: Option<MouseButton>,
+    // NOSHAPE PATCH (agent nav2): every held button, so releasing one of two
+    // (right-drag + middle) leaves the other reported as pressed, as on X11
+    // (`pressed_button_from_mask`).
+    buttons_down: Vec<MouseButton>,
     mouse_focused_window: Option<WaylandWindowStatePtr>,
     keyboard_focused_window: Option<WaylandWindowStatePtr>,
     loop_handle: LoopHandle<'static, ()>,
@@ -561,6 +565,15 @@ pub(crate) enum PendingActivation {
     Path(PathBuf),
     /// A window from ourselves to raise.
     Window(ObjectId),
+}
+
+// NOSHAPE PATCH (agent nav2): the button reported as pressed while several
+// are held, in X11's order (left, middle, right, then the others).
+fn held_button(down: &[MouseButton]) -> Option<MouseButton> {
+    [MouseButton::Left, MouseButton::Middle, MouseButton::Right]
+        .into_iter()
+        .find(|b| down.contains(b))
+        .or_else(|| down.first().copied())
 }
 
 impl WaylandClientState {
@@ -1183,6 +1196,7 @@ impl WaylandConnection {
             vertical_modifier: -1.0,
             horizontal_modifier: -1.0,
             button_pressed: None,
+            buttons_down: Vec::new(),
             mouse_focused_window: None,
             keyboard_focused_window: None,
             loop_handle: handle.clone(),
@@ -2548,6 +2562,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                 state.serial_tracker.update(SerialKind::MouseEnter, serial);
                 state.mouse_location = Some(position);
                 state.button_pressed = None;
+                state.buttons_down.clear();
 
                 if let Some(window) = get_window(&mut state, &surface.id()) {
                     state.mouse_focused_window = Some(window.clone());
@@ -2596,6 +2611,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                     state.mouse_focused_window = None;
                     state.mouse_location = None;
                     state.button_pressed = None;
+                    state.buttons_down.clear();
                     state.cursor_hidden_window = None;
 
                     drop(state);
@@ -2712,7 +2728,10 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                         state.click.last_mouse_button = Some(button);
                         state.click.last_location = state.mouse_location.unwrap();
 
-                        state.button_pressed = Some(button);
+                        if !state.buttons_down.contains(&button) {
+                            state.buttons_down.push(button);
+                        }
+                        state.button_pressed = held_button(&state.buttons_down);
 
                         if let Some(window) = state.mouse_focused_window.clone() {
                             let input = PlatformInput::MouseDown(MouseDownEvent {
@@ -2727,7 +2746,8 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                         }
                     }
                     wl_pointer::ButtonState::Released => {
-                        state.button_pressed = None;
+                        state.buttons_down.retain(|b| *b != button);
+                        state.button_pressed = held_button(&state.buttons_down);
 
                         if let Some(window) = state.mouse_focused_window.clone() {
                             let input = PlatformInput::MouseUp(MouseUpEvent {
