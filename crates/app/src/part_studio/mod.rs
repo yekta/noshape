@@ -18,6 +18,7 @@ mod annotations_ui;
 mod scope;
 mod default_tolerances;
 mod pending;
+mod perf_script;
 mod fab_panel;
 mod flat_view;
 mod sheet_metal_panel;
@@ -312,6 +313,8 @@ pub struct PartStudioView {
     flat_view: Option<Entity<flat_view::FlatView>>,
     /// Onshape interaction state (hide/isolate, select other, S toolbar...).
     ui: behaviors::UiState,
+    /// `NOSHAPE_PERF_SCRIPT` (benchmarks).
+    perf_script: Option<perf_script::Script>,
     _subs: Vec<Subscription>,
 }
 
@@ -435,6 +438,7 @@ impl PartStudioView {
             flat_task: None,
             flat_view: None,
             ui: behaviors::UiState::new(cx),
+            perf_script: perf_script::from_env(),
             _subs: subs,
         };
         // Graphics preferences apply live (camera and render options dialog).
@@ -576,6 +580,9 @@ impl PartStudioView {
                     crate::start_thumbnail::regen_done(&path, this.tab, made, cx);
                 }
                 this.apply_display(display, window, cx);
+                if !refine {
+                    this.perf_script_step(cx);
+                }
                 // Remove / Intersect: the see-through tool body follows.
                 this.schedule_tool_preview(window, cx);
             });
@@ -604,6 +611,7 @@ impl PartStudioView {
                     let display = Arc::new(fine.display);
                     crate::start_thumbnail::regen_done(&path, this.tab, head.then(|| (studio.clone(), shown_vars, display.clone())), cx);
                     this.apply_display(display, window, cx);
+                    this.perf_script_step(cx);
                 });
             }
         }));
