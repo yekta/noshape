@@ -65,6 +65,19 @@ pub fn outputs() -> HashMap<FeatureId, FeatureOutput> {
     OUTPUTS.lock().clone()
 }
 
+/// Whether the last run of an active custom feature in any Part Studio
+/// raised an error (the navbar's red `{!}`).
+pub fn has_errors(doc: &crate::document::Document) -> bool {
+    use crate::document::TabContent;
+    let outputs = OUTPUTS.lock();
+    doc.ordered_tabs().iter().any(|t| match &t.content {
+        TabContent::PartStudio(ps) => ps.features.iter().filter(|f| !f.suppressed && super::is_custom(&f.type_id)).any(|f| {
+            outputs.get(&f.id).is_some_and(|o| o.notices.iter().any(|n| n.kind == noshape_featurescript::interp::NoticeKind::Error))
+        }),
+        _ => false,
+    })
+}
+
 /// Notices and printed output of the last run of one Part Studio feature.
 pub fn output_of(feature: FeatureId) -> Option<FeatureOutput> {
     OUTPUTS.lock().get(&feature).cloned()
