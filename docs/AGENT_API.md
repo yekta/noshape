@@ -37,6 +37,13 @@ Then ask for a part: *"Use noshape to model a 60 x 40 x 6 mm plate with four Ø5
 /tmp/plate.noshape, export STEP and show me an image."* The server sends the agent short instructions on
 how to use the tools (`crates/cli/src/mcp_instructions.md`).
 
+The server's tool list is abridged so it fits an agent's context (about 35k characters with the
+instructions, instead of 340k): the ~45 common tools (`crates/cli/src/core_tools.rs`) with short descriptions
+and their main fields. Nothing is lost: those tools accept every field, `ops_list` lists all 219 tools by
+group, `ops_describe` returns any tool's full description, examples and schema, and `ops_call` runs any tool.
+`noshape-cli mcp --all-tools` lists every tool in full (for clients that defer tool loading); the CLI's
+`--help` is always complete.
+
 ### Command line
 
 ```sh
@@ -279,9 +286,9 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-217 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
+219 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
 
-- **ops**: [`ops_list`](#ops_list)
+- **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
 - **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete)
 - **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
@@ -318,7 +325,40 @@ Examples:
 
 | field | type | | description |
 |---|---|---|---|
-| `group` | string |  | Only this group (document, tab, feature, sketch, query, render, export, history...). |
+| `group` | string |  | Only this group (document, tab, feature, sketch, variable, config, part, material, query, analysis, render, export, import, featurestudio, history, assembly, context, drawing). |
+
+#### ops_describe
+
+Full documentation of tools: description, examples and input schema.
+
+Everything the CLI's --help says about each tool: its whole description with examples, and its JSON input schema with every field. The MCP server's tool list carries only short descriptions and the main fields; this gives the rest (any tool, listed or not; run unlisted ones with ops_call).
+
+Examples:
+
+```json
+{"tools": ["drawing_section_view"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `tools` | array of string | required | Tool names, e.g. ["drawing_section_view", "config_add_input"]. |
+
+#### ops_call
+
+Run any tool by name with its arguments (edits the document (one undoable history entry); deletes or overwrites).
+
+For tools the MCP tool list doesn't show (see ops_list): runs `tool` with `args` exactly as calling it directly would, and returns its reply.
+
+Examples:
+
+```json
+{"tool": "drawing_section_view", "args": {"drawing": "Part 1 Drawing 1", "parent": 1, "point": [205.5, 160], "position": [300, 160]}}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `tool` | string | required | Tool name, e.g. "drawing_section_view". |
+| `args` | object |  | Its arguments (see ops_describe). |
 
 ### document
 
@@ -2969,7 +3009,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `source` | string |  | Part Studio or assembly tab (name or id). Omit for an empty drawing. |
-| `part` | string |  | Only this part (`body:…` id from query_parts). |
+| `part` | string |  | Only this part (`body:…` id from query_parts, or its name). |
 | `sketch` | string |  | Only this sketch of the source Part Studio (feature id or name): Create Drawing of Sketch N. |
 | `configuration` | object |  | Configuration of the source: {input id: value}. |
 | `template` | string |  | Existing templates: file or setup name (`drawing_templates`), e.g. "ANSI_A_INCH.dwt", "ISO A3". Default ANSI_A_INCH.dwt, the dialog's preselected row. |
@@ -3015,7 +3055,7 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `source` | string | required | Part Studio or assembly tab. |
-| `part` | string |  | Only this part (`body:…`). |
+| `part` | string |  | Only this part (`body:…` id or name). |
 | `sketch` | string |  | Insert a sketch of the source Part Studio (a sketch view, facing its plane). |
 | `flat` | boolean |  | A sheet metal part's flat pattern. |
 | `orientation` | one of `front`, `back`, `top`, `bottom`, `left`, `right`, `isometric` |  | View orientation. |
@@ -4211,7 +4251,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
-| `part` | string | required | Part id (`body:…` from query_parts). |
+| `part` | string | required | Part id (`body:…` from query_parts) or name. |
 | `name` | string | required | New name. |
 
 #### part_set_properties
@@ -4230,7 +4270,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
-| `part` | string | required | Part id (`body:…`). |
+| `part` | string | required | Part id (`body:…`) or name. |
 | `name` | string |  | Name. |
 | `description` | string |  | Description. |
 | `part_number` | string |  | Part number. |
@@ -4260,7 +4300,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
-| `part` | string | required | Part id (`body:…`). |
+| `part` | string | required | Part id (`body:…`) or name. |
 | `action` | one of `add_property`, `set`, `delete_column`, `delete_table` |  | What to do (default: read the table). |
 | `property` | one of `Appearance`, `Name`, `Description`, `Part number`, `Revision`, `Vendor`, `Project`, `Product line`, `Material`, `Title 1`, `Title 2`, `Title 3`, `Not revision managed`, `Exclude from all BOMs`, `Unit of measure`, `Mass`, `Tessellation quality` |  | The property (column). |
 | `value` | string |  | set: the value ("true" / "false" for checkboxes). |

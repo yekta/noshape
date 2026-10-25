@@ -257,7 +257,7 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
         studio::insert_feature(&mut trial, feature.clone(), index);
         let r = od.preview(tab, &trial)?;
         let Some(st) = r.display.feature_state(feature.id).filter(|s| s.status != noshape_model::display::FeatureStatus::RolledBack) else { break };
-        let mut changes = studio::boolean_edit_logic(feature, &set, &st.touched);
+        let mut changes = studio::boolean_choices(feature, &set, st);
         changes.extend(studio::hole_scope_logic(feature, &set, &st.touched, &st.touched_behind));
         if !apply(feature, changes) {
             break;
