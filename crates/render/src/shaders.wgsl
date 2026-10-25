@@ -121,8 +121,10 @@ fn highlight_stroke(base: vec3<f32>, st: u32) -> vec3<f32> {
 // vs live (229,170,56)).
 const FACE_SELECTED: vec3<f32> = vec3<f32>(0.887, 0.414, 0.018);
 // A whole selected part / instance (state BODY): live (242,182,72) lit,
-// outlined (state OUTLINE) in (255,192,76), 2 px (live ins-902).
-const BODY_SELECTED: vec3<f32> = vec3<f32>(0.992, 0.503, 0.034);
+// outlined (state OUTLINE) in (255,192,76), 2 px (live ins-902); a part
+// picked in the parts list reads (243,183,72) on its top face where no
+// plane lies over it (selection/09).
+const BODY_SELECTED: vec3<f32> = vec3<f32>(1.0, 0.536, 0.074);
 const BODY_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.527, 0.073);
 
 // ---------------------------------------------------------------- background

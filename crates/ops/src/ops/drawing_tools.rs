@@ -712,7 +712,7 @@ fn refused(t: &Target, tool: &str, view: ViewId, param: &str) -> Result<(), OpEr
     }
 }
 
-fn enum_arg<T: Copy>(a: &Args, name: &str, options: &[(&str, T)], default: T) -> Result<T, OpError> {
+pub(super) fn enum_arg<T: Copy>(a: &Args, name: &str, options: &[(&str, T)], default: T) -> Result<T, OpError> {
     match a.opt_str(name)? {
         None => Ok(default),
         Some(s) => options.iter().find(|o| o.0 == s).map(|o| o.1).ok_or_else(|| OpError::param(name, &format!("one of {}", options.iter().map(|o| o.0).collect::<Vec<_>>().join(", ")))),
@@ -1421,7 +1421,7 @@ fn aligned_section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     done(od, t, "Aligned section view", "view", id.0)
 }
 
-const CORNERS: [(&str, TableCorner); 4] = [("top_left", TableCorner::TopLeft), ("top_right", TableCorner::TopRight), ("bottom_left", TableCorner::BottomLeft), ("bottom_right", TableCorner::BottomRight)];
+pub(super) const CORNERS: [(&str, TableCorner); 4] = [("top_left", TableCorner::TopLeft), ("top_right", TableCorner::TopRight), ("bottom_left", TableCorner::BottomLeft), ("bottom_right", TableCorner::BottomRight)];
 
 fn general_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;

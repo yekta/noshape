@@ -213,3 +213,30 @@ pub fn unsplit_table(s: &mut Sheet, id: u64, l: &TableLayout) -> bool {
     s.tables.retain(|x| x.id != id);
     true
 }
+
+/// Spreadsheet cells from clipboard text (tab-separated rows), if it looks
+/// like a table (a tab, or several lines): Paste as table.
+pub fn parse_cells(text: &str) -> Option<Vec<Vec<String>>> {
+    let text = text.trim_end_matches(['\n', '\r']);
+    if text.is_empty() || (!text.contains('\t') && !text.contains('\n')) || text.trim_start().starts_with('{') {
+        return None;
+    }
+    let rows: Vec<Vec<String>> = text.lines().map(|l| l.split('\t').map(|c| c.trim_matches('"').to_string()).collect()).collect();
+    let n = rows.iter().map(|r| r.len()).max().unwrap_or(0);
+    Some(
+        rows.into_iter()
+            .map(|mut r| {
+                r.resize(n, String::new());
+                r
+            })
+            .collect(),
+    )
+}
+
+/// Paste as table: a general table of `cells` with its top-left corner at
+/// `at` (sheet mm), one edit "Paste as table".
+pub fn pasted_table(id: u64, cells: Vec<Vec<String>>, at: [f64; 2]) -> Table {
+    let mut t = Table::new(id, TableKind::General { cells, title: None, header: false }, at);
+    t.corner = TableCorner::TopLeft;
+    t
+}

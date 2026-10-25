@@ -1,7 +1,7 @@
 //! Robust shell: the offset and the boolean (slab) constructions agree, and
 //! cases OCCT's offset can't do still give the right solid.
 
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 use noshape_kernel::*;
 
 fn bx(a: [f64; 3], b: [f64; 3]) -> Shape {
@@ -176,4 +176,23 @@ fn chamfer_then_fillets_shell_like_onshape() {
     }
     let r = shell_solid(&s, &top, 0.003, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
     assert!(r.is_valid() && vol(&r) > 0.0);
+}
+
+/// fs's std_reference shellTop (live 2653.5 mm³): a 20 mm cube at x = 900
+/// with its top removed, shelled 1.5 mm inward. Its caps lie on planes whose
+/// origin stayed at the sketch's (the world origin), 900 mm from the faces:
+/// the region construction centred each offset half-space there and lost the
+/// floor (2220 mm³).
+#[test]
+fn inward_shell_of_a_part_far_from_its_planes_origin() {
+    let _ = set_working_scale(1000.0);
+    let plane = Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+    let sq = |a: (f64, f64), b: (f64, f64)| Segment2d::Line { a: DVec2::new(a.0, a.1), b: DVec2::new(b.0, b.1) };
+    let (x0, x1) = (0.9, 0.92);
+    let face = make_face_2d(&plane, &[sq((x0, 0.0), (x1, 0.0)), sq((x1, 0.0), (x1, 0.02)), sq((x1, 0.02), (x0, 0.02)), sq((x0, 0.02), (x0, 0.0))], &[]).unwrap();
+    let cube = extrude(&face, DVec3::new(0.0, 0.0, 0.02)).unwrap().shape;
+    let top = cube.faces().into_iter().find(|f| f.centroid().is_ok_and(|c| (c.z - 0.02).abs() < 1e-9)).unwrap();
+    let r = shell_solid(&cube, &[top], 0.0015, ShellSide::Inside, ShellMethod::Auto).unwrap();
+    assert!((r.shape.volume().unwrap() * 1e9 - 2653.5).abs() < 1e-6, "{}", r.shape.volume().unwrap() * 1e9);
+    assert_eq!(r.shape.count(ShapeType::Face), 11);
 }

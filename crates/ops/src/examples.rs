@@ -9,6 +9,17 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("ops_list", &[r##"{}"##, r##"{"group": "sketch"}"##]),
     ("ops_describe", &[r##"{"tools": ["drawing_section_view"]}"##]),
     ("ops_call", &[r##"{"tool": "drawing_section_view", "args": {"drawing": "Part 1 Drawing 1", "parent": 1, "point": [205.5, 160], "position": [300, 160]}}"##]),
+    ("ui_state", &[r##"{}"##]),
+    ("tab_activate", &[r##"{"tab": "Assembly 1"}"##]),
+    ("tab_manager", &[r##"{"search": "bracket"}"##, r##"{"kinds": ["drawing"], "sort": "name_asc"}"##, r##"{"open": false}"##]),
+    ("assembly_switch_to_tab", &[r##"{"instance": "Bracket <1>"}"##]),
+    ("assembly_open_linked_document", &[r##"{"instance": "Motor <1>"}"##]),
+    ("context_go_to_assembly", &[r##"{"tab": "Part Studio 2"}"##]),
+    ("history_view", &[r##"{"to": "V1"}"##, r##"{"to": "workspace"}"##]),
+    ("history_compare", &[r##"{"target": "V1"}"##, r##"{"stop": true}"##]),
+    ("history_repair_view", &[r##"{"at": "V1"}"##, r##"{"close": true}"##]),
+    ("drawing_switch_sheet", &[r##"{"drawing": "Part 1 Drawing 1", "step": "next"}"##, r##"{"drawing": "Part 1 Drawing 1", "sheet": "Sheet2"}"##]),
+    ("drawing_sheets_panel", &[r##"{"drawing": "Part 1 Drawing 1"}"##]),
     // document / tab
     ("document_create", &[r##"{"path": "/tmp/bracket.noshape", "length_unit": "mm"}"##]),
     ("document_open", &[r##"{"path": "/tmp/bracket.noshape"}"##]),
@@ -238,6 +249,14 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("drawing_sheet", &[r##"{"drawing": "Part 1 Drawing 1", "action": "add"}"##, r##"{"drawing": "Part 1 Drawing 1", "sheet": 2, "action": "rename", "name": "Details"}"##, r##"{"drawing": "Part 1 Drawing 1", "action": "properties", "set": {"scale": "1:2", "size": "A2"}}"##]),
     ("drawing_table_edit", &[r##"{"drawing": "Part 1 Drawing 1", "table": 2, "action": "merge_right", "row": 1, "column": 0}"##, r##"{"drawing": "Part 1 Drawing 1", "table": 2, "action": "insert", "row": 0, "column": 1, "at": "column_right"}"##, r##"{"drawing": "Part 1 Drawing 1", "table": 4, "action": "split", "row": 5}"##]),
     ("drawing_annotation_edit", &[r##"{"drawing": "Part 1 Drawing 1", "annotation": 12, "action": "add_jog", "line": 0}"##, r##"{"drawing": "Part 1 Drawing 1", "annotation": 14, "action": "add_leader", "point": [190, 175]}"##, r##"{"drawing": "Part 1 Drawing 1", "annotation": 15, "action": "group_annotation", "with": [16]}"##]),
+    ("drawing_table_properties", &[r##"{"drawing": "Assembly 1 Drawing 1", "table": 1, "structured": true, "corner": "top_left"}"##, r##"{"drawing": "Part 1 Drawing 1", "table": 2, "visible_rows": 8, "newest_top": true}"##]),
+    ("drawing_copy", &[r##"{"drawing": "Part 1 Drawing 1", "views": [2]}"##, r##"{"drawing": "Part 1 Drawing 1", "annotations": [3, 4]}"##]),
+    ("drawing_paste", &[r##"{"drawing": "Part 1 Drawing 1", "position": [300, 150]}"##, r##"{"drawing": "Part 1 Drawing 1", "sheet": 2, "position": [200, 150]}"##]),
+    ("drawing_paste_table", &[r##"{"drawing": "Part 1 Drawing 1", "text": "Item\tQty\nBolt\t4", "position": [20, 280]}"##]),
+    ("drawing_replace", &[r##"{"drawing": "Part 1 Drawing 1", "view": 1, "source": "Part Studio 2"}"##, r##"{"drawing": "Assembly 1 Drawing 1", "table": 1, "source": "Assembly 2"}"##]),
+    ("drawing_replicate", &[r##"{"drawing": "Part 1 Drawing 1", "from": 1, "to": 5}"##, r##"{"drawing": "Part 1 Drawing 1", "from": 1, "region": [[180, 150], [230, 190]], "to": 5, "at": [320, 170]}"##]),
+    ("drawing_switch_to_reference", &[r##"{"drawing": "Part 1 Drawing 1", "view": 1}"##, r##"{"drawing": "Part 1 Drawing 1", "table": 3, "feature_studio": true}"##]),
+    ("drawing_open_feature_studio", &[r##"{"drawing": "Part 1 Drawing 1", "table": 3}"##]),
     ("drawing_view_linestyle", &[r##"{"drawing": "Part 1 Drawing 1", "view": 3, "edges": [[190, 175]], "linestyle": "phantom", "thickness": 0.5}"##]),
     ("drawing_insert_cad", &[r##"{"drawing": "Part 1 Drawing 1", "file": "/tmp/border.dxf"}"##]),
     ("drawing_sketch", &[r##"{"drawing": "Part 1 Drawing 1", "tool": "line", "picks": [[20, 20], [80, 20]]}"##]),
@@ -264,7 +283,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
 ];
 
 /// The groups whose every operation must have examples (the coverage test).
-pub const REQUIRED_GROUPS: &[&str] = &["ops", "document", "tab", "feature", "sketch", "variable", "config", "part", "material", "query", "analysis", "render", "export", "import", "featurestudio", "history", "assembly", "context", "drawing"];
+pub const REQUIRED_GROUPS: &[&str] = &["ops", "document", "tab", "feature", "sketch", "variable", "config", "part", "material", "query", "analysis", "render", "export", "import", "featurestudio", "history", "assembly", "context", "drawing", "ui"];
 
 /// Examples of an operation (MCP tool name).
 pub fn of(tool: &str) -> &'static [&'static str] {

@@ -26,11 +26,14 @@ pub struct OpenDoc {
     /// default for the next fillet (5 mm on a fresh page, then sticky per
     /// tab until the page reloads; here, while the document is open).
     pub sketch_fillet_radius: HashMap<TabId, f64>,
+    /// The document window's state (tab shown, panels, compare…; see
+    /// [`crate::window`]).
+    pub window: crate::window::WindowState,
 }
 
 impl OpenDoc {
     pub fn new(session: Session) -> Self {
-        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: HashMap::new(), active_config: HashMap::new(), sketch_fillet_radius: HashMap::new() }
+        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: HashMap::new(), active_config: HashMap::new(), sketch_fillet_radius: HashMap::new(), window: Default::default() }
     }
 
     pub fn doc(&self) -> &Document {
@@ -120,7 +123,15 @@ pub struct Ctx {
     live: Vec<(PathBuf, (u16, String))>,
     /// The app's own context: calls run here, never forwarded.
     pub serving: bool,
+    /// What drawing_copy copied (the editor's clipboard text), for
+    /// drawing_paste in this session.
+    pub drawing_clipboard: Option<String>,
+    /// What the window should do after a call (live mode: the app acts on
+    /// them, as the menu item would); taken by the app after each call.
+    pub ui_requests: Vec<UiRequest>,
 }
+
+pub use crate::window::UiRequest;
 
 fn canonical(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())

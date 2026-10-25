@@ -88,10 +88,12 @@ for ($i = 0; $i -lt 120 -and -not $cam; $i++) {
 if (-not $cam) { throw 'noshape never traced a camera' }
 Start-Sleep 8
 $origin = $cam.origin; $size = $cam.viewport
+# Function arguments are typed: PowerShell passes `-200` to an untyped
+# parameter as the string "-200", and "-200" * 2 is "-200-200".
 # Calibrate logical pixels -> screen pixels with two probes inside the
 # viewport (each waits for the mouse move it causes to be traced). Note:
 # in PowerShell `@($a + 1, $b)` is `$a + (1, $b)`: parenthesise elements.
-function Probe($sx, $sy) {
+function Probe([int] $sx, [int] $sy) {
   $before = @(Read-Trace | Where-Object { $_.input -eq 'mouse_move' }).Count
   [Nav]::SetCursorPos($sx, $sy) | Out-Null
   for ($k = 0; $k -lt 30; $k++) {
@@ -105,7 +107,7 @@ $s0 = @(($o.x + [int]($origin[0] + $size[0] * 0.3)), ($o.y + [int]($origin[1] + 
 $s1 = @(($o.x + [int]($origin[0] + $size[0] * 0.6)), ($o.y + [int]($origin[1] + $size[1] * 0.6)))
 $a0 = Probe $s0[0] $s0[1]; $a1 = Probe $s1[0] $s1[1]
 $scale = ($s1[0] - $s0[0]) / ($a1[0] - $a0[0])
-function Screen($dx, $dy) {
+function Screen([double] $dx, [double] $dy) {
   $lx = $size[0] / 2 + $dx; $ly = $size[1] / 2 + $dy
   @([int]($s0[0] + ($lx - $a0[0]) * $scale), [int]($s0[1] + ($ly - $a0[1]) * $scale))
 }
@@ -116,11 +118,11 @@ function Step($name, [scriptblock] $body) {
   Log @{ step = $name; at = 'end' }
 }
 function MoveTo($p) { [Nav]::SetCursorPos($p[0], $p[1]) | Out-Null; Start-Sleep 0.15 }
-function Wheel($data, [switch] $Horizontal) {
+function Wheel([int] $data, [switch] $Horizontal) {
   Log @{ posted = @{ kind = 'scroll'; wheel = $data; horizontal = [bool]$Horizontal } }
   [Nav]::Mouse($(if ($Horizontal) { 0x1000 } else { 0x800 }), $data); Start-Sleep 0.12
 }
-function Drag($down, $up, $dx, $dy, $pause) {
+function Drag([int] $down, [int] $up, [double] $dx, [double] $dy, [double] $pause) {
   $p = Screen 0 0; MoveTo $p
   [Nav]::Mouse($down, 0); Start-Sleep 0.05
   for ($k = 1; $k -le 20; $k++) { [Nav]::SetCursorPos($p[0] + [int]($dx * $scale * $k / 20), $p[1] + [int]($dy * $scale * $k / 20)) | Out-Null; Start-Sleep 0.016 }
@@ -128,7 +130,7 @@ function Drag($down, $up, $dx, $dy, $pause) {
   [Nav]::Mouse($up, 0)
   Start-Sleep $(if ($pause -lt 0.05) { 1.2 } else { 0.2 })
 }
-function TouchGesture($from, $to, $steps) {
+function TouchGesture([object[]] $from, [object[]] $to, [int] $steps) {
   # $from / $to: arrays of logical (dx, dy) offsets from the viewport centre per finger.
   $pt = { param($f, $t) $q = Screen ($f[0] + ($t[0] - $f[0]) * $args[0]) ($f[1] + ($t[1] - $f[1]) * $args[0]); $q }
   $frame = { param($t) $xy = @(); for ($k = 0; $k -lt $from.Count; $k++) { $xy += (& $pt $from[$k] $to[$k] $t) }; [int[]]$xy }

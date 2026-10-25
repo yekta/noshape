@@ -166,7 +166,7 @@ fn every_menu_item_is_listed() {
 /// Planned menu items, per area: these only go down (lower them as ops land).
 #[test]
 fn menu_coverage_report() {
-    const CEILINGS: [(&str, usize); 4] = [("partStudio", 2), ("assembly", 1), ("drawing", 13), ("document", 23)];
+    const CEILINGS: [(&str, usize); 4] = [("partStudio", 2), ("assembly", 1), ("drawing", 0), ("document", 23)];
     for (area, ceiling) in CEILINGS {
         let all: Vec<&(&str, Cover)> = MENUS.iter().filter(|(id, _)| id.starts_with(&format!("{area}:"))).collect();
         let planned: Vec<&str> = all.iter().filter(|c| matches!(c.1, Cover::Planned)).map(|c| c.0).collect();
@@ -261,4 +261,14 @@ fn schema_says_when_parameters_show() {
     assert!(other.contains("hidden with the defaults") && other.contains("outputType is CREATE"), "{other}");
     let faces = desc("moveFace", "moveFaces");
     assert!(faces.contains("shown with the defaults") && faces.contains("outputType is CREATE"), "{faces}");
+}
+
+/// Everything a user can do in the window an agent can do too (navigation
+/// and view actions included): the UI-only entries only go down (98 before
+/// the sweep), and none may be added.
+#[test]
+fn ui_only_entries_only_go_down() {
+    const CEILING: usize = 85;
+    let ui: Vec<&str> = SHORTCUTS.iter().chain(MENUS.iter()).filter(|(_, c)| matches!(c, Cover::Ui(_))).map(|(id, _)| *id).collect();
+    assert!(ui.len() <= CEILING, "{} UI-only entries (at most {CEILING}): give the new ones an operation\n{}", ui.len(), ui.join("\n"));
 }

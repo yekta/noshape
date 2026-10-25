@@ -289,14 +289,15 @@ pub fn target_document(doc: &Entity<DocModel>, cx: &App) -> Option<Arc<Document>
     session(doc, cx).map(|s| s.target.clone())
 }
 
+/// A tab's state (shared with the agent API's history_compare).
 fn status_of(s: &CompareSession, tab: TabId) -> Option<TabStatus> {
-    let b = s.base.tab(tab)?;
-    let Some(t) = s.target.tab(tab) else { return Some(TabStatus::OnlyInBase) };
-    if matches!(b.content, TabContent::Drawing(_)) {
-        return Some(TabStatus::NotSupported);
-    }
-    let same = b.name == t.name && serde_json::to_value(&b.content).ok() == serde_json::to_value(&t.content).ok();
-    Some(if same { TabStatus::Same } else { TabStatus::Differs })
+    use noshape_ops::window::TabCompare as C;
+    Some(match noshape_ops::window::tab_compare(&s.base, &s.target, tab)? {
+        C::Differs => TabStatus::Differs,
+        C::Same => TabStatus::Same,
+        C::NotSupported => TabStatus::NotSupported,
+        C::OnlyInBase => TabStatus::OnlyInBase,
+    })
 }
 
 /// A tab's compare state (None: not comparing).

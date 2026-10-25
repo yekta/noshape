@@ -58,7 +58,8 @@ jobs:
             build-essential cmake ninja-build pkg-config \
             libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
             libx11-dev libx11-xcb-dev libxcb1-dev libxi-dev libxcursor-dev libxrandr-dev \
-            libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev
+            libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev \
+            mesa-vulkan-drivers # lavapipe: a software Vulkan adapter, so the offscreen render tests run without a GPU
 
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
