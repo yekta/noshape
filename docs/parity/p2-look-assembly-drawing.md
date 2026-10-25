@@ -28,7 +28,7 @@ asked, → owner.
 | DL2 | Empty Insert view panel | fields greyed with grey ▼; View scale focused (2 px blue underline, dark ▼) | all alike, blue carets | ✅ |
 | DL3 | Active drawing tool button | `#d1dde6` (drawing/20–22, 127) | `#eaeaea` (the Part Studio's) | ✅ |
 | DL4 | Section view dialog label | focused with "A" selected, 2 px underline (drawing/20) | not focused, 1 px, 2 px lower | 🔧 focus + 2 px ✅; the selection and Esc (the focused field swallowed it) fixed after the 17:19 build |
-| DL5 | Section view dialog checkboxes | `#ddd` 12 px boxes 2 px up / left | the kit's darker box | ✗ (a drawing checkbox style; next) |
+| DL5 | Section view dialog checkboxes | `#ddd` 12 px boxes 2 px up / left | the kit's darker box | ✅ Section view (`drawing_chrome::DrCheckbox`, pixel-checked); the other 21 drawing dialogs keep the kit's until asb is clear (asked the lead) |
 | DL6 | Dimension "±0.1" launcher | a small button beside a placed / selected dimension (drawing/12) | none | ? REQUESTS "ui2 (10-24 15:25)" |
 | DL7 | Title block field double-click | Note editor on that note (drawing/726) | nothing (17:19 build too) | ✗ → asb (behaviour) |
 
