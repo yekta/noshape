@@ -46,3 +46,9 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 | Row | Live | Ours | Status |
 |---|---|---|---|
 | Drawing note, Ctrl+Z | **two** steps: the 1st leaves the note and enables Redo, the 2nd removes it (behaviours "qa5 undo across tabs") | one Ctrl+Z removes "hello" at once (Undo greys, Redo enabled); Ctrl+Y brings it back | ✗ **UNDO3** (asb, minor) |
+
+## Release re-check v0.4.8 (qa5, 2026-10-25 02:30, release asset noshape 0.4.8 linux-x86_64)
+| Row | Ours | Status |
+|---|---|---|
+| UNDO1 | Insert Part Studio 1 (2 parts) into Assembly 1, ✓, switch to the Part Studio tab and back, Ctrl+Z once: Instances (0); Ctrl+Y: both back | ✅ |
+| UNDO2, UNDO3 | not re-run (drawing; UNDO3 with asb) | — |

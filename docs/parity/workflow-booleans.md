@@ -107,3 +107,4 @@ Docs /tmp/qa5/d25c/b2.noshape, /tmp/qa5/d25d/s.noshape, /tmp/qa5/d25b/merge.nosh
 | INT2 Intersect of disjoint parts (8000 + 4000 mm³), ☑ Keep tools | Info "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained."; parts unchanged, no copy | ✅ |
 | BOOL1 Union of the same disjoint parts | same Info, parts unchanged | ✅ |
 | BOOL4b Add extrude with an empty merge scope | Error "No merge scope selected.", parts unchanged | ✅ |
+| BOOL1b row tooltips (v0.4.8 app) | disjoint Intersect / Union rows: "Boolean 1", "Boolean 2" | ✅ |

@@ -148,3 +148,9 @@ below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
 |---|---|---|
 | KB1 Shift+N on a part row | inline rename, name selected | ✅ |
 | KB3 Shift+I Isolate (Part 1 + Part 2) | Default geometry rows greyed, the other part translucent, planes faint | ✅ |
+
+## Release re-check v0.4.8 (qa5, 2026-10-25 02:30, release asset noshape 0.4.8 linux-x86_64)
+| Row | Ours | Status |
+|---|---|---|
+| KB1 Shift+N on a part row | inline rename, name selected | ✅ |
+| KB3 Shift+I Isolate (Part 2) | Isolate panel; Default geometry rows grey, Part 1 translucent, planes faint; Extrude 2 row highlighted (part-studio 3.14) | ✅ |
