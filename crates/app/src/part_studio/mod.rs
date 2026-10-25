@@ -25,6 +25,7 @@ mod feature_ops;
 mod manipulators;
 mod menus;
 mod section;
+mod section_manip;
 mod sketch;
 pub(crate) mod shortcut_cmds;
 mod analysis_tools;
@@ -1287,6 +1288,15 @@ impl PartStudioView {
                 let on_manip = vp.read(cx).manipulator_at(*position);
                 if on_manip != self.ui.manip_hover {
                     self.ui.manip_hover = on_manip;
+                    self.refresh_scene(false, cx);
+                }
+                // The section manipulator outlines the handle under the cursor.
+                let sh = match self.current_manip(cx) {
+                    Some(manipulators::Manip::Section(s)) => self.section_handle_at(&s, *position, cx),
+                    _ => None,
+                };
+                if sh != self.ui.section_hover {
+                    self.ui.section_hover = sh;
                     self.refresh_scene(false, cx);
                 }
                 // The translate triad outlines the handle under the cursor.

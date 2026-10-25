@@ -272,6 +272,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 10.5 | Isolate/transparent panel with transparency control and × to exit; Esc exits | View__isolate | 🔧 |
 | 10.6 | Select transparent geometry checkbox; Expand by distance | View__isolate | 🔧 |
 | 10.7 | Section view dialog (live): Exclude | Include tabs, "Section planes" field (planes, planar faces, mate connectors; × removes) + a view-facing plane button, "Items to exclude/include"; ✓/Enter keeps, ✕/Esc restores; empty-space menu Edit section view… / Turn off section view | live part-studio/70–74 | ✅ |
+| 10.7a | Section view manipulator: base circle (slides the manipulator over the plane), offset arrow, and at its tip two rotate rings about the plane's in-plane axes (Top: Y, then X); a ring drag turns the plane about the arrow's base, snapping to 5° within 2° (else 3 decimals) with a "deg" value box that takes a typed angle; a turned plane's chip loses "(Top)"; the hovered handle turns blue | live "skb (10-24) assembly section" (1)–(3) | ✅ (app: ring hover blue, drag → "27.345 deg", tilted cut; `section_manip.rs`, test `rotation_snaps_and_reads_as_live`; look to icons2) |
 | 10.8 | Section by several planes (up to 3), drag arrow on the active plane with an offset box, caps | View__section_view | ✅ (caps: the cut solid is capped in the part color with hatching, separate section pipeline; offscreen test `section_caps_cover_the_cut`) |
 
 ## 11. Measure, mass properties, appearance (View__measure_tool, View__mass_properties_tool, PartStudio__customizing_appearances)

@@ -51,6 +51,8 @@ pub(super) enum Manip {
     Arc(ArcHandle),
     /// Transform ▸ Translate by XYZ (see `triad.rs`).
     Triad(super::triad::Triad),
+    /// Section view: base circle, offset arrow, rotate rings (`section_manip.rs`).
+    Section(super::section_manip::SectionManip),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -62,7 +64,7 @@ pub(super) struct ManipDrag {
 impl PartStudioView {
     /// The manipulator of the feature being edited, if it has one.
     pub(super) fn current_manip(&self, cx: &App) -> Option<Manip> {
-        let Some(e) = self.edit.as_ref() else { return self.section_arrow().map(Manip::Arrow) };
+        let Some(e) = self.edit.as_ref() else { return self.section_manip().map(Manip::Section) };
         match e.dialog.read(cx).feature.type_id.as_str() {
             "extrude" => self.current_arrow(cx).map(Manip::Arrow),
             "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.current_arc(cx).map(Manip::Arc),
@@ -223,6 +225,7 @@ impl PartStudioView {
             // The handle end of the arc (last few degrees) is grabbable.
             Some(Manip::Arc(h)) => vec![(h.point(h.angle * 0.85), h.point(h.angle), 0.0)],
             Some(Manip::Triad(t)) => self.triad_hit_segments(&t, cx),
+            Some(Manip::Section(s)) => self.section_hit_segments(&s, cx),
             None => Vec::new(),
         };
         // Datum boxes can be dragged too.
@@ -241,6 +244,14 @@ impl PartStudioView {
             arrow_dragging: self.manip_drag.is_some(),
             triad_hover: self.ui.triad_drag.as_ref().map(|d| d.handle).or(self.ui.triad_hover),
             triad_dragging: self.ui.triad_drag.is_some(),
+            section_hover: self.ui.section_hover,
+            section_dragging: if self.ui.section_base_drag {
+                Some(super::section_manip::SectionHandle::Base)
+            } else if let Some(r) = self.ui.section_rot.filter(|r| r.dragging) {
+                Some(super::section_manip::SectionHandle::Ring(r.ring))
+            } else {
+                self.manip_drag.map(|_| super::section_manip::SectionHandle::Arrow)
+            },
         }))
     }
 
@@ -262,6 +273,11 @@ impl PartStudioView {
             Some(Manip::Arrow(a)) => a,
             Some(Manip::Arc(h)) => return self.arc_event(h, ev, window, cx),
             Some(Manip::Triad(t)) => return self.triad_event(t, ev, window, cx),
+            // Rings and the base circle first; the arrow as any other.
+            Some(Manip::Section(s)) => match self.section_manip_event(&s, ev, window, cx) {
+                Some(done) => return done,
+                None => s.arrow,
+            },
             None => {
                 self.manip_drag = None;
                 return false;
@@ -410,6 +426,8 @@ pub(super) struct ManipGeometry {
     arrow_dragging: bool,
     triad_hover: Option<usize>,
     triad_dragging: bool,
+    section_hover: Option<super::section_manip::SectionHandle>,
+    section_dragging: Option<super::section_manip::SectionHandle>,
 }
 
 impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
@@ -418,6 +436,12 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
             Manip::Arrow(a) => arrow_glyph(&a, self.arrow_hover, self.arrow_dragging, view, up),
             Manip::Arc(h) => arc_glyph(&h, up),
             Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, view, up),
+            Manip::Section(s) => {
+                use super::section_manip::SectionHandle;
+                let mut out = arrow_glyph(&s.arrow, self.section_hover == Some(SectionHandle::Arrow), self.section_dragging == Some(SectionHandle::Arrow), view, up);
+                out.extend(super::section_manip::section_glyph(&s, self.section_hover, self.section_dragging, view, up));
+                out
+            }
         }
     }
 }

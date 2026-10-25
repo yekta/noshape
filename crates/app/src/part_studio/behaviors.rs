@@ -162,6 +162,12 @@ pub struct UiState {
     pub section_dialog: Option<super::section::SectionDialog>,
     /// The section offset box being typed into (section.rs).
     pub section_offset_edit: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    /// The section manipulator: the last ring drag (its angle shows in the
+    /// value box), the base moved over the plane, a base drag, the hovered handle.
+    pub section_rot: Option<super::section_manip::RingDrag>,
+    pub section_base: Option<glam::DVec3>,
+    pub section_base_drag: bool,
+    pub section_hover: Option<super::section_manip::SectionHandle>,
     pub section_parts: Option<(bool, Vec<BodyId>)>,
     /// Open Appearance editor, and faces of a hovered appearance row.
     pub appearance_edit: Option<super::appearance::AppearanceEdit>,
@@ -420,6 +426,10 @@ impl UiState {
             section: Vec::new(),
             section_dialog: None,
             section_offset_edit: None,
+            section_rot: None,
+            section_base: None,
+            section_base_drag: false,
+            section_hover: None,
             section_parts: None,
             appearance_edit: None,
             appearance_hover: Vec::new(),
