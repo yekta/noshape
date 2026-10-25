@@ -246,7 +246,7 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-214 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
+216 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
@@ -261,7 +261,7 @@ the app.
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
-- **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference)
+- **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image)
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
@@ -4593,6 +4593,50 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `parts` | array of string |  | Parts (`body:…`). Default: every part. |
 
+#### analysis_draft
+
+Draft analysis: each face's draft angle toward a pull direction.
+
+The Draft analysis tool (Analysis tools menu): with mold split direction `pull` (a plane, planar face, sketch, mate connector or straight edge; `flip` reverses it), minimum draft `angle` (default 3 deg) and Show undercut regions (`undercut`, default on), each face of the checked `parts` (default all shown) is classed as Onshape's legend colors it — steep (under the minimum), undercut, side_1 (toward the pull) or side_2 — with its draft angle range (degrees). Faces mixing classes report the share of each.
+
+Examples:
+
+```json
+{"pull": "plane:top", "angle": "3 deg"}
+{"pull": "plane:top", "flip": true, "undercut": false, "parts": ["Part 1"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `pull` | string | required | Mold split direction: a plane, planar face, sketch, mate connector or straight edge id. |
+| `flip` | boolean |  | Reverse the pull direction. |
+| `angle` | number or string |  | Minimum draft angle (0–90 deg). |
+| `undercut` | boolean |  | Show undercut regions. |
+| `parts` | array of string |  | Entities to check: part ids (`body:…`) or names; default all shown parts. |
+
+#### analysis_flatten
+
+Flatten surfaces: a planar sheet of faces with its distortion, optionally exported.
+
+The Flatten surfaces tool (Analysis tools menu): `faces` (contiguous) opened along `rips` (edges; closed faces open along their seams) flattened with minimum strain. Returns the 3D and flat areas, the strain range (negative: compressed, positive: stretched), the flat size and the boundary loops. `export` writes the sheet: DXF or SVG (`inner_edges`: the faces' shared edges too), STL or PARASOLID placed on the XY plane (best fit to the faces' footprint, outer side up) or at mate connector `position` (`angle`, `offset`).
+
+Examples:
+
+```json
+{"faces": ["face:eJyrVkr…"]}
+{"faces": ["face:eJyrVkr…"], "rips": ["edge:eJyrVkr…"], "export": {"format": "DXF", "file": "/tmp/flat.dxf"}}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `faces` | array of string | required | Faces to flatten. |
+| `rips` | array of string |  | Rip edges. |
+| `export` | object |  | {"format": "DXF" \| "SVG" \| "STL" \| "PARASOLID", "file": path, "inner_edges": bool, "position": mate connector id, "angle": degrees, "offset": length, "origin": vertex id} |
+
 ### render
 
 #### render_named_view
@@ -4621,7 +4665,7 @@ Examples:
 
 Render a Part Studio or an Assembly to a PNG image from a standard or named view.
 
-Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look: white background, shaded with edges), zoomed to fit. With `tab` an Assembly: the solved assembly in its active configuration (standard views; sections on plane:top|front|right; `section_exclude` instance names). Returned as an image (MCP image content) and, with `file`, written to disk.
+Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look: white background, shaded with edges), zoomed to fit. With `tab` an Assembly: the solved assembly in its active configuration (standard views; sections on plane:top|front|right; `section_exclude` instance names). The view menu's options as in the app: `perspective`, `tangent_edges`, `hidden_edges`, `boundary_edges`, `isolate` / `transparent` (Make isolate / Make transparent), `normal_to` (View normal to), `high_quality` (View in high quality), and the analysis displays `zebra` (Zebra stripes) and `reflection` (Reflection analysis). Returned as an image (MCP image content) and, with `file`, written to disk.
 
 Examples:
 
@@ -4629,6 +4673,9 @@ Examples:
 {"view": "isometric", "file": "/tmp/part.png"}
 {"tab": "Assembly 1", "view": "isometric", "section": [{"plane": "plane:front"}]}
 {"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}
+{"view": "front", "perspective": true, "tangent_edges": "phantom", "hidden_edges": true}
+{"isolate": ["Part 1"], "zebra": {"stripes": 20}}
+{"normal_to": "plane:front", "reflection": {"image": "Blue sky", "rotation": 45}}
 ```
 
 | field | type | | description |
@@ -4643,6 +4690,16 @@ Examples:
 | `display_mode` | one of `shaded_with_edges`, `shaded`, `hidden_line`, `translucent` |  | Render style (default shaded_with_edges). |
 | `show_sketches` | boolean |  | Draw sketches. |
 | `show_planes` | boolean |  | Draw the default and construction planes. |
+| `perspective` | boolean |  | Perspective view (default orthographic). |
+| `tangent_edges` | one of `visible`, `phantom`, `hidden` |  | Tangent edges visible / phantom / hidden. |
+| `hidden_edges` | boolean |  | Hide/show hidden edges: draw the hidden ones. |
+| `boundary_edges` | boolean |  | Part Studios: Highlight boundary edges. |
+| `isolate` | array of string |  | Make isolate: these parts (Part Studio ids or names) or instances (Assembly), the rest as ghosts. |
+| `transparent` | array of string |  | Make transparent: these parts or instances as ghosts. |
+| `normal_to` | string |  | Part Studios: View normal to a planar face, plane, sketch or mate connector (replaces `view`). |
+| `high_quality` | boolean |  | View in high quality (finer tessellation). |
+| `zebra` | object |  | Zebra stripes: {"stripes": 35, "flip": false, "show_edges": true}. |
+| `reflection` | object |  | Reflection analysis: {"image": an environment map name ("Blue sky", default the first) or an image file path, "rotation": degrees, "opposite": bool, "blur": bool, "show_edges": bool (default false)}. |
 | `file` | string |  | Also write the PNG here. |
 
 ### export

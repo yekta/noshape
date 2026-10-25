@@ -247,6 +247,16 @@ pub(crate) fn length_value(v: &Value, units: &UnitPrefs) -> Result<f64, OpError>
     noshape_units::evaluate_as(&text, Dim::LENGTH, units, &noshape_units::EmptyScope).map(|q| q.value).map_err(|e| OpError::invalid(format!("`{text}`: {e}")))
 }
 
+/// An angle: a number (workspace angle units) or an expression ("3 deg").
+pub(crate) fn angle_value(v: &Value, units: &UnitPrefs) -> Result<f64, OpError> {
+    let text = match v {
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => s.clone(),
+        _ => return Err(OpError::invalid("an angle: a number (workspace units) or an expression like \"3 deg\"")),
+    };
+    noshape_units::evaluate_as(&text, Dim::ANGLE, units, &noshape_units::EmptyScope).map(|q| q.value).map_err(|e| OpError::invalid(format!("`{text}`: {e}")))
+}
+
 pub(super) fn point_value(v: &Value, units: &UnitPrefs) -> Result<DVec2, OpError> {
     let a = v.as_array().filter(|a| a.len() == 2).ok_or_else(|| OpError::invalid("a point is [x, y]"))?;
     Ok(DVec2::new(length_value(&a[0], units)?, length_value(&a[1], units)?))

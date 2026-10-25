@@ -175,10 +175,10 @@ fn menu_coverage_report() {
     }
 }
 
-/// Coverage only goes up: lower `PLANNED_CEILING` as operations land.
+/// Every toolbar / shortcut command has an operation or a UI-only reason:
+/// none is left Planned.
 #[test]
 fn coverage_report() {
-    const PLANNED_CEILING: usize = 14;
     let features = feature_shortcuts().len();
     let ops = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Op(_))).count();
     let planned = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Planned)).count();
@@ -192,7 +192,8 @@ fn coverage_report() {
         features,
         registry::all().len()
     );
-    assert!(planned <= PLANNED_CEILING, "more planned commands ({planned}) than before ({PLANNED_CEILING})");
+    let left: Vec<&str> = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Planned)).map(|c| c.0).collect();
+    assert!(left.is_empty(), "shortcut commands without an operation: {left:?}");
 }
 
 /// Every built-in feature type's dialog defaults convert to the API's JSON

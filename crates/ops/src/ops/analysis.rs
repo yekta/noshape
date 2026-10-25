@@ -83,6 +83,30 @@ pub fn ops() -> Vec<Op> {
             vec![opt("parts", strings(), "Parts (`body:…`). Default: every part.")],
             interference,
         ),
+        op(
+            "draft",
+            "Draft analysis: each face's draft angle toward a pull direction",
+            "The Draft analysis tool (Analysis tools menu): with mold split direction `pull` (a plane, planar face, sketch, mate connector or straight edge; `flip` reverses it), minimum draft `angle` (default 3 deg) and Show undercut regions (`undercut`, default on), each face of the checked `parts` (default all shown) is classed as Onshape's legend colors it — steep (under the minimum), undercut, side_1 (toward the pull) or side_2 — with its draft angle range (degrees). Faces mixing classes report the share of each.",
+            vec![
+                req("pull", json!({ "type": "string" }), "Mold split direction: a plane, planar face, sketch, mate connector or straight edge id."),
+                opt("flip", json!({ "type": "boolean", "default": false }), "Reverse the pull direction."),
+                opt("angle", json!({ "type": ["number", "string"], "default": "3 deg" }), "Minimum draft angle (0–90 deg)."),
+                opt("undercut", json!({ "type": "boolean", "default": true }), "Show undercut regions."),
+                opt("parts", strings(), "Entities to check: part ids (`body:…`) or names; default all shown parts."),
+            ],
+            draft,
+        ),
+        op(
+            "flatten",
+            "Flatten surfaces: a planar sheet of faces with its distortion, optionally exported",
+            "The Flatten surfaces tool (Analysis tools menu): `faces` (contiguous) opened along `rips` (edges; closed faces open along their seams) flattened with minimum strain. Returns the 3D and flat areas, the strain range (negative: compressed, positive: stretched), the flat size and the boundary loops. `export` writes the sheet: DXF or SVG (`inner_edges`: the faces' shared edges too), STL or PARASOLID placed on the XY plane (best fit to the faces' footprint, outer side up) or at mate connector `position` (`angle`, `offset`).",
+            vec![
+                req("faces", strings(), "Faces to flatten."),
+                opt("rips", strings(), "Rip edges."),
+                opt("export", json!({ "type": "object" }), "{\"format\": \"DXF\" | \"SVG\" | \"STL\" | \"PARASOLID\", \"file\": path, \"inner_edges\": bool, \"position\": mate connector id, \"angle\": degrees, \"offset\": length, \"origin\": vertex id}"),
+            ],
+            flatten,
+        ),
     ]
 }
 
@@ -288,4 +312,147 @@ fn curvature_map(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         out.push(j);
     }
     Ok(json!({ "units": units_json(&units), "kind": a.opt_str("kind")?.unwrap_or("gaussian"), "parts": out }).into())
+}
+
+/// A pull / direction reference: a plane-like reference's normal, or a
+/// straight edge's direction.
+fn direction_of(r: &noshape_model::regen::RegenResult, rf: &Reference) -> Option<glam::DVec3> {
+    if let Some(f) = crate::studio::frame_of_ref(&r.display, Some(&r.context), rf) {
+        return Some(f.normal);
+    }
+    let pts = noshape_model::flatten::edge_polyline(&r.display.bodies, rf);
+    let (a, b) = (*pts.first()?, *pts.last()?);
+    let d = (b - a).try_normalize()?;
+    pts.iter().all(|p| (*p - a).cross(d).length() <= 1e-6 + 1e-4 * a.distance(b)).then_some(d)
+}
+
+fn draft(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::analysis::{DraftClass, draft_classes};
+    let (od, tab) = studio_target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let r = od.regenerate(tab, None)?;
+    let pull_ref = refs::parse(a.get("pull").expect("required")).map_err(|e| e.with_param("pull"))?;
+    let mut pull = direction_of(&r, &pull_ref).ok_or_else(|| OpError::param("pull", "Select a plane, a planar face or a straight edge"))?;
+    if a.bool_or("flip", false)? {
+        pull = -pull;
+    }
+    let angle = match a.get("angle") {
+        None => 3f64.to_radians(),
+        Some(v) => crate::ops::sketch::angle_value(v, &units).map_err(|e| e.with_param("angle"))?,
+    };
+    if !(0.0..=std::f64::consts::FRAC_PI_2).contains(&angle) {
+        return Err(OpError::param("angle", "0 to 90 deg"));
+    }
+    let undercut = a.bool_or("undercut", true)?;
+    let names = [(DraftClass::Steep, "steep"), (DraftClass::Undercut, "undercut"), (DraftClass::Side1, "side_1"), (DraftClass::Side2, "side_2")];
+    let mut parts = Vec::new();
+    for b in shown_parts(&r.display, a)? {
+        let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1);
+        let v = draft_classes(&b.mesh, size, pull, angle, undercut);
+        let mut faces = Vec::new();
+        for (fi, fr) in b.face_refs.iter().enumerate() {
+            let Some(&(first, count)) = b.mesh.face_ranges.get(fi) else { continue };
+            let idx = b.mesh.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]);
+            if idx.is_empty() {
+                continue;
+            }
+            let mut counts = [0usize; 4];
+            let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+            for &i in idx {
+                let Some(&(ang, c)) = v.get(i as usize) else { continue };
+                counts[names.iter().position(|n| n.0 == c).expect("class")] += 1;
+                lo = lo.min(ang);
+                hi = hi.max(ang);
+            }
+            let total = counts.iter().sum::<usize>().max(1) as f64;
+            let main = (0..4).max_by_key(|k| counts[*k]).expect("four classes");
+            let mut j = json!({ "face": refs::to_id(fr), "class": names[main].1, "draft_deg": [ (lo.to_degrees() * 1e3).round() / 1e3, (hi.to_degrees() * 1e3).round() / 1e3 ] });
+            if counts.iter().filter(|c| **c > 0).count() > 1 {
+                j["shares"] = names.iter().zip(counts).filter(|(_, c)| *c > 0).map(|(n, c)| (n.1.to_string(), json!(((c as f64 / total) * 1e3).round() / 1e3))).collect::<serde_json::Map<String, Value>>().into();
+            }
+            faces.push(j);
+        }
+        parts.push(json!({ "id": refs::body_id(&b.id), "name": b.name, "faces": faces }));
+    }
+    Ok(json!({ "pull": [pull.x, pull.y, pull.z], "parts": parts }).into())
+}
+
+fn flatten(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::flatten::{SheetPlacement, flat_sheet, flatten_faces, placed_sheet};
+    let (od, tab) = studio_target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let k = len_scale(&units);
+    let r = od.regenerate(tab, None)?;
+    let faces = refs_arg(a, "faces")?;
+    for (i, f) in faces.iter().enumerate() {
+        if !matches!(f, Reference::Face(_)) || !r.display.bodies.iter().any(|b| b.face_refs.contains(f)) {
+            return Err(OpError::param(&format!("faces[{i}]"), "a face of a shown part"));
+        }
+    }
+    if faces.is_empty() {
+        return Err(OpError::param("faces", "Select faces to flatten"));
+    }
+    let rips = match a.get("rips") {
+        Some(_) => refs_arg(a, "rips")?,
+        None => Vec::new(),
+    };
+    for (i, e) in rips.iter().enumerate() {
+        if noshape_model::flatten::edge_polyline(&r.display.bodies, e).is_empty() {
+            return Err(OpError::param(&format!("rips[{i}]"), "an edge of a shown part"));
+        }
+    }
+    let f = flatten_faces(&r.display.bodies, &faces, &rips, Some(&r.context));
+    let (a3, a2) = f.areas();
+    let (smin, smax) = f.strain.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), s| (lo.min(*s), hi.max(*s)));
+    let (lo, hi) = f.flat.iter().fold((glam::DVec2::splat(f64::INFINITY), glam::DVec2::splat(f64::NEG_INFINITY)), |(lo, hi), q| (lo.min(*q), hi.max(*q)));
+    let mut out = json!({
+        "units": units_json(&units),
+        "area_3d": a3 * k * k,
+        "area_flat": a2 * k * k,
+        "strain": [if smin.is_finite() { smin } else { 0.0 }, if smax.is_finite() { smax } else { 0.0 }],
+        "flat_size": [(hi.x - lo.x) * k, (hi.y - lo.y) * k],
+        "loops": f.loops(false).iter().map(|(_, l)| l.len()).sum::<usize>(),
+    });
+    if let Some(e) = a.object("export")? {
+        let err = |k: &str, m: &str| OpError::param(&format!("export.{k}"), m);
+        let format = e.get("format").and_then(Value::as_str).unwrap_or("DXF").to_ascii_uppercase();
+        let file = e.get("file").and_then(Value::as_str).ok_or_else(|| err("file", "a path"))?;
+        let inner = e.get("inner_edges").and_then(Value::as_bool).unwrap_or(false);
+        let connector = match e.get("position").and_then(Value::as_str) {
+            Some(id) => {
+                let rf = refs::parse_str(id).ok_or_else(|| err("position", "a mate connector id"))?;
+                Some(r.display.connectors.iter().find(|c| c.reference == rf).map(|c| (c.origin, c.x, c.z)).ok_or_else(|| err("position", "a mate connector of this Part Studio"))?)
+            }
+            None => None,
+        };
+        let origin_vertex = match e.get("origin").and_then(Value::as_str) {
+            Some(id) => {
+                let rf = refs::parse_str(id).ok_or_else(|| err("origin", "a vertex id"))?;
+                Some(r.display.bodies.iter().find_map(|b| b.vertex_refs.iter().position(|x| *x == rf).and_then(|i| b.mesh.vertices.get(i)).map(|p| glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64))).ok_or_else(|| err("origin", "a vertex of a shown part"))?)
+            }
+            None => None,
+        };
+        let angle = match e.get("angle") {
+            Some(v) => v.as_f64().ok_or_else(|| err("angle", "degrees"))?.to_radians(),
+            None => 0.0,
+        };
+        let offset = match e.get("offset") {
+            Some(v) => crate::ops::sketch::length_value(v, &units).map_err(|x| x.with_param("export.offset"))?,
+            None => 0.0,
+        };
+        let placement = SheetPlacement { connector, angle, offset, origin_vertex };
+        let io = |r: std::io::Result<()>| r.map_err(|x| OpError::new("io", format!("{file}: {x}")).with_param("export.file"));
+        match format.as_str() {
+            "DXF" => io(std::fs::write(file, f.to_dxf(inner)))?,
+            "SVG" => io(std::fs::write(file, f.to_svg(inner)))?,
+            "STL" => io(std::fs::write(file, f.to_stl(&placed_sheet(&f, &placement))))?,
+            "PARASOLID" => {
+                let sheet = flat_sheet(&f, &placed_sheet(&f, &placement), inner).map_err(|x| OpError::new("export_failed", x))?;
+                noshape_kernel::write_parasolid(std::path::Path::new(file), &[sheet], noshape_kernel::LengthUnit::Meter, false).map_err(|x| OpError::new("export_failed", x.to_string()))?;
+            }
+            _ => return Err(err("format", "DXF, SVG, STL or PARASOLID")),
+        }
+        out["file"] = json!(file);
+    }
+    Ok(out.into())
 }

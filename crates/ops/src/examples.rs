@@ -124,7 +124,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("analysis_interference", &[r##"{}"##]),
     ("analysis_curvature_map", &[r##"{}"##, r##"{"parts": ["Part 1"], "kind": "min_radius", "points": 5}"##]),
     ("analysis_thickness", &[r##"{}"##, r##"{"parts": ["Part 1"], "below": "1.5 mm", "points": 5}"##]),
-    ("render_image", &[r##"{"view": "isometric", "file": "/tmp/part.png"}"##, r##"{"tab": "Assembly 1", "view": "isometric", "section": [{"plane": "plane:front"}]}"##, r##"{"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}"##]),
+    ("render_image", &[r##"{"view": "isometric", "file": "/tmp/part.png"}"##, r##"{"tab": "Assembly 1", "view": "isometric", "section": [{"plane": "plane:front"}]}"##, r##"{"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}"##, r##"{"view": "front", "perspective": true, "tangent_edges": "phantom", "hidden_edges": true}"##, r##"{"isolate": ["Part 1"], "zebra": {"stripes": 20}}"##, r##"{"normal_to": "plane:front", "reflection": {"image": "Blue sky", "rotation": 45}}"##]),
     ("render_named_view", &[r##"{"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}"##, r##"{"name": "Section A", "delete": true}"##]),
     // import / export
     ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##]),
@@ -202,6 +202,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("config_duplicate_input", &[r##"{"tab": "Assembly 1", "input": "Configuration"}"##]),
     ("part_configured_properties", &[r##"{"part": "body:F1a2b.0", "action": "add_property", "property": "Description"}"##, r##"{"part": "body:F1a2b.0", "action": "set", "property": "Description", "value": "Long bracket"}"##]),
     ("part_annotation", &[r##"{"action": "add_datum", "face": "face:eJyrVkr…"}"##, r##"{"action": "delete", "annotation": 1}"##]),
+    ("analysis_draft", &[r##"{"pull": "plane:top", "angle": "3 deg"}"##, r##"{"pull": "plane:top", "flip": true, "undercut": false, "parts": ["Part 1"]}"##]),
+    ("analysis_flatten", &[r##"{"faces": ["face:eJyrVkr…"]}"##, r##"{"faces": ["face:eJyrVkr…"], "rips": ["edge:eJyrVkr…"], "export": {"format": "DXF", "file": "/tmp/flat.dxf"}}"##]),
     ("drawing_templates", &[r##"{}"##]),
     ("drawing_create", &[r##"{"source": "Part Studio 1", "template": "ISO A3", "suggested_views": true}"##, r##"{"source": "Assembly 1", "custom_template": {"standard": "ANSI", "size": "B"}}"##]),
     ("drawing_get", &[r##"{"drawing": "Part 1 Drawing 1"}"##, r##"{"drawing": "Part 1 Drawing 1", "edges": false}"##]),

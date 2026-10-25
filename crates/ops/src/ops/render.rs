@@ -43,7 +43,7 @@ pub fn ops() -> Vec<Op> {
         group: "render",
         verb: "image",
         summary: "Render a Part Studio or an Assembly to a PNG image from a standard or named view",
-        description: "Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look: white background, shaded with edges), zoomed to fit. With `tab` an Assembly: the solved assembly in its active configuration (standard views; sections on plane:top|front|right; `section_exclude` instance names). Returned as an image (MCP image content) and, with `file`, written to disk.",
+        description: "Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look: white background, shaded with edges), zoomed to fit. With `tab` an Assembly: the solved assembly in its active configuration (standard views; sections on plane:top|front|right; `section_exclude` instance names). The view menu's options as in the app: `perspective`, `tangent_edges`, `hidden_edges`, `boundary_edges`, `isolate` / `transparent` (Make isolate / Make transparent), `normal_to` (View normal to), `high_quality` (View in high quality), and the analysis displays `zebra` (Zebra stripes) and `reflection` (Reflection analysis). Returned as an image (MCP image content) and, with `file`, written to disk.",
         fields: vec![
             doc_field(),
             opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio."),
@@ -55,6 +55,16 @@ pub fn ops() -> Vec<Op> {
             opt("display_mode", json!({ "type": "string", "enum": ["shaded_with_edges", "shaded", "hidden_line", "translucent"] }), "Render style (default shaded_with_edges)."),
             opt("show_sketches", json!({ "type": "boolean", "default": true }), "Draw sketches."),
             opt("show_planes", json!({ "type": "boolean", "default": false }), "Draw the default and construction planes."),
+            opt("perspective", json!({ "type": "boolean", "default": false }), "Perspective view (default orthographic)."),
+            opt("tangent_edges", json!({ "type": "string", "enum": ["visible", "phantom", "hidden"], "default": "visible" }), "Tangent edges visible / phantom / hidden."),
+            opt("hidden_edges", json!({ "type": "boolean", "default": false }), "Hide/show hidden edges: draw the hidden ones."),
+            opt("boundary_edges", json!({ "type": "boolean", "default": false }), "Part Studios: Highlight boundary edges."),
+            opt("isolate", json!({ "type": "array", "items": { "type": "string" } }), "Make isolate: these parts (Part Studio ids or names) or instances (Assembly), the rest as ghosts."),
+            opt("transparent", json!({ "type": "array", "items": { "type": "string" } }), "Make transparent: these parts or instances as ghosts."),
+            opt("normal_to", s(), "Part Studios: View normal to a planar face, plane, sketch or mate connector (replaces `view`)."),
+            opt("high_quality", json!({ "type": "boolean", "default": false }), "View in high quality (finer tessellation)."),
+            opt("zebra", json!({ "type": "object" }), "Zebra stripes: {\"stripes\": 35, \"flip\": false, \"show_edges\": true}."),
+            opt("reflection", json!({ "type": "object" }), "Reflection analysis: {\"image\": an environment map name (\"Blue sky\", default the first) or an image file path, \"rotation\": degrees, \"opposite\": bool, \"blur\": bool, \"show_edges\": bool (default false)}."),
             opt("file", s(), "Also write the PNG here."),
         ],
         mutates: false,
@@ -73,24 +83,62 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some("translucent") => DisplayMode::Translucent,
         Some(_) => return Err(OpError::param("display_mode", "unknown display mode")),
     };
+    let vo = view_options(a)?;
     let mut opts = SceneOptions {
         show_planes: a.bool_or("show_planes", false)?,
         show_sketches: a.bool_or("show_sketches", true)?,
         show_origin: a.bool_or("show_planes", false)?,
-        display_mode: mode,
+        display_mode: vo.display_mode(mode),
+        tangent_edges: vo.tangent,
+        hidden_edges_visible: vo.hidden_edges,
+        zebra: vo.zebra,
         ..Default::default()
     };
     let view_name = a.opt_str("view")?.unwrap_or("isometric").to_string();
     if super::configuration::asm::is_assembly(ctx, a)? {
-        return image_assembly(ctx, a, width, height, mode, &view_name);
+        for k in ["boundary_edges", "normal_to"] {
+            if a.get(k).is_some() {
+                return Err(OpError::param(k, "Part Studios only"));
+            }
+        }
+        return image_assembly(ctx, a, width, height, vo, mode, &view_name);
     }
+    opts.highlight_boundary = a.bool_or("boundary_edges", false)?;
     let (od, tab) = studio_target(ctx, a)?;
     let named = crate::doc::studio(od.doc(), tab)?.named_views.iter().find(|v| v.name.eq_ignore_ascii_case(&view_name)).cloned();
     let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1);
     if view.is_none() && named.is_none() {
         return Err(OpError::param("view", "a standard view (isometric, front, top, ...) or a named view of this Part Studio"));
     }
-    let r = od.regenerate(tab, None)?;
+    // View in high quality: the parts tessellated 4x finer (as the app's).
+    let r = if vo.high_quality { od.regenerate_with(tab, None, |o| o.relative_deflection *= 0.25)? } else { od.regenerate(tab, None)? };
+    // Make isolate / Make transparent: the others / these parts as ghosts.
+    let pick = |k: &str| -> Result<Option<Vec<noshape_model::BodyId>>, OpError> {
+        let Some(list) = a.opt_array(k)? else { return Ok(None) };
+        list.iter()
+            .enumerate()
+            .map(|(i, v)| {
+                let key = v.as_str().unwrap_or_default();
+                r.display.bodies.iter().find(|b| crate::refs::body_id(&b.id) == key || b.name == key).map(|b| b.id.clone()).ok_or_else(|| OpError::param(&format!("{k}[{i}]"), "a part (id or name)"))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+    };
+    if let Some(chosen) = pick("isolate")? {
+        opts.ghost_bodies = r.display.bodies.iter().filter(|b| !chosen.contains(&b.id)).map(|b| b.id.clone()).collect();
+        opts.faint_planes = true;
+    }
+    if let Some(chosen) = pick("transparent")? {
+        opts.ghost_bodies.extend(chosen);
+    }
+    let normal_to = match a.opt_str("normal_to")? {
+        Some(id) => {
+            let rf = crate::refs::parse_str(id).ok_or_else(|| OpError::param("normal_to", "a planar face, plane, sketch or mate connector id"))?;
+            let f = crate::studio::frame_of_ref(&r.display, Some(&r.context), &rf).ok_or_else(|| OpError::param("normal_to", "Select a planar face, plane, sketch or mate connector"))?;
+            Some(f)
+        }
+        None => None,
+    };
     // Section view: the planes given, else a named view's own.
     if a.get("section").is_some() {
         let (planes, skip) = section_planes(od, &r, a)?;
@@ -101,6 +149,7 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let off = ctx.offscreen()?;
     let up = off.renderer.uploader();
+    opts.reflection = vo.upload_reflection(&up);
     let built = builder::build(&r.display, &opts, &mut off.cache, &up);
     let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
     let aspect = width as f64 / height as f64;
@@ -114,9 +163,16 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         None => noshape_scene::png::fit_camera(lo, hi, aspect, view),
     };
-    let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+    let mut camera = camera;
+    // View normal to: looking at the plane's front, its y up (the app's).
+    if let Some(f) = normal_to {
+        camera.rotation = noshape_render::Camera::look_rotation(-f.normal, f.y);
+        camera.fit_box(lo, hi, aspect);
+    }
+    vo.finish_camera(&mut camera, lo, hi, aspect);
+    let style = vo.style();
     let png = off.render_png(&built.scene, &camera, &style, width, height).map_err(|e| OpError::new("render_failed", e))?;
-    let mut v = json!({ "width": width, "height": height, "view": view_name, "bytes": png.len() });
+    let mut v = json!({ "width": width, "height": height, "view": if normal_to.is_some() { "normal_to".to_string() } else { view_name }, "bytes": png.len() });
     if let Some(f) = a.opt_str("file")? {
         std::fs::write(f, &png).map_err(|e| OpError::new("io", format!("writing {f}: {e}")).with_param("file"))?;
         v["file"] = json!(f);
@@ -194,7 +250,7 @@ fn named_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 /// render_image of an Assembly tab: the solved assembly in its active
 /// configuration, drawn as the Assembly view does.
-fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, mode: DisplayMode, view_name: &str) -> Result<OpOutput, OpError> {
+fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOptions, mode: DisplayMode, view_name: &str) -> Result<OpOutput, OpError> {
     use noshape_model::document::TabContent;
     use noshape_scene::asm_scene::{self, AsmGpuCache, AsmSceneOptions};
     let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1).ok_or_else(|| OpError::param("view", "a standard view: isometric, front, back, left, right, top, bottom, dimetric or trimetric"))?;
@@ -203,7 +259,14 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, mode: Displa
     let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| &t.content) else { unreachable!("checked") };
     let values = super::configuration::asm::values(od, tab, asm);
     let eff = crate::assembly::effective(asm, &values);
-    let mut opts = AsmSceneOptions { display_mode: mode, ..Default::default() };
+    let mut opts = AsmSceneOptions { display_mode: mode, tangent_edges: vo.tangent, hidden_edges_visible: vo.hidden_edges, zebra: vo.zebra, hide_edges: vo.hide_edges(), ..Default::default() };
+    // Make isolate / Make transparent (instances).
+    let tops = |k: &str| -> Result<Option<std::collections::HashSet<noshape_model::assembly::InstanceId>>, OpError> {
+        let Some(list) = a.opt_array(k)? else { return Ok(None) };
+        list.iter().enumerate().map(|(i, v)| super::assembly::find_instance(asm, v.as_str().unwrap_or_default(), &format!("{k}[{i}]"))).collect::<Result<_, _>>().map(Some)
+    };
+    opts.isolate = tops("isolate")?;
+    opts.ghost_tops = tops("transparent")?.unwrap_or_default();
     // Section view: the default planes (an assembly's own planes).
     let units = od.doc().settings.units;
     for (i, p) in a.opt_array("section")?.cloned().unwrap_or_default().iter().enumerate() {
@@ -231,10 +294,13 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, mode: Displa
     let result = od.evaluate_assembly(tab, &eff, &Default::default());
     let off = ctx.offscreen()?;
     let up = off.renderer.uploader();
+    opts.reflection = vo.upload_reflection(&up);
     let built = asm_scene::build(&result, &opts, &mut AsmGpuCache::default(), &up);
     let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
-    let camera = noshape_scene::png::fit_camera(lo, hi, width as f64 / height as f64, Some(view));
-    let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+    let aspect = width as f64 / height as f64;
+    let mut camera = noshape_scene::png::fit_camera(lo, hi, aspect, Some(view));
+    vo.finish_camera(&mut camera, lo, hi, aspect);
+    let style = vo.style();
     let png = off.render_png(&built.scene, &camera, &style, width, height).map_err(|e| OpError::new("render_failed", e))?;
     let mut v = json!({ "width": width, "height": height, "view": view_name, "bytes": png.len(), "instances": result.occurrences.iter().filter(|o| !o.hidden).count() });
     if let Some(f) = a.opt_str("file")? {
@@ -242,4 +308,94 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, mode: Displa
         v["file"] = json!(f);
     }
     Ok(OpOutput { value: v, images: vec![Image { png }] })
+}
+
+/// The 3D view's display options (view menu, analysis tools) shared by
+/// Part Studios and assemblies.
+struct ViewOptions {
+    perspective: bool,
+    tangent: builder::TangentEdges,
+    hidden_edges: bool,
+    high_quality: bool,
+    zebra: Option<noshape_render::Zebra>,
+    /// Environment, rotation (radians), blur.
+    reflection: Option<(noshape_scene::environment_maps::EnvImage, f32, bool)>,
+    /// Zebra stripes / Reflection analysis › Show edges.
+    show_edges: bool,
+}
+
+fn view_options(a: &Args) -> Result<ViewOptions, OpError> {
+    let tangent = match a.opt_str("tangent_edges")? {
+        None | Some("visible") => builder::TangentEdges::Visible,
+        Some("phantom") => builder::TangentEdges::Phantom,
+        Some("hidden") => builder::TangentEdges::Removed,
+        Some(_) => return Err(OpError::param("tangent_edges", "visible, phantom or hidden")),
+    };
+    let mut show_edges = true;
+    let zebra = match a.object("zebra")? {
+        None => None,
+        Some(z) => {
+            // Onshape's defaults: 35 stripes, not flipped, edges shown.
+            let stripes = match z.get("stripes") {
+                None => 35,
+                Some(v) => v.as_u64().filter(|n| (1..=200).contains(n)).ok_or_else(|| OpError::param("zebra.stripes", "1 to 200"))? as u32,
+            };
+            show_edges = z.get("show_edges").and_then(|v| v.as_bool()).unwrap_or(true);
+            Some(noshape_render::Zebra { stripes, flip: z.get("flip").and_then(|v| v.as_bool()).unwrap_or(false) })
+        }
+    };
+    let reflection = match a.object("reflection")? {
+        None => None,
+        Some(_) if zebra.is_some() => return Err(OpError::param("reflection", "one of zebra or reflection")),
+        Some(r) => {
+            use noshape_scene::environment_maps as env;
+            let image = match r.get("image").and_then(|v| v.as_str()) {
+                None => env::generate(env::NAMES[0]).expect("library image"),
+                Some(n) if env::NAMES.contains(&n) => env::generate(n).expect("library image"),
+                Some(path) => {
+                    let bytes = std::fs::read(path).map_err(|e| OpError::param("reflection.image", &format!("an environment map ({}) or an image file: {e}", env::NAMES.join(", "))))?;
+                    env::decode(&bytes).ok_or_else(|| OpError::param("reflection.image", "not a PNG, JPEG, GIF or BMP image"))?
+                }
+            };
+            let deg = r.get("rotation").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let sign = if r.get("opposite").and_then(|v| v.as_bool()).unwrap_or(false) { -1.0 } else { 1.0 };
+            // Onshape's dialog starts with the edges hidden.
+            show_edges = r.get("show_edges").and_then(|v| v.as_bool()).unwrap_or(false);
+            Some((image, (deg.to_radians() * sign) as f32, r.get("blur").and_then(|v| v.as_bool()).unwrap_or(false)))
+        }
+    };
+    Ok(ViewOptions { perspective: a.bool_or("perspective", false)?, tangent, hidden_edges: a.bool_or("hidden_edges", false)?, high_quality: a.bool_or("high_quality", false)?, zebra, reflection, show_edges })
+}
+
+impl ViewOptions {
+    /// Zebra stripes and Reflection without Show edges hide the edges.
+    fn hide_edges(&self) -> bool {
+        (self.zebra.is_some() || self.reflection.is_some()) && !self.show_edges
+    }
+
+    fn display_mode(&self, mode: DisplayMode) -> DisplayMode {
+        if self.hide_edges() && mode == DisplayMode::ShadedWithEdges { DisplayMode::Shaded } else { mode }
+    }
+
+    fn upload_reflection(&self, up: &noshape_render::renderer::Uploader) -> Option<noshape_render::Reflection> {
+        let (img, rotation, blur) = self.reflection.as_ref()?;
+        let environment = up.upload_image(&noshape_render::ImageData { corners: [[0.0; 3]; 4], width: img.width, height: img.height, rgba: img.rgba.clone() });
+        Some(noshape_render::Reflection { environment, rotation: *rotation, blur: *blur, lock: false })
+    }
+
+    /// Perspective view: the same direction, framed again for perspective.
+    fn finish_camera(&self, camera: &mut noshape_render::Camera, lo: glam::DVec3, hi: glam::DVec3, aspect: f64) {
+        if self.perspective {
+            camera.projection = noshape_render::Projection::Perspective;
+            camera.fit_box(lo, hi, aspect);
+        }
+    }
+
+    fn style(&self) -> noshape_render::Style {
+        let mut style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+        if self.high_quality {
+            style.detail.mesh_error_px = noshape_render::scene::MESH_ERROR_PX_HIGH_QUALITY_STUDIO;
+        }
+        style
+    }
 }

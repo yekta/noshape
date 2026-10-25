@@ -2973,3 +2973,99 @@ fn flex_pcb_model_features() {
     let st = &f["feature_status"];
     assert!(st["status"] == "Ok" || (st["status"] == "Info" && st["message"].as_str().is_some_and(|m| m.contains("flat pattern"))), "{f}");
 }
+
+/// render_image's view menu options and analysis displays.
+#[test]
+fn render_image_view_options() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "render_options.noshape");
+    let img = |ctx: &mut Ctx, extra: Value| {
+        let mut a = json!({ "width": 160, "height": 120, "view": "isometric" });
+        a.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        let r = call(ctx, "render_image", a);
+        assert!(num(&r["bytes"]) > 100.0, "{r}");
+        r
+    };
+    let png = |ctx: &mut Ctx, extra: Value| -> Vec<u8> {
+        let file = scratch("render_options.png");
+        let mut a = extra;
+        a["file"] = json!(file.to_str().unwrap());
+        img(ctx, a);
+        std::fs::read(&file).unwrap()
+    };
+    for o in [
+        json!({ "perspective": true }),
+        json!({ "tangent_edges": "phantom" }),
+        json!({ "tangent_edges": "hidden", "hidden_edges": true }),
+        json!({ "boundary_edges": true }),
+        json!({ "isolate": ["Part 1"] }),
+        json!({ "transparent": ["Part 1"] }),
+        json!({ "high_quality": true }),
+        json!({ "reflection": {} }),
+        json!({ "reflection": { "image": "Nightfall", "rotation": 30, "blur": true, "show_edges": true } }),
+    ] {
+        img(&mut ctx, o);
+    }
+    let r = img(&mut ctx, json!({ "normal_to": "plane:front" }));
+    assert_eq!(r["view"], "normal_to");
+    // Zebra stripes change the picture.
+    assert_ne!(png(&mut ctx, json!({})), png(&mut ctx, json!({ "zebra": { "stripes": 20 } })));
+    for (o, param) in [
+        (json!({ "tangent_edges": "dashed" }), "tangent_edges"),
+        (json!({ "isolate": ["Nope"] }), "isolate[0]"),
+        (json!({ "normal_to": "plane:nope" }), "normal_to"),
+        (json!({ "reflection": { "image": "/nonexistent/env.png" } }), "reflection.image"),
+        (json!({ "zebra": {}, "reflection": {} }), "reflection"),
+        (json!({ "zebra": { "stripes": 0 } }), "zebra.stripes"),
+    ] {
+        let mut a = o.clone();
+        a["width"] = json!(64);
+        a["height"] = json!(64);
+        let e = try_call(&mut ctx, "render_image", a).unwrap_err();
+        assert_eq!(e.param.as_deref(), Some(param), "{o}: {e:?}");
+    }
+    // Assemblies: the same options on instances; no normal_to / boundary edges.
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }));
+    let r = call(&mut ctx, "render_image", json!({ "tab": "Assembly 1", "width": 160, "height": 120, "perspective": true, "zebra": {}, "isolate": ["Part Studio 1 <1>"] }));
+    assert!(num(&r["bytes"]) > 100.0, "{r}");
+    let e = try_call(&mut ctx, "render_image", json!({ "tab": "Assembly 1", "normal_to": "plane:top" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("normal_to"), "{e:?}");
+}
+
+/// Draft analysis and Flatten surfaces on the block with a hole.
+#[test]
+fn draft_and_flatten_analysis() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "draft_flatten.noshape");
+    // Pulled along +Z: the top toward the pull, the bottom away, walls and hole steep.
+    let d = call(&mut ctx, "analysis_draft", json!({ "pull": "plane:top" }));
+    let faces = d["parts"][0]["faces"].as_array().unwrap().clone();
+    let count = |faces: &[Value], c: &str| faces.iter().filter(|f| f["class"] == c).count();
+    assert_eq!((count(&faces, "side_1"), count(&faces, "side_2")), (1, 1), "{d}");
+    assert_eq!(count(&faces, "steep"), faces.len() - 2, "{d}");
+    let top = faces.iter().find(|f| f["class"] == "side_1").unwrap();
+    assert!((num(&top["draft_deg"][0]) - 90.0).abs() < 1e-3, "{top}");
+    let flipped = call(&mut ctx, "analysis_draft", json!({ "pull": "plane:top", "flip": true }));
+    let ff = flipped["parts"][0]["faces"].as_array().unwrap();
+    assert_eq!(ff.iter().find(|f| f["face"] == top["face"]).unwrap()["class"], "side_2", "{flipped}");
+    let e = try_call(&mut ctx, "analysis_draft", json!({ "pull": "plane:top", "angle": "100 deg" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("angle"), "{e:?}");
+
+    // Flatten a side wall (already flat: no stretch) and the hole's wall
+    // (opened along its seam). Faces with holes: qa5-routing FLAT-HOLE.
+    let wall = call(&mut ctx, "query_entities", json!({ "kind": "faces", "surface": "plane", "normal": [0, -1, 0] }))["faces"][0]["id"].clone();
+    let f = call(&mut ctx, "analysis_flatten", json!({ "faces": [wall] }));
+    assert!((num(&f["area_3d"]) - 1600.0).abs() < 1e-3, "{f}");
+    assert!((num(&f["area_flat"]) - 1600.0).abs() < 1e-3, "{f}");
+    let size = [num(&f["flat_size"][0]), num(&f["flat_size"][1])];
+    assert!((size[0].min(size[1]) - 20.0).abs() < 1e-3 && (size[0].max(size[1]) - 80.0).abs() < 1e-3, "{f}");
+    // The hole's wall (one face or two halves).
+    let hole: Vec<Value> = call(&mut ctx, "query_entities", json!({ "kind": "faces", "surface": "cylinder" }))["faces"].as_array().unwrap().iter().map(|f| f["id"].clone()).collect();
+    let dxf = scratch("flat_hole.dxf");
+    let f = call(&mut ctx, "analysis_flatten", json!({ "faces": hole, "export": { "format": "DXF", "file": dxf.to_str().unwrap() } }));
+    let want = 2.0 * std::f64::consts::PI * 5.0 * 20.0;
+    assert!((num(&f["area_flat"]) - want).abs() / want < 0.02, "{f}");
+    assert!(std::fs::read_to_string(&dxf).unwrap().contains("SECTION"));
+    let e = try_call(&mut ctx, "analysis_flatten", json!({ "faces": ["plane:top"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("faces[0]"), "{e:?}");
+}
