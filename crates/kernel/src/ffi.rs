@@ -573,6 +573,7 @@ pub(crate) mod ffi {
         fn read_pvz_instances(path: &str) -> Result<Vec<PvzInstance>>;
         fn read_mesh_bodies(path: &str) -> Result<UniquePtr<OcShape>>;
         fn is_mesh(s: &OcShape) -> bool;
+        fn has_triangulation(s: &OcShape) -> bool;
 
         // ---- surfacing (wrap, isocline, surface fitting)
         fn op_wrap_faces(faces: &OcShapeList, src: &DevSurf, dst: &DevSurf, xf: &[f64], tol: f64) -> Result<OpOut>;

@@ -67,6 +67,33 @@ fn stl_mesh_body() {
     assert_eq!(t.positions.len(), 36, "faceted: 12 triangles x 3 corners");
 }
 
+/// Display meshing leaves no triangulation on a B-rep shape (OCCT's booleans
+/// on a meshed shape are several times slower; mesh.cpp `mesh_fill`), and
+/// meshing it again gives the same mesh; a mesh body keeps its triangles.
+#[test]
+fn tessellating_leaves_no_triangulation_behind() {
+    let b = make_box_corners(DVec3::ZERO, DVec3::new(0.02, 0.01, 0.005)).unwrap();
+    let pin = make_cylinder(&Plane::from_normal(DVec3::new(0.01, 0.005, -0.001), DVec3::Z), 0.002, 0.01, std::f64::consts::TAU).unwrap();
+    let s = cut(&b, &pin).unwrap().shape;
+    assert!(!s.has_triangulation());
+    let first = tessellate(&s, 1e-4, 0.1, false).unwrap();
+    assert!(!first.indices.is_empty());
+    assert!(!s.has_triangulation(), "triangulation left on the shape");
+    let again = tessellate(&s, 1e-4, 0.1, false).unwrap();
+    assert_eq!((again.positions.len(), again.indices.len(), again.edge_points.len()), (first.positions.len(), first.indices.len(), first.edge_points.len()));
+
+    let dir = std::env::temp_dir().join(format!("noshape-meshclean-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("box.stl");
+    write_stl(&b, &path, 1e-4, StlFormat::Binary).unwrap();
+    let m = read_mesh_bodies(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    for _ in 0..2 {
+        assert_eq!(tessellate(&m, 1e-4, 0.5, false).unwrap().positions.len(), 36);
+        assert!(m.is_mesh() && m.is_valid());
+    }
+}
+
 /// 3MF and glTF as mesh bodies: a 10 mm cube placed 5 mm along x by the
 /// file's own transform, read in millimetres.
 #[test]

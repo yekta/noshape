@@ -342,6 +342,7 @@ StepImport               read_pvz_parts(rust::Str path);
 rust::Vec<PvzInstance>   read_pvz_instances(rust::Str path);
 std::unique_ptr<OcShape> read_mesh_bodies(rust::Str path);
 bool                     is_mesh(const OcShape& s);
+bool                     has_triangulation(const OcShape& s);
 
 // ---- HLR (hlr.cpp)
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up,
