@@ -1738,6 +1738,10 @@ impl Viewport {
         }
         let drag = std::mem::replace(&mut self.drag, Drag::None);
         match drag {
+            // Onshape (eventCanBeUsedForContextMenu = ctrlKey || right
+            // button, every platform; live "nav2 selection" (3)): Ctrl+click
+            // opens the context menu on release and selects nothing.
+            Drag::Pending(MouseButton::Left) if e.modifiers.control && !self.tool_captures_left => self.context_menu_at(p, e.position, cx),
             Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, cx),
             Drag::Pending(MouseButton::Right) => self.context_menu_at(p, e.position, cx),
             Drag::Box => {

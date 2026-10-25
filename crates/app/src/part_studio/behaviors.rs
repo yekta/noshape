@@ -930,8 +930,11 @@ impl PartStudioView {
     /// the selection; Ctrl+drag deselects (Onshape).
     pub(super) fn box_select(&mut self, ids: &[u32], deselect: bool, cx: &mut Context<Self>) {
         let Some(built) = &self.built else { return };
-        // Live (selection/22–23): a box takes the default planes it covers too.
-        let targets: Vec<PickTarget> = ids.iter().filter_map(|id| built.picks.get(*id).cloned()).filter(|t| t.kind != PickKind::Origin).collect();
+        // Live (behaviours "nav2 selection" (5), 10-25): a box never takes the
+        // default planes, the Origin or a mate connector (nor vertices or
+        // the part body below), window or crossing, even when they lie
+        // inside it.
+        let targets: Vec<PickTarget> = ids.iter().filter_map(|id| built.picks.get(*id).cloned()).filter(|t| !matches!(t.kind, PickKind::Plane | PickKind::Origin | PickKind::Connector)).collect();
         if let Some(e) = &self.edit {
             let dialog = e.dialog.clone();
             if let Some((_, filter, _)) = dialog.read(cx).active_filter() {

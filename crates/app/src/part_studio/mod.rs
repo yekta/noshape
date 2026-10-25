@@ -1430,7 +1430,8 @@ impl PartStudioView {
                     // dialog's chips (live qa5 pass 7: neither a feature
                     // dialog's fields nor Mass properties' "Parts to measure"
                     // or Measure's entities, which show the selection).
-                    None if self.edit.is_none() && !self.show_mass && !self.ui.measure_pinned => {
+                    // Shift+click on empty space keeps it (live "nav2 selection" (3)).
+                    None if self.edit.is_none() && !self.show_mass && !self.ui.measure_pinned && !modifiers.shift => {
                         self.selection.clear();
                         self.selected_features.clear();
                         self.refresh_scene(false, cx);
@@ -4855,7 +4856,7 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {
                 // Esc closes transient UI first (S toolbar, Select other,
                 // zoom to window, dependencies), then the tool or dialog,
-                // then isolate / make transparent, then the selection.
+                // then isolate / make transparent; never the selection.
                 if this.show_shortcuts {
                     this.toggle_shortcut_sheet(window, cx);
                     return;
@@ -4911,11 +4912,10 @@ impl Render for PartStudioView {
                 if this.edit.is_some() {
                     this.cancel_edit(window, cx);
                 } else if this.close_tool_panel(window, cx) {
-                } else if !this.exit_isolate(window, cx) {
-                    this.selection.clear();
-                    this.selected_features.clear();
-                    this.refresh_scene(false, cx);
-                    cx.notify();
+                } else {
+                    // Live ("nav2 selection" (4)): Esc never clears the
+                    // selection in the graphics (Space does).
+                    this.exit_isolate(window, cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &Accept, window, cx| {
