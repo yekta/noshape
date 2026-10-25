@@ -20,8 +20,6 @@ use noshape_render::Projection;
 // (`noshape_render::overlay::view_cube`, `NOSHAPE_OVERLAY=wgpu`).
 pub use noshape_render::overlay::view_cube::{Arrow, CubeCell, WIDGET_PX, widget_hit};
 
-const G: f64 = WIDGET_PX as f64;
-
 /// Onshape's LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE (px moved, |dx| + |dy|).
 const CLICK_TOLERANCE: f32 = 2.0;
 /// VIEW_CUBE_LEFT/RIGHT/TOP/BOTTOM_MARGIN_PX.
@@ -89,7 +87,7 @@ impl<V: 'static> Copy for CubeHooks<V> {}
 /// stays in.
 pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, viewport: DVec2, cx: &mut Context<V>) -> AnyElement {
     let local = |pos: Point<Pixels>, o: Point<Pixels>| {
-        let d = DVec2::new(f64::from(f32::from(pos.x - o.x)), f64::from(f32::from(pos.y - o.y))) - DVec2::splat(G * 0.5);
+        let d = DVec2::new(f64::from(f32::from(pos.x - o.x)), f64::from(f32::from(pos.y - o.y))) - DVec2::from(noshape_render::overlay::view_cube::CENTER);
         DVec2::new(d.x, -d.y)
     };
     let view = cx.entity();
