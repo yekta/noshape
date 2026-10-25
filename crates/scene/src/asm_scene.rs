@@ -898,7 +898,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     if let Some(g) = h.section
         && let Some(d) = g.dir.try_normalize()
     {
-        push_section_glyph(&mut ol, built, &g, d);
+        push_section_glyph(&mut ol, &|h| overlay_id(built, OverlayPick::Section(h)), &g, d);
     }
     if !ol.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&ol))).per_primitive_color().ignore_clip().layer(22));
@@ -920,7 +920,7 @@ fn lin_to_u8(c: [f32; 4]) -> [u8; 4] {
 /// Onshape's mate connector glyph (live qa5/asm-041, assembly/31-*): a khaki
 /// disc in the connector's XY plane with a notch between +X and +Y, a dark
 /// rim, and a small triad (Z up from the centre, X and Y outside the disc).
-fn push_connector_glyph(lines: &mut LineData, f: &Frame, r: f64) {
+pub fn push_connector_glyph(lines: &mut LineData, f: &Frame, r: f64) {
     const FILL: [u8; 4] = [187, 190, 134, 255];
     const RIM: [u8; 4] = [42, 81, 105, 255];
     let (u, v, n) = (f.x(), f.y(), f.z());
@@ -954,8 +954,9 @@ fn push_connector_glyph(lines: &mut LineData, f: &Frame, r: f64) {
 /// (core ≈ 230,232,233, edge ≈ 194,199,203); a hovered handle blue (≈ 70,123,177);
 /// the dragged one deeper blue (≈ 40,97,182). The base circle faces the
 /// viewer; the shaft and hollow head; two small rings at the tip, each with
-/// its axis line (ring 0 about the plane's Y, ring 1 about its X).
-fn push_section_glyph(ol: &mut LineData, built: &AsmBuilt, g: &SectionGlyph, d: DVec3) {
+/// its axis line (ring 0 about the plane's Y, ring 1 about its X). `id`
+/// gives each handle's pick id (the Part Studio's are unpickable).
+pub fn push_section_glyph(ol: &mut LineData, id: &dyn Fn(SectionHandle) -> u32, g: &SectionGlyph, d: DVec3) {
     const CORE: [u8; 4] = [230, 232, 233, 255];
     const EDGE: [u8; 4] = [194, 199, 203, 255];
     const HOVER: [u8; 4] = [70, 123, 177, 255];
@@ -965,7 +966,7 @@ fn push_section_glyph(ol: &mut LineData, built: &AsmBuilt, g: &SectionGlyph, d: 
     let side = d.cross(g.view).try_normalize().unwrap_or_else(|| d.any_orthonormal_vector());
     let up = g.view.cross(side).try_normalize().unwrap_or(d);
     let stroke = |ol: &mut LineData, handle: SectionHandle, pts: &[DVec3], closed: bool| {
-        let pick_id = overlay_id(built, OverlayPick::Section(handle));
+        let pick_id = id(handle);
         let n = pts.len();
         let segs = if closed { n } else { n.saturating_sub(1) };
         let styles: &[([u8; 4], f32)] = if g.dragging == Some(handle) {

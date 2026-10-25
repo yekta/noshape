@@ -25,7 +25,9 @@ mod sheet_metal_panel;
 mod feature_ops;
 mod manipulators;
 mod menus;
+mod box_select;
 mod section;
+mod section_manip;
 mod sketch;
 pub(crate) mod shortcut_cmds;
 mod analysis_tools;
@@ -1437,9 +1439,11 @@ impl PartStudioView {
                 }
                 cx.notify();
             }
-            ViewportEvent::BoxSelect { ids, modifiers, .. } => {
-                // Ctrl+drag deselects (Onshape).
-                self.box_select(ids, modifiers.control || modifiers.platform, cx);
+            ViewportEvent::BoxSelect { modifiers, crossing, rect, .. } => {
+                // Ctrl+drag deselects (Onshape). The box reaches behind what
+                // is in front (box_select.rs).
+                let ids = self.box_ids(*rect, *crossing, cx);
+                self.box_select(&ids, modifiers.control || modifiers.platform, cx);
             }
             ViewportEvent::ContextMenu { pick, position } => {
                 // A datum symbol under the pointer has its own menu.
