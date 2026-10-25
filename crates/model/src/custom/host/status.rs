@@ -255,11 +255,22 @@ fn add_debug_entities(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::Undefined)
 }
 
-fn version_ordinal(v: &Value) -> Option<u32> {
+fn version_ordinal(v: &Value) -> Option<(noshape_featurescript::value::Tag, u32)> {
     match v {
-        Value::Enum(_, o) => Some(*o),
+        Value::Enum(t, o) => Some((*t, *o)),
         _ => None,
     }
+}
+
+/// `as_version >= introduced`: by declaration order in one library, by the
+/// number in the member's name (`V858_SM_FLAT_BUG_FIXES`) across library
+/// versions (a Feature Studio pinned to std 1963 against the current one).
+fn version_at_least(as_version: (noshape_featurescript::value::Tag, u32), introduced: (noshape_featurescript::value::Tag, u32)) -> bool {
+    if as_version.0 == introduced.0 {
+        return as_version.1 >= introduced.1;
+    }
+    let number = |(t, o): (noshape_featurescript::value::Tag, u32)| noshape_featurescript::value::enum_name(t, o).trim_start_matches('V').split('_').next().and_then(|n| n.parse::<u32>().ok()).unwrap_or(0);
+    number(as_version) >= number(introduced)
 }
 
 fn is_at_version_or_later(_: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -267,7 +278,7 @@ fn is_at_version_or_later(_: &mut Interp, a: Vec<Value>) -> R<Value> {
     // saved with an older library) compares against that version instead.
     let Some(introduced) = a.get(1).and_then(version_ordinal) else { return Ok(Value::bool(true)) };
     match a.get(2).and_then(version_ordinal) {
-        Some(as_version) => Ok(Value::bool(as_version >= introduced)),
+        Some(as_version) => Ok(Value::bool(version_at_least(as_version, introduced))),
         None => Ok(Value::bool(true)),
     }
 }

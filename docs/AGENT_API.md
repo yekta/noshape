@@ -39,7 +39,7 @@ how to use the tools (`crates/cli/src/mcp_instructions.md`).
 
 The server's tool list is abridged so it fits an agent's context (about 35k characters with the
 instructions, instead of 340k): the ~45 common tools (`crates/cli/src/core_tools.rs`) with short descriptions
-and their main fields. Nothing is lost: those tools accept every field, `ops_list` lists all 219 tools by
+and their main fields. Nothing is lost: those tools accept every field, `ops_list` lists every tool by
 group, `ops_describe` returns any tool's full description, examples and schema, and `ops_call` runs any tool.
 `noshape-cli mcp --all-tools` lists every tool in full (for clients that defer tool loading); the CLI's
 `--help` is always complete.
@@ -286,7 +286,7 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-222 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
+The operations by group. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)

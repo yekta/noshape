@@ -38,6 +38,7 @@ class Replay:
         self.keys = ui.Keyboard()
         self.pad = ui.Touchpad()
         self.screen = ui.Touchscreen()
+        self.pen = ui.Pen()
         self.origin = self.size = None
 
     def wait_ready(self, timeout=180):
@@ -80,10 +81,22 @@ class Replay:
         subprocess.run(["swaymsg", "seat", "seat0", "cursor", "set", str(int(x)), str(int(y))], check=True, capture_output=True)
         time.sleep(0.15)
 
+    def settle(self, quiet=0.6, limit=15.0):
+        """Until no camera change for `quiet` s (animations played out, on any
+        machine speed), at most `limit` s."""
+        end = time.time() + limit
+        count = sum(1 for r in read_trace(self.trace) if "camera" in r)
+        still = time.time()
+        while time.time() - still < quiet and time.time() < end:
+            time.sleep(0.1)
+            n = sum(1 for r in read_trace(self.trace) if "camera" in r)
+            if n != count:
+                count, still = n, time.time()
+
     def step(self, name, fn):
         self.mark(name, "start")
         fn()
-        time.sleep(0.6)
+        self.settle()
         self.mark(name, "end")
 
     # ------------------------------------------------------------ steps
@@ -246,6 +259,50 @@ class Replay:
             time.sleep(0.3)
         return run
 
+    def pen_drag(self, dx, steps=20):
+        """Pen tip down at the viewport centre, dragged `dx` px, lifted."""
+        def run():
+            x, y = self.screen_point()
+            self.pen.near(x, y)
+            time.sleep(0.1)
+            self.pen.tip(True)
+            time.sleep(0.05)
+            for i in range(1, steps + 1):
+                self.pen.move(x + dx * i / steps, y)
+                time.sleep(0.016)
+            # Still for 200 ms: no release inertia (Onshape coasts only when
+            # the release comes within 50 ms of the last move).
+            time.sleep(0.2)
+            self.pen.tip(False)
+            time.sleep(0.05)
+            self.pen.away()
+            time.sleep(1.0)
+        return run
+
+    def pen_tap(self):
+        def run():
+            x, y = self.screen_point(30, 30)
+            self.pen.near(x, y)
+            time.sleep(0.1)
+            self.pen.tip(True)
+            time.sleep(0.06)
+            self.pen.tip(False)
+            time.sleep(0.05)
+            self.pen.away()
+            time.sleep(0.8)
+        return run
+
+    def pen_hover(self):
+        def run():
+            x, y = self.screen_point(-60, 40)
+            self.pen.near(x, y)
+            for i in range(1, 11):
+                self.pen.move(x + 10 * i, y)
+                time.sleep(0.016)
+            self.pen.away()
+            time.sleep(0.3)
+        return run
+
     def with_key(self, key, fn):
         def run():
             self.keys.key(key, True)
@@ -278,15 +335,17 @@ class Replay:
         self.step("touch-pinch", self.touch({0: (c[0] - 50, c[1]), 1: (c[0] + 50, c[1])}, {0: (c[0] - 100, c[1]), 1: (c[0] + 100, c[1])}))
         self.step("touch-roll", self.touch({0: (c[0] - 80, c[1]), 1: (c[0] + 80, c[1])},
                                            {0: (c[0] - 80 * 0.866, c[1] - 80 * 0.5), 1: (c[0] + 80 * 0.866, c[1] + 80 * 0.5)}, steps=15))
+        self.step("pen-rotate", self.pen_drag(-200))
+        self.step("pen-tap", self.pen_tap())
+        self.step("pen-hover", self.pen_hover())
         self.step("touch-tap", self.tap({0: c}))
         self.step("touch-long-press", self.long_press((c[0] - 60, c[1] - 40), (c[0] + 60, c[1] + 40)))
         # A touch on the view cube (an overlay) stays a normal tap on it.
         cube = (self.origin[0] + self.size[0] - 15 - 75, self.origin[1] + 15 + 75)
         self.step("touch-view-cube", self.tap({0: cube}))
-        time.sleep(1.0)  # the view animation
         # Last: it opens the context menu, which covers the viewport.
         self.step("touch-two-finger-tap", self.tap({0: (c[0] - 40, c[1]), 1: (c[0] + 40, c[1])}))
-        for d in (self.mouse, self.keys, self.pad, self.screen):
+        for d in (self.mouse, self.keys, self.pad, self.screen, self.pen):
             d.close()
 
 
