@@ -2687,13 +2687,13 @@ impl PartStudioView {
             if run > 0 {
                 rows.push(div().h(px(row_h * run as f32)).flex_none().into_any_element());
             }
-            // A feature row's place in the list, for its tooltip.
+            // A row's place in the list, for its side tooltip.
             let slot = (rows.len(), item_indent(&item));
             rows.push(match item {
                 ListItem::Placeholder => self.render_editing_placeholder(cx),
                 ListItem::Rollback(i) => self.render_rollback_bar(i, window, cx),
                 ListItem::Ellipsis => ellipsis(),
-                ListItem::Folder(x, fd) => indent(x, self.render_folder_row(&fd, cx)),
+                ListItem::Folder(x, fd) => indent(x, self.render_folder_row(&fd, slot, cx)),
                 ListItem::Feature(x, id) => indent(x, self.render_feature_row_view(id, slot, cx)),
                 ListItem::DerivedSketch(x, id, k) => indent(x, self.render_derived_sketch_row(id, k, cx)),
                 ListItem::Prompt => self.render_folder_prompt(cx),
@@ -3313,11 +3313,23 @@ impl PartStudioView {
             .into_any_element()
     }
 
+    /// Where a list row is on screen, for its side tooltip: painted at the
+    /// list's scroll offset; an indented row sits in a wrapper as wide as
+    /// the list, inset by the indent and its 5 px right margin.
+    fn row_anchor(&self, (ix, indent): (usize, f32)) -> impl Fn() -> Bounds<Pixels> + 'static {
+        let scroll = self.ui.list_scroll.clone();
+        move || {
+            let b = scroll.bounds_for_item(ix).unwrap_or_default();
+            let b = Bounds::new(b.origin + scroll.offset(), b.size);
+            if indent > 0. { Bounds::new(point(b.left() + px(indent), b.top()), size(b.size.width - px(indent + 5.), b.size.height)) } else { b }
+        }
+    }
+
     /// A folder row (live ui 10-25 b): a click selects it, only the chevron
     /// opens or closes it, a double-click does nothing; its menu is Rename |
     /// Add selection to folder… | Suppress, Dynamic suppression ▸ | Roll to
     /// here | Expand ▸, Collapse ▸ | Delete, Unpack folder.
-    fn render_folder_row(&self, fd: &noshape_model::partstudio::Folder, cx: &mut Context<Self>) -> AnyElement {
+    fn render_folder_row(&self, fd: &noshape_model::partstudio::Folder, slot: (usize, f32), cx: &mut Context<Self>) -> AnyElement {
         let id = fd.id;
         let collapsed = self.folder_collapsed(fd);
         let selected = self.ui.selected_folder == Some(id);
@@ -3357,8 +3369,13 @@ impl PartStudioView {
                     .child(crate::ui::user_text(format!("{} ({})", fd.name, self.studio(cx).map(|s| s.folder_count(id)).unwrap_or(0))))
                     .into_any_element(),
             })
-            .tooltip(crate::ui::tooltip(tip))
-            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.select_folder(id, cx)));
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.select_folder(id, cx)))
+            // Dropping features on it puts them in as its first children (live
+            // qa4 r5 s8 (6)); the row lights up under the dragged feature.
+            .drag_over::<FeatureDrag>(|s, _, _, _| s.bg(gpui_kit::rgb(0xe0f0fb)))
+            .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| this.drop_into_folder(d.id, id, cx)));
+        // Beside the row, as a feature row's (live ui 10-25 b (4)).
+        let row = crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |_| SharedString::from(tip.clone()));
         let view = cx.entity();
         row.os_context_menu(move |menu, window, cx| {
             view.update(cx, |this, cx| this.select_folder(id, cx));
@@ -3884,18 +3901,7 @@ impl PartStudioView {
                 let after = this.ui.feature_drop.take().is_some_and(|(r, a)| r == i && a);
                 this.drop_features(d.id, i, after, cx);
             }));
-        let anchor = {
-            let (scroll, (ix, indent)) = (self.ui.list_scroll.clone(), slot);
-            move || {
-                // Painted at the list's scroll offset; an indented row sits in
-                // a wrapper as wide as the list, inset by the indent and its
-                // 5 px right margin.
-                let b = scroll.bounds_for_item(ix).unwrap_or_default();
-                let b = Bounds::new(b.origin + scroll.offset(), b.size);
-                if indent > 0. { Bounds::new(point(b.left() + px(indent), b.top()), size(b.size.width - px(indent + 5.), b.size.height)) } else { b }
-            }
-        };
-        let row = crate::ui::with_lazy_side_tooltip(row, anchor, tip);
+        let row = crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), tip);
         let view = cx.entity();
         // Roll to here is offered unless the bar already sits right after
         // this feature (live qa4 r5 s2, ROLL-LAST: Roll to here on the

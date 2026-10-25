@@ -2949,6 +2949,46 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// Drop of dragged features onto a folder row (live qa4 r5 s8 (6)): they
+    /// become its first children, moved to the folder's place in the list
+    /// (an empty folder's: where it is listed). One undo step; the same
+    /// order check as a drop between rows.
+    pub(super) fn drop_into_folder(&mut self, dragged: FeatureId, folder: u32, cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx) else { return };
+        let moving: Vec<FeatureId> = if self.selected_features.contains(&dragged) { self.selected_features.clone() } else { vec![dragged] };
+        let first = studio.folder_features(folder).into_iter().find(|f| !moving.contains(f));
+        let empty_after = studio.folder(folder).and_then(|f| f.after);
+        let (to, after) = match first {
+            Some(f) => (studio.index_of(f), false),
+            None => match empty_after {
+                Some(a) => (studio.index_of(a), true),
+                None => (Some(0), false),
+            },
+        };
+        let current: Vec<FeatureId> = studio.features.iter().map(|f| f.id).collect();
+        let order = to.and_then(|to| interaction::reordered_at(&studio.features, &moving, to, after)).unwrap_or(current);
+        if let Err(msg) = interaction::check_order(&studio.features, &order) {
+            self.message = Some((FeatureStatus::Error, msg));
+            cx.notify();
+            return;
+        }
+        let n = moving.len();
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, if n == 1 { "Reorder feature" } else { "Reorder features" }, cx, |ps| {
+                interaction::apply_order(ps, &order);
+                for id in &moving {
+                    if let Some(f) = ps.feature_mut(*id) {
+                        f.folder = Some(folder);
+                    }
+                }
+                // A folder with features is placed by them.
+                if let Some(fd) = ps.folder_mut(folder) {
+                    fd.after = None;
+                }
+            });
+        });
+    }
+
     /// Drop of dragged features onto the row at `to`: moves every selected
     /// feature when the dragged one is selected; refuses moves above a
     /// feature's dependencies (Onshape) with an error message.
