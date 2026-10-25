@@ -425,8 +425,23 @@ def main():
     # moves nothing.
     c0, c1 = first_last("pen-rotate")
     if c0 and c1:
-        w, h = c1["viewport"]
-        ch.check("pen-rotate", "turn (deg) = 190 px at 2 turns/diagonal", angle(c0["camera"]["forward"], c1["camera"]["forward"]), 2 * 360 * 190 / math.hypot(w, h), 0.5)
+        # From the pen positions the app received (libinput may smooth tablet
+        # motion; Chrome gets the same positions): the move that started the
+        # drag only crosses the threshold, every later one rotates.
+        xs, start_x = [], None
+        for r in by["pen-rotate"]:
+            if r.get("input") == "touch":
+                m = re.search(r"phase: (\w+), position: Point \{ x: ([-\d.]+)px", r["data"]["debug"])
+                if m and m.group(1) in ("Started", "Moved"):
+                    xs.append(float(m.group(2)))
+            elif r.get("input") == "touch_action" and "DragStart" in r["data"]["debug"] and xs:
+                start_x = xs[-1]
+        if start_x is not None and xs:
+            w, h = c1["viewport"]
+            px = abs(xs[-1] - start_x)
+            ch.check("pen-rotate", f"turn (deg) = {px:.1f} px of delivered moves at 2 turns/diagonal", angle(c0["camera"]["forward"], c1["camera"]["forward"]), 2 * 360 * px / math.hypot(w, h), 0.5)
+        else:
+            ch.check("pen-rotate", "a pen drag was recognized", 0.0, 1.0, 0)
     if "pen-tap" in by:
         actions = [r["data"]["debug"] for r in by["pen-tap"] if r.get("input") == "touch_action"]
         ch.check("pen-tap", "recognized as a one-finger tap", float(any("fingers: 1" in x for x in actions)), 1.0, 0)
@@ -453,9 +468,12 @@ def main():
         ch.check("touch-view-cube", "viewport gestures (must be none)", float(len([r for r in recs if r.get("input") == "touch_action"])), 0.0, 0)
         cams = [r for r in recs if "camera" in r]
         if cams:
-            f = cams[-1]["camera"]["forward"]
-            off = max(min(abs(abs(x) - v) for v in (0.0, 3 ** -0.5, 2 ** -0.5, 1.0)) for x in f)
-            ch.check("touch-view-cube", "standard view (forward component error)", off, 0.0, 1e-6)
+            # A face (one axis), an edge (two equal components) or a corner
+            # (our cube's corner views are trimetric-like: 0.433, 0.5, 0.75).
+            f = sorted(abs(x) for x in cams[-1]["camera"]["forward"])
+            views = ([0.0, 0.0, 1.0], [0.0, 2 ** -0.5, 2 ** -0.5], [3 ** -0.5] * 3, [0.4330127, 0.5, 0.75])
+            off = min(max(abs(a_ - b_) for a_, b_ in zip(f, v)) for v in views)
+            ch.check("touch-view-cube", "a view cube view (forward component error)", off, 0.0, 1e-6)
         else:
             ch.check("touch-view-cube", "camera changed", 0.0, 1.0, 0)
     ch.report(a.verbose)
