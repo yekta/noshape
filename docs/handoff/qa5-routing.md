@@ -324,3 +324,6 @@ STATUS RHINO1 (2026-10-24 ~00:20, qa5): Rhino export round-trips (65431.327331 m
     (live L45: d 25 × 3 OK). The check is exactly at the limit (L − d = d·n) and `path.length()` is the sampled polyline's chord
     length, a little under L; std uses evPathLength (exact) and TOLERANCE.zeroLength.
   - Expected: the exact path length, std's formula for the parameters, and a test with d 10 × 3 (40° / 80°) and d 25 × 3 (OK).
+
+- STATUS 2026-10-25 06:25 (qa5): ADV9 still fails on main 10195656 (bracket step 8, target-engine CLI 06:17). FSW-L45b unchanged on
+  the same CLI (d 25 × 3 errors, d 10 × 3 at 120° / 240°). psb's ADV9 fix 853cf16b is in ready/psb, queue status CONFLICT since 21:44.
