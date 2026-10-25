@@ -154,3 +154,9 @@ below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
 |---|---|---|
 | KB1 Shift+N on a part row | inline rename, name selected | ✅ |
 | KB3 Shift+I Isolate (Part 2) | Isolate panel; Default geometry rows grey, Part 1 translucent, planes faint; Extrude 2 row highlighted (part-studio 3.14) | ✅ |
+
+## Main 358fcd83 (qa5, 2026-10-25 13:45, queue build target-lead 12:55)
+| Row | Ours | Status |
+|---|---|---|
+| KS1 Keyboard shortcuts ↗ pop-out | page window 1440 × 900 = the app window (was a fixed 1280 × 900) | ✅ **fixed** |
+| Shift+R in an Assembly | toggles high quality: the 3D view menu then reads "Disable high quality" | ✅ **fixed** |
