@@ -1369,6 +1369,58 @@ fn curve_pattern_start_as_fs() {
     assert_eq!(msg.as_deref(), Some("For best results ensure that the path start point and pattern seed are touching."));
 }
 
+/// curvePattern.fs, Distance spacing on a closed path (qa5 L45b): the limit
+/// is checked on the exact path length with the gap back to the start (live
+/// L45: 25 mm × 3 on a 100 mm circle is OK, 25 mm × 4 is not), and instance i
+/// sits at path parameter d·i / (L − d), so 10 mm × 3 lands at 40° and 80°.
+#[test]
+fn curve_pattern_distance_on_closed_path_as_fs() {
+    use noshape_model::display::BodyKind;
+    let r = 0.1 / std::f64::consts::TAU;
+    let run = |d: &str, n: &str| {
+        let mut t = T::new();
+        let (_, x) = t.block(r - 0.005, -0.005, r + 0.005, 0.005, "10 mm");
+        let mut sk = noshape_sketch::Sketch::new();
+        let c = sk.add_circle(DVec2::ZERO, r);
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        t.add(
+            "curvePattern",
+            &[
+                ("entities", q(vec![body_ref(&BodyId { feature: x, index: 0 })])),
+                ("edges", q(vec![Reference::SketchEntity { sketch: s, entity: c.0 }])),
+                ("spacingType", en("DISTANCE")),
+                ("distance", e(d)),
+                ("instanceCount", e(n)),
+            ],
+        );
+        let res = t.regen();
+        let st = res.display.features.last().unwrap().clone();
+        let mut angles: Vec<f64> = res
+            .context
+            .bodies
+            .iter()
+            .filter(|b| b.kind == BodyKind::Solid)
+            .map(|b| {
+                let bb = b.shape.bounding_box(true).unwrap();
+                let m = (bb.min + bb.max) * 0.5;
+                m.y.atan2(m.x).to_degrees().rem_euclid(360.0)
+            })
+            .collect();
+        angles.sort_by(f64::total_cmp);
+        (st, angles)
+    };
+    let near = |a: &[f64], b: &[f64]| a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() < 0.2);
+    let (st, angles) = run("25 mm", "3");
+    assert_eq!(st.status, FeatureStatus::Ok, "{:?}", st.message);
+    assert!(near(&angles, &[0.0, 120.0, 240.0]), "{angles:?}");
+    let (st, angles) = run("10 mm", "3");
+    assert_eq!(st.status, FeatureStatus::Ok, "{:?}", st.message);
+    assert!(near(&angles, &[0.0, 40.0, 80.0]), "{angles:?}");
+    let (st, _) = run("25 mm", "4");
+    assert_eq!(st.message.as_deref(), Some("Cannot create a curve pattern when the entered distance is larger than the path length."));
+    assert_eq!(st.faulty, vec!["distance".to_string()]);
+}
+
 /// hole.fs HOLE_TAP_TOO_DEEP: a tapped depth past the hole's depth in the
 /// part is an info.
 #[test]
