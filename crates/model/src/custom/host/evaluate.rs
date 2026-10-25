@@ -885,11 +885,14 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // editing logic reads `tool`'s plane).
     // (entity, its body, shape, of a solid)
     type Hit = (crate::reference::Reference, Option<crate::reference::Reference>, k::Shape, bool);
-    let shapes = |refs: &[crate::reference::Reference]| -> Vec<Hit> {
+    // The solid bodies among the inputs (for containment).
+    type Solids = Vec<(crate::reference::Reference, k::Shape)>;
+    let shapes = |refs: &[crate::reference::Reference]| -> (Vec<Hit>, Solids) {
         let st = cx.state.lock();
         let q = QueryCx::new(&st);
         let solid = |b: usize| st.ctx.bodies[b].kind == crate::display::BodyKind::Solid;
         let mut out = Vec::new();
+        let mut solids = Vec::new();
         let mut seen = std::collections::HashSet::new();
         for r in refs {
             for e in q.from_ref(r) {
@@ -903,6 +906,9 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                             continue;
                         }
                         let body = &st.ctx.bodies[b];
+                        if solid(b) {
+                            solids.push((r.clone(), body.shape.clone()));
+                        }
                         for (fi, f) in body.shape.faces().into_iter().enumerate() {
                             out.push((q.to_ref(&Ent::Face(b, fi)), Some(r.clone()), f, solid(b)));
                         }
@@ -917,11 +923,32 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
             }
         }
-        out
+        (out, solids)
     };
-    let (ts, gs) = (shapes(&tools), shapes(&targets));
+    let ((ts, tool_solids), (gs, target_solids)) = (shapes(&tools), shapes(&targets));
     let one = |r: &crate::reference::Reference| super::query::query_of_refs(&cx, std::slice::from_ref(r));
+    let clash = |kind: &str| std_enum("clashtype.gen.fs", "ClashType", kind).unwrap_or_else(|| Value::str(kind));
+    // Solid body pairs where one holds the other (live "fs (10-25 f)"):
+    // (tool body, target body, the tool is the inner one).
+    let mut inside = Vec::new();
+    for (tb, t) in &tool_solids {
+        for (gb, g) in &target_solids {
+            if tb == gb || !k::distance(t, g).is_ok_and(|d| d.distance <= 1e-8) {
+                continue;
+            }
+            let Some(common) = k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) else { continue };
+            let (vt, vg) = (t.volume().unwrap_or(0.0).abs(), g.volume().unwrap_or(0.0).abs());
+            let near = |a: f64, b: f64| (a.abs() - b).abs() <= 1e-9 * b.max(1e-15);
+            if near(common, vt) && vt < vg {
+                inside.push((tb.clone(), gb.clone(), true));
+            } else if near(common, vg) && vg < vt {
+                inside.push((tb.clone(), gb.clone(), false));
+            }
+        }
+    }
+    let contained = |tb: &Option<crate::reference::Reference>, gb: &Option<crate::reference::Reference>| inside.iter().any(|(t, g, _)| Some(t) == tb.as_ref() && Some(g) == gb.as_ref());
     let mut out = Vec::new();
+    let mut touched = std::collections::HashSet::new();
     for (tr, tb, t, ts_solid) in &ts {
         for (gr, gb, g, gs_solid) in &gs {
             if t.is_same(g) {
@@ -931,14 +958,20 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if d.distance > 1e-8 {
                 continue;
             }
-            let kind = if face_pair(t, g) { if faces_cross(t, g, *ts_solid && *gs_solid) { "INTERFERE" } else { "ABUT_NO_CLASS" } } else {
+            // A body inside another touching its boundary: its touching
+            // faces interfere (live "fs (10-25 f)" (1)).
+            let kind = if contained(tb, gb) {
+                "INTERFERE"
+            } else if face_pair(t, g) {
+                if faces_cross(t, g, *ts_solid && *gs_solid) { "INTERFERE" } else { "ABUT_NO_CLASS" }
+            } else {
                 match k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) {
                     Some(v) if v > 1e-15 => "INTERFERE",
                     _ => "ABUT_NO_CLASS",
                 }
             };
-            let ty = std_enum("clashtype.gen.fs", "ClashType", kind).unwrap_or_else(|| Value::str(kind));
-            let mut m = vec![("type", ty), ("tool", one(tr)), ("target", one(gr))];
+            touched.insert((tb.clone(), gb.clone()));
+            let mut m = vec![("type", clash(kind)), ("tool", one(tr)), ("target", one(gr))];
             if let Some(b) = tb {
                 m.push(("toolBody", one(b)));
             }
@@ -947,6 +980,14 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
             out.push(Value::map_from(m));
         }
+    }
+    // One touching nothing: one entry for the two bodies (live (2), (3)).
+    for (tb, gb, tool_inner) in inside {
+        if touched.contains(&(Some(tb.clone()), Some(gb.clone()))) {
+            continue;
+        }
+        let kind = if tool_inner { "TOOL_IN_TARGET" } else { "TARGET_IN_TOOL" };
+        out.push(Value::map_from([("type", clash(kind)), ("tool", one(&tb)), ("target", one(&gb)), ("toolBody", one(&tb)), ("targetBody", one(&gb))]));
     }
     Ok(Value::array(out))
 }

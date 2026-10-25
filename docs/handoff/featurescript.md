@@ -793,8 +793,9 @@ source order of the table literals (studio.rs `dyn_level` + `source_entries`, co
 which is Onshape's dropdown order (live L58) and gives levels without a default their first source entry; the
 custom_features lookup test now expects source order. `hole_regenerates_as_std` (12 cases) passes; host fixes:
 evAxis `allowSketchPoints` (sketch point -> its sketch normal), opHole failures thrown as the bare ErrorStringEnum
-(hole.fs catches them as such). Known std-route gap: a hole that hits nothing — live flags Merge scope (native does),
-std throws bare HOLE_NO_HITS (faulty field not compared in those 2 cases). Tapped depth linkage now follows std's
+(hole.fs catches them as such). A hole that hits nothing flags Merge scope on the std route too
+(25 Oct): op statuses keep their faulty fields (`run_op_with`) and `functionReportFeatureStatus` accumulates faulty
+parameters across reports, newest first (live "fs (10-25 e)"), so std's mapped `scope` survives its bare re-throw. Tapped depth linkage now follows std's
 adjustDepthAndThreadParameters exactly (`hole_tables::link_tapped_depths`: of the two fields not edited, the later
 one in Depth / Tapped depth / Tap clearance whose new value stays positive; live L49/L50 still hold);
 `hole_tapped_depths_link_as_std` runs std's holeEditLogic against it. Hole's other editing logic stays native.
@@ -876,3 +877,10 @@ alpha 0.5, edges 2 px and points 6 px on top, colours from the client's table (O
 `Instance::on_top` meshes (render pipeline `mesh-top`: no depth test or write, drawn after the transparent meshes and
 before the lines), so they show through the model as live; test render/tests/offscreen.rs `on_top_meshes_show_through_the_model`.
 Test: `debug_entities_in_their_colors`.
+
+**evCollision containment (25 Oct, live "fs (10-25 f)"):** a solid inside another touching nothing gives one
+TOOL_IN_TARGET / TARGET_IN_TOOL entry (tool/target = the bodies); touching the outer boundary, each touching face pair
+is INTERFERE (strictly interior faces none). Test `collision_containment_as_live`. std Hole's dialog logic
+(holeScopeFlipHeuristics → probeForViableTargets) keeps a blind probe's target only on INTERFERE / *_IN_*, so without
+this its Merge scope came out empty. Next: check std holeEditLogic's scope/flip against the native `hole_scope_logic`
+(ops studio.rs) and move Hole onto STD_EDITING_LOGIC if it matches live (L57).

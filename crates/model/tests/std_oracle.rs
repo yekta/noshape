@@ -912,11 +912,9 @@ fn hole_cases() -> Vec<(&'static str, Studio)> {
 
 #[test]
 fn hole_regenerates_as_std() {
-    // A hole that hits nothing: live flags Merge scope (behaviours.md
-    // "Hole" 2154, native too); std's opHole throws the bare HOLE_NO_HITS
-    // and the field is marked outside FeatureScript.
-    let no_hits = ["from the part, sketch below", "opposite direction"];
-    let report: String = hole_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std_but(name, "hole", s, !no_hits.contains(name))).collect();
+    // A hole that hits nothing flags Merge scope (live behaviours.md "Hole"
+    // 2154): std maps opHole's faulty `targets` onto it.
+    let report: String = hole_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std(name, "hole", s)).collect();
     assert!(report.is_empty(), "native Hole differs from std:\n{report}");
 }
 
