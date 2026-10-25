@@ -125,6 +125,25 @@ fn undoing_a_delete_reuses_the_deleted_feature() {
     assert_eq!(run(&back), vec![lp2], "Linear pattern 2's upstream changed");
 }
 
+/// Undoing and redoing an edit takes every feature, and the body's mesh,
+/// from the cache.
+#[test]
+fn undoing_an_edit_reuses_the_previous_evaluation() {
+    let (ps, _) = model(3);
+    let (units, config) = (UnitPrefs::default(), ConfigValues::default());
+    let mut regen = Regenerator::new();
+    let mut result = |ps: &PartStudio| regen.regenerate(ps, &config, &units, &RegenOptions::default());
+    let first = result(&ps);
+    let mut edited = ps.clone();
+    let plate = edited.features.iter().position(|f| f.type_id == "extrude").unwrap();
+    edited.features[plate].params.set("depth", e("12 mm"));
+    assert_eq!(result(&edited).evaluated.len(), edited.features.len() - plate, "the edit regenerates everything after it");
+    let undone = result(&ps);
+    assert!(undone.evaluated.is_empty(), "undo: {:?} evaluated", undone.evaluated);
+    assert!(std::sync::Arc::ptr_eq(&undone.display.bodies[0].mesh, &first.display.bodies[0].mesh), "undo: the body's mesh comes from the cache");
+    assert!(result(&edited).evaluated.is_empty(), "redo");
+}
+
 /// Planar bodies with straight edges are meshed once, at the final quality,
 /// even in the preview pass: no refine pass follows.
 #[test]
