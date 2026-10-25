@@ -730,3 +730,10 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 - **P2-A1 — skb (assembly dialogs), live to confirm** — Assembly › Linear pattern (Instances Part 2 <1>, Direction an edge,
   Distance 20 mm): Enter in Distance applies the value; **a second Enter (and a third) does not commit**, the dialog stays open
   until ✓. Part Studio feature dialogs commit on the second Enter (behaviours 252, 7041). Request "qa5 (10-25 p3)".
+- **P2-A1 — skb (confirmed live)** — assembly Linear pattern: live's 1st Enter on a changed Distance applies and keeps the dialog
+  open, the **2nd Enter accepts and closes** (behaviours "qa5 (10-25 p3)"). Ours never commits on Enter (only ✓).
+- **P1-12 — ui (query chips)** — a sketch line picked into a query field (Revolve › Revolve axis) reads **"Sketch 4 line"**;
+  live's chip is **"Edge of Sketch N"** (behaviours 6045 / "qa5 (10-25 p3)").
+- **P1-13 — psb (pattern copies' appearance)** — Circular pattern (Part pattern) copies take **new palette colours** (seed
+  navy, copies grey / light blue / orange). Live: the copies **keep the seed's colour** (rgb(165,165,165) ×3, behaviours
+  "qa5 (10-25 p3)"), as Transform copies do (behaviours 7252).
