@@ -94,7 +94,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.15 | Double-click middle button: zoom to fit (animated) | `onMiddleMouseButtonDoubleClick` | ✅ |
 | 1.16 | Scroll wheel up zooms in, down zooms out, about the cursor (also when zooming out) | help; `zoomOnCanvasPoint`, `USE_CENTRAL_ZOOM_OUT` 0; live navigation/11–14 (fixed point = pointer both ways) | ✅ L, R (Wayland value120, X11 valuators, both directions, fixed point < 0.5 px) |
 | 1.17 | Zoom per notch: scale 2^(−i/6) with i = 0.5 per notch (×3 on Windows): ×1.06 per notch on macOS/Linux, ×1.19 on Windows | `zoomOnMouseWheelScroll`; live (Linux Chrome): ×1.060 per notch, up then down returns exactly | ✅ L: 2^(−W/1440) for W = 120, 60, 30, 12, 3, −3, −120, 360; R: hi-res 30 and 7 → wheelDelta 30 and 7, exact |
-| 1.18 | Perspective zoom dollies the eye along the cursor ray by distance × i/6, within 0.05–50 scene diameters | `zoomPoint`, `dollyAlong` | 🔧 |
+| 1.18 | Perspective zoom dollies the eye along the cursor ray by distance × i/6, within 0.05–50 scene diameters | `zoomPoint`, `dollyAlong` | ✅ live "nav2 perspective zoom" (10-25): fit 446.8626 mm and nine wheel events at the live pointer match to 2 µm (U `perspective_wheel_matches_live_onshape`); right-drag 3 turns/diagonal as in ortho. ⏳ the zoom-out stop (live 3240.83 mm, ours one step earlier) awaits the live `canZoom` values (REQUESTS "nav2 (P1) (10-25 b") |
 | 1.19 | Zoom limits: no zoom out once the model is under 100 px across, no zoom in past 2^24 px/m | `canZoom` | 🔧 |
 | 1.20 | Horizontal scroll (tilt wheel, sideways swipe) does nothing | `zoomOnMouseWheelScroll` (`wheelDeltaX > wheelDeltaY` → ignored); live navigation/17 | ✅ R: horizontal wheel → no zoom (X11 and Wayland) |
 | 1.20b | Shift+wheel and Ctrl+wheel zoom exactly like the wheel (Linux; macOS and Chrome on Windows turn Shift+wheel horizontal before Onshape sees it, so it does nothing there) | live navigation/15–16 | ✅ R: Shift / Ctrl+wheel zoom like the wheel; Windows Shift+wheel now zooms too (Chromium keeps it vertical) |
@@ -184,7 +184,7 @@ Wayland (`wl_touch`). Gestures are `touch.rs` (Onshape's recognizers).
 | 7.7 | Two-finger rotate rolls the view about the fingers' centre | help; `rotateAboutCanvasPoint` | ✅ L 30.0000°; R 29.993° |
 | 7.8 | Taps: lifted within 200 ms; reported 200 ms after the last (double tap); fingers overlapping in time are one multi-finger tap | tap recognizer | ✅ fixed 10-24: a tap is reported 200 ms after the lift even while the long-press timer runs (it waited 750 ms after the touch); R |
 | 7.9 | Touches on overlays above the graphics area (view cube, dialogs) stay normal taps | — | ✅ R: a tap on the view cube turns the view to a standard view; the viewport recognizer sees nothing |
-| 7.10 | Pen acts as a finger unless "Use pen input as mouse" | Preferences | 🔧 Windows; ⏳ Linux (tablet pens arrive as pointer devices) |
+| 7.10 | Pen acts as a finger unless "Use pen input as mouse" | Preferences | ✅ 10-25: Onshape sends `pointerType` "pen" to its touch recognizers unless "Use pen input as mouse" (`handlesEvent`). Windows (WM_POINTER PT_PEN), macOS (tablet-point mouse events), X11 (stylus devices: an "Abs Pressure" valuator) and Wayland (`zwp_tablet_v2`, new) now deliver pen contacts as touches; hovering moves the mouse. R: a pen drag of 200 px turns 190 px at 2 turns/diagonal, a pen tap is a one-finger tap, hovering moves nothing (Wayland and X11) |
 | 7.11 | Trimetric / plane views from the view cube menu, 3D Rotate Lock | help (mobile apps) | ❌ mobile apps only |
 
 ## Re-check of the 🔧 rows (qa4, 2026-10-23 23:30–00:30, app /root/qa4-scratch/bin/noshape-a0e = main a0e360a3, Xvfb 1600×1000, demo plate; screenshots /tmp/qa4/cw)
@@ -224,9 +224,9 @@ drives the app through the kernel: a uinput mouse, keyboard, clickpad and touch 
 libinput in a headless sway, the app on Wayland or on X11 through Xwayland. `check.py`
 recomputes every expected number independently (Chromium's rules on the WAYLAND_DEBUG protocol
 log or on the posted events, Onshape's formulas) and compares each camera change.
-Local run 10-25 03:10: **Wayland 491/491, X11 257/257 checks pass** (wheel notches and 120ths,
+Local run 10-25 06:20: **Wayland 495/495, X11 261/261 checks pass** (wheel notches and 120ths,
 Shift/Ctrl+wheel, horizontal wheel, two-finger scroll up/down/sideways, pinch out/in, right-drag
 with its rotate centre fixed on screen, Alt+right-drag, middle-drag, touch rotate/pan/pinch/roll,
-tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube, a drag released over the feature list, a second button pressed mid-drag). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
+tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube, a drag released over the feature list, a second button pressed mid-drag, pen drag / tap / hover). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
 phases and momentum, drags) and Windows (SendInput wheel, InjectTouchInput touch, drags) run in
 `.github/workflows/nav.yml`.
