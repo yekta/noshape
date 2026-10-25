@@ -163,7 +163,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 7.11 | Ellipse: major / minor diameter | B§4.2 | ✅ (T:sm) |
 | 7.12 | Dimension to the sketch origin | H:dimension | ✅ (T:sm) |
 | 7.13 | Dimension to planes / model edges | H:dimension | ✅ (planes as trace lines, model edges / vertices as linked reference geometry) |
-| 7.14 | Over-defining dimensions are made driven, shown in parentheses and gray | H:dimension | ✅ |
+| 7.14 | Over-defining dimensions are made driven: plain grey value ("Ø10", no parentheses) and the value box still opens, no toast | H:dimension; live "qa4 round 5 s5 driven dims" (1) | 🔧 (test `driven_labels_and_offset_side_as_live`) |
 | 7.15 | Driven ↔ driving from the context menu ("Change to driving/driven dimension") | H:dimension | ✅ |
 | 7.16 | Double-click a dimension to edit its value | H:dimension | ✅ |
 | 7.17 | Editing moves both dimensioned sides by half (except radius / diameter) | H:dimension | ✅ (T:ux) |
@@ -186,7 +186,11 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.4 | Coincident: point-point, point-curve, collinear lines, same circle | H:coincident | ✅ |
 | 8.5 | Concentric, Parallel, Tangent, Horizontal, Vertical, Perpendicular, Equal, Fix | constraint pages | ✅ |
 | 8.6 | Midpoint: point + line/arc, or 3 points (start, end, middle) | H:midpoint | ✅ |
-| 8.7 | Normal: line + curve | H:normal | ✅ |
+| 8.7 | Normal: line + curve, in either pick order | H:normal; live qa4 round 5 v3 s6 (3) | 🔧 (test `constraint_picks_and_application_as_live`) |
+| 8.7a | A constraint tool doesn't take a pick it can't use (no message); constraint errors never show internal ids | live qa4 round 5 v3 s6 (CON-MSG) | 🔧 (`pick_fits`) |
+| 8.7b | Vertical on a Horizontal line (anything collapsing a line to a point): "Sketch could not be solved.", the line stays, red | live qa4 round 5 v3 s6 (1) | 🔧 (solver post-check; test `vertical_on_a_horizontal_line_does_not_solve`) |
+| 8.7c | Tangent line–circle moves the circle and keeps its radius | live qa4 round 5 v3 s6 (2) | 🔧 (only the centre takes the change; test `constraint_picks_and_application_as_live`) |
+| 8.7d | Right-click a dimension or constraint glyph: the empty-space sketch menu, a dimension's Change to driving/driven first, "Delete dimension" / "Delete sketch entity" last | live "qa4 round 5 s5 driven dims" (2), (3) | 🔧 |
 | 8.8 | Pierce: point + off-plane edge | H:pierce | ✅ (GUI :103 m14.png: sketch on Front, point + Pierce (Shift+G) with the cylinder top edge → point moves to the pierce point, fully defined) |
 | 8.9 | Symmetric: axis line first, then two entities | H:symmetric | ✅ |
 | 8.10 | Curvature: spline/conic + adjacent curve | H:curvature | ✅ |
@@ -239,7 +243,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.9 | Extend: click a line or arc to extend to the next boundary | H:extend | ✅ |
 | 11.10 | Extend: "Unable to extend the selected geometry." | i18n | ✅ (GUI :103 extending an unbounded circle reports exact message; extend-error.png; T:sm added) |
 | 11.11 | Split: click a curve where to split | H:sketch_split | ✅ |
-| 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves | H:offset | ✅ (T:sm) |
+| 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves. Live "psb (10-24 j)": the copies get their own points joined by Coincidents, sharp outer corners, own centres; one OFFSET per further pair (all on the first picked pair) and one DISTANCE on that pair (a lone curve: one OFFSET), no Parallel / Concentric; free ends unconstrained; editing the distance moves every copy; a new offset starts away from the region (a circle outward), the flip isn't remembered | H:offset; live psb (10-24 j), qa4 round 5 s1 follow-up | 🔧 (`Sketch::offset_tool`, `ConstraintKind::OffsetCurve`; tests `offset_tool_makes_live_constraints_on_a_chain`, `offset_tool_on_the_closed_loop_and_a_circle`) |
 | 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) |
 | 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) |
 | 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) |
@@ -302,7 +306,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 14.21 | Spline / Bezier: first Esc commits the curve through the placed points (cursor point dropped) and keeps the tool; second Esc exits | Live sketch/22x-esc-spline, 233 | ✅ (T:sm `first_escape_commits_a_spline_and_the_second_exits`; GUI :103 h123.png) |
 | 14.22 | The sketch's own plane is not pre-highlighted while sketching on it | Live sketch/09, 51 | ✅ (GUI :103 g1/g2.png: no tan plane highlight under the cursor; was highlighted before) |
 | 14.23 | An idle value box shows a bare number like a dimension label (`1.269`), units appear only once typing starts | Live sketch/211–212 | ✅ (T:sm asserts the label; GUI :103 k1-box-c.png shows `18.188`) |
-| 14.24 | Sketch context menu in live order: Confirm \| Use (model edge) \| Copy sketch entities, Transform sketch entities (nothing selected: Copy sketch) \| Show all (nothing selected), Curve/surface analysis…, Section view… \| Clear selection, Select ▸, Select other… \| Zoom to fit, Zoom to selection, View normal to sketch plane \| Delete sketch entity; no "Construction" item | Live sketch/31, 37, 204 | ✅ (GUI :103 k2-menu-line.png in live order; Select ▸ now also has Create selection…; nothing selected: Select ▸ submenu (Part Studio items until live capture lists the sketch ones); Add comment is a cloud-only exclusion) |
+| 14.24 | Sketch context menu in live order (live 10-24, a selected line, other sketches shown): Confirm \| Copy sketch entities, Transform sketch entities \| Construction \| Extrude…, Revolve… \| Hide other sketches, Hide all sketches (other sketches shown), Curve/surface analysis… \| Clear selection, Select ▸, Select other… \| Zoom to fit, Zoom to selection, View normal to sketch plane, Align view with vertical axis (one line) \| Delete sketch entity; no Section view…; nothing selected: Copy sketch, Show all | Live sketch/31, 37, 204; "qa4 round 5 s5 driven dims" (3); qa4 round 5 v3 s6 (SK-LINE-MENU) | 🔧 (the 10-24 capture supersedes sketch/31's) |
 | 14.25 | Select ▸ Tangent connected edges / Equal length/radius edges / Parallel edges grow the sketch selection | Live sketch/32 | ✅ (T:ux `select_related_grows_tangent_chains_equal_sizes_and_parallels`; GUI :103 k2-parallel-c.png: Parallel edges selects the slot sides + centerline) |
 | 14.26 | Default tool sizes follow the document unit: inch docs fillet R0.5, chamfer/offset 0.25, slot Ø0.5, pattern spacing 1 | Live sketch/107–137 | ✅ (live: inch R0.5/0.25/0.25/Ø0.5/1 in; mm R20/5/5/Ø20/25 mm; GUI :103 mm doc slot shows Ø20) |
 | 14.27 | Slot works only on existing curves (empty-space clicks do nothing); the slot is a light-blue preview until the next click / Enter / leaving the tool; the picked centerline stays solid; no value box opens | Live sketch/104–109, 307–311 | ✅ (T:sm `slot_previews_until_the_next_click_and_keeps_its_centerline_solid`, T:ux slot tests updated; GUI :103 k2-slot.png) |

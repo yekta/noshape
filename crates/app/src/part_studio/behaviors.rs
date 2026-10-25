@@ -525,41 +525,6 @@ impl UiState {
     }
 }
 
-/// What a selection field accepts, for the rejection message.
-pub fn filter_description(f: QueryFilter) -> String {
-    let mut kinds: Vec<&str> = Vec::new();
-    let mut add = |q: QueryFilter, s: &'static str| {
-        if f.intersects(q) && !kinds.contains(&s) {
-            kinds.push(s);
-        }
-    };
-    add(QueryFilter::SKETCH_REGION, "sketch regions");
-    if f.intersects(QueryFilter::FACE) {
-        add(QueryFilter::FACE, "faces");
-    } else {
-        add(QueryFilter::PLANAR_FACE, "planar faces");
-        add(QueryFilter::CYLINDRICAL_FACE, "cylindrical faces");
-    }
-    add(QueryFilter::PLANE, "planes");
-    if f.intersects(QueryFilter::EDGE | QueryFilter::SOLID_EDGE) {
-        add(QueryFilter::EDGE | QueryFilter::SOLID_EDGE, "edges");
-    } else {
-        add(QueryFilter(QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0), "edges");
-    }
-    add(QueryFilter::SKETCH_EDGE, "sketch curves");
-    add(QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::POINT_BODY.0), "points");
-    add(QueryFilter::BODY, "parts");
-    add(QueryFilter::WIRE_BODY, "curves");
-    add(QueryFilter::MATE_CONNECTOR, "mate connectors");
-    add(QueryFilter::FEATURE, "features");
-    add(QueryFilter::SKETCH, "sketches");
-    match kinds.len() {
-        0 => "That entity can't be used in the active field.".into(),
-        1 => format!("Select {}.", kinds[0]),
-        n => format!("Select {} or {}.", kinds[..n - 1].join(", "), kinds[n - 1]),
-    }
-}
-
 /// The info toast while a Remove / Intersect tool misses the parts (live 234).
 pub(super) const NO_INTERSECTION: &str = "Selected tools and targets do not intersect.";
 
@@ -621,6 +586,13 @@ impl PartStudioView {
             out.extend(if t.second_active { &t.selection2 } else { &t.selection }.iter().cloned());
         }
         out
+    }
+
+    /// Whether the active dialog field takes `t`: its kind, the region a
+    /// curve bounds or the part a face is on (None: no field is active).
+    pub(super) fn field_takes(&self, t: &PickTarget, cx: &App) -> Option<bool> {
+        let (_, filter, _) = self.edit.as_ref()?.dialog.read(cx).active_filter()?;
+        Some(kind_matches(t.kind, &t.reference, filter) || self.curve_region(&t.reference, filter).is_some() || self.part_for_field(&t.reference, filter).is_some())
     }
 
     /// Hover target in the graphics area, expanded like the selection.
@@ -740,8 +712,9 @@ impl PartStudioView {
                     cx.notify();
                     return;
                 }
-                dialog.update(cx, |d, cx| d.flash_active_field(cx));
-                self.flash_info(filter_description(filter), cx);
+                // Live ("qa4 round 5 s1 follow-up 2" (1)): an entity the
+                // field doesn't take is neither highlighted nor picked, and
+                // nothing tells you so.
                 return;
             }
             dialog.update(cx, |d, cx| {
@@ -866,9 +839,8 @@ impl PartStudioView {
         if let Some(e) = &self.edit {
             let dialog = e.dialog.clone();
             let Some((_, filter, _)) = dialog.read(cx).active_filter() else { return };
+            // Live: a pick the field doesn't take does nothing.
             if !filter.intersects(QueryFilter::BODY) {
-                dialog.update(cx, |d, cx| d.flash_active_field(cx));
-                self.flash_info(filter_description(filter), cx);
                 return;
             }
             dialog.update(cx, |d, cx| {
@@ -3380,23 +3352,6 @@ pub(super) fn list_autoscroll_speed(y: f32, top: f32, bottom: f32) -> f32 {
     if to_bottom <= to_top { speed(to_bottom) } else { -speed(to_top) }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    // The glob import brings GPUI's `test` attribute; use the built-in one.
-    use std::prelude::v1::test;
-
-    #[test]
-    fn rejection_messages_name_what_the_field_takes() {
-        assert_eq!(filter_description(QueryFilter::EDGE), "Select edges.");
-        assert_eq!(filter_description(QueryFilter::ANY_EDGE), "Select edges or sketch curves.");
-        let m = filter_description(QueryFilter::SKETCH_REGION | QueryFilter::ANY_FACE);
-        assert_eq!(m, "Select sketch regions or faces.");
-        let m = filter_description(QueryFilter::PLANE_LIKE);
-        assert_eq!(m, "Select planar faces, planes or mate connectors.");
-    }
-}
-
 /// How the parts left out look at transparency slider position `t` (live
 /// pixel samples, behaviours.md "Part Studio Isolate…"): under 10 % light
 /// opaque ghosts (back edges hidden); from 10 % see-through, most opaque
@@ -3449,7 +3404,6 @@ mod field_point_tests {
         let fillet = QueryFilter::SOLID_EDGE | QueryFilter::ANY_FACE;
         assert!(km(PickKind::Edge, &r, fillet) && !km(PickKind::SketchCurve, &r, fillet));
         assert!(km(PickKind::SketchCurve, &r, QueryFilter::SKETCH_EDGE) && !km(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
-        assert_eq!(super::filter_description(fillet), "Select faces or edges.");
     }
 
     #[test]

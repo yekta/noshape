@@ -728,6 +728,8 @@ fn hatched_text(text: &str, at: DVec2, dir: DVec2, px: f64, em_px: f64) -> Vec<[
 fn constraint_masters(kind: &ConstraintKind, sk: &Sketch) -> Vec<EntityId> {
     match kind {
         ConstraintKind::Offset { master_ref, master, .. } => vec![*master_ref, *master],
+        // The Offset tool's sources.
+        ConstraintKind::OffsetCurve { master, second, .. } => std::iter::once(*master).chain(second.map(|s| s.0)).collect(),
         ConstraintKind::Symmetric { a, b, .. } if is_point(sk, *a) && is_point(sk, *b) => sk
             .entities()
             .filter(|e| e.kind() == EntityKind::Line && e.endpoints().is_some_and(|(s, en)| [s, en].iter().any(|p| p == a || p == b)))
@@ -914,7 +916,7 @@ pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
         Pierce { .. } => "pierce",
         Quadrant { .. } => "coincident",
         // Live (qa5 sketch tools): the slot's three offsets, an arch glyph.
-        Offset { .. } => "offset",
+        Offset { .. } | OffsetCurve { .. } => "offset",
         _ => return None,
     })
 }
@@ -1106,6 +1108,7 @@ impl SketchEditor {
             Tool::Offset => {
                 let ids: Vec<EntityId> = std::mem::take(&mut self.selection).into_iter().filter(|e| !is_point(&data.sketch, *e)).collect();
                 if !ids.is_empty() {
+                    self.offset_flip = self.offset_default_flip(&data.sketch, &ids);
                     self.offset_pending = Some(ids);
                     self.message = Some("Set the offset distance (drag or click the arrow), then press Enter".into());
                 }
@@ -1653,6 +1656,7 @@ impl SketchEditor {
                 }
                 if self.offset_repeat && self.offset_pending.is_none() {
                     // Later clicks offset by the same distance right away.
+                    self.offset_flip = self.offset_default_flip(&data.sketch, &ids);
                     self.offset_pending = Some(ids);
                     return self.commit_offset(data);
                 }
@@ -1665,7 +1669,10 @@ impl SketchEditor {
                             }
                         }
                     }
-                    None => self.offset_pending = Some(ids),
+                    None => {
+                        self.offset_flip = self.offset_default_flip(&data.sketch, &ids);
+                        self.offset_pending = Some(ids);
+                    }
                 }
                 self.message = Some("Set the offset distance (drag or click the arrow), then press Enter".into());
                 EditOutcome::redraw()
@@ -1715,6 +1722,12 @@ impl SketchEditor {
             Tool::Dimension => self.dimension_click(data, p, hovered),
             Tool::Constraint(c) => {
                 let Some(e) = hovered else { return EditOutcome::none() };
+                // Live: a pick the constraint can't take isn't accepted (and
+                // nothing is said).
+                let picked: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
+                if !picked.contains(&e) && !pick_fits(&data.sketch, c, &picked, e) {
+                    return EditOutcome::none();
+                }
                 if !self.picks.iter().any(|(x, _)| *x == e) {
                     self.picks.push((e, p));
                 }
@@ -1727,15 +1740,12 @@ impl SketchEditor {
                     if already_coincident(&data.sketch, c, &ids) {
                         return EditOutcome::redraw();
                     }
-                    match make_constraint(&data.sketch, c, &ids) {
-                        Some(kind) => match data.sketch.add_constraint(kind) {
-                            Ok(_) => {
-                                data.sketch.solve();
-                                return EditOutcome::changed();
-                            }
-                            Err(err) => self.message = Some(format!("Can't add constraint: {err}")),
-                        },
-                        None => self.message = Some("Those entities can't take this constraint".into()),
+                    // Picks that fit but can't take the constraint: nothing is added.
+                    if let Some(kind) = make_constraint(&data.sketch, c, &ids)
+                        && data.sketch.add_constraint(kind).is_ok()
+                    {
+                        solve_after_constraint(&mut data.sketch, c, &ids);
+                        return EditOutcome::changed();
                     }
                 }
                 EditOutcome::redraw()
@@ -1880,12 +1890,29 @@ impl SketchEditor {
             .collect()
     }
 
+    /// The side a new offset starts on (live "qa4 round 5 s1 follow-up"):
+    /// away from the region the first curve bounds (a circle outward); the
+    /// flip isn't remembered between offsets. With a region on both sides
+    /// or none, the plain side.
+    fn offset_default_flip(&self, sk: &Sketch, ids: &[EntityId]) -> bool {
+        let Some(&first) = ids.first() else { return false };
+        let eps = self.world_per_px.max(1e-9);
+        let inside = |d: f64| -> Option<bool> {
+            let mut tmp = sk.clone();
+            let r = tmp.offset(&[first], d).ok()?;
+            let c = r.created.iter().find_map(|e| tmp.curve(*e))?;
+            let (t0, t1) = c.domain();
+            Some(sk.region_at(c.point((t0 + t1) * 0.5)).is_some())
+        };
+        matches!((inside(eps), inside(-eps)), (Some(true), Some(false)))
+    }
+
     /// Offset curves of the pending offset with the current distance (preview / commit).
     fn offset_result(&self, sk: &Sketch) -> Option<(Sketch, Vec<EntityId>)> {
         let ids = self.offset_pending.as_ref()?;
         let d = if self.offset_flip { -self.offset_distance } else { self.offset_distance };
         let mut tmp = sk.clone();
-        let r = tmp.offset(ids, d).ok()?;
+        let r = tmp.offset_tool(ids, d).ok()?;
         let created = r.created.into_iter().filter(|e| tmp.kind(*e).is_some_and(|k| k != EntityKind::Point)).collect();
         Some((tmp, created))
     }
@@ -1950,7 +1977,7 @@ impl SketchEditor {
     pub fn commit_offset(&mut self, data: &mut SketchData) -> EditOutcome {
         let Some(ids) = self.offset_pending.take() else { return EditOutcome::none() };
         let d = if self.offset_flip { -self.offset_distance } else { self.offset_distance };
-        match data.sketch.offset(&ids, d) {
+        match data.sketch.offset_tool(&ids, d) {
             Ok(r) => {
                 self.offset_repeat = true;
                 self.finish_create(data, &r.created);
@@ -3762,11 +3789,10 @@ impl SketchEditor {
             self.message = Some("Could not create the dimension.".into());
             return EditOutcome::redraw();
         };
-        if data.sketch.constraint(cid).is_some_and(|c| c.driving) {
-            self.open_value_box(data, cid);
-        } else {
-            self.message = Some("The dimension over-defines the sketch; it was added as a driven dimension".into());
-        }
+        // Live ("qa4 round 5 s5 driven dims" (1)): a dimension that would
+        // over-define the sketch is added driven and still opens its value
+        // box ("10 mm" selected); no toast, nothing red.
+        self.open_value_box(data, cid);
         EditOutcome::changed()
     }
 
@@ -3872,10 +3898,9 @@ impl SketchEditor {
             { continue; }
             let Some(pos) = self.label_pos(data, c.id, &c.kind) else { continue };
             let value = dim_value_text_tol(&c.kind, v, units, data.dimension_tolerances.get(&c.id.0));
-            let mut text = dimension_label_text(data.dimension_exprs.get(&c.id.0).map(|e| e.text.as_str()), value, self.show_expressions);
-            if !c.driving {
-                text = format!("({text})");
-            }
+            // Live ("qa4 round 5 s5 driven dims"): a driven dimension is the
+            // plain value in grey ("Ø10"), no parentheses.
+            let text = dimension_label_text(data.dimension_exprs.get(&c.id.0).map(|e| e.text.as_str()), value, self.show_expressions);
             out.push((c.id, pos, text, c.driving));
         }
         out
@@ -4095,15 +4120,12 @@ impl SketchEditor {
         if !self.selection.is_empty() && constraint_applicable(&data.sketch, c, &self.selection) {
             match apply_constraint(&mut data.sketch, c, &self.selection) {
                 Ok(n) if n > 0 => {
-                    data.sketch.solve();
+                    solve_after_constraint(&mut data.sketch, c, &self.selection);
                     self.selection.clear();
                     return true;
                 }
-                Ok(_) => {}
-                Err(e) => {
-                    self.message = Some(format!("Can't add constraint: {e}"));
-                    return false;
-                }
+                // Nothing added (or it couldn't be): the tool takes picks instead.
+                Ok(_) | Err(_) => {}
             }
         }
         // Tool-first: each pair of entities picked is constrained.
@@ -5771,6 +5793,8 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
         Fix { entity } => vec![entity],
         // Live: the slot's three offset glyphs sit together at the end cap.
         Offset { reference, .. } => vec![reference],
+        // Live: the Offset tool's glyph sits on the copy.
+        OffsetCurve { curve, second, .. } => vec![second.map(|s| s.1).unwrap_or(curve)],
         Normal { line, curve } => vec![line, curve],
         // Live draws a tangent's glyph once, on its first entity (the line of
         // a fillet, the cap of a slot; qa5 sketch tools).
@@ -5943,7 +5967,11 @@ fn make_constraint(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Option<C
             let b = b?;
             if is_point(sk, a) { ConstraintKind::Midpoint { point: a, curve: b } } else { ConstraintKind::Midpoint { point: b, curve: a } }
         }
-        ConstraintTool::Normal => ConstraintKind::Normal { line: a, curve: b? },
+        // Live: either pick order (the line is the one that is a line).
+        ConstraintTool::Normal => {
+            let b = b?;
+            if sk.kind(a) != Some(EntityKind::Line) && sk.kind(b) == Some(EntityKind::Line) { ConstraintKind::Normal { line: b, curve: a } } else { ConstraintKind::Normal { line: a, curve: b } }
+        }
         ConstraintTool::Pierce => {
             let b = b?;
             let ext = |e: EntityId| sk.entity(e).is_some_and(|x| x.external);
@@ -5989,6 +6017,51 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
         ConstraintTool::Symmetric => n == 3 && count(&line) >= 1,
         ConstraintTool::Fix => true,
         ConstraintTool::Curvature => n == 2 && all(&curve) && kinds.iter().any(|k| k.is_spline()),
+    }
+}
+
+/// Solve after constraint `c` was added on `ids`. Live (qa4 round 5 v3 s6,
+/// CON-TANGENT-APPLY): Tangent between a line and a circle moves the
+/// circle and keeps its radius, so only the circle's centre takes the change.
+pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
+    let centers: Vec<EntityId> = if c == ConstraintTool::Tangent && ids.iter().any(|e| sk.kind(*e) == Some(EntityKind::Line)) {
+        ids.iter().filter(|e| sk.kind(**e) == Some(EntityKind::Circle)).filter_map(|e| sk.entity(*e).and_then(|x| x.center())).collect()
+    } else {
+        Vec::new()
+    };
+    if centers.is_empty() {
+        sk.solve();
+    } else {
+        sk.solve_with(&noshape_sketch::SolveOptions { light: centers, ..Default::default() });
+    }
+}
+
+/// Whether constraint tool `c` takes `e` after `picks` (live: it doesn't
+/// accept a pick it can't use): the full set must be applicable; earlier
+/// picks only need a kind the constraint takes.
+pub fn pick_fits(sk: &Sketch, c: ConstraintTool, picks: &[EntityId], e: EntityId) -> bool {
+    let Some(k) = sk.kind(e) else { return false };
+    let mut ids = picks.to_vec();
+    ids.push(e);
+    let point = k == EntityKind::Point;
+    let complete = match c {
+        // One line, or two points.
+        ConstraintTool::Horizontal | ConstraintTool::Vertical => !(point && ids.len() == 1),
+        _ => ids.len() >= c.arity(),
+    };
+    if complete {
+        return constraint_applicable(sk, c, &ids);
+    }
+    let curve = !point;
+    match c {
+        ConstraintTool::Coincident | ConstraintTool::Fix | ConstraintTool::Symmetric => true,
+        ConstraintTool::Concentric => point || k.is_circular() || k.is_elliptical(),
+        ConstraintTool::Parallel | ConstraintTool::Perpendicular => k == EntityKind::Line,
+        ConstraintTool::Tangent | ConstraintTool::Normal | ConstraintTool::Curvature => curve,
+        ConstraintTool::Equal => k == EntityKind::Line || k.is_circular(),
+        ConstraintTool::Midpoint => point || matches!(k, EntityKind::Line | EntityKind::Arc),
+        ConstraintTool::Pierce => point || sk.entity(e).is_some_and(|x| x.external),
+        ConstraintTool::Horizontal | ConstraintTool::Vertical => point || k == EntityKind::Line || k == EntityKind::Ellipse,
     }
 }
 
@@ -7435,4 +7508,48 @@ mod tests {
         assert_ne!(ed.selection[0], l);
         assert!(!ed.paste_clipboard(&mut d, "hello"));
     }
+
+    /// qa4 round 5 v3 s6 with live's answers: Normal takes either pick
+    /// order; a pick the constraint can't use isn't taken; Tangent between
+    /// a line and a circle moves the circle and keeps its radius.
+    #[test]
+    fn constraint_picks_and_application_as_live() {
+        let mut sk = Sketch::new();
+        let line = sk.add_line(v(0.0, 0.0), v(0.04, 0.0));
+        let line2 = sk.add_line(v(0.0, 0.02), v(0.04, 0.025));
+        let circle = sk.add_circle(v(0.02, 0.01), 0.004);
+        let p = sk.add_point(v(0.05, 0.05));
+        assert_eq!(make_constraint(&sk, ConstraintTool::Normal, &[circle, line]), Some(ConstraintKind::Normal { line, curve: circle }));
+        assert_eq!(make_constraint(&sk, ConstraintTool::Normal, &[line, circle]), Some(ConstraintKind::Normal { line, curve: circle }));
+        assert!(!pick_fits(&sk, ConstraintTool::Parallel, &[], circle));
+        assert!(pick_fits(&sk, ConstraintTool::Parallel, &[line], line2));
+        assert!(!pick_fits(&sk, ConstraintTool::Parallel, &[line], circle));
+        assert!(!pick_fits(&sk, ConstraintTool::Tangent, &[], p));
+        assert!(pick_fits(&sk, ConstraintTool::Horizontal, &[], p) && !pick_fits(&sk, ConstraintTool::Horizontal, &[p], circle));
+        sk.add_constraint(ConstraintKind::Tangent { a: line, b: circle }).unwrap();
+        solve_after_constraint(&mut sk, ConstraintTool::Tangent, &[line, circle]);
+        let Some(Curve2::Circle { center, radius }) = sk.curve(circle) else { panic!() };
+        assert!((radius - 0.004).abs() < 1e-12, "radius {radius}");
+        assert!((center.y.abs() - 0.004).abs() < 1e-9, "{center:?}");
+        let Some(Curve2::Line { a, b }) = sk.curve(line) else { panic!() };
+        assert!(a.distance(v(0.0, 0.0)) < 1e-12 && b.distance(v(0.04, 0.0)) < 1e-12);
+    }
+
+    /// Live "qa4 round 5 s5 driven dims": a driven dimension reads "Ø10",
+    /// not "(Ø10)"; a new Offset starts away from the region (a circle
+    /// outward).
+    #[test]
+    fn driven_labels_and_offset_side_as_live() {
+        let (mut ed, mut data) = editor(Tool::Select);
+        let c = data.sketch.add_circle(v(0.0, 0.0), 0.005);
+        add_dimension(&mut data, ConstraintKind::Diameter { curve: c, value: 0.01 }, Some(v(0.01, 0.01)), None).unwrap();
+        let driven = add_dimension(&mut data, ConstraintKind::Diameter { curve: c, value: 0.01 }, Some(v(-0.01, 0.01)), None).unwrap();
+        assert!(!data.sketch.constraint(driven).unwrap().driving);
+        for (_, _, text, _) in ed.dimension_labels(&data, &UnitPrefs::default()) {
+            assert!(!text.starts_with('('), "{text}");
+        }
+        ed.set_tool(Tool::Offset);
+        assert!(ed.offset_default_flip(&data.sketch, &[c]), "a positive offset of a lone circle goes in: start flipped, outward");
+    }
 }
+

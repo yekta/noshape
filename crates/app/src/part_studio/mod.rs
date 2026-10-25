@@ -1319,7 +1319,8 @@ impl PartStudioView {
         }
         match ev {
             ViewportEvent::Hover(id) => {
-                let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
+                // Live: with a dialog field active, what it doesn't take isn't highlighted.
+                let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).filter(|t| self.field_takes(t, cx) != Some(false)).map(|t| t.reference.clone()));
                 if r != self.hover {
                     self.hover = r;
                     self.refresh_scene(false, cx);
@@ -3604,6 +3605,15 @@ impl PartStudioView {
         let has_appearance = rc.appearances.contains(&id);
         let is_sketch = rc.sketches.contains(&id);
         let swatch = self.sketch_swatch(id, cx);
+        // A multi-row menu's appearance items (live, qa4 round 5 v3 s8):
+        // Edit sketch appearance… when a sketch is among the rows, Add
+        // appearance to feature… when a feature that makes faces is; each
+        // opens on the clicked row if it is one, else the first such row.
+        let multi_appearance = (self.selected_features.len() > 1 && self.selected_features.contains(&id)).then(|| {
+            let first = |set: &std::collections::HashSet<FeatureId>| if set.contains(&id) { Some(id) } else { self.selected_features.iter().copied().find(|f| set.contains(f)) };
+            let sk = first(&rc.sketches);
+            (sk.map(|s| (s, self.sketch_swatch(s, cx))), first(&rc.makes_faces).map(|f| (f, rc.appearances.contains(&f))))
+        });
         let has_plane = is_sketch || rc.planes.contains(&id);
         // Live (part-studio/495): the icon's ink starts at x 46, the name at 67.
         let row = crate::ui::tree_row(SharedString::from(format!("feat-{}", f.id)), selected || editing)
@@ -3770,9 +3780,8 @@ impl PartStudioView {
                 if this.pick_feature_into_dialog(id, cx) {
                     return;
                 }
-                // A dialog field that can't take it: the row isn't selected.
-                if let Some(f) = this.active_field_filter(cx) {
-                    this.flash_info(behaviors::filter_description(f), cx);
+                // A dialog field that can't take it: nothing happens (live).
+                if this.active_field_filter(cx).is_some() {
                     return;
                 }
                 this.click_feature(id, ev.modifiers().shift, cx);
@@ -3926,7 +3935,16 @@ impl PartStudioView {
                     this.refresh_scene(false, cx);
                     cx.notify();
                 })));
-                return appearance(m.separator()).separator().item(delete);
+                let mut m = m.separator();
+                if let Some((sketch_row, faces_row)) = multi_appearance {
+                    if let Some((sid, sw)) = sketch_row {
+                        m = m.item(item("Edit sketch appearance…", Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(sid, None), w, cx))).swatch(sw));
+                    }
+                    if let Some((fid, has)) = faces_row {
+                        m = m.item(item(if has { "Edit feature appearance…" } else { "Add appearance to feature…" }, Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(fid, None), w, cx))).icon_name("add-appearance"));
+                    }
+                }
+                return m.separator().item(delete);
             }
             let rename = item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)));
             let roll_here = || item("Roll to here", Box::new(move |this, _, cx| this.set_rollback(Some(i + 1), cx)));

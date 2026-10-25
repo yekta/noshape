@@ -306,3 +306,161 @@ fn closed_fit_spline_is_smooth_at_the_seam() {
     let near_tip = (0..=200).map(|i| a + (b - a) * i as f64 / 200.0).map(|t| c.point(t)).fold(DVec2::ZERO, |m, p| if p.y > m.y { p } else { m });
     assert!(near_tip.x.abs() < 2e-3 && (near_tip.y - 0.0775).abs() < 1e-3, "{near_tip}");
 }
+
+/// Live "psb (10-24 j) sketch offset constraints" on the L chain (mm:
+/// (0,0)-(80,0)-(80,20)-(30,20)-(30,50)-(0,50)) and a Ø10 circle at (15,35).
+fn offset_l() -> (Sketch, [EntityId; 6], EntityId) {
+    let mut sk = Sketch::new();
+    let m = 1e-3;
+    let pts: Vec<EntityId> = [(0.0, 0.0), (80.0, 0.0), (80.0, 20.0), (30.0, 20.0), (30.0, 50.0), (0.0, 50.0)].iter().map(|(x, y)| sk.add_point(v(x * m, y * m))).collect();
+    let l: Vec<EntityId> = (0..6).map(|i| sk.add_line_between(pts[i], pts[(i + 1) % 6]).unwrap()).collect();
+    let c = sk.add_circle(v(15.0 * m, 35.0 * m), 5.0 * m);
+    (sk, [l[0], l[1], l[2], l[3], l[4], l[5]], c)
+}
+
+fn radius(sk: &Sketch, id: EntityId) -> f64 {
+    match sk.curve(id) {
+        Some(Curve2::Circle { radius, .. }) => radius,
+        c => panic!("{id} is not a circle: {c:?}"),
+    }
+}
+
+fn line_ends(sk: &Sketch, id: EntityId) -> (DVec2, DVec2) {
+    match sk.curve(id) {
+        Some(Curve2::Line { a, b }) => (a, b),
+        c => panic!("{id} is not a line: {c:?}"),
+    }
+}
+
+/// Distance from the midpoint of line `copy` to the line through `src`, and
+/// whether they are parallel.
+fn offset_of(sk: &Sketch, src: EntityId, copy: EntityId) -> (f64, bool) {
+    let (a, b) = line_ends(sk, src);
+    let (p, q) = line_ends(sk, copy);
+    let d = (b - a).normalize();
+    (d.perp_dot((p + q) * 0.5 - a).abs(), d.perp_dot((q - p).normalize()).abs() < 1e-9)
+}
+
+#[test]
+fn offset_tool_makes_live_constraints_on_a_chain() {
+    let m = 1e-3;
+    let (mut sk, l, _) = offset_l();
+    // (a) the top edge (l4, picked first) and the upper leg's right edge
+    // (l3), 3 mm outward (the copy of the top edge above it).
+    let up = |d: f64| {
+        let mut t = sk.clone();
+        let r = t.offset_tool(&[l[4], l[3]], d).unwrap();
+        r.created.iter().any(|e| t.kind(*e) == Some(EntityKind::Line) && line_ends(&t, *e).0.y > 0.051)
+    };
+    let d = if up(3.0 * m) { 3.0 * m } else { -3.0 * m };
+    let res = sk.offset_tool(&[l[4], l[3]], d).unwrap();
+    let lines: Vec<EntityId> = res.created.iter().copied().filter(|e| sk.kind(*e) == Some(EntityKind::Line)).collect();
+    assert_eq!(lines.len(), 2);
+    let copy = |src: EntityId| *lines.iter().find(|c| offset_of(&sk, src, **c).1 && (offset_of(&sk, src, **c).0 - 3.0 * m).abs() < 1e-9).unwrap();
+    let (c4, c3) = (copy(l[4]), copy(l[3]));
+    // Sharp corner at (33, 53); free ends at (33, 20) and (0, 53).
+    let ends: Vec<DVec2> = [c3, c4].iter().flat_map(|c| [line_ends(&sk, *c).0, line_ends(&sk, *c).1]).collect();
+    for p in [v(33.0 * m, 53.0 * m), v(33.0 * m, 20.0 * m), v(0.0, 53.0 * m)] {
+        assert!(ends.iter().any(|e| (*e - p).length() < 1e-9), "{p:?} in {ends:?}");
+    }
+    // One Coincident (the corner), one OFFSET on (l4, c4) carrying
+    // (l3, c3), one DISTANCE 3 on the first picked pair; no Parallel.
+    let kinds: Vec<ConstraintKind> = res.constraints_added.iter().map(|id| sk.constraint(*id).unwrap().kind.clone()).collect();
+    assert_eq!(kinds.iter().filter(|k| matches!(k, ConstraintKind::Coincident { .. })).count(), 1, "{kinds:?}");
+    assert!(!kinds.iter().any(|k| matches!(k, ConstraintKind::Parallel { .. })), "{kinds:?}");
+    let offsets: Vec<&ConstraintKind> = kinds.iter().filter(|k| matches!(k, ConstraintKind::OffsetCurve { .. })).collect();
+    assert_eq!(offsets.len(), 1);
+    assert!(matches!(offsets[0], ConstraintKind::OffsetCurve { master, curve, second: Some((s, sc)), first_shape: true, .. } if *master == l[4] && *curve == c4 && *s == l[3] && *sc == c3));
+    let dist: Vec<(ConstraintId, ConstraintKind)> = res.constraints_added.iter().map(|id| (*id, sk.constraint(*id).unwrap().kind.clone())).filter(|(_, k)| matches!(k, ConstraintKind::Distance { .. })).collect();
+    assert_eq!(dist.len(), 1);
+    assert!(matches!(&dist[0].1, ConstraintKind::Distance { a, b, value, .. } if *a == l[4] && *b == c4 && (value - 3.0 * m).abs() < 1e-12));
+    let rep = sk.solve();
+    assert!(rep.is_solved() && rep.redundant.is_empty(), "{rep:?}");
+    // (d) the source top edge 30 → 40 long: the copies follow at 3 mm.
+    sk.add_constraint(ConstraintKind::Length { curve: l[4], value: 40.0 * m }).unwrap();
+    assert!(sk.solve().is_solved());
+    for (s, c) in [(l[4], c4), (l[3], c3)] {
+        let (off, par) = offset_of(&sk, s, c);
+        assert!(par && (off - 3.0 * m).abs() < 1e-9, "{off}");
+    }
+    // (e) the "3" set to 6 moves both copies together.
+    sk.set_dimension_value(dist[0].0, 6.0 * m).unwrap();
+    let rep = sk.solve();
+    assert!(rep.is_solved() && rep.redundant.is_empty(), "{rep:?}");
+    for (s, c) in [(l[4], c4), (l[3], c3)] {
+        let (off, par) = offset_of(&sk, s, c);
+        assert!(par && (off - 6.0 * m).abs() < 1e-9, "{off}");
+    }
+}
+
+#[test]
+fn offset_tool_on_the_closed_loop_and_a_circle() {
+    let m = 1e-3;
+    // (b) the whole loop: 6 copies, 6 Coincidents, 5 OFFSETs on the first
+    // picked pair, 1 DISTANCE; fully solvable without redundancy.
+    let (mut sk, l, c) = offset_l();
+    let picks = [l[0], l[1], l[2], l[3], l[4], l[5]];
+    let res = sk.offset_tool(&picks, 3.0 * m).unwrap();
+    let kinds: Vec<ConstraintKind> = res.constraints_added.iter().map(|id| sk.constraint(*id).unwrap().kind.clone()).collect();
+    let count = |f: fn(&ConstraintKind) -> bool| kinds.iter().filter(|k| f(k)).count();
+    assert_eq!(count(|k| matches!(k, ConstraintKind::Coincident { .. })), 6, "{kinds:?}");
+    assert_eq!(count(|k| matches!(k, ConstraintKind::OffsetCurve { .. })), 5);
+    assert_eq!(count(|k| matches!(k, ConstraintKind::OffsetCurve { first_shape: true, .. })), 1);
+    assert_eq!(kinds.iter().filter(|k| matches!(k, ConstraintKind::Distance { a, .. } if *a == l[0])).count(), 1);
+    let rep = sk.solve();
+    assert!(rep.is_solved() && rep.redundant.is_empty(), "{rep:?}");
+    // (c) the circle 3 mm outward: its own centre, an OFFSET and a
+    // DISTANCE, no Concentric; an edit keeps it concentric.
+    let res = sk.offset_tool(&[c], -3.0 * m).unwrap();
+    let copy = res.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Circle)).unwrap();
+    assert!((radius(&sk, copy) - 8.0 * m).abs() < 1e-12);
+    let kinds: Vec<(ConstraintId, ConstraintKind)> = res.constraints_added.iter().map(|id| (*id, sk.constraint(*id).unwrap().kind.clone())).collect();
+    assert!(!kinds.iter().any(|(_, k)| matches!(k, ConstraintKind::Concentric { .. } | ConstraintKind::Coincident { .. })), "{kinds:?}");
+    assert!(kinds.iter().any(|(_, k)| matches!(k, ConstraintKind::OffsetCurve { master, curve, second: None, .. } if *master == c && *curve == copy)));
+    let (dim, _) = kinds.iter().find(|(_, k)| matches!(k, ConstraintKind::Distance { .. })).unwrap();
+    sk.set_dimension_value(*dim, 5.0 * m).unwrap();
+    let rep = sk.solve();
+    assert!(rep.is_solved() && rep.redundant.is_empty(), "{rep:?}");
+    let center = |id: EntityId| match sk.curve(id) {
+        Some(Curve2::Circle { center, .. }) => center,
+        x => panic!("{x:?}"),
+    };
+    assert!((center(c) - center(copy)).length() < 1e-9);
+    assert!((radius(&sk, copy) - radius(&sk, c) - 5.0 * m).abs() < 1e-9);
+}
+
+/// Live (qa4 round 5 v3 s6, CON-HV-COLLAPSE): Vertical on a Horizontal
+/// line doesn't collapse it to a point: the sketch can't be solved, the
+/// line stays and its constraints are the conflicting ones.
+#[test]
+fn vertical_on_a_horizontal_line_does_not_solve() {
+    let mut sk = Sketch::new();
+    let l = sk.add_line(v(0.0, 0.0), v(0.02, 0.0005));
+    sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+    assert!(sk.solve().is_solved());
+    let vert = sk.add_constraint(ConstraintKind::Vertical { a: l, b: None }).unwrap();
+    let rep = sk.solve();
+    assert!(!rep.is_solved());
+    assert!(rep.conflicting().contains(&vert), "{rep:?}");
+    let Some(Curve2::Line { a, b }) = sk.curve(l) else { panic!() };
+    assert!((b - a).length() > 0.019, "the line stays: {a:?} {b:?}");
+}
+
+/// qa4 round 5 v3 s6 (CON-CURVATURE): Curvature between two splines from
+/// the Spline tool (interpolated fit splines) solves, tangent and with
+/// equal curvature at the joint.
+#[test]
+fn curvature_between_fit_splines() {
+    let mut sk = Sketch::new();
+    let a = sk.add_fit_spline(&[v(0.0, 0.0), v(0.01, 0.01), v(0.02, 0.0)]).unwrap();
+    let b = sk.add_fit_spline(&[v(0.02, 0.0), v(0.03, -0.015), v(0.04, 0.0)]).unwrap();
+    let (_, a_end) = sk.endpoints(a).unwrap();
+    let (b_start, _) = sk.endpoints(b).unwrap();
+    sk.add_constraint(ConstraintKind::Coincident { a: a_end, b: b_start }).unwrap();
+    sk.add_constraint(ConstraintKind::Curvature { a, b }).unwrap();
+    let rep = sk.solve();
+    assert!(rep.is_solved() && rep.invalid.is_empty() && rep.redundant.is_empty(), "{rep:?}");
+    let (ca, cb) = (sk.curve(a).unwrap(), sk.curve(b).unwrap());
+    let (ta, tb) = (ca.tangent(ca.domain().1).normalize(), cb.tangent(cb.domain().0).normalize());
+    assert!(ta.perp_dot(tb).abs() < 1e-6, "{ta:?} {tb:?}");
+}

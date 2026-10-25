@@ -194,8 +194,6 @@ pub struct FeatureDialog {
     /// "Final" is offered only when later features exist (Onshape hides it
     /// for new features and for the last feature).
     pub final_available: bool,
-    /// Selection field flashing after a rejected pick.
-    flash: Option<String>,
     /// Help text shown under the title ("?").
     show_help: bool,
     /// Preview slider (before/after blend).
@@ -340,7 +338,6 @@ impl FeatureDialog {
             user_set: Default::default(),
             variables: Default::default(),
             final_available: true,
-            flash: None,
             show_help: false,
             preview: PREVIEW_REST,
             preview_track: Default::default(),
@@ -857,21 +854,6 @@ impl FeatureDialog {
                     this.move_pick(&p2, d.index, index, cx);
                 }
             }))
-    }
-
-    /// Flash the active selection field red (a rejected pick).
-    pub fn flash_active_field(&mut self, cx: &mut Context<Self>) {
-        let Some(path) = self.active_query.clone() else { return };
-        self.flash = Some(path);
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(std::time::Duration::from_millis(450)).await;
-            let _ = this.update(cx, |this, cx| {
-                this.flash = None;
-                cx.notify();
-            });
-        })
-        .detach();
     }
 
     fn advance_query_focus(&mut self, from: &str) {
@@ -2137,7 +2119,6 @@ impl FeatureDialog {
                 let refs = values.query(s.id).to_vec();
                 let cs_open = self.cs_target.as_deref() == Some(path);
                 let active = self.active_query.as_deref() == Some(path) && !cs_open;
-                let flashing = self.flash.as_deref() == Some(path);
                 let takes_cs = s.hints.has(Hints::SHOW_CREATE_SELECTION);
                 let path_s = path.to_string();
                 let any_missing = refs.iter().any(|r| (self.missing)(r));
@@ -2327,7 +2308,7 @@ impl FeatureDialog {
                             .overflow_y_scroll()
                             .rounded(px(2.))
                             .border_1()
-                            .border_color(if flashing || error.is_some() { pal.error } else if active || cs_open { pal.accent } else { pal.border })
+                            .border_color(if error.is_some() { pal.error } else if active || cs_open { pal.accent } else { pal.border })
                             .bg(if active { pal.query_active } else if error.is_some() { gpui_kit::rgb(0xf9ebec) } else { pal.panel })
                             // A parameter with a description shows Onshape's
                             // expanding tooltip (live Derived › Locations: the
@@ -3044,7 +3025,20 @@ impl Render for FeatureDialog {
         // required selection), and stays the normal green for an error of
         // the regeneration itself ("has-regen-error", lp-over-failure-capture
         // 10-22) and for an Add with an empty merge scope (qa5 BOOL4b).
-        let pink = self.ty.params.iter().any(|s| s.is_visible(&self.feature.params) && matches!(s.kind, ParamKind::Query { .. }) && self.field_error(s.id).is_some()) || !self.parse_errors.is_empty();
+        // An array of selections (Loft's profiles) counts while it holds no
+        // picks (icons2: Loft with no profiles has its ✓ disabled, live).
+        let no_picks = |id: &str| match self.feature.params.get(id) {
+            Some(ParamValue::Array(items)) => items.iter().all(|it| it.0.values().all(|v| !matches!(v, ParamValue::Query(q) if !q.is_empty()))),
+            _ => false,
+        };
+        let pink = self.ty.params.iter().any(|s| {
+            s.is_visible(&self.feature.params)
+                && match s.kind {
+                    ParamKind::Query { .. } => self.field_error(s.id).is_some(),
+                    ParamKind::Array { .. } => self.field_error(s.id).is_some() && no_picks(s.id),
+                    _ => false,
+                }
+        }) || !self.parse_errors.is_empty();
         let blocked = invalid && pink && !status.as_ref().is_some_and(|s| s.1 == "No merge scope selected.");
         let title_color = if invalid { pal.text_invalid } else { pal.text };
         let name = noshape_model::interaction::display_name_computed(&self.feature, &|k| self.computed.get(k).cloned().or_else(|| shown_length(&self.feature, k, &self.units, &self.variables)));

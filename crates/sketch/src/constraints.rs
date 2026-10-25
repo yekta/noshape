@@ -62,6 +62,16 @@ pub enum ConstraintKind {
     /// direction, −1 right); a circle or arc is centred on a master point
     /// with that radius.
     Offset { reference: EntityId, curve: EntityId, master_ref: EntityId, master: EntityId, side: f64 },
+    /// Onshape's OFFSET from the Offset tool (live "psb (10-24 j)"): `curve`
+    /// is an offset of `master` (a parallel line, or a circle / arc
+    /// concentric with it) at the distance the pair's DISTANCE dimension
+    /// sets; with `second` = (source, copy), that pair is offset by the same
+    /// signed distance. `sides`: each copy's side, +1 / −1 (lines: left of
+    /// the source's direction; circles and arcs: outside), fixed when made.
+    /// `first_shape`: this one also keeps the first pair parallel /
+    /// concentric (a chain's OFFSETs all refer to that pair; one of them
+    /// carries its equation).
+    OffsetCurve { master: EntityId, curve: EntityId, second: Option<(EntityId, EntityId)>, sides: (f64, f64), first_shape: bool },
 
     // ----- dimensions -----
     /// Point-point, point-line, line-line (parallel) or anything-circle distance.
@@ -186,6 +196,12 @@ impl ConstraintKind {
             Offset { reference, curve, master_ref, master, .. } => {
                 v.extend([*reference, *curve, *master, *master_ref]);
             }
+            // The copy first: live draws the glyph on it.
+            OffsetCurve { master, curve, second, .. } => {
+                v.extend(second.map(|s| s.1));
+                v.extend([*curve, *master]);
+                v.extend(second.map(|s| s.0));
+            }
             Normal { line, curve } => {
                 v.push(*line);
                 v.push(*curve);
@@ -264,6 +280,14 @@ impl ConstraintKind {
                 r(master_ref);
                 r(master)
             }
+            OffsetCurve { master, curve, second, .. } => {
+                r(master);
+                r(curve);
+                if let Some((a, b)) = second {
+                    r(a);
+                    r(b)
+                }
+            }
             Normal { line, curve } => {
                 r(line);
                 r(curve)
@@ -309,7 +333,7 @@ impl ConstraintKind {
             Midpoint { .. } => "Midpoint",
             Symmetric { .. } => "Symmetric",
             Fix { .. } => "Fix",
-            Offset { .. } => "Offset",
+            Offset { .. } | OffsetCurve { .. } => "Offset",
             Normal { .. } => "Normal",
             Collinear { .. } => "Collinear",
             Curvature { .. } => "Curvature",
