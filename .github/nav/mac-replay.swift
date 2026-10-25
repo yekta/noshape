@@ -98,7 +98,7 @@ func notch(_ lines: Int32, flags: CGEventFlags = []) {
     let e = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: lines, wheel2: 0, wheel3: 0)!
     e.setIntegerValueField(.scrollWheelEventIsContinuous, value: 0)
     e.flags = flags
-    append(["posted": ["kind": "scroll", "continuous": false,
+    append(["posted": ["kind": "scroll", "continuous": false, "shift": flags.contains(.maskShift),
                        "axis1": e.getIntegerValueField(.scrollWheelEventDeltaAxis1),
                        "axis2": e.getIntegerValueField(.scrollWheelEventDeltaAxis2)]])
     post(e)

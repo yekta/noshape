@@ -257,8 +257,13 @@ def main():
             ch.note(name, "baseline events (no scroll on X11)", len(posted) - len(kept))
             posted = kept
         ch.check(name, "scroll inputs = posted wheel events", float(len(got)), float(len(posted)), 0)
+        shifted = [r["posted"].get("shift", False) for r in recs if r.get("posted", {}).get("kind") == "scroll" and id(r) not in baselines]
         for i, (s_, p_) in enumerate(zip(got, posted)):
             t = s_.get("ticks")
+            if a.mode == "mac" and i < len(shifted) and shifted[i] and t is not None and t[1] == 0:
+                # macOS may move a Shift+wheel notch to the horizontal axis on
+                # delivery; Chrome reads the same event, so that's what it sees.
+                p_ = (p_[1], 0.0)
             ch.check(name, f"#{i} wheelDelta y (Chrome, posted)", None if t is None else float(trunc120(t[1])), float(trunc120(p_[1])), 0)
             ch.check(name, f"#{i} wheelDelta x (Chrome, posted)", None if t is None else float(trunc120(t[0])), float(trunc120(p_[0])), 0)
 
