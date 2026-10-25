@@ -95,6 +95,36 @@ fn change(regen: &mut Regenerator, ps: &PartStudio, what: &str) -> f64 {
     preview + refine
 }
 
+/// Undoing a delete takes the feature and the body's mesh from the cache
+/// (nothing evaluated or meshed); once its upstream changed it is
+/// evaluated again.
+#[test]
+fn undoing_a_delete_reuses_the_deleted_feature() {
+    let (ps, lp2) = model(3);
+    let (units, config) = (UnitPrefs::default(), ConfigValues::default());
+    let mut regen = Regenerator::new();
+    let mut result = |ps: &PartStudio| regen.regenerate(ps, &config, &units, &RegenOptions::default());
+    let first = result(&ps);
+    assert_eq!(first.evaluated.len(), ps.features.len());
+    let mut deleted = ps.clone();
+    deleted.features.retain(|f| f.id != lp2);
+    assert!(result(&deleted).evaluated.is_empty(), "deleting the last feature evaluates nothing");
+    let undone = result(&ps);
+    assert!(undone.evaluated.is_empty(), "undo: Linear pattern 2 comes from the cache");
+    assert!(std::sync::Arc::ptr_eq(&undone.display.bodies[0].mesh, &first.display.bodies[0].mesh), "undo: the body's mesh comes from the cache");
+    let mut run = |ps: &PartStudio| result(ps).evaluated;
+    // Delete again, edit the wall it patterns, put it back: evaluated again.
+    run(&deleted);
+    let wall = deleted.features.last().unwrap().id;
+    let mut edited = deleted.clone();
+    edited.features.last_mut().unwrap().params.set("depth", e("6 mm"));
+    assert_eq!(run(&edited), vec![wall]);
+    let mut back = ps.clone();
+    let i = back.features.iter().position(|f| f.id == wall).unwrap();
+    back.features[i] = edited.features.last().unwrap().clone();
+    assert_eq!(run(&back), vec![lp2], "Linear pattern 2's upstream changed");
+}
+
 #[test]
 #[ignore]
 fn fins_open_and_undo_cost_about_one_regeneration() {
