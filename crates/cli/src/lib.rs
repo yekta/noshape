@@ -2,6 +2,7 @@
 //! the operation registry of `noshape-ops` (see `docs/AGENT_API.md`). The
 //! app binary forwards `noshape mcp` / `noshape <group> <verb>` here.
 
+pub mod core_tools;
 pub mod mcp;
 
 use clap::{Arg, ArgAction, Command};
@@ -11,6 +12,13 @@ use serde_json::{Value, json};
 use std::ffi::OsString;
 use std::io::{BufRead, Read};
 
+/// `--all-tools`: the MCP tool list with every tool in full, instead of the
+/// common ones with short descriptions (the rest through ops_list /
+/// ops_describe / ops_call).
+fn all_tools_arg() -> Arg {
+    Arg::new("all-tools").long("all-tools").action(ArgAction::SetTrue).help("List every tool with its full description and schema (about 340k characters) instead of the common ones in short")
+}
+
 /// The clap command tree: one subcommand per group, one per operation.
 pub fn command() -> Command {
     let mut cmd = Command::new("noshape-cli")
@@ -18,10 +26,10 @@ pub fn command() -> Command {
         .after_help("Values are JSON when they parse (numbers, arrays, objects, true/false), strings otherwise.\nExamples:\n  noshape-cli document create --path /tmp/a.noshape\n  noshape-cli sketch create --doc /tmp/a.noshape --plane plane:top\n  noshape-cli call feature_add '{\"doc\":\"/tmp/a.noshape\",\"type\":\"extrude\",\"params\":{\"depth\":\"10 mm\"}}'\n  noshape-cli mcp   # MCP server on stdio")
         .subcommand_required(true)
         .arg_required_else_help(true)
-        .subcommand(Command::new("mcp").about("Run the MCP server (stdio, JSON-RPC 2.0, one message per line)"))
+        .subcommand(Command::new("mcp").about("Run the MCP server (stdio, JSON-RPC 2.0, one message per line)").arg(all_tools_arg()))
         .subcommand(Command::new("call").about("Run an operation by MCP tool name with a JSON object of arguments (stdin when omitted)").arg(Arg::new("tool").required(true)).arg(Arg::new("json")))
         .subcommand(Command::new("batch").about("Run JSON lines {\"tool\": ..., \"args\": {...}} from a file (or stdin) in one session; prints one JSON result per line").arg(Arg::new("file")))
-        .subcommand(Command::new("tools").about("Print the MCP tool list (names, descriptions, input schemas) as JSON"))
+        .subcommand(Command::new("tools").about("Print the MCP tool list (names, descriptions, input schemas) as JSON").arg(all_tools_arg()))
         .subcommand(Command::new("docs").about("Print the operation reference of docs/AGENT_API.md (Markdown)"));
     for g in registry::groups() {
         let mut gc = Command::new(g).subcommand_required(true).arg_required_else_help(true).about(format!("{g} operations"));
@@ -81,8 +89,8 @@ pub fn run(args: Vec<OsString>) -> i32 {
     };
     let mut ctx = Ctx::new();
     let result = match m.subcommand() {
-        Some(("mcp", _)) => {
-            return match mcp::serve(ctx) {
+        Some(("mcp", sub)) => {
+            return match mcp::serve(ctx, sub.get_flag("all-tools")) {
                 Ok(()) => 0,
                 Err(e) => {
                     eprintln!("mcp: {e:#}");
@@ -90,7 +98,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
                 }
             };
         }
-        Some(("tools", _)) => Ok(json!({ "tools": mcp::tool_list() })),
+        Some(("tools", sub)) => Ok(json!({ "tools": mcp::tool_list(sub.get_flag("all-tools")) })),
         Some(("docs", _)) => {
             emit(&noshape_ops::reference::markdown());
             return 0;

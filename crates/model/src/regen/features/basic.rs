@@ -10,13 +10,15 @@ const NO_GEOMETRY_CHANGE: &str = "Boolean resulted in no geometry change. The pa
 pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
     let tools_idx = ev.resolve_bodies(ev.query("tools"));
     if tools_idx.is_empty() {
-        return crate::regen::eval::err_at(&["tools"], "Cannot resolve entities.");
+        // As Onshape's opBoolean (no field marked; the empty required
+        // field turns pink in the dialog by itself).
+        return err("Cannot resolve entities.");
     }
     let op = ev.enum_("operationType").to_string();
     match op.as_str() {
         "UNION" => {
             if tools_idx.len() < 2 {
-                return err("Select at least two parts to union");
+                return err("Need at least two parts or surfaces for a Boolean operation.");
             }
             // One union of all the parts: those that touch become one part
             // (the first one's), parts apart keep theirs (qa5 BOOL1: the old
@@ -38,7 +40,8 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
         "SUBTRACTION" | "INTERSECTION" => {
             let targets = ev.resolve_bodies(ev.query("targets"));
             if targets.is_empty() && op == "SUBTRACTION" {
-                return err("Select target parts");
+                // Live (qa5 boolean, Subtract with no Targets).
+                return err("Cannot resolve entities.");
             }
             let tool_ids: Vec<_> = tools_idx.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
             let tools: Vec<NamedShape> = tools_idx.iter().map(|&i| {

@@ -221,11 +221,20 @@ fn fin_feature_pattern_without_reapply_fails_like_onshape() {
 }
 
 #[test]
-fn fin_pattern_x1000_matches_onshape_and_is_fast() {
+fn fin_pattern_x1000_matches_onshape() {
+    // Onshape: 4004 faces, 12006 edges, 8004 vertices.
+    let (_, r) = fins(1000, true, true);
+    assert!(matches!(status(&r).0, FeatureStatus::Ok), "{:?}", status(&r));
+    let t = topology(&r);
+    assert_eq!((t.faces, t.edges, t.vertices, t.front, t.dups, t.sides, t.base_top), (4004, 12006, 8004, 1, 0, (1, 1), 1000));
+}
+
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_fin_pattern_x1000_is_linear() {
     // The whole regeneration (every feature, then the display: tessellation
-    // and edges), as the app runs it. Onshape: 4004 faces, 12006 edges, 8004
-    // vertices; ~82 s for the preview and ~13.8 s from ✓ to the final result
-    // (live, loaded machine).
+    // and edges), as the app runs it. Onshape: ~82 s for the preview and
+    // ~13.8 s from ✓ to the final result (live, loaded machine).
     if std::env::var_os("NOSHAPE_PERF").is_some() && log::set_logger(&PerfLog).is_ok() {
         log::set_max_level(log::LevelFilter::Info);
     }
@@ -240,8 +249,6 @@ fn fin_pattern_x1000_matches_onshape_and_is_fast() {
     let (total, r) = timed(1000);
     let (after, _) = timed(200);
     assert!(matches!(status(&r).0, FeatureStatus::Ok), "{:?}", status(&r));
-    let t = topology(&r);
-    assert_eq!((t.faces, t.edges, t.vertices, t.front, t.dups, t.sides, t.base_top), (4004, 12006, 8004, 1, 0, (1, 1), 1000));
     let pattern = r.display.features.last().unwrap().time_ms as f64 / 1e3;
     let base = before.max(after);
     eprintln!("fins ×1000: pattern {pattern:.2} s, whole regeneration with display {total:.2} s; ×200 {before:.2} / {after:.2} s, ratio {:.2}", total / base);

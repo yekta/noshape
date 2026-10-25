@@ -49,7 +49,27 @@ pub fn ops() -> Vec<Op> {
             destructive: false,
             run: commit,
         },
+        Op {
+            group: "featurestudio",
+            verb: "monitor",
+            summary: "The FeatureScript notices panel's Monitor for a Part Studio: notices and println output",
+            description: "Regenerates the Part Studio and returns what its FeatureScript notices panel's Monitor shows: the compile warnings of the Feature Studios its custom features come from and each custom feature's runtime notices (message, severity, `line` / `column`, stack of `at` line:col and `in` module (function), ending with the Part Studio and feature), in Onshape's order, then the text the features printed (`println`).",
+            fields: vec![super::doc_field(), opt("part_studio", s(), "Part Studio tab (name or id); default: the first.")],
+            mutates: false,
+            destructive: false,
+            run: monitor,
+        },
     ]
+}
+
+fn monitor(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = doc::tab_of_kind(od.doc(), a.opt_str("part_studio")?, "Part Studio", |c| matches!(c, TabContent::PartStudio(_))).map_err(|e| e.with_param("part_studio"))?;
+    // The Monitor shows the last run: regenerate so this session has one.
+    od.regenerate(tab, None)?;
+    let (entries, output) = noshape_model::custom::run::monitor(od.doc(), tab);
+    let name = od.doc().tab(tab).map(|t| t.name.clone());
+    Ok(json!({ "part_studio": name, "notices": entries.iter().map(super::monitor_entry_json).collect::<Vec<_>>(), "output": output }).into())
 }
 
 fn target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {

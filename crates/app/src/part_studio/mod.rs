@@ -249,8 +249,9 @@ pub struct PartStudioView {
     regen: Arc<Mutex<Regenerator>>,
     regen_seq: u64,
     regen_task: Option<Task<()>>,
-    /// The running regeneration (pending.rs: a newer request retires it).
-    regen_inflight: Option<pending::InFlight>,
+    /// The running regenerations (model regen::runs: a newer request
+    /// aborts or supersedes each).
+    regen_runs: noshape_model::regen::runs::Runs,
     /// A regeneration whose result isn't shown yet, its overlay timer and
     /// spinner.
     pending: Option<pending::Pending>,
@@ -278,6 +279,9 @@ pub struct PartStudioView {
     /// The sketch fillet radius last used in this tab: live's default is
     /// R5 on a fresh load and then sticks per tab (behaviours.md 568).
     sketch_fillet_radius: Option<f64>,
+    /// Sketch dialog options toggled before the sketch plane is picked (the
+    /// editor opens with them).
+    sketch_pending_options: Option<crate::sketch_mode::SketchOptions>,
     context: Option<Arc<noshape_model::regen::context::Context>>,
     context_menu: Option<(Point<Pixels>, Entity<crate::os_menu::OsMenu>, Subscription)>,
     measure_cache: Option<MeasureCache>,
@@ -395,7 +399,7 @@ impl PartStudioView {
             regen: Arc::new(Mutex::new(Regenerator::new())),
             regen_seq: 0,
             regen_task: None,
-            regen_inflight: None,
+            regen_runs: Default::default(),
             pending: None,
             pending_timer: None,
             pending_spinner: None,
@@ -409,6 +413,7 @@ impl PartStudioView {
             canceled_edit: None,
             sketch: None,
             sketch_fillet_radius: None,
+            sketch_pending_options: None,
             context: None,
             context_menu: None,
             measure_cache: None,
@@ -516,10 +521,7 @@ impl PartStudioView {
         // finishes its features into the cache when this one only extends it.
         let studio = Arc::new(studio);
         let cancel = noshape_model::regen::RegenCancel::default();
-        if let Some(old) = self.regen_inflight.take() {
-            old.retire(&studio, &config, &doc_vars, editing_sketch);
-        }
-        self.regen_inflight = Some(pending::InFlight { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
+        self.regen_runs.start(noshape_model::regen::runs::Run { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
         self.begin_pending(seq, window, cx);
         let cancel2 = cancel.clone();
         // View in high quality (Shift+R, kept for the session once used):
@@ -549,7 +551,6 @@ impl PartStudioView {
                     p.opening = None;
                 }
                 if !refine {
-                    this.regen_inflight = None;
                     this.end_pending(seq, cx);
                 }
                 this.context = Some(result.context.clone());
@@ -576,7 +577,6 @@ impl PartStudioView {
                     if seq != this.regen_seq {
                         return;
                     }
-                    this.regen_inflight = None;
                     this.end_pending(seq, cx);
                     this.context = Some(fine.context.clone());
                     scene_builder::log_regen_perf("refine", &fine.display, &studio);
@@ -745,8 +745,12 @@ impl PartStudioView {
             self.message = None;
         }
         // A new Extrude / Revolve / Sweep / Loft: operation and merge scope
-        // from what the previewed tool touches.
-        self.boolean_edit_logic(cx);
+        // from what the previewed tool touches (unless std's editing logic
+        // decides them, `std_edit_logic`).
+        let std_logic = self.edit.as_ref().is_some_and(|e| noshape_model::custom::std_feature::has_editing_logic(&e.dialog.read(cx).feature.type_id));
+        if !std_logic {
+            self.boolean_edit_logic(cx);
+        }
         self.hole_scope_logic(cx);
         self.orient_for_sketch(cx);
         self.refresh_scene(true, cx);
@@ -1635,6 +1639,8 @@ impl PartStudioView {
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
         let vertex_sets: std::collections::HashMap<FeatureId, Vec<Reference>> = self.display.sketches.iter().map(|s| (s.feature, sketch_points(s))).collect();
         let studio_view = cx.entity().downgrade();
+        // Options ticked in an earlier, cancelled sketch dialog don't carry over.
+        self.sketch_pending_options = None;
         dialog.update(cx, |d, cx| {
             if d.feature.type_id == "sketch" {
                 d.extra = Some(Self::sketch_dialog_extra(studio_view));
@@ -3621,8 +3627,9 @@ impl PartStudioView {
                     // Onshape list badges: under-defined sketch (12 px blue circle,
                     // undimmed, 8 px in from the icon's top-left). An error only turns
                     // the name red (part-studio/94).
-                    // Missing selections / warnings: Onshape's yellow triangle.
-                    .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().right(px(-3.)).bottom(px(-5.)).text_size(px(10.)).text_color(pal.warning).child("▲")))
+                    // Missing selections / warnings: Onshape's 12 px yellow triangle
+                    // badge on the icon's bottom right (live 2071, 2458 Refold).
+                    .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().left(px(9.)).top(px(8.)).child(crate::assets::icon("list-warning-overlay", 12., cx))))
                     .when(underdefined, |d| d.child(div().absolute().left(px(9.5)).top(px(8.)).child(crate::assets::icon("list-underdefined-overlay", 12., cx)))),
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
@@ -4408,7 +4415,10 @@ impl PartStudioView {
         let me = cx.entity();
         let toolbar = Slice::new(&me, |this, window, cx| {
             let viewport_w = f32::from(window.viewport_size().width);
-            if this.sketch.is_some() { this.render_sketch_toolbar(viewport_w, cx) } else { this.render_toolbar(viewport_w, cx) }
+            // A new sketch's dialog shows the (disabled) sketch toolbar before
+            // its plane is picked (live sketch/00).
+            let sketch_dialog = this.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "sketch");
+            if this.sketch.is_some() || sketch_dialog { this.render_sketch_toolbar(viewport_w, cx) } else { this.render_toolbar(viewport_w, cx) }
         }, cx);
         let underlay = Slice::new(&me, |this, window, cx| this.render_underlay_slice(window, cx), cx);
         let overlay = Slice::new(&me, |this, window, cx| this.render_overlay_slice(window, cx), cx);
@@ -4845,16 +4855,22 @@ impl Render for PartStudioView {
                                     .children(list_head)
                                     .child(slices.features.clone().cached(StyleRefinement::default().w_full().flex_1().min_h_0()))
                                     // Drag the separator to share space between features and parts.
+                                    // Live (part-studio/00): a 1 px #d7d7d7 line over the list's
+                                    // 200 px (5 px short of the panel border), the "Parts (N)" row
+                                    // right under it; the drag target is 5 px around it.
                                     .child(
-                                        div()
-                                            .id("parts-separator")
-                                            .h(px(5.))
-                                            .flex_none()
-                                            // Live: `div.os-splitter` is row-resize.
-                                            .cursor(CursorStyle::ResizeRow)
-                                            .border_t_1()
-                                            .border_color(pal.border)
-                                            .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
+                                        div().h(px(1.)).mr(px(5.)).flex_none().relative().bg(pal.border).child(
+                                            div()
+                                                .id("parts-separator")
+                                                .absolute()
+                                                .left_0()
+                                                .right_0()
+                                                .top(px(-2.))
+                                                .h(px(5.))
+                                                // Live: `div.os-splitter` is row-resize.
+                                                .cursor(CursorStyle::ResizeRow)
+                                                .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
+                                        ),
                                     )
                                     // Live (part-studio/00, 220): the parts take the lower 35% of the
                                     // panel until the separator is dragged. A share of the panel, so

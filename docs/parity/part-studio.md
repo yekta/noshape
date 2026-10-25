@@ -74,7 +74,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.19 | Shift+T makes the hovered/selected parts transparent; cumulative | keyboard_shortcuts; View__make_transparent | 🔧 |
 | 2.20 | Shift+X opens the Section view dialog (again with a section on: turns it off) | keyboard_shortcuts | ✅ |
 | 2.21 | Shift+V named views | keyboard_shortcuts | ✅ |
-| 2.22 | Shift+R view in high quality (4x finer tessellation, notice) | keyboard_shortcuts | 🔧 |
+| 2.22 | Shift+R view in high quality (4x finer tessellation, notice) | keyboard_shortcuts | 🔧 (notice = live's 433×28 #90cef1 bar at the graphics top centre, 13 px text, white Disable button; part-studio/lod4-fill-shiftR) |
 | 2.23 | Alt+click selects through transparent geometry | keyboard_shortcuts | 🔧 (isolate/transparent and translucent part appearances) |
 | 2.24 | Perspective view only from the camera menu (no key, like Onshape; O was a noshape extra, removed 10-23); off in every new graphics area, per Part Studio tab for the session (no Set as default, no preference: live 10-23 a2); field of view 45° vertical (Graphics preferences) in Part Studios and assemblies | View__perspective_view | ✅ |
 
@@ -91,7 +91,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | 🔧 |
 | 3.8 | Selected entities show quick values in the Measure readout | A §5.1 | ✅ |
 | 3.9 | Selection count next to the cursor, 1–5 ("5" for five or more) | Home__selection; live cursors/ | ✅ (Onshape bakes the digit into the cursor image; GPUI has no image cursors, so a black digit with a white outline is drawn at the arrow's lower right) |
-| 3.10 | Midpoints of edges show on hover and can be picked (measure, planes) | Home__selection | 🔧 (part edges and open sketch curves; with a dialog open when its field takes points; regen resolves sketch-curve midpoints) |
+| 3.10 | Midpoints of edges show on hover and can be picked (measure, planes) | Home__selection | 🔧 (part edges and open sketch curves; with a dialog open when its field takes points. Look as live qa4-r5-s9-6: hovering the edge shows a 9 px dark see-through ring at its midpoint (render point style RING); a selected midpoint is an 11 px #fac012 disc with a #c4960b ring and #ffd65b centre; a hovered midpoint target draws the same marker in orange #f8c488/#c49a6a/#ffd8ac. Open (behaviour): live makes the midpoint the hover target within a few px, dropping the edge highlight; ours switches only on click (midpoint_pick).) |
 | 3.11 | Select other lists faces and edges under the cursor nearest first; hovering a row highlights it; click/Enter picks; list closes | Home__select_other | 🔧 |
 | 3.12 | Select other picks go to the active dialog field | Home__select_other | 🔧 |
 | 3.13 | Select other from the face/edge context menu | Home__select_other | 🔧 |
@@ -116,6 +116,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 4.8 | Search tools: typing filters tools, Enter runs the first, Esc closes | Home__search_tools | ✅ |
 | 4.9 | Search tools with no query lists recently used tools first; description on hover | Home__search_tools | 🔧 |
 | 4.10 | REMEMBER_PREVIOUS_VALUE parameters default to the last accepted value of that tool | A §7.2 | 🔧 |
+| 4.11 | Search tools box: 162 px #eee box, "alt/⌥" (35 px) and "c" (17 px) keys joined, 19 px, 1 px #aaa with a 2 px bottom edge, 3 px after the label | live part-studio/00-new-doc-initial | ✅ (box, key edges and key text rows at live's pixels) |
 
 ## 5. Feature dialogs and selection fields (Home__dialogs, feature_basics, Home__numeric_fields, A §7)
 
@@ -156,6 +157,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.31 | Choosing Remove/Intersect on such a feature points it into the part | (Onshape behaviour) | 🔧 |
 | 5.32 | Drag handles for depth/angle/distance (extrude arrow, revolve arc, plane offset, shell thickness, fillet radius, chamfer distance) | A §7.7 | ✅ (hover outlines the arrow blue) |
 | 5.33 | Editing a feature rolls the model back to it | Home__dialogs | ✅ |
+| 5.34 | Feature dialog rows on live's pixels: Chrome's fractional rows (26.33 px empty selection fields, 27.33 px checkbox rows) snapped like Chrome (27/28 px steps), 5 px under a field, 28 px select rows (select on the top line), 26 px quantity rows (29 px with a hole icon), 31 px icon selects, 48 px stacked label + select, Hole size block without top padding, inactive field label #666, frame ending 24.5 px under the list | live dialogs/*-01-open, dom/dialog-extrude-new, dialog-fillet, dialog-chamfer, dialog-hole | ✅ (Extrude, Revolve, Fillet, Chamfer, Shell, Hole, Sweep, Linear pattern, Plane: every row's checkbox/underline/label at live's pixel; Revolve and Fillet's frame bottom and ? are 1 px high from Chrome's sub-pixel rounding) |
 
 ## 6. Feature list (PartStudio__features_and_parts_lists, A §3)
 
@@ -176,7 +178,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.13 | Failed features red with the error as tooltip | Home__error_indicators | ✅ |
 | 6.14 | Suppressed features struck through | features_and_parts_lists | ✅ |
 | 6.15 | Under-defined sketch indicator | features_and_parts_lists | ✅ (blue text) |
-| 6.16 | Missing-selection / warning yellow triangle | features_and_parts_lists | 🔧 |
+| 6.16 | Missing-selection / warning yellow triangle | features_and_parts_lists | 🔧 (12 px #FAB601 badge with a white !, the icon's bottom right, at live's pixels: part-studio/2071; shown for Warning status — missing-selection tracking itself is not modelled) |
 | 6.17 | Eye icon on hover hides/shows sketches, planes, mate connectors | features_and_parts_lists | 🔧 |
 | 6.18 | Rename in place (context menu / Shift+N) | features_and_parts_lists | ✅ |
 | 6.19 | Feature context menu in the live order: Rename | Edit…, Edit <sketch>…, Copy sketch | Add selection to folder… | Show/Hide | Export as DXF/DWG… | Suppress, Configure suppression, Dynamic suppression ▸ | Zoom to selection, View normal to | Show dependencies… | Roll to here (not on the last feature) | sketch/feature appearance | Delete | live (dom/context-menus-partstudio.txt) | ✅ (Create Drawing of Sketch N… via asb's sketch views; Add comment out of scope: cloud comments) |

@@ -133,7 +133,7 @@ impl log::Log for PerfLog {
 /// shares the machine with the others while its ×200 didn't.
 static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-fn check(case: Case) {
+fn check(case: Case, timed: bool) {
     let _one_at_a_time = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
     if std::env::var_os("NOSHAPE_PERF").is_some() && log::set_logger(&PerfLog).is_ok() {
         log::set_max_level(log::LevelFilter::Info);
@@ -153,22 +153,42 @@ fn check(case: Case) {
         times.push(t);
     }
     let ratio = times[1] / times[0].max(1e-3);
-    assert!(ratio < 8.0, "{case:?}: ×1000 took {:.2} s, {ratio:.1} times ×200 ({:.2} s): superlinear", times[1], times[0]);
+    if timed {
+        assert!(ratio < 8.0, "{case:?}: ×1000 took {:.2} s, {ratio:.1} times ×200 ({:.2} s): superlinear", times[1], times[0]);
+    }
 }
 
 #[test]
-fn feature_pattern_on_top_is_linear() {
-    check(Case::FeatureOnTop);
+fn feature_pattern_on_top_regenerates() {
+    check(Case::FeatureOnTop, false);
 }
 
 #[test]
-fn feature_pattern_through_is_linear() {
-    check(Case::FeatureThrough);
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_feature_pattern_on_top_is_linear() {
+    check(Case::FeatureOnTop, true);
 }
 
 #[test]
-fn part_pattern_is_linear() {
-    check(Case::Part);
+fn feature_pattern_through_regenerates() {
+    check(Case::FeatureThrough, false);
+}
+
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_feature_pattern_through_is_linear() {
+    check(Case::FeatureThrough, true);
+}
+
+#[test]
+fn part_pattern_regenerates() {
+    check(Case::Part, false);
+}
+
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_part_pattern_is_linear() {
+    check(Case::Part, true);
 }
 
 /// Live G45: block 30 × 20 × 10 mm, a rib (x 2..3, 15 mm high) added from

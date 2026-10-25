@@ -226,6 +226,9 @@ pub struct UiState {
     /// The edited feature's parameters when std's editing logic last ran
     /// (its `oldDefinition`; empty for a new feature's first change).
     pub std_edit_old: Option<noshape_model::params::ParamValues>,
+    /// std's editing logic running off the UI thread (std Extrude runs a
+    /// whole trial extrude for its boolean heuristics).
+    pub std_edit_task: Option<Task<()>>,
     pub preview_task: Option<Task<()>>,
     /// Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
@@ -451,6 +454,7 @@ impl UiState {
             preview_before: None,
             before_context: None,
             std_edit_old: None,
+            std_edit_task: None,
             preview_task: None,
             preview_tool: None,
             feature_drop: Default::default(),
@@ -1835,6 +1839,12 @@ impl PartStudioView {
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.before_context = Some(context);
                 this.ui.preview_before = Some(Arc::new(display));
+                // Changes made before the model was ready get std's editing logic now.
+                if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone())
+                    && noshape_model::custom::std_feature::has_editing_logic(&dialog.read(cx).feature.type_id)
+                {
+                    this.std_edit_logic(&dialog, cx);
+                }
                 // Chips of parts the feature consumes get their names now.
                 if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone()) {
                     let labeler = this.labeler(cx);
@@ -2570,28 +2580,45 @@ impl PartStudioView {
     pub(super) fn midpoint_overlay(&self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineSegment, PointData, PointSprite};
         let mut points = Vec::new();
-        let sprite = |m: glam::DVec3, color: [u8; 4], size: f32| PointSprite { position: m.as_vec3().into(), color, pick_id: 0, size, style: LineSegment::ON_TOP, _pad: 0 };
-        // Selected midpoints.
+        let sprite = |m: glam::DVec3, color: u32, size: f32, style: u32| PointSprite { position: m.as_vec3().into(), color: [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255], pick_id: 0, size, style: LineSegment::ON_TOP | style, _pad: 0 };
+        // Live (part-studio/qa4-r5-s9-6d, 6e): the midpoint target is an
+        // 11 px disc with a thin darker ring 3–4 px out and a light centre:
+        // orange while hovered (#f8c488, #c49a6a, #ffd8ac), yellow-orange once
+        // selected (#fac012, #c4960b, #ffd65b).
+        let marker = |points: &mut Vec<PointSprite>, m: glam::DVec3, [disc, ring, centre]: [u32; 3]| {
+            points.push(sprite(m, disc, 11.0, 0));
+            points.push(sprite(m, ring, 8.0, PointSprite::RING));
+            points.push(sprite(m, centre, 5.0, 0));
+        };
         for r in &self.selection {
             if let Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint } = r
                 && let Some(m) = self.edge_midpoint(on)
             {
-                points.push(sprite(m, [255, 169, 10, 255], 11.0));
+                marker(&mut points, m, [0xfac012, 0xc4960b, 0xffd65b]);
             }
         }
-        if self.active_field_filter(cx).is_none_or(field_takes_points)
-            && (self.edit.is_none() || self.active_field_filter(cx).is_some())
-            && self.sketch.is_none()
-            && let Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. })) = &self.hover
-            && let Some(m) = self.edge_midpoint(r)
-        {
-            points.push(sprite(m, [255, 194, 14, 255], 9.0));
+        if self.active_field_filter(cx).is_none_or(field_takes_points) && (self.edit.is_none() || self.active_field_filter(cx).is_some()) && self.sketch.is_none() {
+            match &self.hover {
+                Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) => {
+                    if let Some(m) = self.edge_midpoint(on) {
+                        marker(&mut points, m, [0xf8c488, 0xc49a6a, 0xffd8ac]);
+                    }
+                }
+                // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows
+                // a 9 px dark ring at its midpoint, the edge seen through it.
+                Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. })) => {
+                    if let Some(m) = self.edge_midpoint(r) {
+                        points.push(sprite(m, 0x000000, 9.0, PointSprite::RING));
+                    }
+                }
+                _ => {}
+            }
         }
         if points.is_empty() {
             return Vec::new();
         }
-        let pts = PointData { points };
-        vec![Instance::new(Drawable::Points(self.gpu.uploader().upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(22)]
+        let up = self.gpu.uploader();
+        vec![Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22)]
     }
 
     /// An edge click within ~8 px of its midpoint selects the midpoint.
@@ -3036,7 +3063,10 @@ impl PartStudioView {
     /// the profile fills "Flange to merge" and the subtraction offset, live
     /// qa5 4.2), on the model before the feature; fields the user set are
     /// `specifiedParameters`.
-    fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
+    /// It runs in the background; a result for values the user has changed
+    /// since is dropped (the run for the new values follows). Without the
+    /// model before the feature yet, it runs once that arrives.
+    pub(super) fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
         let Some(ctx) = self.ui.before_context.clone() else { return };
         let (ty, id, name, params, user_set) = {
             let d = dialog.read(cx);
@@ -3046,22 +3076,33 @@ impl PartStudioView {
         if old == params {
             return;
         }
+        let creating = self.edit.as_ref().is_some_and(|e| e.is_new);
         let units = self.doc.read(cx).session.doc.settings.units;
-        let Some(changed) = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &params, &user_set) else { return };
-        let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
-        if changes.is_empty() {
-            return;
-        }
-        let mut next = params;
-        for (k, v) in &changes {
-            next.set(k, v.clone());
-        }
-        self.ui.std_edit_old = Some(next);
-        dialog.update(cx, |d, cx| {
-            for (k, v) in changes {
-                d.set_value_auto(&k, v, cx);
-            }
-        });
+        let dialog = dialog.clone();
+        let sent = params.clone();
+        self.ui.std_edit_task = Some(cx.spawn(async move |this, cx| {
+            let changed = cx.background_spawn(async move { noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set, creating) }).await;
+            let Some(changed) = changed else { return };
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if dialog.read(cx).feature.params != params {
+                    return;
+                }
+                let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
+                if changes.is_empty() {
+                    return;
+                }
+                let mut next = params;
+                for (k, v) in &changes {
+                    next.set(k, v.clone());
+                }
+                this.ui.std_edit_old = Some(next);
+                dialog.update(cx, |d, cx| {
+                    for (k, v) in changes {
+                        d.set_value_auto(&k, v, cx);
+                    }
+                });
+            });
+        }));
     }
 
     /// Onshape's deleteFaceEditLogic / replaceFaceEditLogic for a new

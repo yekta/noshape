@@ -92,12 +92,11 @@ fn feature_defaults_are_within_bounds() {
 /// QA: a linear pattern with an absurd instance count used to run (and hang
 /// the regeneration thread); a negative fillet radius or pattern distance
 /// reached the kernel. Out-of-range values now fail the feature with a clear message.
-#[test]
-fn out_of_range_values_fail_with_message() {
-    let mut t = T::new();
+/// A Part pattern of the block with a million instances.
+fn million_instance_pattern(t: &mut T) -> FeatureId {
     t.block();
     let body = t.regen().context.bodies[0].id.clone();
-    let pat = t.add(
+    t.add(
         "linearPattern",
         &[
             ("patternType", en("PART")),
@@ -106,12 +105,27 @@ fn out_of_range_values_fail_with_message() {
             ("distance", e("50 mm")),
             ("instanceCount", e("1000000")),
         ],
-    );
+    )
+}
+
+/// The million-instance pattern fails at once (it used to hang).
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_million_instance_pattern_fails_at_once() {
+    let mut t = T::new();
+    let pat = million_instance_pattern(&mut t);
     let t0 = std::time::Instant::now();
+    assert_eq!(t.status(pat).0, FeatureStatus::Error);
+    assert!(t0.elapsed().as_secs() < 30, "{:?}", t0.elapsed());
+}
+
+#[test]
+fn out_of_range_values_fail_with_message() {
+    let mut t = T::new();
+    let pat = million_instance_pattern(&mut t);
     let (st, msg) = t.status(pat);
     assert_eq!(st, FeatureStatus::Error);
     assert!(msg.as_deref().unwrap_or("").contains("A parameter value is not valid."), "{msg:?}");
-    assert!(t0.elapsed().as_secs() < 30);
     t.set(pat, "instanceCount", e("0"));
     let (st, msg) = t.status(pat);
     assert_eq!(st, FeatureStatus::Error);

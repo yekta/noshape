@@ -197,5 +197,26 @@ pub fn run(ctx: &mut Ctx, op: &'static Op, args: &Value) -> Result<OpOutput, OpE
     if let Some(r) = crate::live::forward(ctx, op, args) {
         return r;
     }
-    (op.run)(ctx, &Args { op, value: args })
+    (op.run)(ctx, &Args { op, value: args }).map(|mut out| {
+        tidy_numbers(&mut out.value);
+        out
+    })
+}
+
+/// Reply numbers without floating-point noise: 12 significant digits,
+/// magnitudes below 1e-12 as 0, no -0 (3.3000000000000007 -> 3.3,
+/// 1.4e-14 -> 0). No value an operation reports is that small.
+pub fn tidy_numbers(v: &mut Value) {
+    match v {
+        Value::Number(n) if n.is_f64() => {
+            let x = n.as_f64().unwrap_or(0.0);
+            let y = if x.abs() < 1e-12 { 0.0 } else { format!("{x:.11e}").parse::<f64>().unwrap_or(x) + 0.0 };
+            if let Some(m) = serde_json::Number::from_f64(y) {
+                *n = m;
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(tidy_numbers),
+        Value::Object(m) => m.values_mut().for_each(tidy_numbers),
+        _ => {}
+    }
 }

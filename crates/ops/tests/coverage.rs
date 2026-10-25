@@ -205,9 +205,9 @@ fn every_feature_type_round_trips_through_json() {
     let ps = noshape_model::PartStudio::new();
     let mut n = 0;
     for ty in noshape_model::features::all() {
-        let schema = values::feature_schema(&ty.params, &units);
-        assert!(schema["properties"].is_object(), "{}", ty.id);
         let f = ps.new_feature(ty.id, &units).expect("new feature");
+        let schema = values::feature_schema(&ty.params, &units, Some(&f.params));
+        assert!(schema["properties"].is_object(), "{}", ty.id);
         let json = values::values_to_json(Some(&ty.params), &f.params);
         let mut back = f.params.clone();
         let obj = json.as_object().unwrap().clone();
@@ -240,4 +240,25 @@ fn agent_api_reference_is_current() {
         return;
     }
     assert!(new == doc, "docs/AGENT_API.md's operation reference is out of date: run `UPDATE_DOCS=1 cargo test -p noshape-ops --test coverage`");
+}
+
+/// Conditional parameters say when the dialog shows them (agent usability:
+/// an agent can't see the dialog).
+#[test]
+fn schema_says_when_parameters_show() {
+    let units = noshape_units::UnitPrefs::default();
+    let ps = noshape_model::PartStudio::new();
+    let desc = |ty: &str, p: &str| {
+        let t = noshape_model::features::get(ty).unwrap();
+        let f = ps.new_feature(ty, &units).unwrap();
+        values::feature_schema(&t.params, &units, Some(&f.params))["properties"][p]["description"].as_str().unwrap().to_string()
+    };
+    let depth = desc("hole", "holeDepthV3");
+    assert!(depth.contains("shown with the defaults; hidden, and ignored, when endStyleV2 is UP_TO_NEXT or UP_TO_ENTITY or THROUGH"), "{depth}");
+    let width = desc("chamfer", "width");
+    assert!(width.contains("shown with the defaults"), "{width}");
+    let other = desc("moveFace", "surfacesAndFaces");
+    assert!(other.contains("hidden with the defaults") && other.contains("outputType is CREATE"), "{other}");
+    let faces = desc("moveFace", "moveFaces");
+    assert!(faces.contains("shown with the defaults") && faces.contains("outputType is CREATE"), "{faces}");
 }
