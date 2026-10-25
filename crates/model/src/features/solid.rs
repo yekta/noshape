@@ -248,7 +248,7 @@ pub fn loft() -> FeatureType {
             "Match connections",
             "connection",
             vec![
-                ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX),
+                ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::ANY_EDGE | QueryFilter::VERTEX),
                 // loft.fs: set by its editing logic, never shown.
                 ParamSpec::query("connectionEdgeQueries", "Edge queries", QueryFilter::EDGE).hints(Hints::ALWAYS_HIDDEN),
                 ParamSpec::text("connectionEdgeParameters", "Edge parameters", "").hints(Hints::ALWAYS_HIDDEN),
