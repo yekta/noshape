@@ -588,6 +588,12 @@ impl WindowsWindowInner {
             }),
             modifiers,
             touch_phase: TouchPhase::Moved,
+            // NOSHAPE PATCH (agent nav2): the raw notches (Chromium:
+            // `GET_WHEEL_DELTA_WPARAM / WHEEL_DELTA`, kept vertical with Shift).
+            wheel_ticks: Some(Point {
+                x: 0.0,
+                y: wparam.signed_hiword() as f32 / WHEEL_DELTA as f32,
+            }),
         });
         let handled = !func(input).propagate;
         self.state.callbacks.input.set(Some(func));
@@ -626,6 +632,11 @@ impl WindowsWindowInner {
             }),
             modifiers: current_modifiers(),
             touch_phase: TouchPhase::Moved,
+            // NOSHAPE PATCH (agent nav2): Chromium negates WM_MOUSEHWHEEL.
+            wheel_ticks: Some(Point {
+                x: -wparam.signed_hiword() as f32 / WHEEL_DELTA as f32,
+                y: 0.0,
+            }),
         });
         let handled = !func(event).propagate;
         self.state.callbacks.input.set(Some(func));
