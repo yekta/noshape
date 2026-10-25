@@ -2299,6 +2299,8 @@ impl AssemblyView {
                     }
                 }
                 self.pointer = *position;
+                // A context menu's face only lasts while its menu is open.
+                self.ui.menu_face = None;
                 // Shift (hold) locks mate inference to the entity under the cursor.
                 self.infer_locked = modifiers.shift;
                 if self.placing.is_some() {
@@ -2723,9 +2725,12 @@ impl AssemblyView {
                     return;
                 }
                 self.triad_menu = None;
-                // Onshape: a selected instance gets the instance menu; an
-                // unselected one (or empty space) the general menu.
-                match self.pick(*pick).map(|t| t.path[0]).filter(|top| self.selected.contains(top)) {
+                // Live (skb-move-origin-menu-graphics.png, behaviours "skb
+                // (10-24) section base snap + move to origin" (2)): an instance,
+                // selected or not, gets the instance menu; empty space the
+                // general menu.
+                self.ui.menu_face = self.pick(*pick).filter(|t| t.kind == PickKind::Face);
+                match self.pick(*pick).map(|t| t.path[0]) {
                     Some(top) => self.open_graphics_menu(Some(top), *position, window, cx),
                     None => self.open_graphics_menu(None, *position, window, cx),
                 }

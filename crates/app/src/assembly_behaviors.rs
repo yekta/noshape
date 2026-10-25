@@ -249,6 +249,9 @@ pub(crate) struct AsmUi {
     pub list_hover: Option<InstanceId>,
     /// Last clicked instance row: the anchor of Shift+click ranges.
     pub list_anchor: Option<InstanceId>,
+    /// The face a graphics context menu was opened on (its Section view…
+    /// cuts parallel to it).
+    pub menu_face: Option<AsmPickTarget>,
     /// Make transparent (Shift+T): instances drawn transparent.
     pub transparent: Option<HashSet<InstanceId>>,
     /// S shortcut toolbar position (viewport-local).
@@ -1118,11 +1121,14 @@ impl AssemblyView {
             m.push(MenuEntry::Sep);
             m.extend(edit);
             m.push(MenuEntry::Sep);
-            // Live sel-17: Clear selection | Select other… in one group.
-            m.push(item("Clear selection", |t, _, cx| {
-                t.clear_selection();
-                t.refresh_scene(false, cx);
-            }));
+            // Live sel-17: Clear selection | Select other… in one group (no
+            // Clear selection on an unselected instance with nothing selected).
+            if !self.selected.is_empty() || !self.ui.entity_sel.is_empty() {
+                m.push(item("Clear selection", |t, _, cx| {
+                    t.clear_selection();
+                    t.refresh_scene(false, cx);
+                }));
+            }
             m.push(item("Select other…", |t, _, cx| t.select_other(false, cx)));
             m.push(MenuEntry::Sep);
             // Live (menus/rmb-asm-two-instances-selected): the view items have no icons.
@@ -4003,7 +4009,8 @@ impl AssemblyView {
         // The face under the pointer (shortcut), else the selected face the
         // menu was opened on (live: right-click a face › Section view… cuts
         // parallel to it, the manipulator at its centroid).
-        let face = self.hover.clone().filter(|t| t.kind == PickKind::Face).or_else(|| {
+        let menu_face = self.ui.menu_face.take();
+        let face = self.hover.clone().filter(|t| t.kind == PickKind::Face).or(menu_face).or_else(|| {
             self.ui.entity_sel.iter().rev().find(|(_, r)| matches!(r, Reference::Face(_))).and_then(|(path, r)| {
                 let occ = self.result.occurrences.iter().position(|o| o.path == *path && o.face_refs.contains(r))?;
                 Some(AsmPickTarget { path: path.clone(), reference: r.clone(), kind: PickKind::Face, occ, anchor: None })
