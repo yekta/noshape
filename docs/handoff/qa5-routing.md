@@ -424,3 +424,13 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
   ours collapses it to zero length silently), **CON-TANGENT-APPLY** (applying Tangent line–circle moves the circle, radius kept;
   ours grows the radius), CON-NORMAL-ORDER confirmed, **SK-LINE-MENU** (line menu: + Construction, Extrude…, Revolve…, Align view
   with vertical axis; − Section view…; + Hide other/all sketches only when other sketches exist).
+- **FILLET-OVERFLOW retracted** (live reports the same OK results and volumes). **CHAMFER-OVERFLOW (kern)** new: Chamfer 25 on a
+  20 mm face edge is OK in live (30000.000 mm³, the leg overflows like a fillet); ours "Failed to chamfer selections.".
+  EXT-DIRECTION confirmed with colours (qa-round-5.md s7 live answers).
+
+## qa4 QA round 5 v3 s8: the feature list (P1; published v0.4.8) — qa-round-5.md "v3 Session 8"
+- **ERR-MISSING-REGION (kern/psb)** dependent of a deleted sketch: "A selected sketch region no longer exists" (eval.rs ~636) is
+  not an Onshape string; use the empty-input "Select face or sketch region to extrude." style (exact text pending live s8 (2)).
+- **MULTI-MENU (psb)** multi-row menu: add "Edit sketch appearance…" when a sketch is selected.
+- Pending live s8: invalid reorder handling (ours: red toast "Cannot reorder: … depends on …"), folder expand as an undo step,
+  geometry-hover → row highlight, folder menu.

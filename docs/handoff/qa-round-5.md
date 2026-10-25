@@ -32,6 +32,34 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 8 on the published v0.4.8 (tag 2bf78a67 = gate c7d9d454 + two CI-test commits; release tarball, not a local build): the feature list on the 30-feature part (r5/v3s2.py; live "Feature-list row states", "ui (10-22 d) feature-row tooltips")
+Timings (spinner gone): Suppress Extrude 1 0.56 s, Unsuppress 0.50 s, valid drag reorder (Plane 1 above Sketch 1) 0.62 s,
+undo / redo / undo of it 0.37 / 0.55 / 0.57 s, Delete Boss sketch 1 0.41 s and its undo 0.63 s, folder Suppress 0.54 s and its
+undo 0.45 s, rename undo 0.45 s; edit / Roll to here / bar drags as in v3 s2 (same app code: 0.35–0.40 s).
+Same as live ✅: row hover highlights the feature's geometry in the viewport; tooltips follow live's format
+`<name>[ [Type]][ (Hidden)][ did not regenerate properly: <msg>]` ("Boss 3 [Extrude] <- Boss sketch 3 [Sketch]", "Boss 1
+[Extrude] did not regenerate properly: No merge scope selected."); suppressed row italic + strike-through; error rows red with
+the red ⓘ on "Features …"; plain clicks add rows to the selection; Delete with the pointer over the viewport deletes the
+selected feature with no confirmation and dependents go red; inline Rename (name selected, Enter commits); "Add selection to
+folder…" → "Folder name" box prefilled "New folder" → collapsed "› New folder (2)"; suppressing a folder suppresses its members;
+every action undoes and redoes.
+- **R5v3-S8-a → ERR-MISSING-REGION (kern/psb, live asked)** after deleting a boss's sketch the boss says "A selected sketch region
+  no longer exists" (no final period; `regen/eval.rs` ~636); that isn't an Onshape string: live's empty-input messages are the
+  "Select …" ones (e.g. "Select edges or faces to fillet." for a Fillet whose edges went away, behaviours ~7155), here presumably
+  "Select face or sketch region to extrude.".
+- **R5v3-S8-b (psb, live asked)** an invalid drag reorder (Boss 4 above its own sketch) shows the normal blue drop line while
+  dragging, then a red toast "Cannot reorder: Boss 4 depends on Boss sketch 4." and leaves the list unchanged; live's handling
+  pending.
+- **R5v3-S8-c (psb)** the multi-row menu lacks "Edit sketch appearance…" when a sketch is among the selected rows (live: Add
+  selection to folder… | Section view…, Suppress, Dynamic suppression ▸ | Clear selection | Edit sketch appearance…, Add
+  appearance to feature… | Delete).
+- **R5v3-S8-d (psb, live asked)** expanding a folder (click on its row) is recorded as an undo step on ours (the first Ctrl+Z
+  after it only collapsed the folder).
+- Pending live: whether hovering geometry highlights its feature row (ours doesn't), whether the dependency tooltip shows on
+  an unselected row (ours does), the folder row menu (ours: Expand, Rename | Suppress, Unsuppress | Expand all, Collapse all |
+  Unpack folder), and what Suppress of a base feature does to Add bosses (ours: red "No merge scope selected.").
+- Note (cosmetic, seen twice now): after a context-menu click the row under the pointer keeps its hover tint.
+
 ## v3 Session 7 in the app: feature dialogs in everyday use (v0.4.8 c7d9d454; r5/v3s7.py: block 60×40×20 + revolve profile/axis on Front + hole points; live "Extrude dialog states", "Fillet", "All other Part Studio feature dialogs")
 Same as live ✅: Extrude End type list (Blind, Up to next, Up to face, Up to part, Up to vertex, Through all) with the search
 input and bold-match filtering ("thr" → **Thr**ough all), Enter picks; Through all hides Depth; Up to face adds "Up to face"
@@ -68,6 +96,14 @@ mirror, Entities to mirror, Mirror plane + MC) field lists. Linear pattern / Hol
   uses live's "Distance of chamfer on face too large." for other over-size chamfers.
 - Note: Remove on a picked face defaults into the part (25 mm then removes the whole 20 mm block); live's recorded case used a
   sketch region whose default pointed away; asked for the face case.
+
+- **Live answers (behaviours "qa4 round 5 s7 dialogs")**: R5v3-S7-e **retracted**: live also reports OK for R 15…45 with the
+  same volumes and face counts (R21 42322.112, R25 40002.735, R45 25607.644 = ours to the printed decimals), so FILLET-OVERFLOW
+  is not a bug. R5v3-S7-f → **CHAMFER-OVERFLOW (kern)**: live's Chamfer 25 on the 20 mm face is **OK, 30000.000 mm³** (the leg
+  overflows the face like the fillet); ours fails "Failed to chamfer selections.". Remove on a picked face defaults into the
+  part in live too (= ours). EXT-DIRECTION confirmed with values: on ticking, the "Extrude direction" field is active (border
+  rgb(22,81,176), fill rgb(222,241,251)), title red rgb(170,37,45), chevron red-brown rgb(189,48,57) (it was the disabled grey
+  rgb(215,215,215) before ticking); after a pick: title dark, chevron grey rgb(102,102,102), focus moves to the next field.
 
 ## v3 Session 6 in the app: every sketch constraint, driven/driving, colours, deleting, glyph menus, dragging (v0.4.8 c7d9d454; r5/v3s6.py: one sketch with free geometry per constraint, coordinates jittered so the line tool infers nothing; live "Constraints", "qa4 round 5 s5 driven dims")
 Applied by selection + shortcut, each with its glyph ✅: Coincident (endpoint–endpoint, point–circle), Concentric (Shift+O),
