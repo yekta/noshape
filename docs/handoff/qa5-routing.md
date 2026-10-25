@@ -690,3 +690,11 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   sketch plane could not be found" but its row keeps the hidden-sketch grey (no red), while the other failing rows turn red.
   Live: a failing sketch's row turns red (behaviours 6432, 6491).
 - STATUS 2026-10-25 (qa5): FSW-L45b fixed and landed (441a5af2, curve_pattern_distance_on_closed_path_as_fs).
+- **Live answers (behaviours "qa5 (10-25 p1) Part Studio pass")**: P1-4 confirmed (live: no origin entity; each point gets a
+  Horizontal constraint to the external Origin). P1-5 confirmed: live's Shell 1 **errors** "Could not shell part with
+  selections." on the 15 mm model and leaves the part unshelled; ours must not return slivers as Ok. Fillet row menu: no
+  "Show dimensions" in live either (ours matches).
+- **P1-8 — ui (query field chips)** — Hole › Sketch points: two sketch points clicked one by one show ONE chip "Vertices of
+  Sketch 2". Live: **two chips "Vertex of Sketch 1"**, one per click; "Vertices of Sketch N" only when the sketch row is picked.
+- **P1-9 — ui (query field chips)** — Linear pattern › Feature pattern, click the Hole row "Ø 6.35 mm ↧ 12 mm": our chip reads
+  "Hole 1"; live's chip is **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name).
