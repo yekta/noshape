@@ -238,7 +238,7 @@ pub fn custom_sizes(standard: &str) -> Vec<(&'static str, SheetSize)> {
 /// 12 x 8, A0 16 x 12).
 pub fn custom_zones(size: SheetSize) -> [u32; 2] {
     match size {
-        SheetSize::AnsiB | SheetSize::AnsiC => [4, 4],
+        SheetSize::AnsiD => [8, 4],
         s => s.standard_zones(),
     }
 }

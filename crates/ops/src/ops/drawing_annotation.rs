@@ -10,12 +10,12 @@ use super::drawing_tools::{Target, edge_at, pt_arg, target};
 use crate::Ctx;
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
-use noshape_model::drawing::{Annotation, AnnotationKind, LeaderStart, TableKind, remove_leader, remove_leader_node};
+use noshape_model::drawing::{Annotation, AnnotationKind, LeaderStart, TableKind};
 use noshape_scene::drawing_tools::Tool;
 use noshape_scene::drawing_tools::annotation_edit as ae;
 use serde_json::{Value, json};
 
-const ACTIONS: [&str; 19] = [
+const ACTIONS: [&str; 20] = [
     "add_jog",
     "remove_jog",
     "add_leader",
@@ -23,6 +23,7 @@ const ACTIONS: [&str; 19] = [
     "add_node",
     "remove_node",
     "delete_leader",
+    "move_leader",
     "foreshorten",
     "remove_foreshorten",
     "hide_dimension",
@@ -43,7 +44,7 @@ pub fn ops() -> Vec<Op> {
         group: "drawing",
         verb: "annotation_edit",
         summary: "Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, detach, align centermark, stacked callouts",
-        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend, or at `from_node` [leader, node]); `remove_leaders`.\n- Note leaders: `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`), `delete_leader` (`leader`).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- `detach` (Detach from geometry: stays put, no longer follows the model).\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).",
+        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).\n- Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- `detach` (Detach from geometry: stays put, no longer follows the model).\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).",
         fields: vec![
             doc_field(),
             drawing_field(),
@@ -51,10 +52,10 @@ pub fn ops() -> Vec<Op> {
             req("annotation", int(), "Annotation id (drawing_get)."),
             req("action", json!({ "type": "string", "enum": ACTIONS }), "The menu action."),
             opt("line", json!({ "type": "integer", "enum": [0, 1] }), "add_jog / remove_jog: the extension line."),
-            opt("point", point(), "add_leader: where it points; add_node: on the leader line; align_centermark: on a straight edge (sheet mm)."),
-            opt("leader", int(), "add_node / remove_node / delete_leader: the note leader (0 = first)."),
+            opt("point", point(), "add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge (sheet mm)."),
+            opt("leader", int(), "add_node / remove_node / delete_leader / move_leader: the leader (a note's 0 = first; a callout's 0 = the one to its anchor)."),
             opt("node", int(), "remove_node: the node (0 = nearest the note)."),
-            opt("from_node", json!({ "type": "array", "items": int(), "minItems": 2, "maxItems": 2 }), "add_leader on a note: branch from [leader, node]."),
+            opt("from_node", json!({ "type": "array", "items": int(), "minItems": 2, "maxItems": 2 }), "add_leader on a note or callout: branch from [leader, node]."),
             opt("all", json!({ "type": "boolean", "default": false }), "show_dimensions: All targets."),
             opt("view", int(), "group: the view to group with."),
             opt("with", json!({ "type": "array", "items": int() }), "group / group_annotation: the other annotations."),
@@ -132,14 +133,15 @@ fn annotation_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         "add_leader" => {
             let p = pt_arg(a, "point")?;
             let start = match a.opt_array("from_node")? {
-                Some(v) if note => {
+                // Notes and callouts (a callout's leader 0 is the one to its anchor).
+                Some(v) if ae::all_leaders(&ann).is_some() => {
                     let (l, n) = (v.first().and_then(Value::as_u64).unwrap_or(u64::MAX) as usize, v.get(1).and_then(Value::as_u64).unwrap_or(u64::MAX) as usize);
-                    if ae::leaders(&ann).and_then(|ls| ls.get(l)).is_none_or(|ld| n >= ld.nodes.len()) {
-                        return Err(OpError::param("from_node", "[leader, node] of a node of this note"));
+                    if ae::all_leaders(&ann).and_then(|ls| ls.get(l).cloned()).is_none_or(|ld| n >= ld.nodes.len()) {
+                        return Err(OpError::param("from_node", "[leader, node] of a node of this note or callout"));
                     }
                     LeaderStart::Node(l, n)
                 }
-                Some(_) => return Err(OpError::param("from_node", "notes only")),
+                Some(_) => return Err(OpError::param("from_node", "notes and callouts only")),
                 None => ae::note_leader_start(&ann),
             };
             let leader = ae::leader_to(&t.m.pick(&Tool::GdtLeader { id }, &[], p), p);
@@ -153,37 +155,59 @@ fn annotation_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             ae::remove_leaders(&mut t.d.sheets[s], id);
             "Remove leaders"
         }
-        "add_node" | "remove_node" | "delete_leader" if !note => return refuse("note leaders only"),
-        "add_node" | "remove_node" | "delete_leader" => {
+        "add_node" | "remove_node" | "delete_leader" | "move_leader" if ae::all_leaders(&ann).is_none() => return refuse("note and callout leaders only"),
+        "add_node" | "remove_node" | "delete_leader" | "move_leader" => {
+            // A note's leaders in order; a callout's: 0 = the leader to its
+            // anchor, then the added ones (drawing_get `leaders`).
             let k = uint(a, "leader")?;
-            let n_leaders = ae::leaders(&ann).map_or(0, Vec::len);
-            if k >= n_leaders {
-                return Err(OpError::param("leader", &format!("the note has {n_leaders} leader(s)")));
+            let all = ae::all_leaders(&ann).unwrap_or_default();
+            if k >= all.len() {
+                return Err(OpError::param("leader", &format!("the annotation has {} leader(s)", all.len())));
             }
+            let built = t.m.built.clone();
+            let pick_at = |p: [f64; 2]| t.m.pick(&Tool::Note, &[], p).snap_at(p);
+            let snapped = match action {
+                "move_leader" => {
+                    let p = pt_arg(a, "point")?;
+                    Some(match pick_at(p) {
+                        Some(q) => (Some(q.view), q.p, q.r),
+                        None => (None, p, None),
+                    })
+                }
+                _ => None,
+            };
             let x = t.d.sheets[s].annotations.iter_mut().find(|x| x.id == id).expect("found");
-            let ls = ae::leaders_mut(x).expect("a note");
             match action {
                 "add_node" => {
                     let p = pt_arg(a, "point")?;
-                    let path = t.m.pick(&Tool::Select, &[], p).note_leader_paths(&ann).into_iter().nth(k).ok_or_else(|| OpError::param("leader", "the leader has no path"))?;
+                    let path = ae::leader_paths(built.as_deref(), &ann).into_iter().find(|(i, _)| *i == k).map(|(_, p)| p).ok_or_else(|| OpError::param("leader", "the leader has no path (a callout in space)"))?;
                     let (seg, d) = ae::nearest_segment(&path, p).ok_or_else(|| OpError::param("leader", "the leader has no path"))?;
                     // Exactly on the leader line, as the right-click is.
                     if d > 0.5 {
                         return Err(OpError::param("point", &format!("not on the leader line ({d:.2} mm away)")));
                     }
-                    ae::add_node(ls, k, seg, path.head, p);
+                    ae::with_all_leaders(x, |l| ae::add_node(l, k, seg, path.head, p));
                     "Add node"
                 }
                 "remove_node" => {
                     let n = uint(a, "node")?;
-                    if n >= ls[k].nodes.len() {
-                        return Err(OpError::param("node", &format!("the leader has {} node(s)", ls[k].nodes.len())));
+                    if n >= all[k].nodes.len() {
+                        return Err(OpError::param("node", &format!("the leader has {} node(s)", all[k].nodes.len())));
                     }
-                    remove_leader_node(ls, k, n);
+                    ae::remove_node(x, k, n);
                     "Remove node"
                 }
+                "move_leader" => {
+                    // Move by grip: onto a vertex, circle center or edge it
+                    // attaches there, elsewhere it stays on the sheet.
+                    let (view, point, r) = snapped.expect("move_leader");
+                    if !ae::move_leader_end(x, k, view, point, r) {
+                        return Err(OpError::param("point", "a callout's leader to its anchor only attaches to a model point"));
+                    }
+                    "Move by grip"
+                }
                 _ => {
-                    remove_leader(ls, k);
+                    ae::delete_leader(x, k);
                     "Delete leader"
                 }
             }

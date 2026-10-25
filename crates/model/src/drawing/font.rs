@@ -279,6 +279,33 @@ pub fn text_strokes(t: &Text2) -> Vec<Vec<[f64; 2]>> {
     out
 }
 
+/// Whether a text draws as strokes: symbols the filled font lacks, or an
+/// SHX shape font (single-stroke glyphs, [`super::shx`]).
+pub fn text_is_stroked(t: &Text2, font: Option<&super::sheet::TextFont>) -> bool {
+    !fill_supported(&t.text) || font.is_some_and(|f| super::sheet::is_shx(&f.family))
+}
+
+/// [`text_strokes`] in a font: an SHX family's own glyphs at live's
+/// advances, else the stroke font.
+pub fn text_strokes_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> Vec<Vec<[f64; 2]>> {
+    let Some((strokes, w)) = font.and_then(|f| super::shx::shx_text(&f.family, &t.text)) else { return text_strokes(t) };
+    let off = anchor_offset(t.anchor, w * t.height, t.height);
+    let (c, sn) = (t.angle.cos(), t.angle.sin());
+    strokes
+        .into_iter()
+        .map(|st| {
+            let pts: Vec<[f64; 2]> = st
+                .iter()
+                .map(|p| {
+                    let (lx, ly) = (off[0] + p[0] * t.height, off[1] + p[1] * t.height);
+                    [t.pos[0] + lx * c - ly * sn, t.pos[1] + lx * sn + ly * c]
+                })
+                .collect();
+            if pts.len() == 1 { vec![pts[0], [pts[0][0] + 1e-3 * t.height, pts[0][1]]] } else { pts }
+        })
+        .collect()
+}
+
 /// Liberation Sans cap height over its ascender (the unit of
 /// `noshape_sketch::text::layout_text`).
 const FILL_CAP: f64 = 1409.0 / 1854.0;

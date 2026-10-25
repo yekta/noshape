@@ -378,7 +378,9 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Duplicate", Op("drawing_sheet")),
     ("drawing:Edit auxiliary view...", Op("drawing_auxiliary_view")),
     ("drawing:Edit crop...", Op("drawing_crop_view")),
+    ("drawing:Edit detail...", Op("drawing_edit_detail")),
     ("drawing:Edit hatch", Op("drawing_hatch_region")),
+    ("drawing:Edit hatch section...", Op("drawing_edit_hatch")),
     ("drawing:Edit note...", Op("drawing_note")),
     ("drawing:Edit section", Op("drawing_broken_out_section")),
     ("drawing:Edit section...", Op("drawing_section_view")),
@@ -411,6 +413,8 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Move down", Op("drawing_sheet")),
     ("drawing:Move to sheet...", Op("drawing_view_edit")),
     ("drawing:Move up", Op("drawing_sheet")),
+    // Edit hatch section's General › None pattern (the region unhatched).
+    ("drawing:None", Op("drawing_edit_hatch")),
     ("drawing:Open Feature Studio in linked document", Op("drawing_open_feature_studio")),
     ("drawing:Partial section view", Op("drawing_jogged_section_view")),
     ("drawing:Paste as table", Op("drawing_paste_table")),

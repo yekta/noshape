@@ -13,6 +13,12 @@ pub fn needs_strokes(t: &Text2) -> bool {
     t.text.chars().any(|c| !(c.is_ascii() || "Ø°±×µ²³".contains(c)))
 }
 
+/// [`needs_strokes`], or text `ti` is in an SHX shape font (live's PDF draws
+/// those as strokes, Type 3 fonts).
+fn stroked(g: &SheetGeometry, ti: usize, t: &Text2) -> bool {
+    needs_strokes(t) || g.text_font(ti).is_some_and(|f| super::sheet::is_shx(&f.family))
+}
+
 /// Export Drawing dialog settings that change the geometry.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExportOptions {
@@ -130,7 +136,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             tf.push(g.text_font(i).cloned());
             continue;
         }
-        if !o.strokes && font::fill_supported(&t.text) {
+        if !o.strokes && !font::text_is_stroked(&t, g.text_font(i)) {
             let (pts, idx) = font::text_fill_font(&t, g.text_font(i));
             for tri in idx.chunks(3).filter(|c| c.len() == 3) {
                 out.fills.push(Fill2 { points: tri.iter().map(|&k| pts[k as usize]).collect() });
@@ -140,7 +146,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
                 fo.push(obj);
             }
         } else {
-            for points in font::text_strokes(&t).into_iter().filter(|s| s.len() >= 2) {
+            for points in font::text_strokes_font(&t, g.text_font(i)).into_iter().filter(|s| s.len() >= 2) {
                 out.lines.push(Polyline2 { points, style: LineStyle::Thin, closed: false, pick: t.pick });
                 lc.push(c);
                 ll.push(layer);
@@ -297,14 +303,14 @@ pub fn to_svg(g: &SheetGeometry) -> String {
         let _ = writeln!(s, r#"<polygon points="{}" fill="{}" stroke="none"/>"#, pts.join(" "), hex(g.fill_color(fi)));
     }
     let _ = writeln!(s, "</g>");
-    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| stroked(g, *ti, t)) {
         let w = stroke_width(t);
-        for st in font::text_strokes(t) {
+        for st in font::text_strokes_font(t, g.text_font(ti)) {
             let pts: Vec<String> = st.iter().map(|p| format!("{:.4},{:.4}", p[0], g.height - p[1])).collect();
             let _ = writeln!(s, r#"<polyline points="{}" fill="none" stroke="{}" stroke-width="{w:.3}" stroke-linecap="round" stroke-linejoin="round"/>"#, pts.join(" "), hex(g.text_color(ti)));
         }
     }
-    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| !needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| !stroked(g, *ti, t)) {
         let (x, y) = (t.pos[0], g.height - t.pos[1]);
         let anchor = match t.anchor {
             Anchor::BottomLeft | Anchor::TopLeft => "start",
@@ -474,8 +480,8 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             }
         }
     }
-    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| needs_strokes(t)) {
-        for st in font::text_strokes(t) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| stroked(g, *ti, t)) {
+        for st in font::text_strokes_font(t, g.text_font(ti)) {
             if st.len() < 2 {
                 continue;
             }
@@ -495,7 +501,7 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             pair(&mut s, 0, "SEQEND");
         }
     }
-    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| !needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| !stroked(g, *ti, t)) {
         pair(&mut s, 0, "TEXT");
         pair(&mut s, 8, g.cad_text_layer(ti).name(true));
         if let Some(c) = g.text_color(ti) {
@@ -566,16 +572,16 @@ fn pdf_content(g: &SheetGeometry) -> String {
         }
         content.push_str("f\n");
     }
-    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| stroked(g, *ti, t)) {
         let _ = writeln!(content, "{:.3} w {} RG", stroke_width(t) * pt, rgb(g.text_color(ti)));
-        for st in font::text_strokes(t) {
+        for st in font::text_strokes_font(t, g.text_font(ti)) {
             for (i, p) in st.iter().enumerate() {
                 let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
             }
             content.push_str("S\n");
         }
     }
-    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| !needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| !stroked(g, *ti, t)) {
         let size = t.height * 1.4 * pt;
         let _ = writeln!(content, "{} rg", rgb(g.text_color(ti)));
         // Approximate Helvetica advance: 0.5 em per char.

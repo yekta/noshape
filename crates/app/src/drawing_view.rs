@@ -66,7 +66,8 @@ pub const DIALOG_TOP: f32 = 0.;
 
 /// Inline property panels shown over the canvas.
 pub enum Panel {
-    Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2], height: Entity<InputState>, style: noshape_model::drawing::note::NoteStyle },
+    /// `field`: a title block field's cell edited as a note (its key).
+    Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2], height: Entity<InputState>, style: noshape_model::drawing::note::NoteStyle, field: Option<String> },
     /// Dimension properties (precision, units, tolerance, texts).
     Datum { edit: Option<u64>, anchor: [f64; 2], input: Entity<InputState> },
     SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState> },
@@ -298,6 +299,9 @@ pub struct DrawingEditor {
     /// The selected note leader (note, leader): drawn amber with its nodes
     /// (live drw2 10-21 g (1)).
     pub leader_sel: Option<(u64, usize)>,
+    /// The broken-out section a context menu was opened on (live: Edit
+    /// section... / Remove section only there).
+    pub menu_broken_out: Option<(ViewId, usize)>,
     /// Weld symbol dialog (drawing_weld.rs).
     pub weld_dlg: Option<crate::drawing_weld::WeldDlg>,
     /// The note editor's formatting ruler (drawing_ruler.rs).
@@ -557,6 +561,7 @@ impl DrawingEditor {
             note_leader: None,
             leader_from: None,
             leader_sel: None,
+            menu_broken_out: None,
             cell_sel: None,
             cell_panel: None,
             note_color: None,
@@ -1072,7 +1077,7 @@ impl DrawingEditor {
         let shaded: Vec<(ViewId, std::ops::Range<usize>)> = built.geometry.view_edges.iter().filter(|(v, r)| !r.is_empty() && self.shaded.images.contains_key(v)).cloned().collect();
         self.shaded.edges = shaded.iter().map(|(v, r)| (*v, up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), self.zoom, true)), up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), self.zoom, false)))).collect();
         let skip: Vec<std::ops::Range<usize>> = shaded.into_iter().map(|(_, r)| r).collect();
-        self.lines = Some(up.upload_lines(&drawing_scene::sheet_lines(&built, self.zoom, &dangling, &skip)));
+        self.lines = Some(up.upload_lines(&drawing_scene::sheet_lines(&built, self.zoom, &dangling, &skip, self.model_bg.is_none())));
         self.lines_zoom = self.zoom;
         self.fills = Some(up.upload_mesh(&drawing_scene::sheet_fills(&built)));
         self.watermark_mesh = self.watermark.as_ref().and_then(|t| {
@@ -1101,6 +1106,7 @@ impl DrawingEditor {
         overlay.points.extend(self.selection_handles());
         self.note_grip_overlay(&mut overlay);
         self.leader_overlay(&mut overlay);
+        self.detail_circle_overlay(&mut overlay);
         if overlay.is_empty() {
             self.overlay_handles = None;
             return;
