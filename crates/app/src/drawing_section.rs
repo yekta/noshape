@@ -6,7 +6,6 @@
 
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -353,7 +352,7 @@ impl DrawingEditor {
                                     ),
                             )
                         })
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("ds-cut-only").label("Show cut geometry only").small().checked(d.cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-only").label("Show cut geometry only").checked(d.cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some(d) = &mut this.section_dlg {
                                 d.cut_only = *v;
                             }
@@ -361,7 +360,7 @@ impl DrawingEditor {
                             cx.notify();
                         }))))
                         .when(of_section, |e| {
-                            e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("ds-cut-from").label("Cut from section").small().checked(d.cut_from).on_click(cx.listener(|this, v: &bool, _, cx| {
+                            e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-from").label("Cut from section").checked(d.cut_from).on_click(cx.listener(|this, v: &bool, _, cx| {
                                 if let Some(d) = &mut this.section_dlg {
                                     d.cut_from = *v;
                                 }
@@ -369,7 +368,7 @@ impl DrawingEditor {
                                 cx.notify();
                             }))))
                         })
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("ds-depth").label("Section depth").small().checked(d.depth.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_depth(*v, w, cx)))))
+                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-depth").label("Section depth").checked(d.depth.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_depth(*v, w, cx)))))
                         .when(d.depth.is_some(), |e| {
                             let tab = |id: &'static str, label: &'static str, on: bool, v: bool, cx: &mut Context<Self>| {
                                 div()
