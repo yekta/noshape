@@ -32,6 +32,22 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 12 on v0.4.8 (release tarball): P0 robustness, a long editing session on the 30-feature part (r5/s12.sh, r5/s12b.sh; expected geometry by CLI)
+**152 UI actions, no crash, no wrong geometry, no slowdown, memory bounded.**
+- Batch 1 (r5/s12.sh, 6 + 90 actions): cycles of edit Extrude 1 depth / Boss 1 depth / Boss 3 depth (double-click, type, ✓), Ctrl+Z,
+  Ctrl+Y, Ctrl+Z. Settle times (screen unchanged 0.6 s, software GL, with 6–10 other agents building): edits median 1.03–1.13 s
+  (max 1.74), undo 1.10 (max 1.64), redo 0.99; **first third 1.08 s vs last third 1.13 s** (no drift). RSS 488 → 551 MB: +18 in the
+  first cycle, then ~+3 per cycle, flat at 543–552 over the last six cycles (undo history + caches, not a leak).
+- Close (app stopped) → the saved file by CLI: **60930.281 mm³, 48 faces, all 30 features OK, Extrude 1 10 mm, Boss 1 8 mm, Boss 3
+  5 mm** = exactly the expected state computed on a fresh copy with feature_edit (60930.281 mm³, 48 faces).
+- Reopen: open ≈ 2 s past my fixed 10 s start wait, RSS 415 MB, ⏱ total 395 ms, model as saved; the undo history starts empty after
+  a reopen (live's undo is per session too, not asked).
+- Batch 2 (r5/s12b.sh, 8 + 48 actions): cycles of Suppress Boss 2, Unsuppress, delete Boss sketch 4 + Ctrl+Z, Rename Boss 3 + Ctrl+Z,
+  edit Extrude 1 + Ctrl+Z. Medians: Suppress 1.22 s, Unsuppress 1.25, Delete 1.41, Undo 0.37, Rename 0.35, Edit 1.59 (max 1.94).
+  RSS 523 → 545 MB, flat over the last two cycles. Saved file afterwards: 60930.281 mm³, 48 faces, no "Peg" names left, nothing
+  suppressed, all features OK.
+- No findings. (The session-1/2 items still stand: per-keystroke preview, regen speed vs live.)
+
 ## v3 Session 11 on v0.4.8 (release tarball): an everyday drawing of the 30-feature part (P2; live asked "qa4 round 5 s11 drawing" with the same steps + PDF/DXF; ours in r5/out/v3s11.pdf|dxf; times with r5/settle.sh = screen region unchanged for 0.6 s)
 Times: Create Drawing (ANSI_B_MM, No views) OK → sheet 0.70 s; Top base / Front / Right / Iso views 0.29 / 0.29 / 0.29 / 0.34 s;
 Section A-A 0.26 s; Detail B (2:1) 0.28 s; Update after the model change 0.36 s; PDF written 0.39 s (1 page 1224×792 pt = ANSI B,
