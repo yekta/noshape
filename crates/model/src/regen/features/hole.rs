@@ -227,6 +227,99 @@ fn hole_profile(d: f64, dims: &HoleDims, h: f64, tip: f64, over: f64) -> FResult
     Ok(pts)
 }
 
+/// Radius of a hole's entry: the counterbore's or countersink's, else the hole's.
+fn entry_radius(dims: &HoleDims) -> f64 {
+    let mut d = dims.diameter;
+    if let Some((cd, _)) = dims.cbore {
+        d = d.max(cd);
+    }
+    if let Some((sd, _)) = dims.csink {
+        d = d.max(sd);
+    }
+    d * 0.5
+}
+
+/// Where the hole's entry circle (radius `r` about the axis through `p` along
+/// `dir`) meets the parts: (deepest first contact, highest contact) as
+/// parameters along `dir` from `p`. One section of the parts with the entry
+/// cylinder; the curves are sampled, binned by angle (the first contact of
+/// each ruling), and the deepest refined along its edge. None when part of
+/// the circle misses the parts (the axis decides then).
+fn entry_contacts(ev: &EvalCtx, bodies: &[usize], p: DVec3, dir: DVec3, r: f64, back: f64, extent: f64) -> Option<(f64, f64)> {
+    let (u, v) = (perp(dir), dir.cross(perp(dir)).normalize());
+    let frame = k::Plane::new(p - dir * back, dir, u);
+    let tube = k::make_cylinder(&frame, r, back + extent * 2.0, std::f64::consts::TAU).ok()?;
+    let t_of = |q: DVec3| (q - p).dot(dir);
+    let angle_of = |q: DVec3| {
+        let w = q - p;
+        let a = w.dot(v).atan2(w.dot(u));
+        if a < 0.0 { a + std::f64::consts::TAU } else { a }
+    };
+    const BINS: usize = 90;
+    // Per angle bin: (first contact t, edge, edge parameter).
+    let mut first: Vec<Option<(f64, k::Shape, f64)>> = vec![None; BINS];
+    let mut top = f64::INFINITY;
+    for &bi in bodies {
+        let Ok(sec) = k::section(&ev.ctx.bodies[bi].shape, &tube) else { continue };
+        for e in sec.shape.edges() {
+            let Ok(info) = e.edge_info() else { continue };
+            // Enough samples that every angle bin of a one-edge curve gets some.
+            let n = 512;
+            for i in 0..=n {
+                let prm = info.first_param + (info.last_param - info.first_param) * i as f64 / n as f64;
+                let Ok(q) = e.point_at(prm) else { continue };
+                let t = t_of(q);
+                top = top.min(t);
+                let bin = ((angle_of(q) / std::f64::consts::TAU * BINS as f64) as usize).min(BINS - 1);
+                if first[bin].as_ref().is_none_or(|f| t < f.0) {
+                    first[bin] = Some((t, e.clone(), prm));
+                }
+            }
+        }
+    }
+    if first.iter().any(|f| f.is_none()) || !top.is_finite() {
+        return None;
+    }
+    let (t0, _, prm_e) = first.iter().flatten().max_by(|a, b| a.0.total_cmp(&b.0))?.clone();
+    let (_, e0, _) = first.iter().flatten().max_by(|a, b| a.0.total_cmp(&b.0))?;
+    // A flat entry square to the hole: every contact at one depth.
+    let low = first.iter().flatten().map(|f| f.0).fold(f64::INFINITY, f64::min);
+    if t0 - low < 1e-12 {
+        return Some((t0, top));
+    }
+    // The section's curves are approximations (to about a micron): the
+    // deepest first contact refined with exact rays about the best angle.
+    let a0 = angle_of(e0.point_at(prm_e).ok()?);
+    let ray = |a: f64| -> f64 {
+        let q = p + (u * a.cos() + v * a.sin()) * r;
+        let origin = q - dir * back;
+        bodies
+            .iter()
+            .flat_map(|&bi| super::helpers_a::ray_intervals(&ev.ctx.bodies[bi].shape, origin, dir, back + extent * 2.0))
+            .filter(|(_, b)| *b - back > 1e-9)
+            .map(|(a, _)| (a - back).max(0.0))
+            .fold(f64::INFINITY, f64::min)
+    };
+    let width = std::f64::consts::TAU / BINS as f64;
+    let (mut lo, mut hi) = (a0 - width, a0 + width);
+    let g = (5f64.sqrt() - 1.0) / 2.0;
+    let mut best = f64::NEG_INFINITY;
+    for _ in 0..48 {
+        let (m1, m2) = (hi - g * (hi - lo), lo + g * (hi - lo));
+        let (a1, a2) = (ray(m1), ray(m2));
+        for x in [a1, a2] {
+            if x.is_finite() {
+                best = best.max(x);
+            }
+        }
+        if a1 > a2 { hi = m2 } else { lo = m1 }
+    }
+    if !best.is_finite() {
+        best = t0;
+    }
+    Some((best, top))
+}
+
 /// Live L51: a fastener fit on a hole through one part.
 const FIT_INFO: &str = "Fastener fit will not be applied if there are fewer than two parts per hole.";
 /// hole.fs HOLE_TAP_TOO_DEEP (its help link kept as text).
@@ -322,6 +415,8 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             })
             .collect();
         // Hole start (parameter along dir relative to the location).
+        let mut axis_first = f64::INFINITY;
+        let mut entry: Option<(f64, f64)> = None;
         let t_start = match (&start_plane, start_style.as_str()) {
             (Some(f), _) => match f.intersect_ray(loc.point, dir) {
                 Some(q) => (q - loc.point).dot(dir),
@@ -329,7 +424,18 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             },
             (None, "PART") => {
                 let first = hits.iter().flat_map(|(_, iv)| iv.iter()).filter(|(_, b)| *b > 1e-9).map(|(a, _)| a.max(0.0)).fold(f64::INFINITY, f64::min);
-                if first.is_finite() { first } else { 0.0 }
+                axis_first = first;
+                if first.is_finite() {
+                    // Live "kern (10-23 23:00)" H1-H5: the depth counts from
+                    // where the whole entry (counterbore / countersink / hole
+                    // diameter) is in the part: the deepest first contact on
+                    // the entry circle (a Ø6 hole on a Ø40 cylinder starts
+                    // 0.226 below its top line).
+                    entry = entry_contacts(ev, &candidates, loc.point, dir, entry_radius(&dims), back, extent);
+                    entry.map_or(first, |(deep, _)| deep.max(first))
+                } else {
+                    0.0
+                }
             }
             _ => 0.0,
         };
@@ -369,12 +475,18 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         // the offset (4.092 for a 6.092 shaft and a 2 mm offset).
         up_to_depth_found.get_or_insert(h - tip_offset);
         spans.push((s, dir, h + tip));
-        // Overshoot above the start when that is outside every part.
+        // Overshoot above the start when that is outside every part; past
+        // the part's highest point over the entry (a start below a sloped or
+        // curved face).
         let over = {
             let o = r_main * 0.25;
             let q = s - dir * o * 0.5;
             let outside = candidates.iter().all(|&bi| !matches!(ev.ctx.bodies[bi].shape.classify_point(q, 1e-9), Ok(k::PointClass::Inside)));
-            if outside { o } else { 0.0 }
+            let above = match entry {
+                Some((_, top)) if t_start > axis_first.min(top) + 1e-12 => t_start - axis_first.min(top),
+                _ => 0.0,
+            };
+            if above > 1e-12 { above + o } else if outside { o } else { 0.0 }
         };
         // The hole for drawing callouts.
         {
@@ -411,6 +523,37 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
                 },
                 tip_angle,
             });
+        }
+        // Live H5: a bore tangent to a side face of the part (a Ø10
+        // counterbore whose rim touches the front face along a line) is
+        // invalid geometry for Parasolid.
+        {
+            let mut bores: Vec<(f64, f64, f64)> = vec![(r_main, dims.cbore.map_or(0.0, |c| c.1), h)];
+            if let Some((cd, cdepth)) = dims.cbore {
+                bores.push((cd * 0.5, -over, cdepth));
+            }
+            for &bi in &candidates {
+                for f in ev.ctx.bodies[bi].shape.faces() {
+                    let Ok(k::Surface::Plane(pl)) = f.face_surface() else { continue };
+                    let n = pl.normal.normalize();
+                    if n.dot(dir).abs() > 1e-9 {
+                        continue;
+                    }
+                    let dist = (s - pl.origin).dot(n);
+                    for &(r, a, b) in &bores {
+                        if (dist.abs() - r).abs() > 1e-9 || b <= a {
+                            continue;
+                        }
+                        let touches = (1..8).any(|i| {
+                            let q = s + dir * (a + (b - a) * i as f64 / 8.0) - n * dist;
+                            k::make_vertex(q).and_then(|v| k::distance(&f, &v)).is_ok_and(|d| d.distance < 1e-9)
+                        });
+                        if touches {
+                            return err("Hole creates invalid geometry.");
+                        }
+                    }
+                }
+            }
         }
         let frame = k::Plane::new(s, -dir, perp(dir));
         let make_tool = |d: f64| -> FResult<NamedShape> {
@@ -511,7 +654,9 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         if targets.is_empty() {
             continue;
         }
-        ev.boolean_into(&targets, tools, k::BooleanOp::Cut).map_err(|e| fe(format!("Hole cut failed: {}", e.message)))?;
+        // Live H5: a counterbore tangent to a side face (non-manifold) is
+        // Onshape's invalid geometry.
+        ev.boolean_into(&targets, tools, k::BooleanOp::Cut).map_err(|e| if e.message.contains("non-manifold") { fe("Hole creates invalid geometry.") } else { fe(format!("Hole cut failed: {}", e.message)) })?;
     }
     // hole.fs: the computed Depth reads "Multiple" for several locations.
     if let Some(h) = up_to_depth_found.filter(|_| end == "UP_TO_NEXT" || end == "UP_TO_ENTITY") {

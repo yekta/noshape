@@ -116,7 +116,10 @@ pub fn array_arg(i: &mut Interp, a: &[Value], n: usize) -> R<Arc<Vec<Value>>> {
 
 pub fn map_arg(i: &mut Interp, a: &[Value], n: usize) -> R<Arc<Map>> {
     match a.get(n) {
-        Some(Value::Map(x, _)) => Ok(x.clone()),
+        Some(Value::Map(x, _)) => {
+            crate::value::note_key_read(x, "*");
+            Ok(x.clone())
+        }
         Some(other) => Err(i.error(format!("Argument {} should be a map, was {}", n + 1, other.type_description()))),
         None => Err(i.error(format!("Missing argument {}", n + 1))),
     }

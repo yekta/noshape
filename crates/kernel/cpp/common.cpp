@@ -869,6 +869,27 @@ bool split_wrapping(const TopoDS_Shape& s, TopoDS_Compound& rest, std::vector<To
 
 } // namespace
 
+// Whether every face lies on a plane, cylinder, cone, sphere or torus (where
+// OCCT's adaptive integrator controls its error; on B-spline surfaces and
+// sweeps it can be far off: a curvature fillet's extruded B-spline section
+// read +30 mm³).
+static bool analytic_only(const TopoDS_Shape& s)
+{
+  for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
+    switch (BRepAdaptor_Surface(TopoDS::Face(e.Current()), false).GetType())
+    {
+      case GeomAbs_Plane:
+      case GeomAbs_Cylinder:
+      case GeomAbs_Cone:
+      case GeomAbs_Sphere:
+      case GeomAbs_Torus:
+        break;
+      default:
+        return false;
+    }
+  return true;
+}
+
 GProp_GProps volume_props(const TopoDS_Shape& s)
 {
   TopoDS_Compound          rest;
@@ -910,6 +931,10 @@ GProp_GProps volume_props(const TopoDS_Shape& s)
   BRepGProp::VolumeProperties(s, adaptive, 1e-7, true);
   const double a = gauss.Mass(), b = adaptive.Mass();
   if (std::abs(a - b) <= 1e-7 * std::max({std::abs(a), std::abs(b), 1e-300}))
+    return adaptive;
+  // Analytic surfaces only: the adaptive one, whose error is controlled (a Ø6
+  // hole through a Ø40 cylinder: Gauss −0.41 mm³, a mesh can't tell 5e-6).
+  if (analytic_only(s))
     return adaptive;
   const double m = mesh_volume(s);
   return std::abs(a - m) < std::abs(b - m) ? gauss : adaptive;

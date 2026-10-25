@@ -64,6 +64,12 @@ pub fn merge_scope() -> Vec<ParamSpec> {
     ]
 }
 
+/// Extrude's second end position is shown: ticked, and not hidden by a
+/// symmetric extrude (std extrude.fs `isSymmetricExtrude`).
+pub fn second_direction_on(v: &ParamValues) -> bool {
+    v.bool("hasSecondDirection") && !(v.bool("symmetric") && (v.is("endBound", "BLIND") || v.is("endBound", "THROUGH_ALL")))
+}
+
 /// End condition block used by Extrude (first or second direction).
 pub fn end_condition(prefix: &'static str, second: bool) -> Vec<ParamSpec> {
     // Parameter ids follow FeatureScript names.
@@ -83,12 +89,13 @@ pub fn end_condition(prefix: &'static str, second: bool) -> Vec<ParamSpec> {
     };
     let _ = prefix;
     let [bound, flip, depth, face, body, vertex, has_off, off] = ids;
-    let gate = move |v: &ParamValues| !second || v.bool("hasSecondDirection");
+    let gate = move |v: &ParamValues| !second || second_direction_on(v);
     let mut out = vec![
         ParamSpec::enum_(bound, "End type", END_BOUND).visible(gate),
         ParamSpec::flip(flip, "Opposite direction").visible(gate),
+        // extrudeCommon.fs: only the first depth can be tolerant.
         ParamSpec::length(depth, "Depth", 25.0, 1.0)
-            .hints(Hints::CAN_BE_TOLERANT)
+            .hints(if second { Hints::NONE } else { Hints::CAN_BE_TOLERANT })
             .visible(move |v| gate(v) && v.is(bound, "BLIND")),
         ParamSpec::query1(face, "Up to face", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR)
             .visible(move |v| gate(v) && v.is(bound, "UP_TO_SURFACE")),
@@ -253,17 +260,22 @@ pub fn curve_approximation(gate: impl Fn(&ParamValues) -> bool + Clone + Send + 
 /// "Skip instances" group of linear (two indices) and circular/curve (one
 /// index) patterns.
 pub fn skip_instances(two_directions: bool) -> Vec<ParamSpec> {
-    let item = if two_directions {
-        vec![
-            ParamSpec::num("index1", "First direction", NumSpec::integer(1, -100_000, 100_000)),
-            ParamSpec::num("index2", "Second direction", NumSpec::integer(0, -100_000, 100_000)),
-        ]
+    // std: "Item name" instance, rows labelled by "Item label template".
+    let (item, template) = if two_directions {
+        (
+            vec![
+                ParamSpec::num("index1", "First direction", NumSpec::integer(1, -100_000, 100_000)),
+                ParamSpec::num("index2", "Second direction", NumSpec::integer(0, -100_000, 100_000)),
+            ],
+            "(#index1, #index2)",
+        )
     } else {
-        vec![ParamSpec::num("index", "Index", NumSpec::integer(1, -100_000, 100_000))]
+        (vec![ParamSpec::num("index", "Index", NumSpec::integer(1, -100_000, 100_000))], "#index")
     };
     vec![
         ParamSpec::bool("skipInstances", "Skip instances", false).hints(Hints::GROUP_HEADER),
-        ParamSpec::array("skippedInstances", "Instances to skip", "Instance", item)
+        ParamSpec::array("skippedInstances", "Instances to skip", "instance", item)
+            .item_template(template)
             .hints(Hints::INITIAL_FOCUS)
             .visible(|v| v.bool("skipInstances")),
     ]

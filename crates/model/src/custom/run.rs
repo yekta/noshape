@@ -65,6 +65,19 @@ pub fn outputs() -> HashMap<FeatureId, FeatureOutput> {
     OUTPUTS.lock().clone()
 }
 
+/// Whether the last run of an active custom feature in any Part Studio
+/// raised an error (the navbar's red `{!}`).
+pub fn has_errors(doc: &crate::document::Document) -> bool {
+    use crate::document::TabContent;
+    let outputs = OUTPUTS.lock();
+    doc.ordered_tabs().iter().any(|t| match &t.content {
+        TabContent::PartStudio(ps) => ps.features.iter().filter(|f| !f.suppressed && super::is_custom(&f.type_id)).any(|f| {
+            outputs.get(&f.id).is_some_and(|o| o.notices.iter().any(|n| n.kind == noshape_featurescript::interp::NoticeKind::Error))
+        }),
+        _ => false,
+    })
+}
+
 /// Notices and printed output of the last run of one Part Studio feature.
 pub fn output_of(feature: FeatureId) -> Option<FeatureOutput> {
     OUTPUTS.lock().get(&feature).cloned()
@@ -244,8 +257,13 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
             (None, Some(m)) => m.to_string(),
             _ => host::error_text("REGEN_ERROR"),
         };
+        // std's faulty parameters mark those fields red (regenError's array).
+        let faulty: Vec<&'static str> = match s.get("faultyParameters") {
+            Value::Array(a, _) => a.iter().filter_map(|v| v.as_str()).filter_map(|p| specs.iter().find(|x| *x.id == *p).map(|x| x.id)).collect(),
+            _ => Vec::new(),
+        };
         match &*kind {
-            "ERROR" => return err(text),
+            "ERROR" => return Err(FeatureError { faulty, ..FeatureError::new(text) }),
             "WARNING" => ev.warnings.push(text),
             // reportFeatureInfo (std Finish sheet metal model): an Info status.
             "INFO" => ev.infos.push(text),
@@ -259,7 +277,8 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
 /// custom feature's) as Onshape does while a dialog is edited:
 /// `f(context, id, oldDefinition, definition, specifiedParameters,
 /// hiddenBodies)` in `ctx`, the Part Studio just before the feature.
-/// `specified`: the parameters the user has set. Returns the parameters the
+/// `specified`: the parameters the user has set; `creating`: the feature is
+/// new (`isCreating` of seven-parameter functions). Returns the parameters the
 /// function changed (queries as references, numbers as literals in
 /// `units`); `None` if it failed.
 #[allow(clippy::too_many_arguments)]
@@ -274,6 +293,7 @@ pub(crate) fn run_editing_logic(
     old: &ParamValues,
     new: &ParamValues,
     specified: &[String],
+    creating: bool,
 ) -> Option<ParamValues> {
     host::register();
     let (mut olds, mut news) = (old.clone(), new.clone());
@@ -283,13 +303,27 @@ pub(crate) fn run_editing_logic(
     let outer = std::collections::BTreeMap::new();
     let ev = EvalCtx::new(feature, name, &news, units, Default::default(), &outer);
     let cx = FsContext::new(ctx, feature, name.to_string(), *units, outer.clone(), None);
-    let old_def = definition(&cx, decls, &olds, &ev, None).ok()?;
+    // No previous values: Onshape's first call on a new feature passes {}
+    // (std cPlaneLogic and holeEditLogic act on preselection only then).
+    let old_def = if old.0.is_empty() { Value::map(Map::new()) } else { definition(&cx, decls, &olds, &ev, None).ok()? };
     let new_def = definition(&cx, decls, &news, &ev, None).ok()?;
     let mut flags = Map::new();
     for d in decls {
         flags.insert(Value::str(d.id.as_str()), Value::bool(specified.contains(&d.id)));
     }
-    let args = vec![cx.value(), host::id_value(&[Arc::<str>::from(feature.to_string())]), old_def, new_def.clone(), Value::map(flags), query_of_refs(&cx, &hidden)];
+    // After (context, id, oldDefinition, definition) each function takes what
+    // its parameters' types ask for: `isCreating` (boolean),
+    // `specifiedParameters` (map), `hiddenBodies` (Query); std's cPlaneLogic
+    // takes none of them, filletEditLogic all three.
+    let mut args = vec![cx.value(), host::id_value(&[Arc::<str>::from(feature.to_string())]), old_def, new_def.clone()];
+    let decl = f.fns.iter().max_by_key(|d| d.arity())?;
+    for t in decl.param_types.iter().skip(4) {
+        args.push(match t {
+            Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::Boolean)) => Value::bool(creating),
+            Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::Map)) => Value::map(flags.clone()),
+            _ => query_of_refs(&cx, &hidden),
+        });
+    }
     let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())));
     let units = *units;
     std::thread::scope(|s| {
@@ -298,38 +332,66 @@ pub(crate) fn run_editing_logic(
             .spawn_scoped(s, || {
                 let mut i = Interp::new();
                 i.set_deadline(Some(Instant::now() + TIME_LIMIT));
-                let out = i.call_value(&func, args).ok()?;
+                let out = i.call_value(&func, args);
+                if host::trace_ops() {
+                    eprintln!("[fs edit] {:?}", out.as_ref().map(noshape_featurescript::value::to_display).map_err(|e| e.message()));
+                }
+                let out = out.ok()?;
                 let mut changed = ParamValues::default();
                 for d in decls {
                     let (v, was) = (out.get(d.id.as_str()), new_def.get(d.id.as_str()));
                     if v.is_undefined() || v == was {
                         continue;
                     }
-                    let pv = match &d.kind {
-                        ParamKindFs::Query { .. } => ParamValue::Query(host::query::evaluate_refs(&mut i, &cx, v).ok()?),
-                        ParamKindFs::FeatureList { .. } => ParamValue::Query(host::feature_list_refs(v)),
-                        ParamKindFs::Bool { .. } => ParamValue::Bool(v.as_bool()?),
-                        ParamKindFs::Num { kind, .. } => {
-                            let q = match kind {
-                                NumKind::Length => noshape_units::Quantity::new(host::length_of(v)?, noshape_units::Dim::LENGTH),
-                                NumKind::Angle => noshape_units::Quantity::new(host::angle_of(v)?, noshape_units::Dim::ANGLE),
-                                NumKind::Integer | NumKind::Real => noshape_units::Quantity::new(v.as_number()?, noshape_units::Dim::UNITLESS),
-                            };
-                            ParamValue::Expr(noshape_units::ExprValue::from_quantity(q, &units))
-                        }
-                        ParamKindFs::Enum { tag, .. } => match v {
-                            Value::Enum(t, o) if t == tag => ParamValue::Enum(type_info(*tag).members.get(*o as usize)?.to_string()),
-                            _ => continue,
-                        },
-                        _ => continue,
-                    };
-                    changed.set(&d.id, pv);
+                    if let Some(pv) = editing_value(&mut i, &cx, d, v, &units) {
+                        changed.set(&d.id, pv);
+                    }
                 }
                 Some(changed)
             })
             .ok()?
             .join()
             .ok()?
+    })
+}
+
+/// A definition value an editing logic function returned, as the
+/// parameter value of `d` (arrays item by item); `None`: not representable.
+fn editing_value(i: &mut Interp, cx: &Arc<FsContext>, d: &ParamDecl, v: &Value, units: &noshape_units::UnitPrefs) -> Option<ParamValue> {
+    Some(match &d.kind {
+        ParamKindFs::Query { .. } => ParamValue::Query(host::query::evaluate_refs(i, cx, v).ok()?),
+        ParamKindFs::FeatureList { .. } => ParamValue::Query(host::feature_list_refs(v)),
+        ParamKindFs::Bool { .. } => ParamValue::Bool(v.as_bool()?),
+        ParamKindFs::Num { kind, .. } => {
+            let q = match kind {
+                NumKind::Length => noshape_units::Quantity::new(host::length_of(v)?, noshape_units::Dim::LENGTH),
+                NumKind::Angle => noshape_units::Quantity::new(host::angle_of(v)?, noshape_units::Dim::ANGLE),
+                NumKind::Integer | NumKind::Real => noshape_units::Quantity::new(v.as_number()?, noshape_units::Dim::UNITLESS),
+            };
+            ParamValue::Expr(noshape_units::ExprValue::from_quantity(q, units))
+        }
+        ParamKindFs::Enum { tag, .. } => match v {
+            Value::Enum(t, o) if t == tag => ParamValue::Enum(type_info(*tag).members.get(*o as usize)?.to_string()),
+            _ => return None,
+        },
+        // std filletEditLogic fills a variable fillet's first vertex.
+        ParamKindFs::Array { items, .. } => {
+            let mut out = Vec::new();
+            for it in v.as_array()?.iter() {
+                let mut p = ParamValues::default();
+                for d in items {
+                    let x = it.get(d.id.as_str());
+                    if !x.is_undefined()
+                        && let Some(pv) = editing_value(i, cx, d, x, units)
+                    {
+                        p.set(&d.id, pv);
+                    }
+                }
+                out.push(p);
+            }
+            ParamValue::Array(out)
+        }
+        _ => return None,
     })
 }
 
