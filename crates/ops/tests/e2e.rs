@@ -3146,3 +3146,39 @@ fn step_assembly_import_matches_live() {
     assert!((t[0] + 210.0).abs() < 1e-6 && t[1].abs() < 1e-6 && (t[2] - 10.0).abs() < 1e-6, "{p3}");
     assert_eq!(asm["instances"].as_array().unwrap().len(), 3, "{asm}");
 }
+
+/// Two different parts with the same name (common in STEP files: "Part",
+/// "Body", "SOLID"): each imported instance gets its own part's geometry,
+/// not the first part of that name.
+#[test]
+fn step_assembly_parts_sharing_a_name_keep_their_geometry() {
+    let mut ctx = Ctx::new();
+    let (block, pin) = two_part_assembly(&mut ctx, "step_same_names.noshape");
+    for p in call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"].as_array().unwrap().clone() {
+        call(&mut ctx, "part_rename", json!({ "tab": "Part Studio 1", "part": p["id"], "name": "Part" }));
+    }
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [0, 0, 30] }));
+    let before = call(&mut ctx, "assembly_list", json!({}));
+    let at = |list: &Value, id: &str| -> Vec<f64> { (0..3).map(|i| num(&list["instances"].as_array().unwrap().iter().find(|x| x["id"] == id).unwrap()["translation"][i])).collect() };
+    let (block_at, pin_at) = (at(&before, &block), at(&before, &pin));
+
+    let file = scratch("same_names.step");
+    call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "STEP", "file": file.to_str().unwrap() }));
+    call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "same_names parts" }));
+    let list = parts["parts"].as_array().unwrap().clone();
+    assert_eq!(list.len(), 2, "{parts}");
+    assert!(list.iter().all(|p| p["name"] == "Part"), "both keep the file's name: {parts}");
+    // Each instance's part: the pin's is the Ø10 cylinder at x 55..65, the block's the 40 mm block.
+    let asm = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1 (1)" }));
+    let instances = asm["instances"].as_array().unwrap().clone();
+    assert_eq!(instances.len(), 2, "{asm}");
+    let part_of = |i: &Value| list.iter().find(|p| p["id"] == i["source"]["part"]).unwrap_or_else(|| panic!("{i}")).clone();
+    let near = |i: &Value, t: &[f64]| (0..3).all(|k| (num(&i["translation"][k]) - t[k]).abs() < 1e-6);
+    let pin_i = instances.iter().find(|i| near(i, &pin_at)).unwrap_or_else(|| panic!("no instance at the pin's place: {asm}"));
+    let block_i = instances.iter().find(|i| near(i, &block_at)).unwrap_or_else(|| panic!("no instance at the block's place: {asm}"));
+    let (pp, bp) = (part_of(pin_i), part_of(block_i));
+    assert_ne!(pp["id"], bp["id"], "two different parts: {asm}");
+    assert!((num(&pp["bounding_box"]["min"][0]) - 55.0).abs() < 1e-3 && (num(&pp["bounding_box"]["max"][0]) - 65.0).abs() < 1e-3, "the pin instance shows the pin: {pp}");
+    assert!((num(&bp["bounding_box"]["min"][0]) + 20.0).abs() < 1e-3 && (num(&bp["bounding_box"]["max"][0]) - 20.0).abs() < 1e-3, "the block instance shows the block: {bp}");
+}

@@ -334,21 +334,13 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
         }
     }
     for p in &inputs.pvz {
-        let pvz = noshape_model::native_assembly::PvzImport { stem: p.name.clone(), root: p.root.clone(), brep: p.foreign.brep.clone(), info: p.foreign.parts.clone(), foreign_id: p.file.clone(), instances: p.instances.clone(), names: p.names.clone(), step: p.step };
+        let mut options = vec![("importAppearances", c.appearances), ("yAxisIsUp", c.y_up), ("createComposite", c.composite)];
+        if p.step {
+            options.push(("joinAdjacentSurfaces", c.join));
+        }
+        let pvz = noshape_model::native_assembly::PvzImport { stem: p.name.clone(), root: p.root.clone(), brep: p.foreign.brep.clone(), info: p.foreign.parts.clone(), foreign_id: p.file.clone(), instances: p.instances.clone(), names: p.names.clone(), step: p.step, options };
         match noshape_model::native_assembly::add_pvz_assembly(d, &pvz, units) {
             Ok((studio, assembly)) => {
-                for tab in [studio] {
-                    if let Some(TabContent::PartStudio(ps)) = d.tab_mut(tab).map(|t| &mut t.content)
-                        && let Some(f) = ps.features.last_mut()
-                    {
-                        f.params.set("importAppearances", ParamValue::Bool(c.appearances));
-                        f.params.set("yAxisIsUp", ParamValue::Bool(c.y_up));
-                        f.params.set("createComposite", ParamValue::Bool(c.composite));
-                        if p.step {
-                            f.params.set("joinAdjacentSurfaces", ParamValue::Bool(c.join));
-                        }
-                    }
-                }
                 crate::docedit::place_after(d, assembly, at);
                 crate::docedit::place_after(d, studio, Some(assembly));
                 at = Some(studio);
