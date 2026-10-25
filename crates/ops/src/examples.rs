@@ -19,6 +19,9 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("tab_rename", &[r##"{"tab": "Part Studio 1", "name": "Housing"}"##]),
     ("tab_duplicate", &[r##"{"tab": "Housing"}"##]),
     ("tab_delete", &[r##"{"tab": "Part Studio 2"}"##]),
+    ("tab_folder_create", &[r##"{}"##, r##"{"name": "Fixtures", "folder": "Folder 1"}"##]),
+    ("tab_move", &[r##"{"tab": "Part Studio 1", "folder": "Folder 1"}"##, r##"{"tab": "Part Studio 1", "to_parent": true}"##, r##"{"tab": "Assembly 1", "before": "Part Studio 1"}"##]),
+    ("tab_folder_unpack", &[r##"{"folder": "Folder 1"}"##]),
     // features
     ("feature_types", &[r##"{}"##, r##"{"category": "Features"}"##]),
     ("feature_schema", &[r##"{"type": "extrude"}"##, r##"{"type": "hole"}"##]),

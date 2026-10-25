@@ -246,11 +246,11 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-216 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
+219 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
-- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete)
+- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_folder_unpack`](#tab_folder_unpack)
 - **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
@@ -487,6 +487,13 @@ Create a tab folder (edits the document (one undoable history entry)).
 
 The tab bar's "+" › Create folder: "Folder 1" (next free number) unless `name` is given, inside `folder` (default: the root). Folders nest up to Onshape's depth limit.
 
+Examples:
+
+```json
+{}
+{"name": "Fixtures", "folder": "Folder 1"}
+```
+
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
@@ -498,6 +505,14 @@ The tab bar's "+" › Create folder: "Folder 1" (next free number) unless `name`
 Move a tab or tab folder into a folder, out to its parent, or before another tab (edits the document (one undoable history entry)).
 
 Dragging a tab onto a folder tab (or onto 🏠: the root), Tab › Move to parent folder (`to_parent`), or dragging it along the bar (`before`: it goes in front of that tab, in that tab's folder). Like Onshape, the tab order isn't undoable; moving between folders is. Refused for a folder into itself or past the depth limit.
+
+Examples:
+
+```json
+{"tab": "Part Studio 1", "folder": "Folder 1"}
+{"tab": "Part Studio 1", "to_parent": true}
+{"tab": "Assembly 1", "before": "Part Studio 1"}
+```
 
 | field | type | | description |
 |---|---|---|---|
@@ -512,6 +527,12 @@ Dragging a tab onto a folder tab (or onto 🏠: the root), Tab › Move to paren
 Unpack a tab folder (edits the document (one undoable history entry)).
 
 Folder › Unpack: the folder goes; its tabs and folders move to its parent, at the end of the tab list (as Onshape).
+
+Examples:
+
+```json
+{"folder": "Folder 1"}
+```
 
 | field | type | | description |
 |---|---|---|---|
