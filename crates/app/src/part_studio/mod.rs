@@ -1429,6 +1429,13 @@ impl PartStudioView {
             ViewportEvent::Click { position, .. } if self.ui.datum_edit.is_some() => {
                 self.datum_pick(*position, cx);
             }
+            // Mass properties' reference field takes a picked mate connector.
+            ViewportEvent::Click { pick, .. } if self.show_mass && self.ui.mass_ref_active => {
+                if let Some(t) = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned()).filter(|t| t.kind == PickKind::Connector) {
+                    self.ui.mass_reference = Some(t.reference);
+                    cx.notify();
+                }
+            }
             // Section view dialog: picks fill its fields.
             ViewportEvent::Click { pick, .. } if self.ui.section_dialog.is_some() => {
                 if let Some(t) = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned()) {

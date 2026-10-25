@@ -67,7 +67,7 @@ selection and hover per step, rows in brackets).
 | 4.3 | Default planes add only angles and distances; a plane alone: "No measurements available for current selection." | L8938–8960; U `default_planes_add_only_angles_and_distances` | ✅ U |
 | 4.4 | A vertex or edge with a plane (AN1): Top + vertical edge reads Perp line and plane angle · Curvature deviation · Min dist · Length (the edge's); vertex / edge midpoint / circle read their Min dist | L8949 (c); U `edge_vertex_midpoint_and_circle_with_the_top_plane` | ✅ U (edge rows exact, Curvature deviation also for a perpendicular line; vertex / circle rows beyond Min dist not captured live) |
 | 4.5 | Units follow the document (mm document: Millimeter) | L14555 (L401 was an inch document) | 🔧 |
-| 4.6 | Status-bar Point readout with red / green / blue axis arrows | L14555–14574 | ❓ (no parity row) |
+| 4.6 | Status-bar Point readout with red / green / blue axis arrows ("Point:  X↘ 40.000 mm  Y↗ 0.000 mm  Z↑ 10.000 mm") | L14555–14574; live part-studio/qa4-r5-s9-4, ui-mass/07 | 🔧 (menus.rs `selection_readout`; live also shows it for the reference connector while Mass properties is open (ui-mass/07), ours hides the readout under any open panel) |
 | 4.7 | Hovering a distance row draws a black dashed line | L8957 | 🔧 |
 | 4.8 | Live update when the selection changes; value display restored after 3 s (`MEASUREMENT_VALUE_DISPLAY_RESTORE_TIME_MS`) | B | ❓ |
 | 4.9 | Mesh parts: an asterisk marks approximate values | L947, L953 | 🔧 |
@@ -79,7 +79,7 @@ selection and hover per step, rows in brackets).
 | 5.1 | Panel 440 px, Part / Face tabs, values = `query_mass_properties` | L403 | 🔧 (P 11.2) |
 | 5.2 | No material: red chip, blank mass / CoM / inertia; a one-time toast "One or more parts do not have a material defined." 3.6 s after opening, hidden 4.6 s later | L6287–6318 | 🔧 |
 | 5.3 | Face tab: Surface area, Perimeter, Lxx/Lxy/Lyx/Lyy, Lzz; non-coplanar faces blank and a red title | L2723–2735 | 🔧 (P 11.5) |
-| 5.4 | Reference mate connector; Mass Override | L8850 | ❌ (P open) |
+| 5.4 | "Mate connector for reference frame": a field of its own (click it, then a connector's row or glyph; × clears); with it the centre of mass reads in the connector's frame (block centre 20/10/5 from a connector at its corner (40,20,10): −20/−10/−5) and the inertia is about the connector's origin in its axes, products as tensor entries (Lxy −m·dx·dy); the CoM and inertia Overrides grey out. Mass ☑ Override: ticking keeps the mass and doesn't focus the box; a typed mass + Enter rescales the inertia at once; ✓ (solid once something changed) stores it on the part, unticking restores the computed mass | live "ui (10-25 d) Part Studio Mass properties" (ui-mass/05–15) | 🔧 (menus.rs `mass_reference`, `mass_override_edit`, `accept_mass_dialog`; the document's mass unit (lb live) is not modelled: values read in kg) |
 | 5.5 | Esc closes Measure and Mass | L6327 | 🔧 |
 
 ## 6. Section view
@@ -87,10 +87,10 @@ selection and hover per step, rows in brackets).
 | # | Behaviour | Live / source | Status |
 |---|---|---|---|
 | 6.1 | Dialog: Exclude / Include tabs, "Section plane 1 (Top)", prompt "Select a plane, planar face, cylinder, cone, or mate connector." | L358, L4955 | ✅ P 10.7 |
-| 6.2 | Part Studio manipulator: base ring at the picked face's centre, arrow (hollow head), two rotate handles; only the hovered handle blue ~#4573AE; the glyph's centre highlights nothing; cursor default | L14576–14598 | 🔧 (section_manip.rs, the assembly's glyph) |
+| 6.2 | Part Studio manipulator: base ring at the picked face's centre, arrow (hollow head), two rotate handles; only the hovered handle blue ~#4573AE; the glyph's centre highlights nothing; cursor default | L14576–14598 | 🔧 (section_manip.rs; the base starts at the picked face's area centroid or the connector's origin, `SectionPlane::base`; default planes across the model's centre) |
 | 6.3 | Arrow drag shows a value box (75×26, 1 decimal while dragging, from the drag start); Esc closes the box, a second Esc cancels | L11990–12030 | 🔧 |
 | 6.4 | Rotate handles: ring 0 about the plane's Y, ring 1 about its X, through the base; 5° multiples catch the drag near them, else free (up to 3 decimals, "deg") | L12023–12028 | 🔧 (U `ring_drags_catch_five_degree_multiples`, `rotating_turns_the_plane_about_its_base`) |
-| 6.5 | Dragging the base snaps to circle centres, faces, edges (~30–35 px, over the face) and vertices (~22 px); what it snaps to lights up; on release the plane moves through the snapped point and the base returns to its place | L14009–14028 | 🔧 (snapped look: the mate connector disc in the section plane; live turns it with the entity) |
+| 6.5 | Dragging the base snaps to circle centres, faces, edges (~30–35 px, over the face) and vertices (~22 px); what it snaps to lights up; on release the plane moves through the snapped point and the base returns to its place | L14009–14028 | 🔧 (section_manip.rs `section_snap`, ported from nav2 onto psb's manipulator: hover picks continue during the base drag (`Viewport::tool_hover`), only the snapped entity lights; the snapped look (pale-yellow disc + triad) not drawn yet: needs `asm_scene::push_connector_glyph` public) |
 | 6.6 | Caps: part colour with view-dependent lighting, hatch 0.5× the fill; while the dialog is open caps blend toward #FFA90A @0.8; excluded instances uncut and outlined | L12207–12230, L12291 | ⏳ (flat 0.9×) |
 | 6.7 | With a feature dialog open, Shift+X does nothing and the camera menu has no Section view… | L4955–4961 | 🔧 |
 | 6.8 | A plane feature row accepted as a section plane (ADV1) | workflow-analysis ADV1 | 🔧 (feature row click → `section_pick`) |

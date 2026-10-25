@@ -5,13 +5,19 @@
 //! axes lie in the plane, perpendicular to each other. Dragging a ring turns
 //! the plane about its axis through the arrow's base, snapping to 5°
 //! multiples within 2° (else up to 3 decimals), with a "deg" value box.
+//! Dragging the base snaps it to what is under the cursor; on release the
+//! plane moves through the snapped point (live "skb (10-24) section base
+//! snap").
 
 use super::PartStudioView;
 use super::manipulators::Arrow;
 use crate::viewport::ViewportEvent;
 use glam::{DQuat, DVec2, DVec3};
 use gpui_kit::*;
+use noshape_model::display::BodyDisplay;
+use noshape_model::reference::Reference;
 use noshape_render::{Drawable, Instance, LineData, LineSegment};
+use noshape_scene::builder::PickKind;
 
 /// Ring geometry (screen px): its radius, and the gap from the arrow's apex
 /// to the rings' centre.
@@ -23,6 +29,10 @@ const BASE_PX: f64 = 8.0;
 const ARROW_PX: f64 = super::manipulators::ARROW_SHAFT_PX + super::manipulators::ARROW_HEAD_PX;
 /// Snap window around 5° multiples (live: 82.046 and 92.111 stay free).
 const SNAP_DEG: f64 = 2.0;
+/// A dragged base snaps onto a vertex within this many px (live ≈22).
+const VERTEX_SNAP_PX: f64 = 22.0;
+/// Over a face, onto one of its edges within this many px (live ≈30–35).
+const EDGE_SNAP_PX: f64 = 32.0;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct SectionManip {
@@ -199,7 +209,10 @@ impl PartStudioView {
                     None
                 }
                 SectionHandle::Base => {
+                    // What is under the cursor keeps being picked: the base
+                    // snaps to it.
                     self.ui.section_base_drag = true;
+                    self.viewport.update(cx, |v, _| v.tool_hover = true);
                     Some(true)
                 }
                 SectionHandle::Ring(k) => {
@@ -216,12 +229,14 @@ impl PartStudioView {
             },
             ViewportEvent::ToolDrag { position, .. } => {
                 if self.ui.section_base_drag {
-                    // The manipulator slides over the plane; the plane stays.
-                    if let Some(q) = on_plane(self, *position, s.arrow.dir, s.arrow.base, cx) {
+                    // The manipulator slides over the plane, snapping; the
+                    // plane stays until the release.
+                    self.ui.section_snap_pos = Some(*position);
+                    let at = self.section_plane_point().unwrap_or(s.arrow.base);
+                    if let Some(q) = on_plane(self, *position, s.arrow.dir, at, cx) {
                         self.ui.section_base = Some(q);
-                        self.sync_manipulator(cx);
-                        self.refresh_scene(false, cx);
                     }
+                    self.section_base_snap(cx);
                     return Some(true);
                 }
                 let r = self.ui.section_rot.filter(|r| r.dragging)?;
@@ -233,8 +248,30 @@ impl PartStudioView {
                 self.open_section_box(window, cx);
                 Some(true)
             }
+            // Live: during a base drag only the snapped entity lights up.
+            ViewportEvent::Hover(id) if self.ui.section_base_drag => {
+                self.ui.hover_pick = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
+                self.section_base_snap(cx);
+                Some(true)
+            }
             ViewportEvent::ToolUp { .. } => {
                 if std::mem::take(&mut self.ui.section_base_drag) {
+                    // The plane now passes through the snapped point; the
+                    // base goes back to its place (live).
+                    self.viewport.update(cx, |v, _| v.tool_hover = false);
+                    let snap = self.ui.section_snap.take();
+                    self.ui.section_base = None;
+                    self.ui.section_snap_pos = None;
+                    self.hover = None;
+                    if let Some((q, _)) = snap
+                        && let Some(i) = self.ui.section_dialog.as_ref().map(|d| d.active)
+                        && let Some(pl) = self.ui.section.get_mut(i)
+                    {
+                        pl.offset = (q - pl.origin).dot(pl.normal);
+                    }
+                    self.apply_section(window, cx);
+                    self.sync_manipulator(cx);
+                    self.refresh_scene(false, cx);
                     return Some(true);
                 }
                 // Live: the box then takes typing, its value selected.
@@ -252,6 +289,95 @@ impl PartStudioView {
         }
     }
 
+    /// A point of the active section plane.
+    fn section_plane_point(&self) -> Option<DVec3> {
+        let pl = self.ui.section.get(self.ui.section_dialog.as_ref()?.active)?;
+        Some(pl.origin + pl.normal * pl.offset)
+    }
+
+    /// Snap the dragged base at its last position and light what it
+    /// snapped to.
+    fn section_base_snap(&mut self, cx: &mut Context<Self>) {
+        let snap = self.ui.section_snap_pos.and_then(|p| self.section_snap(p, cx));
+        let hover = snap.as_ref().map(|s| s.1.clone());
+        let changed = self.hover != hover || self.ui.section_snap.as_ref().map(|s| s.0) != snap.as_ref().map(|s| s.0);
+        self.ui.section_snap = snap;
+        self.hover = hover;
+        if changed {
+            self.sync_manipulator(cx);
+            self.refresh_scene(false, cx);
+        }
+    }
+
+    /// What a base drag snaps to under `p` (live "skb (10-24) section base
+    /// snap"): a vertex within 22 px (of the hovered face or edge, or any
+    /// off the part); a hovered edge, or the hovered face's edge within
+    /// ~32 px: a circle's centre, else the edge's point nearest the cursor
+    /// (a straight edge as a whole line); else the hovered face's point.
+    /// Off the part nothing but vertices snaps.
+    fn section_snap(&self, p: DVec2, cx: &App) -> Option<(DVec3, Reference)> {
+        let vp = self.viewport.read(cx);
+        let s = |q: DVec3| vp.project(q);
+        let (o, r) = vp.ray(p);
+        let p3 = |a: &[f32; 3]| DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
+        let hover = self.ui.hover_pick.as_ref();
+        let bodies = || self.display.bodies.iter().filter(|b| !b.hidden);
+        let face = hover.filter(|t| t.kind == PickKind::Face).and_then(|t| bodies().find_map(|b| Some((b, b.face_refs.iter().position(|x| *x == t.reference)?))));
+        let edge = hover.filter(|t| t.kind == PickKind::Edge).and_then(|t| bodies().find_map(|b| Some((b, b.edge_refs.iter().position(|x| *x == t.reference)?))));
+        let mut verts: Vec<(DVec3, Reference)> = Vec::new();
+        let ends = |b: &BodyDisplay, ei: usize, out: &mut Vec<(DVec3, Reference)>| {
+            let Some(pl) = b.mesh.edges.get(ei) else { return };
+            for e in [pl.first(), pl.last()].into_iter().flatten() {
+                if let Some(vi) = b.mesh.vertices.iter().position(|v| p3(v).distance(p3(e)) < 1e-7)
+                    && let Some(vr) = b.vertex_refs.get(vi)
+                {
+                    out.push((p3(&b.mesh.vertices[vi]), vr.clone()));
+                }
+            }
+        };
+        match (hover, face, edge) {
+            (Some(t), _, _) if t.kind == PickKind::Vertex => verts.extend(t.anchor.map(|a| (a, t.reference.clone()))),
+            (_, Some((b, fi)), _) => b.mesh.face_edges(fi).into_iter().for_each(|ei| ends(b, ei, &mut verts)),
+            (_, _, Some((b, ei))) => ends(b, ei, &mut verts),
+            _ => verts.extend(bodies().flat_map(|b| b.mesh.vertices.iter().map(p3).zip(b.vertex_refs.iter().cloned()))),
+        }
+        let near_vertex = verts.into_iter().filter_map(|(v, r)| Some(((s(v)? - p).length(), v, r))).filter(|x| x.0 <= VERTEX_SNAP_PX).min_by(|a, b| a.0.total_cmp(&b.0));
+        if let Some((_, q, r)) = near_vertex {
+            return Some((q, r));
+        }
+        let on_edge = |b: &BodyDisplay, ei: usize| -> Option<(DVec3, Reference)> {
+            let pts: Vec<DVec3> = b.mesh.edges.get(ei)?.iter().map(p3).collect();
+            let entity = b.edge_refs.get(ei)?.clone();
+            if let Some(c) = circle_center(&pts) {
+                return Some((c, entity));
+            }
+            let (a, z) = (*pts.first()?, *pts.last()?);
+            let straight = (z - a).try_normalize().filter(|d| pts.iter().all(|q| (*q - a).cross(*d).length() <= 1e-6 + 1e-4 * a.distance(z)));
+            let q = match straight {
+                Some(d) => a + d * line_param(o, r, a, d)?,
+                None => pts.iter().copied().filter_map(|q| Some(((s(q)? - p).length(), q))).min_by(|x, y| x.0.total_cmp(&y.0))?.1,
+            };
+            Some((q, entity))
+        };
+        if let Some((b, ei)) = edge {
+            return on_edge(b, ei);
+        }
+        let (b, fi) = face?;
+        let reach = |ei: usize| -> Option<f64> {
+            let v: Option<Vec<DVec2>> = b.mesh.edges.get(ei)?.iter().map(|q| s(p3(q))).collect();
+            v?.windows(2).map(|w| seg_dist(p, w[0], w[1])).min_by(f64::total_cmp)
+        };
+        let nearest = b.mesh.face_edges(fi).into_iter().filter_map(|ei| Some((reach(ei)?, ei))).filter(|x| x.0 <= EDGE_SNAP_PX).min_by(|x, y| x.0.total_cmp(&y.0));
+        if let Some((_, ei)) = nearest {
+            return on_edge(b, ei);
+        }
+        let &(first, count) = b.mesh.face_ranges.get(fi)?;
+        let tris = b.mesh.indices.get(first as usize..(first + count) as usize)?;
+        let v = |i: u32| b.mesh.positions.get(i as usize).map(p3);
+        let t = tris.as_chunks::<3>().0.iter().filter_map(|t| ray_triangle(o, r, v(t[0])?, v(t[1])?, v(t[2])?)).min_by(f64::total_cmp)?;
+        Some((o + r * t, b.face_refs.get(fi)?.clone()))
+    }
+
     /// Turn the active plane to `r.deg` about `r.axis` from where the drag
     /// started; a turned plane loses its "(Top)" name (live).
     pub(super) fn set_section_rotation(&mut self, r: RingDrag, window: &mut Window, cx: &mut Context<Self>) {
@@ -267,6 +393,56 @@ impl PartStudioView {
         self.ui.section_rot = Some(r);
         self.apply_section(window, cx);
     }
+}
+
+/// Parameter along the line (point, dir) where the ray (o, r) passes closest.
+fn line_param(o: DVec3, r: DVec3, point: DVec3, dir: DVec3) -> Option<f64> {
+    let w = point - o;
+    let (a, b, c) = (dir.dot(dir), dir.dot(r), r.dot(r));
+    let (dd, e) = (dir.dot(w), r.dot(w));
+    let den = a * c - b * b;
+    (den.abs() > 1e-12).then(|| (b * e - c * dd) / den)
+}
+
+/// Ray parameter where (o, r) hits the triangle (a, b, c) (Möller–Trumbore).
+fn ray_triangle(o: DVec3, r: DVec3, a: DVec3, b: DVec3, c: DVec3) -> Option<f64> {
+    let (e1, e2) = (b - a, c - a);
+    let p = r.cross(e2);
+    let det = e1.dot(p);
+    if det.abs() < 1e-18 {
+        return None;
+    }
+    let s = o - a;
+    let u = s.dot(p) / det;
+    let q = s.cross(e1);
+    let v = r.dot(q) / det;
+    let t = e2.dot(q) / det;
+    (u >= 0.0 && v >= 0.0 && u + v <= 1.0 && t > 0.0).then_some(t)
+}
+
+/// Centre of an edge polyline that is a circle or an arc of one.
+fn circle_center(pts: &[DVec3]) -> Option<DVec3> {
+    if pts.len() < 4 {
+        return None;
+    }
+    let (a, b, c) = (pts[0], pts[pts.len() / 3], pts[2 * pts.len() / 3]);
+    let (ab, ac) = (b - a, c - a);
+    let n = ab.cross(ac);
+    if n.length_squared() < 1e-24 {
+        return None;
+    }
+    let center = a + (n.cross(ab) * ac.length_squared() + ac.cross(n) * ab.length_squared()) / (2.0 * n.length_squared());
+    let r = center.distance(a);
+    let n = n.normalize();
+    let tol = 1e-3 * r + 1e-7;
+    pts.iter().all(|p| (p.distance(center) - r).abs() <= tol && (*p - center).dot(n).abs() <= tol).then_some(center)
+}
+
+/// Screen distance from `p` to the segment (a, b).
+fn seg_dist(p: DVec2, a: DVec2, b: DVec2) -> f64 {
+    let d = b - a;
+    let u = ((p - a).dot(d) / d.length_squared().max(1e-12)).clamp(0.0, 1.0);
+    (a + d * u - p).length()
 }
 
 /// The base circle and the rings: idle light grey (≈ #e6e8e9 on #c2c7cb),

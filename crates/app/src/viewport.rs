@@ -283,6 +283,9 @@ pub struct Viewport {
     hover: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
     pub tool_captures_left: bool,
+    /// Keep picking what is under the cursor (`ViewportEvent::Hover`)
+    /// during a tool drag (the section view's base snaps to it).
+    pub tool_hover: bool,
     /// Zoom to window (W): the next left-drag box zooms instead of selecting.
     pub zoom_window: bool,
     /// Point under the cursor for a ray (origin, direction): right-drag
@@ -512,6 +515,7 @@ impl Viewport {
             cursor_platform: true,
             hover: None,
             tool_captures_left: false,
+            tool_hover: false,
             zoom_window: false,
             orbit_pivot_fn: None,
             orbit_pivot: None,
@@ -1742,6 +1746,12 @@ impl Viewport {
                 cx.notify();
             }
             Drag::Tool => {
+                if self.tool_hover {
+                    match self.pick_at(p) {
+                        Some(id) => self.set_hover(id, cx),
+                        None => self.request_hover(),
+                    }
+                }
                 cx.emit(ViewportEvent::ToolDrag { position: p });
             }
             Drag::None | Drag::Pending(_) => {

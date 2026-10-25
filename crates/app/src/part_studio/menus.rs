@@ -7,6 +7,7 @@ use crate::os_ui::OsDropupExt as _;
 use crate::scene_builder::{PickKind, PickTarget};
 use crate::theme::{p, with_alpha};
 use crate::ui::{TipExt as _, TipSide};
+use gpui_kit::component::Sizable as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{h_flex, v_flex};
@@ -936,28 +937,51 @@ impl PartStudioView {
         } else if self.show_mass {
             title = "Mass properties";
             let bodies = mass_parts(&self.display, self.selection.iter().filter_map(|r| self.owning_body(r)));
-            // Inertia about a selected mate connector (reference coordinate system).
-            let reference = self.selection.iter().find_map(|r| self.display.connectors.iter().find(|c| &c.reference == r)).cloned();
+            // Inertia about the reference field's mate connector.
+            let reference = self.ui.mass_reference.as_ref().and_then(|r| self.display.connectors.iter().find(|c| &c.reference == r)).cloned();
             let studio = self.studio(cx).cloned().unwrap_or_default();
+            let frame = reference.as_ref().map(|c| (c.origin, c.x, c.z.cross(c.x), c.z));
             if let Some(noshape_ops::analysis::StudioMass { props: mp, reference }) = noshape_ops::analysis::studio_mass_properties(&ctx, &self.display, &studio, &bodies, reference.as_ref()) {
                 if let Some(name) = &reference {
                     rows.push(("Reference".into(), name.clone()));
                 }
                 let len3 = Dim { length: 3, angle: 0 };
                 let len2 = Dim { length: 2, angle: 0 };
-                let c = mp.center_of_mass;
+                // Live (ui-mass/07, 10-25): with a reference mate connector
+                // the center of mass reads in its frame (a block's centre
+                // 20/10/5 from a connector on its corner at 40/20/10 reads
+                // -20/-10/-5).
+                let c = frame.map_or(mp.center_of_mass, |f| in_frame(mp.center_of_mass, f));
                 let l = |x: f64| self.fmt(Quantity::new(x, Dim::LENGTH), cx);
                 // Onshape lists the moments of inertia about the center of mass
                 // (needs a material, like the mass).
                 let units = self.doc.read(cx).session.doc.settings.units;
                 let f = units.si_factor(Dim::LENGTH).powi(2);
                 let sym = units.length.symbol();
-                let i = mp.inertia;
+                // Mass Override (live ui-mass/10–15): one part's stored or
+                // just-typed mass; the inertia scales with it, the centre of
+                // mass stays.
+                let single = match bodies.as_slice() {
+                    [b] => Some(b.clone()),
+                    [] if self.display.bodies.len() == 1 => self.display.bodies.first().map(|b| b.id.clone()),
+                    _ => None,
+                };
+                let stored = single.as_ref().and_then(|b| studio.part_properties.get(b)?.mass_override);
+                let edit = single.as_ref().and_then(|b| self.ui.mass_override_edit.as_ref().filter(|(eb, _)| eb == b)).map(|(_, m)| *m);
+                let computed = single.as_ref().and_then(|b| studio.part_properties.get(b)?.density).map(|d| d * mp.volume);
+                let shown = edit.unwrap_or(stored).or(computed).or(mp.mass);
+                let scale = match (shown, mp.mass) {
+                    (Some(a), Some(b)) if b > 0.0 => a / b,
+                    _ => 1.0,
+                };
+                let i = mp.inertia * scale;
                 let v = |x: f64| noshape_units::to_fixed(x / f, 4);
                 mass_view = Some(MassView {
+                    override_part: single.filter(|_| mp.mass.is_some()).map(|b| (b, edit.unwrap_or(stored).is_some(), shown.unwrap_or(0.0))),
+                    changed: edit.is_some_and(|e| e != stored),
                     volume: self.fmt(Quantity::new(mp.volume, len3), cx),
                     area: self.fmt(Quantity::new(mp.surface_area, len2), cx),
-                    mass: mp.mass.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))),
+                    mass: mp.mass.and(shown).map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))),
                     // Without a material Onshape leaves the center of mass empty.
                     center: if mp.mass.is_some() { [l(c.x), l(c.y), l(c.z)] } else { Default::default() },
                     inertia_unit: format!("{sym}² kg"),
@@ -1056,8 +1080,8 @@ impl PartStudioView {
         // Onshape's selection box: `#def1fb` with a 1 px `#1651b0` border when
         // active, the caption small on top once something is listed.
         // `invalid`: entries in red (live: parts without a material).
-        // `removable`: the items are `self.selection` and a chip's × drops
-        // its entry (the Measure field).
+        // `removable`: a chip's × drops its entry (the Measure field's from
+        // `self.selection`; Mass properties' reference connector).
         let field_view = cx.entity();
         let field = |label: &str, items: Vec<String>, active: bool, invalid: bool, removable: bool| {
             let empty = items.is_empty();
@@ -1086,10 +1110,14 @@ impl PartStudioView {
                         .child(div().flex_1().truncate().child(t))
                         .child(div().id("x").group("measure-x").w(px(20.)).h(px(24.)).pl(px(5.)).flex().items_center().child(crate::ui::glyph("ui-clear", 9., pal.icon_tertiary).when(removable, |g| g.group_hover("measure-x", |s| s.text_color(pal.error)))).when(removable, |d| {
                             let view = field_view.clone();
+                            let reference = label == "Mate connector for reference frame";
                             d.cursor_pointer().on_click(move |_, _, cx| {
                                 cx.stop_propagation();
                                 view.update(cx, |this, cx| {
-                                    if i < this.selection.len() {
+                                    if reference {
+                                        this.ui.mass_reference = None;
+                                        cx.notify();
+                                    } else if i < this.selection.len() {
                                         this.selection.remove(i);
                                         this.refresh_scene(false, cx);
                                         cx.notify();
@@ -1139,6 +1167,7 @@ impl PartStudioView {
             // Live (part-studio/121): the letter in #999, a coloured arrow glyph.
             let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(6.)).text_size(px(15.)).text_color(gpui_kit::rgb(0x999999)).child(l).child(crate::ui::glyph(glyph, 14., gpui_kit::rgb(c)));
             let mut body = v_flex().w_full().child(h_flex().w_full().mb(px(2.)).child(tab("mass-tab-part", "Part", false, cx)).child(tab("mass-tab-face", "Face", true, cx)));
+            let can_accept = face_view.is_none() && mass_view.as_ref().is_some_and(|m| m.changed || m.reference.is_some());
             match (face_view.as_ref(), mass_view) {
                 (Some(fv), _) => {
                     // Live (skb/851): no Override boxes on this tab; blank
@@ -1167,16 +1196,46 @@ impl PartStudioView {
                         .child(cells(&["Lzz"], vec![fv.polar.clone().unwrap_or_default()]).child(div().flex_1()));
                 }
                 (None, Some(m)) => {
+                    let ref_active = self.ui.mass_ref_active;
                     body = body
                         // Live: 5 px between the tabs and the two fields, 8 under them.
-                        .child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, m.parts.clone(), true, m.mass.is_none(), false).mt(px(5.)).mb(px(0.)))
-                        .child(field("Mate connector for reference frame", m.reference.clone().into_iter().collect(), false, false, false).mt(px(5.)).mb(px(0.)))
+                        // One field active at a time; a click on the other
+                        // makes it the active one (live ui-mass/06–07).
+                        .child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, m.parts.clone(), !ref_active, m.mass.is_none(), false).mt(px(5.)).mb(px(0.)).id("mass-parts-field").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.mass_ref_active = false;
+                            cx.notify();
+                        })))
+                        .child(field("Mate connector for reference frame", m.reference.clone().into_iter().collect(), ref_active, false, true).mt(px(5.)).mb(px(0.)).id("mass-ref-field").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.mass_ref_active = true;
+                            cx.notify();
+                        })))
                         // Live (dom/dialog-mass-properties.txt): the rows from here are
                         // 27 / 26 / 29 px tall, 2 px apart (3 px above X): X, Y and Z
                         // sit 31 px apart, the inertia rows 28.
                         .child(div().mt(px(9.)).h(px(27.)).child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", false)))
                         // Nothing measured: Mass's Override is greyed like the others (live part-studio/2382).
-                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(if !m.mass_override_enabled() { disabled_check("mass-override").into_any_element() } else { crate::ui::os_checkbox("mass-override", "Override", false).into_any_element() }).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(m.mass.clone().unwrap_or_default())))
+                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(match &m.override_part {
+                            // Ticking keeps the shown mass and doesn't focus the box.
+                            Some((body, on, kg)) if m.mass_override_enabled() => {
+                                let (body, on, kg) = (body.clone(), *on, *kg);
+                                crate::ui::os_checkbox("mass-override", "Override", on)
+                                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                        this.ui.mass_override_input = None;
+                                        this.ui.mass_override_edit = Some((body.clone(), (!on).then_some(kg)));
+                                        cx.notify();
+                                    }))
+                                    .into_any_element()
+                            }
+                            _ => disabled_check("mass-override").into_any_element(),
+                        }).child(match (&self.ui.mass_override_input, &m.override_part) {
+                            (Some((input, _)), Some((_, true, _))) => div().flex_1().mr(px(5.)).h(px(24.)).border_b_1().border_color(pal.accent).child(gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right)).into_any_element(),
+                            (_, Some((body, true, kg))) => {
+                                let (body, text) = (body.clone(), m.mass.clone().unwrap_or_default());
+                                let kg = *kg;
+                                div().id("mass-override-value").flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).cursor_text().child(text.clone()).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_mass_override(body.clone(), kg, text.clone(), window, cx))).into_any_element()
+                            }
+                            _ => div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(m.mass.clone().unwrap_or_default()).into_any_element(),
+                        }))
                         .child(value_row("Volume".into(), m.volume.clone()).mt(px(2.)).h(px(26.)))
                         .child(value_row("Surface area".into(), m.area.clone()).mt(px(2.)).h(px(26.)))
                         .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(disabled_check("com-override")))
@@ -1227,7 +1286,22 @@ impl PartStudioView {
                                 crate::ui::panel_title("ps-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(bad, |d| d.text_color(pal.text_invalid)).child("Mass and section properties"))
                                     .when(bad, |d| d.tooltip(crate::ui::tooltip("Face selections are not coplanar")))
                             })
-                            .child(div().size(px(28.)).flex().items_center().justify_center().bg(crate::theme::p().accept).when(true, crate::ui::disabled_accept).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)))
+                            // Live (ui-mass/07, 10): ✓ turns solid once there is
+                            // something to apply (a reference, an Override change);
+                            // it stores the Override and closes.
+                            .child(
+                                div()
+                                    .id("mass-ok")
+                                    .size(px(28.))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .bg(crate::theme::p().accept)
+                                    .when(!can_accept, crate::ui::disabled_accept)
+                                    .cursor(gpui_kit::CursorStyle::Arrow)
+                                    .child(crate::assets::icon("dialog-ok", 24., cx))
+                                    .when(can_accept, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_mass_dialog(cx)))),
+                            )
                             .child(close("mass-close", false, cx)),
                     )
                     // Live: 46 px from the last inertia row to the dialog's
@@ -1478,6 +1552,11 @@ struct MassView {
     inertia: Option<[[String; 3]; 3]>,
     parts: Vec<String>,
     reference: Option<String>,
+    /// The part Mass Override applies to (one part measured, with a
+    /// mass), whether it is ticked, and the mass shown (kg).
+    override_part: Option<(BodyId, bool, f64)>,
+    /// An Override change ✓ would store.
+    changed: bool,
 }
 
 impl MassView {
@@ -1492,6 +1571,8 @@ impl MassView {
             inertia: None,
             parts: Vec::new(),
             reference,
+            override_part: None,
+            changed: false,
         }
     }
 
@@ -1583,8 +1664,61 @@ impl PartStudioView {
     /// defined." follows ≈3.6 s after the panel opens (when its computation
     /// is done) and hides itself ≈4.6 s later, once per session, whether or
     /// not the panel is still open (qa4 F19).
+    /// The Mass box typed into (live ui-mass/12–13): Enter applies a mass
+    /// ("1" → 1 kg here; a unit converts) and keeps the box with its value
+    /// selected; leaving it applies too; text that isn't a mass stays.
+    fn edit_mass_override(&mut self, body: BodyId, kg: f64, text: String, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::input::{InputEvent, InputState};
+        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let sub = cx.subscribe_in(&input, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            let enter = matches!(ev, InputEvent::PressEnter { .. });
+            if !enter && !matches!(ev, InputEvent::Blur) {
+                return;
+            }
+            let typed = st.read(cx).value().to_string();
+            if let Some(v) = crate::properties_dialog::parse_mass(&typed) {
+                this.ui.mass_override_edit = Some((body.clone(), Some(v)));
+                if enter {
+                    let shown = format!("{} kg", noshape_units::to_fixed(v, 4));
+                    st.update(cx, |s, cx| {
+                        s.set_value(shown, window, cx);
+                        s.select_all(window, cx);
+                    });
+                } else {
+                    this.ui.mass_override_input = None;
+                }
+            } else if !enter {
+                this.ui.mass_override_input = None;
+                this.ui.mass_override_edit = Some((body.clone(), Some(kg)));
+            }
+            cx.notify();
+        });
+        input.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.ui.mass_override_input = Some((input, sub));
+        cx.notify();
+    }
+
+    /// ✓: store a changed Mass Override on its part (one undo step), close.
+    fn accept_mass_dialog(&mut self, cx: &mut Context<Self>) {
+        if let Some((body, kg)) = self.ui.mass_override_edit.clone() {
+            let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
+            self.doc.update(cx, |doc, cx| {
+                doc.edit_studio(self.tab, &noshape_ops::studio::properties_description(&name), cx, |ps| ps.part_properties.entry(body).or_default().mass_override = kg);
+            });
+        }
+        self.set_show_mass(false, cx);
+        self.refresh_scene(true, cx);
+    }
+
     pub(super) fn set_show_mass(&mut self, show: bool, cx: &mut Context<Self>) {
         self.show_mass = show;
+        self.ui.mass_ref_active = false;
+        self.ui.mass_reference = None;
+        self.ui.mass_override_edit = None;
+        self.ui.mass_override_input = None;
         if show && !NO_MATERIAL_SHOWN.load(std::sync::atomic::Ordering::Relaxed) {
             let props = self.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
             if self.display.bodies.iter().any(|b| props.get(&b.id).and_then(|p| p.density).is_none()) {
@@ -1660,6 +1794,29 @@ mod mass_parts_tests {
         assert_eq!(m.inertia_unit, "mm² kg");
         assert!(!m.mass_override_enabled());
         assert!(super::MassView { volume: "48 mm³".into(), ..m }.mass_override_enabled());
+    }
+}
+
+/// A point in a mate connector's frame (origin, X, Y, Z).
+fn in_frame(p: glam::DVec3, (o, x, y, z): (glam::DVec3, glam::DVec3, glam::DVec3, glam::DVec3)) -> glam::DVec3 {
+    let d = p - o;
+    glam::DVec3::new(d.dot(x), d.dot(y), d.dot(z))
+}
+
+#[cfg(test)]
+mod mass_reference_tests {
+    use super::in_frame;
+    use glam::DVec3;
+
+    /// Live (ui-mass/07): the 40 × 20 × 10 block's centre (20, 10, 5) from
+    /// a world-aligned connector on its corner (40, 20, 10) reads −20 /
+    /// −10 / −5; a connector turned 90° about Z swaps X and Y.
+    #[::core::prelude::v1::test]
+    fn center_of_mass_reads_in_the_connector_frame() {
+        let c = DVec3::new(20., 10., 5.);
+        let o = DVec3::new(40., 20., 10.);
+        assert_eq!(in_frame(c, (o, DVec3::X, DVec3::Y, DVec3::Z)), DVec3::new(-20., -10., -5.));
+        assert_eq!(in_frame(c, (o, DVec3::Y, -DVec3::X, DVec3::Z)), DVec3::new(-10., 20., -5.));
     }
 }
 
