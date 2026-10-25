@@ -125,6 +125,19 @@ fn undoing_a_delete_reuses_the_deleted_feature() {
     assert_eq!(run(&back), vec![lp2], "Linear pattern 2's upstream changed");
 }
 
+/// Planar bodies with straight edges are meshed once, at the final quality,
+/// even in the preview pass: no refine pass follows.
+#[test]
+fn planar_bodies_need_no_refine_pass() {
+    let (ps, _) = model(3);
+    let (units, config) = (UnitPrefs::default(), ConfigValues::default());
+    let preview = Regenerator::new().regenerate(&ps, &config, &units, &RegenOptions { preview_meshes: true, ..Default::default() });
+    let fine = Regenerator::new().regenerate(&ps, &config, &units, &RegenOptions::default());
+    assert!(!preview.needs_refine);
+    let (p, f) = (&preview.display.bodies[0].mesh, &fine.display.bodies[0].mesh);
+    assert_eq!((p.positions.len(), p.indices.len()), (f.positions.len(), f.indices.len()));
+}
+
 #[test]
 #[ignore]
 fn fins_open_and_undo_cost_about_one_regeneration() {
