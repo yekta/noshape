@@ -284,22 +284,6 @@ impl PartStudioView {
     /// The gray-blue banner at the top centre (`#d0dbe5`, 490 px).
     pub(super) fn render_context_banner(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let c = self.ui.in_context.as_ref()?;
-        let small_button = |id: &'static str, label: &'static str| {
-            div()
-                .id(id)
-                .h(px(22.))
-                .px(px(10.))
-                .flex()
-                .items_center()
-                .rounded(px(3.5))
-                .border_1()
-                .border_color(rgb(0xaaaaaa))
-                .bg(rgb(0xffffff))
-                .text_size(px(13.))
-                .text_color(rgb(0x333333))
-                .cursor_pointer()
-                .child(label)
-        };
         let check = |id: &'static str, label: &'static str, on: bool| {
             h_flex()
                 .id(id)
@@ -339,6 +323,7 @@ impl PartStudioView {
         // <assembly>" with [Hide/show instances | ▾] [Done] (live 504, 509).
         let amber = self.shown_context_referenced(cx);
         let split_label = c.split_go_to_assembly;
+        let insert_pending = c.ctx.insert_at.is_some() && !studio_in_assembly(&self.doc.read(cx).session.doc, assembly, self.tab);
         let mut banner = v_flex()
             .w(px(if amber.is_some() { 420. } else { 490. }))
             .bg(if amber.is_some() { rgb(0xfab601) } else { rgb(0xd0dbe5) })
@@ -355,7 +340,9 @@ impl PartStudioView {
                     .child(div().flex_1())
                     .when_some(amber.clone(), |d, _| {
                         let main = if split_label { "Go to assembly" } else { "Hide/show instances" };
-                        d.child(
+                        // Live (qa4 round 5 s2): a Part Studio created in context keeps
+                        // [Insert and go to assembly ▾] until its parts are in the assembly.
+                        let d = if insert_pending { d.child(self.insert_go_split(assembly, cx)) } else { d.child(
                             h_flex()
                                 .child(small_button("ctx-split-main", main).rounded_r(px(0.)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     if split_label {
@@ -398,8 +385,8 @@ impl PartStudioView {
                                     });
                                     crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
                                 }))),
-                        )
-                        .child(div().w(px(10.)))
+                        ) };
+                        d.child(div().w(px(10.)))
                         // Done: leave the context, stay in the Part Studio (it persists).
                         .child(small_button("ctx-done", "Done").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.exit_context(cx))))
                         .child(div().w(px(10.)))
@@ -408,32 +395,7 @@ impl PartStudioView {
                         // A Part Studio created in context (live assembly/551):
                         // [Insert and go to assembly][▾] (Insert and go to
                         // assembly, Go to assembly, Hide/show instances) and ✕.
-                        Some(_) => h_flex()
-                            .child(small_button("ctx-insert-go", "Insert and go to assembly").rounded_r(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_go(cx))))
-                            .child(small_button("ctx-insert-caret", "").w(px(20.)).px(px(0.)).justify_center().rounded_l(px(0.)).border_l_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))).on_click(cx.listener(move |_this, ev: &ClickEvent, window, cx| {
-                                let view = cx.entity();
-                                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                                    let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
-                                    m.list_no_icons()
-                                        .item(crate::os_menu::OsMenuItem::new("Insert and go to assembly").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.open_insert_go(cx))))
-                                        .item(crate::os_menu::OsMenuItem::new("Go to assembly").on_click(move |_, _, cx| {
-                                            v2.update(cx, |this, cx| {
-                                                this.exit_context(cx);
-                                                cx.emit(PartStudioEvent::ActivateTab(assembly));
-                                            })
-                                        }))
-                                        .item(crate::os_menu::OsMenuItem::new("Hide/show instances").on_click(move |_, _, cx| {
-                                            v3.update(cx, |this, cx| {
-                                                if let Some(c) = &mut this.ui.in_context {
-                                                    c.hide_show_open = !c.hide_show_open;
-                                                }
-                                                cx.notify();
-                                            })
-                                        }))
-                                });
-                                crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
-                            })))
-                            .into_any_element(),
+                        Some(_) => self.insert_go_split(assembly, cx),
                         None => h_flex()
                             .child(small_button("ctx-go", "Go to assembly").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 this.exit_context(cx);
@@ -1039,5 +1001,85 @@ impl PartStudioView {
             referenced |= noshape_model::in_context::params_use_context(&e.dialog.read(cx).feature.params, Some(id));
         }
         referenced.then(|| (id, c.name.clone()))
+    }
+}
+
+impl PartStudioView {
+    /// [Insert and go to assembly][▾] (Insert and go to assembly, Go to
+    /// assembly, Hide/show instances) of a Part Studio created in context
+    /// (live assembly/551).
+    fn insert_go_split(&self, assembly: noshape_model::document::TabId, cx: &mut Context<Self>) -> AnyElement {
+        h_flex()
+            .child(small_button("ctx-insert-go", "Insert and go to assembly").rounded_r(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_go(cx))))
+            .child(small_button("ctx-insert-caret", "").w(px(20.)).px(px(0.)).justify_center().rounded_l(px(0.)).border_l_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))).on_click(cx.listener(move |_this, ev: &ClickEvent, window, cx| {
+                let view = cx.entity();
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                    let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                    m.list_no_icons()
+                        .item(crate::os_menu::OsMenuItem::new("Insert and go to assembly").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.open_insert_go(cx))))
+                        .item(crate::os_menu::OsMenuItem::new("Go to assembly").on_click(move |_, _, cx| {
+                            v2.update(cx, |this, cx| {
+                                this.exit_context(cx);
+                                cx.emit(PartStudioEvent::ActivateTab(assembly));
+                            })
+                        }))
+                        .item(crate::os_menu::OsMenuItem::new("Hide/show instances").on_click(move |_, _, cx| {
+                            v3.update(cx, |this, cx| {
+                                if let Some(c) = &mut this.ui.in_context {
+                                    c.hide_show_open = !c.hide_show_open;
+                                }
+                                cx.notify();
+                            })
+                        }))
+                });
+                crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
+            })))
+            .into_any_element()
+    }
+}
+
+/// The banner's small white button (22 px, #aaa border).
+fn small_button(id: &'static str, label: &'static str) -> Stateful<Div> {
+    div()
+        .id(id)
+        .h(px(22.))
+        .px(px(10.))
+        .flex()
+        .items_center()
+        .rounded(px(3.5))
+        .border_1()
+        .border_color(rgb(0xaaaaaa))
+        .bg(rgb(0xffffff))
+        .text_size(px(13.))
+        .text_color(rgb(0x333333))
+        .cursor_pointer()
+        .child(label)
+}
+
+/// Whether the assembly already has an instance from this Part Studio.
+fn studio_in_assembly(doc: &noshape_model::document::Document, assembly: noshape_model::document::TabId, studio: noshape_model::document::TabId) -> bool {
+    match doc.tab(assembly).map(|t| &t.content) {
+        Some(noshape_model::document::TabContent::Assembly(a)) => a.instances.iter().any(|i| i.source.studio() == Some(studio)),
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod insert_pending_tests {
+    use super::studio_in_assembly;
+    use noshape_model::assembly::{Assembly, Instance, InstanceId, InstanceSource, Placement};
+    use noshape_model::document::{Document, TabContent};
+
+    #[::core::prelude::v1::test]
+    fn insert_stays_offered_until_the_studio_is_in_the_assembly() {
+        let mut d = Document::default();
+        let studio = d.add_tab("Part Studio 1", TabContent::PartStudio(noshape_model::PartStudio::new()));
+        let asm = d.add_tab("Assembly 1", TabContent::Assembly(Box::default()));
+        assert!(!studio_in_assembly(&d, asm, studio));
+        if let Some(TabContent::Assembly(a)) = d.tabs.iter_mut().find(|t| t.id == asm).map(|t| &mut t.content) {
+            let a: &mut Assembly = a;
+            a.instances.push(Instance::new(InstanceId(1), "Part Studio 1 <1>".into(), InstanceSource::PartStudio { studio, config: Default::default() }, Placement::default()));
+        }
+        assert!(studio_in_assembly(&d, asm, studio));
     }
 }

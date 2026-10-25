@@ -1162,7 +1162,7 @@ impl DrawingEditor {
             scene.instances.push(Instance::new(Drawable::Lines(l.clone())).per_primitive_color());
         }
         scene.instances.extend(self.shaded_edge_instances());
-        for (m, color) in self.texts.iter().zip([[0.0, 0.0, 0.0, 1.0], crate::theme::lin(0xdc2828)]) {
+        for (m, color) in self.texts.iter().zip([[0.0, 0.0, 0.0, 1.0], crate::theme::lin(drawing_scene::DANGLING_RGB)]) {
             if let Some(m) = m {
                 scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(color).unlit());
             }

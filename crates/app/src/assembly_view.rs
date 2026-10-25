@@ -763,6 +763,11 @@ impl AssemblyView {
     fn apply_result(&mut self, result: Arc<AssemblyResult>, _window: &mut Window, cx: &mut Context<Self>) {
         self.result = result;
         self.infer = None;
+        // The readout follows the new geometry, and picks of parts that are
+        // gone (undone in their Part Studio) drop out (qa4 round 5 s4).
+        let result = self.result.clone();
+        self.ui.entity_sel.retain(|k| analysis::pick_exists(&result, k));
+        self.update_entity_measure();
         self.refresh_center_of_mass(cx);
         if std::mem::take(&mut self.pattern_resync) && self.mate.is_none() && self.pattern.is_none() {
             self.resync_patterns(cx);
@@ -3009,7 +3014,7 @@ impl AssemblyView {
                     "tb-screw" => relation("tb-screw", "screw-relation", "Screw relation", RelationType::Screw, cx).into_any_element(),
                     "tb-linear" => relation("tb-linear", "linear-relation", "Linear relation", RelationType::Linear, cx).into_any_element(),
                     "tb-display-states" => tool(self, "tb-display-states", "display-states", "Display states", self.ui.display_states, cx, |this, w, cx| this.toggle_display_states(w, cx)).into_any_element(),
-                    _ => tool(self, "tb-ps-in-context", "create-partstudio-incontext", "Create Part Studio in context", self.ui.ps_in_context.is_some(), cx, |this, _, cx| this.open_ps_in_context(cx)).into_any_element(),
+                    _ => tool(self, "tb-ps-in-context", "create-partstudio-incontext", "Create Part Studio in context", self.ui.ps_in_context.is_some(), cx, |this, _, cx| this.open_ps_in_context(false, cx)).into_any_element(),
                 })
                 .collect();
             bar = bar.child(sep()).child(self.render_toolset(set, tools, ids, pos >= collapse_from, cx));
