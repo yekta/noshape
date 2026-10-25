@@ -32,6 +32,27 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 10 on v0.4.8 (release tarball): an everyday assembly (P2; r5/v3s10b.py six mates, r5/v3s10.py / v3s10n.py planar stacks of 19 / N cubes; drag rate with r5/dragfps.sh = ffmpeg x11grab 30 fps without the pointer, distinct frames counted)
+Six mates by CLI on a fixed plate: DOF Fastened 0, Revolute 1, Slider 1, Cylindrical 2, Planar 3, Ball 3 ✅ (DOF glyph tooltips
+"Has degrees of freedom (n)"); first instance lands at the origin, not fixed (= live); dragging a revolute instance turns it about
+its axis ✅. Group (tool search "Group": Instances field) → "Group 1" row; Planar + Ball cubes grouped → 1 DOF (the remaining
+rotation about the vertical through the ball point) ✅. BOM panel: Flattened, Item / Quantity / Part number / Description (= live's
+default columns), rows 1 × plate, 6 × cube ✅. Assembly Linear pattern: Instances, Direction + MC button, Distance 25 mm, Instance
+count + flip, Equal spacing, Centered, Second direction; ✓ → "Linear pattern 1" row with Part 2 <7>, <8> ✅. Exploded views panel
+(right strip) → Add exploded view → amber "Editing Explode 1 · Done" bar, the "Build steps by dragging components" box, triad
+on a picked instance, dragging its arrow → "Explode step" dialog (Translation, Instances, Distance 54.3 mm, Explode lines) + dashed
+explode line + "Explode step 1" row ✅. Mate flips: MATE-FLIP-AXIAL (skb) stands.
+Drag rate (software GL on Xvfb, so absolute numbers are low): 7 instances, a Planar cube: **10.0 updates/s**, longest gap 0.17 s;
+20 instances (19 cubes Planar-stacked), the top cube: **3.9 updates/s**, longest gap 0.67 s, and the assembly blows up (below).
+- **R5v3-S10-a → DRAG-RUNAWAY (skb, P2 severe)** dragging the top cube of a Planar-mated stack moves the **other** free cubes: with
+  3 cubes only the dragged one moves ✅; with 10 the whole column shifts and leans; with 19 a 25–150 px drag flings the cubes to
+  ±2.5 million mm in X/Y (assembly_list after the drag: Part 2 <1> at (−2491492, −2917166, 10)), every mate still "ok" (Planar
+  allows any in-plane position) — the solver satisfies the mates but lets the free in-plane DOF of the undragged bodies wander
+  (no pull toward their current pose). Ctrl+Z restores. Repro: r5/v3s10n.py with NCUBES=19, open, drag the top cube.
+- **R5v3-S10-b → CHIP-X-SELECTED (skb)** in the assembly Linear pattern dialog, a seed chip's × doesn't remove the instance while it
+  is still selected in the instance list (the field re-captures it from the selection); after clearing the selection the × works.
+- Note: "Explode" isn't in tool search (exploded views are a right-panel feature; live likely the same, not asked).
+
 ## v3 Session 9 on v0.4.8 (release tarball): interaction (r5/v3s9.py: Part 1 = block 60×40×20 with a Ø10 hole and an R5 vertical fillet, 46321.903 mm³; Part 2 = cylinder Ø16×30, 6031.858 mm³; live "Selection colours", "Box select", "Right-click menus", "Measure & mass properties", "Section view", "Isolate / Make transparent")
 Nothing felt slow: hover, picks, box selection, Select other, menus and panels were all immediate; section drag updated live.
 Same as live ✅: face hover = light-orange boundary only (hole loop too); edge hover = thick light orange; vertex hover = dot;
