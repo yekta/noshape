@@ -246,6 +246,8 @@ STATUS DOC1 / I5 (2026-10-24, qa5): fixed by api in live's layout with noshape's
 STATUS RHINO1 (2026-10-24, qa5): still "needs openNURBS" on main c59c5af9.
 STATUS MEAS1 (2026-10-24, qa5): answered by live "ui (10-23 a)"; fixed on ready/ui 6f16c117 (not on main yet).
 STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty status bar, as live).
+STATUS BOOL1b (2026-10-24 15:3x, qa5): fixed on main; disjoint Union row tooltip reads "Boolean 1".
+STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF iso view as lines, detail clip kept; DXF R14 with CIRCLE / ELLIPSE / MTEXT and live's layer names. Hatch / dimension / table entities not covered by this drawing.
 
 ## DRW-SIL — api — drawing_get omits silhouette edges; callouts can't target curved parts by script
 - Source: qa4 QA round 4 session 2 (2026-10-24, v0.4.7). Assembly drawing iso view of a plate + Ø10 pin: `drawing_get
@@ -311,6 +313,19 @@ Move boundary on a straight edge of such a face moves it in the plane; its arc n
 (live's default, Maintain curvature off; along their circle when ticked or when trimmed), and the moved edges keep
 their names. In qa5's surf doc Move boundary 1 (25 mm) and 3 (10 mm) move the same edge: 1200 + 750 + 300 =
 2250 mm², 1 face (the row's 1200 + 300 assumed MB1 failing). Test features_b `move_boundary_between_arcs_extends_them`.
+## SEL1 — psb (lead to assign) — Fillet / Chamfer fields accept sketch curves
+- Source: qa5 pass 24, 2026-10-24, main 538981d5.
+- Repro: sketch with a rectangle, close it; Fillet (Shift+F) or Chamfer, click a sketch line in the graphics.
+- Expected (live): not pickable (fillet.fs / chamfer.fs filters have SketchObject.NO).
+- Actual: chip "Sketch 1 line" added. Cause: kind_matches lets PickKind::SketchCurve into any field with the EDGE bit; the std filter parser ignores SketchObject.NO; some EDGE fields (Composite curve, Bridging curve) do take sketch curves, so the fix needs EDGE = model edges only, ANY_EDGE where sketch curves are allowed, and a std-vs-builtin test.
+
+## UNDO3 — asb — drawing note undo takes one step, live two
+- Source: qa5 pass 24, 2026-10-24, main 538981d5.
+- Repro: drawing tab, Note (n), click on the sheet, type "hello", ✓; click empty space; Ctrl+Z.
+- Expected (live, behaviours "qa5 undo across tabs"): the 1st Ctrl+Z leaves the note and enables Redo; the 2nd removes it.
+- Actual: the 1st Ctrl+Z removes the note.
+
+STATUS RHINO1 (2026-10-24 ~00:20, qa5): Rhino export round-trips (65431.327331 mm³, 18 faces) on the target-engine CLI built with openNURBS; still a packaging question for builds without it.
 
 ## PCB-CONVERT — fs — Flex PCB model › Convert of a thin plate makes 6 parts (P3)
 - api, 2026-10-24 (e2e `flex_pcb_model_features`): a 60 × 20 × 1 mm plate (sketch rectangle, Extrude 1 mm), then Flex PCB model with
@@ -350,6 +365,20 @@ NAUO order on export is a fixed internal order that follows no recoverable key (
 - api, 2026-10-25: the imported g47-1part block reports bbox 0…40.0001 × 0…20.0001 × 0…10.0001 (`Shape::bounding_box(true)`
   adds the 1e-7 m vertex/edge tolerance); native parts are exact. Onshape reports the exact box. Used by query_parts
   and anything showing a part's size.
+
+## FSW-L45b — psb — Curve pattern Distance spacing on a closed path (spacing and the limit check)
+- qa5, 2026-10-25 (v0.4.8 release CLI and target-engine 00:45, same result): cube 10 mm at (R, 0), closed circle of length 100 mm
+  (R = 15.9155), Part curve pattern, Spacing type Distance.
+  - d 10 mm × 3: ours copies at 120° / 240°. curvePattern.fs (l. 189–202): instance i at path parameter d·i / (L − d) of the whole
+    path → 0°, 40°, 80° (arc spacing d·L / (L − d) = 11.11 mm). The live L45 capture (d 25 × 3 → 120° / 240°) is the special case
+    d = L / (n + 1), not "spread equally"; `pattern.rs` `if closed { len / n }` only matches it there.
+  - d 25 × 3 and d 20 × 4: ours ERROR "Cannot create a curve pattern when the entered distance is larger than the path length."
+    (live L45: d 25 × 3 OK). The check is exactly at the limit (L − d = d·n) and `path.length()` is the sampled polyline's chord
+    length, a little under L; std uses evPathLength (exact) and TOLERANCE.zeroLength.
+  - Expected: the exact path length, std's formula for the parameters, and a test with d 10 × 3 (40° / 80°) and d 25 × 3 (OK).
+
+- STATUS 2026-10-25 06:25 (qa5): ADV9 still fails on main 10195656 (bracket step 8, target-engine CLI 06:17). FSW-L45b unchanged on
+  the same CLI (d 25 × 3 errors, d 10 × 3 at 120° / 240°). psb's ADV9 fix 853cf16b is in ready/psb, queue status CONFLICT since 21:44.
 ## IMP-DENS — api — "Import material density" offered for STEP files (main, since 5d5e0403)
 - Source: qa4 QA round 4 session 5 in the app (2026-10-24). `crates/app/src/import_dialog.rs` `density` includes "step"/"stp".
 - Expected (live): behaviours "qa4 round 4 s5": "For STEP there is **no 'Import material density'** checkbox (an .x_t import
