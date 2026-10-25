@@ -3176,8 +3176,9 @@ impl PartStudioView {
     pub(super) fn auto_operation(&mut self, cx: &mut Context<Self>) {
         let Some(e) = &self.edit else { return };
         // Live L49/L50: a tapped hole's Depth, Tapped depth and Tap
-        // clearance stay linked, new or edited.
-        if e.dialog.read(cx).feature.type_id == "hole" {
+        // clearance stay linked, new or edited (std's holeEditLogic does it
+        // where it runs).
+        if e.dialog.read(cx).feature.type_id == "hole" && !noshape_model::custom::std_feature::has_editing_logic("hole") {
             let dialog = e.dialog.clone();
             let (id, now) = {
                 let d = dialog.read(cx);

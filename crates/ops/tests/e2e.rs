@@ -2951,6 +2951,12 @@ fn edit_in_context_and_part_studio_in_context() {
     let c = &r["context"];
     assert_eq!((c["name"].clone(), c["shown"].clone(), c["referenced"].clone()), (json!("Context 1"), json!(true), json!(false)), "{r}");
     assert_eq!(c["instances"].as_array().unwrap().len(), 1, "the pin around the block: {r}");
+    // The banner's Hide/show instances (view_display context_hidden).
+    let pin_name = c["instances"][0]["instance"].as_str().unwrap().to_string();
+    let d = call(&mut ctx, "view_display", json!({ "tab": "Part Studio 1", "context_hidden": [pin_name] }));
+    assert_eq!(d["context_hidden"], json!([pin]), "{d}");
+    let d = call(&mut ctx, "view_display", json!({ "tab": "Part Studio 1", "context_hidden": [] }));
+    assert_eq!(d["context_hidden"], json!([]), "{d}");
     // The pin's top face, from the context.
     let faces = call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "context": true, "surface": "plane", "normal": [0, 0, 1] }));
     let top = faces["faces"][0]["id"].as_str().unwrap_or_else(|| panic!("{faces}")).to_string();
@@ -3906,8 +3912,17 @@ fn ui_select_related_and_select_other() {
     assert_eq!(o["under"].as_array().unwrap().len(), 2, "{o}");
     let o = call(&mut ctx, "ui_select", json!({ "action": "select_other", "at": at, "index": 1 }));
     assert_eq!(o["selected"], json!([o["under"][1].clone()]), "{o}");
+    // Create selection… adds what it finds to the selection.
+    let cs = call(&mut ctx, "ui_select", json!({ "action": "create_selection", "refs": [face], "criterion": "Tangent connected faces" }));
+    let sel = cs["selected"].as_array().unwrap();
+    assert!(sel.len() >= 2 && sel.contains(&o["under"][1]) && sel.contains(&json!(face)), "{cs}");
     let c = call(&mut ctx, "ui_select", json!({ "action": "clear" }));
     assert_eq!(c["selected"], json!([]), "{c}");
+    // A drawing's MBD status: no model datums here.
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let m = call(&mut ctx, "drawing_mbd", json!({ "drawing": d["drawing"] }));
+    assert_eq!(m["rows"], json!([]), "{m}");
+    assert_eq!(try_call(&mut ctx, "drawing_mbd", json!({ "drawing": d["drawing"], "show": "Datum A" })).unwrap_err().param.as_deref(), Some("show"));
     let e = try_call(&mut ctx, "view_camera", json!({ "action": "zoom_selection" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("refs"), "nothing selected: {e:?}");
 }

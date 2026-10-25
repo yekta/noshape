@@ -1021,6 +1021,91 @@ export const pinnedHelix = defineFeature(function(context is Context, id is Id, 
     assert!(compiled.diagnostics.iter().any(|d| d.message.contains("HelixType")), "{:?}", compiled.diagnostics);
 }
 
+/// evCollision with one solid inside another (live "fs (10-25 f)"): touching
+/// the outer boundary, each touching face interferes; touching nothing, one
+/// TOOL_IN_TARGET / TARGET_IN_TOOL entry for the two bodies. std Hole's
+/// dialog finds its Merge scope this way.
+#[test]
+fn collision_containment_as_live() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Containment probe" }
+export const containmentProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "a", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(40, 40, 40) * millimeter });
+        fCylinder(context, id + "b", { "bottomCenter" : vector(20, 20, 26.5) * millimeter, "topCenter" : vector(20, 20, 40) * millimeter, "radius" : 2.5 * millimeter });
+        fCylinder(context, id + "c", { "bottomCenter" : vector(20, 20, 10) * millimeter, "topCenter" : vector(20, 20, 30) * millimeter, "radius" : 2.5 * millimeter });
+        const body = function(name) { return qCreatedBy(id + name, EntityType.BODY); };
+        const types = function(tools, targets) { return mapArray(evCollision(context, { "tools" : tools, "targets" : targets }), function(x) { return x["type"]; }); };
+        if (types(body("b"), body("a")) != [ClashType.INTERFERE, ClashType.INTERFERE])
+            throw regenError("b in a: " ~ toString(types(body("b"), body("a"))));
+        const inner = evCollision(context, { "tools" : body("c"), "targets" : body("a") });
+        if (size(inner) != 1 || inner[0]["type"] != ClashType.TOOL_IN_TARGET || !areQueriesEquivalent(context, inner[0].tool, body("c")) || !areQueriesEquivalent(context, inner[0].target, body("a")))
+            throw regenError("c in a: " ~ toString(inner));
+        if (types(body("a"), body("c")) != [ClashType.TARGET_IN_TOOL])
+            throw regenError("a around c: " ~ toString(types(body("a"), body("c"))));
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("containmentProbe"), &fx.units).unwrap();
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+}
+
+/// Reported statuses replace the message but faulty parameters accumulate,
+/// newest first, also through a bare enum thrown afterwards (live "fs (10-25
+/// e)": std Hole's HOLE_NO_HITS keeps opHole's mapped Merge scope red).
+#[test]
+fn faulty_parameters_accumulate_across_reports() {
+    let probe = |name: &str, body: &str| {
+        format!(
+            r#"
+annotation {{ "Feature Type Name" : "{name}" }}
+export const {name} = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {{
+        annotation {{ "Name" : "A", "Filter" : EntityType.FACE }}
+        definition.a is Query;
+        annotation {{ "Name" : "B", "Filter" : EntityType.FACE }}
+        definition.b is Query;
+    }}
+    {{
+        reportFeatureError(context, id, ErrorStringEnum.HOLE_NO_HITS, ["a"]);
+        {body}
+    }});
+"#
+        )
+    };
+    let src = studio(&[
+        probe("same", "reportFeatureError(context, id, ErrorStringEnum.HOLE_NO_HITS);"),
+        probe("other", "reportFeatureError(context, id, ErrorStringEnum.REGEN_ERROR);"),
+        probe("both", "reportFeatureError(context, id, ErrorStringEnum.HOLE_NO_HITS, [\"b\"]);"),
+        probe("thrown", "throw ErrorStringEnum.HOLE_NO_HITS;"),
+    ]
+    .concat());
+    let fx = Fixture::new(&src);
+    for (name, faulty, message) in [
+        ("same", vec!["a"], "None of the holes intersected a part."),
+        ("other", vec!["a"], "Error regenerating."),
+        ("both", vec!["b", "a"], "None of the holes intersected a part."),
+        ("thrown", vec!["a"], "None of the holes intersected a part."),
+    ] {
+        let mut ps = PartStudio::new();
+        let f = ps.new_feature(&fx.ty(name), &fx.units).unwrap();
+        let fid = f.id;
+        ps.features.push(f);
+        let mut reg = Regenerator::new();
+        let r = fx.regen(&mut reg, &ps);
+        let st = r.display.feature_state(fid).expect("state");
+        assert_eq!((st.faulty.clone(), st.message.as_deref()), (faulty.iter().map(|s| s.to_string()).collect::<Vec<_>>(), Some(message)), "{name}");
+    }
+}
+
 /// FeatureScript debug() entities reach the feature's display state in
 /// their colours, also from aborted sub-features and when the feature fails
 /// (live "fs (10-25 c)": shown while its dialog is open).
@@ -1097,6 +1182,15 @@ export const polylineProbe = defineFeature(function(context is Context, id is Id
             if (size(evaluateQuery(context, edges)) != c.edges || abs(length - c.length * millimeter) > 1e-6 * millimeter)
                 throw regenError("case " ~ i ~ ": " ~ size(evaluateQuery(context, edges)) ~ " edges, " ~ toString(length));
         }
+        // Live: the lines come first, then the arcs, each in path order.
+        var lengths = [];
+        for (var edge in evaluateQuery(context, qCreatedBy(id + "case0", EntityType.EDGE)))
+        {
+            const kind = evCurveDefinition(context, { "edge" : edge }) is Line ? "line" : "arc";
+            lengths = append(lengths, kind ~ " " ~ roundToPrecision(evLength(context, { "entities" : edge }) / millimeter, 3));
+        }
+        if (lengths != ["line 40", "line 25", "line 25", "arc 15.708", "arc 7.854"])
+            throw regenError("edge order: " ~ toString(lengths));
         for (var i, wrong in [{ "radii" : mm([10]), "error" : ErrorStringEnum.POLYLINE_BEND_RADII_INVALID_SIZE },
                               { "radii" : mm([30, 30]), "error" : ErrorStringEnum.POLYLINE_INVALID_BEND }])
         {

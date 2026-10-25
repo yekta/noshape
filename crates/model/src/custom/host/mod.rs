@@ -720,7 +720,18 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                     None => (failure.to_string(), e.message.clone(), Vec::new()),
                 },
             };
-            st.status.insert(id.to_vec(), status::status_map("ERROR", &code, Some(&msg)));
+            // With its faulty fields: std maps them onto its own parameters
+            // (processSubfeatureStatus' featureParameterMap: hole.fs opHole
+            // `targets` → Merge scope, as live).
+            let mut status = status::status_map("ERROR", &code, Some(&msg));
+            if !faulty.is_empty()
+                && let Value::Map(m, t) = &status
+            {
+                let mut m = (**m).clone();
+                m.insert(Value::str("faultyParameters"), Value::array(faulty.iter().map(|f| Value::str(f.as_str())).collect()));
+                status = Value::Map(Arc::new(m), *t);
+            }
+            st.status.insert(id.to_vec(), status);
             drop(st);
             log::debug!("FeatureScript operation {} failed: {msg}", id.join("."));
             let faulty: Vec<&str> = faulty.iter().map(String::as_str).collect();

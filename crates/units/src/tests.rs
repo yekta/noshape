@@ -528,3 +528,65 @@ fn scopes() {
     assert_mm("0 mm", 0.0);
     assert!((evaluate("#x * #y", &layered).unwrap().value - 0.005).abs() < 1e-15);
 }
+
+/// Live's FeatureScript semantics (behaviours "skb (10-25) expression
+/// functions": REST evaluation and a dimension field): halves round up,
+/// roundToPrecision rounds x·10^p that way, isInteger is exact (false with
+/// units), tolerantEquals' tolerances, clamp and hypot keep the argument kind.
+#[test]
+fn live_rounding_and_the_new_functions() {
+    for (s, v) in [("round(2.5)", 3.0), ("round(-2.5)", -2.0), ("round(0.5)", 1.0), ("round(-0.5)", 0.0), ("round(1.49999)", 1.0), ("round(5, 2)", 6.0), ("floor(7, 2)", 6.0), ("round(1.5, 1)", 2.0), ("round(-2.5) + 30", 28.0)] {
+        assert_num(s, v);
+    }
+    assert_mm("round(-1.25 mm, 0.1 mm)", -1.2);
+    assert_mm("round(12.25 mm, 0.5 mm)", 12.5);
+    for (s, v) in [
+        ("roundToPrecision(1.23456, 2)", 1.23),
+        ("roundToPrecision(-2.345, 2)", -2.35),
+        ("roundToPrecision(2.345, 2)", 2.35),
+        ("roundToPrecision(1.005, 2)", 1.0),
+        ("roundToPrecision(0.125, 2)", 0.13),
+        ("roundToPrecision(-0.125, 2)", -0.12),
+        ("roundToPrecision(2.5, 0)", 3.0),
+        ("roundToPrecision(1234.5, -2)", 1200.0),
+        ("roundToPrecision(12.3456, 2)", 12.35),
+    ] {
+        assert_num(s, v);
+    }
+    assert!(ev_err_any("roundToPrecision(1.5 mm, 1)"));
+    assert!(ev_err_any("roundToPrecision(1.23456, 2.5)"));
+    for (s, v) in [("isInteger(3)", 1.0), ("isInteger(-4)", 1.0), ("isInteger(3.5)", 0.0), ("isInteger(3.0000000001)", 0.0), ("isInteger(3 mm)", 0.0), ("isInteger(1e20)", 1.0)] {
+        assert_num(s, v);
+    }
+    for (s, v) in [
+        ("tolerantEquals(1, 1 + 1e-13)", 1.0),
+        ("tolerantEquals(1, 1 + 1e-12)", 0.0),
+        ("tolerantEquals(0, 1e-13)", 1.0),
+        ("tolerantEquals(0, 1.1e-13)", 0.0),
+        ("tolerantEquals(1 mm, 1.000000001 mm)", 1.0),
+        ("tolerantEquals(1 mm, 1.0001 mm)", 0.0),
+        ("tolerantEquals(0 m, 0.9e-8 m)", 1.0),
+        ("tolerantEquals(0 m, 1e-8 m)", 0.0),
+        ("tolerantEquals(0 rad, 0.9e-11 rad)", 1.0),
+        ("tolerantEquals(0 rad, 1.1e-11 rad)", 0.0),
+        ("tolerantEquals(1 mm, 1.000000001 mm) ? 17 : 13", 17.0),
+    ] {
+        assert_num(s, v);
+    }
+    assert!(ev_err_any("tolerantEquals(1 mm, 2)"));
+    assert_num("clamp(5, 0, 3)", 3.0);
+    assert_num("clamp(50, 0, 30)", 30.0);
+    assert_num("clamp(1, 1, 1)", 1.0);
+    assert_mm("clamp(-1 mm, 0 mm, 3 mm)", 0.0);
+    assert!(ev_err_any("clamp(2, 3, 1)"));
+    assert!(ev_err_any("clamp(1 mm, 0, 3)"));
+    assert_mm("hypot(3 mm, 4 mm)", 5.0);
+    assert_num("hypot(3, 4)", 5.0);
+    assert_num("hypot(-3, 0)", 3.0);
+    assert!(ev_err_any("hypot(3 mm, 4)"));
+    assert_num("isInteger(3) ? 22 : 11", 22.0);
+}
+
+fn ev_err_any(s: &str) -> bool {
+    evaluate(s, &scope()).is_err()
+}

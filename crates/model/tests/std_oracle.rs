@@ -912,11 +912,9 @@ fn hole_cases() -> Vec<(&'static str, Studio)> {
 
 #[test]
 fn hole_regenerates_as_std() {
-    // A hole that hits nothing: live flags Merge scope (behaviours.md
-    // "Hole" 2154, native too); std's opHole throws the bare HOLE_NO_HITS
-    // and the field is marked outside FeatureScript.
-    let no_hits = ["from the part, sketch below", "opposite direction"];
-    let report: String = hole_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std_but(name, "hole", s, !no_hits.contains(name))).collect();
+    // A hole that hits nothing flags Merge scope (live behaviours.md "Hole"
+    // 2154): std maps opHole's faulty `targets` onto it.
+    let report: String = hole_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std(name, "hole", s)).collect();
     assert!(report.is_empty(), "native Hole differs from std:\n{report}");
 }
 
@@ -1575,4 +1573,85 @@ fn more_editing_logic_runs_std() {
     });
     let got = edit_logic(&s, &ParamValues::default(), &["entities", "axis"]);
     assert!(got.contains(&"operationType=Enum(\"ADD\")".to_string()), "{got:?}");
+}
+
+/// std's holeEditLogic through the host natives: a new hole's Merge scope is
+/// the part it reaches, and one sketched below the part flips into it
+/// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,
+/// live "fs (10-25 f)"; the native dialog logic does the same, live L57).
+#[test]
+fn hole_editing_logic_runs_std() {
+    for on_top in [true, false] {
+        let mut s = Studio::new();
+        s.cube();
+        let r = s.regen();
+        let plane = if on_top { face_at(&r, DVec3::new(20.0, 20.0, 40.0)) } else { Reference::Plane(DatumPlane::Top) };
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = sk.add_point(DVec2::new(0.02, 0.02));
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![plane]));
+            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        });
+        s.add("hole", |pv| {
+            pv.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));
+            pv.set("unitsSystem", en("METRIC"));
+            noshape_model::features::hole_tables::apply_table_to_params(pv);
+        });
+        let got = edit_logic(&s, &ParamValues::default(), &["locations"]);
+        let scope = format!("scope={:?}", ParamValue::Query(vec![body_ref(&r, 0)]));
+        let want = if on_top { vec![scope] } else { vec!["oppositeDirection=Bool(true)".to_string(), scope] };
+        assert_eq!(got, want, "hole sketched {}", if on_top { "on the top face" } else { "below the part" });
+    }
+}
+
+/// Live L57 through std's holeEditLogic: two stacked parts, a hole on the
+/// top one's face; Blind 5 fills Merge scope with the top part only, Depth
+/// 15 adds the part below.
+#[test]
+fn hole_scope_follows_depth_as_live() {
+    let mut s = Studio::new();
+    let a = s.sketch(Reference::Plane(DatumPlane::Top), &[SQUARE]).1[0].clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![a]));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.regen();
+    let b = s.sketch(face_at(&r, DVec3::new(20.0, 20.0, 10.0)), &[SQUARE]).1[0].clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![b]));
+        p.set("depth", expr("10 mm"));
+        p.set("operationType", en("NEW"));
+    });
+    let r = s.regen();
+    assert_eq!(r.context.bodies.len(), 2);
+    let (lower, upper) = (body_ref(&r, 0), body_ref(&r, 1));
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.02, 0.02));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![face_at(&r, DVec3::new(20.0, 20.0, 20.0))]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.add("hole", |pv| {
+        pv.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));
+        pv.set("unitsSystem", en("METRIC"));
+        noshape_model::features::hole_tables::apply_table_to_params(pv);
+    });
+    // As the dialog: each run's changes applied before the next edit.
+    let last = s.ps.features.len() - 1;
+    let run = |s: &mut Studio, old: &ParamValues, specified: &[&str]| {
+        let new = s.ps.features[last].params.clone();
+        let spec: Vec<String> = specified.iter().map(|x| x.to_string()).collect();
+        let out = custom::std_feature::editing_logic(&s.ps, last, &ConfigValues::default(), &s.units, &RegenOptions::default(), old, &new, &spec, true).expect("editing logic ran");
+        for (k, v) in out.0 {
+            s.ps.features[last].params.set(&k, v);
+        }
+        s.ps.features[last].params.query("scope").to_vec()
+    };
+    run(&mut s, &ParamValues::default(), &["locations"]);
+    for (depth, want) in [("5 mm", vec![upper.clone()]), ("15 mm", vec![lower.clone(), upper.clone()])] {
+        let old = s.ps.features[last].params.clone();
+        s.ps.features[last].params.set("holeDepthV3", expr(depth));
+        let got = run(&mut s, &old, &["locations", "holeDepthV3"]);
+        assert!(got.len() == want.len() && want.iter().all(|w| got.contains(w)), "Merge scope at depth {depth}: {got:?}");
+    }
 }

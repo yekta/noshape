@@ -214,6 +214,7 @@ std::unique_ptr<OcShape> make_vertex(P3 p);
 std::unique_ptr<OcShape> make_edge_2d(const PlaneF& plane, const Seg2d& seg);
 std::unique_ptr<OcShape> make_wire_2d(const PlaneF& plane, rust::Slice<const Seg2d> segs);
 std::unique_ptr<OcShape> make_wire(const OcShapeList& edges);
+std::unique_ptr<OcShape> wire_with_edge_order(const OcShape& wire, rust::Slice<const uint32_t> order);
 std::unique_ptr<OcShape> make_face_on_plane(const PlaneF& plane, const OcShape& outer,
                                             const OcShapeList& holes);
 std::unique_ptr<OcShape> make_face_from_wire(const OcShape& wire, bool only_plane);

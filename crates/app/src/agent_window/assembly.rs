@@ -32,7 +32,7 @@ impl AssemblyView {
                     self.toggle_snap(window, cx);
                 }
             }
-            DisplaySet::IsolateParts { .. } | DisplaySet::HighlightBoundary(_) | DisplaySet::OrientOnEdit(_) | DisplaySet::ThicknessOff => {}
+            DisplaySet::IsolateParts { .. } | DisplaySet::HighlightBoundary(_) | DisplaySet::OrientOnEdit(_) | DisplaySet::ThicknessOff | DisplaySet::ContextHidden(_) => {}
         }
     }
 

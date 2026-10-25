@@ -58,6 +58,14 @@
 #include <BRepTools_ReShape.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRep_Builder.hxx>
+#include <TColStd_PackedMapOfInteger.hxx>
+#include <NCollection_DataMap.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
+#include <algorithm>
+#include <TopoDS_Compound.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
+#include <BRepExtrema_SelfIntersection.hxx>
 #include <TopoDS_Wire.hxx>
 #include <NCollection_IndexedDataMap.hxx>
 #include <functional>
@@ -1523,6 +1531,89 @@ void set_thread_cancel(size_t flag)
   t_cancel = reinterpret_cast<const std::atomic<bool>*>(flag);
 }
 
+// Tools that can't touch each other, gathered into compounds: OCCT never
+// intersects the parts of one argument with each other, and most of a cut
+// with many tools is spent on tool pairs whose boxes meet but which are apart
+// (the user's Diagonal knurl: 74 parallel helical grooves, over 95 % of the
+// candidate pairs, 29 s -> 11 s). Decided on mesh copies (the parts keep no
+// triangulation): two tools share a group only when no faces of theirs come
+// within twice the mesh deflection, so tools that touch or cross never do.
+static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>& t)
+{
+  const int n = (int)t.size();
+  if (n < 8)
+    return t;
+  Bnd_Box all;
+  for (const TopoDS_Shape& s : t)
+    BRepBndLib::Add(s, all, false);
+  if (all.IsVoid())
+    return t;
+  const double defl = 1e-4 * std::sqrt(all.SquareExtent());
+  TopoDS_Compound copies;
+  BRep_Builder    bb;
+  bb.MakeCompound(copies);
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> owner;
+  for (int i = 0; i < n; ++i)
+  {
+    const TopoDS_Shape c = BRepBuilderAPI_Copy(t[(size_t)i], true, false).Shape();
+    BRepMesh_IncrementalMesh(c, defl, false, 0.5);
+    for (TopExp_Explorer f(c, TopAbs_FACE); f.More(); f.Next())
+      owner.Bind(f.Current(), i);
+    bb.Add(copies, c);
+  }
+  std::vector<std::vector<char>> conflict((size_t)n, std::vector<char>((size_t)n, 0));
+  try
+  {
+    BRepExtrema_SelfIntersection si(copies, 2 * defl);
+    si.Perform();
+    if (!si.IsDone())
+      return t;
+    for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator it(si.OverlapElements()); it.More(); it.Next())
+    {
+      const int* a = owner.Seek(si.GetSubShape(it.Key()));
+      for (TColStd_PackedMapOfInteger::Iterator j(it.Value()); j.More(); j.Next())
+      {
+        const int* b = owner.Seek(si.GetSubShape(j.Key()));
+        if (a != nullptr && b != nullptr && *a != *b)
+          conflict[(size_t)*a][(size_t)*b] = conflict[(size_t)*b][(size_t)*a] = 1;
+      }
+    }
+  }
+  catch (const Standard_Failure&)
+  {
+    return t;
+  }
+  // Greedy colouring: each tool joins the first group it touches nothing in.
+  std::vector<std::vector<int>> groups;
+  for (int i = 0; i < n; ++i)
+  {
+    auto g = std::find_if(groups.begin(), groups.end(), [&](const std::vector<int>& m) {
+      return std::none_of(m.begin(), m.end(), [&](int j) { return conflict[(size_t)i][(size_t)j] != 0; });
+    });
+    if (g == groups.end())
+      groups.push_back({i});
+    else
+      g->push_back(i);
+  }
+  if ((int)groups.size() == n)
+    return t;
+  std::vector<TopoDS_Shape> out;
+  for (const std::vector<int>& g : groups)
+  {
+    if (g.size() == 1)
+    {
+      out.push_back(t[(size_t)g[0]]);
+      continue;
+    }
+    TopoDS_Compound c;
+    bb.MakeCompound(c);
+    for (int i : g)
+      bb.Add(c, t[(size_t)i]);
+    out.push_back(c);
+  }
+  return out;
+}
+
 void set_memory_budget_mb(uint64_t mb)
 {
   g_memory_budget_mb.store(mb > 0 ? mb : 4096);
@@ -1579,6 +1670,11 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     if (done)
       return make_result(concat(args.items, tools.items), out, h.get());
   }
+  // Many tools (not a pattern's checked glue, which handles its own): the
+  // ones apart from each other as one argument each group.
+  const size_t n_tools = t.size();
+  if (opts.glue != 3 && facets.source.empty())
+    t = group_disjoint(t);
   b->SetArguments(to_list(a));
   b->SetTools(to_list(t));
   BoolOpts first = opts;
@@ -1586,7 +1682,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     first.glue = 0;
   // Many tools (a knurl's 148 crossing grooves): OCCT's intersection of the
   // pairs runs in parallel.
-  first.parallel = first.parallel || t.size() >= 8;
+  first.parallel = first.parallel || n_tools >= 8;
   apply_opts(*b, first);
   build_cancellable(*b);
   fail_if_cancelled();

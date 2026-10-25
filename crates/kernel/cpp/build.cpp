@@ -287,6 +287,32 @@ std::unique_ptr<OcShape> make_wire(const OcShapeList& edges)
   return wrap(wire_from_edges(edges.items));
 }
 
+// The same wire (its edges, vertices and orientations) with its edges stored
+// in `order` (indices into the wire's edge order): the order sub-shape
+// queries list them in.
+std::unique_ptr<OcShape> wire_with_edge_order(const OcShape& wire, rust::Slice<const uint32_t> order)
+{
+  TopoDS_Wire                src = as_wire(wire.shape, "wire");
+  std::vector<TopoDS_Shape> edges;
+  for (TopExp_Explorer x(src, TopAbs_EDGE); x.More(); x.Next())
+    edges.push_back(x.Current());
+  if (order.size() != edges.size())
+    fail_invalid("edge order must list every edge of the wire once");
+  std::vector<bool> used(edges.size(), false);
+  BRep_Builder      b;
+  TopoDS_Wire       w;
+  b.MakeWire(w);
+  for (uint32_t i : order)
+  {
+    if (i >= edges.size() || used[i])
+      fail_invalid("edge order must list every edge of the wire once");
+    used[i] = true;
+    b.Add(w, edges[i]);
+  }
+  w.Closed(BRep_Tool::IsClosed(src));
+  return wrap(w);
+}
+
 std::unique_ptr<OcShape> make_face_on_plane(const PlaneF& plane, const OcShape& outer,
                                             const OcShapeList& holes)
 {
