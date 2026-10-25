@@ -106,6 +106,7 @@ pub(crate) fn regen_report(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpErro
     let ps = doc::studio(od.doc(), tab)?;
     let mut features = Vec::new();
     let mut failed = Vec::new();
+    let tab_name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
     for f in &ps.features {
         let st = r.display.feature_state(f.id);
         let status = st.map(|s| format!("{:?}", s.status)).unwrap_or_else(|| "NotEvaluated".into());
@@ -120,8 +121,18 @@ pub(crate) fn regen_report(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpErro
             if s.underdefined {
                 v["underdefined"] = json!(true);
             }
+            // A custom feature's FeatureScript notices (the notices panel's Monitor) say why.
+            let fs = custom_output(od.doc(), &tab_name, f);
+            if let Some(o) = &fs {
+                v["notices"] = o["notices"].clone();
+                v["output"] = o["output"].clone();
+            }
             if matches!(s.status, noshape_model::display::FeatureStatus::Error) {
-                failed.push(json!({ "feature": f.id.to_string(), "name": f.name, "message": s.message, "faulty_params": s.faulty }));
+                let mut x = json!({ "feature": f.id.to_string(), "name": f.name, "message": s.message, "faulty_params": s.faulty });
+                if let Some(o) = fs {
+                    x["notices"] = o["notices"].clone();
+                }
+                failed.push(x);
             }
         }
         if f.suppressed {
@@ -136,6 +147,38 @@ pub(crate) fn regen_report(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpErro
         .map(|b| json!({ "id": crate::refs::body_id(&b.id), "name": b.name, "kind": format!("{:?}", b.kind), "hidden": b.hidden }))
         .collect();
     Ok(json!({ "features": features, "parts": parts, "failed": failed, "rollback_index": ps.rollback_index() }))
+}
+
+/// One FeatureScript notice as the Monitor shows it: the message, its
+/// severity and its stack (`at` "line:col", `in` "module (function)"),
+/// innermost first, ending with the Part Studio and feature.
+pub(crate) fn monitor_entry_json(e: &noshape_model::custom::run::MonitorEntry) -> Value {
+    let mut v = json!({
+        "message": e.message,
+        "severity": format!("{:?}", e.severity).to_lowercase(),
+        "stack": e.rows.iter().map(|(at, inside)| if at.is_empty() { json!({ "in": inside }) } else { json!({ "at": at, "in": inside }) }).collect::<Vec<_>>(),
+    });
+    if let Some((_, line, column)) = e.at {
+        v["line"] = json!(line);
+        v["column"] = json!(column);
+    }
+    v
+}
+
+/// The last run of a custom feature in this session: its FeatureScript
+/// notices and `println` output (`None` for other features, or before it
+/// ran). Read after regenerating.
+pub(crate) fn custom_output(d: &noshape_model::document::Document, tab_name: &str, f: &noshape_model::Feature) -> Option<Value> {
+    if !noshape_model::custom::is_custom(&f.type_id) {
+        return None;
+    }
+    let out = noshape_model::custom::run::output_of(f.id)?;
+    if out.notices.is_empty() && out.output.is_empty() {
+        return None;
+    }
+    let last = format!("{tab_name} ({})", out.feature_name);
+    let notices: Vec<Value> = noshape_model::custom::run::notice_entries(d, &out.notices, &last).iter().map(monitor_entry_json).collect();
+    Some(json!({ "notices": notices, "output": out.output }))
 }
 
 /// A feature id or name argument resolved in a studio.

@@ -12,7 +12,7 @@ pub fn ops() -> Vec<Op> {
             group: "history",
             verb: "undo",
             summary: "Undo the last edit",
-            description: "With `tab`, undoes the last edit of that tab (Onshape's undo is per tab); otherwise the last edit of the document.",
+            description: "With `tab`, undoes the last edit of that tab (Onshape's undo is per tab); otherwise the last edit of the document. `description` names the edit undone.",
             fields: vec![doc_field(), opt("tab", s(), "Tab whose edit to undo.")],
             mutates: true,
             destructive: false,
@@ -103,14 +103,16 @@ fn undo(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     set_scope(od, a)?;
     let done = od.session.undo()?;
-    Ok(json!({ "undone": done, "can_undo": od.session.can_undo(), "can_redo": od.session.can_redo() }).into())
+    let what = if done { od.session.last_undone() } else { None };
+    Ok(json!({ "undone": done, "description": what, "can_undo": od.session.can_undo(), "can_redo": od.session.can_redo() }).into())
 }
 
 fn redo(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     set_scope(od, a)?;
     let done = od.session.redo()?;
-    Ok(json!({ "redone": done, "can_undo": od.session.can_undo(), "can_redo": od.session.can_redo() }).into())
+    let what = if done { od.session.last_redone() } else { None };
+    Ok(json!({ "redone": done, "description": what, "can_undo": od.session.can_undo(), "can_redo": od.session.can_redo() }).into())
 }
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

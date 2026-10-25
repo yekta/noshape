@@ -3069,3 +3069,213 @@ fn draft_and_flatten_analysis() {
     let e = try_call(&mut ctx, "analysis_flatten", json!({ "faces": ["plane:top"] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("faces[0]"), "{e:?}");
 }
+
+/// An Assembly exported as STEP keeps the assembly (root product, each part
+/// once, placed by its instances), and importing it gives back an Assembly
+/// and a "<file> parts" Part Studio with the parts in their own coordinates
+/// (live qa4 r4 s5).
+#[test]
+fn step_assembly_export_and_import_round_trip() {
+    let mut ctx = Ctx::new();
+    let (_, pin) = two_part_assembly(&mut ctx, "step_asm.noshape");
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [0, 0, 30], "axis": [0, 0, 1], "angle": "90 deg" }));
+    let placed = |ctx: &mut Ctx, tab: &str, name: &str| call(ctx, "assembly_list", json!({ "tab": tab }))["instances"].as_array().unwrap().iter().find(|i| i["name"] == name).unwrap_or_else(|| panic!("no {name} in {tab}")).clone();
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let name_of = |id: &str| list["instances"].as_array().unwrap().iter().find(|i| i["id"] == id).unwrap()["name"].as_str().unwrap().to_string();
+    let pin_name = name_of(&pin);
+    let pin_before = placed(&mut ctx, "Assembly 1", &pin_name);
+
+    let file = scratch("step_asm_out.step");
+    let e = call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "STEP", "file": file.to_str().unwrap() }));
+    assert_eq!(e["parts"], 2, "{e}");
+    let text = std::fs::read_to_string(&file).unwrap();
+    assert!(text.contains("PRODUCT('Assembly 1','Assembly 1','Assembly 1'"), "the root product");
+    assert_eq!(text.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 2);
+    assert_eq!(text.matches("MANIFOLD_SOLID_BREP(").count() + text.matches("BREP_WITH_VOIDS(").count(), 2, "each part once");
+
+    let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+    let tabs: Vec<(String, String)> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
+    assert_eq!(tabs.len(), 2, "{r}");
+    assert!(tabs.contains(&("Assembly 1 (1)".to_string(), "Assembly".to_string())), "{r}");
+    assert!(tabs.contains(&("step_asm_out parts".to_string(), "Part Studio".to_string())), "{r}");
+    // The parts in the reverse of the file's order, in their own coordinates.
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "step_asm_out parts" }));
+    let names: Vec<&str> = parts["parts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["Part 2", "Part 1"], "{parts}");
+    let pin_part = &parts["parts"][0];
+    assert!((num(&pin_part["bounding_box"]["min"][0]) - 55.0).abs() < 1e-3 && (num(&pin_part["bounding_box"]["max"][2]) - 50.0).abs() < 1e-3, "the pin where its Part Studio has it: {pin_part}");
+    // The instances where the assembly had them.
+    let pin_after = placed(&mut ctx, "Assembly 1 (1)", "Part 2 <1>");
+    for i in 0..3 {
+        assert!((num(&pin_after["translation"][i]) - num(&pin_before["translation"][i])).abs() < 1e-6, "{pin_after} vs {pin_before}");
+    }
+    for i in 0..4 {
+        assert!((num(&pin_after["rotation"][i]).abs() - num(&pin_before["rotation"][i]).abs()).abs() < 1e-6, "{pin_after} vs {pin_before}");
+    }
+    let block_after = placed(&mut ctx, "Assembly 1 (1)", "Part 1 <1>");
+    assert!(block_after["translation"].as_array().unwrap().iter().all(|v| num(v).abs() < 1e-6), "{block_after}");
+}
+
+/// Live's own STEP assembly (qa4 r4 s5): the tabs, parts and placements live makes.
+#[test]
+fn step_assembly_import_matches_live() {
+    let Some(step) = live_sample("qa4-s5-asm.step") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("qa4_s5.noshape").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let mut tabs: Vec<String> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    tabs.sort();
+    // " (1)": the document already has an Assembly 1.
+    assert_eq!(tabs, ["Assembly 1 (1)", "qa4-s5-asm parts"], "{r}");
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "qa4-s5-asm parts" }));
+    let names: Vec<&str> = parts["parts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["Part 2", "Part 3", "Part 1"], "{parts}");
+    // Each part at its own part position (live).
+    let bbox = |n: &str| {
+        let p = parts["parts"].as_array().unwrap().iter().find(|p| p["name"] == n).unwrap();
+        (0..3).map(|i| num(&p["bounding_box"]["min"][i])).chain((0..3).map(|i| num(&p["bounding_box"]["max"][i]))).collect::<Vec<f64>>()
+    };
+    for (n, want) in [("Part 1", [0.0, 0.0, 0.0, 100.0, 60.0, 10.0]), ("Part 2", [195.0, -5.0, 0.0, 205.0, 5.0, 40.0]), ("Part 3", [300.0, 0.0, 0.0, 320.0, 20.0, 20.0])] {
+        let got = bbox(n);
+        assert!(got.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-3), "{n}: {got:?}");
+    }
+    // The assembly places them as the file does: Part 3 at (-210, 0, 10) from its part position.
+    let asm = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1 (1)" }));
+    let p3 = asm["instances"].as_array().unwrap().iter().find(|i| i["name"] == "Part 3 <1>").unwrap_or_else(|| panic!("{asm}"));
+    let t: Vec<f64> = (0..3).map(|i| num(&p3["translation"][i])).collect();
+    assert!((t[0] + 210.0).abs() < 1e-6 && t[1].abs() < 1e-6 && (t[2] - 10.0).abs() < 1e-6, "{p3}");
+    assert_eq!(asm["instances"].as_array().unwrap().len(), 3, "{asm}");
+}
+
+/// Two different parts with the same name (common in STEP files: "Part",
+/// "Body", "SOLID"): each imported instance gets its own part's geometry,
+/// not the first part of that name.
+#[test]
+fn step_assembly_parts_sharing_a_name_keep_their_geometry() {
+    let mut ctx = Ctx::new();
+    let (block, pin) = two_part_assembly(&mut ctx, "step_same_names.noshape");
+    for p in call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"].as_array().unwrap().clone() {
+        call(&mut ctx, "part_rename", json!({ "tab": "Part Studio 1", "part": p["id"], "name": "Part" }));
+    }
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [0, 0, 30] }));
+    let before = call(&mut ctx, "assembly_list", json!({}));
+    let at = |list: &Value, id: &str| -> Vec<f64> { (0..3).map(|i| num(&list["instances"].as_array().unwrap().iter().find(|x| x["id"] == id).unwrap()["translation"][i])).collect() };
+    let (block_at, pin_at) = (at(&before, &block), at(&before, &pin));
+
+    let file = scratch("same_names.step");
+    call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "STEP", "file": file.to_str().unwrap() }));
+    call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "same_names parts" }));
+    let list = parts["parts"].as_array().unwrap().clone();
+    assert_eq!(list.len(), 2, "{parts}");
+    assert!(list.iter().all(|p| p["name"] == "Part"), "both keep the file's name: {parts}");
+    // Each instance's part: the pin's is the Ø10 cylinder at x 55..65, the block's the 40 mm block.
+    let asm = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1 (1)" }));
+    let instances = asm["instances"].as_array().unwrap().clone();
+    assert_eq!(instances.len(), 2, "{asm}");
+    let part_of = |i: &Value| list.iter().find(|p| p["id"] == i["source"]["part"]).unwrap_or_else(|| panic!("{i}")).clone();
+    let near = |i: &Value, t: &[f64]| (0..3).all(|k| (num(&i["translation"][k]) - t[k]).abs() < 1e-6);
+    let pin_i = instances.iter().find(|i| near(i, &pin_at)).unwrap_or_else(|| panic!("no instance at the pin's place: {asm}"));
+    let block_i = instances.iter().find(|i| near(i, &block_at)).unwrap_or_else(|| panic!("no instance at the block's place: {asm}"));
+    let (pp, bp) = (part_of(pin_i), part_of(block_i));
+    assert_ne!(pp["id"], bp["id"], "two different parts: {asm}");
+    assert!((num(&pp["bounding_box"]["min"][0]) - 55.0).abs() < 1e-3 && (num(&pp["bounding_box"]["max"][0]) - 65.0).abs() < 1e-3, "the pin instance shows the pin: {pp}");
+    assert!((num(&bp["bounding_box"]["min"][0]) + 20.0).abs() < 1e-3 && (num(&bp["bounding_box"]["max"][0]) - 20.0).abs() < 1e-3, "the block instance shows the block: {bp}");
+}
+
+/// The parts and instances of an imported STEP assembly in live's order
+/// (behaviours.md "api (10-25) STEP assembly part order"): occurrences
+/// walked from the file's last, each product one part at its first
+/// occurrence, a product used twice one part with two instances.
+#[test]
+fn step_assembly_import_order_matches_live() {
+    for (file, want_parts, want_instances) in [
+        ("stepord-ABCD.step", &["C", "B", "A", "D"][..], &["C <1>", "B <1>", "A <1>", "D <1>"][..]),
+        ("stepord-ABBCD.step", &["B", "A", "C", "D"][..], &["B <1>", "A <1>", "C <1>", "D <1>", "B <2>"][..]),
+    ] {
+        let Some(step) = live_sample(file) else { return };
+        let stem = file.trim_end_matches(".step");
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": scratch(&format!("{stem}.noshape")).to_str().unwrap() }));
+        let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+        let parts = call(&mut ctx, "query_parts", json!({ "tab": format!("{stem} parts") }));
+        let names: Vec<&str> = parts["parts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+        assert_eq!(names, want_parts, "{file}: {parts}");
+        let root = format!("stepord {}", stem.trim_start_matches("stepord-"));
+        let asm = call(&mut ctx, "assembly_list", json!({ "tab": root }));
+        let instances: Vec<&str> = asm["instances"].as_array().unwrap_or_else(|| panic!("{r}")).iter().map(|i| i["name"].as_str().unwrap()).collect();
+        assert_eq!(instances, want_instances, "{file}: {asm}");
+        // Both B instances show the one B part.
+        let b: Vec<&Value> = asm["instances"].as_array().unwrap().iter().filter(|i| i["name"].as_str().unwrap().starts_with("B <")).collect();
+        assert!(b.iter().all(|i| i["source"]["part"] == b[0]["source"]["part"]), "{file}: {asm}");
+    }
+}
+
+/// The agent-usability pass (AGENT_API.md "Lessons from agent runs"): an L
+/// bracket built the way an agent does, using the helps that came out of it:
+/// `at` and `direction` picks, model points on a turned face sketch, sketch
+/// edits reporting failures, undo naming the edit, tidy numbers, feature type
+/// search and projected view orientations.
+#[test]
+fn agent_usability_pass() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("agent_pass.noshape").to_str().unwrap() }));
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:right" }));
+    let s = call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "line", "points": [[0, 0], [50, 0], [50, 40], [44, 40], [44, 6], [0, 6], [0, 0]] }));
+    let region = s["regions"][0]["id"].clone();
+    assert_eq!(s["failed"], json!([]), "{s}");
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "80 mm" } }));
+
+    // Three different edges in one call, in the points' order.
+    let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "at": [[0, 0, 3], [80, 0, 3], [40, 44, 6]] }));
+    let mids: Vec<Value> = e["edges"].as_array().unwrap().iter().map(|x| x["midpoint"].clone()).collect();
+    assert_eq!(mids, [json!([0.0, 0.0, 3.0]), json!([80.0, 0.0, 3.0]), json!([40.0, 44.0, 6.0])], "{e}");
+    // A point on a face picks it; one on the edge two faces share, the face whose centroid is closer.
+    let f = call(&mut ctx, "query_entities", json!({ "kind": "faces", "at": [[40, 25, 6], [40, 0, 6]] }));
+    assert_eq!(f["faces"][0]["normal"], json!([0.0, 0.0, 1.0]), "{f}");
+    assert_eq!(f["faces"][1]["normal"], json!([0.0, -1.0, 0.0]), "{f}");
+    // Vertical edges only.
+    let v = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [0, 0, 1] }));
+    let list = v["edges"].as_array().unwrap();
+    assert_eq!(list.len(), 6, "{v}");
+    assert!(list.iter().all(|x| num(&x["direction"][2]).abs() == 1.0), "{v}");
+    // No floating-point noise in replies.
+    assert!(!v.to_string().contains("-0.0"), "{v}");
+
+    // Hole points given as model positions on the base's top face, whatever its sketch axes.
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "at": [[40, 22, 6]] }))["faces"][0]["id"].clone();
+    call(&mut ctx, "sketch_create", json!({ "plane": top }));
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 2", "tool": "point", "points": [[10, 10, 6], [70, 10, 6], [10, 34, 6], [70, 34, 6]] }));
+    let pts: Vec<Value> = p["created"].as_array().unwrap().iter().map(|x| x["id"].clone()).collect();
+    assert_eq!(pts.len(), 4, "{p}");
+    let fr = &p["frame"];
+    let world = |at: &Value| (0..3).map(|i| num(&fr["origin"][i]) + num(&at[0]) * num(&fr["x"][i]) + num(&at[1]) * num(&fr["y"][i])).collect::<Vec<f64>>();
+    let first = world(&p["created"][0]["at"]);
+    assert!((first[0] - 10.0).abs() < 1e-9 && (first[1] - 10.0).abs() < 1e-9 && (first[2] - 6.0).abs() < 1e-9, "{p}");
+    let hole = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": pts, "holeDiameterV3": "6.6 mm", "endStyleV2": "THROUGH" } }));
+    assert_eq!(hole["regeneration"]["failed"], json!([]), "{hole}");
+    let vol = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((vol - (40320.0 - 4.0 * std::f64::consts::PI * 3.3 * 3.3 * 6.0)).abs() < 1e-3, "{vol}");
+
+    // Undo names the edit it undid; redo puts it back.
+    let u = call(&mut ctx, "history_undo", json!({}));
+    assert!(u["description"].as_str().unwrap().ends_with("Hole 1"), "{u}");
+    let r = call(&mut ctx, "history_redo", json!({}));
+    assert!(r["description"].as_str().unwrap().ends_with("Hole 1"), "{r}");
+
+    // Sketch edits report the features that fail after them (none here: the hole follows its face).
+    let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": "Sketch 1", "kind": "distance", "entities": [s["created"][2]["id"], s["created"][10]["id"]], "value": "6 mm" }));
+    let dim = d["dimension"].clone();
+    let ok = call(&mut ctx, "sketch_set_dimension", json!({ "sketch": "Sketch 1", "dimension": dim, "value": "8 mm" }));
+    assert_eq!(ok["failed"], json!([]), "{ok}");
+
+    // Finding a feature type by words.
+    let t = call(&mut ctx, "feature_types", json!({ "search": "move face" }));
+    assert_eq!(t["feature_types"].as_array().unwrap().iter().map(|x| x["type"].as_str().unwrap()).collect::<Vec<_>>(), ["moveFace"], "{t}");
+
+    // Projected views name what they look along.
+    call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": "Part Studio 1 Drawing 1" }));
+    let projected: Vec<&Value> = g["views"].as_array().unwrap().iter().filter(|v| v["kind"] == "projected").collect();
+    assert!(!projected.is_empty() && projected.iter().all(|v| v["orientation"].is_string()), "{g}");
+}

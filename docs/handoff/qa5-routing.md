@@ -298,6 +298,31 @@ STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty s
   hole-free face, flattens exactly (1 loop, areas equal, 40 × 80 mm). Expected: an identical flat face (no strain), 2 loops.
   `noshape_model::flatten::flatten_faces` (moved verbatim from the app's flatten_tool.rs; the app's Flatten surfaces is the same).
   Repro: `analysis_flatten {"faces": [<top face id>]}` on `block_with_hole` (ops e2e).
+STATUS STEP-ASM (api, 2026-10-25): fixed on ready/api — a STEP whose root product is an assembly imports as the Assembly "<root
+product>" (" (1)" when taken) + Part Studio "<file> parts" with the parts in their own coordinates, listed in the reverse of the
+file's order, the Assembly placing them as the file does (e2e step_assembly_import_matches_live on samples/qa4-s5-asm.step). An
+Assembly exported as STEP now keeps the assembly (root product, each part once, NAUO placements; export_parts on an Assembly tab).
+The BOM element ("BOM : Assembly 1 (1)") stays hidden (IM1b). Part order in assemblies rests on this one file: live request filed.
+STATUS STEP-ASM (api, 2026-10-25 b): the STEP/PVZ assembly import matches instances to parts by the file's product (no longer
+by name: two parts named "Part" keep their own geometry; e2e step_assembly_parts_sharing_a_name_keep_their_geometry); parts
+ordered as live walks a STEP assembly (occurrences from the file's last, one part per product at its first occurrence; e2e
+step_assembly_import_order_matches_live on samples/stepord-ABCD / ABBCD). Export details: binary STL header 80 zero bytes;
+Parasolid modeller 3801231 in every version and SCH_3801231_38101 (EXP-HDR / I5 closed); STEP products already follow their
+first NAUO as live; text STL as live's UI file ("solid Mesh", 2/4/6 indents, shortest numbers). Not reproducible: live's
+NAUO order on export is a fixed internal order that follows no recoverable key (not insertion, ids, hashes or part ids; "api
+(10-25 b)"), so ours keeps the insertion order.
+
+## MOVEFACE-TANGENT — psb — Move face of a face tangent to fillets moves the whole part
+- api agent-usability pass, 2026-10-25: import samples/g47-1part.step (40 × 20 × 10 block with filleted edges); Move face
+  (Offset 5 mm, or Translate 5 mm along the face) of the +X end face (`query_entities {"kind":"faces","normal":[1,0,0]}`):
+  the part grows 5 mm on every side but the bottom (bbox −5…45 × −5…25 × 0…15, 18739.63 mm³ from 7582.71), status Ok. On a
+  plain 40 × 20 × 10 box the same call gives x 0…45, 9000 mm³ (right). Expected (Onshape): only the end face moves, the
+  fillets touching it are re-rolled ("Reapply fillet", default on). Same area as FSW-move.
+
+## BBOX-TOL — kern — query bounding boxes of imported parts grow by the shape tolerance
+- api, 2026-10-25: the imported g47-1part block reports bbox 0…40.0001 × 0…20.0001 × 0…10.0001 (`Shape::bounding_box(true)`
+  adds the 1e-7 m vertex/edge tolerance); native parts are exact. Onshape reports the exact box. Used by query_parts
+  and anything showing a part's size.
 ## IMP-DENS — api — "Import material density" offered for STEP files (main, since 5d5e0403)
 - Source: qa4 QA round 4 session 5 in the app (2026-10-24). `crates/app/src/import_dialog.rs` `density` includes "step"/"stp".
 - Expected (live): behaviours "qa4 round 4 s5": "For STEP there is **no 'Import material density'** checkbox (an .x_t import
