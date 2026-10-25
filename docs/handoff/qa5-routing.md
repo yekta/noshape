@@ -321,6 +321,7 @@ STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF i
   Part 1, each at its **own product position** (the assembly places the instances). Ours: one Part Studio "qa4-s5-asm", parts
   Part 1, Part 3, Part 2 at the assembly's positions, no assembly. (PVZ: IM1, kern row, is the same gap.)
 - Export details (minor): STL binary header "noshape-kernel st…" (live 80 zero bytes); STEP product order; Parasolid header = EXP-HDR.
+STATUS KS1 (2026-10-25, ui): the ↗ page has been on main since 97c4895c (two columns, legend, footer; the modal stays open). ready/ui adds the opener's size and live's lock spacing.
 STATUS SF2 (kern, 2026-10-24): fixed: a New extrude of several regions fuses them and unifies the faces left on one
 surface (eval.rs `fuse_named`); test kernel_robustness `adjacent_regions_extrude_without_a_seam` (8000 mm³, 6 faces).
 STATUS SF5 (kern, 2026-10-24): fixed: Move boundary on some edges of a planar straight-edged surface moves only those

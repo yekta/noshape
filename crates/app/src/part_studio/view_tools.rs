@@ -382,12 +382,12 @@ impl PartStudioView {
                 .child(
                     h_flex()
                         .flex_1()
-                        .gap_1()
                         .text_size(px(14.))
                         .text_color(pal.text)
                         .child(r.name)
+                        // Live: the lock's 20 px box right after the name (4 px blank before the glyph).
                         .when(r.locked, |d| d.child(crate::assets::icon("lock", 20., cx)))
-                        .when(r.conflict, |d| d.child(crate::assets::icon("shortcut-conflict", 16., cx))),
+                        .when(r.conflict, |d| d.child(div().ml_1().child(crate::assets::icon("shortcut-conflict", 16., cx)))),
                 )
         });
         let tabs = Tab::SHEET.iter().enumerate().map(|(i, t)| {
@@ -399,11 +399,11 @@ impl PartStudioView {
                 .cursor_pointer()
                 .text_size(px(14.))
                 .relative()
-                .text_color(if on { pal.accent } else { pal.text })
+                .text_color(if on { pal.emphasis } else { pal.text })
                 .when(on, |d| d.font_weight(FontWeight::MEDIUM))
                 .child(t.label())
                 // Live: the active tab's 2 px underline sits on the bar's 1 px line.
-                .when(on, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(3.)).bg(pal.accent)))
+                .when(on, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(3.)).bg(pal.emphasis)))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     this.ui.shortcut_tab = i;
                     this.ui.shortcut_scroll.set_offset(point(px(0.), px(0.)));
@@ -477,14 +477,15 @@ impl PartStudioView {
                                 .gap(px(6.))
                                 .border_b_1()
                                 .border_color(pal.border)
-                                // Live (menus/616): #555, 12 px in.
-                                .child(div().ml(px(2.)).text_size(px(19.)).text_color(gpui_kit::rgb(0x555555)).child("Keyboard shortcuts"))
+                                // Live (menus/616): #555 (#d7d7d7 in dark, 2446), 12 px in.
+                                .child(div().ml(px(2.)).text_size(px(19.)).text_color(crate::theme::themed(0x555555, 0xd7d7d7)).child("Keyboard shortcuts"))
                                 .child(
                                     div()
                                         .id("sc-customize")
                                         .text_size(px(12.))
                                         .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(pal.accent)
+                                        // Live: #094174 (616), #b2ddf6 in dark (2446).
+                                        .text_color(crate::theme::themed(0x094174, 0xb2ddf6))
                                         .cursor_pointer()
                                         .child("Customize keyboard shortcuts")
                                         // Onshape opens the account Preferences page (a new tab)
@@ -581,7 +582,10 @@ impl PartStudioView {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let v = st.read(cx).value().to_string();
                 this.renaming = None;
-                if !v.trim().is_empty() {
+                // Live (qa4 r5 s8 (5)): an empty name goes back to the
+                // feature's default name ("Fillet 2"); unchanged, nothing.
+                let old = this.studio(cx).and_then(|s| s.feature(id)).map(|f| f.name.clone()).unwrap_or_default();
+                if v.trim() != old {
                     this.doc.update(cx, |doc, cx| {
                         doc.edit_studio(this.tab, &noshape_ops::studio::rename_description(&v), cx, |ps| noshape_ops::studio::rename_feature(ps, id, &v));
                     });
