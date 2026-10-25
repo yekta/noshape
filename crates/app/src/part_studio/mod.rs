@@ -1787,6 +1787,49 @@ impl PartStudioView {
         });
     }
 
+    /// Feature-list autoscroll while a row or the rollback bar is dragged
+    /// (live "psb (10-24 k)"): the speed for the pointer's height, kept while
+    /// the pointer rests; one frame loop scrolls until the drag ends or the
+    /// pointer leaves the edge zones, stopping at the list's ends.
+    fn list_autoscroll(&mut self, y: Pixels, list: Bounds<Pixels>, cx: &mut Context<Self>) {
+        self.ui.list_autoscroll = behaviors::list_autoscroll_speed(f32::from(y), f32::from(list.top()), f32::from(list.bottom()));
+        if self.ui.list_autoscroll == 0.0 || self.ui.list_autoscrolling {
+            return;
+        }
+        self.ui.list_autoscrolling = true;
+        cx.spawn(async move |this, cx| {
+            let mut last = std::time::Instant::now();
+            loop {
+                cx.background_executor().timer(Duration::from_millis(16)).await;
+                let now = std::time::Instant::now();
+                let dt = (now - last).as_secs_f32();
+                last = now;
+                let go = this.update(cx, |this, cx| {
+                    let v = this.ui.list_autoscroll;
+                    if v == 0.0 || !cx.has_active_drag() {
+                        this.ui.list_autoscroll = 0.0;
+                        this.ui.list_autoscrolling = false;
+                        return false;
+                    }
+                    let s = &this.ui.list_scroll;
+                    let mut o = s.offset();
+                    let max = f32::from(s.max_offset().y).max(0.0);
+                    let y = (f32::from(o.y) - v * dt).clamp(-max, 0.0);
+                    if y != f32::from(o.y) {
+                        o.y = px(y);
+                        s.set_offset(o);
+                        cx.notify();
+                    }
+                    true
+                });
+                if !matches!(go, Ok(true)) {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
     fn set_rollback(&mut self, index: Option<usize>, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, noshape_ops::studio::ROLLBACK_DESCRIPTION, cx, |ps| noshape_ops::studio::set_rollback(ps, index));
@@ -2676,7 +2719,19 @@ impl PartStudioView {
         if skipped > 0 {
             rows.push(div().h(px(row_h * skipped as f32)).flex_none().into_any_element());
         }
-        v_flex().id("feature-list").key_context("FeatureList").track_focus(&self.ui.list_focus).track_scroll(&self.ui.list_scroll).size_full().overflow_y_scroll().children(rows).child(
+        v_flex()
+            .id("feature-list")
+            .key_context("FeatureList")
+            .track_focus(&self.ui.list_focus)
+            .track_scroll(&self.ui.list_scroll)
+            .size_full()
+            .overflow_y_scroll()
+            // Autoscroll (live: the bar and rows alike, also with the pointer
+            // beside the panel; only its height counts).
+            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<RollbackDrag>, _, cx| this.list_autoscroll(e.event.position.y, e.bounds, cx)))
+            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<FeatureDrag>, _, cx| this.list_autoscroll(e.event.position.y, e.bounds, cx)))
+            .children(rows)
+            .child(
             // Space below the last feature: dropping the rollback bar
             // here rolls it to the end (otherwise it could only be
             // dragged up, and back down to above the last feature).
@@ -3772,7 +3827,9 @@ impl PartStudioView {
         };
         let row = crate::ui::with_lazy_side_tooltip(row, anchor, tip);
         let view = cx.entity();
-        let is_last = i + 1 >= self.row_ctx.n_features;
+        // Where the rollback bar is (rows from it on are rolled back) and
+        // whether a feature dialog is open, for the roll items.
+        let (rollback_at, n_features, dialog_open) = (self.row_ctx.rollback, self.row_ctx.n_features, self.edit.is_some());
         let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, typed_name(g)))));
         let feature_name = f.name.clone();
         // A Derived feature's source studio ("Switch to qa5 src", live "qa5
@@ -3871,7 +3928,22 @@ impl PartStudioView {
                 })));
                 return appearance(m.separator()).separator().item(delete);
             }
-            let mut m = menu.item(item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)))).separator().item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
+            let rename = item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)));
+            let roll_here = || item("Roll to here", Box::new(move |this, _, cx| this.set_rollback(Some(i + 1), cx)));
+            let roll_end = || item("Roll to end", Box::new(|this, _, cx| this.set_rollback(None, cx)));
+            if rolled_back {
+                // Live "qa4 round 5 s2 rollback follow-up": a rolled-back
+                // feature has no Edit…, Zoom to selection, Show dependencies…
+                // or appearance and gains Roll to here / Roll to end; with a
+                // feature dialog open only Rename and the suppression items
+                // (R5-S3-b). ("Add comment" is cloud, not built.)
+                if dialog_open {
+                    return dynamic(menu.item(rename).separator().item(suppress), window, cx);
+                }
+                let m = dynamic(menu.item(rename).separator().item(folder).separator().item(suppress), window, cx);
+                return m.separator().item(roll_here()).item(roll_end()).separator().item(delete);
+            }
+            let mut m = menu.item(rename).separator().item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
             if let Some((sid, sname)) = source_sketch.clone() {
                 m = m.item(item(&format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))));
             }
@@ -3933,8 +4005,15 @@ impl PartStudioView {
                 this.ui.dependencies = Some(id);
                 cx.notify();
             })));
-            if !is_last {
-                m = m.separator().item(item("Roll to here", Box::new(move |this, _, cx| this.set_rollback(Some(i + 1), cx))));
+            let (here, to_end) = behaviors::roll_items(i, rollback_at, n_features);
+            if here || to_end {
+                m = m.separator();
+                if here {
+                    m = m.item(roll_here());
+                }
+                if to_end {
+                    m = m.item(roll_end());
+                }
             }
             if is_sketch || makes_faces {
                 m = appearance(m.separator());

@@ -857,6 +857,47 @@ fn feature_pattern_of_a_hole_keeps_the_part() {
     assert!(near(total_volume(&r.context), before, 1e-9), "and the part is unchanged");
 }
 
+/// Live "qa4 round 5 v2 s1 follow-up" (2): a Ø6 through Hole at (3, 10) on
+/// the block's top, tangent to the x = 0 face, fails with hole.fs's
+/// HOLE_CUT_FAIL text and cuts nothing. A Reapply pattern of it along −y
+/// (4 mm × 4) is OK and silently skips the tangent copies (y 6, 2): only
+/// the one at y −2 notches the front face (a 3.0975 mm² segment × 15 mm).
+#[test]
+fn tangent_hole_fails_and_its_reapplied_pattern_cuts_the_good_copies() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.08, 0.05, "15 mm");
+    let pl = t.top_plane("15 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.003, 0.01));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let locs = q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }]);
+    let hole = t.add("hole", &[("locations", locs), ("unitsSystem", en("METRIC")), ("styleV2", en("SIMPLE")), ("endStyleV2", en("THROUGH")), ("holeDiameterV3", e("6 mm"))]);
+    let block = 0.08 * 0.05 * 0.015;
+    let r = t.regen();
+    let st = r.display.features.last().unwrap();
+    assert!(matches!(st.status, FeatureStatus::Error), "{:?}", st.status);
+    assert_eq!(st.message.as_deref(), Some("Hole creates invalid geometry."));
+    assert!(near(total_volume(&r.context), block, 1e-9));
+    t.add(
+        "linearPattern",
+        &[
+            ("patternType", en("FEATURE")),
+            ("instanceFunction", q(vec![Reference::Feature(hole)])),
+            // The Front plane's normal is −y.
+            ("directionOne", q(vec![Reference::Plane(DatumPlane::Front)])),
+            ("distance", e("4 mm")),
+            ("instanceCount", e("4")),
+            ("fullFeaturePattern", b(true)),
+        ],
+    );
+    let r = t.regen();
+    let st = r.display.features.last().unwrap();
+    assert!(matches!(st.status, FeatureStatus::Ok), "{:?}: {:?}", st.status, st.message);
+    let notch = (9.0 * (2.0f64 / 3.0).acos() - 2.0 * 5f64.sqrt()) * 15.0 * 1e-9;
+    let removed = block - total_volume(&r.context);
+    assert!(near(removed, notch, 1e-6), "removed {} mm³, live 46.462", removed * 1e9);
+}
+
 fn hole_pattern_case() {
     let mut t = T::new();
     let (_, block) = t.block(0.0, 0.0, 0.1, 0.05, "30 mm");

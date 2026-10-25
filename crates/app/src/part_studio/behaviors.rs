@@ -91,6 +91,10 @@ pub struct UiState {
     /// The feature list's scroll position and size (qa4: rows out of view
     /// are drawn as empty rows, `render_feature_list`).
     pub list_scroll: ScrollHandle,
+    /// Feature-list autoscroll while a row or the rollback bar is dragged:
+    /// px/s (positive down) and whether its loop is running.
+    pub list_autoscroll: f32,
+    pub list_autoscrolling: bool,
     /// The rollback bar took the keyboard (↑/↓ or a click on it) while these
     /// features were selected; it reads light blue until the selection changes.
     pub rollback_keyboard: Option<Vec<noshape_model::reference::FeatureId>>,
@@ -382,6 +386,8 @@ impl UiState {
             last_click: None,
             list_focus: cx.focus_handle(),
             list_scroll: ScrollHandle::new(),
+            list_autoscroll: 0.0,
+            list_autoscrolling: false,
             rollback_keyboard: None,
             dependencies: None,
             cube_hover: None,
@@ -3324,6 +3330,56 @@ impl PartStudioView {
     }
 }
 
+/// The roll items of a feature row's menu, (Roll to here, Roll to end), for
+/// row `i` with the rollback bar before row `rollback_at` (live "qa4 round 5
+/// s2 rollback follow-up"): Roll to here unless the bar is right below the
+/// feature, Roll to end while the bar isn't at the end.
+pub(super) fn roll_items(i: usize, rollback_at: usize, n_features: usize) -> (bool, bool) {
+    (rollback_at != i + 1, rollback_at < n_features)
+}
+
+/// The feature list's drag autoscroll (live "psb (10-24 k)"): px/s for a
+/// pointer at `y` over a list spanning `top..bottom` (window px), positive
+/// scrolling down. Only the vertical distance counts, also with the pointer
+/// beside the panel. Live's measured speeds (± 15 %), by the distance inside
+/// the edge (negative = past it), mean of the top and bottom edges.
+pub(super) fn list_autoscroll_speed(y: f32, top: f32, bottom: f32) -> f32 {
+    const TABLE: [(f32, f32); 12] = [
+        (-192.0, 600.0),
+        (-40.0, 370.0),
+        (-10.0, 210.0),
+        (0.0, 206.0),
+        (2.0, 205.0),
+        (10.0, 202.0),
+        (20.0, 193.0),
+        (30.0, 191.0),
+        (50.0, 175.0),
+        (58.0, 150.0),
+        (70.0, 33.0),
+        (75.0, 0.0),
+    ];
+    let speed = |d: f32| -> f32 {
+        if d >= TABLE[TABLE.len() - 1].0 {
+            return 0.0;
+        }
+        if d <= TABLE[0].0 {
+            // On past the farthest sample at the last segment's slope.
+            let ((d0, v0), (d1, v1)) = (TABLE[0], TABLE[1]);
+            return v0 + (d - d0) * (v1 - v0) / (d1 - d0);
+        }
+        let k = TABLE.windows(2).position(|w| d >= w[0].0 && d <= w[1].0).unwrap_or(0);
+        let ((d0, v0), (d1, v1)) = (TABLE[k], TABLE[k + 1]);
+        v0 + (d - d0) * (v1 - v0) / (d1 - d0)
+    };
+    if bottom - top <= 0.0 {
+        return 0.0;
+    }
+    // The nearer edge decides (a list shorter than two zones: no overlap
+    // issue, the closer edge wins).
+    let (to_top, to_bottom) = (y - top, bottom - y);
+    if to_bottom <= to_top { speed(to_bottom) } else { -speed(to_top) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3403,5 +3459,48 @@ mod field_point_tests {
         assert!(field_takes_points(QueryFilter::POINT_LIKE));
         assert!(field_takes_points(QueryFilter::MATE_CONNECTOR));
         assert!(field_takes_points(QueryFilter::SKETCH_POINT | QueryFilter::MATE_CONNECTOR));
+    }
+}
+
+#[cfg(test)]
+mod roll_item_tests {
+    use super::roll_items;
+    #[test]
+    fn roll_items_as_live() {
+        // 30 features, the bar just under Extrude 1 (row 1).
+        assert_eq!(roll_items(1, 2, 30), (false, true), "Extrude 1: Roll to end only");
+        assert_eq!(roll_items(29, 2, 30), (true, true), "Chamfer 5, rolled back");
+        assert_eq!(roll_items(20, 2, 30), (true, true), "Fillet 5, rolled back");
+        // The bar at the end.
+        assert_eq!(roll_items(29, 30, 30), (false, false), "the last feature: neither");
+        assert_eq!(roll_items(10, 30, 30), (true, false), "a middle feature: Roll to here");
+    }
+}
+
+#[cfg(test)]
+mod autoscroll_tests {
+    use super::list_autoscroll_speed as v;
+    // Live's list: y 144..708.
+    const T: f32 = 144.0;
+    const B: f32 = 708.0;
+    fn within(got: f32, want: f32) -> bool {
+        (got - want).abs() <= 0.15 * want.abs()
+    }
+    #[test]
+    fn autoscroll_speeds_as_live() {
+        // Bottom edge: live px/s by the distance above (+) / below (−) it.
+        for (d, want) in [(70.0, 33.0), (50.0, 172.0), (30.0, 191.0), (20.0, 192.0), (10.0, 201.0), (2.0, 204.0), (-10.0, 203.0), (-40.0, 385.0), (-192.0, 600.0), (58.0, 155.0)] {
+            let got = v(B - d, T, B);
+            assert!(within(got, want), "{d} above the bottom: {got} vs live {want}");
+        }
+        // Top edge (scrolling up).
+        for (d, want) in [(50.0, -177.0), (20.0, -194.0), (10.0, -203.0), (2.0, -207.0), (-10.0, -219.0), (-40.0, -347.0), (56.0, -142.0)] {
+            let got = v(T + d, T, B);
+            assert!(within(got, want), "{d} below the top: {got} vs live {want}");
+        }
+        // No autoscroll mid-list or 100 px inside an edge.
+        for y in [450.0, B - 100.0, B - 150.0, T + 100.0] {
+            assert_eq!(v(y, T, B), 0.0, "y {y}");
+        }
     }
 }

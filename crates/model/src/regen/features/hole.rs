@@ -314,13 +314,38 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         // Ray from far behind the location so bodies around it are seen.
         let back = extent;
         let origin = loc.point - dir * back;
-        let hits: Vec<(usize, Vec<(f64, f64)>)> = candidates
-            .iter()
-            .map(|&bi| {
-                let iv = ray_intervals(&ev.ctx.bodies[bi].shape, origin, dir, back + extent * 2.0).into_iter().map(|(a, b)| (a - back, b - back)).collect::<Vec<_>>();
-                (bi, iv)
-            })
-            .collect();
+        let cast = |o: DVec3| -> Vec<(usize, Vec<(f64, f64)>)> {
+            candidates
+                .iter()
+                .map(|&bi| {
+                    let iv = ray_intervals(&ev.ctx.bodies[bi].shape, o, dir, back + extent * 2.0).into_iter().map(|(a, b)| (a - back, b - back)).collect::<Vec<_>>();
+                    (bi, iv)
+                })
+                .collect()
+        };
+        let mut hits = cast(origin);
+        // An axis beside the part with the hole still crossing it cuts a notch
+        // (live "qa4 round 5 v2 s1 follow-up": a pattern instance at the
+        // part's edge): rays across the hole's disk, each part's span from
+        // the first entry to the last exit.
+        if hits.iter().all(|(_, iv)| iv.is_empty()) {
+            let (u, w) = (perp(dir), dir.cross(perp(dir)));
+            let r = dims.diameter * 0.5;
+            for f in [0.5, 0.98] {
+                for k in 0..16 {
+                    let a = k as f64 * std::f64::consts::TAU / 16.0;
+                    for ((_, iv), (_, more)) in hits.iter_mut().zip(cast(origin + (u * a.cos() + w * a.sin()) * r * f)) {
+                        if let (Some(first), Some(last)) = (more.first(), more.last()) {
+                            let span = match iv.first() {
+                                Some(&(a0, b0)) => (a0.min(first.0), b0.max(last.1)),
+                                None => (first.0, last.1),
+                            };
+                            *iv = vec![span];
+                        }
+                    }
+                }
+            }
+        }
         // Hole start (parameter along dir relative to the location).
         let t_start = match (&start_plane, start_style.as_str()) {
             (Some(f), _) => match f.intersect_ray(loc.point, dir) {
@@ -511,7 +536,11 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         if targets.is_empty() {
             continue;
         }
-        ev.boolean_into(&targets, tools, k::BooleanOp::Cut).map_err(|e| fe(format!("Hole cut failed: {}", e.message)))?;
+        // hole.fs: a failed cut (a hole tangent to a face: non-manifold) is
+        // HOLE_CUT_FAIL (live "qa4 round 5 v2 s1 follow-up").
+        if let Err(e) = ev.boolean_into(&targets, tools, k::BooleanOp::Cut) {
+            return Err(if ev.cancelled() { e } else { fe("Hole creates invalid geometry.") });
+        }
     }
     // hole.fs: the computed Depth reads "Multiple" for several locations.
     if let Some(h) = up_to_depth_found.filter(|_| end == "UP_TO_NEXT" || end == "UP_TO_ENTITY") {

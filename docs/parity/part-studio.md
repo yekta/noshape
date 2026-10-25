@@ -196,10 +196,11 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 6.30 | Drag the bar to roll back/forward; model shows up to the bar | features_and_parts_lists | ✅ |
-| 6.31 | Right-click a feature > Roll to here | features_and_parts_lists | ✅ |
+| 6.31 | Right-click a feature > Roll to here / Roll to end | features_and_parts_lists; live "qa4 round 5 s2 rollback follow-up" | ✅ Roll to here unless the bar is right below the feature, Roll to end while the bar isn't at the end (`behaviors::roll_items`, tested on live's four menus). A rolled-back feature: Rename \| Add selection to folder… \| Suppress, Dynamic suppression ▸ \| Roll to here, Roll to end \| Delete (no Edit…, Zoom to selection, Show dependencies…, appearance); with a feature dialog open only Rename \| Suppress, Dynamic suppression ▸ (R5-S3-b). Add comment is cloud |
 | 6.32 | (Right-click the bar > Roll to end) | features_and_parts_lists | ✅ removed (live has no menu on the bar) |
 | 6.33 | Select the bar, ↑/↓ step one feature | features_and_parts_lists | ✅ (also after clicking a feature row; the bar turns #a0c7dd while focused) |
 | 6.34 | Features below the bar greyed; new features inserted at the bar | A §3.2 | ✅ |
+| 6.34a | Dragging the bar or a feature row near the list's top/bottom autoscrolls it | live "psb (10-24 k)" | ✅ 70–75 px edge zones, ~30 → 205 px/s toward the edge, faster past it (~370 px/s at 40 px, ~600 at 190 px out), also with the pointer beside the panel (only its height counts); a frame loop keeps scrolling while the pointer rests and stops at the ends (`behaviors::list_autoscroll_speed`, tested against live's speeds) |
 
 ### Folders
 
@@ -340,6 +341,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 13.41 | Model definitions: Isolate active part; "Select default tolerances…" picker (ISO 2768-1 grades c/f/m/v or Precision; applies on open), chip with hover-only Remove, "Default tolerances" section; Characteristics: per-type cells, Default rows from the standard, rolled-back rows, Hide default tolerances, Types ▾ (badge), Show/Hide derived tolerances, Reset filters, row hover/click | live qa4 598–599, psb 10-21 b/c | 🔧 (angle band, Fillet-radius type filter: psb 10-21 d) |
 | 13.42 | Slow regenerations: newest edit wins (stale runs aborted or finished into the cache), old result kept, working-overlay spinner after 1.2 s ("Opening <feature>…" when a dialog opens), ✓ closes at once with the spinner until the final result, Esc doesn't cancel | live "Pending state" | ✅ |
 | 13.43 | Fillet / Chamfer edge fields take part edges only (Onshape `EdgeTopology.TWO_SIDED`): a sketch line lying on a part edge isn't picked, the part edge is; sketch-only fields (Rib profiles, surface Extrude curves) take no part edges | app 10-24 (a chamfer picked "Sketch 1 line") | ✅ `QueryFilter::SOLID_EDGE`, `kind_matches`; the pick pass skips the overlay kinds (sketch curves/points/regions, part edges/vertices) the active field rejects (render state `NO_PICK`), so a click on a shown sketch line lying on a part edge takes the edge (app: Chamfer with Sketch 1 shown → "Edge of Extrude 1"; render test `no_pick_overlay_lets_the_edge_under_it_be_picked`) |
+| 13.44 | A Hole whose cut fails (tangent to a face: non-manifold) reports hole.fs's HOLE_CUT_FAIL "Hole creates invalid geometry." and cuts nothing; a Reapply feature pattern of it is OK and silently skips the instances that fail on their own; a hole whose axis is beside the part but whose cylinder crosses it cuts (rays across its disk) | live "qa4 round 5 v2 s1 follow-up" (2) | ✅ test `tangent_hole_fails_and_its_reapplied_pattern_cuts_the_good_copies` (volume = live's 37453.538 notch) |
 
 ## Not applicable to a local app
 
