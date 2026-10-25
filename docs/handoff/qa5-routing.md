@@ -478,3 +478,36 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
   hole-free face, flattens exactly (1 loop, areas equal, 40 × 80 mm). Expected: an identical flat face (no strain), 2 loops.
   `noshape_model::flatten::flatten_faces` (moved verbatim from the app's flatten_tool.rs; the app's Flatten surfaces is the same).
   Repro: `analysis_flatten {"faces": [<top face id>]}` on `block_with_hole` (ops e2e).
+
+## Re-gate on main ac467453 (qa4 2026-10-25 03:15): sessions 5–11 items vs main since v0.4.8 (2bf78a67)
+Main has 14 new commits since v0.4.8 (API audits 3–9, menus, sheet metal, fonts, dual DXF, assembly section manipulator); the
+merge queue has been bisecting a red batch since 23:56, so most owners' fixes are still on their ready branches. Checked by code
+marker on main (each line names the code the fix must change); "pending" = a fix commit exists on the owner's ready branch.
+| item | owner | main | note |
+|---|---|---|---|
+| OFF-CONSTR / OFF-BOX / OFF-SIDE / OFF-TOAST / OFF-CORNER | psb | ✗ | tools.rs offset_chain still Parallel + arcs; no offset value box change |
+| HOLE-FACE | psb | ✗ | kind_matches still PLANE_LIKE ⊃ MATE_CONNECTOR |
+| EDIT-TYPING-PREVIEW | psb/ui2 | ✗ | on_text_changed still emits Changed per keystroke |
+| ROLL-LAST (rolled-back menu, Roll to end) | psb | ✗ | **pending** ready/psb 33092438 ("rolled-back feature menu") |
+| ROLLBACK-AUTOSCROLL (round 5 v2) | psb | ✗ | **pending** ready/psb 33092438 ("feature-list drag autoscroll") |
+| HOLE-MSG / PAT-REAPPLY-FAIL (round 5 v2) | psb | ✗ | **pending** ready/psb 33092438 |
+| ROLLBACK-DROP-TOP | psb | ✗ | |
+| MATE-FLIP-AXIAL | skb | ✗ | solver.rs:571 still [z.x, z.y]; **pending** ready/skb fc70821b |
+| DRAG-RUNAWAY | skb | ✗ | **pending?** ready/skb 118d110d (drag solve per connected group) — re-test when it lands |
+| CHIP-X-SELECTED | skb | ✗ | |
+| DRW-DIM-2EDGES / ORD-BASE | asb | ✗ | no smart.rs / ordinate change on main |
+| EXPORT-DXF-OPTIONS | asb | **corrected** | all 4 checkboxes are in the code since v0.4.8; at a 900 px window the last two sit below the dialog's footer (clipping, check scroll) |
+| DIM-EXPR-UNIT / DIM-AUTOCOMPLETE / DIM-ESC-UNTOUCHED / DIM-UNSOLVED-GEOM | psb | ✗ | |
+| DIM-MENU / GLYPH-MENU | psb | ✗ | sketch.rs render_dim_menu still the custom list (dea2167b only shared its options with the API) |
+| VAR-KEYWORD | psb/api | ✗ | is_identifier still rejects FS_KEYWORDS |
+| CON-NORMAL-ORDER | psb | ✗ | make_constraint still `Normal { line: a, curve: b? }` |
+| CON-MSG / CON-HV-COLLAPSE / CON-TANGENT-APPLY / CON-CURVATURE / SK-LINE-MENU / DRIVEN-LOOK | psb | ✗ | |
+| EXT-DIRECTION / EXT-2ND-DEPTH / CHIP-HOVER | ui | ✗ | ready/ui has dialog-row fixes (909979d7, d82b2bd2) but not these |
+| SEL-REJECT-TOAST | psb | ✗ | behaviors.rs still flash_info(filter_description) |
+| CHAMFER-OVERFLOW | kern | ✗ | no kernel/regen change on main |
+| ERR-MISSING-REGION / REORDER-INVALID | psb | ✗ | eval.rs:636 and interaction.rs:163 unchanged |
+| SKETCH-UNCONSUMED / MULTI-MENU | psb/ui | ✗ | |
+| SUPPRESSED-MENU / TOOLTIP-PARENT / FOLDER-NAME-INLINE / FOLDER-MENU / FOLDER-EXPAND-UNDO / SELECT-OTHER | ui | ✗ | |
+| BOX-PREHIGHLIGHT / READOUT-AXES / MIDPOINT-MARKER | psb/ui | ✗ | |
+| SECTION-MANIP (Part Studio) | psb | ✗ | the assembly got live's manipulator (e325430a); the Part Studio section view still draws the arrow only |
+Round 4 fixes (e5e5095b) are on main ✅. My own round-4/5 code fixes (09cdc51e…, ready/qa4) are still in the queue's pending half.
