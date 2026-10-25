@@ -313,3 +313,14 @@ STATUS RHINO1 (2026-10-24 ~00:20, qa5): Rhino export round-trips (65431.327331 m
   hole-free face, flattens exactly (1 loop, areas equal, 40 × 80 mm). Expected: an identical flat face (no strain), 2 loops.
   `noshape_model::flatten::flatten_faces` (moved verbatim from the app's flatten_tool.rs; the app's Flatten surfaces is the same).
   Repro: `analysis_flatten {"faces": [<top face id>]}` on `block_with_hole` (ops e2e).
+
+## FSW-L45b — psb — Curve pattern Distance spacing on a closed path (spacing and the limit check)
+- qa5, 2026-10-25 (v0.4.8 release CLI and target-engine 00:45, same result): cube 10 mm at (R, 0), closed circle of length 100 mm
+  (R = 15.9155), Part curve pattern, Spacing type Distance.
+  - d 10 mm × 3: ours copies at 120° / 240°. curvePattern.fs (l. 189–202): instance i at path parameter d·i / (L − d) of the whole
+    path → 0°, 40°, 80° (arc spacing d·L / (L − d) = 11.11 mm). The live L45 capture (d 25 × 3 → 120° / 240°) is the special case
+    d = L / (n + 1), not "spread equally"; `pattern.rs` `if closed { len / n }` only matches it there.
+  - d 25 × 3 and d 20 × 4: ours ERROR "Cannot create a curve pattern when the entered distance is larger than the path length."
+    (live L45: d 25 × 3 OK). The check is exactly at the limit (L − d = d·n) and `path.length()` is the sampled polyline's chord
+    length, a little under L; std uses evPathLength (exact) and TOLERANCE.zeroLength.
+  - Expected: the exact path length, std's formula for the parameters, and a test with d 10 × 3 (40° / 80°) and d 25 × 3 (OK).
