@@ -40,13 +40,15 @@ pub struct DrCheckbox {
     native: bool,
     checked: bool,
     disabled: bool,
+    /// The label's size and colour (default 12 px, the theme's text).
+    label_style: Option<(f32, u32)>,
     tooltip: Option<SharedString>,
     on_click: Option<CheckHandler>,
 }
 
 impl DrCheckbox {
     pub fn new(id: impl Into<ElementId>) -> Self {
-        Self { id: id.into(), label: None, user: false, native: false, checked: false, disabled: false, tooltip: None, on_click: None }
+        Self { id: id.into(), label: None, user: false, native: false, checked: false, disabled: false, label_style: None, tooltip: None, on_click: None }
     }
 
     pub fn label(mut self, label: impl Into<SharedString>) -> Self {
@@ -74,6 +76,12 @@ impl DrCheckbox {
     /// Greyed and inert.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    /// The label's size and colour.
+    pub fn label_style(mut self, size: f32, color: u32) -> Self {
+        self.label_style = Some((size, color));
         self
     }
 
@@ -120,8 +128,8 @@ impl RenderOnce for DrCheckbox {
             .flex()
             .items_center()
             .gap(px(if self.native { 6. } else { 9. }))
-            .text_size(px(12.))
-            .text_color(pal.text)
+            .text_size(px(self.label_style.map_or(12., |s| s.0)))
+            .text_color(self.label_style.map_or(pal.text, |s| gpui_kit::rgb(s.1)))
             .when(self.disabled, |d| d.opacity(0.5))
             .when(handler.is_some(), |d| d.cursor_pointer())
             .child(if self.native { crate::preferences_window::PreferencesView::checkbox_box(checked) } else { custom_box() })

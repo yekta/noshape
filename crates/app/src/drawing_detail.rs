@@ -451,7 +451,8 @@ impl DrawingEditor {
                 // rectangle / closed profile / closed polygon until the profile
                 // exists, then "Profile created" (`#dbf1fa`, 1 px `#1b5faa`,
                 // radius 2, 12 px `#616b73`).
-                .child(div().mx(px(3.)).mt(px(1.)).mb(px(2.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(if editing && !matches!(self.tool, Tool::Detail { .. }) {
+                // Live drawing/127: 5 px under the field to the View scale row.
+                .child(div().mx(px(3.)).mt(px(1.)).mb(px(5.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(if editing && !matches!(self.tool, Tool::Detail { .. }) {
                     // Edit detail (live asbv-5): the profile as a "Profile" chip.
                     "Profile"
                 } else if placed {

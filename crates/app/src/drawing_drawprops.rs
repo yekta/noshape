@@ -88,6 +88,10 @@ fn precision_label(digits: usize) -> String {
 
 type Act = std::rc::Rc<dyn Fn(&mut DrawingProps)>;
 
+/// The panel's select caret (live drawing/1710): 8 px wide, about 5.5 px
+/// down to its point, steeper than the menus' caret.
+const SELECT_CARET: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 2h8L4 7.5z"/></svg>"#;
+
 /// Which text a Font row sets.
 #[derive(Clone, Copy)]
 enum FontOf {
@@ -401,15 +405,23 @@ impl DrawingEditor {
         let units = props.units.unwrap_or(if self.drawing.units_mm { DimUnits::Millimeter } else { DimUnits::Inch });
         let select = |id: &'static str, current: String, items: Vec<(String, bool, Act)>| {
             let ed = ed.clone();
-            Button::new(id)
-                .label(current)
-                .ghost()
-                .small()
-                .w(px(160.))
-                .dropdown_caret(true)
+            // Live drawing/1710: a white 164 × 25 field on a 1 px #ddd line,
+            // the #555 value's ink 7 px in, an 8 px #777 caret 6 px from the
+            // right.
+            h_flex()
+                .id(id)
+                .w(px(164.))
+                .h(px(26.))
+                .pl(px(6.))
+                .pr(px(6.))
+                .bg(gpui_kit::rgb(0xffffff))
                 .border_b_1()
                 .border_color(gpui_kit::rgb(0xdddddd))
-                .rounded(px(0.))
+                .text_size(px(13.33))
+                .text_color(gpui_kit::rgb(0x555555))
+                .cursor_pointer()
+                .child(div().flex_1().min_w_0().truncate().child(current))
+                .child(crate::os_ui::glyph(SELECT_CARET, 8., gpui_kit::rgb_static(0x777777)))
                 .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
                     for (label, checked, f) in &items {
                         let (e, f) = (ed.clone(), f.clone());
@@ -492,10 +504,13 @@ impl DrawingEditor {
                 .child(if shx { div().size(px(24.)).flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).opacity(0.4).child("I").into_any_element() } else { toggle(id.2, "I", i, |f| f.italic = !f.italic, cx).into_any_element() })
                 .into_any_element()
         };
-        // Live dom drawing-properties-*: labels 14 px in, 13.33 px #666; group
-        // headers 30 px `#efefef` with a `#ddd` rule, 500 #333.
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).pl(px(14.)).pr(px(12.)).child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(body).into_any_element();
-        let section = |title: &'static str| div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::rgb(0xefefef)).border_t_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(9.)).child(title).into_any_element();
+        // Live dom drawing-properties-*: labels 13.33 px #666, their ink 15 px
+        // in (1710); the field 2 px below the row's top, above the label's
+        // centre (3 px of margin under it); group headers 30 px `#efefef`
+        // with a `#ddd` rule, 500 #333, 8 px above their first row and 4 px
+        // below the previous group's last one.
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).flex_none().pl(px(13.)).pr(px(11.)).child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().mb(px(3.)).child(body)).into_any_element();
+        let section = |title: &'static str| div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::rgb(0xefefef)).border_t_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mt(px(4.)).mb(px(8.)).child(title).into_any_element();
         let precision_items = |cur: Option<u8>, max: usize, set: fn(&mut DrawingProps, Option<u8>)| -> Vec<(String, bool, Act)> {
             (0..=max).map(|k| (precision_label(k), cur == Some(k as u8), std::rc::Rc::new(move |p: &mut DrawingProps| set(p, Some(k as u8))) as Act)).collect()
         };
@@ -514,14 +529,16 @@ impl DrawingEditor {
                 ("Period".into(), !props.decimal_comma, std::rc::Rc::new(|p: &mut DrawingProps| p.decimal_comma = false) as Act),
                 ("Comma".into(), props.decimal_comma, std::rc::Rc::new(|p: &mut DrawingProps| p.decimal_comma = true) as Act),
             ];
+            // Live (1710): the box 9 px in and 11 px down a 37 px row, a 13.33 px #666 label.
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
             };
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Units and precision"))
+                // The first group sits right under the title (no 4 px gap).
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Units and precision"))
                 .child(section("Primary"))
                 .child(row("Units", select("dp-units", unit_label, unit_items)))
                 .child(row("Decimal separator", select("dp-sep", if props.decimal_comma { "Comma".into() } else { "Period".into() }, sep_items)))
@@ -557,7 +574,7 @@ impl DrawingEditor {
                 ("Horizontal".into(), horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = true) as Act),
             ];
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -570,7 +587,7 @@ impl DrawingEditor {
             };
             let std_name = |ansi: bool| if ansi { "ANSI".to_string() } else { "ISO".to_string() };
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Dimensions"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Dimensions"))
                 .child(section("All dimensions"))
                 .child(row("Font", font_row(FontOf::Dims, props.dim_font.clone(), cx)))
                 .child(row("Text height", field(0)))
@@ -616,7 +633,7 @@ impl DrawingEditor {
                 .map(|&t| (t.name().to_string(), t == props.ann_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.ann_arrow_type = t) as Act))
                 .collect();
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -626,7 +643,7 @@ impl DrawingEditor {
                 all.iter().map(|&v| (name(v).to_string(), v == cur, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, v)) as Act)).collect()
             }
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Annotations"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Annotations"))
                 .child(section("All annotations"))
                 .child(row("Arrowhead", h_flex().gap(px(4.)).child(field(1)).child(select("dp-aarrow", props.ann_arrow_type.name().into(), arrow_items)).into_any_element()));
             for (i, t) in AnnType::ALL.iter().copied().enumerate() {
@@ -693,7 +710,7 @@ impl DrawingEditor {
             }
         } else if self.drawing_props.tab == 3 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -725,7 +742,7 @@ impl DrawingEditor {
             ];
             let tangent_items: Vec<(String, bool, Act)> = ["Hidden", "Solid", "Phantom"].iter().enumerate().map(|(i, n)| (n.to_string(), vd.tangent == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_defaults.tangent = i as u8) as Act)).collect();
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Views"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Views"))
                 .child(section("All views"))
                 .child(row("Projection angle", proj_btn))
                 .child(section("Insert view defaults"))
@@ -781,7 +798,7 @@ impl DrawingEditor {
             let vt = props.view_tab.clone();
             let field = |i: usize| self.wt_field(i, &ed);
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -801,7 +818,7 @@ impl DrawingEditor {
             let locked = props.formats_locked;
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Formats"))
-                .child(div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("dp-flock").native().label("Locked").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
+                .child(div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("dp-flock").native().label_style(13.33, 0x666666).label("Locked").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| p.formats_locked = v, cx);
                 }))))
@@ -814,13 +831,13 @@ impl DrawingEditor {
         } else if self.drawing_props.tab == 6 {
             let field = |i: usize| self.wt_field(i, &ed);
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Tables"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Tables"))
                 .child(section("All tables"))
                 .child(row("Horizontal padding", field(0)))
                 .child(row("Vertical padding", field(1)));
         } else if self.drawing_props.tab == 7 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
@@ -895,8 +912,9 @@ impl DrawingEditor {
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 // Live: the title centred, 18.67 px / 500 `#1b5faa` on a 25 px line
-                // 5 px down, no close button (the right strip toggles the panel).
-                .child(div().h(px(43.)).flex_none().pt(px(5.)).flex().justify_center().child(div().h(px(25.)).line_height(px(25.)).text_size(px(18.67)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x1b5faa)).child("Drawing properties")))
+                // 5 px down, no close button (the right strip toggles the panel);
+                // the tabs 42 px down (1710).
+                .child(div().h(px(42.)).flex_none().pt(px(5.)).flex().justify_center().child(div().h(px(25.)).line_height(px(25.)).text_size(px(18.67)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x1b5faa)).child("Drawing properties")))
                 .child(tabs)
                 .child(body)
                 .child(self.drawing_props_footer(cx))
@@ -912,7 +930,7 @@ impl DrawingEditor {
     fn drawing_props_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
         let locked = self.drawing.props.locked;
-        let dwt = Button::new("dp-dwt").ghost().small().w(px(25.)).h(px(25.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
+        let dwt = Button::new("dp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
             for row in noshape_ops::drawing::template_rows() {
                 let e = ed.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(row.file).on_click(move |_, _, cx| {
@@ -928,29 +946,31 @@ impl DrawingEditor {
             .flex_none()
             .border_t_1()
             .border_color(gpui_kit::rgb(0xdddddd))
-            // Live drawing/160: an input-like row (13.33 px italic, 20 px in,
-            // a #ddd underline up to the 25 px DWT button 9 px from the edge),
-            // then the 12 px Lock checkbox 9 px in with a 12 px label and a
-            // grey help icon at the right.
+            // Live drawing/160, 1710: an input-like row 4 px under the rule
+            // (13.33 px italic, its ink 15 px in, a #ddd underline up to the
+            // 26 px DWT button 8 px from the edge), then a 41 px row with the
+            // 12 px Lock checkbox 9 px in, a 12 px label and a grey help icon
+            // at the right.
             .child(
                 h_flex()
-                    .h(px(34.))
-                    .pt(px(6.))
-                    .pr(px(9.))
+                    .h(px(30.))
+                    .pt(px(4.))
+                    .pr(px(8.))
                     .gap(px(19.))
-                    .child(div().flex_1().h(px(26.)).pl(px(20.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template…"))
+                    .child(div().flex_1().h(px(26.)).pl(px(14.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template…"))
                     .child(dwt),
             )
             .child(
                 h_flex()
-                    .h(px(34.))
-                    .pl(px(5.))
-                    .pr(px(9.))
+                    .h(px(41.))
+                    .pb(px(4.))
+                    .pl(px(9.))
+                    .pr(px(10.))
                     .child(div().flex_1().text_size(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("dp-lock").native().label("Lock drawing properties").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
                         let v = *v;
                         this.set_drawing_prop(&move |p| p.locked = v, cx)
                     }))))
-                    .child(div().size(px(14.)).child(crate::assets::icon("help-filled", 14., cx))),
+                    .child(div().size(px(14.)).mt(px(4.)).child(crate::assets::icon("help-filled", 14., cx))),
             )
             .into_any_element()
     }

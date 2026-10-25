@@ -702,3 +702,10 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   under a plate (z 0..5): the dialog flips the direction as live does (tool goes down, away from the part), Merge scope "Part 1".
   Ours: the tool previews **grey**, **no toast**. Live (part-studio/234–235, behaviours "Extrude preview colours"): the tool is
   a **translucent dark red** solid and a blue toast "ⓘ Selected tools and targets do not intersect. ×" shows at the top centre.
+
+## P2 drawing pass (qa5, 2026-10-25 evening, /root/green/noshape ee654502)
+- **P2-D1 — lead to assign (drawing dimension picking; asb?)** — Assembly drawing (Assembly 1: plate 60×20×5 with three Ø10
+  holes + a pin in hole 1; Create Drawing of Assembly 1…, suggested views). Dimension tool (d): the hole circles in the Top view
+  **highlight on hover but a click is not taken** (prompt stays "Select a circle, arc, line, circle center or point"; tried the
+  middle and right holes, which have no pin). A straight edge in the same view works ("2.362" placed). The same hole in a
+  **part** drawing (Part 1 › Create Drawing of Part 1…) works: "Ø.394". Expected: the diameter dimension as in the part drawing.
