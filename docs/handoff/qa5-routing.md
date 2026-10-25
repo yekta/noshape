@@ -727,3 +727,6 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   (`BRep_Tool::Curve(e, loc, f, l).get()`) to its index; in `source_index`, when `FindIndex` misses, look the split edge's curve
   handle up there (outliner splits keep the source Geom_Curve). Test: drawing tests, tilted demo assembly Top view, exact: every
   visible Sharp edge linked, and a rim click picks a circle.
+- **P2-A1 — skb (assembly dialogs), live to confirm** — Assembly › Linear pattern (Instances Part 2 <1>, Direction an edge,
+  Distance 20 mm): Enter in Distance applies the value; **a second Enter (and a third) does not commit**, the dialog stays open
+  until ✓. Part Studio feature dialogs commit on the second Enter (behaviours 252, 7041). Request "qa5 (10-25 p3)".
