@@ -15,7 +15,7 @@ use noshape_scene::drawing_tools::Tool;
 use noshape_scene::drawing_tools::annotation_edit as ae;
 use serde_json::{Value, json};
 
-const ACTIONS: [&str; 19] = [
+const ACTIONS: [&str; 20] = [
     "add_jog",
     "remove_jog",
     "add_leader",
@@ -35,6 +35,7 @@ const ACTIONS: [&str; 19] = [
     "align_centermark",
     "stacked_callouts",
     "break",
+    "reset_ordinate",
 ];
 
 pub fn ops() -> Vec<Op> {
@@ -43,7 +44,7 @@ pub fn ops() -> Vec<Op> {
         group: "drawing",
         verb: "annotation_edit",
         summary: "Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, detach, align centermark, stacked callouts",
-        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend, or at `from_node` [leader, node]); `remove_leaders`.\n- Note leaders: `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`), `delete_leader` (`leader`).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- `detach` (Detach from geometry: stays put, no longer follows the model).\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).",
+        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend, or at `from_node` [leader, node]); `remove_leaders`.\n- Note leaders: `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`), `delete_leader` (`leader`).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- `detach` (Detach from geometry: stays put, no longer follows the model).\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).\n- Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).",
         fields: vec![
             doc_field(),
             drawing_field(),
@@ -93,6 +94,14 @@ fn annotation_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let note = matches!(ann.kind, AnnotationKind::Note { .. });
     let note_or_callout = note || matches!(ann.kind, AnnotationKind::Balloon { .. });
     let s = t.sheet;
+    if action == "reset_ordinate" {
+        if !matches!(ann.kind, AnnotationKind::OrdinateGroup { .. }) {
+            return refuse("ordinate dimensions only");
+        }
+        let mut out = reply(od, t.tab, s, false)?;
+        out["message"] = json!("Nothing to reset: the ordinate values sit on the group's text line");
+        return Ok(out.into());
+    }
     let desc: &str = match action {
         "add_jog" | "remove_jog" if !matches!(ann.kind, AnnotationKind::LinearDimension { .. }) || ann.inspection.is_some() => return refuse("linear dimensions only"),
         "break" if !matches!(ann.kind, AnnotationKind::LinearDimension { .. } | AnnotationKind::OrdinateGroup { .. }) || ann.inspection.is_some() => return refuse("linear and ordinate dimensions only"),

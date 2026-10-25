@@ -2488,7 +2488,7 @@ Examples:
 
 Exploded views: add, rename or delete a view or a step (edits the document (one undoable history entry); deletes or overwrites).
 
-The Exploded views panel: `add` creates "Explode N" (renamed to `name` if given); `rename` renames a view (or its `step`); `delete` deletes a view (or its `step`). Add steps with assembly_explode_step.
+The Exploded views panel: `add` creates "Explode N" (renamed to `name` if given); `rename` renames a view (or its `step`); `delete` deletes a view (or its `step`); `lines` (with `on`) is the view's Show all explode lines / Hide all explode lines (every step's lines; one edit with that name). Add steps with assembly_explode_step.
 
 Examples:
 
@@ -2500,7 +2500,8 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
-| `action` | one of `add`, `rename`, `delete` | required | What to do. |
+| `action` | one of `add`, `rename`, `delete`, `lines` | required | What to do. |
+| `on` | boolean |  | lines: show (true) or hide (false) all explode lines. |
 | `view` | string |  | The view: its name or 1-based row. |
 | `step` | integer |  | A step of the view (1-based). |
 | `name` | string |  | add / rename: the name. |
@@ -4303,6 +4304,7 @@ The annotation context menus, one edit each with the menu's edit text:
 - `detach` (Detach from geometry: stays put, no longer follows the model).
 - Centermarks: `align_centermark` to the straight edge at `point`.
 - Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).
+- Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).
 
 Examples:
 
@@ -4318,7 +4320,7 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `annotation` | integer | required | Annotation id (drawing_get). |
-| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break` | required | The menu action. |
+| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break`, `reset_ordinate` | required | The menu action. |
 | `line` | one of 0, 1 |  | add_jog / remove_jog: the extension line. |
 | `point` | array of number |  | add_leader: where it points; add_node: on the leader line; align_centermark: on a straight edge (sheet mm). |
 | `leader` | integer |  | add_node / remove_node / delete_leader: the note leader (0 = first). |

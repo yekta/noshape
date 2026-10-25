@@ -51,11 +51,12 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "exploded_view",
             summary: "Exploded views: add, rename or delete a view or a step",
-            description: "The Exploded views panel: `add` creates \"Explode N\" (renamed to `name` if given); `rename` renames a view (or its `step`); `delete` deletes a view (or its `step`). Add steps with assembly_explode_step.",
+            description: "The Exploded views panel: `add` creates \"Explode N\" (renamed to `name` if given); `rename` renames a view (or its `step`); `delete` deletes a view (or its `step`); `lines` (with `on`) is the view's Show all explode lines / Hide all explode lines (every step's lines; one edit with that name). Add steps with assembly_explode_step.",
             fields: vec![
                 doc_field(),
                 asm_field(),
-                req("action", json!({ "type": "string", "enum": ["add", "rename", "delete"] }), "What to do."),
+                req("action", json!({ "type": "string", "enum": ["add", "rename", "delete", "lines"] }), "What to do."),
+                opt("on", json!({ "type": "boolean" }), "lines: show (true) or hide (false) all explode lines."),
                 opt("view", s(), "The view: its name or 1-based row."),
                 opt("step", json!({ "type": "integer", "minimum": 1 }), "A step of the view (1-based)."),
                 opt("name", s(), "add / rename: the name."),
@@ -295,7 +296,16 @@ fn exploded_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 })?,
             }
         }
-        _ => return Err(OpError::param("action", "add, rename or delete")),
+        "lines" => {
+            let v = view_row(&asm, a.opt_str("view")?.ok_or_else(|| OpError::param("view", "required"))?)?;
+            let on = a.get("on").and_then(Value::as_bool).ok_or_else(|| OpError::param("on", "true (Show all explode lines) or false (Hide all explode lines)"))?;
+            commit(od, tab, if on { "Show all explode lines" } else { "Hide all explode lines" }, &result, |a| {
+                for st in &mut a.exploded_views[v].steps {
+                    st.lines = on;
+                }
+            })?;
+        }
+        _ => return Err(OpError::param("action", "add, rename, delete or lines")),
     }
     let now = assembly(od, tab)?;
     Ok(json!({ "exploded_views": json(now).1 }).into())

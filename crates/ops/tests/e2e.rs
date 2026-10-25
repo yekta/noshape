@@ -1004,6 +1004,11 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!(last(&mut ctx), "Assembly 1 :: Edit : Explode step");
     call(&mut ctx, "assembly_exploded_view", json!({ "action": "rename", "view": "Explode 1", "name": "Pin out" }));
     assert_eq!(last(&mut ctx), "Assembly 1 :: Rename : Pin out");
+    // The view's menu: Hide all explode lines, Show all explode lines.
+    call(&mut ctx, "assembly_exploded_view", json!({ "action": "lines", "view": "Pin out", "on": false }));
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Hide all explode lines");
+    call(&mut ctx, "assembly_exploded_view", json!({ "action": "lines", "view": "Pin out", "on": true }));
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Show all explode lines");
     let ev = call(&mut ctx, "assembly_exploded_view", json!({ "action": "delete", "view": "Pin out" }));
     assert_eq!(ev["exploded_views"].as_array().unwrap().len(), 0, "{ev}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Delete : Pin out");
@@ -2871,7 +2876,10 @@ fn drawing_annotation_menu_edits() {
     assert_eq!(last(&mut ctx), "Add to ordinate group");
     let e = try_call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "group": o, "origin": a0, "points": [b0] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("group"), "{e:?}");
-
+    // Reset ordinate: nothing to move back, no edit (as the editor).
+    let r = call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": o, "action": "reset_ordinate" }));
+    assert!(r["message"].as_str().unwrap().starts_with("Nothing to reset"), "{r}");
+    assert_eq!(last(&mut ctx), "Add to ordinate group");
 }
 
 /// P1 menu gaps: display states, the assembly configuration panel's input
