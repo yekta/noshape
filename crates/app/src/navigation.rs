@@ -1253,6 +1253,35 @@ mod tests {
         assert!((d0 / c.distance - fingers).abs() < 1e-6);
     }
 
+    /// Live "nav2 perspective zoom" (10-25): Onshape's numbers for the default
+    /// planes' ±75 mm box in Isometric on a 1673 × 973 canvas, 45° FOV.
+    #[test]
+    fn perspective_wheel_matches_live_onshape() {
+        let vp = DVec2::new(1673.0, 973.0);
+        let (lo, hi) = (DVec3::splat(-0.075), DVec3::splat(0.075));
+        let bounds = Some((lo, hi));
+        let fitted = || {
+            let mut c = Camera { projection: Projection::Perspective, fov_y: 45f64.to_radians(), ..Camera::default() };
+            c.set_view(noshape_render::StandardView::Isometric);
+            c.fit_box(lo, hi, vp.x / vp.y);
+            c
+        };
+        // Shift+7, F: distanceToCenter 446.8626 mm.
+        let mut c = fitted();
+        assert!((c.distance - 0.4468626).abs() < 1e-6, "{}", c.distance);
+        // The pointer at canvas (986, 566); Onshape's ray goes ½ px right and up.
+        let at = DVec2::new(986.5, 565.5);
+        let mut steps = Vec::new();
+        for w in [120.0, 120.0, -120.0, -120.0, 360.0, 30.0, 30.0, 30.0, 30.0] {
+            assert!(zoom_at(&mut c, Zoom::Amount(0.5 / 120.0 * w), at, vp, bounds));
+            steps.push(c.distance);
+        }
+        let live = [0.4100060, 0.3761893, 0.4072168, 0.4408035, 0.3317330, 0.3248928, 0.3181936, 0.3116326, 0.3052068];
+        for (got, want) in steps.iter().zip(live) {
+            assert!((got - want).abs() < 2e-6, "{got} vs {want}");
+        }
+    }
+
     #[test]
     fn perspective_zoom_dollies_by_a_sixth_of_the_distance() {
         let vp = DVec2::new(1600.0, 1000.0);

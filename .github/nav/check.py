@@ -256,16 +256,39 @@ def main():
             kept = [posted_ticks(r["posted"]) for r in recs if r.get("posted", {}).get("kind") == "scroll" and id(r) not in baselines]
             ch.note(name, "baseline events (no scroll on X11)", len(posted) - len(kept))
             posted = kept
-        ch.check(name, "scroll inputs = posted wheel events", float(len(got)), float(len(posted)), 0)
         shifted = [r["posted"].get("shift", False) for r in recs if r.get("posted", {}).get("kind") == "scroll" and id(r) not in baselines]
-        for i, (s_, p_) in enumerate(zip(got, posted)):
+        # Compositors may merge wheel events posted in quick succession into
+        # one frame (libinput/sway sum the value120s, and drop a frame that
+        # sums to 0; the app and Chrome see the merged frames). So compare
+        # running totals: after each app event its total wheelDelta must equal
+        # the posted total at some later posted event, and the final totals
+        # must agree.
+        if a.mode == "mac" and any(shifted):
+            # macOS may move a Shift+wheel notch to the horizontal axis on
+            # delivery (Chrome reads the same event); notches aren't merged.
+            ch.check(name, "scroll inputs = posted wheel events", float(len(got)), float(len(posted)), 0)
+            for i, (s_, p_) in enumerate(zip(got, posted)):
+                t = s_.get("ticks") or (0.0, 0.0)
+                ch.check(name, f"#{i} wheelDelta on either axis", float(trunc120(t[0]) + trunc120(t[1])), float(trunc120(p_[0]) + trunc120(p_[1])), 0)
+            continue
+        totals, tx, ty = [], 0, 0
+        for p_ in posted:
+            tx, ty = tx + trunc120(p_[0]), ty + trunc120(p_[1])
+            totals.append((tx, ty))
+        ax = ay = 0
+        k = 0
+        for i, s_ in enumerate(got):
             t = s_.get("ticks")
-            if a.mode == "mac" and i < len(shifted) and shifted[i] and t is not None and t[1] == 0:
-                # macOS may move a Shift+wheel notch to the horizontal axis on
-                # delivery; Chrome reads the same event, so that's what it sees.
-                p_ = (p_[1], 0.0)
-            ch.check(name, f"#{i} wheelDelta y (Chrome, posted)", None if t is None else float(trunc120(t[1])), float(trunc120(p_[1])), 0)
-            ch.check(name, f"#{i} wheelDelta x (Chrome, posted)", None if t is None else float(trunc120(t[0])), float(trunc120(p_[0])), 0)
+            if t is None:
+                ch.check(name, f"#{i} wheel ticks reported", 0.0, 1.0, 0)
+                continue
+            ax, ay = ax + trunc120(t[0]), ay + trunc120(t[1])
+            while k < len(totals) and (ax, ay) != totals[k]:
+                k += 1
+            ch.check(name, f"#{i} running wheelDelta ({ax}, {ay}) = a posted running total", float(k < len(totals)), 1.0, 0)
+            k += 1
+        ch.check(name, "total wheelDelta y = posted total", float(ay), float(ty), 0)
+        ch.check(name, "total wheelDelta x = posted total", float(ax), float(tx), 0)
 
     def wheel_amount(d, _n):
         t = d.get("ticks")
