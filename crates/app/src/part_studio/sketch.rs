@@ -1035,7 +1035,8 @@ impl PartStudioView {
                     InputEvent::Change => {
                         this.ui.dim_invalid = false;
                         let vars = this.sketch_variables(cx);
-                        let list = crate::var_complete::VarCompletion::compute("dim", st.read(cx), &vars);
+                        let dim = this.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| crate::sketch_mode::dim_unit(&c.kind)));
+                        let list = crate::var_complete::VarCompletion::compute("dim", st.read(cx), &vars, dim);
                         if let Some(ui) = this.ui_mut() {
                             ui.dim_completion = list;
                         }
