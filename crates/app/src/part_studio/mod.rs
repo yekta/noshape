@@ -491,7 +491,9 @@ impl PartStudioView {
         Some((ps, upto))
     }
 
+    #[track_caller]
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let caller = std::panic::Location::caller();
         // Paused regeneration (Onshape): edits wait until "Regenerate".
         if self.ui.regen_paused.is_some() && !std::mem::take(&mut self.ui.force_regen) {
             // Nothing starts: an "Opening…" waiting for this run goes.
@@ -511,6 +513,9 @@ impl PartStudioView {
         let regen2 = self.regen.clone();
         self.regen_seq += 1;
         let seq = self.regen_seq;
+        if noshape_render::perf::enabled() {
+            log::info!(target: "perf", "schedule_regen #{seq} from {caller} (upto {upto:?}, {} features)", studio.features.len());
+        }
         let editing_sketch = self.sketch.as_ref().map(|s| s.feature).or_else(|| self.editing_sketch_id(cx));
         // The newest request wins (pending.rs): the running one is aborted, or
         // finishes its features into the cache when this one only extends it.
@@ -538,6 +543,9 @@ impl PartStudioView {
             let (result, studio, config, units, upto, editing_sketch, doc_vars) = result;
             // A newer request took over.
             if result.cancelled {
+                if noshape_render::perf::enabled() {
+                    log::info!(target: "perf", "regen #{seq} cancelled (preview pass)");
+                }
                 return;
             }
             let refine = result.needs_refine;

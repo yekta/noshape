@@ -164,6 +164,7 @@ impl Regenerator {
         let mut ctx: Arc<Context> = Arc::new(Context::default());
         let mut states = Vec::with_capacity(studio.features.len());
         let mut live: Vec<FeatureId> = Vec::new();
+        let (mut evaluated, mut cached) = (0usize, 0usize);
         // Effective features (configuration applied), visible to evaluators
         // that re-run other features (feature pattern "Reapply features").
         let effective: Vec<eval::EffectiveFeature> = studio
@@ -218,8 +219,10 @@ impl Regenerator {
             {
                 ctx = e.ctx.clone();
                 states.push(e.state.clone());
+                cached += 1;
                 continue;
             }
+            evaluated += 1;
             let ft = Instant::now();
             let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() };
             if let Some(msg) = expr_error.take() {
@@ -329,6 +332,9 @@ impl Regenerator {
         self.entries.retain(|id, _| live.contains(id));
         if opts.cancel.as_ref().is_some_and(RegenCancel::superseded) {
             return cancelled();
+        }
+        if display::perf_enabled() {
+            log::info!(target: "perf", "regen: {evaluated} features evaluated, {cached} cached, {:.0} ms (preview meshes {})", t0.elapsed().as_secs_f64() * 1e3, opts.preview_meshes);
         }
         let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes);
         if aborted() {
