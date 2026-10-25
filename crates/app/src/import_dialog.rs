@@ -63,9 +63,10 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);
     let choice = Rc::new(Cell::new(Choice { appearances: true, unit, ..Default::default() }));
     let opened = Rc::new(opened);
-    window.open_dialog(cx, move |dialog, _, cx| {
+    window.open_dialog(cx, move |dialog, window, cx| {
         let pal = p();
         let c = choice.get();
+        let (text_system, label_font) = (cx.text_system().clone(), Font { weight: FontWeight::SEMIBOLD, ..window.text_style().font() });
         let tile = |id: &'static str, selected: bool, title: &'static str, note: Option<&'static str>, both: bool, combine: bool, choice: Rc<Cell<Choice>>| {
             // Live (dom/dialog-import-*.txt): each tile shows one 150 px
             // picture (a file, an arrow, the Part Studio and Assembly tab
@@ -116,16 +117,29 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                         .bg(rgb(if on { 0x0d6efd } else { 0xffffff }))
                         .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
                 )
-                // GPUI has no inline boxes: the ? sits after the label's last line.
-                .child(
-                    h_flex()
+                // GPUI has no inline boxes: wrap the label with the ? as a
+                // trailing inline element in live's 358 px label box (dom/
+                // dialog-import-in-document.txt), so the ? follows the last
+                // word ("…non-solid bodies ?") or starts a line of its own.
+                .child({
+                    let mut wrapper = text_system.line_wrapper(label_font.clone(), px(14.));
+                    let fragments = [LineFragment::text(label), LineFragment::element(px(TIP_GAP + TIP_SIZE), 1)];
+                    let breaks: Vec<usize> = wrapper.wrap_line(&fragments, px(LABEL_WIDTH), IndentAdjustment::NoIndent).map(|b| b.ix).collect();
+                    let mut lines = wrapped_lines(label, &breaks);
+                    let last = lines.pop().unwrap_or_default();
+                    let line = |t: String| div().text_size(px(14.)).line_height(px(21.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).whitespace_nowrap().child(t);
+                    v_flex()
                         .flex_1()
                         .min_w_0()
-                        .items_end()
-                        .gap(px(8.))
-                        .child(div().flex_shrink(1.).min_w_0().text_size(px(14.)).line_height(px(21.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(label))
-                        .child(div().id(SharedString::from(format!("{id}-tip"))).mb(px(1.)).size(px(18.)).flex_none().rounded_full().border_1().border_color(rgb(0xcccccc)).flex().items_center().justify_center().text_size(px(11.)).text_color(rgb(0xaaaaaa)).child("?").tooltip(crate::ui::tooltip(tip))),
-                )
+                        .children(lines.into_iter().map(line))
+                        .child(
+                            h_flex()
+                                .items_end()
+                                .gap(px(TIP_GAP))
+                                .when(!last.is_empty(), |d| d.child(line(last)))
+                                .child(div().id(SharedString::from(format!("{id}-tip"))).mb(px(1.)).size(px(TIP_SIZE)).flex_none().rounded_full().border_1().border_color(rgb(0xcccccc)).flex().items_center().justify_center().text_size(px(11.)).text_color(rgb(0xaaaaaa)).child("?").tooltip(crate::ui::tooltip(tip))),
+                        )
+                })
                 .on_click(move |_, window, _| {
                     let mut c = choice.get();
                     set(&mut c, !on);
@@ -177,6 +191,26 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     });
 }
 
+/// Live's checkbox label box (dom/dialog-import-in-document.txt: 358 px) and
+/// the ? after the label text.
+const LABEL_WIDTH: f32 = 358.;
+const TIP_GAP: f32 = 8.;
+const TIP_SIZE: f32 = 18.;
+
+/// The lines of `label` broken at `breaks` (the byte index each new line
+/// starts at; the ? element sits at `label.len()`). The last entry is the
+/// text before the ?, empty when the ? wraps onto a line of its own.
+fn wrapped_lines(label: &str, breaks: &[usize]) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut start = 0;
+    for &b in breaks.iter().filter(|&&b| b > 0 && b <= label.len()) {
+        lines.push(label[start..b].trim_end().to_string());
+        start = b;
+    }
+    lines.push(label[start..].trim_end().to_string());
+    lines
+}
+
 /// Translate the files and add their tabs (shared with the agent API:
 /// `noshape_ops::import`).
 fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<TabId>, keep_files: bool, cx: &mut App) -> Option<TabId> {
@@ -203,3 +237,18 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
     first
 }
 
+#[cfg(test)]
+mod tests {
+    use super::wrapped_lines;
+
+    #[::core::prelude::v1::test]
+    fn the_question_mark_follows_the_last_word() {
+        let label = "Create a composite part when importing multiple or non-solid bodies";
+        // Live: "…multiple or" / "non-solid bodies ?".
+        assert_eq!(wrapped_lines(label, &[51]), ["Create a composite part when importing multiple or", "non-solid bodies"]);
+        // One line with room for the ?.
+        assert_eq!(wrapped_lines("Join adjacent surfaces", &[]), ["Join adjacent surfaces"]);
+        // The ? alone on the next line.
+        assert_eq!(wrapped_lines("Join adjacent surfaces", &[22]), ["Join adjacent surfaces", ""]);
+    }
+}

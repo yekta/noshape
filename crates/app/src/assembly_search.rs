@@ -37,7 +37,7 @@ const TOOLS: &[AsmTool] = &[
     AsmTool("screw-relation", "Screw relation", None, |t, w, cx| t.open_relation(RelationType::Screw, None, w, cx)),
     AsmTool("linear-relation", "Linear relation", None, |t, w, cx| t.open_relation(RelationType::Linear, None, w, cx)),
     AsmTool("display-states", "Display states", None, |t, w, cx| t.toggle_display_states(w, cx)),
-    AsmTool("create-partstudio-incontext", "Create Part Studio in context", None, |t, _, cx| t.open_ps_in_context(cx)),
+    AsmTool("create-partstudio-incontext", "Create Part Studio in context", None, |t, _, cx| t.open_ps_in_context(false, cx)),
 ];
 
 /// Onshape's tool search ranking (live dom/assembly-tool-search.txt): names

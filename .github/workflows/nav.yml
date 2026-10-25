@@ -1,0 +1,101 @@
+name: Navigation replay
+
+# View navigation driven by real OS input on every platform (docs/parity/
+# navigation.md, .github/nav/): the app runs with NOSHAPE_NAV_TRACE, a driver
+# injects input through each OS's public input APIs, and check.py compares
+# every camera change with what Onshape does with the same input in Chrome
+# (wheelDelta per Chromium's own rules, Onshape's view controller formulas).
+#   Linux:   uinput mouse / touchpad / touch screen, read by libinput in a
+#            headless sway; the app on Wayland and on X11 (Xwayland).
+#   macOS:   CGEvent notched and continuous scroll (scroll + momentum phases),
+#            Shift / Ctrl wheel, mouse drags.
+#   Windows: SendInput wheel (whole and high-resolution notches, Shift /
+#            Ctrl), InjectTouchInput touch gestures, mouse drags.
+# Opt-in: run it by hand on a release or a branch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to test (default: the latest release)'
+        required: false
+      ref:
+        description: 'Build this branch/commit from source instead of a release'
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  NOSHAPE_NO_NATIVE_DIALOGS: '1'
+
+jobs:
+  replay:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux, os: ubuntu-24.04, asset: linux-x86_64.tar.gz }
+          - { name: macOS, os: macos-15, asset: macos-arm64.dmg }
+          - { name: Windows, os: windows-latest, asset: windows-x86_64.zip }
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/noshape-binary
+        with:
+          tag: ${{ inputs.tag }}
+          ref: ${{ inputs.ref }}
+          asset: ${{ matrix.asset }}
+
+      - name: Replay (Linux, Wayland and X11)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends sway xwayland libinput10 libseat1 \
+            mesa-vulkan-drivers libvulkan1 libxkbcommon-x11-0 libxcb-xkb1 libx11-xcb1 libfontconfig1
+          sudo modprobe uinput
+          out="$RUNNER_TEMP/nav"
+          status=0
+          for mode in wayland x11; do
+            sudo -E env "PATH=$PATH" .github/nav/linux-replay.sh "$BIN" .github/nav/block.noshape "$out" "$mode" || status=1
+          done
+          sudo chown -R "$USER" "$out"
+          exit $status
+
+      - name: Replay (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          out="$RUNNER_TEMP/nav"; mkdir -p "$out"
+          cp .github/nav/block.noshape "$out/nav.noshape"
+          NOSHAPE_NAV_TRACE="$out/trace-mac.jsonl" "$BIN" "$out/nav.noshape" > "$out/app-mac.log" 2>&1 &
+          app=$!
+          swift .github/nav/mac-replay.swift "$out/trace-mac.jsonl"
+          kill $app || true
+          python3 -I .github/nav/check.py --trace "$out/trace-mac.jsonl" --mode mac | tee "$out/check-mac.txt"
+
+      - name: Replay (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\nav"; New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item .github\nav\block.noshape "$out\nav.noshape"
+          $env:NOSHAPE_NAV_TRACE = "$out\trace-windows.jsonl"
+          $p = Start-Process -FilePath $env:BIN -ArgumentList "$out\nav.noshape" -RedirectStandardError "$out\app-windows.log" -RedirectStandardOutput "$out\stdout.log" -PassThru
+          .github\nav\win-replay.ps1 -Trace "$out\trace-windows.jsonl"
+          Stop-Process -Id $p.Id -Force
+          python .github\nav\check.py --trace "$out\trace-windows.jsonl" --mode windows | Tee-Object "$out\check-windows.txt"
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: nav-${{ matrix.os }}
+          path: ${{ runner.temp }}/nav
+          if-no-files-found: warn
