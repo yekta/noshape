@@ -297,7 +297,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_duplicate_input`](#config_duplicate_input), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance)
 - **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly)
-- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit)
+- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_open_feature_studio`](#drawing_open_feature_studio)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
@@ -4232,6 +4232,183 @@ Examples:
 | `with` | array of integer |  | group / group_annotation: the other annotations. |
 | `parts` | array of string |  | stacked_callouts: part names. |
 | `on` | boolean |  | break: Break (true) or Unbreak (false) dimension. |
+
+#### drawing_table_properties
+
+A placed table's properties (BOM, cut list, revision, custom or general table) (edits the document (one undoable history entry)).
+
+The table's right-click › … table properties dialog, one edit with its name. BOM: `structured`, `bottom_to_top`, `corner` ("BOM table properties"); cut list: `bottom_to_top`, `corner` ("Cut list table properties"); revision: `see_sheet1`, `visible_rows` (1-100), `newest_top`, `hide_callouts`, `corner` ("Revision table properties"); custom: `bottom_to_top`, `corner` ("Custom table properties"; its table and Part Studio: drawing_custom_table with `id`); general and hole tables: Table properties… `corner`, the table staying where it is ("Table fixed corner"). Fields not given keep their values; a field the table's dialog doesn't have is refused.
+
+Examples:
+
+```json
+{"drawing": "Assembly 1 Drawing 1", "table": 1, "structured": true, "corner": "top_left"}
+{"drawing": "Part 1 Drawing 1", "table": 2, "visible_rows": 8, "newest_top": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `table` | integer | required | Table id (drawing_get). |
+| `corner` | one of `top_left`, `top_right`, `bottom_left`, `bottom_right` |  | Fixed corner. |
+| `structured` | boolean |  | BOM: Structured (else Flattened). |
+| `bottom_to_top` | boolean |  | BOM, cut list, custom: rows bottom to top. |
+| `see_sheet1` | boolean |  | Revision: "See sheet 1" on the other sheets (else Linked). |
+| `visible_rows` | integer |  | Revision: visible rows. |
+| `newest_top` | boolean |  | Revision: order Bottom to top (newest at the top). |
+| `hide_callouts` | boolean |  | Revision: hide callouts no longer in the table. |
+
+#### drawing_copy
+
+Copy views (with their derived views, annotations and tables), or annotations and tables.
+
+Copy (Ctrl+C, the view and annotation menus): with `views`, those views with the views derived from them and their annotations; else the `annotations` and `tables`. Kept for drawing_paste in this session, and returned as `clipboard` (the editor's clipboard text, to paste into another session or drawing).
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "views": [2]}
+{"drawing": "Part 1 Drawing 1", "annotations": [3, 4]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `views` | array of integer |  | View ids. |
+| `annotations` | array of integer |  | Annotation ids (without `views`). |
+| `tables` | array of integer |  | Table ids (without `views`). |
+
+#### drawing_paste
+
+Paste copied views, annotations and tables centered at a point (edits the document (one undoable history entry)).
+
+Paste (Ctrl+V, the drawing menus): what drawing_copy copied (or `clipboard` text), centered on `position` (sheet mm), one edit "Paste views". Returns the new view ids and annotation ids.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "position": [300, 150]}
+{"drawing": "Part 1 Drawing 1", "sheet": 2, "position": [200, 150]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `position` | array of number | required | Where the copy's center goes (sheet mm). |
+| `clipboard` | string |  | Clipboard text from drawing_copy (default: this session's copy). |
+
+#### drawing_paste_table
+
+Paste spreadsheet cells as a new table (edits the document (one undoable history entry)).
+
+Paste as table: spreadsheet text (rows of tab-separated cells, as a spreadsheet copies them) becomes a general table with its top-left corner at `position` (sheet mm); one edit "Paste as table". Returns the table id.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "text": "Item\tQty\nBolt\t4", "position": [20, 280]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `text` | string | required | Rows separated by newlines, cells by tabs. |
+| `position` | array of number | required | Top-left corner (sheet mm). |
+
+#### drawing_replace
+
+Replace a view's model reference, or a BOM table's assembly (edits the document (one undoable history entry)).
+
+With `view`: the reference's Replace… (sheets panel reference row, view row): on every sheet, the base views showing that view's source (and part) show `source` (and `part`) instead. With `table` (a BOM table): its Replace, every base view on the sheet showing the table's assembly shows `source`. One edit "Replace".
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "view": 1, "source": "Part Studio 2"}
+{"drawing": "Assembly 1 Drawing 1", "table": 1, "source": "Assembly 2"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer |  | A view whose reference to replace. |
+| `table` | integer |  | A BOM table whose source to replace (instead of `view`). |
+| `source` | string | required | The new Part Studio or Assembly (tab name or id). |
+| `part` | string |  | With `view`: the new part (id or name) of a Part Studio; default the whole Part Studio. |
+
+#### drawing_replicate
+
+Replicate annotations from one view onto another (beta) (edits the document (one undoable history entry)).
+
+Select for replication ▸ View (or Region… with `region`), then Replicate annotations on view `to`: a copy of each annotation where `to` shows the same geometry (each reference the same model point, or a vertex / circle center at the mapped spot); the others are skipped. With a region, `at` is where its box's center goes on `to` (sheet mm; snapped to the nearest matching vertex or center within 3 mm). One edit "Replicate annotations"; the reply's message is the editor's ("Successfully replicated 7/7 annotations").
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "from": 1, "to": 5}
+{"drawing": "Part 1 Drawing 1", "from": 1, "region": [[180, 150], [230, 190]], "to": 5, "at": [320, 170]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `from` | integer | required | The view whose annotations to replicate. |
+| `region` | array of array of number |  | Region…: two opposite corners (sheet mm); only the annotations drawn inside. |
+| `to` | integer | required | The view to copy them onto. |
+| `at` | array of number |  | With `region`: the box's center on `to` (sheet mm). |
+
+#### drawing_switch_to_reference
+
+The Part Studio, Assembly or Feature Studio a view or table refers to (Switch to …).
+
+Switch to reference (view reference menu), Switch to <assembly> (BOM table), Switch to Custom tables : <Part Studio> / Switch to <Feature Studio> (custom table): the target tab (id, name, kind), the part a view shows, a pinned version. With the app open on the document (live mode) the window switches to that tab, as the menu item does.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "view": 1}
+{"drawing": "Part 1 Drawing 1", "table": 3, "feature_studio": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer |  | A view. |
+| `table` | integer |  | A BOM or custom table (instead of `view`). |
+| `feature_studio` | boolean |  | Custom table: its Feature Studio instead of its Part Studio. |
+
+#### drawing_open_feature_studio
+
+The Feature Studio a custom table comes from (Open Feature Studio in linked document).
+
+A custom table's Feature Studio: in a linked document (a table defined in another document's version) the document's path, the version and the Feature Studio tab, and with the app open (live mode) the document opens in a window, as "Open Feature Studio in linked document" does; in this document the tab, switched to ("Switch to <Feature Studio>").
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "table": 3}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `table` | integer | required | A custom table. |
 
 ### part
 

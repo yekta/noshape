@@ -85,5 +85,9 @@ fn run(ctx: &mut Option<Ctx>, path: &Path, dm: &mut DocModel, tool: &str, args: 
         cx.emit(DocEvent::HistoryChanged);
         cx.notify();
     }
+    // The window does what the call asked for (Switch to reference...).
+    for req in std::mem::take(&mut ctx.ui_requests) {
+        cx.emit(DocEvent::Ui(req));
+    }
     r
 }

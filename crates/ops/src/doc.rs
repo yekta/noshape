@@ -120,6 +120,23 @@ pub struct Ctx {
     live: Vec<(PathBuf, (u16, String))>,
     /// The app's own context: calls run here, never forwarded.
     pub serving: bool,
+    /// What drawing_copy copied (the editor's clipboard text), for
+    /// drawing_paste in this session.
+    pub drawing_clipboard: Option<String>,
+    /// What the window should do after a call (live mode: the app acts on
+    /// them, as the menu item would); taken by the app after each call.
+    pub ui_requests: Vec<UiRequest>,
+}
+
+/// A window action an operation asks for (navigation items like Switch to
+/// reference). Without the app open there is no window: the reply carries
+/// the target instead.
+#[derive(Clone, Debug, PartialEq)]
+pub enum UiRequest {
+    /// Show this tab.
+    ActivateTab(TabId),
+    /// Open this document in a window.
+    OpenDocument(PathBuf),
 }
 
 fn canonical(path: &Path) -> PathBuf {

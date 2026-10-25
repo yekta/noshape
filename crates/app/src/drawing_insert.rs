@@ -129,31 +129,13 @@ impl DrawingEditor {
         if let (Some(old), Some(old_part)) = (self.insert.replace, self.insert.replace_part.take()) {
             // Sheets panel reference › Replace: on every sheet (help H:sheets).
             self.insert.replace = None;
-            self.edit("Replace", cx, |d| {
-                for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
-                    if let ViewKind::Base { source: src, part: p, .. } = &mut v.kind
-                        && *src == old
-                        && *p == old_part
-                    {
-                        *src = source;
-                        *p = part.clone();
-                    }
-                }
-            });
+            self.edit("Replace", cx, |d| noshape_scene::drawing_tools::view_edit::replace_reference(d, old, &old_part, source, part.clone()));
             self.ensure_sources(false, cx);
             return;
         }
         if let Some(old) = self.insert.replace.take() {
             // Replace: every base view of the old source shows the new one.
-            self.edit_sheet("Replace", cx, |s| {
-                for v in s.views.iter_mut() {
-                    if let ViewKind::Base { source: src, .. } = &mut v.kind
-                        && *src == old
-                    {
-                        *src = source;
-                    }
-                }
-            });
+            self.edit_sheet("Replace", cx, |s| noshape_scene::drawing_tools::view_edit::replace_sheet_source(s, old, source));
             self.ensure_sources(false, cx);
             return;
         }
