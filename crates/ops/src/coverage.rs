@@ -43,7 +43,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("general:Reflection analysis", Op("render_image")),
     ("general:Rename selection", Op("feature_rename")),
     ("general:Reorient secondary axis", Op("assembly_mate")),
-    ("general:Search tools", Ui("tool palette; ops_list / feature_types list every tool")),
+    ("general:Search tools", Op("ui_search_tools")),
     ("general:Select other", Op("ui_select")),
     ("general:Tab manager", Op("tab_manager")),
     ("general:Zebra stripes", Op("render_image")),

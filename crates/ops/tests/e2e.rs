@@ -1013,6 +1013,9 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!(s["selected"], json!([p, b]), "{s}");
     let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "clear" }));
     assert_eq!(s["selected"], json!([]), "{s}");
+    // Search tools in the assembly (live dom/assembly-tool-search.txt).
+    let t = call(&mut ctx, "ui_search_tools", json!({ "tab": "Assembly 1", "text": "gear" }));
+    assert_eq!(t["tools"], json!([{ "name": "Gear relation", "icon": "gear-relation", "keys": null }]), "{t}");
     // The lists: a mate row's Expand, Find in instance list, Expand all.
     let l = call(&mut ctx, "ui_list", json!({ "tab": "Assembly 1", "action": "expand", "items": ["Revolute 1"] }));
     assert_eq!(l["expanded_mates"], json!(["Revolute 1"]), "{l}");
@@ -3925,4 +3928,17 @@ fn ui_select_related_and_select_other() {
     assert_eq!(try_call(&mut ctx, "drawing_mbd", json!({ "drawing": d["drawing"], "show": "Datum A" })).unwrap_err().param.as_deref(), Some("show"));
     let e = try_call(&mut ctx, "view_camera", json!({ "action": "zoom_selection" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("refs"), "nothing selected: {e:?}");
+}
+
+/// Search tools… (ui_search_tools): Onshape's ranking of the Part Studio's
+/// tools, with their feature types and keys.
+#[test]
+fn ui_search_tools_ranks_like_onshape() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "search_tools.noshape");
+    let t = call(&mut ctx, "ui_search_tools", json!({ "text": "fil" }));
+    let names: Vec<&str> = t["tools"].as_array().unwrap().iter().map(|x| x["name"].as_str().unwrap()).collect();
+    assert_eq!(&names[..2], ["Fillet", "Fill"], "{t}");
+    assert_eq!((t["tools"][0]["type"].clone(), t["tools"][0]["keys"].clone()), (json!("fillet"), json!("shift-f")), "{t}");
+    assert!(call(&mut ctx, "ui_search_tools", json!({ "text": "" }))["tools"].as_array().unwrap().is_empty());
 }
