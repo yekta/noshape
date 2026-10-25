@@ -23,6 +23,11 @@ pub mod viewport {
     /// (173,169,149)).
     pub const PICKED_REGION: u32 = 0xb69d4c;
     pub const PICKED_REGION_ALPHA: f32 = 0.34;
+    /// A selected datum plane: filled amber over its own fill, outlined in
+    /// solid selection amber (live selection/01: (253,211,133) inside a
+    /// 2 px #ffa90a border, Top view).
+    pub const PLANE_SELECTED_FILL: u32 = 0xffc524;
+    pub const PLANE_SELECTED_ALPHA: f32 = 0.77;
     /// A point target (vertex, edge midpoint): an 11 px disc, a darker ring
     /// 3–4 px out and a light centre; [disc, ring, centre] hovered and
     /// selected (live selection/08, part-studio/qa4-r5-s9-6d, 6e).
