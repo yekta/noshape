@@ -628,3 +628,21 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   part); the coarse preview takes 20–40 ms. Mesh only faces that changed, or cache per-face triangulations across regens.
 - **REGEN-SPEED (kern)** unchanged: commit of an Extrude 1 depth edit re-evaluates 29 features in 390–490 ms (live 132 ms).
 
+
+## P1 Part Studio workflow pass (qa5, 2026-10-25 evening, /root/green/noshape = main ee654502; docs/parity/workflow-p1-pass.md)
+- **P1-1 — ui** — The "Features (N)" header doesn't count the feature being created. Live counts it as soon as its dialog opens:
+  - New Part Studio, Sketch on Top: live "Features (5)" (live/sketch/501-sketch-on-top-start.png); ours "Features (4)".
+  - Same with Linear pattern / Shell dialogs open: ours (11) / (12), one short.
+- **P1-2 — ui** — While a new sketch / feature dialog is open, our header's "add folder" and pause icons turn grey (disabled). Live
+  keeps them black (sketch/501).
+- **P1-3 — psb (manipulators.rs)** — Fillet, three edges picked in turn: the white radius arrow sits on the **first** picked
+  edge. Live: on the **last** picked edge (behaviours "Fillet": "a white triangular radius arrow sits on the last picked edge").
+- **P1-4 — skb (sketch behaviour)** — Point tool on a face sketch, two clicks that snap into horizontal alignment with the origin:
+  the sketch gets a **third point entity at (0, 0)** plus Horizontal constraints from each new point to it (sketch_get: 3 points,
+  con:0/con:1 Horizontal). The stray point shows as a white dot and becomes an extra hole location. Expected: no new entity;
+  the inference references the origin (live: constraint, if any, pending qa5 request).
+- **P1-5 — psb (regen shell) + kern (kernel shell)** — Block 75.554 × 20.245, R2 on 3 vertical edges, 1 mm chamfer chain, two
+  Ø6.35 × 12 mm drilled holes + feature pattern, Shell 2.5 mm off the top face: fine at depth 10 (8960 mm³). Edit Extrude 1 to
+  15 mm: Shell 1 returns **4 sliver parts** (7.85, 7.85, 7.85, 119.2 mm³) with status **Ok**. Same face picked fresh gives the
+  same; thickness 1 mm OK (5298.2), 2 mm and 3 mm Error "Could not shell part with selections.". A shell that turns one part into
+  slivers must not report Ok (and live presumably shells it). Repro: /root/qa5-scratch/p1/bisect.noshape (Shell 2 at 2.5 mm).
