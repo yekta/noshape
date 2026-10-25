@@ -233,8 +233,13 @@ const CIRCULAR: [&str; 5] = ["Parallel axes dist", "Perp axes angle", "Center ax
 /// (the Area / Length totals of a multi-selection are), then, when a
 /// cylinder / circle is measured, the following distance rows on the same
 /// line (live: "Parallel axes dist: 30.000 mm  Min dist: 22.000 mm  Max
-/// dist: 42.942 mm"). Three edges show nothing.
+/// dist: 42.942 mm"). Three or more entities show nothing (live: three
+/// edges; "With three entities the measure readout disappears"; a box of 18
+/// faces and edges).
 pub fn quick_line(rows: &[(String, Measurement)], count: usize) -> Vec<(String, Measurement)> {
+    if count > 2 {
+        return Vec::new();
+    }
     let secondary = |l: &str| count > 1 && (l == "Area" || l == "Length");
     let Some(first) = rows.iter().position(|(l, _)| !secondary(l)) else { return Vec::new() };
     let mut out = vec![rows[first].clone()];
@@ -737,6 +742,8 @@ mod tests {
         assert_eq!(three.len(), 1);
         assert_eq!(three[0].0, "Length");
         assert!(quick_line(&three, 3).is_empty());
+        // Nor with faces among them (the pair rows don't reach the status bar).
+        assert!(quick_line(&par, 3).is_empty());
         // An edge of the top face against a side face it is parallel to.
         let top_edge = z.edges().into_iter().find(|e| matches!(e.edge_curve(), Ok(k::Curve::Line { direction, .. }) if direction.x.abs() < 1e-9)).unwrap();
         let edge_par = measure_shapes(&[vec![top_edge], vec![x[0].clone()]]);
