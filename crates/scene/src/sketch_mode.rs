@@ -728,6 +728,7 @@ fn hatched_text(text: &str, at: DVec2, dir: DVec2, px: f64, em_px: f64) -> Vec<[
 fn constraint_masters(kind: &ConstraintKind, sk: &Sketch) -> Vec<EntityId> {
     match kind {
         ConstraintKind::Offset { master_ref, master, .. } => vec![*master_ref, *master],
+        ConstraintKind::OffsetPair { master_source, master_copy, .. } => vec![*master_source, *master_copy],
         ConstraintKind::Symmetric { a, b, .. } if is_point(sk, *a) && is_point(sk, *b) => sk
             .entities()
             .filter(|e| e.kind() == EntityKind::Line && e.endpoints().is_some_and(|(s, en)| [s, en].iter().any(|p| p == a || p == b)))
@@ -914,7 +915,7 @@ pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
         Pierce { .. } => "pierce",
         Quadrant { .. } => "coincident",
         // Live (qa5 sketch tools): the slot's three offsets, an arch glyph.
-        Offset { .. } => "offset",
+        Offset { .. } | OffsetPair { .. } => "offset",
         _ => return None,
     })
 }
@@ -5779,6 +5780,7 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
         Fix { entity } => vec![entity],
         // Live: the slot's three offset glyphs sit together at the end cap.
         Offset { reference, .. } => vec![reference],
+        OffsetPair { copy, .. } => vec![copy],
         Normal { line, curve } => vec![line, curve],
         // Live draws a tangent's glyph once, on its first entity (the line of
         // a fillet, the cap of a slot; qa5 sketch tools).
