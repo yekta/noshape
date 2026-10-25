@@ -37,6 +37,13 @@ pub use noshape_ops::drawing::PRECISIONS;
 /// Tolerance lists (D35; hole callouts have no Basic).
 pub use noshape_ops::drawing::{DIM_TOLERANCES, HOLE_TOLERANCES};
 
+impl PaletteDlg {
+    /// Open it at `at` (editor px; the launcher puts it over itself).
+    pub fn set_at(&mut self, at: [f32; 2]) {
+        self.at = Some(at);
+    }
+}
+
 /// The open palette.
 pub struct PaletteDlg {
     pub id: u64,
@@ -168,6 +175,7 @@ impl DrawingEditor {
     }
 
     pub fn close_palette(&mut self, accept: bool, cx: &mut Context<Self>) {
+        self.launcher.opened = false;
         let Some(d) = self.palette.take() else { return };
         self.set_preview(None, cx);
         if accept && d.cur != d.orig {
@@ -544,6 +552,12 @@ impl DrawingEditor {
                     if e.keystroke.key == "escape" {
                         this.close_palette(false, cx);
                         cx.stop_propagation();
+                    }
+                }))
+                // Opened from the launcher: leaving it closes it (live).
+                .on_hover(cx.listener(|this, hovered: &bool, _, cx| {
+                    if !*hovered {
+                        this.launcher_palette_left(cx);
                     }
                 }))
                 .absolute()

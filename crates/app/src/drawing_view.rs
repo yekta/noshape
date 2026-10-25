@@ -335,6 +335,8 @@ pub struct DrawingEditor {
     pub replicate_dlg: Option<crate::drawing_replicate::ReplicateDlg>,
     /// The dimension palette / hole callout panel (double-click).
     pub palette: Option<crate::drawing_palette::PaletteDlg>,
+    /// The "±0.1" launcher beside a selected dimension.
+    pub launcher: crate::drawing_launcher::Launcher,
     /// The Datum dialog (Datum / Datum target tabs).
     pub datum_dlg: Option<crate::drawing_datum::DatumDlg>,
     /// Styles panel › Text gap spinbox: (annotation, field, its subscription).
@@ -551,6 +553,7 @@ impl DrawingEditor {
             replication: None,
             replicate_dlg: None,
             palette: None,
+            launcher: Default::default(),
             datum_dlg: None,
             styles_gap: None,
             table_tool: None,
@@ -1558,6 +1561,7 @@ impl DrawingEditor {
             .children(self.render_section_edit(cx))
             .children(self.render_replicate_dlg(cx))
             .children(self.render_palette(window, cx))
+            .children(self.render_dim_launcher(window, cx))
             .children(self.render_datum_dlg(cx))
             .children(self.render_table_tool(cx))
             .children(self.render_gdt_dlg(cx))
