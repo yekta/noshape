@@ -156,7 +156,8 @@ fn offset_rectangle_outward_and_inward() {
     areas.sort_by(f64::total_cmp);
     assert_eq!(areas.len(), 2, "{areas:?}");
     assert!(close(areas[0], 4.0, 1e-9));
-    assert!(close(areas[1], 4.0 + 4.0 * 2.0 * 0.5 + PI * 0.25 - 4.0, 1e-9), "{areas:?}");
+    // Live (qa4 OFF-CORNER): the copies' lines meet at sharp corners.
+    assert!(close(areas[1], 9.0 - 4.0, 1e-9), "{areas:?}");
 
     let mut sk = Sketch::new();
     let r = sk.corner_rectangle(v(0.0, 0.0), v(2.0, 2.0));
@@ -305,4 +306,97 @@ fn closed_fit_spline_is_smooth_at_the_seam() {
     // Six-fold symmetry: the lobe tip at 90 degrees has a horizontal tangent.
     let near_tip = (0..=200).map(|i| a + (b - a) * i as f64 / 200.0).map(|t| c.point(t)).fold(DVec2::ZERO, |m, p| if p.y > m.y { p } else { m });
     assert!(near_tip.x.abs() < 2e-3 && (near_tip.y - 0.0775).abs() < 1e-3, "{near_tip}");
+}
+
+/// Live (behaviours "psb (10-24 j) sketch offset constraints", qa4
+/// OFF-CONSTR): the first pair gets the offset DISTANCE, every other pair an
+/// OFFSET tied to it, so the copies follow their sources when those move and
+/// the one distance drives them all.
+#[test]
+fn offset_copies_follow_their_sources() {
+    let mut sk = Sketch::new();
+    let r = sk.corner_rectangle(v(0.0, 0.0), v(4.0, 2.0));
+    let res = sk.offset(&r.curves, 0.5).unwrap();
+    let kinds: Vec<&ConstraintKind> = res.constraints_added.iter().filter_map(|c| sk.constraint(*c)).map(|c| &c.kind).collect();
+    let dist: Vec<ConstraintId> = res.constraints_added.iter().copied().filter(|c| matches!(sk.constraint(*c).map(|c| &c.kind), Some(ConstraintKind::Distance { .. }))).collect();
+    assert_eq!(dist.len(), 1, "{kinds:?}");
+    assert_eq!(kinds.iter().filter(|k| matches!(k, ConstraintKind::OffsetPair { .. })).count(), 3, "{kinds:?}");
+    assert!(!kinds.iter().any(|k| matches!(k, ConstraintKind::Parallel { .. })), "{kinds:?}");
+    assert!(sk.solve().is_solved());
+    let copies: Vec<EntityId> = res.created.iter().copied().filter(|e| sk.kind(*e) == Some(EntityKind::Line)).collect();
+    // Each copy with its source: the parallel side nearest to it.
+    let ends = |sk: &Sketch, id: EntityId| {
+        let (a, b) = sk.endpoints(id).unwrap();
+        (sk.point(a).unwrap(), sk.point(b).unwrap())
+    };
+    let pairs: Vec<(EntityId, EntityId)> = copies
+        .iter()
+        .map(|&c| {
+            let (c0, c1) = ends(&sk, c);
+            let src = *r.curves.iter().filter(|&&s| { let (a, b) = ends(&sk, s); (b - a).perp_dot(c1 - c0).abs() < 1e-9 }).min_by(|&&x, &&y| {
+                let m = (c0 + c1) / 2.0;
+                let dx = { let (a, b) = ends(&sk, x); ((a + b) / 2.0 - m).length() };
+                let dy = { let (a, b) = ends(&sk, y); ((a + b) / 2.0 - m).length() };
+                dx.total_cmp(&dy)
+            }).unwrap();
+            (src, c)
+        })
+        .collect();
+    let gap = |sk: &Sketch, want: f64| {
+        for &(src, copy) in &pairs {
+            let (s0, s1) = sk.endpoints(src).unwrap();
+            let (a, b) = (sk.point(s0).unwrap(), sk.point(s1).unwrap());
+            let (c0, c1) = sk.endpoints(copy).unwrap();
+            for p in [sk.point(c0).unwrap(), sk.point(c1).unwrap()] {
+                let d = (b - a).perp_dot(p - a).abs() / (b - a).length();
+                assert!(close(d, want, 1e-7), "copy {copy:?} of {src:?} at {d}, not {want}");
+            }
+        }
+    };
+    gap(&sk, 0.5);
+    // The source's right side moves out: its copy follows, still 0.5 inside.
+    let rep = sk.drag(&[(DragHandle::Entity { id: r.curves[1], grab: v(4.0, 1.0) }, v(6.0, 1.0))]);
+    assert!(rep.is_solved(), "{rep:?}");
+    gap(&sk, 0.5);
+    // The one distance drives every copy.
+    sk.set_dimension_value(dist[0], 0.3).unwrap();
+    assert!(sk.solve().is_solved());
+    gap(&sk, 0.3);
+}
+
+/// Live (behaviours "psb (10-24 j)" (c), "qa4 round 5" (4)): a lone line or
+/// circle gets one DISTANCE and one OFFSET on the pair alone; the line's copy
+/// stays parallel when its source turns, the circle's grows with the value.
+#[test]
+fn offset_lone_line_and_circle_stay_offsets() {
+    let mut sk = Sketch::new();
+    let l = sk.add_line(v(0.0, 0.0), v(4.0, 0.0));
+    let res = sk.offset(&[l], 1.0).unwrap();
+    let kinds: Vec<ConstraintKind> = res.constraints_added.iter().filter_map(|c| sk.constraint(*c)).map(|c| c.kind.clone()).collect();
+    assert_eq!(kinds.len(), 2, "{kinds:?}");
+    assert!(matches!(kinds[0], ConstraintKind::Distance { .. }) && matches!(kinds[1], ConstraintKind::OffsetPair { .. }), "{kinds:?}");
+    let copy = res.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Line)).unwrap();
+    let rep = sk.drag(&[(DragHandle::Entity { id: l, grab: v(4.0, 0.0) }, v(4.0, 2.0))]);
+    assert!(rep.is_solved(), "{rep:?}");
+    let (s0, s1) = sk.endpoints(l).unwrap();
+    let (a, b) = (sk.point(s0).unwrap(), sk.point(s1).unwrap());
+    let (c0, c1) = sk.endpoints(copy).unwrap();
+    for p in [sk.point(c0).unwrap(), sk.point(c1).unwrap()] {
+        assert!(close((b - a).perp_dot(p - a).abs() / (b - a).length(), 1.0, 1e-7), "{p}");
+    }
+
+    let mut sk = Sketch::new();
+    let c = sk.add_circle(v(0.0, 0.0), 5.0);
+    let res = sk.offset(&[c], -3.0).unwrap();
+    let dist = res.constraints_added[0];
+    assert!(matches!(sk.constraint(dist).map(|c| &c.kind), Some(ConstraintKind::Distance { .. })));
+    assert!(matches!(sk.constraint(res.constraints_added[1]).map(|c| &c.kind), Some(ConstraintKind::OffsetPair { .. })));
+    let copy = *res.created.last().unwrap();
+    sk.set_dimension_value(dist, 2.0).unwrap();
+    assert!(sk.solve().is_solved());
+    let r = |sk: &Sketch, id| match sk.curve(id) {
+        Some(Curve2::Circle { radius, .. }) => radius,
+        other => panic!("{other:?}"),
+    };
+    assert!(close(r(&sk, copy) - r(&sk, c), 2.0, 1e-7), "{} {}", r(&sk, copy), r(&sk, c));
 }

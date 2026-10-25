@@ -18,11 +18,13 @@ mod sketch;
 mod types;
 pub mod annotation_edit;
 pub mod table_edit;
+pub mod replicate;
 pub mod view_edit;
 
 pub use commit::*;
 pub use overlay::{Overlay, SnapMark};
 pub use jog::{CentermarkArms, seg_dist};
+pub use annotation_edit::LeaderHit;
 pub use opts::*;
 pub use pending::ToolValues;
 pub use pick::SheetPick;

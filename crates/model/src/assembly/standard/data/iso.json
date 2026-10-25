@@ -13309,21 +13309,97 @@
      "head": 3,
      "drive": 1,
      "point": 0,
-     "neck": 0
+     "neck": 0,
+     "rimDome": 1
     },
     "sizes": [
+     {
+      "name": "M2",
+      "label": "Socket button head screw M2x0.4",
+      "d": 2.0,
+      "dims": {
+       "rf": 1.752256,
+       "ru": 0.1,
+       "d": 2.0,
+       "dk": 3.5,
+       "k": 1.35,
+       "sd": 1.3,
+       "t": 0.91,
+       "dp": 1.566987
+      },
+      "lengths": [
+       "2",
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "20",
+       "22"
+      ],
+      "threads": {
+       "2": [
+        "2"
+       ],
+       "22": [
+        "22"
+       ]
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "Socket button head screw M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "rf": 2.288255,
+       "ru": 0.1,
+       "d": 2.5,
+       "dk": 4.5,
+       "k": 1.5,
+       "sd": 1.5,
+       "t": 1.04,
+       "dp": 2.012861
+      },
+      "lengths": [
+       "2",
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "20",
+       "22"
+      ],
+      "threads": {
+       "2": [
+        "2"
+       ],
+       "22": [
+        "22"
+       ]
+      }
+     },
      {
       "name": "M3",
       "label": "Socket button head screw M3x0.5",
       "d": 3.0,
       "dims": {
+       "rf": 3.063727,
+       "ru": 0.1,
        "d": 3.0,
        "dk": 5.7,
        "k": 1.65,
-       "rf": 3.7,
        "sd": 2.0,
        "t": 1.04,
-       "dp": 2.386566
+       "dp": 2.458734
       },
       "lengths": [
        "3",
@@ -13359,13 +13435,14 @@
       "label": "Socket button head screw M4x0.7",
       "d": 4.0,
       "dims": {
+       "rf": 4.036497,
+       "ru": 0.2,
        "d": 4.0,
        "dk": 7.6,
        "k": 2.2,
-       "rf": 4.6,
        "sd": 2.5,
        "t": 1.3,
-       "dp": 3.141192
+       "dp": 3.242228
       },
       "lengths": [
        "4",
@@ -13404,13 +13481,14 @@
       "label": "Socket button head screw M5x0.8",
       "d": 5.0,
       "dims": {
+       "rf": 5.00934,
+       "ru": 0.2,
        "d": 5.0,
        "dk": 9.5,
        "k": 2.75,
-       "rf": 5.75,
        "sd": 3.0,
        "t": 1.56,
-       "dp": 4.018505
+       "dp": 4.133974
       },
       "lengths": [
        "5",
@@ -13447,13 +13525,14 @@
       "label": "Socket button head screw M6x1",
       "d": 6.0,
       "dims": {
+       "rf": 5.377165,
+       "ru": 0.25,
        "d": 6.0,
        "dk": 10.5,
        "k": 3.3,
-       "rf": 6.15,
        "sd": 4.0,
        "t": 2.08,
-       "dp": 4.773131
+       "dp": 4.917468
       },
       "lengths": [
        "6",
@@ -13494,13 +13573,14 @@
       "label": "Socket button head screw M8x1.25",
       "d": 8.0,
       "dims": {
+       "rf": 7.199667,
+       "ru": 0.4,
        "d": 8.0,
        "dk": 14.0,
        "k": 4.4,
-       "rf": 7.95,
        "sd": 5.0,
        "t": 2.6,
-       "dp": 6.466414
+       "dp": 6.646835
       },
       "lengths": [
        "8",
@@ -13538,13 +13618,14 @@
       "label": "Socket button head screw M10x1.5",
       "d": 10.0,
       "dims": {
+       "rf": 8.961942,
+       "ru": 0.4,
        "d": 10.0,
        "dk": 17.5,
        "k": 5.5,
-       "rf": 9.8,
        "sd": 6.0,
        "t": 3.12,
-       "dp": 8.159696
+       "dp": 8.376202
       },
       "lengths": [
        "16",
@@ -13579,13 +13660,14 @@
       "label": "Socket button head screw M12x1.75",
       "d": 12.0,
       "dims": {
+       "rf": 10.754331,
+       "ru": 0.6,
        "d": 12.0,
        "dk": 21.0,
        "k": 6.6,
-       "rf": 11.2,
        "sd": 8.0,
        "t": 4.16,
-       "dp": 9.852979
+       "dp": 10.105569
       },
       "lengths": [
        "16",
@@ -13618,13 +13700,14 @@
       "label": "Socket button head screw M16x2",
       "d": 16.0,
       "dims": {
+       "rf": 14.339107,
+       "ru": 0.6,
        "d": 16.0,
        "dk": 28.0,
        "k": 8.8,
-       "rf": 15.3,
        "sd": 10.0,
        "t": 5.2,
-       "dp": 13.546262
+       "dp": 13.834936
       },
       "lengths": [
        "25",
@@ -13649,9 +13732,46 @@
         "44"
        ]
       }
+     },
+     {
+      "name": "M18",
+      "label": "Socket button head screw M18x2.5",
+      "d": 18.0,
+      "dims": {
+       "rf": 16.131496,
+       "ru": 0.6,
+       "d": 18.0,
+       "dk": 31.5,
+       "k": 9.9,
+       "sd": 12.0,
+       "t": 6.18,
+       "dp": 15.29367
+      },
+      "lengths": [
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80",
+       "90"
+      ],
+      "threads": {
+       "30": [
+        "30"
+       ],
+       "90": [
+        "90",
+        "44"
+       ]
+      }
      }
     ],
-    "source": "ISO 7380-1:2022 (Table 1); lengths/ls-lg and b from ISO 7380-1:2011 (Fasteners - Hexagon socket button head screws with reduced loadability); https://cdn.standards.iteh.ai/samples/78699/a175805085534f98983d6c8aa583a5b0/ISO-7380-1-2022.pdf (ISO 7380-1:2022 sample: Table 1, foreword change list); https://cdn.standards.iteh.ai/samples/53671/02aed8de0fec43f4955953a10cc52a54/ISO-7380-1-2011.pdf (ISO 7380-1:2011 sample, French: Table 1 incl. b and length/ls/lg table); https://www.fasteners.eu/standards/ISO/7380/ (2011 values); https://www.fasten.it/en/norms/norm/din_en_iso_7380-1 (P, dk, s, e, k, t, w; commercial length masses)",
+    "source": "Onshape standard content table DATA_ISO_7380_HEX_SOCKET_BUTTON_HEAD_SCREW_MAIN (document 58e48e1652e2e595367b89c4, version adding sizes for migration)",
     "thread": {
      "rule": "iso"
     }

@@ -384,8 +384,8 @@ pub fn demo_document_with_drawing() -> Document {
     add(sheet, lin(2, [-0.05, 0.03], [0.05, 0.03], 8.0, DimOrientation::Horizontal), [0.0; 2], vec![(0, v(DVec3::new(-0.05, 0.03, 0.0))), (1, v(DVec3::new(0.05, 0.03, 0.0)))]);
     add(sheet, lin(2, [-0.05, -0.03], [-0.05, 0.03], -8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0))), (1, v(DVec3::new(-0.05, 0.03, 0.0)))]);
     // Hole sizes.
-    add(sheet, AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: true, angle: 2.4, dim_line: false }, [0.0; 2], vec![(0, c(DVec3::ZERO, false))]);
-    add(sheet, AnnotationKind::RadialDimension { view: ViewId(6), center: [0.038, 0.018], radius: 0.0048, diameter: false, angle: 0.9, dim_line: false }, [0.0; 2], vec![(0, c(DVec3::new(0.038, 0.018, 0.0), false))]);
+    add(sheet, AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: true, angle: 2.4, dim_line: false, knee: None }, [0.0; 2], vec![(0, c(DVec3::ZERO, false))]);
+    add(sheet, AnnotationKind::RadialDimension { view: ViewId(6), center: [0.038, 0.018], radius: 0.0048, diameter: false, angle: 0.9, dim_line: false, knee: None }, [0.0; 2], vec![(0, c(DVec3::new(0.038, 0.018, 0.0), false))]);
     // Front view: width and thickness.
     add(sheet, lin(1, [-0.05, 0.0], [0.05, 0.0], -10.0, DimOrientation::Horizontal), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0))), (1, v(DVec3::new(0.05, -0.03, 0.0)))]);
     add(sheet, lin(1, [-0.05, 0.0], [-0.05, 0.012], -8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0)))]);

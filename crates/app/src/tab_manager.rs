@@ -171,23 +171,24 @@ impl TabManager {
         out
     }
 
+    /// The rows shown (shared with the agent API's tab_manager).
     fn matches(&self, cx: &App) -> Vec<(TabId, String, &'static str)> {
-        let q = self.query.trim().to_lowercase();
-        let d = &self.doc.read(cx).session.doc;
-        let order: Vec<TabId> = if self.tree_mode() { self.tree(true, cx).into_iter().map(|t| t.0).collect() } else { d.ordered_tabs().iter().map(|t| t.id).collect() };
-        let mut out: Vec<(TabId, String, &'static str)> = order
-            .into_iter()
-            .filter_map(|id| d.tab(id))
-            .map(|t| (t.id, t.name.clone(), kind_of(&t.content)))
-            .filter(|(_, n, k)| (q.is_empty() || n.to_lowercase().contains(&q)) && (self.kinds.is_empty() || self.kinds.contains(k)))
-            .collect();
-        match self.sort {
-            TabSort::TabOrder => {}
-            TabSort::NameAsc => out.sort_by_key(|t| t.1.to_lowercase()),
-            TabSort::NameDesc => out.sort_by_key(|t| std::cmp::Reverse(t.1.to_lowercase())),
-            TabSort::Type => out.sort_by_key(|t| KINDS.iter().position(|k| k.0 == t.2)),
-        }
-        out
+        use noshape_ops::window::TabSort as S;
+        let sort = match self.sort {
+            TabSort::TabOrder => S::TabOrder,
+            TabSort::NameAsc => S::NameAsc,
+            TabSort::NameDesc => S::NameDesc,
+            TabSort::Type => S::Type,
+        };
+        let kinds: Vec<&str> = self.kinds.iter().copied().collect();
+        noshape_ops::window::tab_manager_rows(&self.doc.read(cx).session.doc, &self.query, &kinds, sort, &kind_of)
+    }
+
+    /// The search box's text (the agent API's tab_manager search).
+    pub fn set_search(&mut self, text: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.query = text.clone();
+        self.search.update(cx, |s, cx| s.set_value(text, window, cx));
+        cx.notify();
     }
 
     /// The rows a context menu acts on: the Ctrl+click selection if `id` is in it.

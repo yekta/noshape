@@ -18,6 +18,39 @@ use noshape_model::drawing::*;
 
 pub use noshape_scene::drawing_tools::view_edit::{ORIENTATIONS, TangentMode, default_view_name, orientation_name, set_standard_orientation};
 
+impl DrawingEditor {
+    /// Right-click on a section's cutting line, its arrows or letters (live
+    /// asb 10-23 views (7)): Edit section... | Flip direction | Paste |
+    /// Paste as table | Clear selection | Zoom to fit | Delete.
+    pub fn section_line_entries(&self, id: ViewId, cx: &App) -> Vec<MenuEntry> {
+        let sheet = self.current_sheet();
+        let Some(v) = sheet.view(id) else { return Vec::new() };
+        let mut out = Vec::new();
+        if matches!(v.kind, ViewKind::Section { .. }) {
+            out.push(MenuEntry::item("Edit section...", move |t, _, cx| t.open_section_edit(id, cx)));
+        } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
+            out.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
+        }
+        out.push(MenuEntry::item("Flip direction", move |t, _, cx| t.flip_section(id, cx)));
+        out.extend(paste_entry(cx));
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+            t.start_paste_table(cx);
+        }));
+        out.push(MenuEntry::Separator);
+        out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+            t.selection.clear();
+            t.redraw(cx);
+        }));
+        out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
+        out.push(MenuEntry::item("Delete", move |t, _, cx| {
+            t.selection.clear();
+            t.edit_sheet("Delete view", cx, |s| s.remove_view(id));
+        }));
+        out
+    }
+}
+
+
 /// Views on the system clipboard (Copy in the view menu / Ctrl+C).
 pub fn view_clipboard(cx: &App) -> Option<clipboard::ViewClipboard> {
     cx.read_from_clipboard().and_then(|c| c.text()).and_then(|t| clipboard::ViewClipboard::from_json(&t))
@@ -122,6 +155,11 @@ impl DrawingEditor {
         show.push(MenuEntry::item(if threads { "Hide threads" } else { "Show threads" }, move |t, _, cx| t.edit_view("Threads", id, cx, |v| v.hide_threads = threads)));
         let faulty = v.show_faulty;
         show.push(MenuEntry::item(if faulty { "Hide faulty parts" } else { "Show faulty parts" }, move |t, _, cx| t.edit_view("Faulty parts", id, cx, |v| v.show_faulty = !faulty)));
+        // Section views (live asb 10-23 views (6)): after Show faulty parts.
+        if matches!(v.kind, ViewKind::Section { .. }) {
+            let oc = v.show_offset_cut_lines;
+            show.push(MenuEntry::item(if oc { "Hide offset cut lines" } else { "Show offset cut lines" }, move |t, _, cx| t.edit_view("Offset cut lines", id, cx, |v| v.show_offset_cut_lines = !oc)));
+        }
         // Part views (not sketch views): the source's sketches and their points.
         if v.sketch.is_none() && !self.view_sketch_list(id).is_empty() {
             show.push(MenuEntry::item("Show/hide sketches...", move |t, _, cx| t.open_view_sketches(id, cx)));
@@ -211,27 +249,45 @@ impl DrawingEditor {
         // View-type entries (Onshape: Edit / Flip direction / Remove crop ...),
         // after Paste as table (live 5664-5670 crop, 2853 auxiliary).
         let mut edits: Vec<MenuEntry> = Vec::new();
+        // Flip direction is only on the cutting line's menu (live asb 10-23
+        // views (7), `section_line_entries`).
         if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
-            edits.push(MenuEntry::item("Flip direction", move |t, _, cx| t.flip_section(id, cx)));
             if matches!(v.kind, ViewKind::Section { .. }) {
                 edits.push(MenuEntry::item("Edit section...", move |t, _, cx| t.open_section_edit(id, cx)));
             } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
                 edits.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
             }
         }
+        // Live asb 10-23 views (4), (7): Edit hatch section... on any view
+        // whose cut is hatched (after Edit section... on section views).
+        if self.geoms.get(&id).is_some_and(|g| !g.section_segments.is_empty()) {
+            edits.push(MenuEntry::item("Edit hatch section...", |t, w, cx| t.open_section_hatch_dialog(w, cx)));
+        }
         if matches!(v.kind, ViewKind::Auxiliary { .. }) {
             edits.push(MenuEntry::item("Edit auxiliary view...", move |t, w, cx| t.edit_aux_view(id, w, cx)));
+        }
+        // Live asb 10-23 views (1): "Edit detail..." reopens the Detail view panel.
+        if matches!(v.kind, ViewKind::Detail { .. }) {
+            edits.push(MenuEntry::item("Edit detail...", move |t, w, cx| t.open_detail_edit(id, w, cx)));
         }
         if v.crop.is_some() {
             // Live 5671-5677: "Edit crop..." reopens the Crop view dialog.
             edits.push(MenuEntry::item("Edit crop...", move |t, _, cx| t.edit_crop(id, cx)));
-            edits.push(MenuEntry::item("Remove crop", move |t, _, cx| t.edit_view("Remove crop", id, cx, |v| v.crop = None)));
+            // Live asb 10-23 views (3): the boundary stays as a sketch entity.
+            edits.push(MenuEntry::item("Remove crop", move |t, _, cx| {
+                let pl = t.placement(id);
+                t.edit_sheet("Remove crop", cx, |s| noshape_scene::drawing_tools::remove_crop(s, pl.as_ref(), id));
+            }));
         }
-        if !v.broken_out.is_empty() {
-            // Help broken_out_section_view: "Edit section" and "Remove section".
-            let last = v.broken_out.len() - 1;
-            edits.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_broken_out_panel(id, last, w, cx)));
-            edits.push(MenuEntry::item("Remove section", move |t, _, cx| t.edit_view("Remove broken-out sections", id, cx, |v| v.broken_out.clear())));
+        // Live asb 10-23 views (3): "Edit section... | Remove section" only on
+        // a broken-out section's hatch or profile; Remove section keeps the
+        // profile as a sketch spline.
+        if let Some((_, index)) = self.menu_broken_out.filter(|(bv, i)| *bv == id && *i < v.broken_out.len()) {
+            edits.push(MenuEntry::item("Edit section...", move |t, w, cx| t.open_broken_out_panel(id, index, w, cx)));
+            edits.push(MenuEntry::item("Remove section", move |t, _, cx| {
+                let pl = t.placement(id);
+                t.edit_sheet("Remove section", cx, |s| noshape_scene::drawing_tools::remove_broken_out(s, pl.as_ref(), id, index));
+            }));
         }
         // Live (drawing context menu): "Insert custom table of Part Studio 1…";
         // assemblies: "Insert BOM for Assembly 1 ..." (live drawing/1108).
@@ -264,7 +320,9 @@ impl DrawingEditor {
         // Rotate view vertically / horizontally: pick a straight edge (views
         // without a parent or children, like the rotation angle).
         // A view linked to a parent on another sheet doesn't align with it (live x (4)).
-        let free = sheet.parent_of(id).is_none_or(|p| p.is_ghost()) && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id));
+        // Detail views aren't aligned with their parent: live asb 10-23
+        // views (1) lists Rotate view on them.
+        let free = (matches!(v.kind, ViewKind::Detail { .. }) || sheet.parent_of(id).is_none_or(|p| p.is_ghost())) && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id));
         // Live (behaviours "Replicate annotations with real annotations" (5)):
         // a "Rotate view" submenu "Vertical to… | Horizontal to…".
         if free {
@@ -302,7 +360,10 @@ impl DrawingEditor {
         }
         // Live drawing/1108, u-944: Paste (with something to paste), Copy.
         out.extend(paste_entry(cx));
-        out.push(MenuEntry::item("Copy", move |t, _, cx| t.copy_views(Some(id), cx)));
+        // Live asb 10-23 views (1), (7): detail and section views have no Copy.
+        if !matches!(v.kind, ViewKind::Detail { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
+            out.push(MenuEntry::item("Copy", move |t, _, cx| t.copy_views(Some(id), cx)));
+        }
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
             t.start_paste_table(cx);
         }));

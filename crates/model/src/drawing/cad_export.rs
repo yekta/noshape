@@ -532,6 +532,29 @@ enum TextIn {
     Cell { style: &'static str, aligned: bool },
 }
 
+/// A note font's MTEXT code (live asb 10-24 "drawing font files"): SHX
+/// shape fonts `\FARSimp.shx|c0;` (`APMONO.SHX`), the others
+/// `\fArimo|b0|i0|c0|p0;` with the CJK families by their font names;
+/// none for the style's Noto Sans.
+fn mtext_font_code(f: &super::sheet::TextFont) -> Option<String> {
+    let family = f.family.as_str();
+    if family == super::sheet::DRAWING_DEFAULT_FONT && !f.bold && !f.italic {
+        return None;
+    }
+    if super::sheet::is_shx(family) {
+        let file = if family == "APMONO" { "APMONO.SHX".to_string() } else { format!("{family}.shx") };
+        return Some(format!("\\F{file}|c0;"));
+    }
+    let name = match family {
+        "Noto Sans Chinese Simplified" => "Noto Sans SC",
+        "Noto Sans Chinese Traditional" => "Noto Sans TC",
+        "Noto Sans Japanese" => "Noto Sans JP",
+        "Noto Sans Korean" => "Noto Sans KR",
+        f => f,
+    };
+    Some(format!("\\f{name}|b{}|i{}|c0|p0;", f.bold as u8, f.italic as u8))
+}
+
 /// The MTEXT paragraph alignment code of an anchor (`\pxq?;`).
 fn paragraph_align(a: Anchor) -> char {
     match a {
@@ -697,8 +720,12 @@ impl Sheet<'_> {
         e.value = match kind {
             TextIn::Dimension => format!("\\A1;{}", mtext_value(t.text.trim()).replace('Ø', "%%c").replace('°', "%%d").replace('±', "%%p")),
             TextIn::Symbol(_) => format!("\\A1;{}", mtext_value(&t.text).replace('Ø', "%%c")),
-            // Live notes: `{\pxql;…}` (the paragraph's alignment).
-            TextIn::Space if self.g.cad_text_style(ti) == Some(CadTextStyle::Note) => format!("{{\\pxq{};{}}}", paragraph_align(t.anchor), mtext_value(&t.text)),
+            // Live notes: `{\pxql;…}` (the paragraph's alignment), then the
+            // font's code unless it is the style's.
+            TextIn::Space if self.g.cad_text_style(ti) == Some(CadTextStyle::Note) => {
+                let font = self.g.text_font(ti).and_then(mtext_font_code).unwrap_or_default();
+                format!("{{\\pxq{};{font}{}}}", paragraph_align(t.anchor), mtext_value(&t.text))
+            }
             TextIn::Space => mtext_value(&t.text),
             TextIn::Cell { aligned: true, .. } => format!("{{\\pxq{};{}}}", paragraph_align(t.anchor), mtext_value(&t.text)),
             TextIn::Cell { .. } => format!("{{{}}}", mtext_value(&t.text)),
@@ -1401,6 +1428,37 @@ mod tests {
         assert!(doc.entities().any(|e| matches!(e, EntityType::Circle(c) if c.common.layer == "Visible" && (c.radius - 10.0).abs() < 1e-6)));
     }
 
+    /// Live asb 10-24 "drawing font files": a note's font is an MTEXT code
+    /// after the paragraph's (`\FARSimp.shx|c0;`, `\fArimo|b0|i0|c0|p0;`,
+    /// the CJK ones by font name); the style's Noto Sans has none.
+    #[test]
+    fn note_fonts_are_mtext_codes_like_live() {
+        use crate::drawing::sheet::{Anchor, FontSpan, Text2, TextFont};
+        let mut g = sample();
+        let fonts = [("ARSimp", false, false), ("APMONO", false, false), ("Arimo", false, false), ("Tinos", true, true), ("Noto Sans Japanese", false, false), ("Noto Sans Chinese Simplified Light", false, false), ("Noto Sans", false, false), ("Noto Sans", true, false)];
+        let t0 = g.texts.len();
+        for (i, (family, bold, italic)) in fonts.iter().enumerate() {
+            let ti = g.texts.len();
+            g.texts.push(Text2 { pos: [20.0, 200.0 - 10.0 * i as f64], height: 3.5, text: format!("N{i}"), angle: 0.0, anchor: Anchor::BottomLeft, pick: 0 });
+            g.fonts.push(FontSpan { texts: ti..ti + 1, font: TextFont { family: family.to_string(), bold: *bold, italic: *italic } });
+        }
+        g.cad_text_style_since(t0, CadTextStyle::Note);
+        let dxf = String::from_utf8(to_dxf_version(&g, 4, DxfVersion::AC1032).unwrap()).unwrap();
+        let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf.as_bytes().to_vec())).unwrap().read().unwrap();
+        let value = |n: usize| doc.entities().find_map(|e| match e {
+            EntityType::MText(m) if m.value.ends_with(&format!("N{n}}}")) => Some(m.value.clone()),
+            _ => None,
+        }).unwrap();
+        assert_eq!(value(0), "{\\pxql;\\FARSimp.shx|c0;N0}");
+        assert_eq!(value(1), "{\\pxql;\\FAPMONO.SHX|c0;N1}");
+        assert_eq!(value(2), "{\\pxql;\\fArimo|b0|i0|c0|p0;N2}");
+        assert_eq!(value(3), "{\\pxql;\\fTinos|b1|i1|c0|p0;N3}");
+        assert_eq!(value(4), "{\\pxql;\\fNoto Sans JP|b0|i0|c0|p0;N4}");
+        assert_eq!(value(5), "{\\pxql;\\fNoto Sans Chinese Simplified Light|b0|i0|c0|p0;N5}");
+        assert_eq!(value(6), "{\\pxql;N6}");
+        assert_eq!(value(7), "{\\pxql;\\fNoto Sans|b1|i0|c0|p0;N7}");
+    }
+
     /// Live drw2-k-dxf2018: a table is an ACAD_TABLE over a *T block (an
     /// INSERT in R14), a feature control frame a TOLERANCE, a broken-out
     /// profile a SPLINE, an image an OLE2FRAME (Paintbrush Picture).
@@ -1473,7 +1531,9 @@ mod tests {
             let dxf = to_dxf_version(g, units, DxfVersion::AC1032).unwrap();
             acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap()
         };
+        // ANSI, inches.
         let mut g = sample();
+        g.style.iso = false;
         let d = read(&g, 1);
         let names: Vec<String> = d.dim_styles.iter().map(|s| s.name.clone()).collect();
         assert_eq!(names.len(), 21, "{names:?}");

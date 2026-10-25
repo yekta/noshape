@@ -140,6 +140,30 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "edit_detail",
+            summary: "Edit a detail view: move / resize its circle, its label and leader, Edit detail's options",
+            description: "The detail circle's grips and menu and Edit detail... (live asb 10-23 views (1), (2)): `center` moves the circle (sheet mm, in its parent), `radius` resizes it (sheet mm; the detail view grows with it); `leader` true puts the label on a leader with an arrow to the circle (Add leader), false back beside it; `label_at` places the label on its leader (sheet mm); the Detail view panel's `scale`, `label`, `style`, `show_profile` and `clip_border`. One edit (\"Edit detail view\").",
+            fields: with(
+                common(),
+                vec![
+                    view_id("view", "The detail view (drawing_get)."),
+                    opt("center", point(), "New circle centre (sheet mm)."),
+                    opt("radius", json!({ "type": "number", "exclusiveMinimum": 0 }), "New circle radius (sheet mm)."),
+                    opt("leader", json!({ "type": "boolean" }), "Label on a leader (Add leader) or beside the circle."),
+                    opt("label_at", point(), "The label's position on its leader (sheet mm)."),
+                    opt("scale", json!({ "type": "number", "exclusiveMinimum": 0 }), "View scale."),
+                    opt("label", json!({ "type": "string", "minLength": 1 }), "View label (detail id)."),
+                    opt("style", json!({ "type": "string", "enum": ["in_line", "connected", "leader"] }), "Profile style."),
+                    opt("show_profile", json!({ "type": "boolean" }), "Show detail view profile."),
+                    opt("clip_border", json!({ "type": "boolean" }), "Clip border to geometry."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: edit_detail,
+        },
+        Op {
+            group: "drawing",
             verb: "auxiliary_view",
             summary: "Auxiliary view: normal to an edge, in line with a sketch line / centerline, or down a hole's axis",
             description: "The Auxiliary view tool. `edge` is a click (sheet mm) on the fold line for `mode`: normal, a straight model edge of the parent view (the view looks along it); in_line, a sheet sketch line or a centerline annotation; axis, a hole's axis seen side-on (its centerline or silhouette; the view looks down it). The view goes to `position` (at least 15 mm from the parent, perpendicular to the fold line). One edit (\"Auxiliary view\").",
@@ -215,6 +239,44 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: broken_out_section,
+        },
+        Op {
+            group: "drawing",
+            verb: "edit_hatch",
+            summary: "Edit hatch section...: restyle one hatch region of a view's cut",
+            description: "The view menu's Edit hatch section... (live asb 10-23 views (4)): the hatch region of view `view`'s cut under `at` (sheet mm) takes `standard` (ansi, iso, general) and `pattern` (its name as listed, e.g. \"ANSI32 steel\", \"ISO02W100\", \"Solid\"; general \"None\" leaves the region unhatched), `scale` and `angle` (\"auto\" or numbers; angle in degrees, the pattern's own when auto) and `color` (\"#rrggbb\", default the drawing's); `reset` puts the region back to the drawing's hatch. Each region is separate. One edit (\"Edit hatch\").",
+            fields: with(
+                common(),
+                vec![
+                    view_id("view", "The view (drawing_get)."),
+                    req("at", point(), "A point inside the hatch region (sheet mm)."),
+                    opt("standard", json!({ "type": "string", "enum": ["ansi", "iso", "general"], "default": "ansi" }), "Pattern group (the dialog's tab)."),
+                    opt("pattern", json!({ "type": "string" }), "Pattern name (default the group's first in the dialog's order)."),
+                    opt("scale", json!({ "type": ["string", "number"], "default": "auto" }), "Scale (auto = 1)."),
+                    opt("angle", json!({ "type": ["string", "number"], "default": "auto" }), "Angle in degrees (auto = the pattern's own)."),
+                    opt("color", json!({ "type": "string" }), "Color \"#rrggbb\" (default the drawing's)."),
+                    opt("reset", json!({ "type": "boolean", "default": false }), "Back to the drawing's section hatch."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: edit_hatch,
+        },
+        Op {
+            group: "drawing",
+            verb: "title_field",
+            summary: "Edit a title block field: its cell's note",
+            description: "Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. \"Title\", \"Drawn by\"; a key the layout lacks is added). Lines split on \\n; property codes like {part.name} expand. One edit (\"Edit title block\").",
+            fields: with(
+                common(),
+                vec![
+                    req("field", json!({ "type": "string" }), "The field (drawing_get `title_fields`)."),
+                    req("text", json!({ "type": "string" }), "Its text."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: title_field,
         },
         Op {
             group: "drawing",
@@ -712,7 +774,7 @@ fn refused(t: &Target, tool: &str, view: ViewId, param: &str) -> Result<(), OpEr
     }
 }
 
-fn enum_arg<T: Copy>(a: &Args, name: &str, options: &[(&str, T)], default: T) -> Result<T, OpError> {
+pub(super) fn enum_arg<T: Copy>(a: &Args, name: &str, options: &[(&str, T)], default: T) -> Result<T, OpError> {
     match a.opt_str(name)? {
         None => Ok(default),
         Some(s) => options.iter().find(|o| o.0 == s).map(|o| o.1).ok_or_else(|| OpError::param(name, &format!("one of {}", options.iter().map(|o| o.0).collect::<Vec<_>>().join(", ")))),
@@ -958,6 +1020,9 @@ fn broken_out_section(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => None,
     };
     let (view, pts) = profile(&t, a, given)?;
+    if let Some(why) = dt::broken_out_refused(&t.d.sheets[t.sheet], view) {
+        return Err(OpError::param("view", why));
+    }
     let index = a.opt_u64("index")?.map(|i| i as usize);
     if let Some(i) = index
         && t.d.sheets[t.sheet].view(view).is_none_or(|v| i >= v.broken_out.len())
@@ -1274,6 +1339,125 @@ fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     done(od, t, "Note", "annotation", id)
 }
 
+fn edit_hatch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::{SectionHatch, hatch_pat};
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let view = view_arg(&t, a, "view")?;
+    let si = t.sheet;
+    let pl = t.m.built.as_ref().and_then(|b| b.placement(view).cloned()).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
+    let geo = t.m.geoms.get(&view).cloned().ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
+    let at = pl.to_view(pt_arg(a, "at")?);
+    let style = if a.bool_or("reset", false)? {
+        None
+    } else {
+        let standard = enum_arg(a, "standard", &[("ansi", 0usize), ("iso", 1), ("general", 2)], 0)?;
+        let pattern = match a.opt_str("pattern")? {
+            Some(n) if standard == 2 && n.trim().eq_ignore_ascii_case("none") => None,
+            Some(n) => Some(hatch_pat::find(standard, n).ok_or_else(|| OpError::param("pattern", "no such pattern in that group"))?),
+            None => Some(hatch_pat::default_pattern(standard)),
+        };
+        // "auto" or a number: scale 1, the pattern's own angle.
+        let num = |name: &str| -> Result<Option<f64>, OpError> {
+            match a.get(name) {
+                None => Ok(None),
+                Some(v) if v.as_str().is_some_and(|s| s.trim().eq_ignore_ascii_case("auto")) => Ok(None),
+                Some(v) => v.as_f64().or_else(|| v.as_str().and_then(|s| s.trim().trim_end_matches('°').parse().ok())).map(Some).ok_or_else(|| OpError::param(name, "\"auto\" or a number")),
+            }
+        };
+        let scale = num("scale")?.unwrap_or(1.0);
+        if scale <= 0.0 {
+            return Err(OpError::param("scale", "must be > 0"));
+        }
+        let base = pattern.map(|p| hatch_pat::base_angle(standard, p)).unwrap_or(0.0);
+        let angle = num("angle")?.map(|deg| deg - base).unwrap_or(0.0);
+        let color = match a.opt_str("color")? {
+            Some(c) => {
+                let h = c.trim().trim_start_matches('#');
+                let v = (h.len() == 6).then(|| u32::from_str_radix(h, 16).ok()).flatten().ok_or_else(|| OpError::param("color", "\"#rrggbb\""))?;
+                Some([(v >> 16) as u8, (v >> 8) as u8, v as u8])
+            }
+            None => None,
+        };
+        Some(SectionHatch { at, standard, pattern, scale, angle, color })
+    };
+    let v = t.d.sheets[si].view_mut(view).expect("view");
+    if !dt::set_section_hatch(v, &geo, at, style) {
+        return Err(OpError::param("at", "not inside a hatch region of the view's cut"));
+    }
+    done(od, t, "Edit hatch", "view", view.0)
+}
+
+fn title_field(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let (key, text) = (a.str("field")?.to_string(), a.str("text")?.to_string());
+    if key.trim().is_empty() {
+        return Err(OpError::param("field", "empty"));
+    }
+    let si = t.sheet;
+    dt::set_title_field(&mut t.d.sheets[si], &key, &text);
+    commit(od, t.tab, si, t.d, "Edit title block")?;
+    Ok(reply(od, t.tab, si, false)?.into())
+}
+
+fn edit_detail(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let id = view_arg(&t, a, "view")?;
+    let si = t.sheet;
+    let parent = match t.d.sheets[si].view(id).map(|v| &v.kind) {
+        Some(ViewKind::Detail { parent, .. }) => *parent,
+        _ => return Err(OpError::param("view", "not a detail view")),
+    };
+    let ppl = t.m.built.as_ref().and_then(|b| b.placement(parent).cloned()).ok_or_else(|| OpError::param("view", "its parent view isn't drawn"))?;
+    let center = a.get("center").map(|v| point_value(v, "center")).transpose()?;
+    let radius = a.opt_f64("radius")?;
+    let leader = a.get("leader").and_then(|v| v.as_bool());
+    let label_at = a.get("label_at").map(|v| point_value(v, "label_at")).transpose()?;
+    let style = if a.get("style").is_some() { Some(enum_arg(a, "style", &[("in_line", 0u8), ("connected", 1), ("leader", 2)], 0)?) } else { None };
+    let (scale, label) = (a.opt_f64("scale")?, a.opt_str("label")?.map(str::to_string));
+    let (show, clip) = (a.get("show_profile").and_then(|v| v.as_bool()), a.get("clip_border").and_then(|v| v.as_bool()));
+    if center.is_none() && radius.is_none() && leader.is_none() && label_at.is_none() && style.is_none() && scale.is_none() && label.is_none() && show.is_none() && clip.is_none() {
+        return Err(OpError::param("center", "nothing to change"));
+    }
+    let v = t.d.sheets[si].view_mut(id).expect("view");
+    if let Some(s) = scale {
+        v.scale = Some(s);
+    }
+    if let Some(s) = style {
+        v.detail_style = s;
+    }
+    if let Some(b) = show {
+        v.detail_hide_profile = !b;
+    }
+    if let Some(b) = clip {
+        v.detail_clip_border = b;
+    }
+    let ViewKind::Detail { center: c, radius: r, label: l, .. } = &mut v.kind else { unreachable!("a detail view") };
+    if let Some(x) = label {
+        *l = x;
+    }
+    if let Some(p) = center {
+        *c = ppl.to_view(p);
+    }
+    if let Some(rs) = radius {
+        *r = rs / ppl.len_to_sheet(1.0).max(1e-12);
+    }
+    // The label's offset from the circle centre (sheet mm).
+    let (cs, rs) = (ppl.to_sheet(*c), ppl.len_to_sheet(*r));
+    match (leader, label_at) {
+        (Some(false), _) => v.detail_label_at = None,
+        (_, Some(p)) => v.detail_label_at = Some([p[0] - cs[0], p[1] - cs[1]]),
+        (Some(true), None) if v.detail_label_at.is_none() => {
+            let d = rs * std::f64::consts::FRAC_1_SQRT_2;
+            v.detail_label_at = Some([d + 12.0, d + 10.0]);
+        }
+        _ => {}
+    }
+    done(od, t, "Edit detail view", "view", id.0)
+}
+
 fn gdt(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let mut t = target(od, a)?;
@@ -1421,7 +1605,7 @@ fn aligned_section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     done(od, t, "Aligned section view", "view", id.0)
 }
 
-const CORNERS: [(&str, TableCorner); 4] = [("top_left", TableCorner::TopLeft), ("top_right", TableCorner::TopRight), ("bottom_left", TableCorner::BottomLeft), ("bottom_right", TableCorner::BottomRight)];
+pub(super) const CORNERS: [(&str, TableCorner); 4] = [("top_left", TableCorner::TopLeft), ("top_right", TableCorner::TopRight), ("bottom_left", TableCorner::BottomLeft), ("bottom_right", TableCorner::BottomRight)];
 
 fn general_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;

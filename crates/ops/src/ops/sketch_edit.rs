@@ -418,7 +418,9 @@ fn offset(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let pending = ed.offset_pending.clone().unwrap_or_default();
         let gap = |flip: bool| -> f64 {
             let mut tmp = t.data.sketch.clone();
-            let d = if flip { -ed.offset_distance } else { ed.offset_distance };
+            // The default side may already be the negative one (live: away
+            // from the region, `offset_out`).
+            let d = if flip != ed.offset_out { -ed.offset_distance } else { ed.offset_distance };
             match tmp.offset(&pending, d) {
                 Ok(r) => r.created.iter().filter_map(|e| tmp.curve(*e)).map(|c| c.closest(p).2).fold(f64::INFINITY, f64::min),
                 Err(_) => f64::INFINITY,

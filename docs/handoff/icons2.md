@@ -1170,3 +1170,15 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   orange×0.64 at α≈0.29); through the preview front face (156,150,124) (part-studio/230), ours (149,141,140).
   Alpha/unlit sweeps (env override, not committed) only reach (155,141,135): the green is short, so the fill
   hue needs to be yellower than #ffa90a — derive the colour, then calibrate (one build per try).
+- (10-25 evening, FAST RULES: clippy -p <changed crates> + only covering tests; build only for an in-app
+  look; mark ready at once; merge main only on CONFLICT; one cargo job; own files = icons, scene palette,
+  scene builder overlays, overlay shaders.) Done since: midpoint hover per live "icons2 midpoint radius"
+  (armed after the edge is hovered, 9 px square window, clicks follow the hover; behaviors.rs update_hover
+  / midpoint_hover_step / in_midpoint_window + tests), selected face/part/plane colours, highlight widths,
+  vertex point marker (palette POINT_HOVER/SELECTED), picked-region tint (palette PICKED_REGION, drawn over
+  the preview), region outline 3 px, selected plane overlay (PLANE_SELECTED_FILL). The lead-cleared patch
+  (renderer.rs outline after transparents + mod.rs feature-row hover outline) is committed on top of the
+  branch and goes ready only after /tmp/lead/mq/ui.status says MERGED.
+  Open: live keeps a hovered edge's dark line in the middle of its orange band, and draws the silhouette
+  edge orange on a feature-row hover (ours black over the band); planes under a selected face read bluer
+  (linear vs sRGB blending). Requested: plane hover/origin highlight captures (REQUESTS icons2 10-25 b).

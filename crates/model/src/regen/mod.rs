@@ -154,6 +154,9 @@ struct CacheEntry {
 /// undoing a delete finds the feature evaluated (its key still chains its
 /// unchanged upstream).
 pub(super) const KEEP_RUNS: u64 = 16;
+/// Evaluations kept per feature: undoing or redoing an edit finds the
+/// feature (and everything after it) as it was.
+const VERSIONS: usize = 3;
 const KEEP_GONE: usize = 8;
 
 /// Parsed Assembly context snapshots: (id, revision) -> bodies and their display.
@@ -161,7 +164,8 @@ type ContextCache = HashMap<(u32, u32), (Vec<Arc<context::Body>>, Vec<crate::dis
 
 #[derive(Default)]
 pub struct Regenerator {
-    entries: HashMap<FeatureId, CacheEntry>,
+    /// Per feature its last few evaluations, newest first ([`VERSIONS`]).
+    entries: HashMap<FeatureId, Vec<CacheEntry>>,
     /// Counts runs (the age of cache entries).
     run: u64,
     meshes: HashMap<u64, (u64, bool, Arc<MeshBuffers>)>,
@@ -269,12 +273,14 @@ impl Regenerator {
                 states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() });
                 continue;
             }
-            if let Some(e) = self.entries.get_mut(&f.id)
-                && e.key == key
+            if let Some(versions) = self.entries.get_mut(&f.id)
+                && let Some(i) = versions.iter().position(|e| e.key == key)
             {
+                let mut e = versions.remove(i);
                 e.last_run = run;
                 ctx = e.ctx.clone();
                 states.push(e.state.clone());
+                versions.insert(0, e);
                 cached += 1;
                 continue;
             }
@@ -388,11 +394,14 @@ impl Regenerator {
                 }
             }
             state.time_ms = ft.elapsed().as_secs_f32() * 1000.0;
-            self.entries.insert(f.id, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run });
+            let versions = self.entries.entry(f.id).or_default();
+            versions.insert(0, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run });
+            versions.truncate(VERSIONS);
             states.push(state);
         }
         // Features gone from this run: the most recently used few stay a while.
-        let mut gone: Vec<(u64, FeatureId)> = self.entries.iter().filter(|(id, e)| !live.contains(id) && run - e.last_run <= KEEP_RUNS).map(|(id, e)| (e.last_run, *id)).collect();
+        let last_run = |versions: &[CacheEntry]| versions.first().map_or(0, |e| e.last_run);
+        let mut gone: Vec<(u64, FeatureId)> = self.entries.iter().filter(|(id, v)| !live.contains(id) && run - last_run(v) <= KEEP_RUNS).map(|(id, v)| (last_run(v), *id)).collect();
         gone.sort_unstable_by_key(|g| std::cmp::Reverse(g.0));
         gone.truncate(KEEP_GONE);
         self.entries.retain(|id, _| live.contains(id) || gone.iter().any(|(_, g)| g == id));
@@ -410,9 +419,10 @@ impl Regenerator {
         // The shown Assembly context: its bodies, translucent and pickable.
         if let Some(active) = studio.active_context
             && let Some(c) = studio.contexts.iter().find(|c| c.id == active)
-            && let Some((_, shown)) = self.contexts.get(&(c.id, c.revision))
+            && let Some((bodies, shown)) = self.contexts.get(&(c.id, c.revision))
         {
             display.context_bodies = shown.clone();
+            display.context_shapes = bodies.clone();
         }
         display.features = states;
         display.variables = ctx.variables.clone();

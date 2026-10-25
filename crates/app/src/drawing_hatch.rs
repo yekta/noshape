@@ -47,8 +47,15 @@ pub struct HatchDlg {
     /// The picked closed profiles, each in a view (view coordinates) or on
     /// the sheet.
     pub profiles: Vec<(Profile, Option<ViewId>)>,
+    /// Edit hatch section... (live asb 10-23 views (4)): the picked hatch
+    /// regions of views' cuts (a point inside each, view coordinates);
+    /// None: the Hatch region dialog.
+    pub sections: Option<Vec<(ViewId, [f64; 2])>>,
     _subs: [Subscription; 2],
 }
+
+/// General › None in Edit hatch section... (the region unhatched).
+const NO_PATTERN: usize = usize::MAX;
 
 impl HatchDlg {
     /// The dialog's options as typed (see `noshape_scene::drawing_tools::HatchOpts`).
@@ -105,20 +112,118 @@ impl DrawingEditor {
         };
         let subs = [sub(&scale, cx), sub(&angle, cx)];
         self.hatch_dlg = Some(match existing {
-            Some(h) => HatchDlg { edit, standard: h.standard, pattern: h.pattern, scale, angle, drawing_color: h.color.is_none(), color: h.color, profiles: vec![((h.boundary, h.holes), h.view)], _subs: subs },
-            None => HatchDlg { edit: None, standard: 0, pattern: hatch_pat::default_pattern(0), scale, angle, drawing_color: true, color: None, profiles: Vec::new(), _subs: subs },
+            Some(h) => HatchDlg { edit, standard: h.standard, pattern: h.pattern, scale, angle, drawing_color: h.color.is_none(), color: h.color, profiles: vec![((h.boundary, h.holes), h.view)], sections: None, _subs: subs },
+            None => HatchDlg { edit: None, standard: 0, pattern: hatch_pat::default_pattern(0), scale, angle, drawing_color: true, color: None, profiles: Vec::new(), sections: None, _subs: subs },
         });
         self.tool = Tool::Select;
         self.status = None;
         self.hatch_preview(cx);
     }
 
+    /// The view menu's Edit hatch section...: the Edit hatch panel with an
+    /// empty Hatches box (live asbv-36).
+    pub fn open_section_hatch_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_hatch_dialog(None, window, cx);
+        if self.hatch_dlg.is_none() {
+            self.open_hatch_dialog(None, window, cx);
+        }
+        if let Some(d) = &mut self.hatch_dlg {
+            d.sections = Some(Vec::new());
+        }
+        self.hatch_preview(cx);
+    }
+
+    /// The hatch regions of view `v`'s cut (view coordinates).
+    fn section_regions_of(&self, v: ViewId) -> Option<Vec<noshape_model::drawing::views::HatchArea>> {
+        let g = self.geoms.get(&v)?;
+        noshape_model::drawing::views::section_regions(&g.section_segments)
+    }
+
+    /// Edit hatch: a click on a hatch region of a view's cut adds it (or,
+    /// picked already, removes it); the first one sets the dialog to its
+    /// current style.
+    fn section_hatch_click(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let c = self.cursor;
+        let Some(view) = self.view_at(c) else { return };
+        let (Some(pl), Some(regions)) = (self.placement(view), self.section_regions_of(view)) else { return };
+        let at = pl.to_view(c);
+        let region_at = noshape_model::drawing::views::section_region_at;
+        let Some(k) = region_at(&regions, at) else { return };
+        let current = self.current_sheet().view(view).and_then(|v| noshape_model::drawing::views::section_region_styles(&regions, &v.section_hatches)[k].cloned());
+        let Some(d) = &mut self.hatch_dlg else { return };
+        let Some(list) = &mut d.sections else { return };
+        let mut texts = None;
+        if let Some(i) = list.iter().position(|(v, p)| *v == view && region_at(&regions, *p) == Some(k)) {
+            list.remove(i);
+        } else {
+            let first = list.is_empty();
+            list.push((view, at));
+            if first {
+                let h = current.unwrap_or(noshape_model::drawing::SectionHatch { at, standard: 0, pattern: Some(hatch_pat::default_pattern(0)), scale: 1.0, angle: 0.0, color: None });
+                d.standard = h.standard;
+                d.pattern = h.pattern.unwrap_or(NO_PATTERN);
+                d.drawing_color = h.color.is_none();
+                d.color = h.color;
+                // Scale / Angle as the Hatch region dialog shows them.
+                let scale = if (h.scale - 1.0).abs() < 1e-9 { "Auto".to_string() } else { format!("{:.1}", h.scale) };
+                let base = h.pattern.map(|p| hatch_pat::base_angle(h.standard, p)).unwrap_or(0.0);
+                let angle = if h.angle.abs() < 1e-9 { "Auto".to_string() } else { format!("{:.1}°", (h.angle + base).rem_euclid(360.0)) };
+                texts = Some((d.scale.clone(), scale, d.angle.clone(), angle));
+            }
+        }
+        if let Some((s_in, s, a_in, a)) = texts {
+            s_in.update(cx, |x, cx| x.set_value(s, window, cx));
+            a_in.update(cx, |x, cx| x.set_value(a, window, cx));
+        }
+        self.hatch_preview(cx);
+    }
+
+    /// The dialog's style for the picked regions (None: the drawing's hatch,
+    /// "ANSI31 general (drawing)" at Auto in the drawing's color).
+    fn section_style(&self, cx: &App) -> Option<noshape_model::drawing::SectionHatch> {
+        let d = self.hatch_dlg.as_ref()?;
+        let (scale, angle) = (d.scale_value(cx), d.angle_value(cx));
+        let default = d.standard == 0 && d.pattern == hatch_pat::default_pattern(0) && (scale - 1.0).abs() < 1e-9 && angle.abs() < 1e-9 && d.drawing_color;
+        (!default).then(|| noshape_model::drawing::SectionHatch {
+            at: [0.0, 0.0],
+            standard: d.standard,
+            pattern: (d.pattern != NO_PATTERN).then_some(d.pattern),
+            scale,
+            angle,
+            color: if d.drawing_color { None } else { d.color },
+        })
+    }
+
+    /// The drawing with the dialog's style on the picked regions (`tint`:
+    /// the preview's tan).
+    fn section_hatched(&self, tint: bool, cx: &App) -> Option<noshape_model::drawing::Drawing> {
+        let list = self.hatch_dlg.as_ref()?.sections.clone()?;
+        let style = self.section_style(cx);
+        let mut dr = self.drawing.clone();
+        for (view, at) in list {
+            let Some(geo) = self.geoms.get(&view).cloned() else { continue };
+            let Some(v) = dr.sheets.get_mut(self.sheet).and_then(|s| s.view_mut(view)) else { continue };
+            // The preview shows the default hatch tan too.
+            let st = match (&style, tint) {
+                (Some(h), true) => Some(noshape_model::drawing::SectionHatch { color: Some(PREVIEW_TAN), ..h.clone() }),
+                (None, true) => Some(noshape_model::drawing::SectionHatch { at, standard: 0, pattern: Some(hatch_pat::default_pattern(0)), scale: 1.0, angle: 0.0, color: Some(PREVIEW_TAN) }),
+                (s, false) => s.clone(),
+            };
+            noshape_scene::drawing_tools::set_section_hatch(v, &geo, at, st);
+        }
+        Some(dr)
+    }
+
     /// A click while the dialog is open (no sketch tool): add the closed
     /// sketch profile (else the region of a view) under the cursor. True
     /// when used.
-    pub fn hatch_click(&mut self, cx: &mut Context<Self>) -> bool {
+    pub fn hatch_click(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if self.hatch_dlg.is_none() || !matches!(self.tool, Tool::Select) {
             return false;
+        }
+        if self.hatch_dlg.as_ref().is_some_and(|d| d.sections.is_some()) {
+            self.section_hatch_click(window, cx);
+            return true;
         }
         let Some(picked) = self.pk().hatch_profile_at(self.cursor) else { return true };
         if let Some(d) = &mut self.hatch_dlg {
@@ -135,6 +240,11 @@ impl DrawingEditor {
 
     /// Show the hatches (tan) in the preview while the dialog is open.
     fn hatch_preview(&mut self, cx: &mut Context<Self>) {
+        if let Some(dr) = self.section_hatched(true, cx) {
+            self.set_preview(Some(dr), cx);
+            cx.notify();
+            return;
+        }
         let Some(d) = &self.hatch_dlg else { return };
         let first = self.hatch_first_id();
         let mut regions = d.regions(first, cx);
@@ -171,6 +281,19 @@ impl DrawingEditor {
     }
 
     fn accept_hatch(&mut self, cx: &mut Context<Self>) {
+        // Edit hatch section...: the picked regions take the style.
+        if let Some(dr) = self.section_hatched(false, cx) {
+            let picked = self.hatch_dlg.take().and_then(|d| d.sections).is_some_and(|l| !l.is_empty());
+            self.preview = None;
+            if picked {
+                let s = dr.sheets[self.sheet].clone();
+                self.edit_sheet("Edit hatch", cx, |x| *x = s);
+            } else {
+                self.refresh(cx);
+            }
+            cx.notify();
+            return;
+        }
         let first = self.hatch_first_id();
         let Some(d) = self.hatch_dlg.take() else { return };
         self.preview = None;
@@ -207,6 +330,12 @@ impl DrawingEditor {
         let ink = gpui_kit::rgb(INK);
         let (standard, pattern, drawing_color) = (d.standard, d.pattern, d.drawing_color);
         let general = standard == 2;
+        // Edit hatch section... (live asbv-36/37): "Edit hatch", no profile
+        // tools, a Hatches box (chips named after the view); the rest once a
+        // region is picked; General › None hides Scale, Angle and Color.
+        let section_mode = d.sections.is_some();
+        let picked = d.sections.as_ref().is_some_and(|l| !l.is_empty());
+        let none = pattern == NO_PATTERN;
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(34.)).pl(px(5.)).child(div().w(px(56.)).text_size(px(11.5)).child(label)).child(body).into_any_element();
         // Profile tools (live: circle ▾, rectangle ▾, spline, polygon).
         let cur = match &self.tool {
@@ -260,6 +389,37 @@ impl DrawingEditor {
                     .into_any_element()
             })
             .collect();
+        let rows = match &d.sections {
+            Some(list) => list
+                .iter()
+                .enumerate()
+                .map(|(i, (v, _))| {
+                    let name = self.current_sheet().view(*v).map(|x| match &x.kind {
+                        noshape_model::drawing::ViewKind::Section { label, .. } | noshape_model::drawing::ViewKind::AlignedSection { label, .. } => format!("Section {label} - {label}"),
+                        _ => crate::drawing_props::default_view_name(&self.drawing, self.current_sheet(), x),
+                    });
+                    h_flex()
+                        .id(("hd-section", i))
+                        .h(px(20.))
+                        .text_size(px(13.))
+                        .child(div().flex_1().child(name.unwrap_or_default()))
+                        .child(div().id(("hd-section-x", i)).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            this.set_hatch(
+                                |d| {
+                                    if let Some(l) = &mut d.sections
+                                        && i < l.len()
+                                    {
+                                        l.remove(i);
+                                    }
+                                },
+                                cx,
+                            )
+                        })))
+                        .into_any_element()
+                })
+                .collect(),
+            None => rows,
+        };
         let profiles = v_flex()
             .mx(px(9.))
             .my(px(3.))
@@ -270,7 +430,7 @@ impl DrawingEditor {
             .border_1()
             .border_color(gpui_kit::rgb(0x5da7dd))
             .bg(gpui_kit::rgb(0xd9eef9))
-            .child(div().text_size(px(10.)).text_color(gpui_kit::rgb(0x5c6670)).child("Closed profiles"))
+            .child(div().text_size(px(10.)).text_color(gpui_kit::rgb(0x5c6670)).child(if section_mode { "Hatches" } else { "Closed profiles" }))
             .children(rows);
         // Tabs ANSI | ISO | General.
         let tabs = h_flex().mx(px(9.)).my(px(3.)).border_b_1().border_color(gpui_kit::rgb(0xe0e0e0)).children(GROUPS.iter().enumerate().map(|(g, (name, _))| {
@@ -302,7 +462,7 @@ impl DrawingEditor {
                 .into_any_element()
         }));
         // Pattern: icon list.
-        let pat = hatch_pat::pattern(standard, pattern).map(|p| p.name).unwrap_or("");
+        let pat = if none { "None" } else { hatch_pat::pattern(standard, pattern).map(|p| p.name).unwrap_or("") };
         let pattern_btn = {
             let ed = ed.clone();
             Button::new("hd-pattern")
@@ -313,9 +473,14 @@ impl DrawingEditor {
                 .border_b_1()
                 .border_color(gpui_kit::rgb(RULE))
                 .dropdown_caret(true)
-                .child(h_flex().gap(px(4.)).child(crate::ui::glyph(&hatch_pat::icon_name(standard, pattern), 16., ink)).child(div().text_size(px(11.5)).text_color(ink).child(pat)))
+                .child(h_flex().gap(px(4.)).when(!none, |h| h.child(crate::ui::glyph(&hatch_pat::icon_name(standard, pattern), 16., ink))).child(div().text_size(px(11.5)).text_color(ink).child(pat)))
                 .os_dropdown_menu("hd-pattern-dd", true, move |mut m, _, _| {
                     m = m.select_list(188.);
+                    // Edit hatch section...: General starts with None (live (4)).
+                    if section_mode && standard == 2 {
+                        let e = ed.clone();
+                        m = m.item(crate::os_menu::OsMenuItem::new("None").checked(none).on_click(move |_, _, cx| e.update(cx, |t, cx| t.set_hatch(|d| d.pattern = NO_PATTERN, cx))));
+                    }
                     for i in hatch_pat::display_order(standard) {
                         let Some(p) = hatch_pat::pattern(standard, i) else { continue };
                         let e = ed.clone();
@@ -408,7 +573,8 @@ impl DrawingEditor {
             .h(px(100.))
             .ml(px(45.))
         };
-        let ok_disabled = d.profiles.is_empty();
+        let ok_disabled = if section_mode { !picked } else { d.profiles.is_empty() };
+        let show_style = !section_mode || picked;
         Some(
             v_flex()
                 .id("dr-hatch-dlg")
@@ -426,7 +592,7 @@ impl DrawingEditor {
                     h_flex()
                         .h(px(30.))
                         .pl(px(11.))
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Hatch region"))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(if section_mode { "Edit hatch" } else { "Hatch region" }))
                         .child(
                             div()
                                 .id("hd-ok")
@@ -457,13 +623,16 @@ impl DrawingEditor {
                                 })),
                         ),
                 )
-                .child(div().pt(px(6.)).child(tools))
+                .when(!section_mode, |e| e.child(div().pt(px(6.)).child(tools)))
+                .when(section_mode, |e| e.pt(px(6.)))
                 .child(profiles)
-                .child(tabs)
-                .child(div().px(px(9.)).child(row("Pattern", pattern_btn)))
-                .when(!general, |e| e.child(div().px(px(9.)).child(row("Scale", combo("hd-scale", &d.scale, scales)))).child(div().px(px(9.)).child(row("Angle", combo("hd-angle", &d.angle, angles)))))
-                .child(div().px(px(9.)).border_b_1().border_color(gpui_kit::rgb(0xe0e0e0)).child(color))
-                .child(div().pt(px(4.)).child(preview))
+                .when(show_style, |e| {
+                    e.child(tabs)
+                        .child(div().px(px(9.)).child(row("Pattern", pattern_btn)))
+                        .when(!general && !none, |e| e.child(div().px(px(9.)).child(row("Scale", combo("hd-scale", &d.scale, scales)))).child(div().px(px(9.)).child(row("Angle", combo("hd-angle", &d.angle, angles)))))
+                        .when(!none, |e| e.child(div().px(px(9.)).border_b_1().border_color(gpui_kit::rgb(0xe0e0e0)).child(color)))
+                        .child(div().pt(px(4.)).child(preview))
+                })
                 .into_any_element(),
         )
     }

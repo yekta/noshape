@@ -825,6 +825,50 @@ fn std_show_label_hints_match_builtin() {
     assert!(report.is_empty(), "SHOW_LABEL differs from the std:\n{report}");
 }
 
+/// Edge selection fields take sketch curves exactly where the std
+/// FeatureScript's "Filter" allows them, and model edges exactly where it
+/// does (qa5 SEL1: Fillet and Chamfer took a sketch line though fillet.fs and
+/// chamfer.fs say `SketchObject.NO`). Every feature, every query parameter.
+#[test]
+fn std_edge_filters_match_builtin() {
+    use noshape_model::params::{Hints, ParamKind, ParamSpec, QueryFilter};
+    const MODEL_EDGES: u32 = QueryFilter::EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0;
+    fn filters(specs: &[ParamSpec], prefix: &str, out: &mut Vec<(String, QueryFilter)>) {
+        for p in specs {
+            match &p.kind {
+                // Hidden fields (set by editing logic) are never picked into.
+                ParamKind::Query { .. } if p.hints.has(Hints::ALWAYS_HIDDEN) => {}
+                ParamKind::Query { filter, .. } => out.push((format!("{prefix}{}", p.id), *filter)),
+                ParamKind::Array { item, .. } => filters(item, &format!("{prefix}{}.", p.id), out),
+                _ => {}
+            }
+        }
+    }
+    let mut report = String::new();
+    for (file, src) in noshape_featurescript::STD_SOURCES {
+        for line in src.lines() {
+            let Some(name) = line.strip_prefix("export const ").and_then(|l| l.split_once(" = defineFeature")).map(|(n, _)| n) else { continue };
+            let Some(builtin) = noshape_model::features::get(name) else { continue };
+            let mut doc = Document::new();
+            let tab = doc.add_tab(file, TabContent::FeatureStudio(FeatureStudio::new(src)));
+            let compiled = custom::compile(tab, src);
+            let Some(def) = compiled.feature(name) else { continue };
+            let (mut fs, mut b) = (Vec::new(), Vec::new());
+            filters(&def.feature_type.params, "", &mut fs);
+            filters(&builtin.params, "", &mut b);
+            for (id, std_f) in &fs {
+                let Some((_, ours)) = b.iter().find(|(i, _)| i == id) else { continue };
+                let edges = |f: &QueryFilter| (f.0 & MODEL_EDGES != 0, f.0 & QueryFilter::SKETCH_EDGE.0 != 0);
+                let (s, o) = (edges(std_f), edges(ours));
+                if (s.0 || s.1 || o.0 || o.1) && s != o {
+                    report.push_str(&format!("{name}.{id}: std (model edges, sketch curves) {s:?}, ours {o:?}\n"));
+                }
+            }
+        }
+    }
+    assert!(report.is_empty(), "edge filters differ from the std:\n{report}");
+}
+
 /// Standard library features whose generated dialog equals the built-in one.
 const EXPECTED_IDENTICAL_DIALOGS: &[&str] = &[
     "bodyDraft", "booleanBodies", "boundarySurface", "chamfer", "circularPattern", "compositeCurve", "compositePart", "constrainedSurface", "cPlane", "cPoint", "curvePattern",

@@ -217,7 +217,7 @@ pub(super) fn sheet_index(d: &Drawing, a: &Args) -> Result<usize, OpError> {
     }
 }
 
-fn source_tab(od: &OpenDoc, a: &Args, name: &str) -> Result<TabId, OpError> {
+pub(super) fn source_tab(od: &OpenDoc, a: &Args, name: &str) -> Result<TabId, OpError> {
     doc::tab_of_kind(od.doc(), Some(a.str(name)?), "Part Studio or Assembly", |c| matches!(c, TabContent::PartStudio(_) | TabContent::Assembly(_))).map_err(|e| e.with_param(name))
 }
 
@@ -257,7 +257,7 @@ fn pt(p: [f64; 2]) -> Value {
     json!([r3(p[0]), r3(p[1])])
 }
 
-fn kind_name(k: &ViewKind) -> &'static str {
+pub(super) fn kind_name(k: &ViewKind) -> &'static str {
     match k {
         ViewKind::Base { .. } => "base",
         ViewKind::Projected { .. } => "projected",
@@ -269,7 +269,7 @@ fn kind_name(k: &ViewKind) -> &'static str {
 }
 
 /// The annotation kind's name (`LinearDimension`, `Note`...).
-fn variant_name<T: std::fmt::Debug>(v: &T) -> String {
+pub(super) fn variant_name<T: std::fmt::Debug>(v: &T) -> String {
     let s = format!("{v:?}");
     s.split([' ', '{', '(']).next().unwrap_or("").to_string()
 }
@@ -291,6 +291,33 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(p) = sheet.parent_of(v.id) {
                 j["parent"] = json!(p.0);
             }
+            // Show annotations from model (child views inherit it).
+            if !v.model_annotations {
+                j["model_annotations"] = json!(false);
+            }
+            // A detail view's circle in its parent (sheet mm) and its label
+            // on a leader (drawing_edit_detail).
+            if let ViewKind::Detail { parent, center, radius, .. } = &v.kind
+                && let Some(ppl) = m.built.as_ref().and_then(|b| b.placement(*parent))
+            {
+                let c = ppl.to_sheet(*center);
+                let mut d = json!({ "center": pt(c), "radius": ppl.len_to_sheet(*radius) });
+                if let Some(o) = v.detail_label_at {
+                    d["label_at"] = pt([c[0] + o[0], c[1] + o[1]]);
+                }
+                j["detail"] = d;
+            }
+            // Section hatch regions and the ones restyled with Edit hatch
+            // section... (drawing_edit_hatch).
+            if let Some(regions) = m.geoms.get(&v.id).filter(|g| !g.section_segments.is_empty()).and_then(|g| noshape_model::drawing::views::section_regions(&g.section_segments)) {
+                j["hatch_regions"] = json!(regions.len());
+            }
+            if !v.section_hatches.is_empty()
+                && let Some(pl) = m.built.as_ref().and_then(|b| b.placement(v.id))
+            {
+                let name = |h: &noshape_model::drawing::SectionHatch| h.pattern.and_then(|p| noshape_model::drawing::hatch_pat::pattern(h.standard, p)).map(|p| p.name).unwrap_or("None");
+                j["section_hatches"] = json!(v.section_hatches.iter().map(|h| json!({ "at": pt(pl.to_sheet(h.at)), "pattern": name(h) })).collect::<Vec<_>>());
+            }
             // What the view shows: a base view's orientation, a projected
             // view's side of its parent.
             match &v.kind {
@@ -308,9 +335,6 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                     }
                     if v.sketch_appearances {
                         j["sketch_appearances"] = json!(true);
-                    }
-                    if !v.model_annotations {
-                        j["model_annotations"] = json!(false);
                     }
                     if let Some(s) = v.simplification.filter(|s| *s != noshape_model::drawing::Simplification::Auto) {
                         j["simplification"] = json!(format!("{s:?}"));
@@ -359,6 +383,9 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             }
             if v.flip {
                 j["flipped"] = json!(true);
+            }
+            if v.show_offset_cut_lines {
+                j["offset_cut_lines"] = json!(true);
             }
             if v.pinned.is_some() {
                 j["pinned"] = json!(true);
@@ -461,15 +488,22 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if a.unbroken {
                 j["unbroken"] = json!(true);
             }
-            if let Some(ls) = noshape_scene::drawing_tools::annotation_edit::leaders(a).filter(|l| !l.is_empty()) {
-                // Notes: each leader's path on the sheet (landing, nodes, point).
-                let paths = m.pick(&noshape_scene::drawing_tools::Tool::Select, &[], [0.0; 2]).note_leader_paths(a);
+            // Each leader's path on the sheet (landing, nodes, point): a
+            // note's in order, a callout's by `all_leaders` (0 = the leader
+            // to its anchor, no path while the callout is in space); other
+            // annotations' added leaders.
+            use noshape_scene::drawing_tools::annotation_edit as ae;
+            let ls = ae::all_leaders(a).or_else(|| ae::leaders(a).cloned()).unwrap_or_default();
+            let paths = ae::leader_paths(m.built.as_deref(), a);
+            // A callout in space without added leaders has none to list.
+            let free_callout = paths.is_empty() && ls.len() == 1 && matches!(a.kind, noshape_model::drawing::AnnotationKind::Balloon { .. });
+            if !ls.is_empty() && !free_callout {
                 j["leaders"] = ls
                     .iter()
                     .enumerate()
                     .map(|(i, l)| {
-                        let mut v = json!({ "nodes": l.nodes.len() });
-                        if let Some(p) = paths.get(i) {
+                        let mut v = json!({ "leader": i, "nodes": l.nodes.len() });
+                        if let Some((_, p)) = paths.iter().find(|(k, _)| *k == i) {
                             v["path"] = p.points.iter().map(|q| pt(*q)).collect();
                         }
                         v
@@ -567,7 +601,22 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
         .collect();
     let images: Vec<Value> = sheet.images.iter().map(|i| json!({ "id": i.id, "name": i.name, "position": pt(i.pos), "size": pt(i.size) })).collect();
     let sketch_entities = sheet.sketch.sketch.entities().count();
-    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables, "hatches": hatches, "images": images, "sketch_entities": sketch_entities })
+    // Title block field cells: the stored text and the lines shown.
+    let title_fields: Vec<Value> = m
+        .built
+        .as_ref()
+        .map(|b| {
+            b.title_cells
+                .iter()
+                .filter_map(|&(pick, r)| {
+                    let Some(noshape_model::drawing::build::PickTarget::TitleField(key)) = b.picks.get(pick as usize) else { return None };
+                    let shown: Vec<&str> = b.geometry.texts.iter().filter(|t| t.pick == pick).map(|t| t.text.as_str()).collect();
+                    Some(json!({ "field": key, "value": sheet.title_field(key).unwrap_or(""), "shown": shown, "cell": [r3(r[0]), r3(r[1]), r3(r[2]), r3(r[3])] }))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables, "hatches": hatches, "images": images, "sketch_entities": sketch_entities, "title_fields": title_fields })
 }
 
 pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<Value, OpError> {

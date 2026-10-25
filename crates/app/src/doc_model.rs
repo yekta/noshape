@@ -21,6 +21,9 @@ pub enum DocEvent {
     Error(String),
     /// A user-facing notice (not an error), e.g. a merge result.
     Info(String),
+    /// A window action an agent call asked for (live mode: Switch to
+    /// reference and the like).
+    Ui(noshape_ops::UiRequest),
 }
 
 pub struct DocModel {

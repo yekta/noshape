@@ -368,6 +368,9 @@ impl PartStudioView {
     }
 
     fn apply_outcome(&mut self, out: EditOutcome, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(text) = self.sketch.as_mut().and_then(|s| s.toast.take()) {
+            self.message = Some((noshape_model::display::FeatureStatus::Warning, text));
+        }
         if out.changed {
             self.regen_sync(window, cx);
         } else if out.redraw {
@@ -565,12 +568,10 @@ impl PartStudioView {
                 let Some(data) = self.sketch_data(cx) else { return true };
                 let Some(d) = self.placed_dimension_labels(&data, cx).into_iter().find(|d| d.cid == cid) else { return true };
                 match button {
-                    // Context menu: edit / driving-driven / delete.
+                    // Live (qa4 DIM-MENU): the sketch context menu, led by
+                    // the dimension's own items.
                     MouseButton::Right => {
-                        if let Some(ui) = self.ui_mut() {
-                            ui.dim_menu = Some((cid, d.at.0 + 6.0, d.at.1 + 10.0));
-                        }
-                        cx.notify();
+                        self.open_sketch_context_menu(window.mouse_position(), Some(cid), window, cx);
                     }
                     // The press goes on to the editor too, which turns it
                     // into a label drag / selection.
@@ -599,8 +600,10 @@ impl PartStudioView {
                 }
                 let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
                 // Live Onshape: the sketch's own plane (or face) is never
-                // pre-highlighted while sketching on it.
-                if r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx)) {
+                // pre-highlighted while sketching on it, except a face for
+                // Use, which projects its edges (qa5 CTX-USE).
+                let use_face = self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) && matches!(r, Some(Reference::Face(_)));
+                if !use_face && r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx)) {
                     if self.hover.take().is_some() {
                         self.refresh_scene(false, cx);
                     }
@@ -770,7 +773,7 @@ impl PartStudioView {
             }
             ViewportEvent::Click { .. } => true,
             ViewportEvent::ContextMenu { position, .. } => {
-                self.open_sketch_context_menu(*position, window, cx);
+                self.open_sketch_context_menu(*position, None, window, cx);
                 true
             }
             _ => false,
@@ -1944,6 +1947,7 @@ impl PartStudioView {
                     }
                     this.sync_offset_input(window, cx);
                     window.focus(&this.focus, cx);
+                    this.sync_dim_edit(window, cx);
                 }
                 _ => {}
             }
@@ -2450,6 +2454,28 @@ impl PartStudioView {
         Some((cp.input.clone(), option))
     }
 
+    /// A dimension's own context-menu items (label, `dim_menu_action`):
+    /// driving / driven, tolerance, configuration ("Delete dimension" ends
+    /// the menu).
+    fn dimension_menu_items(&self, cid: noshape_sketch::ConstraintId, cx: &App) -> Vec<(String, String)> {
+        let Some((driving, allowed)) = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| (c.driving, crate::sketch_mode::tolerance_allowed(&c.kind)))) else { return Vec::new() };
+        let mut out = vec![((if driving { "Change to driven dimension" } else { "Change to driving dimension" }).to_string(), "driving".to_string())];
+        if allowed {
+            out.push(("Tolerance and precision…".into(), "tolerance".into()));
+        }
+        if self.dimension_configuration(cid, cx).is_some() {
+            out.push(("Unconfigure dimension".into(), "unconfigure".into()));
+        } else {
+            use noshape_model::configuration::ConfigInputKind;
+            if let Some(st) = self.studio(cx) {
+                for i in st.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })) {
+                    out.push((format!("Configure dimension with {}", i.name), format!("configure:{}", i.id)));
+                }
+            }
+        }
+        out
+    }
+
     fn render_dim_menu(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let pal = p();
         let (cid, x, y) = self.ui_ref()?.dim_menu?;
@@ -2801,18 +2827,26 @@ impl PartStudioView {
                             let st = st.clone();
                             move |this, e: &KeyDownEvent, window, cx| {
                                 let k = &e.keystroke;
-                                // Live (qa5 dim conflict): Esc in the box reverts
-                                // it to the committed value and blurs it; the box
-                                // stays, and the next Esc (the sketch's) closes
-                                // it. The sketch gets the keys back (qa4 F29).
+                                // Live (qa5 dim conflict): Esc in a changed box
+                                // reverts it to the committed value and blurs it;
+                                // the box stays, and the next Esc (the sketch's)
+                                // closes it. The sketch gets the keys back (qa4
+                                // F29). An untouched box closes at once (qa4
+                                // DIM-ESC-UNTOUCHED).
                                 if k.key == "escape" && !k.modifiers.modified() {
                                     cx.stop_propagation();
                                     this.ui.dim_invalid = false;
                                     let units = this.doc.read(cx).session.doc.settings.units;
-                                    if let Some(text) = this.sketch_data(cx).and_then(|d| crate::sketch_mode::dimension_edit_text(&d, cid, &units)) {
+                                    let committed = this.sketch_data(cx).and_then(|d| crate::sketch_mode::dimension_edit_text(&d, cid, &units));
+                                    let untouched = dim_box_untouched(committed.as_deref(), &st.read(cx).value());
+                                    window.focus(&this.focus, cx);
+                                    if untouched {
+                                        this.sketch_cancel(cx);
+                                        return;
+                                    }
+                                    if let Some(text) = committed {
                                         st.update(cx, |s, cx| s.set_value(text, window, cx));
                                     }
-                                    window.focus(&this.focus, cx);
                                     cx.notify();
                                     return;
                                 }
@@ -3000,13 +3034,11 @@ impl PartStudioView {
                             }
                         }
                     }))
-                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
-                        // Context menu: edit / driving-driven / delete (the viewport must not rotate).
+                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
+                        // The sketch context menu led by the dimension's items
+                        // (live, qa4 DIM-MENU; the viewport must not rotate).
                         cx.stop_propagation();
-                        if let Some(ui) = this.ui_mut() {
-                            ui.dim_menu = Some((cid, x + 6.0, y + 10.0));
-                        }
-                        cx.notify();
+                        this.open_sketch_context_menu(ev.position, Some(cid), window, cx);
                     }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                         // Not consumed: the viewport receives the press too and the
@@ -3737,8 +3769,11 @@ impl PartStudioView {
     }
 
     /// Right-click in an active sketch: the sketch context menu (Onshape).
-    fn open_sketch_context_menu(&mut self, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
-        let hovered = self.hovered_sketch_entity(cx);
+    /// The sketch context menu; for a dimension (`dim`), its own items lead
+    /// and "Delete dimension" ends it (live, qa4 DIM-MENU).
+    fn open_sketch_context_menu(&mut self, position: Point<Pixels>, dim: Option<noshape_sketch::ConstraintId>, window: &mut Window, cx: &mut Context<Self>) {
+        let hovered = self.hovered_sketch_entity(cx).filter(|_| dim.is_none());
+        let dim_items: Vec<(String, String)> = dim.map(|cid| self.dimension_menu_items(cid, cx)).unwrap_or_default();
         let model_edge = matches!(self.hover, Some(Reference::Edge(_) | Reference::Face(_)));
         // Model geometry under the cursor: its part (Hide / Isolate / Make
         // transparent) and, for a straight edge, Align view (live sketch/204).
@@ -3782,6 +3817,13 @@ impl PartStudioView {
                 m = m.item(item(&format!("Escape {tool_name}"), Box::new(|this, _, cx| this.set_tool(Tool::Select, cx))));
                 let v = v.clone();
                 m = m.on_first_escape(move |_, cx| v.update(cx, |this, cx| this.set_tool(Tool::Select, cx)));
+            }
+            if let Some(cid) = dim {
+                for (label, action) in &dim_items {
+                    let action = action.clone();
+                    m = m.item(item(label, Box::new(move |this, w, cx| this.dim_menu_action(cid, &action, w, cx))));
+                }
+                m = m.separator();
             }
             m = m.item(item(&format!("Confirm {sketch_name}"), Box::new(|this, window, cx| this.accept_edit(false, window, cx))));
             m = m.separator();
@@ -3984,7 +4026,9 @@ impl PartStudioView {
                     this.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, up, cx));
                 })));
             }
-            if n > 0 && !tool_active {
+            if let Some(cid) = dim {
+                m = m.separator().item(item("Delete dimension", Box::new(move |this, w, cx| this.dim_menu_action(cid, "delete", w, cx))));
+            } else if n > 0 && !tool_active {
                 let label = if n == 1 { "Delete sketch entity".to_string() } else { format!("Delete {n} sketch entities") };
                 m = m.separator().item(item(&label, Box::new(|this, w, cx| this.sketch_delete(w, cx))));
             }
@@ -4062,6 +4106,8 @@ impl PartStudioView {
                             this.apply_outcome(out, window, cx);
                         }
                         this.sync_offset_input(window, cx);
+                        // Enter opens the distance value box (live, qa4 OFF-BOX).
+                        this.sync_dim_edit(window, cx);
                     }
                     E::OnTheFly => {
                         // Live Onshape: Enter while drawing places the boxed
@@ -4165,6 +4211,11 @@ impl PartStudioView {
     }
 }
 
+/// The dimension box still shows its committed text (Esc closes it at once).
+fn dim_box_untouched(committed: Option<&str>, current: &str) -> bool {
+    committed.is_some_and(|t| t.trim() == current.trim())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4179,6 +4230,16 @@ mod tests {
             assert!(seen.insert(format!("{t:?}")), "{t:?} twice");
         }
         assert!(tools.contains(&Tool::InsertDxf) && tools.contains(&Tool::Chamfer) && tools.contains(&Tool::SplinePoint));
+    }
+
+    /// qa4 DIM-ESC-UNTOUCHED: Esc closes a box still showing its committed
+    /// text; a changed one reverts first.
+    #[test]
+    fn dimension_box_escape_closes_only_when_untouched() {
+        assert!(dim_box_untouched(Some("40 mm"), "40 mm"));
+        assert!(dim_box_untouched(Some("40 mm"), " 40 mm "));
+        assert!(!dim_box_untouched(Some("40 mm"), "45 mm"));
+        assert!(!dim_box_untouched(None, "40 mm"));
     }
 }
 

@@ -1030,6 +1030,29 @@ fn drawing_section_detail_views_and_annotations() {
     assert_eq!(sv["kind"], "section", "{sv}");
     assert_eq!(sv["parent"], top_id, "{sv}");
     assert!(last(&mut ctx).ends_with(":: Section view"));
+    // Edit hatch section...: one region restyled, then back (live asb 10-23 views (4)).
+    assert!(sv["hatch_regions"].as_u64().is_some_and(|n| n >= 1), "{sv}");
+    let corner = [num(&sv["bounds"]["min"][0]) + 0.5, num(&sv["bounds"]["min"][1]) + 0.5];
+    call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": corner, "pattern": "ANSI32 steel", "angle": 90, "color": "#ff0000" }));
+    assert!(last(&mut ctx).ends_with(":: Edit hatch"));
+    let sv = views_of(&mut ctx).into_iter().find(|v| v["id"] == sid).unwrap();
+    assert_eq!(sv["section_hatches"][0]["pattern"], "ANSI32 steel", "{sv}");
+    call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": corner, "standard": "general", "pattern": "None" }));
+    let sv = views_of(&mut ctx).into_iter().find(|v| v["id"] == sid).unwrap();
+    assert_eq!(sv["section_hatches"].as_array().map(|a| a.len()), Some(1), "the same region: replaced {sv}");
+    assert_eq!(sv["section_hatches"][0]["pattern"], "None");
+    call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": corner, "reset": true }));
+    // Show/hide ▸ Show offset cut lines (section views, live (6)).
+    call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": sid, "offset_cut_lines": true }));
+    assert!(last(&mut ctx).ends_with(":: Offset cut lines"));
+    assert_eq!(views_of(&mut ctx).into_iter().find(|v| v["id"] == sid).unwrap()["offset_cut_lines"], true);
+    let e = try_call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": top_id, "offset_cut_lines": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("offset_cut_lines"), "{e:?}");
+    assert!(views_of(&mut ctx).into_iter().find(|v| v["id"] == sid).unwrap()["section_hatches"].is_null());
+    let e = try_call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": [5, 5] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("at"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": corner, "pattern": "Plaid" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("pattern"), "{e:?}");
 
     // Detail view of the hole, twice the parent's scale.
     let dv = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": top_id, "center": [cx, cy], "radius": r * 1.5, "position": [380, 60] }));
@@ -1188,6 +1211,20 @@ fn drawing_callouts_ordinates_and_datums() {
     let o = call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "origin": a0, "side": [a0[0], a0[1] - 15.0], "points": [b0, p(&lines[1], "b")] }));
     assert_eq!(kind_of(&mut ctx, o["annotation"].as_u64().unwrap()), "OrdinateGroup");
     assert!(last(&mut ctx).ends_with(":: Add to ordinate group"));
+    // The base clicked just inside an edge, within its highlight (5 px at
+    // the API zoom; qa4 R5v3-S11-a): measured from
+    // the edge, not the click: the hole centre at 40, the far edge at 80.
+    let verticals: Vec<Value> = top["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][0]) - num(&e["b"][0])).abs() < 1e-6).cloned().collect();
+    let left = verticals.iter().min_by(|x, y| num(&x["a"][0]).total_cmp(&num(&y["a"][0]))).unwrap();
+    let right = verticals.iter().max_by(|x, y| num(&x["a"][0]).total_cmp(&num(&y["a"][0]))).unwrap();
+    let (lx, ly) = (num(&left["a"][0]), (num(&left["a"][1]) + num(&left["b"][1])) / 2.0);
+    let base = [lx + 0.2, ly];
+    let o2 = call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "origin": base, "side": [base[0], base[1] + 40.0], "points": [[cx, cy], p(right, "a")] }));
+    let text = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|a| a["id"] == o2["annotation"]).unwrap()["text"].as_str().unwrap().to_string();
+    let values: Vec<f64> = text.split_whitespace().filter_map(|w| w.replace(',', ".").parse().ok()).collect();
+    for want in [40.0, 80.0] {
+        assert!(values.iter().any(|v| (v - want).abs() < 1e-9), "{want} in {text:?}");
+    }
 
     // Max/min: the hole's far side to the edge's end.
     let mm = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "max_min", "picks": [[cx + r, cy], a0], "place": [cx, cy - 25.0] }));
@@ -1316,6 +1353,30 @@ fn drawing_out_of_date_until_update() {
     assert!(h2 > h0 + 1.0, "updated views: {h0} -> {h2}");
 }
 
+/// A title block field's cell is a note edited in place, with the formats
+/// locked too (live qa4 round 5 s11 (4)): the TITLE cell's middle field
+/// replaced by typed text, the other two fields kept.
+#[test]
+fn drawing_title_block_fields() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_title.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let title = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["title_fields"].as_array().unwrap().iter().find(|f| f["field"] == "Title").cloned().expect("a Title cell");
+    let t = title(&mut ctx);
+    let cell: Vec<f64> = t["cell"].as_array().unwrap().iter().map(num).collect();
+    assert!(cell[2] - cell[0] > 20.0 && cell[3] - cell[1] > 5.0, "{cell:?}");
+    let value = t["value"].as_str().unwrap().to_string();
+    let lines: Vec<&str> = value.split('\n').collect();
+    assert_eq!(lines.len(), 3, "three property fields: {value}");
+    let typed = format!("{}\nQA4 PLATE\n{}", lines[0], lines[2]);
+    call(&mut ctx, "drawing_title_field", json!({ "drawing": tab, "field": "Title", "text": typed }));
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Edit title block"));
+    let t = title(&mut ctx);
+    assert_eq!(t["value"].as_str().unwrap(), typed);
+    assert!(t["shown"].as_array().unwrap().iter().any(|l| l == "QA4 PLATE"), "{t}");
+}
+
 #[test]
 fn drawing_broken_out_sections_and_profile_crops() {
     let mut ctx = Ctx::new();
@@ -1348,6 +1409,12 @@ fn drawing_broken_out_sections_and_profile_crops() {
     assert_eq!(e.param.as_deref(), Some("depth"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": a["id"], "points": tri(a), "index": 4 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("index"), "{e:?}");
+    // Not on section, detail or aligned section views (help broken_out_section_view).
+    let (ax, ay) = ((num(&a["bounds"]["min"][0]) + num(&a["bounds"]["max"][0])) / 2.0, (num(&a["bounds"]["min"][1]) + num(&a["bounds"]["max"][1])) / 2.0);
+    let det = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": a["id"], "center": [ax, ay], "radius": 6, "position": [350, 250] }));
+    let dv = det["views"].as_array().unwrap().last().unwrap().clone();
+    let e = try_call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": dv["id"], "points": tri(&dv) })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
     // Spline and polygon crops of the other view.
     call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "spline", "points": tri(b) }));
     assert!(last(&mut ctx).ends_with(":: Crop view"));
@@ -1356,6 +1423,21 @@ fn drawing_broken_out_sections_and_profile_crops() {
     assert_eq!(views_of(&mut ctx).into_iter().find(|v| v["id"] == b["id"]).unwrap()["crop"], "polygon");
     let e = try_call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "polygon", "points": [[1, 1], [2, 2]] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("points"), "{e:?}");
+    // Remove crop / Remove section keep their boundary as a sketch entity
+    // (live asb 10-23 views (3)).
+    let sketch_n = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["sketch_entities"].as_u64().unwrap_or(0);
+    let n0 = sketch_n(&mut ctx);
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": b["id"], "action": "remove_crop" }));
+    assert!(last(&mut ctx).ends_with(":: Remove crop"));
+    assert!(views_of(&mut ctx).into_iter().find(|v| v["id"] == b["id"]).unwrap()["crop"].is_null());
+    let n1 = sketch_n(&mut ctx);
+    assert!(n1 > n0, "the polygon stays: {n0} -> {n1}");
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": a["id"], "action": "remove_broken_out", "index": 0 }));
+    assert!(last(&mut ctx).ends_with(":: Remove section"));
+    assert!(views_of(&mut ctx).into_iter().find(|v| v["id"] == a["id"]).unwrap()["broken_out"].as_array().is_none_or(|x| x.is_empty()));
+    assert!(sketch_n(&mut ctx) > n1, "the spline stays");
+    let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": b["id"], "action": "remove_crop" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
 }
 
 #[test]
@@ -1437,6 +1519,13 @@ export const partFaces = defineTable(function(context is Context, definition is 
     let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "table": "nope", "position": [10, 10] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
     assert!(e.message.contains("Part faces"), "{e:?}");
+    // Its properties in drawing_table_properties too; its Feature Studio (this document's).
+    call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": id, "bottom_to_top": false }));
+    assert!(last(&mut ctx).ends_with(":: Custom table properties"));
+    let f = call(&mut ctx, "drawing_open_feature_studio", json!({ "drawing": tab, "table": id }));
+    assert_eq!((f["linked"].clone(), f["target"]["kind"].clone()), (json!(false), json!("Feature Studio")), "{f}");
+    let s = call(&mut ctx, "drawing_switch_to_reference", json!({ "drawing": tab, "table": id }));
+    assert_eq!(s["target"]["name"], "Part Studio 1", "{s}");
 }
 
 #[test]
@@ -1521,6 +1610,91 @@ fn drawing_format_painter_copies_content() {
     assert_eq!(text(&mut ctx, &b), "FROM");
     let e = try_call(&mut ctx, "drawing_format_painter", json!({ "drawing": tab, "source": a, "targets": [999] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("targets[0]"), "{e:?}");
+}
+
+/// drawing_annotation_edit on leaders (live drw2 10-21 g, (6)): Add node /
+/// Remove node / Add leader from a node / Delete on a callout's leaders, Add
+/// leader, Move by grip and Remove leaders on a note, as the leader menus do.
+#[test]
+fn drawing_leader_nodes_and_branches() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_leaders.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let top = g["views"].as_array().unwrap().iter().find(|v| v["edges"].as_array().is_some_and(|es| es.iter().any(|e| e["type"] == "circle"))).unwrap().clone();
+    let line = top["edges"].as_array().unwrap().iter().find(|e| e["type"] == "line" && (num(&e["a"][1]) - num(&e["b"][1])).abs() < 1e-6).unwrap().clone();
+    let quarter = [num(&line["a"][0]) * 0.75 + num(&line["b"][0]) * 0.25, num(&line["a"][1]) * 0.75 + num(&line["b"][1]) * 0.25];
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let leaders_of = |ctx: &mut Ctx, id: u64| -> Vec<Value> {
+        let g = call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+        g["annotations"].as_array().unwrap().iter().find(|a| a["id"] == id).and_then(|a| a["leaders"].as_array().cloned()).unwrap_or_default()
+    };
+    let p2 = |v: &Value| [num(&v[0]), num(&v[1])];
+    let edit = |ctx: &mut Ctx, args: Value| {
+        let mut a = json!({ "drawing": tab });
+        a.as_object_mut().unwrap().extend(args.as_object().unwrap().clone());
+        call(ctx, "drawing_annotation_edit", a)
+    };
+
+    let c = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": quarter, "position": [40, 250], "text": "7" }))["annotation"].as_u64().unwrap();
+    let l = leaders_of(&mut ctx, c);
+    assert_eq!((l.len(), l[0]["leader"].as_u64()), (1, Some(0)), "{l:?}");
+    // Add node halfway along the leader to the anchor (on the line).
+    let path = l[0]["path"].as_array().unwrap();
+    let (s0, s1) = (p2(&path[0]), p2(&path[1]));
+    let mid = [(s0[0] + s1[0]) / 2.0, (s0[1] + s1[1]) / 2.0];
+    edit(&mut ctx, json!({ "annotation": c, "action": "add_node", "leader": 0, "point": mid }));
+    assert!(last(&mut ctx).ends_with(":: Add node"));
+    let l = leaders_of(&mut ctx, c);
+    assert_eq!(l[0]["nodes"].as_u64(), Some(1));
+    // The path runs border → node → anchor.
+    let node = p2(&l[0]["path"][1]);
+    assert!((node[0] - mid[0]).abs() < 1e-3 && (node[1] - mid[1]).abs() < 1e-3, "{node:?}");
+    // Add leader from that node: the branch starts there.
+    edit(&mut ctx, json!({ "annotation": c, "action": "add_leader", "from_node": [0, 0], "point": [120, 270] }));
+    assert!(last(&mut ctx).ends_with(":: Add leader"));
+    let l = leaders_of(&mut ctx, c);
+    assert_eq!(l.len(), 2);
+    let b0 = p2(&l[1]["path"][0]);
+    assert!((b0[0] - node[0]).abs() < 1e-3 && (b0[1] - node[1]).abs() < 1e-3, "{b0:?}");
+    // Remove node: the branch starts at the border again.
+    edit(&mut ctx, json!({ "annotation": c, "action": "remove_node", "leader": 0, "node": 0 }));
+    assert!(last(&mut ctx).ends_with(":: Remove node"));
+    let l = leaders_of(&mut ctx, c);
+    assert_eq!(l[0]["nodes"].as_u64(), Some(0));
+    assert!((p2(&l[1]["path"][0])[0] - node[0]).abs() > 1e-3);
+    // Delete the leader to the anchor: the callout keeps its added one.
+    edit(&mut ctx, json!({ "annotation": c, "action": "delete_leader", "leader": 0 }));
+    assert!(last(&mut ctx).ends_with(":: Delete leader"));
+    let l = leaders_of(&mut ctx, c);
+    assert!(l[0]["path"].is_null() && l[1]["path"].is_array(), "{l:?}");
+
+    // A note: Add leader branches from its landing's bend; Move by grip; Remove leaders.
+    let a0 = [num(&line["a"][0]), num(&line["a"][1])];
+    let n = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "BREAK EDGES", "position": [300, 250], "leader": a0 }))["annotation"].as_u64().unwrap();
+    edit(&mut ctx, json!({ "annotation": n, "action": "add_leader", "point": [350, 200] }));
+    let l = leaders_of(&mut ctx, n);
+    assert_eq!(l.len(), 2);
+    assert_eq!(l[1]["path"][0], l[0]["path"][1], "from the bend");
+    // The second leader's end into empty sheet, then onto the edge's end.
+    edit(&mut ctx, json!({ "annotation": n, "action": "move_leader", "leader": 1, "point": [14, 150] }));
+    assert!(last(&mut ctx).ends_with(":: Move by grip"));
+    let l = leaders_of(&mut ctx, n);
+    let end = |l: &Vec<Value>, i: usize| p2(l[i]["path"].as_array().unwrap().last().unwrap());
+    assert!((end(&l, 1)[0] - 14.0).abs() < 1e-3 && (end(&l, 1)[1] - 150.0).abs() < 1e-3, "{l:?}");
+    edit(&mut ctx, json!({ "annotation": n, "action": "move_leader", "leader": 1, "point": a0 }));
+    let l = leaders_of(&mut ctx, n);
+    assert!((end(&l, 1)[0] - a0[0]).abs() < 0.5 && (end(&l, 1)[1] - a0[1]).abs() < 0.5, "attached to the vertex: {l:?}");
+    edit(&mut ctx, json!({ "annotation": n, "action": "remove_leaders" }));
+    assert!(last(&mut ctx).ends_with(":: Remove leaders"));
+    assert!(leaders_of(&mut ctx, n).is_empty());
+
+    // Errors name the argument.
+    let e = try_call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": c, "action": "delete_leader", "leader": 5 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("leader"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": c, "action": "remove_node", "leader": 1, "node": 0 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("node"), "{e:?}");
 }
 
 #[test]
@@ -2090,6 +2264,31 @@ fn drawing_insert_view_options() {
     // A detail view with a rectangle profile.
     let det = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": base["id"], "profile": "rectangle", "points": [[90, 140], [110, 160]], "position": [200, 260] }));
     assert_eq!(det["views"].as_array().unwrap().last().unwrap()["kind"], "detail", "{det}");
+    // Child views inherit Show annotations from model (live 3102).
+    assert_eq!(det["views"].as_array().unwrap().last().unwrap()["model_annotations"], false, "{det}");
+    let pr = call(&mut ctx, "drawing_projected_view", json!({ "drawing": tab, "parent": base["id"], "position": [100, 260] }));
+    assert_eq!(pr["views"].as_array().unwrap().last().unwrap()["model_annotations"], false, "{pr}");
+    // A circle detail: move and resize its circle, its label onto a leader
+    // and back (the circle's grips and menu, live asb 10-23 views (2)).
+    let cd = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": base["id"], "center": [100, 150], "radius": 8, "position": [330, 260] }));
+    let did = cd["views"].as_array().unwrap().last().unwrap()["id"].clone();
+    let detail = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().iter().find(|v| v["id"] == did).unwrap()["detail"].clone();
+    call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "center": [104, 151], "radius": 12 }));
+    let dj = detail(&mut ctx);
+    assert!((num(&dj["center"][0]) - 104.0).abs() < 1e-3 && (num(&dj["center"][1]) - 151.0).abs() < 1e-3 && (num(&dj["radius"]) - 12.0).abs() < 1e-3, "{dj}");
+    assert!(dj["label_at"].is_null());
+    call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "leader": true }));
+    assert!(detail(&mut ctx)["label_at"].is_array());
+    call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "label_at": [130, 180] }));
+    assert_eq!(detail(&mut ctx)["label_at"], json!([130.0, 180.0]));
+    call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "leader": false }));
+    assert!(detail(&mut ctx)["label_at"].is_null());
+    // Edit detail's options.
+    let ed = call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "scale": 3, "label": "Z" }));
+    let dv = ed["views"].as_array().unwrap().iter().find(|v| v["id"] == did).unwrap().clone();
+    assert!((num(&dv["scale"]) - 3.0).abs() < 1e-9, "{dv}");
+    let e = try_call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": base["id"], "radius": 5 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": base["id"], "profile": "polygon", "points": [[90, 140], [110, 160]], "position": [200, 260] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("points"));
     let e = try_call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "named_view": "Nope", "position": [200, 60] })).unwrap_err();
@@ -2753,6 +2952,22 @@ fn edit_in_context_and_part_studio_in_context() {
     assert!(contexts(&mut ctx, "Part Studio 1").is_empty());
 }
 
+/// qa5 CTX-USE: Use on the context face a sketch lies on projects its
+/// edges (live: the face's outer edges), as on an ordinary face.
+#[test]
+fn use_on_the_context_face_a_sketch_lies_on() {
+    let mut ctx = Ctx::new();
+    let (block, _pin) = two_part_assembly(&mut ctx, "ctx_use.noshape");
+    call(&mut ctx, "assembly_edit_in_context", json!({ "instance": block }));
+    let faces = call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "context": true, "surface": "plane", "normal": [0, 0, 1] }));
+    let top = faces["faces"][0]["id"].as_str().unwrap_or_else(|| panic!("{faces}")).to_string();
+    let sk = call(&mut ctx, "sketch_create", json!({ "tab": "Part Studio 1", "plane": top, "name": "On pin" }))["sketch"].as_str().unwrap().to_string();
+    let r = try_call(&mut ctx, "sketch_use", json!({ "tab": "Part Studio 1", "sketch": sk, "references": [top] }));
+    assert!(r.is_ok(), "{r:?}");
+    let got = call(&mut ctx, "sketch_get", json!({ "tab": "Part Studio 1", "sketch": sk }));
+    assert!(!got["entities"].as_array().map(|e| e.is_empty()).unwrap_or(true), "{got}");
+}
+
 /// The annotation menus: jogs, break, leaders and note nodes, foreshorten,
 /// groups, detach, align centermark, stacked callouts, add to an ordinate
 /// group, and Adjust linestyle.
@@ -3324,4 +3539,158 @@ fn agent_usability_pass() {
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": "Part Studio 1 Drawing 1" }));
     let projected: Vec<&Value> = g["views"].as_array().unwrap().iter().filter(|v| v["kind"] == "projected").collect();
     assert!(!projected.is_empty() && projected.iter().all(|v| v["orientation"].is_string()), "{g}");
+}
+
+/// The last drawing menu items: Replicate annotations, Copy / Paste, Paste
+/// as table, table properties, Switch to reference and Replace, each with
+/// the editor's edit text.
+#[test]
+fn drawing_replicate_copy_paste_replace_and_navigation() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_more.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let top_v = g["views"].as_array().unwrap().iter().find(|v| v["orientation"] == "top").unwrap_or_else(|| panic!("{g}")).clone();
+    let top = top_v["id"].as_u64().unwrap();
+    let hole = top_v["edges"].as_array().unwrap().iter().find(|e| e["type"] == "circle").unwrap_or_else(|| panic!("{top_v}")).clone();
+    let (cx, cy, r) = (num(&hole["center"][0]), num(&hole["center"][1]), num(&hole["radius"]));
+    call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "diameter", "picks": [[cx + r, cy]], "place": [cx + r + 15.0, cy + 15.0] }));
+
+    // Replicate the Ø onto a second top view: it shows the same hole.
+    let second = call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "orientation": "top", "position": [330, 90] }))["view"].as_u64().unwrap();
+    let rep = call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": top, "to": second }));
+    assert_eq!(rep["message"], "Successfully replicated 1/1 annotations", "{rep}");
+    assert!(last(&mut ctx).ends_with(":: Replicate annotations"));
+    // Once there, it isn't copied again.
+    let again = call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": top, "to": second }));
+    assert_eq!((again["replicated"].clone(), again["message"].clone()), (json!([]), json!("No annotations replicated")), "{again}");
+    let e = try_call(&mut ctx, "drawing_replicate", json!({ "drawing": tab, "from": top, "to": second, "region": [[0, 0], [1, 1]] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("at"), "{e:?}");
+
+    // Copy the top view (with its Ø) and paste it.
+    let c = call(&mut ctx, "drawing_copy", json!({ "drawing": tab, "views": [top] }));
+    assert_eq!((c["copied"]["views"].clone(), c["message"].clone()), (json!(1), json!("Copied 1 view")), "{c}");
+    assert!(c["copied"]["annotations"].as_u64().unwrap() >= 1, "{c}");
+    let p = call(&mut ctx, "drawing_paste", json!({ "drawing": tab, "position": [100, 70] }));
+    assert_eq!(p["pasted"]["views"].as_array().unwrap().len(), 1, "{p}");
+    assert!(!p["pasted"]["annotations"].as_array().unwrap().is_empty(), "{p}");
+    assert!(last(&mut ctx).ends_with(":: Paste views"));
+
+    // Paste as table, then Table properties… (fixed corner, kept in place).
+    let pt = call(&mut ctx, "drawing_paste_table", json!({ "drawing": tab, "text": "Item\tQty\nBolt\t4", "position": [20, 280] }));
+    assert!(last(&mut ctx).ends_with(":: Paste as table"));
+    let tid = pt["table"].clone();
+    let t = pt["tables"].as_array().unwrap().iter().find(|t| t["id"] == tid).unwrap().clone();
+    assert_eq!(t["corner"], "TopLeft", "{t}");
+    let p2 = call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": tid, "corner": "bottom_left" }));
+    assert!(last(&mut ctx).ends_with(":: Table fixed corner"));
+    let t2 = p2["tables"].as_array().unwrap().iter().find(|t| t["id"] == tid).unwrap().clone();
+    assert_eq!(t2["corner"], "BottomLeft", "{t2}");
+    for k in ["min", "max"] {
+        for i in 0..2 {
+            assert!((num(&t2["bounds"][k][i]) - num(&t["bounds"][k][i])).abs() < 1e-6, "the table stays where it is: {t} {t2}");
+        }
+    }
+    let e = try_call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": tid, "structured": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("structured"), "{e:?}");
+    // Revision table properties.
+    let rid = call(&mut ctx, "drawing_revision_table", json!({ "drawing": tab, "position": [400, 290] }))["table"].clone();
+    call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": rid, "visible_rows": 8, "newest_top": true }));
+    assert!(last(&mut ctx).ends_with(":: Revision table properties"));
+    let e = try_call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": rid, "visible_rows": 0 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("visible_rows"), "{e:?}");
+
+    // Switch to reference: the view's Part Studio (no app open: nothing to switch).
+    let s = call(&mut ctx, "drawing_switch_to_reference", json!({ "drawing": tab, "view": top }));
+    assert_eq!((s["target"]["name"].clone(), s["target"]["kind"].clone(), s["shown_in_app"].clone()), (json!("Part Studio 1"), json!("Part Studio"), json!(false)), "{s}");
+    // Replace…: every base view of Part Studio 1 shows the copy.
+    let dup = call(&mut ctx, "tab_duplicate", json!({ "tab": "Part Studio 1" }))["tab"]["name"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_replace", json!({ "drawing": tab, "view": top, "source": dup }));
+    assert!(last(&mut ctx).ends_with(":: Replace"));
+    for v in [top, second] {
+        let s = call(&mut ctx, "drawing_switch_to_reference", json!({ "drawing": tab, "view": v }));
+        assert_eq!(s["target"]["name"], dup.as_str(), "{s}");
+    }
+    let e = try_call(&mut ctx, "drawing_open_feature_studio", json!({ "drawing": tab, "table": rid })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
+}
+
+/// The window's navigation (UI-only sweep, batch 1): the tab shown, the Tab
+/// manager, instance and in-context navigation, viewing / comparing /
+/// repairing history, the drawing's sheets. Each is read back in ui_state.
+#[test]
+fn window_navigation() {
+    let mut ctx = Ctx::new();
+    let (block, _pin) = two_part_assembly(&mut ctx, "window_nav.noshape");
+    let state = |ctx: &mut Ctx| call(ctx, "ui_state", json!({}));
+    let shown = |ctx: &mut Ctx| state(ctx)["active_tab"]["name"].as_str().unwrap().to_string();
+    assert_eq!(shown(&mut ctx), "Part Studio 1");
+    let t = call(&mut ctx, "tab_activate", json!({ "tab": "Assembly 1" }));
+    assert_eq!((t["tab"]["kind"].clone(), t["shown_in_app"].clone()), (json!("Assembly"), json!(false)), "{t}");
+    assert_eq!(shown(&mut ctx), "Assembly 1");
+
+    // Tab manager: search, type filter, close.
+    let m = call(&mut ctx, "tab_manager", json!({ "search": "assem" }));
+    assert_eq!(m["rows"].as_array().unwrap().iter().map(|r| r["name"].as_str().unwrap()).collect::<Vec<_>>(), ["Assembly 1"], "{m}");
+    assert_eq!(state(&mut ctx)["tab_manager"], json!({ "open": true, "search": "assem" }));
+    let m = call(&mut ctx, "tab_manager", json!({ "kinds": ["drawing"], "open": false }));
+    assert!(m["rows"].as_array().unwrap().is_empty(), "{m}");
+    assert_eq!(state(&mut ctx)["tab_manager"]["open"], false);
+    let e = try_call(&mut ctx, "tab_manager", json!({ "kinds": ["nope"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("kinds[0]"), "{e:?}");
+
+    // Instance menu › Switch to Part Studio.
+    let s = call(&mut ctx, "assembly_switch_to_tab", json!({ "instance": block }));
+    assert_eq!((s["target"]["name"].clone(), s["part"]["name"].clone()), (json!("Part Studio 1"), json!("Part 1")), "{s}");
+    assert_eq!(shown(&mut ctx), "Part Studio 1");
+    let e = try_call(&mut ctx, "assembly_open_linked_document", json!({ "instance": block })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("instance"), "{e:?}");
+    let e = try_call(&mut ctx, "context_go_to_assembly", json!({})).unwrap_err();
+    assert!(e.message.contains("context"), "{e:?}");
+
+    // History: compare with a version, view it read-only, repair from it.
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    call(&mut ctx, "feature_rename", json!({ "feature": "Extrude 1", "name": "Plate" }));
+    let c = call(&mut ctx, "history_compare", json!({ "target": "V1" }));
+    let ps = c["tabs"].as_array().unwrap().iter().find(|t| t["name"] == "Part Studio 1").unwrap().clone();
+    assert_eq!(ps["status"], "differs", "{c}");
+    assert!(ps["features"].as_array().unwrap().iter().any(|f| f["status"] == "modified"), "{ps}");
+    assert_eq!(c["target"], "V1", "{c}");
+    assert_eq!(state(&mut ctx)["compare"]["target"], "V1");
+    call(&mut ctx, "history_compare", json!({ "stop": true }));
+    assert!(state(&mut ctx)["compare"].is_null());
+    let v = call(&mut ctx, "history_view", json!({ "to": "V1" }));
+    assert_eq!(v["label"], "V1", "{v}");
+    assert!(v["tabs"].as_array().unwrap().iter().any(|t| t["features"].as_array().is_some_and(|f| f.iter().any(|f| f["name"] == "Extrude 1"))), "{v}");
+    let e = try_call(&mut ctx, "feature_rename", json!({ "feature": "Extrude 1", "name": "X" })).unwrap_err();
+    assert!(e.message.contains("read-only"), "{e:?}");
+    assert!(state(&mut ctx)["viewing"].is_string());
+    call(&mut ctx, "history_view", json!({ "to": "workspace" }));
+    assert!(state(&mut ctx)["viewing"].is_null());
+    let r = call(&mut ctx, "history_repair_view", json!({ "at": "V1" }));
+    assert_eq!(r["label"], "V1", "{r}");
+    assert_eq!(state(&mut ctx)["repair"]["label"], "V1");
+    call(&mut ctx, "history_repair_view", json!({ "close": true }));
+    assert!(state(&mut ctx)["repair"].is_null());
+
+    // A drawing's sheets: the panel, then First / Next / Last sheet.
+    let tab = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }))["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "action": "add" }));
+    let p = call(&mut ctx, "drawing_sheets_panel", json!({ "drawing": tab }));
+    let sheets = p["sheets"].as_array().unwrap();
+    assert_eq!(sheets.len(), 2, "{p}");
+    assert!(!sheets[0]["views"].as_array().unwrap().is_empty(), "{p}");
+    assert_eq!(state(&mut ctx)["sheets_panel_open"][0]["name"], tab.as_str());
+    let first = call(&mut ctx, "drawing_switch_sheet", json!({ "drawing": tab, "step": "first" }));
+    assert_eq!(first["shown_sheet"], 1, "{first}");
+    let next = call(&mut ctx, "drawing_switch_sheet", json!({ "drawing": tab, "step": "next" }));
+    assert_eq!(next["shown_sheet"], 2, "{next}");
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.ends_with("Switch sheet"), "{last}");
+    assert_eq!(call(&mut ctx, "drawing_switch_sheet", json!({ "drawing": tab, "step": "last" }))["shown_sheet"], 2);
+    let p = call(&mut ctx, "drawing_sheets_panel", json!({ "drawing": tab, "open": false }));
+    assert_eq!(p["sheets"][1]["shown"], true, "{p}");
+    assert!(state(&mut ctx)["sheets_panel_open"].as_array().unwrap().is_empty());
 }

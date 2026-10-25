@@ -14,19 +14,11 @@ use crate::theme::p;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::build::ViewPlacement;
-use noshape_model::drawing::views::{self, SnapKind};
-use noshape_model::drawing::{Annotation, AnnotationRef, PointRef, ViewId};
+use noshape_model::drawing::ViewId;
 use noshape_render::{Drawable, Instance, LineData, LineSegment, PointData, PointSprite, Scene};
 
-/// What Select for replication picked: the annotations (with their
-/// reference points, view coordinates), the source view's placement and
-/// the region (sheet mm), if any.
-pub struct Replication {
-    pub items: Vec<(Annotation, Vec<[f64; 2]>)>,
-    pub src: ViewPlacement,
-    pub region: Option<[[f64; 2]; 2]>,
-}
+/// What Select for replication picked (shared with the agent API).
+pub use noshape_scene::drawing_tools::replicate::Replication;
 
 /// The Replicate region dialog.
 pub enum ReplicateDlg {
@@ -39,12 +31,6 @@ pub enum ReplicateDlg {
 /// The rectangle's dashed outline (live #CC925C) and grips (#90CEF1).
 const RECT_ORANGE: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
 const GRIP_BLUE: [u8; 4] = [0x90, 0xce, 0xf1, 255];
-/// References match within this (view coordinates, m).
-const MATCH_TOL: f64 = 1e-5;
-
-fn dist(a: [f64; 2], b: [f64; 2]) -> f64 {
-    ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt()
-}
 
 impl DrawingEditor {
     /// The view menu's replication items (live: after Paste as table).
@@ -67,30 +53,8 @@ impl DrawingEditor {
 
     /// Remember the view's annotations (inside `region`, sheet mm, if any).
     fn select_for_replication(&mut self, view: ViewId, region: Option<[[f64; 2]; 2]>, cx: &mut Context<Self>) {
-        let Some(src) = self.placement(view) else { return };
-        let Some(geo) = self.geoms.get(&view).cloned() else { return };
-        let sheet = self.current_sheet();
-        let Some(ctx) = views::view_source(sheet, view).and_then(|(k, _)| self.sources.get(&k)).map(|s| s.context.clone()) else { return };
-        let inside = |a: &Annotation| -> bool {
-            let Some(r) = region else { return true };
-            let Some(b) = &self.built else { return false };
-            let picks = self.picks_of(Sel::Annotation(a.id));
-            let pts: Vec<[f64; 2]> = b.geometry.lines.iter().filter(|l| picks.contains(&l.pick)).flat_map(|l| l.points.iter().copied()).collect();
-            if pts.is_empty() {
-                return false;
-            }
-            let c = pts.iter().fold([0.0, 0.0], |s, p| [s[0] + p[0], s[1] + p[1]]);
-            let c = [c[0] / pts.len() as f64, c[1] / pts.len() as f64];
-            (r[0][0]..=r[1][0]).contains(&c[0]) && (r[0][1]..=r[1][1]).contains(&c[1])
-        };
-        let mut items = Vec::new();
-        for a in sheet.annotations.iter().filter(|a| a.kind.view() == Some(view) && inside(a)) {
-            let pts: Option<Vec<[f64; 2]>> = a.refs.iter().map(|r| views::resolve_in_view(&ctx, &geo, &r.point).map(|(p, _)| p)).collect();
-            if let Some(pts) = pts {
-                items.push((a.clone(), pts));
-            }
-        }
-        self.replication = Some(Replication { items, src, region });
+        let Some(r) = self.pk().select_for_replication(view, region) else { return };
+        self.replication = Some(r);
         cx.notify();
     }
 
@@ -111,96 +75,7 @@ impl DrawingEditor {
     /// moves a region's contents, else view coordinates carry over.
     fn replicate_into(&mut self, target: ViewId, delta: Option<[f64; 2]>, cx: &mut Context<Self>) {
         let Some(r) = &self.replication else { return };
-        let (Some(dst), Some(geo)) = (self.placement(target), self.geoms.get(&target).cloned()) else { return };
-        let sheet = self.current_sheet();
-        let Some(ctx) = views::view_source(sheet, target).and_then(|(k, _)| self.sources.get(&k)).map(|s| s.context.clone()) else { return };
-        let src = r.src;
-        let map = |p: [f64; 2]| match delta {
-            None => p,
-            Some(d) => {
-                let s = src.to_sheet(p);
-                dst.to_view([s[0] + d[0], s[1] + d[1]])
-            }
-        };
-        let shift = delta.unwrap_or_else(|| {
-            let (a, b) = (src.to_sheet([0.0, 0.0]), dst.to_sheet([0.0, 0.0]));
-            [b[0] - a[0], b[1] - a[1]]
-        });
-        // A placed box is positioned by hand: snap it so the first vertex /
-        // circle center lands on the nearest one of its kind (3 mm on the
-        // sheet), and move every point by the same amount.
-        let kind_of = |p: &PointRef| match p {
-            PointRef::Vertex { .. } => Some(SnapKind::Vertex),
-            PointRef::Center { .. } => Some(SnapKind::Center),
-            _ => None,
-        };
-        let mut corr = [0.0, 0.0];
-        if delta.is_some() {
-            let tol = 3.0 / (dst.scale * 1000.0).max(1e-9);
-            let first = r.items.iter().flat_map(|(a, pts)| a.refs.iter().zip(pts)).find_map(|(rf, p)| kind_of(&rf.point).map(|k| (k, map(*p))));
-            if let Some((k, q)) = first
-                && let Some(s) = geo.snaps.iter().filter(|s| s.kind == k).min_by(|a, b| dist(a.p, q).total_cmp(&dist(b.p, q)))
-                && dist(s.p, q) < tol
-            {
-                corr = [s.p[0] - q[0], s.p[1] - q[1]];
-            }
-        }
-        let map = |p: [f64; 2]| {
-            let q = map(p);
-            [q[0] + corr[0], q[1] + corr[1]]
-        };
-        let shift = match delta {
-            Some(_) => {
-                let (a, b) = (dst.to_sheet([0.0, 0.0]), dst.to_sheet(corr));
-                [shift[0] + b[0] - a[0], shift[1] + b[1] - a[1]]
-            }
-            None => shift,
-        };
-        let mut next = sheet.next_annotation_id();
-        let existing: Vec<&Annotation> = sheet.annotations.iter().filter(|a| a.kind.view() == Some(target)).collect();
-        let mut out: Vec<Annotation> = Vec::new();
-        // Tried: the annotations that could land (live's "n/m").
-        let mut tried = 0usize;
-        for (a, pts) in &r.items {
-            // Region copies need references to land on.
-            if a.refs.is_empty() && delta.is_some() {
-                continue;
-            }
-            tried += 1;
-            let mut refs = Vec::new();
-            for (rf, p) in a.refs.iter().zip(pts) {
-                let q = map(*p);
-                // A circle's center lands only where the circle shows (live: the
-                // Ø of a hole seen edge-on is not replicated).
-                let shown = !matches!(rf.point, PointRef::Center { .. }) || geo.snaps.iter().any(|s| s.kind == SnapKind::Center && dist(s.p, q) < MATCH_TOL);
-                if shown && views::resolve_in_view(&ctx, &geo, &rf.point).is_some_and(|(x, _)| dist(x, q) < MATCH_TOL) {
-                    refs.push(rf.clone());
-                    continue;
-                }
-                let Some(point) = kind_of(&rf.point).and_then(|k| geo.snaps.iter().find(|s| s.kind == k && dist(s.p, q) < MATCH_TOL)).and_then(|s| s.point.clone()) else { break };
-                refs.push(AnnotationRef { slot: rf.slot, point });
-            }
-            if refs.len() != a.refs.len() {
-                continue;
-            }
-            let same = |e: &&Annotation| std::mem::discriminant(&e.kind) == std::mem::discriminant(&a.kind) && e.refs == refs;
-            if !refs.is_empty() && (existing.iter().any(same) || out.iter().any(|e| same(&e))) {
-                continue;
-            }
-            let mut b = a.clone();
-            b.id = next;
-            next += 1;
-            b.refs = refs;
-            if let Some(v) = b.kind.view_mut() {
-                *v = target;
-            }
-            b.position = [b.position[0] + shift[0], b.position[1] + shift[1]];
-            b.group = None;
-            b.view_group = None;
-            b.ann_group = None;
-            b.inspection = None;
-            out.push(b);
-        }
+        let Some((out, tried)) = self.pk().replicate_into(r, target, delta) else { return };
         let n = out.len();
         if n > 0 {
             self.edit_sheet("Replicate annotations", cx, |s| s.annotations.extend(out));
@@ -253,8 +128,7 @@ impl DrawingEditor {
                 ReplicateDlg::Create { view, rect: Some(rect), .. } => self.select_for_replication(view, Some(rect), cx),
                 ReplicateDlg::Place { view, at: Some(at) } => {
                     if let Some(r) = self.replication.as_ref().and_then(|r| r.region) {
-                        let c = [(r[0][0] + r[1][0]) * 0.5, (r[0][1] + r[1][1]) * 0.5];
-                        self.replicate_into(view, Some([at[0] - c[0], at[1] - c[1]]), cx);
+                        self.replicate_into(view, Some(noshape_scene::drawing_tools::replicate::region_delta(r, at)), cx);
                     }
                 }
                 _ => {}

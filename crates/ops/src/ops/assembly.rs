@@ -13,7 +13,7 @@ use noshape_model::document::{TabContent, TabId};
 use noshape_model::reference::Reference;
 use serde_json::{Value, json};
 
-fn asm_field() -> crate::registry::Field {
+pub(super) fn asm_field() -> crate::registry::Field {
     opt("tab", s(), "Assembly tab, by name or id. Default: the first Assembly.")
 }
 
@@ -176,13 +176,13 @@ fn is_assembly(c: &TabContent) -> bool {
     matches!(c, TabContent::Assembly(_))
 }
 
-fn target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {
+pub(super) fn target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let tab = doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", is_assembly)?;
     Ok((od, tab))
 }
 
-fn assembly(od: &OpenDoc, tab: TabId) -> Result<&Assembly, OpError> {
+pub(super) fn assembly(od: &OpenDoc, tab: TabId) -> Result<&Assembly, OpError> {
     match od.doc().tab(tab).map(|t| &t.content) {
         Some(TabContent::Assembly(a)) => Ok(a),
         _ => Err(OpError::param("tab", "not an Assembly")),
@@ -725,7 +725,13 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(slot) => *slot = m.clone(),
         None => preview.mates.push(m.clone()),
     }
-    let opts = if a.bool_or("solve_all", false)? { SolveOptions::default() } else { sa::mate_preview_options(&preview, &m) };
+    let mut opts = if a.bool_or("solve_all", false)? { SolveOptions::default() } else { sa::mate_preview_options(&preview, &m) };
+    // A new mate brings its connectors together (free values zero), as the
+    // dialog does (live "qa4 round 5 s3 mate flip": Cylindrical and Planar
+    // land at t (0,0,−30), the connectors coincident).
+    if editing.is_none() && opts.only_mate.is_some() {
+        opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m));
+    }
     let solved = od.evaluate_assembly(tab, &preview, &opts);
     let ok = solved.mates.iter().find(|s| s.id == id).map(|s| (s.ok, s.message.clone()));
     let values = asm.configuration.defaults();

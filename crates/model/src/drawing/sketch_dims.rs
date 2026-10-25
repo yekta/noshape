@@ -32,7 +32,7 @@ impl Sheet {
             Geometry::Circle { center, radius } => {
                 let c = sk.point(center)?;
                 let angle = (at[1] - c.y).atan2(at[0] - c.x);
-                (AnnotationKind::RadialDimension { view: SHEET_VIEW, center: [c.x / 1000.0, c.y / 1000.0], radius: radius / 1000.0, diameter: true, angle, dim_line: false }, radius * 2.0, ConstraintKind::Diameter { curve: e, value: radius * 2.0 })
+                (AnnotationKind::RadialDimension { view: SHEET_VIEW, center: [c.x / 1000.0, c.y / 1000.0], radius: radius / 1000.0, diameter: true, angle, dim_line: false, knee: None }, radius * 2.0, ConstraintKind::Diameter { curve: e, value: radius * 2.0 })
             }
             _ => return None,
         };

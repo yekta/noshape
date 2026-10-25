@@ -41,7 +41,7 @@ pub fn helix() -> FeatureType {
             .hints(Hints::INITIAL_FOCUS)
             .visible(move |v| axis_ty(v, "SURFACE")),
         ParamSpec::query1("axis", "Helix axis", QueryFilter::AXIS | QueryFilter::CIRCULAR_EDGE).visible(move |v| axis_ty(v, "AXIS")),
-        ParamSpec::query1("edge", "Circular edge", QueryFilter::CIRCULAR_EDGE).visible(move |v| axis_ty(v, "CIRCLE")),
+        ParamSpec::query1("edge", "Circular edge", QueryFilter(QueryFilter::CIRCULAR_EDGE.0 | QueryFilter::SKETCH_EDGE.0)).visible(move |v| axis_ty(v, "CIRCLE")),
         ParamSpec::enum_("pathType", "Input type", &[("TURNS", "Turns"), ("PITCH", "Pitch"), ("TURNS_PITCH", "Turns and pitch")]).hints(Hints::SHOW_LABEL),
         ParamSpec::flip("oppositeDirection", "Opposite direction"),
         ParamSpec::enum_("startType", "Start condition", &[("START_ANGLE", "Start angle"), ("START_POINT", "Start point")]).hints(Hints::SHOW_LABEL),
@@ -105,7 +105,7 @@ pub fn fit_spline() -> FeatureType {
     }
     p.push(hidden(ParamSpec::bool("hasStartDirection", "Has start direction", false)));
     p.push(hidden(ParamSpec::bool("hasEndDirection", "Has end direction", false)));
-    p.push(ParamSpec::query("edges", "Edges", QueryFilter::EDGE).visible(move |v| !verts(v)));
+    p.push(ParamSpec::query("edges", "Edges", QueryFilter::ANY_EDGE).visible(move |v| !verts(v)));
     p.extend(curve_approximation(always));
     FeatureType::new("fitSpline", "3D fit spline", Category::Curve, p).describe("Create a 3D spline through vertices or along a tangent edge chain")
 }
@@ -150,10 +150,10 @@ pub fn bridging_curve() -> FeatureType {
         hidden(ParamSpec::bool("side2HasVertex", "End has vertex", false)),
         hidden(ParamSpec::bool("side1HasFace", "Start has face", false)),
         hidden(ParamSpec::bool("side2HasFace", "End has face", false)),
-        query_n("side1", "Start", QueryFilter::EDGE | QueryFilter::POINT_LIKE | QueryFilter::ANY_FACE, 2).hints(Hints::INITIAL_FOCUS),
+        query_n("side1", "Start", QueryFilter::ANY_EDGE | QueryFilter::POINT_LIKE | QueryFilter::ANY_FACE, 2).hints(Hints::INITIAL_FOCUS),
         match_opt("match1", "Match"),
         ParamSpec::flip("flip1", "Opposite direction").visible(move |v| non_pos(v, "match1")),
-        query_n("side2", "End", QueryFilter::EDGE | QueryFilter::POINT_LIKE | QueryFilter::ANY_FACE, 2),
+        query_n("side2", "End", QueryFilter::ANY_EDGE | QueryFilter::POINT_LIKE | QueryFilter::ANY_FACE, 2),
         match_opt("match2", "Match"),
         ParamSpec::flip("flip2", "Opposite direction").visible(move |v| non_pos(v, "match2")),
         ParamSpec::enum_("method", "Method", &[("MAGNITUDE_BIAS", "Magnitude/bias"), ("CONTROL_POINTS", "Control points")])

@@ -21,6 +21,9 @@ pub struct DimText {
     /// the primary (Dual › Dimension location Bottom) rather than above.
     pub dual: Option<String>,
     pub dual_below: bool,
+    /// A rule between the stacked `upper` and `lower` (fit classes
+    /// "Stacked with line").
+    pub rule: bool,
 }
 
 impl DimText {
@@ -258,6 +261,7 @@ pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, sym
                 _ if !h.is_empty() && !sh.is_empty() && fo.stacking != super::FitStacking::Diagonal => {
                     t.upper = Some(h.to_string());
                     t.lower = Some(sh.to_string());
+                    t.rule = fo.stacking == super::FitStacking::WithLine;
                 }
                 _ if !classes.is_empty() => t.main = format!("{} {classes}", t.main),
                 _ => {}
@@ -711,6 +715,8 @@ mod tests {
         // tolerance adds the H7 deviations; tolerance only shows just them.
         let fit = |mode, stacking| DimFormat { tolerance: Tolerance::Fit { hole: "H7".into(), shaft: "g6".into() }, fit: FitOpts { mode, stacking, ..Default::default() }, ..Default::default() };
         let t = dim_text(&d, &fit(FitMode::Fit, FitStacking::WithoutLine), 0.010, false, "");
+        assert!(!t.rule);
+        assert!(dim_text(&d, &fit(FitMode::Fit, FitStacking::WithLine), 0.010, false, "").rule, "Stacked with line: a rule between the classes");
         assert_eq!((t.main.as_str(), t.upper.as_deref(), t.lower.as_deref()), ("10", Some("H7"), Some("g6")));
         assert_eq!(dim_text(&d, &fit(FitMode::Fit, FitStacking::Diagonal), 0.010, false, "").main, "10 H7/g6");
         let t = dim_text(&d, &fit(FitMode::WithTolerance, FitStacking::WithoutLine), 0.010, false, "");

@@ -60,3 +60,59 @@ fn plate_with_400_filleted_holes() {
     assert_eq!(mesh2.triangle_count(), mesh.triangle_count());
     assert_eq!(back.faces().len(), nf);
 }
+
+/// The user's knurling feature (lead 10-25) as its operations build it, timed
+/// against live (behaviours "kern (10-25) knurl timing"): a Ø50 × 40 mm
+/// cylinder, ANSI/ASME B94.6 circular pitch 12 TPI (74 grooves), tooth angle
+/// 80°, groove depth 100 %, tooth helix angle 30° (0 for Straight). Each
+/// groove is the diamond profile swept along the helix from the bottom
+/// circle; the grooves are a circular pattern of it, Diamond adds their mirror
+/// images; one subtraction. Live: Straight 0.75 s, 224 faces, 76702.187 mm³;
+/// Diagonal 3.80 s, 224 faces, 76419.516 mm³; Diamond 32.05 s, 8142 faces,
+/// 75405.795 mm³. `KNURL=straight|diagonal|diamond` runs one (default all).
+#[test]
+#[ignore]
+fn knurl_like_onshape() {
+    let (r, h, n) = (25.0, 40.0, 74usize);
+    let depth = 0.034 * 25.4;
+    let tooth = 80f64.to_radians();
+    let only = std::env::var("KNURL").ok();
+    for (kind, live_s, live_faces, live_volume) in [("straight", 0.75, 224, 76702.187), ("diagonal", 3.80, 224, 76419.516), ("diamond", 32.05, 8142, 75405.795)] {
+        if only.as_deref().is_some_and(|k| k != kind) {
+            continue;
+        }
+        let t0 = Instant::now();
+        let helix_angle = if kind == "straight" { 0.0 } else { 30f64.to_radians() };
+        // knurling.fs: the profile in the plane square to the axis at the
+        // path's start, x along the circle, y outward.
+        let cos_h = helix_angle.cos();
+        let groove_half_base = depth * (tooth / 2.0).tan() / cos_h;
+        let extra = 2.0 * r * (1.0 - (groove_half_base / r).asin().cos());
+        let tooth_height = depth + extra;
+        let half_base = tooth_height * (tooth / 2.0).tan() / cos_h;
+        let p = |x: f64, y: f64| DVec3::new(r + y, -x, 0.0);
+        let profile = make_face_from_wire(&make_polyline(&[p(half_base, extra), p(0.0, -depth), p(-half_base, extra), p(0.0, extra + tooth_height)], true).unwrap(), true).unwrap();
+        let frame = Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+        let path = if kind == "straight" { make_line(DVec3::new(r, 0.0, 0.0), DVec3::new(r, 0.0, h)).unwrap() } else { make_helix(&frame, r, 2.0 * r * PI * (PI / 2.0 - helix_angle).tan(), h, true, 0.0).unwrap() };
+        let groove = sweep(&profile, &path, &SweepOptions::default()).unwrap().shape;
+        let mut tools: Vec<Shape> = (0..n).map(|i| transform(&groove, &Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::Z, angle: 2.0 * PI * i as f64 / n as f64 }, true).unwrap().shape).collect();
+        if kind == "diamond" {
+            let mirror = Plane::new(DVec3::new(r, 0.0, 0.0), DVec3::Y, DVec3::X);
+            let mirrored: Vec<Shape> = tools.iter().map(|t| transform(t, &Transform::Mirror(mirror), true).unwrap().shape).collect();
+            tools.extend(mirrored);
+        }
+        let t_tools = t0.elapsed();
+        let cylinder = make_cylinder(&frame, r, h, 2.0 * PI).unwrap();
+        let res = boolean(BooleanOp::Cut, &[cylinder], &tools, &BooleanOptions::default());
+        let t = t0.elapsed();
+        match res {
+            Ok(res) => {
+                let (faces, volume) = (res.shape.count(ShapeType::Face), res.shape.volume().unwrap());
+                eprintln!("knurl {kind}: {:.2} s (tools {:.2} s; live {live_s} s), {faces} faces (live {live_faces}), volume {volume:.3} mm3 (live {live_volume})", t.as_secs_f64(), t_tools.as_secs_f64());
+                assert!((volume - live_volume).abs() < 5e-4 * live_volume, "knurl {kind}: volume {volume} vs live {live_volume}");
+                assert_eq!(faces, live_faces, "knurl {kind}: faces");
+            }
+            Err(e) => panic!("knurl {kind}: failed after {:.2} s (live {live_s} s): {e}", t.as_secs_f64()),
+        }
+    }
+}

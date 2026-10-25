@@ -12,7 +12,37 @@ use crate::perf;
 use crate::renderer::{Completed, FrameRequest, PickRect, Present, RenderError, Renderer, Uploader};
 use crate::scene::{Scene, Style};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
+use std::time::{Duration, Instant};
+
+static PREWARM_HELD: AtomicBool = AtomicBool::new(false);
+static PREWARM_RELEASED: AtomicBool = AtomicBool::new(false);
+/// The longest a held shader compile waits for [`release_prewarm`].
+const PREWARM_MAX_HOLD: Duration = Duration::from_secs(5);
+
+/// Hold the render worker's shader compile ([`Renderer::prewarm`]) until
+/// [`release_prewarm`]: compiled alongside the first window's own shaders,
+/// ours held the window back (macOS 14 runners: drawn at 2.7 s, 1.2 s
+/// without). Call before the worker starts.
+pub fn hold_prewarm() {
+    PREWARM_HELD.store(true, Ordering::Relaxed);
+}
+
+/// The first window has drawn: compile now.
+pub fn release_prewarm() {
+    PREWARM_RELEASED.store(true, Ordering::Relaxed);
+}
+
+fn wait_for_prewarm() {
+    if !PREWARM_HELD.load(Ordering::Relaxed) {
+        return;
+    }
+    let deadline = Instant::now() + PREWARM_MAX_HOLD;
+    while !PREWARM_RELEASED.load(Ordering::Relaxed) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
 
 
 #[derive(Clone)]
@@ -66,6 +96,7 @@ impl RenderWorker {
         std::thread::Builder::new()
             .name("noshape-render".into())
             .spawn(move || {
+                wait_for_prewarm();
                 renderer.prewarm(Style::default().msaa);
                 let mut jobs: Vec<RenderJob> = Vec::new();
                 let mut picks: Vec<(u64, u64, PickRect)> = Vec::new();

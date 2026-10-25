@@ -7,7 +7,7 @@
 use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_model::drawing::build::PickTarget;
-use noshape_model::drawing::{Table, TableCorner, TableKind};
+use noshape_model::drawing::{Table, TableKind};
 
 /// BOM / cut list tables showing the same rows (same kind and view).
 use noshape_scene::drawing_tools::table_edit as te;
@@ -30,20 +30,8 @@ impl CellSel {
     }
 }
 
-/// Spreadsheet cells from clipboard text (tab-separated rows), if it looks
-/// like a table (a tab, or several lines).
-pub fn parse_cells(text: &str) -> Option<Vec<Vec<String>>> {
-    let text = text.trim_end_matches(['\n', '\r']);
-    if text.is_empty() || (!text.contains('\t') && !text.contains('\n')) || text.trim_start().starts_with('{') {
-        return None;
-    }
-    let rows: Vec<Vec<String>> = text.lines().map(|l| l.split('\t').map(|c| c.trim_matches('"').to_string()).collect()).collect();
-    let n = rows.iter().map(|r| r.len()).max().unwrap_or(0);
-    Some(rows.into_iter().map(|mut r| {
-        r.resize(n, String::new());
-        r
-    }).collect())
-}
+/// Spreadsheet cells from clipboard text (shared with the agent API).
+pub use noshape_scene::drawing_tools::table_edit::parse_cells;
 
 impl DrawingEditor {
     /// A click in Select mode on a table: select the cell (Shift: extend the
@@ -250,8 +238,7 @@ impl DrawingEditor {
     pub fn place_paste_table(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(cells) = self.paste_table.take() else { return false };
         let id = self.current_sheet().next_table_id();
-        let mut t = Table::new(id, TableKind::General { cells, title: None, header: false }, self.cursor);
-        t.corner = TableCorner::TopLeft;
+        let t = noshape_scene::drawing_tools::table_edit::pasted_table(id, cells, self.cursor);
         self.edit_sheet("Paste as table", cx, |s| s.tables.push(t));
         self.selection = vec![Sel::Table(id)];
         // The clipboard is used up after one paste.

@@ -192,10 +192,11 @@ impl SheetPick<'_> {
                     *offset = dim_offset(pl.to_sheet(*pa), pl.to_sheet(*pb), *orientation, c);
                 }
             }
-            AnnotationKind::RadialDimension { center, angle, .. } => {
+            AnnotationKind::RadialDimension { view, center, radius, angle, knee, .. } => {
                 if let Some(pl) = pl {
                     let v = sub(c, pl.to_sheet(*center));
                     *angle = v[1].atan2(v[0]);
+                    *knee = self.radial_knee(*view, *center, *radius, c);
                 }
             }
             AnnotationKind::AngularDimension { vertex, radius, a: pa, b: pb, three_point, .. } => {
@@ -237,7 +238,10 @@ impl SheetPick<'_> {
             out.position = a.position;
             match (&mut out.kind, &a.kind) {
                 (AnnotationKind::LinearDimension { offset, .. }, AnnotationKind::LinearDimension { offset: o, .. }) => *offset = *o,
-                (AnnotationKind::RadialDimension { angle, .. }, AnnotationKind::RadialDimension { angle: g, .. }) => *angle = *g,
+                (AnnotationKind::RadialDimension { angle, knee, .. }, AnnotationKind::RadialDimension { angle: g, knee: k, .. }) => {
+                    *angle = *g;
+                    *knee = *k;
+                }
                 (AnnotationKind::AngularDimension { radius, a: pa, b: pb, .. }, AnnotationKind::AngularDimension { radius: r, a: na, .. }) => {
                     *radius = *r;
                     // Legs swapped by the drag: swap the stored legs and their references too.
