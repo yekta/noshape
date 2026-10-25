@@ -3065,18 +3065,43 @@ impl PartStudioView {
         // ---- constraint glyphs
         let show_all = ed.show_constraints || ed.shift_held;
         let recent = ed.glyph_entity.filter(|(_, t)| t.elapsed().as_millis() < 750).map(|(e, _)| e);
-        let mut per_entity: HashMap<u32, usize> = HashMap::new();
-        for g in ed.constraint_glyphs(&data) {
-            let visible = show_all
-                || ed.hover == Some(g.entity)
-                || recent == Some(g.entity)
-                || ed.selection.contains(&g.entity)
-                || ed.selected_constraints.contains(&g.constraint)
-                || ed.hover_constraint == Some(g.constraint);
-            if !visible {
-                continue;
+        let glyphs: Vec<_> = ed
+            .constraint_glyphs(&data)
+            .into_iter()
+            .filter(|g| {
+                show_all
+                    || ed.hover == Some(g.entity)
+                    || recent == Some(g.entity)
+                    || ed.selection.contains(&g.entity)
+                    || ed.selected_constraints.contains(&g.constraint)
+                    || ed.hover_constraint == Some(g.constraint)
+            })
+            .collect();
+        // Glyphs per entity laid out next to it (dragged ones aside).
+        let mut counts: HashMap<u32, usize> = HashMap::new();
+        for g in glyphs.iter().filter(|g| g.offset.is_none()) {
+            *counts.entry(g.entity.0).or_default() += 1;
+        }
+        // A line's side for its glyphs (screen unit normal): below a
+        // horizontal line, left of a vertical one (live sketch/28).
+        let line_side = |e: noshape_sketch::EntityId| -> Option<(f32, f32)> {
+            let noshape_sketch::Curve2::Line { a, b } = data.sketch.curve(e)? else { return None };
+            let ((ax, ay), (bx, by)) = (project(a)?, project(b)?);
+            let (dx, dy) = (bx - ax, by - ay);
+            let len = (dx * dx + dy * dy).sqrt();
+            if len < 1e-3 {
+                return None;
             }
-            // Dragged glyphs sit centered on their stored offset; others stack next to the entity.
+            let (nx, ny) = (-dy / len, dx / len);
+            Some(if ny < -1e-3 || (ny.abs() <= 1e-3 && nx > 0.0) { (-nx, -ny) } else { (nx, ny) })
+        };
+        let mut per_entity: HashMap<u32, usize> = HashMap::new();
+        for g in glyphs {
+            // Dragged glyphs sit centered on their stored offset. Live
+            // (sketch/28): 20 px white boxes 22 px apart; a line's row is
+            // centred 20.5 px off its midpoint, a point's glyph sits up-left
+            // of it (top-left at -27, -26) with a leader.
+            let mut leader = false;
             let (x, y, dx, dy) = match g.offset {
                 Some(o) => {
                     let Some((x, y)) = project(g.anchor + o) else { continue };
@@ -3085,11 +3110,41 @@ impl PartStudioView {
                 None => {
                     let Some((x, y)) = project(g.anchor) else { continue };
                     let k = per_entity.entry(g.entity.0).or_default();
-                    let d = if g.on_point { (7.0 + 19.0 * *k as f32, -25.0) } else { (6.0 + 19.0 * *k as f32, 6.0) };
+                    let n = counts.get(&g.entity.0).copied().unwrap_or(1) as f32;
+                    let kf = *k as f32;
                     *k += 1;
-                    (x, y, d.0, d.1)
+                    if g.on_point {
+                        leader = true;
+                        (x, y, -27.0 - 22.0 * kf, -26.0)
+                    } else if let Some((nx, ny)) = line_side(g.entity) {
+                        (x + nx * 20.5, y + ny * 20.5, -10.0 - 11.0 * (n - 1.0) + 22.0 * kf, -10.0)
+                    } else {
+                        (x, y, 6.0 + 22.0 * kf, 6.0)
+                    }
                 }
             };
+            if leader {
+                // Live: a 1 px #a8b2bb line from the box's corner to the point.
+                out.push(
+                    canvas(
+                        |_, _, _| {},
+                        |b, _, window, _| {
+                            let mut pb = PathBuilder::stroke(px(1.));
+                            pb.move_to(b.origin);
+                            pb.line_to(b.origin + point(b.size.width, b.size.height));
+                            if let Ok(path) = pb.build() {
+                                window.paint_path(path, gpui_kit::rgb_static(0xa8b2bb));
+                            }
+                        },
+                    )
+                    .absolute()
+                    .left(px(x - 7.0))
+                    .top(px(y - 6.0))
+                    .w(px(7.))
+                    .h(px(6.))
+                    .into_any_element(),
+                );
+            }
             let cid = g.constraint;
             let gent = g.entity;
             let selected = ed.selected_constraints.contains(&cid);
@@ -3119,11 +3174,10 @@ impl PartStudioView {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .rounded(px(2.))
                     .bg(bg)
-                    .shadow_xs()
                     .cursor_pointer()
-                    .child(icon_px(g.icon, 14.0, fg))
+                    // Live sketch/28: the icon spans 14 px of the 20 px box (ours at 18 px).
+                    .child(icon_px(g.icon, 18.0, fg))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         if let Some(ed) = &mut this.sketch {
                             let new = if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
