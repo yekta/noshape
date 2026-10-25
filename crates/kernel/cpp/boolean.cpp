@@ -1,4 +1,25 @@
 // Booleans, split, unify, enclose, transforms, sections, projections.
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <psapi.h>
+#ifdef _MSC_VER
+#pragma comment(lib, "psapi.lib")
+#endif
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#else
+#include <unistd.h>
+#endif
 #include "internal.hpp"
 
 #include <BOPAlgo_MakerVolume.hxx>
@@ -47,6 +68,27 @@
 
 namespace noshape {
 
+// The process's resident memory in bytes (0 when unknown).
+static size_t resident_bytes()
+{
+#if defined(_WIN32)
+  PROCESS_MEMORY_COUNTERS c;
+  return GetProcessMemoryInfo(GetCurrentProcess(), &c, sizeof c) ? (size_t)c.WorkingSetSize : 0;
+#elif defined(__APPLE__)
+  mach_task_basic_info_data_t info;
+  mach_msg_type_number_t      n = MACH_TASK_BASIC_INFO_COUNT;
+  return task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &n) == KERN_SUCCESS ? (size_t)info.resident_size : 0;
+#else
+  FILE* f = std::fopen("/proc/self/statm", "r");
+  if (f == nullptr)
+    return 0;
+  long size = 0, resident = 0;
+  const int got = std::fscanf(f, "%ld %ld", &size, &resident);
+  std::fclose(f);
+  return got == 2 ? (size_t)resident * (size_t)sysconf(_SC_PAGESIZE) : 0;
+#endif
+}
+
 namespace {
 
 using HHist = occ::handle<BRepTools_History>;
@@ -60,38 +102,68 @@ bool cancelled(const std::atomic<bool>* flag)
   return flag != nullptr && flag->load(std::memory_order_relaxed);
 }
 
-// Only answers UserBreak (it shows nothing).
+// Memory budget of one boolean (lead 10-25, the user's Diamond knurl: 148
+// crossing helical tools took 17 GB and ran on): the process's resident
+// memory may grow by this much while an operation builds, then the
+// operation stops with an error. NOSHAPE_BOOLEAN_MEMORY_MB overrides 4096.
+size_t memory_budget()
+{
+  static const size_t budget = [] {
+    const char* v = std::getenv("NOSHAPE_BOOLEAN_MEMORY_MB");
+    const long  mb = v != nullptr ? std::atol(v) : 0;
+    return (size_t)(mb > 0 ? mb : 4096) << 20;
+  }();
+  return budget;
+}
+
+// Set when an operation ran out of its budget (also on a pool thread); the
+// operation then fails (fail_if_cancelled) instead of trying another way.
+std::atomic<bool> g_over_budget{false};
+
+// Stops a build when the thread's cancel flag is set or when the process
+// grew past the memory budget since the build started (checked every 50
+// ms). It shows nothing.
 class CancelIndicator : public Message_ProgressIndicator
 {
 public:
-  explicit CancelIndicator(const std::atomic<bool>* flag) : myFlag(flag) {}
-  bool UserBreak() override { return cancelled(myFlag); }
+  explicit CancelIndicator(const std::atomic<bool>* flag) : myFlag(flag), myStart(resident_bytes()) {}
+  bool UserBreak() override
+  {
+    if (cancelled(myFlag) || myOver)
+      return true;
+    const auto now = std::chrono::steady_clock::now();
+    if (now - myChecked < std::chrono::milliseconds(50))
+      return false;
+    myChecked = now;
+    const size_t rss = resident_bytes();
+    if (rss > myStart && rss - myStart > memory_budget())
+    {
+      myOver = true;
+      g_over_budget.store(true);
+    }
+    return myOver;
+  }
   void Show(const Message_ProgressScope&, const bool) override {}
 
 private:
-  const std::atomic<bool>* myFlag;
+  const std::atomic<bool>*              myFlag;
+  size_t                                myStart;
+  bool                                  myOver = false;
+  std::chrono::steady_clock::time_point myChecked = std::chrono::steady_clock::now();
 };
 
-// Build `algo`, stoppable through the thread's cancel flag.
+// Build `algo`, stoppable through the thread's cancel flag and the memory
+// budget.
 template <class A> void build_cancellable(A& algo)
 {
-  if (t_cancel == nullptr)
-  {
-    algo.Build();
-    return;
-  }
   occ::handle<CancelIndicator> pi = new CancelIndicator(t_cancel);
   algo.Build(pi->Start());
 }
 
-// Build `algo`, stoppable through `flag` (a pool thread has no thread flag).
+// Build `algo`, stoppable through `flag` (a pool thread has no thread flag)
+// and the memory budget; never throws (the caller checks the flags).
 template <class A> void build_with(A& algo, const std::atomic<bool>* flag)
 {
-  if (flag == nullptr)
-  {
-    algo.Build();
-    return;
-  }
   occ::handle<CancelIndicator> pi = new CancelIndicator(flag);
   algo.Build(pi->Start());
 }
@@ -100,6 +172,8 @@ void fail_if_cancelled()
 {
   if (cancelled(t_cancel))
     fail_op("cancelled");
+  if (g_over_budget.load())
+    fail_op("operation stopped: it needed more than " + std::to_string(memory_budget() >> 20) + " MB of memory");
 }
 
 void apply_opts(BRepAlgoAPI_BuilderAlgo& a, const BoolOpts& o)
@@ -1462,6 +1536,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     fail_invalid("boolean needs at least one tool");
   check_all(args.items, "boolean argument");
   check_all(tools.items, "boolean tool");
+  g_over_budget.store(false);
   auto make = [op]() -> std::unique_ptr<BRepAlgoAPI_BooleanOperation> {
     switch (op)
     {
