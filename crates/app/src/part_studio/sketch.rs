@@ -598,8 +598,10 @@ impl PartStudioView {
                 }
                 let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
                 // Live Onshape: the sketch's own plane (or face) is never
-                // pre-highlighted while sketching on it.
-                if r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx)) {
+                // pre-highlighted while sketching on it, except a face for
+                // Use, which projects its edges (qa5 CTX-USE).
+                let use_face = self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) && matches!(r, Some(Reference::Face(_)));
+                if !use_face && r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx)) {
                     if self.hover.take().is_some() {
                         self.refresh_scene(false, cx);
                     }
