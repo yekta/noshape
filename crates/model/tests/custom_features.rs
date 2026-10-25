@@ -832,7 +832,7 @@ fn std_show_label_hints_match_builtin() {
 #[test]
 fn std_edge_filters_match_builtin() {
     use noshape_model::params::{Hints, ParamKind, ParamSpec, QueryFilter};
-    const MODEL_EDGES: u32 = QueryFilter::EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0;
+    const MODEL_EDGES: u32 = QueryFilter::EDGE.0 | QueryFilter::SOLID_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0;
     fn filters(specs: &[ParamSpec], prefix: &str, out: &mut Vec<(String, QueryFilter)>) {
         for p in specs {
             match &p.kind {
@@ -1019,6 +1019,49 @@ export const pinnedHelix = defineFeature(function(context is Context, id is Id, 
     // As in Onshape, std 3095 does not export HelixType.
     let compiled = custom::compile(fx.fs, &pinned(3095));
     assert!(compiled.diagnostics.iter().any(|d| d.message.contains("HelixType")), "{:?}", compiled.diagnostics);
+}
+
+/// evSurfaceDefinition of a B-spline face: std's BSplineSurface with live's
+/// keys (live "fs (10-25 b)" (2): a loft from a circle to a rectangle).
+#[test]
+fn bspline_surface_definition() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Spline face probe" }
+export const splineFaceProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        const s1 = newSketchOnPlane(context, id + "s1", { "sketchPlane" : plane(vector(0, 0, 0) * millimeter, vector(0, 0, 1)) });
+        skCircle(s1, "c", { "center" : vector(0, 0) * millimeter, "radius" : 10 * millimeter });
+        skSolve(s1);
+        const s2 = newSketchOnPlane(context, id + "s2", { "sketchPlane" : plane(vector(0, 0, 20) * millimeter, vector(0, 0, 1)) });
+        skRectangle(s2, "r", { "firstCorner" : vector(-8, -5) * millimeter, "secondCorner" : vector(8, 5) * millimeter });
+        skSolve(s2);
+        opLoft(context, id + "loft", { "profileSubqueries" : [qCreatedBy(id + "s1", EntityType.FACE), qCreatedBy(id + "s2", EntityType.FACE)], "bodyType" : ToolBodyType.SOLID });
+        var splines = 0;
+        for (var face in evaluateQuery(context, qCreatedBy(id + "loft", EntityType.FACE)))
+        {
+            const definition = evSurfaceDefinition(context, { "face" : face });
+            if (definition.surfaceType != SurfaceType.SPLINE)
+                continue;
+            splines += 1;
+            if (!(definition is BSplineSurface) || keys(definition) != ["controlPoints", "isRational", "isUPeriodic", "isVPeriodic", "surfaceType", "uDegree", "uKnots", "vDegree", "vKnots"])
+                throw regenError("B-spline face: " ~ toString(keys(definition)));
+            if (evSurfaceDefinition(context, { "face" : face, "returnBSplinesAsOther" : true }) != { "surfaceType" : SurfaceType.OTHER })
+                throw regenError("returnBSplinesAsOther");
+        }
+        if (splines == 0)
+            throw regenError("no B-spline face on the loft");
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("splineFaceProbe"), &fx.units).unwrap();
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
 }
 
 /// evCollision with one solid inside another (live "fs (10-25 f)"): touching

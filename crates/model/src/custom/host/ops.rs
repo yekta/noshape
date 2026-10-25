@@ -630,7 +630,9 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         for bi in bodies {
             let body = ev.ctx.bodies[bi].clone();
             for (k_, m) in transforms.iter().enumerate() {
-                let res = k::transform(&body.shape, &k::Transform::Matrix(*m), true)?;
+                // Located instances sharing the body's shapes (mirrors share one mirrored copy), as
+                // Onshape's instances: a boolean with many of them intersects each congruent pair once.
+                let res = k::transform(&body.shape, &k::Transform::Matrix(*m), false)?;
                 let inst = instance_number(names.get(k_).map(|s| s.as_str()).unwrap_or(""), k_);
                 let faces = copy_names(ev, &body.faces, &res, inst);
                 push_body(ev, BodyId { feature: ev.feature, index: n }, body.kind, res.shape, faces);
@@ -952,12 +954,9 @@ fn op_polyline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         for (k, r) in bends.iter().enumerate() {
             radii[(k + 1) % p.len()] = *r;
         }
-        // The Routing curve's arcs (curves.rs); Onshape lists the lines
-        // before the arcs (live "fs (10-25 d)"), each in path order.
+        // The Routing curve's arcs, the lines listed first as Onshape (curves.rs).
         let wire = crate::regen::features::curves::filleted_polyline(p, &radii, closed).map_err(|_| super::code_error("POLYLINE_INVALID_BEND"))?;
-        let is_line: Vec<bool> = wire.edges().iter().map(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, k::Curve::Line { .. }))).collect();
-        let order: Vec<u32> = (0..is_line.len() as u32).filter(|i| is_line[*i as usize]).chain((0..is_line.len() as u32).filter(|i| !is_line[*i as usize])).collect();
-        add_wire(ev, k::wire_with_edge_order(&wire, &order)?)
+        add_wire(ev, crate::regen::features::curves::lines_before_arcs(&wire)?)
     })?;
     Ok(Value::Undefined)
 }

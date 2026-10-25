@@ -3883,8 +3883,24 @@ fn din_985_nuts_build_every_live_size() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let c = CATALOGUE.iter().find(|c| c.name == "Prevailing torque hex thin nut grade A & B DIN 985").expect("DIN 985 in the catalogue");
     let names: Vec<&str> = c.sizes.iter().map(|s| s.name.as_str()).collect();
-    for want in ["M3x0.5", "M8x1.25", "M8x1", "M48X3"] {
+    for want in ["M2x0.4", "M2.5x0.45", "M3x0.5", "M8x1.25", "M8x1", "M48X3"] {
         assert!(names.contains(&want), "{want} in {names:?}");
+    }
+    // Live's B-rep (behaviours "skb (10-25) DIN 985"): 27 faces and their
+    // total area; the volumes of the small sizes (M48's mass properties
+    // differ by 1e-4 though every face area agrees).
+    for (size, area, volume) in [("M2x0.4", 71.7929, Some(27.4414)), ("M8x1.25", 713.9754, Some(819.7291)), ("M8x1", 716.1122, Some(801.2191)), ("M48X3", 24805.5791, None)] {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        let r = standard::regenerate(&spec).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        assert_eq!(b.faces.len(), 27, "{size}");
+        let total: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap() * 1e6).sum();
+        assert!((total - area).abs() < area * 1e-6 + 1e-3, "{size}: {total} mm², live {area}");
+        if let Some(volume) = volume {
+            let v = b.shape.volume().unwrap() * 1e9;
+            assert!((v - volume).abs() < f64::max(1e-3, volume * 1e-6), "{size}: {v} mm³, live {volume}");
+        }
     }
     let mut failures = Vec::new();
     for size in &names {
@@ -4003,6 +4019,45 @@ fn iso_set_screws_match_live() {
     }
 }
 
+/// ASME socket head cap screw 1/4-20 x 1 against live's B-rep (dom/skb-sc-geom
+/// Socket_head_cap_screw_1-4-20, captured with the drilled(6) default: 27
+/// faces, 909.9164 mm²): the 0.025 in 45 degree head chamfer, the 0.007 in
+/// fillet torus under the head, the socket with its 120 degree drill point;
+/// the plain Hex screw 21 faces.
+#[test]
+fn asme_socket_head_cap_screw_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Socket head cap screw" && c.inch).unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("1/4-20");
+    spec.length = Some("1".into());
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    assert_eq!(b.faces.len(), 21);
+    // Live's Drive type (REST FeatureScript on the component, DrillHole2/4/6):
+    // Hex 21 faces 1178.4515 mm³; drilled(2) one hole, drilled(6) three.
+    for (drive, faces, volume) in [("Hex", 21, 1178.4515), ("Hex drilled(2)", 23, 1173.2688), ("Hex drilled(6)", 27, 1162.9034)] {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size("1/4-20");
+        spec.length = Some("1".into());
+        spec.params.insert("Drive type".into(), drive.into());
+        let r = standard::regenerate(&spec).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let v = b.shape.volume().unwrap() * 1e9;
+        assert_eq!(b.faces.len(), faces, "{drive}");
+        // The capture is the drilled(6) screw: all 27 faces, 909.9164 mm².
+        if drive == "Hex drilled(6)" {
+            let total: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap() * 1e6).sum();
+            assert!((total - 909.9164).abs() < 1e-3, "{total} mm²");
+        }
+        // (Mass properties agree to a few 1e-6 of the volume with the holes'
+        // cylinder intersections.)
+        assert!((v - volume).abs() < volume * 5e-6, "{drive}: {v} mm³");
+    }
+    // A size without drilled heads offers only Hex.
+    assert_eq!(c.size("#0-80").unwrap().values.get("Drive type").map(Vec::as_slice), Some(&["Hex".to_string()][..]));
+}
+
 /// ISO 7380 socket button head M6 x 20 against live's B-rep (dom/skb-sc-geom
 /// M6x20, behaviours "skb (10-25) ISO 7380 dome"): 20 faces; the dome is a
 /// sphere through the rim, cut flat at the head height (top plane out to
@@ -4037,3 +4092,5 @@ fn iso_7380_button_head_matches_live() {
     let v = b.shape.volume().unwrap() * 1e9;
     assert!((v - 739.6215).abs() < 1e-3, "{v} mm³");
 }
+
+

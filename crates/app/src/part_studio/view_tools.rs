@@ -82,60 +82,18 @@ impl PartStudioView {
     /// by their plain names (live qa5-ts-sketch-*: "chamfer" lists just the
     /// sketch "Chamfer", no Part Studio feature).
     fn palette_items(&self, cx: &App) -> Vec<PaletteItem> {
-        let q: Vec<char> = self.palette_query.trim().to_lowercase().chars().collect();
-        if q.is_empty() {
-            return Vec::new();
-        }
-        // (first matched index, span of the match) for the in-order match of `q` in `name`.
-        let score = |name: &str| -> Option<(usize, usize)> {
-            let chars: Vec<char> = name.to_lowercase().chars().collect();
-            let mut best: Option<(usize, usize)> = None;
-            for start in 0..chars.len() {
-                if chars[start] != q[0] {
-                    continue;
-                }
-                let mut k = 1;
-                let mut end = start;
-                for (i, c) in chars.iter().enumerate().skip(start + 1) {
-                    if k == q.len() {
-                        break;
-                    }
-                    if *c == q[k] {
-                        k += 1;
-                        end = i;
-                    }
-                }
-                if k == q.len() {
-                    let cand = (start, end - start);
-                    if best.is_none_or(|b| cand < b) {
-                        best = Some(cand);
-                    }
-                }
-            }
-            best
-        };
-        let mut found: Vec<((usize, usize, usize), PaletteItem)> = Vec::new();
-        let mut order = 0usize;
+        use noshape_ops::tool_search::studio_rank;
         if self.sketch.is_some() {
-            for t in super::sketch::all_sketch_tools() {
-                order += 1;
-                if let Some((f, span)) = score(sketch_search_name(t)) {
-                    found.push(((f, span, order), PaletteItem::SketchTool(t)));
-                }
-            }
-        } else {
-            let custom: Vec<&'static features::FeatureType> = self.doc.read(cx).custom_features().feature_types().into_iter().collect();
-            // Only tools: hidden feature types (Rip, Recognize, …) are not in
-            // live's tool search either.
-            for t in features::all().filter(|t| t.in_toolbar).chain(custom) {
-                order += 1;
-                if let Some((f, span)) = score(t.name) {
-                    found.push(((f, span, order), PaletteItem::Feature(t.id)));
-                }
-            }
+            let tools: Vec<crate::sketch_mode::Tool> = super::sketch::all_sketch_tools().collect();
+            let names: Vec<&str> = tools.iter().map(|t| sketch_search_name(*t)).collect();
+            return studio_rank(&names, &self.palette_query).into_iter().map(|i| PaletteItem::SketchTool(tools[i])).collect();
         }
-        found.sort_by_key(|(k, _)| *k);
-        found.into_iter().map(|(_, i)| i).collect()
+        let custom: Vec<&'static features::FeatureType> = self.doc.read(cx).custom_features().feature_types().into_iter().collect();
+        // Only tools: hidden feature types (Rip, Recognize, …) are not in
+        // live's tool search either.
+        let types: Vec<&'static features::FeatureType> = features::all().filter(|t| t.in_toolbar).chain(custom).collect();
+        let names: Vec<&str> = types.iter().map(|t| t.name).collect();
+        studio_rank(&names, &self.palette_query).into_iter().map(|i| PaletteItem::Feature(types[i].id)).collect()
     }
 
     fn run_palette(&mut self, item: PaletteItem, window: &mut Window, cx: &mut Context<Self>) {
@@ -746,25 +704,9 @@ impl PartStudioView {
 }
 
 
-/// A sketch tool's name in the tool search: live's title, the label without
-/// its shortcut ("Line (L)" -> "Line") and plain where the toolbar label
-/// isn't ("Sketch fillet (Shift+F)" -> "Fillet", live qa5-ts-sketch-fillet).
-fn sketch_search_name(t: crate::sketch_mode::Tool) -> &'static str {
-    let l = t.label();
-    match l.rsplit_once(" (").map_or(l, |(name, _)| name) {
-        "Sketch fillet" => "Fillet",
-        "Sketch chamfer" => "Chamfer",
-        "Center rectangle" => "Center point rectangle",
-        "Use / project edges" => "Use",
-        name => name,
-    }
-}
-
-/// The shortcut in a sketch tool's label ("Offset (O)" -> "O"), shown as the
-/// search row's key badge (live: Fillet "shift f", Offset "o").
-fn sketch_tool_shortcut(t: crate::sketch_mode::Tool) -> Option<&'static str> {
-    t.label().rsplit_once(" (").and_then(|(_, k)| k.strip_suffix(')'))
-}
+// A sketch tool's search name and key badge (shared with the agent API's
+// ui_search_tools).
+use noshape_ops::tool_search::{sketch_search_name, sketch_tool_shortcut};
 
 #[cfg(test)]
 mod tests {

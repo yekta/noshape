@@ -709,6 +709,9 @@ fn boundary_routing_edit_isoparametric() {
     let route = wire_length(&r, wires[0]);
     let expected = 0.1 - 2.0 * 0.005 + PI / 2.0 * 0.005;
     assert!(near(route, expected, 1e-7), "routing length {route} vs {expected}");
+    // Onshape lists the bent polyline's lines before its arcs (live "fs (10-25 d)").
+    let kinds: Vec<bool> = r.context.bodies[wires[0]].shape.edges().iter().map(|e| matches!(e.edge_info().unwrap().curve, noshape_kernel::Curve::Line { .. })).collect();
+    assert_eq!(kinds, [true, true, false], "routing edges: lines, then the arc");
     let bb = r.context.bodies[wires[1]].shape.bounding_box(true).unwrap();
     assert!(bb.max.z.abs() < 1e-6 && bb.min.z.abs() < 1e-6, "planarized helix {bb:?}");
     for &w in &wires[2..] {

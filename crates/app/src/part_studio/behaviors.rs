@@ -3585,7 +3585,7 @@ mod field_point_tests {
         assert!(km(PickKind::SketchCurve, &r, QueryFilter::ANY_EDGE));
         // Fillet / Chamfer take part edges only (a sketch line lying on a
         // part's edge isn't picked); sketch-only fields take no part edges.
-        let fillet = QueryFilter::SOLID_EDGE | QueryFilter::ANY_FACE;
+        let fillet = QueryFilter::EDGE | QueryFilter::ANY_FACE;
         assert!(km(PickKind::Edge, &r, fillet) && !km(PickKind::SketchCurve, &r, fillet));
         assert!(km(PickKind::SketchCurve, &r, QueryFilter::SKETCH_EDGE) && !km(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
         // HOLE-FACE (live): Hole locations take sketch points and explicit

@@ -1,0 +1,621 @@
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_3.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_3.cxx
+@@ -46,6 +46,11 @@
+ #include <TopoDS.hxx>
+ #include <TopoDS_Edge.hxx>
+ #include <TopoDS_Vertex.hxx>
++#include <cmath>
++#include <cstdio>
++#include <string>
++#include <unordered_map>
++#include <vector>
+ 
+ /////////////////////////////////////////////////////////////////////////
+ //=================================================================================================
+@@ -87,7 +92,7 @@
+   void Perform() override
+   {
+     Message_ProgressScope aPS(myProgressRange, nullptr, 1);
+-    if (UserBreak(aPS))
++    if (UserBreak(aPS) || myIsCopy)
+     {
+       return;
+     }
+@@ -128,14 +133,64 @@
+     }
+   }
+ 
++  // noshape: a pair congruent to an earlier one (the same two edge TShapes
++  // at the same relative location and the same ranges, e.g. instances of a
++  // pattern) takes that pair's results moved by theT instead of being
++  // intersected again. Edge parameters don't change with location.
++  void SetCopy() { myIsCopy = true; }
++
++  bool IsCopy() const { return myIsCopy; }
++
++  const TopoDS_Edge& FirstEdge() const { return myEdge1; }
++
++  void CopyResultsFrom(const BOPAlgo_EdgeEdge& theRep, const gp_Trsf& theT)
++  {
++    myErrorStatus = theRep.IsDone() && !theRep.HasErrors() ? 0 : 1;
++    myCommonParts.Clear();
++    for (int i = 1; i <= theRep.myCommonParts.Length(); ++i)
++    {
++      IntTools_CommonPrt aCP = theRep.myCommonParts(i);
++      gp_Pnt             aP1, aP2;
++      aCP.BoundingPoints(aP1, aP2);
++      aCP.SetBoundingPoints(aP1.Transformed(theT), aP2.Transformed(theT));
++      aCP.SetEdge1(myEdge1);
++      aCP.SetEdge2(myEdge2);
++      myCommonParts.Append(aCP);
++    }
++  }
++
+   //
+ protected:
+   occ::handle<BOPDS_PaveBlock> myPB1;
+   occ::handle<BOPDS_PaveBlock> myPB2;
+   Bnd_Box                      myBox1;
+   Bnd_Box                      myBox2;
++  bool                         myIsCopy = false;
+ };
+ 
++// noshape: the congruence key of an edge-edge pair: their TShapes,
++// orientations, the location of the second relative to the first (rounded)
++// and their ranges.
++static std::string CongruenceKey(const TopoDS_Shape& theS1,
++                                 const TopoDS_Shape& theS2,
++                                 const double        theT11,
++                                 const double        theT12,
++                                 const double        theT21,
++                                 const double        theT22,
++                                 const bool          theQuick)
++{
++  const gp_Trsf aRel = theS1.Location().Transformation().Inverted() * theS2.Location().Transformation();
++  char          aBuf[640];
++  int           aN = std::snprintf(aBuf, sizeof aBuf, "%p %p %d %d %d %.9g %.9g %.9g %.9g", (void*)theS1.TShape().get(), (void*)theS2.TShape().get(), (int)theS1.Orientation(), (int)theS2.Orientation(), (int)theQuick, theT11, theT12, theT21, theT22);
++  for (int r = 1; r <= 3; ++r)
++    for (int c = 1; c <= 4; ++c)
++    {
++      const double v = aRel.Value(r, c);
++      aN += std::snprintf(aBuf + aN, sizeof aBuf - (size_t)aN, " %.9g", std::abs(v) < 1e-12 ? 0.0 : v);
++    }
++  return std::string(aBuf, (size_t)aN);
++}
++
+ //
+ //=======================================================================
+ typedef NCollection_DynamicArray<BOPAlgo_EdgeEdge> BOPAlgo_VectorOfEdgeEdge;
+@@ -162,6 +217,9 @@
+   NCollection_List<occ::handle<BOPDS_PaveBlock>>::Iterator aIt1, aIt2;
+   occ::handle<NCollection_BaseAllocator>                   aAllocator;
+   BOPAlgo_VectorOfEdgeEdge                                 aVEdgeEdge;
++  // noshape: per pair, the earlier congruent pair it copies (-1: none).
++  std::vector<int>                     aCopyOf;
++  std::unordered_map<std::string, int> aRepOf;
+   NCollection_Map<occ::handle<BOPDS_PaveBlock>>::Iterator  aItPB;
+   // keep modified edges for further update
+   NCollection_Map<int> aMEdges;
+@@ -262,6 +320,14 @@
+         anEdgeEdge.SetEdge2(aE2, aT21, aT22);
+         anEdgeEdge.SetBoxes(aBB1, aBB2);
+         anEdgeEdge.SetFuzzyValue(myFuzzyValue);
++        // noshape: congruent to an earlier pair?
++        {
++          const int  aK   = aVEdgeEdge.Length() - 1;
++          const auto aIns = aRepOf.emplace(CongruenceKey(aE1, aE2, aT11, aT12, aT21, aT22, bExpressCompute), aK);
++          aCopyOf.push_back(aIns.second ? -1 : aIns.first->second);
++          if (!aIns.second)
++            anEdgeEdge.SetCopy();
++        }
+       } // for (; aIt2.More(); aIt2.Next()) {
+     } // for (; aIt1.More(); aIt1.Next()) {
+   } // for (; myIterator->More(); myIterator->Next()) {
+@@ -291,6 +357,11 @@
+     Bnd_Box aBB1, aBB2;
+     //
+     BOPAlgo_EdgeEdge& anEdgeEdge = aVEdgeEdge(k);
++    if (anEdgeEdge.IsCopy())
++    {
++      const BOPAlgo_EdgeEdge& aRep = aVEdgeEdge(aCopyOf[(size_t)k]);
++      anEdgeEdge.CopyResultsFrom(aRep, anEdgeEdge.FirstEdge().Location().Transformation() * aRep.FirstEdge().Location().Transformation().Inverted());
++    }
+     if (!anEdgeEdge.IsDone() || anEdgeEdge.HasErrors())
+     {
+       // Warn about failed intersection of sub-shapes
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_4.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_4.cxx
+@@ -31,6 +31,13 @@
+ #include <Standard_Integer.hxx>
+ #include <TopoDS_Face.hxx>
+ #include <TopoDS_Vertex.hxx>
++#include <BRep_Tool.hxx>
++#include <TopoDS.hxx>
++#include <cmath>
++#include <cstdio>
++#include <string>
++#include <unordered_map>
++#include <vector>
+ 
+ //=================================================================================================
+ 
+@@ -102,7 +109,7 @@
+   void Perform() override
+   {
+     Message_ProgressScope aPS(myProgressRange, nullptr, 1);
+-    if (UserBreak(aPS))
++    if (UserBreak(aPS) || myIsCopy)
+     {
+       return;
+     }
+@@ -118,8 +125,25 @@
+     }
+   }
+ 
++  // noshape: a pair congruent to an earlier one (the same face TShape and
++  // the vertex at the same point in its frame, see CongruenceKey) takes that
++  // pair's results (face parameters and tolerance don't change with location)
++  // instead of being computed again.
++  void SetCopy() { myIsCopy = true; }
++
++  bool IsCopy() const { return myIsCopy; }
++
++  void CopyResultsFrom(const BOPAlgo_VertexFace& theRep)
++  {
++    myFlag    = theRep.HasErrors() && theRep.myFlag == 0 ? -1 : theRep.myFlag;
++    myT1      = theRep.myT1;
++    myT2      = theRep.myT2;
++    myTolVNew = theRep.myTolVNew;
++  }
++
+   //
+ protected:
++  bool                          myIsCopy = false;
+   int                           myIV;
+   int                           myIF;
+   int                           myFlag;
+@@ -134,6 +158,18 @@
+ //=======================================================================
+ typedef NCollection_DynamicArray<BOPAlgo_VertexFace> BOPAlgo_VectorOfVertexFace;
+ 
++// noshape: the congruence key of a vertex-face pair: the face's TShape and
++// orientation, the vertex's point in the face's own frame (rounded) and its
++// tolerance. ComputeVF depends on nothing else, so congruent pairs (pattern
++// instances, and the vertices made where congruent edges cross) share it.
++static std::string CongruenceKey(const TopoDS_Vertex& theV, const TopoDS_Face& theF)
++{
++  const gp_Pnt aP = BRep_Tool::Pnt(theV).Transformed(theF.Location().Transformation().Inverted());
++  char         aBuf[256];
++  const int    aN = std::snprintf(aBuf, sizeof aBuf, "%p %d %.10g %.10g %.10g %.9g", (void*)theF.TShape().get(), (int)theF.Orientation(), std::abs(aP.X()) < 1e-12 ? 0.0 : aP.X(), std::abs(aP.Y()) < 1e-12 ? 0.0 : aP.Y(), std::abs(aP.Z()) < 1e-12 ? 0.0 : aP.Z(), BRep_Tool::Tolerance(theV));
++  return std::string(aBuf, (size_t)aN);
++}
++
+ //=================================================================================================
+ 
+ void BOPAlgo_PaveFiller::PerformVF(const Message_ProgressRange& theRange)
+@@ -172,6 +208,9 @@
+   int                        nVSD, iFlag, nVx, aNbVF, k;
+   double                     aT1, aT2;
+   BOPAlgo_VectorOfVertexFace aVVF;
++  // noshape: per pair, the earlier congruent pair it copies (-1: none).
++  std::vector<int>                     aCopyOf;
++  std::unordered_map<std::string, int> aRepOf;
+   //
+   aVFs.SetIncrement(iSize);
+   //
+@@ -228,6 +267,14 @@
+     aVertexFace.SetVertex(aV);
+     aVertexFace.SetFace(aF);
+     aVertexFace.SetFuzzyValue(myFuzzyValue);
++    // noshape: congruent to an earlier pair?
++    {
++      const int  aK   = aVVF.Length() - 1;
++      const auto aIns = aRepOf.emplace(CongruenceKey(aV, aF), aK);
++      aCopyOf.push_back(aIns.second ? -1 : aIns.first->second);
++      if (!aIns.second)
++        aVertexFace.SetCopy();
++    }
+ 
+   } // for (; myIterator->More(); myIterator->Next()) {
+   //
+@@ -252,7 +299,9 @@
+     {
+       return;
+     }
+-    const BOPAlgo_VertexFace& aVertexFace = aVVF(k);
++    BOPAlgo_VertexFace& aVertexFace = aVVF(k);
++    if (aVertexFace.IsCopy())
++      aVertexFace.CopyResultsFrom(aVVF(aCopyOf[(size_t)k]));
+     //
+     iFlag = aVertexFace.Flag();
+     if (iFlag != 0)
+@@ -360,18 +409,46 @@
+   aIt.SetSubSet2(aLIV);
+   aIt.Prepare();
+   aIt.Initialize();
++  // noshape: the pairs to compute, each congruent class once and in parallel
++  // (see CongruenceKey); the results are then applied in the pairs' order.
++  std::vector<std::pair<int, int>>     aPairs;
++  std::vector<int>                     aRepOfPair;
++  std::unordered_map<std::string, int> aRepOf;
++  BOPAlgo_VectorOfVertexFace           aVVF;
+   for (; aIt.More(); aIt.Next())
+   {
+     aIt.Value(nV, nF);
+-    //
+-    BOPDS_FaceInfo&             aFI   = myDS->ChangeFaceInfo(nF);
+-    const NCollection_Map<int>& aMVOn = aFI.VerticesOn();
+-    //
+-    if (!aMVOn.Contains(nV))
++    if (myDS->ChangeFaceInfo(nF).VerticesOn().Contains(nV))
++    {
++      continue;
++    }
++    const TopoDS_Vertex& aV   = (*(TopoDS_Vertex*)(&myDS->Shape(nV)));
++    const TopoDS_Face&   aF   = (*(TopoDS_Face*)(&myDS->Shape(nF)));
++    const auto           aIns = aRepOf.emplace(CongruenceKey(aV, aF), aVVF.Length());
++    if (aIns.second)
++    {
++      // In the face's own frame: every instance of a face then shares one
++      // projector in the contexts.
++      BOPAlgo_VertexFace& aVertexFace = aVVF.Appended();
++      aVertexFace.SetIndices(nV, nF);
++      aVertexFace.SetVertex(TopoDS::Vertex(aV.Moved(aF.Location().Inverted())));
++      aVertexFace.SetFace(TopoDS::Face(aF.Located(TopLoc_Location())));
++      aVertexFace.SetFuzzyValue(myFuzzyValue);
++    }
++    aPairs.emplace_back(nV, nF);
++    aRepOfPair.push_back(aIns.first->second);
++  }
++  BOPTools_Parallel::Perform(myRunParallel, aVVF, myContext);
++  (void)dummy;
++  for (size_t k = 0; k < aPairs.size(); ++k)
++  {
++    nV                                = aPairs[k].first;
++    nF                                = aPairs[k].second;
++    BOPDS_FaceInfo&           aFI     = myDS->ChangeFaceInfo(nF);
++    const BOPAlgo_VertexFace& aRep    = aVVF(aRepOfPair[k]);
++    iFlag                             = aRep.HasErrors() && aRep.Flag() == 0 ? -1 : aRep.Flag();
++    aRep.Parameters(aT1, aT2);
+     {
+-      const TopoDS_Vertex& aV = (*(TopoDS_Vertex*)(&myDS->Shape(nV)));
+-      const TopoDS_Face&   aF = (*(TopoDS_Face*)(&myDS->Shape(nF)));
+-      iFlag                   = myContext->ComputeVF(aV, aF, aT1, aT2, dummy, myFuzzyValue);
+       if (!iFlag)
+       {
+         // 1
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
+@@ -49,6 +49,11 @@
+ #include <TopoDS_Edge.hxx>
+ #include <TopoDS_Face.hxx>
+ #include <TopoDS_Vertex.hxx>
++#include <cmath>
++#include <cstdio>
++#include <string>
++#include <unordered_map>
++#include <vector>
+ 
+ //=================================================================================================
+ 
+@@ -105,19 +110,28 @@
+   void Perform() override
+   {
+     Message_ProgressScope aPS(myProgressRange, nullptr, 1);
+-    if (UserBreak(aPS))
++    if (UserBreak(aPS) || myIsCopy)
+     {
+       return;
+     }
+     TopoDS_Face aFace   = myFace;
+     TopoDS_Edge anEdge  = myEdge;
+     bool        hasTrsf = false;
++    // noshape: a located face's pairs are computed in its own frame (the edge
++    // moved there), so the contexts keep one projector for all instances.
++    const TopLoc_Location aLF        = myFace.Location();
++    const bool            isLocalFrm = !aLF.IsIdentity();
++    if (isLocalFrm)
++    {
++      myEdge = TopoDS::Edge(myEdge.Moved(aLF.Inverted()));
++      myFace = TopoDS::Face(myFace.Located(TopLoc_Location()));
++    }
+     try
+     {
+       OCC_CATCH_SIGNALS
+ 
+       gp_Trsf aTrsf;
+-      if (BOPAlgo_Tools::TrsfToPoint(myBox1, myBox2, aTrsf))
++      if (!isLocalFrm && BOPAlgo_Tools::TrsfToPoint(myBox1, myBox2, aTrsf))
+       {
+         // Shapes are located far from origin, move the shapes to the origin,
+         // to increase the accuracy of intersection.
+@@ -136,16 +150,47 @@
+     myFace = aFace;
+     myEdge = anEdge;
+ 
+-    if (hasTrsf)
++    if (hasTrsf || isLocalFrm)
+     {
+       for (int i = 1; i <= mySeqOfCommonPrts.Length(); ++i)
+       {
+         IntTools_CommonPrt& aCPart = mySeqOfCommonPrts(i);
+         aCPart.SetEdge1(myEdge);
++        if (isLocalFrm)
++        {
++          gp_Pnt aP1, aP2;
++          aCPart.BoundingPoints(aP1, aP2);
++          aCPart.SetBoundingPoints(aP1.Transformed(aLF.Transformation()), aP2.Transformed(aLF.Transformation()));
++        }
+       }
+     }
+   }
+ 
++  // noshape: a pair congruent to an earlier one (the same edge and face
++  // TShapes at the same relative location and the same pave block, e.g.
++  // instances of a pattern) takes that pair's results moved by theT instead
++  // of being intersected again. Edge parameters don't change with location.
++  void SetCopy() { myIsCopy = true; }
++
++  bool IsCopy() const { return myIsCopy; }
++
++  void CopyResultsFrom(const BOPAlgo_EdgeFace& theRep, const gp_Trsf& theT)
++  {
++    myIsDone      = theRep.IsDone() && !theRep.HasErrors();
++    myErrorStatus = theRep.myErrorStatus;
++    myMinDistance = theRep.myMinDistance;
++    mySeqOfCommonPrts.Clear();
++    for (int i = 1; i <= theRep.mySeqOfCommonPrts.Length(); ++i)
++    {
++      IntTools_CommonPrt aCP = theRep.mySeqOfCommonPrts(i);
++      gp_Pnt             aP1, aP2;
++      aCP.BoundingPoints(aP1, aP2);
++      aCP.SetBoundingPoints(aP1.Transformed(theT), aP2.Transformed(theT));
++      aCP.SetEdge1(myEdge);
++      mySeqOfCommonPrts.Append(aCP);
++    }
++  }
++
+   //
+ protected:
+   int                          myIE;
+@@ -154,8 +199,30 @@
+   occ::handle<BOPDS_PaveBlock> myPB;
+   Bnd_Box                      myBox1;
+   Bnd_Box                      myBox2;
++  bool                         myIsCopy = false;
+ };
+ 
++// noshape: the congruence key of an edge-face pair: their TShapes,
++// orientations, the location of the face relative to the edge (rounded) and
++// the pave block's ranges.
++static std::string CongruenceKey(const TopoDS_Shape&   theS1,
++                                 const TopoDS_Shape&   theS2,
++                                 const IntTools_Range& theR1,
++                                 const IntTools_Range& theR2,
++                                 const bool            theQuick)
++{
++  const gp_Trsf aRel = theS1.Location().Transformation().Inverted() * theS2.Location().Transformation();
++  char          aBuf[640];
++  int           aN = std::snprintf(aBuf, sizeof aBuf, "%p %p %d %d %d %.9g %.9g %.9g %.9g", (void*)theS1.TShape().get(), (void*)theS2.TShape().get(), (int)theS1.Orientation(), (int)theS2.Orientation(), (int)theQuick, theR1.First(), theR1.Last(), theR2.First(), theR2.Last());
++  for (int r = 1; r <= 3; ++r)
++    for (int c = 1; c <= 4; ++c)
++    {
++      const double v = aRel.Value(r, c);
++      aN += std::snprintf(aBuf + aN, sizeof aBuf - (size_t)aN, " %.9g", std::abs(v) < 1e-12 ? 0.0 : v);
++    }
++  return std::string(aBuf, (size_t)aN);
++}
++
+ //
+ //=======================================================================
+ typedef NCollection_DynamicArray<BOPAlgo_EdgeFace> BOPAlgo_VectorOfEdgeFace;
+@@ -201,6 +268,9 @@
+   TopAbs_ShapeEnum                                         aType;
+   NCollection_List<occ::handle<BOPDS_PaveBlock>>::Iterator aIt;
+   BOPAlgo_VectorOfEdgeFace                                 aVEdgeFace;
++  // noshape: per pair, the earlier congruent pair it copies (-1: none).
++  std::vector<int>                     aCopyOf;
++  std::unordered_map<std::string, int> aRepOf;
+   //-----------------------------------------------------scope f
+   //
+   aAllocator = NCollection_BaseAllocator::CommonBaseAllocator();
+@@ -295,6 +365,14 @@
+       aSR = aPBRange;
+       BOPTools_AlgoTools::CorrectRange(aE, aF, aSR, aPBRange);
+       aEdgeFace.SetRange(aPBRange);
++      // noshape: congruent to an earlier pair?
++      {
++        const int  aK   = aVEdgeFace.Length() - 1;
++        const auto aIns = aRepOf.emplace(CongruenceKey(aE, aF, aPBRange, anewSR, bExpressCompute), aK);
++        aCopyOf.push_back(aIns.second ? -1 : aIns.first->second);
++        if (!aIns.second)
++          aEdgeFace.SetCopy();
++      }
+       //
+       // Save the pair to avoid their forced intersection
+       NCollection_Map<occ::handle<BOPDS_PaveBlock>>* pMPB = myFPBDone.ChangeSeek(nF);
+@@ -328,6 +406,11 @@
+       return;
+     }
+     BOPAlgo_EdgeFace& aEdgeFace = aVEdgeFace(k);
++    if (aEdgeFace.IsCopy())
++    {
++      const BOPAlgo_EdgeFace& aRep = aVEdgeFace(aCopyOf[(size_t)k]);
++      aEdgeFace.CopyResultsFrom(aRep, aEdgeFace.Edge().Location().Transformation() * aRep.Edge().Location().Transformation().Inverted());
++    }
+     if (!aEdgeFace.IsDone() || aEdgeFace.HasErrors())
+     {
+       // Warn about failed intersection of sub-shapes
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
+@@ -75,6 +75,10 @@
+ #include <TopoDS_Vertex.hxx>
+ #include <TopoDS_Shape.hxx>
+ #include <TopTools_ShapeMapHasher.hxx>
++#include <cmath>
++#include <cstdio>
++#include <string>
++#include <unordered_map>
+ class BOPDS_PaveBlock;
+ 
+ static double ToleranceFF(const BRepAdaptor_Surface& aBAS1, const BRepAdaptor_Surface& aBAS2);
+@@ -202,7 +206,7 @@
+   void Perform() override
+   {
+     Message_ProgressScope aPS(myProgressRange, nullptr, 1);
+-    if (UserBreak(aPS))
++    if (UserBreak(aPS) || myIsCopy)
+     {
+       return;
+     }
+@@ -212,7 +216,17 @@
+ 
+       gp_Trsf     aTrsf;
+       TopoDS_Face aF1 = myF1, aF2 = myF2;
+-      if (BOPAlgo_Tools::TrsfToPoint(myBox1, myBox2, aTrsf))
++      if (!aF1.Location().IsIdentity())
++      {
++        // noshape: a located first face's pairs are computed in its own frame
++        // (the second face moved there), so the contexts keep one projector
++        // for all instances; ApplyTrsf moves the results back.
++        const TopLoc_Location aL1 = aF1.Location();
++        aF2.Move(aL1.Inverted());
++        aF1.Location(TopLoc_Location());
++        myTrsf = aL1.Transformation();
++      }
++      else if (BOPAlgo_Tools::TrsfToPoint(myBox1, myBox2, aTrsf))
+       {
+         // Shapes are located far from origin, move the shapes to the origin,
+         // to increase the accuracy of intersection.
+@@ -264,6 +278,47 @@
+     }
+   }
+ 
++  // noshape: a pair congruent to an earlier one (the same two face TShapes
++  // at the same relative location, e.g. instances of a pattern) takes that
++  // pair's results moved by theT instead of being intersected again.
++  void SetCopy() { myIsCopy = true; }
++
++  bool IsCopy() const { return myIsCopy; }
++
++  void CopyResultsFrom(const BOPAlgo_FaceFace& theRep, const gp_Trsf& theT)
++  {
++    myIsDone       = theRep.IsDone() && !theRep.HasErrors();
++    myTangentFaces = theRep.myTangentFaces;
++    myTol          = theRep.myTol;
++    myTolF1        = theRep.myTolF1;
++    myTolF2        = theRep.myTolF2;
++    mySeqOfCurve.Clear();
++    for (int i = 1; i <= theRep.mySeqOfCurve.Length(); ++i)
++    {
++      const IntTools_Curve&       aIC = theRep.mySeqOfCurve(i);
++      occ::handle<Geom_Curve>     aC3;
++      occ::handle<Geom2d_Curve>   aC1, aC2;
++      if (!aIC.Curve().IsNull())
++        aC3 = occ::down_cast<Geom_Curve>(aIC.Curve()->Transformed(theT));
++      if (!aIC.FirstCurve2d().IsNull())
++        aC1 = occ::down_cast<Geom2d_Curve>(aIC.FirstCurve2d()->Copy());
++      if (!aIC.SecondCurve2d().IsNull())
++        aC2 = occ::down_cast<Geom2d_Curve>(aIC.SecondCurve2d()->Copy());
++      mySeqOfCurve.Append(IntTools_Curve(aC3, aC1, aC2, aIC.Tolerance(), aIC.TangentialTolerance()));
++    }
++    myPnts.Clear();
++    for (int i = 1; i <= theRep.myPnts.Length(); ++i)
++    {
++      IntTools_PntOn2Faces aP2F   = theRep.myPnts(i);
++      IntTools_PntOnFace   aPOnF1 = aP2F.P1(), aPOnF2 = aP2F.P2();
++      aPOnF1.SetPnt(aPOnF1.Pnt().Transformed(theT));
++      aPOnF2.SetPnt(aPOnF2.Pnt().Transformed(theT));
++      aP2F.SetP1(aPOnF1);
++      aP2F.SetP2(aPOnF2);
++      myPnts.Append(aP2F);
++    }
++  }
++
+   //
+ protected:
+   int         myIF1;
+@@ -274,8 +329,25 @@
+   Bnd_Box     myBox1;
+   Bnd_Box     myBox2;
+   gp_Trsf     myTrsf;
++  bool        myIsCopy = false;
+ };
+ 
++// noshape: the congruence key of a pair of faces: their TShapes, orientations
++// and the location of the second relative to the first (rounded).
++static std::string CongruenceKey(const TopoDS_Shape& theS1, const TopoDS_Shape& theS2)
++{
++  const gp_Trsf aRel = theS1.Location().Transformation().Inverted() * theS2.Location().Transformation();
++  char          aBuf[512];
++  int           aN = std::snprintf(aBuf, sizeof aBuf, "%p %p %d %d", (void*)theS1.TShape().get(), (void*)theS2.TShape().get(), (int)theS1.Orientation(), (int)theS2.Orientation());
++  for (int r = 1; r <= 3; ++r)
++    for (int c = 1; c <= 4; ++c)
++    {
++      const double v = aRel.Value(r, c);
++      aN += std::snprintf(aBuf + aN, sizeof aBuf - (size_t)aN, " %.9g", std::abs(v) < 1e-12 ? 0.0 : v);
++    }
++  return std::string(aBuf, (size_t)aN);
++}
++
+ //=================================================================================================
+ 
+ typedef NCollection_DynamicArray<BOPAlgo_FaceFace> BOPAlgo_VectorOfFaceFace;
+@@ -361,6 +433,9 @@
+ 
+   // Prepare the pairs of faces for intersection
+   BOPAlgo_VectorOfFaceFace aVFaceFace;
++  // noshape: per pair, the earlier congruent pair it copies (-1: none).
++  std::vector<int>                     aCopyOf;
++  std::unordered_map<std::string, int> aRepOf;
+   myIterator->Initialize(TopAbs_FACE, TopAbs_FACE);
+   for (; myIterator->More(); myIterator->Next())
+   {
+@@ -505,6 +580,19 @@
+       //
+       aFaceFace.SetParameters(bApprox, bCompC2D1, bCompC2D2, anApproxTol);
+       aFaceFace.SetFuzzyValue(myFuzzyValue);
++      // noshape: congruent to an earlier pair (unshifted faces only)?
++      if (!aFShifted1.IsSame(aF1) || !aFShifted2.IsSame(aF2) || aFShifted1.Location() != aF1.Location() || aFShifted2.Location() != aF2.Location())
++      {
++        aCopyOf.push_back(-1);
++      }
++      else
++      {
++        const int  aK   = aVFaceFace.Length() - 1;
++        const auto aIns = aRepOf.emplace(CongruenceKey(aF1, aF2), aK);
++        aCopyOf.push_back(aIns.second ? -1 : aIns.first->second);
++        if (!aIns.second)
++          aFaceFace.SetCopy();
++      }
+     }
+     else
+     {
+@@ -542,6 +630,11 @@
+     }
+     BOPAlgo_FaceFace& aFaceFace = aVFaceFace(k);
+     aFaceFace.Indices(nF1, nF2);
++    if (aFaceFace.IsCopy())
++    {
++      const BOPAlgo_FaceFace& aRep = aVFaceFace(aCopyOf[(size_t)k]);
++      aFaceFace.CopyResultsFrom(aRep, aFaceFace.Face1().Location().Transformation() * aRep.Face1().Location().Transformation().Inverted());
++    }
+     if (!aFaceFace.IsDone() || aFaceFace.HasErrors())
+     {
+       BOPDS_InterfFF& aFF = aFFs.Appended();
+@@ -555,9 +648,12 @@
+     bool   bTangentFaces = aFaceFace.TangentFaces();
+     double aTolFF        = aFaceFace.TolFF();
+     //
+-    aFaceFace.PrepareLines3D(bSplitCurve);
+-    //
+-    aFaceFace.ApplyTrsf();
++    if (!aFaceFace.IsCopy())
++    {
++      aFaceFace.PrepareLines3D(bSplitCurve);
++      //
++      aFaceFace.ApplyTrsf();
++    }
+     //
+     const NCollection_Sequence<IntTools_Curve>&       aCvsX  = aFaceFace.Lines();
+     const NCollection_Sequence<IntTools_PntOn2Faces>& aPntsX = aFaceFace.Points();

@@ -36,6 +36,7 @@ pub mod shortcuts;
 pub mod sketch_export;
 pub mod sketch_use;
 pub mod studio;
+pub mod tool_search;
 pub mod values;
 pub mod variable_studio;
 pub mod window;

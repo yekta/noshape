@@ -4554,10 +4554,10 @@ pub(super) fn sketch_points(sk: &noshape_model::display::SketchDisplay) -> Vec<R
     own().filter(|p| !p.handle).map(|p| Reference::SketchEntity { sketch: sk.feature, entity: p.entity }).collect()
 }
 
-/// The model-edge filter bits (edges, linear / circular edges). A sketch
-/// curve needs SKETCH_EDGE: fields the std marks `SketchObject.NO` (Fillet,
-/// Chamfer) don't take one (qa5 SEL1).
-const MODEL_EDGES: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
+/// The model-edge filter bits (edges, part-only edges, linear / circular
+/// edges). A sketch curve needs SKETCH_EDGE: fields the std marks
+/// `SketchObject.NO` (Fillet, Chamfer: SOLID_EDGE) don't take one (qa5 SEL1).
+const MODEL_EDGES: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::SOLID_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
 
 pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     // A parts field that also takes mate connectors or point bodies

@@ -1201,7 +1201,7 @@ pub fn routing_curve(ev: &mut EvalCtx) -> FResult<()> {
     let wire = if ev.is("curveType", "POLYLINE") {
         let global = ev.length("bendRadius")?;
         let r: Vec<f64> = (0..pts.len()).map(|i| radii.get(i).copied().flatten().unwrap_or(global)).collect();
-        filleted_polyline(&pts, &r, closed)?
+        lines_before_arcs(&filleted_polyline(&pts, &r, closed)?)?
     } else {
         let t = if tangents.iter().any(|t| t.length_squared() > 0.0) { tangents } else { Vec::new() };
         k::make_wire(&[k::make_interpolated_spline(&pts, &t, closed)?])?
@@ -1213,6 +1213,15 @@ fn point_at_fraction(samples: &[DVec3], t: f64) -> DVec3 {
     let r = resample(samples, 201);
     let i = ((r.len() - 1) as f64 * t).round() as usize;
     r[i.min(r.len() - 1)]
+}
+
+/// A bent polyline's edges as Onshape lists them: the lines, then the arcs,
+/// each in path order (live "fs (10-25 d)": opPolyline, the Routing curve).
+pub(crate) fn lines_before_arcs(wire: &Shape) -> FResult<Shape> {
+    let is_line: Vec<bool> = wire.edges().iter().map(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, k::Curve::Line { .. }))).collect();
+    let n = is_line.len() as u32;
+    let order: Vec<u32> = (0..n).filter(|i| is_line[*i as usize]).chain((0..n).filter(|i| !is_line[*i as usize])).collect();
+    Ok(k::wire_with_edge_order(wire, &order)?)
 }
 
 /// Polyline with tangent fillet arcs of radius `r[i]` at corner i (0 = sharp).
