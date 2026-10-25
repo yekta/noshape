@@ -399,3 +399,14 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - **DIM-MENU (skb)** right-click on a sketch dimension should be the standard sketch context menu with "Change to driven
   dimension" on top and "Delete dimension" last; ours is a 2-item custom list with centred labels (sketch.rs render_dim_menu).
 - **VAR-KEYWORD (psb/api)** `#var` is a valid live variable name; ours rejects it via FS_KEYWORDS (variable_table.rs is_identifier).
+
+## qa4 QA round 5 v3 s6: every sketch constraint, driven dims, glyph menus, dragging (P1) — qa-round-5.md "v3 Session 6"
+- **CON-NORMAL-ORDER (skb)** Normal with the circle picked first fails ("e50 is not a line"): make_constraint (scene/sketch_mode.rs
+  ~5946) should order line/curve by kind like Midpoint.
+- **CON-MSG (skb)** constraint errors expose internal ids in the status bar and linger after later actions.
+- **DRIVEN-LOOK (skb)** driven dims: grey plain "Ø10" (no parentheses); a redundant (auto-driven) dimension still opens the value box.
+- **GLYPH-MENU (skb)** glyph right-click = reduced sketch menu ending "Delete sketch entity" (ours: one centred "Delete").
+- **MATE-FLIP-AXIAL confirmed by live (asb)** flip swaps the pose for Revolute/Cylindrical/Planar; the default follows the
+  connectors' axes, not the instance's pose (live "qa4 round 5 s3 mate flip").
+- Pending live (follow-up "qa4 round 5 s6 constraints"): H+V on one line (ours collapses it), Tangent/drag changing the radius,
+  line menu items.

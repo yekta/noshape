@@ -32,6 +32,36 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 6 in the app: every sketch constraint, driven/driving, colours, deleting, glyph menus, dragging (v0.4.8 c7d9d454; r5/v3s6.py: one sketch with free geometry per constraint, coordinates jittered so the line tool infers nothing; live "Constraints", "qa4 round 5 s5 driven dims")
+Applied by selection + shortcut, each with its glyph ✅: Coincident (endpoint–endpoint, point–circle), Concentric (Shift+O),
+Parallel (B), Tangent (T), Horizontal (H), Vertical (V), Perpendicular (Shift+L), Equal (E), Midpoint (Shift+M), Symmetric
+(Shift+Q, axis last), Fix (Shift+J: the line turns black = fully defined). Glyph hover (yellow box, entity highlighted) ✅;
+deleting a constraint by glyph + Delete or glyph menu → Delete ✅ (geometry stays); dragging a circle carries its point-on-curve
+coincident point ✅; a fixed line doesn't move when dragged ✅; empty-space right-click menu = live's (Confirm Sketch 1 | Copy
+sketch | Show all, Curve/surface analysis… | Select ▸, Select other… | Zoom to fit, View normal to sketch plane) ✅; driven ↔
+driving toggles via the dimension menu ("Change to driving dimension" once driven) ✅; constraint tools picked with nothing
+selected stay active as a pick tool (live) ✅.
+- **R5v3-S6-a → CON-NORMAL-ORDER (skb)** Normal (Shift+K) with the circle picked first fails: status "Can't add constraint:
+  invalid constraint: e50 is not a line". `scene/sketch_mode.rs` make_constraint (~5946) builds `Normal { line: a, curve: b }`
+  as picked; Midpoint and Symmetric already reorder by kind. (Live order-independence asked, follow-up (3).)
+- **R5v3-S6-b → CON-MSG (skb)** constraint errors show internal ids ("e7 is not a line", "e50 …") in the status bar and the
+  message stays there after later, successful actions; live doesn't accept a non-matching pick in the first place (no hover).
+- **R5v3-S6-c → DRIVEN-LOOK (skb; live "qa4 round 5 s5 driven dims")** driven dimensions draw grey **in parentheses**
+  "(23.07)", "(Ø10)"; live: grey **plain** "Ø10". A redundant dimension (auto-driven) gets **no value box** on ours; live opens
+  the normal box ("10 mm" selected, ±, ✓/✕).
+- **R5v3-S6-d → GLYPH-MENU (skb; same live answer (3))** right-click on a constraint glyph: ours = one centred "Delete" button
+  (custom list, sketch.rs render_dim_menu); live = Confirm Sketch | Copy sketch | Show all, Curve/surface analysis… | Select,
+  Select other… | Zoom to fit, View normal to sketch plane | **Delete sketch entity**.
+- **R5v3-S6-e (skb, live asked (1))** Vertical on a line that is already Horizontal collapses it to a zero-length "line" (both
+  glyphs, no error, nothing red).
+- **R5v3-S6-f (skb, live asked (2))** Tangent line–circle and dragging the circle's centre change the circle's **radius** (r 4 →
+  ~7 on applying; ~7 → ~15 when the centre was dragged 12 mm) rather than moving the line.
+- **R5v3-S6-g (skb, live asked (5))** right-click on a sketch line: ours = Confirm | Copy sketch entities, Transform sketch
+  entities | Curve/surface analysis…, Section view… | Clear selection, Select ▸, Select other… | Zoom to fit, Zoom to
+  selection, View normal to sketch plane | Delete sketch entity (= live's earlier capture sketch/31); live's 10-24 capture (a
+  Part Studio with other sketches) adds Construction, Extrude…, Revolve…, Hide other sketches, Hide all sketches, Align view
+  with vertical axis and has no Section view….
+
 ## v3 Session 5 in the app: sketch constraints and dimension editing (v0.4.8 c7d9d454; doc by r5/v3s5.py: Variable #v = 10 mm + free lines and circles; live "Sketch dimension display + Enter/Esc", "qa5 dim conflict", "Constraints")
 Same as live ✅: new box "62 mm" selected, ± and ✓/✕; `1 in` → label **25.4**, reopens as **`1 in`**; `2*5` → **ƒ 10** with the
 tan just-applied background; `#v` → grey **ƒx 10**; Diameter box "16 mm" → **Ø10**; typed value + Esc → Esc #1 reverts to the
@@ -137,6 +167,11 @@ the rows below a 7 px bar; dragging shows the "Rollback bar" pill; Parts (0) wit
   rows keep Edit… / Zoom to selection / Show dependencies…, no "Roll to end" anywhere, and the last row lacks Roll to here →
   ROLL-LAST widened. R5v3-S2-d **confirmed**: live's drop indicator clamps to the first legal slot (below "Right"), so a drop
   over Origin or the Default geometry header lands at the top → ROLLBACK-DROP-TOP (psb).
+
+- **Live answer (behaviours "qa4 round 5 s3 mate flip")**: live's default Revolute top-face → top-face also hangs through the
+  plate (Z axes aligned; = ours) and **Flip primary axis swaps it** (pin stands upside down, t (0,0,50)) for Revolute,
+  Cylindrical and Planar alike → MATE-FLIP-AXIAL confirmed. Live's default also **follows the connectors' axes, not the part's
+  pose** (pin laid on its side first → same result), which ours (nearest pose) doesn't.
 
 ## v3 Session 3 in the app: 3-part assembly by hand (v0.4.8 c7d9d454; parts by r5/v3s3.py, assembly built in the UI)
 Plate 100×60×10, pin Ø10×40, block 20³ (round 4 S2's parts). Insert dialog (Current document › Part Studios, click part →
