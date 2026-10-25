@@ -216,20 +216,14 @@ impl DrawingEditor {
         let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
         let heights: Vec<f64> = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).collect();
         let (cols, rows): (Vec<usize>, Vec<usize>) = (cs.cols().filter(|c| *c < widths.len()).collect(), cs.rows().filter(|r| *r < heights.len()).collect());
-        let avg = |v: &[f64], ix: &[usize]| ix.iter().map(|i| v[*i]).sum::<f64>() / ix.len().max(1) as f64;
-        let (cw, rh) = (avg(&widths, &cols), avg(&heights, &rows));
-        let (w1, c1, h1, r1) = (widths.clone(), cols.clone(), heights.clone(), rows.clone());
+        let (l1, l2, c1, r1) = (l.clone(), l.clone(), cols.clone(), rows.clone());
         let size = vec![
             MenuEntry::item("Columns Equally", move |t, _, cx| {
-                let mut w = w1.clone();
-                c1.iter().for_each(|c| w[*c] = cw);
-                t.edit_table(id, "Size columns equally", cx, |t| t.col_widths = w);
+                t.edit_table(id, "Size columns equally", cx, |t| noshape_scene::drawing_tools::table_edit::columns_equally_of(t, &l1, &c1));
             })
             .disabled(cols.len() < 2),
             MenuEntry::item("Rows Equally", move |t, _, cx| {
-                let mut h = h1.clone();
-                r1.iter().for_each(|r| h[*r] = rh);
-                t.edit_table(id, "Size rows equally", cx, |t| t.row_heights = h);
+                t.edit_table(id, "Size rows equally", cx, |t| noshape_scene::drawing_tools::table_edit::rows_equally_of(t, &l2, &r1));
             })
             .disabled(rows.len() < 2),
         ];

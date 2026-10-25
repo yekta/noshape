@@ -23,7 +23,15 @@ fn list(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let ops: Vec<_> = registry::all()
         .iter()
         .filter(|o| group.is_none_or(|g| o.group == g))
-        .map(|o| json!({ "tool": o.tool_name(), "cli": format!("noshape-cli {} {}", o.group, o.verb), "summary": o.summary, "mutates": o.mutates }))
+        .map(|o| {
+            let mut v = json!({ "tool": o.tool_name(), "cli": format!("noshape-cli {} {}", o.group, o.verb), "summary": o.summary, "mutates": o.mutates });
+            // With one group: each operation's examples too.
+            let examples = crate::examples::of(&o.tool_name());
+            if group.is_some() && !examples.is_empty() {
+                v["examples"] = examples.iter().filter_map(|e| serde_json::from_str::<serde_json::Value>(e).ok()).collect();
+            }
+            v
+        })
         .collect();
     Ok(json!({ "operations": ops }).into())
 }

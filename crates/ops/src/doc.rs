@@ -82,11 +82,26 @@ impl OpenDoc {
 }
 
 impl OpenDoc {
+    /// Regenerate an edited copy of a Part Studio tab without committing it
+    /// (a dialog's preview), in the active configuration.
+    pub fn preview(&mut self, tab: TabId, edited: &noshape_model::partstudio::PartStudio) -> Result<RegenResult, OpError> {
+        let opts = self.regen_options(tab);
+        let units = self.session.doc.settings.units;
+        let values = crate::config::current(edited, self.active_config.get(&tab).unwrap_or(&ConfigValues::default()));
+        let reg = self.regens.entry(tab).or_default();
+        Ok(reg.regenerate(edited, &values, &units, &opts))
+    }
+
     /// Evaluate (solve) an assembly tab as given (already configured, with
     /// any previewed edits), as the Assembly view does.
     pub fn evaluate_assembly(&mut self, tab: TabId, asm: &noshape_model::assembly::Assembly, opts: &noshape_model::assembly::eval::SolveOptions) -> noshape_model::assembly::eval::AssemblyResult {
         let doc = &self.session.doc;
-        let ev = self.assemblies.entry(tab).or_default();
+        let ev = self.assemblies.entry(tab).or_insert_with(|| {
+            let mut ev = noshape_model::assembly::eval::AssemblyEvaluator::default();
+            // Instances showing a version of this or another document.
+            ev.set_external(std::sync::Arc::new(crate::derived::ExternalDocs));
+            ev
+        });
         ev.retain_tabs(doc);
         ev.evaluate(doc, asm, opts, None)
     }

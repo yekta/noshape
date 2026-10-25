@@ -55,21 +55,7 @@ type CatalogPart = (BodyId, String, Option<(DVec3, DVec3)>, bool);
 type InferCache = ((Vec<InstanceId>, Reference), usize, Vec<InferencePoint>);
 
 /// Resolves parts inserted from other documents (version-pinned snapshots).
-struct AppExternal;
-
-impl noshape_model::assembly::eval::ExternalStudios for AppExternal {
-    fn studio(&self, key: &str) -> Option<(Arc<Document>, TabId)> {
-        let r = crate::derived::ExternalRef::parse(key)?;
-        let doc = crate::derived::external_snapshot(&r.path, r.microversion).ok()?;
-        let tab = doc.tabs.iter().find(|t| t.id.to_string() == r.tab)?.id;
-        Some((doc, tab))
-    }
-
-    fn sibling(&self, key: &str, tab: TabId) -> Option<String> {
-        let r = crate::derived::ExternalRef::parse(key)?;
-        Some(crate::derived::ExternalRef { tab: tab.to_string(), ..r }.key())
-    }
-}
+use noshape_ops::derived::ExternalDocs as AppExternal;
 
 /// A Part Studio or Assembly offered by the Insert panel.
 #[derive(Clone, Debug)]

@@ -4027,7 +4027,13 @@ impl SketchEditor {
     pub fn paste_clipboard(&mut self, data: &mut SketchData, text: &str) -> bool {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return false };
         let Some(clip) = v.get("noshape_sketch_entities").and_then(|c| serde_json::from_value::<Sketch>(c.clone()).ok()) else { return false };
-        let created = data.sketch.paste(&clip, DVec2::ZERO);
+        self.paste_entities(data, &clip, DVec2::ZERO)
+    }
+
+    /// Paste sketch entities (copied with [`Sketch::extract`]) moved by
+    /// `offset`; the pasted entities become the selection.
+    pub fn paste_entities(&mut self, data: &mut SketchData, clip: &Sketch, offset: DVec2) -> bool {
+        let created = data.sketch.paste(clip, offset);
         if created.is_empty() {
             return false;
         }
