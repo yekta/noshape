@@ -40,12 +40,12 @@
 namespace noshape {
 
 namespace {
-// A planar face with many boundary nodes (400 hole rims: ~56k) through our
+// A planar face (any size: BRepMesh took 35-68 ms on a 144-node disk) through our
 // constrained Delaunay triangulation (planar_cdt.hpp) of BRepMesh's own
 // boundary nodes: the same triangles as BRepMesh's (Delaunay, no inner
 // nodes on a plane) without BRepMesh's per-link bookkeeping (the 400-hole
-// plate's faces 1.4 s → 0.1 s). Smaller faces, and any face it can't take
-// (self-intersecting or seam wires, a ring it refuses), go to `fallback`
+// plate's faces 1.4 s → 0.1 s). Any face it can't take
+// (self-intersecting or seam wires, a ring it refuses) goes to `fallback`
 // (BRepMesh's own planar algorithm).
 class PlanarCdtAlgo : public IMeshTools_MeshAlgo
 {
@@ -67,7 +67,7 @@ public:
   }
 
 private:
-  static constexpr size_t MIN_NODES = 1000;
+  static constexpr size_t MIN_NODES = 3;
 
   static bool triangulate(const IMeshData::IFaceHandle& f)
   {
