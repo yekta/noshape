@@ -335,6 +335,7 @@ pub(crate) mod ffi {
         fn surface_info(face: &OcShape) -> Result<SurfaceInfo>;
         fn curve_info(edge: &OcShape) -> Result<CurveInfo>;
         fn edge_bspline(edge: &OcShape) -> Result<BSplineF>;
+        fn face_bspline(face: &OcShape) -> Result<BSplineSurfF>;
         fn face_normal_at_uv(face: &OcShape, u: f64, v: f64) -> Result<P3>;
         fn face_point_at_uv(face: &OcShape, u: f64, v: f64) -> Result<P3>;
         fn face_project_point(face: &OcShape, p: P3) -> Result<ProjPoint>;
@@ -357,6 +358,7 @@ pub(crate) mod ffi {
         fn make_edge_2d(plane: &PlaneF, seg: &Seg2d) -> Result<UniquePtr<OcShape>>;
         fn make_wire_2d(plane: &PlaneF, segs: &[Seg2d]) -> Result<UniquePtr<OcShape>>;
         fn make_wire(edges: &OcShapeList) -> Result<UniquePtr<OcShape>>;
+        fn wire_with_edge_order(wire: &OcShape, order: &[u32]) -> Result<UniquePtr<OcShape>>;
         fn make_face_on_plane(
             plane: &PlaneF,
             outer: &OcShape,

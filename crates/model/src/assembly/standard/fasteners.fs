@@ -394,7 +394,15 @@ function screwHead(context is Context, id is Id, def is map) returns array
     {
         // A collar (dc, c) under the head (DIN 967) lifts it by c.
         const pan = def.re > EPS && def.rf > EPS;
-        const profile = pan ? panCrown(def.dk / 2, def.k - def.c, def.rf, def.re, def.c) : roundHead(def.dk / 2, def.k - def.c, def.rf, def.c);
+        var profile = pan ? panCrown(def.dk / 2, def.k - def.c, def.rf, def.re, def.c) : roundHead(def.dk / 2, def.k - def.c, def.rf, def.c);
+        // Live's ASME socket head cap screws: a 45 degree HEAD_CHAMFER on the
+        // top edge (1/4-20: 0.025 in; dom/skb-sc-geom).
+        if (!pan && def.rf <= EPS && def.hc != undefined && def.hc > EPS)
+        {
+            const r = def.dk / 2;
+            const top = def.k;
+            profile = [{ "p" : rz(Z, def.c) }, { "p" : rz(r, def.c) }, { "p" : rz(r, top - def.hc) }, { "p" : rz(r - def.hc, top) }, { "p" : rz(Z, top) }];
+        }
         // Spherical crowns (the pan's, a dome) under a square recess: the
         // profile up to the crown's rim, the crown from a seamless sphere.
         const dome = !pan && def.rf >= def.dk / 2 - EPS && def.rf > EPS;
@@ -759,7 +767,10 @@ function driveCut(context is Context, id is Id, target is Query, def is map, top
         const half = (def.drill != undefined && def.drill > 0 ? def.drill : 140) / 2 * degree;
         const r = def.sd / 2;
         prismZ(context, id + "hex", top - def.t, def.t + reach, polygonPoints(6, def.sd, 0));
-        revolveProfile(context, id + "cone", [{ "p" : rz(Z, top - def.t - r / tan(half)) }, { "p" : rz(r, top - def.t) }, { "p" : rz(Z, top - def.t) }]);
+        // Live's metric set screws: a flat floor, no drill point.
+        const flatFloor = def.head == HEAD_NONE && def.dm != undefined && def.dm > EPS;
+        if (!flatFloor)
+            revolveProfile(context, id + "cone", [{ "p" : rz(Z, top - def.t - r / tan(half)) }, { "p" : rz(r, top - def.t) }, { "p" : rz(Z, top - def.t) }]);
         tool = qCreatedBy(id, EntityType.BODY);
     }
     else if (kind == DRIVE_SLOT)
@@ -864,6 +875,10 @@ function shankProfile(def is map, top is ValueWithUnits) returns array
     const l = def.l;
     const rp = def.dp / 2;
     var pts = [{ "p" : rz(Z, top) }, { "p" : rz(r, top) }];
+    // Live's metric set screws (behaviours "skb (10-25) set screw sockets"):
+    // a 30 degree chamfer from the minor diameter dm on top out to d.
+    if (def.dm != undefined && def.dm > EPS && def.dm < def.d - EPS)
+        pts = [{ "p" : rz(Z, top) }, { "p" : rz(def.dm / 2, top) }, { "p" : rz(r, top - (r - def.dm / 2) * tan(30 * degree)) }];
     const kind = def.point;
     if (kind == POINT_FLAT || (kind == POINT_CHAMFER && def.dp <= EPS))
         return join(pts, [{ "p" : rz(r, -l) }, { "p" : rz(Z, -l) }]);
@@ -877,8 +892,9 @@ function shankProfile(def is map, top is ValueWithUnits) returns array
         return join(pts, [{ "p" : rz(r, -l + def.z) }, { "p" : rz(Z, -l) }]);
     if (kind == POINT_CUP)
     {
-        // 45 degree chamfer to the cup diameter dp; a 118 degree cup.
-        const depth = rp * 0.6;
+        // 45 degree chamfer to the cup diameter dp; a 120 degree cup (live
+        // ISO 4029 M6: 0.866 deep).
+        const depth = rp / tan(60 * degree);
         return join(pts, [{ "p" : rz(r, -l + (r - rp)) }, { "p" : rz(rp, -l) }, { "p" : rz(Z, -l + depth) }]);
     }
     if (kind == POINT_DOG)
@@ -1005,6 +1021,16 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isInteger(definition.drill, { (unitless) : [0, 0, 180] } as IntegerBoundSpec);
         annotation { "Name" : "Under-head fillet" }
         isLength(definition.ru, LENGTH_0);
+        annotation { "Name" : "Top chamfer diameter" }
+        isLength(definition.dm, LENGTH_0);
+        annotation { "Name" : "Head holes" }
+        isInteger(definition.holes, { (unitless) : [0, 0, 3] } as IntegerBoundSpec);
+        annotation { "Name" : "Head hole diameter" }
+        isLength(definition.hd, LENGTH_0);
+        annotation { "Name" : "Head hole offset" }
+        isLength(definition.ho, LENGTH_0);
+        annotation { "Name" : "Head chamfer" }
+        isLength(definition.hc, LENGTH_0);
         annotation { "Name" : "Transition diameter" }
         isLength(definition.da, LENGTH_0);
         annotation { "Name" : "Transition length" }
@@ -1162,6 +1188,24 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
             subtract(context, id + "indent", screw, qCreatedBy(id + "indentTool", EntityType.BODY));
         }
         driveCut(context, id + "drive", solidsOf(context, id), def, def.head == HEAD_NONE ? Z : head[1]);
+        // Live's drilled heads (ASME socket head cap screws, "Hex drilled(2 /
+        // 4 / 6)"): one, two or three through-holes of diameter hd, ho below
+        // the top, across the hex flats at -60, 0 and 60 degrees.
+        if (def.holes != undefined && def.holes > 0 && def.hd != undefined && def.hd > EPS && def.head != HEAD_NONE)
+        {
+            const screw = solidsOf(context, id);
+            const zc = head[1] - def.ho;
+            const reach = def.dk + def.d;
+            const angles = [-60, 0, 60];
+            var tools = [];
+            for (var i = 0; i < min(def.holes, 3); i += 1)
+            {
+                const dir = vector(cos(angles[i] * degree), sin(angles[i] * degree), 0);
+                fCylinder(context, id + ("hole" ~ i), { "bottomCenter" : vector(Z, Z, zc) - dir * reach, "topCenter" : vector(Z, Z, zc) + dir * reach, "radius" : def.hd / 2 });
+                tools = append(tools, qCreatedBy(id + ("hole" ~ i), EntityType.BODY));
+            }
+            subtract(context, id + "holes", screw, qUnion(tools));
+        }
         if (def.point == POINT_BT)
             btSlot(context, id + "bt", solidsOf(context, id), def);
         else if (def.point == POINT_TIP_D || def.point == POINT_TIP_G || def.point == POINT_TIP_F)
@@ -1374,6 +1418,10 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         isInteger(definition.cskTop, { (unitless) : [0, 1, 1] } as IntegerBoundSpec);
         annotation { "Name" : "Collar bore" }
         isLength(definition.cb, LENGTH_0);
+        annotation { "Name" : "Collar round" }
+        isLength(definition.cr, LENGTH_0);
+        annotation { "Name" : "Hole countersink half-angle" }
+        isInteger(definition.cska, { (unitless) : [0, 0, 89] } as IntegerBoundSpec);
         annotation { "Name" : "Collar bore depth" }
         isLength(definition.cd, LENGTH_0);
         annotation { "Name" : "T-slot nut length" }
@@ -1467,7 +1515,8 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
             // from w to m, its top outer edge rounded 0.2 (m - w); the
             // hole cut below bores it out (cb, cd deep).
             const rc = definition.de / 2;
-            const rr = (definition.m - bodyTop) * 0.2;
+            // Live's DIN 985: cr = 0.3125 (h - m) (behaviours "skb (10-25) DIN 985").
+            const rr = definition.cr != undefined && definition.cr > EPS ? definition.cr : (definition.m - bodyTop) * 0.2;
             revolveProfile(context, id + "collar", [{ "p" : rz(Z, bodyTop - EPS) }, { "p" : rz(rc, bodyTop - EPS) }, { "p" : rz(rc, definition.m - rr) },
                         { "p" : rz(rc - rr, definition.m), "mid" : rz(rc - rr + rr * cos(45 * degree), definition.m - rr + rr * sin(45 * degree)) }, { "p" : rz(Z, definition.m) }]);
         }
@@ -1487,9 +1536,13 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
             // 90 degree countersinks out to d on both faces.
             const rh = definition.dh / 2;
             const rd = definition.d / 2;
-            const cut = rd - rh;
+            // The countersinks' depth: 90 degrees (ANSI), cska = 60 for live's
+            // DIN 985 120 degree countersinks.
+            const half = (definition.cska != undefined && definition.cska > 0 ? definition.cska : 45) * degree;
+            const cut = (rd - rh) / tan(half);
             // A cap nut's hole is drilled dd deep with a 118 degree tip.
-            var top = [{ "p" : rz(rh, definition.m - cut) }, { "p" : rz(rd + EPS, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
+            // (Past the faces along the countersink's own slope.)
+            var top = [{ "p" : rz(rh, definition.m - cut) }, { "p" : rz(rd + EPS * tan(half), definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
             if (form == NUT_CAP && definition.dd > EPS)
                 top = [{ "p" : rz(rh, definition.dd) }, { "p" : rz(Z, definition.dd + rh / tan(59 * degree)) }];
             else if (form == NUT_INSERT && definition.cb > EPS)
@@ -1500,11 +1553,11 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
                 const zf = definition.cd > EPS ? definition.m - definition.cd : bodyTop;
                 const rb = definition.cb / 2;
                 top = rd < rb ? [{ "p" : rz(rh, zf - cut) }, { "p" : rz(rd, zf) }, { "p" : rz(rb, zf) }, { "p" : rz(rb, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }] :
-                    [{ "p" : rz(rh, zf - cut) }, { "p" : rz(rb, zf - cut + rb - rh) }, { "p" : rz(rb, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
+                    [{ "p" : rz(rh, zf - cut) }, { "p" : rz(rb, zf - cut + (rb - rh) / tan(half)) }, { "p" : rz(rb, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
             }
             else if (definition.cskTop == 0)
                 top = [{ "p" : rz(rh, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
-            subtract(context, id + "holeCut", nutBody, revolveProfile(context, id + "hole", concatenateArrays([[{ "p" : rz(Z, -definition.h - EPS) }, { "p" : rz(rd + EPS, -definition.h - EPS) }, { "p" : rz(rh, -definition.h + cut) }], top])));
+            subtract(context, id + "holeCut", nutBody, revolveProfile(context, id + "hole", concatenateArrays([[{ "p" : rz(Z, -definition.h - EPS) }, { "p" : rz(rd + EPS * tan(half), -definition.h - EPS) }, { "p" : rz(rh, -definition.h + cut) }], top])));
         }
         else
             subtract(context, id + "holeCut", nutBody, cylinderZ(context, id + "hole", -definition.m - definition.h, holeTop, definition.d / 2));

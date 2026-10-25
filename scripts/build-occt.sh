@@ -11,9 +11,22 @@ JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)}"
 mkdir -p "$WORK"
 cd "$WORK"
 SRC="OCCT-${OCCT_TAG#V}"
+# noshape's patches to OCCT (patches/occt/*.patch, applied in name order to a
+# fresh source tree; the marker re-extracts it when the patch set changes).
+PATCHES="$(cd "$(dirname "$0")/.." && pwd)/patches/occt"
+PATCH_SET="$(cat "$PATCHES"/*.patch 2>/dev/null | cksum | cut -d' ' -f1)"
+if [ -d "$SRC" ] && [ "$(cat "$SRC/.noshape-patches" 2>/dev/null)" != "$PATCH_SET" ]; then
+  rm -rf "$SRC" build
+fi
 if [ ! -d "$SRC" ]; then
   curl -sSL -o occt.tgz "https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/${OCCT_TAG}.tar.gz"
   tar xzf occt.tgz && rm occt.tgz
+  for p in "$PATCHES"/*.patch; do
+    [ -e "$p" ] || continue
+    echo "Applying $(basename "$p")"
+    patch -p1 -d "$SRC" < "$p"
+  done
+  echo "$PATCH_SET" > "$SRC/.noshape-patches"
 fi
 GEN=()
 command -v ninja >/dev/null && GEN=(-G Ninja)

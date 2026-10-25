@@ -25,6 +25,10 @@ pub struct SectionPlane {
     pub normal: DVec3,
     pub offset: f64,
     pub flipped: bool,
+    /// Where the manipulator's base starts (live qa4-r5-s9-5: the picked
+    /// face's centre, a mate connector's origin); else across the model's
+    /// centre.
+    pub base: Option<DVec3>,
 }
 
 impl SectionPlane {
@@ -87,9 +91,15 @@ impl PartStudioView {
     /// Planes for the given references (or the Front plane).
     fn planes_for(&self, refs: &[Reference], cx: &App) -> Vec<SectionPlane> {
         let labeler = self.labeler(cx);
-        let frames: Vec<(String, PlaneFrame)> = refs.iter().filter_map(|r| self.frame_of_ref(r).map(|f| (labeler(r), f))).collect();
-        let frames = if frames.is_empty() { vec![("Front plane".to_string(), PlaneFrame::FRONT)] } else { frames };
-        frames.into_iter().take(MAX_PLANES).map(|(l, f)| plane(&l, f.origin, f.normal)).collect()
+        let mut frames: Vec<(String, PlaneFrame, Option<DVec3>)> = refs.iter().filter_map(|r| self.frame_of_ref(r).map(|f| (labeler(r), f, self.section_home(r, &f)))).collect();
+        if frames.is_empty() {
+            frames.push(("Front plane".to_string(), PlaneFrame::FRONT, None));
+        }
+        frames
+            .into_iter()
+            .take(MAX_PLANES)
+            .map(|(l, f, base)| SectionPlane { base, ..plane(&l, f.origin, f.normal) })
+            .collect()
     }
 
     /// Open the dialog (keeping the current planes, or starting from the
@@ -225,7 +235,7 @@ impl PartStudioView {
                 self.flash_info("Maximum number of section planes reached".into(), cx);
                 return true;
             } else {
-                self.ui.section.push(plane(&label, f.origin, f.normal));
+                self.ui.section.push(SectionPlane { base: self.section_home(r, &f), ..plane(&label, f.origin, f.normal) });
                 if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
                     self.message = None;
                 }
@@ -237,6 +247,30 @@ impl PartStudioView {
         }
         self.apply_section(window, cx);
         true
+    }
+
+    /// The manipulator base's start for a picked plane reference: a face's
+    /// centre (area-weighted over its display triangles), a connector's
+    /// origin; none for planes.
+    fn section_home(&self, r: &Reference, f: &PlaneFrame) -> Option<DVec3> {
+        match r {
+            Reference::MateConnector { .. } => Some(f.origin),
+            Reference::Face(_) => self.display.bodies.iter().filter(|b| !b.hidden).find_map(|b| {
+                let fi = b.face_refs.iter().position(|x| x == r)?;
+                let &(first, count) = b.mesh.face_ranges.get(fi)?;
+                let idx = b.mesh.indices.get(first as usize..(first + count) as usize)?;
+                let p = |i: u32| b.mesh.positions.get(i as usize).map(|a| DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64));
+                let (mut sum, mut area) = (DVec3::ZERO, 0.0);
+                for t in idx.as_chunks::<3>().0 {
+                    let (a, b, c) = (p(t[0])?, p(t[1])?, p(t[2])?);
+                    let w = (b - a).cross(c - a).length() * 0.5;
+                    sum += (a + b + c) / 3.0 * w;
+                    area += w;
+                }
+                (area > 0.0).then(|| sum / area)
+            }),
+            _ => None,
+        }
     }
 
     /// Restore saved planes (named views).
@@ -262,8 +296,12 @@ impl PartStudioView {
         let center = (lo + hi) * 0.5;
         let on_plane = pl.origin + pl.normal * pl.offset;
         // Where the base circle was slid to (live), else across the model's centre.
-        let at = self.ui.section_base.unwrap_or(center);
-        let base = at - pl.normal * pl.normal.dot(at - on_plane);
+        let at = self.ui.section_base.or(pl.base).unwrap_or(center);
+        // A snapped base sits on what it snapped to, off the plane too.
+        let base = match &self.ui.section_snap {
+            Some((q, _)) => *q,
+            None => at - pl.normal * pl.normal.dot(at - on_plane),
+        };
         Some(super::manipulators::Arrow { base, dir: pl.normal, length: section_handle(lo, hi), param: SECTION_PARAM, flip: None })
     }
 
@@ -325,6 +363,7 @@ impl PartStudioView {
         self.ui.section_box = false;
         self.ui.section_drag0 = None;
         self.ui.section_base = None;
+        self.ui.section_snap = None;
     }
 
     pub(super) fn render_section_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -511,7 +550,7 @@ fn section_box(anchor: glam::DVec2) -> Div {
 pub(super) const SECTION_PARAM: &str = "__section";
 
 fn plane(label: &str, origin: DVec3, normal: DVec3) -> SectionPlane {
-    SectionPlane { label: label.to_string(), origin, normal, offset: 0.0, flipped: false }
+    SectionPlane { label: label.to_string(), origin, normal, offset: 0.0, flipped: false, base: None }
 }
 
 /// Length of the section arrow's handle: a fraction of the model size.

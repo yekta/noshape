@@ -361,3 +361,47 @@ fn open_composite_keeps_its_members() {
     let comp = &r.display.bodies[0];
     assert!(comp.composite.as_ref().is_some_and(|i| i.closed) && !comp.mesh.indices.is_empty());
 }
+
+/// MOVEFACE-TANGENT (api 10-25, samples/g47-1part.step: a 40 × 20 × 10
+/// block, r 2 vertical and r 4 top fillets): Move face (Offset 5 mm) of the
+/// +X end face moves that face only, the fillets touching it rolled again
+/// (Reapply fillet, the default), on the native part and on an imported copy
+/// without fillet history. It grew the part on every side but the bottom.
+#[test]
+fn move_face_beside_tangent_fillets_moves_one_face() {
+    let mut t = T::new();
+    t.block();
+    let r = t.regen();
+    let edges_where = |r: &RegenResult, f: &dyn Fn(&noshape_kernel::EdgeInfo) -> bool| -> Vec<Reference> {
+        let body = &r.context.bodies[0];
+        body.shape.edges().iter().enumerate().filter(|(_, e)| f(&e.edge_info().unwrap())).map(|(i, _)| Reference::Edge((*body.edges[i]).clone())).collect()
+    };
+    let vertical = edges_where(&r, &|i| (i.start.z - i.end.z).abs() > 1e-6);
+    let f1 = t.add("fillet", &[("entities", q(vertical)), ("radius", e("2 mm"))]);
+    assert_eq!(t.status(f1).0, FeatureStatus::Ok);
+    let r = t.regen();
+    let top = edges_where(&r, &|i| i.start.z > 0.0099 && i.end.z > 0.0099 && matches!(i.curve, noshape_kernel::Curve::Line { .. }));
+    let f2 = t.add("fillet", &[("entities", q(top)), ("radius", e("4 mm")), ("tangentPropagation", ParamValue::Bool(true))]);
+    assert_eq!(t.status(f2).0, FeatureStatus::Ok);
+    let r = t.regen();
+    let brep = String::from_utf8(r.context.bodies[0].shape.to_brep_bytes().unwrap()).unwrap();
+    let mut imported = T::new();
+    imported.add("importForeign", &[("blobData", ParamValue::Text(brep))]);
+    for (what, mut t) in [("native", t), ("imported", imported)] {
+        let r = t.regen();
+        let body = &r.context.bodies[0];
+        let end = body.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|p| p.unit_normal().x > 0.999)).map(|i| Reference::Face((*body.faces[i]).clone())).expect("+X face");
+        let n_faces = body.faces.len();
+        let m = t.add("moveFace", &[("moveFaces", q(vec![end])), ("offsetDistance", e("5 mm"))]);
+        let (st, msg) = t.status(m);
+        assert_eq!(st, FeatureStatus::Ok, "{what}: {msg:?}");
+        let r = t.regen();
+        let body = &r.context.bodies[0];
+        let bb = body.shape.bounding_box(true).unwrap();
+        let (lo, hi) = (bb.min, bb.max);
+        for (got, want) in [(lo.x, 0.0), (lo.y, 0.0), (lo.z, 0.0), (hi.x, 0.045), (hi.y, 0.02), (hi.z, 0.01)] {
+            assert!((got - want).abs() < 1e-6, "{what}: box {lo:?} … {hi:?}");
+        }
+        assert_eq!(body.faces.len(), n_faces, "{what}: faces");
+    }
+}

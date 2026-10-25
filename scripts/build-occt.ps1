@@ -15,11 +15,26 @@ $Jobs = if ($env:JOBS) { $env:JOBS } else { $env:NUMBER_OF_PROCESSORS }
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
 Set-Location $Work
 $Src = "OCCT-" + $Tag.Substring(1)
+# noshape's patches to OCCT (patches\occt\*.patch, applied in name order to a
+# fresh source tree; the marker re-extracts it when the patch set changes).
+$Patches = Join-Path (Split-Path -Parent $PSScriptRoot) "patches\occt"
+$PatchFiles = @(Get-ChildItem -Path $Patches -Filter *.patch -ErrorAction SilentlyContinue | Sort-Object Name)
+$PatchSet = ($PatchFiles | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash }) -join ","
+$Marker = Join-Path $Src ".noshape-patches"
+if ((Test-Path $Src) -and ((Get-Content $Marker -ErrorAction SilentlyContinue) -ne $PatchSet)) {
+  Remove-Item -Recurse -Force $Src, build -ErrorAction SilentlyContinue
+}
 if (-not (Test-Path $Src)) {
   $url = "https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/$Tag.tar.gz"
   Invoke-WebRequest -Uri $url -OutFile occt.tgz
   tar xzf occt.tgz
   Remove-Item occt.tgz
+  foreach ($p in $PatchFiles) {
+    Write-Host "Applying $($p.Name)"
+    git apply --whitespace=nowarn --directory=$Src $p.FullName
+    if ($LASTEXITCODE -ne 0) { throw "OCCT patch $($p.Name) failed" }
+  }
+  Set-Content -Path $Marker -Value $PatchSet
 }
 
 $gen = @()

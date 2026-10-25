@@ -152,6 +152,13 @@ pub fn make_wire(edges: &[Shape]) -> Result<Shape> {
     Shape::from_res(ffi::make_wire(&l))
 }
 
+/// The same wire with its edges stored in `order` (indices into its edge
+/// order, each once): the order its edges are listed in afterwards
+/// (Onshape's opPolyline lists the lines before the bend arcs).
+pub fn wire_with_edge_order(wire: &Shape, order: &[u32]) -> Result<Shape> {
+    Shape::from_res(ffi::wire_with_edge_order(wire.raw(), order))
+}
+
 /// A planar face on `plane` bounded by the closed `outer` wire with `holes`.
 /// Wire orientations are fixed automatically (outer CCW, holes CW w.r.t. the
 /// plane normal), so the face normal equals the plane normal.

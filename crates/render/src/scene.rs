@@ -253,6 +253,10 @@ pub struct Instance {
     /// Translucent meshes drawn after the lines and points (color pass): a
     /// drawing's release watermark lies over the ink.
     pub over_lines: bool,
+    /// Translucent meshes drawn through everything (no depth test or write,
+    /// after the transparent meshes, before the lines): FeatureScript debug
+    /// faces, which Onshape shows behind the model too.
+    pub on_top: bool,
     /// Only rendered into the pick buffer (invisible but selectable), e.g.
     /// B-rep vertices and sketch regions; highlights are drawn separately.
     pub pick_only: bool,
@@ -348,6 +352,7 @@ impl Instance {
             hidden_only: false,
             over_transparent: false,
             over_lines: false,
+            on_top: false,
             pick_only: false,
             pick_base: 0,
             zebra: None,
@@ -374,6 +379,11 @@ impl Instance {
     /// Draw a translucent mesh after the lines and points ([`Instance::over_lines`]).
     pub fn over_lines(mut self) -> Self {
         self.over_lines = true;
+        self
+    }
+    /// Draw a translucent mesh through all other geometry ([`Instance::on_top`]).
+    pub fn on_top(mut self) -> Self {
+        self.on_top = true;
         self
     }
     /// Draw only the parts hidden behind other geometry (lines and points).

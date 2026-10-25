@@ -1004,6 +1004,27 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!((dv["isolate"][0].clone(), dv["show_mates"].clone(), dv["snap_mode"].clone()), (json!(p), json!(true), json!(true)), "{dv}");
     let e = try_call(&mut ctx, "view_display", json!({ "tab": "Assembly 1", "highlight_boundary": true })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("highlight_boundary"), "{e:?}");
+    // Selection: Select instances with same configuration; Clear selection.
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "same_configuration", "refs": [p] }));
+    assert_eq!(s["selected"], json!([b, p]), "both from Part Studio 1 in its default configuration: {s}");
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "same_configuration", "refs": [p], "same_part": true }));
+    assert_eq!(s["selected"], json!([p]), "{s}");
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "add", "refs": [b] }));
+    assert_eq!(s["selected"], json!([p, b]), "{s}");
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "clear" }));
+    assert_eq!(s["selected"], json!([]), "{s}");
+    // Search tools in the assembly (live dom/assembly-tool-search.txt).
+    let t = call(&mut ctx, "ui_search_tools", json!({ "tab": "Assembly 1", "text": "gear" }));
+    assert_eq!(t["tools"], json!([{ "name": "Gear relation", "icon": "gear-relation", "keys": null }]), "{t}");
+    // The lists: a mate row's Expand, Find in instance list, Expand all.
+    let l = call(&mut ctx, "ui_list", json!({ "tab": "Assembly 1", "action": "expand", "items": ["Revolute 1"] }));
+    assert_eq!(l["expanded_mates"], json!(["Revolute 1"]), "{l}");
+    let e = try_call(&mut ctx, "ui_list", json!({ "tab": "Assembly 1", "action": "expand", "items": [b] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("items[0]"), "a part instance has no rows under it: {e:?}");
+    let l = call(&mut ctx, "ui_list", json!({ "tab": "Assembly 1", "action": "find", "items": [p] }));
+    assert_eq!(l["selected"], json!([p]), "{l}");
+    let l = call(&mut ctx, "ui_list", json!({ "tab": "Assembly 1", "action": "collapse_all" }));
+    assert_eq!(l["expanded_mates"], json!([]), "{l}");
 
     let e = try_call(&mut ctx, "assembly_named_position_drivers", json!({ "drivers": [{ "mate": "Revolute 1", "dof": "tz" }] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("drivers[0].dof"));
@@ -2087,6 +2108,22 @@ fn feature_folders_dependencies_and_dynamic_suppression() {
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" }));
     assert!(g.get("suppression_expression").is_none(), "{g}");
     assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 1);
+    // On a folder: every feature in it; Remove expression clears them.
+    call(&mut ctx, "feature_add_folder", json!({ "features": ["Sketch 1", "Extrude 1"], "name": "Base" }));
+    call(&mut ctx, "feature_dynamic_suppression", json!({ "folder": "Base", "unsuppressed_if": "2 mm < 1 mm" }));
+    assert_eq!(call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" }))["suppression_expression"], "2 mm < 1 mm");
+    call(&mut ctx, "feature_dynamic_suppression", json!({ "folder": "Base" }));
+    assert!(call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" })).get("suppression_expression").is_none());
+    // The list's folders and filter (ui_list).
+    let l = call(&mut ctx, "ui_list", json!({ "action": "collapse_all" }));
+    assert!(l["folders"].as_array().unwrap().iter().all(|f| f["open"] == false), "{l}");
+    let l = call(&mut ctx, "ui_list", json!({ "action": "expand", "items": ["Base"] }));
+    assert_eq!(l["folders"].as_array().unwrap().iter().find(|f| f["name"] == "Base").unwrap()["open"], true, "{l}");
+    let l = call(&mut ctx, "ui_list", json!({ "action": "filter", "text": "extrude" }));
+    assert_eq!(l["shown_features"], json!(["Extrude 1"]), "{l}");
+    let l = call(&mut ctx, "ui_list", json!({ "action": "filter", "text": "" }));
+    assert!(l.get("shown_features").is_none(), "{l}");
+    assert_eq!(try_call(&mut ctx, "ui_list", json!({ "action": "expand", "items": ["Nope"] })).unwrap_err().param.as_deref(), Some("items[0]"));
 }
 
 #[test]
@@ -2917,6 +2954,12 @@ fn edit_in_context_and_part_studio_in_context() {
     let c = &r["context"];
     assert_eq!((c["name"].clone(), c["shown"].clone(), c["referenced"].clone()), (json!("Context 1"), json!(true), json!(false)), "{r}");
     assert_eq!(c["instances"].as_array().unwrap().len(), 1, "the pin around the block: {r}");
+    // The banner's Hide/show instances (view_display context_hidden).
+    let pin_name = c["instances"][0]["instance"].as_str().unwrap().to_string();
+    let d = call(&mut ctx, "view_display", json!({ "tab": "Part Studio 1", "context_hidden": [pin_name] }));
+    assert_eq!(d["context_hidden"], json!([pin]), "{d}");
+    let d = call(&mut ctx, "view_display", json!({ "tab": "Part Studio 1", "context_hidden": [] }));
+    assert_eq!(d["context_hidden"], json!([]), "{d}");
     // The pin's top face, from the context.
     let faces = call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "context": true, "surface": "plane", "normal": [0, 0, 1] }));
     let top = faces["faces"][0]["id"].as_str().unwrap_or_else(|| panic!("{faces}")).to_string();
@@ -3846,4 +3889,56 @@ fn view_display_settings() {
     call(&mut ctx, "render_image", json!({ "view": "window", "width": 64, "height": 40 }));
     let d = call(&mut ctx, "view_display", json!({ "exit_isolate": true }));
     assert_eq!(d["transparent"], Value::Null, "{d}");
+}
+
+/// The window's selection (ui_select): set, Select ▸ related, Select
+/// other… under a point, Clear selection; Zoom to selection uses it.
+#[test]
+fn ui_select_related_and_select_other() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "ui_select.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let s = call(&mut ctx, "ui_select", json!({ "action": "set", "refs": [part] }));
+    assert_eq!(s["selected"], json!([part]), "{s}");
+    let z = call(&mut ctx, "view_camera", json!({ "action": "zoom_selection" }));
+    assert_eq!(z["previous_views"], 1, "zooms to the selection: {z}");
+    // Select ▸ All faces of part, from one face.
+    let face = call(&mut ctx, "query_entities", json!({ "kind": "faces" }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "ui_select", json!({ "action": "related", "refs": [face], "criterion": "All faces of part" }));
+    assert!(r["selected"].as_array().unwrap().len() >= 7, "a block with a hole: {r}");
+    // Select other… looking down at the block 20 mm right of its centre:
+    // the top face, then the bottom face.
+    let n = call(&mut ctx, "view_camera", json!({ "action": "normal_to", "refs": ["plane:top"] }));
+    let ppm = 800.0 / num(&n["visible_height"]);
+    let at = json!([640.0 + 20.0 * ppm, 400.0]);
+    let o = call(&mut ctx, "ui_select", json!({ "action": "select_other", "at": at }));
+    assert_eq!(o["under"].as_array().unwrap().len(), 2, "{o}");
+    let o = call(&mut ctx, "ui_select", json!({ "action": "select_other", "at": at, "index": 1 }));
+    assert_eq!(o["selected"], json!([o["under"][1].clone()]), "{o}");
+    // Create selection… adds what it finds to the selection.
+    let cs = call(&mut ctx, "ui_select", json!({ "action": "create_selection", "refs": [face], "criterion": "Tangent connected faces" }));
+    let sel = cs["selected"].as_array().unwrap();
+    assert!(sel.len() >= 2 && sel.contains(&o["under"][1]) && sel.contains(&json!(face)), "{cs}");
+    let c = call(&mut ctx, "ui_select", json!({ "action": "clear" }));
+    assert_eq!(c["selected"], json!([]), "{c}");
+    // A drawing's MBD status: no model datums here.
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let m = call(&mut ctx, "drawing_mbd", json!({ "drawing": d["drawing"] }));
+    assert_eq!(m["rows"], json!([]), "{m}");
+    assert_eq!(try_call(&mut ctx, "drawing_mbd", json!({ "drawing": d["drawing"], "show": "Datum A" })).unwrap_err().param.as_deref(), Some("show"));
+    let e = try_call(&mut ctx, "view_camera", json!({ "action": "zoom_selection" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("refs"), "nothing selected: {e:?}");
+}
+
+/// Search tools… (ui_search_tools): Onshape's ranking of the Part Studio's
+/// tools, with their feature types and keys.
+#[test]
+fn ui_search_tools_ranks_like_onshape() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "search_tools.noshape");
+    let t = call(&mut ctx, "ui_search_tools", json!({ "text": "fil" }));
+    let names: Vec<&str> = t["tools"].as_array().unwrap().iter().map(|x| x["name"].as_str().unwrap()).collect();
+    assert_eq!(&names[..2], ["Fillet", "Fill"], "{t}");
+    assert_eq!((t["tools"][0]["type"].clone(), t["tools"][0]["keys"].clone()), (json!("fillet"), json!("shift-f")), "{t}");
+    assert!(call(&mut ctx, "ui_search_tools", json!({ "text": "" }))["tools"].as_array().unwrap().is_empty());
 }

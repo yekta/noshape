@@ -53,6 +53,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "ui",
+            verb: "search_tools",
+            summary: "Search tools… (Alt+C): the tools a text finds, in Onshape's order",
+            description: "The toolbar's Search tools box: in a Part Studio the tools (features, custom features included) whose names hold the typed letters in order, ranked by where the first letter matches, then how tightly the letters sit; in an Assembly the toolbar tools whose names start with the text, then contain it, then hold its letters in order (shorter names first; at most 10). Each with its id (feature_add `type` / the assembly tool's icon) and key. Start one with feature_add or the assembly ops.",
+            fields: vec![doc_field(), opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the window's tab."), req("text", s(), "The search text.")],
+            mutates: false,
+            destructive: false,
+            run: search_tools,
+        },
+        Op {
+            group: "ui",
             verb: "shortcuts",
             summary: "The keyboard shortcuts (Help › Keyboard shortcuts, the Shift+/ sheet)",
             description: "The sheet's rows per tab (General, Part Studio, Assembly, 3D view, Sketch, Feature Studio, Drawing): each action with a key (the user's customized key, else Onshape's default; `customized`, `disabled`) and the Onshape-controlled ones (`locked`), by name. `tab` keeps one tab; `search` matches names and keys, as the sheet's search box.",
@@ -194,6 +204,8 @@ fn state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             v["tab"] = tab_json(od, *t);
             v
         }).collect::<Vec<_>>(),
+        "selection": w.selection.iter().filter(|(_, s)| !s.is_empty()).map(|(t, s)| json!({ "tab": tab_json(od, *t), "selected": s })).collect::<Vec<_>>(),
+        "lists": w.lists.iter().map(|(t, l)| json!({ "tab": tab_json(od, *t), "filter": l.filter, "folders_open": l.folders_open.iter().map(|(k, v)| (k.to_string(), json!(v))).collect::<serde_json::Map<_, _>>(), "expanded": l.expanded, "expanded_mates": l.expanded_mates })).collect::<Vec<_>>(),
         "drawing_zoom": w.sheets.iter().map(|(t, sv)| json!({ "tab": tab_json(od, *t), "zoom": sv.zoom, "center": sv.center, "viewport": sv.size })).collect::<Vec<_>>(),
     })
     .into())
@@ -248,6 +260,29 @@ fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         ctx.reload_prefs = true;
     }
     Ok(json!({ "toolbar": prefs, "shortcut_tools": prefs.shortcut_tools() }).into())
+}
+
+fn search_tools(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::tool_search::{ASSEMBLY_TOOLS, assembly_rank, studio_rank};
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let d = od.doc();
+    let tab = match a.opt_str("tab")? {
+        Some(k) => doc::find_tab(d, k)?,
+        None => od.window.active_tab.filter(|t| d.tab(*t).is_some_and(|t| matches!(t.content, TabContent::PartStudio(_) | TabContent::Assembly(_)))).or_else(|| d.ordered_tabs().into_iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| t.id)).ok_or_else(|| OpError::not_found("the document has no Part Studio").with_param("tab"))?,
+    };
+    let text = a.str("text")?;
+    let tools: Vec<Value> = match d.tab(tab).map(|t| &t.content) {
+        Some(TabContent::Assembly(_)) => assembly_rank(&ASSEMBLY_TOOLS.iter().map(|t| t.1).collect::<Vec<_>>(), text).into_iter().map(|i| json!({ "name": ASSEMBLY_TOOLS[i].1, "icon": ASSEMBLY_TOOLS[i].0, "keys": ASSEMBLY_TOOLS[i].2 })).collect(),
+        Some(TabContent::PartStudio(_)) => {
+            // Only tools: hidden feature types are not in live's tool search either.
+            let scripts = noshape_model::custom::DocumentScripts::from_document(d);
+            let types: Vec<&'static noshape_model::features::FeatureType> = noshape_model::features::all().filter(|t| t.in_toolbar).chain(scripts.feature_types()).collect();
+            let key = |name: &str| crate::shortcuts::entries(crate::shortcuts::Tab::PartStudio).find(|e| e.name == name).and_then(|e| e.default);
+            studio_rank(&types.iter().map(|t| t.name).collect::<Vec<_>>(), text).into_iter().map(|i| json!({ "name": types[i].name, "type": types[i].id, "keys": key(types[i].name) })).collect()
+        }
+        _ => return Err(OpError::invalid("tool search is a Part Studio's or Assembly's").with_param("tab")),
+    };
+    Ok(json!({ "tab": tab_json(od, tab), "tools": tools }).into())
 }
 
 fn shortcuts(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

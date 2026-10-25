@@ -3228,12 +3228,12 @@ impl PartStudioView {
                             }
                         }
                     }))
-                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
+                        // Live (qa4 round 5 s5 driven dims (3), GLYPH-MENU): a
+                        // constraint glyph's menu is the sketch menu, its
+                        // delete reading "Delete sketch entity".
                         cx.stop_propagation();
-                        if let Some(ui) = this.ui_mut() {
-                            ui.dim_menu = Some((cid, x + dx + 6.0, y + dy + 18.0));
-                        }
-                        cx.notify();
+                        this.open_sketch_context_menu(ev.position, Some(cid), window, cx);
                     }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, _| {
                         // Drag to move the glyph, click to select its constraint.
@@ -3771,7 +3771,9 @@ impl PartStudioView {
     /// and "Delete dimension" ends it (live, qa4 DIM-MENU).
     fn open_sketch_context_menu(&mut self, position: Point<Pixels>, dim: Option<noshape_sketch::ConstraintId>, window: &mut Window, cx: &mut Context<Self>) {
         let hovered = self.hovered_sketch_entity(cx).filter(|_| dim.is_none());
-        let dim_items: Vec<(String, String)> = dim.map(|cid| self.dimension_menu_items(cid, cx)).unwrap_or_default();
+        // A constraint glyph's menu has no dimension items.
+        let dim_is_dimension = dim.and_then(|cid| Some(self.sketch_data(cx)?.sketch.constraint(cid)?.is_dimension())).unwrap_or(true);
+        let dim_items: Vec<(String, String)> = dim.filter(|_| dim_is_dimension).map(|cid| self.dimension_menu_items(cid, cx)).unwrap_or_default();
         let model_edge = matches!(self.hover, Some(Reference::Edge(_) | Reference::Face(_)));
         // Model geometry under the cursor: its part (Hide / Isolate / Make
         // transparent) and, for a straight edge, Align view (live sketch/204).
@@ -3780,6 +3782,9 @@ impl PartStudioView {
         let linear_model_edge = model_ref.as_ref().filter(|r| self.linear_edge_direction(r).is_some()).cloned();
         let sketch_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_else(|| "sketch".into());
         let own_plane = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned());
+        // Other sketches shown (live: Hide other sketches / Hide all sketches).
+        let this_sketch = self.sketch.as_ref().map(|e| e.feature);
+        let other_sketches = self.display.sketches.iter().any(|s| !s.hidden && Some(s.feature) != this_sketch);
         let Some(ed) = &mut self.sketch else { return };
         // The entity under the cursor joins the selection the menu acts on.
         if let Some(h) = hovered
@@ -3798,6 +3803,7 @@ impl PartStudioView {
             noshape_sketch::Curve2::Line { a, b } => Some(frame.to_world(b) - frame.to_world(a)),
             _ => None,
         });
+        let curves_selected = self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().any(|e| d.sketch.curve(*e).is_some())));
         let has_clip = cx.read_from_clipboard().and_then(|c| c.text()).is_some_and(|t| t.contains("noshape_sketch_entities"));
         let view = cx.entity();
         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
@@ -3816,7 +3822,7 @@ impl PartStudioView {
                 let v = v.clone();
                 m = m.on_first_escape(move |_, cx| v.update(cx, |this, cx| this.set_tool(Tool::Select, cx)));
             }
-            if let Some(cid) = dim {
+            if let Some(cid) = dim.filter(|_| !dim_items.is_empty()) {
                 for (label, action) in &dim_items {
                     let action = action.clone();
                     m = m.item(item(label, Box::new(move |this, w, cx| this.dim_menu_action(cid, &action, w, cx))));
@@ -3939,15 +3945,26 @@ impl PartStudioView {
             if has_clip {
                 m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
             }
+            // Live (behaviours "qa4 round 5 s5 driven dims", a selected line,
+            // SK-LINE-MENU): Construction | Extrude…, Revolve… | Hide other
+            // sketches, Hide all sketches, Curve/surface analysis… (no
+            // Section view…).
+            if n > 0 && !tool_active {
+                m = m.separator().item(item("Construction", Box::new(|this, w, cx| this.toggle_construction(w, cx))));
+                m = m.separator().item(item("Extrude…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Extrude), cx)))).item(item("Revolve…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Revolve), cx))));
+            }
             m = m.separator();
             if n == 0 {
                 m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx))));
+            }
+            if n > 0 && !tool_active && other_sketches {
+                m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(this_sketch, cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
             }
             if !tool_active {
                 m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
             }
             if n > 0 {
-                if let Some(plane) = own_plane.clone().filter(|_| !tool_active) {
+                if let Some(plane) = own_plane.clone().filter(|_| !tool_active && !curves_selected) {
                     m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through(plane.clone(), w, cx))));
                 }
                 m = m.separator();
@@ -4011,9 +4028,7 @@ impl PartStudioView {
                 this.view_normal(cx);
                 this.selection = prev;
             })));
-            if tool_active
-                && let Some(d) = single_line
-            {
+            if let Some(d) = single_line {
                 m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| {
                     let cam = this.viewport.read(cx).camera;
                     let fwd = cam.forward();
@@ -4025,7 +4040,8 @@ impl PartStudioView {
                 })));
             }
             if let Some(cid) = dim {
-                m = m.separator().item(item("Delete dimension", Box::new(move |this, w, cx| this.dim_menu_action(cid, "delete", w, cx))));
+                let label = if dim_is_dimension { "Delete dimension" } else { "Delete sketch entity" };
+                m = m.separator().item(item(label, Box::new(move |this, w, cx| this.dim_menu_action(cid, "delete", w, cx))));
             } else if n > 0 && !tool_active {
                 let label = if n == 1 { "Delete sketch entity".to_string() } else { format!("Delete {n} sketch entities") };
                 m = m.separator().item(item(&label, Box::new(|this, w, cx| this.sketch_delete(w, cx))));

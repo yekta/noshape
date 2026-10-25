@@ -105,6 +105,21 @@ impl Workspace {
                 Some(TabView::Assembly(v)) => v.update(cx, |v, cx| v.agent_display(set, window, cx)),
                 _ => {}
             },
+            R::Select { tab, sel } => match self.views.get(&tab) {
+                Some(TabView::PartStudio(v)) => v.update(cx, |v, cx| v.agent_select(sel, cx)),
+                Some(TabView::Assembly(v)) => v.update(cx, |v, cx| v.agent_select(sel, cx)),
+                Some(TabView::Drawing(v)) => v.update(cx, |v, cx| {
+                    // The sheet menu's Clear selection.
+                    v.selection.clear();
+                    v.redraw(cx);
+                }),
+                _ => {}
+            },
+            R::List { tab, act } => match self.views.get(&tab) {
+                Some(TabView::PartStudio(v)) => v.update(cx, |v, cx| v.agent_list(act, window, cx)),
+                Some(TabView::Assembly(v)) => v.update(cx, |v, cx| v.agent_list(act, cx)),
+                _ => {}
+            },
             R::SheetZoom { tab, mv } => {
                 if let Some(TabView::Drawing(v)) = self.views.get(&tab) {
                     v.update(cx, |v, cx| {

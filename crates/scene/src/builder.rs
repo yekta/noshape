@@ -1021,12 +1021,11 @@ pub fn debug_geometry(debug: &noshape_model::display::DebugGeometry, up: &Upload
     for item in &debug.colored {
         match item {
             ColoredDebug::Faces(mesh, [r, g, b]) => {
-                // 1 µm off the face, so a debugged part face shows over it.
-                let positions = mesh.positions.iter().zip(&mesh.normals).map(|(p, n)| std::array::from_fn(|i| p[i] + n[i] * 1e-6)).collect();
-                let m = MeshData { positions, normals: mesh.normals.clone(), pick_ids: vec![0; mesh.positions.len()], indices: mesh.indices.clone() };
+                // Through the model, as live (a debugged face behind the part shows).
+                let m = MeshData { positions: mesh.positions.clone(), normals: mesh.normals.clone(), pick_ids: vec![0; mesh.positions.len()], indices: mesh.indices.clone() };
                 let mut fill = noshape_render::srgb(*r, *g, *b);
                 fill[3] = 0.5;
-                out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(fill).unpickable().ignore_clip().layer(8));
+                out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(fill).on_top().unpickable().ignore_clip().layer(8));
             }
             ColoredDebug::Line(pl, [r, g, b]) => lines.push_polyline(pl, [*r, *g, *b, 255], 0, 2.0, LineSegment::ON_TOP),
             ColoredDebug::Point(p, [r, g, b]) => points.push(PointSprite { position: *p, color: [*r, *g, *b, 255], pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 }),

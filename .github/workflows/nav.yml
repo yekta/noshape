@@ -63,8 +63,12 @@ jobs:
           sudo modprobe uinput
           out="$RUNNER_TEMP/nav"
           status=0
+          # Navigation, then the interaction suite (clicks, boxes, hover:
+          # docs/parity/interaction.md) on each display server.
           for mode in wayland x11; do
-            sudo -E env "PATH=$PATH" .github/nav/linux-replay.sh "$BIN" .github/nav/block.noshape "$out" "$mode" || status=1
+            for suite in nav interact; do
+              sudo -E env "PATH=$PATH" .github/nav/linux-replay.sh "$BIN" .github/nav/block.noshape "$out" "$mode" "$suite" || status=1
+            done
           done
           sudo chown -R "$USER" "$out"
           exit $status

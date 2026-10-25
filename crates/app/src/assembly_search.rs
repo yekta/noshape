@@ -5,40 +5,49 @@
 
 use super::*;
 use gpui_kit::component::input::InputEvent;
+use noshape_ops::tool_search::ASSEMBLY_TOOLS;
 
 type Run = fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>);
 
-/// (icon, name, shortcut, action); the description is live's, by name
-/// (`tool_text::ASSEMBLY`).
-struct AsmTool(&'static str, &'static str, Option<&'static str>, Run);
-
-const TOOLS: &[AsmTool] = &[
-    AsmTool("update-all-button", "Update all references to latest versions", None, |t, _, cx| t.open_reference_manager(None, cx)),
-    AsmTool("insert", "Insert", Some("i"), |t, w, cx| t.toggle_insert(w, cx)),
-    AsmTool("mate-connector-assembly", "Mate connector", Some("ctrl+m"), |t, w, cx| t.open_mc(None, w, cx)),
-    AsmTool("fastened", "Fastened mate", Some("m"), |t, w, cx| t.start_mate(MateType::Fastened, w, cx)),
-    AsmTool("revolute", "Revolute mate", Some("m"), |t, w, cx| t.start_mate(MateType::Revolute, w, cx)),
-    AsmTool("slider", "Slider mate", Some("m"), |t, w, cx| t.start_mate(MateType::Slider, w, cx)),
-    AsmTool("planar", "Planar mate", Some("m"), |t, w, cx| t.start_mate(MateType::Planar, w, cx)),
-    AsmTool("cylindrical", "Cylindrical mate", Some("m"), |t, w, cx| t.start_mate(MateType::Cylindrical, w, cx)),
-    AsmTool("pin-slot", "Pin slot mate", Some("m"), |t, w, cx| t.start_mate(MateType::PinSlot, w, cx)),
-    AsmTool("ball", "Ball mate", Some("m"), |t, w, cx| t.start_mate(MateType::Ball, w, cx)),
-    AsmTool("parallel-mate", "Parallel mate", Some("m"), |t, w, cx| t.start_mate(MateType::Parallel, w, cx)),
-    AsmTool("group", "Group", None, |t, _, cx| t.create_group(cx)),
-    AsmTool("snap-mode", "Snap mode", Some("shift+s"), |t, w, cx| t.toggle_snap(w, cx)),
-    AsmTool("show-mates", "Show mates mode", Some("h"), |t, _, cx| t.toggle_show_mates_mode(cx)),
-    AsmTool("replicate", "Replicate", None, |t, w, cx| t.open_pattern(PatternDialogKind::Replicate, w, cx)),
-    AsmTool("replace-part", "Replace instance", None, |t, _, cx| t.replace_selected(cx)),
-    AsmTool("linear-pattern", "Assembly linear pattern", None, |t, w, cx| t.open_pattern(PatternDialogKind::Linear, w, cx)),
-    AsmTool("circular-pattern", "Assembly circular pattern", None, |t, w, cx| t.open_pattern(PatternDialogKind::Circular, w, cx)),
-    AsmTool("mirror", "Assembly mirror", None, |t, w, cx| t.open_pattern(PatternDialogKind::Mirror, w, cx)),
-    AsmTool("gear-relation", "Gear relation", None, |t, w, cx| t.open_relation(RelationType::Gear, None, w, cx)),
-    AsmTool("rack-pinion", "Rack and pinion relation", None, |t, w, cx| t.open_relation(RelationType::RackAndPinion, None, w, cx)),
-    AsmTool("screw-relation", "Screw relation", None, |t, w, cx| t.open_relation(RelationType::Screw, None, w, cx)),
-    AsmTool("linear-relation", "Linear relation", None, |t, w, cx| t.open_relation(RelationType::Linear, None, w, cx)),
-    AsmTool("display-states", "Display states", None, |t, w, cx| t.toggle_display_states(w, cx)),
-    AsmTool("create-partstudio-incontext", "Create Part Studio in context", None, |t, _, cx| t.open_ps_in_context(false, cx)),
+/// What each toolbar tool does, in the order of
+/// `noshape_ops::tool_search::ASSEMBLY_TOOLS` (their icons, names and
+/// shortcuts, shared with the agent API's ui_search_tools).
+const RUNS: &[Run] = &[
+    |t, _, cx| t.open_reference_manager(None, cx),
+    |t, w, cx| t.toggle_insert(w, cx),
+    |t, w, cx| t.open_mc(None, w, cx),
+    |t, w, cx| t.start_mate(MateType::Fastened, w, cx),
+    |t, w, cx| t.start_mate(MateType::Revolute, w, cx),
+    |t, w, cx| t.start_mate(MateType::Slider, w, cx),
+    |t, w, cx| t.start_mate(MateType::Planar, w, cx),
+    |t, w, cx| t.start_mate(MateType::Cylindrical, w, cx),
+    |t, w, cx| t.start_mate(MateType::PinSlot, w, cx),
+    |t, w, cx| t.start_mate(MateType::Ball, w, cx),
+    |t, w, cx| t.start_mate(MateType::Parallel, w, cx),
+    |t, _, cx| t.create_group(cx),
+    |t, w, cx| t.toggle_snap(w, cx),
+    |t, _, cx| t.toggle_show_mates_mode(cx),
+    |t, w, cx| t.open_pattern(PatternDialogKind::Replicate, w, cx),
+    |t, _, cx| t.replace_selected(cx),
+    |t, w, cx| t.open_pattern(PatternDialogKind::Linear, w, cx),
+    |t, w, cx| t.open_pattern(PatternDialogKind::Circular, w, cx),
+    |t, w, cx| t.open_pattern(PatternDialogKind::Mirror, w, cx),
+    |t, w, cx| t.open_relation(RelationType::Gear, None, w, cx),
+    |t, w, cx| t.open_relation(RelationType::RackAndPinion, None, w, cx),
+    |t, w, cx| t.open_relation(RelationType::Screw, None, w, cx),
+    |t, w, cx| t.open_relation(RelationType::Linear, None, w, cx),
+    |t, w, cx| t.toggle_display_states(w, cx),
+    |t, _, cx| t.open_ps_in_context(false, cx),
 ];
+
+/// (icon, name, shortcut); the description is live's, by name
+/// (`tool_text::ASSEMBLY`).
+struct AsmTool(&'static str, &'static str, Option<&'static str>);
+
+fn tool(i: usize) -> AsmTool {
+    let (icon, name, key) = ASSEMBLY_TOOLS[i];
+    AsmTool(icon, name, key)
+}
 
 /// Onshape's tool search ranking (live dom/assembly-tool-search.txt): names
 /// starting with the text, then names containing it, then names holding
@@ -46,7 +55,7 @@ const TOOLS: &[AsmTool] = &[
 /// toolbar order; at most 10 results.
 /// A toolbar tool's description (its tooltip's second line), by icon.
 pub(super) fn tool_description(icon: &str) -> &'static str {
-    let title = TOOLS.iter().find(|t| t.0 == icon).map(|t| t.1).unwrap_or(match icon {
+    let title = ASSEMBLY_TOOLS.iter().find(|t| t.0 == icon).map(|t| t.1).unwrap_or(match icon {
         "tangent-mate" => "Tangent mate",
         "width-mate" => "Width mate",
         _ => "",
@@ -55,33 +64,7 @@ pub(super) fn tool_description(icon: &str) -> &'static str {
 }
 
 fn matching(query: &str) -> Vec<usize> {
-    let q = query.trim().to_lowercase();
-    if q.is_empty() {
-        return Vec::new();
-    }
-    let subsequence = |n: &str| {
-        let mut it = n.chars();
-        q.chars().filter(|c| !c.is_whitespace()).all(|c| it.any(|x| x == c))
-    };
-    let mut hits: Vec<(u8, usize, usize)> = TOOLS
-        .iter()
-        .enumerate()
-        .filter_map(|(i, t)| {
-            let n = t.1.to_lowercase();
-            let tier = if n.starts_with(&q) {
-                0
-            } else if n.contains(&q) {
-                1
-            } else if subsequence(&n) {
-                2
-            } else {
-                return None;
-            };
-            Some((tier, n.chars().count(), i))
-        })
-        .collect();
-    hits.sort();
-    hits.into_iter().take(10).map(|(_, _, i)| i).collect()
+    noshape_ops::tool_search::assembly_rank(&ASSEMBLY_TOOLS.iter().map(|t| t.1).collect::<Vec<_>>(), query)
 }
 
 impl AssemblyView {
@@ -126,12 +109,12 @@ impl AssemblyView {
             return None;
         }
         let m = matching(&self.ui.tool_query);
-        m.get(self.ui.tool_sel).or(m.first()).map(|&i| TOOLS[i].0)
+        m.get(self.ui.tool_sel).or(m.first()).map(|&i| ASSEMBLY_TOOLS[i].0)
     }
 
     fn run_tool(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.close_tool_search(window, cx);
-        (TOOLS[i].3)(self, window, cx);
+        RUNS[i](self, window, cx);
     }
 
     pub(super) fn render_tool_search(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -145,7 +128,7 @@ impl AssemblyView {
             .iter()
             .enumerate()
             .map(|(row, &i)| {
-                let t = &TOOLS[i];
+                let t = tool(i);
                 h_flex()
                     .id(SharedString::from(format!("atool-{row}")))
                     .h(px(34.))
@@ -170,7 +153,7 @@ impl AssemblyView {
             })
             .collect();
         let detail = items.get(sel).map(|&i| {
-            let t = &TOOLS[i];
+            let t = tool(i);
             v_flex()
                 .flex_1()
                 .min_w_0()
@@ -293,7 +276,8 @@ mod tests {
     /// Every assembly tool shows live's description.
     #[test]
     fn every_tool_has_its_live_description() {
-        for t in super::TOOLS {
+        assert_eq!(super::RUNS.len(), super::ASSEMBLY_TOOLS.len(), "a run per tool");
+        for t in super::ASSEMBLY_TOOLS {
             assert!(crate::tool_text::assembly_description(t.1).is_some(), "{}", t.1);
         }
         assert!(!super::tool_description("tangent-mate").is_empty() && !super::tool_description("width-mate").is_empty());
@@ -303,7 +287,7 @@ mod tests {
 
     #[test]
     fn tool_search_ranks_like_onshape() {
-        let names = |q: &str| matching(q).into_iter().map(|i| super::TOOLS[i].1).collect::<Vec<_>>();
+        let names = |q: &str| matching(q).into_iter().map(|i| super::ASSEMBLY_TOOLS[i].1).collect::<Vec<_>>();
         assert!(names("").is_empty());
         // Live order (dom/assembly-tool-search.txt).
         assert_eq!(names("mate"), vec!["Mate connector", "Ball mate", "Slider mate", "Planar mate", "Fastened mate", "Revolute mate", "Pin slot mate", "Parallel mate", "Show mates mode", "Cylindrical mate"]);

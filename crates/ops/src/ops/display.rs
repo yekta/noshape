@@ -19,7 +19,7 @@ pub fn ops() -> Vec<Op> {
         group: "view",
         verb: "display",
         summary: "Display settings of a Part Studio or Assembly window: isolate, transparent, boundary edges, orient on edit, thickness off, mates, snap mode",
-        description: "What the view and context menus change without editing the document, kept per tab (`ui_state`; nothing given: read them). `isolate` (Isolate…: these parts, the rest as ghosts) or `transparent` (Make transparent…: these as ghosts) replace the current isolation; `exit_isolate` ends it. Part Studios: `highlight_boundary` (Highlight boundary edges), `orient_on_edit` (Orient normal to sketch on edit), `thickness_analysis: false` (Turn thickness analysis off). Assemblies (instances for isolate / transparent): `show_mates` (Hide/show mates: the mate indicators), `show_mates_mode` (Show mates mode), `snap_mode` (Snap mode). With the app open the window does the same; render_image `view: \"window\"` draws with them.",
+        description: "What the view and context menus change without editing the document, kept per tab (`ui_state`; nothing given: read them). `isolate` (Isolate…: these parts, the rest as ghosts) or `transparent` (Make transparent…: these as ghosts) replace the current isolation; `exit_isolate` ends it. Part Studios: `highlight_boundary` (Highlight boundary edges), `orient_on_edit` (Orient normal to sketch on edit), `thickness_analysis: false` (Turn thickness analysis off), `context_hidden` (the Assembly context banner's Hide/show instances). Assemblies (instances for isolate / transparent): `show_mates` (Hide/show mates: the mate indicators), `show_mates_mode` (Show mates mode), `snap_mode` (Snap mode). With the app open the window does the same; render_image `view: \"window\"` draws with them.",
         fields: vec![
             doc_field(),
             opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the window's tab."),
@@ -29,6 +29,7 @@ pub fn ops() -> Vec<Op> {
             opt("highlight_boundary", b(), "Part Studio: Highlight boundary edges."),
             opt("orient_on_edit", b(), "Part Studio: Orient normal to sketch on edit."),
             opt("thickness_analysis", b(), "Part Studio: false = Turn thickness analysis off (run the analysis with analysis_thickness)."),
+            opt("context_hidden", strings(), "Part Studio: the shown Assembly context's Hide/show instances: the top-level instances (names or ids, context_list) to hide; [] shows all."),
             opt("show_mates", b(), "Assembly: Hide/show mates."),
             opt("show_mates_mode", b(), "Assembly: Show mates mode."),
             opt("snap_mode", b(), "Assembly: Snap mode."),
@@ -68,6 +69,7 @@ pub(crate) fn display_json(d: &TabDisplay, assembly: bool) -> Value {
         v["snap_mode"] = json!(d.snap_mode);
     } else {
         v["highlight_boundary"] = json!(d.highlight_boundary);
+        v["context_hidden"] = json!(d.context_hidden);
         v["orient_on_edit"] = json!(d.orient_on_edit);
     }
     v
@@ -137,6 +139,32 @@ fn display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             return Err(OpError::param("thickness_analysis", "only false (Turn thickness analysis off); run it with analysis_thickness"));
         }
         sets.push(DisplaySet::ThicknessOff);
+    }
+    if let Some(list) = a.opt_array("context_hidden")? {
+        if assembly {
+            return Err(OpError::param("context_hidden", "a Part Studio's setting"));
+        }
+        let ps = crate::doc::studio(od.doc(), tab)?;
+        let c = ps.active_context.and_then(|id| ps.contexts.iter().find(|c| c.id == id)).ok_or_else(|| OpError::invalid("no Assembly context is shown (context_show)").with_param("context_hidden"))?;
+        let asm = match od.doc().tab(c.assembly).map(|t| &t.content) {
+            Some(TabContent::Assembly(a)) => Some(a),
+            _ => None,
+        };
+        let tops: Vec<u64> = c.bodies.iter().filter_map(|b| b.path.first().copied()).fold(Vec::new(), |mut v, t| {
+            if !v.contains(&t) {
+                v.push(t);
+            }
+            v
+        });
+        let name_of = |t: u64| asm.and_then(|a| a.instance(noshape_model::assembly::InstanceId(t))).map(|i| i.name.clone()).unwrap_or_else(|| format!("inst:{t}"));
+        let mut hidden = Vec::new();
+        for (i, v) in list.iter().enumerate() {
+            let k = v.as_str().unwrap_or_default();
+            let t = tops.iter().copied().find(|t| name_of(*t) == k || format!("inst:{t}") == k).ok_or_else(|| OpError::param(&format!("context_hidden[{i}]"), &format!("a context instance: {}", tops.iter().map(|t| name_of(*t)).collect::<Vec<_>>().join(", "))))?;
+            hidden.push(noshape_model::assembly::InstanceId(t));
+        }
+        d.context_hidden = hidden.iter().map(|t| format!("inst:{}", t.0)).collect();
+        sets.push(DisplaySet::ContextHidden(hidden));
     }
     if let Some(on) = only("show_mates", true)? {
         d.show_mates = on;
