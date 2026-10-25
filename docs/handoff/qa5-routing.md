@@ -716,3 +716,14 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   **highlight on hover but a click is not taken** (prompt stays "Select a circle, arc, line, circle center or point"; tried the
   middle and right holes, which have no pin). A straight edge in the same view works ("2.362" placed). The same hole in a
   **part** drawing (Part 1 › Create Drawing of Part 1…) works: "Ø.394". Expected: the diameter dimension as in the part drawing.
+- **P2-D1 cause found (qa5, 22:50)** — not the picker. The assembly view uses exact HLR (`project_hlr_with(.., exact = true)`);
+  when an instance is tilted even slightly (here the plate after a drag, rotation ≈ 0.3°), the holes' cylinder silhouettes
+  touch the rims and HLRBRep's outliner **splits those edges into new TopoDS edges**, which `source_index`
+  (crates/kernel/cpp/hlr.cpp:90, `srcEdges.FindIndex`) doesn't find → `source = -1` → `ViewEdge.model = None` → the Dimension
+  tool's `hovered_edge()` is None and `circle_pick` has nothing (the hover highlight still draws). Probe (demo assembly, all
+  instances rotated [-0.00035, 0.00503, -0.00245, 0.99998]): exact HLR → 11 visible Sharp edges unlinked (polygonal: 0);
+  untilted: 0. Part drawings (face-on, no split) are fine.
+  Proposed fix (kern's file, needs clearance): in hlr.cpp, besides `srcEdges`, map each source edge's 3D curve handle
+  (`BRep_Tool::Curve(e, loc, f, l).get()`) to its index; in `source_index`, when `FindIndex` misses, look the split edge's curve
+  handle up there (outliner splits keep the source Geom_Curve). Test: drawing tests, tilted demo assembly Top view, exact: every
+  visible Sharp edge linked, and a rim click picks a circle.
