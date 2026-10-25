@@ -203,6 +203,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.33 | Select the bar, ↑/↓ step one feature | features_and_parts_lists | ✅ (also after clicking a feature row; the bar turns #a0c7dd while focused) |
 | 6.34 | Features below the bar greyed; new features inserted at the bar | A §3.2 | ✅ |
 | 6.34a | Dragging the bar or a feature row near the list's top/bottom autoscrolls it | live "psb (10-24 k)" | ✅ 70–75 px edge zones, ~30 → 205 px/s toward the edge, faster past it (~370 px/s at 40 px, ~600 at 190 px out), also with the pointer beside the panel (only its height counts); a frame loop keeps scrolling while the pointer rests and stops at the ends (`behaviors::list_autoscroll_speed`, tested against live's speeds) |
+| 6.34b | The bar dropped over the Default geometry rows or header lands at the top slot (drop line under the last default row) | live "qa4 round 5 s2 rollback follow-up" (3) | ✅ (app: drop on Origin → every feature rolled back) |
 
 ### Folders
 
@@ -346,6 +347,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 13.43 | Fillet / Chamfer edge fields take part edges only (Onshape `EdgeTopology.TWO_SIDED`): a sketch line lying on a part edge isn't picked, the part edge is; sketch-only fields (Rib profiles, surface Extrude curves) take no part edges | app 10-24 (a chamfer picked "Sketch 1 line") | ✅ `QueryFilter::SOLID_EDGE`, `kind_matches`; the pick pass skips the overlay kinds (sketch curves/points/regions, part edges/vertices) the active field rejects (render state `NO_PICK`), so a click on a shown sketch line lying on a part edge takes the edge (app: Chamfer with Sketch 1 shown → "Edge of Extrude 1"; render test `no_pick_overlay_lets_the_edge_under_it_be_picked`) |
 | 13.44 | A Hole whose cut fails (tangent to a face: non-manifold) reports hole.fs's HOLE_CUT_FAIL "Hole creates invalid geometry." and cuts nothing; a Reapply feature pattern of it is OK and silently skips the instances that fail on their own; a hole whose axis is beside the part but whose cylinder crosses it cuts (rays across its disk) | live "qa4 round 5 v2 s1 follow-up" (2) | ✅ test `tangent_hole_fails_and_its_reapplied_pattern_cuts_the_good_copies` (volume = live's 37453.538 notch) |
 | 13.45 | A sketch region that no longer resolves (its sketch deleted or moved below) is a missing selection: the feature reports its own empty-input message ("Select face or sketch region to extrude.") and the row tooltip adds "1 missing selection"; a feature that still works with the rest warns "1 missing selection" | live qa4 round 5 v3 s8 (ERR-MISSING-REGION) | ✅ (`drop_missing_regions`, `FeatureState::missing`; test `extrude_above_its_sketch_misses_its_region`) |
+| 13.46 | Hole "Sketch points to place holes" takes sketch points and explicit mate connectors only: a face or a part vertex is neither highlighted nor added | live "qa4 round 5 s1 follow-up 2" (1) (HOLE-FACE) | ✅ (`kind_matches`: no implicit mate connector in a sketch-point field; a part vertex isn't a sketch point; test `face_fields_take_no_edges`) |
 
 ## Not applicable to a local app
 

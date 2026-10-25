@@ -2672,13 +2672,20 @@ impl PartStudioView {
                         this.ui.default_geometry_collapsed = !this.ui.default_geometry_collapsed;
                         cx.notify();
                     }))
+                    // Live (qa4 round 5 s2 rollback follow-up (3)): the bar
+                    // dropped over the group lands at the top slot.
+                    .when(!open, |d| d.drag_over::<RollbackDrag>(|s, _, _, _| s.border_b_2().border_color(p().accent)))
+                    .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(Some(0), cx)))
                     .into_any_element(),
             );
             if open {
                 rows.push(
                     v_flex()
                         .relative()
+                        .id("dg-rows")
                         .children(dg_rows)
+                        .drag_over::<RollbackDrag>(|s, _, _, _| s.border_b_2().border_color(p().accent))
+                        .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(Some(0), cx)))
                         // Live: the line ends in a 9 px tick; drawn over the rows.
                         .child(div().absolute().left(px(9.)).top(px(2.)).bottom(px(1.)).w(px(1.)).bg(pal.border))
                         .child(div().absolute().left(px(5.)).bottom(px(1.)).w(px(9.)).h(px(1.)).bg(pal.border))
@@ -4336,13 +4343,19 @@ pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     // part-studio/445 reads "Part 1").
     let part_geometry = matches!(kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) && f.intersects(QueryFilter::BODY);
     let f = if part_geometry { QueryFilter(f.0 & !(QueryFilter::MATE_CONNECTOR.0 | QueryFilter::POINT_BODY.0)) } else { f };
+    // A field of sketch points or mate connectors (Hole locations) takes
+    // explicit mate connectors only: a face or a part vertex is neither
+    // highlighted nor added (live "qa4 round 5 s1 follow-up 2" (1)).
+    let point_field = matches!(kind, PickKind::Face | PickKind::Vertex) && f.intersects(QueryFilter::SKETCH_POINT);
+    let f = if point_field { QueryFilter(f.0 & !QueryFilter::MATE_CONNECTOR.0) } else { f };
     let want = |q: QueryFilter| f.intersects(q);
     match kind {
         PickKind::Face => want(QueryFilter::ANY_FACE) || want(QueryFilter::PLANE_LIKE),
         // Edge bits only: AXIS also holds cylindrical faces (their axis), so
         // a face field would take edges (qa5 I2: a hole wall in Move face).
         PickKind::Edge => want(PART_EDGES),
-        PickKind::Vertex => want(QueryFilter::POINT_LIKE),
+        // A part vertex isn't a sketch point (Hole locations take neither it nor a face).
+        PickKind::Vertex => want(QueryFilter(QueryFilter::POINT_LIKE.0 & !QueryFilter::SKETCH_POINT.0)),
         PickKind::Plane => want(QueryFilter::PLANE),
         PickKind::Origin => want(QueryFilter::POINT_LIKE),
         PickKind::SketchCurve => want(SKETCH_CURVES),

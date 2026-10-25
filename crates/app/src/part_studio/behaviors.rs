@@ -3304,6 +3304,13 @@ mod field_point_tests {
         let fillet = QueryFilter::SOLID_EDGE | QueryFilter::ANY_FACE;
         assert!(km(PickKind::Edge, &r, fillet) && !km(PickKind::SketchCurve, &r, fillet));
         assert!(km(PickKind::SketchCurve, &r, QueryFilter::SKETCH_EDGE) && !km(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
+        // HOLE-FACE (live): Hole locations take sketch points and explicit
+        // mate connectors, not a face or a part vertex.
+        let hole = QueryFilter::SKETCH_POINT | QueryFilter::MATE_CONNECTOR;
+        assert!(!km(PickKind::Face, &r, hole) && !km(PickKind::Vertex, &r, hole));
+        assert!(km(PickKind::SketchPoint, &r, hole) && km(PickKind::Connector, &r, hole));
+        // A vertex field still takes part vertices.
+        assert!(km(PickKind::Vertex, &r, QueryFilter::VERTEX | QueryFilter::MATE_CONNECTOR));
     }
 
     #[test]
