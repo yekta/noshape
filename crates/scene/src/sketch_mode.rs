@@ -1649,7 +1649,9 @@ impl SketchEditor {
                     self.drag = Some(DragState::OffsetArrow { start: p, moved: false });
                     return EditOutcome::redraw();
                 }
-                let ids: Vec<EntityId> = if self.selection.is_empty() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
+                // While an offset is pending a click picks the hovered curve
+                // (the selection then only holds curves the warning selected).
+                let ids: Vec<EntityId> = if self.selection.is_empty() || self.offset_pending.is_some() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
                 if ids.is_empty() {
                     // Clicking empty space accepts a pending offset.
                     return if self.offset_pending.is_some() { self.commit_offset(data) } else { EditOutcome::none() };
@@ -1659,6 +1661,21 @@ impl SketchEditor {
                     self.offset_flip = self.offset_default_flip(&data.sketch, &ids);
                     self.offset_pending = Some(ids);
                     return self.commit_offset(data);
+                }
+                // Live (qa4 round 5 s1 follow-up (5)): a curve not connected to
+                // the pending chain is only selected (a second click deselects
+                // it) with a warning; the preview stays.
+                if let Some(p) = &self.offset_pending
+                    && let Some(&e) = ids.iter().find(|e| !p.contains(e) && !chain_touches(&data.sketch, p, **e))
+                {
+                    match self.selection.iter().position(|x| *x == e) {
+                        Some(i) => {
+                            self.selection.remove(i);
+                        }
+                        None => self.selection.push(e),
+                    }
+                    self.message = Some("Can only offset a single chain at once.".into());
+                    return EditOutcome::redraw();
                 }
                 match &mut self.offset_pending {
                     // Add curves to the pending offset (chain selection).
@@ -6028,6 +6045,15 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
     }
 }
 
+/// Whether curve `e` shares an end with one of `chain`'s curves.
+fn chain_touches(sk: &Sketch, chain: &[EntityId], e: EntityId) -> bool {
+    let ends = |id: EntityId| sk.curve(id).filter(|c| !c.is_periodic()).map(|c| [c.start_point(), c.end_point()]);
+    let Some(mine) = ends(e) else { return false };
+    let b = sk.bbox();
+    let tol = ((b.max - b.min).length() * 1e-9).max(1e-12);
+    chain.iter().filter_map(|c| ends(*c)).any(|theirs| mine.iter().any(|p| theirs.iter().any(|q| (*p - *q).length() <= tol)))
+}
+
 /// Solve after constraint `c` was added on `ids`. Live (qa4 round 5 v3 s6,
 /// CON-TANGENT-APPLY): Tangent between a line and a circle moves the
 /// circle and keeps its radius, so only the circle's centre takes the change.
@@ -7253,6 +7279,38 @@ mod tests {
         click(&mut ed, &mut d, v(0.02, 0.03));
         assert_eq!(count(&d, EntityKind::Line), 4);
         let _ = l1;
+    }
+
+    /// Live (qa4 round 5 v3 s5, DIM-EXPR-UNIT): a bare expression typed in
+    /// a dimension box reopens with the document unit around it.
+    #[test]
+    fn dimension_expression_keeps_the_unit() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        let cid = add_dimension(&mut d, ConstraintKind::Length { curve: l, value: 0.03 }, None, None).unwrap();
+        let units = UnitPrefs::default();
+        ed.apply_dimension(&mut d, cid, "2*5", &units, &noshape_units::EmptyScope).unwrap();
+        assert_eq!(dimension_edit_text(&d, cid, &units).as_deref(), Some("(2*5) mm"));
+        ed.apply_dimension(&mut d, cid, "2 *5", &units, &noshape_units::EmptyScope).unwrap();
+        assert_eq!(dimension_edit_text(&d, cid, &units).as_deref(), Some("(2 *5) mm"));
+    }
+
+    /// Live (qa4 round 5 s1 follow-up (5), OFF-TOAST): a curve not connected
+    /// to the pending chain is only selected (again: deselected), with
+    /// "Can only offset a single chain at once."; the preview stays.
+    #[test]
+    fn offset_takes_one_chain() {
+        let (mut ed, mut d) = editor(Tool::Offset);
+        let l = d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        let c = d.sketch.add_circle(v(0.06, 0.06), 0.005);
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        assert_eq!(ed.offset_pending.as_deref(), Some(&[l][..]));
+        click(&mut ed, &mut d, v(0.065, 0.06));
+        assert_eq!(ed.offset_pending.as_deref(), Some(&[l][..]), "the preview stays the line");
+        assert!(ed.selection.contains(&c));
+        assert_eq!(ed.message.as_deref(), Some("Can only offset a single chain at once."));
+        click(&mut ed, &mut d, v(0.065, 0.06));
+        assert!(!ed.selection.contains(&c), "a second click deselects it");
     }
 
     #[test]

@@ -166,6 +166,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 7.14 | Over-defining dimensions are made driven: plain grey value ("Ø10", no parentheses) and the value box still opens, no toast | H:dimension; live "qa4 round 5 s5 driven dims" (1) | 🔧 (test `driven_labels_and_offset_side_as_live`) |
 | 7.15 | Driven ↔ driving from the context menu ("Change to driving/driven dimension") | H:dimension | ✅ |
 | 7.16 | Double-click a dimension to edit its value | H:dimension | ✅ |
+| 7.16a | Esc on an untouched value box (new or reopened) closes it at once (a new dimension keeps its measured value); a changed box reverts on the first Esc, closes on the second; a bare expression is stored with the document unit ("2*5" → "(2*5) mm") | live qa4 round 5 v3 s5 (DIM-ESC-UNTOUCHED, DIM-EXPR-UNIT) | ✅ (app; `quantity_text::simple` no longer reads "*5" as a unit; tests `dimension_expression_keeps_the_unit`, `expressions_get_the_unit_around_them`) |
 | 7.17 | Editing moves both dimensioned sides by half (except radius / diameter) | H:dimension | ✅ (T:ux) |
 | 7.18 | Negative values flip direction (distance, angle, line length); not allowed for arc, radius, diameter | H:dimension | ✅ (T:sm) |
 | 7.19 | Drag the dimension label to move it | B§4 | ✅ |
@@ -244,6 +245,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.10 | Extend: "Unable to extend the selected geometry." | i18n | ✅ (GUI :103 extending an unbounded circle reports exact message; extend-error.png; T:sm added) |
 | 11.11 | Split: click a curve where to split | H:sketch_split | ✅ |
 | 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves. Live "psb (10-24 j)": the copies get their own points joined by Coincidents, sharp outer corners, own centres; one OFFSET per further pair (all on the first picked pair) and one DISTANCE on that pair (a lone curve: one OFFSET), no Parallel / Concentric; free ends unconstrained; editing the distance moves every copy; a new offset starts away from the region (a circle outward), the flip isn't remembered | H:offset; live psb (10-24 j), qa4 round 5 s1 follow-up | 🔧 (`Sketch::offset_tool`, `ConstraintKind::OffsetCurve`; tests `offset_tool_makes_live_constraints_on_a_chain`, `offset_tool_on_the_closed_loop_and_a_circle`) |
+| 11.12a | Offset takes one chain: a curve not connected to the pending one is only selected (again: deselected) with "Can only offset a single chain at once."; the preview stays | live qa4 round 5 s1 follow-up (5) (OFF-TOAST) | ✅ (test `offset_takes_one_chain`) |
 | 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) |
 | 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) |
 | 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) |

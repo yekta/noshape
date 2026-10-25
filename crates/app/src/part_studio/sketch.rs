@@ -2758,10 +2758,18 @@ impl PartStudioView {
                                     cx.stop_propagation();
                                     this.ui.dim_invalid = false;
                                     let units = this.doc.read(cx).session.doc.settings.units;
-                                    if let Some(text) = this.sketch_data(cx).and_then(|d| crate::sketch_mode::dimension_edit_text(&d, cid, &units)) {
+                                    let committed = this.sketch_data(cx).and_then(|d| crate::sketch_mode::dimension_edit_text(&d, cid, &units));
+                                    window.focus(&this.focus, cx);
+                                    // Live (qa4 round 5 v3 s5): Esc on an untouched box
+                                    // (new or reopened) closes it at once; a new
+                                    // dimension keeps its measured value.
+                                    if committed.as_deref() == Some(st.read(cx).value().trim()) {
+                                        this.sketch_cancel(cx);
+                                        return;
+                                    }
+                                    if let Some(text) = committed {
                                         st.update(cx, |s, cx| s.set_value(text, window, cx));
                                     }
-                                    window.focus(&this.focus, cx);
                                     cx.notify();
                                     return;
                                 }
