@@ -3182,3 +3182,30 @@ fn step_assembly_parts_sharing_a_name_keep_their_geometry() {
     assert!((num(&pp["bounding_box"]["min"][0]) - 55.0).abs() < 1e-3 && (num(&pp["bounding_box"]["max"][0]) - 65.0).abs() < 1e-3, "the pin instance shows the pin: {pp}");
     assert!((num(&bp["bounding_box"]["min"][0]) + 20.0).abs() < 1e-3 && (num(&bp["bounding_box"]["max"][0]) - 20.0).abs() < 1e-3, "the block instance shows the block: {bp}");
 }
+
+/// The parts and instances of an imported STEP assembly in live's order
+/// (behaviours.md "api (10-25) STEP assembly part order"): occurrences
+/// walked from the file's last, each product one part at its first
+/// occurrence, a product used twice one part with two instances.
+#[test]
+fn step_assembly_import_order_matches_live() {
+    for (file, want_parts, want_instances) in [
+        ("stepord-ABCD.step", &["C", "B", "A", "D"][..], &["C <1>", "B <1>", "A <1>", "D <1>"][..]),
+        ("stepord-ABBCD.step", &["B", "A", "C", "D"][..], &["B <1>", "A <1>", "C <1>", "D <1>", "B <2>"][..]),
+    ] {
+        let Some(step) = live_sample(file) else { return };
+        let mut ctx = Ctx::new();
+        let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+        let stem = file.trim_end_matches(".step");
+        let parts = call(&mut ctx, "query_parts", json!({ "tab": format!("{stem} parts") }));
+        let names: Vec<&str> = parts["parts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+        assert_eq!(names, want_parts, "{file}: {parts}");
+        let root = format!("stepord {}", stem.trim_start_matches("stepord-"));
+        let asm = call(&mut ctx, "assembly_list", json!({ "tab": root }));
+        let instances: Vec<&str> = asm["instances"].as_array().unwrap_or_else(|| panic!("{r}")).iter().map(|i| i["name"].as_str().unwrap()).collect();
+        assert_eq!(instances, want_instances, "{file}: {asm}");
+        // Both B instances show the one B part.
+        let b: Vec<&Value> = asm["instances"].as_array().unwrap().iter().filter(|i| i["name"].as_str().unwrap().starts_with("B <")).collect();
+        assert!(b.iter().all(|i| i["source"]["part"] == b[0]["source"]["part"]), "{file}: {asm}");
+    }
+}

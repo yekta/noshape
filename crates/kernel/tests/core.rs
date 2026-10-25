@@ -262,6 +262,8 @@ fn step_round_trip() {
     // STL / OBJ export
     write_stl(&b, &dir.join("b.stl"), 0.1, StlFormat::Binary).unwrap();
     assert_eq!(std::fs::metadata(dir.join("b.stl")).unwrap().len(), 84 + 50 * 12);
+    // Onshape's binary STL header is 80 zero bytes (live G35).
+    assert!(std::fs::read(dir.join("b.stl")).unwrap()[..80].iter().all(|&x| x == 0));
     write_stl(&b, &dir.join("b_ascii.stl"), 0.1, StlFormat::Ascii).unwrap();
     write_obj(&c, &dir.join("c.obj"), 0.1).unwrap();
     assert!(read_step(&dir.join("missing.step"), LengthUnit::Millimeter).is_err());

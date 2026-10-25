@@ -186,9 +186,12 @@ fn read_pvz_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
 
 /// A STEP file whose root product is an assembly: an Assembly named after
 /// the root and a Part Studio "<name> parts" with the distinct parts in
-/// their own coordinates (live qa4 r4 s5). The parts are listed in the
-/// reverse of the file's order (live: Part 2, Part 3, Part 1 for a file
-/// with Part 1, Part 3, Part 2); `None` for other STEP files.
+/// their own coordinates (live qa4 r4 s5); `None` for other STEP files.
+/// Live ("api (10-25) STEP assembly part order") walks the occurrences in
+/// the reverse of the file's order: each product becomes one part at its
+/// first occurrence there (NAUOs D, A, B, C give parts C, B, A, D; B, D, C,
+/// A, B give B, A, C, D), and the instances are listed and numbered in that
+/// order (`add_pvz_assembly` reverses them).
 fn read_step_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
     use noshape_kernel as k;
     // Only files with assembly usages are read for their product tree (the
@@ -197,11 +200,19 @@ fn read_step_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
     if !std::fs::read(path)?.windows(NAUO.len()).any(|w| w.eq_ignore_ascii_case(NAUO)) {
         return Ok(None);
     }
-    let Some((root, mut parts, mut instances)) = k::read_step_assembly(path, k::LengthUnit::Meter)? else { return Ok(None) };
-    let n = parts.len();
-    parts.reverse();
+    let Some((root, parts, mut instances)) = k::read_step_assembly(path, k::LengthUnit::Meter)? else { return Ok(None) };
+    let mut order: Vec<usize> = Vec::new();
+    for i in instances.iter().rev() {
+        if i.part < parts.len() && !order.contains(&i.part) {
+            order.push(i.part);
+        }
+    }
+    let unused: Vec<usize> = (0..parts.len()).rev().filter(|p| !order.contains(p)).collect();
+    order.extend(unused);
+    let mut slots: Vec<Option<k::ImportedShape>> = parts.into_iter().map(Some).collect();
+    let parts: Vec<k::ImportedShape> = order.iter().filter_map(|&p| slots[p].take()).collect();
     for i in &mut instances {
-        i.part = n - 1 - i.part;
+        i.part = order.iter().position(|&p| p == i.part).unwrap_or(usize::MAX);
     }
     let info: Vec<noshape_model::features::importing::ImportPartInfo> = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: p.color, opacity: p.opacity, faces: p.face_colors.clone() }).collect();
     let names = parts.iter().map(|p| p.name.clone()).collect();

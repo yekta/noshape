@@ -586,9 +586,8 @@ pub fn write_stl_mesh(mesh: &Tessellation, path: &Path, format: StlFormat) -> Re
     let n = mesh.triangle_count();
     match format {
         StlFormat::Binary => {
-            let mut header = [0u8; 80];
-            header[..17].copy_from_slice(b"noshape-kernel st");
-            w.write_all(&header)?;
+            // An all-zero header, as Onshape's (live G35, qa4 s5).
+            w.write_all(&[0u8; 80])?;
             w.write_all(&(n as u32).to_le_bytes())?;
             for i in 0..n {
                 let (a, b, c) = tri(i);
