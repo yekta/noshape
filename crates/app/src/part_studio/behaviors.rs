@@ -2579,7 +2579,7 @@ impl PartStudioView {
     /// with a dialog open only when its field takes points, like Onshape).
     pub(super) fn midpoint_overlay(&self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineSegment, PointData, PointSprite};
-        let mut points = Vec::new();
+        let (mut points, mut rings) = (Vec::new(), Vec::new());
         let sprite = |m: glam::DVec3, color: [u8; 4], size: f32| PointSprite { position: m.as_vec3().into(), color, pick_id: 0, size, style: LineSegment::ON_TOP, _pad: 0 };
         // Selected midpoints.
         for r in &self.selection {
@@ -2595,13 +2595,21 @@ impl PartStudioView {
             && let Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. })) = &self.hover
             && let Some(m) = self.edge_midpoint(r)
         {
-            points.push(sprite(m, [255, 194, 14, 255], 9.0));
+            // Live (selection/06): an 8 px black ring filled #ffd3a0. (Live's
+            // hovered edge also covers the ring where it crosses; ours draws
+            // points after lines, so the ring stays whole.)
+            rings.push(sprite(m, [0, 0, 0, 255], 8.0));
+            points.push(sprite(m, [255, 211, 160, 255], 5.5));
         }
-        if points.is_empty() {
-            return Vec::new();
+        let up = self.gpu.uploader();
+        let mut out = Vec::new();
+        if !rings.is_empty() {
+            out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points: rings }))).per_primitive_color().unpickable().ignore_clip().layer(11));
         }
-        let pts = PointData { points };
-        vec![Instance::new(Drawable::Points(self.gpu.uploader().upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(22)]
+        if !points.is_empty() {
+            out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22));
+        }
+        out
     }
 
     /// An edge click within ~8 px of its midpoint selects the midpoint.
