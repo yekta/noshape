@@ -16,7 +16,7 @@ use noshape_model::select::Criterion;
 use noshape_scene::camera_ops as co;
 use serde_json::json;
 
-const ACTIONS: [&str; 8] = ["get", "set", "add", "remove", "clear", "related", "select_other", "same_configuration"];
+const ACTIONS: [&str; 9] = ["get", "set", "add", "remove", "clear", "related", "create_selection", "select_other", "same_configuration"];
 
 const CRITERIA: [Criterion; 12] = [
     Criterion::TangentFaces,
@@ -38,7 +38,7 @@ pub fn ops() -> Vec<Op> {
         group: "ui",
         verb: "select",
         summary: "The window's selection: select, clear, Select ▸ related entities, Select other…, same configuration",
-        description: "What is selected in a Part Studio, Assembly or Drawing window (per tab; `get` reads it). Part Studios: `set` / `add` / `remove` entity ids (query_entities: parts, faces, edges, vertices, sketches, planes), `clear` (Clear selection), `related` (the context menu's Select ▸ item `criterion` grown from the first of `refs`; Bounded faces stops at the other `refs`, which stay selected), `select_other` (Select other…: the faces under graphics-area point `at` [x, y] through the window's camera (view_camera), nearest first; `index` picks one, else the list is returned). Assemblies: `set` / `add` / `remove` instances (ids or names), `clear`, `same_configuration` (Select instances with same configuration as the first of `refs`; `same_part` for same part and same configuration). Drawings: `clear`. With the app open the window selects the same.",
+        description: "What is selected in a Part Studio, Assembly or Drawing window (per tab; `get` reads it). Part Studios: `set` / `add` / `remove` entity ids (query_entities: parts, faces, edges, vertices, sketches, planes), `clear` (Clear selection), `related` (the context menu's Select ▸ item `criterion` grown from the first of `refs`; Bounded faces stops at the other `refs`, which stay selected), `create_selection` (Create selection…: the same from the `refs` (its Selection field), with `patterns` (Include patterns) the pattern instances too, then Add selection: added to the selection), `select_other` (Select other…: the faces under graphics-area point `at` [x, y] through the window's camera (view_camera), nearest first; `index` picks one, else the list is returned). Assemblies: `set` / `add` / `remove` instances (ids or names), `clear`, `same_configuration` (Select instances with same configuration as the first of `refs`; `same_part` for same part and same configuration). Drawings: `clear`. With the app open the window selects the same.",
         fields: vec![
             doc_field(),
             opt("tab", s(), "Part Studio, Assembly or Drawing tab, by name or id. Default: the window's tab."),
@@ -48,6 +48,7 @@ pub fn ops() -> Vec<Op> {
             opt("at", json!({ "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }), "select_other: the point [x, y] in graphics-area pixels."),
             opt("index", json!({ "type": "integer", "minimum": 0 }), "select_other: select the index-th entity under the point (0 = nearest)."),
             opt("same_part", json!({ "type": "boolean" }), "same_configuration: same part and same configuration."),
+            opt("patterns", json!({ "type": "boolean" }), "create_selection: Include patterns."),
         ],
         mutates: false,
         destructive: false,
@@ -102,7 +103,7 @@ fn select(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let parsed = studio_refs(&given)?;
             combine(action, current.clone(), parsed.iter().map(crate::refs::to_id).collect())
         }
-        (Kind::Studio, "related") => {
+        (Kind::Studio, "related" | "create_selection") => {
             let parsed = studio_refs(&given)?;
             let seed = parsed.first().ok_or_else(|| OpError::param("refs", "the entity to grow from"))?;
             let name = a.opt_str("criterion")?.ok_or_else(|| OpError::param("criterion", "a Select ▸ item"))?;
@@ -122,8 +123,14 @@ fn select(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 Reference::SketchEntity { .. } | Reference::SketchRegion { .. } => return Err(OpError::param("refs", "a part's face or edge (sketch entities: sketch_get lists their connections)")),
                 _ => noshape_model::select::select_related(&r.context, seed, c),
             };
-            // Each item replaces the selection; nothing found clears it (live).
-            found.iter().map(crate::refs::to_id).collect()
+            if action == "create_selection" {
+                // Include patterns, then Add selection.
+                let found = if a.bool_or("patterns", false)? { noshape_model::select::with_pattern_instances(&r.context, &found) } else { found };
+                combine("add", current.clone(), found.iter().map(crate::refs::to_id).collect())
+            } else {
+                // Each item replaces the selection; nothing found clears it (live).
+                found.iter().map(crate::refs::to_id).collect()
+            }
         }
         (Kind::Studio, "select_other") => {
             let at = a.opt_array("at")?.and_then(|v| Some(DVec2::new(v.first()?.as_f64()?, v.get(1)?.as_f64()?))).ok_or_else(|| OpError::param("at", "[x, y] in graphics-area pixels"))?;

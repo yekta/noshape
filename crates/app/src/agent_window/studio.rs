@@ -34,6 +34,14 @@ impl PartStudioView {
                 cx.notify();
             }
             DisplaySet::ThicknessOff => self.thickness_off(cx),
+            DisplaySet::ContextHidden(tops) => {
+                // As the context banner's Hide/show instances rows.
+                if let Some(c) = &mut self.ui.in_context {
+                    c.hidden = tops.into_iter().collect();
+                }
+                self.refresh_scene(false, cx);
+                cx.notify();
+            }
             DisplaySet::IsolateInstances { .. } | DisplaySet::ShowMates(_) | DisplaySet::ShowMatesMode(_) | DisplaySet::SnapMode(_) => {}
         }
     }

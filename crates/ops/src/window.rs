@@ -97,6 +97,8 @@ pub enum DisplaySet {
     OrientOnEdit(bool),
     /// Analysis › Turn thickness analysis off.
     ThicknessOff,
+    /// The Assembly context's Hide/show instances: these top-level instances hidden.
+    ContextHidden(Vec<noshape_model::assembly::InstanceId>),
     /// Assembly: Hide/show mates (the mate indicators).
     ShowMates(bool),
     /// Assembly: Show mates mode.
@@ -119,6 +121,8 @@ pub struct TabDisplay {
     pub isolate: Option<Isolation>,
     pub highlight_boundary: bool,
     pub orient_on_edit: bool,
+    /// The shown Assembly context's hidden top-level instances (`inst:` ids).
+    pub context_hidden: Vec<String>,
     pub show_mates: bool,
     pub show_mates_mode: bool,
     pub snap_mode: bool,

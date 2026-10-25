@@ -23,6 +23,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("history_view", &[r##"{"to": "V1"}"##, r##"{"to": "workspace"}"##]),
     ("history_compare", &[r##"{"target": "V1"}"##, r##"{"stop": true}"##]),
     ("history_repair_view", &[r##"{"at": "V1"}"##, r##"{"close": true}"##]),
+    ("drawing_mbd", &[r##"{"drawing": "Drawing 1"}"##, r##"{"drawing": "Drawing 1", "show": "Datum A"}"##]),
     ("drawing_switch_sheet", &[r##"{"drawing": "Part 1 Drawing 1", "step": "next"}"##, r##"{"drawing": "Part 1 Drawing 1", "sheet": "Sheet2"}"##]),
     ("drawing_sheets_panel", &[r##"{"drawing": "Part 1 Drawing 1"}"##]),
     // document / tab

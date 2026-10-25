@@ -35,6 +35,16 @@ pub fn ops() -> Vec<Op> {
     vec![
         Op {
             group: "drawing",
+            verb: "mbd",
+            summary: "MBD status: the model datums of the drawing's Part Studios, and a row's Show",
+            description: "The MBD status panel: each model datum (from the Part Studios the views show; `all_sheets` or the shown sheet's) with whether some view shows it. `show` (a row's Show: `name`) puts a hidden one back where it was; refused, as live, when its view shows no model annotations. One edit (\"Show\").",
+            fields: vec![doc_field(), drawing_field(), opt("all_sheets", json!({ "type": "boolean" }), "List every sheet's (the panel's All models), not only the shown sheet's."), opt("show", s(), "Show this row (its name).")],
+            mutates: true,
+            destructive: false,
+            run: mbd,
+        },
+        Op {
+            group: "drawing",
             verb: "table_properties",
             summary: "A placed table's properties (BOM, cut list, revision, custom or general table)",
             description: "The table's right-click › … table properties dialog, one edit with its name. BOM: `structured`, `bottom_to_top`, `corner` (\"BOM table properties\"); cut list: `bottom_to_top`, `corner` (\"Cut list table properties\"); revision: `see_sheet1`, `visible_rows` (1-100), `newest_top`, `hide_callouts`, `corner` (\"Revision table properties\"); custom: `bottom_to_top`, `corner` (\"Custom table properties\"; its table and Part Studio: drawing_custom_table with `id`); general and hole tables: Table properties… `corner`, the table staying where it is (\"Table fixed corner\"). Fields not given keep their values; a field the table's dialog doesn't have is refused.",
@@ -422,4 +432,24 @@ fn open_feature_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             Ok(out.into())
         }
     }
+}
+
+fn mbd(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = super::drawing::drawing_tab(od, a)?;
+    let mut d = crate::drawing::drawing_of(od.doc(), tab).cloned().ok_or_else(|| OpError::invalid("not a drawing").with_param("drawing"))?;
+    let sheet = d.active_sheet.min(d.sheets.len().saturating_sub(1));
+    let all = a.bool_or("all_sheets", false)?;
+    if let Some(name) = a.opt_str("show")? {
+        let rows = noshape_model::drawing::mbd::mbd_rows(&d, od.doc(), None);
+        let row = rows.iter().find(|r| r.name == name).ok_or_else(|| OpError::not_found(format!("no MBD row `{name}`; rows: {}", rows.iter().map(|r| r.name.clone()).collect::<Vec<_>>().join(", "))).with_param("show"))?;
+        match d.show_model_annotation(row.tab, row.id) {
+            Some(true) => commit(od, tab, sheet, d.clone(), "Show")?,
+            Some(false) => return Err(OpError::invalid("Annotations from the model have been disabled on this view.").with_param("show")),
+            None => return Err(OpError::invalid(format!("`{name}` is not hidden")).with_param("show")),
+        }
+        d = crate::drawing::drawing_of(od.doc(), tab).cloned().expect("drawing");
+    }
+    let rows = noshape_model::drawing::mbd::mbd_rows(&d, od.doc(), (!all).then_some(sheet));
+    Ok(json!({ "rows": rows.iter().map(|r| json!({ "name": r.name, "part_studio": od.doc().tab(r.tab).map(|t| t.name.clone()), "visible": r.visible })).collect::<Vec<_>>() }).into())
 }
