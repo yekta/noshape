@@ -378,6 +378,10 @@ def main():
             # the view turns by 200 px worth (100 px if the switch were ignored).
             w, h = c1["viewport"]
             ch.check(name, "turn (deg) = 200 px of rotate moves", angle(c0["camera"]["forward"], c1["camera"]["forward"]), 3 * 360 * 200 / math.hypot(w, h), 0.5)
+    if "ctrl-left-drag" in by:
+        recs = by["ctrl-left-drag"]
+        ch.check("ctrl-left-drag", "the press reached the viewport", float(any(r.get("input") == "mouse_down" for r in recs)), 1.0, 0)
+        ch.check("ctrl-left-drag", "camera unchanged (Ctrl+left never navigates)", float(len([r for r in recs if "camera" in r])), 0.0, 0)
     if "wheel-during-box" in by:
         n = len([r for r in by["wheel-during-box"] if r.get("input") == "scroll"])
         cams = [r for r in by["wheel-during-box"] if "camera" in r]
