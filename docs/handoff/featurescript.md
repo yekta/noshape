@@ -812,3 +812,24 @@ NO_ROTATION_AXIS from evAxis, TRANSFORM_SCALE_SELECTION, TRANSFORM_MATE_CONNECTO
 an enum (surface lofts were solids), one profile = LOFT_TWO_PROFILES (live L15). std's loftEditLogic now runs in
 the dialog (`loft_editing_logic_runs_std`). **Known gaps (kernel):** loft start/end conditions are ignored (native
 warns; Onshape shapes the ends), loft guides and path are not supported natively ("not supported yet" errors).
+
+**Rest of the P1 list (25 Oct):** Revolve, Chamfer, Shell, Linear/Circular pattern, Mirror, Sweep, Boolean, Plane,
+Draft, Split are in `STRICT` (dialog in every state) with regeneration oracles (`*_regenerates_as_std`). Fixes:
+- Generator: UIHint SHOW_CREATE_SELECTION / PRIMARY_AXIS / MATE_CONNECTOR_AXIS_TYPE (patterns' and Mirror's face fields,
+  Draft's parting edges; Transform's mate-connector buttons now carry the latter two in the built-in too).
+- Patterns: skip-instance items named "instance" with std's templates "(#index1, #index2)" / "#index".
+- Native texts/fields per std and Onshape ops: Revolve REVOLVE_SELECT_AXIS [axis], Thin empty = REVOLVE_SURF_NO_CURVE;
+  Shell SHELL_SELECT_FACES/PARTS marked; Boolean one tool = BOOLEAN_BAD_INPUT (live 7360), Subtract without targets
+  = "Cannot resolve entities." (live 7216), empty tools unmarked; Split SPLIT_SELECT_TOOL / face split texts, SPLIT_NO_CHANGE
+  as an INFO (not an error; live 10-25 06:15), and std's infos (plane or mate connector tool without Keep tools: "Planes and mate connectors will
+  be kept."; a face: "Faces selected as split tools must be kept.").
+- Host ops: opSplitPart keepType (front = the plane normal's side, live 7239) and SPLIT_SELECT_*/NO_CHANGE; opShell
+  sharp outer corners (shell_solid, live S3); inward stays on k::shell (shell_solid gave 2220 vs live 2653.5 on
+  std_reference shellTop, a kernel issue) but falls back to shell_solid when k::shell returns the body unchanged,
+  then SHELL_FAILED; opBoolean / opDraft / opSweep empty-selection errors.
+- Editing logic: run_editing_logic passes the arguments each function's parameter types ask for (cPlaneLogic has
+  none, draftEditLogic isCreating+specified), and {} as oldDefinition on a new feature's first call (Onshape:
+  preselection logic only then). STD_EDITING_LOGIC adds revolve, sweep, mirror, cPlane, draft, splitPart
+  (`more_editing_logic_runs_std`: Split keeps a plane tool (live), Plane type from picks, Mirror/Revolve Add).
+- Loft end conditions: psb's kernel support (3c25e9c9) is on ready/psb, not main yet; the two loft cases stay
+  listed as a gap in `loft_regenerates_as_std` until it lands.

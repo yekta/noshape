@@ -400,6 +400,14 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         _ => "BOOLEAN_INVALID",
     };
     let merged = run_op(i, &cx, &id, failure, |ev| {
+        // Onshape's opBoolean on empty selections (live qa5 boolean: a
+        // Subtract without Targets reads "Cannot resolve entities.").
+        if ev.resolve_bodies(&tool_refs).is_empty() {
+            return Err(super::code_error("CANNOT_RESOLVE_ENTITIES"));
+        }
+        if &*kind == "SUBTRACTION" && ev.resolve_bodies(&target_refs).is_empty() {
+            return Err(super::code_error("CANNOT_RESOLVE_ENTITIES"));
+        }
         let index = |ev: &EvalCtx, id: &BodyId| ev.ctx.bodies.iter().position(|b| &b.id == id);
         let body_named = |ev: &EvalCtx, i: usize| crate::regen::features::helpers_a::body_named(&ev.ctx.bodies[i]);
         let tools: Vec<BodyId> = ev.resolve_bodies(&tool_refs).into_iter().map(|i| ev.ctx.bodies[i].id.clone()).collect();
@@ -721,7 +729,20 @@ fn op_shell(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let body = ev.ctx.bodies[bi].clone();
             let removed: Vec<Shape> = faces.iter().filter(|f| f.0 == bi).filter_map(|f| body.shape.sub_shape(ShapeType::Face, f.1).ok()).collect();
             let side = if t < 0.0 { k::ShellSide::Inside } else { k::ShellSide::Outside };
-            let res = k::shell(&body.shape, &removed, t.abs(), side, k::JoinType::default())?;
+            // Outward as the Shell feature: sharp outer corners (live S3);
+            // inward the offset shell (std_reference shellTop matches live).
+            // An offset shell that comes back unchanged gets the Shell
+            // feature's method; still unchanged (a wall too thick for the
+            // part): Onshape's SHELL_FAILED.
+            let volume = |s: &Shape| s.volume().unwrap_or(0.0);
+            let unchanged = |r: &k::OpResult| (volume(&r.shape) - volume(&body.shape)).abs() <= 1e-12 * volume(&body.shape).abs().max(1e-12);
+            let mut res = if side == k::ShellSide::Outside { k::shell_solid(&body.shape, &removed, t.abs(), side, k::ShellMethod::Auto)? } else { k::shell(&body.shape, &removed, t.abs(), side, k::JoinType::default())? };
+            if unchanged(&res) && side == k::ShellSide::Inside {
+                res = k::shell_solid(&body.shape, &removed, t.abs(), side, k::ShellMethod::Auto).map_err(|_| fe("Could not shell part with selections."))?;
+            }
+            if unchanged(&res) {
+                return err("Could not shell part with selections.");
+            }
             let names = body.shape_names();
             let offset = |n: &Name| Role::Offset(n.clone());
             let new = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&offset));
@@ -786,6 +807,13 @@ fn op_sweep(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let profiles = evaluate_refs(i, &cx, def.get("profiles"))?;
     let path = evaluate_refs(i, &cx, def.get("path"))?;
     run_op(i, &cx, &id, "SWEEP_FAILED", |ev| {
+        // Onshape's opSweep on empty selections, path first (as the Sweep feature).
+        if path.is_empty() {
+            return Err(super::code_error_faulty("SWEEP_SELECT_PATH", &["path"]));
+        }
+        if profiles.is_empty() {
+            return Err(super::code_error_faulty("SWEEP_SELECT_PROFILE", &["profiles"]));
+        }
         let wire = path_wire(ev, &path)?;
         let opts = k::SweepOptions { solid: true, ..Default::default() };
         let mut tools = Vec::new();
@@ -944,7 +972,21 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let targets = evaluate_refs(i, &cx, def.get("targets"))?;
     let tool_refs = evaluate_refs(i, &cx, def.get("tool"))?;
     let keep_tools = def_bool(&def, "keepTools", false);
+    // KEEP_FRONT: the pieces on the side the plane's normal points to (live
+    // "Split" ☐ Keep both sides); KEEP_BACK the others.
+    let keep_side = match def_enum(&def, "keepType").as_deref() {
+        Some("KEEP_FRONT") => Some(true),
+        Some("KEEP_BACK") => Some(false),
+        _ => None,
+    };
     let (split_targets, plane) = run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
+        // Onshape's opSplitPart texts (std splitpart.fs leaves them to it).
+        if ev.resolve_bodies(&targets).is_empty() {
+            return Err(super::code_error_faulty("SPLIT_SELECT_TARGETS", &["targets"]));
+        }
+        if tool_refs.is_empty() {
+            return Err(super::code_error_faulty("SPLIT_SELECT_TOOL", &["tool"]));
+        }
         let mut tools: Vec<Shape> = Vec::new();
         let mut plane = None;
         for r in &tool_refs {
@@ -957,15 +999,27 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let tool_bodies = ev.resolve_bodies(&tool_refs.iter().filter(|r| matches!(r, Reference::Body(_))).cloned().collect::<Vec<_>>());
         tools.extend(tool_bodies.iter().map(|b| ev.ctx.bodies[*b].shape.clone()));
         if tools.is_empty() {
-            return err("Select a tool");
+            return Err(super::code_error_faulty("SPLIT_SELECT_TOOL", &["tool"]));
         }
         let target_ids: Vec<BodyId> = ev.resolve_bodies(&targets).into_iter().map(|b| ev.ctx.bodies[b].id.clone()).collect();
+        let mut changed = false;
         for bi in ev.resolve_bodies(&targets).into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
-            let res = k::split(std::slice::from_ref(&body.shape), &tools, &Default::default())?;
+            let mut res = k::split(std::slice::from_ref(&body.shape), &tools, &Default::default())?;
+            let solids = res.shape.solids();
+            changed |= solids.len() > 1 || body.kind != BodyKind::Solid;
+            if let (Some(front), Some((o, n)), true) = (keep_side, plane, solids.len() > 1) {
+                let kept: Vec<Shape> = solids.into_iter().filter(|s| s.bounding_box(false).is_ok_and(|b| ((b.center() - o).dot(n) > 0.0) == front)).collect();
+                res.shape = Shape::compound(&kept);
+            }
             let names = body.shape_names();
             let faces = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
             ev.replace_body(bi, res.shape, faces);
+        }
+        // A tool that splits nothing: an info, nothing changes (live "fs
+        // (10-25 06:15)").
+        if !changed {
+            ev.infos.push(super::error_text("SPLIT_NO_CHANGE"));
         }
         if !keep_tools {
             let ids: Vec<BodyId> = tool_bodies.iter().filter_map(|b| ev.ctx.bodies.get(*b).map(|x| x.id.clone())).collect();
@@ -993,7 +1047,13 @@ fn op_draft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // std passes `pullVec` (extrude's draft flips it for the second side).
     let pull = vec3_of(def.get("pullVec")).or_else(|| vec3_of(def.get("pullDirection")));
     run_op(i, &cx, &id, "DRAFT_FAILED", |ev| {
-        let Some(np) = neutral.first().and_then(|r| ev.resolve_plane(r)) else { return err("Could not resolve the neutral plane.") };
+        if neutral.is_empty() {
+            return Err(super::code_error_faulty("DRAFT_SELECT_NEUTRAL", &["neutralPlane"]));
+        }
+        if faces.is_empty() {
+            return Err(super::code_error_faulty("DRAFT_SELECT_FACES", &["draftFaces"]));
+        }
+        let Some(np) = neutral.first().and_then(|r| ev.resolve_plane(r)) else { return Err(super::code_error("DRAFT_NO_NEUTRAL_PLANE")) };
         let dir = pull.unwrap_or(np.normal).normalize_or_zero();
         let groups = by_body(ev.resolve_faces(&faces));
         if super::trace_ops() {

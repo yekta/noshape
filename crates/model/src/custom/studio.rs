@@ -644,6 +644,9 @@ fn hints(a: &Ann) -> Hints {
             "CAN_BE_TOLERANT" => Hints::CAN_BE_TOLERANT,
             "CAN_BE_TOLERANT_DIAMETER" => Hints::CAN_BE_TOLERANT_DIAMETER,
             "ALWAYS_HIDDEN" => Hints::ALWAYS_HIDDEN,
+            "SHOW_CREATE_SELECTION" => Hints::SHOW_CREATE_SELECTION,
+            "PRIMARY_AXIS" => Hints::PRIMARY_AXIS,
+            "MATE_CONNECTOR_AXIS_TYPE" => Hints::MATE_CONNECTOR_AXIS_TYPE,
             "FOCUS_INNER_QUERY" | "PREVENT_CREATING_NEW_MATE_CONNECTORS" => Hints::NONE,
             _ => Hints::NONE,
         };

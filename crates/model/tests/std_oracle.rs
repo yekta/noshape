@@ -15,7 +15,10 @@ use noshape_model::sketch_feature::SketchData;
 use noshape_units::{ExprValue, UnitPrefs};
 
 /// Core features whose dialogs equal std's in every state.
-const STRICT: &[&str] = &["extrude", "fillet", "hole", "loft", "transform"];
+const STRICT: &[&str] = &[
+    "extrude", "fillet", "hole", "loft", "transform", "revolve", "chamfer", "shell", "linearPattern", "circularPattern", "mirror", "sweep", "booleanBodies",
+    "cPlane", "draft", "splitPart",
+];
 
 /// Hints only built-in dialogs carry (UI behaviour the std expresses
 /// elsewhere, e.g. `GROUP_LABEL` for std's collapsible groups).
@@ -1050,6 +1053,7 @@ fn loft_regenerates_as_std() {
     // Known gap: loft start/end conditions. Our kernel loft has no end
     // derivatives; native warns that it ignores them, the host's opLoft
     // ignores them silently. Onshape applies them (geometry differs).
+    // Re-check when psb's Loft end conditions (3c25e9c9, ready/psb) land.
     let gaps = ["normal to the start profile", "normal to both profiles"];
     let report: String = loft_cases().iter().filter(|(name, _)| only(name) && !gaps.contains(name)).filter_map(|(name, s)| same_as_std(name, "loft", s)).collect();
     assert!(report.is_empty(), "native Loft differs from std:\n{report}");
@@ -1148,4 +1152,427 @@ fn loft_editing_logic_runs_std() {
     s.add("loft", |p| p.set("sheetProfilesArray", profile_items("sheetProfileEntities", vec![vec![a], vec![b]])));
     let got = edit_logic(&s, &ParamValues::default(), &["sheetProfilesArray"]);
     assert!(!got.iter().any(|x| x.starts_with("operationType=")), "{got:?}");
+}
+
+/// An open sketch polyline (mm) on `plane`; its sketch and edges.
+fn polyline(s: &mut Studio, plane: Reference, pts: &[(f64, f64)]) -> (FeatureId, Vec<Reference>) {
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = pts.iter().map(|&(x, y)| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3))).collect();
+    for w in p.windows(2) {
+        sk.add_line_between(w[0], w[1]).unwrap();
+    }
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![plane]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let edges = s.sketch_edges(sketch);
+    (sketch, edges)
+}
+
+/// The 40 mm cube with feature `ty` after it, set from the regenerated cube.
+fn on_the_cube(ty: &'static str, name: &'static str, set: fn(&mut ParamValues, &RegenResult)) -> (&'static str, Studio) {
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    s.add(ty, |p| set(p, &r));
+    (name, s)
+}
+
+fn q(r: Reference) -> ParamValue {
+    ParamValue::Query(vec![r])
+}
+
+fn oracle(ty: &str, cases: Vec<(&'static str, Studio)>) {
+    let report: String = cases.iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std(name, ty, s)).collect();
+    assert!(report.is_empty(), "native {ty} differs from std:\n{report}");
+}
+
+const TOP_FACE: DVec3 = DVec3::new(20.0, 20.0, 40.0);
+const BOTTOM_FACE: DVec3 = DVec3::new(20.0, 20.0, 0.0);
+const SIDE_FACE: DVec3 = DVec3::new(0.0, 20.0, 20.0);
+const Z_EDGE: DVec3 = DVec3::new(0.0, 0.0, 20.0);
+const X_EDGE: DVec3 = DVec3::new(20.0, 0.0, 0.0);
+const TOP_EDGE: DVec3 = DVec3::new(20.0, 0.0, 40.0);
+
+#[test]
+fn revolve_regenerates_as_std() {
+    let mut cases = Vec::new();
+    let revolve = |name: &'static str, set: fn(&mut ParamValues, &RegenResult)| {
+        let mut s = Studio::new();
+        s.cube();
+        let profile: &[(f64, f64)] = &[(50.0, 0.0), (70.0, 0.0), (70.0, 20.0), (50.0, 20.0)];
+        let (_, regions) = s.sketch(Reference::Plane(DatumPlane::Front), &[profile]);
+        let r = s.regen();
+        let region = regions[0].clone();
+        s.add("revolve", |p| {
+            p.set("entities", q(region));
+            set(p, &r);
+        });
+        (name, s)
+    };
+    cases.push(revolve("full", |p, r| p.set("axis", q(edge_at(r, Z_EDGE)))));
+    cases.push(revolve("90 deg", |p, r| {
+        p.set("axis", q(edge_at(r, Z_EDGE)));
+        p.set("fullRevolve", ParamValue::Bool(false));
+        p.set("angle", expr("90 deg"));
+    }));
+    cases.push(revolve("no axis", |_, _| {}));
+    cases.push(revolve("thin", |p, r| {
+        p.set("axis", q(edge_at(r, Z_EDGE)));
+        p.set("bodyType", en("THIN"));
+    }));
+    let mut s = Studio::new();
+    s.add("revolve", |_| {});
+    cases.push(("nothing selected", s));
+    oracle("revolve", cases);
+}
+
+#[test]
+fn chamfer_regenerates_as_std() {
+    oracle(
+        "chamfer",
+        vec![
+            on_the_cube("chamfer", "nothing selected", |_, _| {}),
+            on_the_cube("chamfer", "one edge", |p, r| p.set("entities", q(edge_at(r, TOP_EDGE)))),
+            on_the_cube("chamfer", "a face", |p, r| p.set("entities", q(face_at(r, TOP_FACE)))),
+            on_the_cube("chamfer", "two offsets", |p, r| {
+                p.set("entities", q(edge_at(r, TOP_EDGE)));
+                p.set("chamferType", en("TWO_OFFSETS"));
+                p.set("width1", expr("3 mm"));
+                p.set("width2", expr("6 mm"));
+            }),
+            on_the_cube("chamfer", "offset and angle", |p, r| {
+                p.set("entities", q(edge_at(r, TOP_EDGE)));
+                p.set("chamferType", en("OFFSET_ANGLE"));
+                p.set("angle", expr("30 deg"));
+            }),
+            on_the_cube("chamfer", "too wide", |p, r| {
+                p.set("entities", q(face_at(r, TOP_FACE)));
+                p.set("width", expr("30 mm"));
+            }),
+        ],
+    );
+}
+
+#[test]
+fn shell_regenerates_as_std() {
+    oracle(
+        "shell",
+        vec![
+            on_the_cube("shell", "nothing selected", |_, _| {}),
+            on_the_cube("shell", "open top", |p, r| {
+                p.set("entities", q(face_at(r, TOP_FACE)));
+                p.set("thickness", expr("2 mm"));
+            }),
+            on_the_cube("shell", "outside", |p, r| {
+                p.set("entities", q(face_at(r, TOP_FACE)));
+                p.set("thickness", expr("2 mm"));
+                p.set("oppositeDirection", ParamValue::Bool(true));
+            }),
+            on_the_cube("shell", "hollow", |p, r| {
+                p.set("isHollow", ParamValue::Bool(true));
+                p.set("parts", q(body_ref(r, 0)));
+                p.set("thickness", expr("2 mm"));
+            }),
+            on_the_cube("shell", "hollow, no part", |p, _| p.set("isHollow", ParamValue::Bool(true))),
+            ("open top of a 20 mm cube, 1.5 mm (std_reference shellTop, live 2653.5 mm³)", {
+                let mut s = Studio::new();
+                s.add("cube", |p| p.set("sideLength", expr("20 mm")));
+                let r = s.regen();
+                s.add("shell", |p| {
+                    p.set("entities", q(face_at(&r, DVec3::new(10.0, 10.0, 20.0))));
+                    p.set("thickness", expr("1.5 mm"));
+                });
+                s
+            }),
+            on_the_cube("shell", "too thick", |p, r| {
+                p.set("entities", q(face_at(r, TOP_FACE)));
+                p.set("thickness", expr("25 mm"));
+            }),
+        ],
+    );
+}
+
+#[test]
+fn patterns_regenerate_as_std() {
+    oracle(
+        "linearPattern",
+        vec![
+            on_the_cube("linearPattern", "nothing selected", |_, _| {}),
+            on_the_cube("linearPattern", "no direction", |p, r| p.set("entities", q(body_ref(r, 0)))),
+            on_the_cube("linearPattern", "three along X", |p, r| {
+                p.set("entities", q(body_ref(r, 0)));
+                p.set("directionOne", q(edge_at(r, X_EDGE)));
+                p.set("distance", expr("50 mm"));
+                p.set("instanceCount", expr("3"));
+            }),
+            on_the_cube("linearPattern", "two directions, centered, skip", |p, r| {
+                p.set("entities", q(body_ref(r, 0)));
+                p.set("directionOne", q(edge_at(r, X_EDGE)));
+                p.set("distance", expr("50 mm"));
+                p.set("instanceCount", expr("3"));
+                p.set("isCentered", ParamValue::Bool(true));
+                p.set("hasSecondDir", ParamValue::Bool(true));
+                p.set("directionTwo", q(edge_at(r, DVec3::new(0.0, 20.0, 0.0))));
+                p.set("distanceTwo", expr("60 mm"));
+                p.set("instanceCountTwo", expr("2"));
+                p.set("skipInstances", ParamValue::Bool(true));
+                let mut skip = ParamValues::default();
+                skip.set("index1", expr("1"));
+                skip.set("index2", expr("1"));
+                p.set("skippedInstances", ParamValue::Array(vec![skip]));
+            }),
+        ],
+    );
+    oracle(
+        "circularPattern",
+        vec![
+            on_the_cube("circularPattern", "no axis", |p, r| p.set("entities", q(body_ref(r, 0)))),
+            on_the_cube("circularPattern", "four around an edge", |p, r| {
+                p.set("entities", q(body_ref(r, 0)));
+                p.set("axis", q(edge_at(r, Z_EDGE)));
+                p.set("instanceCount", expr("4"));
+                p.set("equalSpace", ParamValue::Bool(true));
+                p.set("angle", expr("360 deg"));
+            }),
+            on_the_cube("circularPattern", "three at 100 deg", |p, r| {
+                p.set("entities", q(body_ref(r, 0)));
+                p.set("axis", q(edge_at(r, Z_EDGE)));
+                p.set("instanceCount", expr("3"));
+                p.set("angle", expr("100 deg"));
+            }),
+        ],
+    );
+}
+
+#[test]
+fn mirror_regenerates_as_std() {
+    oracle(
+        "mirror",
+        vec![
+            on_the_cube("mirror", "nothing selected", |_, _| {}),
+            on_the_cube("mirror", "no plane", |p, r| p.set("entities", q(body_ref(r, 0)))),
+            on_the_cube("mirror", "about Right", |p, r| {
+                p.set("entities", q(body_ref(r, 0)));
+                p.set("mirrorPlane", q(Reference::Plane(DatumPlane::Right)));
+            }),
+            on_the_cube("mirror", "about its own face", |p, r| {
+                p.set("entities", q(body_ref(r, 0)));
+                p.set("mirrorPlane", q(face_at(r, TOP_FACE)));
+            }),
+        ],
+    );
+}
+
+#[test]
+fn sweep_regenerates_as_std() {
+    let mut cases = Vec::new();
+    let sweep = |name: &'static str, set: fn(&mut ParamValues)| {
+        let mut s = Studio::new();
+        let square: &[(f64, f64)] = &[(-3.0, -3.0), (3.0, -3.0), (3.0, 3.0), (-3.0, 3.0)];
+        let (_, regions) = s.sketch(Reference::Plane(DatumPlane::Front), &[square]);
+        let (_, path) = polyline(&mut s, Reference::Plane(DatumPlane::Top), &[(0.0, 0.0), (0.0, 50.0), (40.0, 80.0)]);
+        let region = regions[0].clone();
+        s.add("sweep", |p| {
+            p.set("profiles", q(region));
+            p.set("path", ParamValue::Query(path));
+            set(p);
+        });
+        (name, s)
+    };
+    cases.push(sweep("along a polyline", |_| {}));
+    cases.push(sweep("keep orientation", |p| p.set("profileControl", en("KEEP_ORIENTATION"))));
+    cases.push(sweep("thin", |p| p.set("bodyType", en("THIN"))));
+    let mut s = Studio::new();
+    s.add("sweep", |_| {});
+    cases.push(("nothing selected", s));
+    oracle("sweep", cases);
+}
+
+#[test]
+fn boolean_regenerates_as_std() {
+    let mut cases = Vec::new();
+    let two = |name: &'static str, set: fn(&mut ParamValues, &RegenResult)| {
+        let mut s = Studio::new();
+        s.cube();
+        let (_, regions) = s.sketch(Reference::Plane(DatumPlane::Top), &[SQUARE]);
+        let region = regions[0].clone();
+        s.add("extrude", |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("60 mm"));
+        });
+        let r = s.regen();
+        s.add("booleanBodies", |p| set(p, &r));
+        (name, s)
+    };
+    cases.push(two("nothing selected", |_, _| {}));
+    cases.push(two("union", |p, r| p.set("tools", ParamValue::Query(vec![body_ref(r, 0), body_ref(r, 1)]))));
+    cases.push(two("union of one part", |p, r| p.set("tools", q(body_ref(r, 0)))));
+    cases.push(two("subtract", |p, r| {
+        p.set("operationType", en("SUBTRACTION"));
+        p.set("targets", q(body_ref(r, 0)));
+        p.set("tools", q(body_ref(r, 1)));
+    }));
+    cases.push(two("subtract, no targets", |p, r| {
+        p.set("operationType", en("SUBTRACTION"));
+        p.set("tools", q(body_ref(r, 1)));
+    }));
+    cases.push(two("subtract, keep tools", |p, r| {
+        p.set("operationType", en("SUBTRACTION"));
+        p.set("targets", q(body_ref(r, 0)));
+        p.set("tools", q(body_ref(r, 1)));
+        p.set("keepTools", ParamValue::Bool(true));
+    }));
+    cases.push(two("intersect", |p, r| {
+        p.set("operationType", en("INTERSECTION"));
+        p.set("tools", ParamValue::Query(vec![body_ref(r, 0), body_ref(r, 1)]));
+    }));
+    oracle("booleanBodies", cases);
+}
+
+#[test]
+fn plane_regenerates_as_std() {
+    oracle(
+        "cPlane",
+        vec![
+            on_the_cube("cPlane", "nothing selected", |_, _| {}),
+            on_the_cube("cPlane", "offset from Top", |p, _| {
+                p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+                p.set("offset", expr("20 mm"));
+            }),
+            on_the_cube("cPlane", "offset from a face, flipped", |p, r| {
+                p.set("entities", q(face_at(r, TOP_FACE)));
+                p.set("offset", expr("5 mm"));
+                p.set("oppositeDirection", ParamValue::Bool(true));
+            }),
+            on_the_cube("cPlane", "mid plane of two faces", |p, r| {
+                p.set("cplaneType", en("MID_PLANE"));
+                p.set("entities", ParamValue::Query(vec![face_at(r, TOP_FACE), face_at(r, BOTTOM_FACE)]));
+            }),
+            on_the_cube("cPlane", "three points", |p, r| {
+                p.set("cplaneType", en("THREE_POINT"));
+                p.set("entities", ParamValue::Query(vec![vertex_at(r, DVec3::ZERO), vertex_at(r, DVec3::new(40.0, 0.0, 0.0)), vertex_at(r, DVec3::new(0.0, 40.0, 40.0))]));
+            }),
+            on_the_cube("cPlane", "three points, two given", |p, r| {
+                p.set("cplaneType", en("THREE_POINT"));
+                p.set("entities", ParamValue::Query(vec![vertex_at(r, DVec3::ZERO), vertex_at(r, DVec3::new(40.0, 0.0, 0.0))]));
+            }),
+            on_the_cube("cPlane", "plane point", |p, r| {
+                p.set("cplaneType", en("PLANE_POINT"));
+                p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top), vertex_at(r, DVec3::new(40.0, 40.0, 40.0))]));
+            }),
+            on_the_cube("cPlane", "line angle", |p, r| {
+                p.set("cplaneType", en("LINE_ANGLE"));
+                p.set("entities", q(edge_at(r, Z_EDGE)));
+                p.set("angle", expr("30 deg"));
+            }),
+        ],
+    );
+}
+
+#[test]
+fn draft_regenerates_as_std() {
+    oracle(
+        "draft",
+        vec![
+            on_the_cube("draft", "nothing selected", |_, _| {}),
+            on_the_cube("draft", "no faces", |p, r| p.set("neutralPlane", q(face_at(r, BOTTOM_FACE)))),
+            on_the_cube("draft", "one side from the bottom", |p, r| {
+                p.set("neutralPlane", q(face_at(r, BOTTOM_FACE)));
+                p.set("draftFaces", q(face_at(r, SIDE_FACE)));
+                p.set("angle", expr("5 deg"));
+            }),
+            on_the_cube("draft", "one side, other pull", |p, r| {
+                p.set("neutralPlane", q(face_at(r, BOTTOM_FACE)));
+                p.set("draftFaces", q(face_at(r, SIDE_FACE)));
+                p.set("angle", expr("5 deg"));
+                p.set("pullDirection", ParamValue::Bool(true));
+            }),
+        ],
+    );
+}
+
+#[test]
+fn split_regenerates_as_std() {
+    let mut cases = Vec::new();
+    let split = |name: &'static str, set: fn(&mut ParamValues, &RegenResult, FeatureId)| {
+        let mut s = Studio::new();
+        s.cube();
+        let plane = s.add("cPlane", |p| {
+            p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+            p.set("offset", expr("15 mm"));
+        });
+        let r = s.regen();
+        s.add("splitPart", |p| set(p, &r, plane));
+        (name, s)
+    };
+    cases.push(split("nothing selected", |_, _, _| {}));
+    cases.push(split("no tool", |p, r, _| p.set("targets", q(body_ref(r, 0)))));
+    cases.push(split("by a plane", |p, r, plane| {
+        p.set("targets", q(body_ref(r, 0)));
+        p.set("tool", q(Reference::FeaturePlane(plane)));
+    }));
+    cases.push(split("by a plane, keep the front", |p, r, plane| {
+        p.set("targets", q(body_ref(r, 0)));
+        p.set("tool", q(Reference::FeaturePlane(plane)));
+        p.set("keepBothSides", ParamValue::Bool(false));
+    }));
+    // Live "fs (10-25 06:15)": an info, the part unchanged.
+    cases.push(split("by a plane that misses", |p, r, _| {
+        p.set("targets", q(body_ref(r, 0)));
+        p.set("tool", q(Reference::Plane(DatumPlane::Top)));
+    }));
+    oracle("splitPart", cases);
+}
+
+/// std's editing logic of Split, Plane, Revolve and Mirror (run as the
+/// dialog runs it).
+#[test]
+fn more_editing_logic_runs_std() {
+    // Split: a plane tool turns Keep tools on (live "Split part by the Right plane").
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    s.add("splitPart", |p| {
+        p.set("targets", q(body_ref(&r, 0)));
+        p.set("tool", q(Reference::Plane(DatumPlane::Right)));
+    });
+    let got = edit_logic(&s, &ParamValues::default(), &["targets", "tool"]);
+    assert!(got.contains(&"keepTools=Bool(true)".to_string()), "{got:?}");
+
+    // Plane: three vertices make a Three point plane, a line a Mid plane.
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    s.add("cPlane", |p| p.set("entities", ParamValue::Query(vec![vertex_at(&r, DVec3::ZERO), vertex_at(&r, DVec3::new(40.0, 0.0, 0.0)), vertex_at(&r, DVec3::new(0.0, 40.0, 40.0))])));
+    let got = edit_logic(&s, &ParamValues::default(), &["entities"]);
+    assert!(got.contains(&"cplaneType=Enum(\"THREE_POINT\")".to_string()), "{got:?}");
+    s.ps.features.pop();
+    s.add("cPlane", |p| p.set("entities", q(edge_at(&r, X_EDGE))));
+    let got = edit_logic(&s, &ParamValues::default(), &["entities"]);
+    assert!(got.contains(&"cplaneType=Enum(\"MID_PLANE\")".to_string()), "{got:?}");
+
+    // Mirror: the cube mirrored about its top face sits on it: Add.
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    s.add("mirror", |p| {
+        p.set("entities", q(body_ref(&r, 0)));
+        p.set("mirrorPlane", q(face_at(&r, TOP_FACE)));
+    });
+    let got = edit_logic(&s, &ParamValues::default(), &["entities", "mirrorPlane"]);
+    assert!(got.contains(&"operationType=Enum(\"ADD\")".to_string()), "{got:?}");
+
+    // Revolve: a profile against the cube's side revolved about its edge: Add.
+    let mut s = Studio::new();
+    s.cube();
+    let profile: &[(f64, f64)] = &[(40.0, 0.0), (60.0, 0.0), (60.0, 20.0), (40.0, 20.0)];
+    let (_, regions) = s.sketch(Reference::Plane(DatumPlane::Front), &[profile]);
+    let r = s.regen();
+    s.add("revolve", |p| {
+        p.set("entities", q(regions[0].clone()));
+        p.set("axis", q(edge_at(&r, DVec3::new(40.0, 0.0, 20.0))));
+    });
+    let got = edit_logic(&s, &ParamValues::default(), &["entities", "axis"]);
+    assert!(got.contains(&"operationType=Enum(\"ADD\")".to_string()), "{got:?}");
 }

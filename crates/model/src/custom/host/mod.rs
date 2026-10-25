@@ -663,6 +663,7 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
         eprintln!("[fs op] {} {failure} {} -> {outcome} | {}", id.join("."), faces(&snapshot), faces(&ev.ctx));
     }
     let warnings = std::mem::take(&mut ev.warnings);
+    let infos = std::mem::take(&mut ev.infos);
     let mut ctx = ev.ctx;
     match r {
         Ok(v) => {
@@ -684,6 +685,14 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
             }
             if !changed.is_empty() {
                 st.remap_attributes(&changed);
+            }
+            // An operation's info (opSplitPart's SPLIT_NO_CHANGE, live): its member.
+            for m in infos {
+                let s = match error_code(&m) {
+                    Some(c) => status::status_map("INFO", c, None),
+                    None => status::status_map("INFO", "CUSTOM_ERROR", Some(&m)),
+                };
+                st.status.insert(id.to_vec(), s);
             }
             for w in warnings {
                 let s = status::status_map("WARNING", "CUSTOM_ERROR", Some(&w));

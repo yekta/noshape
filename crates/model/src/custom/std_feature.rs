@@ -106,6 +106,13 @@ core_features! {
     core_chamfer => "chamfer", "chamfer.fs", "chamfer";
     core_shell => "shell", "shell.fs", "shell";
     core_sweep => "sweep", "sweep.fs", "sweep";
+    core_linear_pattern => "linearPattern", "linearPattern.fs", "linearPattern";
+    core_circular_pattern => "circularPattern", "circularPattern.fs", "circularPattern";
+    core_mirror => "mirror", "mirror.fs", "mirror";
+    core_boolean => "booleanBodies", "boolean.fs", "booleanBodies";
+    core_plane => "cPlane", "cplane.fs", "cPlane";
+    core_draft => "draft", "draft.fs", "draft";
+    core_split => "splitPart", "splitpart.fs", "splitPart";
 }
 
 macro_rules! std_features {
@@ -193,8 +200,11 @@ pub fn editing_logic(
 /// tool's collisions, flips for Up to and Remove, the second direction;
 /// std Fillet: a variable fillet's first vertex takes the fillet's values;
 /// std Loft: Add and the merge scope as Extrude, profiles kept across a
-/// creation type change, adjacent faces for matched end conditions).
-const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft"];
+/// creation type change, adjacent faces for matched end conditions; Revolve,
+/// Sweep, Mirror: the same boolean step; Plane: its type from the picks;
+/// Draft: parting-line hint faces and flips; Split: Keep tools for a face or
+/// plane tool, live "Split").
+const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart"];
 
 /// Whether std has editing logic for built-in feature `type_id` and the
 /// dialog runs it (std runs the feature, or it is in STD_EDITING_LOGIC).

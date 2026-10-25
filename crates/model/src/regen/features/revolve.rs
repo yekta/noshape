@@ -35,9 +35,10 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     };
     let refs = ev.query(if thin { "wallShape" } else { "entities" });
     if refs.is_empty() {
-        return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall." } else { "Select face or sketch region to revolve." });
+        // std revolve.fs: REVOLVE_SELECT_FACES, else (Thin too) REVOLVE_SURF_NO_CURVE.
+        return crate::regen::eval::err_at(if thin { &["surfaceEntities"] } else { &["entities"] }, if thin { "Select sketch curves to revolve." } else { "Select face or sketch region to revolve." });
     }
-    let Some(axis_ref) = ev.query("axis").first() else { return err("Select a revolve axis") };
+    let Some(axis_ref) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
     let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return err("The revolve axis could not be resolved") };
     let axis = if ev.bool("oppositeDirection") { -axis } else { axis };
     let profiles = if thin { super::thin::thin_profiles(ev, refs)? } else { ev.profiles(refs)? };
@@ -65,7 +66,7 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
     if refs.is_empty() {
         return err("Select edges or sketch curves to revolve");
     }
-    let Some(axis_ref) = ev.query("axis").first() else { return err("Select a revolve axis") };
+    let Some(axis_ref) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
     let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return err("The revolve axis could not be resolved") };
     let axis = if ev.bool("oppositeDirection") { -axis } else { axis };
     let edges = resolve_curves(ev, &refs)?;

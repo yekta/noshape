@@ -290,16 +290,26 @@ pub(crate) fn run_editing_logic(
     let outer = std::collections::BTreeMap::new();
     let ev = EvalCtx::new(feature, name, &news, units, Default::default(), &outer);
     let cx = FsContext::new(ctx, feature, name.to_string(), *units, outer.clone(), None);
-    let old_def = definition(&cx, decls, &olds, &ev, None).ok()?;
+    // No previous values: Onshape's first call on a new feature passes {}
+    // (std cPlaneLogic and holeEditLogic act on preselection only then).
+    let old_def = if old.0.is_empty() { Value::map(Map::new()) } else { definition(&cx, decls, &olds, &ev, None).ok()? };
     let new_def = definition(&cx, decls, &news, &ev, None).ok()?;
     let mut flags = Map::new();
     for d in decls {
         flags.insert(Value::str(d.id.as_str()), Value::bool(specified.contains(&d.id)));
     }
-    let mut args = vec![cx.value(), host::id_value(&[Arc::<str>::from(feature.to_string())]), old_def, new_def.clone(), Value::map(flags), query_of_refs(&cx, &hidden)];
-    // Seven parameters: `isCreating` after the definition (std filletEditLogic).
-    if f.fns.iter().any(|d| d.arity() == 7) {
-        args.insert(4, Value::bool(creating));
+    // After (context, id, oldDefinition, definition) each function takes what
+    // its parameters' types ask for: `isCreating` (boolean),
+    // `specifiedParameters` (map), `hiddenBodies` (Query); std's cPlaneLogic
+    // takes none of them, filletEditLogic all three.
+    let mut args = vec![cx.value(), host::id_value(&[Arc::<str>::from(feature.to_string())]), old_def, new_def.clone()];
+    let decl = f.fns.iter().max_by_key(|d| d.arity())?;
+    for t in decl.param_types.iter().skip(4) {
+        args.push(match t {
+            Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::Boolean)) => Value::bool(creating),
+            Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::Map)) => Value::map(flags.clone()),
+            _ => query_of_refs(&cx, &hidden),
+        });
     }
     let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())));
     let units = *units;
@@ -309,7 +319,11 @@ pub(crate) fn run_editing_logic(
             .spawn_scoped(s, || {
                 let mut i = Interp::new();
                 i.set_deadline(Some(Instant::now() + TIME_LIMIT));
-                let out = i.call_value(&func, args).ok()?;
+                let out = i.call_value(&func, args);
+                if host::trace_ops() {
+                    eprintln!("[fs edit] {:?}", out.as_ref().map(noshape_featurescript::value::to_display).map_err(|e| e.message()));
+                }
+                let out = out.ok()?;
                 let mut changed = ParamValues::default();
                 for d in decls {
                     let (v, was) = (out.get(d.id.as_str()), new_def.get(d.id.as_str()));

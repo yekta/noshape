@@ -260,17 +260,22 @@ pub fn curve_approximation(gate: impl Fn(&ParamValues) -> bool + Clone + Send + 
 /// "Skip instances" group of linear (two indices) and circular/curve (one
 /// index) patterns.
 pub fn skip_instances(two_directions: bool) -> Vec<ParamSpec> {
-    let item = if two_directions {
-        vec![
-            ParamSpec::num("index1", "First direction", NumSpec::integer(1, -100_000, 100_000)),
-            ParamSpec::num("index2", "Second direction", NumSpec::integer(0, -100_000, 100_000)),
-        ]
+    // std: "Item name" instance, rows labelled by "Item label template".
+    let (item, template) = if two_directions {
+        (
+            vec![
+                ParamSpec::num("index1", "First direction", NumSpec::integer(1, -100_000, 100_000)),
+                ParamSpec::num("index2", "Second direction", NumSpec::integer(0, -100_000, 100_000)),
+            ],
+            "(#index1, #index2)",
+        )
     } else {
-        vec![ParamSpec::num("index", "Index", NumSpec::integer(1, -100_000, 100_000))]
+        (vec![ParamSpec::num("index", "Index", NumSpec::integer(1, -100_000, 100_000))], "#index")
     };
     vec![
         ParamSpec::bool("skipInstances", "Skip instances", false).hints(Hints::GROUP_HEADER),
-        ParamSpec::array("skippedInstances", "Instances to skip", "Instance", item)
+        ParamSpec::array("skippedInstances", "Instances to skip", "instance", item)
+            .item_template(template)
             .hints(Hints::INITIAL_FOCUS)
             .visible(|v| v.bool("skipInstances")),
     ]

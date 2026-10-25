@@ -520,7 +520,8 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if groups.is_empty() {
-        return err(if ev.bool("isHollow") { "Select parts to hollow." } else { "Select faces to remove." });
+        // std shell.fs: SHELL_SELECT_PARTS / SHELL_SELECT_FACES, the field marked.
+        return if ev.bool("isHollow") { crate::regen::eval::err_at(&["parts"], "Select parts to hollow.") } else { crate::regen::eval::err_at(&["entities"], "Select faces to remove.") };
     }
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
