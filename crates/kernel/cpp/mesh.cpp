@@ -33,6 +33,8 @@
 #include <TopLoc_Location.hxx>
 
 #include <algorithm>
+#include <BRepAdaptor_Surface.hxx>
+#include <functional>
 #include <cstdlib>
 
 namespace noshape {
@@ -173,14 +175,16 @@ private:
 class StripAlgo : public IMeshTools_MeshAlgo
 {
 public:
-  explicit StripAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback) : myFallback(fallback) {}
+  /// `grid`: inner rows allowed (a torus, curved along v); cylinders and
+  /// cones are straight along v and take the rims alone.
+  StripAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback, bool grid) : myFallback(fallback), myGrid(grid) {}
 
   void Perform(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm, const Message_ProgressRange& range) override
   {
     bool done = false;
     try
     {
-      done = triangulate(f);
+      done = triangulate(f, myGrid);
     }
     catch (const Standard_Failure&)
     {
@@ -196,11 +200,10 @@ private:
     gp_Pnt p;
   };
 
-  static bool triangulate(const IMeshData::IFaceHandle& f)
+  static bool triangulate(const IMeshData::IFaceHandle& f, bool grid)
   {
-    // The pcurves' points: the face's two constant-v rings, and the ends of
-    // the constant-u edges (which must be just their two ends).
-    std::vector<std::pair<double, std::vector<Node>>> rings; // (v, nodes)
+    // The pcurves' points: the face's two constant-v rings (rims) and its
+    // constant-u sides (seams or straight / arc edges at umin and umax).
     struct Side
     {
       IMeshData::IPCurveHandle P;
@@ -224,68 +227,64 @@ private:
         const int                       n = P->ParametersNb();
         if (n < 2 || E->GetCurve()->ParametersNb() != n)
           return false;
-        double u0 = P->GetPoint(0).X(), u1 = u0, v0 = P->GetPoint(0).Y(), v1 = v0;
-        for (int k = 1; k < n; ++k)
+        for (int k = 0; k < n; ++k)
         {
           const gp_Pnt2d q = P->GetPoint(k);
-          u0 = std::min(u0, q.X());
-          u1 = std::max(u1, q.X());
-          v0 = std::min(v0, q.Y());
-          v1 = std::max(v1, q.Y());
+          umin             = any ? std::min(umin, q.X()) : q.X();
+          umax             = any ? std::max(umax, q.X()) : q.X();
+          any              = true;
         }
-        if (!any)
-        {
-          umin = u0;
-          umax = u1;
-          any  = true;
-        }
-        umin = std::min(umin, u0);
-        umax = std::max(umax, u1);
-        span = std::max(span, std::max(u1 - u0, v1 - v0));
         sides.push_back({P, E->GetCurve(), n});
       }
     }
     if (!any || sides.size() < 2 || sides.size() > 64)
       return false;
-    const double tol = 1e-9 * std::max(1.0, span);
-    auto         ring_of = [&](double v) -> std::vector<Node>* {
-      for (auto& r : rings)
-        if (std::abs(r.first - v) <= tol)
-          return &r.second;
-      rings.push_back({v, {}});
-      return &rings.back().second;
-    };
-    std::vector<std::pair<double, double>> ends; // constant-u edges' (u, v) ends
-    for (const Side& s : sides)
-    {
-      double v0 = s.P->GetPoint(0).Y(), v1 = v0, u0 = s.P->GetPoint(0).X(), u1 = u0;
-      for (int k = 1; k < s.n; ++k)
+    for (const Side& sd : sides)
+      for (int k = 1; k < sd.n; ++k)
       {
-        v0 = std::min(v0, s.P->GetPoint(k).Y());
-        v1 = std::max(v1, s.P->GetPoint(k).Y());
-        u0 = std::min(u0, s.P->GetPoint(k).X());
-        u1 = std::max(u1, s.P->GetPoint(k).X());
+        const gp_Pnt2d a = sd.P->GetPoint(0), b = sd.P->GetPoint(k);
+        span             = std::max(span, std::max(std::abs(a.X() - b.X()), std::abs(a.Y() - b.Y())));
+      }
+    const double tol = 1e-9 * std::max(1.0, std::max(span, umax - umin));
+    // (height, nodes) of the rims; (u, (v, point)) of the sides.
+    std::vector<std::pair<double, std::vector<Node>>>                       rims;
+    std::vector<std::pair<double, std::vector<std::pair<double, gp_Pnt>>>> cols;
+    for (const Side& sd : sides)
+    {
+      double v0 = sd.P->GetPoint(0).Y(), v1 = v0, u0 = sd.P->GetPoint(0).X(), u1 = u0;
+      for (int k = 1; k < sd.n; ++k)
+      {
+        v0 = std::min(v0, sd.P->GetPoint(k).Y());
+        v1 = std::max(v1, sd.P->GetPoint(k).Y());
+        u0 = std::min(u0, sd.P->GetPoint(k).X());
+        u1 = std::max(u1, sd.P->GetPoint(k).X());
       }
       if (v1 - v0 <= tol)
       {
-        std::vector<Node>* r = ring_of(v0);
-        for (int k = 0; k < s.n; ++k)
-          r->push_back({s.P->GetPoint(k).X(), s.C->GetPoint(k)});
+        auto it = std::find_if(rims.begin(), rims.end(), [&](const auto& r) { return std::abs(r.first - v0) <= tol; });
+        if (it == rims.end())
+          it = rims.insert(rims.end(), {v0, {}});
+        for (int k = 0; k < sd.n; ++k)
+          it->second.push_back({sd.P->GetPoint(k).X(), sd.C->GetPoint(k)});
       }
-      else if (u1 - u0 <= tol && s.n == 2)
+      else if (u1 - u0 <= tol)
       {
-        ends.push_back({u0, v0});
-        ends.push_back({u0, v1});
+        auto it = std::find_if(cols.begin(), cols.end(), [&](const auto& c) { return std::abs(c.first - u0) <= tol; });
+        if (it == cols.end())
+          it = cols.insert(cols.end(), {u0, {}});
+        for (int k = 0; k < sd.n; ++k)
+          it->second.push_back({sd.P->GetPoint(k).Y(), sd.C->GetPoint(k)});
       }
       else
         return false;
     }
-    if (rings.size() != 2)
+    if (rims.size() != 2 || cols.size() > 2)
       return false;
-    if (rings[0].first > rings[1].first)
-      std::swap(rings[0], rings[1]);
-    // Each ring: sorted by u, shared ends once, from umin to umax.
-    for (auto& r : rings)
+    if (rims[0].first > rims[1].first)
+      std::swap(rims[0], rims[1]);
+    const double vlo = rims[0].first, vhi = rims[1].first;
+    // Each rim sorted by u, shared ends once, from umin to umax.
+    for (auto& r : rims)
     {
       std::vector<Node>& nodes = r.second;
       std::sort(nodes.begin(), nodes.end(), [](const Node& a, const Node& b) { return a.u < b.u; });
@@ -297,61 +296,135 @@ private:
         return false;
       nodes = std::move(unique);
     }
-    // The constant-u edges run between the rings at umin and umax.
-    for (const auto& [u, v] : ends)
-      if ((std::abs(u - umin) > tol && std::abs(u - umax) > tol) || (std::abs(v - rings[0].first) > tol && std::abs(v - rings[1].first) > tol))
+    // Each side at umin or umax, sorted by v, from vlo to vhi; both sides
+    // with the same heights: the grid's rows.
+    std::vector<double> rows;
+    for (auto& c : cols)
+    {
+      if (std::abs(c.first - umin) > tol && std::abs(c.first - umax) > tol)
         return false;
-    const std::vector<Node>& lo   = rings[0].second;
-    const std::vector<Node>& hi   = rings[1].second;
-    const double             vlo  = rings[0].first;
-    const double             vhi  = rings[1].first;
-    const int                nlo  = (int)lo.size();
-    const int                nhi  = (int)hi.size();
-    occ::handle<Poly_Triangulation> T = new Poly_Triangulation(nlo + nhi, nlo + nhi - 2, true);
-    for (int i = 0; i < nlo; ++i)
-    {
-      T->SetNode(i + 1, lo[(size_t)i].p);
-      T->SetUVNode(i + 1, gp_Pnt2d(lo[(size_t)i].u, vlo));
+      auto& pts = c.second;
+      std::sort(pts.begin(), pts.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+      std::vector<std::pair<double, gp_Pnt>> unique;
+      for (const auto& pt : pts)
+        if (unique.empty() || pt.first - unique.back().first > tol)
+          unique.push_back(pt);
+      if (unique.size() < 2 || std::abs(unique.front().first - vlo) > tol || std::abs(unique.back().first - vhi) > tol)
+        return false;
+      pts = std::move(unique);
+      std::vector<double> heights;
+      for (const auto& pt : pts)
+        heights.push_back(pt.first);
+      if (rows.empty())
+        rows = std::move(heights);
+      else if (heights.size() != rows.size() || !std::equal(rows.begin(), rows.end(), heights.begin(), [&](double a, double b) { return std::abs(a - b) <= tol; }))
+        return false;
     }
-    for (int j = 0; j < nhi; ++j)
+    if (rows.empty())
+      rows = {vlo, vhi};
+    const std::vector<Node>& lo = rims[0].second;
+    const std::vector<Node>& hi = rims[1].second;
+    occ::handle<Poly_Triangulation> T;
+    std::function<int(const gp_Pnt2d&)> node_of;
+    if (rows.size() == 2)
     {
-      T->SetNode(nlo + j + 1, hi[(size_t)j].p);
-      T->SetUVNode(nlo + j + 1, gp_Pnt2d(hi[(size_t)j].u, vhi));
+      // No inner rows (cylinders, cones): zip the rims (counter-clockwise in
+      // uv), advancing on the rim whose next node comes first.
+      const int nlo = (int)lo.size(), nhi = (int)hi.size();
+      T             = new Poly_Triangulation(nlo + nhi, nlo + nhi - 2, true);
+      for (int i = 0; i < nlo; ++i)
+      {
+        T->SetNode(i + 1, lo[(size_t)i].p);
+        T->SetUVNode(i + 1, gp_Pnt2d(lo[(size_t)i].u, vlo));
+      }
+      for (int j = 0; j < nhi; ++j)
+      {
+        T->SetNode(nlo + j + 1, hi[(size_t)j].p);
+        T->SetUVNode(nlo + j + 1, gp_Pnt2d(hi[(size_t)j].u, vhi));
+      }
+      int i = 0, j = 0, t = 0;
+      while (i < nlo - 1 || j < nhi - 1)
+      {
+        const bool on_lo = j == nhi - 1 || (i < nlo - 1 && lo[(size_t)i + 1].u <= hi[(size_t)j + 1].u);
+        if (on_lo)
+        {
+          T->SetTriangle(++t, Poly_Triangle(i + 1, i + 2, nlo + j + 1));
+          ++i;
+        }
+        else
+        {
+          T->SetTriangle(++t, Poly_Triangle(i + 1, nlo + j + 2, nlo + j + 1));
+          ++j;
+        }
+      }
+      node_of = [&lo, &hi, vlo, nlo, tol](const gp_Pnt2d& q) -> int {
+        const bool               low = std::abs(q.Y() - vlo) <= tol;
+        const std::vector<Node>& r   = low ? lo : hi;
+        auto it = std::lower_bound(r.begin(), r.end(), q.X() - tol, [](const Node& a, double u) { return a.u < u; });
+        if (it == r.end() || std::abs(it->u - q.X()) > tol)
+          return -1;
+        return (int)(it - r.begin()) + (low ? 1 : nlo + 1);
+      };
     }
-    // Zip the rings (counter-clockwise in uv): advance on the ring whose
-    // next node comes first.
-    int i = 0, j = 0, t = 0;
-    while (i < nlo - 1 || j < nhi - 1)
+    else
     {
-      const bool on_lo = j == nhi - 1 || (i < nlo - 1 && lo[(size_t)i + 1].u <= hi[(size_t)j + 1].u);
-      if (on_lo)
-      {
-        T->SetTriangle(++t, Poly_Triangle(i + 1, i + 2, nlo + j + 1));
-        ++i;
-      }
-      else
-      {
-        T->SetTriangle(++t, Poly_Triangle(i + 1, nlo + j + 2, nlo + j + 1));
-        ++j;
-      }
+      // Inner rows (a torus band): a grid, the rims' u by the sides' v,
+      // inner nodes on the surface, two triangles per cell.
+      if (!grid || lo.size() != hi.size() || cols.size() != 2)
+        return false;
+      for (size_t i = 0; i < lo.size(); ++i)
+        if (std::abs(lo[i].u - hi[i].u) > tol)
+          return false;
+      const occ::handle<BRepAdaptor_Surface>& S = f->GetSurface();
+      if (S.IsNull())
+        return false;
+      const auto& left  = std::abs(cols[0].first - umin) <= tol ? cols[0].second : cols[1].second;
+      const auto& right = std::abs(cols[0].first - umin) <= tol ? cols[1].second : cols[0].second;
+      const int   n = (int)lo.size(), k = (int)rows.size();
+      T             = new Poly_Triangulation(n * k, 2 * (n - 1) * (k - 1), true);
+      for (int j = 0; j < k; ++j)
+        for (int i = 0; i < n; ++i)
+        {
+          const double u = lo[(size_t)i].u, v = rows[(size_t)j];
+          gp_Pnt       p;
+          if (j == 0)
+            p = lo[(size_t)i].p;
+          else if (j == k - 1)
+            p = hi[(size_t)i].p;
+          else if (i == 0)
+            p = left[(size_t)j].second;
+          else if (i == n - 1)
+            p = right[(size_t)j].second;
+          else
+            p = S->Value(u, v);
+          T->SetNode(j * n + i + 1, p);
+          T->SetUVNode(j * n + i + 1, gp_Pnt2d(u, v));
+        }
+      int t = 0;
+      for (int j = 0; j + 1 < k; ++j)
+        for (int i = 0; i + 1 < n; ++i)
+        {
+          const int a = j * n + i + 1, b = a + 1, c = a + n + 1, d = a + n;
+          T->SetTriangle(++t, Poly_Triangle(a, b, c));
+          T->SetTriangle(++t, Poly_Triangle(a, c, d));
+        }
+      node_of = [&lo, &rows, n, tol](const gp_Pnt2d& q) -> int {
+        auto r = std::lower_bound(rows.begin(), rows.end(), q.Y() - tol);
+        auto c = std::lower_bound(lo.begin(), lo.end(), q.X() - tol, [](const Node& a, double u) { return a.u < u; });
+        if (r == rows.end() || std::abs(*r - q.Y()) > tol || c == lo.end() || std::abs(c->u - q.X()) > tol)
+          return -1;
+        return (int)(r - rows.begin()) * n + (int)(c - lo.begin()) + 1;
+      };
     }
     // Every pcurve point's node in this triangulation (the edges' polygons).
-    auto node_of = [&](const gp_Pnt2d& q) -> int {
-      const bool               low = std::abs(q.Y() - vlo) <= tol;
-      const std::vector<Node>& r   = low ? lo : hi;
-      auto it = std::lower_bound(r.begin(), r.end(), q.X() - tol, [](const Node& a, double u) { return a.u < u; });
-      if (it == r.end() || std::abs(it->u - q.X()) > tol)
-        return -1;
-      return (int)(it - r.begin()) + (low ? 1 : nlo + 1);
-    };
     std::vector<std::pair<IMeshData::IPCurveHandle, std::vector<int>>> indices;
-    for (const Side& s : sides)
+    for (const Side& sd : sides)
     {
-      std::vector<int> idx((size_t)s.n);
-      for (int k = 0; k < s.n; ++k)
-        if ((idx[(size_t)k] = node_of(s.P->GetPoint(k))) < 0)
+      std::vector<int> idx((size_t)sd.n);
+      for (int k = 0; k < sd.n; ++k)
+        if ((idx[(size_t)k] = node_of(sd.P->GetPoint(k))) < 0)
           return false;
-      indices.push_back({s.P, std::move(idx)});
+      indices.push_back({sd.P, std::move(idx)});
     }
     for (auto& [P, idx] : indices)
       for (int k = 0; k < (int)idx.size(); ++k)
@@ -361,6 +434,7 @@ private:
   }
 
   occ::handle<IMeshTools_MeshAlgo> myFallback;
+  bool                             myGrid;
 };
 
 // Planar faces through PlanarCdtAlgo (BRepMesh's own algorithm below its
@@ -373,8 +447,8 @@ public:
   {
     if (type == GeomAbs_Plane)
       return new PlanarCdtAlgo(myDefault->GetAlgo(type, prm));
-    if ((type == GeomAbs_Cylinder || type == GeomAbs_Cone) && std::getenv("NOSHAPE_MESH_NO_STRIPS") == nullptr)
-      return new StripAlgo(myDefault->GetAlgo(type, prm));
+    if ((type == GeomAbs_Cylinder || type == GeomAbs_Cone || type == GeomAbs_Torus) && std::getenv("NOSHAPE_MESH_NO_STRIPS") == nullptr)
+      return new StripAlgo(myDefault->GetAlgo(type, prm), type == GeomAbs_Torus);
     return myDefault->GetAlgo(type, prm);
   }
 
