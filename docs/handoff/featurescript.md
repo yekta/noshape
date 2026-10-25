@@ -883,5 +883,7 @@ Test: `debug_entities_in_their_colors`.
 TOOL_IN_TARGET / TARGET_IN_TOOL entry (tool/target = the bodies); touching the outer boundary, each touching face pair
 is INTERFERE (strictly interior faces none). Test `collision_containment_as_live`. std Hole's dialog logic
 (holeScopeFlipHeuristics → probeForViableTargets) keeps a blind probe's target only on INTERFERE / *_IN_*, so without
-this its Merge scope came out empty. Next: check std holeEditLogic's scope/flip against the native `hole_scope_logic`
-(ops studio.rs) and move Hole onto STD_EDITING_LOGIC if it matches live (L57).
+this its Merge scope came out empty. Hole is on STD_EDITING_LOGIC since 25 Oct (lead): its dialog
+and the agent API's dialog_logic run std's holeEditLogic (Merge scope, flip, standard tables, tapped depths); the
+native `hole_scope_logic` (ops studio.rs), tapped-depth link (behaviors.rs) and table copy (feature_dialog.rs) stand
+down via `has_editing_logic("hole")`. Tests: `hole_editing_logic_runs_std`, `hole_scope_follows_depth_as_live` (L57).

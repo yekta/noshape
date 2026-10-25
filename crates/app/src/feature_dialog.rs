@@ -516,7 +516,7 @@ impl FeatureDialog {
         }
         self.refocus_hidden_query();
         // Hole: switching units or style shows another Standard; copy its values.
-        if self.feature.type_id == "hole" && matches!(path, "unitsSystem" | "styleV2") && noshape_model::features::hole_tables::sync_hole_standard(&mut self.feature.params) {
+        if self.feature.type_id == "hole" && !noshape_model::custom::std_feature::has_editing_logic("hole") && matches!(path, "unitsSystem" | "styleV2") && noshape_model::features::hole_tables::sync_hole_standard(&mut self.feature.params) {
             self.inputs.clear();
         }
         cx.emit(DialogEvent::Changed);
@@ -3137,9 +3137,10 @@ impl FeatureDialog {
             }
         }
         self.set_value(path, ParamValue::Lookup(full), cx);
-        if self.feature.type_id == "hole" {
+        if self.feature.type_id == "hole" && !noshape_model::custom::std_feature::has_editing_logic("hole") {
             // Copy the standard's sizes into the numeric fields (Onshape behavior)
-            // and rebuild the inputs so they show the new values.
+            // and rebuild the inputs so they show the new values (std's
+            // holeEditLogic does it where it runs).
             noshape_model::features::hole_tables::apply_table_to_params(&mut self.feature.params);
             self.inputs.clear();
             cx.emit(DialogEvent::Changed);

@@ -1603,3 +1603,55 @@ fn hole_editing_logic_runs_std() {
         assert_eq!(got, want, "hole sketched {}", if on_top { "on the top face" } else { "below the part" });
     }
 }
+
+/// Live L57 through std's holeEditLogic: two stacked parts, a hole on the
+/// top one's face; Blind 5 fills Merge scope with the top part only, Depth
+/// 15 adds the part below.
+#[test]
+fn hole_scope_follows_depth_as_live() {
+    let mut s = Studio::new();
+    let a = s.sketch(Reference::Plane(DatumPlane::Top), &[SQUARE]).1[0].clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![a]));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.regen();
+    let b = s.sketch(face_at(&r, DVec3::new(20.0, 20.0, 10.0)), &[SQUARE]).1[0].clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![b]));
+        p.set("depth", expr("10 mm"));
+        p.set("operationType", en("NEW"));
+    });
+    let r = s.regen();
+    assert_eq!(r.context.bodies.len(), 2);
+    let (lower, upper) = (body_ref(&r, 0), body_ref(&r, 1));
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.02, 0.02));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![face_at(&r, DVec3::new(20.0, 20.0, 20.0))]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.add("hole", |pv| {
+        pv.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));
+        pv.set("unitsSystem", en("METRIC"));
+        noshape_model::features::hole_tables::apply_table_to_params(pv);
+    });
+    // As the dialog: each run's changes applied before the next edit.
+    let last = s.ps.features.len() - 1;
+    let run = |s: &mut Studio, old: &ParamValues, specified: &[&str]| {
+        let new = s.ps.features[last].params.clone();
+        let spec: Vec<String> = specified.iter().map(|x| x.to_string()).collect();
+        let out = custom::std_feature::editing_logic(&s.ps, last, &ConfigValues::default(), &s.units, &RegenOptions::default(), old, &new, &spec, true).expect("editing logic ran");
+        for (k, v) in out.0 {
+            s.ps.features[last].params.set(&k, v);
+        }
+        s.ps.features[last].params.query("scope").to_vec()
+    };
+    run(&mut s, &ParamValues::default(), &["locations"]);
+    for (depth, want) in [("5 mm", vec![upper.clone()]), ("15 mm", vec![lower.clone(), upper.clone()])] {
+        let old = s.ps.features[last].params.clone();
+        s.ps.features[last].params.set("holeDepthV3", expr(depth));
+        let got = run(&mut s, &old, &["locations", "holeDepthV3"]);
+        assert!(got.len() == want.len() && want.iter().all(|w| got.contains(w)), "Merge scope at depth {depth}: {got:?}");
+    }
+}
