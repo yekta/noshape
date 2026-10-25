@@ -862,10 +862,26 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                 overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, fill, !error));
             }
         }
+        // A selected datum plane: a solid amber fill and border over the
+        // plane (live selection/01) instead of tinting its faint fill.
+        let plane_selected = flag == state::SELECTED
+            && built.picks.ids_for(r).iter().any(|&id| built.picks.get(id).is_some_and(|t| t.kind == PickKind::Plane));
+        if plane_selected && let Some(pl) = display.planes.iter().find(|p| !p.hidden && &p.reference == r) {
+            let f = &pl.frame;
+            let c = |u: f64, v: f64| -> [f32; 3] { (f.origin + f.x * u * pl.half_width + f.y * v * pl.half_height).as_vec3().into() };
+            let corners = [c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)];
+            let n: [f32; 3] = f.normal.as_vec3().into();
+            let k = theme::lin(theme::viewport::PLANE_SELECTED_FILL);
+            overlay_regions.push((MeshData { positions: corners.to_vec(), normals: vec![n; 4], pick_ids: vec![0; 4], indices: vec![0, 1, 2, 0, 2, 3] }, [k[0], k[1], k[2], theme::viewport::PLANE_SELECTED_ALPHA], true));
+            for i in 0..4 {
+                overlay_lines.segments.push(LineSegment { a: corners[i], b: corners[(i + 1) % 4], color: lin_to_u8(sel_color), pick_id: 0, width: 2.4, style: 0 });
+            }
+        }
         for &id in built.picks.ids_for(r) {
             let t = built.picks.get(id);
-            // An erroring input face shows only its red outline.
-            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) {
+            // An erroring input face shows only its red outline; a selected
+            // plane its overlay above.
+            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) && !plane_selected {
                 scene.add_flag(id, flag);
             }
             let Some(t) = t else { continue };
