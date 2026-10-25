@@ -405,6 +405,10 @@ pub mod view_cube {
     const G: f64 = WIDGET_PX as f64;
     /// The arrow tips touch the widget's edge.
     const ARROW_OUT: f64 = 0.5 * G;
+    /// The geometry's center in the widget (from its top left, y down):
+    /// live draws it 1 px under the middle (VC8: every arrow and the cube
+    /// 1 px lower than ours at the middle, x exact).
+    pub const CENTER: [f64; 2] = [0.5 * G, 0.5 * G + 1.0];
     /// Half of `VIEW_CUBE_ARROW_WIDTH` and `VIEW_CUBE_ARROW_HEIGHT`.
     const ARROW_HALF_W: f64 = 0.05 * G;
     const ARROW_HALF_H: f64 = 0.065 * G;
@@ -718,7 +722,7 @@ pub mod view_cube {
         let lit = |cell: CubeCell, base: Rgba| if cube.hover == Some(cell) { c.highlight } else { base };
         // Widget origin (top-left) in logical pixels within the frame.
         let o = DVec2::new(cube.origin[0] as f64 / dpr as f64, cube.origin[1] as f64 / dpr as f64);
-        let at = |v: DVec2| DVec2::new(o.x + (G * 0.5 + v.x) as f32 as f64, o.y + (G * 0.5 - v.y) as f32 as f64);
+        let at = |v: DVec2| DVec2::new(o.x + (CENTER[0] + v.x) as f32 as f64, o.y + (CENTER[1] - v.y) as f32 as f64);
         let place = |polys: &[Vec<DVec2>]| -> Vec<Vec<DVec2>> { polys.iter().map(|p| p.iter().map(|q| at(*q)).collect()).collect() };
         for a in Arrow::ALL {
             out.fill(&place(&a.polys()), lit(a.cell(), c.frame), dpr);
@@ -757,8 +761,8 @@ pub mod view_cube {
                 // zero), the text element centered in it, and the text's
                 // absolute position rounded again. The glyph then goes where
                 // `Window::paint_glyph` puts it.
-                // In f32, as the widget computes it (`left(px(WIDGET_PX * 0.5 + v.x as f32 - 10.0))`).
-                let local = [WIDGET_PX * 0.5 + v.x as f32 - 10.0, WIDGET_PX * 0.5 - v.y as f32 - 8.0];
+                // In f32, as the widget computes it (`left(px(CENTER[0] as f32 + v.x as f32 - 10.0))`).
+                let local = [CENTER[0] as f32 + v.x as f32 - 10.0, CENTER[1] as f32 - v.y as f32 - 8.0];
                 let bx = cube.origin[0] + round_half_toward_zero(local[0] * dpr);
                 let by = cube.origin[1] + round_half_toward_zero(local[1] * dpr);
                 let tx = round_half_toward_zero(bx + label.text_x);

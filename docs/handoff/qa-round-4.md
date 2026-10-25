@@ -1043,6 +1043,29 @@ Differences:
 | Parasolid | `APPL=noshape`, `SCH_1200000_12006`, no MC_MODEL/FRU/KEY/FILE/DATE lines (= EXP-HDR, api) | `APPL=Onshape`, `FRU=Parasolid 38.1.231`, `SCH_3801231_38101`, … |
 | Default file name | (CLI: the given path) | the Part Studio name "qa4-s5-asm parts" |
 
+### Session 5 in the app (10-24 ~12:00, v0.4.7, fresh profile; live part-studio/2394–2396)
+Create › Document "qa4 r4 s5" → + › Import… → samples/qa4-s5-asm.step → defaults → Sketch on Top, Ø5 circle, Extrude Remove
+Through all (merge scope Part 1 filled itself, as live) → rename Part 1 "Edited" → select the 3 parts › right-click › Export…
+as Parasolid, STEP, STL (Binary, Millimeter, Fine). Screenshots r4/s5-*.png, files /tmp/qa4/s5ui/.
+- Import modal ✅ (tiles, 4 checkboxes, no density for STEP) except **S5-a** the "?" of "Create a composite part when importing
+  multiple or non-solid bodies" sat at the far right; live puts it inline after "bodies" on the 2nd line (dom: label box
+  358 px) → **fixed by qa4** (`import_dialog.rs`: labels wrapped with GPUI's LineWrapper with the ? as a trailing inline
+  element; test `the_question_mark_follows_the_last_word`).
+- After Import ours switched to the new tab; live stays on Part Studio 1 → already fixed on main (api 5d5e0403). Main's same
+  commit offers ☐ Import material density for STEP, which live doesn't → **IMP-DENS** routed (api).
+- Tabs / part names / positions / list order: = STEP-ASM (api, routed).
+- Edit and rename ✅ (Through all, merge scope, double-click rename).
+- **S5-b** 3 parts selected (Ctrl+click works) › right-click gives the **single-part menu for the clicked row** ("Copy Part 2",
+  "Create Drawing of Part 2…", Rename, Hide other parts…); live: Properties…, Assign material for 3 parts…, Edit appearance
+  for 3 parts…, Check interference for 3 parts…, Boolean, Copy 3 items, Hide, Isolate…, Make transparent…, Export…,
+  Release…, Delete (text only, no capture) → live asked for the exact menu (REQUESTS.md, also Shift range-select in the parts
+  list: ours doesn't extend with Shift); qa4 fixes it once answered. r4/s5-multi-part-menu.png.
+- Export dialog ✅ against dom/dialog-export-partstudio-assembly.txt and dialog-export-parasolid.txt (fields, order, format
+  list, STL defaults Binary / Meter / Medium); default name = the studio for a multi-part export (live: the Part Studio name).
+  Live's own dialog could not load today (429), so only the dumps were compared.
+- Files = the CLI results above. **S5-c** STL header "noshape-kernel st" vs live's 80 zero bytes → **fixed by qa4**
+  (`kernel/src/io.rs`; test `binary_stl_header_is_zeros`). Parasolid header = EXP-HDR (api reworked headers on main).
+
 ### Live comparison of sessions 1–4 (behaviours "qa4 round 4 s1…s4", answered 10-24 ~02:00)
 - **S1** live: Flange 1 20295.075 / 34 faces, Hem 22074.861 / 43, cut 20805.412 / 61 vs ours 20051.651 / 28, 21804.734 / 34,
   20547.157 / 37: the corner difference is **SM1** (fs, routed: live's walls run to the corner with rips "Joint B/C Rip").

@@ -72,7 +72,8 @@ impl PartStudioView {
         let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
         let mut lines = LineData::default();
         for [a, b] in segments {
-            lines.push_polyline(&[f(a), f(b)], [0, 0, 0, 255], 0, 1.0, LineSegment::ON_TOP);
+            // Live: ~1.1 px of ink, as in the sketch (width − 0.4 px with our AA).
+            lines.push_polyline(&[f(a), f(b)], [0, 0, 0, 255], 0, 1.5, LineSegment::ON_TOP);
         }
         vec![Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(30)]
     }
