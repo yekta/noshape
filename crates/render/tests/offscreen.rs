@@ -1368,3 +1368,46 @@ fn label_quads_and_shadows_follow_gpui() {
     assert_eq!(overlay.label_at(&view_proj, logical, 1.0, glam::DVec2::new(w as f64 / 2.0, h as f64 / 2.0)), Some(7));
     assert_eq!(overlay.label_at(&view_proj, logical, 1.0, glam::DVec2::new(w as f64 / 2.0 + 41.0, h as f64 / 2.0)), None);
 }
+
+/// Faces nothing hides or clips are drawn by the discard-free pipeline
+/// (`mesh-solid`); the same parts drawn by the discarding one (a hidden
+/// pick id the mesh doesn't use moves it there) give the same pixels.
+#[test]
+fn faces_without_discard_match_the_discarding_pipeline() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (320u32, 240u32);
+    // Box A's faces use ids 1, 3..6 (2 unused, inside its range); box B
+    // behind it, overlapping on screen.
+    let mut a = primitives::box_mesh([-0.05, -0.05, -0.05], [0.05, 0.05, 0.05], 1);
+    for id in &mut a.pick_ids {
+        if *id == 2 {
+            *id = 3;
+        }
+    }
+    let b = primitives::box_mesh([-0.02, -0.12, -0.12], [0.08, -0.02, -0.02], 1);
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&a))).with_color([0.3, 0.5, 0.8, 1.0]));
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&b))).with_color([0.8, 0.4, 0.2, 1.0]).pick_base(10));
+    scene.states = vec![0; 20];
+    scene.states[1] = state::SELECTED;
+    scene.states[13] = state::SELECTED;
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Isometric);
+    cam.fit_box(glam::DVec3::splat(-0.12), glam::DVec3::splat(0.08), w as f64 / h as f64);
+    let mut shot = |scene: &Scene| r.render(RenderParams { scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap().bgra;
+    let solid = shot(&scene);
+    scene.states[2] = state::HIDDEN;
+    let discarding = shot(&scene);
+    let drawn = solid.chunks(4).filter(|p| p[..3] != discarding.chunks(4).next().unwrap()[..3]).count();
+    let differ = solid.chunks(4).zip(discarding.chunks(4)).filter(|(x, y)| x != y).count();
+    eprintln!("pixels differing {differ} of {}, {drawn} unlike the corner", solid.len() / 4);
+    assert!(drawn > 1000, "both boxes drawn");
+    assert_eq!(differ, 0);
+}
