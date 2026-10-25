@@ -976,8 +976,11 @@ fn view_cube_overlay_is_drawn_in_the_top_right_corner_only() {
     let red = |f: &Frame| (15..165).flat_map(|y| (w - 165..w - 15).map(move |x| (x, y))).filter(|&(x, y)| px(f, x, y) == [0, 0, 255]).count();
     assert_eq!(red(&plain), 0);
     assert!(red(&with) > 3000, "{} face pixels", red(&with));
-    // Everything outside the widget is untouched.
-    let changed_outside = (0..h).flat_map(|y| (0..w).map(move |x| (x, y))).filter(|&(x, y)| !(x >= w - 165 && y < 165)).filter(|&(x, y)| px(&plain, x, y) != px(&with, x, y)).count();
+    // Everything outside the widget is untouched (one row more at the
+    // bottom: live draws the cube 1 px under the widget's middle, so the
+    // down arrow's tip ends on the widget's last row, its anti-aliasing 1 px
+    // under it; `view_cube::CENTER`).
+    let changed_outside = (0..h).flat_map(|y| (0..w).map(move |x| (x, y))).filter(|&(x, y)| !(x >= w - 165 && y < 166)).filter(|&(x, y)| px(&plain, x, y) != px(&with, x, y)).count();
     assert_eq!(changed_outside, 0);
 }
 

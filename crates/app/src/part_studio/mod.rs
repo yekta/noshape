@@ -29,7 +29,7 @@ mod section;
 mod sketch;
 pub(crate) mod shortcut_cmds;
 mod analysis_tools;
-pub(crate) mod environment_maps;
+pub(crate) use noshape_scene::environment_maps;
 pub(crate) mod reflection;
 mod thickness;
 mod flatten_tool;
@@ -279,6 +279,9 @@ pub struct PartStudioView {
     /// The sketch fillet radius last used in this tab: live's default is
     /// R5 on a fresh load and then sticks per tab (behaviours.md 568).
     sketch_fillet_radius: Option<f64>,
+    /// Sketch dialog options toggled before the sketch plane is picked (the
+    /// editor opens with them).
+    sketch_pending_options: Option<crate::sketch_mode::SketchOptions>,
     context: Option<Arc<noshape_model::regen::context::Context>>,
     context_menu: Option<(Point<Pixels>, Entity<crate::os_menu::OsMenu>, Subscription)>,
     measure_cache: Option<MeasureCache>,
@@ -412,6 +415,7 @@ impl PartStudioView {
             canceled_edit: None,
             sketch: None,
             sketch_fillet_radius: None,
+            sketch_pending_options: None,
             context: None,
             context_menu: None,
             measure_cache: None,
@@ -1666,6 +1670,8 @@ impl PartStudioView {
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
         let vertex_sets: std::collections::HashMap<FeatureId, Vec<Reference>> = self.display.sketches.iter().map(|s| (s.feature, sketch_points(s))).collect();
         let studio_view = cx.entity().downgrade();
+        // Options ticked in an earlier, cancelled sketch dialog don't carry over.
+        self.sketch_pending_options = None;
         dialog.update(cx, |d, cx| {
             if d.feature.type_id == "sketch" {
                 d.extra = Some(Self::sketch_dialog_extra(studio_view));
@@ -3652,8 +3658,9 @@ impl PartStudioView {
                     // Onshape list badges: under-defined sketch (12 px blue circle,
                     // undimmed, 8 px in from the icon's top-left). An error only turns
                     // the name red (part-studio/94).
-                    // Missing selections / warnings: Onshape's yellow triangle.
-                    .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().right(px(-3.)).bottom(px(-5.)).text_size(px(10.)).text_color(pal.warning).child("▲")))
+                    // Missing selections / warnings: Onshape's 12 px yellow triangle
+                    // badge on the icon's bottom right (live 2071, 2458 Refold).
+                    .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().left(px(9.)).top(px(8.)).child(crate::assets::icon("list-warning-overlay", 12., cx))))
                     .when(underdefined, |d| d.child(div().absolute().left(px(9.5)).top(px(8.)).child(crate::assets::icon("list-underdefined-overlay", 12., cx)))),
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
@@ -4439,7 +4446,10 @@ impl PartStudioView {
         let me = cx.entity();
         let toolbar = Slice::new(&me, |this, window, cx| {
             let viewport_w = f32::from(window.viewport_size().width);
-            if this.sketch.is_some() { this.render_sketch_toolbar(viewport_w, cx) } else { this.render_toolbar(viewport_w, cx) }
+            // A new sketch's dialog shows the (disabled) sketch toolbar before
+            // its plane is picked (live sketch/00).
+            let sketch_dialog = this.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "sketch");
+            if this.sketch.is_some() || sketch_dialog { this.render_sketch_toolbar(viewport_w, cx) } else { this.render_toolbar(viewport_w, cx) }
         }, cx);
         let underlay = Slice::new(&me, |this, window, cx| this.render_underlay_slice(window, cx), cx);
         let overlay = Slice::new(&me, |this, window, cx| this.render_overlay_slice(window, cx), cx);
@@ -4876,16 +4886,22 @@ impl Render for PartStudioView {
                                     .children(list_head)
                                     .child(slices.features.clone().cached(StyleRefinement::default().w_full().flex_1().min_h_0()))
                                     // Drag the separator to share space between features and parts.
+                                    // Live (part-studio/00): a 1 px #d7d7d7 line over the list's
+                                    // 200 px (5 px short of the panel border), the "Parts (N)" row
+                                    // right under it; the drag target is 5 px around it.
                                     .child(
-                                        div()
-                                            .id("parts-separator")
-                                            .h(px(5.))
-                                            .flex_none()
-                                            // Live: `div.os-splitter` is row-resize.
-                                            .cursor(CursorStyle::ResizeRow)
-                                            .border_t_1()
-                                            .border_color(pal.border)
-                                            .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
+                                        div().h(px(1.)).mr(px(5.)).flex_none().relative().bg(pal.border).child(
+                                            div()
+                                                .id("parts-separator")
+                                                .absolute()
+                                                .left_0()
+                                                .right_0()
+                                                .top(px(-2.))
+                                                .h(px(5.))
+                                                // Live: `div.os-splitter` is row-resize.
+                                                .cursor(CursorStyle::ResizeRow)
+                                                .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
+                                        ),
                                     )
                                     // Live (part-studio/00, 220): the parts take the lower 35% of the
                                     // panel until the separator is dragged. A share of the panel, so

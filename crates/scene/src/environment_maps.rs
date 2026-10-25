@@ -17,6 +17,12 @@ pub struct EnvImage {
     pub rgba: Vec<u8>,
 }
 
+/// An image file's bytes (PNG, JPEG, GIF, BMP) as an environment.
+pub fn decode(bytes: &[u8]) -> Option<EnvImage> {
+    let img = image::load_from_memory(bytes).ok()?.to_rgba8();
+    Some(EnvImage { width: img.width(), height: img.height(), rgba: img.into_raw() })
+}
+
 /// The named library image, `None` for an unknown name.
 pub fn generate(name: &str) -> Option<EnvImage> {
     let f: fn(DVec3) -> DVec3 = match name {

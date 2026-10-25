@@ -1051,3 +1051,104 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   plane (plain chip, part-colour caps: live dark-2437). Esc closes the assembly Named views from the graphics.
   Open: our 3D-drawn cube (triangle, X label) is 1 px above live in both views (button/menu exact); live's
   open button reads #eaeaea with darker edges vs our flat #e5e5e5 (captures disagree: part-studio/53).
+- Round 21 (10-24, lead: cube offset + look-only 🔧 rows of docs/parity/part-studio.md):
+  - View cube: `overlay::view_cube::CENTER` = (75, 76): live draws the cube 1 px under the widget middle (every
+    arrow 1 px lower, x exact). Used by the overlay drawing, the axis-label boxes and the app's hit testing
+    (part_studio/view_cube.rs `local`). Arrows now at live's pixels in both views; hover/click checked.
+  - 6.16: icons/list-warning-overlay.svg (hand-drawn 12x12 #FAB601 triangle, white !) at the row icon's
+    (9, 8) for Warning status, at live's pixels (part-studio/2071). Live also shows it for ERROR rows with a
+    missing selection: our model doesn't track missing selections (psb).
+  - 2.22: analysis.rs `render_analysis_panel` = live's 433x28 #90cef1 bar at the graphics top centre, 13 px
+    #333 text 12 px in, white 65x21 Disable (1 px #aaa) 8 px from the right: bar, button and text rows exact,
+    our text 5 px longer (font).
+  - 3.10: hover midpoint = 8 px black ring (layer 11) + 5.5 px #ffd3a0 fill (layer 22), selection/06. Open:
+    live's hovered edge covers the ring where it crosses; our renderer draws all points after lines (a ring
+    pass before the line pass would be needed). Depth-testing the ring hides its lower half (tried).
+  - Survey for the lead (other owners): 5.8 contradicts live (a rejected pick adds nothing, no flash/message;
+    psb built a flash); 6.12 tooltip should read "N feature(s) failed to regenerate" (ui); 11.7's "no mixer tab"
+    is stale (the Mixer exists; only custom-colour tiles are missing). No live capture: 6.25 paused banner, 5.8.
+- **HANDOFF STATE (10-24, moved to another account; lead quota pre-empt)**. Branch agent/icons2:
+  - Committed + verified: d08bfff7 (view cube 1 px, block 1). NOT yet marked ready (ready/icons2 is still
+    the VC8 merge 3e67232e).
+  - WIP commit (built and checked in the app unless noted, clippy NOT yet run on it):
+    - 6.16 warning badge (list-warning-overlay.svg, left 9 top 8): at live's pixels; last tweak (sharper apex)
+      not rebuilt.
+    - 2.22 high-quality bar (analysis.rs): bar/button/text rows exact vs lod4-fill-shiftR.
+    - 3.10 midpoint marker (behaviors.rs midpoint_overlay): ring + fill; edge-over-ring open (see above).
+    - P1 look, NOT rebuilt yet: ui.rs `search_tools_toggle` chips = live 19 px joined keys (alt/⌥ 35 px,
+      c 17 px, 1 px #aaa + 2 px bottom, on the box fill, gap 3 after the label); feature_dialog.rs bool rows
+      min_h 27.333 (live 27.33: checkboxes at 262/290/317/344/372 in extrude-01), tolerant-row label pt 6,
+      tolerance button mt 7, expander pt 2 (Depth row ink vs extrude-01: label +2, button +4, › +1).
+    - parity doc rows 2.22 / 3.10 / 6.16 updated.
+  - Next steps, in order: build (`cargo build -p noshape`), re-measure (tools in /root/icons2-scratch/tools:
+    runs.py, sbs3.py; app3.sh start <doc>; live refs part-studio/00-new-doc-initial.png for the toolbar row,
+    dialogs/extrude-01-new-empty.png + dom/dialog-extrude-new.txt for Extrude; checkbox tops should read
+    262/290/317/344/372, slider 404, search box 1665–1826 with chips 1765–1799 / 1800–1816); then clippy
+    `-p noshape-render -p noshape --all-targets -D warnings`, `cargo test -p noshape-render`, the view_cube
+    tests; split/squash the WIP into blocks, merge main, mark ready.
+  - P1 look rows: done = toolbar icon positions (all exact vs part-studio/00), feature list panel (matches),
+    Extrude header/tabs/field/Blind rows (exact). In progress = Search tools chip, Extrude rows (above).
+    Next (most-used first) = Revolve / Fillet / Chamfer / Hole / Shell / Sweep / Loft / patterns / Mirror /
+    Boolean / Plane dialogs (live dialogs/*-01-open.png, compare in an inch doc:
+    /root/icons2-scratch/docs/empty-in.noshape), sketch toolbar + dimension visuals, parts list, viewport
+    overlays (manipulator arrows, previews, selection highlight). Left rail icons differ from live (ui's).
+  - Test docs: /root/icons2-scratch/docs/warn.noshape (Query variable 1 = Warning row), empty-in.noshape.
+  - Checks after the WIP commit: clippy `-p noshape-render -p noshape --all-targets -D warnings` CLEAN; app
+    view_cube tests pass; render `offscreen::view_cube_overlay_is_drawn_in_the_top_right_corner_only` failed
+    (2 px of the down arrow's AA 1 px under the widget, from the 1 px CENTER shift, as live) → test box widened
+    by 1 row (commit "View cube test…"); its re-run was still queued at handoff: re-run
+    `cargo test -p noshape-render --test offscreen view_cube`.
+  - Re-run done: `offscreen view_cube` passes (1 passed). Block 1 (d08bfff7 + 2ce6ecb1) is fully checked.
+
+## Round 22 (10-24, new icons2 after the quota move; predecessor ddba69f1)
+- WIP split into commits on agent/icons2 (backup of the pre-split tree: local branch icons2-presplit, delete
+  once merged): view cube test box, warning badge, high-quality bar, midpoint marker, Search tools chip,
+  feature dialog rows, docs. Main merged after the split.
+- Search tools (ui.rs `search_tools_toggle`): keys 19 px, fixed widths 35 (alt/⌥) / 17 (c), 2 px under the
+  box middle, text 1 px lower still: edges 1765/1799/1800/1816 and key text rows = live part-studio/00.
+- Feature dialog rows (feature_dialog.rs). gpui rounds every authored length to whole pixels BEFORE layout
+  (vendor/gpui-pre/src/taffy.rs `to_taffy`), so `min_h(27.333)` was 27. Chrome keeps fractional rows (1/64 px
+  layout units) and snaps edges: `FeatureDialog::live_h(h)` returns round(y+h)−round(y) from a running
+  unrounded position (`live_y`, reset per render; only fractional rows call it, in render order):
+  LIVE_EMPTY_FIELD 26.328125 (empty selection field), LIVE_CHECKBOX_ROW 27.328125 (checkbox rows, group
+  titles), and the footer (frame = list end + 24.5 → an extra 1 px spacer when that rounds up).
+  Row boxes now follow the DOM (each fix removed a pair of cancelling 1 px errors): 5 px under every field
+  (`os-param-requires-margin`, also when the dialog ends on a field), select rows 28 px with the select on the
+  top line (inline label pt 7 like live), stacked label+select 48 (select box 25, the 26 px select overflows),
+  quantity rows 26 px (field/tolerance/expander offsets −1; rows with a hole icon 29 px, contents +1), icon
+  selects 31 px with the select 3 px down, Hole size block without top padding, footer 20 px + pt 2 after the
+  body's 4 px padding. Inactive empty field label #666 (active #555).
+  Checked against live dialogs/*-01-open (x=420 underline/edge columns, checkbox ink rows): Extrude, Revolve,
+  Fillet, Chamfer, Shell, Hole, Sweep, Loft, Linear/Circular pattern, Mirror, Boolean, Plane: every row equal.
+  Frame bottom: equal except Revolve and Hole, 1 px short (their side-button field rows; DOM dumps are rounded,
+  can't resolve) — Fillet and Mirror fixed by the footer spacer / 5 px trailing margin (verify in the next build).
+- Behaviour found (not look, reported to the lead): Loft with no profiles shows an enabled ✓ (live: disabled);
+  our Loft error doesn't flag the Profiles field (`field_error`), so `blocked` stays false.
+- Tools: tools/inkrows.py IMG x0 x1 y0 y1 [thr] (ink row runs), tools/dlg3.sh SLUG "Tool" TAG (open a tool by
+  Search tools in the running app3 instance, shot + 3x live|ours in w/cmp-SLUG.png).
+- Next (P1 look, most-used first): sketch toolbar + sketch dimension visuals, feature list / parts list rows,
+  viewport overlays (manipulator arrows, previews, selection highlight); then the remaining dialogs' rarer
+  rows (Draft, Split, Transform, Helix …) with the same model.
+- (10-24 evening) WORKFLOW 17: ask the lead before editing other agents' files. Parked on agent/icons2 as a
+  WIP commit (NOT in ready, waiting for the lead's OK; part_studio/sketch.rs + mod.rs, skb/ui2 files): the Sketch
+  dialog's Show constraints / expressions / errors rows and diagnostics button before the plane is picked
+  (saved options; toggles before the plane go to `sketch_pending_options`, applied when the editor opens,
+  cleared in `open_dialog`), and the sketch toolbar at 25 % (live #333→#ccc) with an occluding layer while
+  the new sketch has no plane. Verified vs live sketch/00: rows 152/180/207/234 and box x 250 equal.
+  Active sketch toolbar (live sketch/01): all 53 icon columns equal.
+  Asked the lead: parts list header (live: "Parts (N)" row on the divider, text 9 px under it, divider only
+  the 200 px list; ours 13 px, full width) is in part_studio/mod.rs `render_parts_list` — waiting for OK.
+- Done + ready: help ? 1 px right (disc x 449–461 = live in all dialogs). Committed, building: Sketch dialog
+  footer ? 10 px under the footer top (live dom/dialog-sketch-empty).
+- (10-25) Feature dialog, more states checked vs live (all row/underline/checkbox/guide pixels equal):
+  Extrude with a picked region (extrude-03) + Symmetric/Draft/Second end/Direction/Starting offset (20–24),
+  Fillet with 3 edges (fillet-04) + Asymmetric/Partial/Smooth corners (10, 11, 13). Fixes: a filled field
+  advances the fractional phase like an empty one; group indent 20 px, guide 8 px in, 10 px foot on each
+  group's last row (rows are wrapped after the loop, from their depth and the next row's); inline values
+  (Draft) run to the 194 px column; selection-row × = 8 px glyph in a 24 px box (pl 2), 1 px low.
+  Known 1 px: glyphs inside rows whose live top is fractional (Fillet Radius ±, some chevrons) — live draws
+  them unrounded. Test docs (CLI-built): docs/sk-in.noshape (rectangle sketch), docs/fil-in.noshape
+  (+ extrude + 3-edge fillet; double-click Fillet 1 at (95,339)).
+- For the lead (other areas): ticking a group (Direction, Smooth fillet corners) makes its first field
+  active in live (blue) + red expander while empty; ours doesn't. model features/common.rs end_condition():
+  the second end's depth has CAN_BE_TOLERANT (live: no ± on the second Depth).

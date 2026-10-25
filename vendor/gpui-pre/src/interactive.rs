@@ -535,6 +535,16 @@ pub struct ScrollWheelEvent {
 
     /// The phase of the touch event.
     pub touch_phase: TouchPhase,
+
+    /// NOSHAPE PATCH (agent nav2): the wheel notches of this event as a web
+    /// browser counts them (Chromium's `wheel_ticks`; the DOM's legacy
+    /// `wheelDelta` is 120 × this), before any Shift swap, positive = wheel
+    /// up / left. Set by the platform layers that know it exactly: macOS
+    /// (`kCGScrollWheelEventDeltaAxis*`, or point deltas / 40 for continuous
+    /// devices), Windows (`WHEEL_DELTA` units, precision touchpad pixels /
+    /// 120), X11 (valuator increments) and Wayland (`value120` / 120, finger
+    /// scroll units / 10). `None` for synthesized events.
+    pub wheel_ticks: Option<Point<f32>>,
 }
 
 impl Sealed for ScrollWheelEvent {}

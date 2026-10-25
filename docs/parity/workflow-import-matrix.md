@@ -147,3 +147,23 @@ differently from live's. On g50, F18 + F8 + F19 + F11 add up to the whole −0.0
 
 **IMP2 (parts order after a two-part STEP import): ✅.** Live lists "Part 2, Part 1" for g48-two.step, which is the
 file's product/body order, the same as ours.
+
+**IM2b progress (api, 2026-10-24 later):** the differences were mostly OCCT's area and volume integration across
+**gaps** in a face's boundary. At a tolerant vertex one edge's pcurve ends away from where the next one starts (g50's F18:
+0.02 mm in v). Parasolid closes such gaps with straight (u, v) segments; OCCT skips them, so its result depends on where
+u is measured from. Our moments integration now closes them (kernel common.cpp `uv_gaps`) and centres the divergence
+field on the shape's box, so the volume with gaps doesn't depend on where the part sits.
+| Sample | Now | Status |
+|---|---|---|
+| g50 F18 cylinder | 82.8478429 (was 82.786126) | ✅ |
+| g50 F11 plane | 46.000000 (was 45.999575) | ✅ |
+| g50 F19 offset | 4.189139 (live 4.1893432, −0.0002) | ✗ small |
+| g50 F8 | 8.321612 (live 8.3308904, −0.0093) | ✗ live reports EXTRUDED: Onshape replaced the file's B_SURFACE (which collapses to the apex; its area over its whole parameter range is ours) with another surface on import. Live request filed ("api (10-24) IM2b follow-up") |
+| g50 volume | 6052.680 (live 6052.761; was 6053.320) | ✅ band |
+| McMaster F0 cylinder | 13.938182 (live 13.9122437, +0.026; was +0.034) | ✗ its helix edges: ours 159.394088 / 159.325155, live 159.392935 / 159.3450619; live request filed |
+| McMaster thread flanks F1 / F2 | −0.0008 / −0.0012 | ✗ small |
+| McMaster volume | 254.418923 (live 254.403780; was 254.521984) | ✅ band |
+
+Surface types: a B-surface that is an exact linear extrusion (degree 1 across, rows translates) reports as an extrusion
+(FeatureScript EXTRUDED, query_entities "extruded"), as Parasolid reports such surfaces; query_entities also names
+REVOLVED faces "revolved". F8 isn't one in the file (see above).

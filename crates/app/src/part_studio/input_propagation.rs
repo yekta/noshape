@@ -27,14 +27,6 @@ pub(super) struct Candidate {
     pub done: bool,
 }
 
-/// The option keys of an input's rows (list options; "true"/"false").
-fn row_keys(input: &ConfigInput) -> Vec<String> {
-    match &input.kind {
-        ConfigInputKind::List { options, .. } => options.iter().map(|o| o.id.clone()).collect(),
-        ConfigInputKind::Checkbox { .. } => vec!["true".into(), "false".into()],
-        _ => Vec::new(),
-    }
-}
 
 impl PartStudioView {
     /// The input of another Part Studio tab by id.
@@ -80,18 +72,7 @@ impl PartStudioView {
     /// Derived features whose source has an input with this input's id and kind.
     pub(super) fn propagation_candidates(&self, input: &str, cx: &App) -> Vec<Candidate> {
         let Some(studio) = self.studio(cx) else { return Vec::new() };
-        let Some(own) = studio.configuration.inputs.iter().find(|i| i.id == input) else { return Vec::new() };
-        if !matches!(own.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. }) {
-            return Vec::new();
-        }
-        let param = format!("{DERIVED_CONFIG_PREFIX}{input}");
-        studio
-            .features
-            .iter()
-            .filter(|f| f.type_id == "importDerived")
-            .filter(|f| self.source_input(f.params.text("partStudio"), input, cx).is_some_and(|s| std::mem::discriminant(&s.kind) == std::mem::discriminant(&own.kind)))
-            .map(|f| Candidate { feature: f.id, name: f.name.clone(), done: studio.configuration.configured.iter().any(|c| c.feature == f.id && c.param == param) })
-            .collect()
+        noshape_ops::config::propagation_candidates(&self.doc.read(cx).session.doc, studio, input).into_iter().map(|(feature, name, done)| Candidate { feature, name, done }).collect()
     }
 
     /// Copy table: the input's table as tab-separated text (Help: the
@@ -164,18 +145,9 @@ impl PartStudioView {
     /// yet; visibility conditions needing missing inputs are repaired.
     pub(super) fn paste_config_inputs(&mut self, cx: &mut Context<Self>) {
         let copied = crate::config_visibility::copied_inputs();
-        let mut repaired = false;
-        let mut pasted: Vec<String> = Vec::new();
+        let (mut pasted, mut repaired) = (Vec::new(), false);
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Paste configuration inputs", cx, |ps| {
-                for i in copied {
-                    if !ps.configuration.inputs.iter().any(|x| x.id == i.id) {
-                        pasted.push(i.name.clone());
-                        ps.configuration.inputs.push(i);
-                    }
-                }
-                repaired = !ps.configuration.repair_visibility().is_empty();
-            });
+            doc.edit_studio(self.tab, noshape_ops::config::PASTE_INPUTS, cx, |ps| (pasted, repaired) = noshape_ops::config::paste_inputs(ps, copied));
         });
         if repaired {
             self.flash_info("Visibility conditions for pasted inputs were updated.".into(), cx);
@@ -242,24 +214,8 @@ impl PartStudioView {
     /// Configure the Derived features' source configuration with the inputs
     /// (`picked`: input index, feature).
     fn propagate_inputs(&mut self, ids: &[String], picked: &[(usize, FeatureId)], cx: &mut Context<Self>) {
-        let Some(studio) = self.studio(cx).cloned() else { return };
-        let picked: Vec<(String, Vec<String>, FeatureId)> = picked
-            .iter()
-            .filter_map(|(k, f)| {
-                let input = studio.configuration.inputs.iter().find(|i| i.id == ids[*k])?;
-                Some((input.id.clone(), row_keys(input), *f))
-            })
-            .collect();
-        self.edit_config("Input propagation", cx, |ps| {
-            for (input, keys, f) in picked {
-                let param = format!("{DERIVED_CONFIG_PREFIX}{input}");
-                if ps.configuration.configured.iter().any(|c| c.feature == f && c.param == param) {
-                    continue;
-                }
-                let values = keys.iter().map(|k| (k.clone(), ParamValue::Text(k.clone()))).collect();
-                ps.configuration.configured.push(ConfiguredParam { input: input.clone(), feature: f, param, values });
-            }
-        });
+        let picks: Vec<(String, FeatureId)> = picked.iter().filter_map(|(k, f)| Some((ids.get(*k)?.clone(), *f))).collect();
+        self.edit_config(noshape_ops::config::INPUT_PROPAGATION, cx, |ps| noshape_ops::config::propagate_inputs(ps, &picks));
         self.config_dirty(cx);
         self.flash_success("Matching parameters successfully configured.".into(), cx);
     }

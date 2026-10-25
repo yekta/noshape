@@ -85,6 +85,22 @@ pub fn ops() -> Vec<Op> {
             destructive: false,
             run: explode_step,
         },
+        Op {
+            group: "assembly",
+            verb: "display_state",
+            summary: "Display states: add, apply, update, rename, remove",
+            description: "The Display states panel: `add` saves which instances and mates are hidden now as a new state `name` (\"Add display state : Front\"); `apply` shows and hides them as the state says (instances added since keep theirs); `update` saves the current visibility into the state; `rename` to `name`; `remove`. One edit each with the panel's text.",
+            fields: vec![
+                doc_field(),
+                asm_field(),
+                req("action", json!({ "type": "string", "enum": ["add", "apply", "update", "rename", "remove"] }), "What to do."),
+                opt("state", s(), "The display state: its name or 1-based row (all actions but add)."),
+                opt("name", s(), "add: the new state's name; rename: the new name."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: display_state,
+        },
     ]
 }
 
@@ -338,4 +354,53 @@ fn explode_step(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     })?;
     let now = assembly(od, tab)?;
     Ok(json!({ "view": now.exploded_views[v].name, "steps": now.exploded_views[v].steps.len() }).into())
+}
+
+fn display_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let asm = assembly(od, tab)?.clone();
+    let result = solve(od, tab, &SolveOptions::default())?;
+    let state = || -> Result<usize, OpError> { row(asm.display_states.iter().map(|d| d.name.as_str()).collect(), a.opt_str("state")?.ok_or_else(|| OpError::param("state", "required"))?, "state") };
+    let new_name = || -> Result<String, OpError> { a.opt_str("name")?.map(|n| n.trim().to_string()).filter(|n| !n.is_empty()).ok_or_else(|| OpError::param("name", "a name")) };
+    match a.str("action")? {
+        "add" => {
+            let name = new_name()?;
+            if asm.display_states.iter().any(|d| d.name == name) {
+                return Err(OpError::param("name", "There is already a display state with this name."));
+            }
+            commit(od, tab, &format!("Add display state : {name}"), &result, |x| x.save_display_state(&name))?;
+        }
+        "apply" => {
+            let i = state()?;
+            commit(od, tab, &format!("Apply display state : {}", asm.display_states[i].name), &result, |x| x.apply_display_state(i))?;
+        }
+        "update" => {
+            let name = asm.display_states[state()?].name.clone();
+            commit(od, tab, &format!("Update display state : {name}"), &result, |x| x.save_display_state(&name))?;
+        }
+        "rename" => {
+            let i = state()?;
+            let name = new_name()?;
+            commit(od, tab, &format!("Rename display state : {name}"), &result, |x| {
+                if let Some(d) = x.display_states.get_mut(i) {
+                    d.name = name.clone();
+                }
+            })?;
+        }
+        "remove" => {
+            let i = state()?;
+            commit(od, tab, "Remove display state", &result, |x| {
+                if i < x.display_states.len() {
+                    x.display_states.remove(i);
+                }
+            })?;
+        }
+        _ => return Err(OpError::param("action", "add, apply, update, rename or remove")),
+    }
+    let now = assembly(od, tab)?;
+    Ok(json!({
+        "display_states": now.display_states.iter().map(|d| json!({ "name": d.name, "hidden_instances": d.hidden_instances.iter().filter_map(|i| now.instance(*i)).map(|i| i.name.clone()).collect::<Vec<_>>() })).collect::<Vec<_>>(),
+        "hidden_instances": now.instances.iter().filter(|i| i.hidden).map(|i| i.name.clone()).collect::<Vec<_>>(),
+    })
+    .into())
 }

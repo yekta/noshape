@@ -663,21 +663,43 @@ pub fn tool_separator() -> Div {
 /// search popover is open it reads "Close search [escape]" (Onshape).
 pub fn search_tools_toggle(id: impl Into<ElementId>, open: bool) -> Stateful<Div> {
     let pal = p();
-    let chip = |t: &'static str| div().px(px(3.)).h(px(16.)).flex().items_center().rounded(px(2.)).border_1().border_color(pal.field_outline).bg(pal.panel).text_size(px(11.)).text_color(pal.text).child(t);
+    // Live (part-studio/00): 19 px keys on the box's fill, 1 px #aaa with a
+    // 2 px bottom edge, side by side ("alt/⌥" 35 px, "c" 17 px), 3 px after
+    // the label, 2 px under the box's middle (text 1 px lower still).
+    let chip = |t: &'static str, w: Option<f32>| {
+        div()
+            .when_some(w, |d, w| d.w(px(w)))
+            .px(px(2.))
+            .pt(px(2.))
+            .min_w(px(17.))
+            .h(px(19.))
+            .relative()
+            .top(px(2.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(2.))
+            .border_1()
+            .border_b_2()
+            .border_color(pal.field_outline)
+            .text_size(px(11.))
+            .text_color(pal.text)
+            .child(t)
+    };
     h_flex()
         .id(id)
         .flex_none()
         .h(px(32.))
         .px(px(10.))
-        .gap(px(6.))
+        .gap(px(3.))
         .rounded(px(3.))
         .bg(pal.search_fill)
         .hover(|d| d.bg(pal.border))
         .cursor_pointer()
         .when(open, |d| d.bg(pal.border))
         .child(div().text_size(px(14.)).text_color(pal.text).child(if open { "Close search" } else { "Search tools…" }))
-        .when(open, |d| d.child(chip("escape")))
-        .when(!open, |d| d.child(h_flex().gap(px(2.)).child(chip("alt/⌥")).child(chip("c"))))
+        .when(open, |d| d.child(chip("escape", None)))
+        .when(!open, |d| d.child(h_flex().child(chip("alt/⌥", Some(35.))).child(chip("c", Some(17.)))))
 }
 
 /// Toolbar undo / redo pair (Onshape puts them first in every toolbar).

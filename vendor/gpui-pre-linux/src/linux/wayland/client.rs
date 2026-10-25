@@ -397,11 +397,19 @@ pub(crate) struct WaylandClientState {
     pub mouse_location: Option<Point<Pixels>>,
     continuous_scroll_delta: Option<Point<Pixels>>,
     discrete_scroll_delta: Option<Point<f32>>,
+    // NOSHAPE PATCH (agent nav2): this frame's scroll as Chromium sums it
+    // (wayland_event_source.cc `OnPointerAxisEvent`): axis values × −12, or
+    // −value120 (which replaces them); and whether it is value120.
+    chrome_scroll: Option<(Point<f32>, bool)>,
     vertical_modifier: f32,
     horizontal_modifier: f32,
     scroll_event_received: bool,
     enter_token: Option<()>,
     button_pressed: Option<MouseButton>,
+    // NOSHAPE PATCH (agent nav2): every held button, so releasing one of two
+    // (right-drag + middle) leaves the other reported as pressed, as on X11
+    // (`pressed_button_from_mask`).
+    buttons_down: Vec<MouseButton>,
     mouse_focused_window: Option<WaylandWindowStatePtr>,
     keyboard_focused_window: Option<WaylandWindowStatePtr>,
     loop_handle: LoopHandle<'static, ()>,
@@ -559,7 +567,32 @@ pub(crate) enum PendingActivation {
     Window(ObjectId),
 }
 
+// NOSHAPE PATCH (agent nav2): the button reported as pressed while several
+// are held, in X11's order (left, middle, right, then the others).
+fn held_button(down: &[MouseButton]) -> Option<MouseButton> {
+    [MouseButton::Left, MouseButton::Middle, MouseButton::Right]
+        .into_iter()
+        .find(|b| down.contains(b))
+        .or_else(|| down.first().copied())
+}
+
 impl WaylandClientState {
+    // NOSHAPE PATCH (agent nav2): see `chrome_scroll`.
+    fn chrome_axis(&mut self, axis: wl_pointer::Axis, delta: f32, high_resolution: bool) {
+        let offset = match axis {
+            wl_pointer::Axis::VerticalScroll => point(0.0, delta),
+            wl_pointer::Axis::HorizontalScroll => point(delta, 0.0),
+            _ => return,
+        };
+        let (sum, high) = self.chrome_scroll.get_or_insert((point(0.0, 0.0), high_resolution));
+        if *high == high_resolution {
+            *sum = point(sum.x + offset.x, sum.y + offset.y);
+        } else if high_resolution {
+            *sum = offset;
+            *high = true;
+        }
+    }
+
     fn consume_startup_activation_token(&mut self, surface: &wl_surface::WlSurface) {
         let Some(startup_activation_token) = self.startup_activation_token.take() else {
             return;
@@ -1159,9 +1192,11 @@ impl WaylandConnection {
             mouse_location: None,
             continuous_scroll_delta: None,
             discrete_scroll_delta: None,
+            chrome_scroll: None,
             vertical_modifier: -1.0,
             horizontal_modifier: -1.0,
             button_pressed: None,
+            buttons_down: Vec::new(),
             mouse_focused_window: None,
             keyboard_focused_window: None,
             loop_handle: handle.clone(),
@@ -2080,6 +2115,14 @@ impl Dispatch<wl_seat::WlSeat, ()> for WaylandClientStatePtr {
                     .as_ref()
                     .map(|cursor_shape_manager| cursor_shape_manager.get_pointer(&pointer, qh, ()));
 
+                // NOSHAPE PATCH (agent nav2): a seat announcing its pointer
+                // again (a device plugged in) must not leave the old pinch
+                // object alive: the compositor keeps sending it every pinch
+                // update, so each one arrived twice (the copy with scale
+                // change 0).
+                if let Some(old) = state.pinch_gesture.take() {
+                    old.destroy();
+                }
                 state.pinch_gesture = state.globals.gesture_manager.as_ref().map(
                     |gesture_manager: &zwp_pointer_gestures_v1::ZwpPointerGesturesV1| {
                         gesture_manager.get_pinch_gesture(&pointer, qh, ())
@@ -2519,6 +2562,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                 state.serial_tracker.update(SerialKind::MouseEnter, serial);
                 state.mouse_location = Some(position);
                 state.button_pressed = None;
+                state.buttons_down.clear();
 
                 if let Some(window) = get_window(&mut state, &surface.id()) {
                     state.mouse_focused_window = Some(window.clone());
@@ -2567,6 +2611,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                     state.mouse_focused_window = None;
                     state.mouse_location = None;
                     state.button_pressed = None;
+                    state.buttons_down.clear();
                     state.cursor_hidden_window = None;
 
                     drop(state);
@@ -2683,7 +2728,10 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                         state.click.last_mouse_button = Some(button);
                         state.click.last_location = state.mouse_location.unwrap();
 
-                        state.button_pressed = Some(button);
+                        if !state.buttons_down.contains(&button) {
+                            state.buttons_down.push(button);
+                        }
+                        state.button_pressed = held_button(&state.buttons_down);
 
                         if let Some(window) = state.mouse_focused_window.clone() {
                             let input = PlatformInput::MouseDown(MouseDownEvent {
@@ -2698,7 +2746,8 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                         }
                     }
                     wl_pointer::ButtonState::Released => {
-                        state.button_pressed = None;
+                        state.buttons_down.retain(|b| *b != button);
+                        state.button_pressed = held_button(&state.buttons_down);
 
                         if let Some(window) = state.mouse_focused_window.clone() {
                             let input = PlatformInput::MouseUp(MouseUpEvent {
@@ -2726,6 +2775,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                 value,
                 ..
             } => {
+                state.chrome_axis(axis, -value as f32 * 12.0, false);
                 if state.axis_source == AxisSource::Wheel {
                     return;
                 }
@@ -2785,6 +2835,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                 axis: WEnum::Value(axis),
                 value120,
             } => {
+                state.chrome_axis(axis, -value120 as f32, true);
                 state.scroll_event_received = true;
                 let axis = if state.modifiers.shift {
                     wl_pointer::Axis::HorizontalScroll
@@ -2814,6 +2865,15 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                     state.scroll_event_received = false;
                     let continuous = state.continuous_scroll_delta.take();
                     let discrete = state.discrete_scroll_delta.take();
+                    // Chromium rounds wheel frames to whole units and sends
+                    // finger / continuous frames as they are, 120 per tick.
+                    let wheel_ticks = state.chrome_scroll.take().map(|(d, _)| {
+                        if state.axis_source == AxisSource::Wheel || state.axis_source == AxisSource::WheelTilt {
+                            point(d.x.round() / 120.0, d.y.round() / 120.0)
+                        } else {
+                            point(d.x / 120.0, d.y / 120.0)
+                        }
+                    });
                     if let Some(continuous) = continuous {
                         if let Some(window) = state.mouse_focused_window.clone() {
                             let input = PlatformInput::ScrollWheel(ScrollWheelEvent {
@@ -2821,6 +2881,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                                 delta: ScrollDelta::Pixels(continuous),
                                 modifiers: state.modifiers,
                                 touch_phase: TouchPhase::Moved,
+                                wheel_ticks,
                             });
                             drop(state);
                             window.handle_input(input);
@@ -2833,6 +2894,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                             delta: ScrollDelta::Lines(discrete),
                             modifiers: state.modifiers,
                             touch_phase: TouchPhase::Moved,
+                            wheel_ticks,
                         });
                         drop(state);
                         window.handle_input(input);

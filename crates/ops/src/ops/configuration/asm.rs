@@ -15,7 +15,7 @@ use noshape_units::ExprValue;
 use serde_json::{Value, json};
 
 /// Whether `tab` names an Assembly.
-pub(super) fn is_assembly(ctx: &mut Ctx, a: &Args) -> Result<bool, OpError> {
+pub(crate) fn is_assembly(ctx: &mut Ctx, a: &Args) -> Result<bool, OpError> {
     let Some(t) = a.opt_str("tab")? else { return Ok(false) };
     let od = ctx.doc(a.opt_str("doc")?)?;
     Ok(doc::find_tab(od.doc(), t).ok().and_then(|id| od.doc().tab(id)).is_some_and(|x| matches!(x.content, TabContent::Assembly(_))))
@@ -336,5 +336,87 @@ pub(super) fn set_value(ctx: &mut Ctx, args: &Args) -> Result<crate::registry::O
     edit(od, tab, config::EDIT_CONFIGURED_VALUE, |x| {
         asm_config::set_cell(x, index, &key, value);
         Ok(json!({ "set": { "param": param_name(p), "configuration": key } }))
+    })
+}
+
+/// Visibility conditions… of an assembly input.
+pub(super) fn visibility(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let x = asm(od, tab);
+    let input = find_input(x, a.str("input")?, "input")?;
+    let v = super::visibility_arg(a)?;
+    super::check_visibility(&x.configuration.inputs, &input, &v)?;
+    edit(od, tab, config::EDIT_VISIBILITY, |x| {
+        asm_config::set_visibility(x, &input, v);
+        Ok(json!({ "input": input }))
+    })
+}
+
+/// The configuration inputs of an instance's source: a Part Studio or
+/// assembly of this document, or of a version of it (Change to version).
+fn source_inputs(od: &OpenDoc, i: &noshape_model::assembly::Instance) -> Vec<noshape_model::configuration::ConfigInput> {
+    use noshape_model::assembly::InstanceSource as S;
+    let of_tab = |d: &noshape_model::Document, tab: &str| match d.tabs.iter().find(|t| t.id.to_string() == tab).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+        Some(TabContent::Assembly(x)) => x.configuration.inputs.clone(),
+        _ => Vec::new(),
+    };
+    match &i.source {
+        S::Part { studio, .. } | S::PartStudio { studio, .. } | S::MirroredPart { studio, .. } | S::Sketch { studio, .. } => of_tab(od.doc(), &studio.to_string()),
+        S::Assembly { assembly, .. } => of_tab(od.doc(), &assembly.to_string()),
+        S::External { key, .. } => crate::derived::ExternalRef::parse(key)
+            .filter(|r| r.path == od.session.path)
+            .and_then(|r| {
+                let d = noshape_model::Document::from_blobs(&od.session.store.read_all(r.microversion).ok()?).ok()?;
+                Some(of_tab(&d, &r.tab))
+            })
+            .unwrap_or_default(),
+        S::Standard { .. } => Vec::new(),
+    }
+}
+
+/// Input propagation… of an assembly input to its instances.
+pub(super) fn propagate(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::OpOutput, OpError> {
+    if a.get("features").is_some() {
+        return Err(OpError::param("features", "Part Studios only; an assembly's input propagates to instances (`instances`)"));
+    }
+    let (od, tab) = target(ctx, a)?;
+    let x = asm(od, tab).clone();
+    let input = find_input(&x, a.str("input")?, "input")?;
+    let candidates = asm_config::propagation_candidates(&x, &input, &|i| source_inputs(od, i));
+    if candidates.is_empty() {
+        return Err(OpError::param("input", "no instance's source has a List or Checkbox input with this id"));
+    }
+    let picks: Vec<(String, noshape_model::assembly::InstanceId)> = match a.opt_array("instances")? {
+        Some(list) => list
+            .iter()
+            .enumerate()
+            .map(|(k, v)| {
+                let field = format!("instances[{k}]");
+                let id = crate::ops::assembly::find_instance(&x, v.as_str().unwrap_or_default(), &field)?;
+                candidates.iter().find(|c| c.0 == id).map(|c| (input.clone(), c.0)).ok_or_else(|| OpError::param(&field, "not an instance this input can propagate to"))
+            })
+            .collect::<Result<_, _>>()?,
+        None => candidates.iter().map(|c| (input.clone(), c.0)).collect(),
+    };
+    let out = edit(od, tab, config::INPUT_PROPAGATION, |x| {
+        asm_config::propagate_inputs(x, &picks);
+        Ok(json!({}))
+    })?;
+    let x = asm(od, tab).clone();
+    let mut v = out.value;
+    v["candidates"] = json!(asm_config::propagation_candidates(&x, &input, &|i| source_inputs(od, i)).iter().map(|c| json!({ "instance": format!("inst:{}", c.0.0), "name": c.1, "propagated": c.2 })).collect::<Vec<_>>());
+    Ok(v.into())
+}
+
+/// Input ⋯ › Copy input: "<name> copy" after the others.
+pub(super) fn duplicate_input(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let input = find_input(asm(od, tab), a.str("input")?, "input")?;
+    edit(od, tab, asm_config::COPY_INPUT, |x| {
+        let before: Vec<String> = x.configuration.inputs.iter().map(|i| i.id.clone()).collect();
+        asm_config::duplicate_input(x, &input);
+        let new = x.configuration.inputs.iter().find(|i| !before.contains(&i.id)).map(|i| i.id.clone());
+        Ok(json!({ "input": new }))
     })
 }

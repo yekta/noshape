@@ -211,7 +211,7 @@ impl AssemblyView {
             "tb-screw" => self.open_relation(RelationType::Screw, None, window, cx),
             "tb-linear" => self.open_relation(RelationType::Linear, None, window, cx),
             "tb-display-states" => self.toggle_display_states(window, cx),
-            "tb-ps-in-context" => self.open_ps_in_context(cx),
+            "tb-ps-in-context" => self.open_ps_in_context(false, cx),
             "tb-section" => self.toggle_section(window, cx),
             "tb-mass" => self.toggle_mass(window, cx),
             "tb-measure" => self.toggle_measure(cx),
