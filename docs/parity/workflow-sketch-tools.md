@@ -89,3 +89,9 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 | 18 sketch Chamfer (tool search "chamfer" → 2nd row) | preview, two "5" dimensions, hollow arrow | ✅ |
 | (new) Tool search in a sketch | "chamfer" lists the Part Studio **Chamfer** first and **"Sketch chamfer"** second; Enter on the first confirms the sketch and opens the feature (live names the sketch tool "Chamfer", behaviours ~7819; Part Studio features in sketch-mode search not captured) | ? live requested "qa5 (10-24, sketch tool search)" |
 | (new) **SEL1** Fillet / Chamfer take sketch curves | with Fillet or Chamfer open, clicking a sketch line adds "Sketch 1 line" (live: SketchObject.NO in fillet.fs / chamfer.fs) | ✗ SEL1 (cross-area fix proposed to the lead) |
+
+## Release re-check v0.4.8 (qa5, 2026-10-25 02:20, release asset noshape-cli 0.4.8 linux-x86_64)
+| Row | Ours | Status |
+|---|---|---|
+| SK5 fillet radius edit (pass20/sk5.py + sk5b.py) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065; R8: 25.089 / 33.089 / 22.065 / 14.065 = live | ✅ |
+| POLY1 dash-dot along the whole polygon preview | not in v0.4.8 (fix eb764d1b is in ready/qa5) | — |

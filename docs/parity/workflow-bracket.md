@@ -78,3 +78,9 @@ Steps 1–7 OK (65431.3275 after the gusset); step 8 feature mirror (Reapply off
 |---|---|---|
 | 1–7 (base, wall, holes, fillet R5, chamfer, wall hole, pattern 25×3, gusset) | all Ok; 32000 → 65280 → 64475.7523 → 64389.9115 → 64349.9115 → 64123.7169 → 63671.3275 → 65431.3275 mm³; each call ≤ 0.6 s | ✅ |
 | 8 ADV9 Feature mirror of the gusset (Reapply off) | Error "Could not create all instances as entered. Try selecting "Reapply features" option." (live OK 67191.3275) | ✗ still on main; psb's fix 853cf16b is in ready/psb (FAILED in the queue 20:01) |
+
+## Release re-check v0.4.8 (qa5, 2026-10-25 02:15, release asset noshape-cli 0.4.8 linux-x86_64, pass3/mkbracket2.py)
+| Step | Ours | Status |
+|---|---|---|
+| 1–7 | same as pass 24: 32000 → … → 65431.3275 mm³, 18 faces; each step 0.1–0.3 s | ✅ |
+| 8 ADV9 Feature mirror of the gusset | Error "Could not create all instances as entered…"; app tree shows Mirror 1 red | ✗ still in v0.4.8 (psb) |
