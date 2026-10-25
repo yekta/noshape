@@ -17,6 +17,7 @@ mod feature;
 mod featurestudio;
 mod history;
 mod import;
+mod list;
 mod meta;
 mod parts;
 mod query;
@@ -62,6 +63,7 @@ pub fn all() -> Vec<Op> {
     v.extend(camera::ops());
     v.extend(display::ops());
     v.extend(select::ops());
+    v.extend(list::ops());
     v.extend(export::ops());
     v.extend(import::ops());
     v.extend(featurestudio::ops());

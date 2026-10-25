@@ -6,7 +6,7 @@ use super::PartStudioView;
 use super::behaviors::IsolateMode;
 use gpui_kit::*;
 use noshape_model::reference::Reference;
-use noshape_ops::window::{DisplaySet, Selected};
+use noshape_ops::window::{DisplaySet, ListAct, Selected};
 
 impl PartStudioView {
     /// A display setting (view_display).
@@ -47,5 +47,19 @@ impl PartStudioView {
         self.selected_features.clear();
         self.refresh_scene(false, cx);
         cx.notify();
+    }
+
+    /// The feature list (ui_list), as its menus do it.
+    pub(crate) fn agent_list(&mut self, act: ListAct, window: &mut Window, cx: &mut Context<Self>) {
+        match act {
+            ListAct::All(open) => self.set_all_folders_collapsed(!open, cx),
+            ListAct::Folders { ids, open } => {
+                for id in ids {
+                    self.set_folder_collapsed(id, !open, cx);
+                }
+            }
+            ListAct::Filter(text) => self.set_filter(&text, window, cx),
+            ListAct::Instances { .. } | ListAct::Mates { .. } | ListAct::Find(_) => {}
+        }
     }
 }

@@ -10,6 +10,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("ops_describe", &[r##"{"tools": ["drawing_section_view"]}"##]),
     ("ops_call", &[r##"{"tool": "drawing_section_view", "args": {"drawing": "Part 1 Drawing 1", "parent": 1, "point": [205.5, 160], "position": [300, 160]}}"##]),
     ("ui_state", &[r##"{}"##]),
+    ("ui_list", &[r##"{"action": "collapse_all"}"##, r##"{"action": "filter", "text": ":variable \"width\""}"##, r##"{"tab": "Assembly 1", "action": "expand", "items": ["Subassembly 1 <1>"]}"##, r##"{"tab": "Assembly 1", "action": "find", "items": ["Part 1 <2>"]}"##]),
     ("ui_select", &[r##"{"action": "set", "refs": ["body:…"]}"##, r##"{"action": "related", "refs": ["face:…"], "criterion": "Tangent connected faces"}"##, r##"{"action": "select_other", "at": [640, 400], "index": 1}"##, r##"{"tab": "Assembly 1", "action": "same_configuration", "refs": ["Part 1 <1>"]}"##]),
     ("ui_preferences", &[r##"{}"##, r##"{"graphics": {"fov_deg": 60, "line_width": 1.5, "sketch_constrained": "#202020"}}"##]),
     ("ui_toolbar", &[r##"{}"##, r##"{"set": {"removed": ["helix"], "shortcut_tools": ["sketch", "extrude", "fillet"]}}"##]),

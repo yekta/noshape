@@ -1013,6 +1013,15 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!(s["selected"], json!([p, b]), "{s}");
     let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "clear" }));
     assert_eq!(s["selected"], json!([]), "{s}");
+    // The lists: a mate row's Expand, Find in instance list, Expand all.
+    let l = call(&mut ctx, "ui_list", json!({ "tab": "Assembly 1", "action": "expand", "items": ["Revolute 1"] }));
+    assert_eq!(l["expanded_mates"], json!(["Revolute 1"]), "{l}");
+    let e = try_call(&mut ctx, "ui_list", json!({ "tab": "Assembly 1", "action": "expand", "items": [b] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("items[0]"), "a part instance has no rows under it: {e:?}");
+    let l = call(&mut ctx, "ui_list", json!({ "tab": "Assembly 1", "action": "find", "items": [p] }));
+    assert_eq!(l["selected"], json!([p]), "{l}");
+    let l = call(&mut ctx, "ui_list", json!({ "tab": "Assembly 1", "action": "collapse_all" }));
+    assert_eq!(l["expanded_mates"], json!([]), "{l}");
 
     let e = try_call(&mut ctx, "assembly_named_position_drivers", json!({ "drivers": [{ "mate": "Revolute 1", "dof": "tz" }] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("drivers[0].dof"));
@@ -2102,6 +2111,16 @@ fn feature_folders_dependencies_and_dynamic_suppression() {
     assert_eq!(call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" }))["suppression_expression"], "2 mm < 1 mm");
     call(&mut ctx, "feature_dynamic_suppression", json!({ "folder": "Base" }));
     assert!(call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" })).get("suppression_expression").is_none());
+    // The list's folders and filter (ui_list).
+    let l = call(&mut ctx, "ui_list", json!({ "action": "collapse_all" }));
+    assert!(l["folders"].as_array().unwrap().iter().all(|f| f["open"] == false), "{l}");
+    let l = call(&mut ctx, "ui_list", json!({ "action": "expand", "items": ["Base"] }));
+    assert_eq!(l["folders"].as_array().unwrap().iter().find(|f| f["name"] == "Base").unwrap()["open"], true, "{l}");
+    let l = call(&mut ctx, "ui_list", json!({ "action": "filter", "text": "extrude" }));
+    assert_eq!(l["shown_features"], json!(["Extrude 1"]), "{l}");
+    let l = call(&mut ctx, "ui_list", json!({ "action": "filter", "text": "" }));
+    assert!(l.get("shown_features").is_none(), "{l}");
+    assert_eq!(try_call(&mut ctx, "ui_list", json!({ "action": "expand", "items": ["Nope"] })).unwrap_err().param.as_deref(), Some("items[0]"));
 }
 
 #[test]

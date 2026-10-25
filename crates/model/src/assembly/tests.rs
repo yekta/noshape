@@ -3977,6 +3977,32 @@ fn iso_10642_countersunk_screw_matches_live() {
     assert!(failures.is_empty(), "{failures:#?}");
 }
 
+/// Metric hex socket set screws against live's B-rep (behaviours "skb
+/// (10-25) set screw sockets"): 12 faces each, a flat-bottomed socket
+/// (shallow A on short screws), a 30 degree chamfer from the minor diameter
+/// on top, and the flat or 120 degree cup point; live's volumes.
+#[test]
+fn iso_set_screws_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for (name, size, len, volume) in [
+        ("Flat point hex socket set screw ISO 4026", "M3", "4", 24.7018),
+        ("Flat point hex socket set screw ISO 4026", "M6", "6", 144.1804),
+        ("Flat point hex socket set screw ISO 4026", "M6", "30", 811.0731),
+        ("Flat point hex socket set screw ISO 4026", "M12", "40", 4213.1173),
+        ("Cup point hex socket set screw ISO 4029", "M6", "30", 799.7387),
+    ] {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap();
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        spec.length = Some(len.into());
+        let r = standard::regenerate(&spec).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let v = b.shape.volume().unwrap() * 1e9;
+        assert_eq!(b.faces.len(), 12, "{name} {size}x{len}");
+        assert!((v - volume).abs() < 1e-3, "{name} {size}x{len}: {v} mm³, live {volume}");
+    }
+}
+
 /// ISO 7380 socket button head M6 x 20 against live's B-rep (dom/skb-sc-geom
 /// M6x20, behaviours "skb (10-25) ISO 7380 dome"): 20 faces; the dome is a
 /// sphere through the rim, cut flat at the head height (top plane out to
