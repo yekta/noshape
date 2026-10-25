@@ -10,7 +10,6 @@
 #include <BRepTools.hxx>
 #include <TopExp_Explorer.hxx>
 #include <BRepMesh_MeshAlgoFactory.hxx>
-#include <BRepTools.hxx>
 #include <BRepMesh_ShapeTool.hxx>
 #include <IMeshData_Curve.hxx>
 #include <IMeshData_Edge.hxx>
@@ -32,6 +31,7 @@
 #include <TopLoc_Location.hxx>
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace noshape {
 
@@ -158,9 +158,212 @@ private:
   occ::handle<IMeshTools_MeshAlgo> myFallback;
 };
 
+// A cylindrical or conical face bounded by two arcs (or circles) of
+// constant height and straight edges along the axis (a hole, a chamfer, a
+// band between two planes): the two rings of BRepMesh's own edge nodes
+// joined by triangles, no inner nodes. Both surfaces are straight along
+// their height, so the triangles lie on the surface between the rings,
+// whose sampling (the edges' angular deflection) BRepMesh's Delaunay kept
+// as well; without its per-link bookkeeping (the 400-hole plate's 800 such
+// faces were ~28 % of its display meshing). Any other face (a seam with
+// inner nodes, a degenerated edge, curved trimming) goes to `fallback`.
+// NOSHAPE_MESH_NO_STRIPS=1 turns it off (tests compare both).
+class StripAlgo : public IMeshTools_MeshAlgo
+{
+public:
+  explicit StripAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback) : myFallback(fallback) {}
+
+  void Perform(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm, const Message_ProgressRange& range) override
+  {
+    bool done = false;
+    try
+    {
+      done = triangulate(f);
+    }
+    catch (const Standard_Failure&)
+    {
+    }
+    if (!done)
+      myFallback->Perform(f, prm, range);
+  }
+
+private:
+  struct Node
+  {
+    double u;
+    gp_Pnt p;
+  };
+
+  static bool triangulate(const IMeshData::IFaceHandle& f)
+  {
+    // The pcurves' points: the face's two constant-v rings, and the ends of
+    // the constant-u edges (which must be just their two ends).
+    std::vector<std::pair<double, std::vector<Node>>> rings; // (v, nodes)
+    struct Side
+    {
+      IMeshData::IPCurveHandle P;
+      IMeshData::ICurveHandle  C;
+      int                      n;
+    };
+    std::vector<Side> sides;
+    double            umin = 0, umax = 0, span = 0;
+    bool              any  = false;
+    for (int w = 0; w < f->WiresNb(); ++w)
+    {
+      const IMeshData::IWireHandle& W = f->GetWire(w);
+      if (W->IsSet(IMeshData_SelfIntersectingWire))
+        return false;
+      for (int e = 0; e < W->EdgesNb(); ++e)
+      {
+        const IMeshData::IEdgeHandle E = W->GetEdge(e);
+        if (E->GetDegenerated())
+          return false;
+        const IMeshData::IPCurveHandle& P = E->GetPCurve(f.get(), W->GetEdgeOrientation(e));
+        const int                       n = P->ParametersNb();
+        if (n < 2 || E->GetCurve()->ParametersNb() != n)
+          return false;
+        double u0 = P->GetPoint(0).X(), u1 = u0, v0 = P->GetPoint(0).Y(), v1 = v0;
+        for (int k = 1; k < n; ++k)
+        {
+          const gp_Pnt2d q = P->GetPoint(k);
+          u0 = std::min(u0, q.X());
+          u1 = std::max(u1, q.X());
+          v0 = std::min(v0, q.Y());
+          v1 = std::max(v1, q.Y());
+        }
+        if (!any)
+        {
+          umin = u0;
+          umax = u1;
+          any  = true;
+        }
+        umin = std::min(umin, u0);
+        umax = std::max(umax, u1);
+        span = std::max(span, std::max(u1 - u0, v1 - v0));
+        sides.push_back({P, E->GetCurve(), n});
+      }
+    }
+    if (!any || sides.size() < 2 || sides.size() > 64)
+      return false;
+    const double tol = 1e-9 * std::max(1.0, span);
+    auto         ring_of = [&](double v) -> std::vector<Node>* {
+      for (auto& r : rings)
+        if (std::abs(r.first - v) <= tol)
+          return &r.second;
+      rings.push_back({v, {}});
+      return &rings.back().second;
+    };
+    std::vector<std::pair<double, double>> ends; // constant-u edges' (u, v) ends
+    for (const Side& s : sides)
+    {
+      double v0 = s.P->GetPoint(0).Y(), v1 = v0, u0 = s.P->GetPoint(0).X(), u1 = u0;
+      for (int k = 1; k < s.n; ++k)
+      {
+        v0 = std::min(v0, s.P->GetPoint(k).Y());
+        v1 = std::max(v1, s.P->GetPoint(k).Y());
+        u0 = std::min(u0, s.P->GetPoint(k).X());
+        u1 = std::max(u1, s.P->GetPoint(k).X());
+      }
+      if (v1 - v0 <= tol)
+      {
+        std::vector<Node>* r = ring_of(v0);
+        for (int k = 0; k < s.n; ++k)
+          r->push_back({s.P->GetPoint(k).X(), s.C->GetPoint(k)});
+      }
+      else if (u1 - u0 <= tol && s.n == 2)
+      {
+        ends.push_back({u0, v0});
+        ends.push_back({u0, v1});
+      }
+      else
+        return false;
+    }
+    if (rings.size() != 2)
+      return false;
+    if (rings[0].first > rings[1].first)
+      std::swap(rings[0], rings[1]);
+    // Each ring: sorted by u, shared ends once, from umin to umax.
+    for (auto& r : rings)
+    {
+      std::vector<Node>& nodes = r.second;
+      std::sort(nodes.begin(), nodes.end(), [](const Node& a, const Node& b) { return a.u < b.u; });
+      std::vector<Node> unique;
+      for (const Node& nd : nodes)
+        if (unique.empty() || nd.u - unique.back().u > tol)
+          unique.push_back(nd);
+      if (unique.size() < 2 || std::abs(unique.front().u - umin) > tol || std::abs(unique.back().u - umax) > tol)
+        return false;
+      nodes = std::move(unique);
+    }
+    // The constant-u edges run between the rings at umin and umax.
+    for (const auto& [u, v] : ends)
+      if ((std::abs(u - umin) > tol && std::abs(u - umax) > tol) || (std::abs(v - rings[0].first) > tol && std::abs(v - rings[1].first) > tol))
+        return false;
+    const std::vector<Node>& lo   = rings[0].second;
+    const std::vector<Node>& hi   = rings[1].second;
+    const double             vlo  = rings[0].first;
+    const double             vhi  = rings[1].first;
+    const int                nlo  = (int)lo.size();
+    const int                nhi  = (int)hi.size();
+    occ::handle<Poly_Triangulation> T = new Poly_Triangulation(nlo + nhi, nlo + nhi - 2, true);
+    for (int i = 0; i < nlo; ++i)
+    {
+      T->SetNode(i + 1, lo[(size_t)i].p);
+      T->SetUVNode(i + 1, gp_Pnt2d(lo[(size_t)i].u, vlo));
+    }
+    for (int j = 0; j < nhi; ++j)
+    {
+      T->SetNode(nlo + j + 1, hi[(size_t)j].p);
+      T->SetUVNode(nlo + j + 1, gp_Pnt2d(hi[(size_t)j].u, vhi));
+    }
+    // Zip the rings (counter-clockwise in uv): advance on the ring whose
+    // next node comes first.
+    int i = 0, j = 0, t = 0;
+    while (i < nlo - 1 || j < nhi - 1)
+    {
+      const bool on_lo = j == nhi - 1 || (i < nlo - 1 && lo[(size_t)i + 1].u <= hi[(size_t)j + 1].u);
+      if (on_lo)
+      {
+        T->SetTriangle(++t, Poly_Triangle(i + 1, i + 2, nlo + j + 1));
+        ++i;
+      }
+      else
+      {
+        T->SetTriangle(++t, Poly_Triangle(i + 1, nlo + j + 2, nlo + j + 1));
+        ++j;
+      }
+    }
+    // Every pcurve point's node in this triangulation (the edges' polygons).
+    auto node_of = [&](const gp_Pnt2d& q) -> int {
+      const bool               low = std::abs(q.Y() - vlo) <= tol;
+      const std::vector<Node>& r   = low ? lo : hi;
+      auto it = std::lower_bound(r.begin(), r.end(), q.X() - tol, [](const Node& a, double u) { return a.u < u; });
+      if (it == r.end() || std::abs(it->u - q.X()) > tol)
+        return -1;
+      return (int)(it - r.begin()) + (low ? 1 : nlo + 1);
+    };
+    std::vector<std::pair<IMeshData::IPCurveHandle, std::vector<int>>> indices;
+    for (const Side& s : sides)
+    {
+      std::vector<int> idx((size_t)s.n);
+      for (int k = 0; k < s.n; ++k)
+        if ((idx[(size_t)k] = node_of(s.P->GetPoint(k))) < 0)
+          return false;
+      indices.push_back({s.P, std::move(idx)});
+    }
+    for (auto& [P, idx] : indices)
+      for (int k = 0; k < (int)idx.size(); ++k)
+        P->GetIndex(k) = idx[(size_t)k];
+    BRepMesh_ShapeTool::AddInFace(f->GetFace(), T);
+    return true;
+  }
+
+  occ::handle<IMeshTools_MeshAlgo> myFallback;
+};
+
 // Planar faces through PlanarCdtAlgo (BRepMesh's own algorithm below its
 // threshold and as its fallback; not Delabella, which crashed on macOS arm64),
-// every other surface through BRepMesh's own.
+// cylinders and cones through StripAlgo, every other surface through BRepMesh's own.
 class PlanarCdtAlgoFactory : public IMeshTools_MeshAlgoFactory
 {
 public:
@@ -168,6 +371,8 @@ public:
   {
     if (type == GeomAbs_Plane)
       return new PlanarCdtAlgo(myDefault->GetAlgo(type, prm));
+    if ((type == GeomAbs_Cylinder || type == GeomAbs_Cone) && std::getenv("NOSHAPE_MESH_NO_STRIPS") == nullptr)
+      return new StripAlgo(myDefault->GetAlgo(type, prm));
     return myDefault->GetAlgo(type, prm);
   }
 
