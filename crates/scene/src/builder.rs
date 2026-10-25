@@ -350,7 +350,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     // them (live part-studio/61: white, unlit, only the edges show).
                     DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)).unlit(),
                 };
-                let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
+                // Live (dialogs/extrude-03): the see-through preview lies over
+                // the datum planes (layer 5) and the picked sketch regions
+                // (layer 9) behind it, so they tint it from below rather than
+                // wash it out.
+                let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview().layer(10) } else { mesh };
                 let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(ISOLATE_GHOST) } else { mesh };
                 // Parts excluded from the section view are not cut.
                 scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });

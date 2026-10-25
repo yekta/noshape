@@ -351,6 +351,10 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                         };
                         j["projection"] = json!(side);
                     }
+                    // What it looks along (Onshape names the view by it: "Top", "Right"...).
+                    if let Some(o) = noshape_model::drawing::views::standard_orientation(&m.drawing, sheet, v.id) {
+                        j["orientation"] = json!(ORIENTATIONS.iter().find(|x| x.1 == o).map(|x| x.0));
+                    }
                 }
                 _ => {}
             }

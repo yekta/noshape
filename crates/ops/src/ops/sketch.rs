@@ -67,6 +67,8 @@ const DIMENSION_KINDS: &str = "auto (what the Dimension tool infers from the ent
 
 pub fn ops() -> Vec<Op> {
     let point = json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 2, "maxItems": 2 });
+    // sketch_draw's clicks: sketch (x, y), or model (x, y, z) projected onto the sketch plane.
+    let click_point = json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 2, "maxItems": 3 });
     vec![
         Op {
             group: "sketch",
@@ -84,7 +86,7 @@ pub fn ops() -> Vec<Op> {
             summary: "Draw sketch geometry with a sketch tool (line, rectangle, circle, arc, spline, slot, polygon, ellipse, point...)",
             description: Box::leak(
                 format!(
-                    "Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions (\"10 mm\"). One call = one edit of the sketch (\"Edit : Sketch 1\"); `shapes` draws many shapes in that one edit. Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:\n{}",
+                    "Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions (\"10 mm\"); a point of three coordinates [x, y, z] is a model (Part Studio) position, projected onto the sketch plane: easiest on a face, whose sketch axes may be turned (the reply's `frame` gives them). One call = one edit of the sketch (\"Edit : Sketch 1\"); `shapes` draws many shapes in that one edit. Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:\n{}",
                     DRAW_TOOLS.iter().map(|(n, _, h)| format!("- {n}: {h}")).collect::<Vec<_>>().join("\n")
                 )
                 .into_boxed_str(),
@@ -94,8 +96,8 @@ pub fn ops() -> Vec<Op> {
                 tab_field(),
                 req("sketch", s(), "Sketch feature id or name."),
                 opt("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool (required without `shapes`)."),
-                opt("points", json!({ "type": "array", "items": point.clone() }), "The clicks, in order: [[x, y], ...] (required without `shapes`)."),
-                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
+                opt("points", json!({ "type": "array", "items": click_point.clone() }), "The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`)."),
+                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
                 opt("construction", json!({ "type": "boolean" }), "Make the new geometry construction geometry."),
                 opt("sides", json!({ "type": "integer", "minimum": 3, "maximum": 1000 }), "Polygon sides."),
             ],
@@ -260,6 +262,20 @@ pub(crate) fn angle_value(v: &Value, units: &UnitPrefs) -> Result<f64, OpError> 
 pub(super) fn point_value(v: &Value, units: &UnitPrefs) -> Result<DVec2, OpError> {
     let a = v.as_array().filter(|a| a.len() == 2).ok_or_else(|| OpError::invalid("a point is [x, y]"))?;
     Ok(DVec2::new(length_value(&a[0], units)?, length_value(&a[1], units)?))
+}
+
+/// A sketch_draw click: sketch [x, y], or a model position [x, y, z]
+/// projected onto the sketch plane.
+fn click_value(v: &Value, units: &UnitPrefs, frame: &PlaneFrame) -> Result<DVec2, OpError> {
+    match v.as_array().map(Vec::len) {
+        Some(3) => {
+            let a = v.as_array().expect("array");
+            let p = glam::DVec3::new(length_value(&a[0], units)?, length_value(&a[1], units)?, length_value(&a[2], units)?);
+            Ok(frame.to_local(p))
+        }
+        Some(2) => point_value(v, units),
+        _ => Err(OpError::invalid("a point is [x, y] (sketch) or [x, y, z] (model)")),
+    }
 }
 
 pub(super) fn entity_id(sketch: FeatureId, e: EntityId) -> String {
@@ -428,8 +444,17 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
         Some(ParamValue::Sketch(d)) => (**d).clone(),
         _ => SketchData::default(),
     };
+    let features: Vec<(FeatureId, String)> = ps.features.iter().map(|f| (f.id, f.name.clone())).collect();
     let r = od.regenerate(tab, None)?;
-    let mut v = json!({ "sketch": id.to_string(), "units": crate::ops::query::units_json(&units) });
+    // Features the edit broke downstream (or that were already failing), as feature replies report them.
+    let failed: Vec<Value> = features
+        .iter()
+        .filter_map(|(fid, name)| {
+            let st = r.display.feature_state(*fid)?;
+            matches!(st.status, noshape_model::display::FeatureStatus::Error).then(|| json!({ "feature": fid.to_string(), "name": name, "message": st.message, "faulty_params": st.faulty }))
+        })
+        .collect();
+    let mut v = json!({ "sketch": id.to_string(), "units": crate::ops::query::units_json(&units), "failed": failed });
     let entities: Vec<Value> = data.sketch.entities().filter(|e| before.is_none_or(|b| !b.contains(&e.id))).map(|e| geometry_json(&data, id, e, k)).collect();
     v[if before.is_some() { "created" } else { "entities" }] = json!(entities);
     if before.is_none() {
@@ -561,7 +586,8 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 /// `sketch_draw` call does (`p`: the parameter prefix for errors).
 fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool) -> Result<(), OpError> {
     let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| OpError::param(&format!("{p}tool"), "unknown drawing tool"))?;
-    let points = points.iter().enumerate().map(|(i, v)| point_value(v, units).map_err(|e| e.with_param(format!("{p}points[{i}]")))).collect::<Result<Vec<_>, _>>()?;
+    let frame = t.frame;
+    let points = points.iter().enumerate().map(|(i, v)| click_value(v, units, &frame).map_err(|e| e.with_param(format!("{p}points[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     if points.is_empty() {
         return Err(OpError::param(&format!("{p}points"), "at least one click"));
     }

@@ -107,6 +107,31 @@ thread_local! {
     static SHOWN: std::cell::Cell<(u64, u64)> = const { std::cell::Cell::new((0, 0)) };
 }
 
+thread_local! {
+    /// Map keys read through [`Value::get`] (`"*"`: the whole map through
+    /// [`Value::as_map`]) by map address, while recording.
+    static KEY_READS: std::cell::RefCell<Option<Vec<(usize, String)>>> = const { std::cell::RefCell::new(None) };
+}
+
+pub(crate) fn note_key_read(m: &Arc<Map>, key: &str) {
+    KEY_READS.with(|r| {
+        if let Some(reads) = r.borrow_mut().as_mut() {
+            reads.push((Arc::as_ptr(m) as usize, key.to_string()));
+        }
+    });
+}
+
+/// Start recording the map keys natives read on this thread (the check that
+/// every native reads the map std passes it, not a positional argument).
+pub fn record_key_reads() {
+    KEY_READS.with(|r| *r.borrow_mut() = Some(Vec::new()));
+}
+
+/// Stop recording: the keys read as (map address, key).
+pub fn take_key_reads() -> Vec<(usize, String)> {
+    KEY_READS.with(|r| r.borrow_mut().take()).unwrap_or_default()
+}
+
 /// Restart the printed numbers (at the start of each feature run).
 pub fn reset_shown_numbers() {
     set_shown_counters((0, 0));
@@ -401,7 +426,10 @@ impl Value {
     }
     pub fn as_map(&self) -> Option<&Arc<Map>> {
         match self {
-            Value::Map(m, _) => Some(m),
+            Value::Map(m, _) => {
+                note_key_read(m, "*");
+                Some(m)
+            }
             _ => None,
         }
     }
@@ -409,7 +437,10 @@ impl Value {
     pub fn get(&self, key: &str) -> &Value {
         static UNDEF: Value = Value::Undefined;
         match self {
-            Value::Map(m, _) => m.get(&Value::Str(key.into(), Tag::NONE)).unwrap_or(&UNDEF),
+            Value::Map(m, _) => {
+                note_key_read(m, key);
+                m.get(&Value::Str(key.into(), Tag::NONE)).unwrap_or(&UNDEF)
+            }
             _ => &UNDEF,
         }
     }

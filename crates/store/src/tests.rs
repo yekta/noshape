@@ -1,7 +1,7 @@
 //! Integration-style tests of the document store.
 
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::*;
 
@@ -932,10 +932,10 @@ fn backup_copy() {
     assert_eq!(copy.graph().unwrap(), doc.graph().unwrap());
 }
 
-#[test]
-fn commit_one_megabyte_is_fast() {
-    let dir = TempDir::new();
-    let (mut doc, main) = new_doc(&dir);
+/// Five 1 MB commits after a warm-up: their median time, and the document
+/// with the last payload committed.
+fn commit_one_megabyte(dir: &TempDir) -> (Duration, Document, Vec<u8>, BranchId) {
+    let (mut doc, main) = new_doc(dir);
     // Semi-compressible payload resembling serialized geometry.
     let mut payload: Vec<u8> = Vec::with_capacity(1 << 20);
     let mut x = 0x1234_5678u32;
@@ -957,15 +957,26 @@ fn commit_one_megabyte_is_fast() {
         times.push(t.elapsed());
     }
     times.sort();
-    let median = times[2];
-    eprintln!("1 MB commit: median {median:?}, all {times:?}");
-    // Generous bound for slow/debug CI machines; typically a few ms.
-    assert!(median.as_millis() < 250, "1 MB commit took {median:?}");
-    let t = Instant::now();
+    eprintln!("1 MB commit: median {:?}, all {times:?}", times[2]);
+    (times[2], doc, payload, main)
+}
+
+#[test]
+fn commit_one_megabyte_round_trips() {
+    let dir = TempDir::new();
+    let (_, doc, payload, main) = commit_one_megabyte(&dir);
     let head = doc.head(main).unwrap();
     let back = doc.read(head, "tab/a").unwrap().unwrap();
-    eprintln!("1 MB read: {:?}", t.elapsed());
     assert_eq!(back, payload);
+}
+
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_commit_one_megabyte_is_fast() {
+    let dir = TempDir::new();
+    let (median, ..) = commit_one_megabyte(&dir);
+    // Typically a few ms.
+    assert!(median.as_millis() < 250, "1 MB commit took {median:?}");
 }
 
 /// QA: after reopening a document, Ctrl+Z did nothing although the user

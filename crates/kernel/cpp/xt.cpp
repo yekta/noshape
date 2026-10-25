@@ -199,19 +199,22 @@ struct BaseType
 struct XtVersion
 {
   const char* name;
-  const char* modeller; // the version's modeller id (major minor build)
   const char* schema;
 };
+
+// The writing modeller's id (major minor build), the same in every
+// version's file (live G36: "modeller version 3801231", FRU 38.1.231).
+const char* const kModeller = "3801231";
 const XtVersion kVersions[] = {
-  {"38.1", "3801000", "SCH_3801000_38101"}, {"37.1", "3701000", "SCH_3701000_37102"}, {"37.0", "3700000", "SCH_3700000_36001"},
-  {"36.0", "3600000", "SCH_3600000_36001"}, {"35.1", "3501000", "SCH_3501000_35102"}, {"34.1", "3401000", "SCH_3401000_34101"},
-  {"34.0", "3400000", "SCH_3400000_34001"}, {"33.1", "3301000", "SCH_3301000_33103"}, {"33.0", "3300000", "SCH_3300000_32001"},
-  {"32.1", "3201000", "SCH_3201000_32001"}, {"32.0", "3200000", "SCH_3200000_32001"}, {"31.1", "3101000", "SCH_3101000_31100"},
-  {"31.0", "3100000", "SCH_3100000_31001"}, {"30.1", "3001000", "SCH_3001000_30100"}, {"30.0", "3000000", "SCH_3000000_30000"},
-  {"29.1", "2901000", "SCH_2901000_28101"}, {"29.0", "2900000", "SCH_2900000_28101"}, {"28.1", "2801000", "SCH_2801000_28101"},
-  {"28.0", "2800000", "SCH_2800000_28002"}, {"27.1", "2701000", "SCH_2701000_26105"}, {"27.0", "2700000", "SCH_2700000_26105"},
-  {"26.1", "2601000", "SCH_2601000_26105"}, {"26.0", "2600000", "SCH_2600000_25001"}, {"25.1", "2501000", "SCH_2501000_25001"},
-  {"25.0", "2500000", "SCH_2500000_25001"}, {"12.0", "1200000", "SCH_1200000_12006"},
+  {"38.1", "SCH_3801231_38101"}, {"37.1", "SCH_3701000_37102"}, {"37.0", "SCH_3700000_36001"},
+  {"36.0", "SCH_3600000_36001"}, {"35.1", "SCH_3501000_35102"}, {"34.1", "SCH_3401000_34101"},
+  {"34.0", "SCH_3400000_34001"}, {"33.1", "SCH_3301000_33103"}, {"33.0", "SCH_3300000_32001"},
+  {"32.1", "SCH_3201000_32001"}, {"32.0", "SCH_3200000_32001"}, {"31.1", "SCH_3101000_31100"},
+  {"31.0", "SCH_3100000_31001"}, {"30.1", "SCH_3001000_30100"}, {"30.0", "SCH_3000000_30000"},
+  {"29.1", "SCH_2901000_28101"}, {"29.0", "SCH_2900000_28101"}, {"28.1", "SCH_2801000_28101"},
+  {"28.0", "SCH_2800000_28002"}, {"27.1", "SCH_2701000_26105"}, {"27.0", "SCH_2700000_26105"},
+  {"26.1", "SCH_2601000_26105"}, {"26.0", "SCH_2600000_25001"}, {"25.1", "SCH_2501000_25001"},
+  {"25.0", "SCH_2500000_25001"}, {"12.0", "SCH_1200000_12006"},
 };
 
 XtVersion xt_version(const std::string& name)
@@ -332,7 +335,7 @@ std::string num(double v)
 
 std::string text_body(const std::vector<Node>& nodes, const XtVersion& v)
 {
-  const std::string kVersion = std::string(": TRANSMIT FILE created by modeller version ") + v.modeller;
+  const std::string kVersion = std::string(": TRANSMIT FILE created by modeller version ") + kModeller;
   const std::string kSchema  = v.schema;
   std::string       s        = "T";
   auto        put = [&](const std::string& t) {
@@ -434,7 +437,7 @@ struct Bin
 
 std::string binary_body(const std::vector<Node>& nodes, const XtVersion& v)
 {
-  const std::string kVersion  = std::string(": TRANSMIT FILE created by modeller version ") + v.modeller;
+  const std::string kVersion  = std::string(": TRANSMIT FILE created by modeller version ") + kModeller;
   const std::string kSchema   = v.schema;
   const double      kNullReal = -3.14158e13;
   Bin               b;
