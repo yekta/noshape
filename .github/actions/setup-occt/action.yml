@@ -30,7 +30,7 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: ${{ steps.paths.outputs.prefix }}
-        key: occt-${{ runner.os }}-${{ runner.arch }}-${{ inputs.occt-tag }}-${{ hashFiles(runner.os == 'Windows' && 'scripts/build-occt.ps1' || 'scripts/build-occt.sh') }}
+        key: occt-${{ runner.os }}-${{ runner.arch }}-${{ inputs.occt-tag }}-${{ hashFiles(runner.os == 'Windows' && 'scripts/build-occt.ps1' || 'scripts/build-occt.sh', 'patches/occt/**') }}
 
     - name: Build OCCT (Linux/macOS)
       if: steps.cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
