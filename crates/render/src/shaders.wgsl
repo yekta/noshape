@@ -787,6 +787,9 @@ struct PointOut {
     @location(3) world: vec3<f32>,
     @location(4) @interpolate(flat) style: u32,
     @location(5) @interpolate(flat) slot: u32,
+    // The point's radius in device pixels (its quad reaches 0.75 px further
+    // for the anti-aliased rim).
+    @location(6) @interpolate(flat) rpx: f32,
 };
 
 @vertex
@@ -806,7 +809,7 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     var size = p.size + g.viewport.w;
     if ((st & (HOVER | SELECTED)) != 0u) { size = size * 1.5 + 1.0; }
     let half = size * g.viewport.z * 0.5;
-    c = vec4(c.xy + uv * half / (g.viewport.xy * 0.5) * c.w, c.z, c.w);
+    c = vec4(c.xy + uv * (half + 0.75) / (g.viewport.xy * 0.5) * c.w, c.z, c.w);
     // Onshape's offsets: points 9 units, faces 27.
     if ((p.style & 2u) != 0u) { c.z = c.w; } else { c = in_front_of_faces(c, 18.0); }
     var o: PointOut;
@@ -820,27 +823,37 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     o.uv = uv;
     o.world = w;
     o.style = p.style;
+    o.rpx = half;
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
+}
+
+/// Distance from a point sprite's centre in device pixels.
+fn point_dist(uv: vec2<f32>, rpx: f32) -> f32 {
+    return length(uv) * (rpx + 0.75);
 }
 
 @fragment
 fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);
-    let r2 = dot(i.uv, i.uv);
-    if (r2 > 1.0 || clipped(i.world)) { discard; }
+    // An anti-aliased disc (live sketch/51: a 50 % rim around the dot).
+    let d = point_dist(i.uv, i.rpx);
+    let coverage = clamp(i.rpx - d + 0.5, 0.0, 1.0);
+    if (coverage <= 0.0 || clipped(i.world)) { discard; }
+    let rn = d / max(i.rpx, 1e-3);
+    let r2 = rn * rn;
     // Style bit 4: a ring with a center dot (the origin).
     if ((i.style & 4u) != 0u && r2 < 0.42 && r2 > 0.1) { discard; }
     // Style bit 8: a hollow point (white inside a ring of the point color),
     // Onshape's standalone sketch points and spline handles.
     if ((i.style & 8u) != 0u && r2 < 0.3) { return vec4<f32>(1.0, 1.0, 1.0, i.color.a); }
-    return i.color;
+    return vec4<f32>(i.color.rgb, i.color.a * coverage);
 }
 
 @fragment
 fn fs_point_pick(i: PointOut) -> @location(0) u32 {
     load_inst(i.slot);
-    if (dot(i.uv, i.uv) > 1.0 || clipped(i.world)) { discard; }
+    if (point_dist(i.uv, i.rpx) > i.rpx || clipped(i.world)) { discard; }
     if (inst.params.z == 0u) { discard; }
     return i.pick;
 }
