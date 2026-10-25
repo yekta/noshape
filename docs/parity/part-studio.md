@@ -171,7 +171,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.6 | Shift+click selects a range | Home__selection | 🔧 (Shift toggled) |
 | 6.7 | Drag a feature to reorder | features_and_parts_lists | ✅ |
 | 6.8 | Dragging a selected feature moves every selected feature (non-contiguous allowed) | features_and_parts_lists | 🔧 |
-| 6.9 | Reorder refused above a feature's dependencies, with an error ("Cannot reorder: X depends on Y.") | (Onshape behaviour) | ✅ (app 10-24) |
+| 6.9 | A reorder above a feature's dependencies is done (no refusal, no toast); the feature then fails on its missing selection | live qa4 round 5 v3 s8 (REORDER-INVALID) | ✅ (the app no longer checks the order; test `extrude_above_its_sketch_misses_its_region`) |
 | 6.10 | Search box filters by name or type | features_and_parts_lists | 🔧 |
 | 6.11 | Filter commands :errors :warnings :suppressed :hidden :shown :type :name :folder :variable :part | features_and_parts_lists | 🔧 (:partnumber / :revision match the parts' Part number / Revision properties) |
 | 6.12 | Error icon with count in the header; click filters to errors | features_and_parts_lists | 🔧 |
@@ -345,6 +345,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 13.42 | Slow regenerations: newest edit wins (stale runs aborted or finished into the cache), old result kept, working-overlay spinner after 1.2 s ("Opening <feature>…" when a dialog opens), ✓ closes at once with the spinner until the final result, Esc doesn't cancel | live "Pending state" | ✅ |
 | 13.43 | Fillet / Chamfer edge fields take part edges only (Onshape `EdgeTopology.TWO_SIDED`): a sketch line lying on a part edge isn't picked, the part edge is; sketch-only fields (Rib profiles, surface Extrude curves) take no part edges | app 10-24 (a chamfer picked "Sketch 1 line") | ✅ `QueryFilter::SOLID_EDGE`, `kind_matches`; the pick pass skips the overlay kinds (sketch curves/points/regions, part edges/vertices) the active field rejects (render state `NO_PICK`), so a click on a shown sketch line lying on a part edge takes the edge (app: Chamfer with Sketch 1 shown → "Edge of Extrude 1"; render test `no_pick_overlay_lets_the_edge_under_it_be_picked`) |
 | 13.44 | A Hole whose cut fails (tangent to a face: non-manifold) reports hole.fs's HOLE_CUT_FAIL "Hole creates invalid geometry." and cuts nothing; a Reapply feature pattern of it is OK and silently skips the instances that fail on their own; a hole whose axis is beside the part but whose cylinder crosses it cuts (rays across its disk) | live "qa4 round 5 v2 s1 follow-up" (2) | ✅ test `tangent_hole_fails_and_its_reapplied_pattern_cuts_the_good_copies` (volume = live's 37453.538 notch) |
+| 13.45 | A sketch region that no longer resolves (its sketch deleted or moved below) is a missing selection: the feature reports its own empty-input message ("Select face or sketch region to extrude.") and the row tooltip adds "1 missing selection"; a feature that still works with the rest warns "1 missing selection" | live qa4 round 5 v3 s8 (ERR-MISSING-REGION) | ✅ (`drop_missing_regions`, `FeatureState::missing`; test `extrude_above_its_sketch_misses_its_region`) |
 
 ## Not applicable to a local app
 

@@ -210,7 +210,7 @@ impl Regenerator {
             }
             live.push(f.id);
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() });
                 continue;
             }
             if let Some(e) = self.entries.get(&f.id)
@@ -221,7 +221,7 @@ impl Regenerator {
                 continue;
             }
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -237,6 +237,14 @@ impl Regenerator {
                         // Query variables (`#name` selections) expand against the upstream context.
                         let expanded = eval::expand_query_variables(params, &ctx);
                         let params = expanded.as_ref().unwrap_or(params);
+                        // Live (qa4 round 5 v3 s8): a sketch region that no longer
+                        // exists (its sketch deleted, or moved below) is a missing
+                        // selection: left out, so the feature reports its own
+                        // empty-input message ("Select face or sketch region to
+                        // extrude.") with "1 missing selection".
+                        let (pruned, missing) = eval::drop_missing_regions(params, &ctx);
+                        let params = pruned.as_ref().unwrap_or(params);
+                        state.missing = missing;
                         // Geometry of Assembly contexts joins the feature's context only
                         // while it is evaluated (never merged, patterned or listed).
                         let uses_context = !studio.contexts.is_empty() && crate::in_context::params_use_context(params, None);
@@ -273,6 +281,9 @@ impl Regenerator {
                         }
                         match result {
                             Ok(Ok(())) => {
+                                if missing > 0 && ev.warnings.is_empty() {
+                                    ev.warnings.push(missing_text(missing));
+                                }
                                 if !ev.warnings.is_empty() {
                                     state.status = FeatureStatus::Warning;
                                     state.message = Some(ev.warnings.join("\n"));
@@ -373,4 +384,9 @@ fn resolve_bool_exprs(params: &crate::params::ParamValues, specs: &[crate::param
         }
     }
     out
+}
+
+/// Live's second line for selections that no longer resolve.
+pub fn missing_text(n: usize) -> String {
+    if n == 1 { "1 missing selection".into() } else { format!("{n} missing selections") }
 }

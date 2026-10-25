@@ -325,6 +325,9 @@ pub struct FeatureState {
     pub time_ms: f32,
     /// Parameters at fault when it failed.
     pub faulty: Vec<String>,
+    /// Selections that no longer resolve (live: the row's tooltip adds
+    /// "1 missing selection").
+    pub missing: usize,
     /// Values the feature computed for its read-only parameters (Onshape's
     /// `setFeatureComputedParameter`, e.g. a Hole's Up to next depth).
     pub computed: Vec<(String, ComputedValue)>,

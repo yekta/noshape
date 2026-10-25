@@ -3570,7 +3570,11 @@ impl PartStudioView {
             let msg = state.and_then(|s| {
                 let m = s.message.clone()?;
                 match s.status {
-                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{head} did not regenerate properly: {m}")),
+                    // Live: unresolved selections add a second line ("1 missing selection").
+                    FeatureStatus::Error | FeatureStatus::Warning => {
+                        let more = noshape_model::regen::missing_text(s.missing);
+                        Some(if s.missing > 0 && m != more { format!("{head} did not regenerate properly: {m}\n{more}") } else { format!("{head} did not regenerate properly: {m}") })
+                    }
                     FeatureStatus::Info => None,
                     _ => Some(m),
                 }

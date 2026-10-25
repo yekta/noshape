@@ -2737,17 +2737,13 @@ impl PartStudioView {
     }
 
     /// Drop of dragged features onto the row at `to`: moves every selected
-    /// feature when the dragged one is selected; refuses moves above a
-    /// feature's dependencies (Onshape) with an error message.
+    /// feature when the dragged one is selected. Live (qa4 round 5 v3 s8):
+    /// a move above a feature's dependencies is done all the same; the
+    /// feature then fails on its missing selection.
     pub(super) fn drop_features(&mut self, dragged: FeatureId, to: usize, after: bool, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
         let moving: Vec<FeatureId> = if self.selected_features.contains(&dragged) { self.selected_features.clone() } else { vec![dragged] };
         let Some(order) = interaction::reordered_at(&studio.features, &moving, to, after) else { return };
-        if let Err(msg) = interaction::check_order(&studio.features, &order) {
-            self.message = Some((FeatureStatus::Error, msg));
-            cx.notify();
-            return;
-        }
         let n = moving.len();
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, if n == 1 { "Reorder feature" } else { "Reorder features" }, cx, |ps| interaction::apply_order(ps, &order));

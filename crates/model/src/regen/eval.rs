@@ -173,6 +173,43 @@ fn is_sketch_ref(r: &Reference) -> bool {
     }
 }
 
+/// Copy of `params` without the sketch regions that don't resolve in `ctx`
+/// (their sketch is gone or comes later, or it no longer has the region),
+/// and how many were left out; `None` when every region resolves.
+pub fn drop_missing_regions(params: &ParamValues, ctx: &Context) -> (Option<ParamValues>, usize) {
+    fn resolves(r: &Reference, ctx: &Context) -> bool {
+        match r {
+            Reference::SketchRegion { sketch, key } => ctx
+                .sketch(*sketch)
+                .is_some_and(|s| decode_region_key(key).is_some_and(|id| noshape_sketch::regions::find_region_in(&s.regions, &id).is_some())),
+            _ => true,
+        }
+    }
+    fn prune(v: &ParamValues, ctx: &Context, missing: &mut usize) -> Option<ParamValues> {
+        let mut out: Option<ParamValues> = None;
+        for (k, p) in v.0.iter() {
+            let new = match p {
+                ParamValue::Query(q) if q.iter().any(|r| !resolves(r, ctx)) => {
+                    *missing += q.iter().filter(|r| !resolves(r, ctx)).count();
+                    Some(ParamValue::Query(q.iter().filter(|r| resolves(r, ctx)).cloned().collect()))
+                }
+                ParamValue::Array(items) => {
+                    let pruned: Vec<Option<ParamValues>> = items.iter().map(|it| prune(it, ctx, missing)).collect();
+                    pruned.iter().any(|x| x.is_some()).then(|| ParamValue::Array(items.iter().zip(pruned).map(|(it, x)| x.unwrap_or_else(|| it.clone())).collect()))
+                }
+                _ => None,
+            };
+            if let Some(new) = new {
+                out.get_or_insert_with(|| v.clone()).0.insert(k.clone(), new);
+            }
+        }
+        out
+    }
+    let mut missing = 0;
+    let out = prune(params, ctx, &mut missing);
+    (out, missing)
+}
+
 /// Copy of `params` with every [`Reference::QueryVariable`] (also inside
 /// arrays) replaced by the variable's references from `ctx`; `None` when
 /// the parameters use no query variable. Unknown variables expand to

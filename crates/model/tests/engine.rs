@@ -1284,3 +1284,22 @@ fn fillet_wider_than_its_faces_regenerates_like_onshape() {
     assert!((v - 7458.6158).abs() < 1e-3, "{v}");
     assert_eq!(r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count(), 1);
 }
+
+/// Live (qa4 round 5 v3 s8, REORDER-INVALID / ERR-MISSING-REGION): an
+/// Extrude moved above its sketch (its region now missing) fails with its
+/// own empty-input message and one missing selection.
+#[test]
+fn extrude_above_its_sketch_misses_its_region() {
+    let mut t = T::new();
+    let (s, x) = t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+    let i = t.ps.features.iter().position(|f| f.id == x).unwrap();
+    let f = t.ps.features.remove(i);
+    let j = t.ps.features.iter().position(|g| g.id == s).unwrap();
+    t.ps.features.insert(j, f);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|st| st.id == x).unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    assert_eq!(st.message.as_deref(), Some("Select face or sketch region to extrude."));
+    assert_eq!(st.missing, 1);
+    assert_eq!(noshape_model::regen::missing_text(st.missing), "1 missing selection");
+}
