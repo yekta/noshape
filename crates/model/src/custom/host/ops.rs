@@ -630,7 +630,9 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         for bi in bodies {
             let body = ev.ctx.bodies[bi].clone();
             for (k_, m) in transforms.iter().enumerate() {
-                let res = k::transform(&body.shape, &k::Transform::Matrix(*m), true)?;
+                // Located instances sharing the body's shapes (mirrors share one mirrored copy), as
+                // Onshape's instances: a boolean with many of them intersects each congruent pair once.
+                let res = k::transform(&body.shape, &k::Transform::Matrix(*m), false)?;
                 let inst = instance_number(names.get(k_).map(|s| s.as_str()).unwrap_or(""), k_);
                 let faces = copy_names(ev, &body.faces, &res, inst);
                 push_body(ev, BodyId { feature: ev.feature, index: n }, body.kind, res.shape, faces);
