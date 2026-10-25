@@ -103,6 +103,16 @@ selected stay active as a pick tool (live) ✅.
   Part Studio with other sketches) adds Construction, Extrude…, Revolve…, Hide other sketches, Hide all sketches, Align view
   with vertical axis and has no Section view….
 
+- **Live answers (behaviours "qa4 round 5 s6 constraints")**: (1) V on a Horizontal line: live **adds it anyway**, toast "Sketch
+  could not be solved.", line + both glyphs red, title red, the line **does not collapse** → **CON-HV-COLLAPSE (psb)** confirmed
+  (ours collapses it to zero length silently). (2) Tangent line–circle: live **moves the circle, radius kept** (r 4); ours grows
+  the radius → **CON-TANGENT-APPLY (psb)**; dragging the centre afterwards grows the radius in live too (= ours ✅). (3) Normal
+  is order-independent in live (circle first works; the centre lands on the line) → CON-NORMAL-ORDER confirmed. (4) Fully defined
+  = black line, dots and dimension, plain sketch icon (= ours for the fixed line). (5) Line menu with one sketch: Confirm |
+  Copy sketch entities, Transform sketch entities | **Construction** | **Extrude…, Revolve…** | Curve/surface analysis… | Clear
+  selection, Select, Select other… | (Add comment) | Zoom to fit, Zoom to selection, View normal to sketch plane, **Align view
+  with vertical axis** | Delete sketch entity; no Section view… → **SK-LINE-MENU (psb)**.
+
 ## v3 Session 5 in the app: sketch constraints and dimension editing (v0.4.8 c7d9d454; doc by r5/v3s5.py: Variable #v = 10 mm + free lines and circles; live "Sketch dimension display + Enter/Esc", "qa5 dim conflict", "Constraints")
 Same as live ✅: new box "62 mm" selected, ± and ✓/✕; `1 in` → label **25.4**, reopens as **`1 in`**; `2*5` → **ƒ 10** with the
 tan just-applied background; `#v` → grey **ƒx 10**; Diameter box "16 mm" → **Ø10**; typed value + Esc → Esc #1 reverts to the

@@ -420,3 +420,7 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - **CHIP-HOVER (psb/ui2)** chip hover should highlight the entity yellow-green #f2ff80 (ours keeps amber).
 - **FILLET-OVERFLOW (kern, pending live)** R > face height (21…45 on a 20 mm block edge) reports OK as a clipped quarter
   cylinder; r5/v3s7-fillet.py prints status/volume per radius.
+- **Live s6 answers → psb**: **CON-HV-COLLAPSE** (V on an H line must make the sketch unsolvable: toast + red, line unchanged;
+  ours collapses it to zero length silently), **CON-TANGENT-APPLY** (applying Tangent line–circle moves the circle, radius kept;
+  ours grows the radius), CON-NORMAL-ORDER confirmed, **SK-LINE-MENU** (line menu: + Construction, Extrude…, Revolve…, Align view
+  with vertical axis; − Section view…; + Hide other/all sketches only when other sketches exist).
