@@ -1029,7 +1029,7 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
       failed[(size_t)k] = 1;
       return;
     }
-    if (!f.HasErrors() && f.IsDone() && volumes_add_up(concat(p, q), f.Shape()))
+    if (!f.HasErrors() && f.IsDone() && !cancelled(flag) && volumes_add_up(concat(p, q), f.Shape()))
     {
       res[(size_t)k] = f.Shape();
       hs[(size_t)k]  = new BRepTools_History(to_list(concat(p, q)), f);
@@ -1061,11 +1061,16 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
   }
   if (parts.size() < 2)
     return false;
-  // The slabs back together: they share the cut faces.
+  // The slabs back together: they share the cut faces. (An abort is
+  // checked between these steps: each takes ~0.1 s on a 2000-face part.)
   std::vector<TopoDS_Shape> shared;
   const TopoDS_Shape        joined = join_on_shared_faces(parts, shared);
+  if (cancelled(flag))
+    return false;
   if (!joined.IsNull() && volumes_add_up(concat({target}, t), joined))
   {
+    if (cancelled(flag))
+      return false;
     HHist h3 = new BRepTools_History();
     for (const TopoDS_Shape& f : shared)
       h3->Remove(f);
@@ -1095,6 +1100,8 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
   stages.push_back(std::move(level2));
   stages.push_back({stage_of(parts, h3)});
   hist = compose(concat({target}, t), stages);
+  if (cancelled(flag))
+    return false;
   // Without the cuts: unified (the caller's unify then finds nothing).
   out = unify(g.Shape(), hist);
   return true;

@@ -8,20 +8,13 @@
 //! - ✓ closes the dialog at once and the final regeneration runs under that
 //!   overlay; Esc doesn't cancel it.
 //!
-//! Internally the newest edit wins: a running regeneration whose features a
-//! newer request changes is aborted; one the newer request only extends
-//! (✓ after the preview, same features up to the edited one) finishes its
-//! features into the cache and skips its display.
+//! Internally the newest edit wins (model regen::runs): a running
+//! regeneration whose features a newer request changes is aborted; one the
+//! newer request only extends (✓ after the preview, same features up to the
+//! edited one) finishes its features into the cache and skips its display.
 
 use super::PartStudioView;
 use gpui_kit::*;
-use noshape_model::configuration::ConfigValues;
-use noshape_model::partstudio::PartStudio;
-use noshape_model::reference::FeatureId;
-use noshape_model::regen::RegenCancel;
-use noshape_units::Quantity;
-use std::collections::BTreeMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Live: the working overlay appears 1.2 s after the edit.
@@ -33,42 +26,6 @@ pub(super) struct Pending {
     pub since: Instant,
     /// "Opening <feature>…" (an edit dialog opening on a slow model).
     pub opening: Option<String>,
-}
-
-/// What the running regeneration computes, to tell whether a newer request
-/// makes it stale.
-pub(super) struct InFlight {
-    pub cancel: RegenCancel,
-    pub studio: Arc<PartStudio>,
-    pub upto: Option<usize>,
-    pub config: ConfigValues,
-    pub doc_vars: BTreeMap<String, Quantity>,
-    pub editing_sketch: Option<FeatureId>,
-}
-
-impl InFlight {
-    /// The newer request evaluates the same features as this one (and maybe
-    /// more after them), so this run's cached feature results stay useful.
-    pub fn extended_by(&self, studio: &PartStudio, config: &ConfigValues, doc_vars: &BTreeMap<String, Quantity>, editing_sketch: Option<FeatureId>) -> bool {
-        let n = self.upto.unwrap_or_else(|| self.studio.rollback_index()).min(self.studio.features.len());
-        self.config == *config
-            && self.doc_vars == *doc_vars
-            && self.editing_sketch == editing_sketch
-            && self.studio.configuration == studio.configuration
-            && self.studio.contexts == studio.contexts
-            && studio.features.len() >= n
-            && self.studio.features[..n] == studio.features[..n]
-    }
-
-    /// Stop it for a newer request: abort, or let it finish its features
-    /// when the newer one only extends it.
-    pub fn retire(self, studio: &PartStudio, config: &ConfigValues, doc_vars: &BTreeMap<String, Quantity>, editing_sketch: Option<FeatureId>) {
-        if self.extended_by(studio, config, doc_vars, editing_sketch) {
-            self.cancel.supersede();
-        } else {
-            self.cancel.abort();
-        }
-    }
 }
 
 /// Onshape's medium spinner (`os-spinner-medium`, 41 px box): a light grey
