@@ -410,3 +410,4 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
   connectors' axes, not the instance's pose (live "qa4 round 5 s3 mate flip").
 - Pending live (follow-up "qa4 round 5 s6 constraints"): H+V on one line (ours collapses it), Tangent/drag changing the radius,
   line menu items.
+- **CON-CURVATURE (skb)** Curvature refuses Spline-tool (interpolated) splines: equations.rs curv_spec has no case for them.

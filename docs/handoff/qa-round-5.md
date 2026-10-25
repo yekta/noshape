@@ -56,6 +56,10 @@ selected stay active as a pick tool (live) ✅.
   glyphs, no error, nothing red).
 - **R5v3-S6-f (skb, live asked (2))** Tangent line–circle and dragging the circle's centre change the circle's **radius** (r 4 →
   ~7 on applying; ~7 → ~15 when the centre was dragged 12 mm) rather than moving the line.
+- **R5v3-S6-h → CON-CURVATURE (skb)** Curvature between two splines from the Spline tool is refused: "Can't add constraint:
+  invalid constraint: curvature constraint not supported for e6" (CLI, /tmp/qa4/r5/v3s6b.noshape); `sketch/equations.rs`
+  curv_spec (~785) only handles Line, Arc and control-point BSpline, not the interpolated spline the Spline tool makes. Pierce
+  not tested (needs a 3D curve).
 - **R5v3-S6-g (skb, live asked (5))** right-click on a sketch line: ours = Confirm | Copy sketch entities, Transform sketch
   entities | Curve/surface analysis…, Section view… | Clear selection, Select ▸, Select other… | Zoom to fit, Zoom to
   selection, View normal to sketch plane | Delete sketch entity (= live's earlier capture sketch/31); live's 10-24 capture (a
