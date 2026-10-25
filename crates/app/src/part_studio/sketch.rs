@@ -2578,12 +2578,14 @@ impl PartStudioView {
             let b = crate::overlay_labels::RowBox {
                 leaves,
                 text_size: 16.0,
-                height: 22.0,
+                // Live sketch/24: the hover / selected box is 27 px high,
+                // centred on the value.
+                height: 27.0,
                 pad_x: 4.0,
                 radius: 4.0,
                 background: bg.map(Into::into),
                 border: configured.then(|| rgb(0xffc20e).into()),
-                offset: [shift - est_w * 0.5, -11.0],
+                offset: [shift - est_w * 0.5, -13.5],
             };
             if let Some(l) = crate::overlay_labels::row_box(window, cx, &b, anchor, dim_label_hit(cid)) {
                 out.push(l);
@@ -2971,8 +2973,9 @@ impl PartStudioView {
                     .id(SharedString::from(format!("dim-{}", cid.0)))
                     .absolute()
                     .left(px(x - est_w * 0.5))
-                    .top(px(y - 11.0))
-                    .h(px(22.))
+                    // Live sketch/24: 27 px high, centred on the value.
+                    .top(px(y - 13.5))
+                    .h(px(27.))
                     .px(px(4.))
                     .flex()
                     .items_center()
@@ -3260,16 +3263,17 @@ impl PartStudioView {
             && let Some((x, y)) = project(inf.position)
         {
             let icons: Vec<&'static str> = if inf.kind == noshape_sketch::InferenceKind::AlignBoth { vec!["horizontal", "vertical"] } else { vec![crate::sketch_mode::inference_icon(inf.kind)] };
-            // Live (sketch/51, 52): the bare constraint icon in `#333`, centred
-            // 30 px right of and 31 px below the point (at 18 px our icons give
-            // live's 14 px horizontal bar and 16 px perpendicular base).
+            // Live (sketch/51, 52; part-studio/1032): the constraint icon in
+            // `#333` on a 20 px box of 40 % white (unseen on the white plane),
+            // centred 30 px right of and 31 px below the point (at 18 px our
+            // icons give live's 14 px horizontal bar and 16 px perpendicular base).
             out.push(
                 h_flex()
                     .absolute()
-                    .left(px(x + 20.0))
-                    .top(px(y + 22.0))
+                    .left(px(x + 19.0))
+                    .top(px(y + 21.0))
                     .gap_0p5()
-                    .children(icons.into_iter().map(|i| icon_px(i, 18.0, gpui_kit::rgb_static(0x333333))))
+                    .children(icons.into_iter().map(|i| div().size(px(20.)).flex().items_center().justify_center().bg(gpui_kit::rgba_static(0xffffff66)).child(icon_px(i, 18.0, gpui_kit::rgb_static(0x333333)))))
                     .into_any_element(),
             );
         }

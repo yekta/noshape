@@ -4867,12 +4867,16 @@ impl SketchEditor {
         if let Some(inf) = self.inference.as_ref().filter(|i| !(self.tool == Tool::Line && is_direction(i.kind)))
             && let Some(r) = inf.reference
         {
+            // Live (part-studio/1032): a 1 px yellow dash, 4 px on / 4 off, as
+            // on a rubber band.
             let pts3 = [w(r), w(inf.position)];
-            lines.push_polyline(&pts3, guide_color, 0, 1.0, on_top | LineSegment::DASHED);
+            lines.push_polyline(&pts3, INFERRED_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
         }
         // A point inference marks its point; a direction inference of the
-        // line being drawn shows on the line itself (its dash and end dot).
-        if let Some(inf) = self.inference.as_ref().filter(|i| !(self.tool == Tool::Line && is_direction(i.kind))) {
+        // line being drawn shows on the line itself (its dash and end dot),
+        // an alignment by its guide alone (live part-studio/1032).
+        let alignment = |k: InferenceKind| matches!(k, InferenceKind::AlignHorizontal | InferenceKind::AlignVertical | InferenceKind::AlignBoth);
+        if let Some(inf) = self.inference.as_ref().filter(|i| !(self.tool == Tool::Line && is_direction(i.kind)) && !alignment(i.kind)) {
             points.points.push(PointSprite { position: w(inf.position), color: guide_color, pick_id: 0, size: 8.0, style: on_top, _pad: 0 });
         }
         if let Some((_, q, _)) = self.drag_snap {
