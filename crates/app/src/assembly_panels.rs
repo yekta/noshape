@@ -1276,6 +1276,7 @@ impl AssemblyView {
                             cx.stop_propagation();
                             remove(this);
                             this.update_pattern_preview(cx);
+                            this.refresh_scene(false, cx);
                             cx.notify();
                         })),
                 )
@@ -1295,6 +1296,10 @@ impl AssemblyView {
                         if let Some(p) = &mut this.pattern {
                             p.seeds.retain(|x| *x != id);
                         }
+                        // The field follows the selection (above): the chip's
+                        // instance is deselected too, or it would come back
+                        // (qa4 CHIP-X-SELECTED).
+                        this.selected.retain(|x| *x != id);
                     }),
                 )
             })
