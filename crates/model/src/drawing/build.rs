@@ -1656,7 +1656,30 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         None => circle_points(c, r, 96),
                     };
                     let top_right = outline.iter().copied().fold([f64::MIN, f64::MIN], |m, p| if p[0] + p[1] > m[0] + m[1] { p } else { m });
-                    g.lines.push(Polyline2 { points: outline, style: LineStyle::Thin, closed: true, pick });
+                    // In line on a circle (live qa4 r5 s11 2n, qa4-r5-s11.dxf):
+                    // the label on the circle at 0°, the circle broken
+                    // around it, an arrow each side along the circle
+                    // pointing at it, tips 0.75 of the text height away.
+                    let in_line_circle = v.detail_profile.is_none() && v.detail_style != 1 && v.detail_style != 2 && v.detail_label_at.is_none();
+                    if in_line_circle && r > 1e-6 {
+                        let h = drawing.props.ann_text_height;
+                        let a = drawing.props.ann_arrow;
+                        let half = |chord: f64| 2.0 * (chord / (2.0 * r)).min(1.0).asin();
+                        let tip_a = half(0.75 * h);
+                        let base_a = (tip_a + half(a)).min(std::f64::consts::PI * 0.95);
+                        let on = |t: f64| [c[0] + r * t.cos(), c[1] + r * t.sin()];
+                        let n = 96;
+                        let arc: Vec<[f64; 2]> = (0..=n).map(|i| on(base_a + (std::f64::consts::TAU - 2.0 * base_a) * i as f64 / n as f64)).collect();
+                        g.lines.push(Polyline2 { points: arc, style: LineStyle::Thin, closed: false, pick });
+                        for sign in [1.0, -1.0] {
+                            let (tip, base) = (on(sign * tip_a), on(sign * base_a));
+                            // `arrow` scales by the (default) style's size: the drawing's here.
+                            g.arrow(tip, [tip[0] - base[0], tip[1] - base[1]], 3.0 * a / g.style.ann_arrow.max(1e-9));
+                        }
+                        g.texts.push(Text2 { pos: on(0.0), height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                    } else {
+                        g.lines.push(Polyline2 { points: outline, style: LineStyle::Thin, closed: true, pick });
+                    }
                     match (v.detail_style, v.detail_label_at) {
                         // Connected: a dashed line from the profile to the detail view, no label.
                         (1, _) => {
@@ -1676,12 +1699,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             g.arrow(tip, [d[0] / l, d[1] / l], 3.5);
                             g.texts.push(Text2 { pos: [at[0] - d[0] / l * 3.5, at[1] - d[1] / l * 3.5], height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         }
-                        // In line: the label beside the profile.
-                        _ => {
-                            let a = std::f64::consts::FRAC_PI_4;
-                            let pos = if v.detail_profile.is_some() { [top_right[0] + 3.0, top_right[1] + 3.0] } else { [c[0] + (r + 4.0) * a.cos(), c[1] + (r + 4.0) * a.sin()] };
-                            g.texts.push(Text2 { pos, height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                        // In line on another profile: the label beside it.
+                        _ if !in_line_circle => {
+                            g.texts.push(Text2 { pos: [top_right[0] + 3.0, top_right[1] + 3.0], height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         }
+                        _ => {}
                     }
                 }
             }

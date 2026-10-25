@@ -2163,6 +2163,42 @@ fn exact_export_clips_detail_views_to_their_circle() {
     }
 }
 
+/// Detail profile In line on a circle (live qa4-r5-s11.dxf, detail B): the
+/// label on the circle at 0°, the circle broken around it, an arrow each
+/// side along the circle, tips 0.75 of the text height from the label's
+/// point, one annotation arrow long.
+#[test]
+fn detail_in_line_label_breaks_its_circle() {
+    let (doc, drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let detail = drawing.sheets[0].views.iter().find(|v| matches!(v.kind, ViewKind::Detail { .. })).expect("demo detail view");
+    assert!(detail.detail_style == 0 && detail.detail_profile.is_none() && detail.detail_label_at.is_none());
+    let ViewKind::Detail { parent, center, radius, ref label } = detail.kind else { unreachable!() };
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let pick = built.picks.iter().position(|p| *p == PickTarget::DetailCircle(detail.id)).unwrap() as u32;
+    let ppl = built.placements.iter().find(|p| p.id == parent).unwrap();
+    let c = ppl.to_sheet(center);
+    let r = ppl.len_to_sheet(radius);
+    let (h, a) = (drawing.props.ann_text_height, drawing.props.ann_arrow);
+    let g = &built.geometry;
+    let t = g.texts.iter().find(|t| t.pick == pick && &t.text == label).unwrap();
+    assert!((t.pos[0] - (c[0] + r)).abs() < 1e-9 && (t.pos[1] - c[1]).abs() < 1e-9 && t.height == h, "{t:?}");
+    // The arc leaves the label's side open.
+    let arc: Vec<[f64; 2]> = g.lines.iter().filter(|l| l.pick == pick).flat_map(|l| l.points.clone()).collect();
+    let tip_a = 2.0 * (0.75 * h / (2.0 * r)).asin();
+    let base_a = tip_a + 2.0 * (a / (2.0 * r)).asin();
+    assert!(arc.iter().all(|p| (p[1] - c[1]).atan2(p[0] - c[0]).abs() >= base_a - 1e-9), "broken around the label");
+    // Two arrows, tips on the circle at ±tip_a, pointing at the label.
+    let fills: Vec<&Vec<[f64; 2]>> = g.fills.iter().map(|f| &f.points).filter(|f| ((f[0][0] - c[0]).hypot(f[0][1] - c[1]) - r).abs() < 1e-9).collect();
+    for sign in [1.0f64, -1.0] {
+        let tip = [c[0] + r * (sign * tip_a).cos(), c[1] + r * (sign * tip_a).sin()];
+        let f = fills.iter().find(|f| (f[0][0] - tip[0]).abs() < 1e-9 && (f[0][1] - tip[1]).abs() < 1e-9).expect("arrow at the tip");
+        let mid = [(f[1][0] + f[2][0]) / 2.0, (f[1][1] + f[2][1]) / 2.0];
+        assert!(((mid[0] - tip[0]).hypot(mid[1] - tip[1]) - a).abs() < 1e-9, "one annotation arrow long");
+    }
+}
+
 #[test]
 fn sheet_scale_stays_after_its_views_are_gone() {
     // qa5 D14: "----" only before the first view; once a sheet has had one,
