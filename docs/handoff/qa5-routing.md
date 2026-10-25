@@ -511,3 +511,6 @@ marker on main (each line names the code the fix must change); "pending" = a fix
 | BOX-PREHIGHLIGHT / READOUT-AXES / MIDPOINT-MARKER | psb/ui | ✗ | |
 | SECTION-MANIP (Part Studio) | psb | ✗ | the assembly got live's manipulator (e325430a); the Part Studio section view still draws the arrow only |
 Round 4 fixes (e5e5095b) are on main ✅. My own round-4/5 code fixes (09cdc51e…, ready/qa4) are still in the queue's pending half.
+- **EXPORT-DXF-OPTIONS retracted (asb)**: the DXF dialog has all four checkboxes and scrolls with the wheel at a 900 px window
+  (Hide inspection items, Exclude off-sheet content come into view); not a bug. Re-gate after main 824135c0 (icons2 visual polish
+  only): no routed item changed; ready/kern FAILED in the queue at 04:20.
