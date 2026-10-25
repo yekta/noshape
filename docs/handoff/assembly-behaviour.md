@@ -1197,3 +1197,23 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
 - **Still in the catalogue report:** 52 PEM and 4 NAS sheet-metal fasteners unmapped. Size gaps remain in ISO 7380 (M2, M2.5,
   M18), ISO 10511 (M2, M2.5, M18), ISO 10512 fine pitch, ISO 7379 lengths, DIN 7050 / 7051 / 967 / 923 / 6908, and ASME taper /
   spring pins. Onshape's own tables are captured for all of them (dom/skb-sc-comp), so live() mappings can close them.
+
+## Standard content: hex socket screws against live's B-rep (skb 10-25)
+- **The gap:** none of our socket screws had been checked against live. For the 8 captured in dom/skb-sc-geom (ISO 4762, 10642,
+  7380, 4026–4029 M6; ANSI 1/4-20 socket head), ours were 2–18 % off in area, with 10–23 extra faces.
+- **Socket (all screws):** a hex to the depth t, then a drill point from the flats' circle, ISO 140°, inch 120° (`drill` param,
+  set by `mod.rs` from `c.inch`). This leaves six flat ledges in the hex corners, as live does. The old 118° cone from the
+  corners left ~18 sliver faces.
+- **Point chamfer:** socket screws end at the basic minor diameter d − 1.0825 P (`minor_basic_live` for ISO 7380 and the ANSI
+  SOCKET_LIVE family), as every live socket screw does.
+- **Under-head fillet:** new `ru` param (ISO 7380 HEAD_FILLET).
+- **ISO 7380:** now takes live's own table, which adds M2, M2.5 and M18. Every face but the dome matches live exactly (test
+  `iso_7380_button_head_matches_live_but_the_dome`). Live's dome is a sphere through the rim (new `rimDome` flag), but its radius
+  doesn't follow from M6's row (it reaches the head height at r 1.30, while HEAD_TOP_DIA is 6.0); asked live (REQUESTS "skb
+  (10-25) ISO 7380 dome").
+- **Next:**
+  - ISO 4762: a HeadFillet on the head top edge and an under-head transition cone (AverageDiameter, TransitionLength), with
+    UnderHeadFillet at both ends.
+  - ISO 10642.
+  - Set screws: live's socket is a 0.7 mm flat-bottomed hex in the one capture, against table depths of 2 / 3.5; asked live
+    (REQUESTS "skb (10-25) set screw sockets").
