@@ -2,7 +2,7 @@ use gpui::{
     Capslock, KeyDownEvent, KeyUpEvent, Keystroke, Modifiers, ModifiersChangedEvent, MouseButton,
     MouseDownEvent, MouseExitEvent, MouseMoveEvent, MousePressureEvent, MouseUpEvent,
     NavigationDirection, PinchEvent, Pixels, PlatformInput, PressureStage, ScrollDelta,
-    ScrollWheelEvent, TouchPhase, point, px,
+    ScrollWheelEvent, TouchEvent, TouchId, TouchPhase, point, px,
 };
 
 use crate::{
@@ -57,6 +57,60 @@ unsafe fn wheel_ticks(native_event: id) -> Option<gpui::Point<f32>> {
     } else {
         point(field(SCROLL_WHEEL_EVENT_DELTA_AXIS_2), field(SCROLL_WHEEL_EVENT_DELTA_AXIS_1))
     })
+}
+
+// NOSHAPE PATCH (agent nav2): a pen in contact is a touch, as in Chrome (a
+// tablet-point mouse event is `pointerType` "pen", which Onshape's graphics
+// treat like a finger), unless the app treats the pen as a mouse
+// (`gpui::set_pen_as_mouse`). The contact lasts from the first button down to
+// the last button up; a hovering pen stays a mouse.
+const NS_EVENT_SUBTYPE_TABLET_POINT: i16 = 1;
+
+thread_local! {
+    /// Pen buttons held, and the id of the current contact.
+    static PEN_CONTACT: std::cell::Cell<(u32, u64)> = const { std::cell::Cell::new((0, 0)) };
+}
+
+/// `Some(input)` when the event is a pen contact's (`input` is `None` for one
+/// that is not delivered), `None` for every other event.
+unsafe fn pen_touch(
+    native_event: id,
+    event_type: NSEventType,
+    window_height: Option<Pixels>,
+) -> Option<Option<PlatformInput>> {
+    use NSEventType::*;
+    let down = matches!(event_type, NSLeftMouseDown | NSRightMouseDown | NSOtherMouseDown);
+    let up = matches!(event_type, NSLeftMouseUp | NSRightMouseUp | NSOtherMouseUp);
+    let dragged = matches!(event_type, NSLeftMouseDragged | NSRightMouseDragged | NSOtherMouseDragged);
+    if !(down || up || dragged) || gpui::pen_as_mouse() {
+        return None;
+    }
+    let subtype: i16 = unsafe { msg_send![native_event, subtype] };
+    let (held, contact) = PEN_CONTACT.get();
+    if subtype != NS_EVENT_SUBTYPE_TABLET_POINT {
+        return None;
+    }
+    let (phase, held, contact) = if down {
+        if held == 0 { (TouchPhase::Started, 1, contact + 1) } else { (TouchPhase::Moved, held + 1, contact) }
+    } else if held == 0 {
+        // The contact began before this window saw it.
+        return Some(None);
+    } else if up {
+        (if held == 1 { TouchPhase::Ended } else { TouchPhase::Moved }, held - 1, contact)
+    } else {
+        (TouchPhase::Moved, held, contact)
+    };
+    PEN_CONTACT.set((held, contact));
+    let window_height = window_height?;
+    let location = unsafe { native_event.locationInWindow() };
+    Some(Some(PlatformInput::Touch(TouchEvent {
+        // Above any finger id (macOS reports no touch screens).
+        id: TouchId((1 << 48) + contact),
+        phase,
+        position: point(px(location.x as f32), window_height - px(location.y as f32)),
+        predicted_position: None,
+        force: None,
+    })))
 }
 
 pub fn key_to_native(key: &str) -> Cow<'_, str> {
@@ -148,6 +202,10 @@ pub(crate) unsafe fn platform_input_from_native(
                 return None;
             }
             _ => {}
+        }
+
+        if let Some(input) = pen_touch(native_event, event_type, window_height) {
+            return input;
         }
 
         match event_type {

@@ -38,7 +38,8 @@ pub fn markdown() -> String {
     let ops = registry::all();
     let groups = registry::groups();
     let mut out = String::new();
-    out.push_str(&format!("{} operations in {} groups. Field types are JSON types; lengths and angles take expressions with units.\n\n", ops.len(), groups.len()));
+    // No totals here: branches adding operations would all change one line.
+    out.push_str("The operations by group. Field types are JSON types; lengths and angles take expressions with units.\n\n");
     for g in &groups {
         let names: Vec<String> = ops.iter().filter(|o| o.group == *g).map(|o| format!("[`{}`](#{})", o.tool_name(), o.tool_name())).collect();
         out.push_str(&format!("- **{g}**: {}\n", names.join(", ")));

@@ -40,13 +40,5 @@ pub(crate) use wrapper::*;
 
 pub use platform::WindowsPlatform;
 
-/// NOSHAPE PATCH: whether pen contacts act as a mouse (Onshape's "Use pen
-/// input as mouse"); otherwise they are touches like fingers.
-pub(crate) static PEN_AS_MOUSE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-/// NOSHAPE PATCH: set "Use pen input as mouse" (see [`PEN_AS_MOUSE`]).
-pub fn set_pen_as_mouse(on: bool) {
-    PEN_AS_MOUSE.store(on, std::sync::atomic::Ordering::Relaxed);
-}
 
 pub(crate) use windows::Win32::Foundation::HWND;

@@ -246,6 +246,8 @@ STATUS DOC1 / I5 (2026-10-24, qa5): fixed by api in live's layout with noshape's
 STATUS RHINO1 (2026-10-24, qa5): still "needs openNURBS" on main c59c5af9.
 STATUS MEAS1 (2026-10-24, qa5): answered by live "ui (10-23 a)"; fixed on ready/ui 6f16c117 (not on main yet).
 STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty status bar, as live).
+STATUS BOOL1b (2026-10-24 15:3x, qa5): fixed on main; disjoint Union row tooltip reads "Boolean 1".
+STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF iso view as lines, detail clip kept; DXF R14 with CIRCLE / ELLIPSE / MTEXT and live's layer names. Hatch / dimension / table entities not covered by this drawing.
 
 ## DRW-SIL — api — drawing_get omits silhouette edges; callouts can't target curved parts by script
 - Source: qa4 QA round 4 session 2 (2026-10-24, v0.4.7). Assembly drawing iso view of a plate + Ø10 pin: `drawing_get
@@ -312,6 +314,19 @@ Move boundary on a straight edge of such a face moves it in the plane; its arc n
 (live's default, Maintain curvature off; along their circle when ticked or when trimmed), and the moved edges keep
 their names. In qa5's surf doc Move boundary 1 (25 mm) and 3 (10 mm) move the same edge: 1200 + 750 + 300 =
 2250 mm², 1 face (the row's 1200 + 300 assumed MB1 failing). Test features_b `move_boundary_between_arcs_extends_them`.
+## SEL1 — psb (lead to assign) — Fillet / Chamfer fields accept sketch curves
+- Source: qa5 pass 24, 2026-10-24, main 538981d5.
+- Repro: sketch with a rectangle, close it; Fillet (Shift+F) or Chamfer, click a sketch line in the graphics.
+- Expected (live): not pickable (fillet.fs / chamfer.fs filters have SketchObject.NO).
+- Actual: chip "Sketch 1 line" added. Cause: kind_matches lets PickKind::SketchCurve into any field with the EDGE bit; the std filter parser ignores SketchObject.NO; some EDGE fields (Composite curve, Bridging curve) do take sketch curves, so the fix needs EDGE = model edges only, ANY_EDGE where sketch curves are allowed, and a std-vs-builtin test.
+
+## UNDO3 — asb — drawing note undo takes one step, live two
+- Source: qa5 pass 24, 2026-10-24, main 538981d5.
+- Repro: drawing tab, Note (n), click on the sheet, type "hello", ✓; click empty space; Ctrl+Z.
+- Expected (live, behaviours "qa5 undo across tabs"): the 1st Ctrl+Z leaves the note and enables Redo; the 2nd removes it.
+- Actual: the 1st Ctrl+Z removes the note.
+
+STATUS RHINO1 (2026-10-24 ~00:20, qa5): Rhino export round-trips (65431.327331 mm³, 18 faces) on the target-engine CLI built with openNURBS; still a packaging question for builds without it.
 
 ## PCB-CONVERT — fs — Flex PCB model › Convert of a thin plate makes 6 parts (P3)
 - api, 2026-10-24 (e2e `flex_pcb_model_features`): a 60 × 20 × 1 mm plate (sketch rectangle, Extrude 1 mm), then Flex PCB model with
@@ -351,6 +366,20 @@ NAUO order on export is a fixed internal order that follows no recoverable key (
 - api, 2026-10-25: the imported g47-1part block reports bbox 0…40.0001 × 0…20.0001 × 0…10.0001 (`Shape::bounding_box(true)`
   adds the 1e-7 m vertex/edge tolerance); native parts are exact. Onshape reports the exact box. Used by query_parts
   and anything showing a part's size.
+
+## FSW-L45b — psb — Curve pattern Distance spacing on a closed path (spacing and the limit check)
+- qa5, 2026-10-25 (v0.4.8 release CLI and target-engine 00:45, same result): cube 10 mm at (R, 0), closed circle of length 100 mm
+  (R = 15.9155), Part curve pattern, Spacing type Distance.
+  - d 10 mm × 3: ours copies at 120° / 240°. curvePattern.fs (l. 189–202): instance i at path parameter d·i / (L − d) of the whole
+    path → 0°, 40°, 80° (arc spacing d·L / (L − d) = 11.11 mm). The live L45 capture (d 25 × 3 → 120° / 240°) is the special case
+    d = L / (n + 1), not "spread equally"; `pattern.rs` `if closed { len / n }` only matches it there.
+  - d 25 × 3 and d 20 × 4: ours ERROR "Cannot create a curve pattern when the entered distance is larger than the path length."
+    (live L45: d 25 × 3 OK). The check is exactly at the limit (L − d = d·n) and `path.length()` is the sampled polyline's chord
+    length, a little under L; std uses evPathLength (exact) and TOLERANCE.zeroLength.
+  - Expected: the exact path length, std's formula for the parameters, and a test with d 10 × 3 (40° / 80°) and d 25 × 3 (OK).
+
+- STATUS 2026-10-25 06:25 (qa5): ADV9 still fails on main 10195656 (bracket step 8, target-engine CLI 06:17). FSW-L45b unchanged on
+  the same CLI (d 25 × 3 errors, d 10 × 3 at 120° / 240°). psb's ADV9 fix 853cf16b is in ready/psb, queue status CONFLICT since 21:44.
 ## IMP-DENS — api — "Import material density" offered for STEP files (main, since 5d5e0403)
 - Source: qa4 QA round 4 session 5 in the app (2026-10-24). `crates/app/src/import_dialog.rs` `density` includes "step"/"stp".
 - Expected (live): behaviours "qa4 round 4 s5": "For STEP there is **no 'Import material density'** checkbox (an .x_t import
@@ -465,3 +494,115 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - **DIM-MENU (skb)** right-click on a sketch dimension should be the standard sketch context menu with "Change to driven
   dimension" on top and "Delete dimension" last; ours is a 2-item custom list with centred labels (sketch.rs render_dim_menu).
 - **VAR-KEYWORD (psb/api)** `#var` is a valid live variable name; ours rejects it via FS_KEYWORDS (variable_table.rs is_identifier).
+
+## qa4 QA round 5 v3 s6: every sketch constraint, driven dims, glyph menus, dragging (P1) — qa-round-5.md "v3 Session 6"
+- **CON-NORMAL-ORDER (skb)** Normal with the circle picked first fails ("e50 is not a line"): make_constraint (scene/sketch_mode.rs
+  ~5946) should order line/curve by kind like Midpoint.
+- **CON-MSG (skb)** constraint errors expose internal ids in the status bar and linger after later actions.
+- **DRIVEN-LOOK (skb)** driven dims: grey plain "Ø10" (no parentheses); a redundant (auto-driven) dimension still opens the value box.
+- **GLYPH-MENU (skb)** glyph right-click = reduced sketch menu ending "Delete sketch entity" (ours: one centred "Delete").
+- **MATE-FLIP-AXIAL confirmed by live (asb)** flip swaps the pose for Revolute/Cylindrical/Planar; the default follows the
+  connectors' axes, not the instance's pose (live "qa4 round 5 s3 mate flip").
+- Pending live (follow-up "qa4 round 5 s6 constraints"): H+V on one line (ours collapses it), Tangent/drag changing the radius,
+  line menu items.
+- **CON-CURVATURE (skb)** Curvature refuses Spline-tool (interpolated) splines: equations.rs curv_spec has no case for them.
+
+## qa4 QA round 5 v3 s7: feature dialogs in everyday use (P1) — qa-round-5.md "v3 Session 7" (sketch items now go to psb)
+- **EXT-DIRECTION (psb/ui2)** ticking Direction: the new field should become active, the title red and the group chevron
+  red-brown until picked (live dialogs/extrude-23); ours: white field, black title, grey chevron.
+- **EXT-2ND-DEPTH (psb/ui2)** Second end position Depth: no › expander and no ± icon on live.
+- **SEL-REJECT-TOAST (psb)** no toast for a rejected pick (ours: "Select sketch regions or planar faces." from filter_description).
+- **CHIP-HOVER (psb/ui2)** chip hover should highlight the entity yellow-green #f2ff80 (ours keeps amber).
+- **FILLET-OVERFLOW (kern, pending live)** R > face height (21…45 on a 20 mm block edge) reports OK as a clipped quarter
+  cylinder; r5/v3s7-fillet.py prints status/volume per radius.
+- **Live s6 answers → psb**: **CON-HV-COLLAPSE** (V on an H line must make the sketch unsolvable: toast + red, line unchanged;
+  ours collapses it to zero length silently), **CON-TANGENT-APPLY** (applying Tangent line–circle moves the circle, radius kept;
+  ours grows the radius), CON-NORMAL-ORDER confirmed, **SK-LINE-MENU** (line menu: + Construction, Extrude…, Revolve…, Align view
+  with vertical axis; − Section view…; + Hide other/all sketches only when other sketches exist).
+- **FILLET-OVERFLOW retracted** (live reports the same OK results and volumes). **CHAMFER-OVERFLOW (kern)** new: Chamfer 25 on a
+  20 mm face edge is OK in live (30000.000 mm³, the leg overflows like a fillet); ours "Failed to chamfer selections.".
+  EXT-DIRECTION confirmed with colours (qa-round-5.md s7 live answers).
+
+## qa4 QA round 5 v3 s8: the feature list (P1; published v0.4.8) — qa-round-5.md "v3 Session 8"
+- **ERR-MISSING-REGION (kern/psb)** dependent of a deleted sketch: "A selected sketch region no longer exists" (eval.rs ~636) is
+  not an Onshape string; use the empty-input "Select face or sketch region to extrude." style (exact text pending live s8 (2)).
+- **MULTI-MENU (psb)** multi-row menu: add "Edit sketch appearance…" when a sketch is selected.
+- Pending live s8: invalid reorder handling (ours: red toast "Cannot reorder: … depends on …"), folder expand as an undo step,
+  geometry-hover → row highlight, folder menu.
+
+## qa4 QA round 5 v3 s9: interaction (P1; v0.4.8) — qa-round-5.md "v3 Session 9"
+- **BOX-PREHIGHLIGHT (psb)** crossing box: pre-highlight everything it touches while dragging (live).
+- **SELECT-OTHER (psb/ui2)** popup: header ✕, no type column, no preselected row, hovered row bold, "?" footer (live sketch/231).
+- Pending live s9: global selection filter, parts-row "Hide other/all parts", Measure panel default unit, Point readout axis
+  icons, section manipulator, edge midpoint marker.
+- **Live s8 answers → psb**: **REORDER-INVALID** (do the move, dependents go red with "Select face or sketch region to
+  extrude." / "1 missing selection"; no refusal toast), ERR-MISSING-REGION confirmed (+ second line "1 missing selection"),
+  **SUPPRESSED-MENU** (Rename | Add selection to folder… | Unsuppress | Dynamic suppression | Roll to here | Delete),
+  **SKETCH-UNCONSUMED** (a sketch whose consumer is suppressed shows again), **TOOLTIP-PARENT** (no type tag on the parent),
+  **FOLDER-NAME-INLINE** (Add selection to folder… names inline in the row), **FOLDER-MENU** (Rename | Add selection to folder… |
+  Suppress/Unsuppress | Dynamic suppression | Roll to here | Expand | Collapse | Delete | Unpack folder), **FOLDER-EXPAND-UNDO**
+  (expand/collapse is not an undo step).
+
+## qa4 QA round 5 v3 s10: everyday assembly (P2; v0.4.8) — qa-round-5.md "v3 Session 10" (assemblies → skb)
+- **DRAG-RUNAWAY (skb, P2 severe)** dragging one instance in a Planar-mated stack moves the other free instances: 10 cubes lean, 19
+  cubes are flung ±2.5e6 mm in X/Y (mates still ok). Undragged bodies need a pull toward their current pose / minimal-norm steps.
+  Repro r5/v3s10n.py (NCUBES=19). Drag rate 3.9 updates/s at 20 instances vs 10.0 at 7 (software GL; r5/dragfps.sh).
+- **CHIP-X-SELECTED (skb)** pattern dialog seed chip × is undone while the instance stays selected (re-captured from selection).
+- **Live s9 answers**: **READOUT-AXES (ui/psb)** Point readout needs X↘/Y↗/Z↑ coloured axis arrows; **SECTION-MANIP (psb)** section
+  plane manipulator = ring + shaft + arrowhead + two rotate handles; **MIDPOINT-MARKER (psb/ui)** dark hollow ring on edge hover,
+  orange hollow ring near the midpoint (edge un-highlighted), yellow-orange ring when selected. No global selection filter,
+  parts-row Hide other/all parts and the Measure unit are live-like.
+
+## qa4 QA round 5 v3 s11: everyday drawing (P2; v0.4.8) — qa-round-5.md "v3 Session 11"
+- **ORD-BASE (asb, P2 wrong value)** ordinate base measured from the click point, not the highlighted edge (boss centres 14.26 /
+  39.26 / 64.26 instead of 15 / 40 / 65; 15.39 when clicked outside).
+- **EXPORT-DXF-OPTIONS (asb)** DXF/DWG export: add ☐ Hide inspection items and ☐ Exclude off-sheet content (live).
+- Pending live s11: auto-update vs Update button, title block editing, iso angular value, live PDF/DXF for comparison.
+- **DRAG-RUNAWAY confirmed by live (skb)**: Onshape moves only the dragged instance; all others keep their exact pose (live REST
+  before/after for 10- and 19-cube Planar stacks); server ≈ 21 ms per drag step regardless of stack size.
+## PCB-CONVERT — fs — Flex PCB model › Convert of a thin plate makes 6 parts (P3)
+- api, 2026-10-24 (e2e `flex_pcb_model_features`): a 60 × 20 × 1 mm plate (sketch rectangle, Extrude 1 mm), then Flex PCB model with
+  Process Convert, Parts and surfaces to convert = the plate, other fields default → 6 solid parts "Part 1" … "Part 6"
+  (`body:<pcbStart>.2114097152` … `.2114097157`); Finish flex PCB model (Unfold none) then reports its Info note. Expected (live,
+  to be checked): one flex PCB part. Priority P3 (lead). Repro: `cargo test -p noshape-ops --test e2e flex_pcb_model_features`
+  and print `query_parts` after the pcbStart call.
+
+## FLAT-HOLE — model (lead to assign) — Flatten surfaces of a planar face with a hole is wrong
+- api, 2026-10-25: an 80 × 40 × 20 mm block with a Ø10 through hole; Flatten surfaces of its top (or bottom) face → 20 boundary
+  loops, flat area 4396 mm² for 3121.5 mm² in 3D, strain up to 24, flat size 59 × 84 mm. The same block without the hole, and every
+  hole-free face, flattens exactly (1 loop, areas equal, 40 × 80 mm). Expected: an identical flat face (no strain), 2 loops.
+  `noshape_model::flatten::flatten_faces` (moved verbatim from the app's flatten_tool.rs; the app's Flatten surfaces is the same).
+  Repro: `analysis_flatten {"faces": [<top face id>]}` on `block_with_hole` (ops e2e).
+
+## Re-gate on main ac467453 (qa4 2026-10-25 03:15): sessions 5–11 items vs main since v0.4.8 (2bf78a67)
+Main has 14 new commits since v0.4.8 (API audits 3–9, menus, sheet metal, fonts, dual DXF, assembly section manipulator); the
+merge queue has been bisecting a red batch since 23:56, so most owners' fixes are still on their ready branches. Checked by code
+marker on main (each line names the code the fix must change); "pending" = a fix commit exists on the owner's ready branch.
+| item | owner | main | note |
+|---|---|---|---|
+| OFF-CONSTR / OFF-BOX / OFF-SIDE / OFF-TOAST / OFF-CORNER | psb | ✗ | tools.rs offset_chain still Parallel + arcs; no offset value box change |
+| HOLE-FACE | psb | ✗ | kind_matches still PLANE_LIKE ⊃ MATE_CONNECTOR |
+| EDIT-TYPING-PREVIEW | psb/ui2 | ✗ | on_text_changed still emits Changed per keystroke |
+| ROLL-LAST (rolled-back menu, Roll to end) | psb | ✗ | **pending** ready/psb 33092438 ("rolled-back feature menu") |
+| ROLLBACK-AUTOSCROLL (round 5 v2) | psb | ✗ | **pending** ready/psb 33092438 ("feature-list drag autoscroll") |
+| HOLE-MSG / PAT-REAPPLY-FAIL (round 5 v2) | psb | ✗ | **pending** ready/psb 33092438 |
+| ROLLBACK-DROP-TOP | psb | ✗ | |
+| MATE-FLIP-AXIAL | skb | ✗ | solver.rs:571 still [z.x, z.y]; **pending** ready/skb fc70821b |
+| DRAG-RUNAWAY | skb | ✗ | **pending?** ready/skb 118d110d (drag solve per connected group) — re-test when it lands |
+| CHIP-X-SELECTED | skb | ✗ | |
+| DRW-DIM-2EDGES / ORD-BASE | asb | ✗ | no smart.rs / ordinate change on main |
+| EXPORT-DXF-OPTIONS | asb | **corrected** | all 4 checkboxes are in the code since v0.4.8; at a 900 px window the last two sit below the dialog's footer (clipping, check scroll) |
+| DIM-EXPR-UNIT / DIM-AUTOCOMPLETE / DIM-ESC-UNTOUCHED / DIM-UNSOLVED-GEOM | psb | ✗ | |
+| DIM-MENU / GLYPH-MENU | psb | ✗ | sketch.rs render_dim_menu still the custom list (dea2167b only shared its options with the API) |
+| VAR-KEYWORD | psb/api | ✗ | is_identifier still rejects FS_KEYWORDS |
+| CON-NORMAL-ORDER | psb | ✗ | make_constraint still `Normal { line: a, curve: b? }` |
+| CON-MSG / CON-HV-COLLAPSE / CON-TANGENT-APPLY / CON-CURVATURE / SK-LINE-MENU / DRIVEN-LOOK | psb | ✗ | |
+| EXT-DIRECTION / EXT-2ND-DEPTH / CHIP-HOVER | ui | ✗ | ready/ui has dialog-row fixes (909979d7, d82b2bd2) but not these |
+| SEL-REJECT-TOAST | psb | ✗ | behaviors.rs still flash_info(filter_description) |
+| CHAMFER-OVERFLOW | kern | ✗ | no kernel/regen change on main |
+| ERR-MISSING-REGION / REORDER-INVALID | psb | ✗ | eval.rs:636 and interaction.rs:163 unchanged |
+| SKETCH-UNCONSUMED / MULTI-MENU | psb/ui | ✗ | |
+| SUPPRESSED-MENU / TOOLTIP-PARENT / FOLDER-NAME-INLINE / FOLDER-MENU / FOLDER-EXPAND-UNDO / SELECT-OTHER | ui | ✗ | |
+| BOX-PREHIGHLIGHT / READOUT-AXES / MIDPOINT-MARKER | psb/ui | ✗ | |
+| SECTION-MANIP (Part Studio) | psb | ✗ | the assembly got live's manipulator (e325430a); the Part Studio section view still draws the arrow only |
+Round 4 fixes (e5e5095b) are on main ✅. My own round-4/5 code fixes (09cdc51e…, ready/qa4) are still in the queue's pending half.
