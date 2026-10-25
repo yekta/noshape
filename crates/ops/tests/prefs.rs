@@ -9,7 +9,7 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Result<Value, noshape_ops::Op
 }
 
 #[test]
-fn graphics_preferences_read_set_and_kept() {
+fn graphics_preferences_and_toolbar_read_set_and_kept() {
     let dir = std::env::temp_dir().join(format!("noshape-prefs-test-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -29,5 +29,14 @@ fn graphics_preferences_read_set_and_kept() {
     assert_eq!(e.param.as_deref(), Some("graphics.fov_deg"), "{e:?}");
     let e = call(&mut ctx, "ui_preferences", json!({ "graphics": { "nope": 1 } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("graphics.nope"), "{e:?}");
+
+    // The toolbar: Customize toolbar… and the S shortcut toolbar.
+    let t = call(&mut ctx, "ui_toolbar", json!({})).unwrap();
+    assert_eq!(t["shortcut_tools"].as_array().unwrap().len(), 10, "Onshape's ten: {t}");
+    call(&mut ctx, "ui_toolbar", json!({ "set": { "removed": ["helix"], "shortcut_tools": ["sketch", "extrude", "fillet"], "hide_search": true } })).unwrap();
+    let t = call(&mut Ctx::new(), "ui_toolbar", json!({})).unwrap();
+    assert_eq!((t["toolbar"]["removed"].clone(), t["shortcut_tools"].clone(), t["toolbar"]["hide_search"].clone()), (json!(["helix"]), json!(["sketch", "extrude", "fillet"]), json!(true)), "{t}");
+    let e = call(&mut ctx, "ui_toolbar", json!({ "set": { "shortcut_tools": ["nope"] } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set.shortcut_tools"), "{e:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }

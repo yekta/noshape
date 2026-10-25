@@ -1,7 +1,9 @@
 //! The user's preference files (per user, JSON in noshape's config
-//! directory), shared by the app and the agent API: Graphics preferences.
+//! directory), shared by the app and the agent API: Graphics preferences,
+//! the Part Studio toolbar (Customize toolbar…, the S shortcut toolbars).
 
 use noshape_scene::GraphicsPrefs;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 fn graphics_path() -> std::path::PathBuf {
@@ -76,4 +78,101 @@ pub fn graphics_with(p: &GraphicsPrefs, set: &Map<String, Value>) -> Result<Grap
         m.insert(k.clone(), x.clone());
     }
     serde_json::from_value(v).map_err(|e| (String::new(), e.to_string()))
+}
+
+// ------------------------------------------------------------ toolbar
+
+/// Default S shortcut toolbar (Part Studio, live: two rows of five).
+pub const DEFAULT_SHORTCUT_TOOLS: &[&str] = &["sketch", "extrude", "revolve", "sweep", "loft", "fillet", "chamfer", "hole", "booleanBodies", "transform"];
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ToolbarPrefs {
+    /// Tool ids removed from the Part Studio toolbar.
+    #[serde(default)]
+    pub removed: Vec<String>,
+    /// Tool set order: indices into the default toolbar groups, ⊞ last
+    /// (Customize toolbar…; `toolbar_customize::full_order`).
+    #[serde(default)]
+    pub group_order: Vec<usize>,
+    /// Right-click the toolbar › Hide "Search tools".
+    #[serde(default)]
+    pub hide_search: bool,
+    /// S shortcut toolbar tools (None = defaults).
+    #[serde(default)]
+    pub shortcut_tools: Option<Vec<String>>,
+    /// S shortcut toolbar tools in a sketch, by tool name (None = defaults;
+    /// Preferences › Shortcut toolbars › Sketch).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sketch_shortcut_tools: Option<Vec<String>>,
+    /// The drawing S toolbar's tools, by name (None = defaults; Preferences ›
+    /// Shortcut toolbars › Drawing; `drawing_keys::SHORTCUT_CATALOGUE`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drawing_shortcut_tools: Option<Vec<String>>,
+}
+
+impl ToolbarPrefs {
+    fn path() -> std::path::PathBuf {
+        noshape_scene::config_dir().join("part_studio_toolbar.json")
+    }
+
+    pub fn load() -> Self {
+        std::fs::read_to_string(Self::path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+    }
+
+    pub fn save(&self) {
+        let p = Self::path();
+        if let Some(dir) = p.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Ok(t) = serde_json::to_string_pretty(self) {
+            let _ = std::fs::write(p, t);
+        }
+    }
+
+    pub fn shortcut_tools(&self) -> Vec<String> {
+        self.shortcut_tools.clone().unwrap_or_else(|| DEFAULT_SHORTCUT_TOOLS.iter().map(|s| s.to_string()).collect())
+    }
+
+    /// Sketch S toolbar tool names (`defaults`: Onshape's ten).
+    pub fn sketch_shortcut_tools(&self, defaults: &[&str]) -> Vec<String> {
+        self.sketch_shortcut_tools.clone().unwrap_or_else(|| defaults.iter().map(|s| s.to_string()).collect())
+    }
+
+    pub fn toggle_sketch_shortcut(&mut self, name: &str, defaults: &[&str]) {
+        let mut tools = self.sketch_shortcut_tools(defaults);
+        match tools.iter().position(|t| t == name) {
+            Some(i) => {
+                tools.remove(i);
+            }
+            None => tools.push(name.to_string()),
+        }
+        self.sketch_shortcut_tools = Some(tools);
+    }
+
+    /// Drawing S toolbar tool names (`defaults`: Onshape's ten).
+    pub fn drawing_shortcut_tools(&self, defaults: &[&str]) -> Vec<String> {
+        self.drawing_shortcut_tools.clone().unwrap_or_else(|| defaults.iter().map(|s| s.to_string()).collect())
+    }
+
+    pub fn toggle_drawing_shortcut(&mut self, name: &str, defaults: &[&str]) {
+        let mut tools = self.drawing_shortcut_tools(defaults);
+        match tools.iter().position(|t| t == name) {
+            Some(i) => {
+                tools.remove(i);
+            }
+            None => tools.push(name.to_string()),
+        }
+        self.drawing_shortcut_tools = Some(tools);
+    }
+
+    pub fn toggle_shortcut(&mut self, id: &str) {
+        let mut tools = self.shortcut_tools();
+        match tools.iter().position(|t| t == id) {
+            Some(i) => {
+                tools.remove(i);
+            }
+            None => tools.push(id.to_string()),
+        }
+        self.shortcut_tools = Some(tools);
+    }
 }

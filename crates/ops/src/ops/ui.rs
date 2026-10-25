@@ -42,6 +42,16 @@ pub fn ops() -> Vec<Op> {
             run: preferences,
         },
         Op {
+            group: "ui",
+            verb: "toolbar",
+            summary: "The Part Studio toolbar's customization (Customize toolbar…) and the S shortcut toolbars",
+            description: "The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide \"Search tools\"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do.",
+            fields: vec![doc_field(), opt("set", json!({ "type": "object" }), "Settings to change (see the reply).")],
+            mutates: false,
+            destructive: false,
+            run: toolbar,
+        },
+        Op {
             group: "tab",
             verb: "activate",
             summary: "Show a tab (click it in the tab bar)",
@@ -176,6 +186,47 @@ fn preferences(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         ctx.reload_prefs = true;
     }
     Ok(json!({ "graphics": crate::prefs::graphics_json(&prefs), "shown_in_app": ctx.serving }).into())
+}
+
+fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::prefs::ToolbarPrefs;
+    let mut prefs = ToolbarPrefs::load();
+    if let Some(set) = a.object("set")?.filter(|m| !m.is_empty()) {
+        // Feature tool ids (a document's custom features when one is open).
+        if let Ok(od) = ctx.doc(a.opt_str("doc")?) {
+            let _ = noshape_model::custom::DocumentScripts::from_document(od.doc());
+        }
+        let tool_ids = |key: &str, v: &Value| -> Result<Vec<String>, OpError> {
+            let l = v.as_array().ok_or_else(|| OpError::param(&format!("set.{key}"), "a list of tool ids"))?;
+            l.iter()
+                .map(|x| match x.as_str() {
+                    Some(id) if noshape_model::features::get(id).is_some() => Ok(id.to_string()),
+                    _ => Err(OpError::param(&format!("set.{key}"), &format!("unknown tool {x} (feature_types)"))),
+                })
+                .collect()
+        };
+        let names = |key: &str, v: &Value| -> Result<Option<Vec<String>>, OpError> {
+            match v {
+                Value::Null => Ok(None),
+                Value::Array(l) => l.iter().map(|x| x.as_str().map(str::to_string).ok_or_else(|| OpError::param(&format!("set.{key}"), "tool names"))).collect::<Result<_, _>>().map(Some),
+                _ => Err(OpError::param(&format!("set.{key}"), "a list of tool names, or null for the defaults")),
+            }
+        };
+        for (k, v) in set {
+            match k.as_str() {
+                "removed" => prefs.removed = tool_ids(k, v)?,
+                "group_order" => prefs.group_order = v.as_array().and_then(|l| l.iter().map(|x| x.as_u64().map(|n| n as usize)).collect()).ok_or_else(|| OpError::param("set.group_order", "tool set indices"))?,
+                "hide_search" => prefs.hide_search = v.as_bool().ok_or_else(|| OpError::param("set.hide_search", "true or false"))?,
+                "shortcut_tools" => prefs.shortcut_tools = if v.is_null() { None } else { Some(tool_ids(k, v)?) },
+                "sketch_shortcut_tools" => prefs.sketch_shortcut_tools = names(k, v)?,
+                "drawing_shortcut_tools" => prefs.drawing_shortcut_tools = names(k, v)?,
+                _ => return Err(OpError::param(&format!("set.{k}"), "removed, group_order, hide_search, shortcut_tools, sketch_shortcut_tools or drawing_shortcut_tools")),
+            }
+        }
+        prefs.save();
+        ctx.reload_prefs = true;
+    }
+    Ok(json!({ "toolbar": prefs, "shortcut_tools": prefs.shortcut_tools() }).into())
 }
 
 fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
