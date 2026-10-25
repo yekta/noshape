@@ -1592,6 +1592,18 @@ impl Viewport {
         }
     }
 
+    /// Moves over the viewport while no drag of its own is in progress (a
+    /// drag's moves come through the window listener, [`Self::on_mouse_move`]).
+    fn on_hover_move(&mut self, e: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.drag == Drag::None {
+            self.on_mouse_move(e, window, cx);
+        }
+    }
+
+    /// Every mouse move of a press that started here, wherever the pointer is
+    /// (Onshape's `dragHelper` is jQuery UI's `mouse`, which follows the drag
+    /// on the whole document: rotating on over the feature list keeps
+    /// rotating), and hover moves over the viewport.
     fn on_mouse_move(&mut self, e: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
         if crate::nav_trace::enabled() {
             let local = self.local(e.position);
@@ -2218,9 +2230,20 @@ impl Render for Viewport {
                             // Touchscreen: raw touches that start on this
                             // viewport (nothing in front of it) are claimed
                             // from gpui's portable recognizer.
-                            window.on_mouse_event(move |e: &TouchEvent, phase, window, cx| {
-                                if phase == DispatchPhase::Bubble {
-                                    entity.update(cx, |this, cx| this.on_touch(e, hitbox.id, window, cx));
+                            window.on_mouse_event({
+                                let entity = entity.clone();
+                                move |e: &TouchEvent, phase, window, cx| {
+                                    if phase == DispatchPhase::Bubble {
+                                        entity.update(cx, |this, cx| this.on_touch(e, hitbox.id, window, cx));
+                                    }
+                                }
+                            });
+                            // A press that started here follows the pointer
+                            // over the rest of the window (capture phase: no
+                            // panel under it can swallow the move).
+                            window.on_mouse_event(move |e: &MouseMoveEvent, phase, window, cx| {
+                                if phase == DispatchPhase::Capture && entity.read(cx).drag != Drag::None {
+                                    entity.update(cx, |this, cx| this.on_mouse_move(e, window, cx));
                                 }
                             });
                         }
@@ -2250,7 +2273,7 @@ impl Render for Viewport {
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Right, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Middle, cx.listener(Self::on_mouse_down))
-            .on_mouse_move(cx.listener(Self::on_mouse_move))
+            .on_mouse_move(cx.listener(Self::on_hover_move))
             .on_hover(cx.listener(Self::on_hover_change))
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Right, cx.listener(Self::on_mouse_up))

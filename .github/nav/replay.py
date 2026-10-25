@@ -197,6 +197,30 @@ class Replay:
             time.sleep(0.3)
         return run
 
+    def release_outside(self):
+        """Right-drag from the viewport out over the panel at its left, release
+        there, then move the pointer: the drag must have ended."""
+        def run():
+            # From 100 px inside the viewport's left edge to the middle of the
+            # panel at its left (under half a turn, so the angle is unambiguous).
+            self.cursor(*self.screen_point(-self.size[0] / 2 + 100, 0))
+            self.mouse.button(ui.BTN_RIGHT, True)
+            time.sleep(0.05)
+            out = int(100 + self.origin[0] / 2) // 20 * 20
+            for _ in range(20):
+                self.mouse.move(-out // 20, 0)
+                time.sleep(0.016)
+            time.sleep(0.1)
+            self.mouse.button(ui.BTN_RIGHT, False)
+            with open(self.trace, "a") as f:
+                f.write(json.dumps({"mark": "released"}) + "\n")
+            time.sleep(0.3)
+            for _ in range(10):
+                self.mouse.move(out // 10, 0)
+                time.sleep(0.016)
+            time.sleep(0.3)
+        return run
+
     def wheel_during_box(self):
         """A left-drag box selection with wheel notches in the middle."""
         def run():
@@ -238,6 +262,7 @@ class Replay:
         self.step("alt-right-drag", self.with_key(ui.KEY_LEFTALT, self.drag(ui.BTN_RIGHT, -200, 0)))
         self.step("ctrl-mid-drag", self.ctrl_mid_drag())
         self.step("wheel-during-box", self.wheel_during_box())
+        self.step("release-outside", self.release_outside())
         self.step("touch-rotate", self.touch({0: c}, {0: (c[0] - 200, c[1])}))
         self.step("touch-pan", self.touch({0: (c[0] - 50, c[1]), 1: (c[0] + 50, c[1])}, {0: (c[0] + 100, c[1]), 1: (c[0] + 200, c[1])}, steps=15))
         self.step("touch-pinch", self.touch({0: (c[0] - 50, c[1]), 1: (c[0] + 50, c[1])}, {0: (c[0] - 100, c[1]), 1: (c[0] + 100, c[1])}))

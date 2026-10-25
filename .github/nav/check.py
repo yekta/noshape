@@ -351,6 +351,24 @@ def main():
         n = len([r for r in by["wheel-during-box"] if r.get("input") == "scroll"])
         cams = [r for r in by["wheel-during-box"] if "camera" in r]
         ch.check("wheel-during-box", f"camera unchanged by {n} wheel events", float(len(cams)), 0.0, 0)
+    if "release-outside" in by:
+        recs = by["release-outside"]
+        i = next((k for k, r in enumerate(recs) if r.get("mark") == "released"), None)
+        if i is not None:
+            before = [r for r in recs[:i] if "camera" in r]
+            after = [r for r in recs[i:] if "camera" in r]
+            ch.check("release-outside", "the drag rotated before the release", float(bool(before)), 1.0, 0)
+            down = next((r["data"]["at"] for r in recs if r.get("input") == "mouse_down"), None)
+            up = next((r["data"]["at"] for r in recs if r.get("input") == "mouse_up"), None)
+            c0 = recs[0]["camera0"]
+            if down and up and before and c0:
+                # Onshape follows the drag over the whole page: the moves over
+                # the panel rotate too.
+                w, h = before[-1]["viewport"]
+                want = (3 * 360 * abs(up[0] - down[0]) / math.hypot(w, h)) % 360
+                want = min(want, 360 - want)
+                ch.check("release-outside", f"turn (deg) for the whole {abs(up[0] - down[0]):.0f} px drag", angle(c0["camera"]["forward"], before[-1]["camera"]["forward"]), want, 0.5)
+            ch.check("release-outside", "camera changes after the release", float(len(after)), 0.0, 0)
     c0, c1 = first_last("middle-drag")
     if c0 and c1:
         moved = math.dist(c0["camera"]["target"], c1["camera"]["target"]) / c1["camera"]["world_per_pixel"]

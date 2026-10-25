@@ -89,7 +89,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.10 | Ctrl+middle-drag pans (closest binding) | `getClosestMode` | ✅ |
 | 1.11 | Pressing/releasing Ctrl or Alt mid-drag switches mode (rotate ↔ pan ↔ constrained) without lifting the button | `updateManipulationMode` per drag event | ✅ R: right-drag −100 px, Ctrl held +100 px, released −100 px → the view turns 200 px worth (the Ctrl part pans) |
 | 1.12 | A second button pressed mid-drag re-resolves the mode | `updateInputState` | 🔧 |
-| 1.13 | Releasing outside the graphics area ends the drag | — | 🔧 (`on_mouse_up_out`) |
+| 1.13 | Releasing outside the graphics area ends the drag | — | ✅ fixed 10-25: the drag also follows the pointer over the panels (Onshape's dragHelper is jQuery UI `mouse`, bound to the document; ours stopped at the viewport edge) and ends on release there; R: 220 px from the viewport into the feature list → 146.442° = 3 turns/diagonal, no change after the release |
 | 1.14 | Right-click (no drag): context menu; a right-drag opens none | Home__context_menus | ✅ |
 | 1.15 | Double-click middle button: zoom to fit (animated) | `onMiddleMouseButtonDoubleClick` | ✅ |
 | 1.16 | Scroll wheel up zooms in, down zooms out, about the cursor (also when zooming out) | help; `zoomOnCanvasPoint`, `USE_CENTRAL_ZOOM_OUT` 0; live navigation/11–14 (fixed point = pointer both ways) | ✅ L, R (Wayland value120, X11 valuators, both directions, fixed point < 0.5 px) |
@@ -224,9 +224,9 @@ drives the app through the kernel: a uinput mouse, keyboard, clickpad and touch 
 libinput in a headless sway, the app on Wayland or on X11 through Xwayland. `check.py`
 recomputes every expected number independently (Chromium's rules on the WAYLAND_DEBUG protocol
 log or on the posted events, Onshape's formulas) and compares each camera change.
-Local run 10-25 01:10: **Wayland 487/487, X11 253/253 checks pass** (wheel notches and 120ths,
+Local run 10-25 02:30: **Wayland 490/490, X11 256/256 checks pass** (wheel notches and 120ths,
 Shift/Ctrl+wheel, horizontal wheel, two-finger scroll up/down/sideways, pinch out/in, right-drag
 with its rotate centre fixed on screen, Alt+right-drag, middle-drag, touch rotate/pan/pinch/roll,
-tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
+tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube, a drag released over the feature list). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
 phases and momentum, drags) and Windows (SendInput wheel, InjectTouchInput touch, drags) run in
 `.github/workflows/nav.yml`.
