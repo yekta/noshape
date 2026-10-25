@@ -255,7 +255,7 @@ fn schema_says_when_parameters_show() {
 /// the sweep), and none may be added.
 #[test]
 fn ui_only_entries_only_go_down() {
-    const CEILING: usize = 61;
+    const CEILING: usize = 39;
     let ui: Vec<&str> = SHORTCUTS.iter().chain(MENUS.iter()).filter(|(_, c)| matches!(c, Cover::Ui(_))).map(|(id, _)| *id).collect();
     assert!(ui.len() <= CEILING, "{} UI-only entries (at most {CEILING}): give the new ones an operation\n{}", ui.len(), ui.join("\n"));
 }

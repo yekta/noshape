@@ -304,7 +304,7 @@ pub struct AssemblyView {
     pub tab: TabId,
     doc: Entity<DocModel>,
     gpu: Gpu,
-    viewport: Entity<Viewport>,
+    pub(crate) viewport: Entity<Viewport>,
     /// Variable Studio tables in the Variable table panel.
     var_tables: HashMap<TabId, Entity<crate::variable_studio::VariableStudioView>>,
     /// View cube hover cell and last painted origin (`view_cube`).
@@ -5253,7 +5253,7 @@ impl AssemblyView {
     }
 
     /// Keep the camera for "Previous view" (before a view change).
-    fn push_camera_history(&mut self, cx: &App) {
+    pub(crate) fn push_camera_history(&mut self, cx: &App) {
         let cam = self.viewport.read(cx).camera;
         if self.ui.cam_history.last() != Some(&cam) {
             self.ui.cam_history.push(cam);
@@ -5351,7 +5351,7 @@ impl AssemblyView {
     }
 
     /// The camera menu's picks ([`crate::camera_menu`]).
-    fn on_camera_action(&mut self, a: crate::camera_menu::Action, w: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn on_camera_action(&mut self, a: crate::camera_menu::Action, w: &mut Window, cx: &mut Context<Self>) {
         use crate::camera_menu::Action;
         match a {
             Action::View(sv) => {

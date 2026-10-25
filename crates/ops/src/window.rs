@@ -4,9 +4,11 @@
 //! and read it back (`ui_state`). Each change is also a [`UiRequest`]: with
 //! the app open on the document (live mode) the window does the same.
 
+use glam::{DQuat, DVec2, DVec3};
 use noshape_model::document::{Document, TabContent, TabId};
+use noshape_render::Camera;
 use noshape_store::{BranchId, MicroversionId};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 /// A window action an operation asks for. Without the app open there is no
@@ -26,6 +28,78 @@ pub enum UiRequest {
     Compare(Option<CompareRequest>),
     /// The Repair panel on a history entry (`label`), or closed.
     Repair(Option<(MicroversionId, String)>),
+    /// A Part Studio's or Assembly's camera move (the window's graphics
+    /// area does it, animated, at its own size).
+    Camera { tab: TabId, mv: CameraMove },
+    /// A drawing's zoom.
+    SheetZoom { tab: TabId, mv: SheetMove },
+}
+
+/// A camera move as the view menus do it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum CameraMove {
+    /// Zoom to fit, at this orientation (a standard view) if given.
+    Fit(Option<DQuat>),
+    /// Zoom to selection: frame this box (an assembly's instances: as a sphere).
+    FitBox { lo: DVec3, hi: DVec3, sphere: bool },
+    /// Z / Shift+Z.
+    Step { zoom_in: bool },
+    /// Zoom to window: the box between two points given as fractions of
+    /// the view (0..1, from the top left).
+    Window(DVec2, DVec2),
+    /// Look along `forward`, `up` up (View normal to, Align view with
+    /// vertical axis).
+    Direction { forward: DVec3, up: DVec3 },
+    /// Previous view.
+    Previous,
+    /// Perspective view on / off.
+    Perspective(bool),
+}
+
+/// A drawing zoom.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SheetMove {
+    /// Zoom to fit / Zoom to sheet.
+    Fit,
+    /// Zoom in (factor > 1) or out about the canvas centre.
+    Step(f64),
+    /// Zoom to window (fractions of the canvas, as [`CameraMove::Window`]).
+    Window([f64; 2], [f64; 2]),
+}
+
+/// The size of the agent's graphics area (logical pixels) until set.
+pub const VIEWPORT: [f64; 2] = [1280.0, 800.0];
+
+/// A 3D tab's view as the agent drives it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewCamera {
+    pub camera: Camera,
+    /// Previous view: the cameras before each change (latest last; 50 kept).
+    pub history: Vec<Camera>,
+    /// The graphics area's size (logical pixels).
+    pub viewport: DVec2,
+}
+
+impl ViewCamera {
+    /// Keep the camera for Previous view, then change it.
+    pub fn set(&mut self, to: Camera) {
+        if self.history.last() != Some(&self.camera) {
+            self.history.push(self.camera);
+            if self.history.len() > 50 {
+                self.history.remove(0);
+            }
+        }
+        self.camera = to;
+    }
+}
+
+/// A drawing's zoom (pixels per mm) and the sheet point (mm) at the canvas
+/// centre, for a canvas of `size` pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SheetView {
+    pub zoom: f64,
+    pub center: [f64; 2],
+    pub size: [f64; 2],
 }
 
 /// One side of a compare: a workspace's head or a history entry.
@@ -56,6 +130,10 @@ pub struct WindowState {
     pub compare: Option<CompareRequest>,
     /// The Repair panel: the entry shown and its label.
     pub repair: Option<(MicroversionId, String)>,
+    /// 3D tabs' cameras (set by view_camera).
+    pub cameras: BTreeMap<TabId, ViewCamera>,
+    /// Drawings' zoom (set by view_camera).
+    pub sheets: BTreeMap<TabId, SheetView>,
 }
 
 impl WindowState {
@@ -74,6 +152,8 @@ impl WindowState {
             }
             UiRequest::Compare(c) => self.compare = c.clone(),
             UiRequest::Repair(r) => self.repair = r.clone(),
+            // view_camera keeps the cameras itself.
+            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } => {}
         }
     }
 }

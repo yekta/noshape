@@ -711,17 +711,10 @@ impl Viewport {
     }
 
     /// Zoom so the box (viewport-local corners) fills the view.
-    fn zoom_to_box(&mut self, a: DVec2, b: DVec2, cx: &mut Context<Self>) {
-        let size = self.size();
-        let (w, h) = ((a.x - b.x).abs(), (a.y - b.y).abs());
-        if w < 4.0 || h < 4.0 || size.x <= 0.0 || size.y <= 0.0 {
-            return;
+    pub(crate) fn zoom_to_box(&mut self, a: DVec2, b: DVec2, cx: &mut Context<Self>) {
+        if let Some(to) = noshape_scene::camera_ops::zoom_to_window(&self.camera, a, b, self.size()) {
+            self.animate_to(to, cx);
         }
-        let mut to = self.camera;
-        // Bring the box center to the view center, then zoom about it.
-        to.pan(size * 0.5 - (a + b) * 0.5, size.y);
-        to.zoom_at((w / size.x).max(h / size.y), size * 0.5, size);
-        self.animate_to(to, cx);
     }
 
     fn camera_changed(&mut self, cx: &mut Context<Self>) {
@@ -2351,15 +2344,5 @@ impl Viewport {
     }
 }
 
-/// Fit `camera` to a world box for a viewport of `size` logical pixels whose
-/// left `inset` pixels are covered (ignored when it would leave too little).
-pub fn fit_camera_to_box(camera: &mut Camera, lo: DVec3, hi: DVec3, size: DVec2, inset: f64) {
-    let inset = if size.x - inset >= size.x * 0.45 { inset.max(0.0) } else { 0.0 };
-    let width = (size.x - inset).max(1.0);
-    let aspect = if size.y > 0.0 { width / size.y } else { 1.0 };
-    camera.fit_box(lo, hi, aspect);
-    if inset > 0.0 && size.y > 0.0 {
-        // Move the model right, into the middle of the uncovered part.
-        camera.pan(DVec2::new(inset * 0.5, 0.0), size.y);
-    }
-}
+/// Zoom to fit a box (shared with the agent API's view_camera).
+pub use noshape_scene::camera_ops::fit_camera_to_box;

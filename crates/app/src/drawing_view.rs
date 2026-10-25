@@ -993,8 +993,7 @@ impl DrawingEditor {
     }
 
     pub fn to_sheet(&self, local: [f64; 2]) -> [f64; 2] {
-        let s = self.size_px();
-        [self.center[0] + (local[0] - s[0] / 2.0) / self.zoom, self.center[1] - (local[1] - s[1] / 2.0) / self.zoom]
+        noshape_scene::camera_ops::drawing_to_sheet(self.zoom, self.center, self.size_px(), local)
     }
 
     pub fn local(&self, p: Point<Pixels>) -> [f64; 2] {
@@ -1007,20 +1006,10 @@ impl DrawingEditor {
             return;
         }
         // A model space has no paper: fit its content.
-        let content = self.current_sheet().imported.as_ref().filter(|m| m.model).and_then(|m| m.extents());
-        let (x0, y0, w, h) = match content {
-            Some(b) => (b[0], b[1], (b[2] - b[0]).max(1.0), (b[3] - b[1]).max(1.0)),
-            None => {
-                let (w, h) = self.current_sheet().size.size_mm();
-                (0.0, 0.0, w, h)
-            }
-        };
-        // Live (drawing/156, ISO A3): 40 px clear on each side, the bottom
-        // measured to the window's edge as if the canvas ran under the 30 px
-        // tab bar (sheet 1304×922 centred at y 577 in a 1919×1079 window).
-        const UNDER: f64 = 30.0;
-        self.zoom = ((s[0] - 80.0) / w).min((s[1] + UNDER - 80.0) / h).clamp(0.05, 200.0);
-        self.center = [x0 + w / 2.0, y0 + h / 2.0 + UNDER / 2.0 / self.zoom];
+        let (x0, y0, w, h) = noshape_scene::camera_ops::drawing_content(self.current_sheet());
+        // Live (drawing/156, ISO A3): sheet 1304×922 centred at y 577 in a
+        // 1919×1079 window.
+        (self.zoom, self.center) = noshape_scene::camera_ops::drawing_fit(s, (x0, y0, w, h));
         self.fitted = true;
         self.frame_dirty = true;
         cx.notify();
@@ -1037,11 +1026,7 @@ impl DrawingEditor {
     }
 
     pub fn zoom_by(&mut self, factor: f64, at_local: [f64; 2], cx: &mut Context<Self>) {
-        let before = self.to_sheet(at_local);
-        self.zoom = (self.zoom * factor).clamp(0.05, 200.0);
-        let after = self.to_sheet(at_local);
-        self.center[0] += before[0] - after[0];
-        self.center[1] += before[1] - after[1];
+        (self.zoom, self.center) = noshape_scene::camera_ops::drawing_zoom_about(self.zoom, self.center, factor, self.to_sheet(at_local));
         self.frame_dirty = true;
         cx.notify();
     }

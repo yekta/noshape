@@ -38,12 +38,7 @@ impl DrawingEditor {
         let Some(Some((a, b))) = self.zoom_window else { return false };
         self.zoom_window = None;
         self.status = None;
-        let (w, h) = ((b[0] - a[0]).abs(), (b[1] - a[1]).abs());
-        let s = self.size_px();
-        let mid = [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5];
-        let factor = if w < 4.0 || h < 4.0 { 2.0 } else { (s[0] / w).min(s[1] / h) };
-        self.center = self.to_sheet(mid);
-        self.zoom = (self.zoom * factor).clamp(0.05, 400.0);
+        (self.zoom, self.center) = noshape_scene::camera_ops::drawing_zoom_window(self.zoom, self.center, self.size_px(), a, b);
         self.redraw(cx);
         true
     }

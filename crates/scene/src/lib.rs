@@ -5,6 +5,7 @@
 
 pub mod asm_scene;
 pub mod builder;
+pub mod camera_ops;
 pub mod drawing_tools;
 pub mod environment_maps;
 pub mod graphics_prefs;
