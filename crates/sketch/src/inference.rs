@@ -8,7 +8,7 @@
 
 use crate::constraints::ConstraintKind;
 use crate::entities::{EntityKind, Geometry};
-use crate::geom::{angle_in_range, Curve2};
+use crate::geom::Curve2;
 use crate::ids::EntityId;
 use crate::sketch::Sketch;
 use glam::DVec2;
@@ -51,9 +51,11 @@ pub struct InferenceContext {
     /// real (fixed) point when the click is placed.
     #[serde(default)]
     pub origin: bool,
-    /// "Woken" entities: curves the cursor recently passed over. Lines give
-    /// parallel / perpendicular hints for the line being drawn even when
-    /// they don't touch it (Onshape's wake-up inferences).
+    /// "Woken" entities: curves and points the cursor recently passed over.
+    /// Lines give parallel / perpendicular hints for the line being drawn
+    /// even when they don't touch it; points give horizontal / vertical
+    /// alignment, which other points don't (Onshape's wake-up inferences,
+    /// behaviours "skb (10-25) sketch inference").
     #[serde(default)]
     pub woken: Vec<EntityId>,
 }
@@ -194,6 +196,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                     let kind = if centers.contains(&e.id) { InferenceKind::Center } else { InferenceKind::Endpoint };
                     push(&mut out, kind, *pos, Some(e.id), None, vec![AutoConstraint::CoincidentPoint(e.id)], 0);
                 }
+                // Alignment: woken points and a point on the (always-on) origin.
+                if !(ctx.woken.contains(&e.id) || (ctx.origin && pos.length() < 1e-12)) {
+                    continue;
+                }
                 let dx = (pos.x - cursor.x).abs();
                 let dy = (pos.y - cursor.y).abs();
                 if dx <= r && d > r && best_v.is_none_or(|b| dx < b.0) {
@@ -224,19 +230,17 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                     }
                     _ => {}
                 }
-                // quadrants
-                if let (Curve2::Circle { center, radius } | Curve2::Arc { center, radius, .. }, Some(cid)) = (&c, e.center()) {
-                    for k in 0..4 {
-                        let a = k as f64 * PI / 2.0;
-                        if let Curve2::Arc { start_angle, end_angle, .. } = &c
-                            && angle_in_range(a, *start_angle, end_angle - start_angle, 1e-12).is_none() {
-                                continue;
-                            }
-                        let q = *center + DVec2::from_angle(a) * *radius;
-                        if (q - cursor).length() <= r {
-                            let align = if k % 2 == 0 { AutoConstraint::HorizontalWith(cid) } else { AutoConstraint::VerticalWith(cid) };
-                            push(&mut out, InferenceKind::Quadrant, q, Some(e.id), Some(*center), vec![AutoConstraint::OnCurve(e.id), align], 1);
-                        }
+                // Circles and arcs have no quadrant snaps (live "skb (10-25)
+                // sketch inference": 1.9 px off the top or left quadrant the
+                // end stays where it is, on the curve). Ellipse quadrants
+                // (axis end points) are Onshape's QUADRANT constraint.
+                if let (Some(a), SketchTool::Line, Curve2::Circle { center, .. } | Curve2::Arc { center, .. }) = (ctx.anchor, ctx.tool, &c) {
+                    // A line ending on a circle or arc nearly along its
+                    // tangent there: Coincident + Tangent (live, no Horizontal).
+                    let (_, q, d) = c.closest(cursor);
+                    let (u, t) = ((q - a).normalize_or_zero(), (q - *center).perp().normalize_or_zero());
+                    if d <= r && u != DVec2::ZERO && t != DVec2::ZERO && u.perp_dot(t).abs() <= ctx.angle_tolerance.sin() {
+                        push(&mut out, InferenceKind::Tangent, q, Some(e.id), Some(a), vec![AutoConstraint::OnCurve(e.id), AutoConstraint::TangentTo(e.id)], 1);
                     }
                 }
                 // ellipse quadrants (axis end points)
@@ -307,9 +311,17 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             };
             if near(ang, 0.0) {
                 push(&mut out, InferenceKind::Horizontal, DVec2::new(cursor.x, a.y), None, Some(a), vec![AutoConstraint::HorizontalLine], 2);
+                // A horizontal line ending in vertical alignment with a woken
+                // point takes both (live: Horizontal + Vertical with it).
+                if let Some((_, vp, vpos)) = best_v {
+                    push(&mut out, InferenceKind::AlignVertical, DVec2::new(vpos.x, a.y), Some(vp), Some(vpos), vec![AutoConstraint::HorizontalLine, AutoConstraint::VerticalWith(vp)], 1);
+                }
             }
             if near(ang, PI / 2.0) {
                 push(&mut out, InferenceKind::Vertical, DVec2::new(a.x, cursor.y), None, Some(a), vec![AutoConstraint::VerticalLine], 2);
+                if let Some((_, hp, hpos)) = best_h {
+                    push(&mut out, InferenceKind::AlignHorizontal, DVec2::new(a.x, hpos.y), Some(hp), Some(hpos), vec![AutoConstraint::VerticalLine, AutoConstraint::HorizontalWith(hp)], 1);
+                }
             }
             // woken lines (not attached to the anchor): parallel / perpendicular
             for &w in &ctx.woken {
@@ -405,9 +417,10 @@ mod tests {
         assert_eq!(r[0].constraints, vec![AutoConstraint::CoincidentPoint(s)]);
         let r = infer(&sk, v(1.02, 0.03), &ctx);
         assert_eq!(r[0].kind, InferenceKind::Midpoint);
+        // no circle quadrants: on the curve where the cursor is
         let r = infer(&sk, v(5.03, 0.98), &ctx);
-        assert_eq!(r[0].kind, InferenceKind::Quadrant);
-        assert!((r[0].position - v(5.0, 1.0)).length() < 1e-12);
+        assert_eq!(r[0].kind, InferenceKind::OnCurve);
+        assert!((r[0].position - v(5.0, 1.0)).length() > 1e-3, "{:?}", r[0].position);
         let r = infer(&sk, v(5.02, -0.05), &ctx);
         assert_eq!(r[0].kind, InferenceKind::Center);
         let r = infer(&sk, v(1.5, 0.05), &ctx);
@@ -415,8 +428,10 @@ mod tests {
         assert!((r[0].position - v(1.5, 0.0)).length() < 1e-12);
         let r = infer(&sk, v(5.6, 0.85), &ctx);
         assert!(r.iter().any(|x| x.kind == InferenceKind::OnCurve && x.entity == Some(c)));
-        // alignment
-        let r = infer(&sk, v(2.05, 3.0), &ctx);
+        // alignment: only with a woken point (live: one the cursor passed over)
+        let (_, le) = sk.endpoints(l).unwrap();
+        assert!(infer(&sk, v(2.05, 3.0), &ctx).is_empty());
+        let r = infer(&sk, v(2.05, 3.0), &InferenceContext { woken: vec![le], ..ctx.clone() });
         assert_eq!(r[0].kind, InferenceKind::AlignVertical);
         assert!((r[0].position.x - 2.0).abs() < 1e-12);
         // line tool: horizontal and perpendicular from an endpoint
@@ -431,6 +446,20 @@ mod tests {
         assert!(r.iter().any(|x| x.kind == InferenceKind::Horizontal));
         let k = AutoConstraint::HorizontalLine.to_constraint(EntityId(99), Some(l)).unwrap();
         assert_eq!(k, ConstraintKind::Horizontal { a: l, b: None });
+    }
+
+    /// Live ("skb (10-25) sketch inference"): a horizontal line ending under
+    /// a woken point gets Horizontal + Vertical with that point.
+    #[test]
+    fn horizontal_line_and_woken_point_alignment_combine() {
+        let mut sk = Sketch::new();
+        let p = sk.add_point(v(2.0, 3.0));
+        let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(4.0, 6.0)), snap_radius: 0.1, woken: vec![p], ..Default::default() };
+        let r = infer(&sk, v(2.03, 6.03), &ctx);
+        assert_eq!(r[0].constraints, vec![AutoConstraint::HorizontalLine, AutoConstraint::VerticalWith(p)]);
+        assert!((r[0].position - v(2.0, 6.0)).length() < 1e-12);
+        let r = infer(&sk, v(2.03, 6.03), &InferenceContext { woken: vec![], ..ctx });
+        assert_eq!(r[0].constraints, vec![AutoConstraint::HorizontalLine]);
     }
 
     #[test]

@@ -51,6 +51,8 @@
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <Geom2d_Line.hxx>
+#include <Geom_ConicalSurface.hxx>
+#include <Geom_CylindricalSurface.hxx>
 #include <GeomConvert_ApproxCurve.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
@@ -497,12 +499,41 @@ OpOut op_pipe(const OcShape& profile, const OcShape& spine)
   return hb.finish();
 }
 
+// Whether every edge of the path is a helix: a straight, sloped line on a
+// cylindrical or conical surface (as make_helix builds it).
+static bool is_helix_path(const TopoDS_Wire& w)
+{
+  bool any = false;
+  for (TopExp_Explorer e(w, TopAbs_EDGE); e.More(); e.Next())
+  {
+    occ::handle<Geom2d_Curve> pc;
+    occ::handle<Geom_Surface> sf;
+    TopLoc_Location           loc;
+    double                    f, l;
+    BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Current()), pc, sf, loc, f, l);
+    if (pc.IsNull() || sf.IsNull())
+      return false;
+    occ::handle<Geom2d_Line> line = occ::down_cast<Geom2d_Line>(pc);
+    if (line.IsNull() || (occ::down_cast<Geom_CylindricalSurface>(sf).IsNull() && occ::down_cast<Geom_ConicalSurface>(sf).IsNull()))
+      return false;
+    const gp_Dir2d d = line->Direction();
+    if (std::abs(d.X()) < 1e-9 || std::abs(d.Y()) < 1e-9)
+      return false;
+    any = true;
+  }
+  return any;
+}
+
 OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const SweepOpts& o,
                     const OcShape& aux)
 {
   if (profiles.items.empty())
     fail_invalid("sweep needs at least one profile");
   TopoDS_Wire sw = as_wire(spine.shape, "sweep path");
+  // Along a helix the minimal-twist frame is the Frenet frame: the profile
+  // keeps its angle to the axis and ends as it started (a knurl's grooves end
+  // flush with the part, live 224 faces). OCCT's corrected Frenet tilts it.
+  const int mode = o.mode == 0 && is_helix_path(sw) ? 1 : o.mode;
 
   // A single face profile with holes: use BRepOffsetAPI_MakePipe (supports faces).
   if (profiles.items.size() == 1 && profiles.items[0].ShapeType() == TopAbs_FACE &&
@@ -511,7 +542,7 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
     if (std::abs(o.scale_end - 1.0) > 1e-12)
       fail_unsupported("scaled sweep of a face with holes");
     GeomFill_Trihedron tri;
-    switch (o.mode)
+    switch (mode)
     {
       case 0:
         tri = GeomFill_IsCorrectedFrenet;
@@ -538,7 +569,7 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
     return hb.finish();
   }
 
-  if (o.mode == 6)
+  if (mode == 6)
   {
     // Lock profile faces: the trihedron's binormal follows the faces' normal
     // (BRepFill_EdgeOnSurfLaw), so each path edge needs its curve on one of
@@ -647,7 +678,7 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
     mk.SetMode(aw, false, BRepFill_NoContact);
   }
   else
-  switch (o.mode)
+  switch (mode)
   {
     case 0:
       mk.SetMode(false);

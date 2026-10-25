@@ -16,14 +16,10 @@ pub struct GraphicsGlobal(pub GraphicsPrefs);
 
 impl Global for GraphicsGlobal {}
 
-fn path() -> Option<std::path::PathBuf> {
-    dirs::config_dir().map(|d| d.join("noshape").join("graphics.json"))
-}
-
-/// Load the saved preferences into the app (call once at startup).
+/// Load the saved preferences into the app (at startup, and after an
+/// agent changed them in live mode).
 pub fn init(cx: &mut App) {
-    let prefs = path().and_then(|p| std::fs::read(p).ok()).and_then(|b| serde_json::from_slice::<GraphicsPrefs>(&b).ok()).unwrap_or_default();
-    cx.set_global(GraphicsGlobal(prefs));
+    cx.set_global(GraphicsGlobal(noshape_ops::prefs::load_graphics()));
 }
 
 /// The current preferences.
@@ -35,14 +31,7 @@ pub fn get(cx: &App) -> GraphicsPrefs {
 /// also writes them to disk.
 pub fn set(prefs: GraphicsPrefs, save: bool, cx: &mut App) {
     cx.set_global(GraphicsGlobal(prefs));
-    if save
-        && let Some(p) = path()
-    {
-        if let Some(dir) = p.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        if let Ok(json) = serde_json::to_vec_pretty(&prefs) {
-            let _ = std::fs::write(p, json);
-        }
+    if save {
+        noshape_ops::prefs::save_graphics(&prefs);
     }
 }

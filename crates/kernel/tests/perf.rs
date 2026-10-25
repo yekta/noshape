@@ -94,7 +94,16 @@ fn knurl_like_onshape() {
         let profile = make_face_from_wire(&make_polyline(&[p(half_base, extra), p(0.0, -depth), p(-half_base, extra), p(0.0, extra + tooth_height)], true).unwrap(), true).unwrap();
         let frame = Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
         let path = if kind == "straight" { make_line(DVec3::new(r, 0.0, 0.0), DVec3::new(r, 0.0, h)).unwrap() } else { make_helix(&frame, r, 2.0 * r * PI * (PI / 2.0 - helix_angle).tan(), h, true, 0.0).unwrap() };
-        let groove = sweep(&profile, &path, &SweepOptions::default()).unwrap().shape;
+        // KNURL_SWEEP=frenet|discrete: the sweep's frame (default corrected Frenet).
+        let mode = match std::env::var("KNURL_SWEEP").as_deref() {
+            Ok("frenet") => SweepMode::Frenet,
+            Ok("discrete") => SweepMode::Discrete,
+            _ => SweepMode::CorrectedFrenet,
+        };
+        let groove = sweep(&profile, &path, &SweepOptions { mode, ..SweepOptions::default() }).unwrap().shape;
+        if let Some(cap) = groove.faces().into_iter().filter_map(|f| f.face_plane().ok().flatten()).find(|p| p.origin.z > h * 0.5 || p.normal.z.abs() > 0.5 && p.origin.z > h * 0.5) {
+            eprintln!("knurl {kind}: end cap normal {:?}", cap.normal);
+        }
         let mut tools: Vec<Shape> = (0..n).map(|i| transform(&groove, &Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::Z, angle: 2.0 * PI * i as f64 / n as f64 }, true).unwrap().shape).collect();
         if kind == "diamond" {
             let mirror = Plane::new(DVec3::new(r, 0.0, 0.0), DVec3::Y, DVec3::X);
@@ -103,7 +112,8 @@ fn knurl_like_onshape() {
         }
         let t_tools = t0.elapsed();
         let cylinder = make_cylinder(&frame, r, h, 2.0 * PI).unwrap();
-        let res = boolean(BooleanOp::Cut, &[cylinder], &tools, &BooleanOptions::default());
+        // As the model does after a boolean: faces left on one surface merged.
+        let res = boolean(BooleanOp::Cut, &[cylinder], &tools, &BooleanOptions::default()).and_then(|r| unify_same_domain(&r.shape));
         let t = t0.elapsed();
         match res {
             Ok(res) => {

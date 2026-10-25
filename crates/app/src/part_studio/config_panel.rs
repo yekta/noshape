@@ -321,19 +321,7 @@ impl PartStudioView {
     /// header rows included).
     fn copy_variable_table(&mut self, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
-        let kind = |k: &str| match k {
-            "ANGLE" => "Angle",
-            "NUMBER" => "Number",
-            "ANY" => "Any",
-            "MEASURED" => "Measured",
-            "TABLE" => "From import",
-            _ => "Length",
-        };
-        let mut lines = vec!["Name\tVariable type\tValue\tDescription".to_string()];
-        for r in noshape_model::variable_table::active_rows(studio) {
-            lines.push(format!("{}\t{}\t{}\t{}", r.name, kind(&r.kind), r.value, r.description));
-        }
-        cx.write_to_clipboard(ClipboardItem::new_string(lines.join("\n")));
+        cx.write_to_clipboard(ClipboardItem::new_string(noshape_ops::variable_studio::part_studio_table_text(studio)));
     }
 
     /// A refused variable name (Help: names must be FeatureScript

@@ -32,6 +32,36 @@ pub fn ops() -> Vec<Op> {
             run: state,
         },
         Op {
+            group: "ui",
+            verb: "preferences",
+            summary: "Graphics preferences (the camera menu's Graphics preferences…)",
+            description: "The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors \"#rrggbb\", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once.",
+            fields: vec![opt("graphics", json!({ "type": "object" }), "Preferences to change, by name (see the reply).")],
+            mutates: false,
+            destructive: false,
+            run: preferences,
+        },
+        Op {
+            group: "ui",
+            verb: "toolbar",
+            summary: "The Part Studio toolbar's customization (Customize toolbar…) and the S shortcut toolbars",
+            description: "The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide \"Search tools\"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do.",
+            fields: vec![doc_field(), opt("set", json!({ "type": "object" }), "Settings to change (see the reply).")],
+            mutates: false,
+            destructive: false,
+            run: toolbar,
+        },
+        Op {
+            group: "ui",
+            verb: "shortcuts",
+            summary: "The keyboard shortcuts (Help › Keyboard shortcuts, the Shift+/ sheet)",
+            description: "The sheet's rows per tab (General, Part Studio, Assembly, 3D view, Sketch, Feature Studio, Drawing): each action with a key (the user's customized key, else Onshape's default; `customized`, `disabled`) and the Onshape-controlled ones (`locked`), by name. `tab` keeps one tab; `search` matches names and keys, as the sheet's search box.",
+            fields: vec![opt("tab", json!({ "type": "string", "enum": ["General", "Part Studio", "Assembly", "3D view", "Sketch", "Feature Studio", "Drawing"] }), "Only this tab."), opt("search", s(), "Search text (names and keys).")],
+            mutates: false,
+            destructive: false,
+            run: shortcuts,
+        },
+        Op {
             group: "tab",
             verb: "activate",
             summary: "Show a tab (click it in the tab bar)",
@@ -156,6 +186,87 @@ fn state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         "repair": w.repair.as_ref().map(|r| json!({ "at": r.0.to_string(), "label": r.1 })),
     })
     .into())
+}
+
+fn preferences(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let mut prefs = crate::prefs::load_graphics();
+    if let Some(set) = a.object("graphics")?.filter(|m| !m.is_empty()) {
+        prefs = crate::prefs::graphics_with(&prefs, set).map_err(|(field, why)| OpError::param(&format!("graphics.{field}"), &why))?;
+        crate::prefs::save_graphics(&prefs);
+        ctx.reload_prefs = true;
+    }
+    Ok(json!({ "graphics": crate::prefs::graphics_json(&prefs), "shown_in_app": ctx.serving }).into())
+}
+
+fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::prefs::ToolbarPrefs;
+    let mut prefs = ToolbarPrefs::load();
+    if let Some(set) = a.object("set")?.filter(|m| !m.is_empty()) {
+        // Feature tool ids (a document's custom features when one is open).
+        if let Ok(od) = ctx.doc(a.opt_str("doc")?) {
+            let _ = noshape_model::custom::DocumentScripts::from_document(od.doc());
+        }
+        let tool_ids = |key: &str, v: &Value| -> Result<Vec<String>, OpError> {
+            let l = v.as_array().ok_or_else(|| OpError::param(&format!("set.{key}"), "a list of tool ids"))?;
+            l.iter()
+                .map(|x| match x.as_str() {
+                    Some(id) if noshape_model::features::get(id).is_some() => Ok(id.to_string()),
+                    _ => Err(OpError::param(&format!("set.{key}"), &format!("unknown tool {x} (feature_types)"))),
+                })
+                .collect()
+        };
+        let names = |key: &str, v: &Value| -> Result<Option<Vec<String>>, OpError> {
+            match v {
+                Value::Null => Ok(None),
+                Value::Array(l) => l.iter().map(|x| x.as_str().map(str::to_string).ok_or_else(|| OpError::param(&format!("set.{key}"), "tool names"))).collect::<Result<_, _>>().map(Some),
+                _ => Err(OpError::param(&format!("set.{key}"), "a list of tool names, or null for the defaults")),
+            }
+        };
+        for (k, v) in set {
+            match k.as_str() {
+                "removed" => prefs.removed = tool_ids(k, v)?,
+                "group_order" => prefs.group_order = v.as_array().and_then(|l| l.iter().map(|x| x.as_u64().map(|n| n as usize)).collect()).ok_or_else(|| OpError::param("set.group_order", "tool set indices"))?,
+                "hide_search" => prefs.hide_search = v.as_bool().ok_or_else(|| OpError::param("set.hide_search", "true or false"))?,
+                "shortcut_tools" => prefs.shortcut_tools = if v.is_null() { None } else { Some(tool_ids(k, v)?) },
+                "sketch_shortcut_tools" => prefs.sketch_shortcut_tools = names(k, v)?,
+                "drawing_shortcut_tools" => prefs.drawing_shortcut_tools = names(k, v)?,
+                _ => return Err(OpError::param(&format!("set.{k}"), "removed, group_order, hide_search, shortcut_tools, sketch_shortcut_tools or drawing_shortcut_tools")),
+            }
+        }
+        prefs.save();
+        ctx.reload_prefs = true;
+    }
+    Ok(json!({ "toolbar": prefs, "shortcut_tools": prefs.shortcut_tools() }).into())
+}
+
+fn shortcuts(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::shortcuts::{LOCKED, Tab, entries};
+    // The user's customizations (the app's keyboard-shortcuts.json: id -> {key, disabled}).
+    #[derive(serde::Deserialize, Default)]
+    struct Custom {
+        #[serde(default)]
+        key: Option<String>,
+        #[serde(default)]
+        disabled: bool,
+    }
+    let custom: std::collections::BTreeMap<String, Custom> = std::fs::read_to_string(noshape_scene::config_dir().join("keyboard-shortcuts.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    let only = a.opt_str("tab")?;
+    let q = a.opt_str("search")?.unwrap_or("").trim().to_lowercase();
+    let mut out = Vec::new();
+    for tab in Tab::SHEET.iter().filter(|t| only.is_none_or(|o| t.label() == o)) {
+        let mut rows: Vec<Value> = LOCKED.iter().filter(|(t, _, _)| t == tab).map(|(_, k, n)| json!({ "name": n, "keys": k, "locked": true })).collect();
+        for e in entries(*tab) {
+            let c = custom.get(e.id);
+            let Some(key) = c.and_then(|c| c.key.clone()).or_else(|| e.default.map(str::to_string)) else { continue };
+            rows.push(json!({ "name": e.name, "keys": key, "id": e.id, "customized": c.is_some(), "disabled": c.is_some_and(|c| c.disabled) }));
+        }
+        rows.retain(|r| q.is_empty() || r["name"].as_str().is_some_and(|n| n.to_lowercase().contains(&q)) || r["keys"].as_str().is_some_and(|k| [k.to_lowercase(), k.to_lowercase().replace(['-', ' '], "+")].iter().any(|k| k.contains(&q))));
+        rows.sort_by_key(|r| r["name"].as_str().unwrap_or("").to_lowercase());
+        if !rows.is_empty() || only.is_some() {
+            out.push(json!({ "tab": tab.label(), "rows": rows }));
+        }
+    }
+    Ok(json!({ "tabs": out }).into())
 }
 
 fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

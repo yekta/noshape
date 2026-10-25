@@ -392,7 +392,7 @@ impl ViewOptions {
     }
 
     fn style(&self) -> noshape_render::Style {
-        let mut style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+        let mut style = noshape_scene::png::viewport_style(&crate::prefs::load_graphics());
         if self.high_quality {
             style.detail.mesh_error_px = noshape_render::scene::MESH_ERROR_PX_HIGH_QUALITY_STUDIO;
         }
