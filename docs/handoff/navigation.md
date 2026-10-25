@@ -51,6 +51,20 @@ Worktree /root/wt/nav2 (branch agent/nav2, codegen-units 237), scratch
 * **Next:** run nav.yml on macOS/Windows runners once main has the branch
   (`gh workflow run nav.yml -f ref=main`), fix what it finds; then 1.11–1.13,
   1.18 (perspective), 1.21, 2.9, 7.9/7.10 (pen) with replay steps.
+* **10-25:** pens act as a finger everywhere (`gpui::set_pen_as_mouse` in
+  core; macOS tablet-point events, X11 stylus = "Abs Pressure" valuator,
+  Wayland `zwp_tablet_v2` in new wayland/tablet.rs); Wayland keeps every held
+  button; drags follow the pointer over the window (capture-phase listener);
+  rotate moves wait for the depth centre; touch timers fire before the next
+  touch event. Replay: Wayland 495/495, X11 261/261 locally.
+* **CI** `gh workflow run nav.yml --repo yekta/noshape --ref main -f ref=<main
+  sha>` (builds from source, ~45 min). First run 40167921463: Linux passed all
+  but merged-wheel pairing (check fixed), Windows failed on PowerShell comma
+  precedence, macOS on `sleep` ambiguity (both fixed in 9452f51c). Re-run after
+  that merges.
+* **Open:** perspective zoom-out stop (ours 2993.9 mm, live 3240.83 mm): live
+  `canZoom` values requested (REQUESTS "nav2 (P1) (10-25 b"); then add the
+  stop asserts back to `perspective_wheel_matches_live_onshape`.
 * **Live request** REQUESTS.md "nav2 (P1)": DOM WheelEvent wheelDelta sweep,
   CDP synthesizePinchGesture (real touchpad-pinch pipeline), drags with the
   camera read from the view controller, CDP touch gestures.

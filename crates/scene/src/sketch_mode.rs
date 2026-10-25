@@ -658,6 +658,50 @@ const PATTERN_ARROW_STEM_PX: f64 = 30.0;
 const PATTERN_ARROW_HANDLE_PX: f64 = PATTERN_SQUARE_PX * 0.5 + PATTERN_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX * 0.5;
 const PATTERN_LABEL_PX: f64 = 95.0;
 const PATTERN_DIM_PX: f64 = 101.0;
+/// The line shader's dash-dot period (`fs_line`, style 4) in pixels.
+const DASH_DOT_PERIOD_PX: f64 = 16.0;
+
+/// The dash and dot pieces of a dash-dot polyline with the given period,
+/// measured along the whole polyline (the shader's proportions: dash
+/// 0–0.55, dot 0.68–0.8 of each period).
+pub fn dash_dot_pieces(pts: &[DVec2], period: f64) -> Vec<Vec<DVec2>> {
+    const MARKS: [(f64, f64); 2] = [(0.0, 0.55), (0.68, 0.8)];
+    let mut out: Vec<Vec<DVec2>> = Vec::new();
+    if period <= 0.0 || pts.len() < 2 {
+        return vec![pts.to_vec()];
+    }
+    let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum();
+    // Every mark interval along the curve, then the polyline clipped to it.
+    let mut start = 0.0;
+    while start < total {
+        for (a, b) in MARKS {
+            let (lo, hi) = (start + a * period, (start + b * period).min(total));
+            if lo >= hi {
+                continue;
+            }
+            let mut piece = Vec::new();
+            let mut d = 0.0;
+            for w in pts.windows(2) {
+                let len = (w[1] - w[0]).length();
+                let (s0, s1) = (d, d + len);
+                if s1 > lo && s0 < hi && len > 0.0 {
+                    let at = |x: f64| w[0] + (w[1] - w[0]) * ((x - s0) / len);
+                    if piece.is_empty() {
+                        piece.push(at(lo.max(s0)));
+                    }
+                    piece.push(at(hi.min(s1)));
+                }
+                d = s1;
+            }
+            if piece.len() >= 2 {
+                out.push(piece);
+            }
+        }
+        start += period;
+    }
+    out
+}
+
 /// Polygon side spinner (live sketch/91): 24 px out from the circumference
 /// point, its ◀ / ▶ 15 px either side of the count along the ray.
 const POLYGON_SPINNER_PX: f64 = 24.0;
@@ -4965,9 +5009,14 @@ impl SketchEditor {
             let (width, style) = if width < 0.0 { (2.0, on_top | LineSegment::DASH_DOT) } else { (width, on_top) };
             lines.push_polyline(&pts3, color, 0, width, style);
         }
+        // Dash-dot laid out along the whole curve here: the line shader's
+        // pattern restarts on every segment, so a circle's short segments
+        // (foreshortened ones especially) came out solid (qa5 POLY1).
         for pts in dash_dot {
-            let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
-            lines.push_polyline(&pts3, preview_color, 0, 2.0, on_top | LineSegment::DASH_DOT);
+            for piece in dash_dot_pieces(&pts, DASH_DOT_PERIOD_PX * self.world_per_px) {
+                let pts3: Vec<[f32; 3]> = piece.iter().map(|p| w(*p)).collect();
+                lines.push_polyline(&pts3, preview_color, 0, 2.0, on_top);
+            }
         }
         (lines, points)
     }
@@ -7619,3 +7668,22 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod dash_dot_tests {
+    use super::dash_dot_pieces;
+    use glam::DVec2;
+
+    /// qa5 POLY1: the pattern runs along the whole circle, not per segment.
+    #[test]
+    fn dash_dot_follows_the_whole_polyline() {
+        // A 100-long line in 50 segments of 2: period 10 → 10 dashes of 5.5
+        // and 10 dots of 1.2, whatever the segment length.
+        let pts: Vec<DVec2> = (0..=50).map(|i| DVec2::new(i as f64 * 2.0, 0.0)).collect();
+        let pieces = dash_dot_pieces(&pts, 10.0);
+        assert_eq!(pieces.len(), 20);
+        let len = |p: &Vec<DVec2>| p.windows(2).map(|w| (w[1] - w[0]).length()).sum::<f64>();
+        assert!((len(&pieces[0]) - 5.5).abs() < 1e-9, "{}", len(&pieces[0]));
+        assert!((len(&pieces[1]) - 1.2).abs() < 1e-9);
+        assert!((pieces[2][0].x - 10.0).abs() < 1e-9);
+    }
+}

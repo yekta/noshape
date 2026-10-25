@@ -137,13 +137,24 @@ pub struct RegenResult {
     pub context: Arc<Context>,
     /// Stopped by [`RegenCancel`]: `display` and `context` are empty.
     pub cancelled: bool,
+    /// Features this run evaluated (the others came from the cache).
+    pub evaluated: Vec<FeatureId>,
 }
 
 struct CacheEntry {
     key: u64,
     ctx: Arc<Context>,
     state: FeatureState,
+    /// The run that last used it ([`Regenerator::run`]).
+    last_run: u64,
 }
+
+/// Entries of features a run no longer has (deleted, or a feature list from
+/// before an edit) stay this many runs, at most [`KEEP_GONE`] of them, so
+/// undoing a delete finds the feature evaluated (its key still chains its
+/// unchanged upstream).
+pub(super) const KEEP_RUNS: u64 = 16;
+const KEEP_GONE: usize = 8;
 
 /// Parsed Assembly context snapshots: (id, revision) -> bodies and their display.
 type ContextCache = HashMap<(u32, u32), (Vec<Arc<context::Body>>, Vec<crate::display::BodyDisplay>)>;
@@ -151,7 +162,11 @@ type ContextCache = HashMap<(u32, u32), (Vec<Arc<context::Body>>, Vec<crate::dis
 #[derive(Default)]
 pub struct Regenerator {
     entries: HashMap<FeatureId, CacheEntry>,
+    /// Counts runs (the age of cache entries).
+    run: u64,
     meshes: HashMap<u64, (u64, bool, Arc<MeshBuffers>)>,
+    /// Shapes of the cached meshes and when they were last shown ([`display::build`]).
+    mesh_owners: HashMap<u64, (u64, noshape_kernel::Shape)>,
     contexts: ContextCache,
     /// Features evaluated so far (not taken from the cache).
     evaluations: u64,
@@ -202,6 +217,9 @@ impl Regenerator {
         let mut ctx: Arc<Context> = Arc::new(Context::default());
         let mut states = Vec::with_capacity(studio.features.len());
         let mut live: Vec<FeatureId> = Vec::new();
+        let (mut evaluated, mut cached): (Vec<FeatureId>, usize) = (Vec::new(), 0);
+        self.run += 1;
+        let run = self.run;
         // Effective features (configuration applied), visible to evaluators
         // that re-run other features (feature pattern "Reapply features").
         let effective: Vec<eval::EffectiveFeature> = studio
@@ -251,13 +269,16 @@ impl Regenerator {
                 states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() });
                 continue;
             }
-            if let Some(e) = self.entries.get(&f.id)
+            if let Some(e) = self.entries.get_mut(&f.id)
                 && e.key == key
             {
+                e.last_run = run;
                 ctx = e.ctx.clone();
                 states.push(e.state.clone());
+                cached += 1;
                 continue;
             }
+            evaluated.push(f.id);
             let ft = Instant::now();
             let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() };
             if let Some(msg) = expr_error.take() {
@@ -376,14 +397,21 @@ impl Regenerator {
                 }
             }
             state.time_ms = ft.elapsed().as_secs_f32() * 1000.0;
-            self.entries.insert(f.id, CacheEntry { key, ctx: ctx.clone(), state: state.clone() });
+            self.entries.insert(f.id, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run });
             states.push(state);
         }
-        self.entries.retain(|id, _| live.contains(id));
+        // Features gone from this run: the most recently used few stay a while.
+        let mut gone: Vec<(u64, FeatureId)> = self.entries.iter().filter(|(id, e)| !live.contains(id) && run - e.last_run <= KEEP_RUNS).map(|(id, e)| (e.last_run, *id)).collect();
+        gone.sort_unstable_by_key(|g| std::cmp::Reverse(g.0));
+        gone.truncate(KEEP_GONE);
+        self.entries.retain(|id, _| live.contains(id) || gone.iter().any(|(_, g)| g == id));
         if opts.cancel.as_ref().is_some_and(RegenCancel::superseded) {
             return cancelled();
         }
-        let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes);
+        if display::perf_enabled() {
+            log::info!(target: "perf", "regen: {} features evaluated, {cached} cached, {:.0} ms (preview meshes {})", evaluated.len(), t0.elapsed().as_secs_f64() * 1e3, opts.preview_meshes);
+        }
+        let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes, &mut self.mesh_owners, run);
         if aborted() {
             return cancelled();
         }
@@ -398,7 +426,7 @@ impl Regenerator {
         display.features = states;
         display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
-        RegenResult { display, needs_refine, context: ctx, cancelled: false }
+        RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated }
     }
 }
 

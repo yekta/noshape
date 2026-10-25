@@ -22,4 +22,24 @@ fn main() {
         writeln!(f, "    ({n:?}, include_str!({:?})),", dir.join(&n).display().to_string()).unwrap();
     }
     writeln!(f, "];").unwrap();
+    // Older standard libraries that Feature Studios pin (`std-versions/<version>/`).
+    let vdir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR")).join("std-versions");
+    println!("cargo:rerun-if-changed={}", vdir.display());
+    let mut versions: Vec<(u32, std::path::PathBuf)> = std::fs::read_dir(&vdir)
+        .map(|d| d.filter_map(|e| e.ok()).filter_map(|e| Some((e.file_name().to_string_lossy().parse().ok()?, e.path()))).collect())
+        .unwrap_or_default();
+    versions.sort();
+    writeln!(f, "/// (version, its modules sorted by name) of the older standard libraries embedded.").unwrap();
+    writeln!(f, "pub static STD_VERSIONS: &[(u32, &[(&str, &str)])] = &[").unwrap();
+    for (v, d) in versions {
+        println!("cargo:rerun-if-changed={}", d.display());
+        let mut names: Vec<String> = std::fs::read_dir(&d).expect("std version dir").filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.ends_with(".fs")).collect();
+        names.sort();
+        writeln!(f, "    ({v}, &[").unwrap();
+        for n in names {
+            writeln!(f, "        ({n:?}, include_str!({:?})),", d.join(&n).display().to_string()).unwrap();
+        }
+        writeln!(f, "    ]),").unwrap();
+    }
+    writeln!(f, "];").unwrap();
 }

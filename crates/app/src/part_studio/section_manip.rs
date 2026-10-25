@@ -20,7 +20,7 @@ const RING_GAP_PX: f64 = 14.0;
 /// The base circle's radius (px).
 const BASE_PX: f64 = 8.0;
 /// Arrow glyph length (px), as `manipulators.rs` draws it.
-const ARROW_PX: f64 = 47.0;
+const ARROW_PX: f64 = super::manipulators::ARROW_SHAFT_PX + super::manipulators::ARROW_HEAD_PX;
 /// Snap window around 5° multiples (live: 82.046 and 92.111 stay free).
 const SNAP_DEG: f64 = 2.0;
 

@@ -503,7 +503,7 @@ impl PartStudioView {
                                         .top(px(-4.))
                                         .cursor_pointer()
                                         .child(crate::assets::icon("popout-arrow", 14., cx))
-                                        .on_click(|_: &ClickEvent, _, cx| crate::shortcuts_page::show(cx)),
+                                        .on_click(|_: &ClickEvent, window, cx| crate::shortcuts_page::show(Some(window.bounds().size), cx)),
                                 )
                                 .child(
                                     div()

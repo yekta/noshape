@@ -176,3 +176,8 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | A5 MC inference | hovering the hole rim: rim highlighted, connector at the hole centre, no dots on other parts (b16) | ✅ **fixed** |
 | DOC5 new Assembly tab position | + › Create Assembly with Part Studio 1 active → "Assembly 2" right after Part Studio 1, stays there after tab switches (t01) | ✅ **fixed** |
 | A15 / A18 | fixed in pass 8 (rows in workflow-configured-assembly.md are stale) | ✅ |
+
+## Release re-check v0.4.8 (qa5, 2026-10-25 04:00, release asset noshape 0.4.8; doc built with v048/tools/a12.py + a12b.py: plate with three Ø10 holes, Ø10 × 30 pin, Cylindrical 1 in hole 1, Replicate over the plate)
+| Row | Ours | Status |
+|---|---|---|
+| A12 Replicate mate placement | two copies (Part 2 <2>, <3>); tree: "Replicate 1 ▸ Part 2 <2>, Part 2 <3>, Mate features (2)"; top-level "Mate features (1)" keeps only Cylindrical 1 (light grey, hidden as A3) | ✅ |

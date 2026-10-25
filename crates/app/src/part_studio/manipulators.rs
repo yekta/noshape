@@ -24,9 +24,12 @@ pub(super) struct Arrow {
     pub flip: Option<&'static str>,
 }
 
-/// The arrow glyph (live, in pixels): shaft length and head length.
-const ARROW_SHAFT_PX: f64 = 25.;
-const ARROW_HEAD_PX: f64 = 22.;
+/// The arrow glyph (pixels at the arrow, drawn in 3D like live's): shaft
+/// length, head length and head width. Live (dialogs/extrude-03, 05; iso,
+/// Z up, seen at 0.816): head 24.5 px tall on screen, 20 px wide, shaft 24 px.
+pub(super) const ARROW_SHAFT_PX: f64 = 29.;
+pub(super) const ARROW_HEAD_PX: f64 = 30.;
+const ARROW_HEAD_W_PX: f64 = 20.;
 
 /// An angular manipulator: an arc around an axis bound to an angle parameter.
 #[derive(Clone, Copy, Debug)]
@@ -470,9 +473,7 @@ fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::ca
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
     // Live (part-studio/230, dialogs/extrude-05): a screen-sized arrow at
     // the end of the length: a 1.5 px white shaft and a hollow triangular
-    // head, outlined light gray; hovered, outlined blue around a light-blue
-    // core (≈ #39669e / #99b2da); while dragged, one solid blue stroke
-    // (≈ #2c61a3, dialogs/extrude-06).
+    // head, outlined light gray (blue when hovered).
     let tip = a.base + a.dir * a.length;
     let dir = a.dir * a.length.signum();
     let Some(wpp) = view.world_per_px(tip) else { return Vec::new() };
@@ -480,13 +481,13 @@ fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::ca
     let side = dir.cross(view.direction()).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
     let base = tip + dir * ARROW_SHAFT_PX * wpp;
     let apex = base + dir * ARROW_HEAD_PX * wpp;
-    let (l, r) = (base + side * ARROW_HEAD_PX * 0.45 * wpp, base - side * ARROW_HEAD_PX * 0.45 * wpp);
+    let (l, r) = (base + side * ARROW_HEAD_W_PX * 0.5 * wpp, base - side * ARROW_HEAD_W_PX * 0.5 * wpp);
+    // Idle and hovered as icons2 matched them; while dragged, one solid blue
+    // stroke (≈ #2c61a3, dialogs/extrude-06).
     let (outline, core, outline_px, core_px) = if dragging {
         (crate::theme::rgb8(0x2c61a3), crate::theme::rgb8(0x2c61a3), 2.0, 2.0)
-    } else if hover {
-        (crate::theme::rgb8(0x39669e), crate::theme::rgb8(0x99b2da), 4.0, 1.5)
     } else {
-        (crate::theme::rgb8(0xa8adb2), crate::theme::rgb8(0xffffff), 3.0, 1.5)
+        (if hover { crate::theme::rgb8(0x3e6eb0) } else { crate::theme::rgb8(0xa8adb2) }, crate::theme::rgb8(0xffffff), if hover { 4.0 } else { 3.0 }, 1.5)
     };
     let mut back = LineData::default();
     let mut front = LineData::default();

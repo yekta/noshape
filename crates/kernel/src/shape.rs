@@ -303,6 +303,12 @@ impl Shape {
         ffi::is_mesh(self.raw())
     }
 
+    /// Whether a B-rep face carries a stored triangulation (display meshing
+    /// leaves none behind; mesh bodies' faces don't count).
+    pub fn has_triangulation(&self) -> bool {
+        ffi::has_triangulation(self.raw())
+    }
+
     /// BRepCheck_Analyzer validity (mesh faces: a triangulation with triangles).
     pub fn is_valid(&self) -> bool {
         ffi::is_valid(self.raw()).unwrap_or(false)

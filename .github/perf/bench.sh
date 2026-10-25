@@ -12,12 +12,22 @@
 # until the bench starts, default 90), VARIANTS (extra texture-mode orbit runs
 # for diagnosis, `name:VAR=value[,VAR=value]` separated by spaces, e.g.
 # `msaa1:NOSHAPE_PERF_MSAA=1 nolines:NOSHAPE_PERF_SKIP=lines`; logged as
-# `texture+<name>-orbit.log`).
+# `texture+<name>-orbit.log`), BENCH_ENV (`VAR=value[,VAR=value]` for every
+# run, before a variant's own).
+#
+# The macOS runners: only the first run of a job (the texture orbit, about a
+# minute in) is reliable for presented fps. A few minutes into a job the
+# runner slows the app's window down (the orbit's 8 ms timer then fires every
+# ~62 ms: parts-1000 at 33 fps in the first orbit, 19 fps later, for any
+# build: v0.4.7 and v0.4.8 alike), so later runs and variants are only
+# comparable with each other; compare settings for fps in separate jobs
+# (BENCH_ENV), GPU time (`w.gpu_wait`) within a job.
 set -u
 BIN=$1; DOC=$2; OUT=$3; shift 3
 MODES=("$@")
 FRAMES=${FRAMES:-300}
 DELAY=${DELAY:-90}
+BENCH_ENV=${BENCH_ENV:-}
 mkdir -p "$OUT"
 shot() {
   if [[ "$(uname)" == Darwin ]]; then screencapture -x "$1"; else import -window root "$1"; fi
@@ -38,7 +48,7 @@ for run in "${RUNS[@]}"; do
     cp "$DOC" "$work/bench.noshape"
     echo "== $label $kind ${extra//,/ }"
     env NOSHAPE_PERF=1 NOSHAPE_PERF_ORBIT="$FRAMES" NOSHAPE_PERF_ORBIT_DELAY="$DELAY" \
-      NOSHAPE_PERF_BENCH="$kind" NOSHAPE_PRESENT="$mode" RUST_LOG=info ${extra//,/ } \
+      NOSHAPE_PERF_BENCH="$kind" NOSHAPE_PRESENT="$mode" RUST_LOG=info ${BENCH_ENV//,/ } ${extra//,/ } \
       "$BIN" "$work/bench.noshape" > "$log" 2>&1 &
     pid=$!
     if [[ $kind == orbit && $label == "$mode" ]]; then

@@ -845,11 +845,11 @@ impl MouseControls {
         c
     }
 
-    /// "Use pen input as mouse": the Windows platform turns pen contacts into
-    /// touches unless it is set (vendor/gpui-pre-windows).
+    /// "Use pen input as mouse": the platform layers turn pen contacts into
+    /// touches unless it is set (`gpui::set_pen_as_mouse`; Windows pointer
+    /// messages, macOS tablet-point events, X11 stylus devices).
     fn apply_to_platform(self) {
-        #[cfg(target_os = "windows")]
-        gpui_windows::set_pen_as_mouse(self.pen_as_mouse);
+        gpui_kit::set_pen_as_mouse(self.pen_as_mouse);
     }
 
     /// "Save mouse controls".
@@ -1251,6 +1251,35 @@ mod tests {
         }
         let fingers = 1.05 * 1.05 * (1.0 - 0.0952381) * 1.2 * (1.0 - 1.0 / 6.0);
         assert!((d0 / c.distance - fingers).abs() < 1e-6);
+    }
+
+    /// Live "nav2 perspective zoom" (10-25): Onshape's numbers for the default
+    /// planes' ±75 mm box in Isometric on a 1673 × 973 canvas, 45° FOV.
+    #[test]
+    fn perspective_wheel_matches_live_onshape() {
+        let vp = DVec2::new(1673.0, 973.0);
+        let (lo, hi) = (DVec3::splat(-0.075), DVec3::splat(0.075));
+        let bounds = Some((lo, hi));
+        let fitted = || {
+            let mut c = Camera { projection: Projection::Perspective, fov_y: 45f64.to_radians(), ..Camera::default() };
+            c.set_view(noshape_render::StandardView::Isometric);
+            c.fit_box(lo, hi, vp.x / vp.y);
+            c
+        };
+        // Shift+7, F: distanceToCenter 446.8626 mm.
+        let mut c = fitted();
+        assert!((c.distance - 0.4468626).abs() < 1e-6, "{}", c.distance);
+        // The pointer at canvas (986, 566); Onshape's ray goes ½ px right and up.
+        let at = DVec2::new(986.5, 565.5);
+        let mut steps = Vec::new();
+        for w in [120.0, 120.0, -120.0, -120.0, 360.0, 30.0, 30.0, 30.0, 30.0] {
+            assert!(zoom_at(&mut c, Zoom::Amount(0.5 / 120.0 * w), at, vp, bounds));
+            steps.push(c.distance);
+        }
+        let live = [0.4100060, 0.3761893, 0.4072168, 0.4408035, 0.3317330, 0.3248928, 0.3181936, 0.3116326, 0.3052068];
+        for (got, want) in steps.iter().zip(live) {
+            assert!((got - want).abs() < 2e-6, "{got} vs {want}");
+        }
     }
 
     #[test]
