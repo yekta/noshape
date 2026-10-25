@@ -114,6 +114,38 @@ fn nine_hundred_parts_and_then_a_small_studio_render() {
     assert!(failures.is_empty(), "{failures:#?}");
 }
 
+/// The user's fin plate (`tests/perf/fins-400.noshape`, perf.yml `fixture`;
+/// qa4's v0.4.8 gate (a), /root/qa4-scratch/mk-fins2.py): plate 810 × 20 × 10
+/// mm, a 1 × 20 × 5 mm wall on top patterned ×400 every 2 mm with Reapply
+/// (LP1), the same wall under the plate (LP2). `NOSHAPE_FIXTURE_OUT=<path>`
+/// writes it.
+#[test]
+#[ignore]
+fn write_fins_fixture() {
+    let out = std::env::var("NOSHAPE_FIXTURE_OUT").expect("NOSHAPE_FIXTURE_OUT");
+    let _ = std::fs::remove_file(&out);
+    let n = 400;
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": out }));
+    let region = |ctx: &mut Ctx, i: usize, a: [f64; 2], b: [f64; 2]| {
+        call(ctx, "sketch_create", json!({ "plane": "plane:top" }));
+        call(ctx, "sketch_draw", json!({ "sketch": format!("Sketch {i}"), "tool": "corner_rectangle", "points": [a, b] }));
+        call(ctx, "sketch_get", json!({ "sketch": format!("Sketch {i}") }))["regions"][0]["id"].as_str().unwrap().to_string()
+    };
+    let ok = |f: &Value| assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+    let plate = region(&mut ctx, 1, [0.0, 0.0], [(2 * n + 10) as f64, 20.0]);
+    ok(&call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [plate], "depth": "10 mm", "operationType": "NEW" } })));
+    let pattern = |ctx: &mut Ctx, f: &str| call(ctx, "feature_add", json!({ "type": "linearPattern", "params": { "patternType": "FEATURE", "instanceFunction": [format!("feature:{f}")], "directionOne": ["plane:right"], "distance": "2 mm", "instanceCount": n.to_string(), "operationType": "ADD", "defaultScope": true, "fullFeaturePattern": true } }));
+    let top = region(&mut ctx, 2, [2.0, 0.0], [3.0, 20.0]);
+    let w1 = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [top], "operationType": "ADD", "defaultScope": true, "startOffset": true, "startOffsetBound": "BLIND", "startOffsetDistance": "10 mm", "depth": "5 mm" } }));
+    ok(&w1);
+    ok(&pattern(&mut ctx, w1["feature"].as_str().unwrap()));
+    let bottom = region(&mut ctx, 3, [2.0, 0.0], [3.0, 20.0]);
+    let w2 = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [bottom], "operationType": "ADD", "defaultScope": true, "oppositeDirection": true, "depth": "5 mm" } }));
+    ok(&w2);
+    ok(&pattern(&mut ctx, w2["feature"].as_str().unwrap()));
+}
+
 /// The 1000-part benchmark fixture (`tests/perf/parts-1000.noshape`, perf.yml
 /// `fixture`): the pin as a 40 × 25 Part pattern of new parts (one shared
 /// shape, drawn with instancing). `NOSHAPE_FIXTURE_OUT=<path>` writes it.
