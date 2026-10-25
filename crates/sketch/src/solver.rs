@@ -1083,6 +1083,38 @@ impl Sketch {
 
     pub fn solve_with(&mut self, opts: &SolveOptions) -> SolveReport {
         let snapshot = self.clone();
+        let rep = self.solve_inner(opts);
+        // Live (qa4 round 5 v3 s6, CON-HV-COLLAPSE): constraints that
+        // collapse a line to a point (Vertical on a Horizontal line) don't
+        // solve: the line stays, its constraints are the conflicting ones
+        // ("Sketch could not be solved.", red).
+        let collapsed: Vec<EntityId> = self
+            .entities()
+            .filter(|e| e.kind() == EntityKind::Line)
+            .filter(|e| {
+                let len = |sk: &Sketch| match sk.curve(e.id) {
+                    Some(crate::Curve2::Line { a, b }) => Some((b - a).length()),
+                    _ => None,
+                };
+                matches!((len(&snapshot), len(self)), (Some(before), Some(after)) if before > 1e-9 && after <= 1e-9)
+            })
+            .map(|e| e.id)
+            .collect();
+        if collapsed.is_empty() {
+            return rep;
+        }
+        *self = snapshot;
+        let conflicting: Vec<ConstraintId> = self.constraints().filter(|c| c.driving && c.kind.entities().iter().any(|x| collapsed.contains(x))).map(|c| c.id).collect();
+        let mut rep = rep;
+        for id in &collapsed {
+            rep.entity_states.insert(*id, ConstraintState::OverConstrained);
+        }
+        rep.status = SolveStatus::Overconstrained { conflicting };
+        rep
+    }
+
+    fn solve_inner(&mut self, opts: &SolveOptions) -> SolveReport {
+        let snapshot = self.clone();
         let rep = run_ext(self, opts, &[], false);
         if !matches!(rep.status, SolveStatus::Failed { .. }) {
             return rep;

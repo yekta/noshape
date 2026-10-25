@@ -27,8 +27,8 @@ pub(super) struct Arrow {
 /// The arrow glyph (pixels at the arrow, drawn in 3D like live's): shaft
 /// length, head length and head width. Live (dialogs/extrude-03, 05; iso,
 /// Z up, seen at 0.816): head 24.5 px tall on screen, 20 px wide, shaft 24 px.
-const ARROW_SHAFT_PX: f64 = 29.;
-const ARROW_HEAD_PX: f64 = 30.;
+pub(super) const ARROW_SHAFT_PX: f64 = 29.;
+pub(super) const ARROW_HEAD_PX: f64 = 30.;
 const ARROW_HEAD_W_PX: f64 = 20.;
 
 /// An angular manipulator: an arc around an axis bound to an angle parameter.
@@ -54,6 +54,8 @@ pub(super) enum Manip {
     Arc(ArcHandle),
     /// Transform ▸ Translate by XYZ (see `triad.rs`).
     Triad(super::triad::Triad),
+    /// Section view: base circle, offset arrow, rotate rings (`section_manip.rs`).
+    Section(super::section_manip::SectionManip),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -65,7 +67,7 @@ pub(super) struct ManipDrag {
 impl PartStudioView {
     /// The manipulator of the feature being edited, if it has one.
     pub(super) fn current_manip(&self, cx: &App) -> Option<Manip> {
-        let Some(e) = self.edit.as_ref() else { return self.section_arrow().map(Manip::Arrow) };
+        let Some(e) = self.edit.as_ref() else { return self.section_manip().map(Manip::Section) };
         match e.dialog.read(cx).feature.type_id.as_str() {
             "extrude" => self.current_arrow(cx).map(Manip::Arrow),
             "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.current_arc(cx).map(Manip::Arc),
@@ -226,6 +228,7 @@ impl PartStudioView {
             // The handle end of the arc (last few degrees) is grabbable.
             Some(Manip::Arc(h)) => vec![(h.point(h.angle * 0.85), h.point(h.angle), 0.0)],
             Some(Manip::Triad(t)) => self.triad_hit_segments(&t, cx),
+            Some(Manip::Section(s)) => self.section_hit_segments(&s, cx),
             None => Vec::new(),
         };
         // Datum boxes can be dragged too.
@@ -241,8 +244,17 @@ impl PartStudioView {
         Some(std::sync::Arc::new(ManipGeometry {
             manip,
             arrow_hover: self.ui.manip_hover,
+            arrow_dragging: self.manip_drag.is_some(),
             triad_hover: self.ui.triad_drag.as_ref().map(|d| d.handle).or(self.ui.triad_hover),
             triad_dragging: self.ui.triad_drag.is_some(),
+            section_hover: self.ui.section_hover,
+            section_dragging: if self.ui.section_base_drag {
+                Some(super::section_manip::SectionHandle::Base)
+            } else if let Some(r) = self.ui.section_rot.filter(|r| r.dragging) {
+                Some(super::section_manip::SectionHandle::Ring(r.ring))
+            } else {
+                self.manip_drag.map(|_| super::section_manip::SectionHandle::Arrow)
+            },
         }))
     }
 
@@ -264,6 +276,11 @@ impl PartStudioView {
             Some(Manip::Arrow(a)) => a,
             Some(Manip::Arc(h)) => return self.arc_event(h, ev, window, cx),
             Some(Manip::Triad(t)) => return self.triad_event(t, ev, window, cx),
+            // Rings and the base circle first; the arrow as any other.
+            Some(Manip::Section(s)) => match self.section_manip_event(&s, ev, window, cx) {
+                Some(done) => return done,
+                None => s.arrow,
+            },
             None => {
                 self.manip_drag = None;
                 return false;
@@ -295,11 +312,13 @@ impl PartStudioView {
                     len *= 2.0;
                 }
                 let flip = len < 0.0 && a.flip.is_some();
-                // Snap to a round step one decade below the value (Onshape-like).
-                let len = len.abs().max(1e-6);
-                let step = 10f64.powf((len * 1e3).log10().floor() - 1.0).max(0.01) * 1e-3;
-                let len = ((len / step).round() * step).max(step);
+                // Live (dialogs/extrude-06, the triad and section arrows): a
+                // dragged length moves in 0.1 mm steps ("13.9 mm", "2.6 mm"),
+                // or 0.01 in in imperial units ("2.06 in", "1.76 in").
                 let units = self.doc.read(cx).session.doc.settings.units;
+                let imperial = matches!(units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
+                let step = if imperial { 0.000254 } else { 0.0001 };
+                let len = ((len.abs() / step).round() * step).max(step);
                 let text = noshape_units::format_quantity(Quantity::new(len, Dim::LENGTH), &units);
                 if let Some(e) = &self.edit {
                     e.dialog.update(cx, |dlg, cx| {
@@ -308,6 +327,8 @@ impl PartStudioView {
                             dlg.feature.params.set(f, ParamValue::Bool(!cur));
                         }
                         dlg.set_expr_text(a.param, &text, window, cx);
+                        // Live: the field shows the value selected while dragging.
+                        dlg.focus_field_selected(a.param, window, cx);
                     });
                 }
                 if flip {
@@ -405,16 +426,25 @@ fn region_anchor(positions: &[[f32; 3]], indices: &[u32]) -> Option<DVec3> {
 pub(super) struct ManipGeometry {
     manip: Manip,
     arrow_hover: bool,
+    arrow_dragging: bool,
     triad_hover: Option<usize>,
     triad_dragging: bool,
+    section_hover: Option<super::section_manip::SectionHandle>,
+    section_dragging: Option<super::section_manip::SectionHandle>,
 }
 
 impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
         match self.manip {
-            Manip::Arrow(a) => arrow_glyph(&a, self.arrow_hover, view, up),
+            Manip::Arrow(a) => arrow_glyph(&a, self.arrow_hover, self.arrow_dragging, view, up),
             Manip::Arc(h) => arc_glyph(&h, up),
             Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, view, up),
+            Manip::Section(s) => {
+                use super::section_manip::SectionHandle;
+                let mut out = arrow_glyph(&s.arrow, self.section_hover == Some(SectionHandle::Arrow), self.section_dragging == Some(SectionHandle::Arrow), view, up);
+                out.extend(super::section_manip::section_glyph(&s, self.section_hover, self.section_dragging, view, up));
+                out
+            }
         }
     }
 }
@@ -439,7 +469,7 @@ fn arc_glyph(h: &ArcHandle, up: &noshape_render::renderer::Uploader) -> Vec<Inst
     ]
 }
 
-fn arrow_glyph(a: &Arrow, hover: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
+fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
     // Live (part-studio/230, dialogs/extrude-05): a screen-sized arrow at
     // the end of the length: a 1.5 px white shaft and a hollow triangular
@@ -452,11 +482,16 @@ fn arrow_glyph(a: &Arrow, hover: bool, view: &noshape_render::camera_geometry::V
     let base = tip + dir * ARROW_SHAFT_PX * wpp;
     let apex = base + dir * ARROW_HEAD_PX * wpp;
     let (l, r) = (base + side * ARROW_HEAD_W_PX * 0.5 * wpp, base - side * ARROW_HEAD_W_PX * 0.5 * wpp);
-    let outline = if hover { crate::theme::rgb8(0x3e6eb0) } else { crate::theme::rgb8(0xa8adb2) };
-    let white = crate::theme::rgb8(0xffffff);
+    // Idle and hovered as icons2 matched them; while dragged, one solid blue
+    // stroke (≈ #2c61a3, dialogs/extrude-06).
+    let (outline, core, outline_px, core_px) = if dragging {
+        (crate::theme::rgb8(0x2c61a3), crate::theme::rgb8(0x2c61a3), 2.0, 2.0)
+    } else {
+        (if hover { crate::theme::rgb8(0x3e6eb0) } else { crate::theme::rgb8(0xa8adb2) }, crate::theme::rgb8(0xffffff), if hover { 4.0 } else { 3.0 }, 1.5)
+    };
     let mut back = LineData::default();
     let mut front = LineData::default();
-    for (data, color, width) in [(&mut back, outline, if hover { 4.0 } else { 3.0 }), (&mut front, white, 1.5)] {
+    for (data, color, width) in [(&mut back, outline, outline_px), (&mut front, core, core_px)] {
         data.push_polyline(&[f(tip), f(base)], color, 0, width, LineSegment::ON_TOP);
         data.push_polyline(&[f(l), f(apex), f(r), f(l)], color, 0, width, LineSegment::ON_TOP);
     }

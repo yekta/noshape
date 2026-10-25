@@ -354,6 +354,12 @@ pub fn help_dot(light: u32) -> Rgba {
     if gpui_kit::hex_theme_active() { rgb_const(0xaeaeae) } else { rgb_const(light) }
 }
 
+/// A colour live gives per theme where the light one has no fitting
+/// `DARK_HEX` mapping (it maps elsewhere to another dark colour).
+pub fn themed(light: u32, dark: u32) -> Rgba {
+    rgb_const(if gpui_kit::hex_theme_active() { dark } else { light })
+}
+
 pub fn with_alpha(c: Rgba, a: f32) -> Rgba {
     Rgba { a, ..c }
 }

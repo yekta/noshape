@@ -337,6 +337,22 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         if dist.abs() < 1e-12 {
             continue;
         }
+        // moveFace.fs "Reapply fillet" (default on): the fillets beside the
+        // moved faces are removed and rolled again at their radii.
+        if ev.params.get("reFillet").is_none_or(|_| ev.bool("reFillet")) {
+            let blends = super::detail_a::blends_to_reapply(&body.shape, &body.faces, &faces, false)?;
+            if !blends.is_empty() {
+                let td = translate_dir;
+                super::detail_a::reblend(ev, bi, &faces, &blends, failed_msg, |shape, fs| match td {
+                    None => k::offset_faces(shape, fs, dist),
+                    Some(d) => {
+                        let each: Vec<f64> = fs.iter().map(|s| s.face_plane().ok().flatten().map_or(0.0, |pl| dist * pl.unit_normal().dot(d))).collect();
+                        k::offset_faces_each(shape, fs, &each)
+                    }
+                })?;
+                continue;
+            }
+        }
         let res = match translate_dir {
             None => match k::offset_faces(&body.shape, &shapes, dist) {
                 Ok(r) if r.shape.is_valid() && r.shape.count(ShapeType::Solid) > 0 => r,

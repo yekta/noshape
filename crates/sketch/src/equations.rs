@@ -52,6 +52,42 @@ pub(crate) enum CurvSpec {
     Line,
 }
 
+/// One side of a curvature joint: a control-point curve or a fit spline's
+/// end (inputs: its points, then its two handles if it has them).
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum CurvSide {
+    Spec(CurvSpec),
+    Fit { n: usize, at_end: bool, handles: bool },
+}
+
+impl CurvSide {
+    fn arity(&self) -> usize {
+        match self {
+            CurvSide::Spec(s) => s.arity(),
+            CurvSide::Fit { n, handles, .. } => 2 * n + if *handles { 4 } else { 0 },
+        }
+    }
+
+    /// Curvature at the joint, oriented away from it (as [`curv`]).
+    fn curvature(&self, x: &[f64]) -> f64 {
+        match self {
+            CurvSide::Spec(s) => curv(s, x),
+            CurvSide::Fit { n, at_end, handles } => {
+                let c = if *handles { fit_curve_handles(x, *n) } else { fit_curve(x, *n) };
+                let Some(c) = c else { return 0.0 };
+                let (a, b) = c.domain();
+                let d = c.eval_ders(if *at_end { b } else { a });
+                let d1 = if *at_end { -d[1] } else { d[1] };
+                let l = d1.length();
+                if l < 1e-300 {
+                    return 0.0;
+                }
+                d1.perp_dot(d[2]) / (l * l * l)
+            }
+        }
+    }
+}
+
 impl CurvSpec {
     fn arity(&self) -> usize {
         match self {
@@ -96,6 +132,12 @@ pub(crate) enum EqKind {
     /// Inputs fit points (2n), o0, o1: cross (or dot if `perp`) of the fit
     /// spline's outgoing end tangent with (o1 - o0), normalized.
     FitEndDir { at_end: bool, perp: bool, n: usize },
+    /// Two fit splines' end directions parallel (perpendicular): inputs the
+    /// first's `na` points, then the second's.
+    FitFitDir { na: usize, end_a: bool, end_b: bool, perp: bool },
+    /// Sum of oriented end curvatures (G2) with a fit spline on either side:
+    /// evaluated numerically.
+    CurvatureNum { a: CurvSide, b: CurvSide },
 }
 
 #[derive(Clone, Debug)]
@@ -222,7 +264,7 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
             let na = a.arity();
             curv(a, &x[..na]) + curv(b, &x[na..])
         }
-        EqKind::SplinePoint { .. } | EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } => {
+        EqKind::SplinePoint { .. } | EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::CurvatureNum { .. } => {
             // only evaluated through `eval_f64`
             T::cst(f64::NAN)
         }
@@ -288,6 +330,24 @@ impl Eq {
                 let p = c.point(x[2].clamp(a, b));
                 if *comp == 0 { p.x - x[0] } else { p.y - x[1] }
             }
+            EqKind::FitFitDir { na, end_a, end_b, perp } => {
+                let nb = x.len() / 2 - na;
+                let dir = |xs: &[f64], n: usize, at_end: bool| -> Option<glam::DVec2> {
+                    let c = fit_curve(xs, n)?;
+                    let (a, b) = c.domain();
+                    Some(c.eval_ders(if at_end { b } else { a })[1])
+                };
+                let (Some(t), Some(o)) = (dir(&x[..2 * na], *na, *end_a), dir(&x[2 * na..], nb, *end_b)) else { return 0.0 };
+                let den = t.length() * o.length();
+                if den < 1e-300 {
+                    return 0.0;
+                }
+                if *perp { t.dot(o) / den } else { t.perp_dot(o) / den }
+            }
+            EqKind::CurvatureNum { a, b } => {
+                let na = a.arity();
+                a.curvature(&x[..na]) + b.curvature(&x[na..])
+            }
             EqKind::FitEndDir { at_end, perp, n } => {
                 let Some(c) = fit_curve(x, *n) else { return 0.0 };
                 let (a, b) = c.domain();
@@ -307,7 +367,7 @@ impl Eq {
     pub fn eval_grad(&self, x: &[f64], g: &mut [f64]) -> f64 {
         match &self.kind {
             EqKind::SplinePoint { comp, curve } => return spline_point_eval(curve, *comp as usize, x, Some(g)),
-            EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } => return self.numeric_grad(x, g),
+            EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::CurvatureNum { .. } => return self.numeric_grad(x, g),
             _ => {}
         }
         let n = x.len();
@@ -566,7 +626,11 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 self.push(EqKind::FitEndDir { at_end, perp, n }, cat(&[&pts, &v]));
                 Ok(())
             }
-            _ => Err("tangency between two fit splines is not supported".into()),
+            // CON-CURVATURE (qa4 round 5 v3 s6): two Spline-tool splines.
+            (Dir::Fit { pts: pa, n: na, at_end: ea }, Dir::Fit { pts: pb, at_end: eb, .. }) => {
+                self.push(EqKind::FitFitDir { na, end_a: ea, end_b: eb, perp }, cat(&[&pa, &pb]));
+                Ok(())
+            }
         }
     }
 
@@ -825,6 +889,19 @@ impl<'a, L: Lookup> Builder<'a, L> {
             }
             (a, b) => Err(format!("offset not supported between {a:?} and {b:?}")),
         }
+    }
+
+    /// [`Builder::curv_spec`], or a fit spline's end (the Spline tool's).
+    fn curv_side(&self, id: EntityId, at_end: bool) -> Result<(CurvSide, SmallVec<[u32; 8]>), String> {
+        if let Geometry::FitSpline { points, handles } = self.geom(id)? {
+            let mut inp = SmallVec::new();
+            for p in points.iter().chain(handles.iter().flat_map(|(a, b)| [a, b])) {
+                inp.extend_from_slice(&self.lk.point(*p));
+            }
+            return Ok((CurvSide::Fit { n: points.len(), at_end, handles: handles.is_some() }, inp));
+        }
+        let (s, inp) = self.curv_spec(id, at_end)?;
+        Ok((CurvSide::Spec(s), inp))
     }
 
     fn curv_spec(&self, id: EntityId, at_end: bool) -> Result<(CurvSpec, SmallVec<[u32; 8]>), String> {
@@ -1118,9 +1195,12 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 self.tangent(*a, *b, c)?;
                 let (ka, kb) = (self.kind(*a)?, self.kind(*b)?);
                 let (a, b) = if tangent_rank(ka) <= tangent_rank(kb) { (*a, *b) } else { (*b, *a) };
-                let (sa, ia) = self.curv_spec(a, c.hints.end_a)?;
-                let (sb, ib) = self.curv_spec(b, c.hints.end_b)?;
-                self.push(EqKind::Curvature { a: sa, b: sb }, cat(&[&ia, &ib]));
+                let (sa, ia) = self.curv_side(a, c.hints.end_a)?;
+                let (sb, ib) = self.curv_side(b, c.hints.end_b)?;
+                match (sa, sb) {
+                    (CurvSide::Spec(sa), CurvSide::Spec(sb)) => self.push(EqKind::Curvature { a: sa, b: sb }, cat(&[&ia, &ib])),
+                    (sa, sb) => self.push(EqKind::CurvatureNum { a: sa, b: sb }, cat(&[&ia, &ib])),
+                }
                 Ok(())
             }
             K::Distance { a, b, value, mode } => self.distance(*a, *b, *value, *mode, c),

@@ -198,6 +198,10 @@ fn assembly_with_mates() {
     assert_eq!(mj["limits"]["rz"], json!({ "min": "-30 deg", "max": "45 deg" }), "{mj}");
     assert_eq!(mj["offset"]["z"], "5 mm", "{mj}");
     assert_eq!(mj["reorient_secondary"], 1, "{mj}");
+    // Mate menu › Reset: its rotation back to 0, one edit.
+    call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "reset": true }));
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Reset : Revolute 1");
     assert_eq!(mj["type"], "revolute", "the type kept: {mj}");
     // Limits the mate type doesn't have are refused.
     let err = try_call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "limits": { "x": { "min": "0 mm" } } })).unwrap_err();
@@ -724,6 +728,10 @@ fn assembly_patterns_bom_interference() {
     let qty: Vec<u64> = bom["rows"].as_array().unwrap().iter().map(|r| r["quantity"].as_u64().unwrap()).collect();
     assert_eq!(qty, vec![1, 3], "{bom}");
     assert!(std::fs::read_to_string(&csv).unwrap().starts_with("Item,Quantity"));
+    // ⋯ › Copy table: the clipboard text, tab-separated.
+    let copy = call(&mut ctx, "assembly_bom", json!({ "copy": true }));
+    assert!(copy["copied"].as_str().unwrap().starts_with("Item\tQuantity"), "{copy}");
+    assert!(copy["message"].as_str().unwrap().ends_with("BOM table copied to clipboard."), "{copy}");
     let s = call(&mut ctx, "assembly_bom_settings", json!({ "columns": ["Item", "Quantity", "Material", "Part number", "Description"] }));
     assert_eq!(s["columns"], json!(["Item", "Quantity", "Material", "Part number", "Description"]), "{s}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 3 }));
@@ -969,6 +977,22 @@ fn assembly_named_positions_and_exploded_views() {
     call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": p, "entity": pf }, "b": { "instance": b, "entity": hole } }));
     let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
 
+    // Animate…: the dialog's defaults (a full turn in 300 steps); a quarter
+    // of the run turns the pin 90°, and nothing is saved.
+    let before = last(&mut ctx);
+    let start = call(&mut ctx, "assembly_animate", json!({ "frame": 0 }));
+    let an = call(&mut ctx, "assembly_animate", json!({ "mate": "Revolute 1", "frame": 75 }));
+    assert_eq!((an["dofs"].clone(), an["dof"].clone(), an["start"].clone(), an["end"].clone(), an["steps"].clone()), (json!(["rz"]), json!("rz"), json!("0 deg"), json!("360 deg"), json!(300)), "{an}");
+    assert!((num(&an["value"]) - 90.0).abs() < 1e-9, "{an}");
+    let rot = |v: &Value, i: &str| v["instances"].as_array().unwrap().iter().find(|x| x["id"] == i).unwrap()["rotation"].clone();
+    assert_ne!(rot(&start, &p), rot(&an, &p), "the pin turns: {an}");
+    assert_eq!(rot(&start, &b), rot(&an, &b), "the fixed block stays");
+    assert_eq!(last(&mut ctx), before, "animation is not saved");
+    let e = try_call(&mut ctx, "assembly_animate", json!({ "dof": "tz" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("dof"), "{e:?}");
+    let e = try_call(&mut ctx, "assembly_animate", json!({ "steps": 10, "frame": 11 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("frame"), "{e:?}");
+
     let e = try_call(&mut ctx, "assembly_named_position_drivers", json!({ "drivers": [{ "mate": "Revolute 1", "dof": "tz" }] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("drivers[0].dof"));
     call(&mut ctx, "assembly_named_position_drivers", json!({ "drivers": [{ "mate": "Revolute 1", "dof": "rz" }] }));
@@ -996,6 +1020,11 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!(last(&mut ctx), "Assembly 1 :: Edit : Explode step");
     call(&mut ctx, "assembly_exploded_view", json!({ "action": "rename", "view": "Explode 1", "name": "Pin out" }));
     assert_eq!(last(&mut ctx), "Assembly 1 :: Rename : Pin out");
+    // The view's menu: Hide all explode lines, Show all explode lines.
+    call(&mut ctx, "assembly_exploded_view", json!({ "action": "lines", "view": "Pin out", "on": false }));
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Hide all explode lines");
+    call(&mut ctx, "assembly_exploded_view", json!({ "action": "lines", "view": "Pin out", "on": true }));
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Show all explode lines");
     let ev = call(&mut ctx, "assembly_exploded_view", json!({ "action": "delete", "view": "Pin out" }));
     assert_eq!(ev["exploded_views"].as_array().unwrap().len(), 0, "{ev}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Delete : Pin out");
@@ -2886,6 +2915,7 @@ fn edit_in_context_and_part_studio_in_context() {
     let cs = contexts(&mut ctx, "Part Studio 1");
     assert_eq!(cs[0]["referenced"], true, "{cs:?}");
     assert_eq!(cs[0]["out_of_date"], false, "{cs:?}");
+    assert_eq!(cs[0]["follow_position"], "Current assembly position", "{cs:?}");
 
     // Moving the pin makes an update available.
     call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [0, 0, 15] }));
@@ -3112,7 +3142,10 @@ fn drawing_annotation_menu_edits() {
     assert_eq!(last(&mut ctx), "Add to ordinate group");
     let e = try_call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "group": o, "origin": a0, "points": [b0] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("group"), "{e:?}");
-
+    // Reset ordinate: nothing to move back, no edit (as the editor).
+    let r = call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": o, "action": "reset_ordinate" }));
+    assert!(r["message"].as_str().unwrap().starts_with("Nothing to reset"), "{r}");
+    assert_eq!(last(&mut ctx), "Add to ordinate group");
 }
 
 /// P1 menu gaps: display states, the assembly configuration panel's input
@@ -3693,4 +3726,37 @@ fn window_navigation() {
     let p = call(&mut ctx, "drawing_sheets_panel", json!({ "drawing": tab, "open": false }));
     assert_eq!(p["sheets"][1]["shown"], true, "{p}");
     assert!(state(&mut ctx)["sheets_panel_open"].as_array().unwrap().is_empty());
+}
+
+/// The Insert dialog's configuration menu (Reset to default, Set to last
+/// viewed) and the Variables panel's Copy table.
+#[test]
+fn insert_configuration_menu_and_variable_table_copy() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "insert_config_menu.noshape");
+    for c in ["default", "last_viewed"] {
+        let r = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "configuration": c }));
+        assert!(r["instance"].is_string(), "{c}: {r}");
+    }
+    let e = try_call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "configuration": "nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("configuration"), "{e:?}");
+    call(&mut ctx, "variable_create", json!({ "name": "w", "value": "20 mm", "description": "Width" }));
+    let v = call(&mut ctx, "variable_list", json!({ "copy": true }));
+    let text = v["copied"].as_str().unwrap();
+    assert!(text.starts_with("Name\tVariable type\tValue\tDescription\n"), "{v}");
+    assert!(text.lines().any(|l| l.starts_with("w\tLength\t") && l.ends_with("\tWidth")), "{v}");
+}
+
+/// The line tool's Line/tangent arc switch (Shift+A while chaining): the
+/// next segment is a tangent arc, then the chain goes on with lines.
+#[test]
+fn line_tangent_arc_switch() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("tangent_arc_switch.noshape").to_str().unwrap() }));
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "line", "points": [[0, 0], [20, 0], [30, 10], [30, 30]], "tangent_arc_switch": [2] }));
+    let kinds: Vec<&str> = d["created"].as_array().unwrap().iter().map(|e| e["type"].as_str().unwrap()).filter(|t| *t != "point").collect();
+    assert_eq!(kinds, ["line", "arc", "line"], "{d}");
+    let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "circle", "points": [[50, 0], [55, 0]], "tangent_arc_switch": [1] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tangent_arc_switch"), "{e:?}");
 }

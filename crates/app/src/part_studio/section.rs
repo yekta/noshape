@@ -126,7 +126,7 @@ impl PartStudioView {
 
     /// "Turn off section view" (also with the dialog open).
     pub(super) fn turn_off_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.close_section_dialog(false, window, cx);
+        self.end_section_dialog(false, window, cx);
         self.ui.section.clear();
         self.ui.section_parts = None;
         self.apply_section(window, cx);
@@ -140,7 +140,7 @@ impl PartStudioView {
             return;
         }
         if self.ui.section_dialog.is_some() {
-            self.close_section_dialog(false, window, cx);
+            self.end_section_dialog(false, window, cx);
         } else if !self.ui.section.is_empty() {
             self.ui.section.clear();
             self.ui.section_parts = None;
@@ -167,10 +167,23 @@ impl PartStudioView {
         }
     }
 
-    /// ✓ keeps the section, ✕ restores the state before the dialog.
+    /// Enter accepts; Esc closes the value box first (live: "Esc closes
+    /// only the value box", then cancels the dialog).
     pub(super) fn close_section_dialog(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if !accept && std::mem::take(&mut self.ui.section_box) {
+            self.ui.section_offset_edit = None;
+            window.focus(&self.focus, cx);
+            cx.notify();
+            return;
+        }
+        self.end_section_dialog(accept, window, cx);
+    }
+
+    /// ✓ keeps the section, ✕ restores the state before the dialog.
+    pub(super) fn end_section_dialog(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(d) = self.ui.section_dialog.take() else { return };
         self.ui.section_offset_edit = None;
+        self.reset_section_manip();
         if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
             self.message = None;
         }
@@ -220,6 +233,7 @@ impl PartStudioView {
             if let Some(d) = &mut self.ui.section_dialog {
                 d.active = self.ui.section.len().saturating_sub(1);
             }
+            self.reset_section_manip();
         }
         self.apply_section(window, cx);
         true
@@ -247,7 +261,9 @@ impl PartStudioView {
         let (lo, hi) = self.fit_bounds()?;
         let center = (lo + hi) * 0.5;
         let on_plane = pl.origin + pl.normal * pl.offset;
-        let base = center - pl.normal * pl.normal.dot(center - on_plane);
+        // Where the base circle was slid to (live), else across the model's centre.
+        let at = self.ui.section_base.unwrap_or(center);
+        let base = at - pl.normal * pl.normal.dot(at - on_plane);
         Some(super::manipulators::Arrow { base, dir: pl.normal, length: section_handle(lo, hi), param: SECTION_PARAM, flip: None })
     }
 
@@ -258,8 +274,57 @@ impl PartStudioView {
         let Some(i) = self.ui.section_dialog.as_ref().map(|d| d.active) else { return };
         if let Some(pl) = self.ui.section.get_mut(i) {
             pl.offset += length - section_handle(lo, hi);
+            // Live: the plane moves in 0.1 mm (0.01 in) steps from the drag
+            // start ("2.6 mm", "-8.5 mm").
+            if let Some(s0) = self.ui.section_drag0 {
+                let units = self.doc.read(cx).session.doc.settings.units;
+                let imperial = matches!(units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
+                let step = if imperial { 0.000254 } else { 0.0001 };
+                pl.offset = s0 + ((pl.offset - s0) / step).round() * step;
+            }
         }
+        self.ui.section_rot = None;
         self.apply_section(window, cx);
+        if self.ui.section_box {
+            self.open_section_box(window, cx);
+        }
+    }
+
+    /// The value box's text, shown from a drag on (live): the last ring
+    /// drag's angle ("15 deg"), else the distance from the arrow drag's start.
+    fn section_value_text(&self, cx: &App) -> Option<String> {
+        if !self.ui.section_box {
+            return None;
+        }
+        if let Some(r) = self.ui.section_rot {
+            return Some(super::section_manip::deg_text(r.deg));
+        }
+        let d = self.ui.section_dialog.as_ref()?;
+        let pl = self.ui.section.get(d.active)?;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        Some(noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset - self.ui.section_drag0.unwrap_or(0.0), noshape_units::Dim::LENGTH), &units))
+    }
+
+    /// The value box from a drag on: a field with its value selected,
+    /// following the drag (live asm/2370–2372).
+    pub(super) fn open_section_box(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(text) = self.section_value_text(cx) else { return };
+        if let Some((input, _)) = &self.ui.section_offset_edit {
+            input.update(cx, |s, cx| {
+                s.set_value(text, window, cx);
+                s.select_all(window, cx);
+            });
+            return;
+        }
+        self.open_section_offset_edit(text, window, cx);
+    }
+
+    /// Forget the manipulator's rotation and moved base (another plane).
+    fn reset_section_manip(&mut self) {
+        self.ui.section_rot = None;
+        self.ui.section_box = false;
+        self.ui.section_drag0 = None;
+        self.ui.section_base = None;
     }
 
     pub(super) fn render_section_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -275,7 +340,7 @@ impl PartStudioView {
         use crate::section_dialog::Action;
         match a {
             Action::Accept => self.close_section_dialog(true, w, cx),
-            Action::Cancel => self.close_section_dialog(false, w, cx),
+            Action::Cancel => self.end_section_dialog(false, w, cx),
             Action::Include(include) => {
                 if let Some(d) = &mut self.ui.section_dialog {
                     d.include = include;
@@ -295,6 +360,7 @@ impl PartStudioView {
                 if i < self.ui.section.len() {
                     self.ui.section.remove(i);
                 }
+                self.reset_section_manip();
                 if let Some(d) = &mut self.ui.section_dialog {
                     d.active = self.ui.section.len().saturating_sub(1);
                 }
@@ -321,40 +387,18 @@ impl PartStudioView {
         if self.ui.section_offset_edit.is_some() {
             return None;
         }
-        let a = self.section_arrow()?;
-        let d = self.ui.section_dialog.as_ref()?;
-        let pl = self.ui.section.get(d.active)?;
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let text = noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset, noshape_units::Dim::LENGTH), &units);
+        let (anchor, _) = self.section_box_anchor(cx)?;
+        let text = self.section_value_text(cx)?;
         let pal = p();
-        let b = crate::overlay_labels::ValueBox { text: &text, text_size: 12., text_color: pal.text.into(), background: gpui_kit::rgb(0xffffff).into(), border: Some(pal.accent.into()), pad_x: 4., offset: [12., -10.] };
-        crate::overlay_labels::value_box(window, cx, &b, a.base + a.dir * a.length)
+        let b = crate::overlay_labels::ValueBox { text: &text, text_size: 13.33, text_color: pal.text.into(), background: gpui_kit::rgb(0xffffff).into(), border: Some(gpui_kit::rgb(0x1651b0).into()), pad_x: 3., offset: [BOX_DX, BOX_DY] };
+        crate::overlay_labels::value_box(window, cx, &b, anchor)
     }
 
     /// The offset box beside the section arrow (live: e.g. "-0.91 in").
     pub(super) fn render_section_value(&self, cx: &App) -> Option<AnyElement> {
-        let a = self.section_arrow()?;
-        let d = self.ui.section_dialog.as_ref()?;
-        let pl = self.ui.section.get(d.active)?;
-        let tip = a.base + a.dir * a.length;
-        let s = self.viewport.read(cx).project(tip)?;
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let text = noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset, noshape_units::Dim::LENGTH), &units);
-        let pal = p();
-        Some(
-            div()
-                .absolute()
-                .left(px(s.x as f32 + 12.))
-                .top(px(s.y as f32 - 10.))
-                .px(px(4.))
-                .border_1()
-                .border_color(pal.accent)
-                .bg(gpui_kit::rgb(0xffffff))
-                .text_size(px(12.))
-                .text_color(pal.text)
-                .child(text)
-                .into_any_element(),
-        )
+        let (_, s) = self.section_box_anchor(cx)?;
+        let text = self.section_value_text(cx)?;
+        Some(section_box(s).flex().items_center().justify_end().px(px(3.)).text_size(px(13.33)).text_color(p().text).child(text).into_any_element())
     }
 
     /// The offset box as a field (qa5 AN3; live: the arrow's value box takes
@@ -362,23 +406,18 @@ impl PartStudioView {
     /// an input there. Enter or leaving it moves the plane; the click never
     /// reaches the graphics (it would pick the plane under it).
     pub(super) fn section_value_field(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let a = self.section_arrow()?;
-        let d = self.ui.section_dialog.as_ref()?;
-        let pl = self.ui.section.get(d.active)?;
-        let s = self.viewport.read(cx).project(a.base + a.dir * a.length)?;
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let text = noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset, noshape_units::Dim::LENGTH), &units);
-        let at = div().absolute().left(px(s.x as f32 + 12.)).top(px(s.y as f32 - 10.)).occlude();
+        let (_, s) = self.section_box_anchor(cx)?;
+        let text = self.section_value_text(cx)?;
+        let at = section_box(s).occlude();
         if let Some((input, _)) = &self.ui.section_offset_edit {
-            let field = gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(12.));
-            return Some(at.id("section-offset-field").w(px(90.)).px(px(4.)).border_1().border_color(p().accent).bg(gpui_kit::rgb(0xffffff)).child(gpui_kit::base::input::input_frame(div().child(field))).into_any_element());
+            let field = gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right);
+            return Some(at.id("section-offset-field").px(px(3.)).child(gpui_kit::base::input::input_frame(div().size_full().flex().items_center().child(field))).into_any_element());
         }
-        // The drawn box: 12 px text, 4 px padding.
-        let w = text.chars().count() as f32 * 7.0 + 10.0;
+        // The drawn box takes the click.
         Some(
             at.id("section-offset-hit")
-                .w(px(w))
-                .h(px(18.))
+                .bg(gpui_kit::rgba(0x00000000))
+                .border_color(gpui_kit::rgba(0x00000000))
                 .cursor(CursorStyle::IBeam)
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
                     cx.stop_propagation();
@@ -394,7 +433,7 @@ impl PartStudioView {
         let sub = cx.subscribe_in(&input, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let typed = st.read(cx).value().to_string();
-                this.commit_section_offset(&typed, window, cx);
+                this.commit_section_offset(&typed, matches!(ev, InputEvent::PressEnter { .. }), window, cx);
             }
         });
         input.update(cx, |s, cx| {
@@ -405,21 +444,40 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// A typed offset (a bare number in the workspace unit) moves the active
-    /// plane; text that doesn't evaluate leaves it.
-    fn commit_section_offset(&mut self, typed: &str, window: &mut Window, cx: &mut Context<Self>) {
+    /// A typed offset (a bare number in the workspace unit, from the arrow
+    /// drag's start) moves the active plane; text that doesn't evaluate
+    /// leaves it. After Enter the box stays open with its value selected
+    /// (live: "5" + Enter → "5 mm").
+    fn commit_section_offset(&mut self, typed: &str, enter: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.ui.section_offset_edit = None;
         let units = self.doc.read(cx).session.doc.settings.units;
         let vars = self.scope_variables(None, cx);
+        // After a ring drag the box takes an angle (live: "33" + Enter → 33 deg).
+        if let Some(r) = self.ui.section_rot {
+            let text = noshape_model::quantity_text::commit_text(typed, noshape_units::Dim::ANGLE, &units, &vars);
+            if let Ok(q) = noshape_units::evaluate_as(&text, noshape_units::Dim::ANGLE, &units, &vars) {
+                self.set_section_rotation(super::section_manip::RingDrag { deg: q.value.to_degrees(), dragging: false, ..r }, window, cx);
+            }
+            self.after_section_commit(enter, window, cx);
+            return;
+        }
         let text = noshape_model::quantity_text::commit_text(typed, noshape_units::Dim::LENGTH, &units, &vars);
         if let Ok(q) = noshape_units::evaluate_as(&text, noshape_units::Dim::LENGTH, &units, &vars)
             && let Some(active) = self.ui.section_dialog.as_ref().map(|d| d.active)
             && let Some(pl) = self.ui.section.get_mut(active)
         {
-            pl.offset = q.value;
+            pl.offset = self.ui.section_drag0.unwrap_or(0.0) + q.value;
             self.apply_section(window, cx);
         }
-        window.focus(&self.focus, cx);
+        self.after_section_commit(enter, window, cx);
+    }
+
+    fn after_section_commit(&mut self, enter: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if enter {
+            self.open_section_box(window, cx);
+        } else {
+            window.focus(&self.focus, cx);
+        }
         cx.notify();
     }
 
@@ -437,6 +495,16 @@ impl PartStudioView {
         }
         self.apply_section(window, cx);
     }
+}
+
+/// The value box (live asm/2370–2371: an `os-canvas-text-edit` 75×26 with a
+/// 1 px #1651b0 border, its corner 40 px right of the rotate glyph's centre
+/// and 25 px above it; the value right-aligned).
+const BOX_DX: f32 = 40.;
+const BOX_DY: f32 = -25.;
+
+fn section_box(anchor: glam::DVec2) -> Div {
+    div().absolute().left(px(anchor.x as f32 + BOX_DX)).top(px(anchor.y as f32 + BOX_DY)).w(px(75.)).h(px(26.)).border_1().border_color(gpui_kit::rgb(0x1651b0)).bg(gpui_kit::rgb(0xffffff))
 }
 
 /// Parameter name marking the section arrow among the manipulators.

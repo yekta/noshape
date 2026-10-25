@@ -52,32 +52,91 @@ impl PartStudioView {
         });
     }
 
-    /// Suppress or unsuppress every feature of a folder.
+    /// Every feature in a folder, nested folders included.
+    pub(super) fn folder_features(&self, folder: u32, cx: &App) -> Vec<FeatureId> {
+        self.studio(cx).map(|s| s.folder_features(folder)).unwrap_or_default()
+    }
+
+    /// Suppress or unsuppress every feature of a folder (nested ones too:
+    /// live qa4 r5 s8 (6)).
     pub(super) fn suppress_folder(&mut self, folder: u32, suppressed: bool, cx: &mut Context<Self>) {
-        let ids: Vec<FeatureId> = self.studio(cx).map(|s| s.features.iter().filter(|f| f.folder == Some(folder)).map(|f| f.id).collect()).unwrap_or_default();
+        let ids = self.folder_features(folder, cx);
         self.set_suppressed(ids, suppressed, cx);
+    }
+
+    /// A folder counts as suppressed when everything in it is, by hand or
+    /// by an expression (the regenerated state; its menu then offers
+    /// Unsuppress; an empty folder never is).
+    pub(super) fn folder_suppressed(&self, folder: u32, cx: &App) -> bool {
+        let Some(s) = self.studio(cx) else { return false };
+        let ids = s.folder_features(folder);
+        let off = |id: &FeatureId| s.feature(*id).is_some_and(|f| f.suppressed) || self.display.feature_state(*id).is_some_and(|st| st.status == noshape_model::display::FeatureStatus::Suppressed);
+        !ids.is_empty() && ids.iter().all(off)
+    }
+
+    /// The folder's Edit dynamic suppression ▸ Remove expression: off every
+    /// feature in it (one undo step).
+    pub(super) fn clear_folder_dynamic_suppression(&mut self, folder: u32, cx: &mut Context<Self>) {
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(None), cx, |ps| ps.set_folder_suppression_expr(folder, None));
+        });
+    }
+
+    /// Whether any feature in a folder has a dynamic suppression expression
+    /// (its menu then offers Edit dynamic suppression ▸ Remove expression).
+    pub(super) fn folder_has_expr(&self, folder: u32, cx: &App) -> bool {
+        self.studio(cx).is_some_and(|s| s.folder_features(folder).iter().any(|id| s.feature(*id).is_some_and(|f| f.suppression_expr.is_some())))
+    }
+
+    /// A feature's Edit dynamic suppression ▸ Remove expression.
+    pub(super) fn remove_dynamic_suppression(&mut self, id: FeatureId, cx: &mut Context<Self>) {
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(None), cx, |ps| noshape_ops::studio::set_suppression_expr(ps, id, None));
+        });
+    }
+
+    /// The folder row's Delete: the folder with everything in it.
+    pub(super) fn delete_folder(&mut self, folder: u32, cx: &mut Context<Self>) {
+        let ids = self.folder_features(folder, cx);
+        let desc = self.studio(cx).map(|s| noshape_ops::studio::delete_description(s, &ids)).unwrap_or_else(|| noshape_ops::studio::delete_description(&Default::default(), &ids));
+        self.ui.selected_folder = None;
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, &desc, cx, |ps| ps.delete_folder_tree(folder));
+        });
+    }
+
+    /// The folder row's Roll to here: the bar after its last feature.
+    pub(super) fn roll_to_folder(&mut self, folder: u32, cx: &mut Context<Self>) {
+        let Some(last) = self.studio(cx).and_then(|s| s.folder_features(folder).last().and_then(|id| s.index_of(*id))) else { return };
+        self.set_rollback(Some(last + 1), cx);
+    }
+
+    /// Expand ▸ / Collapse ▸ "… selected": the selected folder.
+    pub(super) fn set_folder_collapsed(&mut self, folder: u32, collapsed: bool, cx: &mut Context<Self>) {
+        self.ui.folder_open.insert(folder, !collapsed);
+        cx.notify();
     }
 
     /// Folder menu "Expand all" / "Collapse all".
     pub(super) fn set_all_folders_collapsed(&mut self, collapsed: bool, cx: &mut Context<Self>) {
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, if collapsed { "Collapse all folders" } else { "Expand all folders" }, cx, |ps| {
-                for f in &mut ps.folders {
-                    f.collapsed = collapsed;
-                }
-            });
-        });
+        let ids: Vec<u32> = self.studio(cx).map(|s| s.folders.iter().map(|f| f.id).collect()).unwrap_or_default();
+        for id in ids {
+            self.ui.folder_open.insert(id, !collapsed);
+        }
+        cx.notify();
     }
 
+    /// Whether a folder is closed in this view (see `UiState::folder_open`).
+    pub(super) fn folder_collapsed(&self, fd: &noshape_model::partstudio::Folder) -> bool {
+        self.ui.folder_open.get(&fd.id).map_or(fd.collapsed, |open| !open)
+    }
+
+    /// Opening or closing a folder is view state: no undo step (live qa4
+    /// r5 s8 (7): the undo steps are the user's model actions).
     pub(super) fn toggle_folder(&mut self, folder: u32, cx: &mut Context<Self>) {
-        // Collapse state is view state but lives in the document like Onshape's.
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Toggle folder", cx, |ps| {
-                if let Some(f) = ps.folder_mut(folder) {
-                    f.collapsed = !f.collapsed;
-                }
-            });
-        });
+        let Some(collapsed) = self.studio(cx).and_then(|s| s.folder(folder)).map(|fd| self.folder_collapsed(fd)) else { return };
+        self.ui.folder_open.insert(folder, collapsed);
+        cx.notify();
     }
 
     pub(super) fn start_folder_rename(&mut self, folder: u32, window: &mut Window, cx: &mut Context<Self>) {

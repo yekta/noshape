@@ -132,7 +132,7 @@ pub fn ops() -> Vec<Op> {
             verb: "list",
             summary: "The variables of a Part Studio or a Variable Studio, with their values",
             description: "Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables). Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).",
-            fields: vec![doc_field(), var_tab()],
+            fields: vec![doc_field(), var_tab(), opt("copy", json!({ "type": "boolean" }), "Part Studio: the Variables panel's Copy table, `copied` being the text it puts on the clipboard (a header row, then name, type, value, description per variable, tab-separated). A row's Copy copies its description (`description` here).")],
             mutates: false,
             destructive: false,
             run: list,
@@ -264,7 +264,13 @@ fn list_value(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     match table(ctx, a)? {
-        (od, Table::Studio(tab)) => Ok(list_value(od, tab)?.into()),
+        (od, Table::Studio(tab)) => {
+            let mut v = list_value(od, tab)?;
+            if a.bool_or("copy", false)? {
+                v["copied"] = json!(crate::variable_studio::part_studio_table_text(crate::doc::studio(od.doc(), tab)?));
+            }
+            Ok(v.into())
+        }
         (od, Table::Vs(tab)) => Ok(vs_list(od, tab)?.into()),
     }
 }

@@ -721,6 +721,36 @@ pub fn hole_table(ctx: &crate::regen::context::Context, units: &noshape_units::U
     out
 }
 
+/// draft.fs draftEditLogic (flipAlongPull): with the first parting edge
+/// picked, the "Switch face" value that drafts the steeper of the edge's two
+/// faces (the one nearer parallel to the pull; on a tie the face against the
+/// pull). None when the pull or the edge doesn't resolve.
+pub fn draft_switch_face(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs) -> Option<bool> {
+    use noshape_kernel::ShapeType;
+    let vars = std::collections::BTreeMap::new();
+    let ev = crate::regen::eval::EvalCtx::new(FeatureId(0), "", params, units, ctx.clone(), &vars);
+    let pull = ev.resolve_direction(params.query("pullDirectionEntity").first()?)?.try_normalize()?;
+    let &(bi, ei) = ev.resolve_edges(params.query("partingEdges")).first()?;
+    let shape = &ctx.bodies[bi].shape;
+    let edge = shape.sub_shape(ShapeType::Edge, ei).ok()?;
+    let info = edge.edge_info().ok()?;
+    let mid = edge.point_at((info.first_param + info.last_param) * 0.5).ok()?;
+    let faces = shape.edge_faces().ok()?.get(ei)?.clone();
+    // (along the pull, steepness) of each face.
+    let data: Vec<(bool, f64)> = faces
+        .iter()
+        .filter_map(|&f| {
+            let face = shape.sub_shape(ShapeType::Face, f as usize).ok()?;
+            let c = face.centroid().ok()?;
+            let n = face.normal_at_point(c).ok()?.try_normalize()?;
+            Some(((c - mid).dot(pull) >= 0.0, 1.0 - n.dot(pull).abs()))
+        })
+        .collect();
+    let along = data.iter().find(|d| d.0)?.1;
+    let against = data.iter().find(|d| !d.0)?.1;
+    Some(along > against + 1e-9)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -805,6 +835,32 @@ mod tests {
         assert_eq!(ps2.features.iter().map(|f| f.id).collect::<Vec<_>>(), order);
     }
 
+    /// Live (ui 10-25 c): a folder's Add expression… puts the expression on
+    /// every feature inside it (none on the folder); unpacked, they keep it.
+    #[test]
+    fn a_folders_dynamic_suppression_goes_on_its_features() {
+        use crate::display::FeatureStatus;
+        use crate::regen::{RegenOptions, Regenerator};
+        let mut ps = crate::demo::plate_studio();
+        let ext = ps.features.iter().find(|f| f.type_id == "extrude").map(|f| f.id).expect("extrude");
+        let run = |ps: &PartStudio| {
+            let mut r = Regenerator::new();
+            r.regenerate(ps, &Default::default(), &noshape_units::UnitPrefs::default(), &RegenOptions::default()).display
+        };
+        let inner = ps.new_folder(&[ext], None);
+        let outer = ps.wrap_folder(inner, "Outer".into()).unwrap();
+        ps.set_folder_suppression_expr(outer, Some("2 mm < 1 mm".into()));
+        assert_eq!(ps.feature(ext).and_then(|f| f.suppression_expr.as_deref()), Some("2 mm < 1 mm"));
+        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Suppressed));
+        ps.dissolve_folder(outer);
+        ps.dissolve_folder(inner);
+        assert_eq!(ps.feature(ext).and_then(|f| f.suppression_expr.as_deref()), Some("2 mm < 1 mm"));
+        assert_eq!(run(&ps).feature_state(ext).map(|s| s.status), Some(FeatureStatus::Suppressed));
+        let f = ps.new_folder(&[ext], None);
+        ps.set_folder_suppression_expr(f, None);
+        assert_eq!(ps.feature(ext).and_then(|f| f.suppression_expr.clone()), None);
+    }
+
     #[test]
     fn dynamic_suppression_and_boolean_expressions() {
         use crate::display::FeatureStatus;
@@ -846,6 +902,40 @@ mod tests {
         let wrap = ps.new_folder(&[FeatureId(1003)], Some("New folder".into()));
         assert_eq!(ps.folder_count(wrap), 1);
         assert!(ps.folder(wrap).unwrap().collapsed);
+    }
+
+    /// Live (ui 10-25 b (1)): Boss 1 and Boss 2 selected → "New folder (3)"
+    /// with Boss sketch 2 in between, in place.
+    #[test]
+    fn a_new_folder_takes_the_run_between_the_selected_features() {
+        let mut ps = studio();
+        let order: Vec<FeatureId> = ps.features.iter().map(|f| f.id).collect();
+        let f = ps.new_folder(&[order[1], order[3]], None);
+        assert_eq!(ps.features.iter().map(|f| f.id).collect::<Vec<_>>(), order);
+        assert_eq!(ps.folder_count(f), 3);
+        assert!(ps.features[1..=3].iter().all(|x| x.folder == Some(f)));
+        // A folder inside the run moves in whole.
+        let inner = ps.new_folder(&[order[2]], None);
+        let outer_parent = ps.folder(inner).and_then(|x| x.parent);
+        assert_eq!(outer_parent, Some(f));
+        ps.dissolve_folder(f);
+        let g = ps.new_folder(&[order[1], order[3]], None);
+        assert_eq!(ps.folder(inner).and_then(|x| x.parent), Some(g));
+        assert_eq!(ps.folder_count(g), 2);
+    }
+
+    /// Live (ui 10-25 b (2)): a folder's Add selection to folder… wraps it;
+    /// Delete takes the folder with everything in it.
+    #[test]
+    fn folders_wrap_and_delete_with_their_contents() {
+        let mut ps = studio();
+        let inner = ps.new_folder(&[FeatureId(1003), FeatureId(1004)], None);
+        let outer = ps.wrap_folder(inner, "New folder".into()).unwrap();
+        assert_eq!(ps.folder(inner).and_then(|f| f.parent), Some(outer));
+        assert_eq!(ps.folder_features(outer), vec![FeatureId(1003), FeatureId(1004)]);
+        ps.delete_folder_tree(outer);
+        assert!(ps.folders.is_empty());
+        assert_eq!(ps.features.iter().map(|f| f.id).collect::<Vec<_>>(), vec![FeatureId(1001), FeatureId(1002), FeatureId(1005)]);
     }
 
     #[test]

@@ -5,24 +5,11 @@ use noshape_ops::coverage::{Cover, MENUS, SHORTCUTS};
 use noshape_ops::{registry, values};
 use std::collections::BTreeSet;
 
-const SHORTCUTS_RS: &str = include_str!("../../app/src/shortcuts.rs");
 const SHORTCUT_CMDS_RS: &str = include_str!("../../app/src/part_studio/shortcut_cmds.rs");
 
 /// `<prefix>:<name>` ids of the shortcut registry (`ENTRIES`).
 fn shortcut_ids() -> Vec<String> {
-    let start = SHORTCUTS_RS.find("pub const ENTRIES").expect("ENTRIES");
-    let body = &SHORTCUTS_RS[start..start + SHORTCUTS_RS[start..].find("\n};").expect("end of ENTRIES")];
-    let mut ids = Vec::new();
-    let mut prefix = "";
-    for line in body.lines() {
-        let t = line.trim();
-        if t.ends_with('[') && t.contains('"') {
-            prefix = t.split('"').nth(1).expect("prefix");
-        } else if let Some(rest) = t.strip_prefix("(\"") {
-            ids.push(format!("{prefix}:{}", &rest[..rest.find('"').expect("name")]));
-        }
-    }
-    ids
+    noshape_ops::shortcuts::ENTRIES.iter().map(|e| e.id.to_string()).collect()
 }
 
 /// Part Studio shortcut names that open a feature: (name, feature type).
@@ -268,7 +255,7 @@ fn schema_says_when_parameters_show() {
 /// the sweep), and none may be added.
 #[test]
 fn ui_only_entries_only_go_down() {
-    const CEILING: usize = 85;
+    const CEILING: usize = 61;
     let ui: Vec<&str> = SHORTCUTS.iter().chain(MENUS.iter()).filter(|(_, c)| matches!(c, Cover::Ui(_))).map(|(id, _)| *id).collect();
     assert!(ui.len() <= CEILING, "{} UI-only entries (at most {CEILING}): give the new ones an operation\n{}", ui.len(), ui.join("\n"));
 }

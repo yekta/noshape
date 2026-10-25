@@ -103,7 +103,13 @@ fn bsurf_profiles(id: &'static str, label: &'static str, ids: [&'static str; 5])
             ParamSpec::query1(direction, "Direction", QueryFilter::DIRECTION).visible(move |v| is_direction_condition(v.enum_(cond))),
         ],
     )
-    .hints(Hints::COLLAPSE_ARRAY_ITEMS)
+    // Live L28: a driven query, one row per pick, "[None] Edges of Curve U1"
+    // (no limit on the rows).
+    .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
+    .item_template(match id {
+        "uProfilesArray" => "[#uCondition] #uProfileEntities",
+        _ => "[#vCondition] #vProfileEntities",
+    })
 }
 
 pub fn boundary_surface() -> FeatureType {

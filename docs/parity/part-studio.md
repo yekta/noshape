@@ -20,13 +20,13 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 1.1 | Enter commits the open dialog (in a number field whose text changed, the first Enter applies the value and selects it, the second commits) | keyboard_shortcuts; live | ✅ (two-stage Enter per live capture) |
-| 1.2 | Enter works after clicking the feature list/viewport (focus left the dialog) | keyboard_shortcuts | 🔧 |
-| 1.3 | Enter with a feature selected in the list (no dialog) opens it for editing | A §3.3 (implied by Edit) | 🔧 |
+| 1.2 | Enter works after clicking the feature list/viewport (focus left the dialog) | keyboard_shortcuts | ✅ (app 10-24: list clicked, Enter committed Extrude 2) |
+| 1.3 | Enter with a feature selected in the list (no dialog) opens it for editing | A §3.3 (implied by Edit) | ✅ (app 10-24) |
 | 1.4 | Shift+Enter commits and reopens the same tool, empty | keyboard_shortcuts; Home__dialogs | ✅ |
 | 1.5 | Esc exits the command / cancels the dialog | keyboard_shortcuts | ✅ |
 | 1.6 | Esc in a changed dialog field reverts the typed value; the next Esc cancels the dialog | live (behaviours.md: Feature dialog basics) | ✅ |
 | 1.7 | Esc closes transient UI first (S toolbar, Select other, zoom-window mode), then exits isolate/transparent, then clears the selection | View__isolate; select_other | 🔧 |
-| 1.8 | Space deselects everything (features and entities) | keyboard_shortcuts | 🔧 (features were not cleared) |
+| 1.8 | Space deselects everything (features and entities) | keyboard_shortcuts | ✅ (app 10-24) |
 | 1.9 | Ctrl/⌘+C copies selected features | keyboard_shortcuts | ✅ |
 | 1.10 | Ctrl/⌘+V pastes copied features (repeatable, at the rollback bar) | keyboard_shortcuts | ✅ |
 | 1.11 | Delete/Backspace removes selected features | keyboard_shortcuts | ✅ |
@@ -58,7 +58,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.3 | Shift+W revolve (same rules) | keyboard_shortcuts | ✅ |
 | 2.4 | Shift+F fillet (selected edges preselected) | keyboard_shortcuts | ✅ |
 | 2.5 | Shift+H shows/hides sketches | keyboard_shortcuts | ✅ |
-| 2.6 | Rollback bar selected + ↑/↓ steps the bar | keyboard_shortcuts; features_and_parts_lists | 🔧 (clicking the bar now gives the list focus) |
+| 2.6 | Rollback bar selected + ↑/↓ steps the bar | keyboard_shortcuts; features_and_parts_lists | ✅ (= 6.33) |
 | 2.7 | Shift+1…7 Front, Back, Left, Right, Top, Bottom, Isometric | keyboard_shortcuts | ✅ |
 | 2.8 | N view normal to the hovered/selected plane, face or sketch; N again flips to the reverse | keyboard_shortcuts | ✅ |
 | 2.9 | F zoom to fit: the world box of the visible parts/sketches, the origin point when shown and the default planes (150 mm, ±75) when shown, its 8 corners centred, half-height 1.05 × max(h, w/aspect), in both projections (perspective: eye at padded half-height / tan(fov/2) + padded half-depth); a Part Studio opens at Trimetric fitted to its parts and the planes' box even when hidden (live "Zoom to fit (perf 10-23 22:40)"; navigation `zoom_to_fit_frames_like_onshape`) | keyboard_shortcuts, live | ✅ |
@@ -67,7 +67,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.12 | ←→↑↓ rotate 15°, Ctrl 5°, Shift 90° | keyboard_shortcuts | ✅ |
 | 2.13 | Ctrl+Shift+←→↑↓ pan (150 px per step) | keyboard_shortcuts; A §6.1 | 🔧 (bound but unhandled) |
 | 2.14 | P shows/hides planes | keyboard_shortcuts | ✅ |
-| 2.15 | Shift+P hides all construction geometry (planes, sketches); again shows it | keyboard_shortcuts | 🔧 (bound but unhandled) |
+| 2.15 | Shift+P hides all construction geometry (planes, sketches); again shows it | keyboard_shortcuts | ✅ (app 10-24, = sketch 1.17) |
 | 2.16 | Y hides the hovered entity's part/sketch/plane (or the selection) | keyboard_shortcuts; View__hide_show | 🔧 (bound but unhandled) |
 | 2.17 | Shift+Y shows hidden entities (selected ones, else all parts) | keyboard_shortcuts; View__hide_show | 🔧 |
 | 2.18 | Shift+I isolates the hovered/selected parts (others transparent); cumulative | keyboard_shortcuts; View__isolate | 🔧 |
@@ -83,7 +83,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 3.1 | Click selects, click again deselects; selection is additive without modifiers | Home__selection | ✅ |
-| 3.2 | Click in empty space clears the selection (entities and features) | Home__selection | 🔧 (features stayed selected) |
+| 3.2 | Click in empty space clears the selection (entities and features) | Home__selection | ✅ (app 10-24) |
 | 3.3 | Hover pre-highlights the entity under the cursor | A §5.3 | ✅ |
 | 3.4 | Box select left→right = window (fully inside), right→left = crossing | Home__selection | ✅ |
 | 3.5 | Window box is solid, crossing box dashed | Home__selection; A §5.2 | ✅ |
@@ -96,7 +96,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.12 | Select other picks go to the active dialog field | Home__select_other | 🔧 |
 | 3.13 | Select other from the face/edge context menu | Home__select_other | 🔧 |
 | 3.14 | Selecting a face or part highlights the features that created/modified it in the feature list | features_and_parts_lists | 🔧 |
-| 3.15 | Hovering a feature in the list highlights its geometry | features_and_parts_lists ("Hover over a feature…") | 🔧 |
+| 3.15 | Hovering a feature in the list highlights its geometry | features_and_parts_lists ("Hover over a feature…") | ✅ (app 10-24) |
 | 3.16 | Selecting a feature in the list highlights its geometry | A §5.3 (FEATURE_HIGHLIGHT) | 🔧 |
 | 3.17 | Selecting / hovering a part in the parts list highlights the whole part | A §5.3 (PART_HIGHLIGHT) | 🔧 |
 | 3.18 | Double-click a sketch in the graphics area edits it | (Onshape behaviour) | 🔧 |
@@ -107,7 +107,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 4.1 | Entities selected before starting a feature fill its first compatible field | A §2.3 | ✅ |
-| 4.2 | A sketch selected in the feature list preselects all its regions (Extrude, Revolve…) | features_and_parts_lists | 🔧 |
+| 4.2 | A sketch selected in the feature list preselects all its regions (Extrude, Revolve…) | features_and_parts_lists | ✅ (app 10-24: "Face of Sketch 2" preselected) |
 | 4.3 | Planes / features selected in the list preselect plane / feature fields | A §2.3 | 🔧 |
 | 4.4 | Clicking the active toolbar tool again closes it | Home__selection | 🔧 |
 | 4.5 | Picking a tool from a toolbar dropdown makes it the group's face for the session | A §2.3 | 🔧 |
@@ -115,7 +115,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 4.7 | Customize toolbar (drag tool sets, Reset) | part_studios | ✅ (built by an earlier pass: move tool sets, remove/restore tools, reset) |
 | 4.8 | Search tools: typing filters tools, Enter runs the first, Esc closes | Home__search_tools | ✅ |
 | 4.9 | Search tools with no query lists recently used tools first; description on hover | Home__search_tools | 🔧 |
-| 4.10 | REMEMBER_PREVIOUS_VALUE parameters default to the last accepted value of that tool | A §7.2 | 🔧 |
+| 4.10 | REMEMBER_PREVIOUS_VALUE parameters default to the last accepted value of that tool | A §7.2 | ✅ (app 10-24: Fillet 3 opened at the 3 mm just accepted) |
 | 4.11 | Search tools box: 162 px #eee box, "alt/⌥" (35 px) and "c" (17 px) keys joined, 19 px, 1 px #aaa with a 2 px bottom edge, 3 px after the label | live part-studio/00-new-doc-initial | ✅ (box, key edges and key text rows at live's pixels) |
 
 ## 5. Feature dialogs and selection fields (Home__dialogs, feature_basics, Home__numeric_fields, A §7)
@@ -130,7 +130,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.5 | First selection field active when the dialog opens | feature_basics | ✅ |
 | 5.6 | Click a selection field to make it active; it stays active while a number field has keyboard focus ("two fields are active") | Home__dialogs; feature_basics | 🔧 (typing deactivated it) |
 | 5.7 | Picks go to the active field; clicking a picked entity again removes it | Home__selection; A §5.4 | ✅ |
-| 5.8 | Picks that don't pass the field filter are rejected: the field flashes red and a message names what it takes | A §5.4 | 🔧 (generic message before) |
+| 5.8 | Picks that don't pass the field filter do nothing: no highlight on hover, no pick, no toast, no flash | live "qa4 round 5 s1 follow-up 2" (1) | 🔧 (`field_takes`: the hover and the click; the invented rejection toast and red flash removed) |
 | 5.8b | Clicking a sketch curve while a region field is active takes the region it bounds (the smaller one for a curve between two regions); hovering the curve pre-highlights that region | live (Extrude dialog) | ✅ (was "all regions"; changed per live) |
 | 5.9 | List clicks (default planes, parts) obey the field filter | A §5.4 | 🔧 (were added unfiltered) |
 | 5.10 | Clicking a sketch in the feature list fills a region field with all its regions, shown as one "Faces of Sketch 1" row; clicking again removes them; feature fields take the feature | features_and_parts_lists; live | ✅ |
@@ -147,13 +147,13 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.21 | Expressions show their evaluated value | Home__numeric_fields | 🔧 |
 | 5.22 | Mouse wheel over a focused numeric field: ±0.1, Ctrl ±0.01, Shift ±1 (integers ±1), clamped to the field range | Home__numeric_fields | 🔧 |
 | 5.23 | Field shows the converted value after accepting, the original text when focused | Home__numeric_fields | ✅ (fixed: focusing showed the converted text) |
-| 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | 🔧 (was always shown) |
+| 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | ✅ (app 10-24) |
 | 5.25 | Preview opacity slider (blends the model before and after the feature) | Home__dialogs | 🔧 |
 | 5.26 | Rename the feature from the dialog title | Home__dialogs | ✅ (double-click the title) |
 | 5.27 | Dialog movable and resizable; help (?) icon | Home__dialogs | ✅ (move by the title, resize by the bottom-right grip; size kept for the session) |
 | 5.28 | Boolean "Convert to expression" / "Convert to checkbox" (evaluated at regeneration with upstream variables) | feature_basics | ✅ (starts as true/false text, focused) |
 | 5.29 | Tolerance options on tolerant quantities (± icon "Tolerance options": precision ▾ then tolerance type ▾; Hole diameter adds Fit / Fit with tolerance / Fit (tolerance only) with Standard, Fit type, Hole class, Shaft class) | Home__tolerance_options; live dialogs/hole-30–37 | ✅ (`model::fits`; the hole callout in the graphics area shows "Ø6.350 H7 +0.015/−0.000 THRU") |
-| 5.30 | Extrude/Revolve from a part face (or a sketch on one) defaults to Add with that part as the merge scope | (Onshape behaviour, A §7) | 🔧 |
+| 5.30 | Extrude/Revolve from a part face (or a sketch on one) defaults to Add with that part as the merge scope | (Onshape behaviour, A §7) | ✅ (app 10-24) |
 | 5.31 | Choosing Remove/Intersect on such a feature points it into the part | (Onshape behaviour) | 🔧 |
 | 5.32 | Drag handles for depth/angle/distance (extrude arrow, revolve arc, plane offset, shell thickness, fillet radius, chamfer distance) | A §7.7 | ✅ (hover outlines the arrow blue) |
 | 5.33 | Editing a feature rolls the model back to it | Home__dialogs | ✅ |
@@ -167,11 +167,11 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.2 | Default geometry rows (Origin, Top, Front, Right) | features_and_parts_lists | ✅ |
 | 6.3 | Each feature with its tool icon | features_and_parts_lists | ✅ |
 | 6.4 | Double-click a feature to edit it | A §3.3 | ✅ |
-| 6.5 | Click toggles a feature in the selection (additive) | features_and_parts_lists ("just click to select additional items") | 🔧 (click replaced the selection) |
+| 6.5 | Click toggles a feature in the selection (additive) | features_and_parts_lists ("just click to select additional items") | ✅ (app 10-24) |
 | 6.6 | Shift+click selects a range | Home__selection | 🔧 (Shift toggled) |
 | 6.7 | Drag a feature to reorder | features_and_parts_lists | ✅ |
 | 6.8 | Dragging a selected feature moves every selected feature (non-contiguous allowed) | features_and_parts_lists | 🔧 |
-| 6.9 | Reorder refused above a feature's dependencies, with an error ("Cannot reorder: X depends on Y.") | (Onshape behaviour) | 🔧 |
+| 6.9 | A reorder above a feature's dependencies is done (no refusal, no toast); the feature then fails on its missing selection | live qa4 round 5 v3 s8 (REORDER-INVALID) | ✅ (the app no longer checks the order; test `extrude_above_its_sketch_misses_its_region`) |
 | 6.10 | Search box filters by name or type | features_and_parts_lists | 🔧 |
 | 6.11 | Filter commands :errors :warnings :suppressed :hidden :shown :type :name :folder :variable :part | features_and_parts_lists | 🔧 (:partnumber / :revision match the parts' Part number / Revision properties) |
 | 6.12 | Error icon with count in the header; click filters to errors | features_and_parts_lists | 🔧 |
@@ -179,7 +179,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.14 | Suppressed features struck through | features_and_parts_lists | ✅ |
 | 6.15 | Under-defined sketch indicator | features_and_parts_lists | ✅ (blue text) |
 | 6.16 | Missing-selection / warning yellow triangle | features_and_parts_lists | 🔧 (12 px #FAB601 badge with a white !, the icon's bottom right, at live's pixels: part-studio/2071; shown for Warning status — missing-selection tracking itself is not modelled) |
-| 6.17 | Eye icon on hover hides/shows sketches, planes, mate connectors | features_and_parts_lists | 🔧 |
+| 6.17 | Eye icon on hover hides/shows sketches, planes, mate connectors | features_and_parts_lists | ✅ (app 10-24) |
 | 6.18 | Rename in place (context menu / Shift+N) | features_and_parts_lists | ✅ |
 | 6.19 | Feature context menu in the live order: Rename | Edit…, Edit <sketch>…, Copy sketch | Add selection to folder… | Show/Hide | Export as DXF/DWG… | Suppress, Configure suppression, Dynamic suppression ▸ | Zoom to selection, View normal to | Show dependencies… | Roll to here (not on the last feature) | sketch/feature appearance | Delete | live (dom/context-menus-partstudio.txt) | ✅ (Create Drawing of Sketch N… via asb's sketch views; Add comment out of scope: cloud comments) |
 | 6.20 | Several selected features: Add selection to folder… | Suppress, Dynamic suppression ▸ | Clear selection | appearance | Delete | live | ✅ (Section view… through the selected sketches' / planes' planes) |
@@ -191,17 +191,19 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.26 | Collapse the whole list; drag the feature/parts separator | features_and_parts_lists | 🔧 |
 | 6.27 | Default plane row menu (live): Rename | New sketch…, Offset plane…, Size to Part Studio (Paste sketch when a sketch was copied) | Hide, Hide other planes, Hide all planes | Zoom to selection, View normal to | Show dependencies…; origin: Rename | Hide | Show dependencies… | Hide, Hide other planes, Hide all planes | ✅ |
 | 6.28 | Default planes/origin can be hidden (never deleted) | part_studios | 🔧 |
-| 6.29 | Clicking empty list space clears the feature selection | (Onshape behaviour) | 🔧 |
+| 6.29 | Clicking empty list space clears the feature selection | (Onshape behaviour) | ✅ (app 10-24) |
 
 ### Rollback bar
 
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 6.30 | Drag the bar to roll back/forward; model shows up to the bar | features_and_parts_lists | ✅ |
-| 6.31 | Right-click a feature > Roll to here | features_and_parts_lists | ✅ |
+| 6.31 | Right-click a feature > Roll to here / Roll to end | features_and_parts_lists; live "qa4 round 5 s2 rollback follow-up" | ✅ Roll to here unless the bar is right below the feature, Roll to end while the bar isn't at the end (`behaviors::roll_items`, tested on live's four menus). A rolled-back feature: Rename \| Add selection to folder… \| Suppress, Dynamic suppression ▸ \| Roll to here, Roll to end \| Delete (no Edit…, Zoom to selection, Show dependencies…, appearance); with a feature dialog open only Rename \| Suppress, Dynamic suppression ▸ (R5-S3-b). Add comment is cloud |
 | 6.32 | (Right-click the bar > Roll to end) | features_and_parts_lists | ✅ removed (live has no menu on the bar) |
 | 6.33 | Select the bar, ↑/↓ step one feature | features_and_parts_lists | ✅ (also after clicking a feature row; the bar turns #a0c7dd while focused) |
 | 6.34 | Features below the bar greyed; new features inserted at the bar | A §3.2 | ✅ |
+| 6.34a | Dragging the bar or a feature row near the list's top/bottom autoscrolls it | live "psb (10-24 k)" | ✅ 70–75 px edge zones, ~30 → 205 px/s toward the edge, faster past it (~370 px/s at 40 px, ~600 at 190 px out), also with the pointer beside the panel (only its height counts); a frame loop keeps scrolling while the pointer rests and stops at the ends (`behaviors::list_autoscroll_speed`, tested against live's speeds) |
+| 6.34b | The bar dropped over the Default geometry rows or header lands at the top slot (drop line under the last default row) | live "qa4 round 5 s2 rollback follow-up" (3) | ✅ (app: drop on Origin → every feature rolled back) |
 
 ### Folders
 
@@ -271,6 +273,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 10.5 | Isolate/transparent panel with transparency control and × to exit; Esc exits | View__isolate | 🔧 |
 | 10.6 | Select transparent geometry checkbox; Expand by distance | View__isolate | 🔧 |
 | 10.7 | Section view dialog (live): Exclude | Include tabs, "Section planes" field (planes, planar faces, mate connectors; × removes) + a view-facing plane button, "Items to exclude/include"; ✓/Enter keeps, ✕/Esc restores; empty-space menu Edit section view… / Turn off section view | live part-studio/70–74 | ✅ |
+| 10.7a | Section view manipulator: base circle (slides the manipulator over the plane), offset arrow, and at its tip two rotate rings about the plane's in-plane axes (Top: Y, then X); a ring drag turns the plane about the arrow's base, snapping to 5° within 2° (else 3 decimals) with a "deg" value box that takes a typed angle; a turned plane's chip loses "(Top)"; the hovered handle turns blue | live "skb (10-24) assembly section" (1)–(3) | ✅ (app: ring hover blue, drag → "27.345 deg", tilted cut; `section_manip.rs`, test `rotation_snaps_and_reads_as_live`; look to icons2) |
 | 10.8 | Section by several planes (up to 3), drag arrow on the active plane with an offset box, caps | View__section_view | ✅ (caps: the cut solid is capped in the part color with hatching, separate section pipeline; offscreen test `section_caps_cover_the_cut`) |
 
 ## 11. Measure, mass properties, appearance (View__measure_tool, View__mass_properties_tool, PartStudio__customizing_appearances)
@@ -302,7 +305,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 13.2 | Ctrl+A does nothing in the Part Studio | live (shortcuts/14) | ✅ (not bound) |
 | 13.3 | Delete/Backspace on a selected feature deletes it at once (no confirmation, no toast); Ctrl+Z restores it | live (shortcuts/15) | ✅ (Delete and Ctrl+Z verified) |
 | 13.4 | Tab skips the End type dropdown; Shift+Tab from Depth reaches the flip button | live | ✅ |
-| 13.5 | Depth arrow: hover outlines it blue; dragging updates the Depth field with the value selected; no viewport label | live (dialogs/extrude-05..07) | ✅ (drag end focuses the field with the value selected; hover outlines the arrow blue) |
+| 13.5 | Depth arrow: hover outlines it blue; dragging updates the Depth field with the value selected; no viewport label | live (dialogs/extrude-05..07) | ✅ (app 10-24 vs dialogs/extrude-05..07: the field is focused with the value selected during the drag too, not only after; the dragged arrow is one solid blue stroke (≈ #2c61a3), the hovered one blue around a light-blue core; values move in 0.1 mm / 0.01 in steps like live's "13.9 mm", "2.06 in") |
 | 13.6 | Hovering a selected feature row shows "Extrude 1 <- Sketch 1" | live | ✅ |
 | 13.7 | Rollback bar: no right-click menu; after clicking a feature row ↑/↓ move the bar; focused bar `#a0c7dd`; dragging shows a "Rollback bar" pill and a 2 px blue drop line | live | ✅ |
 | 13.8 | Picking through planes: a part face behind a transparent plane always wins | live (selection/30–31) | ✅ (verified: the face behind the Right plane is picked) |
@@ -341,6 +344,10 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 13.40 | Variable Studio tables above the Part Studio's own table, stored per Part Studio; lowest wins a clash; header drag with grabbing cursor, pill ghost and blue drop line (own table refused, red); shadowed rows ⓘ "Overwritten in another variable table." | live psb 10-20 t | 🔧 (ⓘ waits on ui2's variable_studio.rs hook) |
 | 13.41 | Model definitions: Isolate active part; "Select default tolerances…" picker (ISO 2768-1 grades c/f/m/v or Precision; applies on open), chip with hover-only Remove, "Default tolerances" section; Characteristics: per-type cells, Default rows from the standard, rolled-back rows, Hide default tolerances, Types ▾ (badge), Show/Hide derived tolerances, Reset filters, row hover/click | live qa4 598–599, psb 10-21 b/c | 🔧 (angle band, Fillet-radius type filter: psb 10-21 d) |
 | 13.42 | Slow regenerations: newest edit wins (stale runs aborted or finished into the cache), old result kept, working-overlay spinner after 1.2 s ("Opening <feature>…" when a dialog opens), ✓ closes at once with the spinner until the final result, Esc doesn't cancel | live "Pending state" | ✅ |
+| 13.43 | Fillet / Chamfer edge fields take part edges only (Onshape `EdgeTopology.TWO_SIDED`): a sketch line lying on a part edge isn't picked, the part edge is; sketch-only fields (Rib profiles, surface Extrude curves) take no part edges | app 10-24 (a chamfer picked "Sketch 1 line") | ✅ `QueryFilter::SOLID_EDGE`, `kind_matches`; the pick pass skips the overlay kinds (sketch curves/points/regions, part edges/vertices) the active field rejects (render state `NO_PICK`), so a click on a shown sketch line lying on a part edge takes the edge (app: Chamfer with Sketch 1 shown → "Edge of Extrude 1"; render test `no_pick_overlay_lets_the_edge_under_it_be_picked`) |
+| 13.44 | A Hole whose cut fails (tangent to a face: non-manifold) reports hole.fs's HOLE_CUT_FAIL "Hole creates invalid geometry." and cuts nothing; a Reapply feature pattern of it is OK and silently skips the instances that fail on their own; a hole whose axis is beside the part but whose cylinder crosses it cuts (rays across its disk) | live "qa4 round 5 v2 s1 follow-up" (2) | ✅ test `tangent_hole_fails_and_its_reapplied_pattern_cuts_the_good_copies` (volume = live's 37453.538 notch) |
+| 13.45 | A sketch region that no longer resolves (its sketch deleted or moved below) is a missing selection: the feature reports its own empty-input message ("Select face or sketch region to extrude.") and the row tooltip adds "1 missing selection"; a feature that still works with the rest warns "1 missing selection" | live qa4 round 5 v3 s8 (ERR-MISSING-REGION) | ✅ (`drop_missing_regions`, `FeatureState::missing`; test `extrude_above_its_sketch_misses_its_region`) |
+| 13.46 | Hole "Sketch points to place holes" takes sketch points and explicit mate connectors only: a face or a part vertex is neither highlighted nor added | live "qa4 round 5 s1 follow-up 2" (1) (HOLE-FACE) | ✅ (`kind_matches`: no implicit mate connector in a sketch-point field; a part vertex isn't a sketch point; test `face_fields_take_no_edges`) |
 
 ## Not applicable to a local app
 

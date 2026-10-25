@@ -315,7 +315,7 @@ impl PartStudioView {
                     })
                 }))
                 // Live 918 also has "Add comment" (cloud, not built).
-                .item(crate::os_menu::OsMenuItem::new("Select other…").on_click(move |_, _, cx| v5.update(cx, |this, cx| this.select_other(false, cx))))
+                .item(crate::os_menu::OsMenuItem::new("Select other…").on_click(move |_, _, cx| v5.update(cx, |this, cx| this.select_other_from_menu(cx))))
                 .separator()
                 .item(crate::os_menu::OsMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.zoom_fit(cx))))
                 .separator()

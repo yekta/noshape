@@ -346,7 +346,8 @@ fn thin_extrude_closed_and_open_profiles() {
     u.dedup();
     assert_eq!(u.len(), names.len());
 
-    // Open line: thickness 1 on the left of its direction, thickness 2 right.
+    // Open line (live "psb (10-24 e)"): thickness 1 on the right of its
+    // direction seen down the sketch normal, thickness 2 left.
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();
     let l = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.04, 0.0));
@@ -355,9 +356,9 @@ fn thin_extrude_closed_and_open_profiles() {
     let res = t.ok();
     assert!(near(total_volume(&res.context), 0.04 * 0.003 * 0.01, 1e-6), "{}", total_volume(&res.context));
     let bb = res.context.bodies[0].shape.bounding_box(true).unwrap();
-    assert!((bb.max.y - 0.002).abs() < 1e-7 && (bb.min.y + 0.001).abs() < 1e-7, "{bb:?}");
+    assert!((bb.min.y + 0.002).abs() < 1e-7 && (bb.max.y - 0.001).abs() < 1e-7, "{bb:?}");
 
-    // Open L polyline turning left: wall on the inside of the corner.
+    // Open L polyline turning left: wall on the outside of the corner.
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();
     let p: Vec<_> = [(0.0, 0.0), (0.04, 0.0), (0.04, 0.03)].iter().map(|(x, y)| sk.add_point(DVec2::new(*x, *y))).collect();
@@ -366,8 +367,35 @@ fn thin_extrude_closed_and_open_profiles() {
     let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
     thin_extrude(&mut t, vec![Reference::SketchEntity { sketch: s, entity: l1.0 }, Reference::SketchEntity { sketch: s, entity: l2.0 }], &[("thickness1", e("2 mm"))]);
     let res = t.ok();
-    let area = 0.04 * 0.002 + 0.002 * 0.028;
+    let area = 0.042 * 0.002 + 0.002 * 0.03;
     assert!(near(total_volume(&res.context), area * 0.01, 1e-6), "{}", total_volume(&res.context));
+}
+
+/// A Thin wall that is one sketch circle edge: OCCT's 2D wire offset
+/// (BRepOffsetAPI_MakeOffset) segfaulted on it, so the circle is offset
+/// directly. Outward, inward (Flip wall), both sides, and too thick inward
+/// (an error, not a crash).
+#[test]
+fn thin_wall_of_a_lone_circle_edge() {
+    let run = |params: &[(&str, ParamValue)]| {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let c = sk.add_circle(DVec2::ZERO, 0.01);
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        thin_extrude(&mut t, vec![Reference::SketchEntity { sketch: s, entity: c.0 }], params);
+        let res = t.regen();
+        let st = res.display.features.last().unwrap().clone();
+        (st.status, total_volume(&res.context))
+    };
+    let ring = |r1: f64, r2: f64| PI * (r2 * r2 - r1 * r1) * 0.01;
+    let (st, v) = run(&[("thickness1", e("2 mm"))]);
+    assert!(st == FeatureStatus::Ok && near(v, ring(0.01, 0.012), 1e-7), "{st:?} {v}");
+    let (st, v) = run(&[("thickness1", e("2 mm")), ("flipWall", b(true))]);
+    assert!(st == FeatureStatus::Ok && near(v, ring(0.008, 0.01), 1e-7), "{st:?} {v}");
+    let (st, v) = run(&[("midplane", b(true)), ("thickness", e("4 mm"))]);
+    assert!(st == FeatureStatus::Ok && near(v, ring(0.008, 0.012), 1e-7), "{st:?} {v}");
+    let (st, _) = run(&[("thickness1", e("15 mm")), ("flipWall", b(true))]);
+    assert_eq!(st, FeatureStatus::Error);
 }
 
 #[test]
@@ -830,6 +858,47 @@ fn feature_pattern_of_a_hole_keeps_the_part() {
     assert!(near(total_volume(&r.context), before, 1e-9), "and the part is unchanged");
 }
 
+/// Live "qa4 round 5 v2 s1 follow-up" (2): a Ø6 through Hole at (3, 10) on
+/// the block's top, tangent to the x = 0 face, fails with hole.fs's
+/// HOLE_CUT_FAIL text and cuts nothing. A Reapply pattern of it along −y
+/// (4 mm × 4) is OK and silently skips the tangent copies (y 6, 2): only
+/// the one at y −2 notches the front face (a 3.0975 mm² segment × 15 mm).
+#[test]
+fn tangent_hole_fails_and_its_reapplied_pattern_cuts_the_good_copies() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.08, 0.05, "15 mm");
+    let pl = t.top_plane("15 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.003, 0.01));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let locs = q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }]);
+    let hole = t.add("hole", &[("locations", locs), ("unitsSystem", en("METRIC")), ("styleV2", en("SIMPLE")), ("endStyleV2", en("THROUGH")), ("holeDiameterV3", e("6 mm"))]);
+    let block = 0.08 * 0.05 * 0.015;
+    let r = t.regen();
+    let st = r.display.features.last().unwrap();
+    assert!(matches!(st.status, FeatureStatus::Error), "{:?}", st.status);
+    assert_eq!(st.message.as_deref(), Some("Hole creates invalid geometry."));
+    assert!(near(total_volume(&r.context), block, 1e-9));
+    t.add(
+        "linearPattern",
+        &[
+            ("patternType", en("FEATURE")),
+            ("instanceFunction", q(vec![Reference::Feature(hole)])),
+            // The Front plane's normal is −y.
+            ("directionOne", q(vec![Reference::Plane(DatumPlane::Front)])),
+            ("distance", e("4 mm")),
+            ("instanceCount", e("4")),
+            ("fullFeaturePattern", b(true)),
+        ],
+    );
+    let r = t.regen();
+    let st = r.display.features.last().unwrap();
+    assert!(matches!(st.status, FeatureStatus::Ok), "{:?}: {:?}", st.status, st.message);
+    let notch = (9.0 * (2.0f64 / 3.0).acos() - 2.0 * 5f64.sqrt()) * 15.0 * 1e-9;
+    let removed = block - total_volume(&r.context);
+    assert!(near(removed, notch, 1e-6), "removed {} mm³, live 46.462", removed * 1e9);
+}
+
 fn hole_pattern_case() {
     let mut t = T::new();
     let (_, block) = t.block(0.0, 0.0, 0.1, 0.05, "30 mm");
@@ -1215,4 +1284,23 @@ fn fillet_wider_than_its_faces_regenerates_like_onshape() {
     let v = total_volume(&r.context) * 1e9;
     assert!((v - 7458.6158).abs() < 1e-3, "{v}");
     assert_eq!(r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count(), 1);
+}
+
+/// Live (qa4 round 5 v3 s8, REORDER-INVALID / ERR-MISSING-REGION): an
+/// Extrude moved above its sketch (its region now missing) fails with its
+/// own empty-input message and one missing selection.
+#[test]
+fn extrude_above_its_sketch_misses_its_region() {
+    let mut t = T::new();
+    let (s, x) = t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+    let i = t.ps.features.iter().position(|f| f.id == x).unwrap();
+    let f = t.ps.features.remove(i);
+    let j = t.ps.features.iter().position(|g| g.id == s).unwrap();
+    t.ps.features.insert(j, f);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|st| st.id == x).unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    assert_eq!(st.message.as_deref(), Some("Select face or sketch region to extrude."));
+    assert_eq!(st.missing, 1);
+    assert_eq!(noshape_model::regen::missing_text(st.missing), "1 missing selection");
 }

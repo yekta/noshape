@@ -274,6 +274,55 @@ fn pick_only_region_on_face_wins_the_pick() {
     assert_eq!(at(glam::DVec3::new(-0.008, 0.008, 0.01)), 2);
 }
 
+/// `state::NO_PICK`: a line drawn over a part edge (a shown sketch line)
+/// stays visible but leaves the pick pass, so the edge under it is picked.
+#[test]
+fn no_pick_overlay_lets_the_edge_under_it_be_picked() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (lo, hi) = ([-0.01f32, -0.01, -0.01], [0.01f32, 0.01, 0.01]);
+    let c = |i: u32| [if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }];
+    let pairs = [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)];
+    let cam = iso_camera();
+    let cam = &cam;
+    let (w, h) = (400u32, 300u32);
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let mid = |k: usize| {
+        let (a, b) = (c(pairs[k].0), c(pairs[k].1));
+        glam::DVec3::new((a[0] + b[0]) as f64 * 0.5, (a[1] + b[1]) as f64 * 0.5, (a[2] + b[2]) as f64 * 0.5)
+    };
+    let mut render = |overlay: Option<(usize, bool)>| {
+        let mut scene = Scene::default();
+        scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh(lo, hi, 1)))));
+        scene.instances.push(Instance::new(Drawable::Lines(r.upload_lines(&primitives::box_edges(lo, hi, 10, 1.5)))));
+        if let Some((k, no_pick)) = overlay {
+            let mut l = LineData::default();
+            l.push_polyline(&[c(pairs[k].0), c(pairs[k].1)], [0, 0, 255, 255], 500, 3.0, LineSegment::ON_TOP);
+            scene.instances.push(Instance::new(Drawable::Lines(r.upload_lines(&l))).layer(9));
+            if no_pick {
+                scene.set_state(500, state::NO_PICK);
+            }
+        }
+        let f = r.render(RenderParams { scene: &scene, camera: cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
+        let pick = f.pick.unwrap();
+        move |p: glam::DVec3| {
+            let s = cam.project(p, vp, 0.02).unwrap();
+            pick.id_at(s.x as i32, s.y as i32).unwrap()
+        }
+    };
+    // A visible edge: its midpoint picks it.
+    let at = render(None);
+    let k = (0..12).find(|&k| at(mid(k)) == 10 + k as u32).expect("a visible edge");
+    assert_eq!(render(Some((k, false)))(mid(k)), 500, "the overlay covers the edge");
+    assert_eq!(render(Some((k, true)))(mid(k)), 10 + k as u32, "a NO_PICK overlay lets the edge through");
+}
+
 /// Regression: edges fought faces at the same depth and looked dotted on
 /// silhouettes, bottom faces and hole rims. Every visible edge of a shaded
 /// plate in iso view (app-like scene: large default planes, wide viewport)

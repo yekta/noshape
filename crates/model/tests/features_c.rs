@@ -1527,6 +1527,86 @@ fn parting_line_draft_sides_as_live() {
     }
 }
 
+/// draft.fs: parting edges on two parts draft each part (two frustums);
+/// a parting line stepped to two heights (front/back at z 5, ends at z 3)
+/// hinges each face about its own edge.
+#[test]
+fn parting_line_draft_on_two_parts_and_steps() {
+    let tn = 5f64.to_radians().tan();
+    let draft = |s: &mut Studio, edges: Vec<Reference>| {
+        s.add("draft", move |p| {
+            p.set("draftFeatureType", en("PARTING_LINE"));
+            p.set("pullDirectionEntity", q(Reference::Plane(DatumPlane::Top)));
+            p.set("partingEdges", ParamValue::Query(edges));
+            p.set("angle", expr("5 deg"));
+        });
+    };
+    let mut s = Studio::new();
+    for x0 in [0.0, 40.0] {
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(x0, 0.0), (x0 + 20.0, 0.0), (x0 + 20.0, 20.0), (x0, 20.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+            p.set("operationType", en("NEW"));
+        });
+    }
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 2);
+    let mut bottom = Vec::new();
+    for (bi, x0) in [(0, 0.0), (1, 40.0)] {
+        for p in [(x0 + 10.0, 0.0), (x0 + 10.0, 20.0), (x0, 10.0), (x0 + 20.0, 10.0)] {
+            bottom.push(edge_near(&r, bi, DVec3::new(mm(p.0), mm(p.1), 0.0)));
+        }
+    }
+    draft(&mut s, bottom);
+    let r = s.ok();
+    let h = mm(10.0);
+    let side = |d: f64| mm(20.0) - d;
+    let v = h / 6.0 * (side(0.0).powi(2) + side(2.0 * h * tn).powi(2) + 4.0 * side(h * tn).powi(2));
+    for bi in 0..2 {
+        assert!(near(volume(&r, bi), v, 1e-11), "part {bi}: {} vs {v}", volume(&r, bi));
+    }
+
+    // Stepped: block 40×20×10, front/back split at z 5, ends at z 3.
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    for (z, faces) in [(5.0, [(20.0, 0.0), (20.0, 20.0)]), (3.0, [(0.0, 10.0), (40.0, 10.0)])] {
+        let plane = top_plane_at(&mut s, z);
+        let r = s.ok();
+        let targets: Vec<Reference> = faces.iter().map(|p| face_at(&r, 0, DVec3::new(mm(p.0), mm(p.1), mm(5.0)))).collect();
+        s.add("splitPart", move |p| {
+            p.set("splitType", en("FACE"));
+            p.set("faceTargets", ParamValue::Query(targets));
+            p.set("faceTools", q(Reference::FeaturePlane(plane)));
+        });
+    }
+    let r = s.ok();
+    let edges = vec![
+        edge_near(&r, 0, DVec3::new(mm(20.0), 0.0, mm(5.0))),
+        edge_near(&r, 0, DVec3::new(mm(20.0), mm(20.0), mm(5.0))),
+        edge_near(&r, 0, DVec3::new(0.0, mm(10.0), mm(3.0))),
+        edge_near(&r, 0, DVec3::new(mm(40.0), mm(10.0), mm(3.0))),
+    ];
+    draft(&mut s, edges);
+    let r = s.ok();
+    // Each upper face leans in from its own parting edge: the section at z
+    // is (40 − 2·max(0, z − 3)·tan) × (20 − 2·max(0, z − 5)·tan).
+    let area = |z: f64| (mm(40.0) - 2.0 * (z - mm(3.0)).max(0.0) * tn) * (mm(20.0) - 2.0 * (z - mm(5.0)).max(0.0) * tn);
+    let simpson = |a: f64, b: f64| (b - a) / 6.0 * (area(a) + 4.0 * area((a + b) / 2.0) + area(b));
+    let v = simpson(0.0, mm(3.0)) + simpson(mm(3.0), mm(5.0)) + simpson(mm(5.0), mm(10.0));
+    assert!(near(volume(&r, 0), v, 1e-11), "stepped: {} vs {v}", volume(&r, 0));
+}
+
 /// Live L12 ("psb L12-13 sweep"): a Ø10 circle at the middle of a 100 mm
 /// line sweeps the half toward the path's start (3926.9908 mm³), the other
 /// half with the path's Opposite direction, the whole path (7853.9816) with
@@ -1562,6 +1642,247 @@ fn sweep_from_the_middle_of_the_path_as_live() {
     assert!((v - 3926.9908).abs() < 1e-3 && (cx - 75.0).abs() < 1e-6, "{v} centred at x {cx}");
     let (v, _) = run(false, true);
     assert!((v - 7853.9816).abs() < 1e-3, "{v}");
+}
+
+/// Live "psb (10-24 c) thin sweep": a Ø20 circle (or a 20 mm line) on Top
+/// swept Thin 50 up, Thickness 1 = 2: outward / on −y; Flip wall inward;
+/// Mid plane both sides; Scale 2 keeps the wall 2 thick normal to the cone;
+/// an oblique path trims the ends to z 0 / 50 (or leaves them square to the
+/// path); an arc bends it; too thick fails with the trim / thicken text.
+#[test]
+fn thin_sweep_as_live() {
+    enum Path {
+        Up,
+        Oblique,
+        Arc,
+    }
+    let run = |wall: &str, path: Path, set: &dyn Fn(&mut ParamValues)| -> Result<(f64, noshape_kernel::BoundingBox), String> {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let line = if wall == "line" { Some(sk.add_line(DVec2::new(-0.01, 0.0), DVec2::new(0.01, 0.0)).0) } else { None };
+        let circle = if wall == "line" { None } else { Some(sk.add_circle(DVec2::ZERO, 0.01)) };
+        let wall_sketch = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let wall_ref = match (line, circle, wall) {
+            (Some(l), _, _) => Reference::SketchEntity { sketch: wall_sketch, entity: l },
+            (_, _, "region") => s.region(wall_sketch),
+            (_, Some(c), _) => Reference::SketchEntity { sketch: wall_sketch, entity: c.0 },
+            _ => unreachable!(),
+        };
+        let mut sk = noshape_sketch::Sketch::new();
+        let (plane, e) = match path {
+            // Front: sketch x = X, y = Z; Right: sketch x = world Y, y = Z.
+            Path::Up => (DatumPlane::Front, sk.add_line(DVec2::ZERO, DVec2::new(0.0, 0.05)).0),
+            Path::Oblique => (DatumPlane::Right, sk.add_line(DVec2::ZERO, DVec2::new(0.02, 0.05)).0),
+            Path::Arc => (DatumPlane::Front, sk.add_arc(DVec2::new(0.04, 0.0), DVec2::new(0.04, 0.04), DVec2::ZERO).0),
+        };
+        let path_sketch = s.sketch(Reference::Plane(plane), sk);
+        s.add("sweep", |p| {
+            p.set("bodyType", en("THIN"));
+            p.set("wallShape", q(wall_ref));
+            p.set("path", q(Reference::SketchEntity { sketch: path_sketch, entity: e }));
+            p.set("thickness1", expr("2 mm"));
+            p.set("thickness2", expr("0 mm"));
+            set(p);
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        if st.status != FeatureStatus::Ok {
+            return Err(st.message.clone().unwrap_or_default());
+        }
+        Ok((volume(&r, 0) * 1e9, r.context.bodies[0].shape.bounding_box(true).unwrap()))
+    };
+    let none = |_: &mut ParamValues| {};
+    let near_v = |r: Result<(f64, noshape_kernel::BoundingBox), String>, want: f64, tol: f64| {
+        let (v, bb) = r.unwrap();
+        assert!((v - want).abs() < tol, "{v} vs live {want}");
+        bb
+    };
+    let bb = near_v(run("circle", Path::Up, &none), 6911.5038, 1e-3);
+    assert!((bb.max.x - 0.012).abs() < 1e-6, "outward: {bb:?}");
+    near_v(run("circle", Path::Up, &|p| p.set("flipWall", ParamValue::Bool(true))), 5654.8668, 1e-3);
+    near_v(
+        run("circle", Path::Up, &|p| {
+            p.set("midplane", ParamValue::Bool(true));
+            p.set("thickness", expr("4 mm"));
+        }),
+        12566.3706,
+        1e-3,
+    );
+    let bb = near_v(run("line", Path::Up, &none), 2000.0, 1e-3);
+    assert!((bb.min.y + 0.002).abs() < 1e-6 && bb.max.y.abs() < 1e-6, "on −y: {bb:?}");
+    near_v(run("region", Path::Up, &none), 6911.5038, 1e-3);
+    near_v(
+        run("circle", Path::Up, &|p| {
+            p.set("hasScale", ParamValue::Bool(true));
+            p.set("scaleFactor", expr("2"));
+        }),
+        10264.8766,
+        1e-2,
+    );
+    // The exact solid is 7204.1553 (ring 144.0831 × 50; live's end faces
+    // read 144.08306): live's volume carries its offset approximation.
+    let bb = near_v(run("circle", Path::Oblique, &none), 7204.0248, 0.2);
+    assert!(bb.min.z.abs() < 1e-6 && (bb.max.z - 0.05).abs() < 1e-6, "trimmed to z 0..50: {bb:?}");
+    let bb = near_v(run("circle", Path::Oblique, &|p| p.set("trimEnds", ParamValue::Bool(false))), 7203.9915, 0.2);
+    assert!(bb.min.z < -0.0007, "square to the path: {bb:?}");
+    near_v(run("circle", Path::Arc, &none), 8685.2519, 1e-2);
+    let thick = |p: &mut ParamValues| {
+        p.set("thickness1", expr("15 mm"));
+        p.set("flipWall", ParamValue::Bool(true));
+    };
+    assert_eq!(run("circle", Path::Up, &thick).unwrap_err(), "Failed to trim result body, try deselecting \"Trim ends\" option.");
+    let thick_untrimmed = |p: &mut ParamValues| {
+        thick(p);
+        p.set("trimEnds", ParamValue::Bool(false));
+    };
+    assert_eq!(run("circle", Path::Up, &thick_untrimmed).unwrap_err(), "Failed to thicken swept body, check thickness.");
+}
+
+/// Live "psb (10-24 e) thin sides": an open wall's Thickness 1 lies on
+/// d × D (d the line as drawn, D the feature's positive direction: the
+/// sketch normal for Extrude whatever Opposite says, the turning direction
+/// about the axis as drawn for Revolve).
+#[test]
+fn thin_sides_as_live() {
+    let bbox = |s: &mut Studio| {
+        let r = s.ok();
+        r.context.bodies[0].shape.bounding_box(false).unwrap()
+    };
+    let extrude = |plane: DatumPlane, a: (f64, f64), b: (f64, f64), opposite: bool| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(mm(a.0), mm(a.1)), DVec2::new(mm(b.0), mm(b.1))).0;
+        let sid = s.sketch(Reference::Plane(plane), sk);
+        s.add("extrude", move |p| {
+            p.set("bodyType", en("THIN"));
+            p.set("wallShape", q(Reference::SketchEntity { sketch: sid, entity: l }));
+            p.set("depth", expr("50 mm"));
+            p.set("thickness1", expr("2 mm"));
+            p.set("thickness2", expr("0 mm"));
+            p.set("oppositeDirection", ParamValue::Bool(opposite));
+        });
+        bbox(&mut s)
+    };
+    let span = |lo: f64, hi: f64, want: (f64, f64)| (lo - mm(want.0)).abs() < 1e-6 && (hi - mm(want.1)).abs() < 1e-6;
+    let bb = extrude(DatumPlane::Top, (-10.0, 0.0), (10.0, 0.0), false);
+    assert!(span(bb.min.y, bb.max.y, (-2.0, 0.0)), "E1 {bb:?}");
+    let bb = extrude(DatumPlane::Top, (10.0, 0.0), (-10.0, 0.0), false);
+    assert!(span(bb.min.y, bb.max.y, (0.0, 2.0)), "E2 {bb:?}");
+    let bb = extrude(DatumPlane::Top, (-10.0, 0.0), (10.0, 0.0), true);
+    assert!(span(bb.min.y, bb.max.y, (-2.0, 0.0)) && span(bb.min.z, bb.max.z, (-50.0, 0.0)), "E5 {bb:?}");
+    let bb = extrude(DatumPlane::Front, (-10.0, 0.0), (10.0, 0.0), false);
+    assert!(span(bb.min.z, bb.max.z, (-2.0, 0.0)), "E6 {bb:?}");
+    // Revolve on Front (sketch x = X, y = Z) about a sketch line along Z.
+    let revolve = |a: (f64, f64), b: (f64, f64), axis_up: bool| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(mm(a.0), mm(a.1)), DVec2::new(mm(b.0), mm(b.1))).0;
+        let (p, q2) = if axis_up { (DVec2::ZERO, DVec2::new(0.0, mm(30.0))) } else { (DVec2::new(0.0, mm(30.0)), DVec2::ZERO) };
+        let ax = sk.add_line(p, q2).0;
+        let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+        s.add("revolve", move |p| {
+            p.set("bodyType", en("THIN"));
+            p.set("wallShape", q(Reference::SketchEntity { sketch: sid, entity: l }));
+            p.set("axis", q(Reference::SketchEntity { sketch: sid, entity: ax }));
+            p.set("thickness1", expr("2 mm"));
+            p.set("thickness2", expr("0 mm"));
+        });
+        bbox(&mut s)
+    };
+    let bb = revolve((10.0, 0.0), (20.0, 0.0), true);
+    assert!(span(bb.min.z, bb.max.z, (0.0, 2.0)), "R1 {bb:?}");
+    let bb = revolve((10.0, 0.0), (20.0, 0.0), false);
+    assert!(span(bb.min.z, bb.max.z, (-2.0, 0.0)), "R3 {bb:?}");
+    let bb = revolve((-10.0, 0.0), (-20.0, 0.0), true);
+    assert!(span(bb.min.z, bb.max.z, (0.0, 2.0)), "R5 {bb:?}");
+}
+
+/// Live "psb (10-24 g) body draft": block 40×20×10, pull +Z, parting Top,
+/// 5°: the top stays, the bottom grows by 10·tan 5° (8535.1377); Plane
+/// corners bevel them (8530.0348); Symmetric about z 5 (8265.0174); only
+/// the front face (8174.9773); the top edges held (= Parts); a Ø20 cylinder
+/// becomes a cone (3424.4619); and the error texts.
+#[test]
+fn body_draft_as_live() {
+    let run = |cylinder: bool, set: &dyn Fn(&mut ParamValues, &RegenResult, FeatureId, FeatureId)| -> Result<(f64, usize), (String, Vec<String>)> {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        if cylinder {
+            sk.add_circle(DVec2::ZERO, mm(10.0));
+        } else {
+            polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+        }
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        let ext = s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+        });
+        let z5 = top_plane_at(&mut s, 5.0);
+        let r = s.ok();
+        s.add("bodyDraft", |p| {
+            p.set("pullDirection", q(Reference::Plane(DatumPlane::Top)));
+            p.set("partingObject", q(Reference::Plane(DatumPlane::Top)));
+            p.set("angle", expr("5 deg"));
+            p.set("bodies", q(Reference::Body(r.context.bodies[0].id.clone())));
+            set(p, &r, ext, z5);
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        if st.status != FeatureStatus::Ok {
+            return Err((st.message.clone().unwrap_or_default(), st.faulty.clone()));
+        }
+        Ok((volume(&r, 0) * 1e9, r.context.bodies[0].shape.faces().len()))
+    };
+    let ok = |r: Result<(f64, usize), (String, Vec<String>)>, v: f64, faces: usize| {
+        let (got, n) = r.unwrap();
+        assert!((got - v).abs() < 1e-3 && n == faces, "{got} ({n} faces) vs live {v} ({faces})");
+    };
+    let none = |_: &mut ParamValues, _: &RegenResult, _: FeatureId, _: FeatureId| {};
+    ok(run(false, &none), 8535.137669482949, 6);
+    ok(run(false, &|p, _, _, _| p.set("cornerType", en("PLANE"))), 8530.034825319246, 10);
+    ok(
+        run(false, &|p, _, _, z5| {
+            p.set("bothSides", ParamValue::Bool(true));
+            p.set("partingObject", q(Reference::FeaturePlane(z5)));
+        }),
+        8265.017412659625,
+        10,
+    );
+    ok(
+        run(false, &|p, r, _, _| {
+            p.set("selectionType", en("FACES"));
+            p.set("faces", q(face_at(r, 0, DVec3::new(mm(20.0), 0.0, mm(5.0)))));
+        }),
+        8174.977327051848,
+        6,
+    );
+    ok(
+        run(false, &|p, r, _, _| {
+            p.set("selectionType", en("EDGES"));
+            let top = [(20.0, 0.0), (20.0, 20.0), (0.0, 10.0), (40.0, 10.0)].iter().map(|(x, y)| edge_near(r, 0, DVec3::new(mm(*x), mm(*y), mm(10.0)))).collect();
+            p.set("topEdges", ParamValue::Query(top));
+        }),
+        8535.137669482949,
+        6,
+    );
+    ok(run(true, &none), 3424.4619250637747, 3);
+    let fails = |r: Result<(f64, usize), (String, Vec<String>)>, text: &str, field: &str| {
+        let (msg, faulty) = r.unwrap_err();
+        assert_eq!((msg.as_str(), faulty), (text, vec![field.to_string()]));
+    };
+    fails(run(false, &|p, _, _, _| p.set("bodies", ParamValue::Query(vec![]))), "Select parts to draft.", "bodies");
+    fails(run(false, &|p, _, _, _| p.set("pullDirection", ParamValue::Query(vec![]))), "Body draft pull direction is invalid.", "pullDirection");
+    fails(run(false, &|p, _, _, _| p.set("draftOnSelf", ParamValue::Bool(true))), "Selected parts could not be drafted.", "bodies");
+    fails(
+        run(false, &|p, r, _, _| {
+            p.set("selectionType", en("EDGES"));
+            p.set("topEdges", q(edge_near(r, 0, DVec3::new(mm(20.0), 0.0, mm(10.0)))));
+            p.set("partingObject", ParamValue::Query(vec![]));
+        }),
+        "Parting entity is invalid.",
+        "partingObject",
+    );
 }
 
 /// Live L11 ("psb L10-11 delete face"): block 40×20×10 with an R3 fillet on

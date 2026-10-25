@@ -40,8 +40,15 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     }
     let Some(axis_ref) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
     let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return err("The revolve axis could not be resolved") };
+    // Live "psb (10-24 e)": an open wall's Thickness 1 follows the axis as
+    // its edge is directed, not Opposite direction.
+    let turning = |f: &crate::display::PlaneFrame, m: DVec3| {
+        let r = m - origin - axis * (m - origin).dot(axis);
+        let d = axis.cross(r).normalize_or_zero();
+        if d == DVec3::ZERO { f.normal } else { d }
+    };
     let axis = if ev.bool("oppositeDirection") { -axis } else { axis };
-    let profiles = if thin { super::thin::thin_profiles(ev, refs)? } else { ev.profiles(refs)? };
+    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&turning))? } else { ev.profiles(refs)? };
     let full = ev.bool("fullRevolve");
     let mut tools = Vec::new();
     for p in &profiles {

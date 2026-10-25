@@ -129,6 +129,8 @@ pub struct Ctx {
     /// What the window should do after a call (live mode: the app acts on
     /// them, as the menu item would); taken by the app after each call.
     pub ui_requests: Vec<UiRequest>,
+    /// The user's preference files changed (live mode: the app reloads them).
+    pub reload_prefs: bool,
 }
 
 pub use crate::window::UiRequest;

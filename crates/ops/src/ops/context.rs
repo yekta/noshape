@@ -67,7 +67,7 @@ pub fn ops() -> Vec<Op> {
             group: "context",
             verb: "list",
             summary: "A Part Studio's Assembly contexts",
-            description: "The Assembly contexts section above the Feature list: each context's `id`, `name`, `assembly`, whether it is `shown` and `referenced` (only referenced contexts persist), `out_of_date` (an update is available), its `primary` instance, whether it has an `origin` (created in context: context_insert_in_assembly works) and its `instances` (instance and part names).",
+            description: "The Assembly contexts section above the Feature list: each context's `id`, `name`, `assembly`, whether it is `shown` and `referenced` (only referenced contexts persist), `out_of_date` (an update is available), its `follow_position` (Follow position ▸, whose only choice is \"Current assembly position\"), its `primary` instance, whether it has an `origin` (created in context: context_insert_in_assembly works) and its `instances` (instance and part names).",
             fields: vec![doc_field(), ps_tab()],
             mutates: false,
             destructive: false,
@@ -164,6 +164,8 @@ fn context_json(od: &mut OpenDoc, ps: &PartStudio, c: &AssemblyContext) -> Value
         "shown": ps.active_context == Some(c.id),
         "referenced": referenced,
         "out_of_date": out_of_date,
+        // The context menu's Follow position ▸: its only choice, checked.
+        "follow_position": "Current assembly position",
         "primary": primary,
         "origin": c.origin.is_some(),
         "instances": c.bodies.iter().map(|b| json!({ "instance": b.instance, "part": b.part, "hidden": c.hidden.contains(&b.path) })).collect::<Vec<_>>(),

@@ -512,6 +512,10 @@ pub mod state {
     /// selection color in sRGB; live "lp wall over" 2258: a feature picked
     /// in Features to pattern, end face #4e6876 → #717560).
     pub const TINT: u32 = 512;
+    /// Left out of the pick pass (drawn as usual): an overlay the active
+    /// dialog field can't take, so what lies under it can be picked (a
+    /// shown sketch line on a part edge for Fillet's edges).
+    pub const NO_PICK: u32 = 1024;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

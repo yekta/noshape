@@ -295,10 +295,10 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_duplicate_input`](#config_duplicate_input), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
-- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance), [`assembly_switch_to_tab`](#assembly_switch_to_tab), [`assembly_open_linked_document`](#assembly_open_linked_document)
+- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_animate`](#assembly_animate), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance), [`assembly_switch_to_tab`](#assembly_switch_to_tab), [`assembly_open_linked_document`](#assembly_open_linked_document)
 - **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly), [`context_go_to_assembly`](#context_go_to_assembly)
 - **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_edit_detail`](#drawing_edit_detail), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_edit_hatch`](#drawing_edit_hatch), [`drawing_title_field`](#drawing_title_field), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_open_feature_studio`](#drawing_open_feature_studio), [`drawing_switch_sheet`](#drawing_switch_sheet), [`drawing_sheets_panel`](#drawing_sheets_panel)
-- **ui**: [`ui_state`](#ui_state)
+- **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_shortcuts`](#ui_shortcuts)
 - **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
@@ -1079,6 +1079,7 @@ Examples:
 | `shapes` | array of object |  | Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. |
 | `construction` | boolean |  | Make the new geometry construction geometry. |
 | `sides` | integer |  | Polygon sides. |
+| `tangent_arc_switch` | array of integer |  | line: press the Line/tangent arc switch (Shift+A) before these clicks (0-based): that click draws a tangent arc, then the chain goes on with lines (as in Onshape). |
 
 #### sketch_constrain
 
@@ -1668,6 +1669,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
+| `copy` | boolean |  | Part Studio: the Variables panel's Copy table, `copied` being the text it puts on the clipboard (a header row, then name, type, value, description per variable, tab-separated). A row's Copy copies its description (`description` here). |
 
 #### variable_create
 
@@ -2073,7 +2075,7 @@ Examples:
 | `source` | string | required | Part Studio or Assembly tab (name or id) to insert from. |
 | `part` | string |  | A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio as one instance. |
 | `sketch` | string |  | A sketch of that Part Studio (feature id or name): the Insert dialog's sketches. |
-| `configuration` | object |  | Configuration of the source: {input id: value}. |
+| `configuration` | object or string |  | Configuration of the source: {input id: value}, or the Insert dialog's "default" (Reset to default) / "last_viewed" (Set to last viewed: the configuration the source shows). |
 
 #### assembly_list
 
@@ -2170,6 +2172,7 @@ Examples:
 | `limits` | object |  | Limits: {"<axis>": {"min": expr, "max": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone). |
 | `tangent_propagation` | boolean |  | Tangent mates: Tangent propagation. |
 | `solve_all` | boolean |  | Solve every mate (the dialog's Solve) instead of only moving this mate's first instance. |
+| `reset` | boolean |  | With `mate`: the mate menu's Reset, its degrees of freedom back to 0 ("Reset : <mate>"; not Fastened, Tangent or Width). |
 
 #### assembly_transform
 
@@ -2303,6 +2306,7 @@ Examples:
 | `show_excluded` | boolean |  | Show excluded and suppressed items. |
 | `show_top_level` | boolean |  | Show the top level assembly row. |
 | `csv` | string |  | Write the table to this CSV file. |
+| `copy` | boolean |  | Copy table (the BOM's ⋯ menu): `copied` is the text it puts on the clipboard (tab-separated rows), with its toast message. |
 
 #### assembly_bom_settings
 
@@ -2543,7 +2547,7 @@ Examples:
 
 Exploded views: add, rename or delete a view or a step (edits the document (one undoable history entry); deletes or overwrites).
 
-The Exploded views panel: `add` creates "Explode N" (renamed to `name` if given); `rename` renames a view (or its `step`); `delete` deletes a view (or its `step`). Add steps with assembly_explode_step.
+The Exploded views panel: `add` creates "Explode N" (renamed to `name` if given); `rename` renames a view (or its `step`); `delete` deletes a view (or its `step`); `lines` (with `on`) is the view's Show all explode lines / Hide all explode lines (every step's lines; one edit with that name). Add steps with assembly_explode_step.
 
 Examples:
 
@@ -2555,7 +2559,8 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
-| `action` | one of `add`, `rename`, `delete` | required | What to do. |
+| `action` | one of `add`, `rename`, `delete`, `lines` | required | What to do. |
+| `on` | boolean |  | lines: show (true) or hide (false) all explode lines. |
 | `view` | string |  | The view: its name or 1-based row. |
 | `step` | integer |  | A step of the view (1-based). |
 | `name` | string |  | add / rename: the name. |
@@ -2584,6 +2589,30 @@ Examples:
 | `pivot` | array of number |  | Rotation pivot [x, y, z] in document units. |
 | `lines` | boolean |  | Show explode lines. |
 | `step` | integer |  | Edit this step (1-based) instead of adding one. |
+
+#### assembly_animate
+
+Animate a mate: the assembly at a step of the Animate dialog's run (not saved).
+
+The mate context menu's Animate… dialog: the mate's degree of freedom `dof` runs from `start` to `end` in `steps` steps (defaults as the dialog fills them: the mate's limits, else 0 → 360 deg or 0 → 25 mm; 300 steps). Returns the chooser's degrees of freedom, the run's values and the instances' placements at step `frame` (value = start + (end − start)·frame/steps; Single playback stops on the last step, Loop and Reciprocate repeat these). Like the dialog, nothing is saved: the assembly goes back to its positions when the dialog closes.
+
+Examples:
+
+```json
+{"mate": "Revolute 1", "frame": 75}
+{"tab": "Assembly 1", "mate": "Cylindrical 1", "dof": "tz", "start": "0 mm", "end": "40 mm", "steps": 40, "frame": 10}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `mate` | string |  | The mate (id or name); default the first unsuppressed mate with degrees of freedom. |
+| `dof` | one of `rz`, `tx`, `ty`, `tz` |  | The degree of freedom ("Select degree of freedom"): rz = rotation about Z, tx / ty / tz = translation; needed when the mate has several. |
+| `start` | string or number |  | Start value (angle or length expression). |
+| `end` | string or number |  | End value. |
+| `steps` | integer |  | Steps. |
+| `frame` | integer |  | The step to show (0 = start; default the last step, the end). |
 
 #### assembly_display_state
 
@@ -2990,7 +3019,7 @@ Examples:
 
 A Part Studio's Assembly contexts.
 
-The Assembly contexts section above the Feature list: each context's `id`, `name`, `assembly`, whether it is `shown` and `referenced` (only referenced contexts persist), `out_of_date` (an update is available), its `primary` instance, whether it has an `origin` (created in context: context_insert_in_assembly works) and its `instances` (instance and part names).
+The Assembly contexts section above the Feature list: each context's `id`, `name`, `assembly`, whether it is `shown` and `referenced` (only referenced contexts persist), `out_of_date` (an update is available), its `follow_position` (Follow position ▸, whose only choice is "Current assembly position"), its `primary` instance, whether it has an `origin` (created in context: context_insert_in_assembly works) and its `instances` (instance and part names).
 
 Examples:
 
@@ -4437,6 +4466,7 @@ The annotation context menus, one edit each with the menu's edit text:
 - `detach` (Detach from geometry: stays put, no longer follows the model).
 - Centermarks: `align_centermark` to the straight edge at `point`.
 - Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).
+- Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).
 
 Examples:
 
@@ -4452,7 +4482,7 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `annotation` | integer | required | Annotation id (drawing_get). |
-| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break` | required | The menu action. |
+| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break`, `reset_ordinate` | required | The menu action. |
 | `line` | one of 0, 1 |  | add_jog / remove_jog: the extension line. |
 | `point` | array of number |  | add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge (sheet mm). |
 | `leader` | integer |  | add_node / remove_node / delete_leader / move_leader: the leader (a note's 0 = first; a callout's 0 = the one to its anchor). |
@@ -4696,6 +4726,59 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+
+#### ui_preferences
+
+Graphics preferences (the camera menu's Graphics preferences…).
+
+The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors "#rrggbb", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once.
+
+Examples:
+
+```json
+{}
+{"graphics": {"fov_deg": 60, "line_width": 1.5, "sketch_constrained": "#202020"}}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `graphics` | object |  | Preferences to change, by name (see the reply). |
+
+#### ui_toolbar
+
+The Part Studio toolbar's customization (Customize toolbar…) and the S shortcut toolbars.
+
+The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide "Search tools"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do.
+
+Examples:
+
+```json
+{}
+{"set": {"removed": ["helix"], "shortcut_tools": ["sketch", "extrude", "fillet"]}}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `set` | object |  | Settings to change (see the reply). |
+
+#### ui_shortcuts
+
+The keyboard shortcuts (Help › Keyboard shortcuts, the Shift+/ sheet).
+
+The sheet's rows per tab (General, Part Studio, Assembly, 3D view, Sketch, Feature Studio, Drawing): each action with a key (the user's customized key, else Onshape's default; `customized`, `disabled`) and the Onshape-controlled ones (`locked`), by name. `tab` keeps one tab; `search` matches names and keys, as the sheet's search box.
+
+Examples:
+
+```json
+{"tab": "Sketch"}
+{"search": "fillet"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `tab` | one of `General`, `Part Studio`, `Assembly`, `3D view`, `Sketch`, `Feature Studio`, `Drawing` |  | Only this tab. |
+| `search` | string |  | Search text (names and keys). |
 
 ### history
 

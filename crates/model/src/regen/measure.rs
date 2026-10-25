@@ -233,8 +233,13 @@ const CIRCULAR: [&str; 5] = ["Parallel axes dist", "Perp axes angle", "Center ax
 /// (the Area / Length totals of a multi-selection are), then, when a
 /// cylinder / circle is measured, the following distance rows on the same
 /// line (live: "Parallel axes dist: 30.000 mm  Min dist: 22.000 mm  Max
-/// dist: 42.942 mm"). Three edges show nothing.
+/// dist: 42.942 mm"). Three or more entities show nothing (live: three
+/// edges; "With three entities the measure readout disappears"; a box of 18
+/// faces and edges).
 pub fn quick_line(rows: &[(String, Measurement)], count: usize) -> Vec<(String, Measurement)> {
+    if count > 2 {
+        return Vec::new();
+    }
     let secondary = |l: &str| count > 1 && (l == "Area" || l == "Length");
     let Some(first) = rows.iter().position(|(l, _)| !secondary(l)) else { return Vec::new() };
     let mut out = vec![rows[first].clone()];
@@ -377,6 +382,8 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
                 let t = angle.unwrap_or_else(|| std::f64::consts::FRAC_PI_2 - d.angle_between(n).min(std::f64::consts::PI - d.angle_between(n)));
                 if is_right_angle(t) {
                     out.push(("Perp line and plane angle".into(), Measurement::Angle(t)));
+                    // Live (AN1 c): a perpendicular line reads it too.
+                    out.push(("Curvature deviation".into(), Measurement::Percent(0.0)));
                     out.extend(min());
                     out.extend(face_area());
                     out.extend(max());
@@ -638,6 +645,51 @@ mod tests {
         assert!(!measure_shapes(&[vec![e], top]).is_empty());
     }
 
+    /// qa5 AN1 through `measure` (the readout and the Measure panel): live
+    /// (ui 10-23 a, case c) the Top plane with a vertical edge of a 40×20×10
+    /// block standing on it reads exactly "Perp line and plane angle 90°",
+    /// "Curvature deviation 0 %", "Min dist 0", "Length 10" (the edge's
+    /// own). A vertex, an edge midpoint and a circle read their distance.
+    #[test]
+    fn edge_vertex_midpoint_and_circle_with_the_top_plane() {
+        use crate::reference::{DatumPlane, Inference};
+        let shape = k::make_box(&k::Plane::xy(), 0.04, 0.02, 0.01).unwrap();
+        let block = body(0, shape.clone());
+        let ctx = Context { bodies: vec![block.clone()], ..Default::default() };
+        let top = Reference::Plane(DatumPlane::Top);
+        let edge = |pred: &dyn Fn(&Shape) -> bool| -> Reference {
+            let i = (0..block.edges.len()).find(|&i| pred(&shape.sub_shape(ShapeType::Edge, i).unwrap())).unwrap();
+            Reference::Edge((*block.edges[i]).clone())
+        };
+        let vertical = edge(&|e| matches!(e.edge_curve(), Ok(k::Curve::Line { direction, .. }) if direction.z.abs() > 0.9));
+        let rows = measure(&ctx, &[vertical.clone(), top.clone()]);
+        let labels: Vec<&str> = rows.iter().map(|(l, _)| l.as_str()).collect();
+        assert_eq!(labels, ["Perp line and plane angle", "Curvature deviation", "Min dist", "Length"]);
+        assert!(matches!(rows[0].1, Measurement::Angle(t) if (t - std::f64::consts::FRAC_PI_2).abs() < 1e-9));
+        assert!(matches!(rows[2].1, Measurement::Distance { distance, .. } if distance.abs() < 1e-9));
+        assert!(matches!(rows[3].1, Measurement::Length(l) if (l - 0.01).abs() < 1e-9));
+        let min_dist = |rows: &[(String, Measurement)]| rows.iter().find_map(|(l, m)| match m {
+            Measurement::Distance { distance, .. } if l == "Min dist" => Some(*distance),
+            _ => None,
+        });
+        // The block's top corner (z = 10 mm).
+        let vi = (0..block.vertices.len()).find(|&i| shape.sub_shape(ShapeType::Vertex, i).unwrap().vertex_point().unwrap().z > 0.005).unwrap();
+        let vertex = Reference::Vertex((*block.vertices[vi]).clone());
+        let d = min_dist(&measure(&ctx, &[vertex, top.clone()])).expect("vertex + Top: a Min dist");
+        assert!((d - 0.01).abs() < 1e-9, "{d}");
+        // The midpoint of the vertical edge (5 mm up).
+        let mid = Reference::Implicit { on: Box::new(vertical), inference: Inference::Midpoint };
+        let d = min_dist(&measure(&ctx, &[mid, top.clone()])).expect("midpoint + Top: a Min dist");
+        assert!((d - 0.005).abs() < 1e-9, "{d}");
+        // A circle 3 mm above the Top plane.
+        let circle = k::make_circle(DVec3::new(0.0, 0.0, 0.003), DVec3::Z, 0.002).unwrap();
+        let ctx = Context { bodies: vec![body(1, circle.clone())], ..Default::default() };
+        let c = Reference::Edge((*ctx.bodies[0].edges[0]).clone());
+        let rows = measure(&ctx, &[c, top]);
+        let d = min_dist(&rows).expect("circle + Top: a Min dist");
+        assert!((d - 0.003).abs() < 1e-9, "{d}");
+    }
+
     /// qa4 round 4 S3-a: a surface body has no mass properties (ours gave a
     /// "volume" for an open loft); with a part beside it only the part counts.
     #[test]
@@ -690,6 +742,8 @@ mod tests {
         assert_eq!(three.len(), 1);
         assert_eq!(three[0].0, "Length");
         assert!(quick_line(&three, 3).is_empty());
+        // Nor with faces among them (the pair rows don't reach the status bar).
+        assert!(quick_line(&par, 3).is_empty());
         // An edge of the top face against a side face it is parallel to.
         let top_edge = z.edges().into_iter().find(|e| matches!(e.edge_curve(), Ok(k::Curve::Line { direction, .. }) if direction.x.abs() < 1e-9)).unwrap();
         let edge_par = measure_shapes(&[vec![top_edge], vec![x[0].clone()]]);

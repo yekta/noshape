@@ -133,7 +133,7 @@ pub fn fillet() -> FeatureType {
     const END_TYPES: &[(&str, &str)] = &[("PERCENTAGE", "Position"), ("ENTITY", "Entity"), ("OFFSET", "Offset")];
     let p = vec![
         ParamSpec::enum_("filletType", "Fillet type", &[("EDGE", "Edge"), ("FULL_ROUND", "Full round")]).hints(Hints::HORIZONTAL_ENUM),
-        ParamSpec::query("entities", "Entities to fillet", QueryFilter::EDGE | QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS).visible(edge),
+        ParamSpec::query("entities", "Entities to fillet", QueryFilter::SOLID_EDGE | QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS).visible(edge),
         ParamSpec::query1("side1Face", "First side face", QueryFilter::ANY_FACE).visible(|v| v.is("filletType", "FULL_ROUND")),
         ParamSpec::query1("side2Face", "Second side face", QueryFilter::ANY_FACE).visible(|v| v.is("filletType", "FULL_ROUND")),
         ParamSpec::query("centerFaces", "Faces to round", QueryFilter::ANY_FACE).visible(|v| v.is("filletType", "FULL_ROUND")),
@@ -207,7 +207,7 @@ pub fn fillet() -> FeatureType {
         .visible(variable),
         ParamSpec::bool("smoothTransition", "Smooth transition", false).visible(variable),
         ParamSpec::bool("allowEdgeOverflow", "Allow edge overflow", true).hints(Hints::GROUP_HEADER).visible(not_curvature),
-        ParamSpec::query("keepEdges", "Edges to keep", QueryFilter::EDGE).visible(move |v| not_curvature(v) && v.bool("allowEdgeOverflow")),
+        ParamSpec::query("keepEdges", "Edges to keep", QueryFilter::SOLID_EDGE).visible(move |v| not_curvature(v) && v.bool("allowEdgeOverflow")),
         ParamSpec::bool("smoothCorners", "Smooth fillet corners", false).hints(Hints::GROUP_HEADER).visible(not_curvature),
         ParamSpec::query("smoothCornerExceptions", "Corners to exclude", QueryFilter::VERTEX).visible(move |v| not_curvature(v) && v.bool("smoothCorners")),
     ];
