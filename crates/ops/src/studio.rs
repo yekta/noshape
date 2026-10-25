@@ -120,9 +120,24 @@ pub fn rename_description(name: &str) -> String {
     format!("Rename : {name}")
 }
 
+/// Rename a feature; an empty name gives it back its default name (live
+/// qa4 r5 s8 (5): "Fillet 2"), the lowest free "<type> N".
 pub fn rename_feature(ps: &mut PartStudio, id: FeatureId, name: &str) {
+    let name = name.trim();
+    if name.is_empty() {
+        let Some(ty) = ps.feature(id).and_then(|f| f.feature_type()) else { return };
+        if let Some(f) = ps.feature_mut(id) {
+            f.name.clear();
+        }
+        let default = ps.next_name(ty);
+        if let Some(f) = ps.feature_mut(id) {
+            f.name = default;
+            f.custom_name = false;
+        }
+        return;
+    }
     if let Some(f) = ps.feature_mut(id) {
-        f.name = name.trim().to_string();
+        f.name = name.to_string();
         f.custom_name = true;
     }
 }
@@ -512,5 +527,22 @@ pub fn frame_of_ref(display: &noshape_model::display::StudioDisplay, ctx: Option
             Some(PlaneFrame { origin: pl.origin, x, y: normal.cross(x), normal })
         }),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod rename_tests {
+    use super::*;
+
+    /// Live (qa4 r5 s8 (5)): renaming to an empty name gives the feature
+    /// its default name back.
+    #[test]
+    fn an_empty_name_restores_the_default_name() {
+        let mut ps = noshape_model::demo::plate_studio();
+        let ext = ps.features.iter().find(|f| f.type_id == "extrude").map(|f| (f.id, f.name.clone())).expect("extrude");
+        rename_feature(&mut ps, ext.0, "Renamed");
+        assert_eq!(ps.feature(ext.0).map(|f| (f.name.as_str(), f.custom_name)), Some(("Renamed", true)));
+        rename_feature(&mut ps, ext.0, "  ");
+        assert_eq!(ps.feature(ext.0).map(|f| (f.name.clone(), f.custom_name)), Some((ext.1, false)));
     }
 }

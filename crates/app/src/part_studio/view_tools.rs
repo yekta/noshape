@@ -582,7 +582,10 @@ impl PartStudioView {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let v = st.read(cx).value().to_string();
                 this.renaming = None;
-                if !v.trim().is_empty() {
+                // Live (qa4 r5 s8 (5)): an empty name goes back to the
+                // feature's default name ("Fillet 2"); unchanged, nothing.
+                let old = this.studio(cx).and_then(|s| s.feature(id)).map(|f| f.name.clone()).unwrap_or_default();
+                if v.trim() != old {
                     this.doc.update(cx, |doc, cx| {
                         doc.edit_studio(this.tab, &noshape_ops::studio::rename_description(&v), cx, |ps| noshape_ops::studio::rename_feature(ps, id, &v));
                     });

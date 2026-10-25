@@ -3742,7 +3742,21 @@ impl PartStudioView {
                     .when(underdefined, |d| d.child(div().absolute().left(px(9.5)).top(px(8.)).child(crate::assets::icon("list-underdefined-overlay", 12., cx)))),
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
-                Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.))).into_any_element(),
+                // Live (qa4 r5 s8 (5)): Esc cancels; Enter or a click elsewhere
+                // commits (dropping the subscription keeps the blur from it).
+                Some((_, st, _)) => div()
+                    .flex_1()
+                    .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                        if ev.keystroke.key == "escape" {
+                            this.renaming = None;
+                            cx.stop_propagation();
+                            let fh = this.focus.clone();
+                            window.focus(&fh, cx);
+                            cx.notify();
+                        }
+                    }))
+                    .child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.)))
+                    .into_any_element(),
                 // Live (psb 10-21 p): a Hole's row shows its whole callout,
                 // both parts ("Ø 6.6 mm ↧ 10 mm | ⌴Ø 11 mm ↧ 6.5 mm"), cut by
                 // the ellipsis at the list's width.
