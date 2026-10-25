@@ -97,9 +97,10 @@ pub fn ops() -> Vec<Op> {
                 req("sketch", s(), "Sketch feature id or name."),
                 opt("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool (required without `shapes`)."),
                 opt("points", json!({ "type": "array", "items": click_point.clone() }), "The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`)."),
-                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
+                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
                 opt("construction", json!({ "type": "boolean" }), "Make the new geometry construction geometry."),
                 opt("sides", json!({ "type": "integer", "minimum": 3, "maximum": 1000 }), "Polygon sides."),
+                opt("tangent_arc_switch", json!({ "type": "array", "items": { "type": "integer", "minimum": 1 } }), "line: press the Line/tangent arc switch (Shift+A) before these clicks (0-based): that click draws a tangent arc, then the chain goes on with lines (as in Onshape)."),
             ],
             mutates: true,
             destructive: false,
@@ -569,12 +570,14 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let points = obj.get("points").and_then(Value::as_array).ok_or_else(|| OpError::param(&format!("{p}points"), "required: [[x, y], ...]"))?;
                 let sides = obj.get("sides").map(|v| v.as_u64().ok_or_else(|| OpError::param(&format!("{p}sides"), "an integer"))).transpose()?;
                 let construction = obj.get("construction").map(|v| v.as_bool().ok_or_else(|| OpError::param(&format!("{p}construction"), "true or false"))).transpose()?.unwrap_or(false);
-                draw_shape(&mut t, &units, &p, tool, points, sides, construction)?;
+                let switches = switch_list(obj.get("tangent_arc_switch"), &format!("{p}tangent_arc_switch"))?;
+                draw_shape(&mut t, &units, &p, tool, points, sides, construction, &switches)?;
             }
         }
         None => {
             let (tool, points) = (a.opt_str("tool")?.ok_or_else(|| OpError::param("tool", "required (or `shapes`)"))?, a.opt_array("points")?.ok_or_else(|| OpError::param("points", "required (or `shapes`)"))?);
-            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?)?;
+            let switches = switch_list(a.get("tangent_arc_switch"), "tangent_arc_switch")?;
+            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, &switches)?;
         }
     }
     let (id, tab) = (t.id, t.tab);
@@ -582,9 +585,20 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(sketch_state(od, tab, id, Some(&before))?.into())
 }
 
+/// `tangent_arc_switch`: click indices (None: none).
+fn switch_list(v: Option<&Value>, param: &str) -> Result<Vec<usize>, OpError> {
+    match v {
+        None | Some(Value::Null) => Ok(Vec::new()),
+        Some(Value::Array(l)) => l.iter().map(|x| x.as_u64().map(|n| n as usize).ok_or_else(|| OpError::param(param, "click indices"))).collect(),
+        Some(_) => Err(OpError::param(param, "click indices")),
+    }
+}
+
 /// One drawing tool run on its clicks with a fresh editor, as one
 /// `sketch_draw` call does (`p`: the parameter prefix for errors).
-fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool) -> Result<(), OpError> {
+/// `switches`: the line tool's Shift+A before those clicks.
+#[allow(clippy::too_many_arguments)]
+fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, switches: &[usize]) -> Result<(), OpError> {
     let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| OpError::param(&format!("{p}tool"), "unknown drawing tool"))?;
     let frame = t.frame;
     let points = points.iter().enumerate().map(|(i, v)| click_value(v, units, &frame).map_err(|e| e.with_param(format!("{p}points[{i}]")))).collect::<Result<Vec<_>, _>>()?;
@@ -597,7 +611,17 @@ fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, poin
     if let Some(n) = sides {
         ed.polygon_sides = n.clamp(3, 1000) as usize;
     }
-    for c in &points {
+    if !switches.is_empty() && name != "line" {
+        return Err(OpError::param(&format!("{p}tangent_arc_switch"), "the line tool's switch"));
+    }
+    if let Some(k) = switches.iter().find(|k| **k == 0 || **k >= points.len()) {
+        return Err(OpError::param(&format!("{p}tangent_arc_switch"), &format!("click {k}: between the first and the last click")));
+    }
+    for (k, c) in points.iter().enumerate() {
+        // Shift+A while chaining (Line / Tangent arc).
+        for _ in switches.iter().filter(|s| **s == k) {
+            ed.toggle_tangent_arc();
+        }
         click(&mut ed, &mut t.data, *c);
     }
     // Commit what the tool still holds (spline, slot, polygon), then leave it.

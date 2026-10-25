@@ -2666,6 +2666,7 @@ fn edit_in_context_and_part_studio_in_context() {
     let cs = contexts(&mut ctx, "Part Studio 1");
     assert_eq!(cs[0]["referenced"], true, "{cs:?}");
     assert_eq!(cs[0]["out_of_date"], false, "{cs:?}");
+    assert_eq!(cs[0]["follow_position"], "Current assembly position", "{cs:?}");
 
     // Moving the pin makes an update available.
     call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [0, 0, 15] }));
@@ -3479,4 +3480,18 @@ fn insert_configuration_menu_and_variable_table_copy() {
     let text = v["copied"].as_str().unwrap();
     assert!(text.starts_with("Name\tVariable type\tValue\tDescription\n"), "{v}");
     assert!(text.lines().any(|l| l.starts_with("w\tLength\t") && l.ends_with("\tWidth")), "{v}");
+}
+
+/// The line tool's Line/tangent arc switch (Shift+A while chaining): the
+/// next segment is a tangent arc, then the chain goes on with lines.
+#[test]
+fn line_tangent_arc_switch() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("tangent_arc_switch.noshape").to_str().unwrap() }));
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "line", "points": [[0, 0], [20, 0], [30, 10], [30, 30]], "tangent_arc_switch": [2] }));
+    let kinds: Vec<&str> = d["created"].as_array().unwrap().iter().map(|e| e["type"].as_str().unwrap()).filter(|t| *t != "point").collect();
+    assert_eq!(kinds, ["line", "arc", "line"], "{d}");
+    let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "circle", "points": [[50, 0], [55, 0]], "tangent_arc_switch": [1] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tangent_arc_switch"), "{e:?}");
 }

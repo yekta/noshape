@@ -1021,6 +1021,7 @@ Examples:
 | `shapes` | array of object |  | Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. |
 | `construction` | boolean |  | Make the new geometry construction geometry. |
 | `sides` | integer |  | Polygon sides. |
+| `tangent_arc_switch` | array of integer |  | line: press the Line/tangent arc switch (Shift+A) before these clicks (0-based): that click draws a tangent arc, then the chain goes on with lines (as in Onshape). |
 
 #### sketch_constrain
 
@@ -2936,7 +2937,7 @@ Examples:
 
 A Part Studio's Assembly contexts.
 
-The Assembly contexts section above the Feature list: each context's `id`, `name`, `assembly`, whether it is `shown` and `referenced` (only referenced contexts persist), `out_of_date` (an update is available), its `primary` instance, whether it has an `origin` (created in context: context_insert_in_assembly works) and its `instances` (instance and part names).
+The Assembly contexts section above the Feature list: each context's `id`, `name`, `assembly`, whether it is `shown` and `referenced` (only referenced contexts persist), `out_of_date` (an update is available), its `follow_position` (Follow position ▸, whose only choice is "Current assembly position"), its `primary` instance, whether it has an `origin` (created in context: context_insert_in_assembly works) and its `instances` (instance and part names).
 
 Examples:
 
