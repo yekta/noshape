@@ -2603,14 +2603,14 @@ impl PartStudioView {
             if let Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint } = r
                 && let Some(m) = self.edge_midpoint(on)
             {
-                marker(&mut points, m, [0xfac012, 0xc4960b, 0xffd65b]);
+                marker(&mut points, m, crate::theme::viewport::POINT_SELECTED);
             }
         }
         match &self.hover {
             // The hovered midpoint target ([`Self::hover_target`]).
             Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() => {
                 if let Some(m) = self.edge_midpoint(on) {
-                    marker(&mut points, m, [0xf8c488, 0xc49a6a, 0xffd8ac]);
+                    marker(&mut points, m, crate::theme::viewport::POINT_HOVER);
                 }
             }
             // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows a
