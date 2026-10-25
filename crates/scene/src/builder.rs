@@ -649,7 +649,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // over one plane's #3d3d3d: 0.09 in linear light.
                 let fill = if editing {
                     let c = theme::lin(theme::pick(theme::viewport::SKETCH_REGION, theme::viewport_dark::SKETCH_REGION));
-                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], theme::pick(0.34, 0.09)])
+                    // Flat: lit, the fill came out darker and grayer
+                    // ((215,218,221) over the plane).
+                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], theme::pick(0.34, 0.09)]).unlit()
                 } else {
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 0.0]).pick_only()
                 };
@@ -886,8 +888,9 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         for &id in built.picks.ids_for(r) {
             let t = built.picks.get(id);
             // An erroring input face shows only its red outline; a selected
-            // plane its overlay above.
-            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) && !plane_selected {
+            // plane its overlay above; a hovered sketch region only its
+            // boundary (live sketch/25: the fill doesn't change).
+            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) && !plane_selected && !(flag == state::HOVER && t.is_some_and(|t| t.kind == PickKind::SketchRegion)) {
                 scene.add_flag(id, flag);
             }
             let Some(t) = t else { continue };

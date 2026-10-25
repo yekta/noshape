@@ -1157,9 +1157,6 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
             draw(pass, &lists.opaque[start..end], if solid { &pipelines.mesh_solid } else { &pipelines.mesh_opaque });
             start = end;
         }
-        if outline {
-            draw(pass, &lists.opaque, &pipelines.mesh_outline);
-        }
         if let Some((group, planes)) = caps {
             // A quad on each plane, colored from the section mask.
             pass.set_pipeline(&pipelines.section_cap);
@@ -1188,6 +1185,12 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &previews, &pipelines.mesh_transparent_front);
         draw(pass, &after, &pipelines.mesh_transparent);
         draw(pass, &lists.over_transparent, &pipelines.mesh_opaque);
+        // Part outlines over the datum planes and other see-through meshes
+        // (live selection/10: the hover outline reads full #ffc685 over a
+        // plane; drawn before them it came out washed, (233,208,188)).
+        if outline {
+            draw(pass, &lists.opaque, &pipelines.mesh_outline);
+        }
         // Hidden-only geometry right after the meshes, so only faces count
         // as hiding it (not hover outlines or overlays drawn over the same
         // curves); the visible lines come after.
