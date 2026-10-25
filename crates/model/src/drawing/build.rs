@@ -298,6 +298,9 @@ impl BuiltSheet {
     }
 }
 
+/// How far a section cutting line runs past its view (live: 0.25 in).
+const CUT_OVERSHOOT: f64 = 6.35;
+
 /// Format a model length (meters) in drawing units.
 pub fn format_length(drawing: &Drawing, meters: f64) -> String {
     format::format_len(drawing, &Default::default(), meters)
@@ -1585,7 +1588,27 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             ViewKind::Section { parent, label, .. } | ViewKind::AlignedSection { parent, label, .. } => {
                 if let (Some(ppl), Some(cut)) = (place(*parent), views::section_cut(sheet, v.id)) {
                     let pick = picks.id(PickTarget::SectionLine(v.id));
-                    let pts: Vec<[f64; 2]> = cut.points.iter().map(|p| ppl.to_sheet(*p)).collect();
+                    let mut pts: Vec<[f64; 2]> = cut.points.iter().map(|p| ppl.to_sheet(*p)).collect();
+                    // Both end legs run 0.25 in past the view's geometry (live
+                    // qa4-r5-s11.dxf, drw2-k: exactly 6.35 mm / 0.25 in).
+                    let n = pts.len();
+                    for (e, i) in [(0, 1), (n - 1, n - 2)] {
+                        let d = [pts[e][0] - pts[i][0], pts[e][1] - pts[i][1]];
+                        let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+                        if l < 1e-9 {
+                            continue;
+                        }
+                        let u = [d[0] / l, d[1] / l];
+                        // Where the leg's line leaves the view's bounds.
+                        let exit = (0..2)
+                            .filter(|&k| u[k].abs() > 1e-12)
+                            .map(|k| ((if u[k] > 0.0 { ppl.max[k] } else { ppl.min[k] }) - pts[i][k]) / u[k])
+                            .fold(f64::INFINITY, f64::min);
+                        if exit.is_finite() && exit > 0.0 {
+                            let t = exit + CUT_OVERSHOOT;
+                            pts[e] = [pts[i][0] + u[0] * t, pts[i][1] + u[1] * t];
+                        }
+                    }
                     g.lines.push(Polyline2 { points: pts.clone(), style: LineStyle::Section, closed: false, pick });
                     // Thick strokes at the jogs.
                     for k in 1..pts.len().saturating_sub(1) {
@@ -1598,23 +1621,25 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         }
                     }
                     let sight0 = ppl.dir_to_sheet([-cut.toward_view[0], -cut.toward_view[1]]);
-                    let n = pts.len();
                     let leg0 = [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]];
                     let leg_n = [pts[n - 1][0] - pts[n - 2][0], pts[n - 1][1] - pts[n - 2][1]];
                     let turn = leg_n[1].atan2(leg_n[0]) - leg0[1].atan2(leg0[0]);
-                    for (end, inner, sight) in [(pts[0], pts[1], sight0), (pts[n - 1], pts[n - 2], rotate2(sight0, turn))] {
-                        let d = [end[0] - inner[0], end[1] - inner[1]];
-                        let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
-                        let u = [d[0] / l, d[1] / l];
-                        // Short thick end stroke, then the arrow showing the line of sight.
-                        let e2 = [end[0] - u[0] * 6.0, end[1] - u[1] * 6.0];
-                        g.lines.push(Polyline2 { points: vec![e2, end], style: LineStyle::Border, closed: false, pick });
-                        let base = [end[0] - u[0] * 1.5, end[1] - u[1] * 1.5];
-                        let tail = [base[0] - sight[0] * 8.0, base[1] - sight[1] * 8.0];
-                        g.lines.push(Polyline2 { points: vec![tail, base], style: LineStyle::Thin, closed: false, pick });
-                        g.arrow(base, sight, 3.5);
-                        let tp = [tail[0] + u[0] * 3.0 - sight[0] * 1.0, tail[1] + u[1] * 3.0 - sight[1] * 1.0];
-                        g.texts.push(Text2 { pos: tp, height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                    // Each end (live qa4-r5-s11.dxf, drw2-k): from the line a
+                    // solid shaft a twelfth of an arrow wide and an arrow long
+                    // along the line of sight, the arrow beyond it (its tip
+                    // two arrows out), the letter past the tip.
+                    let (a, h) = (drawing.props.ann_arrow, drawing.props.ann_text_height);
+                    for (end, sight) in [(pts[0], sight0), (pts[n - 1], rotate2(sight0, turn))] {
+                        let neck = [end[0] + sight[0] * a, end[1] + sight[1] * a];
+                        let tip = [end[0] + sight[0] * 2.0 * a, end[1] + sight[1] * 2.0 * a];
+                        let w = [-sight[1] * a / 24.0, sight[0] * a / 24.0];
+                        g.fills.push(Fill2 { points: vec![[end[0] - w[0], end[1] - w[1]], [neck[0] - w[0], neck[1] - w[1]], [neck[0] + w[0], neck[1] + w[1]], [end[0] + w[0], end[1] + w[1]]] });
+                        // Under the fill, for picking.
+                        g.lines.push(Polyline2 { points: vec![end, neck], style: LineStyle::Thin, closed: false, pick });
+                        // `arrow` scales by the (default) style's size: the drawing's here.
+                        g.arrow(tip, sight, 3.0 * a / g.style.ann_arrow.max(1e-9));
+                        let at = [tip[0] + sight[0] * 1.1 * h, tip[1] + sight[1] * 1.1 * h];
+                        g.texts.push(Text2 { pos: at, height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                     }
                 }
             }

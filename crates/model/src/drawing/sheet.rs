@@ -608,7 +608,9 @@ impl SheetGeometry {
         let len = len * size / 3.0;
         let l = (dir[0] * dir[0] + dir[1] * dir[1]).sqrt().max(1e-12);
         let (dx, dy) = (dir[0] / l, dir[1] / l);
-        let w = len * 0.3;
+        // A third as wide as long (live DXF SOLIDs: ANSI 0.18 x 0.06 in,
+        // ISO 2.5 x 0.833 mm; dimensions, cutting lines, leaders alike).
+        let w = len / 6.0;
         let base = [tip[0] - dx * len, tip[1] - dy * len];
         let (left, right) = ([base[0] - dy * w, base[1] + dx * w], [base[0] + dy * w, base[1] - dx * w]);
         match kind {

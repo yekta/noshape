@@ -742,6 +742,39 @@ fn editing_cutting_line_points() {
     assert!((l.points[1][0] - l.points[0][0]).abs() > 1.0, "cutting line is tilted on the sheet");
 }
 
+/// The cutting line as live (qa4-r5-s11.dxf, drw2-k): 0.25 in past the
+/// parent's geometry at both ends; at each end a shaft a twelfth of an arrow
+/// wide and an arrow long along the line of sight, the arrow beyond it, the
+/// letter past the tip.
+#[test]
+fn cutting_line_ends_as_live() {
+    let (doc, drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let ViewKind::Section { parent, ref label, .. } = drawing.sheets[0].view(ViewId(5)).unwrap().kind else { panic!("demo section") };
+    let ppl = built.placements.iter().find(|p| p.id == parent).unwrap();
+    let sp = pick_of(&built, PickTarget::SectionLine(ViewId(5)));
+    let g = &built.geometry;
+    let line = g.lines.iter().find(|l| l.pick == sp && l.style == sheet::LineStyle::Section).unwrap();
+    let (p0, p1) = (line.points[0], *line.points.last().unwrap());
+    let (a, h) = (drawing.props.ann_arrow, drawing.props.ann_text_height);
+    // The demo's line is vertical: 6.35 mm past the view's top and bottom.
+    assert!((p0[0] - p1[0]).abs() < 1e-9, "{p0:?} {p1:?}");
+    let (lo, hi) = (p0[1].min(p1[1]), p0[1].max(p1[1]));
+    assert!((lo - (ppl.min[1] - 6.35)).abs() < 1e-9 && (hi - (ppl.max[1] + 6.35)).abs() < 1e-9, "{lo} {hi} {:?} {:?}", ppl.min, ppl.max);
+    for end in [p0, p1] {
+        // The letter 2 arrows + 1.1 text heights out, square to the line.
+        let t = g.texts.iter().find(|t| t.pick == sp && &t.text == label && (t.pos[1] - end[1]).abs() < 1e-9).expect("a letter at each end");
+        assert!(((t.pos[0] - end[0]).abs() - (2.0 * a + 1.1 * h)).abs() < 1e-9 && t.height == h, "{t:?}");
+        // The shaft: a quad from the end, a twelfth of an arrow wide, an arrow long.
+        let q = g.fills.iter().find(|f| f.points.len() == 4 && (f.points[0][1] - end[1]).abs() < a).expect("shaft");
+        let w = q.points.iter().map(|p| p[1]).fold(f64::MIN, f64::max) - q.points.iter().map(|p| p[1]).fold(f64::MAX, f64::min);
+        let len = q.points.iter().map(|p| p[0]).fold(f64::MIN, f64::max) - q.points.iter().map(|p| p[0]).fold(f64::MAX, f64::min);
+        assert!((w - a / 12.0).abs() < 1e-9 && (len - a).abs() < 1e-9, "{q:?}");
+    }
+}
+
 #[test]
 fn spline_and_polygon_crops() {
     let (doc, mut drawing) = demo();
@@ -2711,6 +2744,8 @@ fn ansi_radial_dimension_leader_knee_and_shoulder() {
         assert!(near(f[0], tip), "{f:?}");
         let base = [(f[1][0] + f[2][0]) / 2.0 - 100.0, (f[1][1] + f[2][1]) / 2.0 - 100.0];
         assert!((base[0].hypot(base[1]) - (5.0 + a)).abs() < 1e-9, "outside, pointing in: {f:?}");
+        // A third as wide as long (live DXF SOLIDs).
+        assert!(((f[1][0] - f[2][0]).hypot(f[1][1] - f[2][1]) - a / 3.0).abs() < 1e-9, "{f:?}");
         // The leader from the circle to the knee, nothing inside.
         assert!(g.lines.iter().any(|l| l.points.len() == 2 && near(l.points[0], tip) && near(l.points[1], knee)), "{:?}", g.lines);
         // The shoulder on the circle's side, the value inline past it.
