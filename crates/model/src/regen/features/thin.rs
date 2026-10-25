@@ -104,7 +104,7 @@ pub fn thin_profiles(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<Profile>> 
         }
     }
     if out.is_empty() {
-        return err("Select edges or faces to define the path of the thin wall");
+        return err("Select edges or faces to define the path of the thin wall.");
     }
     Ok(out)
 }

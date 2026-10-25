@@ -74,7 +74,7 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 doc_field(),
                 opt("source", s(), "Part Studio or assembly tab (name or id). Omit for an empty drawing."),
-                opt("part", s(), "Only this part (`body:…` id from query_parts)."),
+                opt("part", s(), "Only this part (`body:…` id from query_parts, or its name)."),
                 opt("sketch", s(), "Only this sketch of the source Part Studio (feature id or name): Create Drawing of Sketch N."),
                 opt("configuration", json!({ "type": "object" }), "Configuration of the source: {input id: value}."),
                 opt("template", s(), "Existing templates: file or setup name (`drawing_templates`), e.g. \"ANSI_A_INCH.dwt\", \"ISO A3\". Default ANSI_A_INCH.dwt, the dialog's preselected row."),
@@ -106,7 +106,7 @@ pub fn ops() -> Vec<Op> {
                 drawing_field(),
                 sheet_field(),
                 req("source", s(), "Part Studio or assembly tab."),
-                opt("part", s(), "Only this part (`body:…`)."),
+                opt("part", s(), "Only this part (`body:…` id or name)."),
                 opt("sketch", s(), "Insert a sketch of the source Part Studio (a sketch view, facing its plane)."),
                 opt("flat", json!({ "type": "boolean", "default": false }), "A sheet metal part's flat pattern."),
                 opt("orientation", json!({ "type": "string", "enum": ORIENTATIONS.iter().map(|o| o.0).collect::<Vec<_>>(), "default": "front" }), "View orientation."),
@@ -221,12 +221,18 @@ fn source_tab(od: &OpenDoc, a: &Args, name: &str) -> Result<TabId, OpError> {
     doc::tab_of_kind(od.doc(), Some(a.str(name)?), "Part Studio or Assembly", |c| matches!(c, TabContent::PartStudio(_) | TabContent::Assembly(_))).map_err(|e| e.with_param(name))
 }
 
-pub(super) fn part_arg(a: &Args) -> Result<Option<noshape_model::BodyId>, OpError> {
+/// The `part` argument: a `body:…` id, or the name a part of the Part
+/// Studio `source` shows.
+pub(super) fn part_arg(od: &mut OpenDoc, source: TabId, a: &Args) -> Result<Option<noshape_model::BodyId>, OpError> {
     match a.opt_str("part")? {
         None => Ok(None),
         Some(p) => match refs::parse_str(p) {
             Some(noshape_model::reference::Reference::Body(b)) => Ok(Some(b)),
-            _ => Err(OpError::param("part", "a part id (`body:…` from query_parts)")),
+            _ if matches!(od.doc().tab(source).map(|t| &t.content), Some(TabContent::PartStudio(_))) => {
+                let r = od.regenerate(source, None)?;
+                Ok(Some(super::query::find_part(&r, p)?.id.clone()))
+            }
+            _ => Err(OpError::param("part", "a part id (`body:…` from query_parts) or name of a Part Studio's part")),
         },
     }
 }
@@ -326,6 +332,10 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                             "below parent"
                         };
                         j["projection"] = json!(side);
+                    }
+                    // What it looks along (Onshape names the view by it: "Top", "Right"...).
+                    if let Some(o) = noshape_model::drawing::views::standard_orientation(&m.drawing, sheet, v.id) {
+                        j["orientation"] = json!(ORIENTATIONS.iter().find(|x| x.1 == o).map(|x| x.0));
                     }
                 }
                 _ => {}
@@ -596,7 +606,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             if sketch.is_some() && a.get("part").is_some() {
                 return Err(OpError::param("sketch", "give `part` or `sketch`, not both"));
             }
-            Some(DrawingSource { tab, part: part_arg(a)?, config: super::config_arg(a)?, sketch })
+            Some(DrawingSource { tab, part: part_arg(od, tab, a)?, config: super::config_arg(a)?, sketch })
         }
         None => {
             if let Some(k) = ["part", "sketch", "configuration"].into_iter().find(|k| a.get(k).is_some()) {
@@ -737,7 +747,7 @@ fn place_view(od: &mut OpenDoc, a: &Args, tool: Tool, opts: ViewOptions, extra: 
 fn insert_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let source = source_tab(od, a, "source")?;
-    let part = part_arg(a)?;
+    let part = part_arg(od, source, a)?;
     let o = a.opt_str("orientation")?.unwrap_or("front");
     let orientation = ORIENTATIONS.iter().find(|x| x.0 == o).map(|x| x.1).ok_or_else(|| OpError::param("orientation", "unknown orientation"))?;
     let mut opts = ViewOptions::default();

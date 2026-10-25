@@ -11,8 +11,8 @@ pub fn ops() -> Vec<Op> {
     vec![Op {
         group: "export",
         verb: "parts",
-        summary: "Export a Part Studio's parts to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
-        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
+        summary: "Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
+        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP keeps the assembly (the root product, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
         fields: vec![
             doc_field(),
             tab_field(),
@@ -78,6 +78,9 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         s.version = list.iter().position(|x| x.eq_ignore_ascii_case(v)).ok_or_else(|| OpError::param("version", &format!("one of {}", list.join(", "))))?;
         s.latest = false;
     }
+    if super::configuration::asm::is_assembly(ctx, a)? {
+        return assembly(ctx, a, format, s);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let r = od.regenerate(tab, None)?;
     let selected: Vec<noshape_model::BodyId> = match a.opt_array("parts")? {
@@ -113,6 +116,30 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         })
         .collect();
     let n = list.len();
+    write_out(od, tab, a, format, n, |file| crate::export::write_export(&s, file, list))
+}
+
+/// Export of an Assembly tab: its instances (or `parts`: instance ids or
+/// names); STEP keeps the assembly, as Onshape's.
+fn assembly(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> Result<OpOutput, OpError> {
+    use noshape_model::document::TabContent;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
+    let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| &t.content) else { unreachable!("checked") };
+    let asm = asm.clone();
+    let ids: Option<Vec<noshape_model::assembly::InstanceId>> = match a.opt_array("parts")? {
+        Some(list) => Some(list.iter().enumerate().map(|(i, v)| super::assembly::find_instance(&asm, v.as_str().unwrap_or_default(), &format!("parts[{i}]"))).collect::<Result<_, _>>()?),
+        None => None,
+    };
+    let result = super::assembly::solve_assembly(od, tab, &asm, &Default::default());
+    let root = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+    let export = crate::export::AssemblyExport::of(&root, &result, ids.as_deref(), s.hidden);
+    let n = export.instances.len();
+    write_out(od, tab, a, format, n, |file| crate::export::write_assembly_export(&s, file, &export))
+}
+
+/// Write the export to `file` (or store it), as the dialog's Options say.
+fn write_out(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, a: &Args, format: PartFormat, n: usize, write: impl FnOnce(&std::path::Path) -> anyhow::Result<std::path::PathBuf>) -> Result<OpOutput, OpError> {
     let (download, store) = options_arg(a)?;
     let tab_name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
     let mut file = match a.opt_str("file")? {
@@ -129,7 +156,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let Some(dir) = file.parent().filter(|d| !d.as_os_str().is_empty()) {
         std::fs::create_dir_all(dir).map_err(|e| OpError::new("io", format!("{}: {e}", dir.display())).with_param("file"))?;
     }
-    let out = crate::export::write_export(&s, &file, list).map_err(|e| OpError::new("export_failed", format!("{e:#}")))?;
+    let out = write(&file).map_err(|e| OpError::new("export_failed", format!("{e:#}")))?;
     let bytes = std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0);
     let mut reply = json!({ "format": format.label(), "parts": n, "bytes": bytes });
     if store {

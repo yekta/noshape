@@ -772,6 +772,15 @@ impl<'a> EvalCtx<'a> {
         let res = k::boolean(k::BooleanOp::Fuse, &shapes[..1], &shapes[1..], &k::BooleanOptions::default())?;
         let names: Vec<&ShapeNames> = tools.iter().map(|t| &t.names).collect();
         let face_names = self.name_result(&names, &res.history, &res.shape, &BTreeMap::new(), None);
+        // Like Parasolid (and boolean_into), faces the union leaves on one
+        // surface are one face (qa5 SF2: two adjacent regions extruded, 6
+        // faces, no seam).
+        let unified = k::unify_same_domain(&res.shape)?;
+        if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
+            let before = names_for(&res.shape, face_names);
+            let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
+            return Ok(split_solids(&unified.shape, &names));
+        }
         Ok(split_solids(&res.shape, &face_names))
     }
 

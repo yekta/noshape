@@ -34,7 +34,8 @@ pub fn interferences(shapes: &[Shape]) -> Vec<Interference> {
             if volume <= size.powi(3) * 1e-9 {
                 continue;
             }
-            let Ok(bx) = shape.bounding_box(false) else { continue };
+            // The tight box (qa5 AN4: the loose one read 35.485 x 20.233 x 10 for 30 x 20 x 10).
+            let Ok(bx) = shape.bounding_box(true) else { continue };
             let Ok(mesh) = noshape_kernel::tessellate(&shape, size * 2e-3, 0.3, false) else { continue };
             out.push(Interference { a, b, volume, bounds: (bx.min, bx.max), positions: mesh.positions, normals: mesh.normals, indices: mesh.indices });
         }
@@ -57,5 +58,18 @@ mod tests {
         assert!((i.volume - 1.0).abs() < 1e-9, "{}", i.volume);
         assert!(i.bounds.0.distance(DVec3::ONE) < 1e-6 && i.bounds.1.distance(DVec3::splat(2.0)) < 1e-6);
         assert!(!i.indices.is_empty());
+    }
+
+    /// qa5 AN4: the size shown is the overlap's tight box (a half cylinder
+    /// here: 1 × 2 × 2), not OCCT's loose one.
+    #[test]
+    fn interference_bounds_are_tight() {
+        let frame = noshape_kernel::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+        let cyl = noshape_kernel::make_cylinder(&frame, 1.0, 2.0, std::f64::consts::TAU).unwrap();
+        let half = noshape_kernel::make_box_corners(DVec3::new(0.0, -2.0, 0.0), DVec3::new(2.0, 2.0, 2.0)).unwrap();
+        let found = interferences(&[cyl, half]);
+        assert_eq!(found.len(), 1);
+        let (lo, hi) = found[0].bounds;
+        assert!(lo.distance(DVec3::new(0.0, -1.0, 0.0)) < 1e-6 && hi.distance(DVec3::new(1.0, 1.0, 2.0)) < 1e-6, "{lo} {hi}");
     }
 }

@@ -336,7 +336,8 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     };
     // Live L15: no profile marks the field; one profile has its own text.
     if sections.is_empty() {
-        return crate::regen::eval::err_at(&["sheetProfilesArray", "wireProfilesArray"], "Select profiles in order from start to finish.");
+        // std loft.fs: the profiles field of the creation type.
+        return crate::regen::eval::err_at(if solid { &["sheetProfilesArray"] } else { &["wireProfilesArray"] }, "Select profiles in order from start to finish.");
     }
     if sections.len() < 2 {
         return err("Select at least two profiles, a closed guide curve or a closed path.");
@@ -449,6 +450,8 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
     // L17: two adjacent faces give one part), and a surface is used up only
     // when all of its faces are (L16).
     let mut picked: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    // Corner fills of each body's picked faces (by body).
+    let mut fills: Vec<(usize, Shape)> = Vec::new();
     for r in refs {
         match r {
             Reference::SketchRegion { .. } => {
@@ -487,9 +490,14 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
             consumed.push(b.id.clone());
         }
         // Several faces of one body make one part (live L17). Each face is
-        // thickened and the slabs are fused; Onshape's square corner fill
-        // between them is still missing (kernel).
+        // thickened, the slabs are fused, and where they part at an edge the
+        // corner is filled (corner_fills).
         let group = (fis.len() > 1).then_some(bi);
+        if group.is_some() && b.kind == BodyKind::Solid {
+            for f in corner_fills(&b.shape, &fis, t1, t2)? {
+                fills.push((bi, f));
+            }
+        }
         for f in faces {
             let n = sub_names(b, &f);
             inputs.push(ThickenInput {
@@ -528,6 +536,23 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
+    for (bi, fill) in fills {
+        let Some(&ti) = grouped.get(&bi) else { continue };
+        let a = tools[ti].clone();
+        let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&a.shape), std::slice::from_ref(&fill), &k::BooleanOptions::default())?;
+        let empty = crate::naming::ShapeNames::default();
+        let names = ev.name_result(&[&a.names, &empty], &res.history, &res.shape, &BTreeMap::new(), None);
+        tools[ti] = NamedShape::new(res.shape, names);
+    }
+    // The slabs' and fills' faces on one plane are one face (live L17: 8).
+    for t in tools.iter_mut() {
+        let un = k::unify_same_domain(&t.shape)?;
+        if un.shape.count(ShapeType::Face) < t.shape.count(ShapeType::Face) {
+            let before = crate::regen::eval::names_for(&t.shape, t.names.faces.clone());
+            let names = ev.name_result(&[&before], &un.history, &un.shape, &BTreeMap::new(), None);
+            *t = NamedShape::new(un.shape, names);
+        }
+    }
     let op = ev.enum_("operationType").to_string();
     let scope = scope_ids(ev);
     if !ev.bool("keepTools") {
@@ -537,6 +562,58 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
     }
     let scope = ids_to_indices(ev, &scope);
     ev.apply_operation(tools, &op, scope, BodyKind::Solid)
+}
+
+/// The corners between the slabs of a body's picked faces `fis` (thickened
+/// t1 along their outward normals, t2 against): at a straight edge between two
+/// planar picked faces, where the slabs part (a convex edge thickened outward,
+/// a concave one inward), the prism between the edge, the slabs' outer edges
+/// and the line where their offset planes meet (Onshape's intersection join,
+/// live L17: top + front of a 40 × 20 × 10 block, 2 mm: a 40 × 2 × 2 square
+/// corner, 2560 mm³ in all).
+fn corner_fills(body: &Shape, fis: &[usize], t1: f64, t2: f64) -> FResult<Vec<Shape>> {
+    let faces = body.faces();
+    let ef = body.edge_faces()?;
+    let mut out = Vec::new();
+    for (ei, fs) in ef.iter().enumerate() {
+        let [a, b] = fs[..] else { continue };
+        let (a, b) = (a as usize, b as usize);
+        if a == b || !fis.contains(&a) || !fis.contains(&b) {
+            continue;
+        }
+        let (fa, fb) = (&faces[a], &faces[b]);
+        if !matches!(fa.face_surface(), Ok(k::Surface::Plane(_))) || !matches!(fb.face_surface(), Ok(k::Surface::Plane(_))) {
+            continue;
+        }
+        let edge = body.sub_shape(ShapeType::Edge, ei)?;
+        let info = edge.edge_info()?;
+        if !matches!(info.curve, k::Curve::Line { .. }) {
+            continue;
+        }
+        let (e0, e1) = (info.start, info.end);
+        let mid = (e0 + e1) * 0.5;
+        let (Some((_, n1)), Some((_, n2))) = (face_normal_near(fa, mid), face_normal_near(fb, mid)) else { continue };
+        let (n1, n2) = (n1.normalize(), n2.normalize());
+        let c = n1.dot(n2);
+        if c.abs() > 1.0 - 1e-9 {
+            continue;
+        }
+        let size = (e1 - e0).length().max(1e-9);
+        let convex = body.classify_point(mid - (n1 + n2).normalize() * size * 1e-4, 1e-9)? == k::PointClass::Inside;
+        for (d, t) in [(1.0, t1), (-1.0, t2)] {
+            // The slabs part on the outside of a convex edge, the inside of a concave one.
+            if t <= 1e-12 || (d > 0.0) != convex {
+                continue;
+            }
+            let (m1, m2) = (n1 * d, n2 * d);
+            let x = e0 + (m1 + m2) * (t / (1.0 + c));
+            let pts = [e0, e0 + m1 * t, x, e0 + m2 * t];
+            let wire = k::make_polyline(&pts, true)?;
+            let face = k::make_face_from_wire(&wire, true)?;
+            out.push(k::extrude(&face, e1 - e0)?.shape);
+        }
+    }
+    Ok(out)
 }
 
 /// Geometric naming for thicken: faces on the input are start caps, faces
@@ -710,7 +787,17 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
             let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body.shape), std::slice::from_ref(&shape), &k::BooleanOptions::default()).map_err(|_| fe("Failed to merge ribs into parts."))?;
             let empty = crate::naming::ShapeNames::default();
             let names = ev.name_result(&[&body.shape_names(), &empty], &res.history, &res.shape, &BTreeMap::new(), None);
-            ev.replace_body(bi, res.shape, names);
+            // Like Parasolid, the rib's faces on the part's surfaces are the
+            // part's (live "kern (10-23 23:00)" R1: 11 faces).
+            let un = k::unify_same_domain(&res.shape)?;
+            let (shape, names) = if un.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
+                let before = crate::regen::eval::names_for(&res.shape, names);
+                let names = ev.name_result(&[&before], &un.history, &un.shape, &BTreeMap::new(), None);
+                (un.shape, names)
+            } else {
+                (res.shape, names)
+            };
+            ev.replace_body(bi, shape, names);
         } else {
             let res = k::cut(&shape, &body.shape)?;
             let names = name_new(ev, &res.shape);
@@ -756,7 +843,22 @@ fn rib_parallel(base: &Shape, wire: &Shape, normal: DVec3, opposite: bool, t: f6
         dir = -dir;
     }
     let near = |s: &Shape, p: DVec3| k::make_vertex(p).and_then(|v| k::distance(s, &v)).is_ok_and(|d| d.distance < tol);
-    let (faces, part_edges) = (base.faces(), base.edges());
+    // (A seam isn't an edge between faces: live R1's profile ends on the boss
+    // cylinder's seam and is extended into it.)
+    let ef = base.edge_faces()?;
+    let part_edges: Vec<Shape> = base
+        .edges()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| {
+            let mut fs = ef.get(*i).cloned().unwrap_or_default();
+            fs.sort_unstable();
+            fs.dedup();
+            fs.len() > 1
+        })
+        .map(|(_, e)| e)
+        .collect();
+    let faces = base.faces();
     // rib.fs endNeedsExtension. An end on an edge of the part (live's rim
     // line, L24's L) isn't extended.
     let needs = |p: DVec3, d: DVec3| !part_edges.iter().any(|pe| near(pe, p)) && faces.iter().any(|f| near(f, p) && f.normal_at_point(p).is_ok_and(|n| d.dot(n) < -1e-9));
@@ -780,9 +882,12 @@ fn rib_parallel(base: &Shape, wire: &Shape, normal: DVec3, opposite: bool, t: f6
     let Some(slab) = slab else { return err(RIB_FAILED) };
     let pieces = k::cut(&slab, base)?.shape.solids();
     // rib.fs applyBoolean: the part must split the sweep. Live L22: with
-    // extended ends that fails on the profile.
+    // extended ends that fails on the profile, where the sweep runs into the
+    // part; a sweep that misses it is no intersection (live "kern (10-23
+    // 23:00)" R3: a rib toward a cylinder lying on the plate).
     if pieces.len() < 2 {
-        return err(if tips.is_empty() { RIB_MISS } else { RIB_FAILED });
+        let into = !tips.is_empty() && k::common(&slab, base).is_ok_and(|c| c.shape.volume().is_ok_and(|v| v > (t * t * t) * 1e-9));
+        return err(if into { RIB_FAILED } else { RIB_MISS });
     }
     let far = p0 + dir * len;
     let rib: Vec<Shape> = pieces.into_iter().filter(|s| k::distance(s, e).is_ok_and(|d| d.distance < tol) && !near(s, far) && !tips.iter().any(|q| near(s, *q))).collect();

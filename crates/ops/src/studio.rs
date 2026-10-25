@@ -409,6 +409,19 @@ pub fn boolean_edit_logic(f: &Feature, user_set: &dyn Fn(&str) -> bool, touched:
     changes
 }
 
+/// The new feature dialog's Boolean choices after a preview, as the open
+/// dialog makes them (std booleanStepEditLogic): when the tool itself can't
+/// be built (Extrude's Direction ticked with nothing picked) the operation
+/// and merge scope stay as they are; only a failing boolean (its merge
+/// scope at fault) is judged. Otherwise [`boolean_edit_logic`] on the parts
+/// the tool touched. The app's dialog and the agent API both call this.
+pub fn boolean_choices(f: &Feature, user_set: &dyn Fn(&str) -> bool, state: &noshape_model::display::FeatureState) -> AutoChanges {
+    if state.status == noshape_model::display::FeatureStatus::Error && !state.faulty.iter().any(|p| p == "booleanScope") {
+        return Vec::new();
+    }
+    boolean_edit_logic(f, user_set, &state.touched)
+}
+
 /// A new Hole's Merge scope is the parts its holes reach and follows a
 /// deeper or shallower hole until the user sets it (live L57); more parts
 /// behind the locations than in front flips it (holeScopeFlipHeuristics)
@@ -512,5 +525,46 @@ pub fn frame_of_ref(display: &noshape_model::display::StudioDisplay, ctx: Option
             Some(PlaneFrame { origin: pl.origin, x, y: normal.cross(x), normal })
         }),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use noshape_model::display::{FeatureState, FeatureStatus};
+    use noshape_model::params::ParamValue;
+
+    fn state(status: FeatureStatus, faulty: &[&str], touched: Vec<BodyId>) -> FeatureState {
+        FeatureState { id: FeatureId::new_random(), status, message: None, underdefined: false, time_ms: 0.0, faulty: faulty.iter().map(|s| s.to_string()).collect(), computed: Vec::new(), touched, error_mesh: None, touched_behind: Vec::new(), debug: Default::default() }
+    }
+
+    /// An Extrude already Adding into Part 1 (a first preview touched it).
+    fn adding() -> (Feature, BodyId) {
+        let part = BodyId { feature: FeatureId::new_random(), index: 0 };
+        let mut f = PartStudio::new().new_feature("extrude", &noshape_units::UnitPrefs::default()).unwrap();
+        f.params.set("operationType", ParamValue::Enum("ADD".into()));
+        f.params.set("booleanScope", ParamValue::Query(vec![Reference::Body(part.clone())]));
+        (f, part)
+    }
+
+    #[test]
+    fn a_tool_that_fails_keeps_the_operation() {
+        let (f, _) = adding();
+        // Direction ticked with nothing picked: the tool fails, touches nothing.
+        let st = state(FeatureStatus::Error, &["extrudeDirection"], Vec::new());
+        assert!(boolean_choices(&f, &|_| false, &st).is_empty());
+        // Without the rule the empty preview would turn it into New.
+        assert!(!boolean_edit_logic(&f, &|_| false, &[]).is_empty());
+    }
+
+    #[test]
+    fn a_failing_boolean_is_judged() {
+        let (f, part) = adding();
+        let st = state(FeatureStatus::Error, &["booleanScope"], Vec::new());
+        let c = boolean_choices(&f, &|_| false, &st);
+        assert!(c.iter().any(|(k, v)| *k == "operationType" && *v == ParamValue::Enum("NEW".into())), "{c:?}");
+        // A working tool over one part: Add into it, nothing to change.
+        let ok = state(FeatureStatus::Ok, &[], vec![part]);
+        assert!(boolean_choices(&f, &|_| false, &ok).is_empty());
     }
 }
