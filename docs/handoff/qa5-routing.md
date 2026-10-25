@@ -311,3 +311,15 @@ Parasolid modeller 3801231 in every version and SCH_3801231_38101 (EXP-HDR / I5 
 first NAUO as live; text STL as live's UI file ("solid Mesh", 2/4/6 indents, shortest numbers). Not reproducible: live's
 NAUO order on export is a fixed internal order that follows no recoverable key (not insertion, ids, hashes or part ids; "api
 (10-25 b)"), so ours keeps the insertion order.
+
+## MOVEFACE-TANGENT — psb — Move face of a face tangent to fillets moves the whole part
+- api agent-usability pass, 2026-10-25: import samples/g47-1part.step (40 × 20 × 10 block with filleted edges); Move face
+  (Offset 5 mm, or Translate 5 mm along the face) of the +X end face (`query_entities {"kind":"faces","normal":[1,0,0]}`):
+  the part grows 5 mm on every side but the bottom (bbox −5…45 × −5…25 × 0…15, 18739.63 mm³ from 7582.71), status Ok. On a
+  plain 40 × 20 × 10 box the same call gives x 0…45, 9000 mm³ (right). Expected (Onshape): only the end face moves, the
+  fillets touching it are re-rolled ("Reapply fillet", default on). Same area as FSW-move.
+
+## BBOX-TOL — kern — query bounding boxes of imported parts grow by the shape tolerance
+- api, 2026-10-25: the imported g47-1part block reports bbox 0…40.0001 × 0…20.0001 × 0…10.0001 (`Shape::bounding_box(true)`
+  adds the 1e-7 m vertex/edge tolerance); native parts are exact. Onshape reports the exact box. Used by query_parts
+  and anything showing a part's size.

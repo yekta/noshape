@@ -3210,3 +3210,72 @@ fn step_assembly_import_order_matches_live() {
         assert!(b.iter().all(|i| i["source"]["part"] == b[0]["source"]["part"]), "{file}: {asm}");
     }
 }
+
+/// The agent-usability pass (AGENT_API.md "Lessons from agent runs"): an L
+/// bracket built the way an agent does, using the helps that came out of it:
+/// `at` and `direction` picks, model points on a turned face sketch, sketch
+/// edits reporting failures, undo naming the edit, tidy numbers, feature type
+/// search and projected view orientations.
+#[test]
+fn agent_usability_pass() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("agent_pass.noshape").to_str().unwrap() }));
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:right" }));
+    let s = call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "line", "points": [[0, 0], [50, 0], [50, 40], [44, 40], [44, 6], [0, 6], [0, 0]] }));
+    let region = s["regions"][0]["id"].clone();
+    assert_eq!(s["failed"], json!([]), "{s}");
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "80 mm" } }));
+
+    // Three different edges in one call, in the points' order.
+    let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "at": [[0, 0, 3], [80, 0, 3], [40, 44, 6]] }));
+    let mids: Vec<Value> = e["edges"].as_array().unwrap().iter().map(|x| x["midpoint"].clone()).collect();
+    assert_eq!(mids, [json!([0.0, 0.0, 3.0]), json!([80.0, 0.0, 3.0]), json!([40.0, 44.0, 6.0])], "{e}");
+    // A point on a face picks it; one on the edge two faces share, the face whose centroid is closer.
+    let f = call(&mut ctx, "query_entities", json!({ "kind": "faces", "at": [[40, 25, 6], [40, 0, 6]] }));
+    assert_eq!(f["faces"][0]["normal"], json!([0.0, 0.0, 1.0]), "{f}");
+    assert_eq!(f["faces"][1]["normal"], json!([0.0, -1.0, 0.0]), "{f}");
+    // Vertical edges only.
+    let v = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [0, 0, 1] }));
+    let list = v["edges"].as_array().unwrap();
+    assert_eq!(list.len(), 6, "{v}");
+    assert!(list.iter().all(|x| num(&x["direction"][2]).abs() == 1.0), "{v}");
+    // No floating-point noise in replies.
+    assert!(!v.to_string().contains("-0.0"), "{v}");
+
+    // Hole points given as model positions on the base's top face, whatever its sketch axes.
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "at": [[40, 22, 6]] }))["faces"][0]["id"].clone();
+    call(&mut ctx, "sketch_create", json!({ "plane": top }));
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 2", "tool": "point", "points": [[10, 10, 6], [70, 10, 6], [10, 34, 6], [70, 34, 6]] }));
+    let pts: Vec<Value> = p["created"].as_array().unwrap().iter().map(|x| x["id"].clone()).collect();
+    assert_eq!(pts.len(), 4, "{p}");
+    let fr = &p["frame"];
+    let world = |at: &Value| (0..3).map(|i| num(&fr["origin"][i]) + num(&at[0]) * num(&fr["x"][i]) + num(&at[1]) * num(&fr["y"][i])).collect::<Vec<f64>>();
+    let first = world(&p["created"][0]["at"]);
+    assert!((first[0] - 10.0).abs() < 1e-9 && (first[1] - 10.0).abs() < 1e-9 && (first[2] - 6.0).abs() < 1e-9, "{p}");
+    let hole = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": pts, "holeDiameterV3": "6.6 mm", "endStyleV2": "THROUGH" } }));
+    assert_eq!(hole["regeneration"]["failed"], json!([]), "{hole}");
+    let vol = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((vol - (40320.0 - 4.0 * std::f64::consts::PI * 3.3 * 3.3 * 6.0)).abs() < 1e-3, "{vol}");
+
+    // Undo names the edit it undid; redo puts it back.
+    let u = call(&mut ctx, "history_undo", json!({}));
+    assert!(u["description"].as_str().unwrap().ends_with("Hole 1"), "{u}");
+    let r = call(&mut ctx, "history_redo", json!({}));
+    assert!(r["description"].as_str().unwrap().ends_with("Hole 1"), "{r}");
+
+    // Sketch edits report the features that fail after them (none here: the hole follows its face).
+    let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": "Sketch 1", "kind": "distance", "entities": [s["created"][2]["id"], s["created"][10]["id"]], "value": "6 mm" }));
+    let dim = d["dimension"].clone();
+    let ok = call(&mut ctx, "sketch_set_dimension", json!({ "sketch": "Sketch 1", "dimension": dim, "value": "8 mm" }));
+    assert_eq!(ok["failed"], json!([]), "{ok}");
+
+    // Finding a feature type by words.
+    let t = call(&mut ctx, "feature_types", json!({ "search": "move face" }));
+    assert_eq!(t["feature_types"].as_array().unwrap().iter().map(|x| x["type"].as_str().unwrap()).collect::<Vec<_>>(), ["moveFace"], "{t}");
+
+    // Projected views name what they look along.
+    call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": "Part Studio 1 Drawing 1" }));
+    let projected: Vec<&Value> = g["views"].as_array().unwrap().iter().filter(|v| v["kind"] == "projected").collect();
+    assert!(!projected.is_empty() && projected.iter().all(|v| v["orientation"].is_string()), "{g}");
+}
