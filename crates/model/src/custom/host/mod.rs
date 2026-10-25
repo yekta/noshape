@@ -18,6 +18,7 @@ mod evaluate;
 pub mod hole;
 mod sheetmetal;
 mod sm_flat;
+mod legacy;
 mod loft;
 #[cfg(test)]
 mod native_args;
@@ -581,6 +582,7 @@ pub fn register() {
         all.extend_from_slice(builtin::NATIVES);
         all.extend_from_slice(super::reference::NATIVES);
         noshape_featurescript::interp::register_natives(&all);
+        legacy::register();
 
     });
 }

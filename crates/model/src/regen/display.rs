@@ -327,7 +327,31 @@ fn split_levels(mut levels: Vec<Arc<MeshBuffers>>) -> (Arc<MeshBuffers>, Vec<Arc
 }
 
 /// Build the display; returns whether any body only has a preview mesh.
-pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &mut HashMap<u64, (u64, bool, Arc<MeshBuffers>)>) -> (StudioDisplay, bool) {
+/// Faces all planes and edges all lines (not a mesh body): its preview mesh
+/// would be its final mesh.
+fn planar_only(shape: &noshape_kernel::Shape) -> bool {
+    use noshape_kernel::{Curve, Surface};
+    !shape.is_mesh() && shape.faces().iter().all(|f| matches!(f.face_surface(), Ok(Surface::Plane(_)))) && shape.edges().iter().all(|e| matches!(e.edge_curve(), Ok(Curve::Line { .. })))
+}
+
+/// Meshes of bodies a run no longer shows kept for undo ([`build`]).
+const KEEP_GONE_MESHES: usize = 32;
+
+/// `owners`: each cached mesh's body shape and the run that last showed it
+/// (the mesh keys are shape addresses: holding the shape keeps another one
+/// from getting a kept mesh's key).
+pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &mut HashMap<u64, (u64, bool, Arc<MeshBuffers>)>, owners: &mut HashMap<u64, (u64, noshape_kernel::Shape)>, run: u64) -> (StudioDisplay, bool) {
+    // Preview meshes are coarser only along curves: when every body is
+    // planar with straight edges they would be the final ones, so the
+    // preview pass meshes at the final quality and no refine pass follows
+    // (fins x400: 1.2 s of meshing saved when opening).
+    let final_opts;
+    let opts = if opts.preview_meshes && !ctx.bodies.is_empty() && ctx.bodies.iter().all(|b| planar_only(&b.shape)) {
+        final_opts = RegenOptions { preview_meshes: false, ..opts.clone() };
+        &final_opts
+    } else {
+        opts
+    };
     let mut needs_refine = false;
     let t_all = std::time::Instant::now();
     let mut d = StudioDisplay::defaults();
@@ -349,6 +373,9 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         let keys: Vec<u64> = qualities.iter().map(|&q| world_key(&b.shape, q)).collect();
         let nfaces = b.faces.len() as u64;
         used.extend(keys.iter().copied());
+        for &k in &keys {
+            owners.insert(k, (run, b.shape.clone()));
+        }
         let valid = |m: &HashMap<u64, (u64, bool, Arc<MeshBuffers>)>, key: u64| m.get(&key).is_some_and(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes));
         // An open composite's members are drawn themselves.
         let open_composite = b.composite.as_ref().is_some_and(|c| !c.closed);
@@ -359,6 +386,9 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         let partner_levels = (partner != 0 && !open_composite && partners.get(&partner).is_some_and(|&n| n > 1)).then(|| {
             let lkeys: Vec<u64> = qualities.iter().map(|&q| local_key(partner, q)).collect();
             used.extend(lkeys.iter().copied());
+            for &k in &lkeys {
+                owners.insert(k, (run, b.shape.clone()));
+            }
             // Made just now (in parallel): the copies' world meshes follow.
             let mut fresh: Vec<bool> = lkeys.iter().map(|k| meshed_here.contains(k)).collect();
             let have: Vec<bool> = lkeys.iter().map(|&k| valid(meshes, k)).collect();
@@ -438,7 +468,14 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             face_colors,
         });
     }
-    meshes.retain(|k, _| used.contains(k));
+    // Meshes of bodies this run doesn't show (a deleted feature's result)
+    // stay a few runs, so undoing the delete shows them without meshing.
+    let mut gone: Vec<(u64, u64)> = owners.iter().filter(|(k, (r, _))| !used.contains(*k) && run - r <= super::KEEP_RUNS).map(|(k, (r, _))| (*r, *k)).collect();
+    gone.sort_unstable_by_key(|g| std::cmp::Reverse(g.0));
+    gone.truncate(KEEP_GONE_MESHES);
+    let keep = |k: &u64| used.contains(k) || gone.iter().any(|(_, g)| g == k);
+    meshes.retain(|k, _| keep(k));
+    owners.retain(|k, _| keep(k));
     if perf_enabled() {
         log::info!(target: "perf", "display: bodies {:.1} ms", t_all.elapsed().as_secs_f64() * 1000.0);
     } else {
