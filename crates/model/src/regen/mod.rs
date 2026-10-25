@@ -65,6 +65,16 @@ pub struct RegenCancel(Arc<CancelFlags>);
 struct CancelFlags {
     superseded: std::sync::atomic::AtomicBool,
     aborted: std::sync::atomic::AtomicBool,
+    hook: std::sync::OnceLock<EvaluateHook>,
+}
+
+/// [`RegenCancel::on_evaluate`]'s callback.
+struct EvaluateHook(Arc<dyn Fn(FeatureId) + Send + Sync>);
+
+impl std::fmt::Debug for EvaluateHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("EvaluateHook")
+    }
 }
 
 impl RegenCancel {
@@ -83,6 +93,19 @@ impl RegenCancel {
 
     pub fn superseded(&self) -> bool {
         self.0.superseded.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Test hook: `f` runs on the regenerating thread before each feature
+    /// this run evaluates (not the cached ones), e.g. to hold the run at a
+    /// barrier while a newer request retires it. Set once.
+    pub fn on_evaluate(&self, f: impl Fn(FeatureId) + Send + Sync + 'static) {
+        let _ = self.0.hook.set(EvaluateHook(Arc::new(f)));
+    }
+
+    fn evaluating(&self, id: FeatureId) {
+        if let Some(h) = self.0.hook.get() {
+            (h.0)(id);
+        }
     }
 
     /// Another handle than this one exists: a regeneration (or the task
@@ -250,6 +273,9 @@ impl Regenerator {
                     }
                     Some(eval_fn) => {
                         self.evaluations += 1;
+                        if let Some(c) = &opts.cancel {
+                            c.evaluating(f.id);
+                        }
                         // Query variables (`#name` selections) expand against the upstream context.
                         let expanded = eval::expand_query_variables(params, &ctx);
                         let params = expanded.as_ref().unwrap_or(params);

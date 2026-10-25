@@ -243,42 +243,76 @@ fn timed_deleting_the_running_second_pattern_in_the_app_shows_the_first_at_once(
     }
 }
 
-/// The behaviour behind the timed tests, deterministic (no clock, no race):
-/// the app's run bookkeeping (model regen::runs) aborts the LP2 preview and
-/// the ✓ run when LP2 is deleted or suppressed, also after ✓ superseded the
-/// preview; an aborted run returns `cancelled` and caches nothing of LP2, and
-/// its kernel booleans stop; the next run takes LP1 and everything before it
-/// from the cache (no feature evaluated).
+/// The behaviour behind the timed tests, deterministic (no clock, no sleep):
+/// LP2's preview is held at a barrier just before it evaluates LP2 (holding
+/// the Regenerator, as in the app), ✓ and then the delete (or suppress) are
+/// requested through the app's run bookkeeping (model regen::runs), and the
+/// preview is released: it and the ✓ run return `cancelled`, nothing of LP2
+/// is cached, and the run without LP2 takes LP1 and everything before it
+/// from the cache (no feature evaluated). An aborted run's kernel booleans
+/// stop too.
 #[test]
 fn deleting_the_running_second_pattern_aborts_it_and_reuses_the_first() {
     use noshape_model::regen::runs::{Run, Runs};
-    use std::sync::Arc;
+    use std::sync::{Arc, Barrier, Mutex};
     let (s, lp1, lp2) = model(20, true);
     let index = s.ps.index_of(lp2).unwrap();
     let mut without = s.ps.clone();
     without.remove(lp2);
     let mut suppressed = s.ps.clone();
     suppressed.feature_mut(lp2).unwrap().suppressed = true;
-    let run = |ps: &PartStudio, upto: Option<usize>| {
-        let cancel = RegenCancel::default();
-        (Run { cancel: cancel.clone(), studio: Arc::new(ps.clone()), upto, config: ConfigValues::default(), doc_vars: Default::default(), editing_sketch: None }, cancel)
-    };
-    for edited in [&without, &suppressed] {
+    let volume = |r: &RegenResult| r.context.bodies.iter().filter_map(|b| b.shape.volume().ok()).sum::<f64>();
+    for edited in [without.clone(), suppressed] {
+        let regen = Arc::new(Mutex::new(Regenerator::new()));
+        let units = s.units;
+        // Starts a run on its own thread, the way schedule_regen does.
+        let spawn = |runs: &mut Runs, ps: &PartStudio, upto: Option<usize>, cancel: RegenCancel| {
+            let studio = Arc::new(ps.clone());
+            runs.start(Run { cancel: cancel.clone(), studio: studio.clone(), upto, config: ConfigValues::default(), doc_vars: Default::default(), editing_sketch: None });
+            let regen = regen.clone();
+            std::thread::spawn(move || regen.lock().unwrap().regenerate(&studio, &ConfigValues::default(), &units, &RegenOptions { upto, preview_meshes: true, cancel: Some(cancel), ..Default::default() }))
+        };
+        let shown = regen.lock().unwrap().regenerate(&without, &ConfigValues::default(), &units, &RegenOptions { preview_meshes: true, ..Default::default() });
         let mut runs = Runs::default();
-        // Each `held` clone stands for the regeneration still running it.
-        let (preview, held_preview) = run(&s.ps, Some(index + 1));
-        runs.start(preview);
-        let (accepted, held_accepted) = run(&s.ps, None);
-        runs.start(accepted);
-        // ✓ only extends the preview: it finishes its features into the cache.
-        assert!(held_preview.superseded() && !held_preview.aborted());
-        assert_eq!(runs.running(), 2);
-        let (edit, held_edit) = run(edited, None);
-        runs.start(edit);
+        // LP2's preview, held just before LP2.
+        let (reached, release) = (Arc::new(Barrier::new(2)), Arc::new(Barrier::new(2)));
+        let preview_cancel = RegenCancel::default();
+        let (r1, r2) = (reached.clone(), release.clone());
+        preview_cancel.on_evaluate(move |id| {
+            if id == lp2 {
+                r1.wait();
+                r2.wait();
+            }
+        });
+        let preview = spawn(&mut runs, &s.ps, Some(index + 1), preview_cancel.clone());
+        reached.wait();
+        // ✓ only extends the preview: it would finish LP2 into the cache.
+        let accepted_cancel = RegenCancel::default();
+        let accepted = spawn(&mut runs, &s.ps, None, accepted_cancel.clone());
+        assert!(preview_cancel.superseded() && !preview_cancel.aborted());
         // The edit changes LP2: both stop, also the superseded preview.
-        assert!(held_preview.aborted() && held_accepted.aborted() && !held_edit.superseded());
-        drop((held_preview, held_accepted));
+        let edit_cancel = RegenCancel::default();
+        runs.start(Run { cancel: edit_cancel.clone(), studio: Arc::new(edited.clone()), upto: None, config: ConfigValues::default(), doc_vars: Default::default(), editing_sketch: None });
+        assert!(preview_cancel.aborted() && accepted_cancel.aborted() && !edit_cancel.superseded());
+        release.wait();
+        let (preview, accepted) = (preview.join().unwrap(), accepted.join().unwrap());
+        assert!(preview.cancelled, "the held preview finished");
+        assert!(accepted.cancelled, "the ✓ run finished");
+        // Only the edit's run is left.
         assert_eq!(runs.running(), 1);
+        // The edited model: LP1 and everything before it from the cache.
+        let mut g = regen.lock().unwrap();
+        let before = g.evaluations();
+        let r = g.regenerate(&edited, &ConfigValues::default(), &units, &RegenOptions { preview_meshes: true, cancel: Some(edit_cancel), ..Default::default() });
+        assert!(!r.cancelled);
+        assert_eq!(g.evaluations(), before, "the model without LP2 recomputed features");
+        assert!(r.display.features.iter().any(|f| f.id == lp1 && f.status == FeatureStatus::Ok));
+        assert!((volume(&r) - volume(&shown)).abs() < 1e-12);
+        // Nothing of the aborted LP2 was cached: undo evaluates it again.
+        let before = g.evaluations();
+        let undo = g.regenerate(&s.ps, &ConfigValues::default(), &units, &RegenOptions::default());
+        assert!(!undo.cancelled && undo.display.features.iter().any(|f| f.id == lp2 && f.status == FeatureStatus::Ok));
+        assert_eq!(g.evaluations(), before + 1, "only LP2 is evaluated");
     }
     // An aborted run's kernel booleans stop (the flag reaches OCCT).
     let cancel = RegenCancel::default();
@@ -287,34 +321,4 @@ fn deleting_the_running_second_pattern_aborts_it_and_reuses_the_first() {
     let b = noshape_kernel::make_box_corners(glam::DVec3::splat(0.005), glam::DVec3::splat(0.015)).unwrap();
     let fused = cancel.scope(|| noshape_kernel::boolean(noshape_kernel::BooleanOp::Fuse, &[a], &[b], &Default::default()));
     assert!(fused.is_err(), "a boolean ran to the end under an aborted run");
-    // One Regenerator, as the app's: the model without LP2 shown, then LP2's
-    // run aborted (by the delete) returns cancelled and evaluates nothing.
-    let mut g = Regenerator::new();
-    let regen = |g: &mut Regenerator, ps: &PartStudio, cancel: Option<RegenCancel>| g.regenerate(ps, &ConfigValues::default(), &s.units, &RegenOptions { preview_meshes: true, cancel, ..Default::default() });
-    let shown = regen(&mut g, &without, None);
-    assert!(!shown.cancelled);
-    let volume = |r: &RegenResult| r.context.bodies.iter().filter_map(|b| b.shape.volume().ok()).sum::<f64>();
-    let aborted = RegenCancel::default();
-    aborted.abort();
-    let before = g.evaluations();
-    assert!(regen(&mut g, &s.ps, Some(aborted)).cancelled);
-    assert_eq!(g.evaluations(), before, "an aborted run evaluated features");
-    // ✓ after the preview (superseded): LP2 is evaluated into the cache, no
-    // display.
-    let superseded = RegenCancel::default();
-    superseded.supersede();
-    assert!(regen(&mut g, &s.ps, Some(superseded)).cancelled);
-    assert_eq!(g.evaluations(), before + 1, "only LP2 is evaluated");
-    // Delete LP2: LP1 and everything before it come from the cache.
-    let before = g.evaluations();
-    let deleted = regen(&mut g, &without, None);
-    assert!(!deleted.cancelled);
-    assert_eq!(g.evaluations(), before, "the model without LP2 recomputed features");
-    assert!(deleted.display.features.iter().any(|f| f.id == lp1 && f.status == FeatureStatus::Ok));
-    assert!((volume(&deleted) - volume(&shown)).abs() < 1e-12);
-    // Suppress LP2 instead: also nothing to evaluate.
-    let r = regen(&mut g, &suppressed, None);
-    assert_eq!(g.evaluations(), before, "suppressing LP2 recomputed features");
-    assert!(r.display.features.iter().any(|f| f.id == lp2 && f.status == FeatureStatus::Suppressed));
-    assert!((volume(&r) - volume(&shown)).abs() < 1e-12);
 }
