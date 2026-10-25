@@ -538,7 +538,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         // While sketching it stays over the edge-on planes crossing it (live
         // sketch/06 shows the whole ring and dot).
         let style = 4 | if opts.editing_sketch.is_some() { LineSegment::ON_TOP } else { 0 };
-        let pts = PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)), pick_id: id, size: 12.0, style, _pad: 0 }] };
+        let pts = PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)), pick_id: id, size: 11.0, style, _pad: 0 }] };
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().ignore_clip().layer(6));
     }
 
