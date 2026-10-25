@@ -3886,10 +3886,10 @@ fn din_985_nuts_build_every_live_size() {
     for want in ["M2x0.4", "M2.5x0.45", "M3x0.5", "M8x1.25", "M8x1", "M48X3"] {
         assert!(names.contains(&want), "{want} in {names:?}");
     }
-    // Live's B-rep (behaviours "skb (10-25) DIN 985"): 27 faces and their
-    // total area; the volumes of the small sizes (M48's mass properties
-    // differ by 1e-4 though every face area agrees).
-    for (size, area, volume) in [("M2x0.4", 71.7929, Some(27.4414)), ("M8x1.25", 713.9754, Some(819.7291)), ("M8x1", 716.1122, Some(801.2191)), ("M48X3", 24805.5791, None)] {
+    // Live's B-rep (behaviours "skb (10-25) DIN 985"): 27 faces, their total
+    // area and the volume (M48: the kernel's own integration once skipped
+    // the internal edge the tangent collar leaves in each flat, -16 mm³).
+    for (size, area, volume) in [("M2x0.4", 71.7929, Some(27.4414)), ("M8x1.25", 713.9754, Some(819.7291)), ("M8x1", 716.1122, Some(801.2191)), ("M48X3", 24805.5791, Some(149094.5953))] {
         let mut spec = StandardSpec::new(c);
         spec.set_size(size);
         let r = standard::regenerate(&spec).unwrap();
@@ -3899,7 +3899,7 @@ fn din_985_nuts_build_every_live_size() {
         assert!((total - area).abs() < area * 1e-6 + 1e-3, "{size}: {total} mm², live {area}");
         if let Some(volume) = volume {
             let v = b.shape.volume().unwrap() * 1e9;
-            assert!((v - volume).abs() < f64::max(1e-3, volume * 1e-6), "{size}: {v} mm³, live {volume}");
+            assert!((v - volume).abs() < f64::max(1e-3, volume * 1e-7), "{size}: {v} mm³, live {volume}");
         }
     }
     let mut failures = Vec::new();
@@ -4092,5 +4092,6 @@ fn iso_7380_button_head_matches_live() {
     let v = b.shape.volume().unwrap() * 1e9;
     assert!((v - 739.6215).abs() < 1e-3, "{v} mm³");
 }
+
 
 
