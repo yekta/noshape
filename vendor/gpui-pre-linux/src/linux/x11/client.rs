@@ -2624,6 +2624,12 @@ fn make_scroll_wheel_event(
         delta: ScrollDelta::Lines(delta),
         modifiers,
         touch_phase: TouchPhase::default(),
+        // NOSHAPE PATCH (agent nav2): Chromium's ticks are the valuator's
+        // increments (120 per wheel button press), unswapped by Shift.
+        wheel_ticks: Some(Point {
+            x: scroll_delta.x / SCROLL_LINES,
+            y: scroll_delta.y / SCROLL_LINES,
+        }),
     }
 }
 

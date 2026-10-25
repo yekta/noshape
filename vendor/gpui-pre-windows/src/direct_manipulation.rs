@@ -175,6 +175,7 @@ impl DirectManipulationEventHandler {
                         delta: ScrollDelta::Pixels(point(px(0.0), px(0.0))),
                         modifiers,
                         touch_phase: TouchPhase::Ended,
+                        wheel_ticks: Some(point(0.0, 0.0)),
                     }));
             }
             GestureKind::Pinch => {
@@ -273,8 +274,11 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
 
         let scale = xform[0];
         let scale_factor = self.scale_factor.get();
-        let x_offset = xform[4] / scale_factor;
-        let y_offset = xform[5] / scale_factor;
+        // NOSHAPE PATCH (agent nav2): whole pixels, as Chromium's
+        // DirectManipulationEventHandler (`int x_offset = xform[4] / dsf`),
+        // so updates and their deltas match the browser's one for one.
+        let x_offset = (xform[4] / scale_factor).trunc();
+        let y_offset = (xform[5] / scale_factor).trunc();
 
         if scale == 0.0 {
             return Ok(());
@@ -284,10 +288,7 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
         let last_x = self.last_x_offset.get();
         let last_y = self.last_y_offset.get();
 
-        if float_equals(scale, last_scale)
-            && float_equals(x_offset, last_x)
-            && float_equals(y_offset, last_y)
-        {
+        if float_equals(scale, last_scale) && x_offset == last_x && y_offset == last_y {
             return Ok(());
         }
 
@@ -329,6 +330,9 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
                         delta: ScrollDelta::Pixels(point(px(dx), px(dy))),
                         modifiers,
                         touch_phase,
+                        // Chromium sends these pixels as a scroll event of
+                        // `pixels / 120` wheel ticks.
+                        wheel_ticks: Some(point(dx / 120.0, dy / 120.0)),
                     }));
             }
             GestureKind::Pinch => {

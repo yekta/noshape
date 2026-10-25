@@ -126,6 +126,7 @@ mod doc_panels;
 mod cursor;
 mod mouse_prefs;
 mod drawing_prefs;
+mod nav_trace;
 mod navigation;
 mod os_menu;
 mod overlay_labels;

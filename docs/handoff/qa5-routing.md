@@ -327,3 +327,117 @@ STATUS RHINO1 (2026-10-24 ~00:20, qa5): Rhino export round-trips (65431.327331 m
 
 - STATUS 2026-10-25 06:25 (qa5): ADV9 still fails on main 10195656 (bracket step 8, target-engine CLI 06:17). FSW-L45b unchanged on
   the same CLI (d 25 × 3 errors, d 10 × 3 at 120° / 240°). psb's ADV9 fix 853cf16b is in ready/psb, queue status CONFLICT since 21:44.
+## IMP-DENS — api — "Import material density" offered for STEP files (main, since 5d5e0403)
+- Source: qa4 QA round 4 session 5 in the app (2026-10-24). `crates/app/src/import_dialog.rs` `density` includes "step"/"stp".
+- Expected (live): behaviours "qa4 round 4 s5": "For STEP there is **no 'Import material density'** checkbox (an .x_t import
+  shows it)" (part-studio/2394); "api (10-23) import parity" only showed it for .x_t (2336). v0.4.7 matched live (4 checkboxes).
+- Actual (main): a STEP import shows ☐ Import material density between Import appearances and Orient … Y Axis Up.
+STATUS STEP-ASM minor (qa4, 2026-10-24): the STL binary header is fixed by qa4 (80 zero bytes, `kernel/src/io.rs`, test
+`binary_stl_header_is_zeros`); "import stays on the open tab" was fixed by api on main (5d5e0403).
+
+## qa4 QA round 5 (2026-10-24; docs/handoff/qa-round-5.md, live "qa4 round 5 s1…s5"; v0.4.7 and v0.4.8 alike unless noted)
+- **DRW-CFG** (asb) Create Drawing ignores the Part Studio's active configuration (Size M active → views 60 long = S); live:
+  "The drawing takes the Part Studio's current configuration". And the view menu has **Configuration ▸ Size ▸** where live has
+  **"Change configuration..."** (between Align views and Switch to Part Studio 1) opening a panel (document/branch, tree with
+  Size [M ▾], part thumbnail, ✓ ✕) that changes every view of that part; View properties shows it read-only.
+- **DRW-DANGLE-DOT** (asb) a dangling dimension keeps its black arrowhead; live draws a **filled orange-red dot** at the
+  attachment point (drawing/qa4-r5-s1-c-dim-2x). The colour itself is fixed by qa4 (#DD5228). Fills carry no pick id, so the
+  arrow → dot swap belongs in the sheet builder.
+- **DRW-DIMMENU** (asb) diameter-dimension right-click: ours Foreshorten · Show as radius · Edit… · Detach from geometry · Paste
+  as table | Clear selection · Zoom to fit · Delete (drawing_tools.rs ~1689, drawing_more.rs Foreshorten); live "Edit... | Paste
+  | Paste as table | Unbreak dimension | Add comment | Clear selection | Zoom to fit | Delete" for healthy and dangling alike.
+- **DRW-CMARK** (asb) Create Drawing › Suggested views: no automatic centre mark on the hole in the Top view (ANSI_A_MM); live has
+  one (ISO_A3 in r5 s1; ANSI too, behaviours ~1537). A CLI-inserted view gets one.
+- **DRW-DUAL** (asb, v0.4.8 gate (f)) the linear dimension line runs unbroken through the dual text; live breaks it around the
+  text block (asbdd-20).
+- **PS-NOTCOMPUTED** (psb) the menu of a row that is still regenerating is the full menu; live reduced "Rename | Add selection to
+  folder… | Suppress | Dynamic suppression ▸ | Add comment | Delete"; with a feature dialog open the rolled-back rows have no Delete
+  ("Rename | Suppress | Dynamic suppression ▸ | Add comment"). (Delete-during-regen speed = v0.4.8 gate (a).)
+- **I18N-DIALOGS** (ui2) German: toolbar tooltip titles ("Extrude (shift+e)", ui.rs:604 formats before the lookup); Extrude
+  (Thin, Intersect, Faces und sketch regions…, Direction, Starting offset, Entwurf → Formschräge, Second end position); Fillet
+  (Verrunden 1 → Verrundung 1, Full round, Entities auf fillet, Tangent propagation, Measurement, Control → Strg, Asymmetric,
+  Partial fillet, Variable fillet, Allow edge overflow, Smooth fillet corners); Mass properties (Parts auf measure, Mate
+  connector for reference frame, „calculation variance“ anzeigen); part menu "Drawing of Part 1… erstellen" (live „Zeichnung
+  erstellen von „Part 1" …"); Create Drawing title "Drawing: erstellen" (live "Zeichnung erstellen:"), "Owned by me" (Gehört
+  mir); Preferences units sentence, heading "Voreinstellungen" (live "Preferences"), "Dezimalstellen" (live "Dezimalstellen
+  anzeigen"). Live's strings: behaviours "qa4 round 5 s5" and ~11470.
+- **DARK-DRW** (ui2) dark mode, drawing tab: our toolbar row is dark with a white block at its right end; live's capture
+  drawing/qa4-r5-s5-12 shows the drawing toolbar light (white, dark icons; live's text says dark: ask live if unsure). Dark
+  Create Drawing: the selected "No views" tile's label is unreadable.
+- **CTX-USE** (skb) in a Part Studio's assembly context, **Use (u) on the context face the sketch lies on projects nothing** (no
+  hover) and Use on its in-plane edges says "That geometry can't be used in this sketch"; an out-of-plane context edge projects.
+  Live: Use on that face projects its 4 outer edges. On an ordinary face (CLI sketch_use) the same works.
+
+## CI-TIMING (lead, WORKFLOW 17; qa4 2026-10-24) — wall-clock assertions in ci.yml tests (`cargo test --workspace --exclude noshape`)
+These assert on elapsed time, so they can go red on a loaded runner; per WORKFLOW 17 the timing part belongs in perf.yml, the
+functional part (volumes, cancelled = true, error message) can stay:
+- `crates/model/tests/pattern_second.rs:127` `c < 3.0 * a + 300.0` (LP2 vs LP1 ms; comment: "CI release ×400: 1.9-2.7× (runner
+  noise)", already loosened once in c5cf7366) — kern/perf.
+- `crates/model/tests/pattern_second.rs:163` abort latency `< 200 ms` release / `600 ms` debug — kern/perf (the gate (a) property;
+  keep `out.cancelled` as the deterministic check).
+- `crates/model/tests/qa_regressions.rs:114` `t0.elapsed().as_secs() < 30` (1 000 000-instance pattern rejected) — psb; the
+  error-message assert above it is the deterministic part.
+- `crates/store/src/tests.rs:963` 1 MB commit median `< 250 ms` — owner of store (2b3f0530 area).
+Not timing (no action): custom_features.rs:660 only checks the Timer line's format.
+
+## qa4 QA round 5 v2 (P0/P1; live "qa4 round 5 v2 s1 follow-up" and "qa4 round 5 v2 s1 / s2"; v0.4.8 c7d9d454; r5/v2fu.py)
+- **FUSE-UNIFY (kern, P1 topology)** Extrude (New) of several touching regions of one sketch keeps the region boundaries as
+  separate coplanar faces: live's case (L + Ø10 circle + outer loop offset 3 mm in, 3 regions, Extrude 15 all regions) gives
+  **12 faces** on ours vs live **8 faces** (one 2500 mm² top face, no inner-loop edges), same volume 37500. Cause:
+  `regen/eval.rs` `fuse_named` (~770) fuses the NEW tools with a plain boolean and never runs `unify_same_domain` (extrude.rs's
+  two-sided path does). Downstream faces/edges (fillet picks, face counts, drawings) differ from Onshape.
+- **HOLE-MSG (psb)** a Simple Ø6 through hole tangent to an outer face fails on ours with "Hole cut failed: Boolean operation
+  would result in non-manifold body."; live: "Hole 1 did not regenerate properly: Hole creates invalid geometry."
+- **PAT-REAPPLY-FAIL (psb)** Feature pattern (Reapply ON) of that failing hole, 4 mm × 4 along the x=0 top edge: ours **ERROR
+  "Could not pattern selected features."**; live **OK, no message**, the instances that fail individually are silently skipped and
+  the one that succeeds cuts (37453.53776879832 mm³, 10 faces: a notch at (3,−2)). (On another part ours did report OK and cut;
+  the rule should be live's: skip failing instances, report OK.)
+- **ROLLBACK-AUTOSCROLL (psb)** dragging the rollback bar and holding it near the feature list's edge: live autoscrolls the list;
+  ours doesn't (the bar can't reach rows below the visible ones in one drag).
+- **REGEN-SPEED (perf/kern, P0 info)** per-feature regen vs live (Onshape's server times from its ⏱ panel, similar features):
+  s2 bosses (Extrude Add Ø8–Ø12 on a plate) ours 17–71 ms each vs live ≤ 9 ms; s1 hole 129 vs 19–21 ms, linear pattern of it
+  152 vs 47–96 ms, 30-feature totals ours 462 ms (14 plain bosses) vs live 171 ms (30 mixed features incl. fillets/chamfers).
+  Editing feature 2 and ✓: dialog closes ~0.1–0.2 s in both.
+
+## qa4 QA round 5 v3 s1 in the app (P1; live "qa4 round 5 s1 offset"; v0.4.8 c7d9d454) — details in qa-round-5.md "v3 Session 1"
+- **OFF-CONSTR (skb, P1 wrong geometry)** sketch Offset makes Parallel (+ Tangent) constraints only; live makes OFFSET +
+  DISTANCE (the "3" dimension). Dimensioning the source afterwards drifts the copy (3 → 2.61–2.82 mm) and changes the part.
+- **OFF-BOX (skb)** Enter should create the offset and open the value box ("5 mm" selected, ±, ✓/✕), then Enter applies the
+  typed value; ours commits without a box, the label shows only at ≥ 30 px and its box lacks ±/✓/✕.
+- **OFF-SIDE (skb)** first side: a line away from the region, a circle outward (ours: left normal / closed inward).
+- **OFF-TOAST (skb)** an unconnected second entity: select only + toast "Can only offset a single chain at once." (ours offsets both).
+- **HOLE-FACE (psb, pending live follow-up 2)** Hole locations accept a planar face (PickKind::Face matches PLANE_LIKE ⊃ MATE_CONNECTOR).
+- **EDIT-TYPING-PREVIEW (psb/ui2)** dialog number fields re-run the preview on each keystroke; live only on commit (Tab/Enter).
+  `feature_dialog.rs` on_text_changed → DialogEvent::Changed per InputEvent::Change (v3 s2).
+- **ROLL-LAST (psb)** "Roll to here" missing on the last feature while the bar is above it (`part_studio/mod.rs` ~3927 `!is_last`);
+  live rolls forward that way (v3 s2).
+- **REGEN-SPEED (perf/kern) update** live's exact 30-feature part: ours 585 ms at load / 472 ms after an edit vs live 171 / 132 ms;
+  Boss 1 152 ms on load (others 11–18 ms).
+- **MATE-FLIP-AXIAL (asb, P2 wrong placement)** Flip primary axis does nothing for Revolute / Cylindrical / Planar / Pin slot /
+  Parallel: residual `[z.x, z.y]` (`assembly/solver.rs` ~571–579) accepts anti-parallel Z; result = nearest to the prior pose.
+  Repro r5/v3s3-flip.py (identical poses for flip false/true; Fastened differs as it should) (v3 s3).
+- **DRW-DIM-2EDGES (asb, P2)** drawing smart Dimension: a second click on a parallel edge in the same view places the first
+  edge's length there instead of picking the edge (3/3; Top view left+right edge → "54" on the right edge). smart.rs
+  dimension_takes_more / smart_takes (v3 s4).
+- **OFF-CORNER (skb)** sketch Offset of a connected chain: live meets the offset lines at **sharp** corners (extended to their
+  intersection, outward and inward); ours puts arcs where copies separate (`sketch/src/tools.rs` offset_chain "Outer corners get
+  arcs") (live "qa4 round 5 s1 follow-up 2" (3)). OFF-SIDE: live forgets the flip between offsets (ours keeps `offset_flip`).
+- **HOLE-FACE confirmed (psb)** live: no hover, nothing added for a face or a body vertex in Hole locations (filter: sketch
+  vertices || explicit mate connectors). Ours takes both via PLANE_LIKE / POINT_LIKE ⊃ MATE_CONNECTOR in kind_matches; check the
+  other MATE_CONNECTOR fields before narrowing (follow-up 2 (1)).
+- **ROLL-LAST widened (psb)** live rolled-back row menu: Rename | Add selection to folder… | Suppress | Dynamic suppression ▸ |
+  Roll to here | Roll to end | Delete (Add comment is cloud); the row above the bar adds "Roll to end" (no Roll to here); ours
+  keeps Edit… / Zoom to selection / Show dependencies… on rolled-back rows and has no "Roll to end" (s2 rollback follow-up).
+- **ROLLBACK-DROP-TOP (psb)** dropping the dragged bar over Default geometry rows/header: live clamps to the top slot; ours
+  leaves the bar where it was.
+
+## qa4 QA round 5 v3 s5: sketch constraints + dimension editing (P1; v0.4.8 c7d9d454) — qa-round-5.md "v3 Session 5"
+- **DIM-EXPR-UNIT (skb)** bare expression `2*5` should reopen as `(2*5) mm` (ours `2*5`).
+- **DIM-AUTOCOMPLETE (skb)** sketch dimension box: no unit/function/variable dropdown (live: "in", "isInteger(x)"; "#var 10 mm",
+  "New variable…"); VarCompletion is feature-dialog only.
+- **DIM-ESC-UNTOUCHED (skb)** Esc on an unchanged box should close it at once; ours needs two Escs.
+- **DIM-UNSOLVED-GEOM (skb)** unsolvable sketch: keep the last solved shape (ours draws a half-way solve, dimension at old
+  points); the edited dimension should turn red too.
+- **DIM-MENU (skb)** right-click on a sketch dimension should be the standard sketch context menu with "Change to driven
+  dimension" on top and "Delete dimension" last; ours is a 2-item custom list with centred labels (sketch.rs render_dim_menu).
+- **VAR-KEYWORD (psb/api)** `#var` is a valid live variable name; ours rejects it via FS_KEYWORDS (variable_table.rs is_identifier).

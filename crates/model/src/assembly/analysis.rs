@@ -798,6 +798,13 @@ pub fn measure_entities(result: &AssemblyResult, picks: &[(InstancePath, Referen
     crate::regen::measure::measure_shapes(&shapes)
 }
 
+/// Whether a picked entity still exists in `result` (its instance and the
+/// entity on that instance's body): the selection drops picks that a
+/// re-evaluation removed (an undone or deleted part).
+pub fn pick_exists(result: &AssemblyResult, (path, r): &(InstancePath, Reference)) -> bool {
+    result.occurrences.iter().any(|o| &o.path == path && o.context.body(&o.body).is_some_and(|b| entity_on_body(b, r)))
+}
+
 fn entity_on_body(b: &crate::regen::context::Body, r: &Reference) -> bool {
     match r {
         Reference::Face(n) => !b.find_faces(n).is_empty(),
