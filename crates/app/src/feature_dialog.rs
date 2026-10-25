@@ -148,6 +148,9 @@ pub struct FeatureDialog {
     pub cs_target: Option<String>,
     subs: Vec<Subscription>,
     parse_errors: HashMap<String, String>,
+    /// Typed text not yet passed on to the preview (it waits for the
+    /// field's commit, `flush_typed`).
+    typed_pending: bool,
     pub status: Option<(FeatureStatus, String)>,
     /// Parameters the regeneration error points at (Onshape paints those
     /// fields pink with the message as their tooltip).
@@ -320,6 +323,7 @@ impl FeatureDialog {
             cs_target: None,
             subs: Vec::new(),
             parse_errors: HashMap::new(),
+            typed_pending: false,
             status: None,
             faulty: Vec::new(),
             labeler,
@@ -1130,7 +1134,10 @@ impl FeatureDialog {
         let sub = cx.subscribe_in(&state, window, move |this: &mut FeatureDialog, state, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
                 let text = state.read(cx).value().to_string();
-                this.on_text_changed(&path_s, text, cx);
+                if this.set_text_value(&path_s, text) {
+                    this.typed_pending = true;
+                    cx.notify();
+                }
                 let numeric = this.spec_for_path(&path_s).is_some_and(|s| matches!(s.kind, ParamKind::Num(_)));
                 this.completion = numeric.then(|| crate::var_complete::VarCompletion::compute(&path_s, state.read(cx), &this.variables)).flatten();
             }
@@ -1141,6 +1148,8 @@ impl FeatureDialog {
                     cx.emit(DialogEvent::Accept { repeat: true });
                 } else if !this.apply_on_enter(&path_s, state, window, cx) {
                     cx.emit(DialogEvent::Accept { repeat: false });
+                } else {
+                    this.flush_typed(cx);
                 }
             }
             // Onshape keeps the selection field active while a number field
@@ -1151,6 +1160,7 @@ impl FeatureDialog {
                 // Tab / click-away commits: the value gets its unit (live).
                 this.completion = None;
                 this.commit_number(&path_s, state, window, cx);
+                this.flush_typed(cx);
                 cx.notify();
             }
         });
@@ -1527,7 +1537,24 @@ impl FeatureDialog {
     }
 
     fn on_text_changed(&mut self, path: &str, text: String, cx: &mut Context<Self>) {
-        let Some(spec) = self.spec_for_path(path) else { return };
+        if self.set_text_value(path, text) {
+            cx.emit(DialogEvent::Changed);
+            cx.notify();
+        }
+    }
+
+    /// The preview re-runs for typed text only when the field commits (Tab,
+    /// a click away, Enter): live s2 "Typing does not update the preview".
+    fn flush_typed(&mut self, cx: &mut Context<Self>) {
+        if std::mem::take(&mut self.typed_pending) {
+            cx.emit(DialogEvent::Changed);
+        }
+    }
+
+    /// A field's text into the feature's value (no preview update); false
+    /// when the field isn't a number, checkbox expression or text.
+    fn set_text_value(&mut self, path: &str, text: String) -> bool {
+        let Some(spec) = self.spec_for_path(path) else { return false };
         self.user_set.insert(path.to_string());
         let v = match spec.kind {
             ParamKind::Num(_) | ParamKind::Bool { .. } => {
@@ -1542,13 +1569,12 @@ impl FeatureDialog {
                 ParamValue::Expr(noshape_units::ExprValue::new(text))
             }
             ParamKind::Text { .. } => ParamValue::Text(text),
-            _ => return,
+            _ => return false,
         };
         if let Some((vals, id)) = self.values_for_path_mut(path) {
             vals.set(&id, v);
         }
-        cx.emit(DialogEvent::Changed);
-        cx.notify();
+        true
     }
 
     // ------------------------------------------------------------ render helpers

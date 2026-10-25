@@ -2478,7 +2478,6 @@ impl PartStudioView {
             }).collect(),
             appearances,
             first_config_input,
-            n_features,
         };
         self.filter_rows.clone_from(&filtered);
         let mut rows: Vec<AnyElement> = Vec::new();
@@ -3328,7 +3327,10 @@ impl PartStudioView {
         // Live (ui 10-25 b (4), 10-25 c): the hover tooltip is the plain name,
         // "(Suppressed)" after it while everything inside is.
         let tip = if suppressed { format!("{} (Suppressed)", fd.name) } else { fd.name.clone() };
-        let is_last = self.studio(cx).is_some_and(|s| s.folder_features(id).last().is_some_and(|l| s.features.last().is_some_and(|f| f.id == *l)));
+        // Roll to here is offered unless the bar already sits right after
+        // the folder's last feature (live qa4 r5 s2: Roll to here on the
+        // rolled-back last feature brings the bar back to the end).
+        let is_last = self.studio(cx).is_some_and(|s| s.folder_features(id).last().and_then(|l| s.index_of(*l)).is_some_and(|i| i + 1 == s.rollback_index()));
         let row = crate::ui::tree_row(SharedString::from(format!("folder-{id}")), selected)
             .mr(px(5.))
             // Live `related-highlight`: #ECF0F4 with a 1 px #90CEF1 line under it.
@@ -3895,7 +3897,10 @@ impl PartStudioView {
         };
         let row = crate::ui::with_lazy_side_tooltip(row, anchor, tip);
         let view = cx.entity();
-        let is_last = i + 1 >= self.row_ctx.n_features;
+        // Roll to here is offered unless the bar already sits right after
+        // this feature (live qa4 r5 s2, ROLL-LAST: Roll to here on the
+        // rolled-back last feature brings the bar back to the end).
+        let is_last = self.studio(cx).is_some_and(|s| i + 1 == s.rollback_index());
         let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, typed_name(g)))));
         let feature_name = f.name.clone();
         // A Derived feature's source studio ("Switch to qa5 src", live "qa5
@@ -4528,7 +4533,6 @@ struct RowCtx {
     planes: std::collections::HashSet<FeatureId>,
     appearances: std::collections::HashSet<FeatureId>,
     first_config_input: Option<String>,
-    n_features: usize,
 }
 
 /// Model results the features list and its head read every frame, kept
