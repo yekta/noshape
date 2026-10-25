@@ -525,7 +525,8 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 ## Keystroke latency (lead 10-25) — qa4 2026-10-25 12:00, details in qa-round-5.md "Part Studio keystroke latency"
 - **EDIT-TYPING-PREVIEW (psb/ui2, now also the main per-keystroke cost)**: patch ready on branch qa4/typing-preview
   (feature_dialog.rs: number fields keep typed text in the draft and emit DialogEvent::Changed on commit only: Tab, Enter, blur,
-  step); not on ready/qa4 until the lead OKs editing that file.
+  step); not on ready/qa4 until the lead OKs editing that file. Clippy -D warnings clean; verified in the app: Depth
+  keystroke median 225 → 83 ms (= UI-only floor), Tab / Enter / ✓ all commit the typed value.
 - **THUMB-REGEN (perf)** `start_thumbnail.rs` Job::run regenerates the first Part Studio with a separate Regenerator 1.5 s after
   every commit: a second full downstream eval + 380–450 ms fine tessellation per edit. Render the thumbnail from the window's
   latest StudioDisplay (or share its regen cache) instead.

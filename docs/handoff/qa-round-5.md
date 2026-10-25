@@ -43,6 +43,9 @@ Input → first changed frame from 60 fps x11grab (r5/../keylat.sh), phases from
   llvmpipe threads; the extra ~140 ms over the filter box is the per-keystroke preview re-render = **EDIT-TYPING-PREVIEW**
   (live: the preview re-runs only when the field commits). Patch: branch qa4/typing-preview (feature_dialog.rs, psb/ui2 file;
   lead to OK).
+  **Verified (dev build of qa4/typing-preview 66563c00 on the same part):** typing "40" keeps the 12 mm preview, Tab → "40 mm" and the
+  preview follows; Enter applies 25 mm with the text selected; typing 8 then ✓ (no commit) commits 8 mm; no regen in the perf log
+  while typing. Depth digit → first frame **50–117 ms, median 83** (was 150–250, median ~225) = the filter-box floor.
 - **Commit / undo / redo of that edit** (= session 12's "~1.1 s per action", a settle time): full downstream regen
   **390–490 ms** (29 features re-evaluated: Boss 1 59 ms, Fillet 1 65, Hole 1 43, others 11–25; live 132 ms = REGEN-SPEED) +
   coarse tessellation 20–40 ms + render 100–190 ms → preview on screen after ~0.7 s; then refine **fine tessellation
