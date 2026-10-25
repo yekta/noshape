@@ -34,6 +34,7 @@
 #include <XCAFDoc_ColorTool.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
+#include <gp_Trsf.hxx>
 
 #include <fstream>
 #include <sstream>
@@ -317,6 +318,165 @@ StepImport read_step(rust::Str path)
   }
   if (out.shapes->items.empty())
     fail_io("STEP file contains no shapes: " + p);
+  return out;
+}
+
+// A STEP assembly as its distinct parts (prototypes, in their own
+// coordinates) and every placed leaf instance (assembly import, like .pvz).
+namespace
+{
+struct TreeWalk
+{
+  occ::handle<XCAFDoc_ShapeTool> st;
+  occ::handle<XCAFDoc_ColorTool> ct;
+  std::vector<TDF_Label>         protos;
+  std::vector<Leaf>              parts;
+  rust::Vec<PvzInstance>         instances;
+  std::string                    root;
+};
+
+void walk_tree(TreeWalk& w, const TDF_Label& label, const TopLoc_Location& loc,
+               const std::string& inheritedName, bool inheritedHasColor,
+               const Quantity_Color& inheritedColor, int depth)
+{
+  if (depth > 64)
+    return;
+  TDF_Label       ref  = label;
+  TopLoc_Location here = loc;
+  if (XCAFDoc_ShapeTool::IsReference(label))
+  {
+    XCAFDoc_ShapeTool::GetReferredShape(label, ref);
+    here = loc * XCAFDoc_ShapeTool::GetLocation(label);
+  }
+  std::string name = label_name(label);
+  if (name.empty())
+    name = label_name(ref);
+  if (name.empty())
+    name = inheritedName;
+  Quantity_Color c        = inheritedColor;
+  bool           hasColor = inheritedHasColor;
+  {
+    Quantity_Color c2;
+    if (label_color(w.ct, label, TopoDS_Shape(), c2) || label_color(w.ct, ref, TopoDS_Shape(), c2))
+    {
+      c        = c2;
+      hasColor = true;
+    }
+  }
+  if (XCAFDoc_ShapeTool::IsAssembly(ref))
+  {
+    NCollection_Sequence<TDF_Label> comps;
+    XCAFDoc_ShapeTool::GetComponents(ref, comps, false);
+    for (int i = 1; i <= comps.Length(); ++i)
+      walk_tree(w, comps(i), here, name, hasColor, c, depth + 1);
+    return;
+  }
+  TopoDS_Shape s = XCAFDoc_ShapeTool::GetShape(ref);
+  if (s.IsNull())
+    return;
+  size_t part = w.protos.size();
+  for (size_t i = 0; i < w.protos.size(); ++i)
+    if (w.protos[i].IsEqual(ref))
+      part = i;
+  if (part == w.protos.size())
+  {
+    // The part as its product defines it (no placement), named after it.
+    Leaf leaf;
+    leaf.shape = s;
+    leaf.name  = label_name(ref).empty() ? name : label_name(ref);
+    Quantity_Color c3;
+    if (label_color(w.ct, ref, s, c3))
+    {
+      c        = c3;
+      hasColor = true;
+    }
+    leaf.hasColor = hasColor;
+    leaf.color    = c;
+    ShapeIMap faces;
+    TopExp::MapShapes(s, TopAbs_FACE, faces);
+    for (int i = 1; i <= faces.Extent(); ++i)
+    {
+      Quantity_Color fc;
+      if (w.ct->GetColor(faces(i), XCAFDoc_ColorSurf, fc) || w.ct->GetColor(faces(i), XCAFDoc_ColorGen, fc))
+        leaf.faceColors.emplace_back(i - 1, fc);
+    }
+    w.protos.push_back(ref);
+    w.parts.push_back(leaf);
+  }
+  // Placement: row-major 3 x 4, translation in metres (OCCT works in mm).
+  const gp_Trsf t = here.Transformation();
+  PvzInstance   inst;
+  inst.part = (uint32_t)part;
+  inst.name = rust::String(name);
+  inst.root = rust::String(w.root);
+  for (int r = 1; r <= 3; ++r)
+    for (int k = 1; k <= 4; ++k)
+      inst.transform.push_back(k == 4 ? t.Value(r, k) * 1e-3 : t.Value(r, k));
+  w.instances.push_back(std::move(inst));
+}
+} // namespace
+
+StepTree read_step_tree(rust::Str path)
+{
+  std::lock_guard<std::mutex> lock(xde_mutex());
+  quiet_messenger();
+  const std::string p = path_str(path);
+  StepTree          out;
+  out.parts.shapes = std::make_unique<OcShapeList>();
+  occ::handle<XCAFApp_Application> app = XCAFApp_Application::GetApplication();
+  occ::handle<TDocStd_Document>    doc;
+  app->NewDocument("MDTV-XCAF", doc);
+  if (doc.IsNull())
+    fail_io("could not read STEP file " + p);
+  STEPCAFControl_Reader r;
+  r.SetColorMode(true);
+  r.SetNameMode(true);
+  r.SetLayerMode(false);
+  if (r.ReadFile(p.c_str()) != IFSelect_RetDone || !r.Transfer(doc))
+  {
+    app->Close(doc);
+    fail_io("could not read STEP file " + p);
+  }
+  TreeWalk w;
+  w.st = XCAFDoc_DocumentTool::ShapeTool(doc->Main());
+  w.ct = XCAFDoc_DocumentTool::ColorTool(doc->Main());
+  NCollection_Sequence<TDF_Label> roots;
+  w.st->GetFreeShapes(roots);
+  // Only a single root product that is an assembly makes an Assembly.
+  if (roots.Length() == 1 && XCAFDoc_ShapeTool::IsAssembly(roots(1)))
+  {
+    out.root = rust::String(label_name(roots(1)));
+    w.root   = label_name(roots(1));
+    NCollection_Sequence<TDF_Label> comps;
+    XCAFDoc_ShapeTool::GetComponents(roots(1), comps, false);
+    Quantity_Color c;
+    const bool     has = label_color(w.ct, roots(1), TopoDS_Shape(), c);
+    for (int i = 1; i <= comps.Length(); ++i)
+      walk_tree(w, comps(i), TopLoc_Location(), w.root, has, c, 1);
+  }
+  for (const auto& l : w.parts)
+  {
+    out.parts.shapes->items.push_back(l.shape);
+    out.parts.names.push_back(rust::String(l.name));
+    double r_, g_, b_;
+    l.color.Values(r_, g_, b_, Quantity_TOC_sRGB);
+    out.parts.colors.push_back((float)r_);
+    out.parts.colors.push_back((float)g_);
+    out.parts.colors.push_back((float)b_);
+    out.parts.has_color.push_back(l.hasColor);
+    for (const auto& [face, fc] : l.faceColors)
+    {
+      double fr, fg, fb;
+      fc.Values(fr, fg, fb, Quantity_TOC_sRGB);
+      out.parts.face_part.push_back((uint32_t)(out.parts.names.size() - 1));
+      out.parts.face_index.push_back((uint32_t)face);
+      out.parts.face_colors.push_back((float)fr);
+      out.parts.face_colors.push_back((float)fg);
+      out.parts.face_colors.push_back((float)fb);
+    }
+  }
+  out.instances = std::move(w.instances);
+  app->Close(doc);
   return out;
 }
 

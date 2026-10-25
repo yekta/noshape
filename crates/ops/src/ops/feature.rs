@@ -18,7 +18,11 @@ pub fn ops() -> Vec<Op> {
             verb: "types",
             summary: "List the Part Studio feature types",
             description: "Every feature of the Part Studio toolbar and tool search (Extrude, Revolve, Fillet, Hole, Sheet metal, Frames...), plus the document's custom FeatureScript features. Use the `type` id with `feature_add`.",
-            fields: vec![doc_field(), opt("category", s(), "Only this category: Sketch, Solid (Create), Detail, Pattern, Transform, Direct, Surface, Curve, Reference, SheetMetal, Frame, Variable, Import, Custom.")],
+            fields: vec![
+                doc_field(),
+                opt("category", s(), "Only this category: Sketch, Solid (Create), Detail, Pattern, Transform, Direct, Surface, Curve, Reference, SheetMetal, Frame, Variable, Import, Custom."),
+                opt("search", s(), "Only types whose name has every word of this (case-insensitive, word starts: \"move face\", \"fill\"), or whose id it is; when none, those whose description contains the words."),
+            ],
             mutates: false,
             destructive: false,
             run: types,
@@ -27,7 +31,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "schema",
             summary: "The parameters of a feature type (JSON schema, defaults, options, units)",
-            description: "The same parameters, defaults, options and visibility rules as the feature's dialog. Parameters shown only for some values of others (e.g. `depth` only when `endBound` is BLIND) are ignored while hidden.",
+            description: "The same parameters, defaults, options and visibility rules as the feature's dialog. Parameters shown only for some values of others are ignored while hidden; each says whether the dialog shows it with the defaults and which other parameter's values show or hide it (e.g. hole `holeDepthV3`: \"shown with the defaults; hidden, and ignored, when endStyleV2 is UP_TO_NEXT or UP_TO_ENTITY or THROUGH\"). `feature_get` lists a feature's currently `visible` parameters.",
             fields: vec![doc_field(), req("type", s(), "Feature type id, e.g. \"extrude\".")],
             mutates: false,
             destructive: false,
@@ -64,7 +68,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "get",
             summary: "A feature's type, parameters and regeneration state",
-            description: "Parameters in the same JSON forms `feature_add` takes; `visible` lists the ones its dialog currently shows.",
+            description: "Parameters in the same JSON forms `feature_add` takes; `visible` lists the ones its dialog currently shows. A custom (FeatureScript) feature also has the `notices` of its last run (message, severity, stack of `at` line:col and `in` module (function), as the FeatureScript notices panel's Monitor shows them) and its `println` `output`.",
             fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name.")],
             mutates: false,
             destructive: false,
@@ -74,7 +78,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "list",
             summary: "The feature list: every feature with its status, the parts, failures",
-            description: "Regenerates the Part Studio and reports each feature (id, name, type, status Ok/Info/Warning/Error/Suppressed/RolledBack, error message), the parts and the rollback bar.",
+            description: "Regenerates the Part Studio and reports each feature (id, name, type, status Ok/Info/Warning/Error/Suppressed/RolledBack, error message; custom features their FeatureScript `notices` and `output`), the parts and the rollback bar.",
             fields: vec![doc_field(), tab_field()],
             mutates: false,
             destructive: false,
@@ -297,9 +301,21 @@ fn types(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Err(_) => Vec::new(),
     };
     let cat = a.opt_str("category")?;
-    let mut out: Vec<Value> = features::all()
-        .chain(custom.iter().copied())
-        .filter(|t| cat.is_none_or(|c| category_name(t.category).eq_ignore_ascii_case(c) || t.category.label().eq_ignore_ascii_case(c)))
+    let words: Vec<String> = a.opt_str("search")?.unwrap_or_default().split_whitespace().map(str::to_lowercase).collect();
+    let has_all = |text: String| words.iter().all(|w| text.contains(w.as_str()));
+    // Each word starts a word of the name ("move face": Move face, not Move boundary), or the words spell the id.
+    let in_name = |t: &features::FeatureType| {
+        let name = t.name.to_lowercase();
+        let name_words: Vec<&str> = name.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
+        (!words.is_empty() && words.iter().all(|w| name_words.iter().any(|n| n.starts_with(w.as_str())))) || words.concat() == t.id.to_lowercase()
+    };
+    let in_text = |t: &features::FeatureType| has_all(format!("{} {} {}", t.name, t.id, t.description).to_lowercase());
+    let listed: Vec<&features::FeatureType> = features::all().chain(custom.iter().copied()).filter(|t| cat.is_none_or(|c| category_name(t.category).eq_ignore_ascii_case(c) || t.category.label().eq_ignore_ascii_case(c))).collect();
+    // Types named by the words; else those whose descriptions have them.
+    let by_name = listed.iter().any(|t| in_name(t));
+    let mut out: Vec<Value> = listed
+        .into_iter()
+        .filter(|t| if by_name { in_name(t) } else { in_text(t) })
         .map(|t| json!({ "type": t.id, "name": t.name, "category": category_name(t.category), "description": t.description, "shortcut": t.shortcut }))
         .collect();
     out.sort_by(|x, y| x["category"].as_str().cmp(&y["category"].as_str()).then(x["name"].as_str().cmp(&y["name"].as_str())));
@@ -324,7 +340,7 @@ fn schema(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         "name": ty.name,
         "category": category_name(ty.category),
         "description": ty.description,
-        "params": values::feature_schema(&ty.params, &units),
+        "params": values::feature_schema(&ty.params, &units, noshape_model::partstudio::PartStudio::new().new_feature(ty.id, &units).map(|f| f.params).as_ref()),
         "order": ty.params.iter().filter(|p| !matches!(p.kind, ParamKind::Sketch)).map(|p| p.id).collect::<Vec<_>>(),
     })
     .into())
@@ -397,6 +413,7 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let config = od.current_config(tab)?;
     let ps = doc::studio(od.doc(), tab)?;
     let mut feature = ps.configuration.for_editing(&ps.features[index], &config);
+    load_custom_types(od, &feature.type_id);
     let ty = feature.feature_type().ok_or_else(|| OpError::invalid(format!("feature type `{}` is not available", feature.type_id)))?;
     if let Some(params) = a.object("params")? {
         if feature.type_id == "sketch" && params.contains_key("sketch") {
@@ -422,10 +439,28 @@ fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;
     let id = feature_arg(ps, a, "feature")?;
-    let mut v = feature_json(ps.feature(id).expect("found"));
+    let type_id = ps.feature(id).expect("found").type_id.clone();
+    load_custom_types(od, &type_id);
     let report = regen_report(od, tab)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let f = ps.feature(id).expect("found");
+    let mut v = feature_json(f);
     v["status"] = this_feature_status(&report, &id.to_string());
+    let tab_name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+    if let Some(o) = super::custom_output(od.doc(), &tab_name, f) {
+        v["notices"] = o["notices"].clone();
+        v["output"] = o["output"].clone();
+    }
     Ok(v.into())
+}
+
+/// Custom feature types (`custom:<tab>:<name>`) exist once the document's
+/// Feature Studios are compiled in this process (cached by their sources):
+/// a fresh CLI process has to before it can read their parameters.
+fn load_custom_types(od: &crate::OpenDoc, type_id: &str) {
+    if noshape_model::custom::is_custom(type_id) {
+        let _ = noshape_model::custom::DocumentScripts::from_document(od.doc());
+    }
 }
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

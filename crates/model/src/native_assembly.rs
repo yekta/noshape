@@ -25,6 +25,7 @@ use crate::document::{Document, TabContent, TabId};
 use crate::features::importing::ImportPartInfo;
 use crate::params::ParamValue;
 use crate::partstudio::PartStudio;
+use crate::reference::BodyId;
 use crate::regen::{RegenOptions, Regenerator};
 use noshape_kernel as k;
 use noshape_units::UnitPrefs;
@@ -166,13 +167,13 @@ pub fn add_native_assembly(doc: &mut Document, root: &str, components: &[k::Nati
     f.params.set("foreignId", ParamValue::Text(format!("{root}.zip")));
     f.params.set("importAppearances", ParamValue::Bool(import_appearances));
     ps.insert_at_rollback(f);
-    let regen = Regenerator::new().regenerate(&ps, &ConfigValues::default(), units, &RegenOptions::default());
+    let bodies = bodies_of_parts(&ps, units, |k| k != crate::display::BodyKind::Wire);
     let studio_name = unique_name(doc, &format!("{root} parts"));
     let studio = doc.add_tab(&studio_name, TabContent::PartStudio(ps));
     // The Assembly: each part's instances in the assembly's order.
     let mut asm = Assembly::default();
     for (pi, (_, name, users)) in parts.iter().enumerate() {
-        let Some(body) = solid_of[pi].and_then(|_| regen.context.bodies.iter().find(|b| &b.name == name && b.kind != crate::display::BodyKind::Wire)).map(|b| b.id.clone()) else { continue };
+        let Some(body) = solid_of[pi].and_then(|i| bodies.get(i).cloned().flatten()) else { continue };
         for (k, &ci) in users.iter().enumerate() {
             let id = InstanceId(asm.next_id());
             let mut inst = Instance::new(id, format!("{name} <{}>", k + 1), InstanceSource::Part { studio, body: body.clone(), config: ConfigValues::default() }, Placement::from_dmat4(&world[ci]));
@@ -224,11 +225,12 @@ pub fn add_native_zip(doc: &mut Document, z: &AssemblyZip, import_appearances: b
     };
     let mut shapes = Vec::new();
     let mut info = Vec::new();
-    let mut part_names: Vec<Option<String>> = Vec::new();
+    // Each part's name and the `partInfo` entry of its first solid.
+    let mut part_names: Vec<Option<(String, usize)>> = Vec::new();
     for &fi in &order {
         let first = solid_name(fi, 0).unwrap_or_default();
         let named = part_bodies_named(&files[fi], Some(&first), None, &mut shapes, &mut info, &|n| solid_name(fi, n))?;
-        part_names.push(named.map(|_| first));
+        part_names.push(named.map(|i| (first, i)));
     }
     let brep = k::Shape::compound(&shapes).to_brep_bytes().map_err(|e| e.to_string())?;
     let mut ps = PartStudio::new();
@@ -244,15 +246,15 @@ pub fn add_native_zip(doc: &mut Document, z: &AssemblyZip, import_appearances: b
         let name = unique_name(doc, &z.zip);
         return Ok(NativeTabs::Studio(doc.add_tab(&name, TabContent::PartStudio(ps))));
     }
-    let regen = Regenerator::new().regenerate(&ps, &ConfigValues::default(), units, &RegenOptions::default());
+    let bodies = bodies_of_parts(&ps, units, |k| k != crate::display::BodyKind::Wire);
     let studio_name = unique_name(doc, &format!("{} parts", z.zip));
     let studio = doc.add_tab(&studio_name, TabContent::PartStudio(ps));
     let mut asm = Assembly::default();
     let mut counts = vec![0usize; order.len()];
     for &(ci, fi) in &used {
         let Some(pi) = order.iter().position(|&o| o == fi) else { continue };
-        let Some(name) = &part_names[pi] else { continue };
-        let Some(body) = regen.context.bodies.iter().find(|b| &b.name == name && b.kind != crate::display::BodyKind::Wire).map(|b| b.id.clone()) else { continue };
+        let Some((name, info_index)) = &part_names[pi] else { continue };
+        let Some(body) = bodies.get(*info_index).cloned().flatten() else { continue };
         counts[pi] += 1;
         let id = InstanceId(asm.next_id());
         let mut inst = Instance::new(id, format!("{name} <{}>", counts[pi]), InstanceSource::Part { studio, body, config: ConfigValues::default() }, Placement::from_dmat4(&world[ci]));
@@ -376,6 +378,33 @@ fn part_bodies_named(file: &PartFile, wire_name: Option<&str>, at: Option<&glam:
     Ok(named)
 }
 
+/// The body each part of `ps`'s Import feature (its last feature) became,
+/// by `partInfo` entry: the feature regenerated with every part named by
+/// its index (body ids don't depend on names), so parts that share a name
+/// (STEP's "Part", "Body", "SOLID") each get their own body. The first body
+/// of each part whose kind `want` takes.
+fn bodies_of_parts(ps: &PartStudio, units: &UnitPrefs, want: impl Fn(crate::display::BodyKind) -> bool) -> Vec<Option<BodyId>> {
+    const TOKEN: &str = "\u{1}part ";
+    let mut probe = ps.clone();
+    let Some(f) = probe.features.last_mut() else { return Vec::new() };
+    let mut info: Vec<ImportPartInfo> = serde_json::from_str(f.params.text("partInfo")).unwrap_or_default();
+    for (i, p) in info.iter_mut().enumerate() {
+        p.name = Some(format!("{TOKEN}{i}"));
+    }
+    f.params.set("partInfo", ParamValue::Text(serde_json::to_string(&info).unwrap_or_default()));
+    let regen = Regenerator::new().regenerate(&probe, &ConfigValues::default(), units, &RegenOptions::default());
+    let mut out = vec![None; info.len()];
+    for b in regen.context.bodies.iter().filter(|b| want(b.kind)) {
+        if let Some(i) = b.name.strip_prefix(TOKEN).and_then(|r| r.parse::<usize>().ok())
+            && let Some(slot) = out.get_mut(i)
+            && slot.is_none()
+        {
+            *slot = Some(b.id.clone());
+        }
+    }
+    out
+}
+
 /// `base`, or Onshape's "<base> (1)", "(2)", … when a tab already has it
 /// (live G41: a second import of an assembly; "api (10-23) import parity":
 /// a second import of a file's Part Studio).
@@ -400,6 +429,12 @@ pub struct PvzImport {
     pub instances: Vec<k::PvzInstance>,
     /// The parts' names (index = `PvzInstance::part`).
     pub names: Vec<Option<String>>,
+    /// A STEP assembly: the Assembly keeps the root product's name as it
+    /// is (live qa4 r4 s5: "Assembly 1", " (1)" when taken); .pvz roots
+    /// drop their "_NN" suffix first.
+    pub step: bool,
+    /// The Import dialog's boolean choices (Import feature parameter ids).
+    pub options: Vec<(&'static str, bool)>,
 }
 
 /// A PVZ (Creo View) file of several part instances, as Onshape imports it
@@ -411,7 +446,7 @@ pub struct PvzImport {
 /// Assembly tab comes first. `brep` / `info` are the Import feature's data
 /// (the parts in their own coordinates, see `noshape_kernel::read_pvz_parts`).
 pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) -> Result<(TabId, TabId), String> {
-    let PvzImport { stem, root, brep, info, foreign_id, instances, names } = pvz;
+    let PvzImport { stem, root, brep, info, foreign_id, instances, names, step, options } = pvz;
     let (brep, info) = (brep.clone(), info.clone());
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("importForeign", units).ok_or("no Import feature")?;
@@ -419,8 +454,12 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
     f.params.set("blobData", ParamValue::Text(brep));
     f.params.set("partInfo", ParamValue::Text(info));
     f.params.set("foreignId", ParamValue::Text(foreign_id.clone()));
+    // The dialog's choices first: they decide which bodies the parts become.
+    for (k, v) in options {
+        f.params.set(k, ParamValue::Bool(*v));
+    }
     ps.insert_at_rollback(f);
-    let regen = Regenerator::new().regenerate(&ps, &ConfigValues::default(), units, &RegenOptions::default());
+    let bodies = bodies_of_parts(&ps, units, |k| k == crate::display::BodyKind::Solid);
     let studio_name = unique_name(doc, &format!("{stem} parts"));
     let studio = doc.add_tab(&studio_name, TabContent::PartStudio(ps));
     let mut asm = Assembly::default();
@@ -428,14 +467,14 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
     // The occurrences in the reverse of the file's order (live: pvz-rot-asm's
     // <1> is its second, turned occurrence), as native assemblies.
     for inst in instances.iter().rev() {
-        let Some(Some(name)) = names.get(inst.part) else { continue };
-        // The part's solid (mesh parts whose mesh is open are composites: not instanced).
-        let Some(body) = regen.context.bodies.iter().find(|b| &b.name == name && b.kind == crate::display::BodyKind::Solid).map(|b| b.id.clone()) else { continue };
+        // The part's own solid (mesh parts whose mesh is open are composites: not instanced).
+        let Some(body) = bodies.get(inst.part).cloned().flatten() else { continue };
         count[inst.part] += 1;
         let id = InstanceId(asm.next_id());
         asm.instances.push(Instance::new(id, format!("{} <{}>", inst.name, count[inst.part]), InstanceSource::Part { studio, body, config: ConfigValues::default() }, Placement::from_dmat4(&inst.transform)));
     }
-    let assembly = doc.add_tab(&pvz_assembly_name(doc, root), TabContent::Assembly(Box::new(asm)));
+    let name = if *step { unique_name(doc, if root.is_empty() { stem } else { root }) } else { pvz_assembly_name(doc, root) };
+    let assembly = doc.add_tab(&name, TabContent::Assembly(Box::new(asm)));
     let order = &mut doc.settings.tab_order;
     if let (Some(a), Some(s)) = (order.iter().position(|t| *t == assembly), order.iter().position(|t| *t == studio)) {
         let id = order.remove(a);
