@@ -992,6 +992,27 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!(e.param.as_deref(), Some("dof"), "{e:?}");
     let e = try_call(&mut ctx, "assembly_animate", json!({ "steps": 10, "frame": 11 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("frame"), "{e:?}");
+    // The camera: Zoom to selection on the pin; View normal to a block face.
+    let z = call(&mut ctx, "view_camera", json!({ "tab": "Assembly 1", "action": "zoom_selection", "refs": [p] }));
+    assert_eq!(z["previous_views"], 1, "{z}");
+    let face = call(&mut ctx, "assembly_entities", json!({ "instance": b, "kind": "faces", "surface": "plane" }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let n = call(&mut ctx, "view_camera", json!({ "tab": "Assembly 1", "action": "normal_to", "refs": [{ "instance": b, "entity": face }] }));
+    let d = &n["view_direction"];
+    assert!((0..3).any(|i| num(&d[i]).abs() > 1.0 - 1e-9), "normal to an axis-aligned face: {n}");
+    // Display: isolate the pin, show the mates, snap mode.
+    let dv = call(&mut ctx, "view_display", json!({ "tab": "Assembly 1", "isolate": [p], "show_mates": true, "snap_mode": true }));
+    assert_eq!((dv["isolate"][0].clone(), dv["show_mates"].clone(), dv["snap_mode"].clone()), (json!(p), json!(true), json!(true)), "{dv}");
+    let e = try_call(&mut ctx, "view_display", json!({ "tab": "Assembly 1", "highlight_boundary": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("highlight_boundary"), "{e:?}");
+    // Selection: Select instances with same configuration; Clear selection.
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "same_configuration", "refs": [p] }));
+    assert_eq!(s["selected"], json!([b, p]), "both from Part Studio 1 in its default configuration: {s}");
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "same_configuration", "refs": [p], "same_part": true }));
+    assert_eq!(s["selected"], json!([p]), "{s}");
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "add", "refs": [b] }));
+    assert_eq!(s["selected"], json!([p, b]), "{s}");
+    let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "clear" }));
+    assert_eq!(s["selected"], json!([]), "{s}");
 
     let e = try_call(&mut ctx, "assembly_named_position_drivers", json!({ "drivers": [{ "mate": "Revolute 1", "dof": "tz" }] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("drivers[0].dof"));
@@ -2075,6 +2096,12 @@ fn feature_folders_dependencies_and_dynamic_suppression() {
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" }));
     assert!(g.get("suppression_expression").is_none(), "{g}");
     assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 1);
+    // On a folder: every feature in it; Remove expression clears them.
+    call(&mut ctx, "feature_add_folder", json!({ "features": ["Sketch 1", "Extrude 1"], "name": "Base" }));
+    call(&mut ctx, "feature_dynamic_suppression", json!({ "folder": "Base", "unsuppressed_if": "2 mm < 1 mm" }));
+    assert_eq!(call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" }))["suppression_expression"], "2 mm < 1 mm");
+    call(&mut ctx, "feature_dynamic_suppression", json!({ "folder": "Base" }));
+    assert!(call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1" })).get("suppression_expression").is_none());
 }
 
 #[test]
@@ -3759,4 +3786,109 @@ fn line_tangent_arc_switch() {
     assert_eq!(kinds, ["line", "arc", "line"], "{d}");
     let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "circle", "points": [[50, 0], [55, 0]], "tangent_arc_switch": [1] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("tangent_arc_switch"), "{e:?}");
+}
+
+/// The graphics area's camera through the view menus (view_camera), read
+/// back by ui_state and drawn by render_image `view: "window"`.
+#[test]
+fn view_camera_menus() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "view_camera.noshape");
+    let cam = |ctx: &mut Ctx, args: Value| call(ctx, "view_camera", args);
+    let c = cam(&mut ctx, json!({ "action": "get" }));
+    assert_eq!((c["standard_view"].clone(), c["previous_views"].clone()), (json!("trimetric"), json!(0)), "a graphics area opens in Trimetric: {c}");
+    let iso = cam(&mut ctx, json!({ "action": "view" }));
+    assert_eq!((iso["standard_view"].clone(), iso["previous_views"].clone()), (json!("isometric"), json!(1)), "{iso}");
+    let h = num(&iso["visible_height"]);
+    let zin = cam(&mut ctx, json!({ "action": "zoom_in" }));
+    assert!((num(&zin["visible_height"]) - h / 1.75).abs() < 1e-6 * h, "Z zooms by 1.75: {zin}");
+    let back = cam(&mut ctx, json!({ "action": "previous" }));
+    assert!((num(&back["visible_height"]) - h).abs() < 1e-9 * h, "{back}");
+    // View normal to the Top plane; again: from the other side.
+    let n = cam(&mut ctx, json!({ "action": "normal_to", "refs": ["plane:top"] }));
+    assert!((num(&n["view_direction"][2]) + 1.0).abs() < 1e-9, "{n}");
+    let n = cam(&mut ctx, json!({ "action": "normal_to", "refs": ["plane:top"] }));
+    assert!((num(&n["view_direction"][2]) - 1.0).abs() < 1e-9, "{n}");
+    // Align view with vertical axis: an X edge points up the screen.
+    let xedge = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }))["edges"].as_array().unwrap().iter().find(|e| num(&e["direction"][0]).abs() > 0.99).unwrap()["id"].as_str().unwrap().to_string();
+    let al = cam(&mut ctx, json!({ "action": "align_vertical", "refs": [xedge] }));
+    assert!(num(&al["up"][0]).abs() > 1.0 - 1e-9, "{al}");
+    // Zoom to window: a box a quarter of the 800 px height.
+    let before = num(&al["visible_height"]);
+    let w = cam(&mut ctx, json!({ "action": "zoom_window", "box": [[540, 300], [740, 500]] }));
+    assert!((num(&w["visible_height"]) - before / 4.0).abs() < 1e-6 * before, "{w}");
+    let e = try_call(&mut ctx, "view_camera", json!({ "action": "zoom_window", "box": [[10, 10], [12, 12]] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("box"), "{e:?}");
+    // Zoom to selection frames the part closer than Zoom to fit (the planes too).
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let z = cam(&mut ctx, json!({ "action": "zoom_selection", "refs": [part] }));
+    let f = cam(&mut ctx, json!({ "action": "zoom_fit" }));
+    assert!(num(&z["visible_height"]) < num(&f["visible_height"]), "{z} {f}");
+    let p = cam(&mut ctx, json!({ "action": "perspective", "on": true }));
+    assert_eq!(p["projection"], "perspective", "{p}");
+    let ui = call(&mut ctx, "ui_state", json!({}));
+    assert_eq!(ui["cameras"][0]["projection"], "perspective", "{ui}");
+    let img = call(&mut ctx, "render_image", json!({ "view": "window", "width": 64, "height": 40 }));
+    assert_eq!(img["view"], "window", "{img}");
+    // A drawing: Zoom in doubles the zoom; Zoom to fit restores it.
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let fit = cam(&mut ctx, json!({ "tab": tab, "action": "zoom_fit" }));
+    let zi = cam(&mut ctx, json!({ "tab": tab, "action": "zoom_in" }));
+    assert!((num(&zi["zoom"]) - 2.0 * num(&fit["zoom"])).abs() < 1e-9, "{zi}");
+    let again = cam(&mut ctx, json!({ "tab": tab, "action": "zoom_sheet" }));
+    assert_eq!(again["zoom"], fit["zoom"], "{again}");
+}
+
+/// Display settings kept by the window (view_display): isolate,
+/// transparent, boundary edges; render_image `view: "window"` uses them.
+#[test]
+fn view_display_settings() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "view_display.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let d = call(&mut ctx, "view_display", json!({ "isolate": ["Part 1"] }));
+    assert_eq!((d["isolate"].clone(), d["transparent"].clone()), (json!([part]), Value::Null), "{d}");
+    let d = call(&mut ctx, "view_display", json!({ "transparent": [part], "highlight_boundary": true }));
+    assert_eq!((d["isolate"].clone(), d["transparent"].clone(), d["highlight_boundary"].clone()), (Value::Null, json!([part]), json!(true)), "{d}");
+    let e = try_call(&mut ctx, "view_display", json!({ "show_mates": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("show_mates"), "an Assembly's: {e:?}");
+    let e = try_call(&mut ctx, "view_display", json!({ "isolate": ["nope"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("isolate[0]"), "{e:?}");
+    let ui = call(&mut ctx, "ui_state", json!({}));
+    assert_eq!(ui["display"][0]["transparent"], json!([part]), "{ui}");
+    call(&mut ctx, "view_camera", json!({ "action": "zoom_fit" }));
+    call(&mut ctx, "render_image", json!({ "view": "window", "width": 64, "height": 40 }));
+    let d = call(&mut ctx, "view_display", json!({ "exit_isolate": true }));
+    assert_eq!(d["transparent"], Value::Null, "{d}");
+}
+
+/// The window's selection (ui_select): set, Select ▸ related, Select
+/// other… under a point, Clear selection; Zoom to selection uses it.
+#[test]
+fn ui_select_related_and_select_other() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "ui_select.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let s = call(&mut ctx, "ui_select", json!({ "action": "set", "refs": [part] }));
+    assert_eq!(s["selected"], json!([part]), "{s}");
+    let z = call(&mut ctx, "view_camera", json!({ "action": "zoom_selection" }));
+    assert_eq!(z["previous_views"], 1, "zooms to the selection: {z}");
+    // Select ▸ All faces of part, from one face.
+    let face = call(&mut ctx, "query_entities", json!({ "kind": "faces" }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "ui_select", json!({ "action": "related", "refs": [face], "criterion": "All faces of part" }));
+    assert!(r["selected"].as_array().unwrap().len() >= 7, "a block with a hole: {r}");
+    // Select other… looking down at the block 20 mm right of its centre:
+    // the top face, then the bottom face.
+    let n = call(&mut ctx, "view_camera", json!({ "action": "normal_to", "refs": ["plane:top"] }));
+    let ppm = 800.0 / num(&n["visible_height"]);
+    let at = json!([640.0 + 20.0 * ppm, 400.0]);
+    let o = call(&mut ctx, "ui_select", json!({ "action": "select_other", "at": at }));
+    assert_eq!(o["under"].as_array().unwrap().len(), 2, "{o}");
+    let o = call(&mut ctx, "ui_select", json!({ "action": "select_other", "at": at, "index": 1 }));
+    assert_eq!(o["selected"], json!([o["under"][1].clone()]), "{o}");
+    let c = call(&mut ctx, "ui_select", json!({ "action": "clear" }));
+    assert_eq!(c["selected"], json!([]), "{c}");
+    let e = try_call(&mut ctx, "view_camera", json!({ "action": "zoom_selection" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("refs"), "nothing selected: {e:?}");
 }

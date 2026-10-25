@@ -1,5 +1,6 @@
-//! Cylinders and cones are meshed as strips between their rim rings
-//! (mesh.cpp `StripAlgo`) instead of BRepMesh's Delaunay: the same edges
+//! Cylinders and cones are meshed as strips between their rim rings, torus
+//! bands (fillets) as grids (mesh.cpp `StripAlgo`), instead of BRepMesh's
+//! Delaunay: the same edges
 //! (silhouette ends, drawn edges), the same angular sampling (every strip
 //! node is one of BRepMesh's), no more deviation from the surface than
 //! BRepMesh's mesh and no more triangles. The display's own post-processing
@@ -16,6 +17,16 @@ fn plate() -> Shape {
     let hole = cut(&b, &make_cylinder(&axis, 0.004, 0.01, std::f64::consts::TAU).unwrap()).unwrap().shape;
     let sink = Plane::from_normal(DVec3::new(0.01, 0.01, 0.004), DVec3::Z);
     cut(&hole, &make_cone(&sink, 0.004, 0.0055, 0.0015, std::f64::consts::TAU).unwrap()).unwrap().shape
+}
+
+/// A Ø8 × 5 mm boss on the plate, its foot filleted (R1): a torus band.
+fn filleted_boss() -> Shape {
+    let b = make_box_corners(DVec3::ZERO, DVec3::new(0.02, 0.02, 0.005)).unwrap();
+    let axis = Plane::from_normal(DVec3::new(0.01, 0.01, 0.005), DVec3::Z);
+    let s = fuse(&b, &make_cylinder(&axis, 0.004, 0.005, std::f64::consts::TAU).unwrap()).unwrap().shape;
+    let foot: Vec<Shape> = s.edges().into_iter().filter(|e| matches!(e.edge_curve(), Ok(Curve::Circle { radius, center, .. }) if (radius - 0.004).abs() < 1e-9 && (center.z - 0.005).abs() < 1e-9)).collect();
+    assert_eq!(foot.len(), 1, "the boss's foot");
+    fillet(&s, &foot, 0.001).unwrap().shape
 }
 
 fn mesh(s: &Shape, strips: bool) -> Tessellation {
@@ -87,6 +98,28 @@ fn strips_keep_brepmeshs_edges_sampling_and_tolerance() {
         assert!(sg <= dg * 1.0001 + 1e-9, "face {f}: strip deviation {sg:e} vs BRepMesh {dg:e}");
     }
     assert_eq!(checked, 2, "the hole and the countersink");
+
+    // The fillet's torus band as a grid: BRepMesh's nodes, no more triangles,
+    // no more deviation from the torus (major 5 mm, minor 1 mm, at z 6 mm).
+    let s2 = filleted_boss();
+    let (grid, delaunay) = (mesh(&s2, true), mesh(&s2, false));
+    let torus = s2.faces().iter().position(|f| matches!(f.face_surface(), Ok(Surface::Torus { .. }))).expect("the fillet's torus face");
+    let (gp, dp) = (face_points(&grid, torus), face_points(&delaunay, torus));
+    for p in &gp {
+        assert!(dp.iter().any(|q| q.distance(*p) < 1e-7), "torus: grid node {p} isn't one of BRepMesh's");
+    }
+    let off_torus = |tris: &[[DVec3; 3]]| {
+        tris.iter()
+            .map(|t| {
+                let c = (t[0] + t[1] + t[2]) / 3.0;
+                let rho = DVec3::new(c.x - 0.01, c.y - 0.01, 0.0).length();
+                (((rho - 0.005).powi(2) + (c.z - 0.006).powi(2)).sqrt() - 0.001).abs()
+            })
+            .fold(0.0, f64::max)
+    };
+    let (gt, dt) = (face_triangles(&grid, torus), face_triangles(&delaunay, torus));
+    assert!(gt.len() <= dt.len(), "torus: {} grid triangles vs {}", gt.len(), dt.len());
+    assert!(off_torus(&gt) <= off_torus(&dt) * 1.0001 + 1e-9, "torus: grid deviation {:e} vs BRepMesh {:e}", off_torus(&gt), off_torus(&dt));
 
     // BRepMesh's own post-processing: the same triangles and edge polygons.
     // SAFETY: as in `mesh`.

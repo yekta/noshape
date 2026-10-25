@@ -860,17 +860,27 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
     let d = point_dist(i.uv, i.rpx);
     let coverage = clamp(i.rpx - d + 0.5, 0.0, 1.0);
     if (coverage <= 0.0 || clipped(i.world)) { discard; }
-    let rn = d / max(i.rpx, 1e-3);
-    let r2 = rn * rn;
-    // Style bit 4: a ring with a center dot (the origin).
-    if ((i.style & 4u) != 0u && r2 < 0.42 && r2 > 0.1) { discard; }
+    // Inner edges anti-aliased like the rim (live part-studio/00: the
+    // origin's ring and dot are soft-edged).
+    var cov = coverage;
+    var rgb = i.color.rgb;
+    // Style bit 4: a ring with a center dot (the origin: live 11 px, the
+    // ring's inside at 0.65 of the radius, the dot 0.32).
+    if ((i.style & 4u) != 0u) {
+        let ring = clamp(d - 0.65 * i.rpx + 0.5, 0.0, 1.0);
+        let dot = clamp(0.32 * i.rpx - d + 0.5, 0.0, 1.0);
+        cov = cov * max(ring, dot);
+    }
     // Style bit 8: a hollow point (white inside a ring of the point color),
     // Onshape's standalone sketch points and spline handles.
-    if ((i.style & 8u) != 0u && r2 < 0.3) { return vec4<f32>(1.0, 1.0, 1.0, i.color.a); }
+    if ((i.style & 8u) != 0u) {
+        rgb = mix(rgb, vec3<f32>(1.0), clamp(0.55 * i.rpx - d + 0.5, 0.0, 1.0));
+    }
     // Style bit 16: a ring only, see-through inside (live midpoint markers:
     // a 9 px ring with a 1.75 px stroke, inner radius 0.6).
-    if ((i.style & 16u) != 0u && r2 < 0.37) { discard; }
-    return vec4<f32>(i.color.rgb, i.color.a * coverage);
+    if ((i.style & 16u) != 0u) { cov = cov * clamp(d - 0.61 * i.rpx + 0.5, 0.0, 1.0); }
+    if (cov <= 0.0) { discard; }
+    return vec4<f32>(rgb, i.color.a * cov);
 }
 
 @fragment

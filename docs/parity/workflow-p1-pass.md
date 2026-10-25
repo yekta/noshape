@@ -30,3 +30,24 @@ then edits, undo/redo, rollback and suppress.
 | Delete Extrude 1 (dependents) | Fillet, Chamfer, Sketch 2, Hole, Pattern, Shell, Mirror error, Parts (0); errored rows red, **but hidden Sketch 2 stays grey** | failing sketch row red (behaviours 6432, 6491) | ✗ **P1-7** (ui) |
 | Undo the delete | back to 8801.649 mm³ | — | ✅ |
 | Extrude › Remove from a sketch under the part (default flips away, as live) | tool grey, no message | red translucent tool + toast "Selected tools and targets do not intersect." (part-studio/234) | ✗ **P1-10** (psb + icons2) |
+
+## P2 assembly core (same session, /root/green/noshape ee654502; plate 60×20×5 with 3 Ø10 holes + Ø10×30 pin from Part Studio 1)
+| Step | Ours | Live | Status |
+|---|---|---|---|
+| Insert Part 1 (first instance) | placed, view fits, free DOF glyph (not fixed) | same (assembly/80, free glyph) | ✅ |
+| Insert Part 2, click to place, ✓ | Instances (2) | same | ✅ |
+| Cylindrical mate (tool search), pin face then hole face | pin moves into the hole, HUD at the 2nd pick, two connector chips | same (MT10, MT13) | ✅ |
+| HUD ✓ | commits Cylindrical 1 (hidden, light grey row) and opens "Cylindrical 2" | "Commit current mate and start a new mate" (behaviours 1329) | ✅ |
+| Drag the pin | slides along the axis; nothing fixed, so a sideways drag moves both | — | ✅ (plausible) |
+| Edit the mate, type list | Slider, Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened, Parallel; retype renames the row ("Pin slot 1") | same order (behaviours 5941), MT12 | ✅ |
+| Undo the retype | back to Cylindrical 1 | — | ✅ |
+
+## P2 drawing (same session)
+| Step | Ours | Live | Status |
+|---|---|---|---|
+| Create Drawing of Assembly 1… (suggested views) | 4 views, pin seen through hole 1, edges correct | — | ✅ |
+| Part Studio tab menu | Delete, Rename, Properties…, Show code, Duplicate, Copy to clipboard, Select as document thumbnail, Move to document…, Export… | same (+ Open in new browser tab, browser only) | ✅ |
+| Part row › Create Drawing of Part 1… | "Part 1 Drawing 1" tab right after Part Studio 1, 4 views | — | ✅ |
+| Dimension on a straight edge (assembly drawing) | "2.362" placed | — | ✅ |
+| Dimension on a hole circle | part drawing "Ø.394" ✅; **assembly drawing: click not taken** | — | ✗ **P2-D1** |
+| BOM panel (right strip) | "Bill of materials", BOM type ▾ Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description; rows 1 | 1, 2 | 1 | same columns (behaviours 1270) | ✅ |

@@ -4,6 +4,9 @@
 mod analysis;
 mod appearance;
 mod behaviors;
+// What an agent's call asks of this view (live mode).
+#[path = "../agent_window/studio.rs"]
+mod agent_window;
 mod create_selection;
 mod hole_callout;
 mod triad;
@@ -248,7 +251,7 @@ pub struct PartStudioView {
     gpu: Gpu,
     /// Versions and history › Compare graphics.
     compare_gfx: crate::compare_graphics::CompareGraphics,
-    viewport: Entity<Viewport>,
+    pub(crate) viewport: Entity<Viewport>,
     display: Arc<StudioDisplay>,
     built: Option<BuiltScene>,
     cache: GpuCache,
@@ -2023,7 +2026,7 @@ impl PartStudioView {
         if let Some(f) = frame {
             self.push_camera_history(cx);
             let cur = self.viewport.read(cx).camera.forward();
-            let fwd = if cur.dot(-f.normal) > 0.999 { f.normal } else { -f.normal };
+            let fwd = noshape_scene::camera_ops::normal_forward(cur, f.normal);
             self.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, f.y, cx));
         }
     }

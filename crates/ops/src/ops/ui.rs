@@ -184,6 +184,18 @@ fn state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         "sheets_panel_open": w.sheets_panel.iter().map(|t| tab_json(od, *t)).collect::<Vec<_>>(),
         "compare": w.compare.as_ref().map(|c| json!({ "base": c.base_label, "target": c.target_label })),
         "repair": w.repair.as_ref().map(|r| json!({ "at": r.0.to_string(), "label": r.1 })),
+        "cameras": w.cameras.iter().map(|(t, vc)| {
+            let mut v = super::camera::camera_json(vc, super::query::len_scale(&od.doc().settings.units));
+            v["tab"] = tab_json(od, *t);
+            v
+        }).collect::<Vec<_>>(),
+        "display": w.display.iter().map(|(t, d)| {
+            let mut v = super::display::display_json(d, matches!(od.doc().tab(*t).map(|t| &t.content), Some(noshape_model::document::TabContent::Assembly(_))));
+            v["tab"] = tab_json(od, *t);
+            v
+        }).collect::<Vec<_>>(),
+        "selection": w.selection.iter().filter(|(_, s)| !s.is_empty()).map(|(t, s)| json!({ "tab": tab_json(od, *t), "selected": s })).collect::<Vec<_>>(),
+        "drawing_zoom": w.sheets.iter().map(|(t, sv)| json!({ "tab": tab_json(od, *t), "zoom": sv.zoom, "center": sv.center, "viewport": sv.size })).collect::<Vec<_>>(),
     })
     .into())
 }

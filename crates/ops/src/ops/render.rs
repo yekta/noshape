@@ -49,7 +49,7 @@ pub fn ops() -> Vec<Op> {
             opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio."),
             opt("section", json!({ "type": "array", "items": { "type": "object" }, "maxItems": 3 }), "Section view: up to 3 planes [{\"plane\": a plane / planar face / sketch / mate connector id, \"offset\": length along its normal (default 0), \"flip\": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given."),
             opt("section_exclude", json!({ "type": "array", "items": { "type": "string" } }), "Section view › Items to exclude: parts (`body:…`) left whole."),
-            opt("view", json!({ "type": "string" }), "isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, or the name of a saved named view."),
+            opt("view", json!({ "type": "string" }), "isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, the name of a saved named view, or \"window\": the window's camera (view_camera; perspective and fit options then don't apply)."),
             opt("width", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "Pixels (default 800)."),
             opt("height", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "Pixels (default 600)."),
             opt("display_mode", json!({ "type": "string", "enum": ["shaded_with_edges", "shaded", "hidden_line", "translucent"] }), "Render style (default shaded_with_edges)."),
@@ -74,6 +74,16 @@ pub fn ops() -> Vec<Op> {
 }
 
 fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    // `view: "window"`: the window's display settings where the call gives none.
+    let merged = window_display_args(ctx, a)?;
+    let held;
+    let a = match &merged {
+        Some(v) => {
+            held = Args { op: a.op, value: v };
+            &held
+        }
+        None => a,
+    };
     let width = a.opt_u64("width")?.unwrap_or(800).clamp(16, 4096) as u32;
     let height = a.opt_u64("height")?.unwrap_or(600).clamp(16, 4096) as u32;
     let mode = match a.opt_str("display_mode")? {
@@ -107,8 +117,9 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let named = crate::doc::studio(od.doc(), tab)?.named_views.iter().find(|v| v.name.eq_ignore_ascii_case(&view_name)).cloned();
     let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1);
-    if view.is_none() && named.is_none() {
-        return Err(OpError::param("view", "a standard view (isometric, front, top, ...) or a named view of this Part Studio"));
+    let window = window_camera(od, tab, &view_name)?;
+    if view.is_none() && named.is_none() && window.is_none() {
+        return Err(OpError::param("view", "a standard view (isometric, front, top, ...), a named view of this Part Studio, or \"window\""));
     }
     // View in high quality: the parts tessellated 4x finer (as the app's).
     let r = if vo.high_quality { od.regenerate_with(tab, None, |o| o.relative_deflection *= 0.25)? } else { od.regenerate(tab, None)? };
@@ -154,6 +165,7 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
     let aspect = width as f64 / height as f64;
     let camera = match named {
+        _ if window.is_some() => window.expect("checked"),
         Some(v) => {
             let mut c = noshape_scene::png::fit_camera(lo, hi, aspect, None);
             c.rotation = glam::DQuat::from_xyzw(v.rotation[0], v.rotation[1], v.rotation[2], v.rotation[3]);
@@ -169,7 +181,9 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         camera.rotation = noshape_render::Camera::look_rotation(-f.normal, f.y);
         camera.fit_box(lo, hi, aspect);
     }
-    vo.finish_camera(&mut camera, lo, hi, aspect);
+    if window.is_none() {
+        vo.finish_camera(&mut camera, lo, hi, aspect);
+    }
     let style = vo.style();
     let png = off.render_png(&built.scene, &camera, &style, width, height).map_err(|e| OpError::new("render_failed", e))?;
     let mut v = json!({ "width": width, "height": height, "view": if normal_to.is_some() { "normal_to".to_string() } else { view_name }, "bytes": png.len() });
@@ -253,9 +267,13 @@ fn named_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOptions, mode: DisplayMode, view_name: &str) -> Result<OpOutput, OpError> {
     use noshape_model::document::TabContent;
     use noshape_scene::asm_scene::{self, AsmGpuCache, AsmSceneOptions};
-    let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1).ok_or_else(|| OpError::param("view", "a standard view: isometric, front, back, left, right, top, bottom, dimetric or trimetric"))?;
+    let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1);
     let od = ctx.doc(a.opt_str("doc")?)?;
     let tab = crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
+    let window = window_camera(od, tab, view_name)?;
+    if view.is_none() && window.is_none() {
+        return Err(OpError::param("view", "a standard view (isometric, front, back, left, right, top, bottom, dimetric, trimetric) or \"window\""));
+    }
     let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| &t.content) else { unreachable!("checked") };
     let values = super::configuration::asm::values(od, tab, asm);
     let eff = crate::assembly::effective(asm, &values);
@@ -298,8 +316,10 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
     let built = asm_scene::build(&result, &opts, &mut AsmGpuCache::default(), &up);
     let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
     let aspect = width as f64 / height as f64;
-    let mut camera = noshape_scene::png::fit_camera(lo, hi, aspect, Some(view));
-    vo.finish_camera(&mut camera, lo, hi, aspect);
+    let mut camera = window.unwrap_or_else(|| noshape_scene::png::fit_camera(lo, hi, aspect, view));
+    if window.is_none() {
+        vo.finish_camera(&mut camera, lo, hi, aspect);
+    }
     let style = vo.style();
     let png = off.render_png(&built.scene, &camera, &style, width, height).map_err(|e| OpError::new("render_failed", e))?;
     let mut v = json!({ "width": width, "height": height, "view": view_name, "bytes": png.len(), "instances": result.occurrences.iter().filter(|o| !o.hidden).count() });
@@ -308,6 +328,43 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
         v["file"] = json!(f);
     }
     Ok(OpOutput { value: v, images: vec![Image { png }] })
+}
+
+/// The call's arguments with the window's isolate / transparent and
+/// boundary edges (view_display) for those it doesn't give; None when not
+/// `view: "window"` or nothing to add.
+fn window_display_args(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Value>, OpError> {
+    if a.opt_str("view")? != Some("window") {
+        return Ok(None);
+    }
+    let assembly = super::configuration::asm::is_assembly(ctx, a)?;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = if assembly {
+        crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", |c| matches!(c, noshape_model::document::TabContent::Assembly(_)))?
+    } else {
+        crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Part Studio", crate::doc::is_part_studio)?
+    };
+    let Some(d) = od.window.display.get(&tab) else { return Ok(None) };
+    let mut v = a.value.clone();
+    let Some(m) = v.as_object_mut() else { return Ok(None) };
+    if let Some(iso) = &d.isolate
+        && !m.contains_key("isolate")
+        && !m.contains_key("transparent")
+    {
+        m.insert(if iso.transparent { "transparent" } else { "isolate" }.into(), json!(iso.ids));
+    }
+    if !assembly && d.highlight_boundary && !m.contains_key("boundary_edges") {
+        m.insert("boundary_edges".into(), json!(true));
+    }
+    Ok(Some(v))
+}
+
+/// `view: "window"`: the window's camera for the tab (view_camera).
+fn window_camera(od: &crate::OpenDoc, tab: noshape_model::document::TabId, view: &str) -> Result<Option<noshape_render::Camera>, OpError> {
+    if view != "window" {
+        return Ok(None);
+    }
+    od.window.cameras.get(&tab).map(|v| Some(v.camera)).ok_or_else(|| OpError::param("view", "the window has no camera for this tab yet: move it with view_camera first"))
 }
 
 /// The 3D view's display options (view menu, analysis tools) shared by

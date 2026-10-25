@@ -10,6 +10,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("ops_describe", &[r##"{"tools": ["drawing_section_view"]}"##]),
     ("ops_call", &[r##"{"tool": "drawing_section_view", "args": {"drawing": "Part 1 Drawing 1", "parent": 1, "point": [205.5, 160], "position": [300, 160]}}"##]),
     ("ui_state", &[r##"{}"##]),
+    ("ui_select", &[r##"{"action": "set", "refs": ["body:…"]}"##, r##"{"action": "related", "refs": ["face:…"], "criterion": "Tangent connected faces"}"##, r##"{"action": "select_other", "at": [640, 400], "index": 1}"##, r##"{"tab": "Assembly 1", "action": "same_configuration", "refs": ["Part 1 <1>"]}"##]),
     ("ui_preferences", &[r##"{}"##, r##"{"graphics": {"fov_deg": 60, "line_width": 1.5, "sketch_constrained": "#202020"}}"##]),
     ("ui_toolbar", &[r##"{}"##, r##"{"set": {"removed": ["helix"], "shortcut_tools": ["sketch", "extrude", "fillet"]}}"##]),
     ("ui_shortcuts", &[r##"{"tab": "Sketch"}"##, r##"{"search": "fillet"}"##]),
@@ -145,6 +146,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("analysis_curvature_map", &[r##"{}"##, r##"{"parts": ["Part 1"], "kind": "min_radius", "points": 5}"##]),
     ("analysis_thickness", &[r##"{}"##, r##"{"parts": ["Part 1"], "below": "1.5 mm", "points": 5}"##]),
     ("render_image", &[r##"{"view": "isometric", "file": "/tmp/part.png"}"##, r##"{"tab": "Assembly 1", "view": "isometric", "section": [{"plane": "plane:front"}]}"##, r##"{"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}"##, r##"{"view": "front", "perspective": true, "tangent_edges": "phantom", "hidden_edges": true}"##, r##"{"isolate": ["Part 1"], "zebra": {"stripes": 20}}"##, r##"{"normal_to": "plane:front", "reflection": {"image": "Blue sky", "rotation": 45}}"##]),
+    ("view_camera", &[r##"{"action": "zoom_fit"}"##, r##"{"action": "normal_to", "refs": ["plane:top"]}"##, r##"{"tab": "Drawing 1", "action": "zoom_window", "box": [[400, 200], [800, 500]]}"##]),
+    ("view_display", &[r##"{"isolate": ["Part 1"]}"##, r##"{"exit_isolate": true, "highlight_boundary": true}"##, r##"{"tab": "Assembly 1", "show_mates": true, "snap_mode": false}"##]),
     ("render_named_view", &[r##"{"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}"##, r##"{"name": "Section A", "delete": true}"##]),
     // import / export
     ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##, r##"{"tab": "Assembly 1", "format": "STEP", "file": "/tmp/assembly.step"}"##]),

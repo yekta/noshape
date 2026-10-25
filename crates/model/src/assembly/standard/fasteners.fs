@@ -211,6 +211,40 @@ function roundHead(r is ValueWithUnits, k is ValueWithUnits, rf is ValueWithUnit
 }
 
 /**
+ * Live's ISO 4762 under-head transition (behaviours "skb (10-25) ISO 4762
+ * / ISO 10642 tables"): a cone from radius `ra` at the bearing face (z = 0)
+ * to the shank radius `r` at z = -lx, filleted by `ru` against the bearing
+ * face and against the shank. The region reaches into the head and the
+ * shank so the union never rests on touching faces.
+ */
+function underTransition(context is Context, id is Id, r is ValueWithUnits, ra is ValueWithUnits, lx is ValueWithUnits, ru is ValueWithUnits)
+{
+    const dr = r - ra;
+    const len = sqrt(dr * dr + lx * lx);
+    // The cone's outward normal (r, z).
+    const nr = lx / len;
+    const nz = dr / len;
+    const up = lx / 2;
+    if (ru <= EPS)
+    {
+        revolveProfile(context, id, [{ "p" : rz(r / 2, up) }, { "p" : rz(ra, up) }, { "p" : rz(ra, Z) }, { "p" : rz(r, -lx) }, { "p" : rz(r / 2, -lx) }]);
+        return;
+    }
+    // Fillet centres: against the bearing face (z = -ru) and the shank (r + ru).
+    const c1r = ra + ru * (len + dr) / lx;
+    const c1z = -ru;
+    const c2r = r + ru;
+    const c2z = -lx + ru * (len - lx) / dr;
+    const m1 = vector(-nr, 1 - nz) / sqrt(nr * nr + (1 - nz) * (1 - nz));
+    const m2 = vector(-1 - nr, -nz) / sqrt((1 + nr) * (1 + nr) + nz * nz);
+    revolveProfile(context, id, [{ "p" : rz(r / 2, up) }, { "p" : rz(c1r, up) }, { "p" : rz(c1r, Z) },
+            { "p" : rz(c1r - ru * nr, c1z - ru * nz), "mid" : rz(c1r + ru * m1[0], c1z + ru * m1[1]) },
+            { "p" : rz(c2r - ru * nr, c2z - ru * nz) },
+            { "p" : rz(r, c2z), "mid" : rz(c2r + ru * m2[0], c2z + ru * m2[1]) },
+            { "p" : rz(r / 2, c2z) }]);
+}
+
+/**
  * A pan head (live's tapping screws): the side of radius r up to an edge
  * fillet re, tangent to a crown sphere of radius rc whose top is at z0 + k.
  */
@@ -337,13 +371,23 @@ function screwHead(context is Context, id is Id, def is map) returns array
     }
     if (kind == HEAD_ROUND && def.rimDome != undefined && def.rimDome == 1)
     {
-        // Live's ISO 7380 button head: a sphere of radius rf centred on the
-        // axis through the rim (dk at the bearing face); it rises above the
-        // head height k, where the socket cuts it (dom/skb-sc-geom M6).
+        // Live's ISO 7380 button head (behaviours "skb (10-25) ISO 7380
+        // dome"): a sphere of radius rf centred on the axis through the rim
+        // (dk at the bearing face), cut flat at the head height k: the top is
+        // a plane out to dt / 2 (HEAD_TOP_DIA), where the sphere meets it.
         const rb = def.dk / 2;
         const zc = -sqrt(max(def.rf * def.rf - rb * rb, Z * Z));
-        const rm = rb / 2;
-        revolveProfile(context, id + "round", [{ "p" : rz(Z, Z) }, { "p" : rz(rb, Z) }, { "p" : rz(Z, zc + def.rf), "mid" : rz(rm, zc + sqrt(def.rf * def.rf - rm * rm)) }]);
+        if (zc + def.rf > def.k + EPS)
+        {
+            const rt = sqrt(max(def.rf * def.rf - (def.k - zc) * (def.k - zc), Z * Z));
+            const rm = (rb + rt) / 2;
+            revolveProfile(context, id + "round", [{ "p" : rz(Z, Z) }, { "p" : rz(rb, Z) }, { "p" : rz(rt, def.k), "mid" : rz(rm, zc + sqrt(def.rf * def.rf - rm * rm)) }, { "p" : rz(Z, def.k) }]);
+        }
+        else
+        {
+            const rm = rb / 2;
+            revolveProfile(context, id + "round", [{ "p" : rz(Z, Z) }, { "p" : rz(rb, Z) }, { "p" : rz(Z, zc + def.rf), "mid" : rz(rm, zc + sqrt(def.rf * def.rf - rm * rm)) }]);
+        }
         return [qCreatedBy(id, EntityType.BODY), def.k];
     }
     if (kind == HEAD_ROUND)
@@ -385,6 +429,19 @@ function screwHead(context is Context, id is Id, def is map) returns array
             const tangent = rz(cx - rfc * ca, -def.k + rfc * sa);
             const mid = normalize(vector(-1 - ca, sa));
             pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : tangent, "mid" : rz(cx + rfc * mid[0], -def.k + rfc * mid[1]) }, { "p" : rz(def.dk / 2, Z) }];
+        }
+        // Live's ISO 10642 (behaviours "skb (10-25) ISO 4762 / ISO 10642
+        // tables"): HEAD_FILLET rounds the cone into the shank, a torus
+        // tangent to both whose centre is ru outside the shank.
+        if (def.ru != undefined && def.ru > EPS && def.undercut != 1 && def.cskFillet != 1)
+        {
+            const u = normalize(vector(def.dk / 2 - def.d / 2, def.k - def.c));
+            const nr = u[1];
+            const nz = -u[0];
+            const cr = def.d / 2 + def.ru;
+            const cz = -def.k + def.ru * (1 - nr) / nz;
+            const m = normalize(vector(-1 - nr, -nz));
+            pts = [{ "p" : rz(Z, cz) }, { "p" : rz(def.d / 2, cz) }, { "p" : rz(cr - def.ru * nr, cz - def.ru * nz), "mid" : rz(cr + def.ru * m[0], cz + def.ru * m[1]) }, { "p" : rz(def.dk / 2, -def.c) }, { "p" : rz(def.dk / 2, Z) }];
         }
         if (kind == HEAD_RAISED_COUNTERSUNK && def.f > EPS)
         {
@@ -948,6 +1005,10 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isInteger(definition.drill, { (unitless) : [0, 0, 180] } as IntegerBoundSpec);
         annotation { "Name" : "Under-head fillet" }
         isLength(definition.ru, LENGTH_0);
+        annotation { "Name" : "Transition diameter" }
+        isLength(definition.da, LENGTH_0);
+        annotation { "Name" : "Transition length" }
+        isLength(definition.lx, LENGTH_0);
         annotation { "Name" : "Dome through the rim" }
         isInteger(definition.rimDome, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
         annotation { "Name" : "d" }
@@ -1081,7 +1142,10 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         // An under-head fillet `ru` between the shank and a flat bearing face
         // (live's ISO 7380 HEAD_FILLET: a torus); the region reaches into the
         // head and the shank so the union never rests on touching faces.
-        if (def.ru != undefined && def.ru > EPS && def.head != HEAD_NONE && below == Z && neck[1] >= below - EPS)
+        const transition = def.da != undefined && def.lx != undefined && def.da > def.d + EPS && def.lx > EPS;
+        if (transition && def.head != HEAD_NONE && below == Z && neck[1] >= below - EPS)
+            underTransition(context, id + "underFillet", def.d / 2, def.da / 2, def.lx, def.ru == undefined ? Z : def.ru);
+        else if (def.ru != undefined && def.ru > EPS && def.head != HEAD_NONE && below == Z && neck[1] >= below - EPS)
         {
             const r = def.d / 2;
             const q = def.ru * sqrt(0.5);

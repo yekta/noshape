@@ -3906,14 +3906,84 @@ fn din_985_nuts_build_every_live_size() {
     assert!((dz - 0.008).abs() < 1e-6, "height {dz}");
 }
 
-/// ISO 7380 socket button head M6 x 20 against live's B-rep (dom/skb-sc-geom):
-/// 19 faces; every face but the dome sphere and the six hex walls (which end
-/// on it) matches live exactly: the bearing face 53.4071, under-head fillet
-/// 7.6264, shank 362.0761, point chamfer 13.1271 and end 18.9921, the 140
-/// degree drill point 13.3729 and six ledges 0.2150 mm² (sum 469.8914 mm²).
-/// The dome's rule is asked of live (REQUESTS "skb (10-25) ISO 7380 dome").
+/// ISO 4762 socket head cap screw M6 x 20 against live's B-rep (dom/skb-sc-geom
+/// Hex_socket_head_cap_screw_ISO_4762_M6, behaviours "skb (10-25) ISO 4762 /
+/// ISO 10642 tables"): 23 faces, 755.5717 mm²; the head's top edge a 0.6 mm
+/// torus, and under the head a cone from Ø6.8 over 0.68 mm (30.47°) with a
+/// 0.25 mm torus at each end (majors 3.54299 and 3.25).
 #[test]
-fn iso_7380_button_head_matches_live_but_the_dome() {
+fn iso_4762_cap_screw_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::Surface;
+    let c = CATALOGUE.iter().find(|c| c.name == "Hex socket head cap screw ISO 4762").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("M6");
+    spec.length = Some("20".into());
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let (mut total, mut tori, mut cones) = (0.0, 0, 0);
+    for i in 0..b.faces.len() {
+        let f = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+        total += f.area().unwrap() * 1e6;
+        match f.face_surface().unwrap() {
+            Surface::Torus { .. } => tori += 1,
+            Surface::Cone { .. } => cones += 1,
+            _ => {}
+        }
+    }
+    assert_eq!((b.faces.len(), tori, cones), (23, 3, 3));
+    assert!((total - 755.5717).abs() < 1e-3, "{total} mm²");
+    // Every size of live's table builds one solid.
+    let mut failures = Vec::new();
+    for size in c.sizes.iter().map(|s| s.name.clone()) {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(&size);
+        match standard::regenerate(&spec) {
+            Ok(r) if standard::part_body(&r).is_some() => {}
+            Ok(r) => failures.push(format!("{size}: {:?}", r.display.features.iter().filter_map(|f| f.message.clone()).collect::<Vec<_>>())),
+            Err(e) => failures.push(format!("{size}: {e}")),
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// ISO 10642 socket countersunk head M6 x 20 against live's B-rep
+/// (dom/skb-sc-geom Hex_socket_countersunk_head_screw_ISO_10642_M6): 20
+/// faces, 601.1356 mm²; a Ø11.34 head with a 1.05 mm cylindrical rim over
+/// the 90 degree cone, which a 0.25 mm torus (major 3.25) rounds into the
+/// shank.
+#[test]
+fn iso_10642_countersunk_screw_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Hex socket countersunk head screw ISO 10642").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("M6");
+    spec.length = Some("20".into());
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let total: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap() * 1e6).sum();
+    assert_eq!(b.faces.len(), 20);
+    assert!((total - 601.1356).abs() < 1e-3, "{total} mm²");
+    let mut failures = Vec::new();
+    for size in c.sizes.iter().map(|s| s.name.clone()) {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(&size);
+        match standard::regenerate(&spec) {
+            Ok(r) if standard::part_body(&r).is_some() => {}
+            Ok(r) => failures.push(format!("{size}: {:?}", r.display.features.iter().filter_map(|f| f.message.clone()).collect::<Vec<_>>())),
+            Err(e) => failures.push(format!("{size}: {e}")),
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// ISO 7380 socket button head M6 x 20 against live's B-rep (dom/skb-sc-geom
+/// M6x20, behaviours "skb (10-25) ISO 7380 dome"): 20 faces; the dome is a
+/// sphere through the rim, cut flat at the head height (top plane out to
+/// HEAD_TOP_DIA / 2 = 3 mm): sphere 111.4929, top 14.4179, hex walls 4.8036
+/// each; 624.6237 mm² in all and 739.6215 mm³.
+#[test]
+fn iso_7380_button_head_matches_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     use noshape_kernel::Surface;
     let c = CATALOGUE.iter().find(|c| c.name == "Socket button head screw ISO 7380").unwrap();
@@ -3926,15 +3996,18 @@ fn iso_7380_button_head_matches_live_but_the_dome() {
     spec.length = Some("20".into());
     let r = standard::regenerate(&spec).unwrap();
     let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
-    assert_eq!(b.faces.len(), 19);
-    let mut rest = 0.0;
+    assert_eq!(b.faces.len(), 20);
+    let (mut total, mut sphere) = (0.0, 0.0);
     for i in 0..b.faces.len() {
         let f = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
-        let bb = f.bounding_box(true).unwrap();
-        let wall = matches!(f.face_surface().unwrap(), Surface::Plane(_)) && bb.max.z - bb.min.z > 1e-6;
-        if !matches!(f.face_surface().unwrap(), Surface::Sphere { .. }) && !wall {
-            rest += f.area().unwrap();
+        let a = f.area().unwrap() * 1e6;
+        total += a;
+        if matches!(f.face_surface().unwrap(), Surface::Sphere { .. }) {
+            sphere += a;
         }
     }
-    assert!((rest * 1e6 - 469.8914).abs() < 1e-3, "{} mm²", rest * 1e6);
+    assert!((sphere - 111.4929).abs() < 1e-3, "sphere {sphere} mm²");
+    assert!((total - 624.6237).abs() < 1e-3, "{total} mm²");
+    let v = b.shape.volume().unwrap() * 1e9;
+    assert!((v - 739.6215).abs() < 1e-3, "{v} mm³");
 }

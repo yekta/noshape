@@ -4,9 +4,11 @@
 //! and read it back (`ui_state`). Each change is also a [`UiRequest`]: with
 //! the app open on the document (live mode) the window does the same.
 
+use glam::{DQuat, DVec2, DVec3};
 use noshape_model::document::{Document, TabContent, TabId};
+use noshape_render::Camera;
 use noshape_store::{BranchId, MicroversionId};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 /// A window action an operation asks for. Without the app open there is no
@@ -26,6 +28,135 @@ pub enum UiRequest {
     Compare(Option<CompareRequest>),
     /// The Repair panel on a history entry (`label`), or closed.
     Repair(Option<(MicroversionId, String)>),
+    /// A Part Studio's or Assembly's camera move (the window's graphics
+    /// area does it, animated, at its own size).
+    Camera { tab: TabId, mv: CameraMove },
+    /// A drawing's zoom.
+    SheetZoom { tab: TabId, mv: SheetMove },
+    /// A Part Studio's or Assembly's display setting (view_display).
+    Display { tab: TabId, set: DisplaySet },
+    /// The tab's selection (ui_select).
+    Select { tab: TabId, sel: Selected },
+}
+
+/// What a tab has selected.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Selected {
+    /// Part Studio entities.
+    Studio(Vec<noshape_model::reference::Reference>),
+    /// Assembly instances.
+    Instances(Vec<noshape_model::assembly::InstanceId>),
+    /// Clear selection.
+    Clear,
+}
+
+/// A display setting as the view and context menus change it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DisplaySet {
+    /// Isolate… / Make transparent… on these parts (Part Studio).
+    IsolateParts { transparent: bool, parts: Vec<noshape_model::BodyId> },
+    /// Isolate… / Make transparent… on these instances (Assembly).
+    IsolateInstances { transparent: bool, instances: Vec<noshape_model::assembly::InstanceId> },
+    /// Exit isolate.
+    ExitIsolate,
+    /// View › Highlight boundary edges.
+    HighlightBoundary(bool),
+    /// View › Orient normal to sketch on edit.
+    OrientOnEdit(bool),
+    /// Analysis › Turn thickness analysis off.
+    ThicknessOff,
+    /// Assembly: Hide/show mates (the mate indicators).
+    ShowMates(bool),
+    /// Assembly: Show mates mode.
+    ShowMatesMode(bool),
+    /// Assembly: Snap mode.
+    SnapMode(bool),
+}
+
+/// Make isolate / Make transparent: which, and the parts' (`body:…`) or
+/// instances' (`inst:…`) ids.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Isolation {
+    pub transparent: bool,
+    pub ids: Vec<String>,
+}
+
+/// A 3D tab's display settings as the agent set them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TabDisplay {
+    pub isolate: Option<Isolation>,
+    pub highlight_boundary: bool,
+    pub orient_on_edit: bool,
+    pub show_mates: bool,
+    pub show_mates_mode: bool,
+    pub snap_mode: bool,
+}
+
+/// A camera move as the view menus do it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum CameraMove {
+    /// Zoom to fit, at this orientation (a standard view) if given.
+    Fit(Option<DQuat>),
+    /// Zoom to selection: frame this box (an assembly's instances: as a sphere).
+    FitBox { lo: DVec3, hi: DVec3, sphere: bool },
+    /// Z / Shift+Z.
+    Step { zoom_in: bool },
+    /// Zoom to window: the box between two points given as fractions of
+    /// the view (0..1, from the top left).
+    Window(DVec2, DVec2),
+    /// Look along `forward`, `up` up (View normal to, Align view with
+    /// vertical axis).
+    Direction { forward: DVec3, up: DVec3 },
+    /// Previous view.
+    Previous,
+    /// Perspective view on / off.
+    Perspective(bool),
+}
+
+/// A drawing zoom.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SheetMove {
+    /// Zoom to fit / Zoom to sheet.
+    Fit,
+    /// Zoom in (factor > 1) or out about the canvas centre.
+    Step(f64),
+    /// Zoom to window (fractions of the canvas, as [`CameraMove::Window`]).
+    Window([f64; 2], [f64; 2]),
+}
+
+/// The size of the agent's graphics area (logical pixels) until set.
+pub const VIEWPORT: [f64; 2] = [1280.0, 800.0];
+
+/// A 3D tab's view as the agent drives it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewCamera {
+    pub camera: Camera,
+    /// Previous view: the cameras before each change (latest last; 50 kept).
+    pub history: Vec<Camera>,
+    /// The graphics area's size (logical pixels).
+    pub viewport: DVec2,
+}
+
+impl ViewCamera {
+    /// Keep the camera for Previous view, then change it.
+    pub fn set(&mut self, to: Camera) {
+        if self.history.last() != Some(&self.camera) {
+            self.history.push(self.camera);
+            if self.history.len() > 50 {
+                self.history.remove(0);
+            }
+        }
+        self.camera = to;
+    }
+}
+
+/// A drawing's zoom (pixels per mm) and the sheet point (mm) at the canvas
+/// centre, for a canvas of `size` pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SheetView {
+    pub zoom: f64,
+    pub center: [f64; 2],
+    pub size: [f64; 2],
 }
 
 /// One side of a compare: a workspace's head or a history entry.
@@ -56,6 +187,14 @@ pub struct WindowState {
     pub compare: Option<CompareRequest>,
     /// The Repair panel: the entry shown and its label.
     pub repair: Option<(MicroversionId, String)>,
+    /// 3D tabs' cameras (set by view_camera).
+    pub cameras: BTreeMap<TabId, ViewCamera>,
+    /// Drawings' zoom (set by view_camera).
+    pub sheets: BTreeMap<TabId, SheetView>,
+    /// 3D tabs' display settings (set by view_display).
+    pub display: BTreeMap<TabId, TabDisplay>,
+    /// Each tab's selection: entity ids, or an assembly's `inst:` ids (ui_select).
+    pub selection: BTreeMap<TabId, Vec<String>>,
 }
 
 impl WindowState {
@@ -74,6 +213,8 @@ impl WindowState {
             }
             UiRequest::Compare(c) => self.compare = c.clone(),
             UiRequest::Repair(r) => self.repair = r.clone(),
+            // view_camera, view_display and ui_select keep their state themselves.
+            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } => {}
         }
     }
 }

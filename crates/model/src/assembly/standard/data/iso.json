@@ -11333,12 +11333,14 @@
       "label": "Hex socket countersunk head screw M2x0.4",
       "d": 2.0,
       "dims": {
+       "c": 0.2,
+       "ru": 0.1,
        "d": 2.0,
-       "dk": 4.7,
-       "k": 1.35,
+       "dk": 4.0,
+       "k": 1.2,
        "sd": 1.3,
-       "t": 0.75,
-       "dp": 1.509252
+       "t": 0.84,
+       "dp": 1.566987
       },
       "lengths": [
        "2",
@@ -11368,12 +11370,14 @@
       "label": "Hex socket countersunk head screw M2.5x0.45",
       "d": 2.5,
       "dims": {
+       "c": 0.25,
+       "ru": 0.1,
        "d": 2.5,
-       "dk": 5.88,
-       "k": 1.69,
+       "dk": 5.0,
+       "k": 1.5,
        "sd": 1.5,
-       "t": 1.0,
-       "dp": 1.947909
+       "t": 1.05,
+       "dp": 2.012861
       },
       "lengths": [
        "2",
@@ -11403,12 +11407,14 @@
       "label": "Hex socket countersunk head screw M3x0.5",
       "d": 3.0,
       "dims": {
+       "c": 0.59,
+       "ru": 0.1,
        "d": 3.0,
-       "dk": 6.72,
+       "dk": 5.54,
        "k": 1.86,
        "sd": 2.0,
        "t": 1.1,
-       "dp": 2.386566
+       "dp": 2.458734
       },
       "lengths": [
        "3",
@@ -11439,12 +11445,14 @@
       "label": "Hex socket countersunk head screw M4x0.7",
       "d": 4.0,
       "dims": {
+       "c": 0.715,
+       "ru": 0.2,
        "d": 4.0,
-       "dk": 8.96,
+       "dk": 7.53,
        "k": 2.48,
        "sd": 2.5,
-       "t": 1.4,
-       "dp": 3.141192
+       "t": 1.5,
+       "dp": 3.242228
       },
       "lengths": [
        "4",
@@ -11478,12 +11486,14 @@
       "label": "Hex socket countersunk head screw M5x0.8",
       "d": 5.0,
       "dims": {
+       "c": 0.885,
+       "ru": 0.2,
        "d": 5.0,
-       "dk": 11.2,
+       "dk": 9.43,
        "k": 3.1,
        "sd": 3.0,
-       "t": 1.75,
-       "dp": 4.018505
+       "t": 1.9,
+       "dp": 4.133974
       },
       "lengths": [
        "5",
@@ -11518,12 +11528,14 @@
       "label": "Hex socket countersunk head screw M6x1",
       "d": 6.0,
       "dims": {
+       "c": 1.05,
+       "ru": 0.25,
        "d": 6.0,
-       "dk": 13.44,
+       "dk": 11.34,
        "k": 3.72,
        "sd": 4.0,
        "t": 2.2,
-       "dp": 4.773131
+       "dp": 4.917468
       },
       "lengths": [
        "6",
@@ -11562,12 +11574,14 @@
       "label": "Hex socket countersunk head screw M8x1.25",
       "d": 8.0,
       "dims": {
+       "c": 1.34,
+       "ru": 0.4,
        "d": 8.0,
-       "dk": 17.92,
+       "dk": 15.24,
        "k": 4.96,
        "sd": 5.0,
-       "t": 2.9,
-       "dp": 6.466414
+       "t": 3.0,
+       "dp": 6.646835
       },
       "lengths": [
        "8",
@@ -11605,12 +11619,14 @@
       "label": "Hex socket countersunk head screw M10x1.5",
       "d": 10.0,
       "dims": {
+       "c": 1.59,
+       "ru": 0.4,
        "d": 10.0,
-       "dk": 22.4,
+       "dk": 19.22,
        "k": 6.2,
        "sd": 6.0,
-       "t": 3.5,
-       "dp": 8.159696
+       "t": 3.6,
+       "dp": 8.376202
       },
       "lengths": [
        "12",
@@ -11646,12 +11662,14 @@
       "label": "Hex socket countersunk head screw M12x1.75",
       "d": 12.0,
       "dims": {
+       "c": 1.88,
+       "ru": 0.6,
        "d": 12.0,
-       "dk": 26.88,
+       "dk": 23.12,
        "k": 7.44,
        "sd": 8.0,
        "t": 4.3,
-       "dp": 9.852979
+       "dp": 10.105569
       },
       "lengths": [
        "20",
@@ -11685,12 +11703,14 @@
       "label": "Hex socket countersunk head screw M16x2",
       "d": 16.0,
       "dims": {
+       "c": 2.295,
+       "ru": 0.6,
        "d": 16.0,
-       "dk": 33.6,
+       "dk": 29.01,
        "k": 8.8,
        "sd": 10.0,
        "t": 4.8,
-       "dp": 13.546262
+       "dp": 13.834936
       },
       "lengths": [
        "30",
@@ -11721,12 +11741,14 @@
       "label": "Hex socket countersunk head screw M20x2.5",
       "d": 20.0,
       "dims": {
+       "c": 2.135,
+       "ru": 0.8,
        "d": 20.0,
-       "dk": 40.32,
+       "dk": 36.05,
        "k": 10.16,
        "sd": 12.0,
        "t": 5.6,
-       "dp": 16.932828
+       "dp": 17.29367
       },
       "lengths": [
        "35",
@@ -11752,7 +11774,7 @@
       }
      }
     ],
-    "source": "ISO 10642:2019 values (dimensions unchanged in ISO 10642:2026 per its foreword: only footnotes, Table 4/5 and Annex A revised); 2004 values given in *_2004 columns (Fasteners - Hexagon socket countersunk head screws with reduced loadability); https://fasten.it/Norms/Norm/DIN_EN_ISO_10642 (three tables: DIN EN ISO 10642 02/2020 (= ISO 10642:2019), 04/2013 (= 2004+A1:2012), 06/2004); https://cdn.standards.iteh.ai/samples/72578/605af3981ef24d9fb6f7219b02304303/ISO-10642-2019.pdf (ISO 10642:2019 sample: foreword change list only, table not included); https://cdn.standards.iteh.ai/samples/iso/iso-10642-2026/963ae79e6892488fb4214c7c14758051/iso-10642-2026.pdf (ISO 10642:2026 sample: foreword change list)",
+    "source": "Onshape standard content table DATA_ISO_10642_HEX_SOCKET_CTSK_HEAD_SCREW_MAIN (document e100b7397acb2d6ad2b9a132, version adding sizes for migration)",
     "thread": {
      "rule": "iso"
     }
@@ -11774,12 +11796,16 @@
       "label": "Hex socket head cap screw M1.6x0.35",
       "d": 1.6,
       "dims": {
+       "rf": 0.16,
+       "ru": 0.1,
+       "da": 2.0,
+       "lx": 0.34,
        "d": 1.6,
        "dk": 3.0,
        "k": 1.6,
        "sd": 1.5,
        "t": 0.7,
-       "dp": 1.170596
+       "dp": 1.221114
       },
       "lengths": [
        "2.5",
@@ -11807,12 +11833,16 @@
       "label": "Hex socket head cap screw M2x0.40",
       "d": 2.0,
       "dims": {
+       "rf": 0.2,
+       "ru": 0.1,
+       "da": 2.6,
+       "lx": 0.51,
        "d": 2.0,
        "dk": 3.8,
        "k": 2.0,
        "sd": 1.5,
        "t": 1.0,
-       "dp": 1.509252
+       "dp": 1.566987
       },
       "lengths": [
        "3",
@@ -11843,12 +11873,16 @@
       "label": "Hex socket head cap screw M2.5x0.45",
       "d": 2.5,
       "dims": {
+       "rf": 0.25,
+       "ru": 0.1,
+       "da": 3.1,
+       "lx": 0.51,
        "d": 2.5,
        "dk": 4.5,
        "k": 2.5,
        "sd": 2.0,
        "t": 1.1,
-       "dp": 1.947909
+       "dp": 2.012861
       },
       "lengths": [
        "3",
@@ -11879,12 +11913,16 @@
       "label": "Hex socket head cap screw M3x0.50",
       "d": 3.0,
       "dims": {
+       "rf": 0.3,
+       "ru": 0.1,
+       "da": 3.6,
+       "lx": 0.51,
        "d": 3.0,
        "dk": 5.5,
        "k": 3.0,
        "sd": 2.5,
        "t": 1.3,
-       "dp": 2.386566
+       "dp": 2.458734
       },
       "lengths": [
        "3",
@@ -11921,12 +11959,16 @@
       "label": "Hex socket head cap screw M4x0.70",
       "d": 4.0,
       "dims": {
+       "rf": 0.4,
+       "ru": 0.2,
+       "da": 4.7,
+       "lx": 0.6,
        "d": 4.0,
        "dk": 7.0,
        "k": 4.0,
        "sd": 3.0,
        "t": 2.0,
-       "dp": 3.141192
+       "dp": 3.242228
       },
       "lengths": [
        "4",
@@ -11968,12 +12010,16 @@
       "label": "Hex socket head cap screw M5x0.80",
       "d": 5.0,
       "dims": {
+       "rf": 0.5,
+       "ru": 0.2,
+       "da": 5.7,
+       "lx": 0.6,
        "d": 5.0,
        "dk": 8.5,
        "k": 5.0,
        "sd": 4.0,
        "t": 2.5,
-       "dp": 4.018505
+       "dp": 4.133974
       },
       "lengths": [
        "5",
@@ -12017,12 +12063,16 @@
       "label": "Hex socket head cap screw M6x1.00",
       "d": 6.0,
       "dims": {
+       "rf": 0.6,
+       "ru": 0.25,
+       "da": 6.8,
+       "lx": 0.68,
        "d": 6.0,
        "dk": 10.0,
        "k": 6.0,
        "sd": 5.0,
        "t": 3.0,
-       "dp": 4.773131
+       "dp": 4.917468
       },
       "lengths": [
        "6",
@@ -12071,12 +12121,16 @@
       "label": "Hex socket head cap screw M8x1.25",
       "d": 8.0,
       "dims": {
+       "rf": 0.8,
+       "ru": 0.4,
+       "da": 9.2,
+       "lx": 1.02,
        "d": 8.0,
        "dk": 13.0,
        "k": 8.0,
        "sd": 6.0,
        "t": 4.0,
-       "dp": 6.466414
+       "dp": 6.646835
       },
       "lengths": [
        "12",
@@ -12120,12 +12174,16 @@
       "label": "Hex socket head cap screw M10x1.50",
       "d": 10.0,
       "dims": {
+       "rf": 1.0,
+       "ru": 0.4,
+       "da": 11.2,
+       "lx": 1.02,
        "d": 10.0,
        "dk": 16.0,
        "k": 10.0,
        "sd": 8.0,
        "t": 5.0,
-       "dp": 8.159696
+       "dp": 8.376202
       },
       "lengths": [
        "16",
@@ -12167,12 +12225,16 @@
       "label": "Hex socket head cap screw M12x1.75",
       "d": 12.0,
       "dims": {
+       "rf": 1.2,
+       "ru": 0.6,
+       "da": 13.7,
+       "lx": 1.45,
        "d": 12.0,
        "dk": 18.0,
        "k": 12.0,
        "sd": 10.0,
        "t": 6.0,
-       "dp": 9.852979
+       "dp": 10.105569
       },
       "lengths": [
        "18",
@@ -12213,12 +12275,16 @@
       "label": "Hex socket head cap screw M14x2.00",
       "d": 14.0,
       "dims": {
+       "rf": 1.4,
+       "ru": 0.6,
+       "da": 15.7,
+       "lx": 1.45,
        "d": 14.0,
        "dk": 21.0,
        "k": 14.0,
        "sd": 12.0,
-       "t": 7.0,
-       "dp": 11.546262
+       "t": 6.0,
+       "dp": 11.834936
       },
       "lengths": [
        "25",
@@ -12253,12 +12319,16 @@
       "label": "Hex socket head cap screw M16x2.00",
       "d": 16.0,
       "dims": {
+       "rf": 1.6,
+       "ru": 0.6,
+       "da": 17.7,
+       "lx": 1.45,
        "d": 16.0,
        "dk": 24.0,
        "k": 16.0,
        "sd": 14.0,
        "t": 8.0,
-       "dp": 13.546262
+       "dp": 13.834936
       },
       "lengths": [
        "25",
@@ -12297,12 +12367,16 @@
       "label": "Hex socket head cap screw M18x2.50",
       "d": 18.0,
       "dims": {
+       "rf": 1.8,
+       "ru": 0.6,
+       "da": 19.7,
+       "lx": 1.75,
        "d": 18.0,
        "dk": 27.0,
        "k": 18.0,
        "sd": 14.0,
-       "t": 9.0,
-       "dp": 14.932828
+       "t": 8.0,
+       "dp": 15.29367
       },
       "lengths": [
        "35",
@@ -12340,12 +12414,16 @@
       "label": "Hex socket head cap screw M20x2.50",
       "d": 20.0,
       "dims": {
+       "rf": 2.0,
+       "ru": 0.8,
+       "da": 22.4,
+       "lx": 2.04,
        "d": 20.0,
        "dk": 30.0,
        "k": 20.0,
        "sd": 17.0,
        "t": 10.0,
-       "dp": 16.932828
+       "dp": 17.29367
       },
       "lengths": [
        "30",
@@ -12386,12 +12464,16 @@
       "label": "Hex socket head cap screw M24x3.00",
       "d": 24.0,
       "dims": {
+       "rf": 2.4,
+       "ru": 0.8,
+       "da": 26.4,
+       "lx": 2.04,
        "d": 24.0,
        "dk": 36.0,
        "k": 24.0,
        "sd": 19.0,
        "t": 12.0,
-       "dp": 20.319393
+       "dp": 20.752404
       },
       "lengths": [
        "40",
@@ -12428,12 +12510,16 @@
       "label": "Hex socket head cap screw M30x3.50",
       "d": 30.0,
       "dims": {
+       "rf": 3.0,
+       "ru": 1.0,
+       "da": 33.4,
+       "lx": 2.89,
        "d": 30.0,
        "dk": 45.0,
        "k": 30.0,
        "sd": 22.0,
        "t": 15.5,
-       "dp": 25.705959
+       "dp": 26.211138
       },
       "lengths": [
        "45",
@@ -12469,12 +12555,16 @@
       "label": "Hex socket head cap screw M36x4.00",
       "d": 36.0,
       "dims": {
+       "rf": 3.6,
+       "ru": 1.0,
+       "da": 39.4,
+       "lx": 2.89,
        "d": 36.0,
        "dk": 54.0,
        "k": 36.0,
        "sd": 27.0,
        "t": 19.0,
-       "dp": 31.092524
+       "dp": 31.669872
       },
       "lengths": [
        "55",
@@ -12508,12 +12598,16 @@
       "label": "Hex socket head cap screw M42x4.50",
       "d": 42.0,
       "dims": {
+       "rf": 4.2,
+       "ru": 1.2,
+       "da": 45.6,
+       "lx": 3.06,
        "d": 42.0,
        "dk": 63.0,
        "k": 42.0,
        "sd": 32.0,
        "t": 24.0,
-       "dp": 36.47909
+       "dp": 37.128606
       },
       "lengths": [
        "60",
@@ -12551,12 +12645,16 @@
       "label": "Hex socket head cap screw M48x5.00",
       "d": 48.0,
       "dims": {
+       "rf": 4.8,
+       "ru": 1.6,
+       "da": 52.6,
+       "lx": 3.91,
        "d": 48.0,
        "dk": 72.0,
        "k": 48.0,
        "sd": 36.0,
        "t": 28.0,
-       "dp": 41.865655
+       "dp": 42.58734
       },
       "lengths": [
        "70",
@@ -12592,12 +12690,16 @@
       "label": "Hex socket head cap screw M56x5.50",
       "d": 56.0,
       "dims": {
+       "rf": 5.6,
+       "ru": 2.0,
+       "da": 63.0,
+       "lx": 5.95,
        "d": 56.0,
        "dk": 84.0,
        "k": 56.0,
        "sd": 41.0,
        "t": 34.0,
-       "dp": 49.25222
+       "dp": 50.046074
       },
       "lengths": [
        "80",
@@ -12632,12 +12734,16 @@
       "label": "Hex socket head cap screw M64x6.00",
       "d": 64.0,
       "dims": {
+       "rf": 6.4,
+       "ru": 2.0,
+       "da": 71.0,
+       "lx": 5.95,
        "d": 64.0,
        "dk": 96.0,
        "k": 64.0,
        "sd": 46.0,
        "t": 38.0,
-       "dp": 56.638786
+       "dp": 57.504808
       },
       "lengths": [
        "90",
@@ -12667,7 +12773,7 @@
       }
      }
     ],
-    "source": "ISO 4762:2004 (confirmed 2023) (Hexagon socket head cap screws); https://www.fasteners.eu/standards/ISO/4762/ (full Table 1 and Table 2 ls/lg); https://fasten.it/Norms/Norm/DIN_EN_ISO_4762 (DIN EN ISO 4762:2004 table: P, dk, k, s, t, w, b; mass table for length range); https://www.globalfastener.com/standards/detail_1737.html (ISO 4762-2004: P, dk, da, ds, e, k, s, t, w) | some sizes: DIN 912:1983-12 (withdrawn; earlier editions 1933-10 ... 1979-09) (Hexagon socket head cap screws (Zylinderschrauben mit Innensechskant)); https://bolt.msk.ru/standards/DIN%20EN%20ISO%204762.pdf (DIN EN ISO 4762:2004-06 full text: Tabelle 1 values and length ranges used for M1.6-M64; national foreword lists DIN 912:1983-12 as predecessor and the 2004 s-tolerance change for s=1.5/2); https://www.fasteners.eu/standards/DIN/912/ (local copy /root/skb-scratch/dl/fe/din912.html; identical to its ISO 4762 page https://www.fasteners.eu/standards/ISO/4762/ - all values agree with ISO 4762:2004); https://ferrofast.com/resources/dimensional-standards/din/screws/din-912/ (DIN 912 table incl. M1.4/M18/M22/M27/M33: dk min/max(knurled), k min/max, s min/max, t); https://www.wegertseder.com/Download/techdat/DIN-912-Zylinderschrauben-mit-Innensechskant.pdf and https://www.schrauben-lexikon.de/norm/DIN_912.asp (nominal dk, k, s incl. M1.4, M18, M22, M27, M33); https://www.birkhofer-shop.com/WebRoot/Sage/Shops/BirkhoferVerbindungselemente/MediaGallery/TechData/DIN_912.pdf (nominal dk, k, s, b M1.6-M20 incl. M14, M18); https://www.ottoroth.de/media/docs/download/web_handbuch_din_en_iso.pdf (Otto Roth \"Normenumstellung DIN >>> EN und ISO\" handbook p.31: DIN 912 -> ISO 4762 changes); https://media.wuerth.com/stmedia/wuerth/documents/documents/LANG_de/18902376.pdf (Wuerth Normteile 2018: \"ISO 4762 ersetzt DIN 912. Es besteht Austauschbarkeit - Nennmassbereich geaendert - Feingewinde in ISO 12474 ueberfuehrt\"); https://www.haberkorn.com/kataloge/umstellung-din-auf-iso-uebersicht-verbindungselemente/files/assets/common/downloads/publication.pdf (DIN 912 1983-12 -> ISO 4762, nominal range changed)",
+    "source": "Onshape standard content table DATA_ISO_4762_HEX_SOCKET_HEAD_CAP_SCREW_MAIN (document da5fe16b33cc63bf8b9e7e78, version V13)",
     "thread": {
      "rule": "iso"
     }

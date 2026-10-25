@@ -305,6 +305,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image)
+- **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
 - **featurestudio**: [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
@@ -5503,7 +5504,7 @@ Examples:
 | `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `section` | array of object |  | Section view: up to 3 planes [{"plane": a plane / planar face / sketch / mate connector id, "offset": length along its normal (default 0), "flip": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given. |
 | `section_exclude` | array of string |  | Section view › Items to exclude: parts (`body:…`) left whole. |
-| `view` | string |  | isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, or the name of a saved named view. |
+| `view` | string |  | isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, the name of a saved named view, or "window": the window's camera (view_camera; perspective and fit options then don't apply). |
 | `width` | integer |  | Pixels (default 800). |
 | `height` | integer |  | Pixels (default 600). |
 | `display_mode` | one of `shaded_with_edges`, `shaded`, `hidden_line`, `translucent` |  | Render style (default shaded_with_edges). |
@@ -5520,6 +5521,61 @@ Examples:
 | `zebra` | object |  | Zebra stripes: {"stripes": 35, "flip": false, "show_edges": true}. |
 | `reflection` | object |  | Reflection analysis: {"image": an environment map name ("Blue sky", default the first) or an image file path, "rotation": degrees, "opposite": bool, "blur": bool, "show_edges": bool (default false)}. |
 | `file` | string |  | Also write the PNG here. |
+
+### view
+
+#### view_camera
+
+Move the graphics area's camera as the view menus do (zoom to fit / selection / window, zoom in / out, previous view, standard views, view normal to, align vertical, perspective).
+
+The camera of a Part Studio's or Assembly's graphics area, or a drawing's zoom, as the window has it (kept per tab for the session; `get` reads it). 3D tabs: `zoom_fit` (Zoom to fit: the shown parts, sketches, planes and origin; an assembly's instances), `view` (a standard view zoomed to fit; `view`, default isometric), `zoom_selection` (the `refs`: parts, faces, edges, vertices, sketches, planes; an assembly's instances), `zoom_in` / `zoom_out` (Z / Shift+Z: ×1.75 about the centre, within Onshape's limits), `zoom_window` (`box`: two corners in graphics-area pixels), `previous` (Previous view: back one change), `normal_to` (View normal to the first of `refs`: a planar face, plane, sketch or mate connector; in an assembly a planar face {"instance", "entity"}; again on the same plane turns to its back), `normal_to_sketch` (View normal to sketch plane: `refs` [the sketch]), `align_vertical` (Align view with vertical axis: `refs` [a straight edge]), `perspective` (`on`). Drawings: `zoom_fit` / `zoom_sheet`, `zoom_in` / `zoom_out` (×2 / ×½), `zoom_window`. The graphics area is 1280×800 px until `viewport` sets it. With the app open the window does the same move at its own size. Returns the camera: the viewing direction and up (world), the target point and the visible height (document units), projection; a drawing's zoom (px per mm) and the sheet point at the centre (mm).
+
+Examples:
+
+```json
+{"action": "zoom_fit"}
+{"action": "normal_to", "refs": ["plane:top"]}
+{"tab": "Drawing 1", "action": "zoom_window", "box": [[400, 200], [800, 500]]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio, Assembly or Drawing tab, by name or id. Default: the window's tab. |
+| `action` | one of `get`, `zoom_fit`, `zoom_sheet`, `view`, `zoom_selection`, `zoom_in`, `zoom_out`, `zoom_window`, `previous`, `normal_to`, `normal_to_sketch`, `align_vertical`, `perspective` | required | What to do. |
+| `view` | one of `isometric`, `front`, `back`, `left`, `right`, `top`, `bottom`, `dimetric`, `trimetric` |  | view: the standard view (default isometric). |
+| `refs` | array of string or object |  | zoom_selection / normal_to / normal_to_sketch / align_vertical: entity ids (query_entities); in an assembly instance ids or names, and for normal_to {"instance", "entity": a planar face id}. |
+| `box` | array of array of number |  | zoom_window: [[x, y], [x, y]] corners in graphics-area pixels from the top left. |
+| `on` | boolean |  | perspective: on or off. |
+| `viewport` | array of number |  | The graphics area's size [width, height] in pixels from now on (default 1280×800). |
+
+#### view_display
+
+Display settings of a Part Studio or Assembly window: isolate, transparent, boundary edges, orient on edit, thickness off, mates, snap mode.
+
+What the view and context menus change without editing the document, kept per tab (`ui_state`; nothing given: read them). `isolate` (Isolate…: these parts, the rest as ghosts) or `transparent` (Make transparent…: these as ghosts) replace the current isolation; `exit_isolate` ends it. Part Studios: `highlight_boundary` (Highlight boundary edges), `orient_on_edit` (Orient normal to sketch on edit), `thickness_analysis: false` (Turn thickness analysis off). Assemblies (instances for isolate / transparent): `show_mates` (Hide/show mates: the mate indicators), `show_mates_mode` (Show mates mode), `snap_mode` (Snap mode). With the app open the window does the same; render_image `view: "window"` draws with them.
+
+Examples:
+
+```json
+{"isolate": ["Part 1"]}
+{"exit_isolate": true, "highlight_boundary": true}
+{"tab": "Assembly 1", "show_mates": true, "snap_mode": false}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the window's tab. |
+| `isolate` | array of string |  | Isolate…: parts (ids or names) or, in an assembly, instances. |
+| `transparent` | array of string |  | Make transparent…: parts or instances. |
+| `exit_isolate` | boolean |  | Exit isolate. |
+| `highlight_boundary` | boolean |  | Part Studio: Highlight boundary edges. |
+| `orient_on_edit` | boolean |  | Part Studio: Orient normal to sketch on edit. |
+| `thickness_analysis` | boolean |  | Part Studio: false = Turn thickness analysis off (run the analysis with analysis_thickness). |
+| `show_mates` | boolean |  | Assembly: Hide/show mates. |
+| `show_mates_mode` | boolean |  | Assembly: Show mates mode. |
+| `snap_mode` | boolean |  | Assembly: Snap mode. |
 
 ### export
 

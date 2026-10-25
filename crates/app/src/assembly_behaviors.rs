@@ -755,10 +755,7 @@ impl AssemblyView {
         }
         let Some((lo, hi)) = bb else { return };
         self.viewport.update(cx, |vp, cx| {
-            let size = vp.size();
-            let aspect = if size.y > 0.0 { size.x / size.y } else { 1.0 };
-            let mut to = vp.camera;
-            to.fit_sphere((lo + hi) * 0.5, ((hi - lo).length() * 0.5).max(1e-4), aspect);
+            let to = noshape_scene::camera_ops::fit_instances(&vp.camera, lo, hi, vp.size());
             vp.animate_to(to, cx);
         });
     }
@@ -1310,8 +1307,7 @@ impl AssemblyView {
         let f = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &r, &self.units(cx))?;
         let w = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f);
         let n = w.z();
-        let up = if n.z.abs() > 0.99 { DVec3::Y } else { DVec3::Z };
-        Some((-n, up))
+        Some((-n, noshape_scene::camera_ops::face_normal_up(n)))
     }
 
     // ------------------------------------------------------------ folders
