@@ -210,6 +210,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("drawing_insert_view", &[r##"{"drawing": "Part 1 Drawing 1", "source": "Part Studio 1", "orientation": "isometric", "position": [330, 230]}"##]),
     ("drawing_projected_view", &[r##"{"drawing": "Part 1 Drawing 1", "parent": 3, "position": [330, 120]}"##]),
     ("drawing_dimension", &[r##"{"drawing": "Part 1 Drawing 1", "picks": [[180, 180]], "place": [180, 200]}"##, r##"{"drawing": "Part 1 Drawing 1", "kind": "diameter", "picks": [[205.5, 160]], "place": [220, 175]}"##]),
+    ("drawing_title_field", &[r##"{"drawing": "Part 1 Drawing 1", "field": "Title", "text": "BRACKET"}"##, r##"{"drawing": "Part 1 Drawing 1", "field": "Title", "text": "{part.name}\nBRACKET"}"##]),
     ("drawing_update", &[r##"{"drawing": "Part 1 Drawing 1"}"##]),
     ("drawing_export", &[r##"{"drawing": "Part 1 Drawing 1", "format": "PDF", "file": "/tmp/drawing.pdf"}"##, r##"{"drawing": "Part 1 Drawing 1", "format": "DXF", "file": "/tmp/drawing.dxf"}"##]),
     ("drawing_section_view", &[r##"{"drawing": "Part 1 Drawing 1", "parent": 3, "point": [205.5, 160], "position": [300, 160]}"##]),

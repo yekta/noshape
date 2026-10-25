@@ -34,6 +34,9 @@ pub enum PickTarget {
     /// has Edit section / Remove section).
     BrokenOut { view: ViewId, index: usize },
     TitleBlock,
+    /// A title block cell's field (its key): a note, editable while the
+    /// formats are locked (live qa4 round 5 s11 (4)).
+    TitleField(String),
     Table(u64),
     /// Break lines of break `index` of a view.
     BreakLine { view: ViewId, index: usize },
@@ -213,6 +216,8 @@ pub struct BuiltSheet {
     pub tables: Vec<(u64, TableLayout)>,
     /// Title block rectangle [x0, y0, x1, y1] (mm).
     pub title_rect: Option<[f64; 4]>,
+    /// The title block's field cells (pick, rectangle).
+    pub title_cells: Vec<(u32, [f64; 4])>,
 }
 
 impl BuiltSheet {
@@ -271,7 +276,14 @@ impl BuiltSheet {
                 }
             }
         }
-        // Anywhere inside the title block selects it.
+        // A field cell's note over the block's lines; anywhere else inside
+        // the title block selects it.
+        let inside = |r: &[f64; 4]| p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3];
+        if best.is_none_or(|(k, _)| matches!(self.picks.get(k as usize), Some(PickTarget::TitleBlock)))
+            && let Some((pick, _)) = self.title_cells.iter().find(|(_, r)| inside(r))
+        {
+            return Some(*pick);
+        }
         if best.is_none()
             && let Some(r) = self.title_rect
             && p[0] >= r[0]
@@ -1112,6 +1124,16 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         }
     }
 
+    // Field cells stay editable notes under Formats › Locked.
+    let title_cells: Vec<(u32, [f64; 4])> = std::mem::take(&mut g.title_cells)
+        .into_iter()
+        .map(|(key, r, texts)| {
+            let id = picks.id(PickTarget::TitleField(key));
+            g.texts[texts].iter_mut().for_each(|t| t.pick = id);
+            (id, r)
+        })
+        .collect();
+
     let mut placements: Vec<ViewPlacement> = Vec::new();
     // Parent mirrors of linked views have no place on this sheet.
     for v in sheet.views.iter().filter(|v| !v.id.is_ghost() || v.id.is_child_ghost()) {
@@ -1832,7 +1854,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
     // Mirrors aren't views of this sheet (not picked, not listed).
     placements.retain(|p| !p.id.is_ghost());
-    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect }
+    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect, title_cells }
 }
 
 #[cfg(test)]

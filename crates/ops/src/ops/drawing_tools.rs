@@ -264,6 +264,22 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "title_field",
+            summary: "Edit a title block field: its cell's note",
+            description: "Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. \"Title\", \"Drawn by\"; a key the layout lacks is added). Lines split on \\n; property codes like {part.name} expand. One edit (\"Edit title block\").",
+            fields: with(
+                common(),
+                vec![
+                    req("field", json!({ "type": "string" }), "The field (drawing_get `title_fields`)."),
+                    req("text", json!({ "type": "string" }), "Its text."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: title_field,
+        },
+        Op {
+            group: "drawing",
             verb: "hatch_region",
             summary: "Hatch closed profiles of the sheet sketch or of views",
             description: "The Hatch region dialog: each of `points` (sheet mm) picks the smallest closed sheet-sketch profile around it, else the smallest closed region of the visible edges of the view there (not detail or break views); a region per profile. Pattern tab `standard` and `pattern` (its name as listed in the dialog, e.g. \"ANSI31 general\", or just its first word \"ANSI31\"; default the tab's default), `scale` and `angle` (\"Auto\" or a number; not on the General tab), `color` (default: the drawing's hatch color). `hatch` edits that hatch region instead (its profile replaced when `points` are given). One edit (\"Hatch region\" / \"Edit hatch\"); replies with the hatch ids.",
@@ -1370,6 +1386,19 @@ fn edit_hatch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("at", "not inside a hatch region of the view's cut"));
     }
     done(od, t, "Edit hatch", "view", view.0)
+}
+
+fn title_field(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let (key, text) = (a.str("field")?.to_string(), a.str("text")?.to_string());
+    if key.trim().is_empty() {
+        return Err(OpError::param("field", "empty"));
+    }
+    let si = t.sheet;
+    dt::set_title_field(&mut t.d.sheets[si], &key, &text);
+    commit(od, t.tab, si, t.d, "Edit title block")?;
+    Ok(reply(od, t.tab, si, false)?.into())
 }
 
 fn edit_detail(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

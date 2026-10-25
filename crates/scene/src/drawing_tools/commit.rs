@@ -569,6 +569,15 @@ pub fn keep_boundary(sheet: &mut Sheet, pl: &ViewPlacement, b: Boundary) {
     }
 }
 
+/// A title block field's text (its cell edited as a note); a key the
+/// layout lacks is added.
+pub fn set_title_field(sheet: &mut Sheet, key: &str, text: &str) {
+    match sheet.title_block.fields.iter_mut().find(|(k, _)| k == key) {
+        Some((_, v)) => *v = text.to_string(),
+        None => sheet.title_block.fields.push((key.to_string(), text.to_string())),
+    }
+}
+
 /// Remove crop: the view uncropped, its boundary kept as a sketch entity.
 pub fn remove_crop(sheet: &mut Sheet, pl: Option<&ViewPlacement>, view: ViewId) {
     let Some(crop) = sheet.view_mut(view).and_then(|v| v.crop.take()) else { return };

@@ -105,6 +105,14 @@ impl<'a> SheetPick<'a> {
         self.built?.placement(view).copied()
     }
 
+    /// A radial dimension's knee at the sheet point `c`: its distance
+    /// outside the circle (sheet mm).
+    pub fn radial_knee(&self, view: ViewId, center: [f64; 2], radius: f64, c: [f64; 2]) -> Option<f64> {
+        let pl = self.placement(view)?;
+        let cs = pl.to_sheet(center);
+        Some(len(sub(c, cs)) - len(sub(pl.to_sheet([center[0] + radius, center[1]]), cs)))
+    }
+
     /// The view under a sheet point (smallest containing view rectangle).
     pub fn view_at(&self, s: [f64; 2]) -> Option<ViewId> {
         if let Some(h) = self.hover

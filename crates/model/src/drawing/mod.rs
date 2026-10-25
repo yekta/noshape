@@ -753,6 +753,10 @@ pub enum AnnotationKind {
         angle: f64,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         dim_line: bool,
+        /// The leader's knee outside the circle (sheet mm), where it was
+        /// dropped; None: 12.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        knee: Option<f64>,
     },
     /// Angle from leg `a` counterclockwise to leg `b`. `three_point`: made
     /// with the 3 point angular tool (dragging the arc across a leg swaps the

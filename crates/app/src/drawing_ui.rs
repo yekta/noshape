@@ -240,7 +240,24 @@ impl DrawingEditor {
         // Tab moves the text to the next tab stop of the ruler.
         input.update(cx, |s, cx| s.set_tab_size(gpui_kit::component::input::TabSize { tab_size: 4, hard_tabs: true }, cx));
         let height = self.input(&crate::drawing_note::note_height_text(h, self.drawing.units_mm), window, cx);
-        self.panel = Some(Panel::Note { input, edit, pos, height, style });
+        self.panel = Some(Panel::Note { input, edit, pos, height, style, field: None });
+        cx.notify();
+    }
+
+    /// A title block field's cell opens the Note editor in place, its text
+    /// the field's (live qa4 round 5 s11 (4): the cell is a note, editable
+    /// while the formats are locked).
+    pub fn open_title_field(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(b) = self.built.as_ref() else { return };
+        let target = noshape_model::drawing::build::PickTarget::TitleField(key.clone());
+        let Some(&(pick, r)) = b.title_cells.iter().find(|(p, _)| b.picks.get(*p as usize) == Some(&target)) else { return };
+        let h = b.geometry.texts.iter().find(|t| t.pick == pick).map(|t| t.height).unwrap_or(self.drawing.props.ann_text_height);
+        let text = self.drawing.sheets[self.sheet].title_field(&key).unwrap_or("").to_string();
+        let input = self.textarea(&text, 5, window, cx);
+        input.update(cx, |s, cx| s.set_tab_size(gpui_kit::component::input::TabSize { tab_size: 4, hard_tabs: true }, cx));
+        let height = self.input(&crate::drawing_note::note_height_text(h, self.drawing.units_mm), window, cx);
+        let pos = [r[0] + 1.0, r[3] - 1.0];
+        self.panel = Some(Panel::Note { input, edit: None, pos, height, style: Default::default(), field: Some(key) });
         cx.notify();
     }
 
@@ -257,10 +274,12 @@ impl DrawingEditor {
     pub fn apply_panel(&mut self, cx: &mut Context<Self>) {
         let Some(panel) = self.panel.take() else { return };
         match panel {
-            Panel::Note { input, edit, pos, height, style } => {
+            Panel::Note { input, edit, pos, height, style, field } => {
                 let text = input.read(cx).value().to_string();
                 let h = crate::drawing_note::parse_note_height(&height.read(cx).value(), self.drawing.units_mm);
-                if text.trim().is_empty() {
+                if let Some(key) = field {
+                    self.edit_sheet("Edit title block", cx, |s| noshape_scene::drawing_tools::set_title_field(s, &key, text.trim_end()));
+                } else if text.trim().is_empty() {
                     if let Some(id) = edit {
                         self.edit_sheet("Delete note", cx, |s| s.annotations.retain(|a| a.id != id));
                     }

@@ -591,7 +591,22 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
         .collect();
     let images: Vec<Value> = sheet.images.iter().map(|i| json!({ "id": i.id, "name": i.name, "position": pt(i.pos), "size": pt(i.size) })).collect();
     let sketch_entities = sheet.sketch.sketch.entities().count();
-    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables, "hatches": hatches, "images": images, "sketch_entities": sketch_entities })
+    // Title block field cells: the stored text and the lines shown.
+    let title_fields: Vec<Value> = m
+        .built
+        .as_ref()
+        .map(|b| {
+            b.title_cells
+                .iter()
+                .filter_map(|&(pick, r)| {
+                    let Some(noshape_model::drawing::build::PickTarget::TitleField(key)) = b.picks.get(pick as usize) else { return None };
+                    let shown: Vec<&str> = b.geometry.texts.iter().filter(|t| t.pick == pick).map(|t| t.text.as_str()).collect();
+                    Some(json!({ "field": key, "value": sheet.title_field(key).unwrap_or(""), "shown": shown, "cell": [r3(r[0]), r3(r[1]), r3(r[2]), r3(r[3])] }))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables, "hatches": hatches, "images": images, "sketch_entities": sketch_entities, "title_fields": title_fields })
 }
 
 pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<Value, OpError> {

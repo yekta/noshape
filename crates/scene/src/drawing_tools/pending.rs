@@ -79,7 +79,7 @@ impl SheetPick<'_> {
                 let [Pick::Circle { view, center, radius, r }] = picks.as_slice() else { return None };
                 let cs = self.placement(*view)?.to_sheet(*center);
                 let d = sub(c, cs);
-                Some(ann(AnnotationKind::RadialDimension { view: *view, center: *center, radius: *radius, diameter: *kind == DimTool::Diameter, angle: d[1].atan2(d[0]), dim_line: *kind == DimTool::Diameter && self.drawing.radial_dim_lines() }, vec![(0, r.clone())]))
+                Some(ann(AnnotationKind::RadialDimension { view: *view, center: *center, radius: *radius, diameter: *kind == DimTool::Diameter, angle: d[1].atan2(d[0]), dim_line: *kind == DimTool::Diameter && self.drawing.radial_dim_lines(), knee: self.radial_knee(*view, *center, *radius, c) }, vec![(0, r.clone())]))
             }
             Tool::Dimension { kind: DimTool::Angle3, picks } => {
                 let [Pick::Point(v), Pick::Point(pa), Pick::Point(pb)] = picks.as_slice() else { return None };

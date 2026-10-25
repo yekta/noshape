@@ -1512,6 +1512,7 @@ impl DrawingEditor {
         let Some(h) = self.hover else { return };
         match self.built.as_ref().and_then(|b| b.picks.get(h as usize)).cloned() {
             Some(PickTarget::TitleBlock) => self.open_title_panel(window, cx),
+            Some(PickTarget::TitleField(key)) => self.open_title_field(key, window, cx),
             Some(PickTarget::Inspection(id)) => self.edit_inspection(id, window, cx),
             Some(PickTarget::Annotation(id)) => {
                 let note = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();

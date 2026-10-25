@@ -151,6 +151,10 @@ pub struct SheetGeometry {
     /// Callout leaders as drawn (annotation id, index in
     /// `CalloutStyle::all_leaders`, path), for picking their lines and nodes.
     pub leader_paths: Vec<(u64, usize, LeaderPath)>,
+    /// Title block cells holding a field (key, cell rectangle [x0, y0, x1,
+    /// y1], its value's `texts`): each is a note edited in place (live qa4
+    /// round 5 s11 (4)).
+    pub title_cells: Vec<(String, [f64; 4], std::ops::Range<usize>)>,
 }
 
 /// Chamfer dimension settings (Drawing properties › Dimensions › Chamfer).
@@ -705,7 +709,9 @@ impl SheetGeometry {
                         self.line([x0, cy + th / rows as f64], [fx1, cy + th / rows as f64], LineStyle::Thin);
                     }
                     self.text([cx + 1.5, cy + th / rows as f64 - 3.2], 1.8, k.to_uppercase(), Anchor::BottomLeft);
+                    let t0 = self.texts.len();
                     self.text([cx + 1.5, cy + 1.2], 3.0, value_of(k, v), Anchor::BottomLeft);
+                    self.title_cells.push((k.clone(), [cx, cy, cx + tw / 2.0, cy + th / rows as f64], t0..self.texts.len()));
                 }
             }
             style => self.onshape_title_block(sheet, style == TitleBlockStyle::Iso, projection, &value_of),
@@ -887,10 +893,13 @@ impl SheetGeometry {
             let lines: Vec<&str> = v.split('\n').filter(|l| !l.is_empty()).collect();
             let n = lines.len() as f64;
             let (cx, cy) = ((px(u0) + px(u1)) / 2.0, (py(v0) + py(v1)) / 2.0);
+            let t0 = g.texts.len();
             for (i, l) in lines.iter().enumerate() {
                 let y = cy + ((n - 1.0) / 2.0 - i as f64) * h * 1.6;
                 g.text([cx, y], h, l.to_string(), Anchor::Center);
             }
+            let (xa, xb, ya, yb) = (px(u0).min(px(u1)), px(u0).max(px(u1)), py(v0).min(py(v1)), py(v0).max(py(v1)));
+            g.title_cells.push((key.to_string(), [xa, ya, xb, yb], t0..g.texts.len()));
         };
         for (r, (l, name, date)) in fields.iter().enumerate() {
             label_h(self, cols[0], rows[r + 1], l, lab * tr.signoff_h);
@@ -1129,13 +1138,38 @@ impl SheetGeometry {
                         self.overridden.push(first);
                     }
                 }
-                AnnotationKind::RadialDimension { view, center, radius, diameter, angle, dim_line } => {
+                AnnotationKind::RadialDimension { view, center, radius, diameter, angle, dim_line, knee } => {
                     let c = env.to_sheet(*view, *center);
                     let r = radius * env.scale(*view);
                     let dir = [angle.cos(), angle.sin()];
                     let tip = [c[0] + dir[0] * r, c[1] + dir[1] * r];
-                    let out = [c[0] + dir[0] * (r + 12.0), c[1] + dir[1] * (r + 12.0)];
+                    // The knee where the text was dropped (at least clear of the arrow).
+                    let k = r + knee.unwrap_or(12.0).max(self.style.dim_arrow + 1.0);
+                    let out = [c[0] + dir[0] * k, c[1] + dir[1] * k];
                     let far = [c[0] - dir[0] * r, c[1] - dir[1] * r];
+                    let t = if *diameter { env.text(a, radius * 2.0, false, "Ø") } else { env.text(a, *radius, false, "R") };
+                    if !self.style.iso {
+                        // ANSI (live asbdt-3, drawing/368): the arrow outside
+                        // the circle pointing in, the leader on to the knee
+                        // (a diameter's dimension line from the far edge), a
+                        // horizontal shoulder an arrow long on the side
+                        // facing the circle, the value inline past its end.
+                        // Flipped: the arrow inside pointing out.
+                        let start = match (*diameter, *dim_line || self.flip_arrows) {
+                            (true, true) => far,
+                            (false, true) => c,
+                            (_, false) => tip,
+                        };
+                        self.lines.push(Polyline2 { points: vec![start, out], style: LineStyle::Thin, closed: false, pick });
+                        let (inward, node) = if self.flip_arrows { (1.0, -4.0) } else { (-1.0, 4.0) };
+                        self.arrow(tip, [dir[0] * inward, dir[1] * inward], 3.0);
+                        self.grips.push(Grip { pick, pos: [tip[0] + dir[0] * node, tip[1] + dir[1] * node], kind: GripKind::Handle });
+                        let side = if dir[0] < 0.0 { -1.0 } else { 1.0 };
+                        let sh = [out[0] + side * self.style.dim_arrow, out[1]];
+                        self.lines.push(Polyline2 { points: vec![out, sh], style: LineStyle::Thin, closed: false, pick });
+                        self.dim_label([sh[0] + side * dh * 0.5, sh[1]], 0.0, if side < 0.0 { 1.0 } else { 0.0 }, true, &t, dh, pick);
+                        continue;
+                    }
                     if self.flip_arrows {
                         // Flipped: arrows outside pointing in, no line inside.
                         self.lines.push(Polyline2 { points: vec![tip, out], style: LineStyle::Thin, closed: false, pick });
@@ -1159,7 +1193,6 @@ impl SheetGeometry {
                     }
                     // The flip node near the arrow.
                     self.grips.push(Grip { pick, pos: [tip[0] - dir[0] * 4.0, tip[1] - dir[1] * 4.0], kind: GripKind::Handle });
-                    let t = if *diameter { env.text(a, radius * 2.0, false, "Ø") } else { env.text(a, *radius, false, "R") };
                     // Text on a short horizontal shoulder.
                     let left = dir[0] < 0.0;
                     let w = self.dim_label_width(&t, dh);
@@ -2188,7 +2221,9 @@ impl SheetGeometry {
         // here the half gap along the line.
         let h = self.style.dim_text;
         let along = !(self.style.text_horizontal && dir[1].abs() > 1e-9);
-        let inline = !self.style.iso;
+        // ISO: above the line, except horizontal text on a non-horizontal
+        // line (Text alignment Horizontal), inline (live asb 10-25 ISO).
+        let inline = !self.style.iso || !along;
         let gap = match dual_straddles(text) {
             Some(dual) if along => Some(font::text_width(&dual, h).max(font::text_width(&text.main, h)) / 2.0 + 0.65 * h),
             Some(_) => None,

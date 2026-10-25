@@ -66,7 +66,8 @@ pub const DIALOG_TOP: f32 = 0.;
 
 /// Inline property panels shown over the canvas.
 pub enum Panel {
-    Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2], height: Entity<InputState>, style: noshape_model::drawing::note::NoteStyle },
+    /// `field`: a title block field's cell edited as a note (its key).
+    Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2], height: Entity<InputState>, style: noshape_model::drawing::note::NoteStyle, field: Option<String> },
     /// Dimension properties (precision, units, tolerance, texts).
     Datum { edit: Option<u64>, anchor: [f64; 2], input: Entity<InputState> },
     SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState> },

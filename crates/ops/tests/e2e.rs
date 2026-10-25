@@ -1353,6 +1353,30 @@ fn drawing_out_of_date_until_update() {
     assert!(h2 > h0 + 1.0, "updated views: {h0} -> {h2}");
 }
 
+/// A title block field's cell is a note edited in place, with the formats
+/// locked too (live qa4 round 5 s11 (4)): the TITLE cell's middle field
+/// replaced by typed text, the other two fields kept.
+#[test]
+fn drawing_title_block_fields() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_title.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let title = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["title_fields"].as_array().unwrap().iter().find(|f| f["field"] == "Title").cloned().expect("a Title cell");
+    let t = title(&mut ctx);
+    let cell: Vec<f64> = t["cell"].as_array().unwrap().iter().map(num).collect();
+    assert!(cell[2] - cell[0] > 20.0 && cell[3] - cell[1] > 5.0, "{cell:?}");
+    let value = t["value"].as_str().unwrap().to_string();
+    let lines: Vec<&str> = value.split('\n').collect();
+    assert_eq!(lines.len(), 3, "three property fields: {value}");
+    let typed = format!("{}\nQA4 PLATE\n{}", lines[0], lines[2]);
+    call(&mut ctx, "drawing_title_field", json!({ "drawing": tab, "field": "Title", "text": typed }));
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Edit title block"));
+    let t = title(&mut ctx);
+    assert_eq!(t["value"].as_str().unwrap(), typed);
+    assert!(t["shown"].as_array().unwrap().iter().any(|l| l == "QA4 PLATE"), "{t}");
+}
+
 #[test]
 fn drawing_broken_out_sections_and_profile_crops() {
     let mut ctx = Ctx::new();

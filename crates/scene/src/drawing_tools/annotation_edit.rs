@@ -159,7 +159,7 @@ pub fn foreshortened(k: &AnnotationKind) -> Option<AnnotationKind> {
 /// Remove foreshorten: back to a radius dimension.
 pub fn unforeshortened(k: &AnnotationKind) -> Option<AnnotationKind> {
     let &AnnotationKind::ForeshortenedRadial { view, center, radius, angle, .. } = k else { return None };
-    Some(AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle, dim_line: false })
+    Some(AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle, dim_line: false, knee: None })
 }
 
 /// Datum targets: Hide dimension (`hide`) / Show dimensions ▸ This target

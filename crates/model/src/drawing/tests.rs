@@ -1067,7 +1067,10 @@ fn templates_and_title_blocks() {
     }
     let rect = sheet::title_block_rect(&drawing.sheets[0]).unwrap();
     let tb = pick_of(&built, PickTarget::TitleBlock);
-    assert_eq!(built.hit([rect[0] + 70.0, rect[1] + 4.0], 1.0), Some(tb));
+    assert_eq!(built.hit([rect[0] + 5.0, rect[1] + 4.0], 1.0), Some(tb));
+    // A field's cell picks its note (live qa4 round 5 s11 (4)).
+    let hit = built.hit([rect[0] + 70.0, rect[1] + 4.0], 1.0).and_then(|h| built.picks.get(h as usize).cloned());
+    assert!(matches!(hit, Some(PickTarget::TitleField(_))), "{hit:?}");
     // Imperial: ANSI B with a tolerance block in inches.
     templates::apply_template(&mut drawing, 0, &templates::template_by_name("ANSI B").unwrap());
     assert!(!drawing.units_mm && drawing.projection == Projection::ThirdAngle);
@@ -1130,6 +1133,12 @@ fn formats_gaps_and_revision_tables_across_sheets() {
     let built = render_sheet_with(&drawing, 0, &sources, &cache, false, &info).unwrap();
     // Locked: no title block pick; its texts are red.
     assert!(!built.picks.contains(&PickTarget::TitleBlock));
+    // Its field cells stay notes to edit (live qa4 round 5 s11 (4)).
+    assert!(!built.title_cells.is_empty());
+    for &(pick, r) in &built.title_cells {
+        assert!(matches!(built.picks[pick as usize], PickTarget::TitleField(_)));
+        assert_eq!(built.hit([(r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0], 0.5), Some(pick), "{:?}", built.picks[pick as usize]);
+    }
     let g = &built.geometry;
     assert!((0..g.texts.len()).any(|i| g.text_color(i) == Some([220, 40, 40])));
     assert!(texts(&built).iter().any(|t| t == "REVISION HISTORY") && texts(&built).iter().any(|t| t == "First"));
@@ -2600,6 +2609,84 @@ fn ansi_dimension_text_sits_inline() {
     let line_y = g.lines.iter().find(|l| l.points.len() == 2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9 && (l.points[0][0] - l.points[1][0]).abs() > 30.0).unwrap().points[0][1];
     assert!(t.pos[1] > line_y && t.anchor == sheet::Anchor::BottomCenter);
     assert_eq!(horizontal(&g, line_y).len(), 1);
+    // ISO, Text alignment Horizontal: a vertical dimension's value is
+    // horizontal and inline, the line broken around it (live asb 10-25).
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.style.text_horizontal = true;
+    g.linear_dimension_text([100.0, 50.0], [100.0, 110.0], 20.0, DimOrientation::Vertical, &DimText::plain("60"), 1);
+    let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+    assert_eq!((t.anchor, t.angle, t.pos[1]), (sheet::Anchor::Center, 0.0, 80.0));
+    let x = t.pos[0];
+    let vertical: Vec<&sheet::Polyline2> = g.lines.iter().filter(|l| l.points.len() == 2 && l.points.iter().all(|p| (p[0] - x).abs() < 1e-9)).collect();
+    assert_eq!(vertical.len(), 2, "broken around the text: {vertical:?}");
+    assert!(vertical.iter().all(|l| l.points.iter().all(|p| (p[1] - 80.0).abs() > h / 2.0)));
+}
+
+/// ANSI radial and diameter dimensions (live asbdt-3, drawing/368): the
+/// arrow outside the circle pointing in, the leader to the dropped knee, a
+/// horizontal shoulder an arrow long on the circle's side, the value inline
+/// past it.
+#[test]
+fn ansi_radial_dimension_leader_knee_and_shoulder() {
+    use super::format::DimText;
+    struct Ansi<'a>(sheet::PlainEnv<'a>);
+    impl sheet::AnnotationEnv for Ansi<'_> {
+        fn to_sheet(&self, v: ViewId, p: [f64; 2]) -> [f64; 2] {
+            self.0.to_sheet(v, p)
+        }
+        fn scale(&self, v: ViewId) -> f64 {
+            self.0.scale(v)
+        }
+        fn rotation(&self, v: ViewId) -> f64 {
+            self.0.rotation(v)
+        }
+        fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> DimText {
+            self.0.text(a, value, angular, symbol)
+        }
+        fn expand(&self, s: &str) -> String {
+            self.0.expand(s)
+        }
+        fn balloon_text(&self, a: &Annotation, t: &str) -> String {
+            self.0.balloon_text(a, t)
+        }
+        fn sheet_style(&self) -> sheet::SheetStyle {
+            sheet::SheetStyle { iso: false, ..Default::default() }
+        }
+    }
+    let drawing = Drawing::default();
+    let env = Ansi(sheet::PlainEnv { drawing: &drawing, scale: 1000.0 });
+    let draw = |diameter: bool, angle: f64| {
+        let mut s = Sheet::default();
+        // R5 at (100, 100) sheet mm, the knee 10 mm outside.
+        s.annotations.push(Annotation { id: 1, kind: AnnotationKind::RadialDimension { view: ViewId(1), center: [0.1, 0.1], radius: 0.005, diameter, angle, dim_line: false, knee: Some(10.0) }, ..Default::default() });
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(&s, &env);
+        g
+    };
+    let near = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).abs() < 1e-9 && (p[1] - q[1]).abs() < 1e-9;
+    for (diameter, angle) in [(false, 0.6), (true, 0.6), (false, 2.5)] {
+        let g = draw(diameter, angle);
+        let (a, h) = (g.style.dim_arrow, g.style.dim_text);
+        let d = [angle.cos(), angle.sin()];
+        let tip = [100.0 + 5.0 * d[0], 100.0 + 5.0 * d[1]];
+        let knee = [100.0 + 15.0 * d[0], 100.0 + 15.0 * d[1]];
+        // The arrow outside, its tip on the circle.
+        let f = &g.fills[0].points;
+        assert!(near(f[0], tip), "{f:?}");
+        let base = [(f[1][0] + f[2][0]) / 2.0 - 100.0, (f[1][1] + f[2][1]) / 2.0 - 100.0];
+        assert!((base[0].hypot(base[1]) - (5.0 + a)).abs() < 1e-9, "outside, pointing in: {f:?}");
+        // The leader from the circle to the knee, nothing inside.
+        assert!(g.lines.iter().any(|l| l.points.len() == 2 && near(l.points[0], tip) && near(l.points[1], knee)), "{:?}", g.lines);
+        // The shoulder on the circle's side, the value inline past it.
+        let side = if d[0] < 0.0 { -1.0 } else { 1.0 };
+        let end = [knee[0] + side * a, knee[1]];
+        assert!(g.lines.iter().any(|l| l.points.len() == 2 && near(l.points[0], knee) && near(l.points[1], end)), "{:?}", g.lines);
+        let t = g.texts.iter().find(|t| t.text.starts_with(if diameter { 'Ø' } else { 'R' })).unwrap();
+        assert!((t.pos[1] - (knee[1] - h / 2.0)).abs() < 1e-9, "inline");
+        let w = font::text_width(&t.text, h);
+        let x = if side > 0.0 { t.pos[0] } else { t.pos[0] + w };
+        assert!((x - (end[0] + side * h / 2.0)).abs() < 1e-9, "{x} {end:?}");
+    }
 }
 
 /// Fit classes "Stacked with line": a rule between hole and shaft class,
