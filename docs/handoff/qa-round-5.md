@@ -32,6 +32,249 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 12 on v0.4.8 (release tarball): P0 robustness, a long editing session on the 30-feature part (r5/s12.sh, r5/s12b.sh; expected geometry by CLI)
+**152 UI actions, no crash, no wrong geometry, no slowdown, memory bounded.**
+- Batch 1 (r5/s12.sh, 6 + 90 actions): cycles of edit Extrude 1 depth / Boss 1 depth / Boss 3 depth (double-click, type, ✓), Ctrl+Z,
+  Ctrl+Y, Ctrl+Z. Settle times (screen unchanged 0.6 s, software GL, with 6–10 other agents building): edits median 1.03–1.13 s
+  (max 1.74), undo 1.10 (max 1.64), redo 0.99; **first third 1.08 s vs last third 1.13 s** (no drift). RSS 488 → 551 MB: +18 in the
+  first cycle, then ~+3 per cycle, flat at 543–552 over the last six cycles (undo history + caches, not a leak).
+- Close (app stopped) → the saved file by CLI: **60930.281 mm³, 48 faces, all 30 features OK, Extrude 1 10 mm, Boss 1 8 mm, Boss 3
+  5 mm** = exactly the expected state computed on a fresh copy with feature_edit (60930.281 mm³, 48 faces).
+- Reopen: open ≈ 2 s past my fixed 10 s start wait, RSS 415 MB, ⏱ total 395 ms, model as saved; the undo history starts empty after
+  a reopen (live's undo is per session too, not asked).
+- Batch 2 (r5/s12b.sh, 8 + 48 actions): cycles of Suppress Boss 2, Unsuppress, delete Boss sketch 4 + Ctrl+Z, Rename Boss 3 + Ctrl+Z,
+  edit Extrude 1 + Ctrl+Z. Medians: Suppress 1.22 s, Unsuppress 1.25, Delete 1.41, Undo 0.37, Rename 0.35, Edit 1.59 (max 1.94).
+  RSS 523 → 545 MB, flat over the last two cycles. Saved file afterwards: 60930.281 mm³, 48 faces, no "Peg" names left, nothing
+  suppressed, all features OK.
+- No findings. (The session-1/2 items still stand: per-keystroke preview, regen speed vs live.)
+
+## v3 Session 11 on v0.4.8 (release tarball): an everyday drawing of the 30-feature part (P2; live asked "qa4 round 5 s11 drawing" with the same steps + PDF/DXF; ours in r5/out/v3s11.pdf|dxf; times with r5/settle.sh = screen region unchanged for 0.6 s)
+Times: Create Drawing (ANSI_B_MM, No views) OK → sheet 0.70 s; Top base / Front / Right / Iso views 0.29 / 0.29 / 0.29 / 0.34 s;
+Section A-A 0.26 s; Detail B (2:1) 0.28 s; Update after the model change 0.36 s; PDF written 0.39 s (1 page 1224×792 pt = ANSI B,
+860 KB); DXF 0.13 s (AC1014 = Release 14, $INSUNITS 4 = mm; 350 LINE, 31 ELLIPSE, 23 CIRCLE, 18 POLYLINE, 57 MTEXT). Nothing slow.
+Working ✅: Create Drawing dialog (templates, Suggested / No views); Insert view (orientation list, scale, simplification), projected
+views follow the cursor, the diagonal projection gives an iso derived from the Top base; Section view dialog (Vertical / Horizontal /
+Angular, label A, flip, Show cut geometry only, Section depth): horizontal cut through the Ø6 holes, hatching broken at the holes,
+"SECTION A - A", cutting line with A arrows; Detail view (circle / rectangle / spline / polygon profiles, label B, Profile style In
+line), "DETAIL B / SCALE 2:1" and the B circle on the parent; dimension menu (Dimension, Chamfer, Max/min, 2 point, point-line,
+line-line, line-line angular, 3 point angular, arc length, radial, diameter, foreshorten, ordinate, hole/thread callout); linear
+"94", "Ø6", angular, ordinate; double-click a dimension → the dimension text editor (prefix/suffix rows, value, tolerance, units,
+symbols); hole callout "2X Ø6 THRU"; Note with a leader to a vertex (rich-text toolbar + ruler) "BREAK SHARP EDGES"; centre marks on
+every circle by default; model change → the Update button lights (tooltip "Update from this workspace (ctrl+q)"), click → views
+redrawn, annotations whose geometry went away red + "2 dangling annotation(s)" (the holes stop below the 12 mm top: my model's
+holes start at Plane 1, z 10); Export Drawing dialog: PDF (Version 1.5, Overridden dimensions, Text, Color, Options, Hide inspection
+items) and DXF (Release 14 default + "Model space only" = live).
+- **R5v3-S11-a → ORD-BASE (asb, P2 wrong value)** the ordinate base is taken from the **click position**, not from the edge it
+  highlights: with the base clicked 1.9 px inside the Top view's left edge the boss centres read 14.26 / 39.26 / 64.26 instead of
+  15 / 40 / 65 (gaps exactly 25.00, so the centres snapped); clicking 1 px outside gave 15.39.
+- **R5v3-S11-b → EXPORT-DXF-OPTIONS (asb)** the DXF/DWG export lacks two of live's checkboxes: ☐ **Hide inspection items** and ☐
+  **Exclude off-sheet content** (ours: Export splines as polylines, Set z-height to zero and normals to positive).
+- Pending live: whether Onshape updates the drawing by itself after a model change (ours waits for Update), how the title block is
+  edited (double-click on ours does nothing; its right-click has Paste as table, Sheet properties…, Drawing properties…, Zoom …),
+  whether an angular dimension in the iso view is the true 3D angle or the projected one (ours 60.0° for two 90° edges), the hole
+  callout text, and live's PDF / DXF for a file comparison.
+
+## v3 Session 10 on v0.4.8 (release tarball): an everyday assembly (P2; r5/v3s10b.py six mates, r5/v3s10.py / v3s10n.py planar stacks of 19 / N cubes; drag rate with r5/dragfps.sh = ffmpeg x11grab 30 fps without the pointer, distinct frames counted)
+Six mates by CLI on a fixed plate: DOF Fastened 0, Revolute 1, Slider 1, Cylindrical 2, Planar 3, Ball 3 ✅ (DOF glyph tooltips
+"Has degrees of freedom (n)"); first instance lands at the origin, not fixed (= live); dragging a revolute instance turns it about
+its axis ✅. Group (tool search "Group": Instances field) → "Group 1" row; Planar + Ball cubes grouped → 1 DOF (the remaining
+rotation about the vertical through the ball point) ✅. BOM panel: Flattened, Item / Quantity / Part number / Description (= live's
+default columns), rows 1 × plate, 6 × cube ✅. Assembly Linear pattern: Instances, Direction + MC button, Distance 25 mm, Instance
+count + flip, Equal spacing, Centered, Second direction; ✓ → "Linear pattern 1" row with Part 2 <7>, <8> ✅. Exploded views panel
+(right strip) → Add exploded view → amber "Editing Explode 1 · Done" bar, the "Build steps by dragging components" box, triad
+on a picked instance, dragging its arrow → "Explode step" dialog (Translation, Instances, Distance 54.3 mm, Explode lines) + dashed
+explode line + "Explode step 1" row ✅. Mate flips: MATE-FLIP-AXIAL (skb) stands.
+Drag rate (software GL on Xvfb, so absolute numbers are low): 7 instances, a Planar cube: **10.0 updates/s**, longest gap 0.17 s;
+20 instances (19 cubes Planar-stacked), the top cube: **3.9 updates/s**, longest gap 0.67 s, and the assembly blows up (below).
+- **R5v3-S10-a → DRAG-RUNAWAY (skb, P2 severe)** dragging the top cube of a Planar-mated stack moves the **other** free cubes: with
+  3 cubes only the dragged one moves ✅; with 10 the whole column shifts and leans; with 19 a 25–150 px drag flings the cubes to
+  ±2.5 million mm in X/Y (assembly_list after the drag: Part 2 <1> at (−2491492, −2917166, 10)), every mate still "ok" (Planar
+  allows any in-plane position) — the solver satisfies the mates but lets the free in-plane DOF of the undragged bodies wander
+  (no pull toward their current pose). Ctrl+Z restores. Repro: r5/v3s10n.py with NCUBES=19, open, drag the top cube.
+- **R5v3-S10-b → CHIP-X-SELECTED (skb)** in the assembly Linear pattern dialog, a seed chip's × doesn't remove the instance while it
+  is still selected in the instance list (the field re-captures it from the selection); after clearing the selection the × works.
+- Note: "Explode" isn't in tool search (exploded views are a right-panel feature; live likely the same, not asked).
+
+- **Live answer (behaviours "qa4 round 5 s10 drag")**: DRAG-RUNAWAY confirmed. In Onshape **only the dragged cube moves**, in the 10
+  and the 19 stack; REST before/after: every other cube unchanged (e.g. 19 stack: <2>…<19> at (0,0,10…350) unchanged, <20> (0,0,370) →
+  (49.827, 0.165, 370)); dragging back returns it exactly. Minimal-motion solve, not chain-following. Server reply per drag step ≈ 21 ms
+  median (p90 57 ms), the same for 10 and 19 cubes; live's own client rendered only ≈ 4.4 frames/s on this loaded software-GL box, so
+  frame rates here say little about real hardware.
+
+## v3 Session 9 on v0.4.8 (release tarball): interaction (r5/v3s9.py: Part 1 = block 60×40×20 with a Ø10 hole and an R5 vertical fillet, 46321.903 mm³; Part 2 = cylinder Ø16×30, 6031.858 mm³; live "Selection colours", "Box select", "Right-click menus", "Measure & mass properties", "Section view", "Isolate / Make transparent")
+Nothing felt slow: hover, picks, box selection, Select other, menus and panels were all immediate; section drag updated live.
+Same as live ✅: face hover = light-orange boundary only (hole loop too); edge hover = thick light orange; vertex hover = dot;
+edge click → amber + "Length: 60.000 mm"; click at the edge midpoint selects the point ("Point: 30.000 mm 0.000 mm 20.000 mm");
+window box (light-blue fill, blue border) selects only what's fully inside (whole block); crossing box (light-yellow fill,
+dashed amber border) selects what it touches; face and edge right-click menus = live's lists (Add comment = cloud); Measure:
+"Min dist: 22.000 mm" readout, panel with chips, Measure type / units / reference CS and rows (Area 3824.060 mm² = top face
+2316.1 + cylinder side 1508.0 ✓); Mass and section properties (Part | Face, fields, "One or more parts do not have a material
+defined." toast, Volume 52353.761 = both parts); Section view from a face's menu: "Section plane 1 (Face of Extrude 1)", tan
+hatched preview cut on both parts, drag → inline "-18.543 mm" box, ✓ → hatched in the part colour, empty-space menu gains
+"Edit section view…" (reopens with the plane and offset) and "Turn off section view"; Isolate / Make transparent dialog (✕ only,
+Transparency controls + checkbox + slider, Component controls "Expand: distance" + slider, ?), Isolate ghosts the rest and the
+planes, Make transparent ghosts the picked part; Hide → eye-slash + grey row, "Show all" in the empty-space menu.
+- **R5v3-S9-a → BOX-PREHIGHLIGHT (psb)** while dragging a crossing (right→left) box nothing it touches is pre-highlighted;
+  live pre-highlights everything it touches light orange (planes included).
+- **R5v3-S9-b → SELECT-OTHER (psb/ui2)** ours: header "Select other" without ✕, a grey type column ("Edge"/"Face") before each
+  name, a row preselected blue, hover = grey row background, no footer; live (sketch/231): bold header + red ✕, bordered list
+  with plain rows ("Edge of Sketch 2", "Face of Sketch 2", …), the hovered row **bold** (no fill), "?" footer.
+- Pending live ("qa4 round 5 s9 interaction"): a global selection filter (ours has none), "Hide other parts" / "Hide all parts" in
+  the parts-row menu (ours has both; live's recorded list doesn't), the Measure panel's default unit in a mm document (ours
+  Millimeter; live's notes say Inch), axis icons in the Point readout (ours none), the section manipulator (ours: arrow only;
+  live notes: arrow + rotate glyph + ring), the edge midpoint marker (ours shows a filled dot anywhere along the hovered edge).
+
+- **Live answers (behaviours "qa4 round 5 s9 interaction")**: no global selection filter in live either (= ours ✅); "Hide other
+  parts" / "Hide all parts" are in live's parts-row menu too (= ours ✅); the Measure panel defaults to **Millimeter** in a mm
+  document (= ours ✅; the older live note saying Inch was wrong). **READOUT-AXES (ui/psb)**: live's status-bar "Point:" shows a grey
+  letter + coloured axis arrow before each value (X red ↘, Y green ↗, Z blue ↑, values dotted-underlined); ours shows bare values.
+  **SECTION-MANIP (psb)**: live's section-plane manipulator = ring at the plane point + shaft + hollow arrowhead + two crossing
+  rotate handles at the tip (each highlights blue on its own); ours draws the arrow only. **MIDPOINT-MARKER (psb/ui)**: hovering an
+  edge anywhere shows a small **dark hollow ring** at its midpoint; near the midpoint it becomes an **orange hollow ring** and the
+  edge **loses** its highlight; a selected midpoint is a yellow-orange ring (#FAC012 / #FFD65B centre); ours draws a filled
+  orange dot and keeps the edge highlighted.
+
+## v3 Session 8 on the published v0.4.8 (tag 2bf78a67 = gate c7d9d454 + two CI-test commits; release tarball, not a local build): the feature list on the 30-feature part (r5/v3s2.py; live "Feature-list row states", "ui (10-22 d) feature-row tooltips")
+Timings (spinner gone): Suppress Extrude 1 0.56 s, Unsuppress 0.50 s, valid drag reorder (Plane 1 above Sketch 1) 0.62 s,
+undo / redo / undo of it 0.37 / 0.55 / 0.57 s, Delete Boss sketch 1 0.41 s and its undo 0.63 s, folder Suppress 0.54 s and its
+undo 0.45 s, rename undo 0.45 s; edit / Roll to here / bar drags as in v3 s2 (same app code: 0.35–0.40 s).
+Same as live ✅: row hover highlights the feature's geometry in the viewport; tooltips follow live's format
+`<name>[ [Type]][ (Hidden)][ did not regenerate properly: <msg>]` ("Boss 3 [Extrude] <- Boss sketch 3 [Sketch]", "Boss 1
+[Extrude] did not regenerate properly: No merge scope selected."); suppressed row italic + strike-through; error rows red with
+the red ⓘ on "Features …"; plain clicks add rows to the selection; Delete with the pointer over the viewport deletes the
+selected feature with no confirmation and dependents go red; inline Rename (name selected, Enter commits); "Add selection to
+folder…" → "Folder name" box prefilled "New folder" → collapsed "› New folder (2)"; suppressing a folder suppresses its members;
+every action undoes and redoes.
+- **R5v3-S8-a → ERR-MISSING-REGION (kern/psb, live asked)** after deleting a boss's sketch the boss says "A selected sketch region
+  no longer exists" (no final period; `regen/eval.rs` ~636); that isn't an Onshape string: live's empty-input messages are the
+  "Select …" ones (e.g. "Select edges or faces to fillet." for a Fillet whose edges went away, behaviours ~7155), here presumably
+  "Select face or sketch region to extrude.".
+- **R5v3-S8-b (psb, live asked)** an invalid drag reorder (Boss 4 above its own sketch) shows the normal blue drop line while
+  dragging, then a red toast "Cannot reorder: Boss 4 depends on Boss sketch 4." and leaves the list unchanged; live's handling
+  pending.
+- **R5v3-S8-c (psb)** the multi-row menu lacks "Edit sketch appearance…" when a sketch is among the selected rows (live: Add
+  selection to folder… | Section view…, Suppress, Dynamic suppression ▸ | Clear selection | Edit sketch appearance…, Add
+  appearance to feature… | Delete).
+- **R5v3-S8-d (psb, live asked)** expanding a folder (click on its row) is recorded as an undo step on ours (the first Ctrl+Z
+  after it only collapsed the folder).
+- Pending live: whether hovering geometry highlights its feature row (ours doesn't), whether the dependency tooltip shows on
+  an unselected row (ours does), the folder row menu (ours: Expand, Rename | Suppress, Unsuppress | Expand all, Collapse all |
+  Unpack folder), and what Suppress of a base feature does to Add bosses (ours: red "No merge scope selected.").
+- Note (cosmetic, seen twice now): after a context-menu click the row under the pointer keeps its hover tint.
+
+- **Live answers (behaviours "qa4 round 5 s8 feature list")**:
+  - **REORDER-INVALID (psb)**: live **does** an invalid reorder (Boss 2 above its sketch; Sketch 1 below Extrude 1): no
+    refusal, no toast, the same drop indicator; the dependent goes red ("Boss 2 [Extrude] did not regenerate properly: Select face
+    or sketch region to extrude." / "1 missing selection") with its downstream features. Ours refuses with a red toast "Cannot
+    reorder: … depends on …".
+  - **ERR-MISSING-REGION confirmed**: live's text after deleting the sketch is "Select face or sketch region to extrude." plus a
+    second tooltip line **"1 missing selection"**; Chamfer 1 on Boss 1 goes red too. One Ctrl+Z restores both (= ours).
+  - Suppress Extrude 1: bosses "No merge scope selected." (= ours ✅), fillets "Select edges or faces to fillet." / "1 missing
+    selection", Parts (0); suppressed row tooltip "Extrude 1 (Suppressed)". **SUPPRESSED-MENU (psb)**: live's menu of a suppressed
+    feature is Rename | Add selection to folder… | Unsuppress | Dynamic suppression | (Add comment) | Roll to here | Delete; ours
+    keeps Edit…, Edit Sketch 1…, Show dimensions, Zoom to selection, Show dependencies…. **SKETCH-UNCONSUMED (psb)**: live shows
+    Sketch 1 dark again once its consumer is suppressed; ours kept it hidden (eye-slash).
+  - Hover: row hover highlights the geometry, geometry hover highlights no row (= ours ✅). **TOOLTIP-PARENT (psb, minor)**: live's
+    dependency part has no type tag on the parent ("Boss 2 [Extrude] <- Boss sketch 2"); ours adds "[Sketch]".
+  - Rename: double-click = edit (= ours), Esc cancels, **blur commits**, an **empty name reverts to the default name** (ours not
+    checked yet).
+  - **FOLDER-NAME-INLINE (psb)**: "Add selection to folder…" names the new folder **inline in the row** (input prefilled "New
+    folder"), not in a separate "Folder name" box (that box belongs to the header's New folder button). **FOLDER-MENU (psb)**: live
+    = Rename | Add selection to folder… | Suppress (or Unsuppress) | Dynamic suppression | Roll to here | Expand | Collapse |
+    Delete | Unpack folder; ours = Expand, Rename | Suppress, Unsuppress (both at once) | Expand all, Collapse all | Unpack folder.
+    Dragging a feature onto a folder row makes it the first child (not tested on ours yet).
+  - **FOLDER-EXPAND-UNDO (psb)**: live's undo steps are the user's model actions (suppress, drags, folder creation, renames …);
+    expanding/collapsing isn't one. Ours records the expand as an undo step.
+
+## v3 Session 7 in the app: feature dialogs in everyday use (v0.4.8 c7d9d454; r5/v3s7.py: block 60×40×20 + revolve profile/axis on Front + hole points; live "Extrude dialog states", "Fillet", "All other Part Studio feature dialogs")
+Same as live ✅: Extrude End type list (Blind, Up to next, Up to face, Up to part, Up to vertex, Through all) with the search
+input and bold-match filtering ("thr" → **Thr**ough all), Enter picks; Through all hides Depth; Up to face adds "Up to face"
++ mate-connector button + Offset distance and hides Symmetric; title tooltip "Extrude 2 did not regenerate properly: Select face
+or sketch region to extrude."; Draft = inline "3 deg" + ↻; Symmetric hides Second end position; Second end group (End type +
+flip, Depth, Draft); Starting offset (End type + Depth); Thin (Mid plane, Thickness 1 5 mm + flip, Thickness 2 0 mm, …);
+Surface (New | Add, "Sketch curves to extrude", no Draft); Remove adds ☐ Merge with all + Merge scope "Part 1"; a Remove tool
+pointing away from the part = translucent dark red + blue toast "Selected tools and targets do not intersect." ×.
+Revolve (Solid/Surface/Thin, New…Intersect, regions, Revolve axis + MC button, ☑ Full revolve; unticked: End type + ↻, Revolve
+angle 30 deg, Symmetric, Second end position; an empty required axis field turns pink; 30° preview with a rotate handle).
+Fillet (Edge | Full round, Measurement [Radius, Width], Control [Distance, Conic, Curvature], Radius 5 mm, Asymmetric, Partial,
+Variable, ☑ Allow edge overflow, Smooth fillet corners; chip tooltip "Edge of Extrude 1"; chip right-click → "Clear all").
+Chamfer (Measurement [Offset, Tangent], Chamfer type [Equal distance, Two distances, Distance and angle], Distance 5 mm,
+☑ Tangent propagation). Shell (☐ Hollow, Faces to remove, Shell thickness 2.5 mm + flip, arrow handle; 25 mm → "Shell 1 did
+not regenerate properly: **Could not shell part with selections.**" = live). Circular pattern (Part/Feature/Face pattern, New…,
+Entities, Axis + MC, Angle 360 deg, Instance count 4 + ↻, ☑ Equal spacing, ☐ Centered, Skip instances) and Mirror (Part
+mirror, Entities to mirror, Mirror plane + MC) field lists. Linear pattern / Hole checked in s1. Previews 0.32–0.90 s.
+- **R5v3-S7-a → EXT-DIRECTION (psb/ui2)** ticking Direction: live makes the new "Extrude direction" field the active one (blue),
+  turns the title red and the group's chevron red-brown until it's picked (live dialogs/extrude-23); ours leaves the field
+  white, the title black and the chevron grey (the red-brown chevron seems to mark a group with an unfilled required field:
+  live's Second end chevron, all filled, is grey).
+- **R5v3-S7-b → EXT-2ND-DEPTH (psb/ui2)** the Second end position Depth row has a › expander and a ± tolerance icon on ours;
+  live's has neither (dialogs/extrude-22).
+- **R5v3-S7-c → SEL-REJECT-TOAST (psb)** clicking an entity the active field doesn't accept shows an invented blue toast
+  ("Select sketch regions or planar faces.", part_studio/behaviors.rs filter_description); live simply doesn't highlight or
+  accept it, no toast (live "qa4 round 5 s1 follow-up 2" (1)).
+- **R5v3-S7-d → CHIP-HOVER (psb/ui2)** hovering a selection chip leaves its edge amber (255,169,10); live highlights it
+  yellow-green #f2ff80.
+- **R5v3-S7-e → FILLET-OVERFLOW (kern, live asked)** one top edge of the 60×40×20 block: R ≤ 20 volumes match the exact
+  fillet ((1−π/4)·R²·60 removed: R5 47678.1, R20 42849.6); R 21…45 still report **OK**, as a quarter cylinder clipped by the
+  bottom face (R21 42322.1, R25 40002.7, R45 25607.6 with 5 faces); a ball that size can't touch the 20 mm front face, so live
+  probably fails or overflows differently (r5/v3s7-fillet.py).
+- **R5v3-S7-f (kern/psb, live asked)** Chamfer 25 on the 20 mm face: ours "Failed to chamfer selections."; the model already
+  uses live's "Distance of chamfer on face too large." for other over-size chamfers.
+- Note: Remove on a picked face defaults into the part (25 mm then removes the whole 20 mm block); live's recorded case used a
+  sketch region whose default pointed away; asked for the face case.
+
+- **Live answers (behaviours "qa4 round 5 s7 dialogs")**: R5v3-S7-e **retracted**: live also reports OK for R 15…45 with the
+  same volumes and face counts (R21 42322.112, R25 40002.735, R45 25607.644 = ours to the printed decimals), so FILLET-OVERFLOW
+  is not a bug. R5v3-S7-f → **CHAMFER-OVERFLOW (kern)**: live's Chamfer 25 on the 20 mm face is **OK, 30000.000 mm³** (the leg
+  overflows the face like the fillet); ours fails "Failed to chamfer selections.". Remove on a picked face defaults into the
+  part in live too (= ours). EXT-DIRECTION confirmed with values: on ticking, the "Extrude direction" field is active (border
+  rgb(22,81,176), fill rgb(222,241,251)), title red rgb(170,37,45), chevron red-brown rgb(189,48,57) (it was the disabled grey
+  rgb(215,215,215) before ticking); after a pick: title dark, chevron grey rgb(102,102,102), focus moves to the next field.
+
+## v3 Session 6 in the app: every sketch constraint, driven/driving, colours, deleting, glyph menus, dragging (v0.4.8 c7d9d454; r5/v3s6.py: one sketch with free geometry per constraint, coordinates jittered so the line tool infers nothing; live "Constraints", "qa4 round 5 s5 driven dims")
+Applied by selection + shortcut, each with its glyph ✅: Coincident (endpoint–endpoint, point–circle), Concentric (Shift+O),
+Parallel (B), Tangent (T), Horizontal (H), Vertical (V), Perpendicular (Shift+L), Equal (E), Midpoint (Shift+M), Symmetric
+(Shift+Q, axis last), Fix (Shift+J: the line turns black = fully defined). Glyph hover (yellow box, entity highlighted) ✅;
+deleting a constraint by glyph + Delete or glyph menu → Delete ✅ (geometry stays); dragging a circle carries its point-on-curve
+coincident point ✅; a fixed line doesn't move when dragged ✅; empty-space right-click menu = live's (Confirm Sketch 1 | Copy
+sketch | Show all, Curve/surface analysis… | Select ▸, Select other… | Zoom to fit, View normal to sketch plane) ✅; driven ↔
+driving toggles via the dimension menu ("Change to driving dimension" once driven) ✅; constraint tools picked with nothing
+selected stay active as a pick tool (live) ✅.
+- **R5v3-S6-a → CON-NORMAL-ORDER (skb)** Normal (Shift+K) with the circle picked first fails: status "Can't add constraint:
+  invalid constraint: e50 is not a line". `scene/sketch_mode.rs` make_constraint (~5946) builds `Normal { line: a, curve: b }`
+  as picked; Midpoint and Symmetric already reorder by kind. (Live order-independence asked, follow-up (3).)
+- **R5v3-S6-b → CON-MSG (skb)** constraint errors show internal ids ("e7 is not a line", "e50 …") in the status bar and the
+  message stays there after later, successful actions; live doesn't accept a non-matching pick in the first place (no hover).
+- **R5v3-S6-c → DRIVEN-LOOK (skb; live "qa4 round 5 s5 driven dims")** driven dimensions draw grey **in parentheses**
+  "(23.07)", "(Ø10)"; live: grey **plain** "Ø10". A redundant dimension (auto-driven) gets **no value box** on ours; live opens
+  the normal box ("10 mm" selected, ±, ✓/✕).
+- **R5v3-S6-d → GLYPH-MENU (skb; same live answer (3))** right-click on a constraint glyph: ours = one centred "Delete" button
+  (custom list, sketch.rs render_dim_menu); live = Confirm Sketch | Copy sketch | Show all, Curve/surface analysis… | Select,
+  Select other… | Zoom to fit, View normal to sketch plane | **Delete sketch entity**.
+- **R5v3-S6-e (skb, live asked (1))** Vertical on a line that is already Horizontal collapses it to a zero-length "line" (both
+  glyphs, no error, nothing red).
+- **R5v3-S6-f (skb, live asked (2))** Tangent line–circle and dragging the circle's centre change the circle's **radius** (r 4 →
+  ~7 on applying; ~7 → ~15 when the centre was dragged 12 mm) rather than moving the line.
+- **R5v3-S6-h → CON-CURVATURE (skb)** Curvature between two splines from the Spline tool is refused: "Can't add constraint:
+  invalid constraint: curvature constraint not supported for e6" (CLI, /tmp/qa4/r5/v3s6b.noshape); `sketch/equations.rs`
+  curv_spec (~785) only handles Line, Arc and control-point BSpline, not the interpolated spline the Spline tool makes. Pierce
+  not tested (needs a 3D curve).
+- **R5v3-S6-g (skb, live asked (5))** right-click on a sketch line: ours = Confirm | Copy sketch entities, Transform sketch
+  entities | Curve/surface analysis…, Section view… | Clear selection, Select ▸, Select other… | Zoom to fit, Zoom to
+  selection, View normal to sketch plane | Delete sketch entity (= live's earlier capture sketch/31); live's 10-24 capture (a
+  Part Studio with other sketches) adds Construction, Extrude…, Revolve…, Hide other sketches, Hide all sketches, Align view
+  with vertical axis and has no Section view….
+
+- **Live answers (behaviours "qa4 round 5 s6 constraints")**: (1) V on a Horizontal line: live **adds it anyway**, toast "Sketch
+  could not be solved.", line + both glyphs red, title red, the line **does not collapse** → **CON-HV-COLLAPSE (psb)** confirmed
+  (ours collapses it to zero length silently). (2) Tangent line–circle: live **moves the circle, radius kept** (r 4); ours grows
+  the radius → **CON-TANGENT-APPLY (psb)**; dragging the centre afterwards grows the radius in live too (= ours ✅). (3) Normal
+  is order-independent in live (circle first works; the centre lands on the line) → CON-NORMAL-ORDER confirmed. (4) Fully defined
+  = black line, dots and dimension, plain sketch icon (= ours for the fixed line). (5) Line menu with one sketch: Confirm |
+  Copy sketch entities, Transform sketch entities | **Construction** | **Extrude…, Revolve…** | Curve/surface analysis… | Clear
+  selection, Select, Select other… | (Add comment) | Zoom to fit, Zoom to selection, View normal to sketch plane, **Align view
+  with vertical axis** | Delete sketch entity; no Section view… → **SK-LINE-MENU (psb)**.
+
 ## v3 Session 5 in the app: sketch constraints and dimension editing (v0.4.8 c7d9d454; doc by r5/v3s5.py: Variable #v = 10 mm + free lines and circles; live "Sketch dimension display + Enter/Esc", "qa5 dim conflict", "Constraints")
 Same as live ✅: new box "62 mm" selected, ± and ✓/✕; `1 in` → label **25.4**, reopens as **`1 in`**; `2*5` → **ƒ 10** with the
 tan just-applied background; `#v` → grey **ƒx 10**; Diameter box "16 mm" → **Ø10**; typed value + Esc → Esc #1 reverts to the
@@ -137,6 +380,11 @@ the rows below a 7 px bar; dragging shows the "Rollback bar" pill; Parts (0) wit
   rows keep Edit… / Zoom to selection / Show dependencies…, no "Roll to end" anywhere, and the last row lacks Roll to here →
   ROLL-LAST widened. R5v3-S2-d **confirmed**: live's drop indicator clamps to the first legal slot (below "Right"), so a drop
   over Origin or the Default geometry header lands at the top → ROLLBACK-DROP-TOP (psb).
+
+- **Live answer (behaviours "qa4 round 5 s3 mate flip")**: live's default Revolute top-face → top-face also hangs through the
+  plate (Z axes aligned; = ours) and **Flip primary axis swaps it** (pin stands upside down, t (0,0,50)) for Revolute,
+  Cylindrical and Planar alike → MATE-FLIP-AXIAL confirmed. Live's default also **follows the connectors' axes, not the part's
+  pose** (pin laid on its side first → same result), which ours (nearest pose) doesn't.
 
 ## v3 Session 3 in the app: 3-part assembly by hand (v0.4.8 c7d9d454; parts by r5/v3s3.py, assembly built in the UI)
 Plate 100×60×10, pin Ø10×40, block 20³ (round 4 S2's parts). Insert dialog (Current document › Part Studios, click part →

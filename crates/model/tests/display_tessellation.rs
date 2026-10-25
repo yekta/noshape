@@ -101,3 +101,14 @@ fn coarser_levels_stay_coarse_after_finer_meshing() {
         assert_eq!(level_segments(&run(&ps)), want, "{q:?}");
     }
 }
+
+/// A curved body's preview mesh is the coarse one (a refine pass follows).
+#[test]
+fn curved_bodies_get_a_coarse_preview_first() {
+    noshape_model::regen::set_angle_display_mesh(true);
+    let ps = cylinder(0.02);
+    let opts = RegenOptions { preview_meshes: true, ..Default::default() };
+    let preview = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &UnitPrefs::default(), &opts);
+    assert!(preview.needs_refine);
+    assert!(circle_segments(&preview) < circle_segments(&regen(&ps)), "the preview circle is coarser");
+}

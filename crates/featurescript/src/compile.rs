@@ -126,7 +126,7 @@ impl CompiledModule {
             end: expr.pos,
         };
         let mut errors = Vec::new();
-        let mut cx = Cx { scope: &self.scope, module: self.path.clone(), fns: Vec::new(), errors: &mut errors, used: HashSet::new(), lambda_name: None };
+        let mut cx = Cx { scope: &self.scope, module: self.path.clone(), version: self.version, fns: Vec::new(), errors: &mut errors, used: HashSet::new(), lambda_name: None };
         let (f, _) = cx.function(&def, FnKind::Lambda, None, None);
         if errors.iter().any(|e| e.level == Level::Error) { Err(errors) } else { Ok(Arc::new(f)) }
     }
@@ -162,36 +162,52 @@ const STD_PREFIX: &str = "onshape/std/";
 
 // ---------------------------------------------------------------- standard library
 
-static STD_CACHE: LazyLock<Mutex<HashMap<String, Arc<CompiledModule>>>> = LazyLock::new(Default::default);
+type StdCache = HashMap<(u32, String), Arc<CompiledModule>>;
 
-/// A standard library module (`"geometry.fs"`), compiled once.
+static STD_CACHE: LazyLock<Mutex<StdCache>> = LazyLock::new(Default::default);
+
+/// A standard library module (`"geometry.fs"`) of the embedded release,
+/// compiled once.
 pub fn std_module(name: &str) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
-    let mut cache = STD_CACHE.lock();
-    load_std(name, &mut cache)
+    std_module_at(crate::STD_VERSION, name)
 }
 
-fn load_std(name: &str, cache: &mut HashMap<String, Arc<CompiledModule>>) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
-    if let Some(m) = cache.get(name) {
+/// A standard library module as an import pinned to `version` gets it
+/// (see [`crate::std_version_for`]).
+pub fn std_module_at(version: u32, name: &str) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
+    let mut cache = STD_CACHE.lock();
+    load_std(crate::std_version_for(version), name, &mut cache)
+}
+
+/// The version number of an import's `version : "1963.0"`.
+fn import_version(version: &str) -> u32 {
+    version.split('.').next().and_then(|v| v.parse().ok()).unwrap_or(crate::STD_VERSION)
+}
+
+fn load_std(version: u32, name: &str, cache: &mut StdCache) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
+    if let Some(m) = cache.get(&(version, name.to_string())) {
         return Ok(m.clone());
     }
     let path: Arc<str> = format!("{STD_PREFIX}{name}").into();
-    let Some(src) = crate::std_source(name) else {
+    let Some(src) = crate::std_source_at(version, name) else {
         return Err(vec![CompileError { module: path, pos: Pos::default(), message: format!("Standard library module {name} not found"), parse: false, level: Level::Error }]);
     };
     let ast = Arc::new(crate::parser::parse(src).map_err(|e| vec![CompileError { module: path.clone(), pos: e.pos, message: e.message, parse: true, level: Level::Error }])?);
     let mut imports = Vec::new();
     for item in &ast.items {
-        if let TopKind::Import { path: p, .. } = &item.kind {
+        if let TopKind::Import { path: p, version: v, .. } = &item.kind {
             let Some(n) = p.strip_prefix(STD_PREFIX) else {
                 return Err(vec![CompileError { module: path.clone(), pos: item.pos, message: format!("Unknown import {p}"), parse: false, level: Level::Error }]);
             };
-            imports.push(Some(load_std(n, cache)?));
+            // An older library imports its own version's modules.
+            let v = if version == crate::STD_VERSION { version } else { crate::std_version_for(import_version(v)) };
+            imports.push(Some(load_std(v, n, cache)?));
         } else {
             imports.push(None);
         }
     }
     let m = Arc::new(build_module(path, ast, imports)?);
-    cache.insert(name.to_string(), m.clone());
+    cache.insert((version, name.to_string()), m.clone());
     Ok(m)
 }
 
@@ -208,13 +224,14 @@ fn compile_with(path: Arc<str>, src: &str, resolver: &dyn Resolver, loading: &mu
     let ast = Arc::new(crate::parser::parse(src).map_err(|e| vec![CompileError { module: path.clone(), pos: e.pos, message: e.message, parse: true, level: Level::Error }])?);
     let mut imports = Vec::new();
     for item in &ast.items {
-        let TopKind::Import { path: p, .. } = &item.kind else {
+        let TopKind::Import { path: p, version, .. } = &item.kind else {
             imports.push(None);
             continue;
         };
         let err = |m: String| vec![CompileError { module: path.clone(), pos: item.pos, message: m, parse: false, level: Level::Error }];
         if let Some(n) = p.strip_prefix(STD_PREFIX) {
-            imports.push(Some(std_module(n).map_err(|_| err(format!("Standard library module \"{p}\" does not exist")))?));
+            // The library at the version the import pins (when embedded).
+            imports.push(Some(std_module_at(import_version(version), n).map_err(|_| err(format!("Standard library module \"{p}\" does not exist")))?));
             continue;
         }
         let Some((canon, source)) = resolver.resolve(p) else {
@@ -525,7 +542,7 @@ fn build_module(path: Arc<str>, ast: Arc<ast::Module>, imports: Vec<Option<Arc<C
             TopKind::Function(_) => {
                 let (decl, def) = &own_fns[next_fn];
                 next_fn += 1;
-                let mut cx = Cx { scope: &scope, module: path.clone(), fns: Vec::new(), errors: &mut errors, used: HashSet::new(), lambda_name: None };
+                let mut cx = Cx { scope: &scope, module: path.clone(), version: ast.version, fns: Vec::new(), errors: &mut errors, used: HashSet::new(), lambda_name: None };
                 let (f, _) = cx.function(def, decl.kind, Some(&decl.param_types), decl.returns);
                 used.extend(cx.used);
                 let _ = decl.compiled.set(Arc::new(f));
@@ -536,7 +553,7 @@ fn build_module(path: Arc<str>, ast: Arc<ast::Module>, imports: Vec<Option<Arc<C
             TopKind::Const { name, .. } if next_const < own_consts.len() && own_consts[next_const].0.name == *name && own_consts[next_const].0.pos == item.pos => {
                 let (cell, ty, init) = &own_consts[next_const];
                 next_const += 1;
-                let mut cx = Cx { scope: &scope, module: path.clone(), fns: vec![Fcx::default()], errors: &mut errors, used: HashSet::new(), lambda_name: Some(format!("const {name}").into()) };
+                let mut cx = Cx { scope: &scope, module: path.clone(), version: ast.version, fns: vec![Fcx::default()], errors: &mut errors, used: HashSet::new(), lambda_name: Some(format!("const {name}").into()) };
                 let e = cx.expr(init);
                 let frame = cx.fns.pop().map(|f| f.nslots).unwrap_or(0);
                 used.extend(cx.used);
@@ -598,6 +615,8 @@ impl Fcx {
 struct Cx<'a> {
     scope: &'a Scope,
     module: Arc<str>,
+    /// The module's `FeatureScript` version (which form of a native it gets).
+    version: Option<u32>,
     fns: Vec<Fcx>,
     errors: &'a mut Vec<CompileError>,
     /// Module-level names referenced (for "Unused declaration").
@@ -1073,7 +1092,7 @@ impl Cx<'_> {
             ExprKind::Call(f, args) => {
                 let callee = match &*f.kind {
                     ExprKind::Ident(q) => self.callee(q, f.pos, args.len()),
-                    ExprKind::Builtin(name) => match native(name) {
+                    ExprKind::Builtin(name) => match crate::interp::native_at(name, self.version) {
                         Some(n) => Callee::Native(n, name.clone()),
                         None => Callee::MissingNative(name.clone()),
                     },

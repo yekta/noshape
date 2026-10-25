@@ -137,10 +137,10 @@ fn keys_used(body: &str, name: &str) -> Vec<String> {
     keys.into_iter().collect()
 }
 
-/// Every native call in std with its arguments.
-fn std_sites() -> Vec<Site> {
+/// Every native call in a standard library with its arguments.
+fn std_sites(sources: &'static [(&'static str, &'static str)]) -> Vec<Site> {
     let mut sites = Vec::new();
-    for (file, src) in noshape_featurescript::STD_SOURCES {
+    for (file, src) in sources {
         let s = strip_comments(src);
         let b = s.as_bytes();
         // Starts of functions (and their parameter lists) for map parameters.
@@ -237,6 +237,20 @@ const MISSING: &[&str] = &[
     "opSplitBySelfShadow",
 ];
 
+/// Natives std 1963 calls that are not implemented.
+const MISSING_1963: &[&str] = &[
+    "evApproximateBSplineSurface",
+    "evFaults",
+    "evMaxTolerance",
+    "evTolerances",
+    "opBooleanedPattern",
+    "opCreateBSplineSurface",
+    "opCreateOutline",
+    "opImportForeign",
+    "opSMFlatOperation",
+    "opSplitBySelfShadow",
+];
+
 /// A probe value for an argument std passes as `expr` (`args`: the call's
 /// arguments, for a sketch's entity ids).
 fn probe_value(cx: &Arc<FsContext>, expr: &str, args: &[Arg]) -> Value {
@@ -260,12 +274,12 @@ fn probe_value(cx: &Arc<FsContext>, expr: &str, args: &[Arg]) -> Value {
 /// Std's map arguments a native does not read as maps: (site, argument
 /// number, what the native did instead), the natives std calls that do not
 /// exist, and the keys of maps natives read only in part.
-fn unread_maps() -> (Vec<String>, BTreeSet<String>, Vec<String>) {
+fn unread_maps(sources: &'static [(&'static str, &'static str)]) -> (Vec<String>, BTreeSet<String>, Vec<String>) {
     super::register();
     let mut problems = Vec::new();
     let mut missing = BTreeSet::new();
     let mut unread_keys = Vec::new();
-    for site in std_sites() {
+    for site in std_sites(sources) {
         let Some(f) = noshape_featurescript::interp::native(&site.name) else {
             missing.insert(site.name.clone());
             continue;
@@ -318,15 +332,31 @@ fn unread_maps() -> (Vec<String>, BTreeSet<String>, Vec<String>) {
     (problems, missing, unread_keys)
 }
 
-#[test]
-fn natives_read_the_maps_std_passes() {
-    let (problems, missing, unread_keys) = unread_maps();
+fn check(sources: &'static [(&'static str, &'static str)], known_missing: &[&str]) {
+    let (problems, missing, unread_keys) = unread_maps(sources);
     if std::env::var_os("NATIVE_ARGS_REPORT").is_some() {
         for k in &unread_keys {
             eprintln!("keys: {k}");
         }
     }
     assert!(problems.is_empty(), "{} std calls whose map the native does not read:\n{}", problems.len(), problems.join("\n"));
-    let known: BTreeSet<String> = MISSING.iter().map(|s| s.to_string()).collect();
-    assert_eq!(missing, known, "natives std calls that do not exist (update MISSING)");
+    let known: BTreeSet<String> = known_missing.iter().map(|s| s.to_string()).collect();
+    assert_eq!(missing, known, "natives std calls that do not exist (update the missing list)");
+}
+
+#[test]
+fn natives_read_the_maps_std_passes() {
+    check(noshape_featurescript::STD_SOURCES, MISSING);
+}
+
+/// The same for the older libraries Feature Studios pin.
+#[test]
+fn natives_read_the_maps_older_std_passes() {
+    for (version, sources) in noshape_featurescript::STD_VERSIONS {
+        let missing: &[&str] = match version {
+            1963 => MISSING_1963,
+            _ => &[],
+        };
+        check(sources, missing);
+    }
 }

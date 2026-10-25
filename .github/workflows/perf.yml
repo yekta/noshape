@@ -45,6 +45,14 @@ on:
         description: 'Benchmark document in the repo (default the NIST assembly; tests/perf/parts-1000.noshape: 1000 parts, instancing). No baseline unless default'
         required: false
         default: ''
+      env:
+        description: 'Environment for every run on macOS and Linux, e.g. NOSHAPE_DISPLAY_MESH=chord. On macOS only the first orbit of a job is reliable for fps: compare settings in separate jobs'
+        required: false
+        default: ''
+      modes:
+        description: 'Presentation modes instead of the runner default, e.g. texture'
+        required: false
+        default: ''
   workflow_run:
     workflows: [Release]
     types: [completed]
@@ -156,9 +164,43 @@ jobs:
           path: ${{ runner.temp }}/smoke
           if-no-files-found: warn
 
+  # A ref built from source for the macOS benchmarks: on the image the
+  # release is built on (macos-latest, now macOS 26 with Xcode 26), not on
+  # the measuring runner. Linked against the macOS 14 / 15 SDKs the same
+  # code presents far fewer frames (v0.4.7 from source on the macOS 14 and
+  # 15 runners: 19.1 fps orbiting parts-1000, its release DMG 33.5 fps).
+  build-macos:
+    name: Build (macOS, from source)
+    if: (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && inputs.jobs != 'smoke' && inputs.jobs != 'model' && inputs.ref != ''
+    runs-on: macos-latest
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/noshape-binary
+        with:
+          ref: ${{ inputs.ref }}
+          asset: macos-arm64.dmg
+
+      - name: Pack the app
+        run: |
+          ditto -c -k --keepParent "$RUNNER_TEMP/noshape.app" "$RUNNER_TEMP/noshape-app.zip"
+          echo "$BUILD" > "$RUNNER_TEMP/build.txt"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: noshape-macos-app
+          path: |
+            ${{ runner.temp }}/noshape-app.zip
+            ${{ runner.temp }}/build.txt
+          retention-days: 3
+
   bench:
     name: ${{ matrix.name }}
-    if: (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && inputs.jobs != 'smoke' && inputs.jobs != 'model'
+    needs: build-macos
+    if: ${{ !cancelled() && (needs.build-macos.result == 'success' || needs.build-macos.result == 'skipped') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && inputs.jobs != 'smoke' && inputs.jobs != 'model' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 240
     strategy:
@@ -192,10 +234,24 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: ./.github/actions/noshape-binary
+        if: runner.os != 'macOS' || inputs.ref == ''
         with:
           tag: ${{ inputs.tag }}
           ref: ${{ inputs.ref }}
           asset: ${{ matrix.asset }}
+
+      - uses: actions/download-artifact@v8
+        if: runner.os == 'macOS' && inputs.ref != ''
+        with:
+          name: noshape-macos-app
+          path: ${{ runner.temp }}/built
+
+      - name: The app built from source (macOS)
+        if: runner.os == 'macOS' && inputs.ref != ''
+        run: |
+          ditto -x -k "$RUNNER_TEMP/built/noshape-app.zip" "$RUNNER_TEMP"
+          echo "BIN=$RUNNER_TEMP/noshape.app/Contents/MacOS/noshape" >> "$GITHUB_ENV"
+          echo "BUILD=$(cat "$RUNNER_TEMP/built/build.txt")" >> "$GITHUB_ENV"
 
       # ------------------------------------------------------------ the runner
       - name: Install (macOS)
@@ -229,12 +285,13 @@ jobs:
         if: runner.os != 'Windows'
         env:
           VARIANTS: ${{ inputs.variants || '' }}
-        run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ matrix.modes }}
+          BENCH_ENV: ${{ inputs.env || '' }}
+        run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ inputs.modes || matrix.modes }}
 
       - name: Benchmarks (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .github/perf/bench.ps1 $env:BIN $env:FIXTURE "$env:RUNNER_TEMP\perf" ${{ matrix.modes }}
+        run: .github/perf/bench.ps1 $env:BIN $env:FIXTURE "$env:RUNNER_TEMP\perf" ${{ inputs.modes || matrix.modes }}
 
       - name: Baseline (last successful run on main)
         if: inputs.fixture == ''
