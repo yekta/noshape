@@ -368,7 +368,11 @@ impl PartStudioView {
 
     pub(super) fn render_section_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.ui.section_dialog.as_ref()?;
-        let planes = self.ui.section.iter().map(|pl| pl.label.trim_end_matches(" plane").to_string()).collect();
+        // Live (skb 10-24 assembly section, qa4-r5-s9-5): a chip is named by
+        // its plane's nearest standard direction, whatever was picked (a
+        // face, a connector: "Section plane 1 (Top)"); a turned plane has no
+        // name.
+        let planes = self.ui.section.iter().map(|pl| if pl.label.starts_with("Section plane") { String::new() } else { direction_name(pl.normal).to_string() }).collect();
         let items = d.items.iter().map(|b| self.display.body(b).map(|x| x.name.clone()).unwrap_or_else(|| "Part".into())).collect();
         let props = crate::section_dialog::Props { include: d.include, items_active: d.items_active, planes, active: d.active, items };
         Some(crate::section_dialog::render(props, "ps-section", &cx.entity(), Self::on_section_action, cx))
@@ -549,6 +553,18 @@ fn section_box(anchor: glam::DVec2) -> Div {
 /// Parameter name marking the section arrow among the manipulators.
 pub(super) const SECTION_PARAM: &str = "__section";
 
+/// The default plane a normal is nearest to.
+fn direction_name(n: DVec3) -> &'static str {
+    let a = n.abs();
+    if a.z >= a.x && a.z >= a.y {
+        "Top"
+    } else if a.y >= a.x {
+        "Front"
+    } else {
+        "Right"
+    }
+}
+
 fn plane(label: &str, origin: DVec3, normal: DVec3) -> SectionPlane {
     SectionPlane { label: label.to_string(), origin, normal, offset: 0.0, flipped: false, base: None }
 }
@@ -556,4 +572,18 @@ fn plane(label: &str, origin: DVec3, normal: DVec3) -> SectionPlane {
 /// Length of the section arrow's handle: a fraction of the model size.
 fn section_handle(lo: DVec3, hi: DVec3) -> f64 {
     ((hi - lo).length() * 0.12).max(1e-3)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::direction_name;
+    use glam::DVec3;
+
+    /// Live: the top face of a block or a connector on it reads "(Top)".
+    #[::core::prelude::v1::test]
+    fn chips_are_named_by_the_nearest_default_plane() {
+        assert_eq!(direction_name(DVec3::Z), "Top");
+        assert_eq!(direction_name(-DVec3::Y), "Front");
+        assert_eq!(direction_name(DVec3::new(0.9, 0.1, 0.3).normalize()), "Right");
+    }
 }

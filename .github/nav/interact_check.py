@@ -39,7 +39,9 @@ CHECKS = [
     ("hover-leave", "3.6", "leaving the graphics clears the hover", lambda s: s is not None and s["hover"] is None),
     ("select-for-space", "1.5", "(setup) a face selected", lambda s: kinds(s) == ["Face"]),
     ("space-clears", "1.5", "Space clears the selection", lambda s: kinds(s) == []),
-    ("crossing-box-plane", "1.8", "a crossing box over the Top plane selects it", lambda s: s is not None and "Plane(Top)" in s["selection"]),
+    # Live ("nav2 selection" 5, 10-25): a box never takes a default plane,
+    # enclosed or crossed; it takes the faces and edges it reaches.
+    ("crossing-box-plane", "1.8", "a crossing box over the Top plane leaves the plane out", lambda s: s is not None and not any(r.startswith("Plane") for r in s["selection"])),
 ]
 
 
