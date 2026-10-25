@@ -178,13 +178,14 @@ pub fn loft() -> FeatureType {
         ParamSpec::array(
             "sheetProfilesArray",
             "Profiles",
-            "Profile",
+            "profile",
             vec![ParamSpec::query(
                 "sheetProfileEntities",
                 "Faces and sketch regions",
                 QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
             )],
         )
+        .item_template("#sheetProfileEntities")
         // loft.fs: "Driven query" arrays, one selection box adding a
         // profile per pick (live dom/dialog-loft.txt).
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS | Hints::DRIVEN_QUERY)
@@ -194,20 +195,21 @@ pub fn loft() -> FeatureType {
         ParamSpec::array(
             "wireProfilesArray",
             "Profiles",
-            "Profile",
+            "profile",
             vec![ParamSpec::query(
                 "wireProfileEntities",
                 "Edges, curves and sketches",
                 QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE | QueryFilter::WIRE_BODY | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
             )],
         )
+        .item_template("#wireProfileEntities")
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
         .visible(|v| !v.is("bodyType", "SOLID")),
     );
     p.extend(without_hint(thin_block(), Hints::CAN_BE_TOLERANT));
     // loft.fs: Group "End conditions", not collapsed by default.
-    p.push(ParamSpec::bool("endConditions", "End conditions", true).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE));
-    let ends = |v: &ParamValues| v.bool("endConditions");
+    p.push(ParamSpec::bool("endConditionsGroup", "End conditions", true).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE));
+    let ends = |v: &ParamValues| v.bool("endConditionsGroup");
     for (cond, faces, mag, dir, label) in [
         ("startCondition", "adjacentFacesStart", "startMagnitude", "startDirection", ["Start profile condition", "Start magnitude", "Start direction"]),
         ("endCondition", "adjacentFacesEnd", "endMagnitude", "endDirection", ["End profile condition", "End magnitude", "End direction"]),
@@ -223,12 +225,15 @@ pub fn loft() -> FeatureType {
         ParamSpec::array(
             "guidesArray",
             "Guides",
-            "Guide",
+            "guide",
             vec![
                 ParamSpec::query("guideEntities", "Edges, curves and sketches", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY),
                 ParamSpec::enum_("guideDerivativeType", "Continuity", GUIDE_CONTINUITY).hints(Hints::SHOW_LABEL | Hints::MATCH_LAST_ARRAY_ITEM),
+                // loft.fs: set by its editing logic, never shown.
+                ParamSpec::num("guideDerivativeMagnitude", "Magnitude", NumSpec::real(1.0, -1e5, 1e5)).hints(Hints::ALWAYS_HIDDEN),
             ],
         )
+        .item_template("#guideEntities")
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
         .visible(|v| v.bool("addGuides")),
     );
@@ -241,9 +246,15 @@ pub fn loft() -> FeatureType {
         ParamSpec::array(
             "connections",
             "Match connections",
-            "Connection",
-            vec![ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX)],
+            "connection",
+            vec![
+                ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX),
+                // loft.fs: set by its editing logic, never shown.
+                ParamSpec::query("connectionEdgeQueries", "Edge queries", QueryFilter::EDGE).hints(Hints::ALWAYS_HIDDEN),
+                ParamSpec::text("connectionEdgeParameters", "Edge parameters", "").hints(Hints::ALWAYS_HIDDEN),
+            ],
         )
+        .item_template("#connectionEntities")
         .hints(Hints::DRIVEN_QUERY)
         .visible(|v| v.bool("matchConnections")),
     );

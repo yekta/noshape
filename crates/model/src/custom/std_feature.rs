@@ -191,8 +191,10 @@ pub fn editing_logic(
 /// Core features whose dialogs run std's editing logic although they
 /// regenerate natively (std Extrude: Add and the merge scope from the trial
 /// tool's collisions, flips for Up to and Remove, the second direction;
-/// std Fillet: a variable fillet's first vertex takes the fillet's values).
-const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet"];
+/// std Fillet: a variable fillet's first vertex takes the fillet's values;
+/// std Loft: Add and the merge scope as Extrude, profiles kept across a
+/// creation type change, adjacent faces for matched end conditions).
+const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft"];
 
 /// Whether std has editing logic for built-in feature `type_id` and the
 /// dialog runs it (std runs the feature, or it is in STD_EDITING_LOGIC).

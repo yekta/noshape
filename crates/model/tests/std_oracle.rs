@@ -15,7 +15,7 @@ use noshape_model::sketch_feature::SketchData;
 use noshape_units::{ExprValue, UnitPrefs};
 
 /// Core features whose dialogs equal std's in every state.
-const STRICT: &[&str] = &["extrude", "fillet", "hole"];
+const STRICT: &[&str] = &["extrude", "fillet", "hole", "loft", "transform"];
 
 /// Hints only built-in dialogs carry (UI behaviour the std expresses
 /// elsewhere, e.g. `GROUP_LABEL` for std's collapsible groups).
@@ -975,4 +975,177 @@ fn hole_tapped_depths_link_as_std() {
         let close = native.len() == std.len() && native.iter().zip(&std).all(|(a, b)| a.0 == b.0 && (a.1 - b.1).abs() < 1e-9);
         assert!(close, "{field} = {value}: native {native:?}, std {std:?}");
     }
+}
+
+/// Two profiles for a loft: a 20 mm square on Top and a 10 mm one 30 mm
+/// above (an offset plane); their sketches and largest regions.
+fn loft_profiles(s: &mut Studio) -> [(FeatureId, Reference); 2] {
+    let (a, ra) = s.sketch(Reference::Plane(DatumPlane::Top), &[SQUARE]);
+    let plane = s.add("cPlane", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        p.set("cplaneType", en("OFFSET"));
+        p.set("offset", expr("30 mm"));
+    });
+    let small: &[(f64, f64)] = &[(15.0, 15.0), (25.0, 15.0), (25.0, 25.0), (15.0, 25.0)];
+    let (b, rb) = s.sketch(Reference::FeaturePlane(plane), &[small]);
+    [(a, ra[0].clone()), (b, rb[0].clone())]
+}
+
+fn profile_items(id: &str, refs: Vec<Vec<Reference>>) -> ParamValue {
+    ParamValue::Array(
+        refs.into_iter()
+            .map(|r| {
+                let mut v = ParamValues::default();
+                v.set(id, ParamValue::Query(r));
+                v
+            })
+            .collect(),
+    )
+}
+
+/// Loft scenarios, native against std loft.fs.
+fn loft_cases() -> Vec<(&'static str, Studio)> {
+    let mut cases = Vec::new();
+    let solid = |name: &'static str, set: fn(&mut ParamValues)| {
+        let mut s = Studio::new();
+        let [(_, a), (_, b)] = loft_profiles(&mut s);
+        s.add("loft", |p| {
+            p.set("sheetProfilesArray", profile_items("sheetProfileEntities", vec![vec![a], vec![b]]));
+            set(p);
+        });
+        (name, s)
+    };
+    cases.push(solid("two squares", |_| {}));
+    cases.push(solid("normal to the start profile", |p| {
+        p.set("startCondition", en("NORMAL_TO_PROFILE"));
+        p.set("startMagnitude", expr("1.5"));
+    }));
+    cases.push(solid("normal to both profiles", |p| {
+        p.set("startCondition", en("NORMAL_TO_PROFILE"));
+        p.set("endCondition", en("NORMAL_TO_PROFILE"));
+    }));
+    cases.push(solid("thin", |p| p.set("bodyType", en("THIN"))));
+    cases.push(solid("path, nothing selected", |p| p.set("addSections", ParamValue::Bool(true))));
+    cases.push(solid("guides, nothing selected", |p| p.set("addGuides", ParamValue::Bool(true))));
+    let mut s = Studio::new();
+    s.add("loft", |_| {});
+    cases.push(("nothing selected", s));
+    let mut s = Studio::new();
+    let [(_, a), _] = loft_profiles(&mut s);
+    s.add("loft", |p| p.set("sheetProfilesArray", profile_items("sheetProfileEntities", vec![vec![a]])));
+    cases.push(("one profile", s));
+    let mut s = Studio::new();
+    let [(a, _), (b, _)] = loft_profiles(&mut s);
+    let (ea, eb) = (s.sketch_edges(a), s.sketch_edges(b));
+    s.add("loft", |p| {
+        p.set("bodyType", en("SURFACE"));
+        p.set("wireProfilesArray", profile_items("wireProfileEntities", vec![ea, eb]));
+    });
+    cases.push(("surface from sketch edges", s));
+    cases
+}
+
+#[test]
+fn loft_regenerates_as_std() {
+    // Known gap: loft start/end conditions. Our kernel loft has no end
+    // derivatives; native warns that it ignores them, the host's opLoft
+    // ignores them silently. Onshape applies them (geometry differs).
+    let gaps = ["normal to the start profile", "normal to both profiles"];
+    let report: String = loft_cases().iter().filter(|(name, _)| only(name) && !gaps.contains(name)).filter_map(|(name, s)| same_as_std(name, "loft", s)).collect();
+    assert!(report.is_empty(), "native Loft differs from std:\n{report}");
+}
+
+/// Transform scenarios on the 40 mm cube, native against std transformCopy.fs.
+fn transform_cases() -> Vec<(&'static str, Studio)> {
+    let mut cases = Vec::new();
+    let on_cube = |name: &'static str, set: fn(&mut ParamValues, &RegenResult)| {
+        let mut s = Studio::new();
+        s.cube();
+        let r = s.regen();
+        s.add("transform", |p| {
+            p.set("entities", ParamValue::Query(vec![body_ref(&r, 0)]));
+            set(p, &r);
+        });
+        (name, s)
+    };
+    cases.push(on_cube("translate by distance, no direction", |p, _| p.set("transformType", en("TRANSLATION_DISTANCE"))));
+    cases.push(on_cube("translate by distance along an edge", |p, r| {
+        p.set("transformType", en("TRANSLATION_DISTANCE"));
+        p.set("transformDirection", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 0.0))]));
+        p.set("distance", expr("15 mm"));
+    }));
+    cases.push(on_cube("translate by line", |p, r| {
+        p.set("transformType", en("TRANSLATION_ENTITY"));
+        p.set("transformLine", ParamValue::Query(vec![edge_at(r, DVec3::new(0.0, 0.0, 20.0))]));
+    }));
+    cases.push(on_cube("translate by line, opposite, copy", |p, r| {
+        p.set("transformType", en("TRANSLATION_ENTITY"));
+        p.set("transformLine", ParamValue::Query(vec![edge_at(r, DVec3::new(0.0, 0.0, 20.0))]));
+        p.set("oppositeDirectionEntity", ParamValue::Bool(true));
+        p.set("makeCopy", ParamValue::Bool(true));
+    }));
+    cases.push(on_cube("translate by XYZ", |p, _| {
+        p.set("transformType", en("TRANSLATION_3D"));
+        p.set("dx", expr("10 mm"));
+        p.set("dz", expr("-5 mm"));
+    }));
+    cases.push(on_cube("rotate about an edge", |p, r| {
+        p.set("transformType", en("ROTATION"));
+        p.set("transformAxis", ParamValue::Query(vec![edge_at(r, DVec3::new(0.0, 0.0, 20.0))]));
+        p.set("angle", expr("45 deg"));
+    }));
+    cases.push(on_cube("rotate, no axis", |p, _| p.set("transformType", en("ROTATION"))));
+    cases.push(on_cube("copy in place", |p, _| p.set("transformType", en("COPY"))));
+    cases.push(on_cube("scale about a vertex", |p, r| {
+        p.set("transformType", en("SCALE_UNIFORMLY"));
+        p.set("scalePoint", ParamValue::Query(vec![vertex_at(r, DVec3::new(0.0, 0.0, 0.0))]));
+        p.set("scale", expr("0.5"));
+    }));
+    cases.push(on_cube("scale non-uniformly", |p, r| {
+        p.set("transformType", en("SCALE_UNIFORMLY"));
+        p.set("uniform", ParamValue::Bool(false));
+        p.set("scalePoint", ParamValue::Query(vec![vertex_at(r, DVec3::new(0.0, 0.0, 0.0))]));
+        p.set("scaleX", expr("2"));
+    }));
+    cases.push(on_cube("scale, no point", |p, _| p.set("transformType", en("SCALE_UNIFORMLY"))));
+    let mut s = Studio::new();
+    s.cube();
+    s.add("transform", |p| p.set("transformType", en("TRANSLATION_3D")));
+    cases.push(("nothing selected", s));
+    cases
+}
+
+#[test]
+fn transform_regenerates_as_std() {
+    let report: String = transform_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std(name, "transform", s)).collect();
+    assert!(report.is_empty(), "native Transform differs from std:\n{report}");
+}
+
+/// std's loftEditLogic: a new loft whose start profile lies on the cube's
+/// top face adds to the cube; one in empty space stays New.
+#[test]
+fn loft_editing_logic_runs_std() {
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let top = face_at(&r, DVec3::new(20.0, 20.0, 40.0));
+    let cube = vec![body_ref(&r, 0)];
+    let (_, a) = s.sketch(top, &[SQUARE]);
+    let plane = s.add("cPlane", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        p.set("cplaneType", en("OFFSET"));
+        p.set("offset", expr("70 mm"));
+    });
+    let small: &[(f64, f64)] = &[(15.0, 15.0), (25.0, 15.0), (25.0, 25.0), (15.0, 25.0)];
+    let (_, b) = s.sketch(Reference::FeaturePlane(plane), &[small]);
+    let profiles = profile_items("sheetProfileEntities", vec![vec![a[0].clone()], vec![b[0].clone()]]);
+    s.add("loft", |p| p.set("sheetProfilesArray", profiles.clone()));
+    let got = edit_logic(&s, &ParamValues::default(), &["sheetProfilesArray"]);
+    assert!(got.contains(&"operationType=Enum(\"ADD\")".to_string()) && got.contains(&format!("booleanScope={:?}", ParamValue::Query(cube))), "{got:?}");
+
+    let mut s = Studio::new();
+    let [(_, a), (_, b)] = loft_profiles(&mut s);
+    s.add("loft", |p| p.set("sheetProfilesArray", profile_items("sheetProfileEntities", vec![vec![a], vec![b]])));
+    let got = edit_logic(&s, &ParamValues::default(), &["sheetProfilesArray"]);
+    assert!(!got.iter().any(|x| x.starts_with("operationType=")), "{got:?}");
 }

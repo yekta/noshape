@@ -38,7 +38,7 @@ use crate::display::BodyKind;
 use crate::naming::Name;
 use crate::reference::{BodyId, FeatureId, Reference, Role, Source, TopoName};
 use crate::regen::context::{Body, Connector, SketchResult};
-use crate::regen::eval::{EffectiveFeature, EvalCtx, FResult, NamedShape, err, kernel_plane, transform_frame};
+use crate::regen::eval::{EffectiveFeature, EvalCtx, FResult, FeatureError, NamedShape, err, err_at, kernel_plane, transform_frame};
 use glam::{DMat4, DQuat, DVec3, DVec4};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
@@ -1433,42 +1433,47 @@ fn mc_frame(c: &Connector) -> DMat4 {
 fn transform_of(ev: &EvalCtx) -> FResult<Option<k::Transform>> {
     let ty = ev.enum_("transformType").to_string();
     Ok(Some(match ty.as_str() {
-        "TRANSLATION_ENTITY" => {
-            let refs = ev.query("transformLine");
-            let pts: Vec<DVec3> = refs.iter().filter_map(|r| ev.resolve_vertex_point(r)).collect();
+        // std transformCopy.fs: two vertices, else one edge (start to end),
+        // else (by distance) a face's or mate connector's direction.
+        "TRANSLATION_ENTITY" | "TRANSLATION_DISTANCE" => {
+            let by_distance = ty == "TRANSLATION_DISTANCE";
+            let field: &'static str = if by_distance { "transformDirection" } else { "transformLine" };
+            let refs = ev.query(field);
+            let is_vertex = |r: &&Reference| matches!(r, Reference::Vertex(_)) || matches!(r, Reference::SketchEntity { .. } if ev.resolve_vertex_point(r).is_some());
+            let pts: Vec<DVec3> = refs.iter().filter(is_vertex).filter_map(|r| ev.resolve_vertex_point(r)).collect();
+            let edges: Vec<&Reference> = refs.iter().filter(|r| !is_vertex(r) && matches!(r, Reference::Edge(_) | Reference::SketchEntity { .. })).collect();
+            let coincident = |v: DVec3| if v.length() <= 1e-8 { err("Two or more points are coincident.") } else { Ok(v) };
             let mut v = if pts.len() >= 2 {
-                pts[1] - pts[0]
-            } else if let Some(e) = resolve_curves(ev, refs)?.first() {
-                let (a, b) = e.shape.endpoints()?;
-                b - a
+                coincident(pts[1] - pts[0])?
+            } else if edges.len() > 1 {
+                return err_at(&[field], "Too many entities are selected.");
+            } else if let Some(e) = edges.first() {
+                let Some(c) = resolve_curves(ev, std::slice::from_ref(*e))?.into_iter().next() else { return err_at(&[field], "Cannot resolve entities.") };
+                let (a, b) = c.shape.endpoints()?;
+                coincident(b - a)?
+            } else if by_distance && let Some(d) = refs.iter().find(|r| matches!(r, Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::MateConnector { .. } | Reference::Implicit { .. })).map(|r| ev.resolve_direction(r)) {
+                d.ok_or_else(|| FeatureError { faulty: vec![field], ..fe("Translation by distance requires two vertices, an edge, a plane, or a cylindrical face.") })?
+            } else if by_distance {
+                return err_at(&[field], "Translation by distance requires two vertices, an edge, a plane, or a cylindrical face.");
             } else {
-                return err("Select a line or two points");
+                return err_at(&[field], "Translation requires two vertices or an edge.");
             };
-            if ev.bool("oppositeDirectionEntity") {
-                v = -v;
-            }
-            if v.length() < 1e-12 {
-                return err("The points are coincident");
-            }
-            k::Transform::Translate(v)
-        }
-        "TRANSLATION_DISTANCE" => {
-            let refs = ev.query("transformDirection");
-            let pts: Vec<DVec3> = refs.iter().filter(|r| matches!(r, Reference::Vertex(_) | Reference::SketchEntity { .. })).filter_map(|r| ev.resolve_vertex_point(r)).collect();
-            let d = if pts.len() >= 2 {
-                pts[1] - pts[0]
+            if by_distance {
+                let Some(d) = v.try_normalize() else { return err_at(&[field], "Cannot determine translation direction.") };
+                let dist = ev.length("distance")?;
+                k::Transform::Translate(if ev.bool("oppositeDirection") { -d * dist } else { d * dist })
             } else {
-                let Some(r) = refs.first() else { return err("Select a direction") };
-                ev.resolve_direction(r).ok_or_else(|| fe("The direction could not be resolved"))?
-            };
-            let Some(d) = d.try_normalize() else { return err("The points are coincident") };
-            let dist = ev.length("distance")?;
-            k::Transform::Translate(if ev.bool("oppositeDirection") { -d * dist } else { d * dist })
+                if ev.bool("oppositeDirectionEntity") {
+                    v = -v;
+                }
+                k::Transform::Translate(v)
+            }
         }
         "TRANSLATION_3D" => k::Transform::Translate(DVec3::new(ev.length("dx")?, ev.length("dy")?, ev.length("dz")?)),
         "TRANSFORM_MATE_CONNECTORS" => {
-            let base = ev.query("baseConnector").first().and_then(|r| ev.resolve_connector(r)).ok_or_else(|| fe("Select the mate connector to transform from"))?;
-            let dest = ev.query("destinationConnector").first().and_then(|r| ev.resolve_connector(r)).ok_or_else(|| fe("Select the mate connector to transform to"))?;
+            const NEEDS_TWO: &str = "Transform by mate connectors requires two mate connectors.";
+            let base = ev.query("baseConnector").first().and_then(|r| ev.resolve_connector(r)).ok_or_else(|| fe(NEEDS_TWO))?;
+            let dest = ev.query("destinationConnector").first().and_then(|r| ev.resolve_connector(r)).ok_or_else(|| fe(NEEDS_TWO))?;
             let mut to = mc_frame(&dest);
             if ev.bool("oppositeDirectionMateAxis") {
                 to *= DMat4::from_rotation_x(std::f64::consts::PI);
@@ -1483,19 +1488,17 @@ fn transform_of(ev: &EvalCtx) -> FResult<Option<k::Transform>> {
             k::Transform::Matrix(to * mc_frame(&base).inverse())
         }
         "ROTATION" => {
-            let Some(r) = ev.query("transformAxis").first() else { return err("Select a rotation axis") };
-            let (origin, axis) = ev.resolve_axis(r).ok_or_else(|| fe("The rotation axis could not be resolved"))?;
+            // std: evAxis's own errors (its field "axis" isn't the feature's).
+            let Some(r) = ev.query("transformAxis").first() else { return err("Cannot resolve entities.") };
+            let (origin, axis) = ev.resolve_axis(r).ok_or_else(|| fe("Cannot determine rotation axis."))?;
             let a = ev.angle("angle")?;
             k::Transform::Rotate { origin, axis, angle: if ev.bool("oppositeDirection") { -a } else { a } }
         }
         "COPY" => return Ok(None),
         "SCALE_UNIFORMLY" => {
-            let pr = ev.query("scalePoint").first();
-            let conn = pr.filter(|r| matches!(r, Reference::MateConnector { .. } | Reference::Implicit { .. })).and_then(|r| ev.resolve_connector(r));
-            let center = match pr {
-                Some(r) => ev.resolve_vertex_point(r).ok_or_else(|| fe("The scale point could not be resolved"))?,
-                None => DVec3::ZERO,
-            };
+            let Some(r) = ev.query("scalePoint").first() else { return err_at(&["scalePoint"], "Scale requires a vertex or a mate connector.") };
+            let conn = Some(r).filter(|r| matches!(r, Reference::MateConnector { .. } | Reference::Implicit { .. })).and_then(|r| ev.resolve_connector(r));
+            let center = ev.resolve_vertex_point(r).ok_or_else(|| FeatureError { faulty: vec!["scalePoint"], ..fe("Scale requires a vertex or a mate connector.") })?;
             if ev.bool("uniform") {
                 let s = ev.real("scale")?;
                 if s <= 0.0 {

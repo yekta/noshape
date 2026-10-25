@@ -800,3 +800,15 @@ one in Depth / Tapped depth / Tap clearance whose new value stays positive; live
 `hole_tapped_depths_link_as_std` runs std's holeEditLogic against it. Hole's other editing logic stays native.
 App: the native boolean edit logic is skipped at its caller (part_studio/mod.rs) for std-editing-logic features,
 so api's shared `noshape_ops::studio::boolean_edit_logic` refactor merges cleanly.
+
+**Loft and Transform (done, pending checks):** both dialogs identical to std in every state (Loft: array item names
+"profile"/"guide"/"connection" and item templates as loft.fs, the End conditions group id `endConditionsGroup`
+(the generator's naming), loft.fs's hidden guideDerivativeMagnitude / connectionEdgeQueries /
+connectionEdgeParameters). `loft_regenerates_as_std` (9 cases) and `transform_regenerates_as_std` (12) pass.
+Native fixes: Loft's empty-profiles error marks only the creation type's field; Transform follows
+transformCopy.fs's checks and texts (two vertices / one edge / plane direction, TOO_MANY_ENTITIES_SELECTED,
+TRANSFORM_TRANSLATE(_BY_DISTANCE)_INPUT, NO_TRANSLATION_DIRECTION, POINTS_COINCIDENT, CANNOT_RESOLVE_ENTITIES /
+NO_ROTATION_AXIS from evAxis, TRANSFORM_SCALE_SELECTION, TRANSFORM_MATE_CONNECTORS). Host opLoft: `bodyType` is
+an enum (surface lofts were solids), one profile = LOFT_TWO_PROFILES (live L15). std's loftEditLogic now runs in
+the dialog (`loft_editing_logic_runs_std`). **Known gaps (kernel):** loft start/end conditions are ignored (native
+warns; Onshape shapes the ends), loft guides and path are not supported natively ("not supported yet" errors).

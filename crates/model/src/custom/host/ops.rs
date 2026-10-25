@@ -813,7 +813,8 @@ fn op_loft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             sections.push(evaluate_refs(i, &cx, q)?);
         }
     }
-    let solid = !def_bool(&def, "bodyType", false);
+    // `bodyType` is a ToolBodyType (SOLID / SURFACE).
+    let solid = def_enum(&def, "bodyType").is_none_or(|t| &*t != "SURFACE");
     run_op(i, &cx, &id, "LOFT_FAILED", |ev| {
         let mut shapes = Vec::new();
         for s in &sections {
@@ -827,7 +828,7 @@ fn op_loft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
         }
         if shapes.len() < 2 {
-            return err("Select at least two profiles.");
+            return Err(super::code_error("LOFT_TWO_PROFILES"));
         }
         let res = k::loft(&shapes, &k::LoftOptions { solid, ..Default::default() })?;
         let names = fresh_names(ev, &res.shape);
