@@ -2412,8 +2412,15 @@ fn measure_between_instances() {
     let m = analysis::measure_entities(&res, &[(vec![InstanceId(1)], top.clone()), (vec![InstanceId(2)], bottom)]);
     let d = m.iter().find_map(|(_, m)| if let Measurement::Distance { distance, .. } = m { Some(*distance) } else { None }).unwrap();
     assert!((d - 0.02).abs() < 1e-9, "{d}");
-    let m = analysis::measure_entities(&res, &[(vec![InstanceId(2)], top)]);
+    let m = analysis::measure_entities(&res, &[(vec![InstanceId(2)], top.clone())]);
     assert!(m.iter().any(|(l, m)| l == "Area" && matches!(m, Measurement::Area(a) if (a - 0.0008).abs() < 1e-9)));
+    // A pick on an instance that is gone after re-evaluation no longer exists
+    // (qa4 round 5 s4: the readout kept "Area" after the part was undone).
+    assert!(analysis::pick_exists(&res, &(vec![InstanceId(2)], top.clone())));
+    let one = Assembly { instances: asm.instances[..1].to_vec(), ..Default::default() };
+    let res = ev.evaluate(&f.doc, &one, &SolveOptions::default(), None);
+    assert!(!analysis::pick_exists(&res, &(vec![InstanceId(2)], top.clone())));
+    assert!(analysis::pick_exists(&res, &(vec![InstanceId(1)], top)));
 }
 
 #[test]
