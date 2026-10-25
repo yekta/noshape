@@ -872,6 +872,7 @@ To add a version: export it like live/std-1963 into std-versions/<version>/ and 
 call (std debugs points/lines/arrows of sub-features it aborts); run.rs `add_debug` turns them into the feature's
 `DebugGeometry.colored` (faces → meshes, else edges → polylines, else vertices → points), kept when the feature fails.
 The Part Studio draws them only while that feature's dialog is open (scene builder `debug_geometry`): faces lit at
-alpha 0.5, edges 2 px and points 6 px on top, colours from the client's table (ORANGE = 242, 255, 128). Gap: live draws
-debug faces through the model too; our meshes have no on-top pipeline (render crate), so faces are depth-tested.
+alpha 0.5, edges 2 px and points 6 px on top, colours from the client's table (ORANGE = 242, 255, 128). Debug faces are
+`Instance::on_top` meshes (render pipeline `mesh-top`: no depth test or write, drawn after the transparent meshes and
+before the lines), so they show through the model as live; test render/tests/offscreen.rs `on_top_meshes_show_through_the_model`.
 Test: `debug_entities_in_their_colors`.
