@@ -319,6 +319,13 @@ def main():
         cams = [r for r in by.get(name, []) if "camera" in r]
         return (by[name][0]["camera0"], cams[-1]) if cams else (None, None)
 
+    def turned(name):
+        """The view's turn over a step (deg) as the sum of its camera steps:
+        the angle between the first and last view directions wraps past
+        180 deg (a 200 px drag turns 218 deg on a 991 px diagonal)."""
+        cams = [by[name][0]["camera0"]] + [r for r in by.get(name, []) if "camera" in r]
+        return sum(angle(a["camera"]["forward"], b["camera"]["forward"]) for a, b in zip(cams, cams[1:]))
+
     # Steps that must move the camera: a missing camera change must fail,
     # not skip their checks.
     for name in ("right-drag", "right-drag-fling", "middle-drag", "alt-right-drag", "ctrl-mid-drag", "second-button-mid-drag",
@@ -330,7 +337,7 @@ def main():
     if c0 and c1:
         w, h = c1["viewport"]
         want = 3 * 360 * 200 / math.hypot(w, h)
-        ch.check("right-drag", "turn (deg) for 200 px", angle(c0["camera"]["forward"], c1["camera"]["forward"]), want, 0.5)
+        ch.check("right-drag", "turn (deg) for 200 px", turned("right-drag"), want, 0.5)
     # The rotate centre (the geometry under the pointer at the press, else the
     # visible-depth average) stays put on screen while the view turns.
     pivots = [r["data"]["pivot"] for r in by.get("right-drag", []) if r.get("input") == "pivot" and r["data"].get("pivot")]
@@ -345,7 +352,7 @@ def main():
     c0, c1 = first_last("right-drag-fling")
     if c0 and c1:
         w, h = c1["viewport"]
-        ch.note("right-drag-fling", "turn (deg), 200 px + inertia", angle(c0["camera"]["forward"], c1["camera"]["forward"]))
+        ch.note("right-drag-fling", "turn (deg), 200 px + inertia", turned("right-drag-fling"))
         ch.note("right-drag-fling", "  without inertia it would be", 3 * 360 * 200 / math.hypot(w, h))
     if "alt-right-drag" in by:
         # Constrained rotate: the view is first levelled (snapped, or animated
@@ -377,7 +384,7 @@ def main():
             # -100 px rotate, +100 px pan (Ctrl / middle held), -100 px rotate:
             # the view turns by 200 px worth (100 px if the switch were ignored).
             w, h = c1["viewport"]
-            ch.check(name, "turn (deg) = 200 px of rotate moves", angle(c0["camera"]["forward"], c1["camera"]["forward"]), 3 * 360 * 200 / math.hypot(w, h), 0.5)
+            ch.check(name, "turn (deg) = 200 px of rotate moves", turned(name), 3 * 360 * 200 / math.hypot(w, h), 0.5)
     if "ctrl-left-drag" in by:
         recs = by["ctrl-left-drag"]
         ch.check("ctrl-left-drag", "the press reached the viewport", float(any(r.get("input") == "mouse_down" for r in recs)), 1.0, 0)
@@ -411,7 +418,7 @@ def main():
     c0, c1 = first_last("touch-rotate")
     if c0 and c1:
         w, h = c1["viewport"]
-        ch.note("touch-rotate", "turn (deg) for 200 px + inertia", angle(c0["camera"]["forward"], c1["camera"]["forward"]))
+        ch.note("touch-rotate", "turn (deg) for 200 px + inertia", turned("touch-rotate"))
         ch.note("touch-rotate", "  2 turns per diagonal, no inertia", 2 * 360 * 200 / math.hypot(w, h))
     c0, c1 = first_last("touch-pan")
     if c0 and c1:
@@ -464,7 +471,7 @@ def main():
         if start_x is not None and xs:
             w, h = c1["viewport"]
             px = abs(xs[-1] - start_x)
-            ch.check("pen-rotate", f"turn (deg) = {px:.1f} px of delivered moves at 2 turns/diagonal", angle(c0["camera"]["forward"], c1["camera"]["forward"]), 2 * 360 * px / math.hypot(w, h), 0.5)
+            ch.check("pen-rotate", f"turn (deg) = {px:.1f} px of delivered moves at 2 turns/diagonal", turned("pen-rotate"), 2 * 360 * px / math.hypot(w, h), 0.5)
         else:
             ch.check("pen-rotate", "a pen drag was recognized", 0.0, 1.0, 0)
     if "pen-tap" in by:

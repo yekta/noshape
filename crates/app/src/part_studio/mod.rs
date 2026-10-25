@@ -927,6 +927,7 @@ impl PartStudioView {
         {
             extra.extend(scene_builder::debug_geometry(&st.debug, self.gpu.uploader()));
         }
+        crate::nav_trace::highlights("part_studio", &selection, single_hover.as_ref());
         let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
         // Live (lp wall over 2258): the pattern's other inputs (its
         // Direction) are drawn red; the seed keeps the selection colors.
