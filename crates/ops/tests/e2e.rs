@@ -3069,3 +3069,80 @@ fn draft_and_flatten_analysis() {
     let e = try_call(&mut ctx, "analysis_flatten", json!({ "faces": ["plane:top"] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("faces[0]"), "{e:?}");
 }
+
+/// An Assembly exported as STEP keeps the assembly (root product, each part
+/// once, placed by its instances), and importing it gives back an Assembly
+/// and a "<file> parts" Part Studio with the parts in their own coordinates
+/// (live qa4 r4 s5).
+#[test]
+fn step_assembly_export_and_import_round_trip() {
+    let mut ctx = Ctx::new();
+    let (_, pin) = two_part_assembly(&mut ctx, "step_asm.noshape");
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [0, 0, 30], "axis": [0, 0, 1], "angle": "90 deg" }));
+    let placed = |ctx: &mut Ctx, tab: &str, name: &str| call(ctx, "assembly_list", json!({ "tab": tab }))["instances"].as_array().unwrap().iter().find(|i| i["name"] == name).unwrap_or_else(|| panic!("no {name} in {tab}")).clone();
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let name_of = |id: &str| list["instances"].as_array().unwrap().iter().find(|i| i["id"] == id).unwrap()["name"].as_str().unwrap().to_string();
+    let pin_name = name_of(&pin);
+    let pin_before = placed(&mut ctx, "Assembly 1", &pin_name);
+
+    let file = scratch("step_asm_out.step");
+    let e = call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "STEP", "file": file.to_str().unwrap() }));
+    assert_eq!(e["parts"], 2, "{e}");
+    let text = std::fs::read_to_string(&file).unwrap();
+    assert!(text.contains("PRODUCT('Assembly 1','Assembly 1','Assembly 1'"), "the root product");
+    assert_eq!(text.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 2);
+    assert_eq!(text.matches("MANIFOLD_SOLID_BREP(").count() + text.matches("BREP_WITH_VOIDS(").count(), 2, "each part once");
+
+    let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+    let tabs: Vec<(String, String)> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
+    assert_eq!(tabs.len(), 2, "{r}");
+    assert!(tabs.contains(&("Assembly 1 (1)".to_string(), "Assembly".to_string())), "{r}");
+    assert!(tabs.contains(&("step_asm_out parts".to_string(), "Part Studio".to_string())), "{r}");
+    // The parts in the reverse of the file's order, in their own coordinates.
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "step_asm_out parts" }));
+    let names: Vec<&str> = parts["parts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["Part 2", "Part 1"], "{parts}");
+    let pin_part = &parts["parts"][0];
+    assert!((num(&pin_part["bounding_box"]["min"][0]) - 55.0).abs() < 1e-3 && (num(&pin_part["bounding_box"]["max"][2]) - 50.0).abs() < 1e-3, "the pin where its Part Studio has it: {pin_part}");
+    // The instances where the assembly had them.
+    let pin_after = placed(&mut ctx, "Assembly 1 (1)", "Part 2 <1>");
+    for i in 0..3 {
+        assert!((num(&pin_after["translation"][i]) - num(&pin_before["translation"][i])).abs() < 1e-6, "{pin_after} vs {pin_before}");
+    }
+    for i in 0..4 {
+        assert!((num(&pin_after["rotation"][i]).abs() - num(&pin_before["rotation"][i]).abs()).abs() < 1e-6, "{pin_after} vs {pin_before}");
+    }
+    let block_after = placed(&mut ctx, "Assembly 1 (1)", "Part 1 <1>");
+    assert!(block_after["translation"].as_array().unwrap().iter().all(|v| num(v).abs() < 1e-6), "{block_after}");
+}
+
+/// Live's own STEP assembly (qa4 r4 s5): the tabs, parts and placements live makes.
+#[test]
+fn step_assembly_import_matches_live() {
+    let Some(step) = live_sample("qa4-s5-asm.step") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("qa4_s5.noshape").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let mut tabs: Vec<String> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    tabs.sort();
+    // " (1)": the document already has an Assembly 1.
+    assert_eq!(tabs, ["Assembly 1 (1)", "qa4-s5-asm parts"], "{r}");
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "qa4-s5-asm parts" }));
+    let names: Vec<&str> = parts["parts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["Part 2", "Part 3", "Part 1"], "{parts}");
+    // Each part at its own part position (live).
+    let bbox = |n: &str| {
+        let p = parts["parts"].as_array().unwrap().iter().find(|p| p["name"] == n).unwrap();
+        (0..3).map(|i| num(&p["bounding_box"]["min"][i])).chain((0..3).map(|i| num(&p["bounding_box"]["max"][i]))).collect::<Vec<f64>>()
+    };
+    for (n, want) in [("Part 1", [0.0, 0.0, 0.0, 100.0, 60.0, 10.0]), ("Part 2", [195.0, -5.0, 0.0, 205.0, 5.0, 40.0]), ("Part 3", [300.0, 0.0, 0.0, 320.0, 20.0, 20.0])] {
+        let got = bbox(n);
+        assert!(got.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-3), "{n}: {got:?}");
+    }
+    // The assembly places them as the file does: Part 3 at (-210, 0, 10) from its part position.
+    let asm = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1 (1)" }));
+    let p3 = asm["instances"].as_array().unwrap().iter().find(|i| i["name"] == "Part 3 <1>").unwrap_or_else(|| panic!("{asm}"));
+    let t: Vec<f64> = (0..3).map(|i| num(&p3["translation"][i])).collect();
+    assert!((t[0] + 210.0).abs() < 1e-6 && t[1].abs() < 1e-6 && (t[2] - 10.0).abs() < 1e-6, "{p3}");
+    assert_eq!(asm["instances"].as_array().unwrap().len(), 3, "{asm}");
+}

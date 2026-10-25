@@ -298,3 +298,8 @@ STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty s
   hole-free face, flattens exactly (1 loop, areas equal, 40 × 80 mm). Expected: an identical flat face (no strain), 2 loops.
   `noshape_model::flatten::flatten_faces` (moved verbatim from the app's flatten_tool.rs; the app's Flatten surfaces is the same).
   Repro: `analysis_flatten {"faces": [<top face id>]}` on `block_with_hole` (ops e2e).
+STATUS STEP-ASM (api, 2026-10-25): fixed on ready/api — a STEP whose root product is an assembly imports as the Assembly "<root
+product>" (" (1)" when taken) + Part Studio "<file> parts" with the parts in their own coordinates, listed in the reverse of the
+file's order, the Assembly placing them as the file does (e2e step_assembly_import_matches_live on samples/qa4-s5-asm.step). An
+Assembly exported as STEP now keeps the assembly (root product, each part once, NAUO placements; export_parts on an Assembly tab).
+The BOM element ("BOM : Assembly 1 (1)") stays hidden (IM1b). Part order in assemblies rests on this one file: live request filed.

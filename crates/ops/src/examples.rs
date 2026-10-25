@@ -127,7 +127,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("render_image", &[r##"{"view": "isometric", "file": "/tmp/part.png"}"##, r##"{"tab": "Assembly 1", "view": "isometric", "section": [{"plane": "plane:front"}]}"##, r##"{"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}"##, r##"{"view": "front", "perspective": true, "tangent_edges": "phantom", "hidden_edges": true}"##, r##"{"isolate": ["Part 1"], "zebra": {"stripes": 20}}"##, r##"{"normal_to": "plane:front", "reflection": {"image": "Blue sky", "rotation": 45}}"##]),
     ("render_named_view", &[r##"{"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}"##, r##"{"name": "Section A", "delete": true}"##]),
     // import / export
-    ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##]),
+    ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##, r##"{"tab": "Assembly 1", "format": "STEP", "file": "/tmp/assembly.step"}"##]),
     ("import_files", &[r##"{"files": ["/tmp/bracket.step"]}"##, r##"{"files": ["/tmp/a.x_t", "/tmp/b.x_t"], "combine": true}"##]),
     // Feature Studio, history
     ("featurestudio_get", &[r##"{"tab": "Feature Studio 1"}"##]),

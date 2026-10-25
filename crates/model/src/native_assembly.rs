@@ -400,6 +400,10 @@ pub struct PvzImport {
     pub instances: Vec<k::PvzInstance>,
     /// The parts' names (index = `PvzInstance::part`).
     pub names: Vec<Option<String>>,
+    /// A STEP assembly: the Assembly keeps the root product's name as it
+    /// is (live qa4 r4 s5: "Assembly 1", " (1)" when taken); .pvz roots
+    /// drop their "_NN" suffix first.
+    pub step: bool,
 }
 
 /// A PVZ (Creo View) file of several part instances, as Onshape imports it
@@ -411,7 +415,7 @@ pub struct PvzImport {
 /// Assembly tab comes first. `brep` / `info` are the Import feature's data
 /// (the parts in their own coordinates, see `noshape_kernel::read_pvz_parts`).
 pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) -> Result<(TabId, TabId), String> {
-    let PvzImport { stem, root, brep, info, foreign_id, instances, names } = pvz;
+    let PvzImport { stem, root, brep, info, foreign_id, instances, names, step } = pvz;
     let (brep, info) = (brep.clone(), info.clone());
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("importForeign", units).ok_or("no Import feature")?;
@@ -435,7 +439,8 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
         let id = InstanceId(asm.next_id());
         asm.instances.push(Instance::new(id, format!("{} <{}>", inst.name, count[inst.part]), InstanceSource::Part { studio, body, config: ConfigValues::default() }, Placement::from_dmat4(&inst.transform)));
     }
-    let assembly = doc.add_tab(&pvz_assembly_name(doc, root), TabContent::Assembly(Box::new(asm)));
+    let name = if *step { unique_name(doc, if root.is_empty() { stem } else { root }) } else { pvz_assembly_name(doc, root) };
+    let assembly = doc.add_tab(&name, TabContent::Assembly(Box::new(asm)));
     let order = &mut doc.settings.tab_order;
     if let (Some(a), Some(s)) = (order.iter().position(|t| *t == assembly), order.iter().position(|t| *t == studio)) {
         let id = order.remove(a);
