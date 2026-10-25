@@ -592,6 +592,28 @@ fn ev_curve_definition(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(v)
 }
 
+/// A std `BSplineSurface` (live "fs (10-25 b)" (2): controlPoints rows
+/// along u, full knot vectors, weights only when rational).
+fn bspline_surface_value(b: &k::BSplineSurfaceData) -> Value {
+    let rows = |f: &dyn Fn(usize) -> Value| Value::array((0..b.nu).map(|i| Value::array((0..b.nv).map(|j| f(i * b.nv + j)).collect())).collect());
+    let knots = |k: &[f64]| Value::array(k.iter().map(|x| Value::num(*x)).collect()).with_tag(std_tag("curveGeometry.fs", "KnotArray"));
+    let mut entries = vec![
+        ("surfaceType", surface_type("SPLINE")),
+        ("uDegree", Value::num(b.u_degree as f64)),
+        ("vDegree", Value::num(b.v_degree as f64)),
+        ("isRational", Value::bool(b.weights.is_some())),
+        ("isUPeriodic", Value::bool(b.u_periodic)),
+        ("isVPeriodic", Value::bool(b.v_periodic)),
+        ("controlPoints", rows(&|q| point_value(b.poles[q])).with_tag(std_tag("surfaceGeometry.fs", "ControlPointMatrix"))),
+        ("uKnots", knots(&b.u_knots)),
+        ("vKnots", knots(&b.v_knots)),
+    ];
+    if let Some(w) = &b.weights {
+        entries.push(("weights", rows(&|q| Value::num(w[q])).with_tag(std_tag("matrix.fs", "Matrix"))));
+    }
+    Value::map_from(entries).with_tag(std_tag("surfaceGeometry.fs", "BSplineSurface"))
+}
+
 /// A std `BSplineCurve` (knots expanded by multiplicity).
 fn bspline_value(b: &k::BSplineCurveData) -> Value {
     let poles: Vec<Value> = b.poles.iter().map(|p| point_value(*p)).collect();
@@ -668,7 +690,8 @@ fn ev_surface_definition(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             ),
             k::Surface::Revolution { .. } => Value::map_from([("surfaceType", surface_type("REVOLVED"))]),
             k::Surface::Extrusion { .. } => Value::map_from([("surfaceType", surface_type("EXTRUDED"))]),
-            k::Surface::BSpline { .. } | k::Surface::Bezier { .. } => Value::map_from([("surfaceType", surface_type(if other { "OTHER" } else { "SPLINE" }))]),
+            k::Surface::BSpline { .. } | k::Surface::Bezier { .. } if other => Value::map_from([("surfaceType", surface_type("OTHER"))]),
+            k::Surface::BSpline { .. } | k::Surface::Bezier { .. } => bspline_surface_value(&s.face_bspline().ok()?),
             _ => Value::map_from([("surfaceType", surface_type("OTHER"))]),
         })
     })?;

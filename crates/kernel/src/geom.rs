@@ -362,6 +362,25 @@ impl Shape {
         })
     }
 
+    /// A face's surface as a B-spline in FeatureScript's form (the
+    /// counterpart of [`crate::make_bspline_surface`]): full knot vectors, a
+    /// periodic direction with its `degree` overlapping rows or columns.
+    pub fn face_bspline(&self) -> Result<crate::BSplineSurfaceData> {
+        let b = ck(ffi::face_bspline(self.raw()))?;
+        Ok(crate::BSplineSurfaceData {
+            poles: b.poles.as_chunks::<3>().0.iter().map(|c| DVec3::new(c[0], c[1], c[2])).collect(),
+            nu: b.nu as usize,
+            nv: b.nv as usize,
+            weights: if b.weights.is_empty() { None } else { Some(b.weights) },
+            u_knots: b.u_knots,
+            v_knots: b.v_knots,
+            u_degree: b.u_degree.max(0) as u32,
+            v_degree: b.v_degree.max(0) as u32,
+            u_periodic: b.u_periodic,
+            v_periodic: b.v_periodic,
+        })
+    }
+
     /// Underlying curve of an edge.
     pub fn edge_curve(&self) -> Result<Curve> {
         Ok(self.edge_info()?.curve)

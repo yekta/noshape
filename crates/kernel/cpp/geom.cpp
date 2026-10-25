@@ -354,6 +354,73 @@ BSplineF edge_bspline(const OcShape& es)
   return out;
 }
 
+// One direction of a B-spline surface in FeatureScript's form: the full knot
+// vector (repeats written out); periodic, the knots unrolled so that
+// knots[degree] starts the period (the inverse of surfacing.cpp's
+// periodic_dir), with `degree` overlapping poles added by the caller.
+static std::vector<double> fs_knots(const NCollection_Array1<double>& k, const NCollection_Array1<int>& m, int degree, bool periodic)
+{
+  std::vector<double> one; // one period from its start (open: all knots)
+  for (int i = k.Lower(); i <= k.Upper(); ++i)
+  {
+    const bool last = i == k.Upper();
+    if (periodic && last)
+      break;
+    for (int r = 0; r < m(i); ++r)
+      one.push_back(k(i));
+  }
+  if (!periodic)
+    return one;
+  const double        period = k(k.Upper()) - k(k.Lower());
+  const int           n      = (int)one.size(); // unique poles
+  std::vector<double> out;
+  for (int i = n - degree; i < n; ++i)
+    out.push_back(one[(size_t)i] - period);
+  out.insert(out.end(), one.begin(), one.end());
+  for (int i = 0; i <= degree; ++i)
+    out.push_back(one[(size_t)i] + period);
+  return out;
+}
+
+BSplineSurfF face_bspline(const OcShape& fs)
+{
+  const TopoDS_Face&        f = as_face(fs.shape, "shape");
+  TopLoc_Location           loc;
+  occ::handle<Geom_Surface> s = BRep_Tool::Surface(f, loc);
+  if (s.IsNull())
+    fail_invalid("face has no surface");
+  occ::handle<Geom_BSplineSurface> bs = occ::down_cast<Geom_BSplineSurface>(s);
+  bs = bs.IsNull() ? GeomConvert::SurfaceToBSplineSurface(s) : occ::down_cast<Geom_BSplineSurface>(bs->Copy());
+  if (bs.IsNull())
+    fail_op("could not convert the face surface to a B-spline");
+  if (!loc.IsIdentity())
+    bs->Transform(loc.Transformation());
+  BSplineSurfF out;
+  out.u_degree   = bs->UDegree();
+  out.v_degree   = bs->VDegree();
+  out.u_periodic = bs->IsUPeriodic();
+  out.v_periodic = bs->IsVPeriodic();
+  const int pu = bs->NbUPoles(), pv = bs->NbVPoles();
+  const int nu = pu + (out.u_periodic ? out.u_degree : 0), nv = pv + (out.v_periodic ? out.v_degree : 0);
+  out.nu = (uint32_t)nu;
+  out.nv = (uint32_t)nv;
+  for (int i = 0; i < nu; ++i)
+    for (int j = 0; j < nv; ++j)
+    {
+      const gp_Pnt& p = bs->Pole(i % pu + 1, j % pv + 1);
+      out.poles.push_back(p.X());
+      out.poles.push_back(p.Y());
+      out.poles.push_back(p.Z());
+      if (bs->IsURational() || bs->IsVRational())
+        out.weights.push_back(bs->Weight(i % pu + 1, j % pv + 1));
+    }
+  for (double t : fs_knots(bs->UKnots(), bs->UMultiplicities(), out.u_degree, out.u_periodic))
+    out.u_knots.push_back(t);
+  for (double t : fs_knots(bs->VKnots(), bs->VMultiplicities(), out.v_degree, out.v_periodic))
+    out.v_knots.push_back(t);
+  return out;
+}
+
 P3 face_normal_at_uv(const OcShape& fs, double u, double v)
 {
   const TopoDS_Face& f = as_face(fs.shape, "shape");

@@ -335,6 +335,7 @@ pub(crate) mod ffi {
         fn surface_info(face: &OcShape) -> Result<SurfaceInfo>;
         fn curve_info(edge: &OcShape) -> Result<CurveInfo>;
         fn edge_bspline(edge: &OcShape) -> Result<BSplineF>;
+        fn face_bspline(face: &OcShape) -> Result<BSplineSurfF>;
         fn face_normal_at_uv(face: &OcShape, u: f64, v: f64) -> Result<P3>;
         fn face_point_at_uv(face: &OcShape, u: f64, v: f64) -> Result<P3>;
         fn face_project_point(face: &OcShape, p: P3) -> Result<ProjPoint>;
