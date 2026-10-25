@@ -4557,8 +4557,8 @@ impl AssemblyView {
             // Options › Store file in a new tab: no download.
             if s.options == 2 {
                 v.update(cx, |this, cx| {
-                    let parts = this.export_parts(ids.as_deref(), s.hidden);
-                    this.message = Some(match crate::part_studio::export::store_export(&this.doc, this.tab, &file, |p| crate::part_studio::export::write_export(&s, p, parts), cx) {
+                    let asm = this.export_assembly(ids.as_deref(), s.hidden, cx);
+                    this.message = Some(match crate::part_studio::export::store_export(&this.doc, this.tab, &file, |p| crate::part_studio::export::write_assembly_export(&s, p, &asm), cx) {
                         Ok(f) => (false, format!("Stored {f}")),
                         Err(e) => (true, format!("Export failed: {e:#}")),
                     });
@@ -4568,8 +4568,8 @@ impl AssemblyView {
             }
             crate::files::request_save_path("Export", file, s.format.ext(), window, cx, move |path, cx| {
                 v.update(cx, |this, cx| {
-                    let parts = this.export_parts(ids.as_deref(), s.hidden);
-                    this.message = Some(match crate::part_studio::export::write_export(&s, &path, parts) {
+                    let asm = this.export_assembly(ids.as_deref(), s.hidden, cx);
+                    this.message = Some(match crate::part_studio::export::write_assembly_export(&s, &path, &asm) {
                         Ok(p) => {
                             // Download and store file in a new tab.
                             if s.options == 1 {
@@ -4591,21 +4591,12 @@ impl AssemblyView {
         self.open_asm_export(None, window, cx);
     }
 
-    /// The parts to export: instances `ids` (None: all) at their assembly
-    /// positions, hidden ones only with "Include hidden instances in export".
-    fn export_parts(&self, ids: Option<&[InstanceId]>, include_hidden: bool) -> Vec<(String, noshape_kernel::Shape, [f32; 4])> {
-        use noshape_kernel as k;
-        self.result
-            .occurrences
-            .iter()
-            .filter(|o| (include_hidden || !o.hidden) && ids.is_none_or(|ids| ids.contains(&o.top())))
-            .filter_map(|o| {
-                let b = o.context.bodies.iter().find(|b| b.id == o.body)?;
-                let shape = b.shape.transformed(&k::Transform::Matrix(o.transform)).ok()?;
-                let c = o.color;
-                Some((o.instance_name.clone(), shape, [c[0], c[1], c[2], 1.0]))
-            })
-            .collect()
+    /// What to export: instances `ids` (None: all), hidden ones only with
+    /// "Include hidden instances in export"; STEP keeps the assembly
+    /// (`noshape_ops::export::write_assembly_export`).
+    fn export_assembly(&self, ids: Option<&[InstanceId]>, include_hidden: bool, cx: &App) -> crate::part_studio::export::AssemblyExport {
+        let root = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into());
+        crate::part_studio::export::AssemblyExport::of(&root, &self.result, ids, include_hidden)
     }
 }
 

@@ -98,7 +98,8 @@ pub fn canonical_frame(origin: DVec3, normal: DVec3) -> PlaneFrame {
 }
 
 fn align_canonically(i: &mut Interp, a: Vec<Value>) -> R<Value> {
-    let Some(p) = a.get(1).and_then(plane_of) else { return Err(i.error("alignCanonically: argument 2 should be a Plane")) };
+    // std calls `@alignCanonically(context, { "plane" : plane })`.
+    let Some(p) = a.get(1).and_then(|m| plane_of(m.get("plane"))) else { return Err(i.error("alignCanonically: argument 2 should be a map with a Plane")) };
     Ok(plane_value(&canonical_frame(p.origin, p.normal)))
 }
 

@@ -141,19 +141,21 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         use super::blend_section::{BlendSpec, Bound, Partial, Section};
         let asym = !width && ev.bool("isAsymmetric");
         let partial = if !width && ev.bool("isPartial") {
-            let bound = |ev: &EvalCtx, ty: &str, frac: &str, off: &str, ent: &str| -> FResult<Bound> {
+            // std fillet.fs: the end offset is measured from the chain's end.
+            let bound = |ev: &EvalCtx, ty: &str, frac: &str, off: &str, ent: &str, second: bool| -> FResult<Bound> {
                 Ok(match ev.enum_(ty) {
+                    "OFFSET" if second => Bound::OffsetFromEnd(ev.length(off)?),
                     "OFFSET" => Bound::Offset(ev.length(off)?),
                     "ENTITY" => {
-                        let r = ev.query(ent).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Select a bounding entity"))?;
+                        let r = ev.query(ent).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?;
                         let p = ev.resolve_vertex_point(r).or_else(|| ev.resolve_faces(std::slice::from_ref(r)).first().and_then(|&(b, f)| ev.ctx.bodies[b].shape.sub_shape(ShapeType::Face, f).ok()?.centroid().ok()));
                         Bound::Point(p.ok_or_else(|| crate::regen::eval::FeatureError::new("The bounding entity no longer exists"))?)
                     }
                     _ => Bound::Fraction(ev.real(frac)?),
                 })
             };
-            let first = bound(ev, "startPartialType", "partialFirstEdgeTotalParameter", "startPartialOffset", "startPartialEntity")?;
-            let second = if ev.bool("secondBound") { Some(bound(ev, "endPartialType", "partialSecondEdgeTotalParameter", "endPartialOffset", "endPartialEntity")?) } else { None };
+            let first = bound(ev, "startPartialType", "partialFirstEdgeTotalParameter", "startPartialOffset", "startPartialEntity", false)?;
+            let second = if ev.bool("secondBound") { Some(bound(ev, "endPartialType", "partialSecondEdgeTotalParameter", "endPartialOffset", "endPartialEntity", true)?) } else { None };
             Some(Partial { first, second, opposite: ev.bool("partialOppositeParameter") })
         } else {
             None
@@ -189,6 +191,9 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         }
         if let Some(spec) = &special {
             let edges = if propagate { propagate_tangent(&body.shape, &edges) } else { edges };
+            if let Some(p) = &spec.partial {
+                super::blend_section::check_partial(&body.shape, &edges, p)?;
+            }
             super::blend_section::section_blend(ev, bi, &edges, spec)?;
             continue;
         }
@@ -515,7 +520,8 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if groups.is_empty() {
-        return err(if ev.bool("isHollow") { "Select parts to hollow." } else { "Select faces to remove." });
+        // std shell.fs: SHELL_SELECT_PARTS / SHELL_SELECT_FACES, the field marked.
+        return if ev.bool("isHollow") { crate::regen::eval::err_at(&["parts"], "Select parts to hollow.") } else { crate::regen::eval::err_at(&["entities"], "Select faces to remove.") };
     }
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
@@ -541,31 +547,35 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
     let s1 = ev.resolve_faces(ev.query("side1Face"));
     let s2 = ev.resolve_faces(ev.query("side2Face"));
     let center = ev.resolve_faces(ev.query("centerFaces"));
-    let (Some(&(b1, f1)), Some(&(b2, f2))) = (s1.first(), s2.first()) else { return err("Select both side faces") };
+    // Onshape's opFullRoundFillet messages (FULL_ROUND_SELECT_FACES,
+    // FULL_ROUND_COMMON_BODY); shapes it handles but we don't fail as
+    // FILLET_FAILED.
+    const UNSUPPORTED: &str = "Failed to fillet selections.";
+    let (Some(&(b1, f1)), Some(&(b2, f2))) = (s1.first(), s2.first()) else { return err("Select a first side face, a second side face, and one or more faces to round.") };
     if center.is_empty() {
-        return err("Select the center faces to replace with the full round");
+        return err("Select a first side face, a second side face, and one or more faces to round.");
     }
     if b1 != b2 || center.iter().any(|c| c.0 != b1) {
-        return err("The side and center faces must belong to one part");
+        return err("Cannot use faces from more than one part or surface.");
     }
     let bi = b1;
     let body = ev.ctx.bodies[bi].clone();
     let face = |f: usize| body.shape.sub_shape(ShapeType::Face, f);
     let (Some((p1, n1)), Some((p2, n2))) = (plane_of(&face(f1)?), plane_of(&face(f2)?)) else {
-        return err("Full round fillets need planar side faces");
+        return err(UNSUPPORTED);
     };
     if n1.dot(n2) > -1.0 + 1e-7 {
-        return err("Full round fillets need parallel side faces facing away from each other");
+        return err(UNSUPPORTED);
     }
     let w = (p2 - p1).dot(n1).abs();
     if w < 1e-9 {
-        return err("The side faces coincide");
+        return err(UNSUPPORTED);
     }
     let r = w * 0.5;
     let cf = face(center[0].1)?;
-    let Some((cc, nc)) = plane_of(&cf) else { return err("Full round fillets need a planar center face") };
+    let Some((cc, nc)) = plane_of(&cf) else { return err(UNSUPPORTED) };
     if nc.dot(n1).abs() > 1e-6 {
-        return err("The center face must be perpendicular to the side faces");
+        return err(UNSUPPORTED);
     }
     let e = nc.cross(n1).normalize();
     // Axis: mid-plane between the sides, R below the center face.

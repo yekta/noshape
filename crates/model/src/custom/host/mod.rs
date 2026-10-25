@@ -19,6 +19,8 @@ pub mod hole;
 mod sheetmetal;
 mod sm_flat;
 mod loft;
+#[cfg(test)]
+mod native_args;
 mod edge_change;
 mod offsets;
 mod packed;
@@ -663,6 +665,7 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
         eprintln!("[fs op] {} {failure} {} -> {outcome} | {}", id.join("."), faces(&snapshot), faces(&ev.ctx));
     }
     let warnings = std::mem::take(&mut ev.warnings);
+    let infos = std::mem::take(&mut ev.infos);
     let mut ctx = ev.ctx;
     match r {
         Ok(v) => {
@@ -685,6 +688,14 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
             if !changed.is_empty() {
                 st.remap_attributes(&changed);
             }
+            // An operation's info (opSplitPart's SPLIT_NO_CHANGE, live): its member.
+            for m in infos {
+                let s = match error_code(&m) {
+                    Some(c) => status::status_map("INFO", c, None),
+                    None => status::status_map("INFO", "CUSTOM_ERROR", Some(&m)),
+                };
+                st.status.insert(id.to_vec(), s);
+            }
             for w in warnings {
                 let s = status::status_map("WARNING", "CUSTOM_ERROR", Some(&w));
                 st.status.insert(id.to_vec(), s);
@@ -699,7 +710,11 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                     let (c, faulty) = c.split_once('\u{2}').unwrap_or((c, ""));
                     (c.to_string(), error_text(c), faulty.split(',').filter(|f| !f.is_empty()).map(str::to_string).collect::<Vec<_>>())
                 }
-                None => (failure.to_string(), e.message.clone(), Vec::new()),
+                // A built-in evaluator's Onshape message: its member.
+                None => match error_code(&e.message) {
+                    Some(c) => (c.to_string(), e.message.clone(), e.faulty.iter().map(|f| f.to_string()).collect()),
+                    None => (failure.to_string(), e.message.clone(), Vec::new()),
+                },
             };
             st.status.insert(id.to_vec(), status::status_map("ERROR", &code, Some(&msg)));
             drop(st);
@@ -780,11 +795,12 @@ pub fn enum_name(v: &Value) -> Option<Arc<str>> {
     v.as_str()
 }
 
-/// The user-facing text of an `ErrorStringEnum` member: the comment above
-/// it in errorstringenum.gen.fs (what Onshape shows in the feature list).
-pub fn error_text(member: &str) -> String {
-    static TEXTS: std::sync::LazyLock<HashMap<String, String>> = std::sync::LazyLock::new(|| {
-        let mut m = HashMap::new();
+/// `ErrorStringEnum` members' texts (the comments above them in
+/// errorstringenum.gen.fs) and, back, each text's first member.
+#[allow(clippy::type_complexity)]
+fn error_texts() -> &'static (HashMap<String, String>, HashMap<String, String>) {
+    static TEXTS: std::sync::LazyLock<(HashMap<String, String>, HashMap<String, String>)> = std::sync::LazyLock::new(|| {
+        let (mut m, mut back) = (HashMap::new(), HashMap::new());
         let src = noshape_featurescript::std_source("errorstringenum.gen.fs").unwrap_or("");
         let mut last: Option<String> = None;
         for line in src.lines() {
@@ -796,15 +812,28 @@ pub fn error_text(member: &str) -> String {
             let name = t.trim_end_matches(',');
             if !name.is_empty() && name.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_') {
                 if let Some(text) = last.take() {
+                    back.entry(text.clone()).or_insert_with(|| name.to_string());
                     m.insert(name.to_string(), text);
                 }
             } else if !t.starts_with('*') && !t.starts_with("/**") {
                 last = None;
             }
         }
-        m
+        (m, back)
     });
-    TEXTS.get(member).cloned().unwrap_or_else(|| match member {
+    &TEXTS
+}
+
+/// The `ErrorStringEnum` member whose text is `text` (a built-in
+/// evaluator's Onshape message, reported by an operation as its member).
+pub fn error_code(text: &str) -> Option<&'static str> {
+    error_texts().1.get(text).map(String::as_str)
+}
+
+/// The user-facing text of an `ErrorStringEnum` member: the comment above
+/// it in errorstringenum.gen.fs (what Onshape shows in the feature list).
+pub fn error_text(member: &str) -> String {
+    error_texts().0.get(member).cloned().unwrap_or_else(|| match member {
         "REGEN_ERROR" => "Error regenerating.".to_string(),
         other => other.to_string(),
     })

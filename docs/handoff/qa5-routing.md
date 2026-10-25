@@ -284,6 +284,33 @@ STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty s
   Part 1, each at its **own product position** (the assembly places the instances). Ours: one Part Studio "qa4-s5-asm", parts
   Part 1, Part 3, Part 2 at the assembly's positions, no assembly. (PVZ: IM1, kern row, is the same gap.)
 - Export details (minor): STL binary header "noshape-kernel st…" (live 80 zero bytes); STEP product order; Parasolid header = EXP-HDR.
+STATUS SF2 (kern, 2026-10-24): fixed: a New extrude of several regions fuses them and unifies the faces left on one
+surface (eval.rs `fuse_named`); test kernel_robustness `adjacent_regions_extrude_without_a_seam` (8000 mm³, 6 faces).
+STATUS SF5 (kern, 2026-10-24): fixed: Move boundary on some edges of a planar straight-edged surface moves only those
+(surfaces.rs `move_polygon_edges`); test features_b `move_boundary_of_one_edge_moves_only_it`.
+STATUS AN4 (kern, 2026-10-24): fixed: the interference's size is the overlap's tight box (interference.rs); unit test
+`interference_bounds_are_tight`.
+STATUS ADV2 (kern, 2026-10-24): ours is right: side faces equal live's (324.6214685 mm²); the exact ruled solid is
+5927.75434 mm³ (ours 5927.754632), live's 5927.728022 is Onshape's mass-property approximation (its loft volumes carry
+±0.1 % bands, live "kern (10-23 14:15)"). Test kernel_robustness `loft_square_to_circle_matches_onshape`. Closed.
+STATUS IM1 / I5 / DOC1 (kern, 2026-10-24): done by d0a82250 (import/export parity batch 1: PVZ "<file> parts" +
+Assembly, Parasolid header per version, IGES Start/Global as Onshape's). kern rows closed; api owns import/export.
+STATUS EXP1 / RHINO1 (kern, 2026-10-24): not a product gap: every CI and release build has openNURBS
+(release.yml step "openNURBS (Rhino export)", .github/actions/setup-opennurbs; NOSHAPE_REQUIRE_OPENNURBS fails the
+kernel build without it). qa5's CLI was a local build without OPENNURBS_ROOT; on this machine build with
+OPENNURBS_ROOT=/root/opennurbs to get Rhino export. Closed for kern (qa5 to re-check on a release build).
+STATUS IM2 / I1 (kern, 2026-10-24): ours agree with Onshape's own imports (live "kern (10-24) import bands": massproperties
+[value, min, max] of each sample imported in Onshape): ktane 19378.847109 / Bell Crank 2050.836528 / McMaster
+254.403780 / g26 1726.098346 / g48 22595.368808 / g49 44789.914 & 44833.359 / g50-g46 6052.761 / g50-reorder
+5990.520, ours within each band (±0.4..±8.7 mm³; ktane, McMaster, g26 to every digit shown). g25-b: Onshape itself
+gives 7582.872 (SAT) / 7582.848 (STEP) / 7582.912 (X_T), bands ±4.22 / ±4.82 / ±6.67; ours 7585.98 / 7582.71 / 7583.00
+are inside each. qa5's references were other measurements. Closed.
+
+STATUS SF6 (kern, 2026-10-24): fixed: the boundary surface is planar, two straight B-spline edges between two R25 arcs.
+Move boundary on a straight edge of such a face moves it in the plane; its arc neighbours run on along their tangent
+(live's default, Maintain curvature off; along their circle when ticked or when trimmed), and the moved edges keep
+their names. In qa5's surf doc Move boundary 1 (25 mm) and 3 (10 mm) move the same edge: 1200 + 750 + 300 =
+2250 mm², 1 face (the row's 1200 + 300 assumed MB1 failing). Test features_b `move_boundary_between_arcs_extends_them`.
 
 ## PCB-CONVERT — fs — Flex PCB model › Convert of a thin plate makes 6 parts (P3)
 - api, 2026-10-24 (e2e `flex_pcb_model_features`): a 60 × 20 × 1 mm plate (sketch rectangle, Extrude 1 mm), then Flex PCB model with
@@ -298,6 +325,31 @@ STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty s
   hole-free face, flattens exactly (1 loop, areas equal, 40 × 80 mm). Expected: an identical flat face (no strain), 2 loops.
   `noshape_model::flatten::flatten_faces` (moved verbatim from the app's flatten_tool.rs; the app's Flatten surfaces is the same).
   Repro: `analysis_flatten {"faces": [<top face id>]}` on `block_with_hole` (ops e2e).
+STATUS STEP-ASM (api, 2026-10-25): fixed on ready/api — a STEP whose root product is an assembly imports as the Assembly "<root
+product>" (" (1)" when taken) + Part Studio "<file> parts" with the parts in their own coordinates, listed in the reverse of the
+file's order, the Assembly placing them as the file does (e2e step_assembly_import_matches_live on samples/qa4-s5-asm.step). An
+Assembly exported as STEP now keeps the assembly (root product, each part once, NAUO placements; export_parts on an Assembly tab).
+The BOM element ("BOM : Assembly 1 (1)") stays hidden (IM1b). Part order in assemblies rests on this one file: live request filed.
+STATUS STEP-ASM (api, 2026-10-25 b): the STEP/PVZ assembly import matches instances to parts by the file's product (no longer
+by name: two parts named "Part" keep their own geometry; e2e step_assembly_parts_sharing_a_name_keep_their_geometry); parts
+ordered as live walks a STEP assembly (occurrences from the file's last, one part per product at its first occurrence; e2e
+step_assembly_import_order_matches_live on samples/stepord-ABCD / ABBCD). Export details: binary STL header 80 zero bytes;
+Parasolid modeller 3801231 in every version and SCH_3801231_38101 (EXP-HDR / I5 closed); STEP products already follow their
+first NAUO as live; text STL as live's UI file ("solid Mesh", 2/4/6 indents, shortest numbers). Not reproducible: live's
+NAUO order on export is a fixed internal order that follows no recoverable key (not insertion, ids, hashes or part ids; "api
+(10-25 b)"), so ours keeps the insertion order.
+
+## MOVEFACE-TANGENT — psb — Move face of a face tangent to fillets moves the whole part
+- api agent-usability pass, 2026-10-25: import samples/g47-1part.step (40 × 20 × 10 block with filleted edges); Move face
+  (Offset 5 mm, or Translate 5 mm along the face) of the +X end face (`query_entities {"kind":"faces","normal":[1,0,0]}`):
+  the part grows 5 mm on every side but the bottom (bbox −5…45 × −5…25 × 0…15, 18739.63 mm³ from 7582.71), status Ok. On a
+  plain 40 × 20 × 10 box the same call gives x 0…45, 9000 mm³ (right). Expected (Onshape): only the end face moves, the
+  fillets touching it are re-rolled ("Reapply fillet", default on). Same area as FSW-move.
+
+## BBOX-TOL — kern — query bounding boxes of imported parts grow by the shape tolerance
+- api, 2026-10-25: the imported g47-1part block reports bbox 0…40.0001 × 0…20.0001 × 0…10.0001 (`Shape::bounding_box(true)`
+  adds the 1e-7 m vertex/edge tolerance); native parts are exact. Onshape reports the exact box. Used by query_parts
+  and anything showing a part's size.
 ## IMP-DENS — api — "Import material density" offered for STEP files (main, since 5d5e0403)
 - Source: qa4 QA round 4 session 5 in the app (2026-10-24). `crates/app/src/import_dialog.rs` `density` includes "step"/"stp".
 - Expected (live): behaviours "qa4 round 4 s5": "For STEP there is **no 'Import material density'** checkbox (an .x_t import

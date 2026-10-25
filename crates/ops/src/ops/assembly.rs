@@ -59,14 +59,18 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "entities",
             summary: "An instance's faces, edges or vertices, in assembly (world) coordinates, with ids for mates",
-            description: "Like query_entities for one instance: ids, surface/curve type, centroid/midpoint, normal, axis and radius, all placed where the instance is in the assembly.",
+            description: "Like query_entities for one instance: ids, surface/curve type, centroid/midpoint, normal, axis and radius, all placed where the instance is in the assembly. The same filters, in assembly coordinates: `surface`, `curve`, `normal`, `direction`, `near` (closest first) and `at` (the closest entity to each point, in order).",
             fields: vec![
                 doc_field(),
                 asm_field(),
                 req("instance", s(), "Instance id or name."),
                 req("kind", json!({ "type": "string", "enum": ["faces", "edges", "vertices"] }), "Which entities."),
                 opt("surface", json!({ "type": "string" }), "Faces: only this surface type (plane, cylinder, ...)."),
+                opt("curve", json!({ "type": "string", "enum": ["line", "circle", "other"] }), "Edges: only this curve type."),
                 opt("normal", json!({ "type": "array", "items": { "type": "number" } }), "Faces: outward normal in assembly coordinates."),
+                opt("direction", json!({ "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }), "Edges: lines parallel to this direction (either way) or circles around it, within 1°."),
+                opt("near", json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }), "Sort by distance from this point (assembly coordinates, workspace units)."),
+                opt("at", json!({ "type": "array", "items": { "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }, "minItems": 1 }), "Points: the closest entity to each, in order (replaces `near` / `limit`)."),
                 opt("limit", json!({ "type": "integer" }), "At most this many (default 200)."),
             ],
             mutates: false,
@@ -398,6 +402,10 @@ fn occurrence(r: &AssemblyResult, inst: InstanceId) -> Option<&noshape_model::as
     r.occurrences.iter().find(|o| o.path.first() == Some(&inst))
 }
 
+/// An entity assembly_entities lists: its point in the assembly, its JSON,
+/// and (for `at`) its shape with the instance's placement.
+type Listed = (DVec3, Value, Option<(noshape_kernel::Shape, DMat4)>);
+
 fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let units = od.doc().settings.units;
@@ -408,7 +416,26 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let surface = a.opt_str("surface")?;
     let normal = a.opt_array("normal")?.map(|n| DVec3::new(n.first().and_then(Value::as_f64).unwrap_or(0.0), n.get(1).and_then(Value::as_f64).unwrap_or(0.0), n.get(2).and_then(Value::as_f64).unwrap_or(0.0)).normalize_or_zero());
     let limit = a.opt_u64("limit")?.unwrap_or(200) as usize;
-    let mut out = Vec::new();
+    let curve = a.opt_str("curve")?;
+    let point = |key: &'static str, x: &Value| -> Result<DVec3, OpError> {
+        let c = x.as_array().filter(|c| c.len() == 3).ok_or_else(|| OpError::param(key, "three coordinates"))?;
+        let v: Vec<f64> = c.iter().map(|x| crate::ops::sketch::length_value(x, &units).map(|m| m * k)).collect::<Result<_, _>>().map_err(|e| e.with_param(key))?;
+        Ok(DVec3::new(v[0], v[1], v[2]) / k)
+    };
+    let near = a.get("near").map(|x| point("near", x)).transpose()?;
+    let at: Option<Vec<DVec3>> = a.opt_array("at")?.map(|ps| ps.iter().map(|x| point("at", x)).collect::<Result<_, _>>()).transpose()?;
+    let direction = match a.opt_array("direction")? {
+        Some(n) => {
+            let v: Vec<f64> = n.iter().filter_map(Value::as_f64).collect();
+            if v.len() != 3 || DVec3::new(v[0], v[1], v[2]).length() == 0.0 {
+                return Err(OpError::param("direction", "three numbers, not all 0"));
+            }
+            Some(DVec3::new(v[0], v[1], v[2]).normalize())
+        }
+        None => None,
+    };
+    let parallel = |d: DVec3| direction.is_none_or(|w| d.length() > 0.0 && d.angle_between(w).min(d.angle_between(-w)) < 1f64.to_radians());
+    let mut out: Vec<Listed> = Vec::new();
     for o in r.occurrences.iter().filter(|o| o.path.first() == Some(&inst)) {
         let Some(body) = o.context.body(&o.body) else { continue };
         let m: DMat4 = o.transform;
@@ -446,7 +473,8 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                     if let Ok(ar) = f.area() {
                         v["area"] = json!(ar * k * k);
                     }
-                    out.push(v);
+                    let c = m.transform_point3(f.centroid().unwrap_or_default());
+                    out.push((c, v, at.is_some().then(|| (f.clone(), m))));
                 }
             }
             "edges" => {
@@ -455,26 +483,34 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                     let Ok(info) = e.edge_info() else { continue };
                     let mid = noshape_kernel::linear_properties(&e).map(|p| p.center).unwrap_or((info.start + info.end) * 0.5);
                     let mut v = json!({ "id": refs::to_id(&Reference::Edge((**name).clone())), "length": info.length * k, "midpoint": pt(m.transform_point3(mid), k) });
-                    match info.curve {
-                        Curve::Circle { center, radius, .. } => {
+                    let along = match info.curve {
+                        Curve::Circle { center, radius, axis, .. } => {
                             v["curve"] = json!("circle");
                             v["center"] = pt(m.transform_point3(center), k);
                             v["radius"] = json!(radius * k);
+                            m.transform_vector3(axis)
                         }
                         Curve::Line { direction, .. } => {
                             v["curve"] = json!("line");
                             let d = m.transform_vector3(direction);
                             v["direction"] = json!([d.x, d.y, d.z]);
+                            d
                         }
-                        _ => v["curve"] = json!("other"),
+                        _ => {
+                            v["curve"] = json!("other");
+                            DVec3::ZERO
+                        }
+                    };
+                    if curve.is_some_and(|c| v["curve"] != c) || !parallel(along) {
+                        continue;
                     }
-                    out.push(v);
+                    out.push((m.transform_point3(mid), v, at.is_some().then(|| (e.clone(), m))));
                 }
             }
             "vertices" => {
                 for (i, name) in body.vertices.iter().enumerate() {
                     let Ok(p) = body.shape.sub_shape(ShapeType::Vertex, i).and_then(|x| x.vertex_point()) else { continue };
-                    out.push(json!({ "id": refs::to_id(&Reference::Vertex((**name).clone())), "position": pt(m.transform_point3(p), k) }));
+                    out.push((m.transform_point3(p), json!({ "id": refs::to_id(&Reference::Vertex((**name).clone())), "position": pt(m.transform_point3(p), k) }), None));
                 }
             }
             _ => return Err(OpError::param("kind", "faces, edges or vertices")),
@@ -483,8 +519,25 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if out.is_empty() && occurrence(&r, inst).is_none() {
         return Err(OpError::invalid("the instance has no parts (suppressed or failed?)").with_param("instance"));
     }
+    if let Some(points) = at {
+        // As query_entities: the entity closest to each point, then the
+        // closer centroid / midpoint.
+        let mut list = Vec::new();
+        for p in &points {
+            let gap = |x: &Listed| match &x.2 {
+                Some((sh, m)) => noshape_kernel::make_vertex(m.inverse().transform_point3(*p)).and_then(|v| noshape_kernel::distance(sh, &v)).map(|d| d.distance).unwrap_or(f64::INFINITY),
+                None => x.0.distance(*p),
+            };
+            let best = out.iter().map(|x| ((gap(x) / 1e-7).round(), x.0.distance(*p), x)).min_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+            list.push(best.map(|(_, _, x)| x.1.clone()).unwrap_or(Value::Null));
+        }
+        return Ok(json!({ "units": units_json(&units), "instance": format!("inst:{}", inst.0), "count": list.len(), kind: list }).into());
+    }
+    if let Some(p) = near {
+        out.sort_by(|x, y| x.0.distance(p).total_cmp(&y.0.distance(p)));
+    }
     let n = out.len();
-    out.truncate(limit);
+    let out: Vec<Value> = out.into_iter().take(limit).map(|x| x.1).collect();
     Ok(json!({ "units": units_json(&units), "instance": format!("inst:{}", inst.0), "count": n, kind: out }).into())
 }
 

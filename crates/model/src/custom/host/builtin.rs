@@ -26,13 +26,16 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
         op.run(i, a, crate::regen::features::surfacing_c::isocline)
     }),
     ("opBodyDraft", |i, a| BuiltinOp { vectors: &[("pullDirection", "pullDirection")], ..BuiltinOp::new("bodyDraft", "BODY_DRAFT_FAILED") }.run(i, a, crate::regen::features::detail_a::body_draft)),
-    ("opSplineThroughEdges", |i, a| BuiltinOp::new("fitSpline", "REGEN_ERROR").run(i, a, crate::regen::features::curves::fit_spline)),
+    ("opSplineThroughEdges", |i, a| BuiltinOp { enums: &[("fitType", "EDGES")], ..BuiltinOp::new("fitSpline", "REGEN_ERROR") }.run(i, a, crate::regen::features::curves::fit_spline)),
     ("opRuledSurface", op_ruled_surface),
     ("opCreateCurvesOnFace", op_create_curves_on_face),
-    ("opFullRoundFillet", |i, a| BuiltinOp::new("fillet", "REGEN_ERROR").run(i, a, crate::regen::features::detail::fillet)),
+    ("opFullRoundFillet", |i, a| BuiltinOp { enums: &[("filletType", "FULL_ROUND")], ..BuiltinOp::new("fillet", "FILLET_FAILED") }.run(i, a, crate::regen::features::detail::fillet)),
+    // Every opFillet option (cross sections, width, asymmetric, partial,
+    // variable) as the Fillet feature builds it.
+    ("opFillet", |i, a| BuiltinOp { enums: &[("filletType", "EDGE")], defaults: &[("tangentPropagation", ParamValue::Bool(false))], ..BuiltinOp::new("fillet", "FILLET_FAILED") }.run(i, a, crate::regen::features::detail::fillet)),
     ("evRuledSurfaceBases", ev_ruled_surface_bases),
     ("opDropCurve", |i, a| {
-        let op = BuiltinOp { renames: &[("dropTools", "tools")], vectors: &[("directionQuery", "direction")], ..BuiltinOp::new("projectCurves", "REGEN_ERROR") };
+        let op = BuiltinOp { renames: &[("dropTools", "tools")], vectors: &[("directionQuery", "direction")], enums: &[("curveProjectionType", "CURVE_TO_FACE")], ..BuiltinOp::new("projectCurves", "REGEN_ERROR") };
         op.run(i, a, crate::regen::features::curves::project_curves)
     }),
 ];
@@ -52,11 +55,13 @@ struct BuiltinOp {
     skip: &'static [&'static str],
     /// Conversions the generic mapping can't express (definition → parameters).
     adjust: Option<fn(&Value, &mut ParamValues)>,
+    /// Enum parameters preset (the op's kind, e.g. a full round fillet).
+    enums: &'static [(&'static str, &'static str)],
 }
 
 impl BuiltinOp {
     const fn new(type_id: &'static str, failure: &'static str) -> Self {
-        BuiltinOp { type_id, failure, defaults: &[], renames: &[], vectors: &[], skip: &[], adjust: None }
+        BuiltinOp { type_id, failure, defaults: &[], renames: &[], vectors: &[], skip: &[], adjust: None, enums: &[] }
     }
 
     fn run(&self, i: &mut Interp, a: Vec<Value>, f: fn(&mut EvalCtx) -> FResult<()>) -> R<Value> {
@@ -72,15 +77,8 @@ impl BuiltinOp {
         for (k, v) in self.defaults {
             p.set(k, v.clone());
         }
-        // Enum presets (not constant-constructible).
-        if self.type_id == "fitSpline" {
-            p.set("fitType", ParamValue::Enum("EDGES".into()));
-        }
-        if self.type_id == "fillet" {
-            p.set("filletType", ParamValue::Enum("FULL_ROUND".into()));
-        }
-        if self.type_id == "projectCurves" {
-            p.set("curveProjectionType", ParamValue::Enum("CURVE_TO_FACE".into()));
+        for (k, v) in self.enums {
+            p.set(k, ParamValue::Enum(v.to_string()));
         }
         // Vector directions: temporary planes, removed afterwards.
         let mut temp = Vec::new();

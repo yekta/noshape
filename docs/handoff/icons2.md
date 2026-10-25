@@ -1152,3 +1152,14 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
 - For the lead (other areas): ticking a group (Direction, Smooth fillet corners) makes its first field
   active in live (blue) + red expander while empty; ours doesn't. model features/common.rs end_condition():
   the second end's depth has CAN_BE_TOLERANT (live: no ± on the second Depth).
+- (10-25) Lead: icons2 owns the LOOK of sketch dimension visuals, viewport overlays (manipulators, previews,
+  selection/hover highlights) and the parts list; behaviour stays with psb (sketch/features) and ui (chrome).
+  Merged to main (824135c0): sketch dialog before the plane, parts-list divider, dimension lines 1.5 px.
+  Ready/committed since: preview layer 10 (scene builder.rs; planes no longer wash the preview out: top face
+  (124,141,156) vs live (137,149,157)), midpoint markers (render point style RING = bit 16; behaviors.rs
+  midpoint_overlay), status-bar Point readout with axis letters + arrows (menus.rs selection_readout).
+  Open: live makes the edge midpoint the HOVER target within a few px (orange marker, edge highlight drops):
+  behaviour, asked the lead. The picked region under an extrude preview stays grey in ours (live: faint
+  orange) — the preview draws front+back faces over it; look at back-face handling for preview bodies.
+  Test docs (CLI-built, /root/icons2-scratch/docs): dim-in (sketch/17 dims), box-mm (40x30x10 mm box: hover
+  its front bottom edge (1087,598), midpoint (1122,608); vertex (1190,627)).
