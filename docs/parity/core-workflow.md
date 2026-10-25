@@ -490,3 +490,29 @@ under the Hole row, lands under it), F8/F9/F18 closed earlier. Still open, route
 | (b) projection | ✅ right-click Perspective view / Highlight boundary edges: no menu; new Part Studio and reopened document orthographic; perspective per tab. ✗ **Zoom to fit in perspective shrinks the model** (live 2315: the eye moves closer, the model fills the view); our ortho fit is also tighter than live's 2313. Convergence right after ticking Perspective ≈ live 2314 (fins 25 by mk-fins.py, planes hidden) |
 | (c) shading, Isometric, faces clear of planes | ✅ front (79,104,119) vs #4e6876; top (142,187,214) vs #8cb9d4; side (118,156,178) = live 2265. A translucent default plane over a coplanar face lightens it (lp wall front on the Front plane reads #788a96) |
 | (d) regressions | ✅ failed Extrude red region / tooltip / ✓ enabled; section 8 73/73 ALIVE |
+
+## v0.4.8 gate: release/v0.4.8 5668940b (= 36ed7c7d, tree 57d7290a; target-lead dev build 12:39, footer still 36ed7c7d), FRESH=1, 2026-10-24 12:40–14:00, qa4
+**Result: FAIL on (a)** (delete mid-regen ~7–9 s), **(e)** (German tooltip title + Extrude dialog), **(f)** (dual dimension
+line through the dual text), **(d)** (1000-pin orbit 19 fps vs 33 on v0.4.7, macOS CI); (b), (c), (g) PASS. Screenshots /root/qa4-scratch/gate-v048/.
+
+| Item | Result |
+|---|---|
+| (a) user's fins (plate 810×20×10, 1×20×5 wall top + LP1 ×400, wall under + LP2 ×400; mk-fins2.py) | ✅ Reapply on 242000 mm³ / 3206 faces = live; Reapply off both ERROR with live's text, 162200 / 14 = live. Regen panel (dev build): LP1 2.07 s, LP2 5.34 s, Extrude 3 3.10 s (live 55 ms), total 10.60 s (live 9.27 / 24.00 / 33.36 s; same 2.6× ratio). ✗ **Delete LP2 while it regenerates**: row gone at once, spinner 7.0 s (Delete key 4 s into the regen) / 8.8 s (right-click › Delete 1 s in), end state right; Suppress LP2 returns to LP1 in 0.5 s. Open 20 s, undo of the delete 18 s |
+| (b) flush wall W1 (live "psb flush W1"; mk-w1f.py) | ✅ count 2 OK 19700 mm³, 6 faces, x 1.5..100; 3/4/5 ERROR "Could not create all instances as entered. Try selecting "Reapply features" option.", 20100; dialog ghosts: whole block failed-red, nested end caps, Direction red, title/row red (live 2306) |
+| (c) view | ✅ new Part Studio Trimetric, 150 mm planes; fit = live rule (planes 0.800 of the viewport height vs 0.799 computed, centred, w/h 1.050 vs 1.052); planes hidden: perspective + F moves closer, framing = live 2315 (x 1140–1382 vs 1155–1365, y 67–295 vs 67–297); "p" doesn't re-fit |
+| (d) finer mesh | ✅ angle mesh default (9b67d84a; tests/perf/README still says chord); Ø50 cylinder silhouette smooth at fit. Orbit parts-1000: local llvmpipe v0.4.8 6375 ms/frame vs v0.4.7 1738 (instances 11007 vs 6007, load 33–44, not meaningful); ✗ macOS CI, same runner, parts-1000, GPU-presented orbit: **v0.4.8 19.2 fps** (mean 52.1, p95 77.1 ms; macOS 15 19.5) vs **v0.4.7 32.9 fps** (30.4 / 43.5 ms; macOS 15 33.6); display triangles 572k vs 184k (×3.1, the angle mesh); runs 40096334299 / 40096336855 |
+| (e) look | ✅ dark: Part Studio, assembly, BOM = live dk-940/942. ✗ German: toolbar tooltip title "Extrude (shift+e)" (live "Linear austragen (shift+e)"; ui.rs:604 formats before the table lookup, de.tsv:2586 has "Extrude"); Extrude dialog: Thin, Inters…, "Faces und sketch regions to extrude", Direction, Starting offset, Entwurf (live Formschräge), Second end position untranslated/wrong; feature menu German except "Sketch 1… bearbeiten" (live „Sketch 1 [Skizze]“ bearbeiten …). Own names stay English ✅, new features German ✅. Off-gate: Preferences units sentence English, heading "Voreinstellungen" (live "Preferences"), "Dezimalstellen" (live "Dezimalstellen anzeigen") |
+| (f) drawings | ✅ dual text "[2.36 in]" over "60", "[0.39 in]" / "Ø10" (no Ø). ✗ the linear dimension line runs unbroken through the dual text's bracket bottoms (ANSI and ISO); live asbdd-20 breaks it around the text block, in the gap. ✅ PNG 300 px/in (A3 4961×3508, ANSI B 5100×3300), RGB, 2 colours. ✅ note leaders: leader to a vertex with landing, selection amber, leader menu = live minus Paste (empty clipboard) / Add comment. Note tool placement by synthetic clicks fails on v0.4.7 and v0.4.8 alike (Callout works): not a regression |
+| (g) regressions | ✅ section 8: 73/73 ALIVE, no panics (montage g1); smoke: new doc, rectangle (r = Center point rectangle, as live), Extrude, Fillet, quit/reopen intact |
+
+## v0.4.8 re-gate: release/v0.4.8 c7d9d454 (target-lead dev build, footer c7d9d454), FRESH=1, 2026-10-24 19:00–20:30, qa4
+Scope (lead): (a), (d), (f), smoke; German out of scope (P3). **Result: FAIL on (d)**; (a), (f), smoke PASS.
+
+| Item | Result |
+|---|---|
+| (a) fins ×400/×400, delete LP2 while it regenerates | ✅ Delete key: row gone by 0.30 s, spinner gone by 0.92 s; right-click › Delete: row gone by 0.39 s, spinner gone by 1.0 s (was 7–9 s); end state 11 features, LP1 result |
+| (d) orbit, macOS CI perf.yml bench, parts-1000, 300 frames (run 40124041877, ref release/v0.4.8 = c7d9d454) | ✗ GPU-presented orbit **18.9 fps** macOS 14 (mean 52.9 ms, p95 76.0) / **20.0 fps** macOS 15, vs v0.4.7 **32.9 / 33.6** (run 40096336855). The display mesh is back to chord (184 000 triangles = v0.4.7), but the draw has **11 007 instances vs v0.4.7's 6 007**: the remaining cost is not triangles (display levels / edge LOD instances?) |
+| (f) dual dimension line | ✅ broken around the "[2.36 in] / 60" text block on ANSI B and ISO A3, in the PNG and in the app (= live asbdd-20) |
+| smoke | ✅ new doc, corner rectangle (g), Extrude, Fillet, quit/reopen; section 8 73/73 ALIVE, no panics (montage g2) |
+
+Note: perf.yml's `ref` input needs a branch or tag (a bare SHA fails in actions/checkout: run 40121047489 cancelled).
