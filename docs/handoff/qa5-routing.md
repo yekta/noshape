@@ -646,3 +646,7 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   15 mm: Shell 1 returns **4 sliver parts** (7.85, 7.85, 7.85, 119.2 mm³) with status **Ok**. Same face picked fresh gives the
   same; thickness 1 mm OK (5298.2), 2 mm and 3 mm Error "Could not shell part with selections.". A shell that turns one part into
   slivers must not report Ok (and live presumably shells it). Repro: /root/qa5-scratch/p1/bisect.noshape (Shell 2 at 2.5 mm).
+- **P1-6 — kern (kernel shell), needs live** — Same part as P1-5 at depth 10 with Mirror 1 (feature mirror of the Hole): edit
+  Fillet 1 R2 → R1 and Shell 1 fails "Could not shell part with selections." at every thickness 1, 1.5, 2, 2.5 mm (R2: OK).
+  The 1 mm chamfer chain runs over the R1 arcs, which may be what breaks it; live answer pending (REQUESTS qa5 10-25 p1 (6)).
+  Repro: /root/qa5-scratch/p1/shell-r1.noshape.

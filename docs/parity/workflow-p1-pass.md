@@ -22,3 +22,6 @@ then edits, undo/redo, rollback and suppress.
 | Rollback bar above Shell 1 | Shell greyed italic, part unshelled (14220.74) | same | ✅ |
 | Suppress Fillet 1 (row menu) | italic strike-through, sharp corners, rest Ok (8446.23) | same | ✅ |
 | Row menus | Extrude: Rename, Edit…, Edit Sketch 1…, Show dimensions, … ✅; Fillet: no "Show dimensions" | Fillet menu? (request (4)) | ? |
+| Mirror › Feature mirror of the Hole about the Right plane | dropdown Part / Feature / Face mirror; chips "Hole 1", "Right plane"; −158.35 mm³ (two holes through the 2.5 mm floor) | — | ✅ |
+| Edit Fillet 1 R2 → R1 (dialog: later features greyed, "Final" ☐) | R1 applied; **Shell 1 Error "Could not shell part with selections."** at any thickness 1–2.5 mm | live? (request (6)) | ✗? **P1-6** (kern, needs live) |
+| Undo the R1 edit | back to 8801.649 mm³ | — | ✅ |
