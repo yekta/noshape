@@ -24,9 +24,12 @@ pub(super) struct Arrow {
     pub flip: Option<&'static str>,
 }
 
-/// The arrow glyph (live, in pixels): shaft length and head length.
-const ARROW_SHAFT_PX: f64 = 25.;
-const ARROW_HEAD_PX: f64 = 22.;
+/// The arrow glyph (pixels at the arrow, drawn in 3D like live's): shaft
+/// length, head length and head width. Live (dialogs/extrude-03, 05; iso,
+/// Z up, seen at 0.816): head 24.5 px tall on screen, 20 px wide, shaft 24 px.
+const ARROW_SHAFT_PX: f64 = 29.;
+const ARROW_HEAD_PX: f64 = 30.;
+const ARROW_HEAD_W_PX: f64 = 20.;
 
 /// An angular manipulator: an arc around an axis bound to an angle parameter.
 #[derive(Clone, Copy, Debug)]
@@ -448,7 +451,7 @@ fn arrow_glyph(a: &Arrow, hover: bool, view: &noshape_render::camera_geometry::V
     let side = dir.cross(view.direction()).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
     let base = tip + dir * ARROW_SHAFT_PX * wpp;
     let apex = base + dir * ARROW_HEAD_PX * wpp;
-    let (l, r) = (base + side * ARROW_HEAD_PX * 0.45 * wpp, base - side * ARROW_HEAD_PX * 0.45 * wpp);
+    let (l, r) = (base + side * ARROW_HEAD_W_PX * 0.5 * wpp, base - side * ARROW_HEAD_W_PX * 0.5 * wpp);
     let outline = if hover { crate::theme::rgb8(0x3e6eb0) } else { crate::theme::rgb8(0xa8adb2) };
     let white = crate::theme::rgb8(0xffffff);
     let mut back = LineData::default();
