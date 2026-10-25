@@ -457,3 +457,9 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
   plane manipulator = ring + shaft + arrowhead + two rotate handles; **MIDPOINT-MARKER (psb/ui)** dark hollow ring on edge hover,
   orange hollow ring near the midpoint (edge un-highlighted), yellow-orange ring when selected. No global selection filter,
   parts-row Hide other/all parts and the Measure unit are live-like.
+
+## qa4 QA round 5 v3 s11: everyday drawing (P2; v0.4.8) — qa-round-5.md "v3 Session 11"
+- **ORD-BASE (asb, P2 wrong value)** ordinate base measured from the click point, not the highlighted edge (boss centres 14.26 /
+  39.26 / 64.26 instead of 15 / 40 / 65; 15.39 when clicked outside).
+- **EXPORT-DXF-OPTIONS (asb)** DXF/DWG export: add ☐ Hide inspection items and ☐ Exclude off-sheet content (live).
+- Pending live s11: auto-update vs Update button, title block editing, iso angular value, live PDF/DXF for comparison.

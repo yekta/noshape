@@ -32,6 +32,32 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 11 on v0.4.8 (release tarball): an everyday drawing of the 30-feature part (P2; live asked "qa4 round 5 s11 drawing" with the same steps + PDF/DXF; ours in r5/out/v3s11.pdf|dxf; times with r5/settle.sh = screen region unchanged for 0.6 s)
+Times: Create Drawing (ANSI_B_MM, No views) OK → sheet 0.70 s; Top base / Front / Right / Iso views 0.29 / 0.29 / 0.29 / 0.34 s;
+Section A-A 0.26 s; Detail B (2:1) 0.28 s; Update after the model change 0.36 s; PDF written 0.39 s (1 page 1224×792 pt = ANSI B,
+860 KB); DXF 0.13 s (AC1014 = Release 14, $INSUNITS 4 = mm; 350 LINE, 31 ELLIPSE, 23 CIRCLE, 18 POLYLINE, 57 MTEXT). Nothing slow.
+Working ✅: Create Drawing dialog (templates, Suggested / No views); Insert view (orientation list, scale, simplification), projected
+views follow the cursor, the diagonal projection gives an iso derived from the Top base; Section view dialog (Vertical / Horizontal /
+Angular, label A, flip, Show cut geometry only, Section depth): horizontal cut through the Ø6 holes, hatching broken at the holes,
+"SECTION A - A", cutting line with A arrows; Detail view (circle / rectangle / spline / polygon profiles, label B, Profile style In
+line), "DETAIL B / SCALE 2:1" and the B circle on the parent; dimension menu (Dimension, Chamfer, Max/min, 2 point, point-line,
+line-line, line-line angular, 3 point angular, arc length, radial, diameter, foreshorten, ordinate, hole/thread callout); linear
+"94", "Ø6", angular, ordinate; double-click a dimension → the dimension text editor (prefix/suffix rows, value, tolerance, units,
+symbols); hole callout "2X Ø6 THRU"; Note with a leader to a vertex (rich-text toolbar + ruler) "BREAK SHARP EDGES"; centre marks on
+every circle by default; model change → the Update button lights (tooltip "Update from this workspace (ctrl+q)"), click → views
+redrawn, annotations whose geometry went away red + "2 dangling annotation(s)" (the holes stop below the 12 mm top: my model's
+holes start at Plane 1, z 10); Export Drawing dialog: PDF (Version 1.5, Overridden dimensions, Text, Color, Options, Hide inspection
+items) and DXF (Release 14 default + "Model space only" = live).
+- **R5v3-S11-a → ORD-BASE (asb, P2 wrong value)** the ordinate base is taken from the **click position**, not from the edge it
+  highlights: with the base clicked 1.9 px inside the Top view's left edge the boss centres read 14.26 / 39.26 / 64.26 instead of
+  15 / 40 / 65 (gaps exactly 25.00, so the centres snapped); clicking 1 px outside gave 15.39.
+- **R5v3-S11-b → EXPORT-DXF-OPTIONS (asb)** the DXF/DWG export lacks two of live's checkboxes: ☐ **Hide inspection items** and ☐
+  **Exclude off-sheet content** (ours: Export splines as polylines, Set z-height to zero and normals to positive).
+- Pending live: whether Onshape updates the drawing by itself after a model change (ours waits for Update), how the title block is
+  edited (double-click on ours does nothing; its right-click has Paste as table, Sheet properties…, Drawing properties…, Zoom …),
+  whether an angular dimension in the iso view is the true 3D angle or the projected one (ours 60.0° for two 90° edges), the hole
+  callout text, and live's PDF / DXF for a file comparison.
+
 ## v3 Session 10 on v0.4.8 (release tarball): an everyday assembly (P2; r5/v3s10b.py six mates, r5/v3s10.py / v3s10n.py planar stacks of 19 / N cubes; drag rate with r5/dragfps.sh = ffmpeg x11grab 30 fps without the pointer, distinct frames counted)
 Six mates by CLI on a fixed plate: DOF Fastened 0, Revolute 1, Slider 1, Cylindrical 2, Planar 3, Ball 3 ✅ (DOF glyph tooltips
 "Has degrees of freedom (n)"); first instance lands at the origin, not fixed (= live); dragging a revolute instance turns it about
