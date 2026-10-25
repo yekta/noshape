@@ -686,3 +686,7 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   Fillet 1 R2 → R1 and Shell 1 fails "Could not shell part with selections." at every thickness 1, 1.5, 2, 2.5 mm (R2: OK).
   The 1 mm chamfer chain runs over the R1 arcs, which may be what breaks it; live answer pending (REQUESTS qa5 10-25 p1 (6)).
   Repro: /root/qa5-scratch/p1/shell-r1.noshape.
+- **P1-7 — ui (feature list)** — Delete Extrude 1 under a hidden Sketch 2 (sketched on Extrude 1's top face): Sketch 2 errors "The
+  sketch plane could not be found" but its row keeps the hidden-sketch grey (no red), while the other failing rows turn red.
+  Live: a failing sketch's row turns red (behaviours 6432, 6491).
+- STATUS 2026-10-25 (qa5): FSW-L45b fixed and landed (441a5af2, curve_pattern_distance_on_closed_path_as_fs).
