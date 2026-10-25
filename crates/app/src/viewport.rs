@@ -108,6 +108,34 @@ const PICK_HALF: i32 = 40;
 /// Pick radius in logical pixels.
 const PICK_RADIUS: f64 = 5.0;
 
+/// Onshape's pre-highlight with "reduce mouse hover highlight" (on for
+/// accounts, live "nav2 pre-highlight"): `PREHIGHLIGHT_SPEED_THRESHOLD`
+/// (px/ms), `PAUSED_MOUSE_PREHIGHLIGHT_TIMEOUT_MULTIPLIER`, `_MAX_MS`.
+const PREHIGHLIGHT_SPEED_THRESHOLD: f64 = 0.15;
+const PAUSED_PREHIGHLIGHT_MULTIPLIER: f64 = 5.0;
+const PAUSED_PREHIGHLIGHT_MAX_MS: f64 = 250.0;
+
+/// InputHandler `onMouseMove`: a move of `dist` px `ms` after the previous
+/// one (none for the first move) pre-highlights at once below the speed
+/// threshold (`None`); faster, the pick waits for the pointer to pause,
+/// min(5 × average pick time, 250 ms).
+fn prehighlight_delay(dist: f64, ms: Option<f64>, avg_pick_ms: f64) -> Option<Duration> {
+    let speed = match ms {
+        Some(ms) if ms > 0.0 => dist / ms,
+        _ => f64::INFINITY,
+    };
+    if speed < PREHIGHLIGHT_SPEED_THRESHOLD {
+        return None;
+    }
+    Some(Duration::from_secs_f64((avg_pick_ms.max(0.0) * PAUSED_PREHIGHLIGHT_MULTIPLIER).min(PAUSED_PREHIGHLIGHT_MAX_MS) / 1000.0))
+}
+
+/// Onshape's `averagePickDuration`: the first pick as is, then
+/// 0.8·old + 0.2·new (negative before any pick).
+fn average_pick_ms(old: f64, new: f64) -> f64 {
+    if old < 0.0 { new } else { 0.8 * old + 0.2 * new }
+}
+
 struct CameraAnimation {
     from: Camera,
     to: Camera,
@@ -190,6 +218,11 @@ pub struct Viewport {
     /// A hover query is outstanding / another one is wanted when it returns.
     hover_query: bool,
     hover_query_again: bool,
+    /// The previous hover move ([`prehighlight_delay`]), the average GPU
+    /// pick time (ms), and the pre-highlight pick waiting for a pause.
+    last_move_at: Option<Instant>,
+    avg_pick_ms: f64,
+    paused_hover: Option<Task<()>>,
     /// The pointer is over the viewport (hover is cleared when it leaves).
     pointer_inside: bool,
     /// Submitted but not yet presented frames (seq, submit time,
@@ -446,6 +479,9 @@ impl Viewport {
             pick_requests: HashMap::new(),
             hover_query: false,
             hover_query_again: false,
+            last_move_at: None,
+            avg_pick_ms: -1.0,
+            paused_hover: None,
             pointer_inside: false,
             in_flight: VecDeque::new(),
             interactive_until: None,
@@ -823,9 +859,12 @@ impl Viewport {
         let s = self.scale as f64;
         match purpose {
             PickPurpose::Hover => {
+                self.avg_pick_ms = average_pick_ms(self.avg_pick_ms, asked.elapsed().as_secs_f64() * 1000.0);
                 self.hover_query = false;
                 if !self.pointer_inside {
                     self.hover_query_again = false;
+                } else if self.paused_hover.is_some() {
+                    // A fast move: the pick waits for the pause.
                 } else if current {
                     match self.pick_at(self.last_pos) {
                         Some(id) => self.set_hover(id, cx),
@@ -1603,6 +1642,8 @@ impl Viewport {
         self.pointer_inside = *hovered;
         if !*hovered {
             self.hover_query_again = false;
+            self.paused_hover = None;
+            self.last_move_at = None;
             self.set_hover(None, cx);
             self.set_hover_label(None, cx);
         }
@@ -1702,9 +1743,35 @@ impl Viewport {
             Drag::None | Drag::Pending(_) => {
                 let label = if self.pointer_inside { self.label_at(p) } else { None };
                 self.set_hover_label(label, cx);
-                match self.pick_at(p) {
-                    Some(id) => self.set_hover(id, cx),
-                    None => self.request_hover(),
+                let now = Instant::now();
+                let ms = self.last_move_at.replace(now).map(|t| now.duration_since(t).as_secs_f64() * 1000.0);
+                self.paused_hover = None;
+                // Measured live in plain selection; a tool's own hover
+                // (sketch snapping) follows the pointer.
+                let delay = if self.tool_captures_left { None } else { prehighlight_delay(delta.length(), ms, self.avg_pick_ms) };
+                match delay {
+                    None => match self.pick_at(p) {
+                        Some(id) => self.set_hover(id, cx),
+                        None => self.request_hover(),
+                    },
+                    Some(wait) => {
+                        // A fast move: what is highlighted clears unless it
+                        // is still under the pointer; nothing new until the
+                        // pointer pauses.
+                        if self.hover.is_some() && self.pick_at(p) != Some(self.hover) {
+                            self.set_hover(None, cx);
+                        }
+                        self.paused_hover = Some(cx.spawn(async move |this, cx| {
+                            cx.background_executor().timer(wait).await;
+                            let _ = this.update(cx, |this: &mut Viewport, cx| {
+                                this.paused_hover = None;
+                                match this.pick_at(this.last_pos) {
+                                    Some(id) => this.set_hover(id, cx),
+                                    None => this.request_hover(),
+                                }
+                            });
+                        }));
+                    }
                 }
                 cx.emit(ViewportEvent::PointerMove { position: p, modifiers: e.modifiers });
             }
@@ -1731,6 +1798,10 @@ impl Viewport {
         }
         let drag = std::mem::replace(&mut self.drag, Drag::None);
         match drag {
+            // Onshape `eventCanBeUsedForContextMenu` (live "nav2 selection"
+            // 3, every platform): a Ctrl+click opens the context menu on
+            // release and leaves the selection as it is.
+            Drag::Pending(MouseButton::Left) if e.modifiers.control => self.context_menu_at(p, e.position, cx),
             Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, cx),
             Drag::Pending(MouseButton::Right) => self.context_menu_at(p, e.position, cx),
             Drag::Box => {
@@ -2402,5 +2473,23 @@ pub fn fit_camera_to_box(camera: &mut Camera, lo: DVec3, hi: DVec3, size: DVec2,
     if inset > 0.0 && size.y > 0.0 {
         // Move the model right, into the middle of the uncovered part.
         camera.pan(DVec2::new(inset * 0.5, 0.0), size.y);
+    }
+}
+
+#[cfg(test)]
+mod prehighlight_tests {
+    use super::{Duration, average_pick_ms, prehighlight_delay};
+
+    #[::core::prelude::v1::test]
+    fn prehighlight_waits_for_a_pause_as_live() {
+        // 2 px per 16 ms (0.125 px/ms): at once, as live's slow runs.
+        assert_eq!(prehighlight_delay(2.0, Some(16.0), 4.0), None);
+        // 40 px per 16 ms: 5 × the average pick, capped at 250 ms.
+        assert_eq!(prehighlight_delay(40.0, Some(16.0), 4.0), Some(Duration::from_millis(20)));
+        assert_eq!(prehighlight_delay(40.0, Some(16.0), 270.0), Some(Duration::from_millis(250)));
+        // The first move is infinitely fast; no pick yet reads as 0 ms.
+        assert_eq!(prehighlight_delay(1.0, None, -1.0), Some(Duration::ZERO));
+        assert_eq!(average_pick_ms(-1.0, 10.0), 10.0);
+        assert!((average_pick_ms(10.0, 20.0) - 12.0).abs() < 1e-12);
     }
 }
