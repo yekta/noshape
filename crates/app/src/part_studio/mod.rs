@@ -749,8 +749,12 @@ impl PartStudioView {
             self.message = None;
         }
         // A new Extrude / Revolve / Sweep / Loft: operation and merge scope
-        // from what the previewed tool touches.
-        self.boolean_edit_logic(cx);
+        // from what the previewed tool touches (unless std's editing logic
+        // decides them, `std_edit_logic`).
+        let std_logic = self.edit.as_ref().is_some_and(|e| noshape_model::custom::std_feature::has_editing_logic(&e.dialog.read(cx).feature.type_id));
+        if !std_logic {
+            self.boolean_edit_logic(cx);
+        }
         self.hole_scope_logic(cx);
         self.orient_for_sketch(cx);
         self.refresh_scene(true, cx);

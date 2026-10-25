@@ -145,7 +145,16 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
     if target_ids.is_empty() {
         return crate::regen::eval::err_at(&["targets"], "Select parts, surfaces, or curves to split.");
     }
-    let Some(tool_ref) = ev.query("tool").first() else { return crate::regen::eval::err_at(&["tool"], "Select an entity to split with") };
+    // std splitpart.fs / Onshape's opSplitPart texts.
+    let Some(tool_ref) = ev.query("tool").first() else { return crate::regen::eval::err_at(&["tool"], "Select entity to split with.") };
+    // A single face, plane or mate connector stays (std reports which).
+    if !ev.bool("keepTools") {
+        match tool_ref {
+            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::MateConnector { .. } | Reference::Implicit { .. } => ev.infos.push("Planes and mate connectors will be kept.".into()),
+            Reference::Face(_) => ev.infos.push("Faces selected as split tools must be kept.".into()),
+            _ => {}
+        }
+    }
     let tool = resolve_tool(ev, tool_ref, ev.bool("useTrimmed"))?;
     let both = ev.bool("keepBothSides");
     let front = ev.bool("keepFront");
@@ -185,7 +194,11 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if !changed {
-        return err("The split tool doesn't split the selected parts");
+        // Live "fs (10-25 06:15)": an info (the feature's only one), the
+        // part and the tool unchanged.
+        ev.infos.clear();
+        ev.infos.push("Selected entity does not split selected parts.".into());
+        return Ok(());
     }
     if !ev.bool("keepTools")
         && let Some(id) = &tool.body
@@ -198,11 +211,11 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
 fn split_faces(ev: &mut EvalCtx) -> FResult<()> {
     let targets = by_body(ev.resolve_faces(ev.query("faceTargets")));
     if targets.is_empty() {
-        return err("Select faces to split");
+        return crate::regen::eval::err_at(&["faceTargets"], "Select faces to split.");
     }
     let tool_refs = ev.query("faceTools");
     if tool_refs.is_empty() {
-        return err("Select entities to split with");
+        return crate::regen::eval::err_at(&["faceTools"], "Select entities to split with.");
     }
     let curves = resolve_curves(ev, tool_refs)?;
     let direction = if ev.is("projectionType", "NORMAL_TO_TARGET") {
@@ -219,7 +232,7 @@ fn split_faces(ev: &mut EvalCtx) -> FResult<()> {
         match ev.query("directionQuery").first() {
             Some(r) => Some(ev.resolve_direction(r).ok_or_else(|| fe("The projection direction could not be resolved"))?),
             None if curves.is_empty() => None,
-            None => return err("Select a projection direction"),
+            None => return crate::regen::eval::err_at(&["directionQuery"], "Select edge projection direction for split."),
         }
     };
     // Surface-like tools (faces, planes, sheet bodies).
@@ -290,7 +303,7 @@ fn split_faces(ev: &mut EvalCtx) -> FResult<()> {
         changed = true;
     }
     if !changed {
-        return err("The tools don't split the selected faces");
+        return err("Selected entities do not split selected faces.");
     }
     if !ev.bool("keepToolSurfaces") {
         remove_bodies(ev, &tool_bodies);

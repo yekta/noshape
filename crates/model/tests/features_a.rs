@@ -663,6 +663,8 @@ fn transform_move_copy_rotate_scale() {
     t.set(tr, "makeCopy", b(false));
     t.set(tr, "transformType", en("SCALE_UNIFORMLY"));
     t.set(tr, "scale", e("2"));
+    // std transformCopy.fs: Scale needs its point (TRANSFORM_SCALE_SELECTION).
+    t.set(tr, "scalePoint", q(vec![Reference::Origin]));
     let res = t.ok();
     assert!(near(total_volume(&res.context), 8e-6, 1e-6));
     t.set(tr, "transformType", en("ROTATION"));

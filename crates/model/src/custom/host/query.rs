@@ -765,6 +765,21 @@ impl<'a> QueryCx<'a> {
     /// Entities of type `t` adjacent to `e` through a shared edge
     /// (`by_vertex`: through a shared vertex).
     fn adjacent(&self, e: &Ent, t: EType, by_vertex: bool) -> Vec<Ent> {
+        // A sketch region is bounded by its sketch curves (std thin
+        // extrude takes a picked region's edges).
+        if let Ent::SketchRegion(s, key) = e {
+            let sk = &self.st.ctx.sketches[*s];
+            let Some(region) = sk.regions.iter().find(|r| encode_region_key(&r.id) == *key) else { return Vec::new() };
+            let curves: Vec<u32> = region.id.entities().iter().map(|x| x.0).filter(|x| sk.sketch.kind(noshape_sketch::EntityId(*x)).is_some_and(|k| k != noshape_sketch::EntityKind::Point)).collect();
+            let mut out: Vec<Ent> = match t {
+                EType::Edge => curves.iter().map(|c| Ent::SketchEdge(*s, *c)).collect(),
+                EType::Vertex => curves.iter().filter_map(|c| sk.sketch.entity(noshape_sketch::EntityId(*c))).flat_map(|x| x.point_refs().iter().map(|p| Ent::SketchVertex(*s, p.0)).collect::<Vec<_>>()).collect(),
+                EType::Face => sk.regions.iter().filter(|r| r.id.entities().iter().any(|x| curves.contains(&x.0))).map(|r| Ent::SketchRegion(*s, encode_region_key(&r.id))).collect(),
+                EType::Body => vec![Ent::SketchBody(*s)],
+            };
+            out.retain(|x| x != e);
+            return uniq(out);
+        }
         let (edges, verts) = self.boundary(e);
         let Some(b) = (match e {
             Ent::Face(b, _) | Ent::Edge(b, _) | Ent::Vertex(b, _) | Ent::Body(b) => Some(*b),
@@ -1353,6 +1368,23 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
             ["Origin.pointOp"] => vec![Ent::Origin],
             _ => Vec::new(),
         },
+        // The side faces an extrude-like operation swept from the profile's
+        // edges (std extrude's draft faces), not its caps.
+        "SWEPT_FACE" => q
+            .all_with(Some(EType::Face), true)
+            .into_iter()
+            .filter(|e| {
+                let Ent::Face(b, f) = e else { return false };
+                use crate::reference::{Role, TopoName};
+                // Operation names wrap the op's own (`Generated(inner)`).
+                let name = match q.st.ctx.bodies[*b].faces[*f].root() {
+                    TopoName::Face { role: Role::Generated(inner), .. } => inner.root(),
+                    n => n,
+                };
+                let side = matches!(name, TopoName::Face { role: Role::Side(_), .. });
+                side && q.created_by(e).as_ref() == Some(&op)
+            })
+            .collect(),
         // A part of another Part Studio (PartStudioData.partQuery): the
         // bodies its feature made, told apart by their sketch edges.
         "SWEPT_BODY" => {

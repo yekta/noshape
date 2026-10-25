@@ -222,7 +222,8 @@ pub fn ops() -> Vec<Op> {
 /// rules): a tapped hole's linked depths, Thicken's / Extrude's operation and
 /// flip from the parts the profiles lie on, then from a preview the
 /// operation and merge scope of Extrude / Revolve / Sweep / Loft (Add into
-/// the one part the tool touches) and a Hole's scope and flip.
+/// the one part the tool touches) and a Hole's scope and flip. Features
+/// whose dialog runs std's editing logic run it instead.
 fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, feature: &mut noshape_model::Feature, index: usize, given: &serde_json::Map<String, Value>) -> Result<(), OpError> {
     let set = |k: &str| given.contains_key(k);
     let units = od.doc().settings.units;
@@ -242,6 +243,29 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
             let linked = noshape_model::features::hole_tables::link_tapped_depths(&defaults.params, &feature.params, &units);
             apply(feature, linked);
         }
+    }
+    // Features whose dialog runs std's "Editing Logic Function" (Extrude,
+    // Fillet, Loft: the app's `std_edit_logic`) get the same here, on the
+    // model before the feature, until it settles.
+    if noshape_model::custom::std_feature::has_editing_logic(&feature.type_id) {
+        let ctx = od.regenerate_with(tab, None, |o| o.upto = Some(index))?.context;
+        let specified: Vec<String> = given.keys().cloned().collect();
+        let mut old = noshape_model::params::ParamValues::default();
+        for _ in 0..3 {
+            let Some(changed) = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &feature.type_id, feature.id, &feature.name, &units, &old, &feature.params, &specified, true) else { break };
+            old = feature.params.clone();
+            let mut any = false;
+            for (k, v) in changed.0 {
+                if !set(&k) && feature.params.get(&k) != Some(&v) {
+                    feature.params.set(&k, v);
+                    any = true;
+                }
+            }
+            if !any {
+                break;
+            }
+        }
+        return Ok(());
     }
     if !matches!(feature.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft" | "thicken" | "hole") {
         return Ok(());

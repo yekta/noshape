@@ -147,8 +147,9 @@ pub fn transform() -> FeatureType {
         ParamSpec::num("scaleZ", "Z scale", NumSpec::real(1.0, 1e-5, 1e5)).visible(move |v| scale(v) && !v.bool("uniform")),
         ParamSpec::query1("baseConnector", "From mate connector", QueryFilter::MATE_CONNECTOR).visible(mcs),
         ParamSpec::query1("destinationConnector", "To mate connector", QueryFilter::MATE_CONNECTOR).visible(mcs),
-        ParamSpec::bool("oppositeDirectionMateAxis", "Flip primary axis", false).hints(Hints::FIRST_IN_ROW).visible(mcs),
-        ParamSpec::enum_("secondaryAxisType", "Reorient secondary axis", MATE_CONNECTOR_AXIS).visible(mcs),
+        // transformCopy.fs: the Mate connector dialog's flip and reorient buttons.
+        ParamSpec::bool("oppositeDirectionMateAxis", "Flip primary axis", false).hints(Hints::FIRST_IN_ROW | Hints::PRIMARY_AXIS).visible(mcs),
+        ParamSpec::enum_("secondaryAxisType", "Reorient secondary axis", MATE_CONNECTOR_AXIS).hints(Hints::MATE_CONNECTOR_AXIS_TYPE).visible(mcs),
         ParamSpec::num("angle", "Angle", angle_360(30.0)).visible(move |v| ty(v, "ROTATION")),
         ParamSpec::flip("oppositeDirection", "Opposite direction").visible(move |v| ty(v, "ROTATION") || ty(v, "TRANSLATION_DISTANCE")),
         ParamSpec::num("dx", "X translation", ZERO_DEFAULT_LENGTH).visible(xyz),
