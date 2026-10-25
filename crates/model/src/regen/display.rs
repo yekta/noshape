@@ -179,23 +179,28 @@ fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts
 /// Tessellation quality (Auto = Fine) whatever its size; only View in high
 /// quality (Shift+R: a finer `relative_deflection`) refines it, view by
 /// view, up to Very fine, so then it gets every level from its own up.
-/// Preview meshes: Coarse. The chord-based mesh ([`angle_display_mesh`]
+/// Preview meshes: Coarse, unless `meshes` still holds the body's own
+/// levels from an earlier refine (the part didn't change: a dialog opened
+/// or cancelled, undo); those are drawn as they are, so nothing is
+/// re-meshed or refined. The chord-based mesh ([`angle_display_mesh`]
 /// off) has one level, as before.
 ///
 /// [`TessQuality::factor`]: crate::partstudio::TessQuality::factor
-fn body_levels(studio: &PartStudio, b: &super::context::Body, opts: &RegenOptions) -> (Vec<f64>, u8) {
+fn body_levels(studio: &PartStudio, b: &super::context::Body, opts: &RegenOptions, meshes: &HashMap<u64, (u64, bool, Arc<MeshBuffers>)>) -> (Vec<f64>, u8) {
     use crate::partstudio::TessQuality;
     let setting = studio.part_properties.get(&b.id).and_then(|p| p.tessellation);
     let view_scale = opts.relative_deflection / RegenOptions::default().relative_deflection;
     if !angle_display_mesh() {
         return (vec![setting.map(|q| q.factor()).unwrap_or(1.0) * view_scale], 0);
     }
-    if opts.preview_meshes {
-        return (vec![TessQuality::Coarse.factor()], 0);
-    }
     let own = setting.unwrap_or(TessQuality::Auto).level();
     let last = if view_scale < 1.0 { TessQuality::VeryFine.level() } else { own };
-    (TessQuality::LEVELS[own..=last].iter().map(|q| q.factor()).collect(), own as u8)
+    let qualities: Vec<f64> = TessQuality::LEVELS[own..=last].iter().map(|q| q.factor()).collect();
+    let refined = || qualities.iter().all(|&q| meshes.get(&world_key(&b.shape, q)).is_some_and(|(n, preview, _)| *n == b.faces.len() as u64 && !*preview));
+    if opts.preview_meshes && !refined() {
+        return (vec![TessQuality::Coarse.factor()], 0);
+    }
+    (qualities, own as u8)
 }
 
 /// Meshes `shape` at `qualities` (missing levels, coarsest first;
@@ -250,7 +255,7 @@ fn mesh_in_parallel(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, par
     let mut queued = std::collections::HashSet::new();
     let fresh = |m: &HashMap<u64, (u64, bool, Arc<MeshBuffers>)>, key: u64, nfaces: u64| m.get(&key).is_some_and(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes));
     for b in ctx.bodies.iter().filter(|b| b.composite.is_none()) {
-        let (qualities, _) = body_levels(studio, b, opts);
+        let (qualities, _) = body_levels(studio, b, opts, meshes);
         let nfaces = b.faces.len() as u64;
         let partner = b.shape.partner_hash();
         let (keys, shape): (Vec<u64>, _) = if partner != 0 && partners.get(&partner).is_some_and(|&n| n > 1) {
@@ -369,7 +374,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         }
         // The body's display levels (coarsest first); each level is cached
         // by its quality.
-        let (qualities, levels_from) = body_levels(studio, b, opts);
+        let (qualities, levels_from) = body_levels(studio, b, opts, meshes);
         let keys: Vec<u64> = qualities.iter().map(|&q| world_key(&b.shape, q)).collect();
         let nfaces = b.faces.len() as u64;
         used.extend(keys.iter().copied());

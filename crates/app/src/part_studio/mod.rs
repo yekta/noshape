@@ -4511,11 +4511,10 @@ pub(super) fn sketch_points(sk: &noshape_model::display::SketchDisplay) -> Vec<R
     own().filter(|p| !p.handle).map(|p| Reference::SketchEntity { sketch: sk.feature, entity: p.entity }).collect()
 }
 
-/// Every edge-like filter bit (edges, linear / circular edges, sketch edges).
-/// What a part edge / a sketch curve can fill: any edge field, plus the
-/// part-only (`SOLID_EDGE`) or sketch-only (`SKETCH_EDGE`) ones.
-const PART_EDGES: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::SOLID_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
-const SKETCH_CURVES: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::SKETCH_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
+/// The model-edge filter bits (edges, linear / circular edges). A sketch
+/// curve needs SKETCH_EDGE: fields the std marks `SketchObject.NO` (Fillet,
+/// Chamfer) don't take one (qa5 SEL1).
+const MODEL_EDGES: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
 
 pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     // A parts field that also takes mate connectors or point bodies
@@ -4534,12 +4533,12 @@ pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
         PickKind::Face => want(QueryFilter::ANY_FACE) || want(QueryFilter::PLANE_LIKE),
         // Edge bits only: AXIS also holds cylindrical faces (their axis), so
         // a face field would take edges (qa5 I2: a hole wall in Move face).
-        PickKind::Edge => want(PART_EDGES),
+        PickKind::Edge => want(MODEL_EDGES),
         // A part vertex isn't a sketch point (Hole locations take neither it nor a face).
         PickKind::Vertex => want(QueryFilter(QueryFilter::POINT_LIKE.0 & !QueryFilter::SKETCH_POINT.0)),
         PickKind::Plane => want(QueryFilter::PLANE),
         PickKind::Origin => want(QueryFilter::POINT_LIKE),
-        PickKind::SketchCurve => want(SKETCH_CURVES),
+        PickKind::SketchCurve => want(QueryFilter::SKETCH_EDGE),
         PickKind::SketchPoint => want(QueryFilter::SKETCH_POINT) || want(QueryFilter::POINT_LIKE),
         PickKind::SketchRegion => want(QueryFilter::SKETCH_REGION),
         PickKind::Connector => want(QueryFilter::MATE_CONNECTOR),
@@ -5400,5 +5399,23 @@ mod default_row_tests {
         assert!(default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Isolate))));
         // Make transparent keeps the planes, so their rows stay black.
         assert!(!default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Transparent))));
+    }
+
+    /// qa5 SEL1: a sketch curve goes only into fields that take sketch
+    /// curves (fillet.fs / chamfer.fs say `SketchObject.NO`); a model edge
+    /// only into fields that take model edges.
+    #[test]
+    fn sketch_curves_and_model_edges_pick_into_their_own_fields() {
+        let r = Reference::SketchEntity { sketch: FeatureId(1), entity: 0 };
+        let field = |ty: &str, id: &str| match noshape_model::features::get(ty).and_then(|t| t.params.iter().find(|p| p.id == id)).map(|p| &p.kind) {
+            Some(noshape_model::params::ParamKind::Query { filter, .. }) => *filter,
+            _ => panic!("{ty}.{id} is not a query field"),
+        };
+        for (ty, id) in [("fillet", "entities"), ("chamfer", "entities")] {
+            assert!(!kind_matches(PickKind::SketchCurve, &r, field(ty, id)), "{ty}.{id} takes a sketch curve");
+            assert!(kind_matches(PickKind::Edge, &r, field(ty, id)), "{ty}.{id} refuses a model edge");
+        }
+        assert!(kind_matches(PickKind::SketchCurve, &r, field("helix", "edge")));
+        assert!(!kind_matches(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
     }
 }

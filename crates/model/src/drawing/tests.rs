@@ -219,6 +219,104 @@ fn crop_view_keeps_inside_geometry() {
     assert!(built.dangling.is_empty() || !built.dangling.is_empty());
 }
 
+/// A section cut's regions (Edit hatch section...): outer loops with their
+/// holes; a point finds its region, the last style inside a region wins.
+#[test]
+fn section_regions_nest_and_find_styles() {
+    let ring = |x0: f64, y0: f64, x1: f64, y1: f64| -> Vec<[[f64; 2]; 2]> {
+        let c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+        (0..4).map(|i| [c[i], c[(i + 1) % 4]]).collect()
+    };
+    let mut segs = ring(0.0, 0.0, 10.0, 10.0);
+    segs.extend(ring(3.0, 3.0, 7.0, 7.0));
+    segs.extend(ring(20.0, 0.0, 30.0, 10.0));
+    let r = views::section_regions(&segs).unwrap();
+    assert_eq!(r.len(), 2);
+    let with_hole = r.iter().position(|(_, h)| h.len() == 1).unwrap();
+    assert_eq!(views::section_region_at(&r, [1.0, 1.0]), Some(with_hole));
+    assert_eq!(views::section_region_at(&r, [5.0, 5.0]), None, "in the hole");
+    assert!(views::section_region_at(&r, [25.0, 5.0]).is_some_and(|i| i != with_hole));
+    let h = |at: [f64; 2], pattern: Option<usize>| SectionHatch { at, standard: 0, pattern, scale: 1.0, angle: 0.0, color: None };
+    let hs = [h([1.0, 1.0], Some(1)), h([2.0, 9.0], None)];
+    let st = views::section_region_styles(&r, &hs);
+    assert_eq!(st[with_hole].map(|x| x.pattern), Some(None), "the last one inside wins");
+    assert!(st[1 - with_hole].is_none());
+    // A cut that doesn't close has no regions.
+    assert!(views::section_regions(&segs[..3]).is_none());
+}
+
+/// Live asb 10-23 views (4): Edit hatch section restyles one region of the
+/// cut; the others keep the drawing's hatch.
+#[test]
+fn edit_hatch_section_restyles_one_region() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, true);
+    let regions = views::section_regions(&g.section_segments).expect("the cut closes");
+    assert!(regions.len() >= 2, "{} regions", regions.len());
+    // A point inside region 0.
+    let (outer, _) = &regions[0];
+    let (x0, x1) = outer.iter().fold((f64::MAX, f64::MIN), |m, p| (m.0.min(p[0]), m.1.max(p[0])));
+    let (y0, y1) = outer.iter().fold((f64::MAX, f64::MIN), |m, p| (m.0.min(p[1]), m.1.max(p[1])));
+    let at = (1..20).flat_map(|i| (1..20).map(move |j| [x0 + (x1 - x0) * i as f64 / 20.0, y0 + (y1 - y0) * j as f64 / 20.0])).find(|p| views::section_region_at(&regions, *p) == Some(0)).unwrap();
+    let hatch_lines = |d: &Drawing| {
+        let b = render_sheet(d, 0, &sources, &cache, false).unwrap();
+        let vp = b.picks.iter().position(|p| *p == PickTarget::View(ViewId(5))).unwrap() as u32;
+        let idx: Vec<usize> = b.geometry.lines.iter().enumerate().filter(|(_, l)| l.pick == vp && l.style == sheet::LineStyle::Thin).map(|(i, _)| i).collect();
+        let red = idx.iter().filter(|i| b.geometry.line_color(**i) == Some([255, 0, 0])).count();
+        (idx.len(), red)
+    };
+    let (all, _) = hatch_lines(&drawing);
+    assert!(all > 0);
+    let set = |d: &mut Drawing, h: SectionHatch| d.sheets[0].view_mut(ViewId(5)).unwrap().section_hatches = vec![h];
+    // General › None: region 0 unhatched, the others still hatched.
+    set(&mut drawing, SectionHatch { at, standard: 2, pattern: None, scale: 1.0, angle: 0.0, color: None });
+    let (fewer, _) = hatch_lines(&drawing);
+    assert!(fewer < all && fewer > 0, "{fewer} of {all}");
+    // ANSI32 steel in red: that region's lines are red.
+    set(&mut drawing, SectionHatch { at, standard: 0, pattern: Some(1), scale: 1.0, angle: 0.0, color: Some([255, 0, 0]) });
+    let (_, red) = hatch_lines(&drawing);
+    assert!(red > 0);
+}
+
+/// Live asb 10-23 views (6): Show offset cut lines draws a line across the
+/// hatch where a jogged cutting line steps (off by default).
+#[test]
+fn offset_cut_lines_cross_the_hatch_at_the_jog() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    // Jogged through the center hole (x = 0) and the corner hole (x = 38).
+    if let ViewKind::Section { line, .. } = &mut drawing.sheets[0].view_mut(ViewId(5)).unwrap().kind {
+        *line = vec![[0.0, -0.04], [0.0, 0.01], [0.038, 0.01], [0.038, 0.04]];
+    }
+    let sheet = &drawing.sheets[0];
+    let g = compute_view(&drawing, sheet, ViewId(5), &sources, &cache, true);
+    let parent = sheet.parent_of(ViewId(5)).unwrap();
+    let pg = compute_view(&drawing, sheet, parent, &sources, &cache, true);
+    let cut = views::section_cut(sheet, ViewId(5)).unwrap();
+    let lines = views::offset_cut_lines(&cut, pg.frame.as_ref().unwrap(), g.frame.as_ref().unwrap(), &g.section_segments);
+    assert!(!lines.is_empty(), "one step, one line");
+    // Each piece lies inside the cut: its midpoint is in a hatch region.
+    let regions = views::section_regions(&g.section_segments).unwrap();
+    for l in &lines {
+        // On the legs' common boundary: material just to one side of it.
+        let m = [(l[0][0] + l[1][0]) / 2.0, (l[0][1] + l[1][1]) / 2.0];
+        let (dx, dy) = (l[1][0] - l[0][0], l[1][1] - l[0][1]);
+        let n = [-dy / dx.hypot(dy) * 1e-6, dx / dx.hypot(dy) * 1e-6];
+        assert!(views::section_region_at(&regions, [m[0] + n[0], m[1] + n[1]]).is_some() || views::section_region_at(&regions, [m[0] - n[0], m[1] - n[1]]).is_some(), "{l:?}");
+    }
+    let count = |d: &Drawing| {
+        let b = render_sheet(d, 0, &sources, &cache, false).unwrap();
+        let vp = b.picks.iter().position(|p| *p == PickTarget::View(ViewId(5))).unwrap() as u32;
+        b.geometry.lines.iter().filter(|l| l.pick == vp && l.style == sheet::LineStyle::Thin).count()
+    };
+    let off = count(&drawing);
+    drawing.sheets[0].view_mut(ViewId(5)).unwrap().show_offset_cut_lines = true;
+    assert!(count(&drawing) > off);
+}
+
 #[test]
 fn jogged_and_aligned_sections() {
     let (doc, mut drawing) = demo();
@@ -644,6 +742,39 @@ fn editing_cutting_line_points() {
     assert!((l.points[1][0] - l.points[0][0]).abs() > 1.0, "cutting line is tilted on the sheet");
 }
 
+/// The cutting line as live (qa4-r5-s11.dxf, drw2-k): 0.25 in past the
+/// parent's geometry at both ends; at each end a shaft a twelfth of an arrow
+/// wide and an arrow long along the line of sight, the arrow beyond it, the
+/// letter past the tip.
+#[test]
+fn cutting_line_ends_as_live() {
+    let (doc, drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let ViewKind::Section { parent, ref label, .. } = drawing.sheets[0].view(ViewId(5)).unwrap().kind else { panic!("demo section") };
+    let ppl = built.placements.iter().find(|p| p.id == parent).unwrap();
+    let sp = pick_of(&built, PickTarget::SectionLine(ViewId(5)));
+    let g = &built.geometry;
+    let line = g.lines.iter().find(|l| l.pick == sp && l.style == sheet::LineStyle::Section).unwrap();
+    let (p0, p1) = (line.points[0], *line.points.last().unwrap());
+    let (a, h) = (drawing.props.ann_arrow, drawing.props.ann_text_height);
+    // The demo's line is vertical: 6.35 mm past the view's top and bottom.
+    assert!((p0[0] - p1[0]).abs() < 1e-9, "{p0:?} {p1:?}");
+    let (lo, hi) = (p0[1].min(p1[1]), p0[1].max(p1[1]));
+    assert!((lo - (ppl.min[1] - 6.35)).abs() < 1e-9 && (hi - (ppl.max[1] + 6.35)).abs() < 1e-9, "{lo} {hi} {:?} {:?}", ppl.min, ppl.max);
+    for end in [p0, p1] {
+        // The letter 2 arrows + 1.1 text heights out, square to the line.
+        let t = g.texts.iter().find(|t| t.pick == sp && &t.text == label && (t.pos[1] - end[1]).abs() < 1e-9).expect("a letter at each end");
+        assert!(((t.pos[0] - end[0]).abs() - (2.0 * a + 1.1 * h)).abs() < 1e-9 && t.height == h, "{t:?}");
+        // The shaft: a quad from the end, a twelfth of an arrow wide, an arrow long.
+        let q = g.fills.iter().find(|f| f.points.len() == 4 && (f.points[0][1] - end[1]).abs() < a).expect("shaft");
+        let w = q.points.iter().map(|p| p[1]).fold(f64::MIN, f64::max) - q.points.iter().map(|p| p[1]).fold(f64::MAX, f64::min);
+        let len = q.points.iter().map(|p| p[0]).fold(f64::MIN, f64::max) - q.points.iter().map(|p| p[0]).fold(f64::MAX, f64::min);
+        assert!((w - a / 12.0).abs() < 1e-9 && (len - a).abs() < 1e-9, "{q:?}");
+    }
+}
+
 #[test]
 fn spline_and_polygon_crops() {
     let (doc, mut drawing) = demo();
@@ -969,7 +1100,10 @@ fn templates_and_title_blocks() {
     }
     let rect = sheet::title_block_rect(&drawing.sheets[0]).unwrap();
     let tb = pick_of(&built, PickTarget::TitleBlock);
-    assert_eq!(built.hit([rect[0] + 70.0, rect[1] + 4.0], 1.0), Some(tb));
+    assert_eq!(built.hit([rect[0] + 5.0, rect[1] + 4.0], 1.0), Some(tb));
+    // A field's cell picks its note (live qa4 round 5 s11 (4)).
+    let hit = built.hit([rect[0] + 70.0, rect[1] + 4.0], 1.0).and_then(|h| built.picks.get(h as usize).cloned());
+    assert!(matches!(hit, Some(PickTarget::TitleField(_))), "{hit:?}");
     // Imperial: ANSI B with a tolerance block in inches.
     templates::apply_template(&mut drawing, 0, &templates::template_by_name("ANSI B").unwrap());
     assert!(!drawing.units_mm && drawing.projection == Projection::ThirdAngle);
@@ -1032,6 +1166,12 @@ fn formats_gaps_and_revision_tables_across_sheets() {
     let built = render_sheet_with(&drawing, 0, &sources, &cache, false, &info).unwrap();
     // Locked: no title block pick; its texts are red.
     assert!(!built.picks.contains(&PickTarget::TitleBlock));
+    // Its field cells stay notes to edit (live qa4 round 5 s11 (4)).
+    assert!(!built.title_cells.is_empty());
+    for &(pick, r) in &built.title_cells {
+        assert!(matches!(built.picks[pick as usize], PickTarget::TitleField(_)));
+        assert_eq!(built.hit([(r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0], 0.5), Some(pick), "{:?}", built.picks[pick as usize]);
+    }
     let g = &built.geometry;
     assert!((0..g.texts.len()).any(|i| g.text_color(i) == Some([220, 40, 40])));
     assert!(texts(&built).iter().any(|t| t == "REVISION HISTORY") && texts(&built).iter().any(|t| t == "First"));
@@ -1525,6 +1665,47 @@ fn jogged_extension_lines_and_broken_dimensions() {
     assert_eq!(g.grips.iter().filter(|gr| gr.pick == 1 && gr.kind == GripKind::Jog).count(), 2);
 }
 
+/// Live asb 10-24 "template frames" (samples/tpl-ISO_A3.dxf,
+/// tpl-ANSI_A_MM.dxf, tpl-ISO_A4.dxf): frame, zone dividers and labels and
+/// the title block where Onshape's templates have them; nothing at the
+/// sheet edge.
+#[test]
+fn template_frames_and_zones_match_lives() {
+    let geom = |size: SheetSize, style: TitleBlockStyle| {
+        let s = Sheet { size, title_style: style, ..Default::default() };
+        let (w, h) = size.size_mm();
+        let mut g = sheet::SheetGeometry::new(w, h);
+        g.add_border_and_title(&s);
+        (g, sheet::title_block_rect(&s).unwrap())
+    };
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-3 && (a[1] - b[1]).abs() < 1e-3;
+    let has_line = |g: &sheet::SheetGeometry, a: [f64; 2], b: [f64; 2]| g.lines.iter().any(|l| l.points.len() == 2 && ((near(l.points[0], a) && near(l.points[1], b)) || (near(l.points[0], b) && near(l.points[1], a))));
+    let label = |g: &sheet::SheetGeometry, t: &str, p: [f64; 2]| g.texts.iter().any(|x| x.text == t && near(x.pos, p));
+    let rect4 = |r: [f64; 4], e: [f64; 4]| r.iter().zip(e).all(|(a, b)| (a - b).abs() < 1e-3);
+    // ISO A3: whole-millimetre zones, columns 0.5 mm right.
+    let (g, tb) = geom(SheetSize::A3, TitleBlockStyle::Iso);
+    assert!(rect4(SheetSize::A3.frame_rect(), [10.5, 10.0, 410.5, 287.0]));
+    assert!(has_line(&g, [70.5, 10.0], [70.5, 0.5]) && has_line(&g, [350.5, 287.0], [350.5, 296.5]));
+    assert!(has_line(&g, [10.5, 74.5], [1.0, 74.5]) && has_line(&g, [410.5, 222.5], [420.0, 222.5]));
+    assert!(label(&g, "6", [35.5, 5.0]) && label(&g, "1", [385.5, 292.0]) && label(&g, "A", [5.5, 37.5]) && label(&g, "D", [415.5, 259.5]));
+    assert!(g.texts.iter().filter(|x| x.text == "A" && x.height == 6.0).count() == 2);
+    assert!(rect4(tb, [194.6, 10.0, 410.5, 60.8]), "{tb:?}");
+    assert!(!has_line(&g, [0.0, 0.0], [420.0, 0.0]) && !g.lines.iter().any(|l| l.closed && l.points.iter().any(|p| near(*p, [0.0, 0.0]))), "no sheet-edge line");
+    // ANSI A (mm): exact halves, labels 0.18 in.
+    let (g, tb) = geom(SheetSize::AnsiA, TitleBlockStyle::Ansi);
+    assert!(rect4(SheetSize::AnsiA.frame_rect(), [10.1346, 9.652, 270.2306, 206.248]));
+    assert!(has_line(&g, [140.1826, 9.652], [140.1826, 0.4826]) && has_line(&g, [270.2306, 107.95], [279.4, 107.95]) && has_line(&g, [10.1346, 107.95], [0.9652, 107.95]));
+    assert!(label(&g, "1", [210.0326, 4.826]) && label(&g, "2", [70.3326, 211.074]) && label(&g, "A", [5.3086, 53.975]) && label(&g, "B", [275.0566, 161.925]));
+    assert!(rect4(tb, [115.9256, 9.652, 270.2306, 47.752]), "{tb:?}");
+    // ANSI D: 8 x 8, a 2.5 in block; ISO A4: frame to the right edge, no zones.
+    assert_eq!(SheetSize::AnsiD.standard_zones(), [8, 8]);
+    let (_, tb) = geom(SheetSize::AnsiD, TitleBlockStyle::Ansi);
+    assert!(rect4(tb, [588.3275, 19.05, 845.5025, 82.55]), "{tb:?}");
+    let (g, tb) = geom(SheetSize::A4, TitleBlockStyle::Iso);
+    assert!(rect4(SheetSize::A4.frame_rect(), [20.0, 10.0, 297.0, 200.0]) && rect4(tb, [135.075, 10.0, 297.0, 48.1]));
+    assert!(!g.texts.iter().any(|x| x.text == "A" && x.height == 6.0));
+}
+
 #[test]
 fn custom_template_border_zones_and_units() {
     use super::templates::{DrawingTemplate, apply_template};
@@ -1538,7 +1719,7 @@ fn custom_template_border_zones_and_units() {
     };
     let mut s = Sheet { size: SheetSize::AnsiB, title_style: TitleBlockStyle::None, ..Default::default() };
     let (left, top, lines) = zone_texts(&s);
-    // ANSI B: 4 x 2, numbered from the right, lettered from the bottom.
+    // ANSI B: 4 x 4, numbered from the right, lettered from the bottom.
     assert_eq!(top.len(), 4);
     assert_eq!(top.iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "4");
     assert_eq!(left.iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "A");
@@ -2015,6 +2196,42 @@ fn exact_export_clips_detail_views_to_their_circle() {
     }
 }
 
+/// Detail profile In line on a circle (live qa4-r5-s11.dxf, detail B): the
+/// label on the circle at 0°, the circle broken around it, an arrow each
+/// side along the circle, tips 0.75 of the text height from the label's
+/// point, one annotation arrow long.
+#[test]
+fn detail_in_line_label_breaks_its_circle() {
+    let (doc, drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let detail = drawing.sheets[0].views.iter().find(|v| matches!(v.kind, ViewKind::Detail { .. })).expect("demo detail view");
+    assert!(detail.detail_style == 0 && detail.detail_profile.is_none() && detail.detail_label_at.is_none());
+    let ViewKind::Detail { parent, center, radius, ref label } = detail.kind else { unreachable!() };
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let pick = built.picks.iter().position(|p| *p == PickTarget::DetailCircle(detail.id)).unwrap() as u32;
+    let ppl = built.placements.iter().find(|p| p.id == parent).unwrap();
+    let c = ppl.to_sheet(center);
+    let r = ppl.len_to_sheet(radius);
+    let (h, a) = (drawing.props.ann_text_height, drawing.props.ann_arrow);
+    let g = &built.geometry;
+    let t = g.texts.iter().find(|t| t.pick == pick && &t.text == label).unwrap();
+    assert!((t.pos[0] - (c[0] + r)).abs() < 1e-9 && (t.pos[1] - c[1]).abs() < 1e-9 && t.height == h, "{t:?}");
+    // The arc leaves the label's side open.
+    let arc: Vec<[f64; 2]> = g.lines.iter().filter(|l| l.pick == pick).flat_map(|l| l.points.clone()).collect();
+    let tip_a = 2.0 * (0.75 * h / (2.0 * r)).asin();
+    let base_a = tip_a + 2.0 * (a / (2.0 * r)).asin();
+    assert!(arc.iter().all(|p| (p[1] - c[1]).atan2(p[0] - c[0]).abs() >= base_a - 1e-9), "broken around the label");
+    // Two arrows, tips on the circle at ±tip_a, pointing at the label.
+    let fills: Vec<&Vec<[f64; 2]>> = g.fills.iter().map(|f| &f.points).filter(|f| ((f[0][0] - c[0]).hypot(f[0][1] - c[1]) - r).abs() < 1e-9).collect();
+    for sign in [1.0f64, -1.0] {
+        let tip = [c[0] + r * (sign * tip_a).cos(), c[1] + r * (sign * tip_a).sin()];
+        let f = fills.iter().find(|f| (f[0][0] - tip[0]).abs() < 1e-9 && (f[0][1] - tip[1]).abs() < 1e-9).expect("arrow at the tip");
+        let mid = [(f[1][0] + f[2][0]) / 2.0, (f[1][1] + f[2][1]) / 2.0];
+        assert!(((mid[0] - tip[0]).hypot(mid[1] - tip[1]) - a).abs() < 1e-9, "one annotation arrow long");
+    }
+}
+
 #[test]
 fn sheet_scale_stays_after_its_views_are_gone() {
     // qa5 D14: "----" only before the first view; once a sheet has had one,
@@ -2311,6 +2528,44 @@ fn child_view_scale_follows_parent_or_sheet() {
     assert_eq!(views::view_scale(sheet, child), 0.5);
 }
 
+/// Live drw2 10-21 g (6): a callout's leaders take nodes and branches like
+/// a note's; deleting the leader to the anchor leaves it in space.
+#[test]
+fn callout_leaders_take_nodes_and_branches() {
+    let drawing = Drawing::default();
+    let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let mut kind = AnnotationKind::balloon(ViewId(1), [0.1, 0.05], "1");
+    if let AnnotationKind::Balloon { callout, .. } = &mut kind {
+        callout.nodes = vec![[120.0, 60.0]];
+        callout.leaders = vec![Leader { point: [200.0, 60.0], start: LeaderStart::Node(0, 0), ..Default::default() }];
+    }
+    let mut s = Sheet { annotations: vec![Annotation { id: 7, kind, position: [150.0, 120.0], ..Default::default() }], ..Default::default() };
+    let paths = |s: &Sheet| {
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(s, &env);
+        g.leader_paths.into_iter().map(|(id, i, p)| (id, i, p.points)).collect::<Vec<_>>()
+    };
+    let p = paths(&s);
+    assert_eq!(p.len(), 2);
+    // From the border towards the node, through it, to the anchor.
+    let (id, i, main) = &p[0];
+    assert_eq!((*id, *i, main.len()), (7, 0, 3));
+    assert_eq!(&main[1..], &[[120.0, 60.0], [100.0, 50.0]]);
+    let (d, n) = ([main[0][0] - 150.0, main[0][1] - 120.0], [120.0 - 150.0, 60.0 - 120.0]);
+    assert!((d[0] * n[1] - d[1] * n[0]).abs() < 1e-6 && d[0] * n[0] + d[1] * n[1] > 0.0, "on the line to the node");
+    // The branch starts at that node.
+    assert_eq!(p[1], (7, 1, vec![[120.0, 60.0], [200.0, 60.0]]));
+    // Deleting the main leader: no leader to the anchor, the branch starts
+    // at the border.
+    if let AnnotationKind::Balloon { view, anchor, callout, .. } = &mut s.annotations[0].kind {
+        callout.remove_leader(0, *view, *anchor);
+        assert!(callout.free && callout.nodes.is_empty() && callout.leaders[0].start == LeaderStart::Side);
+    }
+    let p = paths(&s);
+    assert_eq!(p.len(), 1);
+    assert_eq!((p[0].1, p[0].2.len(), p[0].2[1]), (1, 2, [200.0, 60.0]));
+}
+
 /// Live drw2 10-21 g: a note leader's landing and side, branches off its
 /// bend and nodes, and node / leader removal keeping the branches.
 #[test]
@@ -2379,6 +2634,152 @@ fn hole_callout_dual_block_like_onshape() {
 /// Live samples/asb-dual-2018: with dual dimensions each DIMENSION's text
 /// override is "[]\P<>" (the alternate units, then the value) and its block
 /// holds one MTEXT "\A1;[…]\P…"; angular dimensions have no dual.
+/// Live asbdt-1 / -2 (ANSI): a linear dimension's value sits inline, its
+/// middle on the line, which is broken around it (DIMGAP); a value that
+/// doesn't fit between the arrows stays centred, the arrows go outside with
+/// tails as long as themselves and no line runs between the extension
+/// lines. ISO keeps the value above the unbroken line.
+#[test]
+fn ansi_dimension_text_sits_inline() {
+    use super::format::DimText;
+    let horizontal = |g: &sheet::SheetGeometry, y: f64| -> Vec<[f64; 2]> {
+        let mut v: Vec<[f64; 2]> = g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1] - y).abs() < 1e-9 && (l.points[1][1] - y).abs() < 1e-9).map(|l| [l.points[0][0].min(l.points[1][0]), l.points[0][0].max(l.points[1][0])]).collect();
+        v.sort_by(|a, b| a[0].total_cmp(&b[0]));
+        v
+    };
+    let dim = |iso: bool, a: f64, b: f64| {
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.style.iso = iso;
+        let t = DimText::plain("60");
+        g.linear_dimension_text([a, 100.0], [b, 100.0], -20.0, DimOrientation::Horizontal, &t, 1);
+        g
+    };
+    let g = dim(false, 50.0, 110.0);
+    let h = g.style.dim_text;
+    let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+    let y = t.pos[1];
+    assert_eq!((t.anchor, t.pos[0]), (sheet::Anchor::Center, 80.0));
+    let pieces = horizontal(&g, y);
+    assert_eq!(pieces.len(), 2, "broken around the text: {pieces:?}");
+    let half = font::text_width("60", h) / 2.0 + 0.65 * h;
+    assert!((pieces[0][1] - (80.0 - half)).abs() < 1e-9 && (pieces[1][0] - (80.0 + half)).abs() < 1e-9);
+    assert!((pieces[0][0] - 50.0).abs() < 1e-9 && (pieces[1][1] - 110.0).abs() < 1e-9);
+    // Too narrow (0.100 in): arrows outside with their tails, nothing between.
+    let g = dim(false, 50.0, 52.54);
+    let a = g.style.dim_arrow;
+    let pieces = horizontal(&g, y);
+    assert!(pieces.iter().all(|p| p[1] <= 50.0 + 1e-9 || p[0] >= 52.54 - 1e-9), "{pieces:?}");
+    assert!(pieces.iter().any(|p| (p[0] - (50.0 - 2.0 * a)).abs() < 1e-9 && (p[1] - (50.0 - a)).abs() < 1e-9), "{pieces:?}");
+    assert!(pieces.iter().any(|p| (p[0] - (52.54 + a)).abs() < 1e-9 && (p[1] - (52.54 + 2.0 * a)).abs() < 1e-9), "{pieces:?}");
+    assert!((g.texts.iter().find(|t| t.text == "60").unwrap().pos[0] - 51.27).abs() < 1e-9, "still centred");
+    // ISO: above the unbroken line.
+    let g = dim(true, 50.0, 110.0);
+    let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+    let line_y = g.lines.iter().find(|l| l.points.len() == 2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9 && (l.points[0][0] - l.points[1][0]).abs() > 30.0).unwrap().points[0][1];
+    assert!(t.pos[1] > line_y && t.anchor == sheet::Anchor::BottomCenter);
+    assert_eq!(horizontal(&g, line_y).len(), 1);
+    // ISO, Text alignment Horizontal: a vertical dimension's value is
+    // horizontal and inline, the line broken around it (live asb 10-25).
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.style.text_horizontal = true;
+    g.linear_dimension_text([100.0, 50.0], [100.0, 110.0], 20.0, DimOrientation::Vertical, &DimText::plain("60"), 1);
+    let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+    assert_eq!((t.anchor, t.angle, t.pos[1]), (sheet::Anchor::Center, 0.0, 80.0));
+    let x = t.pos[0];
+    let vertical: Vec<&sheet::Polyline2> = g.lines.iter().filter(|l| l.points.len() == 2 && l.points.iter().all(|p| (p[0] - x).abs() < 1e-9)).collect();
+    assert_eq!(vertical.len(), 2, "broken around the text: {vertical:?}");
+    assert!(vertical.iter().all(|l| l.points.iter().all(|p| (p[1] - 80.0).abs() > h / 2.0)));
+}
+
+/// ANSI radial and diameter dimensions (live asbdt-3, drawing/368): the
+/// arrow outside the circle pointing in, the leader to the dropped knee, a
+/// horizontal shoulder an arrow long on the circle's side, the value inline
+/// past it.
+#[test]
+fn ansi_radial_dimension_leader_knee_and_shoulder() {
+    use super::format::DimText;
+    struct Ansi<'a>(sheet::PlainEnv<'a>);
+    impl sheet::AnnotationEnv for Ansi<'_> {
+        fn to_sheet(&self, v: ViewId, p: [f64; 2]) -> [f64; 2] {
+            self.0.to_sheet(v, p)
+        }
+        fn scale(&self, v: ViewId) -> f64 {
+            self.0.scale(v)
+        }
+        fn rotation(&self, v: ViewId) -> f64 {
+            self.0.rotation(v)
+        }
+        fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> DimText {
+            self.0.text(a, value, angular, symbol)
+        }
+        fn expand(&self, s: &str) -> String {
+            self.0.expand(s)
+        }
+        fn balloon_text(&self, a: &Annotation, t: &str) -> String {
+            self.0.balloon_text(a, t)
+        }
+        fn sheet_style(&self) -> sheet::SheetStyle {
+            sheet::SheetStyle { iso: false, ..Default::default() }
+        }
+    }
+    let drawing = Drawing::default();
+    let env = Ansi(sheet::PlainEnv { drawing: &drawing, scale: 1000.0 });
+    let draw = |diameter: bool, angle: f64| {
+        let mut s = Sheet::default();
+        // R5 at (100, 100) sheet mm, the knee 10 mm outside.
+        s.annotations.push(Annotation { id: 1, kind: AnnotationKind::RadialDimension { view: ViewId(1), center: [0.1, 0.1], radius: 0.005, diameter, angle, dim_line: false, knee: Some(10.0) }, ..Default::default() });
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(&s, &env);
+        g
+    };
+    let near = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).abs() < 1e-9 && (p[1] - q[1]).abs() < 1e-9;
+    for (diameter, angle) in [(false, 0.6), (true, 0.6), (false, 2.5)] {
+        let g = draw(diameter, angle);
+        let (a, h) = (g.style.dim_arrow, g.style.dim_text);
+        let d = [angle.cos(), angle.sin()];
+        let tip = [100.0 + 5.0 * d[0], 100.0 + 5.0 * d[1]];
+        let knee = [100.0 + 15.0 * d[0], 100.0 + 15.0 * d[1]];
+        // The arrow outside, its tip on the circle.
+        let f = &g.fills[0].points;
+        assert!(near(f[0], tip), "{f:?}");
+        let base = [(f[1][0] + f[2][0]) / 2.0 - 100.0, (f[1][1] + f[2][1]) / 2.0 - 100.0];
+        assert!((base[0].hypot(base[1]) - (5.0 + a)).abs() < 1e-9, "outside, pointing in: {f:?}");
+        // A third as wide as long (live DXF SOLIDs).
+        assert!(((f[1][0] - f[2][0]).hypot(f[1][1] - f[2][1]) - a / 3.0).abs() < 1e-9, "{f:?}");
+        // The leader from the circle to the knee, nothing inside.
+        assert!(g.lines.iter().any(|l| l.points.len() == 2 && near(l.points[0], tip) && near(l.points[1], knee)), "{:?}", g.lines);
+        // The shoulder on the circle's side, the value inline past it.
+        let side = if d[0] < 0.0 { -1.0 } else { 1.0 };
+        let end = [knee[0] + side * a, knee[1]];
+        assert!(g.lines.iter().any(|l| l.points.len() == 2 && near(l.points[0], knee) && near(l.points[1], end)), "{:?}", g.lines);
+        let t = g.texts.iter().find(|t| t.text.starts_with(if diameter { 'Ø' } else { 'R' })).unwrap();
+        assert!((t.pos[1] - (knee[1] - h / 2.0)).abs() < 1e-9, "inline");
+        let w = font::text_width(&t.text, h);
+        let x = if side > 0.0 { t.pos[0] } else { t.pos[0] + w };
+        assert!((x - (end[0] + side * h / 2.0)).abs() < 1e-9, "{x} {end:?}");
+    }
+}
+
+/// Fit classes "Stacked with line": a rule between hole and shaft class,
+/// as wide as the wider; "Stacked without line" none.
+#[test]
+fn stacked_fit_classes_with_line_draw_a_rule() {
+    use super::format::DimText;
+    let label = |rule: bool| {
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        let t = DimText { main: "Ø10".into(), upper: Some("H7".into()), lower: Some("g6".into()), rule, ..Default::default() };
+        g.dim_label([100.0, 100.0], 0.0, 0.0, false, &t, 3.5, 1);
+        g
+    };
+    assert!(label(false).lines.is_empty());
+    let g = label(true);
+    assert_eq!(g.lines.len(), 1);
+    let (up, lo) = (g.texts.iter().find(|t| t.text == "H7").unwrap(), g.texts.iter().find(|t| t.text == "g6").unwrap());
+    let l = &g.lines[0].points;
+    assert!((l[0][1] - l[1][1]).abs() < 1e-9 && l[0][1] < up.pos[1] && l[0][1] > lo.pos[1], "between the classes");
+    assert!((l[0][0] - up.pos[0]).abs() < 1e-9 && (l[1][0] - l[0][0] - font::text_width("H7", up.height).max(font::text_width("g6", lo.height))).abs() < 1e-9);
+}
+
 /// Gate v0.4.8 (f), live asbdd-20: a linear dual dimension's line breaks
 /// around the two-line text block (DIMGAP from the ink, ANSI and ISO, Top
 /// and Bottom, horizontal and vertical); a single value keeps it whole.

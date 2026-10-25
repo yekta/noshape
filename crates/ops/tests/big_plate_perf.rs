@@ -88,3 +88,26 @@ fn big_plate_timing() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Profiling aid: the chamfered plate's body tessellated five times
+/// (`perf record` this test to see where display meshing goes).
+#[test]
+#[ignore]
+fn big_plate_tessellate_profile() {
+    let dir = std::env::temp_dir().join(format!("noshape-big-plate-prof-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("plate.noshape");
+    let mut ctx = Ctx::new();
+    big_plate(&mut ctx, path.to_str().unwrap());
+    let od = ctx.doc(path.to_str()).unwrap();
+    let tabid = noshape_ops::doc::find_tab(od.doc(), "Part Studio 1").unwrap();
+    let r = od.regenerate(tabid, None).unwrap();
+    let shape = r.context.bodies[0].shape.clone();
+    eprintln!("PROFILE START");
+    for _ in 0..5 {
+        let t = Instant::now();
+        let m = noshape_model::regen::tessellate_shape(&shape, 1.0).unwrap();
+        eprintln!("tessellate: {:.0} ms, {} triangles", t.elapsed().as_secs_f64() * 1000.0, m.indices.len() / 3);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

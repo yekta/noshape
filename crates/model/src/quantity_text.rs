@@ -36,8 +36,7 @@ pub fn simple(text: &str) -> Option<(String, Option<String>)> {
     if digits.is_empty() || digits == "." || digits.matches('.').count() > 1 {
         return None;
     }
-    // A unit starts with a letter ("mm", "in^2", "kg*m"): "2*5" is an
-    // expression, not 2 in the unit "*5" (qa4 round 5 v3 s5, DIM-EXPR-UNIT).
+    // A unit word starts with a letter ("mm", "in^2"); "*5" is an expression.
     if !unit.is_empty() && (!unit.starts_with(|c: char| c.is_ascii_alphabetic()) || !unit.chars().all(|c| c.is_ascii_alphabetic() || c == '^' || c.is_ascii_digit() || c == '*')) {
         return None;
     }
@@ -156,16 +155,16 @@ pub fn pin_sketch_data(data: &mut crate::sketch_feature::SketchData, old: &UnitP
 #[cfg(test)]
 mod tests {
     use super::*;
-    use noshape_units::{Dim, EmptyScope, UnitPrefs};
 
+    /// qa4 DIM-EXPR-UNIT: "2*5" is an expression, wrapped as "(2*5) mm".
     #[test]
-    fn expressions_get_the_unit_around_them() {
+    fn bare_expressions_get_the_unit_around_them() {
         let prefs = UnitPrefs::default();
-        assert_eq!(simple("25 mm"), Some(("25".into(), Some("mm".into()))));
+        let scope = noshape_units::EmptyScope;
         assert_eq!(simple("2*5"), None);
-        assert_eq!(simple("2^3"), None);
-        assert_eq!(commit_text("25", Dim::LENGTH, &prefs, &EmptyScope), "25 mm");
-        assert_eq!(commit_text("2*5", Dim::LENGTH, &prefs, &EmptyScope), "(2*5) mm");
-        assert_eq!(commit_text("1 in", Dim::LENGTH, &prefs, &EmptyScope), "1 in");
+        assert_eq!(simple("2 mm^2"), Some(("2".into(), Some("mm^2".into()))));
+        assert_eq!(commit_text("2*5", Dim::LENGTH, &prefs, &scope), "(2*5) mm");
+        assert_eq!(commit_text("2", Dim::LENGTH, &prefs, &scope), "2 mm");
+        assert_eq!(commit_text("1 in", Dim::LENGTH, &prefs, &scope), "1 in");
     }
 }

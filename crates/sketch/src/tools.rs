@@ -936,70 +936,9 @@ impl Sketch {
         let tol = self.tool_tol();
         let mut res = EditResult::default();
         for chain in self.chains(ids) {
-            self.offset_chain(&chain.0, chain.1, distance, tol, &mut res, false, &mut Vec::new())?;
+            self.offset_chain(&chain.0, chain.1, distance, tol, &mut res)?;
         }
         Ok(res)
-    }
-
-    /// The Offset tool (live "psb (10-24 j)"): [`Sketch::offset`], except
-    /// that the copies get their own points joined by Coincidents, outer
-    /// corners are sharp, arcs and circles get their own centres, and the
-    /// copies follow their sources: Onshape's OFFSET constraints (one per
-    /// further pair, all referring to the first picked curve's pair) and one
-    /// DISTANCE dimension on that pair, per chain. The copies' free ends stay
-    /// unconstrained (live).
-    pub fn offset_tool(&mut self, ids: &[EntityId], distance: f64) -> Result<EditResult> {
-        if distance == 0.0 {
-            return Err(SketchError::OperationFailed("offset distance must be non-zero".into()));
-        }
-        let tol = self.tool_tol();
-        let mut res = EditResult::default();
-        for chain in self.chains(ids) {
-            let mut pairs = Vec::new();
-            self.offset_chain(&chain.0, chain.1, distance, tol, &mut res, true, &mut pairs)?;
-            self.offset_constraints(ids, &pairs, distance.abs(), &mut res);
-        }
-        Ok(res)
-    }
-
-    /// The Offset tool's constraints over its (source, copy) pairs: lines
-    /// and circular curves only (other copies are approximations).
-    fn offset_constraints(&mut self, picked: &[EntityId], pairs: &[(EntityId, EntityId)], d: f64, res: &mut EditResult) {
-        let kinds = |sk: &Self, (a, b): (EntityId, EntityId)| (sk.kind(a), sk.kind(b));
-        let pairs: Vec<(EntityId, EntityId)> = pairs
-            .iter()
-            .copied()
-            .filter(|p| match kinds(self, *p) {
-                (Some(EntityKind::Line), Some(EntityKind::Line)) => true,
-                (Some(a), Some(b)) => a.is_circular() && b.is_circular(),
-                _ => false,
-            })
-            .collect();
-        let Some(first) = picked.iter().find_map(|id| pairs.iter().find(|p| p.0 == *id)).copied() else { return };
-        // +1 / −1: a line copy left of its source's direction, a circular copy outside it.
-        let side = |sk: &Self, (src, copy): (EntityId, EntityId)| -> f64 {
-            let s = match (sk.curve(src), sk.curve(copy)) {
-                (Some(Curve2::Line { a, b }), Some(c)) => {
-                    let (t0, t1) = c.domain();
-                    (b - a).perp_dot(c.point((t0 + t1) * 0.5) - a)
-                }
-                _ => match (sk.radius_of(src), sk.radius_of(copy)) {
-                    (Some(rs), Some(rc)) => rc - rs,
-                    _ => 1.0,
-                },
-            };
-            if s < 0.0 { -1.0 } else { 1.0 }
-        };
-        let s1 = side(self, first);
-        let others: Vec<(EntityId, EntityId)> = pairs.iter().copied().filter(|p| *p != first).collect();
-        if others.is_empty() {
-            self.add_c(res, ConstraintKind::OffsetCurve { master: first.0, curve: first.1, second: None, sides: (s1, s1), first_shape: true });
-        }
-        for (k, p) in others.iter().enumerate() {
-            let s2 = side(self, *p);
-            self.add_c(res, ConstraintKind::OffsetCurve { master: first.0, curve: first.1, second: Some(*p), sides: (s1, s2), first_shape: k == 0 });
-        }
-        self.add_c(res, ConstraintKind::Distance { a: first.0, b: first.1, value: d, mode: crate::constraints::DistanceMode::Minimum });
     }
 
     /// Slots around connected chains of centerline curves (Onshape Slot on a
@@ -1147,10 +1086,7 @@ impl Sketch {
         out
     }
 
-    /// `tool`: the Offset tool's copies (see [`Sketch::offset_tool`]); the
-    /// (source, copy) pairs go to `pairs`.
-    #[allow(clippy::too_many_arguments)]
-    fn offset_chain(&mut self, items: &[(EntityId, bool)], closed: bool, d: f64, tol: f64, res: &mut EditResult, tool: bool, pairs: &mut Vec<(EntityId, EntityId)>) -> Result<()> {
+    fn offset_chain(&mut self, items: &[(EntityId, bool)], closed: bool, d: f64, tol: f64, res: &mut EditResult) -> Result<()> {
         #[derive(Clone)]
         enum Off {
             Line { a: DVec2, b: DVec2 },
@@ -1173,16 +1109,12 @@ impl Sketch {
                         if r <= tol {
                             return Err(SketchError::OperationFailed("offset collapses a circle".into()));
                         }
-                        let mut center = *center;
-                        if tool {
-                            // Its own centre: the OFFSET keeps it concentric (live).
-                            let c = self.point(center).unwrap();
-                            center = self.add_point(c);
-                            res.created.push(center);
-                        }
+                        let center = *center;
                         let nid = self.add_circle_at(center, r)?;
                         res.created.push(nid);
-                        pairs.push((id, nid));
+                        // Live: DISTANCE + one OFFSET on the circle pair.
+                        self.add_c(res, ConstraintKind::Distance { a: id, b: nid, value: d.abs(), mode: crate::constraints::DistanceMode::Minimum });
+                        self.add_c(res, ConstraintKind::OffsetPair { source: id, copy: nid, master_source: id, master_copy: nid, side: 1.0 });
                     }
                     _ => {
                         // ellipse: closed interpolating spline through offset samples
@@ -1262,11 +1194,33 @@ impl Sketch {
                 let p = self.add_point(e_k);
                 res.created.push(p);
                 end_pt[k] = Some(p);
-                start_pt[k2] = Some(if tool { self.joint_twin(p, e_k, res) } else { p });
+                start_pt[k2] = Some(p);
                 continue;
             }
             let vpt = verts[k].unwrap();
             let v = self.point(vpt).unwrap();
+            // Two lines (live, qa4 OFF-CORNER): extended to meet at a sharp
+            // corner, outside or inside alike.
+            if let (Off::Line { a: a1, b: b1 }, Off::Line { a: a2, b: b2 }) = (&offs[k].1, &offs[k2].1) {
+                let (d1, d2) = (*b1 - *a1, *b2 - *a2);
+                let den = d1.perp_dot(d2);
+                if den.abs() > 1e-12 * d1.length() * d2.length() {
+                    let x = *a1 + d1 * ((*a2 - *a1).perp_dot(d2) / den);
+                    let p = self.add_point(x);
+                    res.created.push(p);
+                    end_pt[k] = Some(p);
+                    start_pt[k2] = Some(p);
+                    offs[k].3 = x;
+                    offs[k2].2 = x;
+                    if let Off::Line { b, .. } = &mut offs[k].1 {
+                        *b = x;
+                    }
+                    if let Off::Line { a, .. } = &mut offs[k2].1 {
+                        *a = x;
+                    }
+                    continue;
+                }
+            }
             // inner corner: offsets cross near the vertex
             let ext = |o: &Off| -> Option<Curve2> {
                 match o {
@@ -1300,8 +1254,7 @@ impl Sketch {
                     let t1 = tan(self, items[k], true);
                     let t2 = tan(self, items[k2], false);
                     let turn = t1.perp_dot(t2);
-                    // The Offset tool's outer corners are sharp too (live).
-                    if turn * d > 1e-12 || tool {
+                    if turn * d > 1e-12 {
                         inner = Some(x);
                     }
                 }
@@ -1310,7 +1263,7 @@ impl Sketch {
                 let p = self.add_point(x);
                 res.created.push(p);
                 end_pt[k] = Some(p);
-                start_pt[k2] = Some(if tool { self.joint_twin(p, x, res) } else { p });
+                start_pt[k2] = Some(p);
                 // update geometry ends
                 offs[k].3 = x;
                 offs[k2].2 = x;
@@ -1348,25 +1301,14 @@ impl Sketch {
                     p
                 }
             };
-            let (src, off) = (offs[k].0, offs[k].1.clone());
+            let off = offs[k].1.clone();
             let id = match off {
                 Off::Line { .. } => {
                     let id = self.add_line_between(sp, ep)?;
                     res.created.push(id);
-                    if !tool {
-                        self.add_c(res, ConstraintKind::Parallel { a: src, b: id });
-                    }
                     id
                 }
-                Off::Arc { center_pt, center, ccw, .. } => {
-                    // The tool's copy has its own centre (the OFFSET keeps it concentric).
-                    let center_pt = if tool {
-                        let q = self.add_point(center);
-                        res.created.push(q);
-                        q
-                    } else {
-                        center_pt
-                    };
+                Off::Arc { center_pt, ccw, .. } => {
                     let id = if ccw { self.add_arc_between(center_pt, sp, ep)? } else { self.add_arc_between(center_pt, ep, sp)? };
                     res.created.push(id);
                     id
@@ -1404,7 +1346,6 @@ impl Sketch {
                 }
             };
             new_ids.push(id);
-            pairs.push((src, id));
         }
         for (k, vpt, p1, p2) in joint_arcs {
             let v = self.point(vpt).unwrap();
@@ -1418,16 +1359,46 @@ impl Sketch {
                 self.add_c(res, ConstraintKind::Tangent { a: next, b: arc });
             }
         }
+        // Live (behaviours "psb (10-24 j) sketch offset constraints"): the
+        // first line / arc pair gets the offset DISTANCE dimension, every
+        // other one an OFFSET constraint tied to that pair (a lone pair, one
+        // OFFSET on itself), so the copy follows its source and the distance
+        // stays editable.
+        let linked: Vec<usize> = (0..n).filter(|&k| matches!(offs[k].1, Off::Line { .. } | Off::Arc { .. })).collect();
+        if let Some(&m) = linked.first() {
+            let (ms, mc) = (offs[m].0, new_ids[m]);
+            self.add_c(res, ConstraintKind::Distance { a: ms, b: mc, value: d.abs(), mode: crate::constraints::DistanceMode::Minimum });
+            let master = self.signed_offset(ms, mc);
+            if linked.len() == 1 {
+                // A lone pair: one OFFSET on it alone (live, a single line).
+                self.add_c(res, ConstraintKind::OffsetPair { source: ms, copy: mc, master_source: ms, master_copy: mc, side: 1.0 });
+            }
+            for &k in &linked[1..] {
+                let (src, copy) = (offs[k].0, new_ids[k]);
+                if let (Some(sm), Some(sk)) = (master, self.signed_offset(src, copy))
+                    && sm.abs() > tol
+                {
+                    self.add_c(res, ConstraintKind::OffsetPair { source: src, copy, master_source: ms, master_copy: mc, side: (sk / sm).signum() });
+                }
+            }
+        }
         Ok(())
     }
 
-    /// A second point where an Offset tool copy meets the next one,
-    /// Coincident with `p` (live: the copies' ends are joined that way).
-    fn joint_twin(&mut self, p: EntityId, at: DVec2, res: &mut EditResult) -> EntityId {
-        let q = self.add_point(at);
-        res.created.push(q);
-        self.add_c(res, ConstraintKind::Coincident { a: q, b: p });
-        q
+    /// A copy's signed offset from its source, as the solver's OffsetPair
+    /// measures it: lines, the copy's start from the source line (left of
+    /// its start → end positive); arcs, the radius difference.
+    fn signed_offset(&self, source: EntityId, copy: EntityId) -> Option<f64> {
+        match (self.curve(source)?, self.curve(copy)?) {
+            (Curve2::Line { .. }, Curve2::Line { .. }) => {
+                let (s0, s1) = self.endpoints(source)?;
+                let (c0, _) = self.endpoints(copy)?;
+                let (a, b, p) = (self.point(s0)?, self.point(s1)?, self.point(c0)?);
+                Some((b - a).perp_dot(p - a) / (b - a).length())
+            }
+            (Curve2::Arc { radius: rs, .. } | Curve2::Circle { radius: rs, .. }, Curve2::Arc { radius: rc, .. } | Curve2::Circle { radius: rc, .. }) => Some(rc - rs),
+            _ => None,
+        }
     }
 
     /// Points of the offset of `c` for an interpolating spline: as few as

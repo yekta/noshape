@@ -1004,3 +1004,38 @@ these rules, change it in commit.rs (the app and the API both use it). Backups: 
   Auxiliary view › Axis on the demo drawing's right view (the holes' hidden silhouettes highlight on hover) answers
   "Select a hole axis" on click (not investigated; probably no `axes` in that view and `line_pick` not taking the
   hidden edges). In line on a 2 point centerline works.
+
+## PAUSED (asb, 2026-10-25 afternoon, lead: machine overloaded) — state and open items
+- **On ready/asb e74e93f7** (checked green detached: clippy 4 crates, coverage/docs, model drawing 142, ops, app drawing):
+  1e4aae89 suggested views take the automatic centermarks; a34f8afd detail profile In line as live (label on the
+  circle at 0°, circle broken, an arrow each side; test `detail_in_line_label_breaks_its_circle`); f1684ab6 arrowheads
+  a third as wide as long (all live DXF SOLIDs) and the section cutting line as live (0.25 in past the view, shaft an
+  arrow long along the sight, arrow beyond it, letter past the tip; test `cutting_line_ends_as_live`). Earlier today on
+  main: api merge (leaders / crop / broken-out in the shared annotation_edit / view_edit), ORD-BASE (ordinate base on
+  the highlighted edge), ANSI radial / diameter leaders (`RadialDimension.knee`, 0.18 in shoulder, value inline), ISO
+  Text alignment Horizontal inline, title block field cells (`PickTarget::TitleField`, op `drawing_title_field`).
+- **Not seen in the app yet** (model tests only; the app binary in /root/asb-scratch predates them): arrow width,
+  cutting line ends, detail In line. Check with bin/dd.sh (demo Drawing 1: section A-A on the top view, detail B) and
+  bin/ansi_demo.py + noshape-cli (ANSI drawing with Ø / R leaders and a typed TITLE).
+- **Open, in order:**
+  - **UNDO3** (qa5-routing.md; qa5 pass 24): a drawing note takes one Ctrl+Z, live two (the 1st leaves the note and
+    enables Redo, the 2nd removes it). Not started; look at how the Note ✓ commits (drawing_ui.rs apply_panel →
+    `new_note` + edit_sheet "Note"): live probably records the placement and the text as two steps.
+  - **Title block double-click** (S18): works (Note editor in place on the cell, ✓ sets the field, also under
+    Formats › Locked). Missing: the field tokens grey "----" in the editor (ours shows raw codes like
+    {drawing.title1}); the cell's text hidden while edited (drawing_view.rs `inplace_hidden` covers notes only; ui2's
+    hooks live in that file, ask first); right-click "Edit note…"; the orange note box / grips on hover; tooltip.
+  - **EXPORT-DXF-OPTIONS** (qa4 R5v3-S11-b): both checkboxes exist (dialog + drawing_export op `hide_inspection_items`,
+    `exclude_off_sheet`); at 1440×900 the dialog is cut below "Set z-height…" and doesn't scroll. Fix: scrollable
+    body in app/drawing_export.rs, after ui2's 21-dialog checkbox swap lands (merge main first). api needs nothing.
+  - **D24** linear text dragged / placed along the line (user-positioned text): waits for live request asb 10-25 b
+    in REQUESTS.md (placement at the click? drag moves the text? reset item? radial knee = click?).
+  - **V27** Aligned section dialog: live answered (behaviours "asb (10-24) aligned section dialog"), not implemented.
+  - Radial / diameter text dropped inside the circle (asbdt-3r-1, 3d-1): not done (the knee is clamped outside).
+  - Cutting line: ISO overshoot unconfirmed (both live samples ANSI: 0.25 in); our DXF writes the shaft as 2 triangle
+    SOLIDs + a hidden pick LINE (live 1 quad SOLID); the line's weight (LineStyle::Section 0.7) and the jog strokes vs
+    live's SECTION_JOG_LINES not compared. Detail B's letter: live's DXF puts it on SKETCHED_GEOMETRY, ours on
+    DETAIL_VIEW_PARENT_BORDER.
+- **Workflow notes:** AGENT_API.md conflicts with every ops-adding branch; the queue now regenerates it itself (lead
+  10-25), else take main's and run `UPDATE_DOCS=1 cargo test -p noshape-ops --test coverage`. Run checks detached
+  (`setsid nohup`, WORKFLOW 19; bin/check63.sh is a template): background shells die with the session.

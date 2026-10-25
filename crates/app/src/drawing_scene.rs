@@ -12,6 +12,8 @@ use std::collections::HashSet;
 
 // Onshape draws sheet ink pure black.
 const INK: [u8; 4] = [0, 0, 0, 255];
+/// The paper's outline in the editor (live: about rgb 89 on the 1 px edge).
+const PAPER_EDGE: [u8; 4] = [89, 89, 89, 255];
 const TANGENT_INK: [u8; 4] = [70, 70, 78, 255];
 /// A dangling annotation's ink: live's orange-red #DD5228 (qa4 round 5 s1,
 /// drawing/qa4-r5-s1-c-dim-2x).
@@ -95,10 +97,16 @@ fn push(lines: &mut LineData, pts: &[[f64; 2]], color: [u8; 4], pick: u32, width
 /// All sheet polylines as line segments, plus texts the filled font
 /// can't draw (the others: [`sheet_text`]).
 /// `skip`: line ranges drawn separately (shaded views' edges).
-pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>, skip: &[std::ops::Range<usize>]) -> LineData {
+pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>, skip: &[std::ops::Range<usize>], paper: bool) -> LineData {
     let g = &built.geometry;
     let mut lines = LineData::default();
     lines.segments.reserve(g.lines.len() * 4);
+    // The paper's outline, on screen only (live asb 10-24 "template frames"
+    // (a): a thin grey line at the paper edge; the exports have none).
+    if paper {
+        let (w, h) = (g.width, g.height);
+        push(&mut lines, &[[0.0, 0.0], [w, 0.0], [w, h], [0.0, h], [0.0, 0.0]], PAPER_EDGE, 0, 1.0);
+    }
     for li in 0..g.lines.len() {
         if !skip.iter().any(|r| r.contains(&li)) {
             push_sheet_line(&mut lines, built, li, zoom, dangling_picks, true);
@@ -113,11 +121,12 @@ pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>,
             push(&mut lines, &[b[0], b[1]], color, t.pick, px_width(LineStyle::Thin, zoom));
         }
     }
-    // Texts with symbols the filled font lacks (GD&T) stay stroked.
-    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| !font::fill_supported(&t.text)) {
+    // Texts with symbols the filled font lacks (GD&T) stay stroked, and SHX
+    // shape fonts are single strokes.
+    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| font::text_is_stroked(t, g.text_font(*ti))) {
         let color = if dangling_picks.contains(&t.pick) { DANGLING_INK } else { g.text_color(ti).map(|c| [c[0], c[1], c[2], 255]).unwrap_or(INK) };
         let width = (t.height * 0.07 * zoom).clamp(1.0, 4.0) as f32;
-        for s in font::text_strokes(t) {
+        for s in font::text_strokes_font(t, g.text_font(ti)) {
             push(&mut lines, &s, color, t.pick, width);
         }
     }
@@ -159,7 +168,7 @@ pub fn sheet_text(built: &BuiltSheet, dangling_picks: &HashSet<u32>) -> (MeshDat
     let (mut ink, mut red) = (MeshData::default(), MeshData::default());
     for (ti, t) in built.geometry.texts.iter().enumerate() {
         // Colored texts go to [`sheet_colored`].
-        if t.text.trim().is_empty() || !font::fill_supported(&t.text) || built.geometry.text_color(ti).is_some() {
+        if t.text.trim().is_empty() || font::text_is_stroked(t, built.geometry.text_font(ti)) || built.geometry.text_color(ti).is_some() {
             continue;
         }
         let (pts, idx) = font::text_fill_font(t, built.geometry.text_font(ti));
@@ -267,7 +276,7 @@ pub fn sheet_colored(built: &BuiltSheet) -> (ColoredMeshes, ColoredMeshes) {
     }
     for (ti, t) in g.texts.iter().enumerate() {
         let Some(c) = g.text_color(ti) else { continue };
-        if t.text.trim().is_empty() || !font::fill_supported(&t.text) {
+        if t.text.trim().is_empty() || font::text_is_stroked(t, g.text_font(ti)) {
             continue;
         }
         let (pts, idx) = font::text_fill_font(t, g.text_font(ti));

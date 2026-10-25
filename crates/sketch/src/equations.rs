@@ -846,55 +846,48 @@ impl<'a, L: Lookup> Builder<'a, L> {
         }
     }
 
-    /// Onshape's tool OFFSET: see [`ConstraintKind::OffsetCurve`].
-    fn offset_curve(&mut self, master: EntityId, curve: EntityId, second: Option<(EntityId, EntityId)>, sides: (f64, f64), first_shape: bool) -> R {
-        if first_shape {
-            self.offset_shape(master, curve)?;
+    /// The master pair's signed offset as a term of `lin` (times `k`): lines,
+    /// the master copy's start from the master source line; arcs, the radius
+    /// difference.
+    fn offset_master(&self, lin: Lin, k: f64, master_source: EntityId, master_copy: EntityId) -> Result<Lin, String> {
+        match (self.kind(master_source)?, self.kind(master_copy)?) {
+            (EntityKind::Line, EntityKind::Line) => {
+                let (ls, lc) = (self.line(master_source)?, self.line(master_copy)?);
+                Ok(lin.pld(k, [lc[0], lc[1]], ls))
+            }
+            (a, b) if a.is_circular() && b.is_circular() => Ok(lin.rad(k, &self.radius(master_copy)?).rad(-k, &self.radius(master_source)?)),
+            (a, b) => Err(format!("offset master not supported between {a:?} and {b:?}")),
         }
-        if let Some((s, sc)) = second {
-            self.offset_shape(s, sc)?;
-            let lin = self.pair_distance(Lin::new(), sides.1, s, sc)?;
-            let lin = self.pair_distance(lin, -sides.0, master, curve)?;
-            self.lin(lin);
-        }
-        Ok(())
     }
 
-    /// A copy parallel to its source line, or concentric with its circle /
-    /// arc (no equation when they share the centre point).
-    fn offset_shape(&mut self, src: EntityId, copy: EntityId) -> R {
-        match (self.kind(src)?, self.kind(copy)?) {
+    fn offset_pair(&mut self, source: EntityId, copy: EntityId, master_source: EntityId, master_copy: EntityId, side: f64, c: &Constraint) -> R {
+        // The first OFFSET on a master pair also keeps that pair a true
+        // offset (live: an OFFSET alone makes a copy concentric / parallel);
+        // the dimension only sets its size.
+        let first = self.sk.constraints().find(|o| matches!(o.kind, ConstraintKind::OffsetPair { master_source: s, master_copy: m, .. } if s == master_source && m == master_copy)).map(|o| o.id);
+        if first == Some(c.id) && (self.kind(master_source)?, self.kind(master_copy)?) == (EntityKind::Line, EntityKind::Line) {
+            let (ls, lc) = (self.line(master_source)?, self.line(master_copy)?);
+            self.lin(Lin::new().pld(1.0, [lc[2], lc[3]], ls).pld(-1.0, [lc[0], lc[1]], ls));
+        }
+        if (source, copy) == (master_source, master_copy) {
+            return Ok(());
+        }
+        match (self.kind(source)?, self.kind(copy)?) {
             (EntityKind::Line, EntityKind::Line) => {
-                let (ls, lc) = (self.line(src)?, self.line(copy)?);
-                self.push(EqKind::Parallel, cat(&[&ls, &lc]));
-                Ok(())
-            }
-            (ks, kc) if ks.is_circular() && kc.is_circular() => {
-                let (cs, cc) = (self.center(src)?, self.center(copy)?);
-                if cs != cc {
-                    self.lin(Lin::new().p(1.0, cs[0]).p(-1.0, cc[0]));
-                    self.lin(Lin::new().p(1.0, cs[1]).p(-1.0, cc[1]));
+                let (ls, lc) = (self.line(source)?, self.line(copy)?);
+                for p in [[lc[0], lc[1]], [lc[2], lc[3]]] {
+                    let lin = self.offset_master(Lin::new().pld(1.0, p, ls), -side, master_source, master_copy)?;
+                    self.lin(lin);
                 }
                 Ok(())
             }
-            (ks, kc) => Err(format!("offset not supported between {ks:?} and {kc:?}")),
-        }
-    }
-
-    /// `k` × the pair's signed offset distance added to `lin`: a line copy's
-    /// midpoint from the source line, or a circular copy's radius minus the
-    /// source's.
-    fn pair_distance(&self, lin: Lin, k: f64, src: EntityId, copy: EntityId) -> Result<Lin, String> {
-        match (self.kind(src)?, self.kind(copy)?) {
-            (EntityKind::Line, EntityKind::Line) => {
-                let (ls, lc) = (self.line(src)?, self.line(copy)?);
-                Ok(lin.pldm(k, [lc[0], lc[1]], [lc[2], lc[3]], ls))
+            (a, b) if a.is_circular() && b.is_circular() => {
+                let lin = Lin::new().rad(1.0, &self.radius(copy)?).rad(-1.0, &self.radius(source)?);
+                let lin = self.offset_master(lin, -side, master_source, master_copy)?;
+                self.lin(lin);
+                Ok(())
             }
-            (ks, kc) if ks.is_circular() && kc.is_circular() => {
-                let (rs, rc) = (self.radius(src)?, self.radius(copy)?);
-                Ok(lin.rad(k, &rc).rad(-k, &rs))
-            }
-            (ks, kc) => Err(format!("offset not supported between {ks:?} and {kc:?}")),
+            (a, b) => Err(format!("offset not supported between {a:?} and {b:?}")),
         }
     }
 
@@ -1057,7 +1050,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
             }
             K::Tangent { a, b } => self.tangent(*a, *b, c),
             K::Offset { reference, curve, master, side, .. } => self.offset(*reference, *curve, *master, *side),
-            K::OffsetCurve { master, curve, second, sides, first_shape } => self.offset_curve(*master, *curve, *second, *sides, *first_shape),
+            K::OffsetPair { source, copy, master_source, master_copy, side } => self.offset_pair(*source, *copy, *master_source, *master_copy, *side, c),
             K::Equal { a, b } => {
                 let (ka, kb) = (self.kind(*a)?, self.kind(*b)?);
                 match (ka, kb) {

@@ -188,7 +188,7 @@ impl SheetPick<'_> {
                 let diameter = matches!(picks[0], Pick::Circle { .. });
                 let cs = self.placement(*view)?.to_sheet(*center);
                 let d = sub(c, cs);
-                Some((AnnotationKind::RadialDimension { view: *view, center: *center, radius: *radius, diameter, angle: d[1].atan2(d[0]), dim_line: diameter && self.drawing.radial_dim_lines() }, vec![(0, r.clone())]))
+                Some((AnnotationKind::RadialDimension { view: *view, center: *center, radius: *radius, diameter, angle: d[1].atan2(d[0]), dim_line: diameter && self.drawing.radial_dim_lines(), knee: self.radial_knee(*view, *center, *radius, c) }, vec![(0, r.clone())]))
             }
             [Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, b: b2 }] => {
                 let (u, w) = (norm(sub(b1.p, a1.p)), norm(sub(b2.p, a2.p)));

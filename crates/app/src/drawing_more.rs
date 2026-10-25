@@ -123,6 +123,11 @@ impl DrawingEditor {
         match self.tool.clone() {
             Tool::BrokenOut { parent, mut points, done: false } => {
                 if let Some(pp) = self.view_point(parent) {
+                    if let Some(why) = noshape_scene::drawing_tools::broken_out_refused(self.current_sheet(), pp.view) {
+                        self.status = Some(why.into());
+                        cx.notify();
+                        return true;
+                    }
                     if parent.is_none() {
                         points.clear();
                     }

@@ -327,7 +327,7 @@ pub fn variable() -> FeatureType {
         ParamSpec::num("customOffset", "Along custom", zero).hints(Hints::READ_ONLY).visible(move |v| distance(v) && v.bool("axisMeasurements") && v.is("componentSelector", "CUSTOM")),
         ParamSpec::query("lengthEntities", "Entities", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY).visible(move |v| measured(v, "LENGTH")),
         ParamSpec::bool("radius", "Radius", false).visible(move |v| measured(v, "DIAMETER")),
-        ParamSpec::query1("diameterEntity", "Entity", QueryFilter::CIRCULAR_EDGE | QueryFilter::CYLINDRICAL_FACE | QueryFilter::ANY_FACE).visible(move |v| measured(v, "DIAMETER")),
+        ParamSpec::query1("diameterEntity", "Entity", QueryFilter::CIRCULAR_EDGE | QueryFilter::SKETCH_EDGE | QueryFilter::CYLINDRICAL_FACE | QueryFilter::ANY_FACE).visible(move |v| measured(v, "DIAMETER")),
         ParamSpec::text("description", "Description", ""),
     ];
     FeatureType::new("assignVariable", "Variable", Category::Variable, p).icon("variable").describe("Define a variable usable in expressions as #name")

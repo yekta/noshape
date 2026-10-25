@@ -1094,6 +1094,118 @@ pub fn clip_to_crop(pts: &[[f64; 2]], crop: &Crop) -> Vec<Vec<[f64; 2]>> {
 }
 
 /// Even-odd point-in-polygon test.
+/// Show offset cut lines (live asb 10-23 views (6)): where a jogged cutting
+/// line steps (a segment along the line of sight), the step plane seen edge
+/// on in the section view: a line through the step's projection along the
+/// parent's depth axis, kept inside the cut `segs` (even-odd). View
+/// coordinates of the section view.
+pub fn offset_cut_lines(cut: &SectionCut, parent: &ViewFrame, frame: &ViewFrame, segs: &[[[f64; 2]; 2]]) -> Vec<[[f64; 2]; 2]> {
+    let mut out = Vec::new();
+    let d = frame.project(parent.dir);
+    let dl = d[0].hypot(d[1]);
+    if dl < 1e-9 || segs.is_empty() {
+        return out;
+    }
+    let d = [d[0] / dl, d[1] / dl];
+    let n = cut.toward_view;
+    for w in cut.points.windows(2) {
+        let e = [w[1][0] - w[0][0], w[1][1] - w[0][1]];
+        let l = e[0].hypot(e[1]);
+        // A step: along the line of sight (parallel to the cut's normal).
+        if l < 1e-12 || (e[0] * n[1] - e[1] * n[0]).abs() / l > 1e-6 {
+            continue;
+        }
+        let mid = [(w[0][0] + w[1][0]) / 2.0, (w[0][1] + w[1][1]) / 2.0];
+        let p = frame.project(parent.lift(mid));
+        // The step lies on the boundary between the two legs' cuts: the
+        // material along lines just either side of it (even-odd), merged.
+        let side = [-d[1], d[0]];
+        let mut spans: Vec<[f64; 2]> = Vec::new();
+        for k in [-1e-7, 1e-7] {
+            let q0 = [p[0] + side[0] * k, p[1] + side[1] * k];
+            let mut ts: Vec<f64> = segs
+                .iter()
+                .filter_map(|s| {
+                    let r = [s[1][0] - s[0][0], s[1][1] - s[0][1]];
+                    let den = d[0] * r[1] - d[1] * r[0];
+                    if den.abs() < 1e-15 {
+                        return None;
+                    }
+                    let q = [s[0][0] - q0[0], s[0][1] - q0[1]];
+                    let u = (q[0] * d[1] - q[1] * d[0]) / den;
+                    (0.0..1.0).contains(&u).then_some((q[0] * r[1] - q[1] * r[0]) / den)
+                })
+                .collect();
+            ts.sort_by(f64::total_cmp);
+            spans.extend(ts.as_chunks::<2>().0.iter().copied());
+        }
+        spans.sort_by(|a, b| a[0].total_cmp(&b[0]));
+        let mut merged: Vec<[f64; 2]> = Vec::new();
+        for sp in spans {
+            match merged.last_mut() {
+                Some(m) if sp[0] <= m[1] + 1e-9 => m[1] = m[1].max(sp[1]),
+                _ => merged.push(sp),
+            }
+        }
+        for m in merged {
+            out.push([[p[0] + d[0] * m[0], p[1] + d[1] * m[0]], [p[0] + d[0] * m[1], p[1] + d[1] * m[1]]]);
+        }
+    }
+    out
+}
+
+/// A hatch region: outer loop and holes.
+pub type HatchArea = (Vec<[f64; 2]>, Vec<Vec<[f64; 2]>>);
+
+/// A section cut's hatch regions (Edit hatch section...): its segments
+/// chained into loops, each outer loop with the loops directly inside it
+/// as holes (even-odd nesting). None when the segments don't close.
+pub fn section_regions(segs: &[[[f64; 2]; 2]]) -> Option<Vec<HatchArea>> {
+    let loops = super::cad_layers::chain_loops(segs, 1e-9)?;
+    let area = |l: &[[f64; 2]]| (0..l.len()).map(|i| { let (a, b) = (l[i], l[(i + 1) % l.len()]); a[0] * b[1] - b[0] * a[1] }).sum::<f64>().abs() / 2.0;
+    // A loop's parent: the smallest loop containing its first point.
+    let parent = |i: usize| -> Option<usize> {
+        let p = *loops[i].first()?;
+        (0..loops.len()).filter(|&j| j != i && point_in_polygon(p, &loops[j])).min_by(|&a, &b| area(&loops[a]).total_cmp(&area(&loops[b])))
+    };
+    let parents: Vec<Option<usize>> = (0..loops.len()).map(parent).collect();
+    let depth = |mut i: usize| {
+        let mut d = 0;
+        while let Some(p) = parents[i] {
+            d += 1;
+            i = p;
+            if d > loops.len() {
+                break;
+            }
+        }
+        d
+    };
+    let mut out = Vec::new();
+    for i in (0..loops.len()).filter(|&i| depth(i) % 2 == 0) {
+        let holes = (0..loops.len()).filter(|&j| parents[j] == Some(i)).map(|j| loops[j].clone()).collect();
+        out.push((loops[i].clone(), holes));
+    }
+    Some(out)
+}
+
+/// The region of [`section_regions`] containing `p` (inside its outer loop,
+/// outside its holes).
+pub fn section_region_at(regions: &[HatchArea], p: [f64; 2]) -> Option<usize> {
+    regions.iter().position(|(outer, holes)| point_in_polygon(p, outer) && !holes.iter().any(|h| point_in_polygon(p, h)))
+}
+
+/// The section hatch style of each region (`section_hatches`, the last
+/// one inside it wins; None: the drawing's default hatch).
+pub fn section_region_styles<'a>(regions: &[HatchArea], hatches: &'a [super::SectionHatch]) -> Vec<Option<&'a super::SectionHatch>> {
+    let mut out = vec![None; regions.len()];
+    for h in hatches {
+        if let Some(i) = section_region_at(regions, h.at) {
+            out[i] = Some(h);
+        }
+    }
+    out
+}
+
 pub fn point_in_polygon(p: [f64; 2], poly: &[[f64; 2]]) -> bool {
     let mut inside = false;
     let n = poly.len();

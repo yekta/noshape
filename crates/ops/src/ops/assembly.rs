@@ -725,7 +725,13 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(slot) => *slot = m.clone(),
         None => preview.mates.push(m.clone()),
     }
-    let opts = if a.bool_or("solve_all", false)? { SolveOptions::default() } else { sa::mate_preview_options(&preview, &m) };
+    let mut opts = if a.bool_or("solve_all", false)? { SolveOptions::default() } else { sa::mate_preview_options(&preview, &m) };
+    // A new mate brings its connectors together (free values zero), as the
+    // dialog does (live "qa4 round 5 s3 mate flip": Cylindrical and Planar
+    // land at t (0,0,−30), the connectors coincident).
+    if editing.is_none() && opts.only_mate.is_some() {
+        opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m));
+    }
     let solved = od.evaluate_assembly(tab, &preview, &opts);
     let ok = solved.mates.iter().find(|s| s.id == id).map(|s| (s.ok, s.message.clone()));
     let values = asm.configuration.defaults();

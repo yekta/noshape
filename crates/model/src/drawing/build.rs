@@ -30,7 +30,13 @@ pub enum PickTarget {
     SectionLine(ViewId),
     /// Detail circle drawn in the parent of detail view `0`.
     DetailCircle(ViewId),
+    /// The profile of broken-out section `index` of a view (live: its menu
+    /// has Edit section / Remove section).
+    BrokenOut { view: ViewId, index: usize },
     TitleBlock,
+    /// A title block cell's field (its key): a note, editable while the
+    /// formats are locked (live qa4 round 5 s11 (4)).
+    TitleField(String),
     Table(u64),
     /// Break lines of break `index` of a view.
     BreakLine { view: ViewId, index: usize },
@@ -59,7 +65,7 @@ impl PickTarget {
     /// The view this target belongs to (for selecting/dragging views).
     pub fn view(&self) -> Option<ViewId> {
         match self {
-            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::ViewLabel(v) => Some(*v),
+            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::ViewLabel(v) | PickTarget::BrokenOut { view: v, .. } => Some(*v),
             _ => None,
         }
     }
@@ -210,6 +216,8 @@ pub struct BuiltSheet {
     pub tables: Vec<(u64, TableLayout)>,
     /// Title block rectangle [x0, y0, x1, y1] (mm).
     pub title_rect: Option<[f64; 4]>,
+    /// The title block's field cells (pick, rectangle).
+    pub title_cells: Vec<(u32, [f64; 4])>,
 }
 
 impl BuiltSheet {
@@ -268,7 +276,14 @@ impl BuiltSheet {
                 }
             }
         }
-        // Anywhere inside the title block selects it.
+        // A field cell's note over the block's lines; anywhere else inside
+        // the title block selects it.
+        let inside = |r: &[f64; 4]| p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3];
+        if best.is_none_or(|(k, _)| matches!(self.picks.get(k as usize), Some(PickTarget::TitleBlock)))
+            && let Some((pick, _)) = self.title_cells.iter().find(|(_, r)| inside(r))
+        {
+            return Some(*pick);
+        }
         if best.is_none()
             && let Some(r) = self.title_rect
             && p[0] >= r[0]
@@ -282,6 +297,9 @@ impl BuiltSheet {
         best.map(|(k, _)| k)
     }
 }
+
+/// How far a section cutting line runs past its view (live: 0.25 in).
+const CUT_OVERSHOOT: f64 = 6.35;
 
 /// Format a model length (meters) in drawing units.
 pub fn format_length(drawing: &Drawing, meters: f64) -> String {
@@ -621,6 +639,26 @@ fn circle_points(c: [f64; 2], r: f64, n: usize) -> Vec<[f64; 2]> {
             [c[0] + r * t.cos(), c[1] + r * t.sin()]
         })
         .collect()
+}
+
+/// One section hatch line `l` (unbroken sheet coordinates): clipped to a
+/// detail's profile, the crop, and mapped through the view's breaks.
+fn push_hatch_line(g: &mut SheetGeometry, pl: &ViewPlacement, geo: &ViewGeometry, l: [[f64; 2]; 2], pick: u32) {
+    let ub = pl.unbroken();
+    let mut pieces = vec![vec![ub.to_view(l[0]), ub.to_view(l[1])]];
+    if let Some(poly) = &geo.clip_poly {
+        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_polygon(&p, poly)).collect();
+    } else if let Some((c, r)) = geo.clip {
+        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_circle(&p, c, r)).collect();
+    }
+    if let Some(crop) = &geo.crop {
+        pieces = pieces.into_iter().flat_map(|p| views::clip_to_crop(&p, crop)).collect();
+    }
+    for p in pieces {
+        for q in map_polyline(pl, &p) {
+            g.lines.push(Polyline2 { points: q, style: LineStyle::Thin, closed: false, pick });
+        }
+    }
 }
 
 /// Pieces of a view-coordinate polyline outside the view's break bands,
@@ -1066,8 +1104,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         if in_block {
             l.pick = tb;
         }
-        // Formats layers and colors: border frame, zones (sheet edge,
-        // dividers), title block.
+        // Formats layers and colors: border frame, zones (dividers), title
+        // block.
         let layer = if in_block { SheetLayer::TitleBlock } else if l.style == LineStyle::Border { SheetLayer::BorderFrame } else { SheetLayer::BorderZones };
         g.layers.push(LayerSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer });
         if let Some(rgb) = layer.color(fp) {
@@ -1088,6 +1126,16 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             g.colors.push(super::sheet::ColorSpan { lines: 0..0, texts: i..i + 1, fills: 0..0, rgb });
         }
     }
+
+    // Field cells stay editable notes under Formats › Locked.
+    let title_cells: Vec<(u32, [f64; 4])> = std::mem::take(&mut g.title_cells)
+        .into_iter()
+        .map(|(key, r, texts)| {
+            let id = picks.id(PickTarget::TitleField(key));
+            g.texts[texts].iter_mut().for_each(|t| t.pick = id);
+            (id, r)
+        })
+        .collect();
 
     let mut placements: Vec<ViewPlacement> = Vec::new();
     // Parent mirrors of linked views have no place on this sheet.
@@ -1181,33 +1229,68 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let ub = pl.unbroken();
                 let segs: Vec<[[f64; 2]; 2]> = geo.section_segments.iter().map(|s| [ub.to_sheet(s[0]), ub.to_sheet(s[1])]).collect();
                 let hatch_l0 = g.lines.len();
-                for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
-                    let mut pieces = vec![vec![ub.to_view(l[0]), ub.to_view(l[1])]];
-                    if let Some(poly) = &geo.clip_poly {
-                        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_polygon(&p, poly)).collect();
-                    } else if let Some((c, r)) = geo.clip {
-                        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_circle(&p, c, r)).collect();
+                let whole = geo.clip_poly.is_none() && geo.clip.is_none() && geo.crop.is_none() && pl.breaks().is_empty();
+                // Edit hatch section...: restyled regions (the rest keep the
+                // drawing's hatch; a cut that doesn't close keeps it all).
+                let regions = if v.section_hatches.is_empty() { None } else { views::section_regions(&geo.section_segments) };
+                match regions {
+                    None => {
+                        for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
+                            push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                        }
+                        // An uncut, unbroken section: the boundary for the HATCH entity.
+                        if whole && let Some(loops) = super::cad_layers::chain_loops(&segs, 1e-6) {
+                            g.hatches.push(super::cad_layers::HatchRegion { loops, spacing: vt.hatch_spacing.max(0.3), lines: hatch_l0..g.lines.len() });
+                        }
                     }
-                    if let Some(crop) = &geo.crop {
-                        pieces = pieces.into_iter().flat_map(|p| views::clip_to_crop(&p, crop)).collect();
-                    }
-                    for p in pieces {
-                        for q in map_polyline(&pl, &p) {
-                            g.lines.push(Polyline2 { points: q, style: LineStyle::Thin, closed: false, pick: view_pick });
+                    Some(regions) => {
+                        let ring = |l: &[[f64; 2]]| (0..l.len()).map(|i| [ub.to_sheet(l[i]), ub.to_sheet(l[(i + 1) % l.len()])]).collect::<Vec<_>>();
+                        let mut plain: Vec<[[f64; 2]; 2]> = Vec::new();
+                        for ((outer, holes), style) in regions.iter().zip(views::section_region_styles(&regions, &v.section_hatches)) {
+                            let Some(h) = style else {
+                                plain.extend(ring(outer));
+                                plain.extend(holes.iter().flat_map(|x| ring(x)));
+                                continue;
+                            };
+                            let Some(pattern) = h.pattern else { continue };
+                            let mark = g.mark();
+                            let o: Vec<[f64; 2]> = outer.iter().map(|q| ub.to_sheet(*q)).collect();
+                            let hs: Vec<Vec<[f64; 2]>> = holes.iter().map(|x| x.iter().map(|q| ub.to_sheet(*q)).collect()).collect();
+                            for l in super::sheet_sketch::hatch_pattern_holes(&o, &hs, h.standard, pattern, h.scale, h.angle) {
+                                push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                            }
+                            // Solid: filled (the whole region only; not cut by
+                            // crops, clips or breaks).
+                            if whole && hs.is_empty() && super::hatch_pat::pattern(h.standard, pattern).is_some_and(|p| p.families.is_empty()) {
+                                for i in 1..o.len().saturating_sub(1) {
+                                    g.fills.push(super::sheet::Fill2 { points: vec![o[0], o[i], o[i + 1]] });
+                                }
+                            }
+                            if let Some(c) = h.color {
+                                g.color_since(mark, c);
+                            }
+                        }
+                        for l in hatch(&plain, vt.hatch_spacing.max(0.3)) {
+                            push_hatch_line(&mut g, &pl, geo, l, view_pick);
                         }
                     }
                 }
-                // An uncut, unbroken section: the boundary for the HATCH entity.
-                if geo.clip_poly.is_none() && geo.clip.is_none() && geo.crop.is_none() && pl.breaks().is_empty()
-                    && let Some(loops) = super::cad_layers::chain_loops(&segs, 1e-6)
-                {
-                    g.hatches.push(super::cad_layers::HatchRegion { loops, spacing: vt.hatch_spacing.max(0.3), lines: hatch_l0..g.lines.len() });
+            }
+            // Show offset cut lines (section views).
+            if v.show_offset_cut_lines
+                && matches!(v.kind, ViewKind::Section { .. })
+                && let (Some(cut), Some(frame), Some(pf)) = (views::section_cut(sheet, v.id), geo.frame.as_ref(), sheet.parent_of(v.id).and_then(|p| views.get(&p)).and_then(|p| p.frame.as_ref()))
+            {
+                let ub = pl.unbroken();
+                for l in views::offset_cut_lines(&cut, pf, frame, &geo.section_segments) {
+                    push_hatch_line(&mut g, &pl, geo, [ub.to_sheet(l[0]), ub.to_sheet(l[1])], view_pick);
                 }
             }
             g.cad_since(cad_mark, CadLayer::ViewHatches);
             // Broken-out profiles (live: a SPLINE on SECTION_JOG_LINES over
             // the cut's edge; a polygon profile as a polyline).
-            for b in &v.broken_out {
+            for (index, b) in v.broken_out.iter().enumerate() {
+                let pick = picks.id(PickTarget::BrokenOut { view: v.id, index });
                 let outline = views::broken_out_outline(b);
                 if outline.len() < 3 {
                     continue;
@@ -1221,7 +1304,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     if whole {
                         piece.pop();
                     }
-                    g.lines.push(Polyline2 { points: piece, style: LineStyle::Visible, closed: whole, pick: 0 });
+                    g.lines.push(Polyline2 { points: piece, style: LineStyle::Visible, closed: whole, pick });
                 }
                 if b.spline && pl.breaks().is_empty() && g.lines.len() == cad_mark.0 + 1 {
                     let poles: Vec<[f64; 2]> = super::cad_objects::catmull_rom_poles(&b.profile).into_iter().map(|p| pl.to_sheet(p)).collect();
@@ -1505,7 +1588,27 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             ViewKind::Section { parent, label, .. } | ViewKind::AlignedSection { parent, label, .. } => {
                 if let (Some(ppl), Some(cut)) = (place(*parent), views::section_cut(sheet, v.id)) {
                     let pick = picks.id(PickTarget::SectionLine(v.id));
-                    let pts: Vec<[f64; 2]> = cut.points.iter().map(|p| ppl.to_sheet(*p)).collect();
+                    let mut pts: Vec<[f64; 2]> = cut.points.iter().map(|p| ppl.to_sheet(*p)).collect();
+                    // Both end legs run 0.25 in past the view's geometry (live
+                    // qa4-r5-s11.dxf, drw2-k: exactly 6.35 mm / 0.25 in).
+                    let n = pts.len();
+                    for (e, i) in [(0, 1), (n - 1, n - 2)] {
+                        let d = [pts[e][0] - pts[i][0], pts[e][1] - pts[i][1]];
+                        let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+                        if l < 1e-9 {
+                            continue;
+                        }
+                        let u = [d[0] / l, d[1] / l];
+                        // Where the leg's line leaves the view's bounds.
+                        let exit = (0..2)
+                            .filter(|&k| u[k].abs() > 1e-12)
+                            .map(|k| ((if u[k] > 0.0 { ppl.max[k] } else { ppl.min[k] }) - pts[i][k]) / u[k])
+                            .fold(f64::INFINITY, f64::min);
+                        if exit.is_finite() && exit > 0.0 {
+                            let t = exit + CUT_OVERSHOOT;
+                            pts[e] = [pts[i][0] + u[0] * t, pts[i][1] + u[1] * t];
+                        }
+                    }
                     g.lines.push(Polyline2 { points: pts.clone(), style: LineStyle::Section, closed: false, pick });
                     // Thick strokes at the jogs.
                     for k in 1..pts.len().saturating_sub(1) {
@@ -1518,23 +1621,25 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         }
                     }
                     let sight0 = ppl.dir_to_sheet([-cut.toward_view[0], -cut.toward_view[1]]);
-                    let n = pts.len();
                     let leg0 = [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]];
                     let leg_n = [pts[n - 1][0] - pts[n - 2][0], pts[n - 1][1] - pts[n - 2][1]];
                     let turn = leg_n[1].atan2(leg_n[0]) - leg0[1].atan2(leg0[0]);
-                    for (end, inner, sight) in [(pts[0], pts[1], sight0), (pts[n - 1], pts[n - 2], rotate2(sight0, turn))] {
-                        let d = [end[0] - inner[0], end[1] - inner[1]];
-                        let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
-                        let u = [d[0] / l, d[1] / l];
-                        // Short thick end stroke, then the arrow showing the line of sight.
-                        let e2 = [end[0] - u[0] * 6.0, end[1] - u[1] * 6.0];
-                        g.lines.push(Polyline2 { points: vec![e2, end], style: LineStyle::Border, closed: false, pick });
-                        let base = [end[0] - u[0] * 1.5, end[1] - u[1] * 1.5];
-                        let tail = [base[0] - sight[0] * 8.0, base[1] - sight[1] * 8.0];
-                        g.lines.push(Polyline2 { points: vec![tail, base], style: LineStyle::Thin, closed: false, pick });
-                        g.arrow(base, sight, 3.5);
-                        let tp = [tail[0] + u[0] * 3.0 - sight[0] * 1.0, tail[1] + u[1] * 3.0 - sight[1] * 1.0];
-                        g.texts.push(Text2 { pos: tp, height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                    // Each end (live qa4-r5-s11.dxf, drw2-k): from the line a
+                    // solid shaft a twelfth of an arrow wide and an arrow long
+                    // along the line of sight, the arrow beyond it (its tip
+                    // two arrows out), the letter past the tip.
+                    let (a, h) = (drawing.props.ann_arrow, drawing.props.ann_text_height);
+                    for (end, sight) in [(pts[0], sight0), (pts[n - 1], rotate2(sight0, turn))] {
+                        let neck = [end[0] + sight[0] * a, end[1] + sight[1] * a];
+                        let tip = [end[0] + sight[0] * 2.0 * a, end[1] + sight[1] * 2.0 * a];
+                        let w = [-sight[1] * a / 24.0, sight[0] * a / 24.0];
+                        g.fills.push(Fill2 { points: vec![[end[0] - w[0], end[1] - w[1]], [neck[0] - w[0], neck[1] - w[1]], [neck[0] + w[0], neck[1] + w[1]], [end[0] + w[0], end[1] + w[1]]] });
+                        // Under the fill, for picking.
+                        g.lines.push(Polyline2 { points: vec![end, neck], style: LineStyle::Thin, closed: false, pick });
+                        // `arrow` scales by the (default) style's size: the drawing's here.
+                        g.arrow(tip, sight, 3.0 * a / g.style.ann_arrow.max(1e-9));
+                        let at = [tip[0] + sight[0] * 1.1 * h, tip[1] + sight[1] * 1.1 * h];
+                        g.texts.push(Text2 { pos: at, height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                     }
                 }
             }
@@ -1576,7 +1681,30 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         None => circle_points(c, r, 96),
                     };
                     let top_right = outline.iter().copied().fold([f64::MIN, f64::MIN], |m, p| if p[0] + p[1] > m[0] + m[1] { p } else { m });
-                    g.lines.push(Polyline2 { points: outline, style: LineStyle::Thin, closed: true, pick });
+                    // In line on a circle (live qa4 r5 s11 2n, qa4-r5-s11.dxf):
+                    // the label on the circle at 0°, the circle broken
+                    // around it, an arrow each side along the circle
+                    // pointing at it, tips 0.75 of the text height away.
+                    let in_line_circle = v.detail_profile.is_none() && v.detail_style != 1 && v.detail_style != 2 && v.detail_label_at.is_none();
+                    if in_line_circle && r > 1e-6 {
+                        let h = drawing.props.ann_text_height;
+                        let a = drawing.props.ann_arrow;
+                        let half = |chord: f64| 2.0 * (chord / (2.0 * r)).min(1.0).asin();
+                        let tip_a = half(0.75 * h);
+                        let base_a = (tip_a + half(a)).min(std::f64::consts::PI * 0.95);
+                        let on = |t: f64| [c[0] + r * t.cos(), c[1] + r * t.sin()];
+                        let n = 96;
+                        let arc: Vec<[f64; 2]> = (0..=n).map(|i| on(base_a + (std::f64::consts::TAU - 2.0 * base_a) * i as f64 / n as f64)).collect();
+                        g.lines.push(Polyline2 { points: arc, style: LineStyle::Thin, closed: false, pick });
+                        for sign in [1.0, -1.0] {
+                            let (tip, base) = (on(sign * tip_a), on(sign * base_a));
+                            // `arrow` scales by the (default) style's size: the drawing's here.
+                            g.arrow(tip, [tip[0] - base[0], tip[1] - base[1]], 3.0 * a / g.style.ann_arrow.max(1e-9));
+                        }
+                        g.texts.push(Text2 { pos: on(0.0), height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                    } else {
+                        g.lines.push(Polyline2 { points: outline, style: LineStyle::Thin, closed: true, pick });
+                    }
                     match (v.detail_style, v.detail_label_at) {
                         // Connected: a dashed line from the profile to the detail view, no label.
                         (1, _) => {
@@ -1596,12 +1724,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             g.arrow(tip, [d[0] / l, d[1] / l], 3.5);
                             g.texts.push(Text2 { pos: [at[0] - d[0] / l * 3.5, at[1] - d[1] / l * 3.5], height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         }
-                        // In line: the label beside the profile.
-                        _ => {
-                            let a = std::f64::consts::FRAC_PI_4;
-                            let pos = if v.detail_profile.is_some() { [top_right[0] + 3.0, top_right[1] + 3.0] } else { [c[0] + (r + 4.0) * a.cos(), c[1] + (r + 4.0) * a.sin()] };
-                            g.texts.push(Text2 { pos, height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                        // In line on another profile: the label beside it.
+                        _ if !in_line_circle => {
+                            g.texts.push(Text2 { pos: [top_right[0] + 3.0, top_right[1] + 3.0], height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         }
+                        _ => {}
                     }
                 }
             }
@@ -1774,7 +1901,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
     // Mirrors aren't views of this sheet (not picked, not listed).
     placements.retain(|p| !p.id.is_ghost());
-    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect }
+    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect, title_cells }
 }
 
 #[cfg(test)]

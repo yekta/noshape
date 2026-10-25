@@ -105,16 +105,12 @@ bool cancelled(const std::atomic<bool>* flag)
 // Memory budget of one boolean (lead 10-25, the user's Diamond knurl: 148
 // crossing helical tools took 17 GB and ran on): the process's resident
 // memory may grow by this much while an operation builds, then the
-// operation stops with an error. NOSHAPE_BOOLEAN_MEMORY_MB overrides 4096.
-size_t memory_budget()
-{
-  static const size_t budget = [] {
-    const char* v = std::getenv("NOSHAPE_BOOLEAN_MEMORY_MB");
-    const long  mb = v != nullptr ? std::atol(v) : 0;
-    return (size_t)(mb > 0 ? mb : 4096) << 20;
-  }();
-  return budget;
-}
+// operation stops with an error. Set from Rust before each boolean
+// (NOSHAPE_BOOLEAN_MEMORY_MB, default 4096: std::getenv on Windows reads the
+// CRT's copy of the environment and misses changes made after startup).
+std::atomic<uint64_t> g_memory_budget_mb{4096};
+
+size_t memory_budget() { return (size_t)g_memory_budget_mb.load() << 20; }
 
 // Set when an operation ran out of its budget (also on a pool thread); the
 // operation then fails (fail_if_cancelled) instead of trying another way.
@@ -1527,6 +1523,11 @@ void set_thread_cancel(size_t flag)
   t_cancel = reinterpret_cast<const std::atomic<bool>*>(flag);
 }
 
+void set_memory_budget_mb(uint64_t mb)
+{
+  g_memory_budget_mb.store(mb > 0 ? mb : 4096);
+}
+
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts)
 {
@@ -1583,6 +1584,9 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   BoolOpts first = opts;
   if (first.glue == 3 && op != 0) // glue is for fusing touching shapes only
     first.glue = 0;
+  // Many tools (a knurl's 148 crossing grooves): OCCT's intersection of the
+  // pairs runs in parallel.
+  first.parallel = first.parallel || t.size() >= 8;
   apply_opts(*b, first);
   build_cancellable(*b);
   fail_if_cancelled();
@@ -1605,6 +1609,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     {
       BoolOpts plain = opts;
       plain.glue     = 0;
+      plain.parallel = first.parallel;
       b              = make();
       b->SetArguments(to_list(a));
       b->SetTools(to_list(t));

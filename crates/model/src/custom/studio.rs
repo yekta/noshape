@@ -821,7 +821,20 @@ fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, ann_expr: &a
 fn filter_of(f: Option<&Ann>) -> QueryFilter {
     let Some(f) = f else { return QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0 | QueryFilter::BODY.0 | QueryFilter::SKETCH_REGION.0 | QueryFilter::PLANE.0) };
     match f {
+        // A condition we have no bit for (BodyType.COMPOSITE …) adds nothing.
+        Ann::Or(a, b) if matches!(&**b, Ann::Enum(t, m) if enum_filter(t, m).is_none()) => filter_of(Some(a)),
+        Ann::Or(a, b) if matches!(&**a, Ann::Enum(t, m) if enum_filter(t, m).is_none()) => filter_of(Some(b)),
         Ann::Or(a, b) => QueryFilter(filter_of(Some(a)).0 | filter_of(Some(b)).0),
+        // `… && SketchObject.NO`: the other side without its sketch entities
+        // (fillet.fs, chamfer.fs: model edges only, qa5 SEL1).
+        Ann::And(a, b) if [a, b].iter().any(|s| matches!(&***s, Ann::Enum(t, m) if t == "SketchObject" && m == "NO")) => {
+            let other = if matches!(&**a, Ann::Enum(t, _) if t == "SketchObject") { b } else { a };
+            QueryFilter(filter_of(Some(other)).0 & !(QueryFilter::SKETCH_REGION.0 | QueryFilter::SKETCH_EDGE.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::SKETCH.0))
+        }
+        // A condition we have no bit for (EdgeTopology.TWO_SIDED,
+        // ConstructionObject.NO, AllowMeshGeometry.YES …) narrows nothing.
+        Ann::And(a, b) if matches!(&**b, Ann::Enum(t, m) if enum_filter(t, m).is_none()) => filter_of(Some(a)),
+        Ann::And(a, b) if matches!(&**a, Ann::Enum(t, m) if enum_filter(t, m).is_none()) => filter_of(Some(b)),
         Ann::And(a, b) => {
             let (x, y) = (filter_of(Some(a)), filter_of(Some(b)));
             // Refinements: EDGE && LINE -> linear edges, FACE && PLANE -> planar faces...
@@ -829,27 +842,40 @@ fn filter_of(f: Option<&Ann>) -> QueryFilter {
             if i.0 != 0 { i } else { if x.0.count_ones() <= y.0.count_ones() { x } else { y } }
         }
         Ann::Not(_) => QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0 | QueryFilter::BODY.0),
-        Ann::Enum(ty, m) => match (ty.as_str(), m.as_str()) {
-            ("EntityType", "FACE") => QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::SKETCH_REGION.0 | QueryFilter::PLANE.0),
-            ("EntityType", "EDGE") => QueryFilter::ANY_EDGE,
-            ("EntityType", "VERTEX") => QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::MATE_CONNECTOR.0),
-            ("EntityType", "BODY") => QueryFilter(QueryFilter::BODY.0 | QueryFilter::WIRE_BODY.0 | QueryFilter::POINT_BODY.0 | QueryFilter::MATE_CONNECTOR.0),
-            ("GeometryType", "PLANE") => QueryFilter(QueryFilter::PLANAR_FACE.0 | QueryFilter::PLANE.0 | QueryFilter::SKETCH_REGION.0),
-            ("GeometryType", "CYLINDER") => QueryFilter::CYLINDRICAL_FACE,
-            ("GeometryType", "LINE") => QueryFilter(QueryFilter::LINEAR_EDGE.0 | QueryFilter::SKETCH_EDGE.0),
-            ("GeometryType", "CIRCLE" | "ARC") => QueryFilter(QueryFilter::CIRCULAR_EDGE.0 | QueryFilter::SKETCH_EDGE.0),
-            ("BodyType", "SOLID") => QueryFilter(QueryFilter::SOLID_BODY.0 | QueryFilter::ANY_FACE.0 | QueryFilter::EDGE.0 | QueryFilter::VERTEX.0),
-            ("BodyType", "SHEET") => QueryFilter(QueryFilter::SHEET_BODY.0 | QueryFilter::ANY_FACE.0 | QueryFilter::EDGE.0),
-            ("BodyType", "WIRE") => QueryFilter(QueryFilter::WIRE_BODY.0 | QueryFilter::EDGE.0),
-            ("BodyType", "MATE_CONNECTOR") => QueryFilter::MATE_CONNECTOR,
-            ("BodyType", "POINT") => QueryFilter::POINT_BODY,
-            ("EdgeTopology", "TWO_SIDED") => QueryFilter::SOLID_EDGE,
-            ("SketchObject", "YES") => QueryFilter(QueryFilter::SKETCH_REGION.0 | QueryFilter::SKETCH_EDGE.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::SKETCH.0),
-            ("ConstructionObject", "YES") => QueryFilter(QueryFilter::PLANE.0 | QueryFilter::MATE_CONNECTOR.0),
-            _ => QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0 | QueryFilter::BODY.0 | QueryFilter::SKETCH_REGION.0 | QueryFilter::PLANE.0),
-        },
+        Ann::Enum(ty, m) => enum_filter(ty, m).unwrap_or(QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0 | QueryFilter::BODY.0 | QueryFilter::SKETCH_REGION.0 | QueryFilter::PLANE.0)),
         _ => QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0 | QueryFilter::BODY.0),
     }
+}
+
+/// Our selection filter for one Onshape filter enum member; `None` for a
+/// condition we have no bit for (it narrows nothing in an `&&`).
+fn enum_filter(ty: &str, m: &str) -> Option<QueryFilter> {
+    // A body's edges: any model edge (GeometryType.LINE && BodyType.SOLID is a part's linear edge).
+    const MODEL_EDGES: u32 = QueryFilter::EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0;
+    let any = |items: &[(&str, &str)]| items.iter().filter_map(|(t, m)| enum_filter(t, m)).fold(QueryFilter(0), |a, f| QueryFilter(a.0 | f.0));
+    Some(match (ty, m) {
+        ("EntityType", "FACE") => QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::SKETCH_REGION.0 | QueryFilter::PLANE.0),
+        ("EntityType", "EDGE") => QueryFilter::ANY_EDGE,
+        ("EntityType", "VERTEX") => QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::MATE_CONNECTOR.0),
+        ("EntityType", "BODY") => QueryFilter(QueryFilter::BODY.0 | QueryFilter::WIRE_BODY.0 | QueryFilter::POINT_BODY.0 | QueryFilter::MATE_CONNECTOR.0),
+        ("GeometryType", "PLANE") => QueryFilter(QueryFilter::PLANAR_FACE.0 | QueryFilter::PLANE.0 | QueryFilter::SKETCH_REGION.0),
+        ("GeometryType", "CYLINDER") => QueryFilter::CYLINDRICAL_FACE,
+        ("GeometryType", "LINE") => QueryFilter(QueryFilter::LINEAR_EDGE.0 | QueryFilter::SKETCH_EDGE.0),
+        ("GeometryType", "CIRCLE" | "ARC") => QueryFilter(QueryFilter::CIRCULAR_EDGE.0 | QueryFilter::SKETCH_EDGE.0),
+        ("BodyType", "SOLID") => QueryFilter(QueryFilter::SOLID_BODY.0 | QueryFilter::ANY_FACE.0 | MODEL_EDGES | QueryFilter::VERTEX.0),
+        ("BodyType", "SHEET") => QueryFilter(QueryFilter::SHEET_BODY.0 | QueryFilter::ANY_FACE.0 | MODEL_EDGES),
+        ("BodyType", "WIRE") => QueryFilter(QueryFilter::WIRE_BODY.0 | MODEL_EDGES),
+        ("BodyType", "MATE_CONNECTOR") => QueryFilter::MATE_CONNECTOR,
+        ("BodyType", "POINT") => QueryFilter::POINT_BODY,
+        ("SketchObject", "YES") => QueryFilter(QueryFilter::SKETCH_REGION.0 | QueryFilter::SKETCH_EDGE.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::SKETCH.0),
+        ("ConstructionObject", "YES") => QueryFilter(QueryFilter::PLANE.0 | QueryFilter::MATE_CONNECTOR.0),
+        // query.fs's expansions of the compound filters.
+        ("QueryFilterCompound", "ALLOWS_AXIS") => any(&[("GeometryType", "LINE"), ("GeometryType", "CIRCLE"), ("GeometryType", "CYLINDER"), ("BodyType", "MATE_CONNECTOR")]),
+        ("QueryFilterCompound", "ALLOWS_DIRECTION") => any(&[("GeometryType", "LINE"), ("GeometryType", "CIRCLE"), ("GeometryType", "CYLINDER"), ("GeometryType", "PLANE")]),
+        ("QueryFilterCompound", "ALLOWS_PLANE") => any(&[("GeometryType", "PLANE"), ("BodyType", "MATE_CONNECTOR")]),
+        ("QueryFilterCompound", "ALLOWS_VERTEX") => any(&[("EntityType", "VERTEX"), ("BodyType", "MATE_CONNECTOR")]),
+        _ => return None,
+    })
 }
 
 // ---------------------------------------------------------------- schemas

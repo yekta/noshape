@@ -105,6 +105,14 @@ impl<'a> SheetPick<'a> {
         self.built?.placement(view).copied()
     }
 
+    /// A radial dimension's knee at the sheet point `c`: its distance
+    /// outside the circle (sheet mm).
+    pub fn radial_knee(&self, view: ViewId, center: [f64; 2], radius: f64, c: [f64; 2]) -> Option<f64> {
+        let pl = self.placement(view)?;
+        let cs = pl.to_sheet(center);
+        Some(len(sub(c, cs)) - len(sub(pl.to_sheet([center[0] + radius, center[1]]), cs)))
+    }
+
     /// The view under a sheet point (smallest containing view rectangle).
     pub fn view_at(&self, s: [f64; 2]) -> Option<ViewId> {
         if let Some(h) = self.hover
@@ -140,7 +148,7 @@ impl<'a> SheetPick<'a> {
     /// The selectable entity a pick id belongs to.
     pub fn sel_of_pick(&self, pick: u32) -> Option<Sel> {
         match self.built?.picks.get(pick as usize)? {
-            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) => Some(Sel::View(*v)),
+            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) | PickTarget::BrokenOut { view: v, .. } => Some(Sel::View(*v)),
             PickTarget::Annotation(a) | PickTarget::Inspection(a) => Some(Sel::Annotation(*a)),
             PickTarget::Table(t) => Some(Sel::Table(*t)),
             PickTarget::BreakLine { view, index } => Some(Sel::Break(*view, *index)),
@@ -324,10 +332,32 @@ impl<'a> SheetPick<'a> {
             .map(|(center, radius, r)| Pick::Circle { view, center, radius, r })
     }
 
-    /// A point in a view: snap, else the point on a hovered edge, else free.
+    /// A point in a view: snap, else the point on a hovered edge (the click
+    /// projected onto it: an ordinate base clicked beside an edge measures
+    /// from the edge, qa4 R5v3-S11-a), else free.
     pub fn any_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
         if let Some(p) = self.snap_at(s) {
             return Some(p);
+        }
+        if let Some((view, me)) = self.hovered_edge()
+            && let Some(pl) = self.placement(view)
+        {
+            let vp = pl.to_view(s);
+            let p = match me.geom {
+                EdgeGeom::Line { a, b } => {
+                    let d = sub(b, a);
+                    let l2 = d[0] * d[0] + d[1] * d[1];
+                    let t = if l2 > 0.0 { ((vp[0] - a[0]) * d[0] + (vp[1] - a[1]) * d[1]) / l2 } else { 0.0 };
+                    let t = t.clamp(0.0, 1.0);
+                    [a[0] + d[0] * t, a[1] + d[1] * t]
+                }
+                EdgeGeom::Circle { center, radius, .. } if len(sub(vp, center)) > 1e-12 => {
+                    let k = radius / len(sub(vp, center));
+                    [center[0] + (vp[0] - center[0]) * k, center[1] + (vp[1] - center[1]) * k]
+                }
+                _ => vp,
+            };
+            return Some(PickedPoint { view, p, r: None });
         }
         let view = self.view_at(s)?;
         let pl = self.placement(view)?;

@@ -73,7 +73,7 @@ pub fn face_blend() -> FeatureType {
     p.extend(group("crossSectionGroup", "Cross section", true, vec![
         ParamSpec::enum_("crossSection", "Cross section", &[("ROLLING_BALL", "Rolling ball"), ("SWEPT_PROFILE", "Swept profile")])
             .hints(Hints::SHOW_LABEL | rem),
-        ParamSpec::query1("spine", "Spine", QueryFilter::EDGE).visible(|v| v.is("crossSection", "SWEPT_PROFILE")),
+        ParamSpec::query1("spine", "Spine", QueryFilter::ANY_EDGE).visible(|v| v.is("crossSection", "SWEPT_PROFILE")),
         ParamSpec::enum_("blendControlType", "Measurement", &[("RADIUS", "Radius"), ("WIDTH", "Width")]).hints(Hints::SHOW_LABEL | rem),
         ParamSpec::num("radius", "Radius", BLEND_BOUNDS).hints(rem).visible(radius),
         ParamSpec::num("width", "Width", BLEND_BOUNDS).hints(rem).visible(move |v| !radius(v)),
@@ -113,7 +113,7 @@ pub fn face_blend() -> FeatureType {
             "edgeLimits",
             "Edge limits",
             "Edge limit",
-            vec![ParamSpec::query1("edge", "Edge limit", QueryFilter::EDGE), ParamSpec::query1("edgeLimitSide", "Side", QueryFilter::ANY_FACE)],
+            vec![ParamSpec::query1("edge", "Edge limit", QueryFilter::ANY_EDGE), ParamSpec::query1("edgeLimitSide", "Side", QueryFilter::ANY_FACE)],
         )
         .visible(|v| v.bool("hasLimits")),
         ParamSpec::bool("hasHelpPoint", "Help point", false),
@@ -187,7 +187,7 @@ pub fn body_draft() -> FeatureType {
         .visible(|v| !v.bool("draftOnSelf")),
         ParamSpec::num("angle", "Angle", NumSpec::angle(3.0, 0.0, 89.9)),
         ParamSpec::bool("bothSides", "Symmetric", false),
-        ParamSpec::query("bottomEdges", "Bottom edges", QueryFilter::EDGE).visible(move |v| v.bool("bothSides") && scope(v, "EDGES")),
+        ParamSpec::query("bottomEdges", "Bottom edges", QueryFilter::ANY_EDGE).visible(move |v| v.bool("bothSides") && scope(v, "EDGES")),
         ParamSpec::bool("matchFacesAtParting", "Match faces at parting", true)
             .hints(Hints::GROUP_HEADER)
             .visible(|v| v.bool("bothSides") && !v.bool("draftOnSelf")),

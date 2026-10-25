@@ -930,6 +930,10 @@ impl Viewport {
     }
 
     fn submit(&mut self, cx: &mut Context<Self>) {
+        if noshape_render::perf::enabled() {
+            static FIRST: std::sync::Once = std::sync::Once::new();
+            FIRST.call_once(|| noshape_render::perf::milestone("first viewport frame submitted"));
+        }
         if let Some(t) = self.presented_at.filter(|_| self.bench.as_ref().is_some_and(|b| b.started.is_some())) {
             noshape_render::perf::record("v.present_to_submit", t.elapsed());
         }

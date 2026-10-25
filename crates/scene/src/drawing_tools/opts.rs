@@ -111,6 +111,8 @@ impl SheetPick<'_> {
                     v.tangent_phantom = p.tangent_phantom;
                     v.show_centerlines = p.show_centerlines;
                     v.auto_centerlines = p.auto_centerlines;
+                    // Live 3102: child views inherit Show annotations from model.
+                    v.model_annotations = p.model_annotations;
                 }
                 None => self.drawing.props.view_defaults.apply(&mut v),
             }

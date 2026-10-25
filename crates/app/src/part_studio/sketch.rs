@@ -121,10 +121,15 @@ pub(super) struct SketchUi {
     tol_open: Option<noshape_sketch::ConstraintId>,
     /// Hover reference the Use preview was computed for.
     use_preview_for: Option<Reference>,
+    /// Open dimension context menu: constraint and viewport position.
+    dim_menu: Option<(noshape_sketch::ConstraintId, f32, f32)>,
     /// The dimension whose label (in the frame) the pointer is over.
     label_hover: Option<noshape_sketch::ConstraintId>,
     /// Pattern instance-count label being typed into (`3x`).
     count_edit: Option<(crate::sketch_mode::PatternHandle, Entity<InputState>, Subscription)>,
+    /// The dimension box's `#` variable autofill list (live, qa4
+    /// DIM-AUTOCOMPLETE: "(x) #var 10 mm", then "(x) New variable…").
+    dim_completion: Option<crate::var_complete::VarCompletion>,
 }
 
 /// Constraint manager filters and list state.
@@ -366,6 +371,9 @@ impl PartStudioView {
     }
 
     fn apply_outcome(&mut self, out: EditOutcome, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(text) = self.sketch.as_mut().and_then(|s| s.toast.take()) {
+            self.message = Some((noshape_model::display::FeatureStatus::Warning, text));
+        }
         if out.changed {
             self.regen_sync(window, cx);
         } else if out.redraw {
@@ -513,10 +521,8 @@ impl PartStudioView {
             let v = vp.read(cx);
             v.camera.world_per_pixel(v.size().y)
         };
-        // The pointer stands for its pixel's centre (live sketch/51: a point
-        // placed at a pointer pixel draws centred on that pixel row).
         let to_plane = |this: &Self, pos: DVec2, cx: &App| -> Option<DVec2> {
-            let (o, d) = vp.read(cx).ray(pos + DVec2::splat(0.5));
+            let (o, d) = vp.read(cx).ray(pos);
             this.sketch.as_ref()?.plane_point(o, d)
         };
         let wpp_changed = self.sketch.as_ref().is_some_and(|ed| (ed.world_per_px - wpp).abs() > wpp * 1e-6);
@@ -563,10 +569,10 @@ impl PartStudioView {
                 let Some(data) = self.sketch_data(cx) else { return true };
                 let Some(d) = self.placed_dimension_labels(&data, cx).into_iter().find(|d| d.cid == cid) else { return true };
                 match button {
-                    // Context menu: edit / driving-driven / delete.
+                    // Live (qa4 DIM-MENU): the sketch context menu, led by
+                    // the dimension's own items.
                     MouseButton::Right => {
-                        let _ = d;
-                        self.open_constraint_menu(cid, window.mouse_position(), window, cx);
+                        self.open_sketch_context_menu(window.mouse_position(), Some(cid), window, cx);
                     }
                     // The press goes on to the editor too, which turns it
                     // into a label drag / selection.
@@ -595,8 +601,10 @@ impl PartStudioView {
                 }
                 let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
                 // Live Onshape: the sketch's own plane (or face) is never
-                // pre-highlighted while sketching on it.
-                if r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx)) {
+                // pre-highlighted while sketching on it, except a face for
+                // Use, which projects its edges (qa5 CTX-USE).
+                let use_face = self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) && matches!(r, Some(Reference::Face(_)));
+                if !use_face && r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx)) {
                     if self.hover.take().is_some() {
                         self.refresh_scene(false, cx);
                     }
@@ -908,7 +916,7 @@ impl PartStudioView {
     }
 
     pub(super) fn sketch_cancel(&mut self, cx: &mut Context<Self>) {
-        if self.ui_ref().is_some_and(|u| u.pattern_menu.is_some()) {
+        if self.ui_ref().is_some_and(|u| u.dim_menu.is_some() || u.pattern_menu.is_some()) {
             self.close_dim_menu(cx);
             return;
         }
@@ -1018,12 +1026,19 @@ impl PartStudioView {
                 // (Clicking the canvas closes the box; the tolerance panel next
                 // to it may take the focus without closing it.)
                 let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+                    // Enter with the autofill list open picks its entry.
+                    InputEvent::PressEnter { .. } if this.ui_ref().is_some_and(|u| u.dim_completion.is_some()) => this.accept_dim_completion(cid, None, window, cx),
                     InputEvent::PressEnter { .. } => {
                         let text = st.read(cx).value().to_string();
                         this.commit_dimension(cid, &text, window, cx);
                     }
-                    InputEvent::Change if this.ui.dim_invalid => {
+                    InputEvent::Change => {
                         this.ui.dim_invalid = false;
+                        let vars = this.sketch_variables(cx);
+                        let list = crate::var_complete::VarCompletion::compute("dim", st.read(cx), &vars);
+                        if let Some(ui) = this.ui_mut() {
+                            ui.dim_completion = list;
+                        }
                         cx.notify();
                     }
                     _ => {}
@@ -1040,8 +1055,16 @@ impl PartStudioView {
                 self.dim_input = Some((cid, state, sub));
                 self.ui.dim_box_offset = Point::default();
                 self.ui.dim_invalid = false;
+                if let Some(ui) = self.ui_mut() {
+                    ui.dim_completion = None;
+                }
             }
-            None => self.dim_input = None,
+            None => {
+                self.dim_input = None;
+                if let Some(ui) = self.ui_mut() {
+                    ui.dim_completion = None;
+                }
+            }
         }
     }
 
@@ -1184,6 +1207,23 @@ impl PartStudioView {
                 self.message = Some((FeatureStatus::Error, e));
             }
             None => {}
+        }
+        cx.notify();
+    }
+
+    /// Pick entry `index` (the selected one when `None`) of the dimension
+    /// box's autofill list: insert the variable, or "New variable…" opens
+    /// the Create variable popup for the typed name.
+    fn accept_dim_completion(&mut self, cid: noshape_sketch::ConstraintId, index: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(c) = self.ui_mut().and_then(|u| u.dim_completion.take()) else { return };
+        let Some(state) = self.dim_input.as_ref().filter(|d| d.0 == cid).map(|d| d.1.clone()) else { return };
+        if c.picks_new(index) {
+            let dim = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| crate::sketch_mode::dim_unit(&c.kind))).unwrap_or(noshape_units::Dim::LENGTH);
+            if let Some(name) = c.new_variable.clone() {
+                self.open_dim_create_variable(cid, dim, name, window, cx);
+            }
+        } else {
+            c.accept(index, &state, window, cx);
         }
         cx.notify();
     }
@@ -1940,6 +1980,7 @@ impl PartStudioView {
                     }
                     this.sync_offset_input(window, cx);
                     window.focus(&this.focus, cx);
+                    this.sync_dim_edit(window, cx);
                 }
                 _ => {}
             }
@@ -2373,7 +2414,7 @@ impl PartStudioView {
 
     fn close_dim_menu(&mut self, cx: &mut Context<Self>) {
         if let Some(ui) = self.ui_mut()
-            && ui.pattern_menu.take().is_some()
+            && (ui.dim_menu.take().is_some() | ui.pattern_menu.take().is_some())
         {
             cx.notify();
         }
@@ -2444,6 +2485,71 @@ impl PartStudioView {
         let values = self.current_config(studio);
         let option = studio.configuration.value_of(&values, &cp.input)?;
         Some((cp.input.clone(), option))
+    }
+
+    /// A dimension's own context-menu items (label, `dim_menu_action`):
+    /// driving / driven, tolerance, configuration ("Delete dimension" ends
+    /// the menu).
+    fn dimension_menu_items(&self, cid: noshape_sketch::ConstraintId, cx: &App) -> Vec<(String, String)> {
+        let Some((driving, allowed)) = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| (c.driving, crate::sketch_mode::tolerance_allowed(&c.kind)))) else { return Vec::new() };
+        let mut out = vec![((if driving { "Change to driven dimension" } else { "Change to driving dimension" }).to_string(), "driving".to_string())];
+        if allowed {
+            out.push(("Tolerance and precision…".into(), "tolerance".into()));
+        }
+        if self.dimension_configuration(cid, cx).is_some() {
+            out.push(("Unconfigure dimension".into(), "unconfigure".into()));
+        } else {
+            use noshape_model::configuration::ConfigInputKind;
+            if let Some(st) = self.studio(cx) {
+                for i in st.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })) {
+                    out.push((format!("Configure dimension with {}", i.name), format!("configure:{}", i.id)));
+                }
+            }
+        }
+        out
+    }
+
+    fn render_dim_menu(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let pal = p();
+        let (cid, x, y) = self.ui_ref()?.dim_menu?;
+        let (driving, is_dim) = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| (c.driving, c.is_dimension())))?;
+        let item = |id: &str, label: &str, icon: &'static str, action: &str, cx: &mut Context<Self>| {
+            let action = action.to_string();
+            Button::new(SharedString::from(id.to_string()))
+                .label(SharedString::from(label.to_string()))
+                .icon(icon_px(icon, 13.0, pal.text))
+                .ghost()
+                .xsmall()
+                .w_full()
+                .justify_start()
+                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.dim_menu_action(cid, &action, window, cx)))
+        };
+        let mut menu = v_flex().absolute().left(px(x)).top(px(y)).occlude().w(px(170.)).p_1().gap_0p5().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.border_strong).shadow_lg();
+        // Onshape: dimensions toggle driving/driven; constraints only delete.
+        if is_dim {
+            menu = menu.child(item("sk-dim-driving", if driving { "Change to driven dimension" } else { "Change to driving dimension" }, "driven-dimension", "driving", cx));
+        }
+        if is_dim {
+            let allowed = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| crate::sketch_mode::tolerance_allowed(&c.kind))).unwrap_or(false);
+            if allowed {
+                menu = menu.child(item("sk-dim-tol", "Tolerance and precision…", "dimension", "tolerance", cx));
+            }
+            // Configure dimension with a list / checkbox configuration input.
+            if self.dimension_configuration(cid, cx).is_some() {
+                menu = menu.child(item("sk-dim-unconf", "Unconfigure dimension", "configuration", "unconfigure", cx));
+            } else {
+                use noshape_model::configuration::ConfigInputKind;
+                let inputs: Vec<(String, String)> = self
+                    .studio(cx)
+                    .map(|s| s.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).map(|i| (i.id.clone(), i.name.clone())).collect())
+                    .unwrap_or_default();
+                for (id, name) in inputs {
+                    menu = menu.child(item(&format!("sk-dim-conf-{id}"), &format!("Configure dimension with {name}"), "configuration", &format!("configure:{id}"), cx));
+                }
+            }
+        }
+        menu = menu.child(item("sk-dim-delete", if is_dim { "Delete dimension" } else { "Delete" }, "delete", "delete", cx));
+        Some(menu.into_any_element())
     }
 
     // ------------------------------------------------------------ overlay rendering
@@ -2531,14 +2637,12 @@ impl PartStudioView {
             let b = crate::overlay_labels::RowBox {
                 leaves,
                 text_size: 16.0,
-                // Live sketch/24: the hover / selected box is 27 px high,
-                // centred on the value.
-                height: 27.0,
+                height: 22.0,
                 pad_x: 4.0,
                 radius: 4.0,
                 background: bg.map(Into::into),
                 border: configured.then(|| rgb(0xffc20e).into()),
-                offset: [shift - est_w * 0.5, -13.5],
+                offset: [shift - est_w * 0.5, -11.0],
             };
             if let Some(l) = crate::overlay_labels::row_box(window, cx, &b, anchor, dim_label_hit(cid)) {
                 out.push(l);
@@ -2754,20 +2858,40 @@ impl PartStudioView {
                             let st = st.clone();
                             move |this, e: &KeyDownEvent, window, cx| {
                                 let k = &e.keystroke;
-                                // Live (qa5 dim conflict): Esc in the box reverts
-                                // it to the committed value and blurs it; the box
-                                // stays, and the next Esc (the sketch's) closes
-                                // it. The sketch gets the keys back (qa4 F29).
+                                // Live (qa5 dim conflict): Esc in a changed box
+                                // reverts it to the committed value and blurs it;
+                                // the box stays, and the next Esc (the sketch's)
+                                // closes it. The sketch gets the keys back (qa4
+                                // F29). An untouched box closes at once (qa4
+                                // DIM-ESC-UNTOUCHED).
+                                // The autofill list takes ↑ / ↓, Tab and Esc first.
+                                if this.ui_ref().is_some_and(|u| u.dim_completion.is_some()) && !k.modifiers.modified() {
+                                    match k.key.as_str() {
+                                        "up" | "down" => {
+                                            if let Some(c) = this.ui_mut().and_then(|u| u.dim_completion.as_mut()) {
+                                                c.move_selection(if k.key == "up" { -1 } else { 1 });
+                                            }
+                                        }
+                                        "tab" => this.accept_dim_completion(cid, None, window, cx),
+                                        "escape" => {
+                                            if let Some(ui) = this.ui_mut() {
+                                                ui.dim_completion = None;
+                                            }
+                                        }
+                                        _ => return,
+                                    }
+                                    cx.stop_propagation();
+                                    cx.notify();
+                                    return;
+                                }
                                 if k.key == "escape" && !k.modifiers.modified() {
                                     cx.stop_propagation();
                                     this.ui.dim_invalid = false;
                                     let units = this.doc.read(cx).session.doc.settings.units;
                                     let committed = this.sketch_data(cx).and_then(|d| crate::sketch_mode::dimension_edit_text(&d, cid, &units));
+                                    let untouched = dim_box_untouched(committed.as_deref(), &st.read(cx).value());
                                     window.focus(&this.focus, cx);
-                                    // Live (qa4 round 5 v3 s5): Esc on an untouched box
-                                    // (new or reopened) closes it at once; a new
-                                    // dimension keeps its measured value.
-                                    if committed.as_deref() == Some(st.read(cx).value().trim()) {
+                                    if untouched {
                                         this.sketch_cancel(cx);
                                         return;
                                     }
@@ -2917,6 +3041,11 @@ impl PartStudioView {
                                         })),
                                 ),
                         )
+                        // The `#` autofill list, under the value field.
+                        .when_some(self.ui_ref().and_then(|u| u.dim_completion.as_ref()), |d, c| {
+                            let view = cx.entity();
+                            d.child(div().pl(px(20.)).child(c.render(&self.sketch_variables(cx), &units, move |i, window, cx| view.update(cx, |this, cx| this.accept_dim_completion(cid, Some(i), window, cx)))))
+                        })
                         .into_any_element(),
                 );
                 if let Some(panel) = tol_panel.take() {
@@ -2934,9 +3063,8 @@ impl PartStudioView {
                     .id(SharedString::from(format!("dim-{}", cid.0)))
                     .absolute()
                     .left(px(x - est_w * 0.5))
-                    // Live sketch/24: 27 px high, centred on the value.
-                    .top(px(y - 13.5))
-                    .h(px(27.))
+                    .top(px(y - 11.0))
+                    .h(px(22.))
                     .px(px(4.))
                     .flex()
                     .items_center()
@@ -2962,9 +3090,10 @@ impl PartStudioView {
                         }
                     }))
                     .on_mouse_down(MouseButton::Right, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
-                        // Context menu (the viewport must not rotate).
+                        // The sketch context menu led by the dimension's items
+                        // (live, qa4 DIM-MENU; the viewport must not rotate).
                         cx.stop_propagation();
-                        this.open_constraint_menu(cid, ev.position, window, cx);
+                        this.open_sketch_context_menu(ev.position, Some(cid), window, cx);
                     }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                         // Not consumed: the viewport receives the press too and the
@@ -3026,43 +3155,18 @@ impl PartStudioView {
         // ---- constraint glyphs
         let show_all = ed.show_constraints || ed.shift_held;
         let recent = ed.glyph_entity.filter(|(_, t)| t.elapsed().as_millis() < 750).map(|(e, _)| e);
-        let glyphs: Vec<_> = ed
-            .constraint_glyphs(&data)
-            .into_iter()
-            .filter(|g| {
-                show_all
-                    || ed.hover == Some(g.entity)
-                    || recent == Some(g.entity)
-                    || ed.selection.contains(&g.entity)
-                    || ed.selected_constraints.contains(&g.constraint)
-                    || ed.hover_constraint == Some(g.constraint)
-            })
-            .collect();
-        // Glyphs per entity laid out next to it (dragged ones aside).
-        let mut counts: HashMap<u32, usize> = HashMap::new();
-        for g in glyphs.iter().filter(|g| g.offset.is_none()) {
-            *counts.entry(g.entity.0).or_default() += 1;
-        }
-        // A line's side for its glyphs (screen unit normal): below a
-        // horizontal line, left of a vertical one (live sketch/28).
-        let line_side = |e: noshape_sketch::EntityId| -> Option<(f32, f32)> {
-            let noshape_sketch::Curve2::Line { a, b } = data.sketch.curve(e)? else { return None };
-            let ((ax, ay), (bx, by)) = (project(a)?, project(b)?);
-            let (dx, dy) = (bx - ax, by - ay);
-            let len = (dx * dx + dy * dy).sqrt();
-            if len < 1e-3 {
-                return None;
-            }
-            let (nx, ny) = (-dy / len, dx / len);
-            Some(if ny < -1e-3 || (ny.abs() <= 1e-3 && nx > 0.0) { (-nx, -ny) } else { (nx, ny) })
-        };
         let mut per_entity: HashMap<u32, usize> = HashMap::new();
-        for g in glyphs {
-            // Dragged glyphs sit centered on their stored offset. Live
-            // (sketch/28): 20 px white boxes 22 px apart; a line's row is
-            // centred 20.5 px off its midpoint, a point's glyph sits up-left
-            // of it (top-left at -27, -26) with a leader.
-            let mut leader = false;
+        for g in ed.constraint_glyphs(&data) {
+            let visible = show_all
+                || ed.hover == Some(g.entity)
+                || recent == Some(g.entity)
+                || ed.selection.contains(&g.entity)
+                || ed.selected_constraints.contains(&g.constraint)
+                || ed.hover_constraint == Some(g.constraint);
+            if !visible {
+                continue;
+            }
+            // Dragged glyphs sit centered on their stored offset; others stack next to the entity.
             let (x, y, dx, dy) = match g.offset {
                 Some(o) => {
                     let Some((x, y)) = project(g.anchor + o) else { continue };
@@ -3071,41 +3175,11 @@ impl PartStudioView {
                 None => {
                     let Some((x, y)) = project(g.anchor) else { continue };
                     let k = per_entity.entry(g.entity.0).or_default();
-                    let n = counts.get(&g.entity.0).copied().unwrap_or(1) as f32;
-                    let kf = *k as f32;
+                    let d = if g.on_point { (7.0 + 19.0 * *k as f32, -25.0) } else { (6.0 + 19.0 * *k as f32, 6.0) };
                     *k += 1;
-                    if g.on_point {
-                        leader = true;
-                        (x, y, -27.0 - 22.0 * kf, -26.0)
-                    } else if let Some((nx, ny)) = line_side(g.entity) {
-                        (x + nx * 20.5, y + ny * 20.5, -10.0 - 11.0 * (n - 1.0) + 22.0 * kf, -10.0)
-                    } else {
-                        (x, y, 6.0 + 22.0 * kf, 6.0)
-                    }
+                    (x, y, d.0, d.1)
                 }
             };
-            if leader {
-                // Live: a 1 px #a8b2bb line from the box's corner to the point.
-                out.push(
-                    canvas(
-                        |_, _, _| {},
-                        |b, _, window, _| {
-                            let mut pb = PathBuilder::stroke(px(1.));
-                            pb.move_to(b.origin);
-                            pb.line_to(b.origin + point(b.size.width, b.size.height));
-                            if let Ok(path) = pb.build() {
-                                window.paint_path(path, gpui_kit::rgb_static(0xa8b2bb));
-                            }
-                        },
-                    )
-                    .absolute()
-                    .left(px(x - 7.0))
-                    .top(px(y - 6.0))
-                    .w(px(7.))
-                    .h(px(6.))
-                    .into_any_element(),
-                );
-            }
             let cid = g.constraint;
             let gent = g.entity;
             let selected = ed.selected_constraints.contains(&cid);
@@ -3135,10 +3209,11 @@ impl PartStudioView {
                     .flex()
                     .items_center()
                     .justify_center()
+                    .rounded(px(2.))
                     .bg(bg)
+                    .shadow_xs()
                     .cursor_pointer()
-                    // Live sketch/28: the icon spans 14 px of the 20 px box (ours at 18 px).
-                    .child(icon_px(g.icon, 18.0, fg))
+                    .child(icon_px(g.icon, 14.0, fg))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         if let Some(ed) = &mut this.sketch {
                             let new = if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
@@ -3152,9 +3227,12 @@ impl PartStudioView {
                             }
                         }
                     }))
-                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
+                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
                         cx.stop_propagation();
-                        this.open_constraint_menu(cid, ev.position, window, cx);
+                        if let Some(ui) = this.ui_mut() {
+                            ui.dim_menu = Some((cid, x + dx + 6.0, y + dy + 18.0));
+                        }
+                        cx.notify();
                     }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, _| {
                         // Drag to move the glyph, click to select its constraint.
@@ -3218,17 +3296,13 @@ impl PartStudioView {
             && let Some((x, y)) = project(inf.position)
         {
             let icons: Vec<&'static str> = if inf.kind == noshape_sketch::InferenceKind::AlignBoth { vec!["horizontal", "vertical"] } else { vec![crate::sketch_mode::inference_icon(inf.kind)] };
-            // Live (sketch/51, 52; part-studio/1032): the constraint icon in
-            // `#333` on a 20 px box of 40 % white (unseen on the white plane),
-            // centred 30 px right of and 31 px below the point (at 18 px our
-            // icons give live's 14 px horizontal bar and 16 px perpendicular base).
             out.push(
                 h_flex()
                     .absolute()
-                    .left(px(x + 19.0))
-                    .top(px(y + 21.0))
+                    .left(px(x + 12.0))
+                    .top(px(y + 10.0))
                     .gap_0p5()
-                    .children(icons.into_iter().map(|i| div().size(px(20.)).flex().items_center().justify_center().bg(gpui_kit::rgba_static(0xffffff66)).child(icon_px(i, 18.0, gpui_kit::rgb_static(0x333333)))))
+                    .children(icons.into_iter().map(|i| div().size(px(18.)).flex().items_center().justify_center().rounded(px(3.)).bg(with_alpha(rgb(0x27aae1), 0.35)).border_1().border_color(rgb(0xffc20e)).child(icon_px(i, 13.0, rgb(0xffffff)))))
                     .into_any_element(),
             );
         }
@@ -3453,6 +3527,9 @@ impl PartStudioView {
                     })))
                     .into_any_element(),
             );
+        }
+        if let Some(menu) = self.render_dim_menu(cx) {
+            out.push(menu);
         }
         if std::mem::replace(&mut self.ui.sketch_follows_camera, follows) != follows {
             cx.notify();
@@ -3688,34 +3765,12 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// Right-click on a dimension or a constraint glyph (live "qa4 round 5
-    /// s5 driven dims" (2), (3)): the sketch menu as for empty space, a
-    /// dimension's Change to driving / driven first, and its delete last.
-    fn open_constraint_menu(&mut self, cid: noshape_sketch::ConstraintId, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
-        self.open_sketch_context_menu(position, Some(cid), window, cx);
-    }
-
-    /// Right-click in an active sketch: the sketch context menu (Onshape);
-    /// `target`: a dimension or constraint glyph right-clicked.
-    fn open_sketch_context_menu(&mut self, position: Point<Pixels>, target: Option<noshape_sketch::ConstraintId>, window: &mut Window, cx: &mut Context<Self>) {
-        // A dimension / glyph: is it a dimension, driving, and its extra
-        // items (tolerance, configure).
-        let target_info = target.and_then(|cid| {
-            let data = self.sketch_data(cx)?;
-            let c = data.sketch.constraint(cid)?;
-            let (is_dim, driving) = (c.is_dimension(), c.driving);
-            let configured = is_dim && self.dimension_configuration(cid, cx).is_some();
-            let inputs: Vec<(String, String)> = if is_dim && !configured {
-                use noshape_model::configuration::ConfigInputKind;
-                self.studio(cx)
-                    .map(|s| s.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).map(|i| (i.id.clone(), i.name.clone())).collect())
-                    .unwrap_or_default()
-            } else {
-                Vec::new()
-            };
-            Some((cid, is_dim, driving, configured, inputs))
-        });
-        let hovered = if target.is_some() { None } else { self.hovered_sketch_entity(cx) };
+    /// Right-click in an active sketch: the sketch context menu (Onshape).
+    /// The sketch context menu; for a dimension (`dim`), its own items lead
+    /// and "Delete dimension" ends it (live, qa4 DIM-MENU).
+    fn open_sketch_context_menu(&mut self, position: Point<Pixels>, dim: Option<noshape_sketch::ConstraintId>, window: &mut Window, cx: &mut Context<Self>) {
+        let hovered = self.hovered_sketch_entity(cx).filter(|_| dim.is_none());
+        let dim_items: Vec<(String, String)> = dim.map(|cid| self.dimension_menu_items(cid, cx)).unwrap_or_default();
         let model_edge = matches!(self.hover, Some(Reference::Edge(_) | Reference::Face(_)));
         // Model geometry under the cursor: its part (Hide / Isolate / Make
         // transparent) and, for a straight edge, Align view (live sketch/204).
@@ -3723,9 +3778,7 @@ impl PartStudioView {
         let model_body = model_ref.as_ref().and_then(|r| self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r)).map(|b| (b.id.clone(), b.name.clone())));
         let linear_model_edge = model_ref.as_ref().filter(|r| self.linear_edge_direction(r).is_some()).cloned();
         let sketch_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_else(|| "sketch".into());
-        // Other sketches shown (live: Hide other sketches / Hide all sketches).
-        let this_sketch = self.sketch.as_ref().map(|e| e.feature);
-        let other_sketches = self.display.sketches.iter().any(|s| !s.hidden && Some(s.feature) != this_sketch);
+        let own_plane = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned());
         let Some(ed) = &mut self.sketch else { return };
         // The entity under the cursor joins the selection the menu acts on.
         if let Some(h) = hovered
@@ -3733,8 +3786,7 @@ impl PartStudioView {
         {
             ed.selection.push(h);
         }
-        // A dimension / glyph menu is the empty-space one (live).
-        let n = if target.is_some() { 0 } else { ed.selection.len() };
+        let n = ed.selection.len();
         let tool = ed.tool;
         let drawing_spline = matches!(tool, Tool::Spline | Tool::Bezier) && !ed.clicks_empty();
         let tool_active = tool != Tool::Select && !drawing_spline;
@@ -3763,15 +3815,10 @@ impl PartStudioView {
                 let v = v.clone();
                 m = m.on_first_escape(move |_, cx| v.update(cx, |this, cx| this.set_tool(Tool::Select, cx)));
             }
-            // Live's list has no tolerance item (that is the value box's ±).
-            if let Some((cid, true, driving, configured, inputs)) = target_info.clone() {
-                m = m.item(item(if driving { "Change to driven dimension" } else { "Change to driving dimension" }, Box::new(move |this, w, cx| this.dim_menu_action(cid, "driving", w, cx))));
-                if configured {
-                    m = m.item(item("Unconfigure dimension", Box::new(move |this, w, cx| this.dim_menu_action(cid, "unconfigure", w, cx))));
-                }
-                for (id, name) in inputs {
-                    let action = format!("configure:{id}");
-                    m = m.item(item(&format!("Configure dimension with {name}"), Box::new(move |this, w, cx| this.dim_menu_action(cid, &action, w, cx))));
+            if let Some(cid) = dim {
+                for (label, action) in &dim_items {
+                    let action = action.clone();
+                    m = m.item(item(label, Box::new(move |this, w, cx| this.dim_menu_action(cid, &action, w, cx))));
                 }
                 m = m.separator();
             }
@@ -3891,24 +3938,17 @@ impl PartStudioView {
             if has_clip {
                 m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
             }
-            // Live (qa4 round 5 v3 s6, a selected line): Construction |
-            // Extrude…, Revolve… | Hide other sketches, Hide all sketches,
-            // Curve/surface analysis… (no Section view…).
-            if n > 0 && !tool_active {
-                m = m.separator().item(item("Construction", Box::new(|this, w, cx| this.toggle_construction(w, cx))));
-                m = m.separator().item(item("Extrude…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Extrude), cx)))).item(item("Revolve…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Revolve), cx))));
-            }
             m = m.separator();
             if n == 0 {
                 m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx))));
-            }
-            if n > 0 && !tool_active && other_sketches {
-                m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(this_sketch, cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
             }
             if !tool_active {
                 m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
             }
             if n > 0 {
+                if let Some(plane) = own_plane.clone().filter(|_| !tool_active) {
+                    m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through(plane.clone(), w, cx))));
+                }
                 m = m.separator();
                 m = m.item(item("Clear selection", Box::new(|this, _, cx| {
                     if let Some(ed) = &mut this.sketch {
@@ -3970,7 +4010,9 @@ impl PartStudioView {
                 this.view_normal(cx);
                 this.selection = prev;
             })));
-            if let Some(d) = single_line {
+            if tool_active
+                && let Some(d) = single_line
+            {
                 m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| {
                     let cam = this.viewport.read(cx).camera;
                     let fwd = cam.forward();
@@ -3981,13 +4023,11 @@ impl PartStudioView {
                     this.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, up, cx));
                 })));
             }
-            if n > 0 && !tool_active {
+            if let Some(cid) = dim {
+                m = m.separator().item(item("Delete dimension", Box::new(move |this, w, cx| this.dim_menu_action(cid, "delete", w, cx))));
+            } else if n > 0 && !tool_active {
                 let label = if n == 1 { "Delete sketch entity".to_string() } else { format!("Delete {n} sketch entities") };
                 m = m.separator().item(item(&label, Box::new(|this, w, cx| this.sketch_delete(w, cx))));
-            }
-            // Live: a constraint glyph's delete reads "Delete sketch entity".
-            if let Some((cid, is_dim, ..)) = target_info.clone() {
-                m = m.separator().item(item(if is_dim { "Delete dimension" } else { "Delete sketch entity" }, Box::new(move |this, w, cx| this.dim_menu_action(cid, "delete", w, cx))));
             }
             m
         });
@@ -4063,6 +4103,8 @@ impl PartStudioView {
                             this.apply_outcome(out, window, cx);
                         }
                         this.sync_offset_input(window, cx);
+                        // Enter opens the distance value box (live, qa4 OFF-BOX).
+                        this.sync_dim_edit(window, cx);
                     }
                     E::OnTheFly => {
                         // Live Onshape: Enter while drawing places the boxed
@@ -4166,6 +4208,11 @@ impl PartStudioView {
     }
 }
 
+/// The dimension box still shows its committed text (Esc closes it at once).
+fn dim_box_untouched(committed: Option<&str>, current: &str) -> bool {
+    committed.is_some_and(|t| t.trim() == current.trim())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4180,6 +4227,16 @@ mod tests {
             assert!(seen.insert(format!("{t:?}")), "{t:?} twice");
         }
         assert!(tools.contains(&Tool::InsertDxf) && tools.contains(&Tool::Chamfer) && tools.contains(&Tool::SplinePoint));
+    }
+
+    /// qa4 DIM-ESC-UNTOUCHED: Esc closes a box still showing its committed
+    /// text; a changed one reverts first.
+    #[test]
+    fn dimension_box_escape_closes_only_when_untouched() {
+        assert!(dim_box_untouched(Some("40 mm"), "40 mm"));
+        assert!(dim_box_untouched(Some("40 mm"), " 40 mm "));
+        assert!(!dim_box_untouched(Some("40 mm"), "45 mm"));
+        assert!(!dim_box_untouched(None, "40 mm"));
     }
 }
 

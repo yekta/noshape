@@ -78,7 +78,9 @@ impl PartStudioView {
     /// letters in order ("fil" finds Fillet, Fill, Finish flex PCB model,
     /// Finish sheet metal model, 3D fit spline, Modify fillet), ranked by
     /// where the first letter matches, then how tightly the letters sit,
-    /// then catalog order. In a sketch, its tools are searched too.
+    /// then catalog order. In a sketch only the sketch tools are searched,
+    /// by their plain names (live qa5-ts-sketch-*: "chamfer" lists just the
+    /// sketch "Chamfer", no Part Studio feature).
     fn palette_items(&self, cx: &App) -> Vec<PaletteItem> {
         let q: Vec<char> = self.palette_query.trim().to_lowercase().chars().collect();
         if q.is_empty() {
@@ -117,18 +119,19 @@ impl PartStudioView {
         if self.sketch.is_some() {
             for t in super::sketch::all_sketch_tools() {
                 order += 1;
-                if let Some((f, span)) = score(sketch_tool_name(t)) {
+                if let Some((f, span)) = score(sketch_search_name(t)) {
                     found.push(((f, span, order), PaletteItem::SketchTool(t)));
                 }
             }
-        }
-        let custom: Vec<&'static features::FeatureType> = self.doc.read(cx).custom_features().feature_types().into_iter().collect();
-        // Only tools: hidden feature types (Rip, Recognize, …) are not in
-        // live's tool search either.
-        for t in features::all().filter(|t| t.in_toolbar).chain(custom) {
-            order += 1;
-            if let Some((f, span)) = score(t.name) {
-                found.push(((f, span, order), PaletteItem::Feature(t.id)));
+        } else {
+            let custom: Vec<&'static features::FeatureType> = self.doc.read(cx).custom_features().feature_types().into_iter().collect();
+            // Only tools: hidden feature types (Rip, Recognize, …) are not in
+            // live's tool search either.
+            for t in features::all().filter(|t| t.in_toolbar).chain(custom) {
+                order += 1;
+                if let Some((f, span)) = score(t.name) {
+                    found.push(((f, span, order), PaletteItem::Feature(t.id)));
+                }
             }
         }
         found.sort_by_key(|(k, _)| *k);
@@ -162,8 +165,8 @@ impl PartStudioView {
                     (feature_icon(id), t.map(|t| t.name.to_string()).unwrap_or_default(), t.and_then(|t| t.shortcut), crate::tool_text::description(id).or(t.map(|t| t.description)).unwrap_or_default().to_string())
                 }
                 PaletteItem::SketchTool(t) => {
-                    let name = sketch_tool_name(*t);
-                    (t.icon().into(), name.to_string(), None, crate::tool_text::sketch_description(name).unwrap_or_default().to_string())
+                    let name = sketch_search_name(*t);
+                    (t.icon().into(), name.to_string(), sketch_tool_shortcut(*t), crate::tool_text::sketch_description(name).unwrap_or_default().to_string())
                 }
             }
         };
@@ -743,10 +746,24 @@ impl PartStudioView {
 }
 
 
-/// A sketch tool's name without its shortcut ("Line (L)" -> "Line").
-fn sketch_tool_name(t: crate::sketch_mode::Tool) -> &'static str {
+/// A sketch tool's name in the tool search: live's title, the label without
+/// its shortcut ("Line (L)" -> "Line") and plain where the toolbar label
+/// isn't ("Sketch fillet (Shift+F)" -> "Fillet", live qa5-ts-sketch-fillet).
+fn sketch_search_name(t: crate::sketch_mode::Tool) -> &'static str {
     let l = t.label();
-    l.rsplit_once(" (").map_or(l, |(name, _)| name)
+    match l.rsplit_once(" (").map_or(l, |(name, _)| name) {
+        "Sketch fillet" => "Fillet",
+        "Sketch chamfer" => "Chamfer",
+        "Center rectangle" => "Center point rectangle",
+        "Use / project edges" => "Use",
+        name => name,
+    }
+}
+
+/// The shortcut in a sketch tool's label ("Offset (O)" -> "O"), shown as the
+/// search row's key badge (live: Fillet "shift f", Offset "o").
+fn sketch_tool_shortcut(t: crate::sketch_mode::Tool) -> Option<&'static str> {
+    t.label().rsplit_once(" (").and_then(|(_, k)| k.strip_suffix(')'))
 }
 
 #[cfg(test)]
@@ -765,5 +782,21 @@ mod tests {
         assert!(shortcuts::sheet_search(&s, "isol").iter().any(|r| r.name == "Make isolate"));
         assert!(shortcuts::sheet_search(&s, "shift+i").iter().any(|r| r.name == "Make isolate"));
         assert!(!shortcuts::sheet_search(&s, "fillet").iter().any(|r| r.name == "Zoom to window"));
+    }
+
+    /// Live qa5-ts-sketch-*: a sketch tool is searched and listed under its
+    /// live title (which has a live description), with its key badge.
+    #[test]
+    fn sketch_tools_search_by_live_titles() {
+        use crate::sketch_mode::Tool;
+        for t in super::super::sketch::all_sketch_tools() {
+            let name = sketch_search_name(t);
+            assert!(crate::tool_text::sketch_description(name).is_some(), "{name} ({}) is not a live sketch tool title", t.label());
+        }
+        assert_eq!((sketch_search_name(Tool::Fillet), sketch_tool_shortcut(Tool::Fillet)), ("Fillet", Some("Shift+F")));
+        assert_eq!((sketch_search_name(Tool::Chamfer), sketch_tool_shortcut(Tool::Chamfer)), ("Chamfer", None));
+        assert_eq!((sketch_search_name(Tool::Offset), sketch_tool_shortcut(Tool::Offset)), ("Offset", Some("O")));
+        assert_eq!(sketch_search_name(Tool::LinearPattern), "Linear pattern");
+        assert_eq!(sketch_search_name(Tool::Mirror), "Mirror");
     }
 }
