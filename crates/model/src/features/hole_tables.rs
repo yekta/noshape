@@ -566,16 +566,25 @@ pub fn link_tapped_depths(prev: &ParamValues, now: &ParamValues, units: &noshape
         }
         return out;
     }
-    if changed("holeDepthV3", Dim::LENGTH) {
-        return if depth >= tapped { vec![("tapClearance", count((depth - tapped) / pitch))] } else { vec![("tappedDepthV3", len(depth - clear * pitch))] };
+    // std hole.fs adjustDepthAndThreadParameters: of the two fields the
+    // user isn't editing, the later one in (Depth, Tapped depth, Tap
+    // clearance) whose new value stays positive (the clearance may be 0);
+    // none: nothing changes (std then warns HOLE_INCONSISTENT_TAP_INFO).
+    let candidates = [
+        ("holeDepthV3", tapped + clear * pitch, false, Dim::LENGTH),
+        ("tappedDepthV3", depth - clear * pitch, false, Dim::LENGTH),
+        ("tapClearance", (depth - tapped) / pitch, true, Dim::UNITLESS),
+    ];
+    let edited: Vec<&str> = candidates.iter().filter(|c| changed(c.0, c.3)).map(|c| c.0).collect();
+    if edited.is_empty() {
+        return Vec::new();
     }
-    if changed("tapClearance", Dim::UNITLESS) {
-        return vec![("tappedDepthV3", len(depth - clear * pitch))];
+    let pick = candidates.iter().rfind(|c| !edited.contains(&c.0) && (c.1 > 0.0 || (c.2 && c.1 >= 0.0)));
+    match pick {
+        Some(&(id, v, _, dim)) if dim == Dim::LENGTH => vec![(id, len(v))],
+        Some(&(id, v, _, _)) => vec![(id, count(v))],
+        None => Vec::new(),
     }
-    if changed("tappedDepthV3", Dim::LENGTH) {
-        return vec![("holeDepthV3", len(tapped + clear * pitch))];
-    }
-    Vec::new()
 }
 
 pub fn external_thread_for_diameter(standard_id: &str, diameter: f64, tol: f64) -> Option<Vec<String>> {

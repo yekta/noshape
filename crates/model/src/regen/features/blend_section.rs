@@ -54,6 +54,8 @@ pub enum Bound {
     Fraction(f64),
     /// Distance along the chain.
     Offset(f64),
+    /// Distance back from the chain's end (a second bound's offset).
+    OffsetFromEnd(f64),
     /// The chain point nearest this point (a vertex, or a face's nearest point).
     Point(DVec3),
 }
@@ -116,6 +118,51 @@ fn chain(shape: &Shape, edges: &[usize]) -> FResult<Vec<ChainEdge>> {
         out.push(ChainEdge { index, shape, start: s, end: e, length, forward });
     }
     Ok(out)
+}
+
+/// Std fillet.fs's partial fillet checks (getPath and the bounds), with
+/// its messages: one open chain (or a closed one with two bounds), offsets
+/// within the chain, two distinct bounds.
+pub fn check_partial(shape: &Shape, edges: &[usize], p: &Partial) -> FResult<()> {
+    let tol = 1e-9;
+    let mut ends = Vec::new();
+    for &i in edges {
+        let info = shape.sub_shape(ShapeType::Edge, i)?.edge_info()?;
+        ends.extend([info.start, info.end]);
+    }
+    if ends.iter().any(|a| ends.iter().filter(|b| (**b - *a).length() < tol).count() > 2) {
+        return Err(FeatureError::new("Edges do not form a continuous path."));
+    }
+    let chain = chain(shape, edges)?;
+    if chain.windows(2).any(|w| (w[0].end - w[1].start).length() > tol) {
+        return Err(FeatureError::new("Only one edge or one chain of tangent edges can be partially fillet."));
+    }
+    let closed = chain.first().zip(chain.last()).is_some_and(|(a, b)| (a.start - b.end).length() < tol);
+    if closed && p.second.is_none() {
+        return Err(FeatureError::new("Closed entity requires a second boundary point."));
+    }
+    let total: f64 = chain.iter().map(|c| c.length).sum();
+    let parameter = |b: Bound, second: bool| -> FResult<Option<f64>> {
+        let t = match b {
+            Bound::Fraction(f) => f,
+            Bound::Offset(d) => d / total,
+            Bound::OffsetFromEnd(d) => (total - d) / total,
+            Bound::Point(_) => return Ok(None),
+        };
+        if matches!(b, Bound::Offset(_) | Bound::OffsetFromEnd(_)) && !(0.0..=1.0).contains(&t) {
+            let field = if second { "endPartialOffset" } else { "startPartialOffset" };
+            return Err(FeatureError { faulty: vec![field], ..FeatureError::new("Enter a value less than the length of the selected edge(s).") });
+        }
+        Ok(Some(t))
+    };
+    let a = parameter(p.first, false)?;
+    if let Some(sb) = p.second
+        && let (Some(a), Some(b)) = (a, parameter(sb, true)?)
+        && ((a - b) * total).abs() < 1e-8
+    {
+        return Err(FeatureError::new("Boundary points cannot be equal."));
+    }
+    Ok(())
 }
 
 /// Directions at a point of an edge: into each face (perpendicular to the
@@ -201,13 +248,34 @@ fn curvature_profile(corner: DVec3, a: DVec3, b: DVec3, m: f64) -> FResult<Shape
     let at = |x: f64, y: f64| corner + da * x + db * y;
     // Weights of the control points at t = ½: 1/8, 3/8, 3/8, 1/8 (points 2..5).
     let mid = (1.0 - m) / 2.0;
+    let mut p2 = 1.0 - 0.6 * m;
     let mut u = 2.0 / 3.0 * (1.0 - m);
-    let mut v = (mid - 0.125 * (1.0 - 0.6 * m) - 0.375 * u) / 0.375;
+    let mut v = (mid - 0.125 * p2 - 0.375 * u) / 0.375;
     if v < 0.001 {
         v = 0.001;
-        u = (mid - 0.125 * (1.0 - 0.6 * m) - 0.375 * v) / 0.375;
+        u = (mid - 0.125 * p2 - 0.375 * v) / 0.375;
     }
-    let pts = [at(1.0, 0.0), at(1.0 - 0.3 * m, 0.0), at(1.0 - 0.6 * m, 0.0), at(u, v), at(v, u), at(0.0, 1.0 - 0.6 * m), at(0.0, 1.0 - 0.3 * m), at(0.0, 1.0)];
+    // Above 0.8 Parasolid moves the third points too (live "kern (10-24
+    // 00:30) curvature section": exact poles at 0.8 / 0.9 / 0.95 / 0.99, in
+    // setbacks (p2, v) below; the second points stay at 1 − 0.3m and the
+    // midpoint at (1−m)/2). The rule behind them isn't known: p2 and v are
+    // interpolated between those, u keeps the midpoint; above 0.99 the inner
+    // points close in on the corner with 1 − m.
+    const HIGH: [(f64, f64, f64); 4] = [(0.8, 0.52, 0.001), (0.9, 0.3670668738876986, 0.0013922239490643808), (0.95, 0.1615265245644751, 0.0005127210380370142), (0.99, 0.01073877481929723, 0.0031029341051257)];
+    if m > HIGH[0].0 {
+        (p2, v) = match HIGH.windows(2).find(|w| m <= w[1].0) {
+            Some(w) => {
+                let f = (m - w[0].0) / (w[1].0 - w[0].0);
+                (w[0].1 + (w[1].1 - w[0].1) * f, w[0].2 + (w[1].2 - w[0].2) * f)
+            }
+            None => {
+                let k = (1.0 - m) / (1.0 - HIGH[3].0);
+                (HIGH[3].1 * k, HIGH[3].2 * k)
+            }
+        };
+        u = (mid - 0.125 * p2) / 0.375 - v;
+    }
+    let pts = [at(1.0, 0.0), at(1.0 - 0.3 * m, 0.0), at(p2, 0.0), at(u, v), at(v, u), at(0.0, p2), at(0.0, 1.0 - 0.3 * m), at(0.0, 1.0)];
     Ok(k::make_bspline(&pts, None, &[0.0, 0.5, 1.0], &[6, 2, 6], 5, false)?)
 }
 
@@ -264,6 +332,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         Ok(match bd {
             Bound::Fraction(f) => f.clamp(0.0, 1.0) * total,
             Bound::Offset(d) => d.clamp(0.0, total),
+            Bound::OffsetFromEnd(d) => (total - d).clamp(0.0, total),
             Bound::Point(q) => {
                 let (mut best, mut acc, mut where_) = (f64::INFINITY, 0.0, 0.0);
                 for c in &chain {
@@ -321,7 +390,8 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         // How far to run on past a bound: only at the chain's ends, not at partial bounds.
         let ext_at = |is_start: bool| -> FResult<f64> {
             let (end_of_chain, at_bound) = if is_start { (ci == 0, partial && a > 1e-12) } else { (ci + 1 == chain.len(), partial && b < c.length - 1e-12) };
-            if !end_of_chain || at_bound {
+            // A closed edge has no free end.
+            if !end_of_chain || at_bound || (c.start - c.end).length() < 1e-9 {
                 return Ok(0.0);
             }
             let (p, out) = if is_start { (c.start, -tangent_dir(c, true)?) } else { (c.end, tangent_dir(c, false)?) };
@@ -391,9 +461,15 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                 let rot = |v: DVec3| glam::DQuat::from_axis_angle(ax, back) * v;
                 let fr0 = Frame { u: [rot(fr.u[0]), rot(fr.u[1])], m: [rot(fr.m[0]), rot(fr.m[1])] };
                 let (face, edges3, convex) = section_face(p0, &fr0, spec)?;
-                let angle = (f1 - f0) * span + g0 + g1;
+                let mut angle = (f1 - f0) * span + g0 + g1;
+                // A closed circle (live K3: a conic on a Ø20 boss's top edge) is
+                // blended all round; an arc never runs on past a full turn.
+                let closed = span >= std::f64::consts::TAU - 1e-9;
                 if angle >= std::f64::consts::TAU - 1e-9 {
-                    return Err(fail("the blend would run all round"));
+                    if !(closed && e0 == 0.0 && e1 == 0.0) {
+                        return Err(fail("the blend would run all round"));
+                    }
+                    angle = std::f64::consts::TAU;
                 }
                 let tool = k::revolve(&face, *center, ax, angle)?;
                 let names = tool_names(feature, &tool, &face, &edges3[1], &ename);

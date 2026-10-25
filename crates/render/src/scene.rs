@@ -112,7 +112,8 @@ pub struct PointSprite {
     /// Diameter in logical pixels.
     pub size: f32,
     /// Bit 1: always on top. Bit 2: ring with a center dot. Bit 3
-    /// ([`PointSprite::HOLLOW`]): white center inside a colored ring.
+    /// ([`PointSprite::HOLLOW`]): white center inside a colored ring. Bit 4
+    /// ([`PointSprite::RING`]): the ring alone.
     pub style: u32,
     pub _pad: u32,
 }
@@ -141,6 +142,8 @@ impl ImageData {
 impl PointSprite {
     /// A hollow point: white center, ring in the point color.
     pub const HOLLOW: u32 = 8;
+    /// A ring alone (inner radius 0.6 of the outer), see-through inside.
+    pub const RING: u32 = 16;
 }
 
 /// The axis-aligned bounds of `it` (`None` when empty).
@@ -241,7 +244,8 @@ pub struct Instance {
     pub hidden_only: bool,
     /// Opaque meshes drawn after the transparent ones (color pass), so
     /// see-through parts around them don't tint them: the red overlaps of
-    /// Interference detection.
+    /// Interference detection. Translucent ones go after the other
+    /// translucent meshes and previews (picked sketch regions).
     pub over_transparent: bool,
     /// Translucent meshes drawn after the lines and points (color pass): a
     /// drawing's release watermark lies over the ink.
@@ -357,7 +361,9 @@ impl Instance {
         self.compare = layer;
         self
     }
-    /// Draw an opaque mesh after the transparent meshes ([`Instance::over_transparent`]).
+    /// Draw an opaque mesh after the transparent meshes, a translucent one
+    /// after the other translucent ones and feature previews
+    /// ([`Instance::over_transparent`]).
     pub fn over_transparent(mut self) -> Self {
         self.over_transparent = true;
         self

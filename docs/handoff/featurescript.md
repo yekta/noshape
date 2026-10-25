@@ -737,3 +737,132 @@ transient ids `JP<n>` in Context::fs_transients; flat footprint + outline). Nati
   flat 80.126106 x 20; flipped = 3051.33, inside, 76.126106. Std matches the default; the native route (inside) deviates.
 - sheetmetal_frames (7; SM5 fixed the outer-flange one): hem bbox, bend count, flange outer bend direction, convert BUTT, corner relief volume.
 Not mine but seen: drawing::tests::flat_pattern_view_shows_bend_lines_and_notes fails on "DOWN 90.0° R3" (format.rs angle).
+
+## fs (24 Oct, new account): P1 std-oracle pass
+
+Sheet-metal WIP 2c8697d2 reverted on top (f8bd0a64; `git revert f8bd0a64` brings it back when P3 resumes).
+
+**Oracle infrastructure (tests/std_oracle.rs):**
+- `core_dialogs_match_std_in_every_state`: for each feature in `STRICT`, every parameter (id, label, kind, bounds,
+  metric/imperial defaults, hints, description) equals the dialog std's precondition declares
+  (`std_feature::std_dialog`, works for defineSheetMetalFeature and non-exported features like fTransform), and the
+  shown parameters agree in the default state, every single and pair of enum/bool choices and 400 random states.
+  Query filters are not compared (the generator maps std filters roughly: no SketchObject.NO /
+  ConstructionObject.NO / QueryFilterCompound); review them by reading std. `STD_ORACLE=fillet cargo test -p
+  noshape-model --test std_oracle print_one -- --nocapture` prints one feature's diff.
+- `<feature>_regenerates_as_std`: scenarios regenerated natively and with std's own feature
+  (`std_feature::set_std_route(&["extrude"])` runs the core feature through std; CORE list in std_feature.rs);
+  status, message, faulty fields and bodies (kind, faces, edges, volume/area) must agree. `STD_ORACLE_CASE=draft
+  NOSHAPE_FS_TRACE=1` narrows to cases and traces std's operations.
+- std's faulty parameters now reach FeatureError::faulty (run.rs).
+- Dialog generator: a "Driving Parameter" group's boolean gets GROUP_HEADER (as built-in dialogs).
+
+**Extrude (done, 7e603877, ready):** dialog identical in every state (added hidden `domain` + flat-view `flatOperationType`,
+second depth not tolerant, second end hidden when symmetric). Native errors now std's texts + faulty fields
+(EXTRUDE_SELECT_TERMINATING_*, EXTRUDE_SELECT_DIRECTION / DIRECTION_INVALID_ENTITY / DIRECTION_COPLANAR,
+EXTRUDE_SELECT_START_OFFSET_ENTITY / START_OFFSET_BOUND_NOT_PLANAR / NOT_PARALLEL, OFFSET_WIRE_SELECT_WALL_PATH,
+EXTRUDE_SURF_NO_CURVE); Through all / Up to next without parts = "Parts or Surfaces must be present in the Part
+Studio." (CANNOT_BE_EMPTY, live dialogs/extrude-endtype-*). Start offset to an entity follows std's distance rule.
+Host fixes found by the oracle: SWEPT_FACE historical query, qAdjacent of sketch regions, opExtrude up-to planes /
+UP_TO_NEXT / endTranslationalOffset, evMateConnector only for mate connectors, coplanar overlapping faces interfere
+in evCollision (boolean heuristics: boss on a face = Add, as live).
+
+std's editing logic for core features: `std_feature::STD_EDITING_LOGIC` (extrude, fillet) makes `has_editing_logic` true,
+so the app runs std's function (part_studio/behaviors.rs `std_edit_logic`, now on a background thread; results for
+stale values are dropped; changes made before `before_context` arrives run when it does) and skips the native
+`boolean_edit_logic` for them. Seven-parameter editing functions get `isCreating` (EditSession::is_new); returned
+arrays convert item by item (run.rs `editing_value`). Debug-build timing: std extrudeEditLogic ~300 ms (it runs a
+trial extrude + evCollision), filletEditLogic ~3 ms.
+
+**Fillet (done):** dialog identical (BLEND_BOUNDS min 1e-5 m, Location 0.001..0.999, cross-section description,
+variable fillet's vertex field always hidden). `fillet_regenerates_as_std` (24 cases): std's partial-fillet
+checks now native (`blend_section::check_partial`: one chain, closed chain needs two bounds, offsets within the
+chain, distinct bounds; std's texts), the second offset is measured from the chain's end (std), full round's
+messages are opFullRoundFillet's (FULL_ROUND_SELECT_FACES / FULL_ROUND_COMMON_BODY; unsupported shapes =
+FILLET_FAILED). Host: `opFillet` now runs the Fillet evaluator (every option: cross sections, width, asymmetric,
+partial, variable), so the std route's fillet geometry equals native by construction; the oracle there compares
+std's preprocessing and errors. Built-in evaluators' Onshape messages map back to their ErrorStringEnum member in
+FS ops (`host::error_code`). filletEditLogic runs in the dialog (`fillet_editing_logic_runs_std`).
+
+**Hole (done, pending checks):** dialog identical to std hole.fs in the V3 dialog (tests/std_oracle.rs `sync` keeps std's
+legacy mirrors style/endStyle/showThreadClass = the V2 fields; std params no state shows are its V1 fields and are
+skipped; large dialogs sample single changes + 1500 random states instead of all pairs). Fixes: tap drill default =
+std's (5 mm / 0.25 in; the table sets the real one), computed depth's bounds, std's row order (computed depth before
+blind depth). Lookup tables compared as cascades (`table_tree`): FS "Lookup Table" annotations now keep the
+source order of the table literals (studio.rs `dyn_level` + `source_entries`, constants followed across imports),
+which is Onshape's dropdown order (live L58) and gives levels without a default their first source entry; the
+custom_features lookup test now expects source order. `hole_regenerates_as_std` (12 cases) passes; host fixes:
+evAxis `allowSketchPoints` (sketch point -> its sketch normal), opHole failures thrown as the bare ErrorStringEnum
+(hole.fs catches them as such). Known std-route gap: a hole that hits nothing — live flags Merge scope (native does),
+std throws bare HOLE_NO_HITS (faulty field not compared in those 2 cases). Tapped depth linkage now follows std's
+adjustDepthAndThreadParameters exactly (`hole_tables::link_tapped_depths`: of the two fields not edited, the later
+one in Depth / Tapped depth / Tap clearance whose new value stays positive; live L49/L50 still hold);
+`hole_tapped_depths_link_as_std` runs std's holeEditLogic against it. Hole's other editing logic stays native.
+App: the native boolean edit logic is skipped at its caller (part_studio/mod.rs) for std-editing-logic features,
+so api's shared `noshape_ops::studio::boolean_edit_logic` refactor merges cleanly.
+
+**Loft and Transform (done, pending checks):** both dialogs identical to std in every state (Loft: array item names
+"profile"/"guide"/"connection" and item templates as loft.fs, the End conditions group id `endConditionsGroup`
+(the generator's naming), loft.fs's hidden guideDerivativeMagnitude / connectionEdgeQueries /
+connectionEdgeParameters). `loft_regenerates_as_std` (9 cases) and `transform_regenerates_as_std` (12) pass.
+Native fixes: Loft's empty-profiles error marks only the creation type's field; Transform follows
+transformCopy.fs's checks and texts (two vertices / one edge / plane direction, TOO_MANY_ENTITIES_SELECTED,
+TRANSFORM_TRANSLATE(_BY_DISTANCE)_INPUT, NO_TRANSLATION_DIRECTION, POINTS_COINCIDENT, CANNOT_RESOLVE_ENTITIES /
+NO_ROTATION_AXIS from evAxis, TRANSFORM_SCALE_SELECTION, TRANSFORM_MATE_CONNECTORS). Host opLoft: `bodyType` is
+an enum (surface lofts were solids), one profile = LOFT_TWO_PROFILES (live L15). std's loftEditLogic now runs in
+the dialog (`loft_editing_logic_runs_std`). **Known gaps (kernel):** loft start/end conditions are ignored (native
+warns; Onshape shapes the ends), loft guides and path are not supported natively ("not supported yet" errors).
+
+**Rest of the P1 list (25 Oct):** Revolve, Chamfer, Shell, Linear/Circular pattern, Mirror, Sweep, Boolean, Plane,
+Draft, Split are in `STRICT` (dialog in every state) with regeneration oracles (`*_regenerates_as_std`). Fixes:
+- Generator: UIHint SHOW_CREATE_SELECTION / PRIMARY_AXIS / MATE_CONNECTOR_AXIS_TYPE (patterns' and Mirror's face fields,
+  Draft's parting edges; Transform's mate-connector buttons now carry the latter two in the built-in too).
+- Patterns: skip-instance items named "instance" with std's templates "(#index1, #index2)" / "#index".
+- Native texts/fields per std and Onshape ops: Revolve REVOLVE_SELECT_AXIS [axis], Thin empty = REVOLVE_SURF_NO_CURVE;
+  Shell SHELL_SELECT_FACES/PARTS marked; Boolean one tool = BOOLEAN_BAD_INPUT (live 7360), Subtract without targets
+  = "Cannot resolve entities." (live 7216), empty tools unmarked; Split SPLIT_SELECT_TOOL / face split texts, SPLIT_NO_CHANGE
+  as an INFO (not an error; live 10-25 06:15), and std's infos (plane or mate connector tool without Keep tools: "Planes and mate connectors will
+  be kept."; a face: "Faces selected as split tools must be kept.").
+- Host ops: opSplitPart keepType (front = the plane normal's side, live 7239) and SPLIT_SELECT_*/NO_CHANGE; opShell
+  sharp outer corners (shell_solid, live S3); inward stays on k::shell (shell_solid gave 2220 vs live 2653.5 on
+  std_reference shellTop, a kernel issue) but falls back to shell_solid when k::shell returns the body unchanged,
+  then SHELL_FAILED; opBoolean / opDraft / opSweep empty-selection errors.
+- Editing logic: run_editing_logic passes the arguments each function's parameter types ask for (cPlaneLogic has
+  none, draftEditLogic isCreating+specified), and {} as oldDefinition on a new feature's first call (Onshape:
+  preselection logic only then). STD_EDITING_LOGIC adds revolve, sweep, mirror, cPlane, draft, splitPart
+  (`more_editing_logic_runs_std`: Split keeps a plane tool (live), Plane type from picks, Mirror/Revolve Add).
+- Loft end conditions: psb's kernel support (3c25e9c9) is on ready/psb, not main yet; the two loft cases stay
+  listed as a gap in `loft_regenerates_as_std` until it lands.
+
+**Native argument audit (25 Oct, lead request after the knurl helix bug):** `custom/host/native_args.rs`
+(`natives_read_the_maps_std_passes`) finds every `@native(…)` call in std (469 sites) and, where std passes a map (a
+literal, or a `map` parameter it passes on), calls the native with a map of those keys and records the keys it reads
+(`value::record_key_reads`: `Value::get`, `as_map` and `natives::map_arg` note reads while recording). It fails when a
+native reads none of a map std passes (alignCanonically read argument 2 as the plane itself; fixed by the lead in
+3fdf0b6a), when it reads only keys std never passes (a misspelt key), or when the set of natives std calls that do not
+exist changes (`MISSING`, 18: evFaults, evTolerances, opCreateBSplineSurface, opImportForeign, opBooleanedPattern, …).
+`IGNORES_MAP` lists the natives that need none of their map (no-ops, constants). `NATIVE_ARGS_REPORT=1` prints keys
+read only in part; most are the probe's undefined values making a native stop early. Options found ignored and fixed:
+evOwnerSketchPlane `checkAllEntities` (Sweep/Loft profiles), evRaycast `includeIntersectionsBehind`
+(`evaluation_options_std_passes`). Still ignored: opPolyline `bendRadii` (Routing curve; reuse curves.rs
+`filleted_polyline`), evCurveDefinition/evSurfaceDefinition `returnBSplinesAsOther` and evCollisionDetection `owners`
+(live request "fs (10-25 b)"), addDebugEntities `color` (debug entities are not drawn at all), skConicSegment
+`fixedRho`, skInterpolatedSpline `splinePointCount`, skSpline `guess`, evFacePeriodicity `trimmed`,
+evFaceTangentPlanes `returnUndefinedOutsideFace` (no std caller passes the last five). Regression test for the helix:
+`std_helix_from_a_circle_edge` (Turns and Pitch around a cylinder's circular edge).
+
+**Pinned standard library versions (25 Oct, user's knurl script):** Onshape runs a Feature Studio against the std
+version its imports pin. `crates/featurescript/std-versions/<version>/` holds older libraries (1963.0 so far, exported
+unmodified from the public std document, MIT, live/std-1963), embedded by build.rs as `STD_VERSIONS`. An import of
+`onshape/std/x.fs` pinned to v loads the nearest embedded version (`std_version_for`, the newer on a tie); an older
+library's own imports stay in that version (`compile::load_std`, cache keyed by (version, module)). Types share tags
+across versions by declaration key (`onshape/std/query.fs#Query`), except enums whose members changed (QueryType,
+ErrorStringEnum, UIHint, FeatureScriptVersionNumber, ToleranceType, …): those get a tag per version and compare by
+member name (`Value` equality, `is`, `value::map_get` for `{ … }[enum]` lookups); the host still makes 3095 values
+(std_tag/std_enum), and isAtVersionOrLater compares the version number in the member name across versions. Exports of
+1963 that 3095 dropped: HelixType, RevolveType, helixLogic, tagProfile, getIncrementingId, getFaceSweptData,
+mutualTrimMaipulatorChange, the `*FromBuiltin` geometry constructors; signatures that changed include parsePitch /
+computePitchValue / buildPitchAnnotation (now take context), getToleranceInfo, verifyVariableName, sweepEditLogic
+(isCreating), helixManipulatorChange (full list: /root/fs-scratch/export-diff.txt). Tests:
+`std_1963_pinned_helix_types` (custom_features), `natives_read_the_maps_older_std_passes` (the native audit on 1963).
+To add a version: export it like live/std-1963 into std-versions/<version>/ and extend `MISSING_<version>`.

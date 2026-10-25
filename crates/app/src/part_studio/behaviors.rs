@@ -72,6 +72,9 @@ pub struct UiState {
     pub cam_history: Vec<Camera>,
     /// Last pointer position over the viewport (viewport-local).
     pub pointer: Option<DVec2>,
+    /// The pick under the pointer before midpoint snapping
+    /// ([`PartStudioView::hover_target`]).
+    pub hover_pick: Option<PickTarget>,
     pub select_other: Option<SelectOther>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
@@ -226,6 +229,9 @@ pub struct UiState {
     /// The edited feature's parameters when std's editing logic last ran
     /// (its `oldDefinition`; empty for a new feature's first change).
     pub std_edit_old: Option<noshape_model::params::ParamValues>,
+    /// std's editing logic running off the UI thread (std Extrude runs a
+    /// whole trial extrude for its boolean heuristics).
+    pub std_edit_task: Option<Task<()>>,
     pub preview_task: Option<Task<()>>,
     /// Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
@@ -372,6 +378,7 @@ impl UiState {
             dialog_info: None,
             cam_history: Vec::new(),
             pointer: None,
+            hover_pick: None,
             select_other: None,
             mini_toolbar: None,
             camera_menu: None,
@@ -451,6 +458,7 @@ impl UiState {
             preview_before: None,
             before_context: None,
             std_edit_old: None,
+            std_edit_task: None,
             preview_task: None,
             preview_tool: None,
             feature_drop: Default::default(),
@@ -1835,6 +1843,12 @@ impl PartStudioView {
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.before_context = Some(context);
                 this.ui.preview_before = Some(Arc::new(display));
+                // Changes made before the model was ready get std's editing logic now.
+                if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone())
+                    && noshape_model::custom::std_feature::has_editing_logic(&dialog.read(cx).feature.type_id)
+                {
+                    this.std_edit_logic(&dialog, cx);
+                }
                 // Chips of parts the feature consumes get their names now.
                 if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone()) {
                     let labeler = this.labeler(cx);
@@ -2569,37 +2583,59 @@ impl PartStudioView {
     /// with a dialog open only when its field takes points, like Onshape).
     pub(super) fn midpoint_overlay(&self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineSegment, PointData, PointSprite};
-        let (mut points, mut rings) = (Vec::new(), Vec::new());
-        let sprite = |m: glam::DVec3, color: [u8; 4], size: f32| PointSprite { position: m.as_vec3().into(), color, pick_id: 0, size, style: LineSegment::ON_TOP, _pad: 0 };
-        // Selected midpoints.
+        let mut points = Vec::new();
+        let sprite = |m: glam::DVec3, color: u32, size: f32, style: u32| PointSprite { position: m.as_vec3().into(), color: [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255], pick_id: 0, size, style: LineSegment::ON_TOP | style, _pad: 0 };
+        // Live (part-studio/qa4-r5-s9-6d, 6e): the midpoint target is an
+        // 11 px disc with a thin darker ring 3–4 px out and a light centre:
+        // orange while hovered (#f8c488, #c49a6a, #ffd8ac), yellow-orange once
+        // selected (#fac012, #c4960b, #ffd65b).
+        let marker = |points: &mut Vec<PointSprite>, m: glam::DVec3, [disc, ring, centre]: [u32; 3]| {
+            points.push(sprite(m, disc, 11.0, 0));
+            points.push(sprite(m, ring, 8.0, PointSprite::RING));
+            points.push(sprite(m, centre, 5.0, 0));
+        };
         for r in &self.selection {
             if let Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint } = r
                 && let Some(m) = self.edge_midpoint(on)
             {
-                points.push(sprite(m, [255, 169, 10, 255], 11.0));
+                marker(&mut points, m, [0xfac012, 0xc4960b, 0xffd65b]);
             }
         }
-        if self.active_field_filter(cx).is_none_or(field_takes_points)
-            && (self.edit.is_none() || self.active_field_filter(cx).is_some())
-            && self.sketch.is_none()
-            && let Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. })) = &self.hover
-            && let Some(m) = self.edge_midpoint(r)
-        {
-            // Live (selection/06): an 8 px black ring filled #ffd3a0. (Live's
-            // hovered edge also covers the ring where it crosses; ours draws
-            // points after lines, so the ring stays whole.)
-            rings.push(sprite(m, [0, 0, 0, 255], 8.0));
-            points.push(sprite(m, [255, 211, 160, 255], 5.5));
+        match &self.hover {
+            // The hovered midpoint target ([`Self::hover_target`]).
+            Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() => {
+                if let Some(m) = self.edge_midpoint(on) {
+                    marker(&mut points, m, [0xf8c488, 0xc49a6a, 0xffd8ac]);
+                }
+            }
+            // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows a
+            // 9 px dark ring at its midpoint, the edge seen through it.
+            Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. }))
+                if self.active_field_filter(cx).is_none_or(field_takes_points) && (self.edit.is_none() || self.active_field_filter(cx).is_some()) && self.sketch.is_none() =>
+            {
+                if let Some(m) = self.edge_midpoint(r) {
+                    points.push(sprite(m, 0x000000, 9.0, PointSprite::RING));
+                }
+            }
+            _ => {}
+        }
+        if points.is_empty() {
+            return Vec::new();
         }
         let up = self.gpu.uploader();
-        let mut out = Vec::new();
-        if !rings.is_empty() {
-            out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points: rings }))).per_primitive_color().unpickable().ignore_clip().layer(11));
+        vec![Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22)]
+    }
+
+    /// The hover target (Onshape, part-studio/qa4-r5-s9-6c/6d): near a
+    /// hovered edge's midpoint the midpoint itself is hovered (orange marker,
+    /// the edge loses its highlight), within the radius a click picks it
+    /// ([`Self::midpoint_pick`]); fields that take no points keep the edge.
+    pub(super) fn hover_target(&self, cx: &App) -> Option<Reference> {
+        let t = self.ui.hover_pick.clone()?;
+        match self.ui.pointer {
+            Some(p) if matches!(t.kind, PickKind::Edge | PickKind::SketchCurve) && self.active_field_filter(cx).is_none_or(field_takes_points) => Some(self.midpoint_pick(t, p, cx).reference),
+            _ => Some(t.reference),
         }
-        if !points.is_empty() {
-            out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22));
-        }
-        out
     }
 
     /// An edge click within ~8 px of its midpoint selects the midpoint.
@@ -2610,7 +2646,7 @@ impl PartStudioView {
         }
         let Some(m) = self.edge_midpoint(&t.reference) else { return t };
         let Some(s) = self.viewport.read(cx).project(m) else { return t };
-        if s.distance(position) > 8.0 {
+        if !targets_midpoint(s, position, true) {
             return t;
         }
         let r = Reference::Implicit { on: Box::new(t.reference.clone()), inference: noshape_model::reference::Inference::Midpoint };
@@ -3044,7 +3080,10 @@ impl PartStudioView {
     /// the profile fills "Flange to merge" and the subtraction offset, live
     /// qa5 4.2), on the model before the feature; fields the user set are
     /// `specifiedParameters`.
-    fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
+    /// It runs in the background; a result for values the user has changed
+    /// since is dropped (the run for the new values follows). Without the
+    /// model before the feature yet, it runs once that arrives.
+    pub(super) fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
         let Some(ctx) = self.ui.before_context.clone() else { return };
         let (ty, id, name, params, user_set) = {
             let d = dialog.read(cx);
@@ -3054,22 +3093,33 @@ impl PartStudioView {
         if old == params {
             return;
         }
+        let creating = self.edit.as_ref().is_some_and(|e| e.is_new);
         let units = self.doc.read(cx).session.doc.settings.units;
-        let Some(changed) = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &params, &user_set) else { return };
-        let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
-        if changes.is_empty() {
-            return;
-        }
-        let mut next = params;
-        for (k, v) in &changes {
-            next.set(k, v.clone());
-        }
-        self.ui.std_edit_old = Some(next);
-        dialog.update(cx, |d, cx| {
-            for (k, v) in changes {
-                d.set_value_auto(&k, v, cx);
-            }
-        });
+        let dialog = dialog.clone();
+        let sent = params.clone();
+        self.ui.std_edit_task = Some(cx.spawn(async move |this, cx| {
+            let changed = cx.background_spawn(async move { noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set, creating) }).await;
+            let Some(changed) = changed else { return };
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if dialog.read(cx).feature.params != params {
+                    return;
+                }
+                let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
+                if changes.is_empty() {
+                    return;
+                }
+                let mut next = params;
+                for (k, v) in &changes {
+                    next.set(k, v.clone());
+                }
+                this.ui.std_edit_old = Some(next);
+                dialog.update(cx, |d, cx| {
+                    for (k, v) in changes {
+                        d.set_value_auto(&k, v, cx);
+                    }
+                });
+            });
+        }));
     }
 
     /// Onshape's deleteFaceEditLogic / replaceFaceEditLogic for a new
@@ -3246,12 +3296,40 @@ pub(super) fn iso_look(t: f32) -> IsoLook {
     }
 }
 
+/// The pick radius around an edge midpoint, in screen px (hover and click).
+pub(super) const MIDPOINT_PICK_PX: f64 = 8.0;
+
+/// Whether the pointer at `pointer` targets the edge midpoint drawn at `mid`
+/// rather than the edge (Onshape): within [`MIDPOINT_PICK_PX`], when the
+/// active field (if any) takes points.
+pub(super) fn targets_midpoint(mid: DVec2, pointer: DVec2, takes_points: bool) -> bool {
+    takes_points && mid.distance(pointer) <= MIDPOINT_PICK_PX
+}
+
 /// A field takes an edge's midpoint (Onshape's implicit point): it takes
 /// points, or mate connectors without taking edges. A Direction field takes
 /// mate connectors (their Z axis) and edges: a click at an edge's midpoint
 /// picks the edge (qa4 F11, live).
 pub(super) fn field_takes_points(f: QueryFilter) -> bool {
     f.intersects(QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::POINT_BODY.0)) || (f.intersects(QueryFilter::MATE_CONNECTOR) && !f.intersects(QueryFilter(QueryFilter::ANY_EDGE.0 | QueryFilter::LINEAR_EDGE.0)))
+}
+
+#[cfg(test)]
+mod midpoint_target_tests {
+    use super::{MIDPOINT_PICK_PX, targets_midpoint};
+    use glam::DVec2;
+
+    #[test]
+    fn hovering_near_an_edge_midpoint_targets_the_midpoint() {
+        let m = DVec2::new(300.0, 200.0);
+        assert!(targets_midpoint(m, m, true));
+        assert!(targets_midpoint(m, m + DVec2::new(MIDPOINT_PICK_PX - 1.0, 0.0), true));
+        assert!(targets_midpoint(m, m + DVec2::new(3.0, -4.0), true));
+        // Farther along the edge: the edge stays the target.
+        assert!(!targets_midpoint(m, m + DVec2::new(MIDPOINT_PICK_PX + 2.0, 0.0), true));
+        // A field that takes no points (Fillet's edges) keeps the edge.
+        assert!(!targets_midpoint(m, m, false));
+    }
 }
 
 #[cfg(test)]

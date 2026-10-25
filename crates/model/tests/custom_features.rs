@@ -866,7 +866,8 @@ export const boltSize = defineFeature(function(context is Context, id is Id, def
     let noshape_model::params::ParamKind::Lookup { table } = &t.params[0].kind else { panic!("{:?}", t.params[0].id) };
     use noshape_model::features::hole_tables as ht;
     assert_eq!(ht::table_level_name(table, &[]), Some("Standard"));
-    assert_eq!(ht::table_levels(table, &[]).iter().map(|o| o.0.as_str()).collect::<Vec<_>>(), ["ANSI", "ISO"]);
+    // Source order, as Onshape's dropdowns (live L58), not the map's sorted keys.
+    assert_eq!(ht::table_levels(table, &[]).iter().map(|o| o.0.as_str()).collect::<Vec<_>>(), ["ISO", "ANSI"]);
     assert_eq!(ht::complete_path(table, &[]), ["ISO", "M4"]);
     assert_eq!(ht::complete_path(table, &["ANSI".to_string()]), ["ANSI", "#8"]);
 
@@ -896,6 +897,137 @@ fn ops_and_evaluations_run_in_custom_features() {
     let notices: Vec<String> = out.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message)).collect();
     let bad: Vec<&str> = out.output.lines().filter(|l| !l.ends_with(" ok") && *l != "done").collect();
     assert!(bad.is_empty() && out.output.ends_with("done\n"), "{}\n{}", out.output, notices.join("\n"));
+}
+
+/// std helix() around a circular edge, Turns and Pitch (a user's knurl
+/// script: surfaceGeometry.fs calls `@alignCanonically(context, { "plane" :
+/// plane })`, which the native read as a plane and every Circle helix threw).
+#[test]
+fn std_helix_from_a_circle_edge() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Helix probe" }
+export const helixProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "cyl", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 30) * millimeter, "radius" : 10 * millimeter });
+        const circle = qNthElement(qGeometry(qCreatedBy(id + "cyl", EntityType.EDGE), GeometryType.CIRCLE), 0);
+        const common = { "initEntities" : qNothing(), "axisType" : AxisType.CIRCLE, "edge" : circle, "oppositeDirection" : false,
+                         "startType" : StartType.START_ANGLE, "startAngle" : 0 * degree, "endType" : EndType.HEIGHT,
+                         "height" : 20 * millimeter, "handedness" : Direction.CW };
+        helix(context, id + "turns", mergeMaps(common, { "pathType" : PathType.TURNS, "revolutions" : 4 }));
+        helix(context, id + "pitch", mergeMaps(common, { "pathType" : PathType.PITCH, "helicalPitch" : 5 * millimeter }));
+        // Four turns of radius 10 mm over 20 mm either way.
+        const expected = 4 * sqrt((2 * PI * 10 * millimeter) ^ 2 + (5 * millimeter) ^ 2);
+        for (var name in ["turns", "pitch"])
+        {
+            const edges = qCreatedBy(id + name, EntityType.EDGE);
+            const length = evLength(context, { "entities" : edges });
+            println(name ~ " " ~ size(evaluateQuery(context, edges)) ~ " " ~ toString(length));
+            if (abs(length - expected) > 1e-3 * millimeter)
+                throw regenError(name ~ ": helix length " ~ toString(length) ~ ", expected " ~ toString(expected));
+        }
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("helixProbe"), &fx.units).unwrap();
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+}
+
+/// A Feature Studio pinned to an older standard library gets that library
+/// (a user's knurling script: `FeatureScript 1963;` and helix() with std
+/// 1963's exported HelixType, private in 3095).
+#[test]
+fn std_1963_pinned_helix_types() {
+    let body = r#"
+annotation { "Feature Type Name" : "Pinned helix" }
+export const pinnedHelix = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "cyl", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 30) * millimeter, "radius" : 10 * millimeter });
+        const circle = qNthElement(qGeometry(qCreatedBy(id + "cyl", EntityType.EDGE), GeometryType.CIRCLE), 0);
+        const common = { "initEntities" : qNothing(), "edge" : circle, "oppositeDirection" : false, "handedness" : Direction.CW,
+                         "startAngle" : 0 * degree, "height" : 20 * millimeter };
+        helix(context, id + "pitch", mergeMaps(common, { "helixType" : HelixType.HEIGHT_PITCH, "helicalPitch" : 5 * millimeter }));
+        helix(context, id + "turns", mergeMaps(common, { "helixType" : HelixType.HEIGHT_TURNS, "revolutions" : 4 }));
+        const expected = 4 * sqrt((2 * PI * 10 * millimeter) ^ 2 + (5 * millimeter) ^ 2);
+        for (var name in ["pitch", "turns"])
+        {
+            const length = evLength(context, { "entities" : qCreatedBy(id + name, EntityType.EDGE) });
+            if (abs(length - expected) > 1e-3 * millimeter)
+                throw regenError(name ~ ": helix length " ~ toString(length) ~ ", expected " ~ toString(expected));
+        }
+    });
+"#;
+    let pinned = |v: u32| format!("FeatureScript {v};\nimport(path : \"onshape/std/geometry.fs\", version : \"{v}.0\");\n{body}");
+    let fx = Fixture::new(&pinned(1963));
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("pinnedHelix"), &fx.units).unwrap();
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    // As in Onshape, std 3095 does not export HelixType.
+    let compiled = custom::compile(fx.fs, &pinned(3095));
+    assert!(compiled.diagnostics.iter().any(|d| d.message.contains("HelixType")), "{:?}", compiled.diagnostics);
+}
+
+/// Evaluation options the natives used to ignore (found by the native
+/// argument audit): evOwnerSketchPlane's `checkAllEntities` (std Sweep and
+/// Loft profiles) and evRaycast's `includeIntersectionsBehind`.
+#[test]
+fn evaluation_options_std_passes() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Options probe" }
+export const optionsProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        for (var z in [0, 10])
+        {
+            const sketch = newSketchOnPlane(context, id + ("s" ~ z), { "sketchPlane" : plane(vector(0, 0, z) * millimeter, vector(0, 0, 1)) });
+            skRectangle(sketch, "r", { "firstCorner" : vector(0, 0) * millimeter, "secondCorner" : vector(10, 5) * millimeter });
+            skSolve(sketch);
+        }
+        const one = qCreatedBy(id + "s0", EntityType.EDGE);
+        const both = qUnion([one, qCreatedBy(id + "s10", EntityType.EDGE)]);
+        if (evOwnerSketchPlane(context, { "entity" : one, "checkAllEntities" : true }).origin != vector(0, 0, 0) * meter)
+            throw regenError("one sketch: its plane");
+        // Without the check the first entity's plane, with it none.
+        evOwnerSketchPlane(context, { "entity" : both });
+        try silent
+        {
+            evOwnerSketchPlane(context, { "entity" : both, "checkAllEntities" : true });
+            throw regenError("two sketch planes: CANNOT_RESOLVE_PLANE expected");
+        }
+        catch (e)
+        {
+            if (e != ErrorStringEnum.CANNOT_RESOLVE_PLANE && e.message != ErrorStringEnum.CANNOT_RESOLVE_PLANE)
+                throw e;
+        }
+
+        fCuboid(context, id + "box", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(10, 10, 10) * millimeter });
+        const faces = qCreatedBy(id + "box", EntityType.FACE);
+        const ray = line(vector(20, 5, 5) * millimeter, vector(1, 0, 0));
+        const ahead = evRaycast(context, { "entities" : faces, "ray" : ray, "closest" : false });
+        const behind = evRaycast(context, { "entities" : faces, "ray" : ray, "closest" : false, "includeIntersectionsBehind" : true });
+        if (size(ahead) != 0 || size(behind) != 2)
+            throw regenError("raycast hits: " ~ size(ahead) ~ " ahead, " ~ size(behind) ~ " with those behind");
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("optionsProbe"), &fx.units).unwrap();
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
 }
 
 /// More standard library features called from a custom feature.

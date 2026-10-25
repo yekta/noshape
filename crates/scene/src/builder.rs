@@ -350,6 +350,8 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     // them (live part-studio/61: white, unlit, only the edges show).
                     DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)).unlit(),
                 };
+                // (The renderer draws a preview's back faces under the datum
+                // planes and picked regions and its front faces over them.)
                 let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
                 let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(ISOLATE_GHOST) } else { mesh };
                 // Parts excluded from the section view are not cut.
@@ -808,7 +810,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     let _t = noshape_render::perf::scope("s.with_highlights");
     let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare };
     let mut overlay_pts = PointData::default();
-    let mut overlay_regions: Vec<(MeshData, [f32; 4])> = Vec::new();
+    let mut overlay_regions: Vec<(MeshData, [f32; 4], bool)> = Vec::new();
     let mut overlay_lines = LineData::default();
     let sel_color = theme::lin(if error { theme::viewport::ERROR } else { theme::viewport::SELECTION });
     let hov_color = theme::lin(theme::viewport::PREHIGHLIGHT);
@@ -851,9 +853,13 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             }
             if !hovered {
                 let n: [f32; 3] = sk.frame.normal.as_vec3().into();
-                let mut fill = c;
-                fill[3] = if error { 0.3 } else { 0.4 };
-                overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, fill));
+                let fill = if error {
+                    [c[0], c[1], c[2], 0.3]
+                } else {
+                    let k = theme::lin(theme::viewport::PICKED_REGION);
+                    [k[0], k[1], k[2], theme::viewport::PICKED_REGION_ALPHA]
+                };
+                overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, fill, !error));
             }
         }
         for &id in built.picks.ids_for(r) {
@@ -912,8 +918,11 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     if !overlay_pts.points.is_empty() {
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&overlay_pts))).per_primitive_color().unpickable().ignore_clip().layer(20));
     }
-    for (m, c) in overlay_regions {
-        scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(c).unpickable().ignore_clip().layer(8));
+    for (m, c, picked) in overlay_regions {
+        let inst = Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(c).unpickable().ignore_clip().layer(8);
+        // A picked region tints the preview built on it from above (live
+        // part-studio/230): flat, after the see-through meshes.
+        scene.instances.push(if picked { inst.unlit().over_transparent() } else { inst });
     }
     if !overlay_lines.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&overlay_lines))).per_primitive_color().unpickable().ignore_clip().layer(12));

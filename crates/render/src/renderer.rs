@@ -1175,7 +1175,18 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.images, &pipelines.image_opaque);
         draw(pass, &lists.images, &pipelines.image_soft);
         draw(pass, &lists.images_faded, &pipelines.image_blend);
-        draw(pass, &lists.transparent, &pipelines.mesh_transparent);
+        // A feature preview wraps what it is built from: its back faces go
+        // under the datum planes and picked regions, its front faces over
+        // them, so a picked region shows through one layer of the preview
+        // (live part-studio/230, 231, dialogs/extrude-03).
+        // Translucent `over_transparent` meshes (picked sketch regions) go
+        // last, tinting a preview from above.
+        let (previews, rest): (Vec<usize>, Vec<usize>) = lists.transparent.iter().partition(|&&i| instances[i].preview);
+        let (after, others): (Vec<usize>, Vec<usize>) = rest.into_iter().partition(|&i| instances[i].over_transparent);
+        draw(pass, &previews, &pipelines.mesh_transparent_back);
+        draw(pass, &others, &pipelines.mesh_transparent);
+        draw(pass, &previews, &pipelines.mesh_transparent_front);
+        draw(pass, &after, &pipelines.mesh_transparent);
         draw(pass, &lists.over_transparent, &pipelines.mesh_opaque);
         // Hidden-only geometry right after the meshes, so only faces count
         // as hiding it (not hover outlines or overlays drawn over the same
@@ -1430,6 +1441,10 @@ struct Pipelines {
     section_mask: wgpu::RenderPipeline,
     section_cap: wgpu::RenderPipeline,
     mesh_transparent: wgpu::RenderPipeline,
+    /// Feature previews (see-through): their back faces before the other
+    /// transparent meshes, their front faces after (`draw_lists`).
+    mesh_transparent_back: wgpu::RenderPipeline,
+    mesh_transparent_front: wgpu::RenderPipeline,
     /// Opaque meshes mirroring an environment map (image bind group 2).
     mesh_reflect: wgpu::RenderPipeline,
     line: wgpu::RenderPipeline,
@@ -2047,6 +2062,16 @@ impl Renderer {
             // image (drawn just before, without bias) doesn't veil it. Opaque
             // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
             let mesh_transparent = s.spawn(|| make(P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }));
+            let mesh_transparent_back = s.spawn(|| make_full(
+                layout,
+                P { label: "mesh-t-back", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa },
+                Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) },
+            ));
+            let mesh_transparent_front = s.spawn(|| make_full(
+                layout,
+                P { label: "mesh-t-front", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa },
+                Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back) },
+            ));
             let line = s.spawn(|| make(P { label: "line", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }));
             // Front faces culled, like Onshape's pass (`setOverrideFaceCullingMode(FRONT)`).
             let mesh_backsil = s.spawn(|| make_full(
@@ -2079,6 +2104,8 @@ impl Renderer {
                 section_cap: section_cap.join().expect("pipeline compile thread"),
                 mesh_reflect: mesh_reflect.join().expect("pipeline compile thread"),
                 mesh_transparent: mesh_transparent.join().expect("pipeline compile thread"),
+                mesh_transparent_back: mesh_transparent_back.join().expect("pipeline compile thread"),
+                mesh_transparent_front: mesh_transparent_front.join().expect("pipeline compile thread"),
                 line: line.join().expect("pipeline compile thread"),
                 mesh_backsil: mesh_backsil.join().expect("pipeline compile thread"),
                 silhouette: silhouette.join().expect("pipeline compile thread"),

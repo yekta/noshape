@@ -1684,7 +1684,10 @@ impl Workspace {
     /// while a Feature Studio's committed source has errors).
     fn render_notices_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         // Live (part-studio/00): shown in every document, `{✓}` when clean.
-        let errors = crate::fs_notices::document_notices(&self.doc, cx).iter().any(|(_, _, n)| n.iter().any(|n| n.error));
+        // Red for a Feature Studio's compile errors and for errors a custom
+        // feature raised while regenerating.
+        let errors = crate::fs_notices::document_notices(&self.doc, cx).iter().any(|(_, _, n)| n.iter().any(|n| n.error))
+            || noshape_model::custom::run::has_errors(&self.doc.read(cx).session.doc);
         Some(
             h_flex()
                 .id("fs-notices-btn")

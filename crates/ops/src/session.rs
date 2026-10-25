@@ -322,6 +322,16 @@ impl Session {
         Some(move |names: &[String]| names.contains(&blob) || names.iter().all(|n| !n.starts_with("tab/")))
     }
 
+    /// The edit the last undo reverted ("Part Studio 1 :: Insert feature : Hole 1").
+    pub fn last_undone(&self) -> Option<&str> {
+        self.undo.redo_description()
+    }
+
+    /// The edit the last redo re-applied.
+    pub fn last_redone(&self) -> Option<&str> {
+        self.undo.undo_description()
+    }
+
     pub fn can_undo(&self) -> bool {
         match self.tab_scope() {
             Some(scope) => self.undo.can_undo_in(&self.store, &scope),
