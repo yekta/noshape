@@ -14,7 +14,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{EdgeStyle, LINE_THICKNESSES, LinePattern, ViewId};
+use noshape_model::drawing::{LINE_THICKNESSES, LinePattern, ViewId};
 use noshape_model::reference::{BodyId, TopoName};
 
 /// The open Adjust linestyle dialog.
@@ -42,12 +42,8 @@ impl DrawingEditor {
         let k = d.dashes.read(cx).value().trim().parse::<f64>().unwrap_or(1.0);
         let mut dr = self.drawing.clone();
         let v = dr.sheets.get_mut(self.sheet)?.view_mut(d.view)?;
-        for (body, name) in &d.edges {
-            v.edge_styles.retain(|s| !(s.body == *body && s.name == *name));
-            if !d.revert {
-                v.edge_styles.push(EdgeStyle { body: body.clone(), name: name.clone(), pattern: d.pattern, dashes: k, thickness: d.thickness, color: d.color });
-            }
-        }
+        let look = (!d.revert).then_some(noshape_scene::drawing_tools::view_edit::EdgeLook { pattern: d.pattern, dashes: k, thickness: d.thickness, color: d.color });
+        noshape_scene::drawing_tools::view_edit::set_edge_styles(v, &d.edges, look);
         Some(dr)
     }
 

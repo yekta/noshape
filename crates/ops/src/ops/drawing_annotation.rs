@@ -1,0 +1,296 @@
+//! The drawing annotation menus: jogs, leaders and note leader nodes,
+//! foreshortening, datum target dimensions, groups, Detach from geometry,
+//! Align centermark and stacked callouts. Shared code in
+//! `noshape_scene::drawing_tools::annotation_edit`, with the editor's edit
+//! texts.
+
+use super::doc_field;
+use super::drawing::{commit, drawing_field, point, reply, sheet_field};
+use super::drawing_tools::{Target, edge_at, pt_arg, target};
+use crate::Ctx;
+use crate::error::OpError;
+use crate::registry::{Args, Op, OpOutput, opt, req};
+use noshape_model::drawing::{Annotation, AnnotationKind, LeaderStart, TableKind, remove_leader, remove_leader_node};
+use noshape_scene::drawing_tools::Tool;
+use noshape_scene::drawing_tools::annotation_edit as ae;
+use serde_json::{Value, json};
+
+const ACTIONS: [&str; 19] = [
+    "add_jog",
+    "remove_jog",
+    "add_leader",
+    "remove_leaders",
+    "add_node",
+    "remove_node",
+    "delete_leader",
+    "foreshorten",
+    "remove_foreshorten",
+    "hide_dimension",
+    "show_dimensions",
+    "group",
+    "remove_from_group",
+    "group_annotation",
+    "remove_annotation_from_group",
+    "detach",
+    "align_centermark",
+    "stacked_callouts",
+    "break",
+];
+
+pub fn ops() -> Vec<Op> {
+    let int = || json!({ "type": "integer", "minimum": 0 });
+    vec![Op {
+        group: "drawing",
+        verb: "annotation_edit",
+        summary: "Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, detach, align centermark, stacked callouts",
+        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend, or at `from_node` [leader, node]); `remove_leaders`.\n- Note leaders: `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`), `delete_leader` (`leader`).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- `detach` (Detach from geometry: stays put, no longer follows the model).\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).",
+        fields: vec![
+            doc_field(),
+            drawing_field(),
+            sheet_field(),
+            req("annotation", int(), "Annotation id (drawing_get)."),
+            req("action", json!({ "type": "string", "enum": ACTIONS }), "The menu action."),
+            opt("line", json!({ "type": "integer", "enum": [0, 1] }), "add_jog / remove_jog: the extension line."),
+            opt("point", point(), "add_leader: where it points; add_node: on the leader line; align_centermark: on a straight edge (sheet mm)."),
+            opt("leader", int(), "add_node / remove_node / delete_leader: the note leader (0 = first)."),
+            opt("node", int(), "remove_node: the node (0 = nearest the note)."),
+            opt("from_node", json!({ "type": "array", "items": int(), "minItems": 2, "maxItems": 2 }), "add_leader on a note: branch from [leader, node]."),
+            opt("all", json!({ "type": "boolean", "default": false }), "show_dimensions: All targets."),
+            opt("view", int(), "group: the view to group with."),
+            opt("with", json!({ "type": "array", "items": int() }), "group / group_annotation: the other annotations."),
+            opt("parts", json!({ "type": "array", "items": { "type": "string" } }), "stacked_callouts: part names."),
+            opt("on", json!({ "type": "boolean", "default": true }), "break: Break (true) or Unbreak (false) dimension."),
+        ],
+        mutates: true,
+        destructive: false,
+        run: annotation_edit,
+    }]
+}
+
+fn uint(a: &Args, name: &str) -> Result<usize, OpError> {
+    Ok(a.opt_u64(name)?.ok_or_else(|| OpError::param(name, "required for this action"))? as usize)
+}
+
+/// The annotation ids in `with`, each on the sheet, plus `id`.
+fn with_ids(t: &Target, a: &Args, id: u64) -> Result<Vec<u64>, OpError> {
+    let mut ids = vec![id];
+    for (i, v) in a.opt_array("with")?.cloned().unwrap_or_default().iter().enumerate() {
+        let x = v.as_u64().filter(|x| t.d.sheets[t.sheet].annotations.iter().any(|y| y.id == *x)).ok_or_else(|| OpError::param(&format!("with[{i}]"), "an annotation id on the sheet"))?;
+        if !ids.contains(&x) {
+            ids.push(x);
+        }
+    }
+    Ok(ids)
+}
+
+fn annotation_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let id = a.opt_u64("annotation")?.ok_or_else(|| OpError::param("annotation", "an annotation id (drawing_get)"))?;
+    let ann: Annotation = t.d.sheets[t.sheet].annotations.iter().find(|x| x.id == id).cloned().ok_or_else(|| OpError::param("annotation", "no such annotation on the sheet"))?;
+    let action = a.str("action")?;
+    let refuse = |why: &str| Err(OpError::param("action", &format!("{action}: {why}")));
+    let note = matches!(ann.kind, AnnotationKind::Note { .. });
+    let note_or_callout = note || matches!(ann.kind, AnnotationKind::Balloon { .. });
+    let s = t.sheet;
+    let desc: &str = match action {
+        "add_jog" | "remove_jog" if !matches!(ann.kind, AnnotationKind::LinearDimension { .. }) || ann.inspection.is_some() => return refuse("linear dimensions only"),
+        "break" if !matches!(ann.kind, AnnotationKind::LinearDimension { .. } | AnnotationKind::OrdinateGroup { .. }) || ann.inspection.is_some() => return refuse("linear and ordinate dimensions only"),
+        "add_jog" => {
+            let k = uint(a, "line")?;
+            if k > 1 {
+                return Err(OpError::param("line", "0 or 1"));
+            }
+            if ann.jogs[k].is_some() {
+                return refuse("that extension line has a jog (remove_jog)");
+            }
+            let pk = t.m.pick(&Tool::Select, &[], [0.0; 2]);
+            let f = pk.dimension_frame(&pk.resolved_annotation(id).unwrap_or(ann.clone())).ok_or_else(|| OpError::param("annotation", "the dimension's view is gone"))?;
+            let (jog, grow) = ae::jog_for(&f, k);
+            ae::add_jog(&mut t.d.sheets[s], id, k, jog, grow);
+            "Add jog"
+        }
+        "remove_jog" => {
+            let k = uint(a, "line")?;
+            if ann.jogs.get(k).is_none_or(|j| j.is_none()) {
+                return refuse("no jog on that extension line");
+            }
+            ae::remove_jog(&mut t.d.sheets[s], id, k);
+            "Remove jog"
+        }
+        "break" => {
+            let on = a.bool_or("on", true)?;
+            if ann.unbroken != on {
+                return refuse(if on { "the dimension is already broken" } else { "the dimension is not broken" });
+            }
+            if let Some(x) = t.d.sheets[s].annotations.iter_mut().find(|x| x.id == id) {
+                x.unbroken = !on;
+            }
+            if on { "Break dimension" } else { "Unbreak dimension" }
+        }
+        "add_leader" | "remove_leaders" if ae::leaders(&ann).is_none() => return refuse("GD&T frames, callouts, surface finish and weld symbols and notes only"),
+        "add_leader" => {
+            let p = pt_arg(a, "point")?;
+            let start = match a.opt_array("from_node")? {
+                Some(v) if note => {
+                    let (l, n) = (v.first().and_then(Value::as_u64).unwrap_or(u64::MAX) as usize, v.get(1).and_then(Value::as_u64).unwrap_or(u64::MAX) as usize);
+                    if ae::leaders(&ann).and_then(|ls| ls.get(l)).is_none_or(|ld| n >= ld.nodes.len()) {
+                        return Err(OpError::param("from_node", "[leader, node] of a node of this note"));
+                    }
+                    LeaderStart::Node(l, n)
+                }
+                Some(_) => return Err(OpError::param("from_node", "notes only")),
+                None => ae::note_leader_start(&ann),
+            };
+            let leader = ae::leader_to(&t.m.pick(&Tool::GdtLeader { id }, &[], p), p);
+            ae::add_leader(&mut t.d.sheets[s], id, leader, start);
+            "Add leader"
+        }
+        "remove_leaders" => {
+            if ae::leaders(&ann).is_some_and(|l| l.is_empty()) {
+                return refuse("it has no leaders");
+            }
+            ae::remove_leaders(&mut t.d.sheets[s], id);
+            "Remove leaders"
+        }
+        "add_node" | "remove_node" | "delete_leader" if !note => return refuse("note leaders only"),
+        "add_node" | "remove_node" | "delete_leader" => {
+            let k = uint(a, "leader")?;
+            let n_leaders = ae::leaders(&ann).map_or(0, Vec::len);
+            if k >= n_leaders {
+                return Err(OpError::param("leader", &format!("the note has {n_leaders} leader(s)")));
+            }
+            let x = t.d.sheets[s].annotations.iter_mut().find(|x| x.id == id).expect("found");
+            let ls = ae::leaders_mut(x).expect("a note");
+            match action {
+                "add_node" => {
+                    let p = pt_arg(a, "point")?;
+                    let path = t.m.pick(&Tool::Select, &[], p).note_leader_paths(&ann).into_iter().nth(k).ok_or_else(|| OpError::param("leader", "the leader has no path"))?;
+                    let (seg, d) = ae::nearest_segment(&path, p).ok_or_else(|| OpError::param("leader", "the leader has no path"))?;
+                    // Exactly on the leader line, as the right-click is.
+                    if d > 0.5 {
+                        return Err(OpError::param("point", &format!("not on the leader line ({d:.2} mm away)")));
+                    }
+                    ae::add_node(ls, k, seg, path.head, p);
+                    "Add node"
+                }
+                "remove_node" => {
+                    let n = uint(a, "node")?;
+                    if n >= ls[k].nodes.len() {
+                        return Err(OpError::param("node", &format!("the leader has {} node(s)", ls[k].nodes.len())));
+                    }
+                    remove_leader_node(ls, k, n);
+                    "Remove node"
+                }
+                _ => {
+                    remove_leader(ls, k);
+                    "Delete leader"
+                }
+            }
+        }
+        "foreshorten" => {
+            let k = ae::foreshortened(&ann.kind).ok_or_else(|| OpError::param("action", "foreshorten: radius dimensions only"))?;
+            t.d.sheets[s].annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.kind = k.clone());
+            "Foreshorten"
+        }
+        "remove_foreshorten" => {
+            let k = ae::unforeshortened(&ann.kind).ok_or_else(|| OpError::param("action", "remove_foreshorten: foreshortened radius dimensions only"))?;
+            t.d.sheets[s].annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.kind = k.clone());
+            "Remove foreshorten"
+        }
+        "hide_dimension" | "show_dimensions" if !matches!(ann.kind, AnnotationKind::DatumTarget { .. }) => return refuse("datum targets only"),
+        "hide_dimension" => {
+            let o = ann.target.as_deref().cloned().unwrap_or_default();
+            if o.origin.is_none() || o.hide_dims {
+                return refuse("the target has no position dimensions shown");
+            }
+            ae::set_target_dims_hidden(&mut t.d.sheets[s], id, true, false);
+            "Hide dimension"
+        }
+        "show_dimensions" => {
+            let all = a.bool_or("all", false)?;
+            if !all && !ann.target.as_ref().is_some_and(|o| o.hide_dims) {
+                return refuse("this target's dimensions are shown (all: true for every target)");
+            }
+            ae::set_target_dims_hidden(&mut t.d.sheets[s], id, false, all);
+            "Show dimensions"
+        }
+        "group" | "remove_from_group" | "group_annotation" | "remove_annotation_from_group" if !note_or_callout => return refuse("notes and callouts only"),
+        "group" => {
+            if ann.view_group.is_some() {
+                return refuse("already grouped with a view (remove_from_group)");
+            }
+            let v = super::drawing_tools::view_arg(&t, a, "view")?;
+            let ids = with_ids(&t, a, id)?;
+            ae::group_with_view(&mut t.d.sheets[s], &ids, Some(v));
+            "Group"
+        }
+        "remove_from_group" => {
+            if ann.view_group.is_none() {
+                return refuse("not grouped with a view");
+            }
+            ae::group_with_view(&mut t.d.sheets[s], &[id], None);
+            "Remove from group"
+        }
+        "group_annotation" => {
+            if ann.ann_group.is_some() {
+                return refuse("already in an annotation group (remove_annotation_from_group)");
+            }
+            let ids = with_ids(&t, a, id)?;
+            if ids.len() < 2 {
+                return Err(OpError::param("with", "the other annotations to group with (two or more in all)"));
+            }
+            ae::group_annotations(&mut t.d.sheets[s], &ids, true);
+            "Group annotation"
+        }
+        "remove_annotation_from_group" => {
+            if ann.ann_group.is_none() {
+                return refuse("not in an annotation group");
+            }
+            let ids = with_ids(&t, a, id)?;
+            ae::group_annotations(&mut t.d.sheets[s], &ids, false);
+            "Remove annotation from group"
+        }
+        "detach" => {
+            if ann.refs.is_empty() {
+                return refuse("not attached to geometry");
+            }
+            ae::detach(&mut t.d.sheets[s], id);
+            "Detach"
+        }
+        "align_centermark" => {
+            if !matches!(ann.kind, AnnotationKind::Centermark { .. }) {
+                return refuse("centermarks only");
+            }
+            let p = pt_arg(a, "point")?;
+            let (pa, pb, _) = edge_at(&t, &Tool::Select, p, 0).map_err(|_| OpError::param("point", "Select a straight edge"))?;
+            ae::align_centermark(&mut t.d.sheets[s], id, pa.p, pb.p);
+            "Align centermark"
+        }
+        "stacked_callouts" => {
+            if !matches!(ann.kind, AnnotationKind::Balloon { .. }) {
+                return refuse("callouts only");
+            }
+            if !t.d.sheets.iter().flat_map(|x| &x.tables).any(|x| matches!(x.kind, TableKind::Bom { .. })) {
+                return refuse("the drawing has no BOM table");
+            }
+            let sheet = &t.d.sheets[s];
+            let src = ann.kind.view().and_then(|v| noshape_model::drawing::views::view_source(sheet, v)).and_then(|(k, _)| t.m.sources.get(&k)).ok_or_else(|| OpError::param("annotation", "the callout's view has no model"))?;
+            let mut stacked = Vec::new();
+            for (i, n) in a.opt_array("parts")?.cloned().unwrap_or_default().iter().enumerate() {
+                let n = n.as_str().ok_or_else(|| OpError::param(&format!("parts[{i}]"), "a part name"))?;
+                let body = src.parts.iter().find(|p| p.name == n).and_then(|p| p.body.clone()).ok_or_else(|| OpError::param(&format!("parts[{i}]"), &format!("the view's parts: {}", src.parts.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", "))))?;
+                stacked.push(noshape_model::drawing::StackedCallout { text: String::new(), body: Some(body) });
+            }
+            if let Some(AnnotationKind::Balloon { callout, .. }) = t.d.sheets[s].annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+                callout.stacked = stacked;
+            }
+            "Add stacked callouts"
+        }
+        other => return Err(OpError::param("action", &format!("`{other}`: one of {}", ACTIONS.join(", ")))),
+    };
+    commit(od, t.tab, t.sheet, t.d, desc)?;
+    let mut out = reply(od, t.tab, t.sheet, false)?;
+    out["annotation"] = json!(id);
+    Ok(out.into())
+}

@@ -140,6 +140,62 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "config",
+            verb: "copy_inputs",
+            summary: "Copy configuration inputs from another Part Studio or an Assembly",
+            description: "Copy input / Copy all inputs in `from` (a Part Studio, or an Assembly's Copy all inputs), then Paste inputs in this Part Studio: the inputs whose ids this Part Studio doesn't have yet (with their options and visibility conditions; conditions on inputs not pasted are repaired). Inputs with the same id can then drive Derived features (config_propagate).",
+            fields: vec![doc_field(), cfg_tab_field(), req("from", s(), "Part Studio or Assembly to copy from."), opt("inputs", json!({ "type": "array", "items": { "type": "string" } }), "Input ids or names (default all).")],
+            mutates: true,
+            destructive: false,
+            run: copy_inputs,
+        },
+        Op {
+            group: "config",
+            verb: "duplicate_input",
+            summary: "Assembly input ⋯ › Copy input: a copy of the input",
+            description: "The Assembly's Configuration panel, input ⋯ › Copy input: a copy \"<name> copy\" of `input` (new ids, the same options) after the others. One edit (\"Copy configuration input\"). In a Part Studio, Copy input copies to the clipboard: use config_copy_inputs.",
+            fields: vec![doc_field(), cfg_tab_field(), req("input", s(), "Input id or name.")],
+            mutates: true,
+            destructive: false,
+            run: duplicate_input,
+        },
+        Op {
+            group: "config",
+            verb: "propagate",
+            summary: "Input propagation: drive Derived features' configuration from this Part Studio's input",
+            description: "Input propagation…: for a List or Checkbox `input`, the Derived features whose source has an input with the same id and kind take each option's same option (a configured column per feature). `features` limits it (default all candidates). On an Assembly: the instances whose source Part Studio or assembly has an input with the same id and kind follow the assembly's input (`instances` limits it). The reply lists the candidates and which are propagated.",
+            fields: vec![
+                doc_field(),
+                cfg_tab_field(),
+                req("input", s(), "Input id or name."),
+                opt("features", json!({ "type": "array", "items": { "type": "string" } }), "Part Studios: Derived features (ids or names)."),
+                opt("instances", json!({ "type": "array", "items": { "type": "string" } }), "Assemblies: instances (ids or names)."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: propagate,
+        },
+        Op {
+            group: "config",
+            verb: "edit_ids",
+            summary: "Edit FeatureScript IDs of a configuration input and its options",
+            description: "Edit FeatureScript IDs…: the input's id and, for a List, its options' ids (`options`: {current option id or name: new id}); configured values follow.",
+            fields: vec![doc_field(), cfg_tab_field(), req("input", s(), "Input id or name."), opt("id", s(), "New input id."), opt("options", json!({ "type": "object" }), "Option renames: {option: new id}.")],
+            mutates: true,
+            destructive: false,
+            run: edit_ids,
+        },
+        Op {
+            group: "config",
+            verb: "visibility",
+            summary: "Set an input's visibility conditions",
+            description: "Visibility conditions…: when the input shows and which List options do. `visibility` is {\"conditions\": [{\"input\": id, \"test\": {\"Is\": [option ids or \"true\"/\"false\"]} | {\"Between\": [a, b]}}], \"option_rules\": [{\"show\": {\"Options\": [ids]} | {\"Range\": [a, b]}, \"always\": bool, \"conditions\": [...]}]}; null: always shown. config_list shows each input's `visible_when`.",
+            fields: vec![doc_field(), cfg_tab_field(), req("input", s(), "Input id or name."), opt("visibility", json!({ "type": ["object", "null"] }), "The conditions; omitted or null: always shown.")],
+            mutates: true,
+            destructive: false,
+            run: visibility,
+        },
+        Op {
+            group: "config",
             verb: "reorder_inputs",
             summary: "Move a configuration input onto another's place",
             description: "",
@@ -206,6 +262,9 @@ fn describe_inputs(inputs: &[noshape_model::configuration::ConfigInput]) -> Valu
         .iter()
         .map(|i| {
             let mut v = json!({ "id": i.id, "name": i.name });
+            if let Some(w) = &i.visible_when {
+                v["visible_when"] = serde_json::to_value(w).unwrap_or(Value::Null);
+            }
             match &i.kind {
                 ConfigInputKind::List { options, default } => {
                     v["kind"] = json!("list");
@@ -478,6 +537,9 @@ fn set_value(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let raw = a.get("value").ok_or_else(|| OpError::param("value", "required"))?;
     let value = if param == SUPPRESSED_PARAM {
         ParamValue::Bool(raw.as_bool().ok_or_else(|| OpError::param("value", "true or false"))?)
+    } else if param.starts_with(noshape_model::regen::features::sketch::CONFIGURED_DIMENSION_PREFIX) {
+        // A configured sketch dimension (sketch_dimension_options `configure`).
+        ParamValue::Expr(noshape_units::ExprValue::new(text(raw, "value")?))
     } else {
         let spec = ps.feature(feature).and_then(|f| f.feature_type()).and_then(|t| t.param(&param)).ok_or_else(|| OpError::param("param", "unknown parameter"))?;
         values::from_json(spec, raw, &units, od.doc()).map_err(|e| e.with_param("value"))?
@@ -499,5 +561,153 @@ fn reorder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     edit(od, tab, config::REORDER_INPUTS, |ps| {
         config::reorder_inputs(ps, &from, &to);
         Ok(json!({}))
+    })
+}
+
+fn duplicate_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::duplicate_input(ctx, a);
+    }
+    Err(OpError::param("tab", "an Assembly: in a Part Studio, Copy input copies to the clipboard (config_copy_inputs)"))
+}
+
+fn copy_inputs(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return Err(OpError::param("tab", "a Part Studio: an Assembly's panel has no Paste inputs"));
+    }
+    let (od, tab) = studio_target(ctx, a)?;
+    let from = doc::tab_of_kind(od.doc(), Some(a.str("from")?), "Part Studio or Assembly", |c| matches!(c, noshape_model::document::TabContent::PartStudio(_) | noshape_model::document::TabContent::Assembly(_))).map_err(|e| e.with_param("from"))?;
+    if from == tab {
+        return Err(OpError::param("from", "another Part Studio or an Assembly"));
+    }
+    let src_inputs: Vec<noshape_model::configuration::ConfigInput> = match od.doc().tab(from).map(|t| &t.content) {
+        Some(noshape_model::document::TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+        Some(noshape_model::document::TabContent::Assembly(x)) => x.configuration.inputs.clone(),
+        _ => Vec::new(),
+    };
+    let find = |key: &str, field: &str| -> Result<noshape_model::configuration::ConfigInput, OpError> {
+        src_inputs
+            .iter()
+            .find(|i| i.id == key)
+            .or_else(|| src_inputs.iter().find(|i| i.name == key || i.name.eq_ignore_ascii_case(key)))
+            .cloned()
+            .ok_or_else(|| OpError::not_found(format!("no configuration input `{key}`; inputs: {}", src_inputs.iter().map(|i| format!("{} ({})", i.name, i.id)).collect::<Vec<_>>().join(", "))).with_param(field))
+    };
+    let copied: Vec<noshape_model::configuration::ConfigInput> = match a.opt_array("inputs")? {
+        Some(list) => list.iter().enumerate().map(|(i, v)| find(v.as_str().unwrap_or_default(), &format!("inputs[{i}]"))).collect::<Result<_, _>>()?,
+        None => src_inputs.clone(),
+    };
+    let mut result = (Vec::new(), false);
+    let out = edit(od, tab, config::PASTE_INPUTS, |ps| {
+        result = config::paste_inputs(ps, copied);
+        Ok(json!({}))
+    })?;
+    let mut v = out.value;
+    v["pasted"] = json!(result.0);
+    if result.1 {
+        v["info"] = json!("Visibility conditions for pasted inputs were updated.");
+    }
+    Ok(v.into())
+}
+
+fn propagate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::propagate(ctx, a);
+    }
+    if a.get("instances").is_some() {
+        return Err(OpError::param("instances", "assemblies only; a Part Studio's input propagates to Derived features (`features`)"));
+    }
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let input = find_input(ps, a.str("input")?, "input")?;
+    let candidates = config::propagation_candidates(od.doc(), ps, &input);
+    if candidates.is_empty() {
+        return Err(OpError::param("input", "no Derived feature's source has a List or Checkbox input with this id"));
+    }
+    let picks: Vec<(String, noshape_model::FeatureId)> = match a.opt_array("features")? {
+        Some(list) => list
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                let id = feature_arg(ps, &Args { op: a.op, value: &json!({ "feature": v }) }, "feature").map_err(|e| e.with_param(format!("features[{i}]")))?;
+                candidates.iter().find(|c| c.0 == id).map(|c| (input.clone(), c.0)).ok_or_else(|| OpError::param(&format!("features[{i}]"), "not a Derived feature this input can propagate to"))
+            })
+            .collect::<Result<_, _>>()?,
+        None => candidates.iter().map(|c| (input.clone(), c.0)).collect(),
+    };
+    let out = edit(od, tab, config::INPUT_PROPAGATION, |ps| {
+        config::propagate_inputs(ps, &picks);
+        Ok(json!({}))
+    })?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let mut v = out.value;
+    v["candidates"] = json!(config::propagation_candidates(od.doc(), ps, &input).iter().map(|c| json!({ "feature": c.0.to_string(), "name": c.1, "propagated": c.2 })).collect::<Vec<_>>());
+    Ok(v.into())
+}
+
+fn edit_ids(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let input = find_input(ps, a.str("input")?, "input")?;
+    let ident = |v: &str, field: &str| -> Result<String, OpError> {
+        let ok = !v.is_empty() && !v.starts_with(|c: char| c.is_ascii_digit()) && v.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !noshape_model::configuration::FS_KEYWORDS.contains(&v);
+        if ok { Ok(v.to_string()) } else { Err(OpError::param(field, "a FeatureScript identifier: letters, digits and _, not starting with a digit, not a keyword")) }
+    };
+    let new_id = match a.opt_str("id")? {
+        Some(n) => ident(n, "id")?,
+        None => input.clone(),
+    };
+    if new_id != input && ps.configuration.inputs.iter().any(|i| i.id == new_id) {
+        return Err(OpError::param("id", "another input has this id"));
+    }
+    let mut renames = Vec::new();
+    for (k, v) in a.object("options")?.into_iter().flatten() {
+        let field = format!("options.{k}");
+        let from = find_option(ps, &input, k).map_err(|e| e.with_param(&field))?;
+        renames.push((from, ident(v.as_str().unwrap_or_default(), &field)?));
+    }
+    if new_id == input && renames.is_empty() {
+        return Err(OpError::invalid("nothing to change: give `id` or `options`"));
+    }
+    edit(od, tab, config::EDIT_IDS, |ps| {
+        ps.configuration.change_ids(&input, &new_id, &renames);
+        Ok(json!({ "input": new_id }))
+    })
+}
+
+/// Visibility conditions use inputs above the input (the panel's rule;
+/// others are dropped).
+pub(super) fn check_visibility(inputs: &[noshape_model::configuration::ConfigInput], input: &str, v: &Option<noshape_model::configuration::Visibility>) -> Result<(), OpError> {
+    let at = inputs.iter().position(|i| i.id == input).expect("found");
+    for c in v.iter().flat_map(|v| v.conditions.iter().chain(v.option_rules.iter().flat_map(|r| r.conditions.iter()))) {
+        match inputs.iter().position(|i| i.id == c.input) {
+            None => return Err(OpError::param("visibility", &format!("no input `{}`", c.input))),
+            Some(k) if k >= at => return Err(OpError::param("visibility", &format!("`{}` is not above this input: conditions use the inputs above it (config_reorder_inputs)", c.input))),
+            Some(_) => {}
+        }
+    }
+    Ok(())
+}
+
+/// The `visibility` argument (absent: always shown).
+pub(super) fn visibility_arg(a: &Args) -> Result<Option<noshape_model::configuration::Visibility>, OpError> {
+    match a.get("visibility") {
+        None => Ok(None),
+        Some(v) => Ok(Some(serde_json::from_value(v.clone()).map_err(|e| OpError::param("visibility", &format!("not a visibility condition: {e}")))?)),
+    }
+}
+
+fn visibility(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::visibility(ctx, a);
+    }
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let input = find_input(ps, a.str("input")?, "input")?;
+    let v = visibility_arg(a)?;
+    check_visibility(&ps.configuration.inputs, &input, &v)?;
+    edit(od, tab, config::EDIT_VISIBILITY, |ps| {
+        config::set_visibility(ps, &input, v);
+        Ok(json!({ "input": input }))
     })
 }
