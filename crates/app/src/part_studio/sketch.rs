@@ -127,6 +127,9 @@ pub(super) struct SketchUi {
     label_hover: Option<noshape_sketch::ConstraintId>,
     /// Pattern instance-count label being typed into (`3x`).
     count_edit: Option<(crate::sketch_mode::PatternHandle, Entity<InputState>, Subscription)>,
+    /// The dimension box's `#` variable autofill list (live, qa4
+    /// DIM-AUTOCOMPLETE: "(x) #var 10 mm", then "(x) New variable…").
+    dim_completion: Option<crate::var_complete::VarCompletion>,
 }
 
 /// Constraint manager filters and list state.
@@ -1023,12 +1026,19 @@ impl PartStudioView {
                 // (Clicking the canvas closes the box; the tolerance panel next
                 // to it may take the focus without closing it.)
                 let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+                    // Enter with the autofill list open picks its entry.
+                    InputEvent::PressEnter { .. } if this.ui_ref().is_some_and(|u| u.dim_completion.is_some()) => this.accept_dim_completion(cid, None, window, cx),
                     InputEvent::PressEnter { .. } => {
                         let text = st.read(cx).value().to_string();
                         this.commit_dimension(cid, &text, window, cx);
                     }
-                    InputEvent::Change if this.ui.dim_invalid => {
+                    InputEvent::Change => {
                         this.ui.dim_invalid = false;
+                        let vars = this.sketch_variables(cx);
+                        let list = crate::var_complete::VarCompletion::compute("dim", st.read(cx), &vars);
+                        if let Some(ui) = this.ui_mut() {
+                            ui.dim_completion = list;
+                        }
                         cx.notify();
                     }
                     _ => {}
@@ -1045,8 +1055,16 @@ impl PartStudioView {
                 self.dim_input = Some((cid, state, sub));
                 self.ui.dim_box_offset = Point::default();
                 self.ui.dim_invalid = false;
+                if let Some(ui) = self.ui_mut() {
+                    ui.dim_completion = None;
+                }
             }
-            None => self.dim_input = None,
+            None => {
+                self.dim_input = None;
+                if let Some(ui) = self.ui_mut() {
+                    ui.dim_completion = None;
+                }
+            }
         }
     }
 
@@ -1189,6 +1207,23 @@ impl PartStudioView {
                 self.message = Some((FeatureStatus::Error, e));
             }
             None => {}
+        }
+        cx.notify();
+    }
+
+    /// Pick entry `index` (the selected one when `None`) of the dimension
+    /// box's autofill list: insert the variable, or "New variable…" opens
+    /// the Create variable popup for the typed name.
+    fn accept_dim_completion(&mut self, cid: noshape_sketch::ConstraintId, index: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(c) = self.ui_mut().and_then(|u| u.dim_completion.take()) else { return };
+        let Some(state) = self.dim_input.as_ref().filter(|d| d.0 == cid).map(|d| d.1.clone()) else { return };
+        if c.picks_new(index) {
+            let dim = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| crate::sketch_mode::dim_unit(&c.kind))).unwrap_or(noshape_units::Dim::LENGTH);
+            if let Some(name) = c.new_variable.clone() {
+                self.open_dim_create_variable(cid, dim, name, window, cx);
+            }
+        } else {
+            c.accept(index, &state, window, cx);
         }
         cx.notify();
     }
@@ -2829,6 +2864,26 @@ impl PartStudioView {
                                 // closes it. The sketch gets the keys back (qa4
                                 // F29). An untouched box closes at once (qa4
                                 // DIM-ESC-UNTOUCHED).
+                                // The autofill list takes ↑ / ↓, Tab and Esc first.
+                                if this.ui_ref().is_some_and(|u| u.dim_completion.is_some()) && !k.modifiers.modified() {
+                                    match k.key.as_str() {
+                                        "up" | "down" => {
+                                            if let Some(c) = this.ui_mut().and_then(|u| u.dim_completion.as_mut()) {
+                                                c.move_selection(if k.key == "up" { -1 } else { 1 });
+                                            }
+                                        }
+                                        "tab" => this.accept_dim_completion(cid, None, window, cx),
+                                        "escape" => {
+                                            if let Some(ui) = this.ui_mut() {
+                                                ui.dim_completion = None;
+                                            }
+                                        }
+                                        _ => return,
+                                    }
+                                    cx.stop_propagation();
+                                    cx.notify();
+                                    return;
+                                }
                                 if k.key == "escape" && !k.modifiers.modified() {
                                     cx.stop_propagation();
                                     this.ui.dim_invalid = false;
@@ -2986,6 +3041,11 @@ impl PartStudioView {
                                         })),
                                 ),
                         )
+                        // The `#` autofill list, under the value field.
+                        .when_some(self.ui_ref().and_then(|u| u.dim_completion.as_ref()), |d, c| {
+                            let view = cx.entity();
+                            d.child(div().pl(px(20.)).child(c.render(&self.sketch_variables(cx), &units, move |i, window, cx| view.update(cx, |this, cx| this.accept_dim_completion(cid, Some(i), window, cx)))))
+                        })
                         .into_any_element(),
                 );
                 if let Some(panel) = tol_panel.take() {
