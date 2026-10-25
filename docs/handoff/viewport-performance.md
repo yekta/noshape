@@ -677,3 +677,15 @@ changes. I write the renderer part first (my files) and show crops before touchi
   - Found on the way (not fixed): with a section plane on, anti-aliased silhouette pixels of parts seen through
     the plane change (41 px in the offscreen two-box scene, plane cutting nothing): the cap quad, drawn on the plane,
     takes colour from the 1-sample cap mask, which disagrees with the MSAA frame at silhouettes.
+- **2026-10-25 (perf): open and undo on the user's fins model (qa4's v0.4.8 gate (a): open 20 s, undo 18 s).**
+  `tests/perf/fins-400.noshape`, model test `open_undo_fins` (ignored: the app's preview + refine passes timed),
+  app bench hook `NOSHAPE_PERF_SCRIPT=delete-undo-last` (perf.yml `env`). Causes found (local app run): display
+  meshing left triangulations on the cached shapes, so OCCT booleans on a shown body ran 4-5x slower (undo's
+  Linear pattern 2 fuse 15 s vs 3 s); the document thumbnail regenerated the studio again in parallel after every
+  change (and on opening a document without a thumbnail); the cache dropped a deleted feature at once; planar
+  bodies were meshed twice (preview = final). Fixes, one commit each: kernel `mesh_fill` BRepTools::Clean (mesh
+  bodies keep theirs); thumbnail draws the open view's display (`StudioDisplays`, waits while it regenerates);
+  regen cache keeps deleted features 16 runs (8 max) and their meshes (32, holding their shapes); planar contexts
+  meshed once. CI release (run 40174188764, macOS 14 / 15): open shown 4.6 / 7.2 s after start (one regen 2.7 /
+  4.2 s incl. its mesh, first frame 3.6 / 6.2 s; was ~7 s on macOS 14), delete shown 0.36 / 0.33 s, undo shown
+  0.07 / 0.08 s (nothing evaluated or meshed).
