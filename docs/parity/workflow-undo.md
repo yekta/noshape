@@ -51,4 +51,5 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 | Row | Ours | Status |
 |---|---|---|
 | UNDO1 | Insert Part Studio 1 (2 parts) into Assembly 1, ✓, switch to the Part Studio tab and back, Ctrl+Z once: Instances (0); Ctrl+Y: both back | ✅ |
-| UNDO2, UNDO3 | not re-run (drawing; UNDO3 with asb) | — |
+| UNDO2 | Drawing of Assembly 1 (suggested views): Update button pale (disabled) when created; second insert in the assembly → saturated yellow (out of date); Ctrl+Q → pale; Ctrl+Z in the assembly (Instances 4 → 2) → saturated again. Both directions agree (live: pale / saturated, behaviours 6902) | ✅ |
+| UNDO3 | not re-run (asb) | — |
