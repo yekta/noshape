@@ -410,9 +410,10 @@ impl Regenerator {
         // The shown Assembly context: its bodies, translucent and pickable.
         if let Some(active) = studio.active_context
             && let Some(c) = studio.contexts.iter().find(|c| c.id == active)
-            && let Some((_, shown)) = self.contexts.get(&(c.id, c.revision))
+            && let Some((bodies, shown)) = self.contexts.get(&(c.id, c.revision))
         {
             display.context_bodies = shown.clone();
+            display.context_shapes = bodies.clone();
         }
         display.features = states;
         display.variables = ctx.variables.clone();

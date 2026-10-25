@@ -403,6 +403,9 @@ pub struct StudioDisplay {
     /// The shown Assembly context's bodies (translucent, pickable for
     /// references; not parts of this Part Studio, see `crate::in_context`).
     pub context_bodies: Vec<BodyDisplay>,
+    /// Their kernel bodies, for tools that take context geometry outside a
+    /// feature's regeneration (sketch Use on a context face, qa5 CTX-USE).
+    pub context_shapes: Vec<Arc<crate::regen::context::Body>>,
     /// Bodies that are rigidly moved copies of one shape (pattern instances
     /// sharing a TShape, `Shape::partner_hash`): the renderer uploads the
     /// shared mesh once and draws each copy placed by its transform.
