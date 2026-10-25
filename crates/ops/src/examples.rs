@@ -23,7 +23,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("tab_move", &[r##"{"tab": "Part Studio 1", "folder": "Folder 1"}"##, r##"{"tab": "Part Studio 1", "to_parent": true}"##, r##"{"tab": "Assembly 1", "before": "Part Studio 1"}"##]),
     ("tab_folder_unpack", &[r##"{"folder": "Folder 1"}"##]),
     // features
-    ("feature_types", &[r##"{}"##, r##"{"category": "Features"}"##]),
+    ("feature_types", &[r##"{"search": "move face"}"##, r##"{"category": "Detail"}"##]),
     ("feature_schema", &[r##"{"type": "extrude"}"##, r##"{"type": "hole"}"##]),
     (
         "feature_add",
@@ -58,6 +58,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
             r##"{"sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [80, 40]]}"##,
             r##"{"sketch": "Sketch 1", "tool": "circle", "points": [[40, 20], [45, 20]]}"##,
             r##"{"sketch": "Sketch 1", "tool": "line", "points": [[0, 0], [30, 0], [30, 20]]}"##,
+            r##"{"sketch": "Sketch 2", "tool": "point", "points": [[10, 10, 6], [70, 10, 6]]}"##,
         ],
     ),
     ("sketch_constrain", &[r##"{"sketch": "Sketch 1", "constraint": "horizontal", "entities": ["entity:…"]}"##, r##"{"sketch": "Sketch 1", "constraint": "coincident", "entities": ["entity:…", "origin"]}"##]),
@@ -116,7 +117,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("material_list", &[r##"{"search": "steel"}"##]),
     // queries, analysis, render
     ("query_parts", &[r##"{}"##]),
-    ("query_entities", &[r##"{"kind": "faces", "surface": "plane", "normal": [0, 0, 1]}"##, r##"{"kind": "edges", "created_by": "Extrude 1"}"##, r##"{"kind": "faces", "context": true, "surface": "plane"}"##]),
+    ("query_entities", &[r##"{"kind": "faces", "surface": "plane", "normal": [0, 0, 1]}"##, r##"{"kind": "edges", "created_by": "Extrude 1"}"##, r##"{"kind": "edges", "direction": [0, 0, 1]}"##, r##"{"kind": "edges", "at": [[0, 0, 3], [80, 0, 3], [40, 44, 6]]}"##, r##"{"kind": "faces", "context": true, "surface": "plane"}"##]),
     ("query_datums", &[r##"{}"##]),
     ("query_measure", &[r##"{"entities": ["face:…", "face:…"]}"##]),
     ("query_mass_properties", &[r##"{}"##, r##"{"parts": ["Part 1"]}"##]),
@@ -130,12 +131,13 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("render_image", &[r##"{"view": "isometric", "file": "/tmp/part.png"}"##, r##"{"tab": "Assembly 1", "view": "isometric", "section": [{"plane": "plane:front"}]}"##, r##"{"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}"##, r##"{"view": "front", "perspective": true, "tangent_edges": "phantom", "hidden_edges": true}"##, r##"{"isolate": ["Part 1"], "zebra": {"stripes": 20}}"##, r##"{"normal_to": "plane:front", "reflection": {"image": "Blue sky", "rotation": 45}}"##]),
     ("render_named_view", &[r##"{"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}"##, r##"{"name": "Section A", "delete": true}"##]),
     // import / export
-    ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##]),
+    ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##, r##"{"tab": "Assembly 1", "format": "STEP", "file": "/tmp/assembly.step"}"##]),
     ("import_files", &[r##"{"files": ["/tmp/bracket.step"]}"##, r##"{"files": ["/tmp/a.x_t", "/tmp/b.x_t"], "combine": true}"##]),
     // Feature Studio, history
     ("featurestudio_get", &[r##"{"tab": "Feature Studio 1"}"##]),
     ("featurestudio_edit", &[r##"{"tab": "Feature Studio 1", "source": "FeatureScript 2581;\n…"}"##]),
     ("featurestudio_commit", &[r##"{"tab": "Feature Studio 1"}"##]),
+    ("featurestudio_monitor", &[r##"{"part_studio": "Part Studio 1"}"##]),
     ("history_undo", &[r##"{}"##]),
     ("history_redo", &[r##"{}"##]),
     ("history_list", &[r##"{"limit": 10}"##]),
@@ -147,7 +149,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     // assemblies
     ("assembly_insert", &[r##"{"source": "Part Studio 1", "part": "Part 1"}"##, r##"{"source": "Part Studio 1"}"##, r##"{"source": "Bracket", "configuration": {"Size": "Large"}}"##]),
     ("assembly_list", &[r##"{}"##]),
-    ("assembly_entities", &[r##"{"instance": "Part 1 <1>", "kind": "faces", "surface": "cylinder"}"##]),
+    ("assembly_entities", &[r##"{"instance": "Part 1 <1>", "kind": "faces", "surface": "cylinder"}"##, r##"{"instance": "Bracket <1>", "kind": "faces", "at": [[0, 0, 5], [30, 8.8, 9]]}"##]),
     ("assembly_connectors", &[r##"{"instance": "Part 1 <1>", "entity": "face:…"}"##]),
     (
         "assembly_mate",

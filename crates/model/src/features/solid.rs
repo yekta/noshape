@@ -178,13 +178,14 @@ pub fn loft() -> FeatureType {
         ParamSpec::array(
             "sheetProfilesArray",
             "Profiles",
-            "Profile",
+            "profile",
             vec![ParamSpec::query(
                 "sheetProfileEntities",
                 "Faces and sketch regions",
                 QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
             )],
         )
+        .item_template("#sheetProfileEntities")
         // loft.fs: "Driven query" arrays, one selection box adding a
         // profile per pick (live dom/dialog-loft.txt).
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS | Hints::DRIVEN_QUERY)
@@ -194,20 +195,21 @@ pub fn loft() -> FeatureType {
         ParamSpec::array(
             "wireProfilesArray",
             "Profiles",
-            "Profile",
+            "profile",
             vec![ParamSpec::query(
                 "wireProfileEntities",
                 "Edges, curves and sketches",
                 QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE | QueryFilter::WIRE_BODY | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
             )],
         )
+        .item_template("#wireProfileEntities")
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
         .visible(|v| !v.is("bodyType", "SOLID")),
     );
     p.extend(without_hint(thin_block(), Hints::CAN_BE_TOLERANT));
     // loft.fs: Group "End conditions", not collapsed by default.
-    p.push(ParamSpec::bool("endConditions", "End conditions", true).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE));
-    let ends = |v: &ParamValues| v.bool("endConditions");
+    p.push(ParamSpec::bool("endConditionsGroup", "End conditions", true).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE));
+    let ends = |v: &ParamValues| v.bool("endConditionsGroup");
     for (cond, faces, mag, dir, label) in [
         ("startCondition", "adjacentFacesStart", "startMagnitude", "startDirection", ["Start profile condition", "Start magnitude", "Start direction"]),
         ("endCondition", "adjacentFacesEnd", "endMagnitude", "endDirection", ["End profile condition", "End magnitude", "End direction"]),
@@ -223,12 +225,15 @@ pub fn loft() -> FeatureType {
         ParamSpec::array(
             "guidesArray",
             "Guides",
-            "Guide",
+            "guide",
             vec![
                 ParamSpec::query("guideEntities", "Edges, curves and sketches", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY),
                 ParamSpec::enum_("guideDerivativeType", "Continuity", GUIDE_CONTINUITY).hints(Hints::SHOW_LABEL | Hints::MATCH_LAST_ARRAY_ITEM),
+                // loft.fs: set by its editing logic, never shown.
+                ParamSpec::num("guideDerivativeMagnitude", "Magnitude", NumSpec::real(1.0, -1e5, 1e5)).hints(Hints::ALWAYS_HIDDEN),
             ],
         )
+        .item_template("#guideEntities")
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
         .visible(|v| v.bool("addGuides")),
     );
@@ -241,9 +246,15 @@ pub fn loft() -> FeatureType {
         ParamSpec::array(
             "connections",
             "Match connections",
-            "Connection",
-            vec![ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX)],
+            "connection",
+            vec![
+                ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX),
+                // loft.fs: set by its editing logic, never shown.
+                ParamSpec::query("connectionEdgeQueries", "Edge queries", QueryFilter::EDGE).hints(Hints::ALWAYS_HIDDEN),
+                ParamSpec::text("connectionEdgeParameters", "Edge parameters", "").hints(Hints::ALWAYS_HIDDEN),
+            ],
         )
+        .item_template("#connectionEntities")
         .hints(Hints::DRIVEN_QUERY)
         .visible(|v| v.bool("matchConnections")),
     );
@@ -365,7 +376,8 @@ pub fn hole() -> FeatureType {
             .hints(rem | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showThreadClassV2") && v.is("threadStandard", "ISO")),
         ParamSpec::num("holeDiameterV3", "Diameter", NumSpec::positive_length(5.0, 0.25).bounded(1e-5, 500.0)).hints(rem | Hints::CAN_BE_TOLERANT_DIAMETER),
-        ParamSpec::num("tapDrillDiameterV3", "Tap drill diameter", NumSpec::positive_length(4.2, 0.201).bounded(1e-5, 500.0))
+        // hole.fs HOLE_DIAMETER_BOUNDS; the standard's value comes from the table.
+        ParamSpec::num("tapDrillDiameterV3", "Tap drill diameter", NumSpec::positive_length(5.0, 0.25).bounded(1e-5, 500.0))
             .hints(rem | Hints::CAN_BE_TOLERANT)
             .visible(|v| v.bool("hasClearance")),
         ParamSpec::enum_(
@@ -404,12 +416,13 @@ pub fn hole() -> FeatureType {
         ParamSpec::num("cSinkAngleV3", "Countersink angle", NumSpec::angle(90.0, 0.1, 179.9))
             .hints(rem | Hints::CAN_BE_TOLERANT)
             .visible(|v| v.is("styleV2", "C_SINK")),
+        // hole.fs order: the computed depth (Up to …) before the blind one.
+        ParamSpec::num("holeDepthComputedV3", "Depth", NumSpec::positive_length(12.0, 0.5).bounded(1e-5, 500.0))
+            .hints(Hints::READ_ONLY | Hints::CAN_BE_TOLERANT | Hints::UNCONFIGURABLE)
+            .visible(up_to),
         ParamSpec::num("holeDepthV3", "Depth", NumSpec::positive_length(12.0, 0.5).bounded(1e-5, 500.0))
             .hints(rem | Hints::CAN_BE_TOLERANT)
             .visible(|v| v.is("endStyleV2", "BLIND")),
-        ParamSpec::num("holeDepthComputedV3", "Depth", NumSpec::positive_length(12.0, 0.5))
-            .hints(Hints::READ_ONLY | Hints::CAN_BE_TOLERANT | Hints::UNCONFIGURABLE)
-            .visible(up_to),
         ParamSpec::enum_("tipAngleStyle", "Tip angle style", &[("DEGREE118", "118 deg"), ("DEGREE135", "135 deg"), ("FLAT", "Flat"), ("CUSTOM", "Custom")])
             .hints(Hints::SHOW_LABEL)
             .visible(move |v| !through(v)),

@@ -56,6 +56,39 @@ noshape-cli render image --doc /tmp/plate.noshape --view isometric --file /tmp/p
 - `noshape-cli batch file.jsonl` runs `{"tool": ..., "args": {...}}` lines in one session.
 - `noshape-cli tools` prints the MCP tool list with schemas; `noshape-cli <group> <verb> --help` documents one.
 
+### Lessons from agent runs
+
+Five tasks driven through the MCP server with only these docs and the replies (a bracket from a text spec,
+editing an early dimension, a 3-part assembly with mates, a drawing exported to PDF, a STEP import edited and
+re-exported) gave these rules:
+
+- **Get ids in one call.** `query_entities` filters by `surface` / `curve`, `normal` (faces), `direction`
+  (edges along it, e.g. `[0,0,1]` for vertical edges), `created_by` and `near`; `at: [[x,y,z], ...]` returns the
+  entity at each point, in order (three fillet edges: one call). `assembly_entities` has the same filters in
+  assembly coordinates. Parts can be named instead of `body:…` ids (`assembly_insert {"part": "Bracket"}`).
+- **Sketching on a face:** its sketch axes follow the face and may be turned (a +Z face can have x = −Y): read
+  the `frame` in the `sketch_create` reply, or give `sketch_draw` model points `[x, y, z]`, which are projected
+  onto the sketch plane.
+- **Feature parameters:** find a type with `feature_types {"search": "move face"}`; `feature_schema` says for
+  each conditional parameter whether the dialog shows it with the defaults and which values of which parameter
+  show or hide it. Hidden parameters are ignored without an error, so pass the switch too (hole: `endStyleV2`
+  `THROUGH` for a through hole) and, when unsure, check `visible` in `feature_get`.
+- **Check every edit:** `feature_status` / `regeneration.failed` on feature edits, `failed` on sketch edits
+  (a dimension change that breaks a later feature shows there); then compare `query_parts` volume and bounding
+  box with a hand estimate and look at `render_image`. Status `Ok` does not mean the geometry is what you meant.
+- **Dimensions** to edit later: `sketch_dimension` returns its `dim:…` id; `sketch_get` lists them among the
+  `constraints` with their expressions; `sketch_set_dimension` changes one and the model regenerates.
+- **Mates:** the first connector's instance moves. An offset runs along the mate's Z axis, which follows the
+  first connector (flipped as the dialog does, `flip_primary` in `assembly_list`): check the moved instance's
+  `translation` and negate the offset if it went the wrong way. `assembly_interference` lists overlaps.
+- **Drawings:** `drawing_get` gives each view's `orientation` (projected views too: `top`, `right`...), bounds
+  and drawn edges in sheet millimeters; dimension clicks go on those coordinates. Export PNG to look at the sheet.
+- **Custom (FeatureScript) features:** a failing one carries its FeatureScript `notices` (message, stack of
+  `line:col` and `module (function)`) and `println` `output` in `feature_add` / `feature_edit` failures,
+  `feature_get` and `feature_list`; `featurestudio_monitor` shows a Part Studio's whole Monitor.
+- **Undo:** `history_undo` names the edit it undid (`description`). `feature_delete` takes a list `features`.
+- Replies give numbers to 12 significant digits (no `3.3000000000000007`, no `-0`).
+
 ## Concepts
 
 - **Documents** are `.noshape` files holding every tab and the whole history. There is no Save: every edit
@@ -246,7 +279,7 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-219 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
+217 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
@@ -265,7 +298,7 @@ the app.
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image)
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
-- **featurestudio**: [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit)
+- **featurestudio**: [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
 - **history**: [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 
 ### ops
@@ -550,20 +583,21 @@ Every feature of the Part Studio toolbar and tool search (Extrude, Revolve, Fill
 Examples:
 
 ```json
-{}
-{"category": "Features"}
+{"search": "move face"}
+{"category": "Detail"}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `category` | string |  | Only this category: Sketch, Solid (Create), Detail, Pattern, Transform, Direct, Surface, Curve, Reference, SheetMetal, Frame, Variable, Import, Custom. |
+| `search` | string |  | Only types whose name has every word of this (case-insensitive, word starts: "move face", "fill"), or whose id it is; when none, those whose description contains the words. |
 
 #### feature_schema
 
 The parameters of a feature type (JSON schema, defaults, options, units).
 
-The same parameters, defaults, options and visibility rules as the feature's dialog. Parameters shown only for some values of others (e.g. `depth` only when `endBound` is BLIND) are ignored while hidden.
+The same parameters, defaults, options and visibility rules as the feature's dialog. Parameters shown only for some values of others are ignored while hidden; each says whether the dialog shows it with the defaults and which other parameter's values show or hide it (e.g. hole `holeDepthV3`: "shown with the defaults; hidden, and ignored, when endStyleV2 is UP_TO_NEXT or UP_TO_ENTITY or THROUGH"). `feature_get` lists a feature's currently `visible` parameters.
 
 Examples:
 
@@ -626,7 +660,7 @@ Examples:
 
 A feature's type, parameters and regeneration state.
 
-Parameters in the same JSON forms `feature_add` takes; `visible` lists the ones its dialog currently shows.
+Parameters in the same JSON forms `feature_add` takes; `visible` lists the ones its dialog currently shows. A custom (FeatureScript) feature also has the `notices` of its last run (message, severity, stack of `at` line:col and `in` module (function), as the FeatureScript notices panel's Monitor shows them) and its `println` `output`.
 
 Examples:
 
@@ -644,7 +678,7 @@ Examples:
 
 The feature list: every feature with its status, the parts, failures.
 
-Regenerates the Part Studio and reports each feature (id, name, type, status Ok/Info/Warning/Error/Suppressed/RolledBack, error message), the parts and the rollback bar.
+Regenerates the Part Studio and reports each feature (id, name, type, status Ok/Info/Warning/Error/Suppressed/RolledBack, error message; custom features their FeatureScript `notices` and `output`), the parts and the rollback bar.
 
 Examples:
 
@@ -924,7 +958,7 @@ Examples:
 
 Draw sketch geometry with a sketch tool (line, rectangle, circle, arc, spline, slot, polygon, ellipse, point...) (edits the document (one undoable history entry)).
 
-Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions ("10 mm"). One call = one edit of the sketch ("Edit : Sketch 1"); `shapes` draws many shapes in that one edit. Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:
+Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions ("10 mm"); a point of three coordinates [x, y, z] is a model (Part Studio) position, projected onto the sketch plane: easiest on a face, whose sketch axes may be turned (the reply's `frame` gives them). One call = one edit of the sketch ("Edit : Sketch 1"); `shapes` draws many shapes in that one edit. Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:
 - line: Clicks chain segments: [p0, p1, p2...] makes p0-p1, p1-p2...; repeat the first point to close the loop.
 - midpoint_line: [midpoint, end].
 - corner_rectangle: [corner, opposite corner]. Horizontal/vertical and coincident constraints, like the UI.
@@ -951,6 +985,7 @@ Examples:
 {"sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [80, 40]]}
 {"sketch": "Sketch 1", "tool": "circle", "points": [[40, 20], [45, 20]]}
 {"sketch": "Sketch 1", "tool": "line", "points": [[0, 0], [30, 0], [30, 20]]}
+{"sketch": "Sketch 2", "tool": "point", "points": [[10, 10, 6], [70, 10, 6]]}
 ```
 
 | field | type | | description |
@@ -959,7 +994,7 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `tool` | one of `line`, `midpoint_line`, `corner_rectangle`, `center_rectangle`, `aligned_rectangle`, `circle`, `three_point_circle`, `three_point_arc`, `tangent_arc`, `center_point_arc`, `point`, `spline`, `bezier`, `conic`, `slot`, `inscribed_polygon`, `circumscribed_polygon`, `ellipse`, `elliptical_arc` |  | Drawing tool (required without `shapes`). |
-| `points` | array of array of number or string |  | The clicks, in order: [[x, y], ...] (required without `shapes`). |
+| `points` | array of array of number or string |  | The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`). |
 | `shapes` | array of object |  | Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. |
 | `construction` | boolean |  | Make the new geometry construction geometry. |
 | `sides` | integer |  | Polygon sides. |
@@ -1980,12 +2015,13 @@ Examples:
 
 An instance's faces, edges or vertices, in assembly (world) coordinates, with ids for mates.
 
-Like query_entities for one instance: ids, surface/curve type, centroid/midpoint, normal, axis and radius, all placed where the instance is in the assembly.
+Like query_entities for one instance: ids, surface/curve type, centroid/midpoint, normal, axis and radius, all placed where the instance is in the assembly. The same filters, in assembly coordinates: `surface`, `curve`, `normal`, `direction`, `near` (closest first) and `at` (the closest entity to each point, in order).
 
 Examples:
 
 ```json
 {"instance": "Part 1 <1>", "kind": "faces", "surface": "cylinder"}
+{"instance": "Bracket <1>", "kind": "faces", "at": [[0, 0, 5], [30, 8.8, 9]]}
 ```
 
 | field | type | | description |
@@ -1995,7 +2031,11 @@ Examples:
 | `instance` | string | required | Instance id or name. |
 | `kind` | one of `faces`, `edges`, `vertices` | required | Which entities. |
 | `surface` | string |  | Faces: only this surface type (plane, cylinder, ...). |
+| `curve` | one of `line`, `circle`, `other` |  | Edges: only this curve type. |
 | `normal` | array of number |  | Faces: outward normal in assembly coordinates. |
+| `direction` | array of number |  | Edges: lines parallel to this direction (either way) or circles around it, within 1°. |
+| `near` | array of number or string |  | Sort by distance from this point (assembly coordinates, workspace units). |
+| `at` | array of array of number or string |  | Points: the closest entity to each, in order (replaces `near` / `limit`). |
 | `limit` | integer |  | At most this many (default 200). |
 
 #### assembly_connectors
@@ -4429,13 +4469,15 @@ Examples:
 
 Faces, edges or vertices with stable ids and their geometry, to select for features.
 
-Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `created_by` (feature id or name), `near` (closest first, max `limit`). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.
+Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `direction` (line edges along it, either way, or circles around it), `created_by` (feature id or name), `near` (closest first, max `limit`). `at` picks several entities in one call: for each point, the closest entity that passes the filters (in the points' order). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.
 
 Examples:
 
 ```json
 {"kind": "faces", "surface": "plane", "normal": [0, 0, 1]}
 {"kind": "edges", "created_by": "Extrude 1"}
+{"kind": "edges", "direction": [0, 0, 1]}
+{"kind": "edges", "at": [[0, 0, 3], [80, 0, 3], [40, 44, 6]]}
 {"kind": "faces", "context": true, "surface": "plane"}
 ```
 
@@ -4449,7 +4491,9 @@ Examples:
 | `curve` | one of `line`, `circle`, `ellipse`, `bspline`, `other` |  | Edges: only this curve type. |
 | `normal` | array of number |  | Faces: outward normal direction, e.g. [0,0,1] for faces facing +Z. |
 | `created_by` | string |  | Only entities made by this feature (id or name). |
+| `direction` | array of number |  | Edges: lines parallel to this direction (either way) or circles whose axis it is, within 1°; e.g. [0,0,1] for vertical edges. |
 | `near` | array of number or string |  | Sort by distance from this point (workspace units). |
+| `at` | array of array of number or string |  | Points (workspace units): the closest entity to each, in order (replaces `near` / `limit`). |
 | `limit` | integer |  | At most this many results (default 200). |
 | `context` | boolean |  | The shown Assembly context's instances instead of the parts. |
 
@@ -4764,15 +4808,16 @@ Examples:
 
 #### export_parts
 
-Export a Part Studio's parts to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino) (edits the document (one undoable history entry)).
+Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino) (edits the document (one undoable history entry)).
 
-Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.
+Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP keeps the assembly (the root product, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.
 
 Examples:
 
 ```json
 {"format": "STEP", "file": "/tmp/bracket.step"}
 {"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}
+{"tab": "Assembly 1", "format": "STEP", "file": "/tmp/assembly.step"}
 ```
 
 | field | type | | description |
@@ -4882,13 +4927,30 @@ Examples:
 | `tab` | string |  | Feature Studio tab (name or id); default: the first. |
 | `all` | boolean |  | Commit every Feature Studio with uncommitted changes. |
 
+#### featurestudio_monitor
+
+The FeatureScript notices panel's Monitor for a Part Studio: notices and println output.
+
+Regenerates the Part Studio and returns what its FeatureScript notices panel's Monitor shows: the compile warnings of the Feature Studios its custom features come from and each custom feature's runtime notices (message, severity, `line` / `column`, stack of `at` line:col and `in` module (function), ending with the Part Studio and feature), in Onshape's order, then the text the features printed (`println`).
+
+Examples:
+
+```json
+{"part_studio": "Part Studio 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `part_studio` | string |  | Part Studio tab (name or id); default: the first. |
+
 ### history
 
 #### history_undo
 
 Undo the last edit (edits the document (one undoable history entry)).
 
-With `tab`, undoes the last edit of that tab (Onshape's undo is per tab); otherwise the last edit of the document.
+With `tab`, undoes the last edit of that tab (Onshape's undo is per tab); otherwise the last edit of the document. `description` names the edit undone.
 
 Examples:
 
