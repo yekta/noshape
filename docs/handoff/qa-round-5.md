@@ -32,6 +32,43 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 7 in the app: feature dialogs in everyday use (v0.4.8 c7d9d454; r5/v3s7.py: block 60×40×20 + revolve profile/axis on Front + hole points; live "Extrude dialog states", "Fillet", "All other Part Studio feature dialogs")
+Same as live ✅: Extrude End type list (Blind, Up to next, Up to face, Up to part, Up to vertex, Through all) with the search
+input and bold-match filtering ("thr" → **Thr**ough all), Enter picks; Through all hides Depth; Up to face adds "Up to face"
++ mate-connector button + Offset distance and hides Symmetric; title tooltip "Extrude 2 did not regenerate properly: Select face
+or sketch region to extrude."; Draft = inline "3 deg" + ↻; Symmetric hides Second end position; Second end group (End type +
+flip, Depth, Draft); Starting offset (End type + Depth); Thin (Mid plane, Thickness 1 5 mm + flip, Thickness 2 0 mm, …);
+Surface (New | Add, "Sketch curves to extrude", no Draft); Remove adds ☐ Merge with all + Merge scope "Part 1"; a Remove tool
+pointing away from the part = translucent dark red + blue toast "Selected tools and targets do not intersect." ×.
+Revolve (Solid/Surface/Thin, New…Intersect, regions, Revolve axis + MC button, ☑ Full revolve; unticked: End type + ↻, Revolve
+angle 30 deg, Symmetric, Second end position; an empty required axis field turns pink; 30° preview with a rotate handle).
+Fillet (Edge | Full round, Measurement [Radius, Width], Control [Distance, Conic, Curvature], Radius 5 mm, Asymmetric, Partial,
+Variable, ☑ Allow edge overflow, Smooth fillet corners; chip tooltip "Edge of Extrude 1"; chip right-click → "Clear all").
+Chamfer (Measurement [Offset, Tangent], Chamfer type [Equal distance, Two distances, Distance and angle], Distance 5 mm,
+☑ Tangent propagation). Shell (☐ Hollow, Faces to remove, Shell thickness 2.5 mm + flip, arrow handle; 25 mm → "Shell 1 did
+not regenerate properly: **Could not shell part with selections.**" = live). Circular pattern (Part/Feature/Face pattern, New…,
+Entities, Axis + MC, Angle 360 deg, Instance count 4 + ↻, ☑ Equal spacing, ☐ Centered, Skip instances) and Mirror (Part
+mirror, Entities to mirror, Mirror plane + MC) field lists. Linear pattern / Hole checked in s1. Previews 0.32–0.90 s.
+- **R5v3-S7-a → EXT-DIRECTION (psb/ui2)** ticking Direction: live makes the new "Extrude direction" field the active one (blue),
+  turns the title red and the group's chevron red-brown until it's picked (live dialogs/extrude-23); ours leaves the field
+  white, the title black and the chevron grey (the red-brown chevron seems to mark a group with an unfilled required field:
+  live's Second end chevron, all filled, is grey).
+- **R5v3-S7-b → EXT-2ND-DEPTH (psb/ui2)** the Second end position Depth row has a › expander and a ± tolerance icon on ours;
+  live's has neither (dialogs/extrude-22).
+- **R5v3-S7-c → SEL-REJECT-TOAST (psb)** clicking an entity the active field doesn't accept shows an invented blue toast
+  ("Select sketch regions or planar faces.", part_studio/behaviors.rs filter_description); live simply doesn't highlight or
+  accept it, no toast (live "qa4 round 5 s1 follow-up 2" (1)).
+- **R5v3-S7-d → CHIP-HOVER (psb/ui2)** hovering a selection chip leaves its edge amber (255,169,10); live highlights it
+  yellow-green #f2ff80.
+- **R5v3-S7-e → FILLET-OVERFLOW (kern, live asked)** one top edge of the 60×40×20 block: R ≤ 20 volumes match the exact
+  fillet ((1−π/4)·R²·60 removed: R5 47678.1, R20 42849.6); R 21…45 still report **OK**, as a quarter cylinder clipped by the
+  bottom face (R21 42322.1, R25 40002.7, R45 25607.6 with 5 faces); a ball that size can't touch the 20 mm front face, so live
+  probably fails or overflows differently (r5/v3s7-fillet.py).
+- **R5v3-S7-f (kern/psb, live asked)** Chamfer 25 on the 20 mm face: ours "Failed to chamfer selections."; the model already
+  uses live's "Distance of chamfer on face too large." for other over-size chamfers.
+- Note: Remove on a picked face defaults into the part (25 mm then removes the whole 20 mm block); live's recorded case used a
+  sketch region whose default pointed away; asked for the face case.
+
 ## v3 Session 6 in the app: every sketch constraint, driven/driving, colours, deleting, glyph menus, dragging (v0.4.8 c7d9d454; r5/v3s6.py: one sketch with free geometry per constraint, coordinates jittered so the line tool infers nothing; live "Constraints", "qa4 round 5 s5 driven dims")
 Applied by selection + shortcut, each with its glyph ✅: Coincident (endpoint–endpoint, point–circle), Concentric (Shift+O),
 Parallel (B), Tangent (T), Horizontal (H), Vertical (V), Perpendicular (Shift+L), Equal (E), Midpoint (Shift+M), Symmetric

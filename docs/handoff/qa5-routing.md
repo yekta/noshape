@@ -411,3 +411,12 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - Pending live (follow-up "qa4 round 5 s6 constraints"): H+V on one line (ours collapses it), Tangent/drag changing the radius,
   line menu items.
 - **CON-CURVATURE (skb)** Curvature refuses Spline-tool (interpolated) splines: equations.rs curv_spec has no case for them.
+
+## qa4 QA round 5 v3 s7: feature dialogs in everyday use (P1) — qa-round-5.md "v3 Session 7" (sketch items now go to psb)
+- **EXT-DIRECTION (psb/ui2)** ticking Direction: the new field should become active, the title red and the group chevron
+  red-brown until picked (live dialogs/extrude-23); ours: white field, black title, grey chevron.
+- **EXT-2ND-DEPTH (psb/ui2)** Second end position Depth: no › expander and no ± icon on live.
+- **SEL-REJECT-TOAST (psb)** no toast for a rejected pick (ours: "Select sketch regions or planar faces." from filter_description).
+- **CHIP-HOVER (psb/ui2)** chip hover should highlight the entity yellow-green #f2ff80 (ours keeps amber).
+- **FILLET-OVERFLOW (kern, pending live)** R > face height (21…45 on a 20 mm block edge) reports OK as a clipped quarter
+  cylinder; r5/v3s7-fillet.py prints status/volume per radius.
