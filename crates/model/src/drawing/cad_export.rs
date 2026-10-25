@@ -1531,7 +1531,9 @@ mod tests {
             let dxf = to_dxf_version(g, units, DxfVersion::AC1032).unwrap();
             acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap()
         };
+        // ANSI, inches.
         let mut g = sample();
+        g.style.iso = false;
         let d = read(&g, 1);
         let names: Vec<String> = d.dim_styles.iter().map(|s| s.name.clone()).collect();
         assert_eq!(names.len(), 21, "{names:?}");

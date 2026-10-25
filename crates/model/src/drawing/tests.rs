@@ -2556,6 +2556,52 @@ fn hole_callout_dual_block_like_onshape() {
 /// Live samples/asb-dual-2018: with dual dimensions each DIMENSION's text
 /// override is "[]\P<>" (the alternate units, then the value) and its block
 /// holds one MTEXT "\A1;[…]\P…"; angular dimensions have no dual.
+/// Live asbdt-1 / -2 (ANSI): a linear dimension's value sits inline, its
+/// middle on the line, which is broken around it (DIMGAP); a value that
+/// doesn't fit between the arrows stays centred, the arrows go outside with
+/// tails as long as themselves and no line runs between the extension
+/// lines. ISO keeps the value above the unbroken line.
+#[test]
+fn ansi_dimension_text_sits_inline() {
+    use super::format::DimText;
+    let horizontal = |g: &sheet::SheetGeometry, y: f64| -> Vec<[f64; 2]> {
+        let mut v: Vec<[f64; 2]> = g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1] - y).abs() < 1e-9 && (l.points[1][1] - y).abs() < 1e-9).map(|l| [l.points[0][0].min(l.points[1][0]), l.points[0][0].max(l.points[1][0])]).collect();
+        v.sort_by(|a, b| a[0].total_cmp(&b[0]));
+        v
+    };
+    let dim = |iso: bool, a: f64, b: f64| {
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.style.iso = iso;
+        let t = DimText::plain("60");
+        g.linear_dimension_text([a, 100.0], [b, 100.0], -20.0, DimOrientation::Horizontal, &t, 1);
+        g
+    };
+    let g = dim(false, 50.0, 110.0);
+    let h = g.style.dim_text;
+    let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+    let y = t.pos[1];
+    assert_eq!((t.anchor, t.pos[0]), (sheet::Anchor::Center, 80.0));
+    let pieces = horizontal(&g, y);
+    assert_eq!(pieces.len(), 2, "broken around the text: {pieces:?}");
+    let half = font::text_width("60", h) / 2.0 + 0.65 * h;
+    assert!((pieces[0][1] - (80.0 - half)).abs() < 1e-9 && (pieces[1][0] - (80.0 + half)).abs() < 1e-9);
+    assert!((pieces[0][0] - 50.0).abs() < 1e-9 && (pieces[1][1] - 110.0).abs() < 1e-9);
+    // Too narrow (0.100 in): arrows outside with their tails, nothing between.
+    let g = dim(false, 50.0, 52.54);
+    let a = g.style.dim_arrow;
+    let pieces = horizontal(&g, y);
+    assert!(pieces.iter().all(|p| p[1] <= 50.0 + 1e-9 || p[0] >= 52.54 - 1e-9), "{pieces:?}");
+    assert!(pieces.iter().any(|p| (p[0] - (50.0 - 2.0 * a)).abs() < 1e-9 && (p[1] - (50.0 - a)).abs() < 1e-9), "{pieces:?}");
+    assert!(pieces.iter().any(|p| (p[0] - (52.54 + a)).abs() < 1e-9 && (p[1] - (52.54 + 2.0 * a)).abs() < 1e-9), "{pieces:?}");
+    assert!((g.texts.iter().find(|t| t.text == "60").unwrap().pos[0] - 51.27).abs() < 1e-9, "still centred");
+    // ISO: above the unbroken line.
+    let g = dim(true, 50.0, 110.0);
+    let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+    let line_y = g.lines.iter().find(|l| l.points.len() == 2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9 && (l.points[0][0] - l.points[1][0]).abs() > 30.0).unwrap().points[0][1];
+    assert!(t.pos[1] > line_y && t.anchor == sheet::Anchor::BottomCenter);
+    assert_eq!(horizontal(&g, line_y).len(), 1);
+}
+
 /// Fit classes "Stacked with line": a rule between hole and shaft class,
 /// as wide as the wider; "Stacked without line" none.
 #[test]

@@ -404,7 +404,8 @@ pub struct SheetStyle {
     /// end of each ordinate leader (live drawing/382).
     pub ordinate_iso: bool,
     /// An ISO (not ANSI) drawing: the DXF / DWG dimension styles are live's
-    /// Onshape-ISO-25 family.
+    /// Onshape-ISO-25 family; ANSI linear values sit inline on a broken
+    /// dimension line (live asbdt-1). Default: ISO, as the default A3 sheet.
     pub iso: bool,
 }
 
@@ -417,7 +418,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: false }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true }
     }
 }
 
@@ -2180,14 +2181,30 @@ impl SheetGeometry {
         let d = [dq[0] - dp[0], dq[1] - dp[1]];
         let dl = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
         let du = [d[0] / dl, d[1] / dl];
-        // A dual value straddles the line (below): the line breaks around
-        // the text block (live asbdd-20: DIMGAP, 0.75 of the text height from
-        // the ink, = 0.65 from our text box), here the half gap along it.
+        // The line breaks around text that sits on it: a dual value
+        // straddling it (live asbdd-20), and in ANSI drawings every value
+        // (live asbdt-1: inline, its middle on the line). The gap is DIMGAP,
+        // 0.75 of the text height from the ink, = 0.65 from our text box;
+        // here the half gap along the line.
+        let h = self.style.dim_text;
         let along = !(self.style.text_horizontal && dir[1].abs() > 1e-9);
-        let gap = dual_straddles(text).filter(|_| along).map(|dual| {
-            let h = self.style.dim_text;
-            font::text_width(&dual, h).max(font::text_width(&text.main, h)) / 2.0 + 0.65 * h
-        });
+        let inline = !self.style.iso;
+        let gap = match dual_straddles(text) {
+            Some(dual) if along => Some(font::text_width(&dual, h).max(font::text_width(&text.main, h)) / 2.0 + 0.65 * h),
+            Some(_) => None,
+            None if inline => {
+                // Horizontal text on a sloped line: its box's extent along it.
+                let w = self.dim_label_width(text, h);
+                let (sx, cy) = (dir[1].abs(), dir[0].abs());
+                Some(if along { w / 2.0 } else { w / 2.0 * cy + h / 2.0 * sx } + 0.65 * h)
+            }
+            None => None,
+        };
+        // ANSI (live asbdt-2): a value that doesn't fit between the arrows
+        // stays centred and the arrows go outside, pointing in, each with a
+        // tail as long as itself; no line between the extension lines.
+        let a_len = self.style.dim_arrow;
+        let squeezed = inline && !self.flip_arrows && gap.is_some_and(|g| 2.0 * g + 2.0 * a_len > dl);
         let c = [(dp[0] + dq[0]) / 2.0, (dp[1] + dq[1]) / 2.0];
         let broken = |line: [[f64; 2]; 2]| -> Vec<Vec<[f64; 2]>> {
             let Some(g) = gap else { return vec![line.to_vec()] };
@@ -2203,7 +2220,14 @@ impl SheetGeometry {
             }
             out
         };
-        if self.flip_arrows {
+        if squeezed {
+            for (end, out) in [(dp, [-du[0], -du[1]]), (dq, du)] {
+                let base = [end[0] + out[0] * a_len, end[1] + out[1] * a_len];
+                self.lines.push(Polyline2 { points: vec![base, [base[0] + out[0] * a_len, base[1] + out[1] * a_len]], style: LineStyle::Thin, closed: false, pick });
+            }
+            self.arrow(dp, d, 3.0);
+            self.arrow(dq, [-d[0], -d[1]], 3.0);
+        } else if self.flip_arrows {
             // Flipped: arrows outside pointing in, the line runs past them.
             let ext = self.style.dim_arrow + 3.0;
             for seg in broken([[dp[0] - du[0] * ext, dp[1] - du[1] * ext], [dq[0] + du[0] * ext, dq[1] + du[1] * ext]]) {
@@ -2239,6 +2263,17 @@ impl SheetGeometry {
         // Place the text on its own "up" side of the dimension line.
         let up = [-angle.sin(), angle.cos()];
         let tg = self.style.text_gap;
+        if inline && dual_straddles(text).is_none() {
+            // ANSI: on the line, centred (horizontal text on a sloped line
+            // too, the line broken around its box).
+            let angle = if along { angle } else { 0.0 };
+            if text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval {
+                self.texts.push(Text2 { pos: c, height: h, text: text.main.clone(), angle, anchor: Anchor::Center, pick });
+            } else {
+                self.dim_label(c, angle, 0.5, true, text, h, pick);
+            }
+            return;
+        }
         let mut mid = [(dp[0] + dq[0]) / 2.0 + up[0] * tg, (dp[1] + dq[1]) / 2.0 + up[1] * tg];
         if self.style.text_horizontal && angle.abs() > 1e-9 {
             // Horizontal text beside a non-horizontal dimension line: clear
