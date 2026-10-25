@@ -72,6 +72,9 @@ pub struct UiState {
     pub cam_history: Vec<Camera>,
     /// Last pointer position over the viewport (viewport-local).
     pub pointer: Option<DVec2>,
+    /// The pick under the pointer before midpoint snapping
+    /// ([`PartStudioView::hover_target`]).
+    pub hover_pick: Option<PickTarget>,
     pub select_other: Option<SelectOther>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
@@ -372,6 +375,7 @@ impl UiState {
             dialog_info: None,
             cam_history: Vec::new(),
             pointer: None,
+            hover_pick: None,
             select_other: None,
             mini_toolbar: None,
             camera_menu: None,
@@ -2587,28 +2591,41 @@ impl PartStudioView {
                 marker(&mut points, m, [0xfac012, 0xc4960b, 0xffd65b]);
             }
         }
-        if self.active_field_filter(cx).is_none_or(field_takes_points) && (self.edit.is_none() || self.active_field_filter(cx).is_some()) && self.sketch.is_none() {
-            match &self.hover {
-                Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) => {
-                    if let Some(m) = self.edge_midpoint(on) {
-                        marker(&mut points, m, [0xf8c488, 0xc49a6a, 0xffd8ac]);
-                    }
+        match &self.hover {
+            // The hovered midpoint target ([`Self::hover_target`]).
+            Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() => {
+                if let Some(m) = self.edge_midpoint(on) {
+                    marker(&mut points, m, [0xf8c488, 0xc49a6a, 0xffd8ac]);
                 }
-                // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows
-                // a 9 px dark ring at its midpoint, the edge seen through it.
-                Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. })) => {
-                    if let Some(m) = self.edge_midpoint(r) {
-                        points.push(sprite(m, 0x000000, 9.0, PointSprite::RING));
-                    }
-                }
-                _ => {}
             }
+            // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows a
+            // 9 px dark ring at its midpoint, the edge seen through it.
+            Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. }))
+                if self.active_field_filter(cx).is_none_or(field_takes_points) && (self.edit.is_none() || self.active_field_filter(cx).is_some()) && self.sketch.is_none() =>
+            {
+                if let Some(m) = self.edge_midpoint(r) {
+                    points.push(sprite(m, 0x000000, 9.0, PointSprite::RING));
+                }
+            }
+            _ => {}
         }
         if points.is_empty() {
             return Vec::new();
         }
         let up = self.gpu.uploader();
         vec![Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22)]
+    }
+
+    /// The hover target (Onshape, part-studio/qa4-r5-s9-6c/6d): near a
+    /// hovered edge's midpoint the midpoint itself is hovered (orange marker,
+    /// the edge loses its highlight), within the radius a click picks it
+    /// ([`Self::midpoint_pick`]); fields that take no points keep the edge.
+    pub(super) fn hover_target(&self, cx: &App) -> Option<Reference> {
+        let t = self.ui.hover_pick.clone()?;
+        match self.ui.pointer {
+            Some(p) if matches!(t.kind, PickKind::Edge | PickKind::SketchCurve) && self.active_field_filter(cx).is_none_or(field_takes_points) => Some(self.midpoint_pick(t, p, cx).reference),
+            _ => Some(t.reference),
+        }
     }
 
     /// An edge click within ~8 px of its midpoint selects the midpoint.
@@ -2619,7 +2636,7 @@ impl PartStudioView {
         }
         let Some(m) = self.edge_midpoint(&t.reference) else { return t };
         let Some(s) = self.viewport.read(cx).project(m) else { return t };
-        if s.distance(position) > 8.0 {
+        if !targets_midpoint(s, position, true) {
             return t;
         }
         let r = Reference::Implicit { on: Box::new(t.reference.clone()), inference: noshape_model::reference::Inference::Midpoint };
@@ -3255,12 +3272,40 @@ pub(super) fn iso_look(t: f32) -> IsoLook {
     }
 }
 
+/// The pick radius around an edge midpoint, in screen px (hover and click).
+pub(super) const MIDPOINT_PICK_PX: f64 = 8.0;
+
+/// Whether the pointer at `pointer` targets the edge midpoint drawn at `mid`
+/// rather than the edge (Onshape): within [`MIDPOINT_PICK_PX`], when the
+/// active field (if any) takes points.
+pub(super) fn targets_midpoint(mid: DVec2, pointer: DVec2, takes_points: bool) -> bool {
+    takes_points && mid.distance(pointer) <= MIDPOINT_PICK_PX
+}
+
 /// A field takes an edge's midpoint (Onshape's implicit point): it takes
 /// points, or mate connectors without taking edges. A Direction field takes
 /// mate connectors (their Z axis) and edges: a click at an edge's midpoint
 /// picks the edge (qa4 F11, live).
 pub(super) fn field_takes_points(f: QueryFilter) -> bool {
     f.intersects(QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::POINT_BODY.0)) || (f.intersects(QueryFilter::MATE_CONNECTOR) && !f.intersects(QueryFilter(QueryFilter::ANY_EDGE.0 | QueryFilter::LINEAR_EDGE.0)))
+}
+
+#[cfg(test)]
+mod midpoint_target_tests {
+    use super::{MIDPOINT_PICK_PX, targets_midpoint};
+    use glam::DVec2;
+
+    #[test]
+    fn hovering_near_an_edge_midpoint_targets_the_midpoint() {
+        let m = DVec2::new(300.0, 200.0);
+        assert!(targets_midpoint(m, m, true));
+        assert!(targets_midpoint(m, m + DVec2::new(MIDPOINT_PICK_PX - 1.0, 0.0), true));
+        assert!(targets_midpoint(m, m + DVec2::new(3.0, -4.0), true));
+        // Farther along the edge: the edge stays the target.
+        assert!(!targets_midpoint(m, m + DVec2::new(MIDPOINT_PICK_PX + 2.0, 0.0), true));
+        // A field that takes no points (Fillet's edges) keeps the edge.
+        assert!(!targets_midpoint(m, m, false));
+    }
 }
 
 #[cfg(test)]

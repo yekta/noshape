@@ -1274,6 +1274,15 @@ impl PartStudioView {
         match ev {
             ViewportEvent::PointerMove { position, .. } => {
                 self.ui.pointer = Some(*position);
+                // Moving along a hovered edge: its midpoint becomes (or stops
+                // being) the target without a new pick.
+                if self.sketch.is_none() && self.hover.is_some() && self.ui.hover_pick.as_ref().is_some_and(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)) {
+                    let r = self.hover_target(cx);
+                    if r != self.hover {
+                        self.hover = r;
+                        self.refresh_scene(false, cx);
+                    }
+                }
                 // Hovering a manipulator arrow outlines it (Onshape).
                 let on_manip = vp.read(cx).manipulator_at(*position);
                 if on_manip != self.ui.manip_hover {
@@ -1314,7 +1323,8 @@ impl PartStudioView {
         }
         match ev {
             ViewportEvent::Hover(id) => {
-                let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
+                self.ui.hover_pick = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
+                let r = self.hover_target(cx);
                 if r != self.hover {
                     self.hover = r;
                     self.refresh_scene(false, cx);
