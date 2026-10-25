@@ -114,9 +114,11 @@ fn highlight_stroke(base: vec3<f32>, st: u32) -> vec3<f32> {
 }
 
 // A selected face or part, with half of the usual light contrast. Fitted
-// so the top face under a default plane reads `#e4b049` like live
-// (selection/04); alone it is about `#e9a100`.
-const FACE_SELECTED: vec3<f32> = vec3<f32>(0.87, 0.385, 0.0);
+// to live selection/04's top face where no datum plane lies over it:
+// (229,163,34) (was (227,158,0)). Under a plane live blends in sRGB and we
+// in linear light, so the plane adds more blue there (ours (224,176,114)
+// vs live (229,170,56)).
+const FACE_SELECTED: vec3<f32> = vec3<f32>(0.887, 0.414, 0.018);
 // A whole selected part / instance (state BODY): live (242,182,72) lit,
 // outlined (state OUTLINE) in (255,192,76), 2 px (live ins-902).
 const BODY_SELECTED: vec3<f32> = vec3<f32>(0.992, 0.503, 0.034);
@@ -720,7 +722,9 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     let pick = global_pick(l.pick);
     let st = state_of(pick) & state_mask;
     var width = l.width * inst.extra.x + g.viewport.w;
-    if ((st & (HOVER | SELECTED | ERROR)) != 0u) { width = width * 1.8 + 1.0; }
+    // Live (selection/03, 06b, 07b): highlighted edges and face outlines
+    // put ~3.5–4.5 px of colour down (4 px here at the default width).
+    if ((st & (HOVER | SELECTED | ERROR)) != 0u) { width = width * 1.8 + 2.2; }
     let half = max(width * g.viewport.z * 0.5, 0.5);
 
     var c = select(ca, cb, t > 0.5);
