@@ -161,7 +161,7 @@ fn entity_name(sk: &noshape_sketch::Sketch, e: noshape_sketch::EntityId) -> Stri
 
 /// Configuration parameter id of a sketch dimension.
 fn configured_dim_key(cid: noshape_sketch::ConstraintId) -> String {
-    format!("{}{}", noshape_model::regen::features::sketch::CONFIGURED_DIMENSION_PREFIX, cid.0)
+    noshape_ops::studio::configured_dim_key(cid.0)
 }
 
 /// A sketch context menu entry's action on the view.
@@ -261,8 +261,15 @@ impl PartStudioView {
                 }
                 self.sketch = Some(SketchEditor::new(id, frame));
                 let length = self.doc.read(cx).session.doc.settings.units.length;
+                let pending = self.sketch_pending_options.take();
                 if let Some(ed) = &mut self.sketch {
                     ed.apply_unit_defaults(length);
+                    // Options ticked before the plane was picked.
+                    if let Some(o) = pending {
+                        ed.set_show_constraints(o.show_constraints);
+                        ed.show_expressions = o.show_expressions;
+                        ed.show_errors = o.show_errors;
+                    }
                     if let Some(r) = self.sketch_fillet_radius {
                         ed.fillet_radius = r;
                     }
@@ -1542,18 +1549,32 @@ impl PartStudioView {
         Arc::new(move |_, cx| {
             let Some(view) = view.upgrade() else { return (Vec::new(), None) };
             let this = view.read(cx);
-            let Some(ed) = this.sketch.as_ref() else { return (Vec::new(), None) };
+            // Live (sketch/00): the options and the diagnostics button show
+            // before the sketch plane is picked too, with the saved options.
+            let opts = match this.sketch.as_ref() {
+                Some(ed) => crate::sketch_mode::SketchOptions { show_constraints: ed.show_constraints, show_expressions: ed.show_expressions, show_errors: ed.show_errors },
+                None => this.sketch_pending_options.unwrap_or_else(crate::sketch_mode::sketch_options),
+            };
             let pal = p();
-            let (sc, se, serr) = (ed.show_constraints, ed.show_expressions, ed.show_errors);
+            let (sc, se, serr) = (opts.show_constraints, opts.show_expressions, opts.show_errors);
             let (cm_open, pi_open) = this.ui_ref().map(|u| (u.cm.is_some(), u.pi.is_some())).unwrap_or_default();
             let dialog = cx.entity().downgrade();
-            let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut SketchEditor)| {
+            let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut crate::sketch_mode::SketchOptions)| {
                 let (view, dialog) = (view.clone(), dialog.clone());
+                // Live: the dialog's checkbox rows (box 4 px in from the edge).
                 crate::ui::os_checkbox(id, label, on)
+                    .ml(px(-2.))
                     .on_click(move |_, _, cx| {
                         view.update(cx, |this, cx| {
-                            if let Some(ed) = &mut this.sketch {
-                                f(ed);
+                            match &mut this.sketch {
+                                Some(ed) => {
+                                    let mut o = crate::sketch_mode::SketchOptions { show_constraints: ed.show_constraints, show_expressions: ed.show_expressions, show_errors: ed.show_errors };
+                                    f(&mut o);
+                                    ed.set_show_constraints(o.show_constraints);
+                                    ed.show_expressions = o.show_expressions;
+                                    ed.show_errors = o.show_errors;
+                                }
+                                None => f(this.sketch_pending_options.get_or_insert_with(crate::sketch_mode::sketch_options)),
                             }
                             this.refresh_scene(false, cx);
                             cx.notify();
@@ -1563,13 +1584,16 @@ impl PartStudioView {
                     .into_any_element()
             };
             let rows = vec![
-                check("sk-opt-constraints", "Show constraints", sc, |ed| ed.set_show_constraints(!ed.show_constraints)),
-                check("sk-opt-expressions", "Show expressions", se, |ed| ed.show_expressions = !ed.show_expressions),
-                check("sk-opt-errors", "Show errors", serr, |ed| ed.show_errors = !ed.show_errors),
+                check("sk-opt-constraints", "Show constraints", sc, |o| o.show_constraints = !o.show_constraints),
+                check("sk-opt-expressions", "Show expressions", se, |o| o.show_expressions = !o.show_expressions),
+                check("sk-opt-errors", "Show errors", serr, |o| o.show_errors = !o.show_errors),
             ];
             // 22 px outline button, 1 px `#aaa`, radius 3.5 (live).
             let diagnostics = Button::new("sk-diagnostics")
                 .child(crate::assets::icon("sketch-diagnostics", 18., cx))
+                // Live (dom/dialog-sketch-empty): 3 px under the footer's top.
+                .relative()
+                .top(px(-1.))
                 .outline()
                 .w(px(22.))
                 .h(px(22.))
@@ -2377,11 +2401,10 @@ impl PartStudioView {
                 }
             }
             "unconfigure" => {
-                let (feature, key) = (self.sketch.as_ref().map(|s| s.feature), configured_dim_key(cid));
-                if let Some(feature) = feature {
+                if let Some(feature) = self.sketch.as_ref().map(|s| s.feature) {
                     let tab = self.tab;
                     self.doc.update(cx, |doc, cx| {
-                        doc.edit_studio(tab, "Unconfigure dimension", cx, |ps| ps.configuration.configured.retain(|c| !(c.feature == feature && c.param == key)));
+                        doc.edit_studio(tab, noshape_ops::studio::UNCONFIGURE_DIMENSION, cx, |ps| noshape_ops::studio::unconfigure_dimension(ps, feature, cid.0));
                     });
                 }
             }
@@ -2398,29 +2421,13 @@ impl PartStudioView {
     /// with the dimension's current value (edit them in the configuration
     /// table, or edit the dimension with that configuration active).
     fn configure_dimension(&mut self, cid: noshape_sketch::ConstraintId, input: &str, cx: &mut Context<Self>) {
-        use noshape_model::configuration::{ConfigInputKind, ConfiguredParam};
-        use noshape_model::params::ParamValue;
         let Some(feature) = self.sketch.as_ref().map(|s| s.feature) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
-        let Some(text) = self.sketch_data(cx).and_then(|d| {
-            d.dimension_exprs.get(&cid.0).map(|e| e.text.clone()).or_else(|| {
-                let c = d.sketch.constraint(cid)?;
-                Some(noshape_units::format_quantity_exact(Quantity::new(c.kind.value()?, crate::sketch_mode::dim_unit(&c.kind)), &units))
-            })
-        }) else {
-            return;
-        };
-        let (input, key, tab) = (input.to_string(), configured_dim_key(cid), self.tab);
+        let Some(text) = self.sketch_data(cx).and_then(|d| noshape_ops::studio::dimension_text(&d, cid.0, &units)) else { return };
+        let (input, tab) = (input.to_string(), self.tab);
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(tab, "Configure dimension", cx, |ps| {
-                let keys: Vec<String> = match ps.configuration.inputs.iter().find(|i| i.id == input).map(|i| &i.kind) {
-                    Some(ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
-                    Some(ConfigInputKind::Checkbox { .. }) => vec!["true".into(), "false".into()],
-                    _ => return,
-                };
-                ps.configuration.configured.retain(|c| !(c.feature == feature && c.param == key));
-                let values = keys.into_iter().map(|k| (k, ParamValue::Expr(noshape_units::ExprValue::new(text.clone())))).collect();
-                ps.configuration.configured.push(ConfiguredParam { input, feature, param: key, values });
+            doc.edit_studio(tab, noshape_ops::studio::CONFIGURE_DIMENSION, cx, |ps| {
+                noshape_ops::studio::configure_dimension(ps, feature, cid.0, &input, &text);
             });
         });
     }
@@ -3387,11 +3394,15 @@ impl PartStudioView {
     }
 
     pub(super) fn render_sketch_toolbar(&mut self, viewport_w: f32, cx: &mut Context<Self>) -> AnyElement {
-        let Some(ed) = &self.sketch else { return div().into_any_element() };
-        let active = ed.tool;
-        let construction = ed.construction;
+        // Live (sketch/00): a new sketch's toolbar shows as soon as its
+        // dialog opens, all of it (Search tools too) at 25 % until the sketch
+        // plane is picked.
+        let disabled = self.sketch.is_none();
+        let (active, construction, selection) = match &self.sketch {
+            Some(ed) => (ed.tool, ed.construction, ed.selection.clone()),
+            None => (Tool::Select, false, Vec::new()),
+        };
         // Constraint buttons not applicable to the selection are disabled.
-        let selection = ed.selection.clone();
         let data = self.sketch_data(cx);
         // Onshape's sketch toolbar has the feature toolbar's metrics (§3.10).
         let tool_btn = |tool: Tool, cx: &mut Context<Self>| {
@@ -3508,10 +3519,13 @@ impl PartStudioView {
         }
         // Onshape has no "Finish" button in the toolbar: the sketch dialog's
         // green check (or Enter) closes the sketch.
-        crate::ui::toolbar()
+        let toolbar = crate::ui::toolbar()
             .child(bar)
-            .child(crate::ui::search_tools_toggle("sk-search", self.palette.is_some()).ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))))
-            .into_any_element()
+            .child(crate::ui::search_tools_toggle("sk-search", self.palette.is_some()).ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))));
+        if disabled {
+            return div().relative().child(toolbar.opacity(0.25)).child(div().id("sk-toolbar-off").absolute().inset_0().occlude()).into_any_element();
+        }
+        toolbar.into_any_element()
     }
 
     /// A collapsed sketch toolbar group (narrow window): the active member,

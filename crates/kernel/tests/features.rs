@@ -527,3 +527,22 @@ fn sweep_locked_to_cylinder_face() {
     let face = make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap();
     assert!(sweep_locked_to_faces(&[face], &off, &Shape::compound(&side), &SweepOptions::default()).is_err());
 }
+
+/// A ruled B-spline surface between a spline and its translate is an
+/// extrusion, as Parasolid reports such a surface (live IM2b: g50's F8,
+/// EXTRUDED); between a spline and a scaled copy it stays a B-spline.
+#[test]
+fn ruled_translate_reports_as_extrusion() {
+    let pts = |z: f64, k: f64| vec![DVec3::new(0.0, 0.0, z), DVec3::new(k * 0.01, k * 0.004, z), DVec3::new(k * 0.02, -k * 0.003, z), DVec3::new(k * 0.03, k * 0.002, z)];
+    let a = make_interpolated_spline(&pts(0.0, 1.0), &[], false).unwrap();
+    let b = make_interpolated_spline(&pts(0.01, 1.0), &[], false).unwrap();
+    let ruled = loft(&[a.clone(), b], &LoftOptions { solid: false, ruled: true, ..Default::default() }).unwrap().shape;
+    let f = ruled.sub_shape(ShapeType::Face, 0).unwrap();
+    match f.face_surface().unwrap() {
+        Surface::Extrusion { direction } => assert!(direction.normalize().dot(DVec3::Z).abs() > 1.0 - 1e-9, "{direction:?}"),
+        s => panic!("expected an extrusion: {s:?}"),
+    }
+    let c = make_interpolated_spline(&pts(0.01, 1.5), &[], false).unwrap();
+    let flared = loft(&[a, c], &LoftOptions { solid: false, ruled: true, ..Default::default() }).unwrap().shape;
+    assert!(matches!(flared.sub_shape(ShapeType::Face, 0).unwrap().face_surface().unwrap(), Surface::BSpline { .. }));
+}

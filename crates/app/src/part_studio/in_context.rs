@@ -269,10 +269,7 @@ impl PartStudioView {
             self.doc.update(cx, |d, cx| {
                 d.edit_document_not_undoable("Exit context", cx, |doc| {
                     if let Some(noshape_model::TabContent::PartStudio(ps)) = doc.tab_mut(tab).map(|t| &mut t.content) {
-                        ps.active_context = None;
-                        if !noshape_model::in_context::referenced_contexts(&ps.features).contains(&id) {
-                            ps.contexts.retain(|c| c.id != id);
-                        }
+                        noshape_ops::in_context::exit(ps, id);
                     }
                 })
             });
@@ -824,14 +821,10 @@ impl PartStudioView {
         let Some(noshape_model::TabContent::Assembly(asm)) = doc.tab(old.assembly).map(|t| &t.content) else { return };
         let mut ev = crate::derived::assembly_evaluator(self.doc.read(cx).studio_cache.clone());
         let result = ev.evaluate(&doc, asm, &noshape_model::assembly::eval::SolveOptions::default(), None);
-        let primary: Vec<InstanceId> = old.primary.iter().map(|i| InstanceId(*i)).collect();
-        let names = |p: &noshape_model::assembly::eval::InstancePath| asm.instance(p[0]).map(|i| i.name.clone()).unwrap_or_default();
-        let Some(mut fresh) = noshape_model::in_context::snapshot(&result, old.assembly, id, &old.name, &primary, &names) else { return };
-        fresh.revision = old.revision + 1;
-        fresh.hidden = old.hidden.clone();
+        let Some(fresh) = noshape_ops::in_context::refreshed(&old, &result, asm, None) else { return };
         let tab = self.tab;
         self.doc.update(cx, |d, cx| {
-            d.edit_document(&format!("Update context : {}", old.name), cx, |doc| {
+            d.edit_document(&noshape_ops::in_context::update_description(&old.name), cx, |doc| {
                 if let Some(noshape_model::TabContent::PartStudio(ps)) = doc.tab_mut(tab).map(|t| &mut t.content)
                     && let Some(c) = ps.contexts.iter_mut().find(|c| c.id == id)
                 {

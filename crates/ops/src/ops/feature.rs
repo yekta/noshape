@@ -37,7 +37,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "add",
             summary: "Add a feature to a Part Studio (what accepting its dialog does)",
-            description: "Creates the feature with the dialog's defaults, applies `params`, inserts it at the rollback bar (or `index`) and regenerates. As in Onshape, a feature that fails is still added and shown with its error: check `feature_status` and `failed` in the reply. Sketches are made with `sketch_create`.",
+            description: "Creates the feature with the dialog's defaults, applies `params`, makes the dialog's own choices for the fields not given (Extrude / Revolve / Sweep / Loft: Add into the one part the new body touches, with that part as merge scope, else New; a Remove Extrude on a part points into it; Thicken from the faces' parts; Hole: merge scope = the parts it reaches, flipped when more lie behind; a tapped hole's linked depths), inserts it at the rollback bar (or `index`) and regenerates. As in Onshape, a feature that fails is still added and shown with its error: check `feature_status` and `failed` in the reply. Sketches are made with `sketch_create`.",
             fields: vec![
                 doc_field(),
                 tab_field(),
@@ -192,6 +192,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "feature",
+            verb: "size_plane",
+            summary: "Size a plane to the Part Studio (plane menu)",
+            description: "Size to Part Studio: the plane is drawn large enough to cover the shown parts (10 % over). `plane`: `plane:top|front|right` or a Plane feature's `fplane:…`.",
+            fields: vec![doc_field(), tab_field(), req("plane", s(), "Plane reference id.")],
+            mutates: true,
+            destructive: false,
+            run: size_plane,
+        },
+        Op {
+            group: "feature",
             verb: "show_all",
             summary: "Show all parts, sketches, planes and default geometry",
             description: "",
@@ -201,6 +211,55 @@ pub fn ops() -> Vec<Op> {
             run: show_all,
         },
     ]
+}
+
+/// What the feature's dialog decides on its own for a new feature, for the
+/// fields not given (as the Part Studio's dialog does, with the same shared
+/// rules): a tapped hole's linked depths, Thicken's / Extrude's operation and
+/// flip from the parts the profiles lie on, then from a preview the
+/// operation and merge scope of Extrude / Revolve / Sweep / Loft (Add into
+/// the one part the tool touches) and a Hole's scope and flip.
+fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, feature: &mut noshape_model::Feature, index: usize, given: &serde_json::Map<String, Value>) -> Result<(), OpError> {
+    let set = |k: &str| given.contains_key(k);
+    let units = od.doc().settings.units;
+    let apply = |f: &mut noshape_model::Feature, changes: studio::AutoChanges| -> bool {
+        let mut any = false;
+        for (k, v) in changes {
+            if !set(k) && f.params.get(k) != Some(&v) {
+                f.params.set(k, v);
+                any = true;
+            }
+        }
+        any
+    };
+    if feature.type_id == "hole" {
+        let ps = doc::studio(od.doc(), tab)?;
+        if let Some(defaults) = ps.new_feature(&feature.type_id, &units) {
+            let linked = noshape_model::features::hole_tables::link_tapped_depths(&defaults.params, &feature.params, &units);
+            apply(feature, linked);
+        }
+    }
+    if !matches!(feature.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft" | "thicken" | "hole") {
+        return Ok(());
+    }
+    let before = od.regenerate(tab, None)?;
+    let ps = doc::studio(od.doc(), tab)?.clone();
+    let changes = studio::auto_operation(&ps, &before.display, feature, &set);
+    apply(feature, changes);
+    // The preview's touched parts drive the rest; each change previews again
+    // (a flipped hole reaches other parts), as the open dialog does.
+    for _ in 0..3 {
+        let mut trial = ps.clone();
+        studio::insert_feature(&mut trial, feature.clone(), index);
+        let r = od.preview(tab, &trial)?;
+        let Some(st) = r.display.feature_state(feature.id).filter(|s| s.status != noshape_model::display::FeatureStatus::RolledBack) else { break };
+        let mut changes = studio::boolean_edit_logic(feature, &set, &st.touched);
+        changes.extend(studio::hole_scope_logic(feature, &set, &st.touched, &st.touched_behind));
+        if !apply(feature, changes) {
+            break;
+        }
+    }
+    Ok(())
 }
 
 fn category_name(c: Category) -> String {
@@ -296,6 +355,7 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(i) => (i as usize).min(ps.features.len()),
         None => ps.rollback_index(),
     };
+    dialog_logic(od, tab, &mut feature, index, &params)?;
     let (id, name) = (feature.id, feature.name.clone());
     edit_studio(od, tab, &studio::insert_description(&name), |ps| Ok(studio::insert_feature(ps, feature, index)))?;
     let report = regen_report(od, tab)?;
@@ -528,4 +588,20 @@ fn unpack_folder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Ok(())
     })?;
     Ok(json!({ "unpacked": folder }).into())
+}
+
+fn size_plane(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let r = crate::refs::parse_str(a.str("plane")?).filter(|r| matches!(r, noshape_model::reference::Reference::Plane(_) | noshape_model::reference::Reference::FeaturePlane(_))).ok_or_else(|| OpError::param("plane", "`plane:top|front|right` or `fplane:…`"))?;
+    let shown = od.regenerate(tab, None)?;
+    if !shown.display.planes.iter().any(|p| p.reference == r) {
+        return Err(OpError::param("plane", "no such plane in this Part Studio"));
+    }
+    let (hw, hh) = studio::plane_size_to_studio(&shown.display, &r).ok_or_else(|| OpError::invalid("no shown parts to size the plane to"))?;
+    edit_studio(od, tab, studio::SIZE_PLANE_DESCRIPTION, |ps| {
+        studio::set_plane_size(ps, &r, hw, hh);
+        Ok(())
+    })?;
+    let k = crate::ops::query::len_scale(&od.doc().settings.units);
+    Ok(json!({ "plane": a.str("plane")?, "half_width": hw * k, "half_height": hh * k }).into())
 }

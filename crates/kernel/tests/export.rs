@@ -878,7 +878,15 @@ fn parasolid_offset_patch_and_wire_circles_from_onshape() {
         assert!(s.is_valid(), "invalid");
         assert_eq!(s.count(ShapeType::Face), 21);
         let v = volume_properties(s).unwrap().mass * 1e9;
-        assert!((v - 6052.697).abs() < 1.0, "{v}");
+        // Live's estimate 6052.76072 in its band 6048.911 – 6056.610.
+        assert!((v - 6052.76).abs() < 0.2, "{v}");
+        // Per face (live IM2b, Geom dump evArea): the faces at the shell's
+        // tolerant vertices count the slivers between their edges' ends, as
+        // Parasolid's do (F18 82.8478429, F11 46).
+        let areas: Vec<f64> = (0..21).map(|i| s.sub_shape(ShapeType::Face, i).unwrap().area().unwrap() * 1e6).collect();
+        for want in [82.8478429, 46.0, 145.4373552, 224.4762898, 130.2285065, 1211.2304474, 691.2303132] {
+            assert!(areas.iter().any(|a| (a - want).abs() < 2e-6 * want), "no face of {want} mm²: {areas:?}");
+        }
         let b = s.bounding_box(false).unwrap();
         assert!((b.max - b.min).length() < 0.07, "{:?}", b.max - b.min);
     }
