@@ -3319,6 +3319,8 @@ impl SketchEditor {
             Some(DragState::Geometry { handle }) => {
                 if let (DragHandle::Point(id), Some((target, _, is_pt))) = (handle, self.drag_snap.take()) {
                     let target = if target == noshape_sketch::ORIGIN { origin_point(&mut data.sketch) } else { target };
+                    // The hidden Origin stand-in is constrained to, not merged into.
+                    let is_pt = is_pt && !data.sketch.entity(target).is_some_and(|e| e.reference_only);
                     let ok = if is_pt {
                         // Keep the fixed/external point when merging.
                         let ext = data.sketch.entity(target).is_some_and(|e| e.external);
@@ -5274,7 +5276,14 @@ fn crosses_box(sk: &Sketch, id: EntityId, lo: DVec2, hi: DVec2, tol: f64) -> boo
 /// The fixed point on the sketch origin (created on first use).
 pub fn origin_point(sk: &mut Sketch) -> EntityId {
     let existing = sk.entities().find(|e| e.external && matches!(e.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12)).map(|e| e.id);
-    existing.unwrap_or_else(|| sk.use_external_point(DVec2::ZERO))
+    existing.unwrap_or_else(|| {
+        // Live (qa5 P1-4): constraints go to the external Origin; no sketch
+        // point is made there (none drawn, picked or used as a hole location).
+        let o = sk.use_external_point(DVec2::ZERO);
+        let _ = sk.set_construction(o, true);
+        let _ = sk.set_reference_only(o, true);
+        o
+    })
 }
 
 /// Entity an automatic constraint refers to.
@@ -6811,6 +6820,24 @@ mod tests {
         assert_eq!(count(&data, EntityKind::Line), 0);
     }
 
+    /// qa5 P1-4 (live "qa5 (10-25 p1)" (1)): points placed in horizontal
+    /// alignment with the Origin are Horizontal with it, and no sketch point
+    /// appears at the origin (none shown, picked or used by a Hole).
+    #[test]
+    fn points_aligned_with_the_origin_add_no_origin_point() {
+        let (mut ed, mut d) = editor(Tool::Point);
+        click(&mut ed, &mut d, v(0.03, -PX * 3.0));
+        click(&mut ed, &mut d, v(-0.04, PX * 3.0));
+        let shown: Vec<EntityId> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Point && !e.reference_only).map(|e| e.id).collect();
+        assert_eq!(shown.len(), 2, "{:?}", d.sketch.entities().collect::<Vec<_>>());
+        let hidden: Vec<&noshape_sketch::Entity> = d.sketch.entities().filter(|e| e.reference_only).collect();
+        assert!(hidden.iter().all(|e| e.construction && e.external), "{hidden:?}");
+        for p in shown {
+            assert!(d.sketch.point(p).unwrap().y.abs() < 1e-12);
+            assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: Some(o) } if a == p && d.sketch.entity(o).is_some_and(|e| e.reference_only))));
+        }
+    }
+
     #[test]
     fn line_snaps_to_origin_and_infers_horizontal() {
         let (mut ed, mut d) = editor(Tool::Line);
@@ -7191,9 +7218,9 @@ mod tests {
         let (mut ed, mut d) = editor(Tool::Select);
         let p = d.sketch.add_point(v(0.01, 0.01));
         drag(&mut ed, &mut d, v(0.01, 0.01), v(PX, -PX));
-        let survivor = if d.sketch.entity(p).is_some() { p } else { d.sketch.entities().next().unwrap().id };
-        assert_eq!(d.sketch.point(survivor), Some(DVec2::ZERO));
-        assert!(d.sketch.entity(survivor).unwrap().external);
+        // It stays the user's point, Coincident with the (hidden) Origin.
+        assert_eq!(d.sketch.point(p), Some(DVec2::ZERO));
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if a == p && d.sketch.entity(b).is_some_and(|e| e.reference_only))));
         // Shift suppresses the snap
         let (mut ed, mut d) = editor(Tool::Select);
         d.sketch.add_point(v(0.01, 0.01));
