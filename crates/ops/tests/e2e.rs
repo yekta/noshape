@@ -1213,6 +1213,19 @@ fn drawing_callouts_ordinates_and_datums() {
     let o = call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "origin": a0, "side": [a0[0], a0[1] - 15.0], "points": [b0, p(&lines[1], "b")] }));
     assert_eq!(kind_of(&mut ctx, o["annotation"].as_u64().unwrap()), "OrdinateGroup");
     assert!(last(&mut ctx).ends_with(":: Add to ordinate group"));
+    // The base clicked just inside an edge (qa4 R5v3-S11-a): measured from
+    // the edge, not the click: the hole centre at 40, the far edge at 80.
+    let verticals: Vec<Value> = top["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][0]) - num(&e["b"][0])).abs() < 1e-6).cloned().collect();
+    let left = verticals.iter().min_by(|x, y| num(&x["a"][0]).total_cmp(&num(&y["a"][0]))).unwrap();
+    let right = verticals.iter().max_by(|x, y| num(&x["a"][0]).total_cmp(&num(&y["a"][0]))).unwrap();
+    let (lx, ly) = (num(&left["a"][0]), (num(&left["a"][1]) + num(&left["b"][1])) / 2.0);
+    let base = [lx + 0.5, ly];
+    let o2 = call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "origin": base, "side": [base[0], base[1] + 40.0], "points": [[cx, cy], p(right, "a")] }));
+    let text = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|a| a["id"] == o2["annotation"]).unwrap()["text"].as_str().unwrap().to_string();
+    let values: Vec<f64> = text.split_whitespace().filter_map(|w| w.replace(',', ".").parse().ok()).collect();
+    for want in [40.0, 80.0] {
+        assert!(values.iter().any(|v| (v - want).abs() < 1e-9), "{want} in {text:?}");
+    }
 
     // Max/min: the hole's far side to the edge's end.
     let mm = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "max_min", "picks": [[cx + r, cy], a0], "place": [cx, cy - 25.0] }));

@@ -324,10 +324,32 @@ impl<'a> SheetPick<'a> {
             .map(|(center, radius, r)| Pick::Circle { view, center, radius, r })
     }
 
-    /// A point in a view: snap, else the point on a hovered edge, else free.
+    /// A point in a view: snap, else the point on a hovered edge (the click
+    /// projected onto it: an ordinate base clicked beside an edge measures
+    /// from the edge, qa4 R5v3-S11-a), else free.
     pub fn any_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
         if let Some(p) = self.snap_at(s) {
             return Some(p);
+        }
+        if let Some((view, me)) = self.hovered_edge()
+            && let Some(pl) = self.placement(view)
+        {
+            let vp = pl.to_view(s);
+            let p = match me.geom {
+                EdgeGeom::Line { a, b } => {
+                    let d = sub(b, a);
+                    let l2 = d[0] * d[0] + d[1] * d[1];
+                    let t = if l2 > 0.0 { ((vp[0] - a[0]) * d[0] + (vp[1] - a[1]) * d[1]) / l2 } else { 0.0 };
+                    let t = t.clamp(0.0, 1.0);
+                    [a[0] + d[0] * t, a[1] + d[1] * t]
+                }
+                EdgeGeom::Circle { center, radius, .. } if len(sub(vp, center)) > 1e-12 => {
+                    let k = radius / len(sub(vp, center));
+                    [center[0] + (vp[0] - center[0]) * k, center[1] + (vp[1] - center[1]) * k]
+                }
+                _ => vp,
+            };
+            return Some(PickedPoint { view, p, r: None });
         }
         let view = self.view_at(s)?;
         let pl = self.placement(view)?;
