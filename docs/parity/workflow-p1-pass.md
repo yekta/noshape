@@ -29,3 +29,4 @@ then edits, undo/redo, rollback and suppress.
 | Row menus of Fillet / Chamfer | no "Show dimensions" (Extrude has it) | same | ✅ |
 | Delete Extrude 1 (dependents) | Fillet, Chamfer, Sketch 2, Hole, Pattern, Shell, Mirror error, Parts (0); errored rows red, **but hidden Sketch 2 stays grey** | failing sketch row red (behaviours 6432, 6491) | ✗ **P1-7** (ui) |
 | Undo the delete | back to 8801.649 mm³ | — | ✅ |
+| Extrude › Remove from a sketch under the part (default flips away, as live) | tool grey, no message | red translucent tool + toast "Selected tools and targets do not intersect." (part-studio/234) | ✗ **P1-10** (psb + icons2) |

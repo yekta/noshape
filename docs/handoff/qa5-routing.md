@@ -698,3 +698,7 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   Sketch 2". Live: **two chips "Vertex of Sketch 1"**, one per click; "Vertices of Sketch N" only when the sketch row is picked.
 - **P1-9 — ui (query field chips)** — Linear pattern › Feature pattern, click the Hole row "Ø 6.35 mm ↧ 12 mm": our chip reads
   "Hole 1"; live's chip is **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name).
+- **P1-10 — psb (feature info / toast) + icons2 (Remove tool preview colour)** — Extrude › Remove from a circle sketched on Top
+  under a plate (z 0..5): the dialog flips the direction as live does (tool goes down, away from the part), Merge scope "Part 1".
+  Ours: the tool previews **grey**, **no toast**. Live (part-studio/234–235, behaviours "Extrude preview colours"): the tool is
+  a **translucent dark red** solid and a blue toast "ⓘ Selected tools and targets do not intersect. ×" shows at the top centre.
