@@ -377,6 +377,18 @@ def main():
         cams = [r for r in by[name] if "camera" in r]
         ch.check(name, "camera unchanged", float(len(cams)), 0.0, 0)
         ch.note(name, "actions", "; ".join(actions))
+    if "touch-view-cube" in by:
+        # The viewport's recognizer must not see it; the cube turns the view
+        # to one of its standard views (face, edge or corner).
+        recs = by["touch-view-cube"]
+        ch.check("touch-view-cube", "viewport gestures (must be none)", float(len([r for r in recs if r.get("input") == "touch_action"])), 0.0, 0)
+        cams = [r for r in recs if "camera" in r]
+        if cams:
+            f = cams[-1]["camera"]["forward"]
+            off = max(min(abs(abs(x) - v) for v in (0.0, 3 ** -0.5, 2 ** -0.5, 1.0)) for x in f)
+            ch.check("touch-view-cube", "standard view (forward component error)", off, 0.0, 1e-6)
+        else:
+            ch.check("touch-view-cube", "camera changed", 0.0, 1.0, 0)
     ch.report(a.verbose)
     sys.exit(1 if ch.failed else 0)
 

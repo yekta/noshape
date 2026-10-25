@@ -1830,6 +1830,12 @@ impl Viewport {
         let id = e.id.0;
         let now = self.touch_epoch.elapsed();
         let at = self.local(e.position) * self.scale as f64;
+        // Timers already due fire before this event (a busy UI thread can run
+        // the timer late; the gesture must not depend on that).
+        if self.touch.next_deadline().is_some_and(|d| d <= now) {
+            let due = self.touch.tick(now);
+            self.touch_actions(due, cx);
+        }
         let actions = match e.phase {
             TouchPhase::Started => {
                 if window.topmost_hitbox_at(e.position) != Some(hitbox) {

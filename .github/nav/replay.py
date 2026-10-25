@@ -148,7 +148,7 @@ class Replay:
             time.sleep(0.8)  # the tap is reported 200 ms after the last one
         return run
 
-    def long_press(self, a, b, hold=0.9, move=120):
+    def long_press(self, a, b, hold=1.2, move=120):
         """Two fingers held still, then the second one moved: a box selection."""
         def run():
             to = lambda p: (p[0] * 10.0, p[1] * 10.0)  # noqa: E731
@@ -245,6 +245,10 @@ class Replay:
                                            {0: (c[0] - 80 * 0.866, c[1] - 80 * 0.5), 1: (c[0] + 80 * 0.866, c[1] + 80 * 0.5)}, steps=15))
         self.step("touch-tap", self.tap({0: c}))
         self.step("touch-long-press", self.long_press((c[0] - 60, c[1] - 40), (c[0] + 60, c[1] + 40)))
+        # A touch on the view cube (an overlay) stays a normal tap on it.
+        cube = (self.origin[0] + self.size[0] - 15 - 75, self.origin[1] + 15 + 75)
+        self.step("touch-view-cube", self.tap({0: cube}))
+        time.sleep(1.0)  # the view animation
         # Last: it opens the context menu, which covers the viewport.
         self.step("touch-two-finger-tap", self.tap({0: (c[0] - 40, c[1]), 1: (c[0] + 40, c[1])}))
         for d in (self.mouse, self.keys, self.pad, self.screen):

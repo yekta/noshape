@@ -178,12 +178,12 @@ Wayland (`wl_touch`). Gestures are `touch.rs` (Onshape's recognizers).
 | 7.1 | One-finger tap selects; double tap clears the selection / edits the feature under it (a double click) | help; `onTap` | ✅ L: a tap selects like a left click; R: Tap (1 finger) → click |
 | 7.2 | One-finger drag: 3D rotate (2 turns per diagonal, 2 px slop), inertia on release; on a tool's draggable geometry it drags it | help; `POINTER_ROTATION_CYCLES_PER_SCREEN`, single-pointer drag | ✅ L: 70.6841° = 190 px × 2 turns/diagonal (the first move only crosses the threshold); R: 84.31° = 190 px |
 | 7.3 | Two-finger tap: context menu | help | ✅ L: two-finger tap opens the context menu; R: Tap (2 fingers) → context menu |
-| 7.4 | Two-finger long press (750 ms, fingers within 10 px): box selection between the fingers (window), blocks other gestures | help; `TWO_POINTER_DELAYED_DRAG` | ✅ L: 750 ms hold → box between the fingers, camera still; R: BoxStart … BoxStop, camera unchanged |
+| 7.4 | Two-finger long press (750 ms, fingers within 10 px): box selection between the fingers (window), blocks other gestures | help; `TWO_POINTER_DELAYED_DRAG` | ✅ L: 750 ms hold → box between the fingers, camera still; R: BoxStart … BoxStop, camera unchanged. Fixed 10-25: timers already due fire before the next touch event, so a late timer on a busy UI thread can't turn the long press into a pan |
 | 7.5 | Two-finger drag pans (skipped when the fingers move very differently) | help; pan recognizer | ✅ L exact; R: 150 px move → 149.99 px |
 | 7.6 | Pinch zooms by the finger ratio about their centre (centre still within 15 px, turn under 10°) | help; pinch recognizer | ✅ L ×2.000000; R ×2.00004 |
 | 7.7 | Two-finger rotate rolls the view about the fingers' centre | help; `rotateAboutCanvasPoint` | ✅ L 30.0000°; R 29.993° |
 | 7.8 | Taps: lifted within 200 ms; reported 200 ms after the last (double tap); fingers overlapping in time are one multi-finger tap | tap recognizer | ✅ fixed 10-24: a tap is reported 200 ms after the lift even while the long-press timer runs (it waited 750 ms after the touch); R |
-| 7.9 | Touches on overlays above the graphics area (view cube, dialogs) stay normal taps | — | 🔧 (only touches starting on the viewport's own topmost hitbox are claimed) |
+| 7.9 | Touches on overlays above the graphics area (view cube, dialogs) stay normal taps | — | ✅ R: a tap on the view cube turns the view to a standard view; the viewport recognizer sees nothing |
 | 7.10 | Pen acts as a finger unless "Use pen input as mouse" | Preferences | 🔧 Windows; ⏳ Linux (tablet pens arrive as pointer devices) |
 | 7.11 | Trimetric / plane views from the view cube menu, 3D Rotate Lock | help (mobile apps) | ❌ mobile apps only |
 
@@ -224,9 +224,9 @@ drives the app through the kernel: a uinput mouse, keyboard, clickpad and touch 
 libinput in a headless sway, the app on Wayland or on X11 through Xwayland. `check.py`
 recomputes every expected number independently (Chromium's rules on the WAYLAND_DEBUG protocol
 log or on the posted events, Onshape's formulas) and compares each camera change.
-Local run 10-24 23:40: **Wayland 489/489, X11 251/251 checks pass** (wheel notches and 120ths,
+Local run 10-25 01:10: **Wayland 487/487, X11 253/253 checks pass** (wheel notches and 120ths,
 Shift/Ctrl+wheel, horizontal wheel, two-finger scroll up/down/sideways, pinch out/in, right-drag
 with its rotate centre fixed on screen, Alt+right-drag, middle-drag, touch rotate/pan/pinch/roll,
-tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
+tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
 phases and momentum, drags) and Windows (SendInput wheel, InjectTouchInput touch, drags) run in
 `.github/workflows/nav.yml`.
