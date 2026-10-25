@@ -40,6 +40,11 @@ const SNAP_DISC_PX: f64 = 18.0;
 pub struct ManipState {
     pub hover: Option<SectionHandle>,
     pub drag: Option<SectionDrag>,
+    /// The value box: live shows it once the arrow or a ring has been
+    /// dragged (none when the dialog opens, qa4-r5-s9-5); Esc closes it
+    /// first, a second Esc cancels the dialog (behaviours "skb (10-24)
+    /// assembly section" (2)).
+    pub box_shown: bool,
 }
 
 /// A handle drag: the plane at the press, the press's grab (arrow:
@@ -239,10 +244,28 @@ impl PartStudioView {
         Some(pl.base() + pl.dir() * SECTION_TIP_PX * self.section_wpp(pl.base(), cx)?)
     }
 
+    /// Esc with the value box shown (or typed into) closes only the box.
+    pub(super) fn hide_section_box(&mut self, cx: &mut Context<Self>) -> bool {
+        let shown = self.section_state().is_some_and(|(_, st)| st.box_shown) || self.ui.section_offset_edit.is_some();
+        if !shown {
+            return false;
+        }
+        self.ui.section_offset_edit = None;
+        if let Some(st) = self.section_manip_state() {
+            st.box_shown = false;
+        }
+        cx.notify();
+        true
+    }
+
     /// The value box text: a ring drag's angle ("15 deg", up to 3
     /// decimals), else the plane's offset.
     pub(super) fn section_box_text(&self, cx: &App) -> Option<String> {
         let (pl, st) = self.section_state()?;
+        let dragging = st.drag.as_ref().is_some_and(|d| d.moved && d.handle != SectionHandle::Base);
+        if !dragging && !st.box_shown {
+            return None;
+        }
         let units = self.doc.read(cx).session.doc.settings.units;
         Some(match st.drag.as_ref().filter(|d| d.moved) {
             Some(d) if matches!(d.handle, SectionHandle::Ring(_)) => noshape_units::format_quantity_with(noshape_units::Quantity::radians(d.value), &units, 3).replace('°', " deg"),
@@ -391,6 +414,11 @@ impl PartStudioView {
             }
             ViewportEvent::ToolUp { .. } => {
                 let Some(d) = self.section_manip_state().and_then(|st| st.drag.take()) else { return false };
+                if d.moved && d.handle != SectionHandle::Base
+                    && let Some(st) = self.section_manip_state()
+                {
+                    st.box_shown = true;
+                }
                 if d.handle == SectionHandle::Base {
                     self.viewport.update(cx, |v, _| v.tool_hover = false);
                     self.hover = None;

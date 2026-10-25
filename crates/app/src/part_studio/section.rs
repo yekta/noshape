@@ -337,6 +337,10 @@ impl PartStudioView {
     /// an input there. Enter or leaving it moves the plane; the click never
     /// reaches the graphics (it would pick the plane under it).
     pub(super) fn section_value_field(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // Only while the box shows (after a drag) or is typed into.
+        if self.ui.section_offset_edit.is_none() && self.section_box_text(cx).is_none() {
+            return None;
+        }
         let d = self.ui.section_dialog.as_ref()?;
         let pl = self.ui.section.get(d.active)?;
         let s = self.viewport.read(cx).project(self.section_tip(cx)?)?;

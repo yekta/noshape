@@ -4874,7 +4874,10 @@ impl Render for PartStudioView {
                     return;
                 }
                 if this.ui.section_dialog.is_some() {
-                    this.close_section_dialog(false, window, cx);
+                    // The value box first, then the dialog (live).
+                    if !this.hide_section_box(cx) {
+                        this.close_section_dialog(false, window, cx);
+                    }
                     return;
                 }
                 if this.ui.env_picker.take().is_some() {
