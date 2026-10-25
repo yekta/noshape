@@ -368,6 +368,7 @@ fn main() {
         cx.on_action(|_: &actions::Quit, cx| cx.quit());
 
         files::init(cx);
+        noshape_render::perf::milestone("app initialized");
         if path.is_some() || args.iter().any(|a| a.starts_with("--demo")) {
             let path = path.clone().unwrap_or_else(files::new_document_path);
             let initial = if args.iter().any(|a| a == "--demo-drawing-full") {

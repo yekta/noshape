@@ -117,6 +117,9 @@ impl Gpu {
             // GPUI's draw phases (render + layout requests, prepaint, paint, present).
             gpui_kit::set_draw_stats_hook(noshape_render::perf::record);
         }
+        // The shaders compile once the first window has drawn (Workspace and
+        // StartView call `release_prewarm`).
+        noshape_render::worker::hold_prewarm();
         std::thread::Builder::new().name("noshape-gpu-init".into()).spawn(move || {
             let worker = spawn_worker(on_done);
             match &worker {
@@ -312,14 +315,20 @@ fn spawn_worker(on_done: impl Fn(Completed) + Send + 'static) -> Result<(RenderW
         // draw with the same GPU (`compositor_shares_gpu`). Apple silicon has
         // one; on Intel Macs with two, GPUI draws with the integrated one, so
         // render on the GPU GPUI reports when its first window opens.
+        // With one GPU that is GPUI's, the device is made while the first
+        // window opens (its shaders compile once the window has drawn:
+        // `hold_prewarm`).
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
-        let gpui_gpu = loop {
+        let window_gpu = || loop {
             match gpui_kit::renderer_gpus().first() {
                 Some(id) => break Some(*id),
                 None if std::time::Instant::now() >= deadline => break None,
                 None => std::thread::sleep(std::time::Duration::from_millis(5)),
             }
         };
+        let only = metal::only_device();
+        let gpui_gpu = only.or_else(window_gpu);
+        noshape_render::perf::milestone("GPU: chosen");
         let renderer = match gpui_gpu.and_then(metal::device_name) {
             Some(name) => noshape_render::Renderer::new_matching(|info| info.backend == noshape_render::wgpu::Backend::Metal && info.name == name),
             None => noshape_render::Renderer::new(),
@@ -365,6 +374,16 @@ mod metal {
 
     /// The name of the Metal device with `registryID` `id` (what wgpu calls
     /// its adapter).
+    /// The Mac's GPU when it has just one (every Apple silicon Mac).
+    pub fn only_device() -> Option<u64> {
+        let all = objc2_metal::MTLCopyAllDevices();
+        let mut devices = all.iter();
+        match (devices.next(), devices.next()) {
+            (Some(d), None) => Some(d.registryID()),
+            _ => None,
+        }
+    }
+
     pub fn device_name(id: u64) -> Option<String> {
         objc2_metal::MTLCopyAllDevices().iter().find(|d| d.registryID() == id).map(|d| d.name().to_string())
     }

@@ -2811,6 +2811,8 @@ impl StartView {
 
 impl Render for StartView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The window has drawn: the viewport's shaders compile now.
+        noshape_render::worker::release_prewarm();
         let pal = p();
         // Onshape: "Search in Owned by me" (the current place).
         let placeholder = format!("Search in {}", self.source_title());
