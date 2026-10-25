@@ -1584,6 +1584,9 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   BoolOpts first = opts;
   if (first.glue == 3 && op != 0) // glue is for fusing touching shapes only
     first.glue = 0;
+  // Many tools (a knurl's 148 crossing grooves): OCCT's intersection of the
+  // pairs runs in parallel.
+  first.parallel = first.parallel || t.size() >= 8;
   apply_opts(*b, first);
   build_cancellable(*b);
   fail_if_cancelled();
@@ -1606,6 +1609,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     {
       BoolOpts plain = opts;
       plain.glue     = 0;
+      plain.parallel = first.parallel;
       b              = make();
       b->SetArguments(to_list(a));
       b->SetTools(to_list(t));
