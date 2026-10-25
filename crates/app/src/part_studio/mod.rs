@@ -3901,6 +3901,7 @@ impl PartStudioView {
         // this feature (live qa4 r5 s2, ROLL-LAST: Roll to here on the
         // rolled-back last feature brings the bar back to the end).
         let is_last = self.studio(cx).is_some_and(|s| i + 1 == s.rollback_index());
+        let bar_at_end = self.studio(cx).is_some_and(|s| s.rollback_index() >= s.features.len());
         let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, typed_name(g)))));
         let feature_name = f.name.clone();
         // A Derived feature's source studio ("Switch to qa5 src", live "qa5
@@ -4013,17 +4014,31 @@ impl PartStudioView {
                 .icon_name("add-appearance");
                 return m.separator().item(add).separator().item(delete);
             }
-            // A suppressed feature, by hand or by its expression (live qa4 r5
-            // s8 (3), ui 10-25 c (2)): Rename | Add selection to folder… |
-            // Unsuppress, (Edit) dynamic suppression ▸ | Roll to here | Delete
-            // (Add comment is collaboration, cloud).
-            if suppressed {
+            // Roll to here unless the bar is right after the feature; Roll to
+            // end while the bar isn't at the end (live qa4 r5 s2 rollback
+            // follow-up).
+            let rolls = move |m: crate::os_menu::OsMenu| {
+                let mut m = m;
+                if !is_last || !bar_at_end {
+                    m = m.separator();
+                }
+                if !is_last {
+                    m = m.item(item("Roll to here", Box::new(move |this, _, cx| this.set_rollback(Some(i + 1), cx))));
+                }
+                if !bar_at_end {
+                    m = m.item(item("Roll to end", Box::new(move |this, _, cx| this.set_rollback(None, cx))));
+                }
+                m
+            };
+            // A suppressed feature, by hand or by its expression, and a rolled
+            // back one (live qa4 r5 s8 (3), ui 10-25 c (2), s2 rollback
+            // follow-up): Rename | Add selection to folder… | Suppress or
+            // Unsuppress, (Edit) dynamic suppression ▸ | Roll to here, Roll to
+            // end | Delete (Add comment is collaboration, cloud).
+            if suppressed || rolled_back {
                 let mut m = menu.item(item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)))).separator().item(folder).separator().item(suppress);
                 m = dynamic(m, window, cx);
-                if !is_last {
-                    m = m.separator().item(item("Roll to here", Box::new(move |this, _, cx| this.set_rollback(Some(i + 1), cx))));
-                }
-                return m.separator().item(delete);
+                return rolls(m).separator().item(delete);
             }
             let mut m = menu.item(item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)))).separator().item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
             if let Some((sid, sname)) = source_sketch.clone() {
@@ -4087,9 +4102,7 @@ impl PartStudioView {
                 this.ui.dependencies = Some(id);
                 cx.notify();
             })));
-            if !is_last {
-                m = m.separator().item(item("Roll to here", Box::new(move |this, _, cx| this.set_rollback(Some(i + 1), cx))));
-            }
+            m = rolls(m);
             if is_sketch || makes_faces {
                 m = appearance(m.separator());
             }
