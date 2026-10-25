@@ -919,7 +919,10 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
 /// (following a drag) every other free body also gets its stay term. Returns
 /// the groups (free bodies, terms in residual order: mates, relations, drags,
 /// stays) and the free bodies no term reads.
-fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], stays: bool) -> (Vec<(Vec<usize>, Vec<Term>)>, Vec<usize>) {
+/// A group: its free bodies and its terms.
+type Group = (Vec<usize>, Vec<Term>);
+
+fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], stays: bool) -> (Vec<Group>, Vec<usize>) {
     let mut parent: Vec<usize> = (0..bodies.len()).collect();
     fn root(parent: &mut [usize], mut i: usize) -> usize {
         while parent[i] != i {
@@ -929,7 +932,7 @@ fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverR
         i
     }
     let probe = Problem { bodies, mates, relations, drags, terms: Vec::new(), scale: 1.0 };
-    let mut groups: Vec<(Vec<usize>, Vec<Term>)> = Vec::new();
+    let mut groups: Vec<Group> = Vec::new();
     let mut term_root: Vec<(Term, Option<usize>)> = Vec::new();
     let stay_terms: Vec<Term> = if stays && !drags.is_empty() { (0..bodies.len()).filter(|&b| !bodies[b].fixed && !drags.iter().any(|d| d.body == b)).map(Term::Stay).collect() } else { Vec::new() };
     for t in all_terms(mates, relations, drags).chain(stay_terms) {
