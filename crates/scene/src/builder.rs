@@ -842,7 +842,9 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             let flat = |p: [f32; 3]| -> [f32; 3] { (glam::Vec3::from(p) - down).into() };
             let outline = region_outline(&reg.positions, &reg.indices);
             for &(a, b) in &outline {
-                overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 2.0, style: 0 });
+                // Live (dialogs/extrude-02, 03): 3 rows of colour on a 30°
+                // edge (~2.6 px), hovered or picked.
+                overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 3.0, style: 0 });
             }
             // Live part-studio/2028: a picked region shows its corners as
             // small grey dots.
