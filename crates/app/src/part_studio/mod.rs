@@ -4855,16 +4855,22 @@ impl Render for PartStudioView {
                                     .children(list_head)
                                     .child(slices.features.clone().cached(StyleRefinement::default().w_full().flex_1().min_h_0()))
                                     // Drag the separator to share space between features and parts.
+                                    // Live (part-studio/00): a 1 px #d7d7d7 line over the list's
+                                    // 200 px (5 px short of the panel border), the "Parts (N)" row
+                                    // right under it; the drag target is 5 px around it.
                                     .child(
-                                        div()
-                                            .id("parts-separator")
-                                            .h(px(5.))
-                                            .flex_none()
-                                            // Live: `div.os-splitter` is row-resize.
-                                            .cursor(CursorStyle::ResizeRow)
-                                            .border_t_1()
-                                            .border_color(pal.border)
-                                            .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
+                                        div().h(px(1.)).mr(px(5.)).flex_none().relative().bg(pal.border).child(
+                                            div()
+                                                .id("parts-separator")
+                                                .absolute()
+                                                .left_0()
+                                                .right_0()
+                                                .top(px(-2.))
+                                                .h(px(5.))
+                                                // Live: `div.os-splitter` is row-resize.
+                                                .cursor(CursorStyle::ResizeRow)
+                                                .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
+                                        ),
                                     )
                                     // Live (part-studio/00, 220): the parts take the lower 35% of the
                                     // panel until the separator is dragged. A share of the panel, so
