@@ -52,6 +52,16 @@ pub fn ops() -> Vec<Op> {
             run: toolbar,
         },
         Op {
+            group: "ui",
+            verb: "shortcuts",
+            summary: "The keyboard shortcuts (Help › Keyboard shortcuts, the Shift+/ sheet)",
+            description: "The sheet's rows per tab (General, Part Studio, Assembly, 3D view, Sketch, Feature Studio, Drawing): each action with a key (the user's customized key, else Onshape's default; `customized`, `disabled`) and the Onshape-controlled ones (`locked`), by name. `tab` keeps one tab; `search` matches names and keys, as the sheet's search box.",
+            fields: vec![opt("tab", json!({ "type": "string", "enum": ["General", "Part Studio", "Assembly", "3D view", "Sketch", "Feature Studio", "Drawing"] }), "Only this tab."), opt("search", s(), "Search text (names and keys).")],
+            mutates: false,
+            destructive: false,
+            run: shortcuts,
+        },
+        Op {
             group: "tab",
             verb: "activate",
             summary: "Show a tab (click it in the tab bar)",
@@ -227,6 +237,36 @@ fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         ctx.reload_prefs = true;
     }
     Ok(json!({ "toolbar": prefs, "shortcut_tools": prefs.shortcut_tools() }).into())
+}
+
+fn shortcuts(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::shortcuts::{LOCKED, Tab, entries};
+    // The user's customizations (the app's keyboard-shortcuts.json: id -> {key, disabled}).
+    #[derive(serde::Deserialize, Default)]
+    struct Custom {
+        #[serde(default)]
+        key: Option<String>,
+        #[serde(default)]
+        disabled: bool,
+    }
+    let custom: std::collections::BTreeMap<String, Custom> = std::fs::read_to_string(noshape_scene::config_dir().join("keyboard-shortcuts.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    let only = a.opt_str("tab")?;
+    let q = a.opt_str("search")?.unwrap_or("").trim().to_lowercase();
+    let mut out = Vec::new();
+    for tab in Tab::SHEET.iter().filter(|t| only.is_none_or(|o| t.label() == o)) {
+        let mut rows: Vec<Value> = LOCKED.iter().filter(|(t, _, _)| t == tab).map(|(_, k, n)| json!({ "name": n, "keys": k, "locked": true })).collect();
+        for e in entries(*tab) {
+            let c = custom.get(e.id);
+            let Some(key) = c.and_then(|c| c.key.clone()).or_else(|| e.default.map(str::to_string)) else { continue };
+            rows.push(json!({ "name": e.name, "keys": key, "id": e.id, "customized": c.is_some(), "disabled": c.is_some_and(|c| c.disabled) }));
+        }
+        rows.retain(|r| q.is_empty() || r["name"].as_str().is_some_and(|n| n.to_lowercase().contains(&q)) || r["keys"].as_str().is_some_and(|k| [k.to_lowercase(), k.to_lowercase().replace(['-', ' '], "+")].iter().any(|k| k.contains(&q))));
+        rows.sort_by_key(|r| r["name"].as_str().unwrap_or("").to_lowercase());
+        if !rows.is_empty() || only.is_some() {
+            out.push(json!({ "tab": tab.label(), "rows": rows }));
+        }
+    }
+    Ok(json!({ "tabs": out }).into())
 }
 
 fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

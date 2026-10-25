@@ -9,7 +9,7 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Result<Value, noshape_ops::Op
 }
 
 #[test]
-fn graphics_preferences_and_toolbar_read_set_and_kept() {
+fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
     let dir = std::env::temp_dir().join(format!("noshape-prefs-test-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -38,5 +38,18 @@ fn graphics_preferences_and_toolbar_read_set_and_kept() {
     assert_eq!((t["toolbar"]["removed"].clone(), t["shortcut_tools"].clone(), t["toolbar"]["hide_search"].clone()), (json!(["helix"]), json!(["sketch", "extrude", "fillet"]), json!(true)), "{t}");
     let e = call(&mut ctx, "ui_toolbar", json!({ "set": { "shortcut_tools": ["nope"] } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set.shortcut_tools"), "{e:?}");
+
+    // Help › Keyboard shortcuts: Onshape's keys with the user's changes.
+    std::fs::write(dir.join("keyboard-shortcuts.json"), r#"{"sketch:Center point circle*": {"key": "shift-c"}, "general:Flip primary axis": {"disabled": true}}"#).unwrap();
+    let k = call(&mut ctx, "ui_shortcuts", json!({ "tab": "Sketch" })).unwrap();
+    let rows = k["tabs"][0]["rows"].as_array().unwrap();
+    let circle = rows.iter().find(|r| r["name"] == "Center point circle*").expect("circle");
+    assert_eq!((circle["keys"].clone(), circle["customized"].clone()), (json!("shift-c"), json!(true)), "{k}");
+    let flip = call(&mut ctx, "ui_shortcuts", json!({ "search": "flip prim" })).unwrap();
+    assert_eq!(flip["tabs"], json!([{ "tab": "General", "rows": [{ "name": "Flip primary axis", "keys": "a", "id": "general:Flip primary axis", "customized": true, "disabled": true }] }]), "{flip}");
+    let help = call(&mut ctx, "ui_shortcuts", json!({ "search": "shift+/" })).unwrap();
+    assert!(help["tabs"][0]["rows"].as_array().unwrap().iter().any(|r| r["name"] == "Keyboard shortcuts"), "{help}");
+    let locked = call(&mut ctx, "ui_shortcuts", json!({ "tab": "General", "search": "accept command" })).unwrap();
+    assert_eq!(locked["tabs"][0]["rows"][0]["locked"], true, "{locked}");
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -12,6 +12,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("ui_state", &[r##"{}"##]),
     ("ui_preferences", &[r##"{}"##, r##"{"graphics": {"fov_deg": 60, "line_width": 1.5, "sketch_constrained": "#202020"}}"##]),
     ("ui_toolbar", &[r##"{}"##, r##"{"set": {"removed": ["helix"], "shortcut_tools": ["sketch", "extrude", "fillet"]}}"##]),
+    ("ui_shortcuts", &[r##"{"tab": "Sketch"}"##, r##"{"search": "fillet"}"##]),
     ("tab_activate", &[r##"{"tab": "Assembly 1"}"##]),
     ("tab_manager", &[r##"{"search": "bracket"}"##, r##"{"kinds": ["drawing"], "sort": "name_asc"}"##, r##"{"open": false}"##]),
     ("assembly_switch_to_tab", &[r##"{"instance": "Bracket <1>"}"##]),

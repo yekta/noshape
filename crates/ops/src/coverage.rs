@@ -36,7 +36,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("general:Flip primary axis", Op("assembly_mate")),
     ("general:Hide/show mate connectors", Op("feature_set_visibility")),
     ("general:Interference detection", Op("analysis_interference")),
-    ("general:Keyboard shortcuts", Ui("help overlay")),
+    ("general:Keyboard shortcuts", Op("ui_shortcuts")),
     ("general:Mass and section properties", Op("query_mass_properties")),
     ("general:Mate connector", Op("assembly_mate_connector")),
     ("general:Measure", Op("query_measure")),
