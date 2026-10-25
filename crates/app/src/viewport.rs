@@ -2204,7 +2204,9 @@ fn box_overlay(a: DVec2, b: DVec2, style: BoxStyle) -> Div {
                 }
                 (from.x.min(w - 1.0).max(0.0), y, 1.0, end - y)
             };
-            out = out.child(div().absolute().left(px(rect.0)).top(px(rect.1)).w(px(rect.2)).h(px(rect.3)).bg(rgb(color).opacity(alpha * 0.6)));
+            // The line sits on the 0.2 infill: 0.5 on top makes live's 0.6
+            // (1 − 0.8 × 0.5).
+            out = out.child(div().absolute().left(px(rect.0)).top(px(rect.1)).w(px(rect.2)).h(px(rect.3)).bg(rgb(color).opacity(alpha * 0.5)));
         }
     }
     out
