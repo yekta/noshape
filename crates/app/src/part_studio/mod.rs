@@ -1305,14 +1305,10 @@ impl PartStudioView {
         match ev {
             ViewportEvent::PointerMove { position, .. } => {
                 self.ui.pointer = Some(*position);
-                // Moving along a hovered edge: its midpoint becomes (or stops
-                // being) the target without a new pick.
-                if self.sketch.is_none() && self.hover.is_some() && self.ui.hover_pick.as_ref().is_some_and(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)) {
-                    let r = self.hover_target(cx);
-                    if r != self.hover {
-                        self.hover = r;
-                        self.refresh_scene(false, cx);
-                    }
+                // Near a hovered edge's midpoint the midpoint becomes (or
+                // stops being) the target without a new pick.
+                if self.sketch.is_none() && self.hover.is_some() && (self.ui.midpoint_armed.is_some() || self.ui.hover_pick.as_ref().is_some_and(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve))) && self.update_hover(cx) {
+                    self.refresh_scene(false, cx);
                 }
                 // Hovering a manipulator arrow outlines it (Onshape).
                 let on_manip = vp.read(cx).manipulator_at(*position);
@@ -1355,9 +1351,7 @@ impl PartStudioView {
         match ev {
             ViewportEvent::Hover(id) => {
                 self.ui.hover_pick = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
-                let r = self.hover_target(cx);
-                if r != self.hover {
-                    self.hover = r;
+                if self.update_hover(cx) {
                     self.refresh_scene(false, cx);
                 }
             }
@@ -1389,13 +1383,14 @@ impl PartStudioView {
                     Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.pick_through_transparent(t, *position, modifiers.alt, cx),
                     other => other,
                 };
-                // Clicking near a hovered edge's midpoint picks the midpoint,
-                // unless the active field takes no points (Onshape: picks
-                // follow the field's filter).
-                let takes_points = self.active_field_filter(cx).is_none_or(behaviors::field_takes_points);
-                let target = match target {
-                    Some(t) if matches!(t.kind, PickKind::Edge | PickKind::SketchCurve) && takes_points => Some(self.midpoint_pick(t, *position, cx)),
-                    other => other,
+                // A click picks the hovered midpoint target (update_hover:
+                // only once its edge is hovered, with a field that takes
+                // points).
+                let target = match &self.hover {
+                    Some(r @ Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() => {
+                        Some(scene_builder::PickTarget { reference: r.clone(), kind: PickKind::Vertex, anchor: self.edge_midpoint(on) })
+                    }
+                    _ => target,
                 };
                 match target {
                     // Double-clicking a sketch in the graphics area edits it.
