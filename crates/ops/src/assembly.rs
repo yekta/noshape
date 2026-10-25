@@ -528,6 +528,42 @@ pub fn anim_defaults(m: &Mate, dof: usize, units: &noshape_units::UnitPrefs) -> 
     if dof == 0 { (fmt(0.0), fmt(std::f64::consts::TAU)) } else { (fmt(0.0), fmt(0.025)) }
 }
 
+/// Select other… in an assembly: the instances (top level) the ray from
+/// `o` along `d` passes through, nearest first; with Isolate on, only the
+/// isolated ones.
+pub fn instances_under(result: &AssemblyResult, isolate: Option<&std::collections::HashSet<InstanceId>>, o: glam::DVec3, d: glam::DVec3) -> Vec<InstanceId> {
+    use noshape_model::display::BodyKind;
+    let mut hits: Vec<(f64, InstanceId)> = Vec::new();
+    for occ in &result.occurrences {
+        if occ.hidden || !matches!(occ.kind, BodyKind::Solid | BodyKind::Surface) {
+            continue;
+        }
+        if isolate.is_some_and(|s| !s.contains(&occ.top())) {
+            continue;
+        }
+        let inv = occ.transform.inverse();
+        let (lo, ld) = (inv.transform_point3(o), inv.transform_vector3(d));
+        let m = &occ.mesh;
+        let pos = |i: u32| m.positions.get(i as usize).map(|p| glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).unwrap_or_default();
+        let mut best: Option<f64> = None;
+        for t in m.indices.as_chunks::<3>().0 {
+            if let Some(tt) = noshape_scene::camera_ops::ray_triangle(lo, ld, pos(t[0]), pos(t[1]), pos(t[2]))
+                && best.is_none_or(|b| tt < b)
+            {
+                best = Some(tt);
+            }
+        }
+        if let Some(t) = best {
+            match hits.iter_mut().find(|(_, id)| *id == occ.top()) {
+                Some(h) => h.0 = h.0.min(t),
+                None => hits.push((t, occ.top())),
+            }
+        }
+    }
+    hits.sort_by(|a, b| a.0.total_cmp(&b.0));
+    hits.into_iter().map(|(_, id)| id).collect()
+}
+
 /// Add named position's default name: "Named position N".
 pub fn next_named_position_name(a: &Assembly) -> String {
     let mut k = a.named_positions.len() + 1;

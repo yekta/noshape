@@ -1013,6 +1013,11 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!(s["selected"], json!([p, b]), "{s}");
     let s = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "clear" }));
     assert_eq!(s["selected"], json!([]), "{s}");
+    // Select other… through the window's camera: the pin under the view's
+    // centre after Zoom to selection on it.
+    call(&mut ctx, "view_camera", json!({ "tab": "Assembly 1", "action": "zoom_selection", "refs": [p] }));
+    let o = call(&mut ctx, "ui_select", json!({ "tab": "Assembly 1", "action": "select_other", "at": [640, 400], "index": 0 }));
+    assert!(o["under"].as_array().unwrap().contains(&json!(p)), "{o}");
     // Search tools in the assembly (live dom/assembly-tool-search.txt).
     let t = call(&mut ctx, "ui_search_tools", json!({ "tab": "Assembly 1", "text": "gear" }));
     assert_eq!(t["tools"], json!([{ "name": "Gear relation", "icon": "gear-relation", "keys": null }]), "{t}");

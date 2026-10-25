@@ -38,7 +38,7 @@ pub fn ops() -> Vec<Op> {
         group: "ui",
         verb: "select",
         summary: "The window's selection: select, clear, Select ▸ related entities, Select other…, same configuration",
-        description: "What is selected in a Part Studio, Assembly or Drawing window (per tab; `get` reads it). Part Studios: `set` / `add` / `remove` entity ids (query_entities: parts, faces, edges, vertices, sketches, planes), `clear` (Clear selection), `related` (the context menu's Select ▸ item `criterion` grown from the first of `refs`; Bounded faces stops at the other `refs`, which stay selected), `create_selection` (Create selection…: the same from the `refs` (its Selection field), with `patterns` (Include patterns) the pattern instances too, then Add selection: added to the selection), `select_other` (Select other…: the faces under graphics-area point `at` [x, y] through the window's camera (view_camera), nearest first; `index` picks one, else the list is returned). Assemblies: `set` / `add` / `remove` instances (ids or names), `clear`, `same_configuration` (Select instances with same configuration as the first of `refs`; `same_part` for same part and same configuration). Drawings: `clear`. With the app open the window selects the same.",
+        description: "What is selected in a Part Studio, Assembly or Drawing window (per tab; `get` reads it). Part Studios: `set` / `add` / `remove` entity ids (query_entities: parts, faces, edges, vertices, sketches, planes), `clear` (Clear selection), `related` (the context menu's Select ▸ item `criterion` grown from the first of `refs`; Bounded faces stops at the other `refs`, which stay selected), `create_selection` (Create selection…: the same from the `refs` (its Selection field), with `patterns` (Include patterns) the pattern instances too, then Add selection: added to the selection), `select_other` (Select other…: the faces under graphics-area point `at` [x, y] through the window's camera (view_camera), nearest first; `index` picks one, else the list is returned; in an assembly the instances). Assemblies: `set` / `add` / `remove` instances (ids or names), `clear`, `same_configuration` (Select instances with same configuration as the first of `refs`; `same_part` for same part and same configuration). Drawings: `clear`. With the app open the window selects the same.",
         fields: vec![
             doc_field(),
             opt("tab", s(), "Part Studio, Assembly or Drawing tab, by name or id. Default: the window's tab."),
@@ -148,6 +148,21 @@ fn select(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let asm = super::assembly::assembly(od, tab)?;
             let ids = given.iter().enumerate().map(|(i, k)| super::assembly::find_instance(asm, k, &format!("refs[{i}]")).map(|id| format!("inst:{}", id.0))).collect::<Result<Vec<_>, _>>()?;
             combine(action, current.clone(), ids)
+        }
+        (Kind::Assembly, "select_other") => {
+            let at = a.opt_array("at")?.and_then(|v| Some(DVec2::new(v.first()?.as_f64()?, v.get(1)?.as_f64()?))).ok_or_else(|| OpError::param("at", "[x, y] in graphics-area pixels"))?;
+            let vc = od.window.cameras.get(&tab).cloned().ok_or_else(|| OpError::invalid("the window has no camera for this tab yet: set it with view_camera").with_param("at"))?;
+            // Isolate on: only the isolated instances.
+            let isolate: Option<std::collections::HashSet<noshape_model::assembly::InstanceId>> = od.window.display.get(&tab).and_then(|d| d.isolate.as_ref()).filter(|i| !i.transparent).map(|i| i.ids.iter().filter_map(|k| k.strip_prefix("inst:")?.parse().ok().map(noshape_model::assembly::InstanceId)).collect());
+            let asm = super::assembly::assembly(od, tab)?.clone();
+            let result = super::assembly::solve_assembly(od, tab, &asm, &Default::default());
+            let (origin, dir) = vc.camera.ray(at, vc.viewport);
+            let hits: Vec<String> = crate::assembly::instances_under(&result, isolate.as_ref(), origin, dir).iter().map(|id| format!("inst:{}", id.0)).collect();
+            extra.insert("under".into(), json!(hits));
+            match a.opt_u64("index")? {
+                Some(i) => vec![hits.get(i as usize).cloned().ok_or_else(|| OpError::param("index", &format!("{} instances under the point", hits.len())))?],
+                None => current.clone(),
+            }
         }
         (Kind::Assembly, "same_configuration") => {
             let asm = super::assembly::assembly(od, tab)?;

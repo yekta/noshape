@@ -274,30 +274,34 @@ pub fn drawing_content(sheet: &noshape_model::drawing::Sheet) -> (f64, f64, f64,
     }
 }
 
+/// Möller–Trumbore: how far along the ray from `o` along `d` it meets
+/// triangle (a, b, c), when in front.
+pub fn ray_triangle(o: DVec3, d: DVec3, a: DVec3, b: DVec3, c: DVec3) -> Option<f64> {
+    let (e1, e2) = (b - a, c - a);
+    let p = d.cross(e2);
+    let det = e1.dot(p);
+    if det.abs() < 1e-18 {
+        return None;
+    }
+    let inv = 1.0 / det;
+    let s = o - a;
+    let u = s.dot(p) * inv;
+    if !(0.0..=1.0).contains(&u) {
+        return None;
+    }
+    let q = s.cross(e1);
+    let v = d.dot(q) * inv;
+    if v < 0.0 || u + v > 1.0 {
+        return None;
+    }
+    let t = e2.dot(q) * inv;
+    (t > 0.0).then_some(t)
+}
+
 /// Select other…: the faces the ray from `origin` along `dir` passes
 /// through, nearest first (each face once, at its nearest hit).
 pub fn faces_under(display: &StudioDisplay, origin: DVec3, dir: DVec3) -> Vec<(f64, Reference)> {
     let p3 = |a: [f32; 3]| DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
-    // Möller–Trumbore: the distance along the ray to triangle (a, b, c).
-    let hit = |a: DVec3, b: DVec3, c: DVec3| -> Option<f64> {
-        let (e1, e2) = (b - a, c - a);
-        let p = dir.cross(e2);
-        let det = e1.dot(p);
-        if det.abs() < 1e-18 {
-            return None;
-        }
-        let s = origin - a;
-        let u = s.dot(p) / det;
-        if !(0.0..=1.0).contains(&u) {
-            return None;
-        }
-        let q = s.cross(e1);
-        let v = dir.dot(q) / det;
-        if v < 0.0 || u + v > 1.0 {
-            return None;
-        }
-        Some(e2.dot(q) / det)
-    };
     let mut out: Vec<(f64, Reference)> = Vec::new();
     for b in display.bodies.iter().filter(|b| !b.hidden) {
         for (fi, &(first, count)) in b.mesh.face_ranges.iter().enumerate() {
@@ -309,9 +313,8 @@ pub fn faces_under(display: &StudioDisplay, origin: DVec3, dir: DVec3) -> Vec<(f
                 .iter()
                 .filter_map(|t| {
                     let v = |i: u32| b.mesh.positions.get(i as usize).copied().map(p3);
-                    hit(v(t[0])?, v(t[1])?, v(t[2])?)
+                    ray_triangle(origin, dir, v(t[0])?, v(t[1])?, v(t[2])?)
                 })
-                .filter(|t| *t > 0.0)
                 .fold(f64::INFINITY, f64::min);
             if near.is_finite() {
                 out.push((near, r.clone()));

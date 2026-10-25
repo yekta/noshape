@@ -283,7 +283,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Section view…", Op("render_image")),
     ("assembly:Select instances with same configuration", Op("ui_select")),
     ("assembly:Select instances with same part and same configuration", Op("ui_select")),
-    ("assembly:Select other…", Ui("selection / list display; agents address entities by id")),
+    ("assembly:Select other…", Op("ui_select")),
     ("assembly:Set to last viewed", Op("assembly_insert")),
     ("assembly:Show all explode lines", Op("assembly_exploded_view")),
     ("assembly:Show all mate connectors", Op("assembly_set_feature_state")),

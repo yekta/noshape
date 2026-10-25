@@ -3260,35 +3260,7 @@ impl AssemblyView {
     /// Instances under the cursor, nearest first.
     fn instances_under(&self, position: DVec2, cx: &App) -> Vec<InstanceId> {
         let (o, d) = self.viewport.read(cx).ray(position);
-        let mut hits: Vec<(f64, InstanceId)> = Vec::new();
-        for occ in &self.result.occurrences {
-            if occ.hidden || !matches!(occ.kind, BodyKind::Solid | BodyKind::Surface) {
-                continue;
-            }
-            if self.isolate.as_ref().is_some_and(|s| !s.contains(&occ.top())) {
-                continue;
-            }
-            let inv = occ.transform.inverse();
-            let (lo, ld) = (inv.transform_point3(o), inv.transform_vector3(d));
-            let m = &occ.mesh;
-            let pos = |i: u32| m.positions.get(i as usize).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).unwrap_or_default();
-            let mut best: Option<f64> = None;
-            for t in m.indices.as_chunks::<3>().0 {
-                if let Some(tt) = panels::ray_triangle(lo, ld, pos(t[0]), pos(t[1]), pos(t[2]))
-                    && best.is_none_or(|b| tt < b)
-                {
-                    best = Some(tt);
-                }
-            }
-            if let Some(t) = best {
-                match hits.iter_mut().find(|(_, id)| *id == occ.top()) {
-                    Some(h) => h.0 = h.0.min(t),
-                    None => hits.push((t, occ.top())),
-                }
-            }
-        }
-        hits.sort_by(|a, b| a.0.total_cmp(&b.0));
-        hits.into_iter().map(|(_, id)| id).collect()
+        noshape_ops::assembly::instances_under(&self.result, self.isolate.as_ref(), o, d)
     }
 
     /// ` (Select other): cycles through the instances under the cursor
