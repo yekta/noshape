@@ -2199,7 +2199,7 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ camera
 
-    pub(super) fn push_camera_history(&mut self, cx: &App) {
+    pub(crate) fn push_camera_history(&mut self, cx: &App) {
         let cam = self.viewport.read(cx).camera;
         if self.ui.cam_history.last() != Some(&cam) {
             self.ui.cam_history.push(cam);
@@ -2210,7 +2210,7 @@ impl PartStudioView {
     }
 
     /// Camera menu "Previous view".
-    pub(super) fn previous_view(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn previous_view(&mut self, cx: &mut Context<Self>) {
         if let Some(cam) = self.ui.cam_history.pop() {
             self.viewport.update(cx, |vp, cx| vp.animate_to(cam, cx));
         }
@@ -2224,18 +2224,7 @@ impl PartStudioView {
     /// What zoom to fit frames (Onshape): visible parts and sketches; the
     /// default planes only when there is nothing else (`None`).
     pub(super) fn fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
-        let mut acc = self.display.bounds();
-        let mut add = |q: glam::DVec3| acc = Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))));
-        let p3 = |a: [f32; 3]| glam::DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
-        for sk in &self.display.sketches {
-            let editing = self.opts.editing_sketch == Some(sk.feature);
-            if !editing && (sk.hidden || !self.opts.show_sketches) {
-                continue;
-            }
-            sk.curves.iter().flat_map(|c| c.points.iter()).for_each(|q| add(p3(*q)));
-            sk.points.iter().for_each(|q| add(p3(q.position)));
-        }
-        acc
+        noshape_scene::camera_ops::studio_fit_bounds(&self.display, self.opts.show_sketches, self.opts.editing_sketch)
     }
 
     /// What Zoom to fit and the standard views frame (Onshape, live "Zoom to
@@ -2256,18 +2245,7 @@ impl PartStudioView {
     /// The parts and sketches ([`Self::fit_bounds`]), the origin point if
     /// `origin`, and the planes `planes` takes.
     fn fit_box(&self, origin: bool, planes: impl Fn(&noshape_model::display::PlaneDisplay) -> bool) -> Option<(glam::DVec3, glam::DVec3)> {
-        let mut acc = self.fit_bounds();
-        let mut add = |q: glam::DVec3| acc = Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))));
-        if origin {
-            add(glam::DVec3::ZERO);
-        }
-        for pl in self.display.planes.iter().filter(|p| planes(p)) {
-            let f = &pl.frame;
-            for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
-                add(f.origin + f.x * (sx * pl.half_width) + f.y * (sy * pl.half_height));
-            }
-        }
-        acc
+        noshape_scene::camera_ops::studio_fit_box(&self.display, self.fit_bounds(), origin, planes)
     }
 
     /// Logical pixels of the viewport covered by the feature dialog (top left).
@@ -2293,62 +2271,11 @@ impl PartStudioView {
 
     /// Bounding box of the selection (parts, faces, edges, sketches, planes).
     fn selection_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
-        use glam::DVec3;
-        let mut lo = DVec3::splat(f64::INFINITY);
-        let mut hi = DVec3::splat(f64::NEG_INFINITY);
-        let mut add = |q: DVec3| {
-            lo = lo.min(q);
-            hi = hi.max(q);
-        };
-        let p3 = |a: [f32; 3]| DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
         let mut refs = self.selection.clone();
         for f in &self.selected_features {
             refs.extend(self.feature_geometry(*f));
         }
-        for r in &refs {
-            match r {
-                Reference::Body(b) => {
-                    if let Some((a, c)) = self.display.body(b).and_then(|b| b.bounds) {
-                        add(a);
-                        add(c);
-                    }
-                }
-                Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => {
-                    if let Some(sk) = self.display.sketches.iter().find(|s| s.feature == *sketch) {
-                        sk.curves.iter().flat_map(|c| c.points.iter()).for_each(|q| add(p3(*q)));
-                        sk.points.iter().for_each(|q| add(p3(q.position)));
-                    }
-                }
-                Reference::Plane(_) | Reference::FeaturePlane(_) => {
-                    if let Some(pl) = self.display.planes.iter().find(|p| &p.reference == r) {
-                        for (u, v) in [(-1.0, -1.0), (1.0, 1.0), (-1.0, 1.0), (1.0, -1.0)] {
-                            add(pl.frame.origin + pl.frame.x * (u * pl.half_width) + pl.frame.y * (v * pl.half_height));
-                        }
-                    }
-                }
-                Reference::Origin => add(DVec3::ZERO),
-                r => {
-                    for b in &self.display.bodies {
-                        if let Some(fi) = b.face_refs.iter().position(|x| x == r)
-                            && let Some(&(first, count)) = b.mesh.face_ranges.get(fi)
-                        {
-                            for &i in &b.mesh.indices[first as usize..(first + count) as usize] {
-                                if let Some(q) = b.mesh.positions.get(i as usize) {
-                                    add(p3(*q));
-                                }
-                            }
-                        } else if let Some(ei) = b.edge_refs.iter().position(|x| x == r) {
-                            b.mesh.edges.get(ei).into_iter().flatten().for_each(|q| add(p3(*q)));
-                        } else if let Some(vi) = b.vertex_refs.iter().position(|x| x == r)
-                            && let Some(q) = b.mesh.vertices.get(vi)
-                        {
-                            add(p3(*q));
-                        }
-                    }
-                }
-            }
-        }
-        (lo.x <= hi.x).then_some((lo, hi))
+        noshape_scene::camera_ops::selection_bounds(&self.display, &refs)
     }
 
     /// Context / camera menu "Zoom to selection".
@@ -2689,40 +2616,16 @@ impl PartStudioView {
         inst.into_iter().collect()
     }
 
-    /// Arc-length midpoint of an edge polyline (display mesh).
-    /// Polyline of a part edge (world space).
-    pub(super) fn edge_points(&self, r: &Reference) -> Option<Vec<glam::DVec3>> {
-        let p3 = |a: [f32; 3]| glam::DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
-        // Sketch curves: their displayed polyline.
-        if let Reference::SketchEntity { sketch, entity } = r {
-            let c = self.display.sketches.iter().find(|s| s.feature == *sketch)?.curves.iter().find(|c| c.entity == *entity)?;
-            return Some(c.points.iter().map(|p| p3(*p)).collect());
-        }
-        self.display.bodies.iter().find_map(|b| {
-            let ei = b.edge_refs.iter().position(|x| x == r)?;
-            Some(b.mesh.edges.get(ei)?.iter().map(|p| p3(*p)).collect())
-        })
-    }
-
     /// Direction of a straight part edge.
     pub(super) fn linear_edge_direction(&self, r: &Reference) -> Option<glam::DVec3> {
-        let pts = self.edge_points(r)?;
-        let (a, b) = (*pts.first()?, *pts.last()?);
-        let d = (b - a).try_normalize()?;
-        let straight = pts.iter().all(|p| (*p - a).cross(d).length() <= 1e-6 + 1e-4 * a.distance(b));
-        straight.then_some(d)
+        noshape_scene::camera_ops::linear_edge_direction(&self.display, r)
     }
 
     /// Edge menu "Align view with vertical axis": roll the view (keeping
     /// its direction) so the edge points up the screen.
     pub(super) fn align_view_vertical(&mut self, r: &Reference, cx: &mut Context<Self>) {
         let Some(d) = self.linear_edge_direction(r) else { return };
-        let cam = self.viewport.read(cx).camera;
-        let fwd = cam.forward();
-        let Some(mut up) = (d - fwd * d.dot(fwd)).try_normalize() else { return };
-        if up.dot(cam.up()) < 0.0 {
-            up = -up;
-        }
+        let Some((fwd, up)) = noshape_scene::camera_ops::align_vertical(&self.viewport.read(cx).camera, d) else { return };
         self.push_camera_history(cx);
         self.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, up, cx));
     }

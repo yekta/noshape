@@ -405,6 +405,23 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(describe(od, tab)?.into())
 }
 
+/// A face's normal in the assembly (View normal to on a face): `v` is
+/// {"instance", "entity": a face id} as assembly_mate takes.
+pub(crate) fn face_normal(od: &mut OpenDoc, tab: TabId, v: &Value) -> Result<DVec3, OpError> {
+    use noshape_model::reference::Inference;
+    let asm = assembly(od, tab)?.clone();
+    let units = od.doc().settings.units;
+    let c = parse_connector(&asm, od, tab, v, "refs[0]")?;
+    let r = solve(od, tab, &SolveOptions::default())?;
+    let o = occurrence(&r, c.instance).ok_or_else(|| OpError::param("refs[0].instance", "an instance with a part"))?;
+    let at = match &c.reference {
+        Reference::Implicit { .. } => c.reference.clone(),
+        f => Reference::Implicit { on: Box::new(f.clone()), inference: Inference::Centroid },
+    };
+    let f = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &at, &units).ok_or_else(|| OpError::param("refs[0].entity", "a planar face of the instance"))?;
+    Ok(noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f).z())
+}
+
 fn occurrence(r: &AssemblyResult, inst: InstanceId) -> Option<&noshape_model::assembly::eval::PartOccurrence> {
     r.occurrences.iter().find(|o| o.path.first() == Some(&inst))
 }

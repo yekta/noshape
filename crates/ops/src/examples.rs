@@ -145,6 +145,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("analysis_curvature_map", &[r##"{}"##, r##"{"parts": ["Part 1"], "kind": "min_radius", "points": 5}"##]),
     ("analysis_thickness", &[r##"{}"##, r##"{"parts": ["Part 1"], "below": "1.5 mm", "points": 5}"##]),
     ("render_image", &[r##"{"view": "isometric", "file": "/tmp/part.png"}"##, r##"{"tab": "Assembly 1", "view": "isometric", "section": [{"plane": "plane:front"}]}"##, r##"{"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}"##, r##"{"view": "front", "perspective": true, "tangent_edges": "phantom", "hidden_edges": true}"##, r##"{"isolate": ["Part 1"], "zebra": {"stripes": 20}}"##, r##"{"normal_to": "plane:front", "reflection": {"image": "Blue sky", "rotation": 45}}"##]),
+    ("view_camera", &[r##"{"action": "zoom_fit"}"##, r##"{"action": "normal_to", "refs": ["plane:top"]}"##, r##"{"tab": "Drawing 1", "action": "zoom_window", "box": [[400, 200], [800, 500]]}"##]),
+    ("view_display", &[r##"{"isolate": ["Part 1"]}"##, r##"{"exit_isolate": true, "highlight_boundary": true}"##, r##"{"tab": "Assembly 1", "show_mates": true, "snap_mode": false}"##]),
     ("render_named_view", &[r##"{"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}"##, r##"{"name": "Section A", "delete": true}"##]),
     // import / export
     ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##, r##"{"tab": "Assembly 1", "format": "STEP", "file": "/tmp/assembly.step"}"##]),

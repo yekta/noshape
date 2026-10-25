@@ -87,8 +87,8 @@ Implemented and compiling, mostly covered by crate tests; GUI not yet re-verifie
 ## Remaining items (priority order)
 
 1. Diff against the live Onshape capture (`/root/onshape-research/live/`).
-2. The ⏳ rows of the checklist (implemented, GUI not re-verified): 6.14, 8.8, 8.16, 9.5,
-   9.7, 11.10, 11.20, 12.5, 13.3.
+2. (Done) The former ⏳ rows 6.14, 8.8, 8.16, 9.5, 9.7, 11.10, 11.20, 12.5, 13.3 are all ✅
+   with app evidence in docs/parity/sketch.md (re-checked by skb 10-25).
 3. (Done) Circular pattern instances are linked to the seed (`circular_pattern_*` tests
    in sketch/tests/onshape_ux.rs).
 4. 1.9 Restore bubble after cancelling a sketch (feature dialog / mod.rs, other agent).

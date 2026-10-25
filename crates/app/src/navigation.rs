@@ -34,14 +34,11 @@ pub const ROTATION_INERTIA: f64 = 0.77;
 pub const INERTIA_RELEASE_WINDOW: Duration = Duration::from_millis(50);
 /// Ctrl+Shift+arrow pan (`DEFAULT_PAN_AMOUNT_PX`).
 pub const DEFAULT_PAN_AMOUNT_PX: f64 = 150.0;
-/// Z / Shift+Z zoom factor (`DEFAULT_ZOOM_FACTOR`).
-pub const DEFAULT_ZOOM_FACTOR: f64 = 1.75;
+/// Z / Shift+Z zoom, its limits and keyboard zoom (shared with the agent
+/// API's view_camera).
+pub use noshape_scene::camera_ops::{MAX_PIXELS_PER_METRE, MIN_MODEL_PIXEL_SIZE, pixel_size_at, zoom_step};
 /// Drag zoom: device pixels per zoom step (`DRAG_ZOOM_FACTOR`).
 pub const DRAG_ZOOM_FACTOR: f64 = 10.0;
-/// Zoom out stops once the model is this small on screen (`MIN_MODEL_PIXEL_SIZE`).
-pub const MIN_MODEL_PIXEL_SIZE: f64 = 100.0;
-/// Zoom in stops at this many pixels per metre (2^24).
-pub const MAX_PIXELS_PER_METRE: f64 = 16_777_216.0;
 /// Perspective eye distance limits, in scene diameters (`MIN_SCALE`, `MAX_SCALE`).
 pub const PERSPECTIVE_MIN_SCALE: f64 = 0.05;
 pub const PERSPECTIVE_MAX_SCALE: f64 = 50.0;
@@ -211,17 +208,6 @@ pub fn is_x11(window: &gpui_kit::Window) -> bool {
     HasWindowHandle::window_handle(window).is_ok_and(|h| matches!(h.as_raw(), RawWindowHandle::Xlib(_) | RawWindowHandle::Xcb(_)))
 }
 
-/// Pixel size (world units per logical pixel) at a world point.
-pub fn pixel_size_at(camera: &Camera, p: DVec3, viewport: DVec2) -> f64 {
-    let wpp = camera.world_per_pixel(viewport.y);
-    match camera.projection {
-        Projection::Orthographic => wpp,
-        Projection::Perspective => {
-            let depth = (p - camera.eye()).dot(camera.forward());
-            wpp * (depth / camera.distance.max(1e-12)).max(1e-6)
-        }
-    }
-}
 
 /// Onshape's `canZoom`: zooming by `scale` (> 1 zooms out) is refused once the
 /// model would be under 100 px across, or past 2^24 px per metre.
@@ -281,24 +267,6 @@ pub fn zoom_at(camera: &mut Camera, zoom: Zoom, at: DVec2, viewport: DVec2, boun
     true
 }
 
-/// Onshape's `adjustCameraToValidZoom` for keyboard zoom and fits: instead
-/// of refusing, clamp the zoom into the valid range (about the view centre).
-pub fn clamp_zoom(camera: &mut Camera, bounds: Option<(DVec3, DVec3)>, viewport: DVec2) {
-    let Some((lo, hi)) = bounds else { return };
-    let diameter = (hi - lo).length();
-    if diameter <= 0.0 {
-        return;
-    }
-    let px = pixel_size_at(camera, (lo + hi) * 0.5, viewport);
-    let s = if diameter / px <= MIN_MODEL_PIXEL_SIZE {
-        diameter / px / MIN_MODEL_PIXEL_SIZE
-    } else if 1.0 / px >= MAX_PIXELS_PER_METRE {
-        1.0 / (MAX_PIXELS_PER_METRE * px)
-    } else {
-        return;
-    };
-    camera.distance *= s;
-}
 
 // ------------------------------------------------------------ rotation
 
@@ -712,13 +680,6 @@ pub fn pan_step(camera: &Camera, dx: f64, dy: f64, viewport: DVec2, scene_center
     to
 }
 
-/// Camera after Z / Shift+Z (`zoomOut` / `zoomIn`): ×1.75 about the view centre.
-pub fn zoom_step(camera: &Camera, zoom_in: bool, bounds: Option<(DVec3, DVec3)>, viewport: DVec2) -> Camera {
-    let mut to = *camera;
-    to.distance *= if zoom_in { 1.0 / DEFAULT_ZOOM_FACTOR } else { DEFAULT_ZOOM_FACTOR };
-    clamp_zoom(&mut to, bounds, viewport);
-    to
-}
 
 /// Onshape's camera animation easing (smootherstep).
 pub fn ease(t: f64) -> f64 {

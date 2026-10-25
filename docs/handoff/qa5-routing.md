@@ -686,3 +686,26 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   Fillet 1 R2 → R1 and Shell 1 fails "Could not shell part with selections." at every thickness 1, 1.5, 2, 2.5 mm (R2: OK).
   The 1 mm chamfer chain runs over the R1 arcs, which may be what breaks it; live answer pending (REQUESTS qa5 10-25 p1 (6)).
   Repro: /root/qa5-scratch/p1/shell-r1.noshape.
+- **P1-7 — ui (feature list)** — Delete Extrude 1 under a hidden Sketch 2 (sketched on Extrude 1's top face): Sketch 2 errors "The
+  sketch plane could not be found" but its row keeps the hidden-sketch grey (no red), while the other failing rows turn red.
+  Live: a failing sketch's row turns red (behaviours 6432, 6491).
+- STATUS 2026-10-25 (qa5): FSW-L45b fixed and landed (441a5af2, curve_pattern_distance_on_closed_path_as_fs).
+- **Live answers (behaviours "qa5 (10-25 p1) Part Studio pass")**: P1-4 confirmed (live: no origin entity; each point gets a
+  Horizontal constraint to the external Origin). P1-5 confirmed: live's Shell 1 **errors** "Could not shell part with
+  selections." on the 15 mm model and leaves the part unshelled; ours must not return slivers as Ok. Fillet row menu: no
+  "Show dimensions" in live either (ours matches).
+- **P1-8 — ui (query field chips)** — Hole › Sketch points: two sketch points clicked one by one show ONE chip "Vertices of
+  Sketch 2". Live: **two chips "Vertex of Sketch 1"**, one per click; "Vertices of Sketch N" only when the sketch row is picked.
+- **P1-9 — ui (query field chips)** — Linear pattern › Feature pattern, click the Hole row "Ø 6.35 mm ↧ 12 mm": our chip reads
+  "Hole 1"; live's chip is **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name).
+- **P1-10 — psb (feature info / toast) + icons2 (Remove tool preview colour)** — Extrude › Remove from a circle sketched on Top
+  under a plate (z 0..5): the dialog flips the direction as live does (tool goes down, away from the part), Merge scope "Part 1".
+  Ours: the tool previews **grey**, **no toast**. Live (part-studio/234–235, behaviours "Extrude preview colours"): the tool is
+  a **translucent dark red** solid and a blue toast "ⓘ Selected tools and targets do not intersect. ×" shows at the top centre.
+
+## P2 drawing pass (qa5, 2026-10-25 evening, /root/green/noshape ee654502)
+- **P2-D1 — lead to assign (drawing dimension picking; asb?)** — Assembly drawing (Assembly 1: plate 60×20×5 with three Ø10
+  holes + a pin in hole 1; Create Drawing of Assembly 1…, suggested views). Dimension tool (d): the hole circles in the Top view
+  **highlight on hover but a click is not taken** (prompt stays "Select a circle, arc, line, circle center or point"; tried the
+  middle and right holes, which have no pin). A straight edge in the same view works ("2.362" placed). The same hole in a
+  **part** drawing (Part 1 › Create Drawing of Part 1…) works: "Ø.394". Expected: the diameter dimension as in the part drawing.

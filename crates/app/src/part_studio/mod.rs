@@ -4,6 +4,9 @@
 mod analysis;
 mod appearance;
 mod behaviors;
+// What an agent's call asks of this view (live mode).
+#[path = "../agent_window/studio.rs"]
+mod agent_window;
 mod create_selection;
 mod hole_callout;
 mod triad;
@@ -248,7 +251,7 @@ pub struct PartStudioView {
     gpu: Gpu,
     /// Versions and history › Compare graphics.
     compare_gfx: crate::compare_graphics::CompareGraphics,
-    viewport: Entity<Viewport>,
+    pub(crate) viewport: Entity<Viewport>,
     display: Arc<StudioDisplay>,
     built: Option<BuiltScene>,
     cache: GpuCache,
@@ -947,6 +950,26 @@ impl PartStudioView {
             let overlay = |k: PickKind| matches!(k, PickKind::SketchCurve | PickKind::SketchPoint | PickKind::SketchRegion | PickKind::Edge | PickKind::Vertex);
             for id in built.picks.ids_where(|t| overlay(t.kind) && !kinds.contains(&t.kind)) {
                 scene.add_flag(id, noshape_render::scene::state::NO_PICK);
+            }
+        }
+        // Live (selection/10): a feature hovered in the list outlines its
+        // part's silhouette in the hover orange; its faces keep their
+        // shading and its edges stay black.
+        if let Some(f) = self.ui.list_hover.or(self.ui.list_menu).or(self.ui.insp.hover_feature) {
+            use noshape_render::state;
+            for g in self.feature_geometry(f) {
+                let face = matches!(g, Reference::Face(_));
+                if !face && !matches!(g, Reference::Edge(_)) {
+                    continue;
+                }
+                for &id in built.picks.ids_for(&g) {
+                    if let Some(s) = scene.states.get_mut(id as usize) {
+                        *s &= !state::ACCENT;
+                        if face {
+                            *s |= state::OUTLINE | state::HOVER;
+                        }
+                    }
+                }
             }
         }
         // Live (lp wall over 2258): the pattern's other inputs (its
@@ -1995,7 +2018,7 @@ impl PartStudioView {
         if let Some(f) = frame {
             self.push_camera_history(cx);
             let cur = self.viewport.read(cx).camera.forward();
-            let fwd = if cur.dot(-f.normal) > 0.999 { f.normal } else { -f.normal };
+            let fwd = noshape_scene::camera_ops::normal_forward(cur, f.normal);
             self.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, f.y, cx));
         }
     }

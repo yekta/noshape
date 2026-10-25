@@ -1103,8 +1103,13 @@ impl FeatureDialog {
                     this.typed_pending = true;
                     cx.notify();
                 }
-                let numeric = this.spec_for_path(&path_s).is_some_and(|s| matches!(s.kind, ParamKind::Num(_)));
-                this.completion = numeric.then(|| crate::var_complete::VarCompletion::compute(&path_s, state.read(cx), &this.variables)).flatten();
+                // Number fields: units of the field's kind are offered too.
+                let dim = this.spec_for_path(&path_s).and_then(|s| match &s.kind {
+                    ParamKind::Num(n) if n.kind == noshape_model::params::NumKind::Integer => Some(noshape_units::Dim::UNITLESS),
+                    ParamKind::Num(n) => Some(n.kind.dim()),
+                    _ => None,
+                });
+                this.completion = dim.and_then(|d| crate::var_complete::VarCompletion::compute(&path_s, state.read(cx), &this.variables, Some(d)));
             }
             InputEvent::PressEnter { shift, .. } => {
                 // Onshape: Enter in a changed field applies the value (the

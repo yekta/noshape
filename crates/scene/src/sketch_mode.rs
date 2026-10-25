@@ -1732,9 +1732,7 @@ impl SketchEditor {
                     self.drag = Some(DragState::OffsetArrow { start: p, moved: false });
                     return EditOutcome::redraw();
                 }
-                // While an offset is pending a click picks the hovered curve
-                // (the selection then only holds curves the warning selected).
-                let ids: Vec<EntityId> = if self.selection.is_empty() || self.offset_pending.is_some() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
+                let ids: Vec<EntityId> = if self.selection.is_empty() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
                 if ids.is_empty() {
                     // Clicking empty space accepts a pending offset.
                     return if self.offset_pending.is_some() { self.commit_offset(data) } else { EditOutcome::none() };
@@ -1743,21 +1741,6 @@ impl SketchEditor {
                     // Later clicks offset by the same distance right away.
                     self.start_offset(&data.sketch, ids);
                     return self.commit_offset(data);
-                }
-                // Live (qa4 round 5 s1 follow-up (5)): a curve not connected to
-                // the pending chain is only selected (a second click deselects
-                // it) with a warning; the preview stays.
-                if let Some(p) = &self.offset_pending
-                    && let Some(&e) = ids.iter().find(|e| !p.contains(e) && !chain_touches(&data.sketch, p, **e))
-                {
-                    match self.selection.iter().position(|x| *x == e) {
-                        Some(i) => {
-                            self.selection.remove(i);
-                        }
-                        None => self.selection.push(e),
-                    }
-                    self.message = Some("Can only offset a single chain at once.".into());
-                    return EditOutcome::redraw();
                 }
                 match &mut self.offset_pending {
                     // Add connected curves to the pending offset (chain
@@ -6169,15 +6152,6 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
         ConstraintTool::Fix => true,
         ConstraintTool::Curvature => n == 2 && all(&curve) && kinds.iter().any(|k| k.is_spline()),
     }
-}
-
-/// Whether curve `e` shares an end with one of `chain`'s curves.
-fn chain_touches(sk: &Sketch, chain: &[EntityId], e: EntityId) -> bool {
-    let ends = |id: EntityId| sk.curve(id).filter(|c| !c.is_periodic()).map(|c| [c.start_point(), c.end_point()]);
-    let Some(mine) = ends(e) else { return false };
-    let b = sk.bbox();
-    let tol = ((b.max - b.min).length() * 1e-9).max(1e-12);
-    chain.iter().filter_map(|c| ends(*c)).any(|theirs| mine.iter().any(|p| theirs.iter().any(|q| (*p - *q).length() <= tol)))
 }
 
 /// Solve after constraint `c` was added on `ids`. Live (qa4 round 5 v3 s6,
