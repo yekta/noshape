@@ -120,7 +120,7 @@ func pixels(_ dy: Int32, _ dx: Int32 = 0, phase: Int64, momentum: Int64 = 0) {
     pause(0.016)
 }
 
-func drag(_ button: CGMouseButton, _ dx: Double, _ dy: Double, pause: Double) {
+func drag(_ button: CGMouseButton, _ dx: Double, _ dy: Double, still: Double) {
     let (down, dragged, up): (CGEventType, CGEventType, CGEventType) = button == .right
         ? (.rightMouseDown, .rightMouseDragged, .rightMouseUp)
         : (.otherMouseDown, .otherMouseDragged, .otherMouseUp)
@@ -136,9 +136,9 @@ func drag(_ button: CGMouseButton, _ dx: Double, _ dy: Double, pause: Double) {
         post(e)
         pause(0.016)
     }
-    pause(pause)
+    pause(still)
     post(CGEvent(mouseEventSource: nil, mouseType: up, mouseCursorPosition: p, mouseButton: button))
-    pause(pause < 0.05 ? 1.2 : 0.2)
+    pause(still < 0.05 ? 1.2 : 0.2)
 }
 
 // ------------------------------------------------------------ steps
@@ -175,7 +175,7 @@ step("pad-scroll-sideways") {
     for d: Int32 in [5, 10, 10, 5] { pixels(1, d, phase: 2) }
     pixels(0, phase: 4)
 }
-step("right-drag") { drag(.right, -200, 0, pause: 0.1) }
-step("right-drag-fling") { drag(.right, -200, 0, pause: 0.0) }
-step("middle-drag") { drag(.center, 200, 100, pause: 0.1) }
+step("right-drag") { drag(.right, -200, 0, still: 0.1) }
+step("right-drag-fling") { drag(.right, -200, 0, still: 0.0) }
+step("middle-drag") { drag(.center, 200, 100, still: 0.1) }
 print("mac replay done")
