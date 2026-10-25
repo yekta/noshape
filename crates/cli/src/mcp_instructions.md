@@ -1,5 +1,7 @@
 noshape is a local parametric CAD app that works like Onshape. These tools do what a person does in the app; every edit is saved at once as an undoable history entry.
 
+The tool list shows the common tools with short descriptions and their main fields (they accept every field ops_describe lists). The other tools (drawing views, annotations and tables; configurations; patterns, groups, BOM and other assembly tools; analysis; sheet metal tables; versions and branches...) are listed by `ops_list` (with `group`), documented by `ops_describe` and run by `ops_call` {"tool", "args"}. Every tool takes `doc` (a .noshape path; default: the current document) and most take `tab` (a tab name or id; default: the first tab of the kind the tool works on).
+
 Workflow for a part:
 1. `document_create` (path to a new .noshape file) or `document_open`. Later calls use that document unless you pass `doc`.
 2. `sketch_create` on `plane:top` / `plane:front` / `plane:right` or a planar face id. Coordinates are sketch-plane (x, y) in workspace units (mm by default). On Top x=X, y=Y; on Front x=X, y=Z; on Right x=Y, y=Z. On a face the sketch axes follow the face and may be turned (see the reply's `frame`): give `sketch_draw` model points [x, y, z] instead and they are projected onto the sketch.

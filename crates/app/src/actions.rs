@@ -216,6 +216,8 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("shift-c", CurveSurfaceAnalysis, ps),
         KeyBinding::new("shift-d", DihedralAnalysis, ps),
         KeyBinding::new("shift-r", ViewHighQuality, ps),
+        // A "3D view" shortcut: assemblies too.
+        KeyBinding::new("shift-r", ViewHighQuality, asm),
         KeyBinding::new("up", RollbackUp, Some("FeatureList && !Input")),
         KeyBinding::new("down", RollbackDown, Some("FeatureList && !Input")),
         // 3D view

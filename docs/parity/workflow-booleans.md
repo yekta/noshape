@@ -95,3 +95,16 @@ Docs /tmp/qa5/d25c/b2.noshape, /tmp/qa5/d25d/s.noshape, /tmp/qa5/d25b/merge.nosh
 | COPY1 Copy here colour | ✅ the copy keeps the source's colour (dark blue) |
 | INT1, SPLIT1, DEL2 | fixed in qa5's later pass |
 | BOOL3, BOOL4(b), INT2, NAME2, DEL1 | fixes cited in code (psb/ui), not re-run this pass |
+
+## Re-run pass 23 (qa5, 2026-10-24, agent/qa5 on main c703b0d0)
+| BOOL1b no-change row tooltip | disjoint Union of Part 1 + Part 3 (Info "Boolean resulted in no geometry change…"): row tooltip **"Boolean 1"** | ✅ fixed |
+| INT2 Intersect of disjoint Part 1 + Part 3, ☑ Keep tools (pass 24, CLI target-engine 13:51) | Info "Boolean resulted in no geometry change…"; parts unchanged 8000 / 1570.796 / 4000, no extra copy | ✅ fixed |
+| BOOL4b empty merge scope | ✓ allowed, the feature errors (seen in pass 21's bracket script, which now needs a scope) | ✅ fixed |
+
+## Release re-check v0.4.8 (qa5, 2026-10-25 02:20, release asset noshape-cli 0.4.8 linux-x86_64)
+| Row | Ours | Status |
+|---|---|---|
+| INT2 Intersect of disjoint parts (8000 + 4000 mm³), ☑ Keep tools | Info "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained."; parts unchanged, no copy | ✅ |
+| BOOL1 Union of the same disjoint parts | same Info, parts unchanged | ✅ |
+| BOOL4b Add extrude with an empty merge scope | Error "No merge scope selected.", parts unchanged | ✅ |
+| BOOL1b row tooltips (v0.4.8 app) | disjoint Intersect / Union rows: "Boolean 1", "Boolean 2" | ✅ |

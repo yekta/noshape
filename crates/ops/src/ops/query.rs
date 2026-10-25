@@ -104,7 +104,7 @@ fn dir(d: DVec3) -> Value {
 
 /// A part by id or by the name the parts list shows (a renamed part's
 /// name included).
-fn find_part<'a>(r: &'a noshape_model::regen::RegenResult, key: &str) -> Result<&'a Body, OpError> {
+pub(crate) fn find_part<'a>(r: &'a noshape_model::regen::RegenResult, key: &str) -> Result<&'a Body, OpError> {
     let id = refs::parse_str(key);
     let shown = |b: &Body| r.display.bodies.iter().find(|d| d.id == b.id).map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone());
     let bodies = &r.context.bodies;

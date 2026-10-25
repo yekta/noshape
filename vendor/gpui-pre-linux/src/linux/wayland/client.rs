@@ -100,6 +100,10 @@ use crate::linux::{
     },
     xdg_desktop_portal::{Event as XDPEvent, XDPEventSource},
 };
+// NOSHAPE PATCH (agent nav2): graphics tablets (pens).
+#[path = "tablet.rs"]
+mod tablet;
+
 use gpui::{
     AnyWindowHandle, Bounds, Capslock, CursorStyle, DevicePixels, ExternalDragPayload,
     FileDragPaths, FileDropEvent, ForegroundExecutor, GraphicalEnvironment, KeyDownEvent,
@@ -258,6 +262,8 @@ pub struct Globals {
     pub blur_manager: Option<org_kde_kwin_blur_manager::OrgKdeKwinBlurManager>,
     pub text_input_manager: Option<zwp_text_input_manager_v3::ZwpTextInputManagerV3>,
     pub gesture_manager: Option<zwp_pointer_gestures_v1::ZwpPointerGesturesV1>,
+    // NOSHAPE PATCH (agent nav2): graphics tablets (tablet.rs).
+    pub tablet_manager: Option<wayland_protocols::wp::tablet::zv2::client::zwp_tablet_manager_v2::ZwpTabletManagerV2>,
     pub dialog: Option<xdg_wm_dialog_v1::XdgWmDialogV1>,
     pub system_bell: Option<xdg_system_bell_v1::XdgSystemBellV1>,
     pub executor: ForegroundExecutor,
@@ -308,6 +314,7 @@ impl Globals {
             blur_manager: globals.bind(&qh, 1..=1, ()).ok(),
             text_input_manager: globals.bind(&qh, 1..=1, ()).ok(),
             gesture_manager: globals.bind(&qh, 1..=3, ()).ok(),
+            tablet_manager: globals.bind(&qh, 1..=1, ()).ok(),
             dialog: globals.bind(&qh, dialog_v..=dialog_v, ()).ok(),
             system_bell: globals.bind(&qh, 1..=1, ()).ok(),
             executor,
@@ -363,6 +370,8 @@ pub(crate) struct WaylandClientState {
     /// NOSHAPE PATCH: the seat's touch device and the window each touch began on.
     wl_touch: Option<wl_touch::WlTouch>,
     touch_windows: HashMap<i32, (WaylandWindowStatePtr, Point<Pixels>)>,
+    // NOSHAPE PATCH (agent nav2): tablet tools (tablet.rs).
+    tablet: tablet::TabletState,
     pinch_gesture: Option<zwp_pointer_gesture_pinch_v1::ZwpPointerGesturePinchV1>,
     pinch_scale: f32,
     wl_keyboard: Option<wl_keyboard::WlKeyboard>,
@@ -1140,6 +1149,7 @@ impl WaylandConnection {
             wl_pointer: None,
             wl_touch: None,
             touch_windows: HashMap::default(),
+            tablet: Default::default(),
             wl_keyboard: None,
             pinch_gesture: None,
             pinch_scale: 1.0,
@@ -2103,6 +2113,10 @@ impl Dispatch<wl_seat::WlSeat, ()> for WaylandClientStatePtr {
                 state.wl_keyboard = Some(keyboard);
             }
             if capabilities.contains(wl_seat::Capability::Pointer) {
+                {
+                    let state = &mut *state;
+                    state.tablet.bind_seat(state.globals.tablet_manager.as_ref(), seat, qh);
+                }
                 let pointer = seat.get_pointer(qh, ());
 
                 if let Some(cursor_shape_device) = state.cursor_shape_device.take() {

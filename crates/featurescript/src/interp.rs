@@ -111,6 +111,31 @@ pub fn native(name: &str) -> Option<NativeFn> {
     crate::natives::core(name)
 }
 
+/// Natives whose results older standard libraries expect in another form
+/// (std 1963 converted raw maps with `planeFromBuiltin` & co.): name →
+/// (first version with the current form, the old form).
+static LEGACY_NATIVES: LazyLock<RwLock<HashMap<&'static str, (u32, NativeFn)>>> = LazyLock::new(Default::default);
+
+/// Register natives as modules older than `since` call them (Onshape's
+/// builtins answer each library version in its own form).
+pub fn register_legacy_natives(since: u32, list: &[(&'static str, NativeFn)]) {
+    let mut m = LEGACY_NATIVES.write();
+    for (n, f) in list {
+        m.insert(n, (since, *f));
+    }
+}
+
+/// The native `name` as a module with `FeatureScript version;` calls it.
+pub fn native_at(name: &str, version: Option<u32>) -> Option<NativeFn> {
+    if let Some(v) = version
+        && let Some((since, f)) = LEGACY_NATIVES.read().get(name)
+        && v < *since
+    {
+        return Some(*f);
+    }
+    native(name)
+}
+
 // ---------------------------------------------------------------- interpreter
 
 enum Flow {
@@ -995,7 +1020,7 @@ impl Interp {
                 let i = self.array_index(idx, a.len())?;
                 Ok(a[i].clone())
             }
-            Value::Map(m, _) => Ok(m.get(idx).cloned().unwrap_or_default()),
+            Value::Map(m, _) => Ok(crate::value::map_get(&m, idx).cloned().unwrap_or_default()),
             other => Err(self.error(format!("Attempt to dereference non-container {}", crate::value::to_display_quoted(&other)))),
         }
     }

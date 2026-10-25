@@ -29,7 +29,7 @@ func append(_ record: [String: Any]) {
     handle.closeFile()
 }
 
-func sleep(_ s: Double) { Thread.sleep(forTimeInterval: s) }
+func pause(_ s: Double) { Thread.sleep(forTimeInterval: s) }
 
 // ------------------------------------------------------------ where the viewport is
 
@@ -44,11 +44,11 @@ while true {
     if let w = window() {
         let p = CGPoint(x: w.midX, y: w.midY)
         post(CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: p, mouseButton: .left))
-        for n: Int32 in [1, -1] { post(CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: n, wheel2: 0, wheel3: 0)); sleep(0.3) }
+        for n: Int32 in [1, -1] { post(CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: n, wheel2: 0, wheel3: 0)); pause(0.3) }
     }
-    sleep(2)
+    pause(2)
 }
-sleep(8)
+pause(8)
 
 /// The noshape window's frame on screen (CGWindowList, top-left origin).
 func window() -> CGRect? {
@@ -70,7 +70,7 @@ if let w = window() {
     offset = (w.minX, w.minY)
     let probe = CGPoint(x: w.minX + origin.0 + size.0 / 2, y: w.minY + origin.1 + size.1 / 2)
     post(CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: probe, mouseButton: .left))
-    sleep(0.5)
+    pause(0.5)
     if let mv = readTrace().last(where: { ($0["input"] as? String) == "mouse_move" }), let d = mv["data"] as? [String: Any], let at = d["at"] as? [Double] {
         // probe = offset + origin + at
         offset = (Double(probe.x) - origin.0 - at[0], Double(probe.y) - origin.1 - at[1])
@@ -83,13 +83,13 @@ func point(_ dx: Double = 0, _ dy: Double = 0) -> CGPoint {
 
 func moveTo(_ p: CGPoint) {
     post(CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: p, mouseButton: .left))
-    sleep(0.15)
+    pause(0.15)
 }
 
 func step(_ name: String, _ body: () -> Void) {
     append(["step": name, "at": "start"])
     body()
-    sleep(0.6)
+    pause(0.6)
     append(["step": name, "at": "end"])
 }
 
@@ -102,7 +102,7 @@ func notch(_ lines: Int32, flags: CGEventFlags = []) {
                        "axis1": e.getIntegerValueField(.scrollWheelEventDeltaAxis1),
                        "axis2": e.getIntegerValueField(.scrollWheelEventDeltaAxis2)]])
     post(e)
-    sleep(0.12)
+    pause(0.12)
 }
 
 /// A continuous (trackpad) scroll event of `dy` points with its phases
@@ -117,7 +117,7 @@ func pixels(_ dy: Int32, _ dx: Int32 = 0, phase: Int64, momentum: Int64 = 0) {
                        "axis1": e.getIntegerValueField(.scrollWheelEventPointDeltaAxis1),
                        "axis2": e.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)]])
     post(e)
-    sleep(0.016)
+    pause(0.016)
 }
 
 func drag(_ button: CGMouseButton, _ dx: Double, _ dy: Double, pause: Double) {
@@ -127,18 +127,18 @@ func drag(_ button: CGMouseButton, _ dx: Double, _ dy: Double, pause: Double) {
     var p = point()
     moveTo(p)
     post(CGEvent(mouseEventSource: nil, mouseType: down, mouseCursorPosition: p, mouseButton: button))
-    sleep(0.05)
+    pause(0.05)
     for _ in 0..<20 {
         p = CGPoint(x: p.x + dx / 20, y: p.y + dy / 20)
         let e = CGEvent(mouseEventSource: nil, mouseType: dragged, mouseCursorPosition: p, mouseButton: button)!
         e.setIntegerValueField(.mouseEventDeltaX, value: Int64(dx / 20))
         e.setIntegerValueField(.mouseEventDeltaY, value: Int64(dy / 20))
         post(e)
-        sleep(0.016)
+        pause(0.016)
     }
-    sleep(pause)
+    pause(pause)
     post(CGEvent(mouseEventSource: nil, mouseType: up, mouseCursorPosition: p, mouseButton: button))
-    sleep(pause < 0.05 ? 1.2 : 0.2)
+    pause(pause < 0.05 ? 1.2 : 0.2)
 }
 
 // ------------------------------------------------------------ steps

@@ -1036,7 +1036,7 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
     ctx.bodies = vec![Arc::new(body)];
     let mut display = studio.display.clone();
     display.bodies = vec![display_body];
-    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx), cancelled: false })
+    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx), cancelled: false, evaluated: Vec::new() })
 }
 
 /// Sketch instance cache key: (Part Studio, sketch feature, configuration).
@@ -1102,7 +1102,7 @@ pub fn mirrored_result(src: &RegenResult, body: &BodyId, point: DVec3, normal: D
         d.bounds = mesh.positions.iter().map(|q| DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64)).fold(None, |acc: Option<(DVec3, DVec3)>, v| Some(acc.map(|(a, b)| (a.min(v), b.max(v))).unwrap_or((v, v))));
         d.mesh = Arc::new(mesh);
     }
-    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx), cancelled: false })
+    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx), cancelled: false, evaluated: Vec::new() })
 }
 
 fn hash_of<T: serde::Serialize>(v: &T) -> u64 {
