@@ -4878,7 +4878,7 @@ impl SketchEditor {
             lines.push_polyline(&pts3, crate::palette::rgb8(SKETCH_BOX_COLOR), 0, 1.0, 0);
         }
         for sg in &dim_preview {
-            lines.segments.push(LineSegment { a: w(sg[0]), b: w(sg[1]), color: crate::palette::rgb8(crate::palette::pick(crate::palette::viewport::SKETCH_FULL, crate::palette::viewport_dark::SKETCH_FULL)), pick_id: 0, width: 1.0, style: on_top });
+            lines.segments.push(LineSegment { a: w(sg[0]), b: w(sg[1]), color: crate::palette::rgb8(crate::palette::pick(crate::palette::viewport::SKETCH_FULL, crate::palette::viewport_dark::SKETCH_FULL)), pick_id: 0, width: 1.5, style: on_top });
         }
         // Dimension graphics. The dimension line is broken around its value
         // (Onshape draws no box behind the text).
@@ -4907,7 +4907,9 @@ impl SketchEditor {
             } else {
                 rgb8(vc::DIM_DRIVEN)
             };
-            let width = if selected { 2.0 } else { 1.0 };
+            // Live (sketch/17, 24): ~1.1 px of ink, ~1.6 px selected; our
+            // line AA puts about width − 0.4 px of ink down.
+            let width = if selected { 2.0 } else { 1.5 };
             for s in &g.segments {
                 lines.segments.push(LineSegment { a: w(s[0]), b: w(s[1]), color, pick_id: 0, width, style: on_top });
             }
