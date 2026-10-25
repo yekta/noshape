@@ -521,3 +521,15 @@ part_studio_menu_ops, render_an_assembly, render_image_view_options panic at e2e
 rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner has no Vulkan/GL adapter in the Test step
 (macOS and Windows pass). Either install Mesa lavapipe (`mesa-vulkan-drivers`) in that job or make the render e2e tests skip
 (with a printed reason) when no adapter exists; deterministic ci.yml tests must not depend on the runner's GPU (WORKFLOW 17).
+
+## Keystroke latency (lead 10-25) — qa4 2026-10-25 12:00, details in qa-round-5.md "Part Studio keystroke latency"
+- **EDIT-TYPING-PREVIEW (psb/ui2, now also the main per-keystroke cost)**: patch ready on branch qa4/typing-preview
+  (feature_dialog.rs: number fields keep typed text in the draft and emit DialogEvent::Changed on commit only: Tab, Enter, blur,
+  step); not on ready/qa4 until the lead OKs editing that file.
+- **THUMB-REGEN (perf)** `start_thumbnail.rs` Job::run regenerates the first Part Studio with a separate Regenerator 1.5 s after
+  every commit: a second full downstream eval + 380–450 ms fine tessellation per edit. Render the thumbnail from the window's
+  latest StudioDisplay (or share its regen cache) instead.
+- **REFINE-TESS (perf/kern)** after an edit the whole body is re-meshed at Fine: 450–565 ms for 40 k triangles (30-feature
+  part); the coarse preview takes 20–40 ms. Mesh only faces that changed, or cache per-face triangulations across regens.
+- **REGEN-SPEED (kern)** unchanged: commit of an Extrude 1 depth edit re-evaluates 29 features in 390–490 ms (live 132 ms).
+
