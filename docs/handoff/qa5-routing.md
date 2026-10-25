@@ -440,3 +440,10 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - **SELECT-OTHER (psb/ui2)** popup: header ✕, no type column, no preselected row, hovered row bold, "?" footer (live sketch/231).
 - Pending live s9: global selection filter, parts-row "Hide other/all parts", Measure panel default unit, Point readout axis
   icons, section manipulator, edge midpoint marker.
+- **Live s8 answers → psb**: **REORDER-INVALID** (do the move, dependents go red with "Select face or sketch region to
+  extrude." / "1 missing selection"; no refusal toast), ERR-MISSING-REGION confirmed (+ second line "1 missing selection"),
+  **SUPPRESSED-MENU** (Rename | Add selection to folder… | Unsuppress | Dynamic suppression | Roll to here | Delete),
+  **SKETCH-UNCONSUMED** (a sketch whose consumer is suppressed shows again), **TOOLTIP-PARENT** (no type tag on the parent),
+  **FOLDER-NAME-INLINE** (Add selection to folder… names inline in the row), **FOLDER-MENU** (Rename | Add selection to folder… |
+  Suppress/Unsuppress | Dynamic suppression | Roll to here | Expand | Collapse | Delete | Unpack folder), **FOLDER-EXPAND-UNDO**
+  (expand/collapse is not an undo step).

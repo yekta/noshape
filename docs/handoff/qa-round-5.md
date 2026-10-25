@@ -83,6 +83,30 @@ every action undoes and redoes.
   Unpack folder), and what Suppress of a base feature does to Add bosses (ours: red "No merge scope selected.").
 - Note (cosmetic, seen twice now): after a context-menu click the row under the pointer keeps its hover tint.
 
+- **Live answers (behaviours "qa4 round 5 s8 feature list")**:
+  - **REORDER-INVALID (psb)**: live **does** an invalid reorder (Boss 2 above its sketch; Sketch 1 below Extrude 1): no
+    refusal, no toast, the same drop indicator; the dependent goes red ("Boss 2 [Extrude] did not regenerate properly: Select face
+    or sketch region to extrude." / "1 missing selection") with its downstream features. Ours refuses with a red toast "Cannot
+    reorder: … depends on …".
+  - **ERR-MISSING-REGION confirmed**: live's text after deleting the sketch is "Select face or sketch region to extrude." plus a
+    second tooltip line **"1 missing selection"**; Chamfer 1 on Boss 1 goes red too. One Ctrl+Z restores both (= ours).
+  - Suppress Extrude 1: bosses "No merge scope selected." (= ours ✅), fillets "Select edges or faces to fillet." / "1 missing
+    selection", Parts (0); suppressed row tooltip "Extrude 1 (Suppressed)". **SUPPRESSED-MENU (psb)**: live's menu of a suppressed
+    feature is Rename | Add selection to folder… | Unsuppress | Dynamic suppression | (Add comment) | Roll to here | Delete; ours
+    keeps Edit…, Edit Sketch 1…, Show dimensions, Zoom to selection, Show dependencies…. **SKETCH-UNCONSUMED (psb)**: live shows
+    Sketch 1 dark again once its consumer is suppressed; ours kept it hidden (eye-slash).
+  - Hover: row hover highlights the geometry, geometry hover highlights no row (= ours ✅). **TOOLTIP-PARENT (psb, minor)**: live's
+    dependency part has no type tag on the parent ("Boss 2 [Extrude] <- Boss sketch 2"); ours adds "[Sketch]".
+  - Rename: double-click = edit (= ours), Esc cancels, **blur commits**, an **empty name reverts to the default name** (ours not
+    checked yet).
+  - **FOLDER-NAME-INLINE (psb)**: "Add selection to folder…" names the new folder **inline in the row** (input prefilled "New
+    folder"), not in a separate "Folder name" box (that box belongs to the header's New folder button). **FOLDER-MENU (psb)**: live
+    = Rename | Add selection to folder… | Suppress (or Unsuppress) | Dynamic suppression | Roll to here | Expand | Collapse |
+    Delete | Unpack folder; ours = Expand, Rename | Suppress, Unsuppress (both at once) | Expand all, Collapse all | Unpack folder.
+    Dragging a feature onto a folder row makes it the first child (not tested on ours yet).
+  - **FOLDER-EXPAND-UNDO (psb)**: live's undo steps are the user's model actions (suppress, drags, folder creation, renames …);
+    expanding/collapsing isn't one. Ours records the expand as an undo step.
+
 ## v3 Session 7 in the app: feature dialogs in everyday use (v0.4.8 c7d9d454; r5/v3s7.py: block 60×40×20 + revolve profile/axis on Front + hole points; live "Extrude dialog states", "Fillet", "All other Part Studio feature dialogs")
 Same as live ✅: Extrude End type list (Blind, Up to next, Up to face, Up to part, Up to vertex, Through all) with the search
 input and bold-match filtering ("thr" → **Thr**ough all), Enter picks; Through all hides Depth; Up to face adds "Up to face"
