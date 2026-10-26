@@ -870,3 +870,18 @@ STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extr
   Lead 10-26: qa5 fixes the open findings itself, P1 first.
 STATUS FSW-unsupported (psb, 2026-10-26): Decal (0040f4e4, the model side; icons2 draws it) and the face blend variants (4d5af0d8: asymmetric, width ratio, conic, curvature, chamfer) are done as live. Still open: face blend between faces without a common edge.
 STATUS FSW-unsupported (psb, 2026-10-26 b): face blend between faces without a common edge done for planar sides (ad4f19fc, live GA/GC). FSW-unsupported is closed.
+- STATUS 2026-10-26 (qa5): **P1-2 not a bug** — live greys the header's new-folder and pause icons while a feature dialog or
+  sketch is open (part-studio/570 and sketch/501 1:1: both lighter than the timer); ours (opacity 0.4) matches.
+- STATUS 2026-10-26 (qa5): Detail view default scale checked live (p6 (4), drawing/qa5-p6d-2.png): "2:1" with the parent at
+  1:1, as ours.
+- STATUS 2026-10-26 (qa5, green a08e3eda): **P1-10's info fixed** (psb/fs): Extrude › Remove from a circle on Top under the
+  block flips the tool down and shows the blue bubble "Selected tools and targets do not intersect." (×). The tool preview
+  colour stays icons2's (lead: leave it).
+- STATUS 2026-10-26 (qa5, lead: fix them yourself): fixed by qa5 in the owners' files, each with a test unless noted —
+  P1-1 (header counts the new feature), P1-8 (one chip per clicked point), P1-9 (feature chips use the shown name), P1-17
+  (empty mass panel blank, toast on measured parts), P1-18 (⚠ badge on missing-selection rows), P2-A2 (limit Enter applies
+  then accepts), P2-A3 (Esc = Done in explode editing; no unit test, verified in the app), P2-A4 (pattern copies follow
+  their seed during a mate edit), P2-A5 (suppressed rows italic), P2-A6 (Instances counts top-level rows), P2-A7 (pending
+  pattern row stays; app-verified), P2-A8 (no pattern bubble; app-verified), P2-D2 (only the assembly's own sources make
+  its drawing stale), P2-D3 (NOTE preview). Caveat P1-8: a reopened hole whose points were all clicked one by one shows
+  them as "Vertices of Sketch N" (the grouping isn't stored). P1-16 in progress (kernel shell.cpp).

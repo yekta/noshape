@@ -133,7 +133,7 @@ then edits, undo/redo, rollback and suppress.
 | Drawing Note tool (n), hover | prompt only, no preview | "NOTE" preview at the pointer | ✗ **P2-D3** (ui2) |
 | Click, type "QA NOTE" | Note panel next to the note: Noto Sans ( Note ), 0.1200, B I U S colour, spacing, align, list, … ☐ Flag notes (greyed Flag (Drawing), 2 Characters); ruler bar over the text | same (drawing/225, behaviours 3277) | ✅ |
 | Drawing Detail view tool | panel: 4 shapes (circle pressed), "Create circle", View scale ▾, View label A, Profile style In line, ☑ Show detail view profile, ☐ Clip border to geometry | same (behaviours 1404, 1795) | ✅ |
-| Circle drawn on the Top view | field "Profile created", shape buttons un-pressed, View scale **2:1**, label A; preview follows the pointer; click places "DETAIL A / SCALE 2:1" | live capture filled 1:1 (parent scale unknown; request 10-26 p6 (4)) | ? |
+| Circle drawn on the Top view | field "Profile created", shape buttons un-pressed, View scale **2:1**, label A; preview follows the pointer; click places "DETAIL A / SCALE 2:1" | live: "2:1" with the parent at 1:1 (qa5 live check, drawing/qa5-p6d-2.png) | ✅ |
 
 ## Owner fixes re-checked on green a08e3eda
 | Item | Check | Status |
