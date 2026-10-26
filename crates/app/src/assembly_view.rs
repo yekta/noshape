@@ -137,7 +137,7 @@ mod positions;
 #[path = "assembly_bom.rs"]
 mod bom_panel;
 #[path = "assembly_mass.rs"]
-mod mass;
+pub(crate) mod mass;
 // What an agent's call asks of this view (live mode).
 #[path = "agent_window/assembly.rs"]
 mod agent_window;
@@ -2101,7 +2101,10 @@ impl AssemblyView {
         let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none() && self.replace_panel.is_none() && self.step_edit.is_none();
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
-        let capture = snapping || matches!(self.hover_overlay, Some(OverlayPick::Section(_))) || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
+        // Live ("nav2 selection" (7)): with something selected a left-drag
+        // from empty space moves the selection (no box).
+        let selection_drag = free && !self.explode_edit && self.hover.is_none() && self.manip_hover.is_none() && self.hover_overlay.is_none() && !self.selected.is_empty();
+        let capture = snapping || selection_drag || matches!(self.hover_overlay, Some(OverlayPick::Section(_))) || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = capture);
     }
 
@@ -2478,6 +2481,10 @@ impl AssemblyView {
                     self.start_snap_drag(*position, cx);
                     return;
                 }
+                if self.hover.is_none() && !self.selected.is_empty() && !self.explode_edit {
+                    self.start_selection_drag(*position, cx);
+                    return;
+                }
                 let Some(t) = self.hover.clone() else { return };
                 let top = t.path[0];
                 // A part of a flexible subassembly is dragged on its own (Onshape).
@@ -2681,26 +2688,20 @@ impl AssemblyView {
                 }
                 cx.notify();
             }
-            ViewportEvent::BoxSelect { ids, modifiers, crossing, .. } => {
-                // Live (behaviours "Assembly selection model" 6): a right→left
-                // (crossing) box selects the instances it touches, a left→right
-                // (window) box the faces, edges and vertices fully inside it.
+            ViewportEvent::BoxSelect { ids, modifiers, .. } => {
+                // Live ("nav2 selection" (7), 10-25): a box (with nothing
+                // selected; otherwise the drag moves the selection) selects
+                // whole part occurrences, window or crossing.
                 if self.pick_mode(cx).is_some() || self.placing.is_some() {
                     return;
                 }
                 if !(modifiers.shift || modifiers.secondary()) {
                     self.clear_selection();
                 }
-                let picks: Vec<AsmPickTarget> = ids.iter().filter_map(|id| self.pick(Some(*id))).collect();
-                if *crossing {
-                    for t in picks {
-                        if !self.selected.contains(&t.path[0]) {
-                            self.selected.push(t.path[0]);
-                        }
-                    }
-                } else {
-                    for t in picks.into_iter().filter(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)) {
-                        self.select_entity(t, false);
+                let occurrences: Vec<InstanceId> = ids.iter().filter_map(|id| self.pick(Some(*id))).map(|t| t.path[0]).collect();
+                for o in occurrences {
+                    if !self.selected.contains(&o) {
+                        self.selected.push(o);
                     }
                 }
                 self.selected_mate = None;
@@ -2783,6 +2784,45 @@ impl AssemblyView {
 
     fn manip_targets_for(handle: ManipHandle, axis: DVec3, center: DVec3, value: f64, start: &HashMap<InstanceId, Placement>) -> Vec<(InstanceId, Placement)> {
         Self::moved_placements(&Self::manip_motion(handle, axis, center, value, DVec3::ZERO), start)
+    }
+
+    /// A left-drag from empty space with something selected (live "nav2
+    /// selection" (7): Part 1 <1> moved with the pointer): the selected
+    /// instances that can move follow the pointer in the view plane through
+    /// their bounds' centre; a fixed one shows the no-drop cursor.
+    fn start_selection_drag(&mut self, position: DVec2, cx: &mut Context<Self>) {
+        let Some(asm) = self.assembly(cx) else { return };
+        let ids: Vec<InstanceId> = self.selected.iter().copied().filter(|id| asm.instance(*id).is_some_and(|i| !i.fixed && !i.suppressed && !i.hidden)).collect();
+        let mut bb: Option<(DVec3, DVec3)> = None;
+        for id in if ids.is_empty() { &self.selected } else { &ids } {
+            if let Some((a, b)) = self.result.instance_bounds(*id) {
+                bb = Some(bb.map(|(x, y)| (x.min(a), y.max(b))).unwrap_or((a, b)));
+            }
+        }
+        let center = bb.map(|(a, b)| (a + b) * 0.5).unwrap_or(DVec3::ZERO);
+        let normal = self.viewport.read(cx).camera.forward();
+        let grab = self.ray_plane(position, center, normal, cx).unwrap_or(center);
+        let start: HashMap<InstanceId, Placement> = ids.iter().filter_map(|id| self.result.solved.placement(*id).map(|p| (*id, p))).collect();
+        self.drag = Some(DragState {
+            top: ids.first().copied().unwrap_or(self.selected[0]),
+            press: position,
+            started: false,
+            local: DVec3::ZERO,
+            plane_point: grab,
+            plane_normal: normal,
+            pending: None,
+            busy: false,
+            handle: None,
+            ids,
+            start,
+            ring_v0: DVec3::ZERO,
+            value: 0.0,
+            grab0: grab,
+            offset: DVec3::ZERO,
+            triad_preview: None,
+            explode: false,
+            nested: None,
+        });
     }
 
     /// Cursor ray hit on a plane.
@@ -2939,6 +2979,12 @@ impl AssemblyView {
                 // Free instance: exact translation from the drag start.
                 let m = Self::manip_motion(h, d.plane_normal, d.plane_point, d.value, d.offset);
                 SolveOptions { targets: Self::moved_placements(&m, &d.start), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
+            }
+            // The selection dragged from empty space: each instance keeps
+            // its offset to the grab point.
+            None if !d.start.is_empty() => {
+                let drags = d.ids.iter().filter_map(|id| d.start.get(id).map(|p| (*id, placement_to_frame(p).inverse().transform_point(d.grab0), target))).collect();
+                SolveOptions { drags, start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
             }
             _ => match d.nested {
                 Some(c) => SolveOptions { nested_drags: vec![((d.top, c), d.local, target)], start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },

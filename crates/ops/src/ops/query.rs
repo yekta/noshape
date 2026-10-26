@@ -19,7 +19,7 @@ pub fn ops() -> Vec<Op> {
             verb: "parts",
             summary: "The parts, surfaces and curves of a Part Studio",
             description: "Each body with its id (`body:…`), name, kind, volume, surface area, bounding box and face/edge/vertex counts. Lengths in the workspace units (see `units`).",
-            fields: vec![doc_field(), tab_field()],
+            fields: vec![doc_field(), tab_field(), opt("configuration", json!({ "type": "object" }), "In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown.")],
             mutates: false,
             destructive: false,
             run: parts,
@@ -73,7 +73,7 @@ pub fn ops() -> Vec<Op> {
             verb: "mass_properties",
             summary: "Mass properties: volume, surface area, mass, center of mass, inertia",
             description: "Of the given parts, or all parts. Mass, center of mass and inertia need a material (or density) on every part, as in Onshape; mass overrides apply. Inertia (kg·length²) is about the center of mass, or about mate connector `reference`'s axes.",
-            fields: vec![doc_field(), tab_field(), opt("parts", strings(), "Part ids (`body:…`) or names; default all."), opt("reference", s(), "Mate connector id (`mc:…`) for the inertia axes.")],
+            fields: vec![doc_field(), tab_field(), opt("parts", strings(), "Part ids (`body:…`) or names; default all."), opt("reference", s(), "Mate connector id (`mc:…`) for the inertia axes."), opt("configuration", json!({ "type": "object" }), "In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown.")],
             mutates: false,
             destructive: false,
             run: mass,
@@ -82,6 +82,18 @@ pub fn ops() -> Vec<Op> {
 }
 
 /// Workspace length unit per meter.
+/// Regenerate in the `configuration` the call names ({input: option},
+/// ids or names; the other inputs as the Part Studio shows them), else as
+/// it shows.
+fn regenerate_configured(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, a: &Args) -> Result<noshape_model::regen::RegenResult, OpError> {
+    let Some(values) = a.object("configuration")? else { return od.regenerate(tab, None) };
+    let units = od.doc().settings.units;
+    let ps = crate::doc::studio(od.doc(), tab)?;
+    let mut cfg = od.active_config.get(&tab).cloned().unwrap_or_default();
+    cfg.0.extend(super::configuration::studio_values(ps, &units, values, "configuration")?.0);
+    od.regenerate(tab, Some(&cfg))
+}
+
 pub(crate) fn len_scale(u: &UnitPrefs) -> f64 {
     1.0 / u.si_factor(Dim::LENGTH)
 }
@@ -119,7 +131,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let k = len_scale(&units);
-    let r = od.regenerate(tab, None)?;
+    let r = regenerate_configured(od, tab, a)?;
     let ps = crate::doc::studio(od.doc(), tab)?;
     let out: Vec<Value> = r
         .context
@@ -127,13 +139,15 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         .iter()
         .map(|b| {
             let d = r.display.body(&b.id);
+            let shown = b.shape.shown_topology().unwrap_or_default();
             let mut v = json!({
                 "id": refs::body_id(&b.id),
                 "name": d.map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone()),
                 "kind": format!("{:?}", b.kind),
                 "faces": b.shape.count(ShapeType::Face),
-                "edges": b.shape.count(ShapeType::Edge),
-                "vertices": b.shape.count(ShapeType::Vertex),
+                // Onshape's topology: no seams, no vertices on full circles.
+                "edges": shown.edges.iter().filter(|&&e| e).count(),
+                "vertices": shown.vertices.iter().filter(|&&v| v).count(),
                 "hidden": d.is_some_and(|d| d.hidden),
             });
             if let Ok(vol) = b.shape.volume()
@@ -262,7 +276,7 @@ fn edge_json(b: &Body, i: usize, k: f64, names: &dyn Fn(Option<noshape_model::re
     Some((v, mid, kind))
 }
 
-fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let k = len_scale(&units);
@@ -355,7 +369,12 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 }
             }
             "edges" => {
+                // Onshape's edges only (no seams or degenerated edges).
+                let shown = b.shape.shown_topology().unwrap_or_default();
                 for i in 0..b.edges.len() {
+                    if !shown.edges.get(i).copied().unwrap_or(true) {
+                        continue;
+                    }
                     if created_by.is_some_and(|f| b.edges[i].creator() != Some(f) && !edge_touches(&b.edges[i], f)) {
                         continue;
                     }
@@ -374,7 +393,12 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 }
             }
             "vertices" => {
+                // Onshape's vertices only (none at seam ends or on full circles).
+                let shown = b.shape.shown_topology().unwrap_or_default();
                 for i in 0..b.vertices.len() {
+                    if !shown.vertices.get(i).copied().unwrap_or(true) {
+                        continue;
+                    }
                     let Ok(vx) = b.shape.sub_shape(ShapeType::Vertex, i) else { continue };
                     let Ok(p) = vx.vertex_point() else { continue };
                     let v = json!({ "id": refs::to_id(&Reference::Vertex((*b.vertices[i]).clone())), "part": refs::body_id(&b.id), "position": pt(p, k) });
@@ -466,7 +490,7 @@ fn mass(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let k = len_scale(&units);
-    let r = od.regenerate(tab, None)?;
+    let r = regenerate_configured(od, tab, a)?;
     let ps = crate::doc::studio(od.doc(), tab)?;
     let bodies: Vec<BodyId> = match a.opt_array("parts")? {
         Some(list) => list.iter().enumerate().map(|(i, v)| v.as_str().ok_or_else(|| OpError::param(&format!("parts[{i}]"), "part id or name")).and_then(|s| find_part(&r, s).map(|b| b.id.clone()).map_err(|e| e.with_param(format!("parts[{i}]"))))).collect::<Result<_, _>>()?,

@@ -14,7 +14,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("ui_select", &[r##"{"action": "set", "refs": ["body:…"]}"##, r##"{"action": "related", "refs": ["face:…"], "criterion": "Tangent connected faces"}"##, r##"{"action": "select_other", "at": [640, 400], "index": 1}"##, r##"{"tab": "Assembly 1", "action": "same_configuration", "refs": ["Part 1 <1>"]}"##]),
     ("ui_preferences", &[r##"{}"##, r##"{"graphics": {"fov_deg": 60, "line_width": 1.5, "sketch_constrained": "#202020"}}"##]),
     ("ui_toolbar", &[r##"{}"##, r##"{"set": {"removed": ["helix"], "shortcut_tools": ["sketch", "extrude", "fillet"]}}"##, r##"{"tab": "Assembly 1", "set": {"removed": ["tb-gear"], "hide_search": true}}"##]),
-    ("ui_search_tools", &[r##"{"text": "fil"}"##, r##"{"tab": "Assembly 1", "text": "mate"}"##]),
+    ("ui_search_tools", &[r##"{"text": "fil"}"##, r##"{"text": "rect", "sketch": true}"##, r##"{"tab": "Assembly 1", "text": "mate"}"##]),
     ("ui_shortcuts", &[r##"{"tab": "Sketch"}"##, r##"{"search": "fillet"}"##]),
     ("tab_activate", &[r##"{"tab": "Assembly 1"}"##]),
     ("tab_manager", &[r##"{"search": "bracket"}"##, r##"{"kinds": ["drawing"], "sort": "name_asc"}"##, r##"{"open": false}"##]),

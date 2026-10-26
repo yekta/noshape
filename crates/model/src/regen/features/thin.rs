@@ -62,7 +62,7 @@ pub fn side_source(src: &Source, side: u16) -> Source {
 
 /// Thin regions for the `wallShape` selection of a Thin feature.
 pub fn thin_profiles(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<Profile>> {
-    thin_profiles_sided(ev, refs, WallSide::Left)
+    thin_profiles_sided(ev, refs, WallSide::Left, false)
 }
 
 /// Where Thickness 1 of an open wall goes.
@@ -77,8 +77,11 @@ pub enum WallSide<'a> {
     Along(&'a dyn Fn(&PlaneFrame, DVec3) -> DVec3),
 }
 
-/// [`thin_profiles`] with the open walls' side given by `side`.
-pub fn thin_profiles_sided(ev: &EvalCtx, refs: &[Reference], side: WallSide) -> FResult<Vec<Profile>> {
+/// [`thin_profiles`] with the open walls' side given by `side`. Closed loops
+/// get Thickness 1 outside, or with `by_loop_direction` (Revolve) inside
+/// when the loop runs counter-clockwise seen from the sketch normal (its
+/// first sketch edge's direction; live "fs (10-25 j)").
+pub fn thin_profiles_sided(ev: &EvalCtx, refs: &[Reference], side: WallSide, by_loop_direction: bool) -> FResult<Vec<Profile>> {
     let (t1, t2) = thicknesses(ev)?;
     let mut out = Vec::new();
     // Closed loops of regions and planar faces.
@@ -94,7 +97,8 @@ pub fn thin_profiles_sided(ev: &EvalCtx, refs: &[Reference], side: WallSide) -> 
                     SourcedEdge { shape: e, source: src }
                 })
                 .collect();
-            out.push(closed_wall(&p.frame, &w, &sources, t1, t2, p.key.clone())?);
+            let (a, b) = if by_loop_direction && runs_ccw(&w, &sources, p.frame.normal) { (t2, t1) } else { (t1, t2) };
+            out.push(closed_wall(&p.frame, &w, &sources, a, b, p.key.clone())?);
         }
     }
     // Curves: sketch entities, whole sketches, edges, wire bodies.
@@ -114,7 +118,8 @@ pub fn thin_profiles_sided(ev: &EvalCtx, refs: &[Reference], side: WallSide) -> 
             };
             let key = chain.first().map(|e| e.source.clone()).unwrap_or(Source::Index(i as u32));
             if w.is_closed().unwrap_or(false) || closed_chain(&w) {
-                out.push(closed_wall(&frame, &w, &chain, t1, t2, key)?);
+                let (a, b) = if by_loop_direction && runs_ccw(&w, &chain, frame.normal) { (t2, t1) } else { (t1, t2) };
+                out.push(closed_wall(&frame, &w, &chain, a, b, key)?);
             } else {
                 let first = chain.first().map(|s| s.shape.clone()).unwrap_or_else(|| w.edges()[0].clone());
                 let (m, left) = left_of(&first, frame.normal)?;
@@ -229,6 +234,28 @@ fn closed_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t_out: f6
     let face = k::make_face(&kernel_plane(frame), &outer, std::slice::from_ref(&inner)).map_err(kerr("Could not build the thin wall"))?;
     let edge_sources = tag_sources(&face, &outer, &inner, sources, None);
     Ok(Profile { shape: face, frame: *frame, edge_sources, key, from_face: false })
+}
+
+/// Whether a closed loop runs counter-clockwise around `n` in the direction
+/// of its first sketch edge (the lowest source: the first one drawn).
+fn runs_ccw(w: &Shape, sources: &[SourcedEdge], n: DVec3) -> bool {
+    // The wire's own sense: its signed area about `n`, edge by edge in wire order.
+    let mut pts = Vec::new();
+    for e in w.edges() {
+        if let Ok(i) = e.edge_info() {
+            pts.push(i.start);
+            if let Ok(m) = e.point_at((i.first_param + i.last_param) * 0.5) {
+                pts.push(m);
+            }
+        }
+    }
+    let area: f64 = (0..pts.len()).map(|i| pts[i].cross(pts[(i + 1) % pts.len()]).dot(n)).sum();
+    let Some(first) = sources.iter().min_by(|a, b| a.source.cmp(&b.source)) else { return area > 0.0 };
+    // The first edge as drawn (its curve runs start → end) against its sense
+    // in the wire (a reversed edge is traversed against its curve).
+    let Some(in_wire) = w.edges().into_iter().find(|e| e.is_same(&first.shape)) else { return area > 0.0 };
+    let along = in_wire.orientation() != k::Orientation::Reversed;
+    (area > 0.0) == along
 }
 
 /// Unit vector to the left of the first selected edge (around `n`), at its midpoint.

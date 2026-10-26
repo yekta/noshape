@@ -74,7 +74,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | RP3 | Custom tables (empty) | ink from 252; lines 428, 449, 470, 491, 511, 532 | ink from 249; lines from 425, 20 px pitch | ✅ +3 px, 20.8 px lines (checked 10-23: within 1 px) |
 | RP4 | Inspection table (empty) | header text 125–134; tool band 154–199 (46 px, full width, 1 px #d7d7d7 line at 198), icons 170–189 from x 1217; illustration ink 304–453 (170 × 149); text from 480 | header 122–131; band 142–177 (36 px, inset), no line; icons 150–169 from 1225; ink 246–359 (128 × 113); text from 389 | ✅ band, header, 172 px illustration (checked 10-23: within 1 px) |
 | RP5 | Variable table (empty) | ink 312–461 (168 × 149); two lines from 488, the second ending in the link **"Learn more about variable tables."** | ink 272–429 (178 × 157); text from 468; no link | ✅ 171 px illustration lower, the link (checked 10-23: within 1 px) |
-| RP6 | Custom tables illustration art | no inner line | an extra vertical line in front of the cube | ✗ icon art (icons2) |
+| RP6 | Custom tables illustration art | no inner line | an extra vertical line in front of the cube | ✅ matches live part-studio/77 (re-checked 10-26 by icons2: grid, cube with its centre edge, braces) |
 | RP7 | Help-text width | Flama/Open Sans | our UI font is a little narrower | ✗ app-wide font (VC7) |
 
 ## 8. Mass and section properties (live part-studio/80; dom/dialog-mass-properties.txt)

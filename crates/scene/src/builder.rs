@@ -275,7 +275,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.images.retain(|_, (w, _)| w.strong_count() > 0);
     let mut bodies = 0u32;
-    for b in display.bodies.iter().filter(|b| !b.hidden) {
+    for (part_index, b) in display.bodies.iter().enumerate().filter(|(_, b)| !b.hidden) {
         let colors = opts.vertex_colors.as_ref().and_then(|m| m.get(&b.id)).filter(|c| c.len() == b.mesh.positions.len());
         let replaced = opts.replaced_meshes.as_ref().and_then(|m| m.get(&b.id));
         // Pattern copies sharing one mesh (`SharedMesh`): uploaded once and
@@ -358,6 +358,10 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // planes and picked regions and its front faces over them.)
                 let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
                 let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(ISOLATE_GHOST) } else { mesh };
+                // The cap hatch's id: live's Part Studio parts read 230, 234,
+                // 238, … (occurrence id + mesh group hash; live ui (10-26),
+                // icons2 caps 3).
+                let mesh = mesh.hatch_id(230 + 4 * part_index as u32);
                 // Parts excluded from the section view are not cut.
                 scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
             }
@@ -870,27 +874,35 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                 overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, fill, !error));
             }
         }
-        // A selected datum plane: a solid amber fill and border over the
-        // plane (live selection/01) instead of tinting its faint fill.
-        let plane_selected = flag == state::SELECTED
+        // A hovered or selected datum plane (live behaviours "icons2
+        // plane/origin highlight", selection/01): a ~3 px solid border,
+        // #ffc685 hovered / #ffa90a selected; selected, a solid amber fill
+        // too. Hover leaves the fill as it is (the plane's own state isn't
+        // set, it would tint the fill).
+        let plane_lit = (flag == state::SELECTED || flag == state::HOVER)
             && built.picks.ids_for(r).iter().any(|&id| built.picks.get(id).is_some_and(|t| t.kind == PickKind::Plane));
-        if plane_selected && let Some(pl) = display.planes.iter().find(|p| !p.hidden && &p.reference == r) {
+        if plane_lit && let Some(pl) = display.planes.iter().find(|p| !p.hidden && &p.reference == r) {
             let f = &pl.frame;
             let c = |u: f64, v: f64| -> [f32; 3] { (f.origin + f.x * u * pl.half_width + f.y * v * pl.half_height).as_vec3().into() };
             let corners = [c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)];
-            let n: [f32; 3] = f.normal.as_vec3().into();
-            let k = theme::lin(theme::viewport::PLANE_SELECTED_FILL);
-            overlay_regions.push((MeshData { positions: corners.to_vec(), normals: vec![n; 4], pick_ids: vec![0; 4], indices: vec![0, 1, 2, 0, 2, 3] }, [k[0], k[1], k[2], theme::viewport::PLANE_SELECTED_ALPHA], true));
+            if flag == state::SELECTED {
+                let n: [f32; 3] = f.normal.as_vec3().into();
+                let k = theme::lin(theme::viewport::PLANE_SELECTED_FILL);
+                overlay_regions.push((MeshData { positions: corners.to_vec(), normals: vec![n; 4], pick_ids: vec![0; 4], indices: vec![0, 1, 2, 0, 2, 3] }, [k[0], k[1], k[2], theme::viewport::PLANE_SELECTED_ALPHA], true));
+            }
+            let border = if flag == state::HOVER { hov_color } else { sel_color };
             for i in 0..4 {
-                overlay_lines.segments.push(LineSegment { a: corners[i], b: corners[(i + 1) % 4], color: lin_to_u8(sel_color), pick_id: 0, width: 2.4, style: 0 });
+                // Lifted: at the same depth the plane's own blue border won
+                // over it; parts in front still hide it.
+                overlay_lines.segments.push(LineSegment { a: corners[i], b: corners[(i + 1) % 4], color: lin_to_u8(border), pick_id: 0, width: 3.0, style: LineSegment::LIFTED });
             }
         }
         for &id in built.picks.ids_for(r) {
             let t = built.picks.get(id);
-            // An erroring input face shows only its red outline; a selected
+            // An erroring input face shows only its red outline; a lit
             // plane its overlay above; a hovered sketch region only its
             // boundary (live sketch/25: the fill doesn't change).
-            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) && !plane_selected && !(flag == state::HOVER && t.is_some_and(|t| t.kind == PickKind::SketchRegion)) {
+            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) && !plane_lit && !(flag == state::HOVER && t.is_some_and(|t| t.kind == PickKind::SketchRegion)) {
                 scene.add_flag(id, flag);
             }
             let Some(t) = t else { continue };

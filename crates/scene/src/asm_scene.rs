@@ -920,7 +920,7 @@ fn lin_to_u8(c: [f32; 4]) -> [u8; 4] {
 /// Onshape's mate connector glyph (live qa5/asm-041, assembly/31-*): a khaki
 /// disc in the connector's XY plane with a notch between +X and +Y, a dark
 /// rim, and a small triad (Z up from the centre, X and Y outside the disc).
-fn push_connector_glyph(lines: &mut LineData, f: &Frame, r: f64) {
+pub fn push_connector_glyph(lines: &mut LineData, f: &Frame, r: f64) {
     const FILL: [u8; 4] = [187, 190, 134, 255];
     const RIM: [u8; 4] = [42, 81, 105, 255];
     let (u, v, n) = (f.x(), f.y(), f.z());

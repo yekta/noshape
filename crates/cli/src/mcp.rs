@@ -155,12 +155,13 @@ fn call_tool(ctx: &mut Ctx, params: &Value) -> Value {
     };
     match registry::run(ctx, op, &args) {
         Ok(out) => tool_result(out),
-        Err(e) => tool_error(&serde_json::to_string_pretty(&e.to_json()).unwrap_or_else(|_| e.to_string())),
+        Err(e) => tool_error(&serde_json::to_string(&e.to_json()).unwrap_or_else(|_| e.to_string())),
     }
 }
 
 fn tool_result(out: OpOutput) -> Value {
-    let mut content = vec![json!({ "type": "text", "text": serde_json::to_string_pretty(&out.value).unwrap_or_default() })];
+    // Compact JSON: a third fewer tokens than pretty-printed.
+    let mut content = vec![json!({ "type": "text", "text": serde_json::to_string(&out.value).unwrap_or_default() })];
     for img in &out.images {
         content.push(json!({ "type": "image", "data": base64::engine::general_purpose::STANDARD.encode(&img.png), "mimeType": "image/png" }));
     }

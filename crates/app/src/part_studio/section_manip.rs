@@ -33,6 +33,9 @@ const SNAP_DEG: f64 = 2.0;
 const VERTEX_SNAP_PX: f64 = 22.0;
 /// Over a face, onto one of its edges within this many px (live ≈30–35).
 const EDGE_SNAP_PX: f64 = 32.0;
+/// The snapped base's connector disc radius (px; live skb-sv: ≈36 px
+/// across).
+const SNAP_DISC_PX: f64 = 18.0;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct SectionManip {
@@ -42,6 +45,9 @@ pub(super) struct SectionManip {
     /// The arrow base where the last arrow drag started, while its value
     /// box is shown (live: a "⊥" there, led to the base).
     pub start: Option<DVec3>,
+    /// A base drag snapped here (live skb-sv s009–s141: an implicit mate
+    /// connector's disc and triad under the base ring).
+    pub snapped: Option<DVec3>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -152,7 +158,8 @@ impl PartStudioView {
             (true, None, Some(s0), Some(o)) => Some(arrow.base - arrow.dir * (o - s0)),
             _ => None,
         };
-        Some(SectionManip { arrow, axes: ring_axes(arrow.dir), start })
+        let snapped = self.ui.section_snap.as_ref().map(|s| s.0);
+        Some(SectionManip { arrow, axes: ring_axes(arrow.dir), start, snapped })
     }
 
     /// Segments the viewport hit-tests (all handles).
@@ -451,6 +458,16 @@ pub(super) fn section_glyph(s: &SectionManip, hover: Option<SectionHandle>, drag
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
     let Some(wpp) = view.world_per_px(s.tip()) else { return Vec::new() };
     let bw = view.world_per_px(s.arrow.base).unwrap_or(wpp);
+    let mut disc = LineData::default();
+    if let Some(o) = s.snapped
+        && let Some(w) = view.world_per_px(o)
+    {
+        // The disc lies in the section plane, its notch toward world X.
+        let z = s.arrow.dir;
+        let x = [DVec3::X, DVec3::Y].into_iter().map(|a| a - z * z.dot(a)).find(|a| a.length() > 0.1).unwrap_or(DVec3::X);
+        let f = noshape_model::assembly::solver::Frame::from_axes(o, z, x);
+        noshape_scene::asm_scene::push_connector_glyph(&mut disc, &f, SNAP_DISC_PX * w);
+    }
     let mut back = LineData::default();
     let mut front = LineData::default();
     let colors = |h: SectionHandle| {
@@ -485,10 +502,11 @@ pub(super) fn section_glyph(s: &SectionManip, hover: Option<SectionHandle>, drag
         front.push_polyline(&[f(s.arrow.base), f(st)], c, 0, 2.0, LineSegment::ON_TOP);
         front.push_polyline(&[f(st - across), f(st + across)], c, 0, 2.0, LineSegment::ON_TOP);
     }
-    vec![
-        Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),
-        Instance::new(Drawable::Lines(up.upload_lines(&front))).per_primitive_color().unpickable().ignore_clip().layer(41),
-    ]
+    [(disc, 39), (back, 40), (front, 41)]
+        .into_iter()
+        .filter(|(l, _)| !l.segments.is_empty())
+        .map(|(l, layer)| Instance::new(Drawable::Lines(up.upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().layer(layer))
+        .collect()
 }
 
 #[cfg(test)]

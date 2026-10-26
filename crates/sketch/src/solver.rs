@@ -1165,52 +1165,57 @@ impl Sketch {
 
     /// Interactive drag: pulls the handles toward their targets while keeping
     /// every constraint satisfied. Fully constrained geometry does not move.
-    /// On failure the geometry is left unchanged. Constraint states come from
-    /// the last analysis if the sketch structure has not changed since.
+    /// A target the constraints can't reach (or a jump that leaves the
+    /// convergence basin) is approached in steps: the geometry goes as far
+    /// toward it as solves and stops there, as Onshape's does; when not even
+    /// the first step solves it is left unchanged. Each frame's work stays
+    /// bounded (a ~300-entity sketch: ~2 ms a step, a few ms at the limit).
+    /// Constraint states come from the last analysis if the sketch structure
+    /// has not changed since.
     pub fn drag(&mut self, handles: &[(DragHandle, DVec2)]) -> SolveReport {
-        let opts = SolveOptions { analyze: false, max_iterations: 50, ..SolveOptions::default() };
+        // Well-posed drag steps converge in a few iterations; a step that
+        // doesn't converge soon sits at a limit of the constraints.
+        let opts = SolveOptions { analyze: false, max_iterations: 8, ..SolveOptions::default() };
         let targets = self.drag_targets(handles);
         let report = run(self, &opts, &targets);
         if report.is_solved() {
             return report;
         }
-        // Large jumps can leave the convergence basin: approach the target in
-        // smaller steps (each step warm-starts the next).
-        for substeps in [2usize, 4, 8] {
-            let start = self.clone();
-            let mut ok = true;
-            let mut last = report.clone();
-            for k in 1..=substeps {
-                let f = k as f64 / substeps as f64;
-                let partial: Vec<(DragHandle, DVec2)> = handles
-                    .iter()
-                    .map(|(h, t)| {
-                        let from = match *h {
-                            DragHandle::Point(id) => start.point(id).unwrap_or(*t),
-                            DragHandle::Entity { grab, .. } => grab,
-                        };
-                        let target = from + (*t - from) * f;
-                        // entity handles: the grab point moves with the previous sub-step
-                        let h2 = match *h {
-                            DragHandle::Entity { id, grab } => DragHandle::Entity { id, grab: grab + (*t - grab) * ((k - 1) as f64 / substeps as f64) },
-                            p => p,
-                        };
-                        (h2, target)
-                    })
-                    .collect();
-                let targets = self.drag_targets(&partial);
-                last = run(self, &opts, &targets);
-                if !last.is_solved() {
-                    ok = false;
-                    break;
-                }
+        const SUBSTEPS: usize = 4;
+        let start = self.clone();
+        let mut best: Option<SolveReport> = None;
+        for k in 1..=SUBSTEPS {
+            let f = k as f64 / SUBSTEPS as f64;
+            let partial: Vec<(DragHandle, DVec2)> = handles
+                .iter()
+                .map(|(h, t)| {
+                    let from = match *h {
+                        DragHandle::Point(id) => start.point(id).unwrap_or(*t),
+                        DragHandle::Entity { grab, .. } => grab,
+                    };
+                    let target = from + (*t - from) * f;
+                    // entity handles: the grab point moves with the previous sub-step
+                    let h2 = match *h {
+                        DragHandle::Entity { id, grab } => DragHandle::Entity { id, grab: grab + (*t - grab) * ((k - 1) as f64 / SUBSTEPS as f64) },
+                        p => p,
+                    };
+                    (h2, target)
+                })
+                .collect();
+            let targets = self.drag_targets(&partial);
+            let r = run(self, &opts, &targets);
+            if !r.is_solved() {
+                break;
             }
-            if ok {
-                return last;
-            }
-            *self = start;
+            best = Some(r);
         }
-        report
+        match best {
+            Some(r) => r,
+            None => {
+                *self = start;
+                report
+            }
+        }
     }
 
     fn drag_targets(&self, handles: &[(DragHandle, DVec2)]) -> Vec<DragTarget> {

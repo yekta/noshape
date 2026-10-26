@@ -4,7 +4,8 @@ use crate::naming::Name;
 use crate::reference::Role;
 use crate::regen::eval::{EvalCtx, FResult, err};
 use noshape_kernel as k;
-use noshape_kernel::ShapeType;
+use glam::DVec3;
+use noshape_kernel::{Shape, ShapeType};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Group resolved (body, edge) pairs by body.
@@ -113,6 +114,30 @@ fn chamfer_failed(e: k::KernelError) -> crate::regen::eval::FeatureError {
     blend_failed("Failed to chamfer selections.", e)
 }
 
+/// Whether a fillet of `r` on a straight edge between two planar faces
+/// reaches past either face (its setback wider than the face).
+fn overflows(shape: &Shape, edges: &[usize], r: f64) -> bool {
+    let (Ok(ef), faces, all) = (shape.edge_faces(), shape.faces(), shape.edges()) else { return false };
+    edges.iter().any(|&e| {
+        let (Some(edge), Some(fs)) = (all.get(e), ef.get(e)) else { return false };
+        let Ok(info) = edge.edge_info() else { return false };
+        if fs.len() != 2 || !matches!(info.curve, k::Curve::Line { .. }) {
+            return false;
+        }
+        let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+        if !ff.iter().all(|f| matches!(f.face_surface(), Ok(k::Surface::Plane(_)))) {
+            return false;
+        }
+        let d = (info.end - info.start).normalize_or_zero();
+        let mid = (info.start + info.end) * 0.5;
+        let (Ok(n0), Ok(n1)) = (ff[0].normal_at_point(mid), ff[1].normal_at_point(mid)) else { return false };
+        let half = n0.normalize().dot(n1.normalize()).clamp(-1.0, 1.0).acos() / 2.0;
+        let setback = r * half.tan();
+        let line_dist = |q: DVec3| (q - info.start - d * (q - info.start).dot(d)).length();
+        ff.iter().any(|f| f.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(line_dist).fold(0.0, f64::max) < setback * (1.0 - 1e-9))
+    })
+}
+
 pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("filletType", "FULL_ROUND") {
         return full_round(ev);
@@ -172,7 +197,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             } else {
                 Section::Conic(ev.real("rho")?)
             };
-            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation") })
+            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation"), cliff: false })
         } else {
             None
         }
@@ -185,7 +210,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
-        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true };
+        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false };
         if !propagate && curved_edge_left_open(&body.shape, &edges) {
             return err("Adjoining edge not filleted.");
         }
@@ -195,6 +220,13 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
                 super::blend_section::check_partial(&body.shape, &edges, p)?;
             }
             super::blend_section::section_blend(ev, bi, &edges, spec)?;
+            continue;
+        }
+        // Allow edge overflow off and a ball wider than a straight edge's
+        // planar face: it rests on the face's far edge (live oracle_p1 F7).
+        if special.is_none() && !width && !ev.bool("allowEdgeOverflow") && overflows(&body.shape, &edges, radius) {
+            let spec = super::blend_section::BlendSpec { cliff: true, ..unpropagated(radius) };
+            super::blend_section::section_blend(ev, bi, &edges, &spec)?;
             continue;
         }
         if !propagate && propagate_tangent(&body.shape, &edges).len() > edges.len() {
@@ -381,7 +413,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         {
             // OCCT runs a chamfer on along tangent edges; Onshape stops at the
             // selection and runs the section out onto the neighbour (G7).
-            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1: d, r2: d, width: None, partial: None, run_on: true };
+            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1: d, r2: d, width: None, partial: None, run_on: true, cliff: false };
             super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| blend_failed("Failed to chamfer selections.", e.message))?;
             continue;
         }

@@ -58,6 +58,10 @@ impl LineSegment {
     /// Onshape's inferred-direction dash over a sketch rubber band: 4 px on,
     /// 4 px off, starting 1.25 px from the segment's start (live sketch/51).
     pub const INFERRED: u32 = 16;
+    /// Depth tested but a little in front of other edges: wins over a line
+    /// drawn at the same place (a lit datum plane's border over the plane's
+    /// own), still hidden behind faces in front.
+    pub const LIFTED: u32 = 32;
 }
 
 impl LineData {
@@ -262,6 +266,10 @@ pub struct Instance {
     pub pick_only: bool,
     /// Added to the geometry's local (1-based) pick ids; 0 keeps them as-is.
     pub pick_base: u32,
+    /// The section cap hatch's part id (Onshape: occurrence id + mesh group
+    /// hash; its color offset picks the hatch angle and spacing). 0: the
+    /// pick base. Up to 2^24.
+    pub hatch_id: u32,
     /// Zebra stripes instead of shading (Onshape's analysis tool).
     pub zebra: Option<Zebra>,
     /// A mirror reflecting an environment map (Reflection analysis).
@@ -355,6 +363,7 @@ impl Instance {
             on_top: false,
             pick_only: false,
             pick_base: 0,
+            hatch_id: 0,
             zebra: None,
             reflection: None,
             compare: 0,
@@ -363,6 +372,11 @@ impl Instance {
             line_lod: 0,
             mesh_lod: 0,
         }
+    }
+    /// The section cap hatch's part id ([`Instance::hatch_id`]).
+    pub fn hatch_id(mut self, id: u32) -> Self {
+        self.hatch_id = id;
+        self
     }
     /// The version this instance draws in compare mode ([`compare`]).
     pub fn compare_layer(mut self, layer: u8) -> Self {

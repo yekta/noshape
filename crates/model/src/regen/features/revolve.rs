@@ -48,7 +48,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         if d == DVec3::ZERO { f.normal } else { d }
     };
     let axis = if ev.bool("oppositeDirection") { -axis } else { axis };
-    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&turning))? } else { ev.profiles(refs)? };
+    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&turning), true)? } else { ev.profiles(refs)? };
     let full = ev.bool("fullRevolve");
     let mut tools = Vec::new();
     for p in &profiles {
@@ -148,12 +148,10 @@ fn side_end(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, first: bool) 
     };
     let bound = ev.enum_(bound_id).to_string();
     if bound == "BLIND" {
-        return Ok(Side::Angle(if first {
-            ev.angle("angle")?
-        } else {
-            let back = ev.angle("angleBack")?;
-            if ev.bool("startOppositeDirection") { -back } else { back }
-        }));
+        // std revolve.fs: a blind second end position is a start angle in
+        // the revolve's own sense (the sweep runs from it to the end); its
+        // flip only applies to the up-to types (live oracle_p1 R4/R4b).
+        return Ok(Side::Angle(if first { ev.angle("angle")? } else { ev.angle("angleBack")?.rem_euclid(TAU) }));
     }
     // Positive offsets stop short of the bounding entity.
     let off = if ev.bool(has_off) {
@@ -304,12 +302,29 @@ fn partial(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3) -> FResult<Nam
             let res = k::revolve(&p.shape, origin, axis, a)?;
             Ok(NamedShape::new(res.shape.clone(), sweep_names(ev, p, &res, true, true)))
         }
-        // Two blind angles: one revolve (the second side's angle is measured backwards).
-        (Side::Angle(a), Some(Side::Angle(back))) if ev.is("startBound", "BLIND") => {
-            let res = k::revolve_between(&p.shape, origin, axis, -back, a)?;
+        // Two blind angles: one revolve from the start angle to the end
+        // (start 45°, end 90°: 45° to 90°; start 330°, end 30°: −30° to 30°).
+        (Side::Angle(a), Some(Side::Angle(_))) if ev.is("startBound", "BLIND") => {
+            let start = ev.angle("angleBack")?.rem_euclid(TAU);
+            let res = k::revolve_between(&p.shape, origin, axis, if start < a { start } else { start - TAU }, a)?;
             Ok(NamedShape::new(res.shape.clone(), sweep_names(ev, p, &res, true, true)))
         }
         (first, None) => revolve_side(ev, p, origin, axis, first, true),
+        // Up to an entity from a blind start angle: the profile turned to
+        // the start first.
+        (first, Some(Side::Angle(start))) if ev.is("startBound", "BLIND") => {
+            if start.abs() < 1e-12 {
+                return revolve_side(ev, p, origin, axis, first, true);
+            }
+            let turned = Profile {
+                shape: p.shape.transformed(&k::Transform::Rotate { origin, axis, angle: start })?,
+                frame: p.frame,
+                edge_sources: p.edge_sources.clone(),
+                key: p.key.clone(),
+                from_face: p.from_face,
+            };
+            revolve_side(ev, &turned, origin, axis, first, true)
+        }
         (first, Some(second)) => {
             let a = revolve_side(ev, p, origin, axis, first, true)?;
             let b = revolve_side(ev, p, origin, -axis, second, false)?;

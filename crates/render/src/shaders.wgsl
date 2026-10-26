@@ -80,15 +80,17 @@ fn state_of(id: u32) -> u32 {
     return states[id];
 }
 
-// Geometry lying on a section plane counts as cut (live part-studio/74: a
-// face picked as the section plane shows the hatched cap): 0.1 µm.
+// Geometry lying on a section plane is kept (live ui-cap/04, 10-25: the
+// plane on a block's top face leaves the face as it is, no cap; skb-sv
+// bottom-edge-released: the plane through the bottom face keeps it and caps
+// it hatched; an edge in the plane stays and lights up): 0.1 µm.
 const CLIP_EPS: f32 = 1e-7;
 
 fn clipped(world: vec3<f32>) -> bool {
     if (g.flags.x == 0u || (inst.params.y & 1u) != 0u) { return false; }
-    var c = dot(world, g.clip.xyz) > g.clip.w - CLIP_EPS;
-    if (g.flags.x > 1u) { c = c && dot(world, g.clip2.xyz) > g.clip2.w - CLIP_EPS; }
-    if (g.flags.x > 2u) { c = c && dot(world, g.clip3.xyz) > g.clip3.w - CLIP_EPS; }
+    var c = dot(world, g.clip.xyz) > g.clip.w + CLIP_EPS;
+    if (g.flags.x > 1u) { c = c && dot(world, g.clip2.xyz) > g.clip2.w + CLIP_EPS; }
+    if (g.flags.x > 2u) { c = c && dot(world, g.clip3.xyz) > g.clip3.w + CLIP_EPS; }
     return c;
 }
 
@@ -328,7 +330,7 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
     // Per-primitive instances color each vertex (analysis maps, face
     // appearances); vertices with alpha 0 keep the instance color.
     var own = inst.color.rgb;
-    if (inst.params.x != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
+    if ((inst.params.x & 1u) != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
     own = compare_tint(i, front, own);
     // params.y bit 1: unlit (construction planes keep their flat color and
     // tint on hover). Shaded faces don't change on hover: the app outlines
@@ -487,9 +489,11 @@ fn fs_section_mask(i: MeshOut, @builtin(front_facing) front: bool) -> @location(
     load_inst(i.slot);
     if ((inst.params.y & 3u) != 0u || (state_of(i.pick) & HIDDEN) != 0u || clipped(i.world)) { discard; }
     var own = linear_to_srgb(inst.color.rgb);
-    if (inst.params.x != 0u && i.color.a > 0.0) { own = i.color.rgb; }
-    // The part's id nudges its color, so equal colors hatch differently.
-    let id = f32(inst.params.w);
+    if ((inst.params.x & 1u) != 0u && i.color.a > 0.0) { own = i.color.rgb; }
+    // The part's id nudges its color, so equal colors hatch differently
+    // (Onshape: occurrence id + mesh group hash; `Instance::hatch_id`).
+    let hid = inst.params.x >> 8u;
+    let id = select(f32(inst.params.w), f32(hid), hid != 0u);
     let offset = vec3(id % 31.0, id % 71.0, id % 97.0) * 0.001;
     let c = vec4(own + offset, inst.color.a + PART_COUNT_ORDER);
     return select(-c, c, front);
@@ -732,7 +736,15 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
 
     var c = select(ca, cb, t > 0.5);
     let ext = select(-1.0, 1.0, t > 0.5);
-    let off_px = nrm * side * half + d * ext * half * 0.5;
+    var off_px = nrm * side * half;
+    if (len > 1e-3) {
+        // The ends extend along the segment itself, depth included: a wider
+        // line's depth then matches a narrower one's at the same pixel (a lit
+        // plane border over the plane's own was behind it on far edges).
+        c = mix(ca, cb, t + ext * half * 0.5 / len);
+    } else {
+        off_px += d * ext * half * 0.5;
+    }
     c = vec4(c.xy + off_px / half_vp * c.w, c.z, c.w);
 
     if ((l.style & 2u) != 0u) {
@@ -740,6 +752,9 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     } else {
         // At the edge's own depth, offset like Onshape's (27 - 15 units).
         c = in_front_of_faces(c, 12.0);
+        // Style bit 5 (lifted): a little nearer still (1e-5 of the depth;
+        // the units are 0 with nothing but planes shown).
+        if ((l.style & 32u) != 0u) { c.z = c.z * (1.0 + 1e-5); }
     }
 
     var o: LineOut;
@@ -747,7 +762,7 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     o.pos = c;
     var base: vec3<f32>;
     var alpha: f32;
-    if (inst.params.x != 0u) { base = srgb_to_linear(l.color.rgb); alpha = l.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
+    if ((inst.params.x & 1u) != 0u) { base = srgb_to_linear(l.color.rgb); alpha = l.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
     if ((st & DIM) != 0u) { alpha = alpha * 0.3; }
     // A selected part's edges let its amber through (live ins-902: the
     // top/front edge peaks at 0.73 of the faces, ours at 0.53 when opaque).
@@ -827,7 +842,9 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     let pick = global_pick(p.pick);
     let st = state_of(pick);
     var size = p.size + g.viewport.w;
-    if ((st & (HOVER | SELECTED)) != 0u) { size = size * 1.5 + 1.0; }
+    // Live (behaviours "icons2 plane/origin highlight"): the hovered or
+    // selected origin (style 4) is a 13 px filled disc; other points grow.
+    if ((st & (HOVER | SELECTED)) != 0u) { size = select(size * 1.5 + 1.0, size + 2.0, (p.style & 4u) != 0u); }
     let half = size * g.viewport.z * 0.5;
     c = vec4(c.xy + uv * (half + 0.75) / (g.viewport.xy * 0.5) * c.w, c.z, c.w);
     // Onshape's offsets: points 9 units, faces 27.
@@ -837,7 +854,7 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     o.pos = c;
     var base: vec3<f32>;
     var alpha: f32;
-    if (inst.params.x != 0u) { base = srgb_to_linear(p.color.rgb); alpha = p.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
+    if ((inst.params.x & 1u) != 0u) { base = srgb_to_linear(p.color.rgb); alpha = p.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
     o.color = vec4(highlight_stroke(base, st), alpha);
     o.pick = pick;
     o.uv = uv;
@@ -866,7 +883,7 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
     var rgb = i.color.rgb;
     // Style bit 4: a ring with a center dot (the origin: live 11 px, the
     // ring's inside at 0.65 of the radius, the dot 0.32).
-    if ((i.style & 4u) != 0u) {
+    if ((i.style & 4u) != 0u && (state_of(i.pick) & (HOVER | SELECTED)) == 0u) {
         let ring = clamp(d - 0.65 * i.rpx + 0.5, 0.0, 1.0);
         let dot = clamp(0.32 * i.rpx - d + 0.5, 0.0, 1.0);
         cov = cov * max(ring, dot);

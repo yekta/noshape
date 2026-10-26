@@ -31,8 +31,8 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "schema",
             summary: "The parameters of a feature type (JSON schema, defaults, options, units)",
-            description: "The same parameters, defaults, options and visibility rules as the feature's dialog. Parameters shown only for some values of others are ignored while hidden; each says whether the dialog shows it with the defaults and which other parameter's values show or hide it (e.g. hole `holeDepthV3`: \"shown with the defaults; hidden, and ignored, when endStyleV2 is UP_TO_NEXT or UP_TO_ENTITY or THROUGH\"). `feature_get` lists a feature's currently `visible` parameters.",
-            fields: vec![doc_field(), req("type", s(), "Feature type id, e.g. \"extrude\".")],
+            description: "The same parameters, defaults, options and visibility rules as the feature's dialog. Parameters shown only for some values of others are ignored while hidden; each says whether the dialog shows it with the defaults and which other parameter's values show or hide it (e.g. hole `holeDepthV3`: \"shown with the defaults; hidden, and ignored, when endStyleV2 is UP_TO_NEXT or UP_TO_ENTITY or THROUGH\"). `feature_get` lists a feature's currently `visible` parameters. By default only the parameters the dialog shows with the defaults are described; `more_when_shown` names the others (`all` describes every one).",
+            fields: vec![doc_field(), req("type", s(), "Feature type id, e.g. \"extrude\"."), opt("all", json!({ "type": "boolean", "default": false }), "Describe every parameter, also those the dialog shows only for other values.")],
             mutates: false,
             destructive: false,
             run: schema,
@@ -41,7 +41,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "add",
             summary: "Add a feature to a Part Studio (what accepting its dialog does)",
-            description: "Creates the feature with the dialog's defaults, applies `params`, makes the dialog's own choices for the fields not given (Extrude / Revolve / Sweep / Loft: Add into the one part the new body touches, with that part as merge scope, else New; a Remove Extrude on a part points into it; Thicken from the faces' parts; Hole: merge scope = the parts it reaches, flipped when more lie behind; a tapped hole's linked depths), inserts it at the rollback bar (or `index`) and regenerates. As in Onshape, a feature that fails is still added and shown with its error: check `feature_status` and `failed` in the reply. Sketches are made with `sketch_create`.",
+            description: "Creates the feature with the dialog's defaults, applies `params`, makes the dialog's own choices for the fields not given (Extrude / Revolve / Sweep / Loft: Add into the one part the new body touches, with that part as merge scope, else New; a Remove Extrude on a part points into it; Thicken from the faces' parts; Hole: merge scope = the parts it reaches, flipped when more lie behind; a tapped hole's linked depths), inserts it at the rollback bar (or `index`) and regenerates. A selection may be given as a query instead of ids: `{\"query\": {query_entities arguments}}` (e.g. `\"entities\": {\"query\": {\"kind\": \"edges\", \"direction\": [0, 0, 1]}}`), alone or among ids in a list. A pattern's `entities` that are all features (`feature:…`) or faces make it a Feature or Face pattern. As in Onshape, a feature that fails is still added and shown with its error: check `feature_status` and `failed` in the reply. Sketches are made with `sketch_create`.",
             fields: vec![
                 doc_field(),
                 tab_field(),
@@ -345,15 +345,27 @@ fn feature_type(ctx: &mut Ctx, a: &Args, id: &str) -> Result<&'static features::
 fn schema(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let ty = feature_type(ctx, a, a.str("type")?)?;
     let units = ctx.doc(a.opt_str("doc")?).map(|od| od.doc().settings.units).unwrap_or_default();
-    Ok(json!({
+    let defaults = noshape_model::partstudio::PartStudio::new().new_feature(ty.id, &units).map(|f| f.params);
+    let mut params = values::feature_schema(&ty.params, &units, defaults.as_ref());
+    let mut out = json!({
         "type": ty.id,
         "name": ty.name,
         "category": category_name(ty.category),
         "description": ty.description,
-        "params": values::feature_schema(&ty.params, &units, noshape_model::partstudio::PartStudio::new().new_feature(ty.id, &units).map(|f| f.params).as_ref()),
         "order": ty.params.iter().filter(|p| !matches!(p.kind, ParamKind::Sketch)).map(|p| p.id).collect::<Vec<_>>(),
-    })
-    .into())
+    });
+    // By default the parameters the dialog shows with the defaults; the others by id.
+    if !a.bool_or("all", false)?
+        && let Some(defaults) = &defaults
+        && let Some(props) = params.get_mut("properties").and_then(Value::as_object_mut)
+    {
+        let shown = values::visible_ids(&ty.params, defaults);
+        let more: Vec<String> = props.keys().filter(|k| !shown.iter().any(|s| s == *k)).cloned().collect();
+        props.retain(|k, _| shown.iter().any(|s| s == k));
+        out["more_when_shown"] = json!(more);
+    }
+    out["params"] = params;
+    Ok(out.into())
 }
 
 fn feature_json(f: &noshape_model::Feature) -> Value {
@@ -379,17 +391,88 @@ fn this_feature_status(report: &Value, id: &str) -> Value {
     report["features"].as_array().and_then(|fs| fs.iter().find(|f| f["id"] == id)).cloned().unwrap_or(Value::Null)
 }
 
+/// Selections given as `{"query": {query_entities arguments}}` (alone, or
+/// among ids in a list) become the ids it finds on the Part Studio as it
+/// stands: no copying ids out of query_entities.
+fn resolve_queries(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Map<String, Value>>, OpError> {
+    fn is_query(v: &Value) -> bool {
+        v.as_object().is_some_and(|o| o.len() == 1 && o.contains_key("query"))
+    }
+    fn walk(ctx: &mut Ctx, a: &Args, v: &Value) -> Result<Value, OpError> {
+        match v {
+            _ if is_query(v) => run(ctx, a, &v["query"]).map(Value::Array),
+            Value::Array(items) => {
+                let mut out = Vec::new();
+                for (i, it) in items.iter().enumerate() {
+                    match walk(ctx, a, it).map_err(|e| e.under(&format!("[{i}]")))? {
+                        Value::Array(found) if is_query(it) => out.extend(found),
+                        x => out.push(x),
+                    }
+                }
+                Ok(Value::Array(out))
+            }
+            // An array parameter's rows.
+            Value::Object(o) => o.iter().map(|(k, x)| walk(ctx, a, x).map(|y| (k.clone(), y)).map_err(|e| e.under(k))).collect::<Result<serde_json::Map<_, _>, _>>().map(Value::Object),
+            _ => Ok(v.clone()),
+        }
+    }
+    fn run(ctx: &mut Ctx, a: &Args, q: &Value) -> Result<Vec<Value>, OpError> {
+        let mut args = q.as_object().cloned().ok_or_else(|| OpError::param("query", "query_entities arguments: {\"kind\": \"edges\", \"direction\": [0, 0, 1], ...}"))?;
+        for k in ["doc", "tab"] {
+            if let Some(v) = a.get(k) {
+                args.entry(k).or_insert(v.clone());
+            }
+        }
+        let kind = args.get("kind").and_then(Value::as_str).unwrap_or("").to_string();
+        let op = crate::registry::by_tool_name("query_entities").expect("query_entities");
+        let value = Value::Object(args);
+        let found = super::query::entities(ctx, &Args { op, value: &value }).map_err(|e| e.under("query"))?;
+        let ids: Vec<Value> = found.value[kind.as_str()].as_array().map(|l| l.iter().map(|x| x["id"].clone()).collect()).unwrap_or_default();
+        if ids.is_empty() {
+            return Err(OpError::invalid("the query matched nothing (try it with query_entities)").with_param("query"));
+        }
+        Ok(ids)
+    }
+    let Some(params) = a.object("params")? else { return Ok(None) };
+    let params = params.clone();
+    params.iter().map(|(k, v)| walk(ctx, a, v).map(|x| (k.clone(), x)).map_err(|e| e.under(&format!("params.{k}")))).collect::<Result<_, _>>().map(Some)
+}
+
+/// A pattern's `entities` that are all features (`feature:…`) or all faces
+/// make it a Feature or Face pattern, as picking them in the dialog's
+/// Pattern type does (unless `patternType` is given).
+fn pattern_kind(ty: &noshape_model::features::FeatureType, mut params: serde_json::Map<String, Value>) -> serde_json::Map<String, Value> {
+    let has = |id: &str| ty.params.iter().any(|p| p.id == id);
+    if !has("patternType") || !has("instanceFunction") || params.contains_key("patternType") {
+        return params;
+    }
+    let Some(list) = params.get("entities").and_then(Value::as_array).cloned() else { return params };
+    let all = |prefix: &str| !list.is_empty() && list.iter().all(|x| x.as_str().is_some_and(|s| s.starts_with(prefix)));
+    let (kind, field) = if all("feature:") {
+        ("FEATURE", "instanceFunction")
+    } else if all("face:") {
+        ("FACE", "faces")
+    } else {
+        return params;
+    };
+    params.remove("entities");
+    params.insert("patternType".into(), json!(kind));
+    params.insert(field.into(), Value::Array(list));
+    params
+}
+
 fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let type_id = a.str("type")?.to_string();
     if type_id == "sketch" {
         return Err(OpError::param("type", "make sketches with sketch_create, then draw with the sketch tools"));
     }
     let ty = feature_type(ctx, a, &type_id)?;
+    let params = resolve_queries(ctx, a)?.unwrap_or_default();
+    let params = pattern_kind(ty, params);
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let ps = doc::studio(od.doc(), tab)?;
     let mut feature = ps.new_feature(ty.id, &units).ok_or_else(|| OpError::param("type", "unknown feature type"))?;
-    let params = a.object("params")?.cloned().unwrap_or_default();
     values::apply(&ty.params, &mut feature.params, &params, &units, od.doc()).map_err(|e| e.under("params"))?;
     // Plane: the type follows the selection when none is given (cPlaneLogic).
     if ty.id == "cPlane" && !params.contains_key("cplaneType") && !feature.params.query("entities").is_empty() {
@@ -408,12 +491,13 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     dialog_logic(od, tab, &mut feature, index, &params)?;
     let (id, name) = (feature.id, feature.name.clone());
     edit_studio(od, tab, &studio::insert_description(&name), |ps| Ok(studio::insert_feature(ps, feature, index)))?;
-    let report = regen_report(od, tab)?;
+    let report = super::regen_report_with(od, tab, &[id])?;
     let st = this_feature_status(&report, &id.to_string());
     Ok(json!({ "feature": id.to_string(), "name": name, "feature_status": st, "regeneration": report }).into())
 }
 
 fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let resolved = resolve_queries(ctx, a)?;
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let ps = doc::studio(od.doc(), tab)?;
@@ -425,7 +509,7 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut feature = ps.configuration.for_editing(&ps.features[index], &config);
     load_custom_types(od, &feature.type_id);
     let ty = feature.feature_type().ok_or_else(|| OpError::invalid(format!("feature type `{}` is not available", feature.type_id)))?;
-    if let Some(params) = a.object("params")? {
+    if let Some(params) = resolved.as_ref() {
         if feature.type_id == "sketch" && params.contains_key("sketch") {
             return Err(OpError::param("params.sketch", "edit sketch geometry with the sketch tools"));
         }
@@ -440,7 +524,7 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         studio::edit_feature(ps, index, feature, &config);
         Ok(())
     })?;
-    let report = regen_report(od, tab)?;
+    let report = super::regen_report_with(od, tab, &[id])?;
     let st = this_feature_status(&report, &id.to_string());
     Ok(json!({ "feature": id.to_string(), "name": name, "feature_status": st, "regeneration": report }).into())
 }
@@ -451,7 +535,7 @@ fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = feature_arg(ps, a, "feature")?;
     let type_id = ps.feature(id).expect("found").type_id.clone();
     load_custom_types(od, &type_id);
-    let report = regen_report(od, tab)?;
+    let report = super::regen_report_with(od, tab, &[id])?;
     let ps = doc::studio(od.doc(), tab)?;
     let f = ps.feature(id).expect("found");
     let mut v = feature_json(f);
@@ -475,7 +559,7 @@ fn load_custom_types(od: &crate::OpenDoc, type_id: &str) {
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
-    let mut r = regen_report(od, tab)?;
+    let mut r = super::regen_report_all(od, tab)?;
     let ps = doc::studio(od.doc(), tab)?;
     r["tab"] = json!({ "id": tab.to_string(), "name": od.doc().tab(tab).map(|t| t.name.clone()) });
     r["folders"] = json!(ps.folders.iter().map(|f| json!({ "id": f.id, "name": f.name, "parent": f.parent, "features": ps.features.iter().filter(|x| x.folder == Some(f.id)).map(|x| x.id.to_string()).collect::<Vec<_>>() })).collect::<Vec<_>>());

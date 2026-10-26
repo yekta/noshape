@@ -515,11 +515,12 @@ fn transform_connector(c: &Connector, t: &k::Transform) -> (DVec3, DVec3, DVec3)
 }
 
 /// Copy bodies (and connectors) for each instance; returns the copies.
-/// `copy`: duplicate the geometry, for instances that go into a boolean
-/// (moved instances share their edges, and a boolean piles one curve record
-/// per instance onto each shared edge: quadratic, 19 s of unify for ×1000);
-/// else moved (shared geometry and mesh) for instances that stay parts.
-fn copy_bodies(ev: &EvalCtx, bodies: &[usize], instances: &[Instance], copy: bool) -> FResult<Vec<(usize, usize, BodyKind, NamedShape)>> {
+/// Each copy is the body moved (located, sharing its geometry and mesh;
+/// a mirror shares one mirrored copy), also for instances that go into a
+/// boolean: OCCT intersects congruent pairs of instances once (patch 0001),
+/// and the fins ×1000 regenerate faster than with deep copies (9.3 s against
+/// 10.5 for the pattern, same 4004 faces).
+fn copy_bodies(ev: &EvalCtx, bodies: &[usize], instances: &[Instance]) -> FResult<Vec<(usize, usize, BodyKind, NamedShape)>> {
     let mut out = Vec::new();
     for (ii, inst) in instances.iter().enumerate() {
         if ev.cancelled() {
@@ -527,7 +528,7 @@ fn copy_bodies(ev: &EvalCtx, bodies: &[usize], instances: &[Instance], copy: boo
         }
         for (bj, &bi) in bodies.iter().enumerate() {
             let b = &ev.ctx.bodies[bi];
-            let res = k::transform(&b.shape, &inst.t, copy).map_err(kerr("Pattern failed"))?;
+            let res = k::transform(&b.shape, &inst.t, false).map_err(kerr("Pattern failed"))?;
             let names = copy_names(ev, &b.faces, &res, inst.code);
             out.push((ii, bj, b.kind, NamedShape::new(res.shape, names)));
         }
@@ -557,7 +558,7 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
         return Ok(());
     }
     let op = ev.enum_("operationType").to_string();
-    let copies = copy_bodies(ev, &bodies, instances, op != "NEW")?;
+    let copies = copy_bodies(ev, &bodies, instances)?;
     pattern_connectors(ev, refs, instances);
     if op == "NEW" || copies.iter().all(|c| c.2 != BodyKind::Solid) {
         let nb = bodies.len().max(1);
@@ -664,8 +665,8 @@ fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances:
         if ev.cancelled() {
             return err("Cancelled");
         }
-        // Copied, not moved: these go into a boolean (see copy_bodies).
-        let res = k::transform(&tool.shape, &inst.t, true).map_err(kerr("Pattern failed"))?;
+        // Moved, not copied (see copy_bodies).
+        let res = k::transform(&tool.shape, &inst.t, false).map_err(kerr("Pattern failed"))?;
         let names = copy_names(ev, &tool.names, &res, inst.code);
         tools.push(NamedShape::new(res.shape, names));
     }
@@ -793,7 +794,7 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
         let created: Vec<usize> = (0..ev.ctx.bodies.len()).filter(|i| ev.ctx.bodies[*i].id.feature == f).collect();
         if !created.is_empty() {
             found = true;
-            let copies = copy_bodies(ev, &created, instances, false)?;
+            let copies = copy_bodies(ev, &created, instances)?;
             let nb = created.len();
             for (ii, bj, kind, ns) in copies {
                 let index = (f.0 as u32 & 0xFFF).wrapping_mul(1 << 20).wrapping_add((ii * nb + bj) as u32);
@@ -872,7 +873,8 @@ fn failed_instances(ev: &EvalCtx, f: FeatureId, body: &Body, fs: &[usize], insta
         None => ghost.extend(fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok())),
     }
     let seed = Shape::compound(&ghost);
-    instances.iter().filter_map(|inst| k::transform(&seed, &inst.t, true).ok().map(|r| r.shape)).collect()
+    // Moved, not copied: the ghosts share the seed's geometry and mesh.
+    instances.iter().filter_map(|inst| k::transform(&seed, &inst.t, false).ok().map(|r| r.shape)).collect()
 }
 
 /// The body's faces (not the feature's own `fs`) that carry on a face of the
@@ -1075,7 +1077,8 @@ fn copies_fail(ev: &EvalCtx, f: FeatureId, targets: &[usize], instances: &[Insta
     let add = matches!(ev.features.iter().find(|x| x.id == f).and_then(|x| x.params.get("operationType")), Some(crate::params::ParamValue::Enum(o)) if o == "ADD");
     let mirror = verb(ev) == "mirror";
     let mut tools = vec![tool.clone()];
-    tools.extend(instances.iter().filter_map(|inst| k::transform(&tool, &inst.t, true).ok().map(|r| r.shape)));
+    // Moved, not copied: only their boxes are compared.
+    tools.extend(instances.iter().filter_map(|inst| k::transform(&tool, &inst.t, false).ok().map(|r| r.shape)));
     let size = tool.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0);
     let boxes: Vec<Option<k::BoundingBox>> = tools.iter().map(|t| t.bounding_box(false).ok()).collect();
     for i in 0..tools.len() {
@@ -1673,7 +1676,7 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
     let t = t.unwrap_or(k::Transform::Translate(DVec3::ZERO));
     let inst = [Instance { code: 1, t }];
     if copy {
-        let copies = copy_bodies(ev, &bodies, &inst, true)?;
+        let copies = copy_bodies(ev, &bodies, &inst)?;
         pattern_connectors(ev, refs, &inst);
         // Live ("qa5 booleans", Copy here…): a copy keeps its source's
         // colour (a Part pattern's copies take the next colours instead).
@@ -1696,7 +1699,8 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
     // Move in place: bodies keep their ids, names and face names.
     for bi in bodies {
         let b = ev.ctx.bodies[bi].clone();
-        let res = k::transform(&b.shape, &t, true).map_err(kerr("Transform failed"))?;
+        // Moved, not copied: the body keeps its geometry at a new location.
+        let res = k::transform(&b.shape, &t, false).map_err(kerr("Transform failed"))?;
         let mut faces: Vec<Option<Name>> = vec![None; res.shape.count(ShapeType::Face)];
         for r in &res.history.records {
             if r.arg == 0 && r.input_kind == ShapeType::Face && r.output_kind == ShapeType::Face
@@ -1726,7 +1730,7 @@ pub fn copy_part(ev: &mut EvalCtx) -> FResult<()> {
         return err("Select parts to copy");
     }
     let inst = [Instance { code: 1, t: k::Transform::Translate(DVec3::ZERO) }];
-    for (_, bj, kind, ns) in copy_bodies(ev, &bodies, &inst, true)? {
+    for (_, bj, kind, ns) in copy_bodies(ev, &bodies, &inst)? {
         push_body(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces);
     }
     Ok(())

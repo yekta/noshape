@@ -700,6 +700,10 @@ impl PartStudioView {
     fn apply_display(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) {
         let _t = noshape_render::perf::scope("ps.apply_display");
         let geometry_changed = !Arc::ptr_eq(&self.display, &display);
+        // A shown center of mass follows its part (gone with it).
+        if geometry_changed && let Some((b, _)) = self.ui.com.take() {
+            self.toggle_center_of_mass(&b, cx);
+        }
         // A different set of parts (a derived studio's parts arriving after
         // its source regenerated, qa5 TAB1): redraw the whole window once.
         // The cached workspace kept painting the old parts list and strip
@@ -2016,6 +2020,18 @@ impl PartStudioView {
             let fwd = noshape_scene::camera_ops::normal_forward(cur, f.normal);
             self.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, f.y, cx));
         }
+    }
+
+    /// "View normal to section plane" (live ui-com/03: the face menu while
+    /// a section view is on): normal to the first section plane.
+    pub(super) fn view_normal_to_section(&mut self, cx: &mut Context<Self>) {
+        let Some(pl) = self.ui.section.first() else { return };
+        let n = if pl.flipped { -pl.normal } else { pl.normal };
+        let up = n.any_orthonormal_vector();
+        self.push_camera_history(cx);
+        let cur = self.viewport.read(cx).camera.forward();
+        let fwd = noshape_scene::camera_ops::normal_forward(cur, n);
+        self.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, up, cx));
     }
 
     // ------------------------------------------------------------ render pieces
@@ -4842,6 +4858,7 @@ impl PartStudioView {
         // (NOSHAPE_GPUI_LABELS: as GPUI elements, for comparing).
         // The offset box takes a typed value (its click target / field).
         overlay.extend(self.section_value_field(cx));
+        overlay.extend(self.render_center_of_mass(cx));
         if crate::overlay_labels::gpui_labels() {
             overlay.extend(self.render_section_value(cx).filter(|_| self.ui.section_offset_edit.is_none()));
         } else {
@@ -5307,7 +5324,7 @@ impl PartStudioView {
         let d = &self.display;
         let sum = |f: fn(&noshape_model::display::BodyDisplay) -> usize| d.bodies.iter().map(f).sum::<usize>();
         let sketch: usize = d.sketches.iter().map(|s| s.curves.len() + s.points.len()).sum();
-        let primitives = [("Faces", sum(|b| b.face_refs.len())), ("Edges", sum(|b| b.edge_refs.len())), ("Vertices", sum(|b| b.vertex_refs.len())), ("Sketch entities", sketch), ("Planes", d.planes.len())];
+        let primitives = [("Faces", sum(|b| b.face_refs.len())), ("Edges", sum(|b| b.mesh.edges.iter().filter(|p| !p.is_empty()).count())), ("Vertices", sum(|b| b.vertex_refs.len())), ("Sketch entities", sketch), ("Planes", d.planes.len())];
         crate::doc_panels::TabPerf { regen_ms: d.regen_ms, features, primitives: primitives.into_iter().map(|(k, n)| (k.to_string(), n)).collect() }
     }
 

@@ -5,7 +5,7 @@ use noshape_kernel as k;
 use noshape_units::Dim;
 
 /// Onshape's note for a Boolean that changes nothing (live qa5 BOOL1).
-const NO_GEOMETRY_CHANGE: &str = "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.";
+use crate::regen::eval::NO_GEOMETRY_CHANGE;
 
 pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
     let tools_idx = ev.resolve_bodies(ev.query("tools"));
@@ -81,7 +81,12 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                 return Ok(());
             }
             let bop = if op == "SUBTRACTION" { k::BooleanOp::Cut } else { k::BooleanOp::Common };
+            let before: Vec<(crate::reference::BodyId, f64)> = targets.iter().map(|&i| (ev.ctx.bodies[i].id.clone(), ev.ctx.bodies[i].shape.volume().unwrap_or(0.0))).collect();
             ev.boolean_into(&targets, tools, bop)?;
+            // A subtraction that leaves every target as it was (live oracle_p1 B5).
+            if op == "SUBTRACTION" && before.iter().all(|(id, v)| ev.ctx.bodies.iter().find(|b| &b.id == id).and_then(|b| b.shape.volume().ok()).is_some_and(|after| (after - v).abs() <= 1e-9 * v.abs().max(1e-12))) {
+                ev.infos.push(crate::regen::eval::TOOLS_MISS_TARGETS.into());
+            }
             if !ev.bool("keepTools") {
                 ev.ctx.bodies.retain(|b| !tool_ids.contains(&b.id));
             }

@@ -31,55 +31,13 @@ actions!(sketch_entry, [SketchEntryNext, SketchEntryPrev, SketchEntryCancel]);
 
 static BIND_ENTRY_KEYS: std::sync::Once = std::sync::Once::new();
 
-/// Onshape's sketch toolbar groups (the button shows the group's last used tool).
-const DRAW_TOOLS: &[&[Tool]] = &[
-    &[Tool::Line, Tool::MidpointLine],
-    &[Tool::CornerRect, Tool::CenterRect, Tool::AlignedRect],
-    &[Tool::Circle, Tool::ThreePointCircle, Tool::Ellipse],
-    &[Tool::Arc3, Tool::TangentArc, Tool::CenterArc, Tool::EllipticalArc, Tool::Conic],
-    &[Tool::Polygon, Tool::CircumPolygon],
-    &[Tool::Spline, Tool::Bezier, Tool::SplinePoint],
-    &[Tool::Point],
-    &[Tool::Text],
-];
-
-const USE_TOOLS: &[&[Tool]] = &[&[Tool::Use, Tool::Intersection]];
+// The sketch toolbar's groups and their order (shared with the agent API's
+// ui_search_tools).
+use noshape_ops::tool_search::{SKETCH_CONSTRAINT_TOOLS as CONSTRAINT_TOOLS, SKETCH_DRAW_TOOLS as DRAW_TOOLS, SKETCH_EDIT_TOOLS as EDIT_TOOLS, SKETCH_INSERT_TOOLS as INSERT_TOOLS, SKETCH_USE_TOOLS as USE_TOOLS};
+pub(super) use noshape_ops::tool_search::all_sketch_tools;
 
 /// Live Onshape's default two-row S toolbar, in reading order.
 pub(super) const SKETCH_SHORTCUT_TOOLS: [Tool; 10] = [Tool::Line, Tool::CornerRect, Tool::CenterRect, Tool::Circle, Tool::Arc3, Tool::Spline, Tool::Point, Tool::Use, Tool::Trim, Tool::Dimension];
-
-const EDIT_TOOLS: &[&[Tool]] = &[
-    &[Tool::Fillet, Tool::Chamfer],
-    &[Tool::Trim, Tool::Extend, Tool::Split],
-    &[Tool::Offset, Tool::Slot],
-    &[Tool::Mirror],
-    &[Tool::LinearPattern, Tool::CircularPattern, Tool::Transform],
-];
-
-/// Every sketch toolbar tool, in toolbar order (tool search).
-pub(super) fn all_sketch_tools() -> impl Iterator<Item = Tool> {
-    let groups = DRAW_TOOLS.iter().chain(USE_TOOLS).chain(EDIT_TOOLS).chain(INSERT_TOOLS);
-    groups.flat_map(|g| g.iter().copied()).chain(std::iter::once(Tool::Dimension)).chain(CONSTRAINT_TOOLS.iter().map(|c| Tool::Constraint(*c)))
-}
-
-const INSERT_TOOLS: &[&[Tool]] = &[&[Tool::InsertDxf, Tool::InsertImage]];
-
-const CONSTRAINT_TOOLS: &[ConstraintTool] = &[
-    ConstraintTool::Coincident,
-    ConstraintTool::Concentric,
-    ConstraintTool::Parallel,
-    ConstraintTool::Tangent,
-    ConstraintTool::Horizontal,
-    ConstraintTool::Vertical,
-    ConstraintTool::Perpendicular,
-    ConstraintTool::Equal,
-    ConstraintTool::Midpoint,
-    ConstraintTool::Normal,
-    ConstraintTool::Pierce,
-    ConstraintTool::Symmetric,
-    ConstraintTool::Fix,
-    ConstraintTool::Curvature,
-];
 
 thread_local! {
     /// Last tool used from each toolbar group (keyed by the group's first tool).

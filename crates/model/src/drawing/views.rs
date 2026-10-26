@@ -836,7 +836,8 @@ pub struct ModelEdge {
     pub geom: EdgeGeom,
     /// Endpoint references (start, end) with their projected positions.
     pub ends: [Option<(PointRef, [f64; 2])>; 2],
-    /// Seam of a periodic face (both sides on the same face).
+    /// Not an edge in Onshape's topology: the seam of a periodic face or a
+    /// degenerated edge ([`noshape_kernel::Shape::shown_topology`]).
     pub seam: bool,
 }
 
@@ -1866,6 +1867,9 @@ struct BodyTopo {
     ev: Vec<Vec<usize>>,
     /// Edge -> face indices.
     ef: Vec<Vec<u32>>,
+    /// The edges and vertices Onshape's topology has (no seams, degenerated
+    /// edges or vertices on full circles).
+    shown: noshape_kernel::ShownTopology,
 }
 
 impl BodyTopo {
@@ -1881,7 +1885,7 @@ impl BodyTopo {
                 }
             }
         }
-        BodyTopo { ev, ef: shape.edge_faces().unwrap_or_default() }
+        BodyTopo { ev, ef: shape.edge_faces().unwrap_or_default(), shown: shape.shown_topology().unwrap_or_default() }
     }
 }
 
@@ -1914,6 +1918,9 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &Bod
     let mut ends: [Option<(PointRef, [f64; 2])>; 2] = [None, None];
     if let Some(vs) = topo.ev.get(edge_index) {
         for &vi in vs {
+            if !topo.shown.vertices.get(vi).copied().unwrap_or(true) {
+                continue;
+            }
             let Ok(p) = body.shape.sub_shape(ShapeType::Vertex, vi).and_then(|v| v.vertex_point()) else { continue };
             let r = PointRef::Vertex { body: body.id.clone(), name: (*body.vertices[vi]).clone() };
             let slot = if p.distance(info.start) <= p.distance(info.end) { 0 } else { 1 };
@@ -1924,7 +1931,8 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &Bod
             }
         }
     }
-    let seam = topo.ef.get(edge_index).is_some_and(|f| f.len() == 1 || (f.len() == 2 && f[0] == f[1]));
+    // Not an edge in Onshape (a seam or degenerated edge; a sheet's boundary is one).
+    let seam = !topo.shown.edges.get(edge_index).copied().unwrap_or(true);
     Some(ModelEdge { body: body.id.clone(), name: body.edges[edge_index].clone(), geom, ends, seam })
 }
 

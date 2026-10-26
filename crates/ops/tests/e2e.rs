@@ -3951,6 +3951,11 @@ fn ui_search_tools_ranks_like_onshape() {
     assert_eq!(&names[..2], ["Fillet", "Fill"], "{t}");
     assert_eq!((t["tools"][0]["type"].clone(), t["tools"][0]["keys"].clone()), (json!("fillet"), json!("shift-f")), "{t}");
     assert!(call(&mut ctx, "ui_search_tools", json!({ "text": "" }))["tools"].as_array().unwrap().is_empty());
+    // In a sketch: the sketch tools only, by their plain names (live qa5-ts-sketch-*).
+    let s = call(&mut ctx, "ui_search_tools", json!({ "text": "chamfer", "sketch": true }));
+    assert_eq!(s["tools"], json!([{ "name": "Chamfer", "keys": null }]), "{s}");
+    let s = call(&mut ctx, "ui_search_tools", json!({ "text": "fillet", "sketch": true }));
+    assert_eq!(s["tools"][0], json!({ "name": "Fillet", "keys": "Shift+F" }), "{s}");
 }
 
 /// Clear missing references (feature_clear_missing): a fillet whose edges'
@@ -3968,4 +3973,53 @@ fn clear_missing_references() {
     assert_eq!(c["removed"], 1, "{c}");
     let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
     assert!(last.ends_with(":: Edit : Fillet 1"), "{last}");
+}
+
+/// Benchmark 2's fixes (P1 workflows through the API): selections as
+/// queries, a feature pattern from its features, configured queries,
+/// ops_list by a group's longer name, a short feature_schema.
+#[test]
+fn agent_benchmark_p1_fixes() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "bench_p1.noshape");
+    // The four vertical edges by a query, no ids copied.
+    let fi = call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": { "query": { "kind": "edges", "direction": [0, 0, 1], "curve": "line" } }, "radius": "3 mm" } }));
+    assert_eq!(fi["feature_status"]["status"], "Ok", "{fi}");
+    let g = call(&mut ctx, "feature_get", json!({ "feature": "Fillet 1" }));
+    let q = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [0, 0, 1], "curve": "line" }));
+    // The four corners (seams aren't entities).
+    assert_eq!(g["params"]["entities"].as_array().unwrap().len(), 4, "{g} {q}");
+    let e = try_call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": { "query": { "kind": "edges", "curve": "ellipse" } }, "radius": "1 mm" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("params.entities.query"), "{e:?}");
+    // A feature pattern from `entities` that are features.
+    let x = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "curve": "line" }))["edges"][0]["id"].clone();
+    let ex = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().find(|f| f["name"] == "Extrude 1").unwrap()["id"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "feature_add", json!({ "type": "linearPattern", "params": { "entities": [format!("feature:{ex}")], "directionOne": [x], "distance": "100 mm", "instanceCount": 2 } }));
+    assert_eq!(p["feature_status"]["status"], "Ok", "{p}");
+    let g = call(&mut ctx, "feature_get", json!({ "feature": "Linear pattern 1" }));
+    assert_eq!(g["params"]["patternType"], "FEATURE", "{g}");
+    // Configured queries: by input and option names.
+    call(&mut ctx, "config_add_input", json!({ "kind": "list", "name": "Size" }));
+    call(&mut ctx, "config_add_option", json!({ "input": "Size", "name": "Thick" }));
+    call(&mut ctx, "config_configure", json!({ "feature": "Extrude 1", "param": "depth", "input": "Size" }));
+    call(&mut ctx, "config_set_value", json!({ "feature": "Extrude 1", "param": "depth", "configuration": "Thick", "value": "40 mm" }));
+    let vol = |v: &Value| v["parts"].as_array().unwrap().iter().map(|p| num(&p["volume"])).sum::<f64>();
+    let thin = call(&mut ctx, "query_parts", json!({}));
+    let thick = call(&mut ctx, "query_parts", json!({ "configuration": { "Size": "Thick" } }));
+    assert!((vol(&thick) - 2.0 * vol(&thin)).abs() < 0.02 * vol(&thin), "twice the depth: {thin} {thick}");
+    let m = call(&mut ctx, "query_mass_properties", json!({ "configuration": { "Size": "Thick" } }));
+    assert!(m.to_string().contains("volume"), "{m}");
+    // ops_list: a group by its longer name; an unknown one names the groups.
+    let l = call(&mut ctx, "ops_list", json!({ "group": "configuration" }));
+    assert!(l["operations"].as_array().unwrap().iter().any(|o| o["tool"] == "config_add_input"), "{l}");
+    let e = try_call(&mut ctx, "ops_list", json!({ "group": "nope" })).unwrap_err();
+    assert!(e.to_json().to_string().contains("config"), "{e:?}");
+    let s = call(&mut ctx, "ops_list", json!({ "search": "pattern assembly" }));
+    assert!(s["operations"].as_array().unwrap().iter().all(|o| o["tool"].as_str().unwrap().starts_with("assembly")), "{s}");
+    // feature_schema: what the dialog shows; the rest by id.
+    let h = call(&mut ctx, "feature_schema", json!({ "type": "hole" }));
+    assert!(h["params"]["properties"].get("holeDiameterV3").is_some() && h["params"]["properties"].get("cBoreDiameterV3").is_none(), "{h}");
+    assert!(h["more_when_shown"].as_array().unwrap().contains(&json!("cBoreDiameterV3")), "{h}");
+    let all = call(&mut ctx, "feature_schema", json!({ "type": "hole", "all": true }));
+    assert!(all["params"]["properties"].get("cBoreDiameterV3").is_some());
 }
