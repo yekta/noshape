@@ -12,7 +12,7 @@ use glam::DVec3;
 use noshape_model::display::{BodyKind, SharedMesh, SketchEntityState, StudioDisplay};
 use noshape_model::reference::{FeatureId, Reference};
 use noshape_render::renderer::Uploader;
-use noshape_render::{Drawable, ImageData, ImageHandle, Instance, LineData, LineSegment, LinesHandle, MeshData, MeshHandle, PointData, PointSprite, PointsHandle, Scene, SilhouetteData, SilhouetteSegment, state};
+use noshape_render::{Drawable, ImageData, ImageHandle, Instance, LineData, LineSegment, LinesHandle, MeshData, MeshHandle, PointData, PointSprite, PointsHandle, Scene, SilhouetteData, SilhouetteSegment, TexturedData, state};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -131,6 +131,8 @@ pub struct GpuCache {
     /// The unit cube of the bodies' lowest level of detail
     /// ([`Instance::lod_box`]).
     lod_box: Option<MeshHandle>,
+    /// Decal images decoded, keyed by their (shared) encoded bytes.
+    decal_images: HashMap<usize, (std::sync::Weak<Vec<u8>>, Option<DecodedImage>)>,
 }
 
 
@@ -266,6 +268,9 @@ pub struct BuiltScene {
     pub picks: PickMap,
     /// Index range of static instances; overlays are appended after.
     pub static_instances: usize,
+    /// Decal instances: (instance index, the face, the Decal feature), for
+    /// the selection tint.
+    pub decals: Vec<(usize, Reference, FeatureId)>,
 }
 
 const EDGE_COLOR: u32 = theme::viewport::EDGE;
@@ -517,6 +522,75 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         }
     }
 
+    // ---------------------------------------------------------------- decals
+    // Live (behaviours "icons2 decal rendering"): the image on its face,
+    // unlit, texel by texel, on both sides, with the part's opacity.
+    let mut decal_instances = Vec::new();
+    for dec in &display.decals {
+        let Some(b) = display.bodies.iter().find(|b| b.id == dec.body && !b.hidden) else { continue };
+        let face = Reference::Face((*dec.face).clone());
+        let Some(fi) = b.face_refs.iter().position(|r| *r == face) else { continue };
+        let Some(bytes) = &dec.image_bytes else { continue };
+        let key = Arc::as_ptr(bytes) as usize;
+        let rgba = match cache.decal_images.get(&key) {
+            Some((_, img)) => img.clone(),
+            None => {
+                let img = image::load_from_memory(bytes).ok().map(|i| {
+                    let i = i.to_rgba8();
+                    Arc::new((i.width(), i.height(), i.into_raw()))
+                });
+                cache.decal_images.insert(key, (Arc::downgrade(bytes), img.clone()));
+                img
+            }
+        };
+        let (Some(rgba), Some(&(start, count))) = (rgba, b.mesh.face_ranges.get(fi)) else { continue };
+        let m = &b.mesh;
+        let mut t = TexturedData { width: rgba.0, height: rgba.1, rgba: rgba.2.clone(), ..Default::default() };
+        let mut local: HashMap<u32, u32> = HashMap::new();
+        let mut uv_of = |i: u32, t: &mut TexturedData| -> Option<u32> {
+            if let Some(&k) = local.get(&i) {
+                return Some(k);
+            }
+            let p = *m.positions.get(i as usize)?;
+            let uv = dec.uv_at(DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
+            t.positions.push(p);
+            // Texture rows run top down; the image's v runs up.
+            t.uvs.push([uv[0] as f32, (1.0 - uv[1]) as f32]);
+            let k = t.positions.len() as u32 - 1;
+            local.insert(i, k);
+            Some(k)
+        };
+        // On a cylinder one turn moves (u, v) by 2πr·(l00, l10): a triangle
+        // across the angle's wrap (in the gap opposite the image, outside
+        // it) spans about that much and would stretch the image over itself.
+        let wrap = match dec.mapping {
+            noshape_model::regen::context::DecalMapping::Cylindrical { radius, .. } => {
+                let half = std::f64::consts::PI * radius;
+                Some([(half * dec.uv_linear[0][0].abs()) as f32, (half * dec.uv_linear[1][0].abs()) as f32])
+            }
+            noshape_model::regen::context::DecalMapping::Planar { .. } => None,
+        };
+        for tri in m.indices[start as usize..(start + count) as usize].as_chunks::<3>().0 {
+            let Some(k) = tri.iter().map(|&i| uv_of(i, &mut t)).collect::<Option<Vec<u32>>>() else { continue };
+            if let Some(half_turn) = wrap {
+                let across = (0..2).any(|c| {
+                    let (lo, hi) = k.iter().map(|&j| t.uvs[j as usize][c]).fold((f32::MAX, f32::MIN), |(a, b), u| (a.min(u), b.max(u)));
+                    half_turn[c] > 1e-6 && hi - lo > half_turn[c]
+                });
+                if across {
+                    continue;
+                }
+            }
+            t.indices.extend(k);
+        }
+        if t.indices.is_empty() {
+            continue;
+        }
+        let inst = Instance::new(Drawable::Image(up.upload_textured(&t))).with_color([1.0, 1.0, 1.0, b.color[3]]).unpickable().layer(9);
+        decal_instances.push((scene.instances.len(), face, dec.feature));
+        scene.instances.push(if opts.section_skip.contains(&b.id) { inst.ignore_clip() } else { inst });
+    }
+
     // ---------------------------------------------------------------- planes
     if opts.show_planes {
         for pl in display.planes.iter().filter(|p| !p.hidden) {
@@ -719,7 +793,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     }
     let static_instances = scene.instances.len();
     scene.states = vec![0; picks.len() + 1];
-    BuiltScene { scene, picks, static_instances }
+    BuiltScene { scene, picks, static_instances, decals: decal_instances }
 }
 
 fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState, construction: bool, editing: bool, external: bool) -> [u8; 4] {
@@ -1010,6 +1084,15 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                     scene.add_flag(id, state::BODY);
                 }
             }
+        }
+    }
+    // A decal on a selected face (or of a selected Decal feature) is tinted
+    // (live: hovered it isn't).
+    for (i, face, feature) in &built.decals {
+        if (selection.contains(face) || selection.contains(&Reference::Feature(*feature)))
+            && let Some(inst) = scene.instances.get_mut(*i)
+        {
+            inst.decal_selected = true;
         }
     }
     // What is selected isn't pre-highlighted again (live selection/05 =
@@ -1308,6 +1391,9 @@ pub fn owner_secondary(display: &StudioDisplay, body: &noshape_model::BodyId, up
     }
     (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(12))
 }
+
+/// A decoded image: width, height, RGBA8 rows.
+type DecodedImage = Arc<(u32, u32, Vec<u8>)>;
 
 /// A face's boundary side: face index, facet normal, ends.
 type BoundarySide = (usize, glam::Vec3, [f32; 3], [f32; 3]);

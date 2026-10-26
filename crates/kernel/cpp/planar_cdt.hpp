@@ -128,23 +128,40 @@ struct Mesh
   {
     const Pt& q = p[i];
     int       t = start - start % 3;
-    for (int steps = 0;; ++steps)
+    // Visibility walk, each step's edges tried from a varying one (a
+    // stochastic walk: it ends even where rounding makes the plain walk
+    // circle, as on a long thin band's slivers); past its bound, a scan.
+    bool found = false;
+    for (int steps = 0; steps <= (int)v.size(); ++steps)
     {
-      if (steps > (int)v.size())
-        return false;
       ++walked;
-      int out = -1;
-      for (int k = 0; k < 3; ++k)
+      int       out = -1;
+      const int k0  = (int)((uint32_t)(steps + i) * 2654435761u >> 30) % 3;
+      for (int j = 0; j < 3; ++j)
+      {
+        const int k = (k0 + j) % 3;
         if (orient(p[v[t + k]], p[v[t + (k + 1) % 3]], q) < 0)
         {
           out = t + k;
           break;
         }
+      }
       if (out < 0)
+      {
+        found = true;
         break;
+      }
       if (tw[out] < 0)
         return false;
       t = tw[out] - tw[out] % 3;
+    }
+    if (!found)
+    {
+      for (t = 0; t < (int)v.size(); t += 3)
+        if (orient(p[v[t]], p[v[t + 1]], q) >= 0 && orient(p[v[t + 1]], p[v[t + 2]], q) >= 0 && orient(p[v[t + 2]], p[v[t]], q) >= 0)
+          break;
+      if (t >= (int)v.size())
+        return false;
     }
     for (int k = 0; k < 3; ++k)
     {
@@ -356,10 +373,19 @@ inline bool triangulate(const std::vector<Pt>& pts, const std::vector<std::vecto
   }
   if (!(want > 0))
     return false;
+  // Worked on a grid of 2^22 steps across the points, the enclosing
+  // triangle within a few widths of them: every coordinate an integer under
+  // 2^24, so `orient`'s products stay under 2^52 and it is exact in doubles
+  // (rounded orientations made walks circle and segment recovery fail on
+  // long thin polygons). Distinct points that land on one grid point fail
+  // the insertion (the caller meshes the face the usual way).
   detail::Mesh m;
-  const size_t np = pts.size();
-  m.p            = pts;
-  const double cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, big = 1e3 * size;
+  const size_t np   = pts.size();
+  const double grid = 4194304.0 / size;
+  m.p.reserve(np + 3);
+  for (const Pt& q : pts)
+    m.p.push_back({std::round((q.x - minX) * grid), std::round((q.y - minY) * grid)});
+  const double cx = std::round((maxX - minX) * grid / 2), cy = std::round((maxY - minY) * grid / 2), big = 4194304.0;
   m.p.push_back({cx - 2 * big, cy - big});
   m.p.push_back({cx + 2 * big, cy - big});
   m.p.push_back({cx, cy + 2 * big});

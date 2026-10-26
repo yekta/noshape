@@ -388,10 +388,13 @@ fn tangent_continues(body: &Shape, at: DVec3, dir: DVec3, skip: usize) -> bool {
             return false;
         }
         let Ok(info) = e.edge_info() else { return false };
+        // The curve's parameter at a point (start / end follow the edge's
+        // orientation, first / last parameter the curve's).
+        let param = |q: DVec3| if e.point_at(info.first_param).is_ok_and(|x| (x - q).length() < 1e-9) { info.first_param } else { info.last_param };
         let t = if (info.start - at).length() < 1e-9 {
-            e.tangent_at(info.first_param).ok()
+            e.tangent_at(param(info.start)).ok()
         } else if (info.end - at).length() < 1e-9 {
-            e.tangent_at(info.last_param).ok().map(|v| -v)
+            e.tangent_at(param(info.end)).ok().map(|v| -v)
         } else {
             None
         };
@@ -597,4 +600,132 @@ fn tangent_dir(c: &ChainEdge, at_start: bool) -> FResult<DVec3> {
     let param = if at_start == c.forward { info.first_param } else { info.last_param };
     let t = c.shape.tangent_at(param)?.normalize();
     Ok(if c.forward { t } else { -t })
+}
+
+/// A face blend between two planar faces of one body without a common edge
+/// (live psb 10-26 b, GA/GC: an L bracket with an inside chamfer, and one
+/// with a groove between base and wall). Like faceBlend.fs:
+/// - The side each face blends on comes from wallsNormalAlignment: at the
+///   faces' closest points, a face whose normal leans toward the other face
+///   is "aligned", and its normal is reversed unless aligned XOR Flip.
+/// - A side whose direction disagrees with the corner (outward on a concave
+///   corner, inward on a convex one) fails: "Side 1 direction is invalid.",
+///   then side 2. Live words the wrong side of a thin wall differently by
+///   radius ("Provided dimension is too large." for r 1–4 in GC); this
+///   always names the side.
+/// - The section runs along the planes' intersection line over both faces'
+///   common length, touching each face where the section's centre puts it;
+///   a touch point short of its face is "Provided dimension is too small.",
+///   past its far end "Provided dimension is too large.".
+/// - The walls are trimmed to the blend: on a concave corner the space
+///   between a wall's plane and the other face (GC's groove) is filled.
+pub fn apart_blend(ev: &mut EvalCtx, bi: usize, f1: usize, f2: usize, spec: &BlendSpec, flips: [bool; 2]) -> FResult<()> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    let unsupported = || FeatureError::new("Face blend between faces that don't share an edge is supported between planar faces only");
+    let body = ev.ctx.bodies[bi].clone();
+    let faces = body.shape.faces();
+    let (fa, fb) = (&faces[f1], &faces[f2]);
+    if fa.face_plane()?.is_none() || fb.face_plane()?.is_none() {
+        return Err(unsupported());
+    }
+    let d = k::distance(fa, fb)?;
+    let (pa, pb) = (d.point_a, d.point_b);
+    let scale = body.shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    if d.distance <= scale * 1e-9 {
+        return Err(unsupported());
+    }
+    // Outward normals and the blend side of each face.
+    let o = [fa.normal_at_point(pa)?.normalize(), fb.normal_at_point(pb)?.normalize()];
+    let v = (pb - pa).normalize();
+    let aligned = [o[0].dot(v) >= -1e-5, o[1].dot(v) >= -1e-5];
+    let n: [DVec3; 2] = std::array::from_fn(|i| {
+        let flip_normal = if aligned[i] { flips[i] } else { !flips[i] };
+        if flip_normal { -o[i] } else { o[i] }
+    });
+    let line = o[0].cross(o[1]);
+    if line.length() < 1e-9 {
+        return Err(unsupported());
+    }
+    let line = line.normalize();
+    // The corner: the point of both planes nearest the closest points' middle.
+    let mid = (pa + pb) * 0.5;
+    let (c1, c2) = (o[0].dot(pa), o[1].dot(pb));
+    let c3 = line.dot(mid);
+    let m = glam::DMat3::from_cols(o[0], o[1], line).transpose();
+    let corner = m.inverse() * DVec3::new(c1, c2, c3);
+    // In each face's plane, across the line, toward the face.
+    let u: [DVec3; 2] = std::array::from_fn(|i| {
+        let w = o[i].cross(line).normalize();
+        if ([pa, pb][i] - corner).dot(w) >= 0.0 { w } else { -w }
+    });
+    // Material directions; the corner is convex when face 1 lies on face 2's
+    // material side.
+    let mat = [-o[0], -o[1]];
+    let convex = u[0].dot(mat[1]) > 0.0;
+    for i in 0..2 {
+        let want = if convex { mat[i] } else { -mat[i] };
+        if n[i].dot(want) < 0.0 {
+            return Err(FeatureError::new(format!("Side {} direction is invalid.", i + 1)));
+        }
+    }
+    let fr = Frame { u, m: mat, extent: [f64::INFINITY; 2] };
+    let (s1, s2) = setbacks(&fr, spec, true)?;
+    // Each face's reach across and along the line, from points on its edges.
+    let reach = |f: &Shape, w: DVec3| -> FResult<((f64, f64), (f64, f64))> {
+        let (mut a, mut l) = ((f64::INFINITY, f64::NEG_INFINITY), (f64::INFINITY, f64::NEG_INFINITY));
+        for e in f.edges() {
+            let info = e.edge_info()?;
+            for k in 0..=16 {
+                let q = e.point_at(info.first_param + (info.last_param - info.first_param) * k as f64 / 16.0)? - corner;
+                a = (a.0.min(q.dot(w)), a.1.max(q.dot(w)));
+                l = (l.0.min(q.dot(line)), l.1.max(q.dot(line)));
+            }
+        }
+        Ok((a, l))
+    };
+    let ((a0, l0), (a1, l1)) = (reach(fa, u[0])?, reach(fb, u[1])?);
+    let tol = scale * 1e-9;
+    for (s, (lo, hi)) in [(s1, a0), (s2, a1)] {
+        if s < lo - tol {
+            return Err(FeatureError::new("Provided dimension is too small."));
+        }
+        if s > hi + tol {
+            return Err(FeatureError::new("Provided dimension is too large."));
+        }
+    }
+    let (from, to) = (l0.0.max(l1.0), l0.1.min(l1.1));
+    if to - from <= tol {
+        return Err(fail("the faces don't overlap along the blend"));
+    }
+    let (face, edges3, _) = section_face(corner + line * from, &fr, spec, true)?;
+    let tool = k::extrude(&face, line * (to - from))?;
+    let names = tool_names(ev.feature, &tool, &face, &edges3[1], &body.faces[f1]);
+    let mut tools = vec![NamedShape::new(tool.shape, names)];
+    // The walls are trimmed to the blend: on a concave corner what lies
+    // between a wall's plane and the other face, as far as that face reaches
+    // past the corner (GC's groove under the base's plane), becomes material.
+    let (h1, h2) = ((-a1.0).max(0.0), (-a0.0).max(0.0));
+    if !convex && (h1 > tol || h2 > tol) {
+        let at = |a: f64, b: f64| corner + line * from + u[0] * a + u[1] * b;
+        for (a, b) in [((-h2, s1), (-h1, 0.0)), ((-h2, 0.0), (0.0, s2))] {
+            if a.1 - a.0 <= tol || b.1 - b.0 <= tol {
+                continue;
+            }
+            let pts = [at(a.0, b.0), at(a.1, b.0), at(a.1, b.1), at(a.0, b.1)];
+            let wire = k::make_wire(&(0..4).map(|k| k::make_line(pts[k], pts[(k + 1) % 4])).collect::<Result<Vec<_>, _>>()?)?;
+            let back = k::extrude(&k::make_face_from_wire(&wire, true)?, line * (to - from))?;
+            let n = back.shape.count(ShapeType::Face);
+            tools.push(NamedShape::new(back.shape, (0..n).map(|_| Arc::new(TopoName::face(ev.feature, Role::Generated(body.faces[f1].clone())))).collect()));
+        }
+    }
+    let op = if convex { k::BooleanOp::Cut } else { k::BooleanOp::Fuse };
+    let (shape, names) = bool_named(ev, op, &body_named(&body), &tools)?;
+    let named = NamedShape::new(shape, names);
+    let un = k::unify_same_domain(&named.shape)?;
+    let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Err(fail("the result is not one valid solid"));
+    }
+    ev.replace_body(bi, un.shape, names);
+    Ok(())
 }

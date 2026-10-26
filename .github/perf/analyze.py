@@ -85,6 +85,8 @@ def compare_stills(out):
 
 
 def main():
+    # Windows runners print in cp1252, which has no "→" (baseline lines).
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
     ap.add_argument("label")

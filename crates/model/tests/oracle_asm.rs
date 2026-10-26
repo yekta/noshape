@@ -353,14 +353,11 @@ const LIVE_MATES: &[(&str, &str, bool, &str)] = &[
 /// connectors and solver. The test fails on a new difference and on a known
 /// one that matches again.
 const KNOWN: &[(&str, &str)] = &[
-    ("F2", "skb: Fastened offset z 5 and rotation 90°: live puts B at (10, 30, 5) turned −90° about z, ours at (30, −10, 15) turned +90° (offset and rotation sense)"),
-    ("F5", "skb: edge MID_POINT connectors (B's bottom front edge on A's top back edge): live B unturned at (0, 20, 10), ours turned 180° about y at (40, 20, 10); LP1's pattern direction on an edge midpoint runs the other way too"),
-    ("R1", "skb: circular edge CENTER connector: live keeps the pin upright on the hole (identity at (−70, 20, 10), rz 0), ours turns it upside down and 6° about z: live's Z points out of the part (the pin's bottom edge −z, the hole's top edge +z)"),
-    ("R2", "skb: Revolute limits 0..45° from a start at 90°: live returns to rz 0 (pin unturned), ours stops at 45°; also R1's connector flip"),
-    ("R3", "skb: Revolute on cylinder MID_AXIS_POINTs: both flip the pin, live with rz −157.5° (B at (314.75, 96.61, 20)), ours rz +6°"),
-    ("C1", "skb: Cylindrical on cylinder axes: as R3 (live rz −157.5°, translationZ +50 mm; ours rz +6°, −50 mm)"),
+    ("R1", "skb: circular edge CENTER connectors now as live (the pin upright on the hole at (−70, 20, 10)); the solver then turns the pin −6° about the axis (keeping the part origin near its start), live keeps rz 0"),
+    ("R3", "kern + skb: Revolute on cylinder MID_AXIS_POINTs: the connector Z is the cylinder's axis, which live points back toward the sketch (−z for these extrudes; kern 339de774: ours still points away); live then turns the flipped pin rz −157.5° (B at (314.75, 96.61, 20)), ours +6°"),
+    ("C1", "kern + skb: Cylindrical on cylinder axes: as R3 (live rz −157.5°, translationZ +50 mm)"),
+    ("CP1", "kern: circular pattern about the pin's MID_AXIS_POINT: live's axis points back toward the sketch (−z) and its copies turn −90° about world z; since kern 339de774 our cylinder axis points +z (away from the sketch) and they turn +90°"),
     ("M1", "skb: Revolute (bottom on top) + Slider (front faces): live keeps B upright, turned 30° at (7.68, −8.66, 10); ours turns it upside down"),
-    ("LP1", "skb: R1's connector flip and F5's edge direction: live's copies at x −55 / −40 upright, ours at −85 / −100 upside down"),
 ];
 
 #[test]

@@ -752,3 +752,12 @@ changes. I write the renderer part first (my files) and show crops before touchi
   faces), which double-darkens; a one-layer preview plus a refit of FEATURE_PREVIEW (live's top / right faces
   imply a colour near #779cb3 lit in sRGB) is open for the preview's owner. AO now multiplies encoded values
   (as Onshape's SSAO on its canvas); not re-checked against live yet.
+- **2026-10-26 (perf): thread bands (mesh.cpp `BandCdtAlgo`, f095bf20).** The NIST assembly's fine mesh spent ~90% of
+  its time in BRepMesh's Delaunay on its screws' thread faces (B-spline flanks and cylindrical crests/roots bounded by
+  two helix edges of 2300-3000 nodes each, 0.5-5 s a face). Curved faces with 1000+ boundary nodes that StripAlgo
+  doesn't take are triangulated from their edge nodes in parameters scaled to lengths (`cdt_face`, the planar CDT),
+  kept only when every triangle's centre and edge midpoints lie within the face's deflection, else BRepMesh. The
+  planar CDT now works on a 2^22 integer grid (exact `orient`); its walk circled on these long thin polygons.
+  Delabella (OCCT's other Delaunay) was tried first: no faster, 10% more triangles. NIST first launch, macOS 14 /
+  15: regen[refine] 13.9 / 14.4 s -> 4.9 / 6.7 s, 991130 -> 911998 triangles (run 40357492793). Test band_mesh.rs.
+  Remaining fallbacks there are faces under 1000 nodes and seam faces.

@@ -56,7 +56,7 @@ frame-driven delivered rate.
 
 | Row | Then (qa5, llvmpipe, debug) | Now | Status |
 |---|---|---|---|
-| NIST open | preview 6.1 s, refine 25.3 s | first frame 0.67 / 0.51 s; regen[preview] 0.95 / 0.65 s (133094 tris); regen[refine] 15.1 / 10.2 s in the background (991130 tris, the threaded screws' fine meshes) | ✅ open; refine still long (perf, next) |
+| NIST open | preview 6.1 s, refine 25.3 s | first launch: first frame 1.8 / 3.3 s, regen[preview] 1.0 / 2.3 s (133094 tris); regen[refine] in the background **4.9 / 6.7 s** (911998 tris; was 13.9 / 14.4 s, 991130 tris, before the thread bands, f095bf20, run 40357492793) | ✅ |
 | NIST orbit | ≈2 renders/s | 32.5 / 29.6 fps presented (timer-bound), GPU ~5 ms per frame, UI CPU 0.4 ms | ✅ |
 | Big plate: 400 holes (Extrude Remove) | 132 s | 1.15 s (macOS-latest; Windows 1.31 s); live 617 ms | ✅ PERF1 under 2 s; 2x live |
 | Big plate: Chamfer 0.5 × 400 | 133 s | 1.08 s (Windows 1.69 s); live 1.02 s | ✅ |

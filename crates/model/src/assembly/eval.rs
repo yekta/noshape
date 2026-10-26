@@ -496,15 +496,16 @@ impl Prepared {
         {
             let (_, kind, _) = self.mates[i];
             let m = &mut mates[i];
-            // `value` in the mate values' sense (solver::mate_values).
+            // `value` in the mate values' sense (solver::mate_values), which
+            // is the rotation / offset that holds it.
             match kind {
                 MateType::Revolute => {
                     m.kind = MateType::Fastened;
-                    m.rotation = -value;
+                    m.rotation = value;
                 }
                 MateType::Cylindrical => {
                     m.kind = MateType::Slider;
-                    m.rotation = -value;
+                    m.rotation = value;
                 }
                 MateType::Slider => {
                     m.kind = MateType::Fastened;
@@ -1417,7 +1418,7 @@ pub fn resolve_connector_aligned(ctx: &Arc<Context>, body: Option<&BodyId>, refe
             Frame::from_axes(conn.origin, conn.z, conn.x)
         }
     };
-    let Some(align) = align else { return Some(frame) };
+    let Some(align) = align else { return Some(unaligned(&ev, reference, frame).unwrap_or(frame)) };
     let z = match align {
         Reference::Face(_) => {
             let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(align)).first()?;
@@ -1427,6 +1428,13 @@ pub fn resolve_connector_aligned(ctx: &Arc<Context>, body: Option<&BodyId>, refe
             let (bi, ei) = *ev.resolve_edges(std::slice::from_ref(align)).first()?;
             let e = ev.edge_shape(bi, ei).ok()?;
             let i = e.edge_info().ok()?;
+            // A line runs its own way, whichever face's use of it the body
+            // stored (live oracle_asm LP1: a pattern along a plate's front
+            // edge runs +x, as its sketch line).
+            if let noshape_kernel::Curve::Line { direction, .. } = i.curve {
+                let d = direction.normalize();
+                return Some(connector_frame(frame.origin, if e.orientation() == noshape_kernel::Orientation::Reversed { -d } else { d }));
+            }
             // Tangent at the edge parameter nearest to the connector origin.
             let ts = [i.first_param, (i.first_param + i.last_param) * 0.5, i.last_param];
             let t = ts.iter().copied().min_by(|a, b| {
@@ -1440,6 +1448,38 @@ pub fn resolve_connector_aligned(ctx: &Arc<Context>, body: Option<&BodyId>, refe
         Reference::SketchRegion { sketch, .. } => ev.ctx.sketch(*sketch)?.frame.normal,
         _ => return Some(frame),
     };
+    Some(connector_frame(frame.origin, z))
+}
+
+/// A connector given without the face it was picked on (the agent API,
+/// live's REST):
+/// - a line's midpoint runs along the line's own direction, whichever face's
+///   use of the edge the body stored (live oracle_asm F5: a block's front
+///   edges +x, its back edges −x, as their sketch lines; LP1's direction);
+/// - a circular edge's center faces out of the part, along the normal of its
+///   planar face (live R1: a pin's bottom edge −z, a hole's top edge +z), not
+///   along the circle's own axis.
+fn unaligned(ev: &EvalCtx, reference: &Reference, frame: Frame) -> Option<Frame> {
+    let Reference::Implicit { on, inference } = reference else { return None };
+    if !matches!(**on, Reference::Edge(_)) {
+        return None;
+    }
+    let (bi, ei) = *ev.resolve_edges(std::slice::from_ref(&**on)).first()?;
+    let shape = &ev.ctx.bodies[bi].shape;
+    let edge = ev.edge_shape(bi, ei).ok()?;
+    match (inference, edge.edge_info().ok()?.curve) {
+        (Inference::Midpoint, noshape_kernel::Curve::Line { direction, .. }) => {
+            let d = direction.normalize();
+            return Some(connector_frame(frame.origin, if edge.orientation() == noshape_kernel::Orientation::Reversed { -d } else { d }));
+        }
+        (Inference::Center, noshape_kernel::Curve::Circle { .. }) => {}
+        _ => return None,
+    }
+    let faces = shape.edge_faces().ok()?.get(ei)?.clone();
+    let z = faces.iter().find_map(|&fi| {
+        // The face's outward normal (a hole's center isn't on its face).
+        Some(shape.sub_shape(noshape_kernel::ShapeType::Face, fi as usize).ok()?.face_plane().ok()??.unit_normal())
+    })?;
     Some(connector_frame(frame.origin, z))
 }
 

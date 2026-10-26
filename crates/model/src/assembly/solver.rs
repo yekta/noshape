@@ -405,16 +405,17 @@ pub fn mate_values(bodies: &[Frame], m: &SolverMate) -> [f64; 4] {
 /// sense): the turn `-v[0]` and the offset that puts the first connector at
 /// `v[1..]` from the second (Apply limit position, named positions, locks).
 pub fn fasten_at(m: &mut SolverMate, v: [f64; 4]) {
-    let r0 = base_rotation(m.flip_primary, m.reorient);
+    // The offset and rotation move the first connector in its own frame,
+    // as the values measure it.
     m.kind = MateType::Fastened;
-    m.rotation = -v[0];
-    m.offset = r0.inverse() * (DQuat::from_rotation_z(v[0]) * DVec3::new(v[1], v[2], v[3]));
+    m.rotation = v[0];
+    m.offset = DVec3::new(v[1], v[2], v[3]);
     m.limits.clear();
 }
 
 /// The offset along Z that holds a slider at `value` ([`mate_values`]'s sense).
-pub fn slider_offset_z(m: &SolverMate, value: f64) -> f64 {
-    (base_rotation(m.flip_primary, m.reorient).inverse() * DVec3::new(0.0, 0.0, value)).z
+pub fn slider_offset_z(_m: &SolverMate, value: f64) -> f64 {
+    value
 }
 
 fn tangent_residuals(ga: TangentGeom, gb: TangentGeom, flip: bool, internal: bool, out: &mut Vec<f64>) {
@@ -577,13 +578,14 @@ fn mate_residuals(bodies: &[Frame], m: &SolverMate, out: &mut Vec<f64>) {
     }
     let r = relative(bodies, m);
     let z = r.rotation * DVec3::Z;
-    // Offset: the first connector sits at +offset in the second's frame
-    // (bundle `getSecondMateConnectorOffsetTransform`; live assembly/740–748:
-    // the plate picked first ends 10 mm above the other). In the first's
-    // frame: rel.origin = -R_rel * offset, R_rel the full relative rotation.
-    let full = bodies[m.a].mul(&m.a_local).inverse().mul(&bodies[m.b].mul(&m.b_local));
-    let t = r.origin + full.rotation * m.offset;
-    let rot_target = DQuat::from_rotation_z(m.rotation);
+    // Offset and rotation move the first connector along and about its own
+    // Z, relative to the second: rel.origin = -offset in the first's frame,
+    // rel = Rz(-rotation) (live assembly/740–748: the plate picked first ends
+    // 10 mm above the other, both Z up; live oracle_asm F2: a block fastened
+    // bottom on top with offset 5 / 90° sinks 5 mm into the other and turns
+    // −90° about world z, its connector's Z pointing down).
+    let t = r.origin + m.offset;
+    let rot_target = DQuat::from_rotation_z(-m.rotation);
     match m.kind {
         MateType::Fastened => {
             let e = log_rot(rot_target.inverse() * r.rotation);

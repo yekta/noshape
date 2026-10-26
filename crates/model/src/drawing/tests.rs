@@ -1404,11 +1404,15 @@ fn shown_sketches_overlay_part_views() {
     let sketch = sources.get(&key).unwrap().context.sketches.first().map(|s| s.feature).expect("demo studio has a sketch");
     let before = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &cache, false).edges.len();
     drawing.sheets[0].views[0].shown_sketches = vec![sketch];
-    let with_points = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &cache, false).edges.len();
+    let shown = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &cache, false);
+    let sketch_edges = shown.edges.iter().filter(|e| e.sketch == views::SketchEdge::Solid).count();
+    assert!(sketch_edges > 0 && shown.edges.len() == before + sketch_edges, "sketch curves added: {before} -> {}", shown.edges.len());
+    // Live 10-26 c: only free points get a marker (drawn with the sheet, not
+    // as view edges), the curves' ends none; the demo sketch has no free one.
+    assert!(shown.sketch_points.is_empty());
     drawing.sheets[0].views[0].hide_sketch_points = true;
-    let without_points = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &cache, false).edges.len();
-    assert!(without_points > before, "sketch curves added: {before} -> {without_points}");
-    assert!(with_points > without_points, "sketch point crosses: {with_points} vs {without_points}");
+    let hidden = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &cache, false);
+    assert_eq!(hidden.edges.len(), shown.edges.len());
 }
 
 #[test]
