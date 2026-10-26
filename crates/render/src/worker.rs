@@ -208,7 +208,16 @@ impl RenderWorker {
                     }
                     if !delivered && renderer.has_pending() {
                         let _t = perf::scope("w.gpu_wait");
-                        renderer.wait_oldest();
+                        if renderer.frame_slot_free() {
+                            // The next frame can go to the GPU before this
+                            // one is done: wait in short slices, the loop
+                            // takes it as soon as it arrives (blocking for the
+                            // whole frame held every frame back until the
+                            // previous one had finished: one frame in flight).
+                            renderer.wait_oldest_for(std::time::Duration::from_millis(1));
+                        } else {
+                            renderer.wait_oldest();
+                        }
                     }
                 }
             })

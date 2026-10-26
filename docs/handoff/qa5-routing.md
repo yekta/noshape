@@ -798,3 +798,28 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   but **not italic**; live: **grey italic struck-through** (behaviours 1297, assembly/198; also 1339 for instances and their
   mates). Code: assembly_view.rs:3533 mate rows (`line_through` only), :3326 instance rows (italic only when dynamically
   suppressed), assembly_panels.rs:889 pattern rows. Part Studio rows already do italic + line-through (part_studio/mod.rs:3572).
+- **P2-A6 — skb (assembly list header)** — Part 1 <1>, Part 2 <1> and Circular pattern 1 (3 copies, count 4): ours reads
+  **"Instances (5)"** (assembly_view.rs:4032 `a.instances.len()`, every instance). Live counts the **top-level rows**: 4 parts
+  + Replicate 1 + 2 patterns read "Instances (7)" with 10 instances (behaviours 5986, asm-06x; after the Replicate alone
+  "Instances (5)" = 4 parts + the Replicate row). Here live would read "Instances (3)". Folders and subassemblies presumably
+  count as one row each (not captured).
+- **P2-A7 — skb (assembly list while a dialog is open)** — Replicate (tool search "replicate"), Instances = Part 2 <1>:
+  "Mate to be matched" auto-fills "Revolute 1" as live, but **no pending "Replicate 1" row** appears in the instance list
+  while the dialog is open (a28-52.png). Live: "a 'Replicate 1' row (with an error badge) appears in the instance list right
+  away" (behaviours 5970). Linear and circular patterns do show their red pending row with a red dot at open (✅); once,
+  though, the circular pattern's pending row vanished after the axis was picked (a28-26 → a28-28; not reproduced on Linear).
+  The accepted result matches live: "Replicate 1" ▸ Part 2 <5>, Part 2 <6>, "Mate features (2)".
+- **P1-18 — ui (feature list)** — drag "Extrude 3" above its own Sketch 3: accepted, the row fails red rgb(170,37,45), the
+  header turns "Features …" with the red badge, tooltip "…did not regenerate properly: …\n1 missing selection" (all as
+  live), but the row keeps the plain extrude icon. Live: **rows with an unresolved selection get a ⚠ warning-triangle icon**
+  besides the red text (behaviours 8292; also 14734 "Fillet 1 red with a ⚠ icon", 16123, and "qa5 (10-25 p2)" (7):
+  "name turns red rgb(170,37,45) with a ⚠ triangle icon"). part_studio/mod.rs draws no icon for `missing > 0` (only the
+  tooltip's second line, :3824). A live crop of the icon's place/size is in live/qa5/p7-*-after.png.
+STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extrude-after.png, row "Chamfer 1"): a **yellow ⚠
+  triangle badge overlaid on the lower-right of the feature's own icon** (like the sketch's blue minus badge), about 9–10 px,
+  not a separate column. The red header badge (red disc with a down arrow) already matches.
+- **P2-D3 — ui2 (drawing Note tool visuals)** — Note tool (n) in a drawing: the prompt "Click a point for the leader, or
+  click to place the note" shows, but **no "NOTE" text preview follows the pointer** (a28-69/70.png). Live: "a 'NOTE' text
+  preview follows the pointer, always horizontal", with the usual inference glyphs over view edges (behaviours 1414,
+  drawing/220–222). drawing_tools.rs overlay draws only the leader line once a leader point exists (:501); main has no
+  preview either. The editor panel itself matches live (drawing/225).
