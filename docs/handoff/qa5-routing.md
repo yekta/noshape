@@ -748,3 +748,25 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 - **P1-15 — ui (view cube hover), minor** — hovering a view-cube face fills it **rgb(177,217,241) #b1d9f1**; live **#bce2f7**
   rgb(188,226,247) (behaviours 403 "View cube hover", 1x crops part-studio/5x-*-crop1x.png). Measured on green 62524c30, 1x.
 - STATUS 2026-10-26 01:5x (qa5): P2-D1 verified fixed on green af9f1e4c (the assembly drawing's hole circle picks "Ø.394").
+- **P1-16 — kern (shell op)** — live's p2 model rebuilt in noshape (CLI, green-era engine): block 75.554 × 20.245 × **10**,
+  Fillet R1 on the 3 vertical edges, Chamfer 1 mm (tangent chain), Hole Ø6.35 Blind 12 at (15, 6) / (15, 14.245) on the top,
+  Feature linear pattern +X 25 mm × 2 (4 through holes), unshelled volume 13928.664 mm³. Shell, top face removed:
+  **1 mm → ours "Could not shell part with selections."; live OK, 3998.627 mm³, 33 faces** (round tubes standing in the cavity).
+  **2.5 mm → ours OK 8487.861 mm³, 53 faces; live 8503.961 mm³, 47 faces** (bosses merged with each other and the side walls).
+  Live: behaviours "qa5 (10-25 p2)" (6). Repro script /root/qa5-scratch/pass28/build.py.
+- **P1-17 — ui (mass properties)** — Mass and section properties opened with nothing selected ("Parts to measure" empty): ours
+  measures every part (Volume 7178.097 mm³, Surface area filled) and shows the no-material toast 3.6 s after opening. Live:
+  empty field → **Mass, Volume, Surface area, CoM and inertia all blank, no toast** (behaviours "qa5 (10-26 p4)", qa4 toast
+  follow-up 11210). The toast is tied to a **measured** part without material: it shows ≈ 0.75–1.5 s after the part is
+  picked / the panel opens with it preselected, and hides itself ≈ 3.9–4.4 s later. Code: part_studio/menus.rs
+  `set_show_mass` (toast on open whenever any part lacks a material) and the empty-`bodies` case of the mass view.
+- **P2-A2 — skb (mate dialog)** — Cylindrical mate › ☑ Limits › Z max: type `5` + Enter → ours applies **and closes** the
+  dialog (assembly_mate_dialog.rs: limit fields emit Accept on every Enter). Live: Onshape number fields (`os-param-number`,
+  the same family in mate dialogs; behaviours "Input behaviour outside feature dialogs" Fastened › Offset X) apply on the 1st
+  Enter and keep the dialog; the 2nd Enter accepts (as P2-A1 and ours' own offset fields). The limit itself works: a drag
+  stops with the pin 5.0 mm along the hole connector's Z.
+- **P2-D2 — ui2 (drawing Update), no drawing-behaviour owner in WORKFLOW F; lead to reassign if needed** — an assembly
+  drawing goes out of date (Update ⟳ bright) after an **unrelated** change: a STEP import, or a feature in a Part Studio the
+  assembly doesn't use. Live: unrelated changes keep it dim; only the drawing's referenced elements count (behaviours
+  "qa5 (10-26 p5)"). Cause: crates/model/src/drawing/views.rs `source_hash` for an assembly source hashes **every** Part
+  Studio and Assembly tab of the document; it should hash only the tabs the assembly (recursively) instantiates.
