@@ -1731,3 +1731,23 @@ fn feature_mirror_of_a_gusset_as_live() {
     assert!((v - 68800.0).abs() < 1e-3, "{v}");
 }
 
+/// qa5 P1-10 (live part-studio/234–235): Extrude › Remove of a circle on Top
+/// under a plate (z 0..5), Merge scope Part 1, going down away from the part:
+/// the cut misses, a blue info "Selected tools and targets do not
+/// intersect." (the dialog shows it as the bubble); flipped, it cuts.
+#[test]
+fn remove_that_misses_the_part_reports_the_info() {
+    let mut t = T::new();
+    let (_, plate) = t.block(-0.03, -0.02, 0.03, 0.02, "5 mm");
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::ZERO, 0.005));
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "10 mm", "REMOVE");
+    t.set(x, "defaultScope", b(false));
+    t.set(x, "booleanScope", q(vec![body_ref(&BodyId { feature: plate, index: 0 })]));
+    for (opposite, status, message) in [(true, FeatureStatus::Info, Some("Selected tools and targets do not intersect.")), (false, FeatureStatus::Ok, None)] {
+        t.set(x, "oppositeDirection", b(opposite));
+        let res = t.regen();
+        let st = res.display.features.iter().find(|f| f.id == x).unwrap();
+        assert_eq!((st.status, st.message.as_deref()), (status, message), "opposite {opposite}");
+    }
+}

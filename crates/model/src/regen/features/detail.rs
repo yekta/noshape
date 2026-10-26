@@ -561,6 +561,11 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         // Like Parasolid: offsets extend until they meet, vanishing faces
         // disappear and overlapping walls merge (crates/kernel/cpp/shell.cpp).
         let res = k::shell_solid(&body.shape, &shapes, t, side, k::ShellMethod::Auto).map_err(|e| blend_failed("Could not shell part with selections.", e))?;
+        // Live (qa5 P1-5): a shell that breaks the part into pieces fails
+        // (and leaves the part as it was), it never returns the slivers.
+        if res.shape.count(ShapeType::Solid) > body.shape.count(ShapeType::Solid).max(1) {
+            return err("Could not shell part with selections.");
+        }
         let names = body.shape_names();
         let offset_role = |n: &Name| Role::Offset(n.clone());
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&offset_role));

@@ -748,6 +748,12 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 - **P1-13 — psb (pattern copies' appearance)** — Circular pattern (Part pattern) copies take **new palette colours** (seed
   navy, copies grey / light blue / orange). Live: the copies **keep the seed's colour** (rgb(165,165,165) ×3, behaviours
   "qa5 (10-25 p3)"), as Transform copies do (behaviours 7252).
+- STATUS 2026-10-26 (psb): P1-3 fixed (the Fillet / Chamfer arrow on the last picked edge); P1-13 fixed (part pattern, feature
+  pattern and Copy part instances keep the seed's colour; test circular_and_mirror_part_pattern); P1-5 fixed (a Shell whose
+  result has more solids than the part errors "Could not shell part with selections." and leaves the part; test
+  shell_that_breaks_the_part_fails on the P1-5 model at 15 mm); P1-10's toast: the info comes from fs 58913522 (after the
+  qa build) and the dialog shows it as the blue bubble (test remove_that_misses_the_part_reports_the_info); the red tool
+  preview stays icons2's.
 - STATUS 2026-10-26 (qa5, green 62524c30): P1-4 fixed in the UI (no point at the origin; Hole ignores the stand-in). Minor for
   skb: the sketch data keeps a hidden construction "Origin stand-in" point at (0,0) that the constraints use; live has no entity
   and constrains to the external Origin, so agent/API reads (sketch_get) still differ.
