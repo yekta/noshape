@@ -446,8 +446,25 @@ fn explode_step(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             None => steps.push(step),
         }
     })?;
-    let now = assembly(od, tab)?;
-    Ok(json!({ "view": now.exploded_views[v].name, "steps": now.exploded_views[v].steps.len() }).into())
+    let now = assembly(od, tab)?.clone();
+    let ev = now.exploded_views[v].clone();
+    // Where the view puts the instances it moves (all its steps), to check
+    // the step without a render.
+    let mut r = solve(od, tab, &SolveOptions::default())?;
+    let before: std::collections::HashMap<_, _> = r.occurrences.iter().map(|o| (o.top(), o.transform)).collect();
+    let solved = r.solved.clone();
+    r.apply_placements(solved, Some(&ev));
+    let k = len_scale(&od.doc().settings.units);
+    let mut moved: Vec<Value> = Vec::new();
+    for i in &now.instances {
+        let (Some(o), Some(b)) = (r.occurrences.iter().find(|o| o.top() == i.id), before.get(&i.id)) else { continue };
+        let d = o.transform.transform_point3(DVec3::ZERO) - b.transform_point3(DVec3::ZERO);
+        let turned = (o.transform.transform_vector3(DVec3::X) - b.transform_vector3(DVec3::X)).length() > 1e-9;
+        if d.length() > 1e-12 || turned {
+            moved.push(json!({ "instance": i.name, "offset": [d.x * k, d.y * k, d.z * k], "turned": turned }));
+        }
+    }
+    Ok(json!({ "view": ev.name, "steps": ev.steps.len(), "exploded": moved }).into())
 }
 
 fn display_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

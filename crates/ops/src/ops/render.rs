@@ -158,6 +158,7 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     } else if let Some(v) = &named {
         opts.section = v.section.iter().map(|p| (glam::DVec3::new(p[0], p[1], p[2]), p[3])).collect();
     }
+    let _gpu = crate::doc::gpu_lock();
     let off = ctx.offscreen()?;
     let up = off.renderer.uploader();
     opts.reflection = vo.upload_reflection(&up);
@@ -310,6 +311,7 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
         opts.section_skip.insert(id);
     }
     let result = od.evaluate_assembly(tab, &eff, &Default::default());
+    let _gpu = crate::doc::gpu_lock();
     let off = ctx.offscreen()?;
     let up = off.renderer.uploader();
     opts.reflection = vo.upload_reflection(&up);

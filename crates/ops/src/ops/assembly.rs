@@ -397,6 +397,7 @@ fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let mut v = describe(od, tab)?;
     v["instance"] = json!(format!("inst:{}", id.0));
+    v["name"] = json!(assembly(od, tab)?.instance(id).map(|i| i.name.clone()));
     Ok(v.into())
 }
 

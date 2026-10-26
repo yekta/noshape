@@ -125,6 +125,25 @@ impl OpenDoc {
     }
 }
 
+/// Offscreen rendering one context at a time: contexts on several threads
+/// (the tests, an MCP server next to the app) crashed in the Vulkan loader
+/// (lavapipe) when they made, used and dropped their devices at once.
+static VULKAN_SETUP: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
+/// Hold while making or using [`Ctx::offscreen`]'s renderer (not reentrant).
+pub fn gpu_lock() -> parking_lot::MutexGuard<'static, ()> {
+    VULKAN_SETUP.lock()
+}
+
+impl Drop for Ctx {
+    fn drop(&mut self) {
+        if self.offscreen.is_some() {
+            let _one_at_a_time = VULKAN_SETUP.lock();
+            self.offscreen = None;
+        }
+    }
+}
+
 /// The agent API's state: the documents it has open. CLI calls open one
 /// document per process; the MCP server keeps them open between calls.
 #[derive(Default)]
@@ -218,7 +237,8 @@ impl Ctx {
         Ok(key)
     }
 
-    /// The headless renderer (created on the first render).
+    /// The headless renderer (created on the first render); hold
+    /// [`gpu_lock`] while making or using it.
     pub fn offscreen(&mut self) -> Result<&mut noshape_scene::png::Offscreen, OpError> {
         if self.offscreen.is_none() {
             self.offscreen = Some(noshape_scene::png::Offscreen::new().map_err(|e| OpError::new("render_failed", e))?);

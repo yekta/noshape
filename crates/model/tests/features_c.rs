@@ -2370,3 +2370,67 @@ fn decal_places_its_image_as_std() {
     let (_, st, msg) = run(DVec3::new(mm(20.0), mm(10.0), mm(10.0)), true, "40 mm");
     assert_eq!((st, msg.as_str()), (FeatureStatus::Error, "Decal is not on target face."));
 }
+
+/// Face blend between faces without a common edge (live psb 10-26 b GA/GC):
+/// an L bracket with a 2 mm inside chamfer, and one with a groove (x 5..10,
+/// z 2..5) between base and wall; side 1 the base top, side 2 the wall.
+/// Flip side 2 puts the blend in the corner (the default sides fail like
+/// live); the chamfer is consumed and the groove filled.
+#[test]
+fn face_blend_without_a_common_edge_as_live() {
+    let run = |poly: &[(f64, f64)], base: (f64, f64), wall: (f64, f64), r: &str, flips: [bool; 2]| -> (RegenResult, FeatureStatus, String) {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, poly, true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("30 mm"));
+        });
+        let r0 = s.ok();
+        let at = |x: f64, z: f64| {
+            let b = &r0.context.bodies[0];
+            let i = b.shape.faces().iter().position(|f| {
+                let c = f.centroid().unwrap();
+                (c.x - mm(x)).abs() < 1e-9 && (c.z - mm(z)).abs() < 1e-9
+            });
+            Reference::Face((*b.faces[i.unwrap()]).clone())
+        };
+        let (side1, side2) = (at(base.0, base.1), at(wall.0, wall.1));
+        let r = r.to_string();
+        s.add("faceBlend", move |p| {
+            p.set("side1", q(side1));
+            p.set("side2", q(side2));
+            p.set("radius", expr(&r));
+            p.set("flipSide1", ParamValue::Bool(flips[0]));
+            p.set("flipSide2", ParamValue::Bool(flips[1]));
+        });
+        let res = s.regen();
+        let st = res.display.features.last().unwrap();
+        let (status, msg) = (st.status, st.message.clone().unwrap_or_default());
+        (res, status, msg)
+    };
+    let ga: &[(f64, f64)] = &[(0.0, 0.0), (40.0, 0.0), (40.0, 5.0), (7.0, 5.0), (5.0, 7.0), (5.0, 30.0), (0.0, 30.0)];
+    let gc: &[(f64, f64)] = &[(0.0, 0.0), (40.0, 0.0), (40.0, 5.0), (10.0, 5.0), (10.0, 2.0), (5.0, 2.0), (5.0, 30.0), (0.0, 30.0)];
+    for (case, poly, base, wall, r, live, touch) in [("GA_R4f2", ga, (23.5, 5.0), (5.0, 18.5), "4 mm", 9853.008881569225, 9.0), ("GC_R8f2", gc, (25.0, 5.0), (5.0, 16.0), "8 mm", 10162.0355262769, 13.0)] {
+        let (res, st, msg) = run(poly, base, wall, r, [false, true]);
+        assert_eq!(st, FeatureStatus::Ok, "{case}: {msg}");
+        let v = volume(&res, 0) * 1e9;
+        assert!(near(v, live, 1e-6), "{case}: volume {v} vs live {live}");
+        let b = &res.context.bodies[0];
+        assert_eq!(b.shape.faces().len(), 9, "{case}: faces");
+        assert_eq!(cylinder_radii(&res, 0).len(), 1, "{case}: one cylinder");
+        for (x, z) in [(touch, 5.0), (5.0, touch)] {
+            assert!(b.shape.vertices().iter().any(|q| {
+                let p = q.vertex_point().unwrap();
+                (p.x - mm(x)).abs() < 1e-9 && (p.z - mm(z)).abs() < 1e-9
+            }), "{case}: no vertex at x {x} z {z}");
+        }
+    }
+    let err = |poly, base, wall, r, flips| run(poly, base, wall, r, flips).2;
+    assert_eq!(err(ga, (23.5, 5.0), (5.0, 18.5), "4 mm", [false, false]), "Side 2 direction is invalid.");
+    assert_eq!(err(ga, (23.5, 5.0), (5.0, 18.5), "4 mm", [true, true]), "Side 1 direction is invalid.");
+    assert_eq!(err(gc, (25.0, 5.0), (5.0, 16.0), "8 mm", [false, false]), "Side 2 direction is invalid.");
+    assert_eq!(err(gc, (25.0, 5.0), (5.0, 16.0), "3 mm", [false, true]), "Provided dimension is too small.");
+}
