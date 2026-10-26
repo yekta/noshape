@@ -761,3 +761,33 @@ changes. I write the renderer part first (my files) and show crops before touchi
   Delabella (OCCT's other Delaunay) was tried first: no faster, 10% more triangles. NIST first launch, macOS 14 /
   15: regen[refine] 13.9 / 14.4 s -> 4.9 / 6.7 s, 991130 -> 911998 triangles (run 40357492793). Test band_mesh.rs.
   Remaining fallbacks there are faces under 1000 nodes and seam faces.
+- **2026-10-26 STOP — perf state for the replan.**
+  - **On main (perf):** Retina/pan/frame-driven/cold bench tooling (2920cd23..c49f9859); render thread pipelines
+    frames (365280a9); first-frame pipelines first, the rest after the first frame (53ebd72c, d604ac13); sRGB
+    blending like WebGL + colour refits (535285a6, note d0f3a777); perf.yml drag_speed + model artifacts + X11
+    (c01a9c17..57116d1a); thread bands BandCdtAlgo + exact planar CDT orient (f095bf20); analyze.py UTF-8
+    (72564871); large-model rows (d7b1b73e, 5cdaf448).
+  - **WIP branch agent/perf (7594798b, unchecked):** viewport `BenchKind::Drag` (NOSHAPE_PERF_BENCH=drag: hover-pick
+    the centre, ToolDown, ±60 px ToolDrag per frame, ToolUp; BENCH SUMMARY drag) + bench.sh doc; local probe
+    crates/ops/tests/nist_probe.rs (not for main). Next: `cargo clippy -p noshape --all-targets -- -D warnings`
+    (a borrow error was fixed just before the stop), then CI: fixture pins-assembly-1000,
+    env NOSHAPE_PERF_BENCH=drag,NOSHAPE_PERF_BENCH_DRIVE=frames,NOSHAPE_PERF_SCALE=2.
+  - **Measured (macOS CI runners, paravirtual Metal; 14 / 15):** commit / undo / redo shown 174 / 149, 25 / 28,
+    17 / 25 ms (first launch; target < 200 ms) before the later landings; frame-driven at 2x Retina: fins x400
+    orbit 134 / 145 fps, zoom 117 / 93, pan 88 / 100; big plate orbit 93 / 102, zoom 110 / 102, pan 86 / 75
+    (target 60 fps met, 120 in orbit on fins only); 1000-pin assembly orbit 71-87 fps (before the render-thread
+    fix); cold first frame median 1449 / 1675 ms; NIST fine mesh 4.9 / 6.7 s (was 13.9 / 14.4).
+  - **Open, in order, with next steps:**
+    1. Re-measure items 1-4 on current main (runs 40370296564..40370425765 were cancelled at the stop): dispatch
+       perf.yml jobs=bench for live-30-features (env NOSHAPE_PERF_SCRIPT=edit-undo-redo), fins-400 / big-plate /
+       pins-assembly-1000 (env NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames), live-30-features cold=1
+       with variants c1..c3; jobs=model for skb's assembly_perf / drag_speed.
+    2. Assembly drag frame time end to end: land the WIP drag bench (above), measure on pins-assembly-1000.
+    3. Cold start: window to first frame is still the 8 core pipelines (~0.5-0.6 s cold) plus ~0.3 s building
+       the workspace; next levers: smaller shaders per pipeline or a pipeline cache; profile first workspace
+       render (session opened to first workspace render ~310 ms).
+    4. big_plate edits doubled since 10-25 (macOS 1.15 / 1.08 / 1.62 s; Windows depth edit 2.88 s > 2 s gate):
+       booleans, kern's.
+    5. Feature preview: Onshape mixes one opaque preview layer (uPreviewTexture / uPreviewAlpha); ours draws back
+       + front faces (double-darkens); one-layer preview + FEATURE_PREVIEW refit for the preview's owner. AO in
+       sRGB values not yet compared with live.
