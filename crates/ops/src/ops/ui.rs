@@ -457,7 +457,7 @@ fn open_linked_document(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn go_to_assembly(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let doc_arg = a.opt_str("doc")?;
     let od = ctx.doc(doc_arg)?;
-    let tab = doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Part Studio", |c| matches!(c, TabContent::PartStudio(_)))?;
+    let tab = od.tab_of_kind(a.opt_str("tab")?, "Part Studio", |c| matches!(c, TabContent::PartStudio(_)))?;
     let ps = doc::studio(od.doc(), tab)?;
     let c = ps.active_context.and_then(|id| ps.contexts.iter().find(|c| c.id == id)).ok_or_else(|| OpError::param("tab", "no Assembly context is shown (assembly_edit_in_context, context_show)"))?;
     let asm = c.assembly;

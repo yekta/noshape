@@ -36,7 +36,7 @@ fn table<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, Table), OpE
             return Ok((od, Table::Vs(id)));
         }
     }
-    let tab = doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Part Studio or Variable Studio", doc::is_part_studio)?;
+    let tab = od.tab_of_kind(a.opt_str("tab")?, "Part Studio or Variable Studio", doc::is_part_studio)?;
     Ok((od, Table::Studio(tab)))
 }
 

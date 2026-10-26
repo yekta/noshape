@@ -110,6 +110,11 @@ edits with undo / redo, a configured part, an assembly with mates) added:
   "configuration") and `ops_list {"search": "pattern assembly"}` give summaries and examples.
 - **Feature schemas** describe the parameters the dialog shows with the defaults; `more_when_shown` names the
   others (`counterbore`: `cBoreDiameterV3`...), `all: true` describes them too.
+- **Default tabs follow the window:** tools without `tab` use the tab the window shows when it is of their kind
+  (after `tab_activate`, or an import, which shows what it made: `first`), else the first of the kind.
+- **Imports:** a STEP assembly becomes an Assembly plus a "<name> parts" Part Studio; instances are named
+  "<part> <n>", numbered per name. `query_entities` `near` ranks by the distance to the face or edge itself.
+- **Unknown tool names** get "did you mean" suggestions from the same group (`variable_edit` -> `variable_set`).
 - **Edit replies stay small:** `regeneration.features` lists only the features that need a look (not `Ok`,
   or with a message, notices, under-defined, suppressed); `features_ok` counts the rest; `feature_list` lists all.
 

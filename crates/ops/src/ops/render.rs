@@ -269,7 +269,7 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
     use noshape_scene::asm_scene::{self, AsmGpuCache, AsmSceneOptions};
     let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1);
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let tab = crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
+    let tab = od.tab_of_kind(a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
     let window = window_camera(od, tab, view_name)?;
     if view.is_none() && window.is_none() {
         return Err(OpError::param("view", "a standard view (isometric, front, back, left, right, top, bottom, dimetric, trimetric) or \"window\""));
@@ -340,9 +340,9 @@ fn window_display_args(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Val
     let assembly = super::configuration::asm::is_assembly(ctx, a)?;
     let od = ctx.doc(a.opt_str("doc")?)?;
     let tab = if assembly {
-        crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", |c| matches!(c, noshape_model::document::TabContent::Assembly(_)))?
+        od.tab_of_kind(a.opt_str("tab")?, "Assembly", |c| matches!(c, noshape_model::document::TabContent::Assembly(_)))?
     } else {
-        crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Part Studio", crate::doc::is_part_studio)?
+        od.tab_of_kind(a.opt_str("tab")?, "Part Studio", crate::doc::is_part_studio)?
     };
     let Some(d) = od.window.display.get(&tab) else { return Ok(None) };
     let mut v = a.value.clone();

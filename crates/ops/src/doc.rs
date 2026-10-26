@@ -85,6 +85,18 @@ impl OpenDoc {
 }
 
 impl OpenDoc {
+    /// The tab a call names (`key`), else the window's tab when it is of
+    /// the kind (the tab shown: a tab_activate, an import), else the first
+    /// of the kind.
+    pub fn tab_of_kind(&self, key: Option<&str>, kind: &str, is: fn(&TabContent) -> bool) -> Result<TabId, OpError> {
+        if key.is_none()
+            && let Some(t) = self.window.active_tab.filter(|t| self.doc().tab(*t).is_some_and(|x| is(&x.content)))
+        {
+            return Ok(t);
+        }
+        tab_of_kind(self.doc(), key, kind, is)
+    }
+
     /// Regenerate an edited copy of a Part Studio tab without committing it
     /// (a dialog's preview), in the active configuration.
     pub fn preview(&mut self, tab: TabId, edited: &noshape_model::partstudio::PartStudio) -> Result<RegenResult, OpError> {

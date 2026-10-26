@@ -151,7 +151,7 @@ fn call_tool(ctx: &mut Ctx, params: &Value) -> Value {
     let name = params.get("name").and_then(Value::as_str).unwrap_or("");
     let args = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
     let Some(op) = registry::by_tool_name(name) else {
-        return tool_error(&format!("unknown tool `{name}`; call `ops_list` for the list"));
+        return tool_error(&registry::unknown_tool_message(name));
     };
     match registry::run(ctx, op, &args) {
         Ok(out) => tool_result(out),

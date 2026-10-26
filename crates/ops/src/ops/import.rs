@@ -13,7 +13,7 @@ pub fn ops() -> Vec<Op> {
         group: "import",
         verb: "files",
         summary: "Import CAD or mesh files (STEP, IGES, Parasolid, ACIS, JT, Rhino, SolidWorks/Inventor/NX/Solid Edge parts and assembly zips, STL, OBJ, 3MF, glTF)",
-        description: "The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a \"CAD Imports\" folder unless `keep_files` is false. One edit (\"Import <files>\"). Returns the new tabs and the imported parts.",
+        description: "The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a \"CAD Imports\" folder unless `keep_files` is false. One edit (\"Import <files>\"). Returns the new tabs and the imported parts. The window then shows the first new tab (`first`), and tools without `tab` act on it.",
         fields: vec![
             doc_field(),
             req("files", json!({ "type": "array", "items": { "type": "string" }, "minItems": 1 }), "Paths of the files."),
@@ -82,6 +82,11 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut out = json!({ "tabs": new_tabs, "parts": parts, "first": first.map(|t| t.to_string()) });
     if !errors.is_empty() {
         out["errors"] = json!(errors);
+    }
+    // The window opens the import's first tab, as the app does: tools
+    // without `tab` then work on it.
+    if let Some(t) = first {
+        super::show(ctx, a.opt_str("doc")?, crate::UiRequest::ActivateTab(t))?;
     }
     Ok(out.into())
 }

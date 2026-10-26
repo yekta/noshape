@@ -47,7 +47,7 @@ fn describe(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut out = Vec::new();
     for (i, name) in a.array("tools")?.iter().enumerate() {
         let name = name.as_str().ok_or_else(|| OpError::param(&format!("tools[{i}]"), "a tool name"))?;
-        let op = registry::by_tool_name(name).ok_or_else(|| OpError::param(&format!("tools[{i}]"), &format!("unknown tool `{name}`; see ops_list")))?;
+        let op = registry::by_tool_name(name).ok_or_else(|| OpError::param(&format!("tools[{i}]"), &registry::unknown_tool_message(name)))?;
         out.push(json!({ "tool": name, "cli": format!("noshape-cli {} {}", op.group, op.verb), "description": op.full_description(), "input_schema": op.input_schema(), "mutates": op.mutates }));
     }
     Ok(json!({ "tools": out }).into())
@@ -55,7 +55,7 @@ fn describe(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn call(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let name = a.str("tool")?;
-    let op = registry::by_tool_name(name).ok_or_else(|| OpError::param("tool", &format!("unknown tool `{name}`; see ops_list")))?;
+    let op = registry::by_tool_name(name).ok_or_else(|| OpError::param("tool", &registry::unknown_tool_message(name)))?;
     let args = a.get("args").cloned().unwrap_or_else(|| json!({}));
     registry::run(ctx, op, &args)
 }

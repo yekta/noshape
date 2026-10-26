@@ -23,7 +23,7 @@ pub(crate) fn is_assembly(ctx: &mut Ctx, a: &Args) -> Result<bool, OpError> {
 
 fn target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let tab = doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
+    let tab = od.tab_of_kind(a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
     Ok((od, tab))
 }
 
