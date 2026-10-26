@@ -35,7 +35,7 @@ section's rule. Status: ✅ matches, ✗ differs, ⊘ excluded (cloud), ? waitin
 | D2 | Theme notes | `#bbbbbb` | white (fixed) | ✅ |
 | D3 | Checked radio | `#0d6efd` disc + white dot; off ring `#878787` | light-mode style (fixed) | ✅ |
 | D4 | Select arrow | `#777` (the note says white; the pixels are `#777`) | `#999` through the dark palette (fixed: static `#777`) | ✅ |
-| D5 | (?) help icons | light `#d6d6d6` ring and "?" | dim | ✗ icon (icons2, dark (?) icon routed there 10-23) |
+| D5 | (?) help icons | light `#d6d6d6` ring and "?" | light: #333 at 0.2 = #d6d6d6 on white; dark: dark/help-gray.svg solid #d6d6d6 (icons2 4722be7c) | ✅ |
 | D6 | Focused select | 1 px `#3e94ff` border + 1 px `#90cef1` ring outside | 2 px `#3e94ff` (fixed) | ✅ |
 | D7 | Open select list | `#333` list, `#858585` border, current row `#99c8ff` with black text, 27 px rows 15 px under | `#1967d2` / white, `#767676` border (fixed) | ✅ |
 | D8 | Disabled select (pixel density, default profile) | `#666` on a `#ccc` border, `#777` caret | `#888` border, `#999` caret (fixed) | ✅ |
