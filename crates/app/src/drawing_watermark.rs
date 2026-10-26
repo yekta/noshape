@@ -16,11 +16,10 @@ use noshape_model::release::{ItemKind, ItemState, PackageKind};
 pub const COLOR: [u8; 3] = [192, 192, 192];
 pub const ALPHA: f32 = 0.25;
 
-/// The editor's fill: our renderer blends in linear light, where this
-/// colour at [`EDITOR_ALPHA`] gives live's sRGB results over the white
-/// sheet (`#efefef`) and over black ink (`#303030`).
-pub const EDITOR_COLOR: u32 = 0x757575;
-pub const EDITOR_ALPHA: f32 = 0.167;
+/// The editor's fill: [`COLOR`] at [`ALPHA`], live's `#efefef` over the
+/// white sheet and `#303030` over black ink.
+pub const EDITOR_COLOR: u32 = 0xc0c0c0;
+pub const EDITOR_ALPHA: f32 = 0.25;
 
 /// The watermark of a drawing tab, if any: watermarks on, the drawing
 /// revision managed (when "Hide watermark for drawings that are not revision

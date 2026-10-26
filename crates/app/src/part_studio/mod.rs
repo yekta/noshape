@@ -4342,24 +4342,10 @@ impl PartStudioView {
     fn render_viewport_underlay(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
         let mut out = Vec::new();
-        // Plane labels: Onshape draws the name *in the plane* (blue, at the
-        // top-left corner, inside), so it skews with the view: glyph outlines
-        // laid out in the plane, drawn into the 3D frame (overlay.rs).
-        let mut contours: Vec<Vec<glam::DVec3>> = Vec::new();
-        // Isolate takes the planes away, names too (qa5 KB3).
-        let isolating = self.ui.isolate.as_ref().is_some_and(|i| i.mode == behaviors::IsolateMode::Isolate);
-        if self.opts.show_planes && !isolating {
-            let shown = self.with_plane_drag(self.display.clone());
-            for pl in shown.planes.iter().filter(|p| !p.hidden) {
-                let f = &pl.frame;
-                let asc = 0.031 * 2.0 * pl.half_height;
-                let top_left = pl.corner(-1.0, 1.0);
-                in_plane_contours(&pl.name, top_left, f.x, f.y, asc, &mut contours);
-            }
-        }
-        // Light: the accent blue; dark: white (`--os-construction-plane-text-color`).
-        let c = if noshape_scene::palette::is_dark() { gpui_kit::rgb_static(crate::theme::viewport_dark::PLANE_TEXT) } else { Rgba::from(Hsla::from(pal.accent)) };
-        let mut fills = if contours.is_empty() { Vec::new() } else { vec![noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: [c.r, c.g, c.b, c.a] }] };
+        // Plane names are drawn by the scene (scene_builder: in the plane,
+        // hidden by parts in front, live selection/02); in-plane text the
+        // parts don't hide goes here.
+        let mut fills = Vec::new();
         // Inspection datums: black, the selected one in the selection
         // color.
         let sel = Rgba::from(Hsla::from(pal.accent));

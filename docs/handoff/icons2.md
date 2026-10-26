@@ -1204,3 +1204,7 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   unknown, behaviours "icons2 plane resize handles" (5)); the parts' 5–8 level lightening while
   dimensions are shown isn't reproduced (our alpha path shows hidden edges).
   Next: selected face under a plane reads bluer (linear vs sRGB blend), then P3 dark polish.
+- (10-26 later) 3317dd97 plane fill #c3d2e0 at 0.173 (light; fitted with one plane over white fixed:
+  three stacked = live #e7edf2, parts behind closer to live's sRGB blend). c3ae9d4b plane names are
+  scene meshes now (overlay::fill_mesh + 0.7-alpha outline trace for weight), hidden by parts in front
+  (live selection/02); shown-dimension labels and sketch names stay in the 2D overlay (drawn over parts).

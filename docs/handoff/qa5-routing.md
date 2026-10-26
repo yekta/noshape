@@ -258,6 +258,7 @@ STATUS FSW-draft (psb, 2026-10-24): parallel parting edge (7c3821e8), edit logic
 STATUS FSW-pattern (psb, 2026-10-24 b): circular/curve flush variants and W4/W5 ×2 match live "psb (10-24) flush wall follow-up" (test feature_pattern_of_a_flush_wall_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24): Rib draft done (live G33c 27048.1556 matched, test rib_draft_as_live); Body draft, Decal, face blend variants still open.
 STATUS FSW-fill (psb, 2026-10-24): guide rules as live "psb (10-24 d)" and Precise curve guides done (test fill_guides_as_fs); Add on surface edges (SF7) still open.
+STATUS FSW-fill (psb, 2026-10-26): SF7 done: picking open edges of a surface sets Add (surfaceOperationTypeEditLogic, behaviors.rs), and Add with Merge with all knits the open box into one solid, 8000 mm³, 6 faces (test fill_on_an_open_box_knits_a_solid).
 STATUS FSW-bsurf (psb, 2026-10-24): profile arrays are driven-query rows "[None] Edges of …" (live L28: no 2-pick cap); conditions wait for the loft end-derivative rule.
 STATUS FSW-loft (psb, 2026-10-24): end conditions (Normal/Tangent to profile, Normal/Tangent to direction) applied with live's corner rule and loft.fs texts; every connection used (profiles split at the connection points), "Select a point on each profile to define a connection."; guides, path and trims still open.
 STATUS FSW-draft (psb, 2026-10-24 b): parting edges on several parts (each drafted on its own) and stepped / sloped straight parting lines (each edge's own hinge plane) done (test parting_line_draft_on_two_parts_and_steps); curved non-planar parting lines still refused.
@@ -843,3 +844,23 @@ STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extr
 - **VAR-INVALID — ui (feature dialog)** — live: a Variable whose value doesn't evaluate to its type ("#a + 5 mm * cos(#ang * 1
   rad)" with #ang an angle) turns the Value field red, the title "#d = 0 mm" red and ✓ disabled, so it can't be created; ours
   creates the feature, which then fails. Check the dialog against live.
+- STATUS 2026-10-26 (qa5, green a08e3eda), verified in the app:
+  - **P2-A1 fixed**: Circular pattern › Angle 360 → 300 + Enter applies ("300 deg" selected, dialog open); the 2nd Enter
+    accepts. Instance count + Enter accepts at once, as live (behaviours 4299).
+  - **P1-15 fixed**: hovered view-cube face rgb(188,226,247) #bce2f7.
+  - **P1-12 fixed**: Revolve axis = a profile sketch line → chip "Edge of Sketch 2".
+  - **P1-7 fixed**: a hidden sketch on a suppressed extrude's face → its row is red (and loses the minus badge, as live).
+  - **P1-14 fixed**: a new document (Create › Document…) shows "Mass moments of inertia (lb mm²)".
+  - **P1-3 fixed**: the Fillet radius arrow follows the last picked edge (both pick orders tried).
+  - **P1-13 fixed**: Circular pattern (Part pattern) copies keep the seed's colour.
+  - **P1-5 fixed**: depth 15 / R2 / blind holes, Shell 2.5 off the top → "Shell 1 did not regenerate properly: Could not
+    shell part with selections.".
+  - **P1-16 still open** on the green kernel: depth 10 / R1, Shell 1 mm still fails; 2.5 mm still 8487.861 mm³ (live 8503.961).
+  - P1-18 still open (the failing rows above show no ⚠ badge).
+- STATUS 2026-10-26 (qa5, live answer "qa5 (10-26 p6)"): **P2-A2 confirmed** (live: 1st Enter in a mate limit field applies,
+  "5 mm" selected, dialog open; 2nd Enter accepts). **P2-A3 confirmed** (live Esc = Done: plain row, no rollback bar,
+  unexploded; double-click re-enters). New **P2-A8 — skb (assembly patterns)**: ours shows an info bubble "N instance(s)
+  created." after accepting an assembly pattern (assembly_panels.rs:1234; also "0 instance(s) created." after an edit);
+  live shows **no bubble** for circular or linear patterns (polled 20 s). Detail-view scale (p6 (4)) not answered yet.
+- STATUS 2026-10-26 (qa5): P1-6 merges into P1-16 (live "qa5 (10-25 p2)" (6): depth 10, R1, Shell 2.5 and 1 mm both OK).
+  Lead 10-26: qa5 fixes the open findings itself, P1 first.

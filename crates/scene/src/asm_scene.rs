@@ -213,10 +213,10 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                     inst = inst.unpickable();
                 }
                 // The display modes as in the Part Studio (scene_builder): see-through
-                // at 0.48, or unlit faces in the background color (Unshaded).
+                // at 0.35, or unlit faces in the background color (Unshaded).
                 if !sketch {
                     inst = match mode {
-                        DisplayMode::Translucent => inst.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
+                        DisplayMode::Translucent => inst.with_color([color[0], color[1], color[2], color[3].min(0.35)]),
                         DisplayMode::HiddenLine => inst.with_color(theme::lin(0xffffff)).unlit(),
                         DisplayMode::ShadedWithEdges | DisplayMode::Shaded => inst,
                     };

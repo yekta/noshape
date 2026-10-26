@@ -411,12 +411,22 @@ fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entit
     v
 }
 
+/// A constraint's entity: a sketch entity, or (live: constraints to the
+/// Origin or a model edge reference it, no sketch entity) the model
+/// reference a hidden reference-only point or curve stands for.
+fn constrained_id(data: &SketchData, sketch: FeatureId, e: EntityId) -> String {
+    if data.sketch.entity(e).is_some_and(|x| x.reference_only) {
+        return refs::to_id(data.external_refs.get(&e.0).unwrap_or(&Reference::Origin));
+    }
+    entity_id(sketch, e)
+}
+
 fn constraint_json(data: &SketchData, sketch: FeatureId, c: &noshape_sketch::Constraint, units: &UnitPrefs) -> Value {
     let dim = c.kind.is_dimension();
     let mut v = json!({
         "id": constraint_id(c.id, dim),
         "type": c.kind.name(),
-        "entities": c.kind.entities().iter().map(|e| entity_id(sketch, *e)).collect::<Vec<_>>(),
+        "entities": c.kind.entities().iter().map(|e| constrained_id(data, sketch, *e)).collect::<Vec<_>>(),
     });
     if dim {
         if let Some(val) = c.kind.value() {
@@ -456,7 +466,9 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
         })
         .collect();
     let mut v = json!({ "sketch": id.to_string(), "units": crate::ops::query::units_json(&units), "failed": failed });
-    let entities: Vec<Value> = data.sketch.entities().filter(|e| before.is_none_or(|b| !b.contains(&e.id))).map(|e| geometry_json(&data, id, e, k)).collect();
+    // Reference-only geometry (the Origin, model edges constraints point
+    // at) isn't a sketch entity in live: constraints name the reference.
+    let entities: Vec<Value> = data.sketch.entities().filter(|e| !e.reference_only && before.is_none_or(|b| !b.contains(&e.id))).map(|e| geometry_json(&data, id, e, k)).collect();
     v[if before.is_some() { "created" } else { "entities" }] = json!(entities);
     if before.is_none() {
         v["constraints"] = json!(data.sketch.constraints().map(|c| constraint_json(&data, id, c, &units)).collect::<Vec<_>>());
