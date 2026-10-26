@@ -53,6 +53,9 @@ on:
         description: 'Presentation modes instead of the runner default, e.g. texture'
         required: false
         default: ''
+      cold:
+        description: 'macOS: clear the Metal shader cache before every launch, so each one is a cold start (any value)'
+        required: false
   workflow_run:
     workflows: [Release]
     types: [completed]
@@ -286,6 +289,7 @@ jobs:
         env:
           VARIANTS: ${{ inputs.variants || '' }}
           BENCH_ENV: ${{ inputs.env || '' }}
+          COLD: ${{ inputs.cold || '' }}
         run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ inputs.modes || matrix.modes }}
 
       - name: Benchmarks (Windows)
