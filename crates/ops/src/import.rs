@@ -14,6 +14,17 @@ use std::path::{Path, PathBuf};
 pub const IMPORT_EXTS: &[&str] = &["step", "stp", "iges", "igs", "brep", "stl", "obj", "pvz", "x_t", "x_b", "xmt_txt", "xmt_bin", "3dm", "sldprt", "par", "psm", "prt", "ipt", "sat", "sab", "3mf", "gltf", "glb", "jt", "zip"];
 /// Native part files (their own dialog variant).
 pub const NATIVE_PARTS: &[&str] = &["sldprt", "par", "psm", "prt", "ipt"];
+/// Files whose import dialog offers "Import material density": Onshape's
+/// own list (its import service's TYPES_THAT_SUPPORT_MATERIAL_DENSITY,
+/// spelling included); shown when any of the files is one (STEP, SAT, PVZ,
+/// Inventor and meshes never: live part-studio/2394, qa4 IMP-DENS).
+pub const MATERIAL_DENSITY_TYPES: &[&str] = &["sldprt", "sldasm", "zip", "psm", "par", "x_t", "x_b", "xmm_bin", "xmm_txt", "catpart", "catproduct", "prt", "asm"];
+
+/// Whether the import dialog for `paths` shows "Import material density".
+pub fn offers_material_density(paths: &[std::path::PathBuf]) -> bool {
+    paths.iter().any(|p| p.extension().is_some_and(|e| MATERIAL_DENSITY_TYPES.contains(&e.to_string_lossy().to_lowercase().as_str())))
+}
+
 /// Mesh files without units: Onshape asks for them (live G35, G35b).
 pub const MESH_FILES: &[&str] = &["stl", "obj"];
 /// The Units select, as Onshape lists units in its STL dialogs.
@@ -387,4 +398,20 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
 /// "Import <label>".
 pub fn description(label: &str) -> String {
     format!("Import {label}")
+}
+
+#[cfg(test)]
+mod tests {
+    /// "Import material density" as Onshape offers it (qa4 IMP-DENS): not
+    /// for STEP, SAT, PVZ or meshes; any one file of its types is enough.
+    #[test]
+    fn material_density_follows_onshapes_types() {
+        let offers = |names: &[&str]| super::offers_material_density(&names.iter().map(std::path::PathBuf::from).collect::<Vec<_>>());
+        for yes in [&["a.x_t"][..], &["a.X_B"], &["a.sldprt"], &["a.zip"], &["a.step", "b.par"]] {
+            assert!(offers(yes), "{yes:?}");
+        }
+        for no in [&["a.step"][..], &["a.stp"], &["a.sat"], &["a.pvz"], &["a.stl"], &["a.ipt"], &["a.xmt_txt"]] {
+            assert!(!offers(no), "{no:?}");
+        }
+    }
 }

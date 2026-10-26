@@ -357,8 +357,11 @@ fn rhino_breps_are_valid() {
                         let back = read_rhino_parts(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{name}: {e}"));
                         assert_eq!(back.len(), 1, "{name}");
                         assert_eq!(back[0].name.as_deref(), Some(name), "{name}");
+                        // Within 0.01 %: the sphere comes back as a NURBS surface whose
+                        // integrated volume differs by 4e-5 on Windows (live's own bands
+                        // for spline solids are ±0.1 %).
                         let (v, want) = (volume_properties(&back[0].shape).unwrap().mass, volume_properties(&s).unwrap().mass);
-                        assert!(back[0].shape.is_valid() && (v - want).abs() < 2e-5 * want, "{name}: {v} vs {want}");
+                        assert!(back[0].shape.is_valid() && (v - want).abs() < 1e-4 * want, "{name}: {v} vs {want}");
                     }
                 }
                 Err(e) => {

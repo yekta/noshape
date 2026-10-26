@@ -1613,26 +1613,30 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     g.color_since(mark, c);
                 }
             }
-            // Cosmetic threads: ANSI a dashed circle at the major diameter, ISO
-            // and JIS a thin arc of about three quarters (live 10-26 d, sheet
-            // y up: ISO's gap from 188.5° to 270.5°, JIS's from 7.5° to
+            // Cosmetic threads at the major diameter, thin (live 10-26 d, sheet
+            // y up): ANSI four 60° arcs, each ending on an axis with 30° gaps
+            // after it (30°–90°, 120°–180°, 210°–270°, 300°–360°; measured on
+            // drawing/ui2-ct-end-ANSI-2x); ISO and JIS one arc of about three
+            // quarters (ISO's gap from 188.5° to 270.5°, JIS's from 7.5° to
             // 79.5°).
             let thread_mark = g.mark();
             if !geo.threads.is_empty() {
                 // Drawing properties › Views › Cosmetic threads › Thread
                 // style, else the sheet's standard.
                 let style = vt.thread_style.unwrap_or(if sheet.size.is_ansi() { super::ThreadStyle::Ansi } else { super::ThreadStyle::Iso });
-                let ansi = style == super::ThreadStyle::Ansi;
+                let arcs: &[(f64, f64)] = match style {
+                    super::ThreadStyle::Ansi => &[(30.0, 90.0), (120.0, 180.0), (210.0, 270.0), (300.0, 360.0)],
+                    super::ThreadStyle::Iso => &[(-89.5, 188.5)],
+                    super::ThreadStyle::Jis => &[(79.5, 367.5)],
+                };
                 for (c, r) in &geo.threads {
-                    let (a0, a1) = match style {
-                        super::ThreadStyle::Ansi => (0.0, std::f64::consts::TAU),
-                        super::ThreadStyle::Iso => ((-89.5f64).to_radians(), 188.5f64.to_radians()),
-                        super::ThreadStyle::Jis => (79.5f64.to_radians(), 367.5f64.to_radians()),
-                    };
-                    let n = 48;
-                    let pts: Vec<[f64; 2]> = (0..=n).map(|i| a0 + (a1 - a0) * i as f64 / n as f64).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]).collect();
-                    for piece in map_polyline(&pl, &pts) {
-                        g.lines.push(Polyline2 { points: piece, style: if ansi { LineStyle::Hidden } else { LineStyle::Thin }, closed: false, pick: view_pick });
+                    for &(a0, a1) in arcs {
+                        let (a0, a1) = (a0.to_radians(), a1.to_radians());
+                        let n = ((a1 - a0) / std::f64::consts::TAU * 48.0).ceil().max(4.0) as usize;
+                        let pts: Vec<[f64; 2]> = (0..=n).map(|i| a0 + (a1 - a0) * i as f64 / n as f64).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]).collect();
+                        for piece in map_polyline(&pl, &pts) {
+                            g.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick: view_pick });
+                        }
                     }
                 }
             }

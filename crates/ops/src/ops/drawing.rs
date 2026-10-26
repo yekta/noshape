@@ -91,7 +91,7 @@ pub fn ops() -> Vec<Op> {
             verb: "get",
             summary: "A drawing sheet's views (with their edges in sheet coordinates), annotations and tables",
             description: "Coordinates are sheet millimeters from the sheet's lower-left corner. Each view lists its kind, parent, scale, sheet bounds and the model edges as drawn (lines with end points, circles/arcs with center and radius, all in sheet mm) so you can click them with drawing_dimension.",
-            fields: vec![doc_field(), drawing_field(), sheet_field(), opt("edges", json!({ "type": "boolean", "default": true }), "Include each view's edges.")],
+            fields: vec![doc_field(), drawing_field(), sheet_field(), opt("edges", json!({ "type": "boolean", "default": true }), "Include each view's edges: its model edges (line / circle / arc / curve) and the silhouettes of curved faces (`silhouette`), in sheet mm.")],
             mutates: false,
             destructive: false,
             run: get,
@@ -419,18 +419,28 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             {
                 // Other drawn curves (circles seen at an angle, splines):
                 // their drawn points, at most 24 per edge.
-                let curve = |mi: usize| -> Option<Value> {
-                    let pts: Vec<[f64; 2]> = g.edges.iter().filter(|d| d.model == Some(mi as u32)).flat_map(|d| d.points.iter().copied()).collect();
-                    if pts.len() < 2 {
-                        return None;
-                    }
+                let sample = |pts: &[[f64; 2]]| -> Vec<Value> {
                     let step = pts.len().div_ceil(24).max(1);
                     let mut sampled: Vec<Value> = pts.iter().step_by(step).map(|p| pt(pl.to_sheet(*p))).collect();
                     if !(pts.len() - 1).is_multiple_of(step) {
                         sampled.push(pt(pl.to_sheet(pts[pts.len() - 1])));
                     }
-                    Some(json!({ "type": "curve", "points": sampled }))
+                    sampled
                 };
+                let curve = |mi: usize| -> Option<Value> {
+                    let pts: Vec<[f64; 2]> = g.edges.iter().filter(|d| d.model == Some(mi as u32)).flat_map(|d| d.points.iter().copied()).collect();
+                    (pts.len() >= 2).then(|| json!({ "type": "curve", "points": sample(&pts) }))
+                };
+                // Silhouettes of curved faces (a pin's sides): no model edge,
+                // but drawn and clickable (qa4 DRW-SIL).
+                let silhouettes = g
+                    .edges
+                    .iter()
+                    .filter(|d| d.model.is_none() && d.visible && d.class == noshape_kernel::EdgeClass::Outline && d.sketch == noshape_model::drawing::views::SketchEdge::None && d.points.len() >= 2)
+                    .map(|d| match d.points[..] {
+                        [a, b] => json!({ "type": "silhouette", "a": pt(pl.to_sheet(a)), "b": pt(pl.to_sheet(b)) }),
+                        _ => json!({ "type": "silhouette", "points": sample(&d.points) }),
+                    });
                 let list: Vec<Value> = g
                     .model_edges
                     .iter()
@@ -449,6 +459,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                         }
                         _ => curve(mi),
                     })
+                    .chain(silhouettes)
                     .collect();
                 j["edges"] = json!(list);
             }

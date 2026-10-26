@@ -19,7 +19,7 @@ pub fn ops() -> Vec<Op> {
             req("files", json!({ "type": "array", "items": { "type": "string" }, "minItems": 1 }), "Paths of the files."),
             opt("combine", json!({ "type": "boolean" }), "Combine to a single Part Studio (default: one Part Studio per file)."),
             opt("appearances", json!({ "type": "boolean", "default": true }), "Import appearances."),
-            opt("density", json!({ "type": "boolean" }), "Import material density (native parts and assemblies)."),
+            opt("density", json!({ "type": "boolean" }), "Import material density: offered (and used) only when a file is one of Onshape's types for it (Parasolid x_t / x_b, SOLIDWORKS, Solid Edge, NX / Creo prt / asm, CATIA, zip); not STEP."),
             opt("y_up", json!({ "type": "boolean" }), "Orient imported models with Y axis up."),
             opt("mesh_unit", json!({ "type": "string", "enum": MESH_UNITS.iter().map(|u| u.0).collect::<Vec<_>>() }), "STL / OBJ units (default: the workspace unit; OBJ: Meter)."),
             opt("composite", json!({ "type": "boolean" }), "Create a composite part."),
@@ -49,7 +49,8 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut c = ImportChoice::defaults(&paths, units.length);
     c.combine = a.bool_or("combine", false)?;
     c.appearances = a.bool_or("appearances", true)?;
-    c.density = a.bool_or("density", false)?;
+    // As the dialog: only offered for Onshape's material density types.
+    c.density = a.bool_or("density", false)? && import::offers_material_density(&paths);
     c.y_up = a.bool_or("y_up", false)?;
     c.composite = a.bool_or("composite", false)?;
     c.join = a.bool_or("join", false)?;

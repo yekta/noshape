@@ -632,6 +632,40 @@ fn pdf_overlay_states(g: &SheetGeometry) -> String {
     format!(" /ExtGState <<{states} >>")
 }
 
+/// A PDF stream object, FlateDecode-compressed as live's exports (an A3
+/// sheet's content was 680 KB plain): `dict` holds its other entries.
+fn flate_stream(dict: &str, data: &[u8]) -> Vec<u8> {
+    let z = miniz_oxide::deflate::compress_to_vec_zlib(data, 6);
+    let mut o = format!("<< {dict}/Length {} /Filter /FlateDecode >>\nstream\n", z.len()).into_bytes();
+    o.extend_from_slice(&z);
+    o.extend_from_slice(b"\nendstream");
+    o
+}
+
+/// A PDF with its FlateDecode streams inflated (tests read the drawing
+/// operators).
+#[cfg(test)]
+pub(crate) fn pdf_decoded(pdf: &[u8]) -> String {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while let Some(k) = pdf[at..].windows(7).position(|w| w == b"stream\n") {
+        let start = at + k + 7;
+        out.extend_from_slice(&pdf[at..start]);
+        let Some(len) = pdf[start..].windows(10).position(|w| w == b"\nendstream") else { break };
+        let data = &pdf[start..start + len];
+        let header = String::from_utf8_lossy(&pdf[at..start]);
+        if header.rfind("/FlateDecode").is_some_and(|f| f > header.rfind("<<").unwrap_or(0)) {
+            out.extend(miniz_oxide::inflate::decompress_to_vec_zlib(data).unwrap_or_default());
+        } else {
+            out.extend_from_slice(data);
+        }
+        out.extend_from_slice(b"\nendstream");
+        at = start + len + 10;
+    }
+    out.extend_from_slice(&pdf[at..]);
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 /// Single-page vector PDF.
 pub fn to_pdf(g: &SheetGeometry) -> Vec<u8> {
     to_pdf_pages(std::slice::from_ref(g))
@@ -665,17 +699,14 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
             next += 1;
             let _ = write!(xobjects, " /Im{n} {n} 0 R");
             let _ = writeln!(draw, "q {:.3} 0 0 {:.3} {:.3} {:.3} cm /Im{n} Do Q", im.size[0] * pt, im.size[1] * pt, im.pos[0] * pt, im.pos[1] * pt);
-            let mut obj = format!("<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length {} >>\nstream\n", rgb.len()).into_bytes();
-            obj.extend_from_slice(rgb);
-            obj.extend_from_slice(b"\nendstream");
-            images.push(obj);
+            images.push(flate_stream(&format!("/Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 "), rgb));
         }
         let content = draw + pdf_content(g).as_str();
         let (w, h) = (g.width * pt, g.height * pt);
         let xo = if xobjects.is_empty() { String::new() } else { format!(" /XObject <<{xobjects} >>") };
         let gs = pdf_overlay_states(g);
         objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 3 0 R{fonts} >>{xo}{gs} >> /Contents {} 0 R >>", 5 + 2 * i).into_bytes());
-        objects.push(format!("<< /Length {} >>\nstream\n{}endstream", content.len(), content).into_bytes());
+        objects.push(flate_stream("", content.as_bytes()));
     }
     for name in &PDF_FONTS[1..] {
         objects.push(format!("<< /Type /Font /Subtype /Type1 /BaseFont /{name} /Encoding /WinAnsiEncoding >>").into_bytes());
@@ -792,7 +823,7 @@ mod tests {
         let svg = to_svg(&g);
         let at = svg.find(r#"fill-opacity="0.250""#).expect("overlay polygon");
         assert!(svg.rfind("<text").is_none_or(|t| t < at) && svg.rfind("<polyline").is_none_or(|l| l < at), "after the ink");
-        let pdf = String::from_utf8_lossy(&to_pdf(&g)).to_string();
+        let pdf = pdf_decoded(&to_pdf(&g));
         assert!(pdf.contains("/ExtGState << /Ov0 << /ca 0.250 >> >>"));
         assert!(pdf.find("/Ov0 gs").unwrap() > pdf.rfind(" Tj ET").unwrap(), "after the texts");
     }
@@ -836,7 +867,7 @@ mod tests {
         let bw = prepare(&g, &ExportOptions { color_mode: 1, ..Default::default() });
         assert!(bw.colors.is_empty());
         assert!(to_dxf(&g).contains(" 62\n1\n"));
-        assert!(String::from_utf8_lossy(&to_pdf(&g)).contains("1.000 0.000 0.000 RG"));
+        assert!(pdf_decoded(&to_pdf(&g)).contains("1.000 0.000 0.000 RG"));
     }
 
     #[test]

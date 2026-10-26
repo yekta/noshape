@@ -603,7 +603,7 @@ fn bom_hole_table_and_linked_balloons() {
     // Exports include the table.
     assert!(export::to_svg(&built.geometry).contains("HOLE TABLE"));
     assert!(export::to_dxf(&built.geometry).contains("HOLE TABLE"));
-    assert!(String::from_utf8_lossy(&export::to_pdf(&built.geometry)).contains("HOLE TABLE"));
+    assert!(export::pdf_decoded(&export::to_pdf(&built.geometry)).contains("HOLE TABLE"));
 }
 
 #[test]
@@ -639,7 +639,7 @@ fn dimension_formats_and_new_dimension_types() {
     let svg = export::to_svg(&built.geometry);
     assert!(!svg.contains('⌖') && svg.contains("Ra 1.6"));
     let pdf = export::to_pdf(&built.geometry);
-    assert!(!String::from_utf8_lossy(&pdf).contains("(⌖)"));
+    assert!(!export::pdf_decoded(&pdf).contains("(⌖)"));
 }
 
 #[test]

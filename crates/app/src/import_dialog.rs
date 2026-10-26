@@ -8,7 +8,8 @@
 //! bodies, ☐ Join adjacent surfaces (each with a ? tooltip); Import / Cancel.
 //! Native part files (SOLIDWORKS, Solid Edge, NX, Inventor; live G38b,
 //! dom/dialog-import-sldprt.txt, dialog-import-nxhub.txt): no tiles, and ☐
-//! Import material density after Import appearances.
+//! Import material density after Import appearances (Onshape's list of
+//! types, `noshape_ops::import::MATERIAL_DENSITY_TYPES`: not Inventor).
 //! Mesh files (live G35, G35b): STL has no tiles, no Import appearances and
 //! a Units select defaulting to the document's unit; OBJ keeps the tiles and
 //! Import appearances, its Units default to Meter; 3MF is OBJ without Units.
@@ -53,11 +54,10 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     // Mesh files and PVZ (imported as meshes) have no Join adjacent surfaces
     // (live "qa5 zip import": PVZ shows appearances, Y up and composite only).
     let (mesh, units_select) = (all_of(&["stl", "obj", "3mf", "pvz"]), stl || obj);
-    // Native assemblies (a zip; live G38h) keep the tiles and add Import
-    // material density like native parts; STEP and Parasolid files have it
-    // too, SAT and PVZ not (live "qa5 zip import", "api (10-23) import parity").
+    // Import material density: Onshape's own file-type list, when any file
+    // is one (not STEP, SAT or PVZ; qa4 IMP-DENS).
+    let density = noshape_ops::import::offers_material_density(&paths);
     let zip = all_of(&["zip"]);
-    let density = native || zip || all_of(&["step", "stp", "x_t", "x_b", "xmt_txt", "xmt_bin"]);
     let doc_unit = doc.read(cx).session.doc.settings.units.length;
     let default_unit = if obj { noshape_units::LengthUnit::Meter } else { doc_unit };
     let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);
