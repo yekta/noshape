@@ -42,9 +42,10 @@ const LABEL_ASC_PX: f64 = 16.0 * 1.069;
 const DIGIT_H: f64 = 0.714 / 1.069;
 /// The dimension line's gap on each side of its label.
 const LABEL_GAP_PX: f64 = 4.0;
-/// Hovered: olive/gold text and lines on a tan box (live part-studio/41).
-const HOVER_INK: u32 = 0xb08a2a;
-const HOVER_BOX: u32 = 0xe9d9b4;
+/// Hovered: the lines gold, the label on a tan box (live part-studio/41:
+/// lines (148,128,55), box (170,156,133), the text stays black).
+const HOVER_INK: u32 = 0x94803a;
+const HOVER_BOX: u32 = 0xaa9c85;
 
 impl PartStudioView {
     /// Show the dimensions of `sketch` (a sketch feature).
@@ -127,7 +128,7 @@ impl PartStudioView {
     }
 
     /// The labels as glyph outlines in the sketch plane (drawn with the
-    /// plane names), the hovered one gold on a tan box.
+    /// plane names), the hovered one on a tan box.
     pub(super) fn shown_dims_fills(&self, cx: &App) -> Vec<noshape_render::overlay::WorldFill> {
         let Some(shown) = self.ui.shown_dims else { return Vec::new() };
         let Some((labels, _)) = self.shown_dims_geometry(cx) else { return Vec::new() };
@@ -139,14 +140,16 @@ impl PartStudioView {
         for l in labels {
             let hovered = shown.hover == Some(l.cid);
             if hovered {
-                let pad = 3.0 / LABEL_ASC_PX * l.asc;
-                let (lo, hi) = (-0.25 * l.asc - pad, DIGIT_H * l.asc + pad);
-                let quad = vec![l.origin + l.x * -pad + l.y * lo, l.origin + l.x * (l.width + pad) + l.y * lo, l.origin + l.x * (l.width + pad) + l.y * hi, l.origin + l.x * -pad + l.y * hi];
+                // Live: about 0.45 of the ascender past the text along the
+                // line, 0.3 across.
+                let (px, py) = (0.45 * l.asc, 0.3 * l.asc);
+                let (lo, hi) = (-py, DIGIT_H * l.asc + py);
+                let quad = vec![l.origin + l.x * -px + l.y * lo, l.origin + l.x * (l.width + px) + l.y * lo, l.origin + l.x * (l.width + px) + l.y * hi, l.origin + l.x * -px + l.y * hi];
                 out.push(noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(vec![quad]), color: rgba(HOVER_BOX) });
             }
             let layout = super::plane_text(&l.text);
             let contours: Vec<Vec<DVec3>> = layout.polylines.iter().filter(|c| c.len() >= 3).map(|c| c.iter().map(|q| l.origin + l.x * (q.x * l.asc) + l.y * (q.y * l.asc)).collect()).collect();
-            out.push(noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: rgba(if hovered { HOVER_INK } else { 0x000000 }) });
+            out.push(noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: rgba(0x000000) });
         }
         out
     }

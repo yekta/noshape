@@ -40,6 +40,7 @@ mod thickness;
 mod flatten_tool;
 mod draft_tool;
 pub(crate) mod export;
+mod plane_handles;
 mod shown_dims;
 pub(crate) mod toolbar_prefs;
 pub mod view_cube;
@@ -915,7 +916,9 @@ impl PartStudioView {
         let mut extra = self.sketch_overlay(&mut selection, &mut accent, cx);
         // The manipulator's glyph follows the camera: the renderer builds it
         // for every frame (camera_geometry.rs).
-        let manip: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = self.manipulator_geometry(cx).into_iter().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>).collect();
+        let mut manip: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = self.manipulator_geometry(cx).into_iter().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>).collect();
+        // A selected plane's resize rings (plane_handles.rs).
+        manip.extend(self.plane_ring_geometry().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
         self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
         extra.extend(self.consumed_picks_overlay(&selection, &accent));
         extra.extend(self.select_other_overlay());
@@ -946,7 +949,13 @@ impl PartStudioView {
             extra.extend(scene_builder::debug_geometry(&st.debug, self.gpu.uploader()));
         }
         crate::nav_trace::highlights("part_studio", &selection, single_hover.as_ref());
-        let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
+        // Planes picked in the graphics stop dragging their rings once
+        // deselected (a later pick from the list doesn't drag, live).
+        let sel = &self.selection;
+        self.ui.planes_picked_in_graphics.retain(|r| sel.contains(r));
+        // A plane being resized: its highlight follows the drag.
+        let shown = self.with_plane_drag(self.display.clone());
+        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
         // Overlays the active field can't take (a shown sketch line on a
         // part edge for Fillet's edges) leave the pick pass, so what lies
         // under them is picked. Faces keep hiding what's behind them.
@@ -1338,6 +1347,10 @@ impl PartStudioView {
             ViewportEvent::ToolDown { position, .. } if self.annotation_drag_start(*position, cx) => return,
             ViewportEvent::ToolDrag { position } if self.annotation_drag_move(*position, cx) => return,
             ViewportEvent::ToolUp { .. } if self.annotation_drag_end(cx) => return,
+            // Dragging a selected plane's corner ring (plane_handles.rs).
+            ViewportEvent::ToolDown { position, .. } if self.sketch.is_none() && self.plane_drag_start(*position, cx) => return,
+            ViewportEvent::ToolDrag { position } if self.plane_drag_move(*position, window, cx) => return,
+            ViewportEvent::ToolUp { .. } if self.plane_drag_end(window, cx) => return,
             _ => {}
         }
         // Screen-sized geometry built here follows the zoom: resize it when
@@ -1360,6 +1373,15 @@ impl PartStudioView {
             ViewportEvent::PointerMove { position, .. } => {
                 self.ui.pointer = Some(*position);
                 self.select_other_pointer(*position, cx);
+                // A plane's resize ring under the pointer: darker, nothing
+                // pre-highlighted (live).
+                if self.plane_ring_pointer(*position, cx) {
+                    if self.ui.plane_ring_hover.is_some() {
+                        self.ui.hover_pick = None;
+                        self.update_hover(cx);
+                    }
+                    self.refresh_scene(false, cx);
+                }
                 // Near a hovered edge's midpoint the midpoint becomes (or
                 // stops being) the target without a new pick (not while
                 // Select other is open).
@@ -1422,7 +1444,9 @@ impl PartStudioView {
             // Picking under the pointer is off while Select other is open.
             ViewportEvent::Hover(_) if self.ui.select_other.is_some() => {}
             ViewportEvent::Hover(id) => {
-                // Live: with a dialog field active, what it doesn't take isn't highlighted.
+                // Live: with a dialog field active, what it doesn't take isn't
+                // highlighted; on a plane's resize ring nothing is.
+                let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
                 self.ui.hover_pick = id.and_then(|id| self.built.as_ref()?.picks.get(id).filter(|t| self.field_takes(t, cx) != Some(false)).cloned());
                 if self.update_hover(cx) {
                     self.refresh_scene(false, cx);
@@ -1480,7 +1504,13 @@ impl PartStudioView {
                             self.edit_feature(sketch, window, cx);
                         }
                     }
-                    Some(t) => self.pick(t, cx),
+                    Some(t) => {
+                        // Only planes picked here drag their rings (live).
+                        if t.kind == PickKind::Plane && !self.ui.planes_picked_in_graphics.contains(&t.reference) {
+                            self.ui.planes_picked_in_graphics.push(t.reference.clone());
+                        }
+                        self.pick(t, cx)
+                    }
                     // Clicking empty space clears the selection, but never a
                     // dialog's chips (live qa5 pass 7: neither a feature
                     // dialog's fields nor Mass properties' "Parts to measure"
@@ -4313,10 +4343,11 @@ impl PartStudioView {
         // Isolate takes the planes away, names too (qa5 KB3).
         let isolating = self.ui.isolate.as_ref().is_some_and(|i| i.mode == behaviors::IsolateMode::Isolate);
         if self.opts.show_planes && !isolating {
-            for pl in self.display.planes.iter().filter(|p| !p.hidden) {
+            let shown = self.with_plane_drag(self.display.clone());
+            for pl in shown.planes.iter().filter(|p| !p.hidden) {
                 let f = &pl.frame;
                 let asc = 0.031 * 2.0 * pl.half_height;
-                let top_left = f.origin + f.x * (-pl.half_width) + f.y * pl.half_height;
+                let top_left = pl.corner(-1.0, 1.0);
                 in_plane_contours(&pl.name, top_left, f.x, f.y, asc, &mut contours);
             }
         }

@@ -239,7 +239,7 @@ impl PartStudioView {
     /// The scene's display: the model plus the shown Assembly context's
     /// bodies at the banner's transparency, without hidden instances.
     pub(super) fn display_for_scene(&self) -> Arc<StudioDisplay> {
-        let d = self.display_for_scene_inner();
+        let d = self.with_plane_drag(self.display_for_scene_inner());
         if d.context_bodies.is_empty() {
             return d;
         }
