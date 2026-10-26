@@ -65,11 +65,13 @@ pub struct DrawingPropsUi {
     pub overflow: std::rc::Rc<std::cell::Cell<bool>>,
     /// The number field whose ▾ list is open.
     pub wt_list: Option<usize>,
+    /// The arrowhead picker whose list is open.
+    pub arrow_menu: Option<&'static str>,
 }
 
 impl Default for DrawingPropsUi {
     fn default() -> Self {
-        Self { open: false, tab: 0, inspection_inputs: None, focused: None, scroll: ScrollHandle::new(), overflow: Default::default(), wt_list: None }
+        Self { open: false, tab: 0, inspection_inputs: None, focused: None, scroll: ScrollHandle::new(), overflow: Default::default(), wt_list: None, arrow_menu: None }
     }
 }
 
@@ -203,6 +205,9 @@ enum FontOf {
     SectionLabel,
     DetailLabel,
     AuxLabel,
+    /// Tables › kind `k`'s font, Hole tables' tags.
+    Table(usize),
+    HoleTags,
 }
 
 fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawing::sheet::TextFont> {
@@ -214,6 +219,8 @@ fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawin
         FontOf::SectionLabel => &mut p.view_tab.section_label.font,
         FontOf::DetailLabel => &mut p.view_tab.detail_label.font,
         FontOf::AuxLabel => &mut p.view_tab.aux_label.font,
+        FontOf::Table(k) => &mut table_style_mut(p, k).font,
+        FontOf::HoleTags => &mut p.table_styles.hole_tags_font,
     }
 }
 
@@ -295,6 +302,32 @@ fn flat_slot(p: &mut DrawingProps, k: usize) -> &mut (u8, Option<[u8; 3]>) {
         rows.push((FLAT_LINE_ROWS[rows.len()].1, None));
     }
     &mut rows[k]
+}
+
+/// Drawing properties › Tables' style of kind `k` (live's order: BOM,
+/// Custom, Cut list, Hole, Revision tables, Tables).
+fn table_style_mut(p: &mut DrawingProps, k: usize) -> &mut TableStyle {
+    let s = &mut p.table_styles;
+    match k {
+        0 => &mut s.bom,
+        1 => &mut s.custom,
+        2 => &mut s.cut_list,
+        3 => &mut s.hole,
+        4 => &mut s.revision,
+        _ => &mut s.general,
+    }
+}
+
+fn set_table_header<const K: usize>(p: &mut DrawingProps, v: f64) {
+    table_style_mut(p, K).header.height = Some(v);
+}
+
+fn set_table_content<const K: usize>(p: &mut DrawingProps, v: f64) {
+    table_style_mut(p, K).content.height = Some(v);
+}
+
+fn set_table_title<const K: usize>(p: &mut DrawingProps, v: f64) {
+    table_style_mut(p, K).title = Some(v);
 }
 
 /// Sets annotation type `I`'s text height.
@@ -427,7 +460,33 @@ impl DrawingEditor {
             }
             6 => {
                 let (h, v) = (p.table_h_padding, p.table_v_padding);
-                vec![spin3(h, |p, v| p.table_h_padding = v, window, cx), spin3(v, |p, v| p.table_v_padding = v, window, cx)]
+                let ts = &p.table_styles;
+                let styles = [&ts.bom, &ts.custom, &ts.cut_list, &ts.hole, &ts.revision, &ts.general];
+                let header = |k: usize| styles[k].header.height.unwrap_or(p.ann_text_height);
+                let content = |k: usize| styles[k].content.height.unwrap_or(p.ann_text_height);
+                let title = |k: usize| styles[k].title.unwrap_or(content(k) * 1.3);
+                // 2 + 2k / 3 + 2k: kind k's header / content row text; 14 /
+                // 15: Revision tables' and Tables' title row text.
+                vec![
+                    spin3(h, |p, v| p.table_h_padding = v, window, cx),
+                    spin3(v, |p, v| p.table_v_padding = v, window, cx),
+                    dropdown(header(0), set_table_header::<0>, window, cx),
+                    dropdown(content(0), set_table_content::<0>, window, cx),
+                    dropdown(header(1), set_table_header::<1>, window, cx),
+                    dropdown(content(1), set_table_content::<1>, window, cx),
+                    dropdown(header(2), set_table_header::<2>, window, cx),
+                    dropdown(content(2), set_table_content::<2>, window, cx),
+                    dropdown(header(3), set_table_header::<3>, window, cx),
+                    dropdown(content(3), set_table_content::<3>, window, cx),
+                    dropdown(header(4), set_table_header::<4>, window, cx),
+                    dropdown(content(4), set_table_content::<4>, window, cx),
+                    dropdown(header(5), set_table_header::<5>, window, cx),
+                    dropdown(content(5), set_table_content::<5>, window, cx),
+                    dropdown(title(4), set_table_title::<4>, window, cx),
+                    dropdown(title(5), set_table_title::<5>, window, cx),
+                    // 16: Hole tables' Indicator arrowhead.
+                    dropdown(ts.hole_indicator_arrow.unwrap_or(p.ann_arrow * 2.0 / 3.0), |p, v| p.table_styles.hole_indicator_arrow = Some(v), window, cx),
+                ]
             }
             _ => {
                 vec![dropdown(p.inspection_text_height, |p, v| p.inspection_text_height = v, window, cx)]
@@ -695,6 +754,8 @@ impl DrawingEditor {
                 FontOf::SectionLabel => "dp-slfont",
                 FontOf::DetailLabel => "dp-dlfont",
                 FontOf::AuxLabel => "dp-alfont",
+                FontOf::Table(k) => ["dp-tf0", "dp-tf1", "dp-tf2", "dp-tf3", "dp-tf4", "dp-tf5"][k.min(5)],
+                FontOf::HoleTags => "dp-htags",
             };
             sel(id, label, items, width)
         };
@@ -710,22 +771,65 @@ impl DrawingEditor {
         // centred.
         let trow = |label: &'static str, col: f32, h: f32, top: f32, body: AnyElement| div().h(px(h)).flex_none().flex().pl(px(13.)).child(div().w(px(col - 14.)).flex_none().h_full().flex().items_center().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().pt(px(top)).child(body)).into_any_element();
         // The arrowhead control: the style's glyph and a caret, 28 px.
+        // Live "ui2 (10-26) arrowhead picker": a 28 x 158 list right under
+        // the control, six 26 px cells of glyphs only (None, Filled,
+        // Closed, Open, Tick, Dot), hover rgba(144,206,241,0.7), no check.
+        let arrow_open = self.drawing_props.arrow_menu;
         let asel = |id: &'static str, cur: noshape_model::drawing::sheet::ArrowType, items: Vec<(String, bool, Act)>| {
-            let ed = ed.clone();
-            h_flex()
-                .id(id)
-                .h(px(26.))
-                .gap(px(2.))
-                .cursor_pointer()
-                .child(arrowhead_glyph(cur))
-                .child(crate::os_ui::glyph(SELECT_CARET, 8., gpui_kit::rgb_static(0x333333)))
-                .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
-                    for (label, checked, f) in &items {
-                        let (e, f) = (ed.clone(), f.clone());
-                        menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, _, cx| e.update(cx, |this, cx| this.set_drawing_prop(&*f, cx))));
-                    }
-                    menu
-                })
+            let open = arrow_open == Some(id);
+            let toggle = {
+                let ed = ed.clone();
+                move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+                    ed.update(cx, |this, cx| {
+                        this.drawing_props.arrow_menu = if open { None } else { Some(id) };
+                        cx.notify();
+                    })
+                }
+            };
+            let menu = open.then(|| {
+                let close = ed.clone();
+                deferred(
+                    div()
+                        .id(SharedString::from(format!("{id}-menu")))
+                        .absolute()
+                        .top(px(26.))
+                        .left_0()
+                        .w(px(28.))
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .border_1()
+                        .border_color(gpui_kit::rgb(0xcccccc))
+                        .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.18), offset: point(px(0.), px(3.)), blur_radius: px(6.), spread_radius: px(0.), inset: false }])
+                        .occlude()
+                        .on_mouse_down_out(move |_, _, cx| {
+                            close.update(cx, |this, cx| {
+                                this.drawing_props.arrow_menu = None;
+                                cx.notify();
+                            })
+                        })
+                        .children(items.into_iter().zip(noshape_model::drawing::sheet::ArrowType::ALL).enumerate().map(|(i, ((_, _, f), t))| {
+                            let e = ed.clone();
+                            div()
+                                .id(SharedString::from(format!("{id}-{i}")))
+                                .size(px(26.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .hover(|d| d.bg(gpui_kit::rgba(0x90cef1b3)))
+                                .child(arrowhead_glyph(t))
+                                .on_click(move |_, _, cx| {
+                                    e.update(cx, |this, cx| {
+                                        this.drawing_props.arrow_menu = None;
+                                        this.set_drawing_prop(&*f, cx);
+                                    })
+                                })
+                        })),
+                )
+            });
+            div()
+                .relative()
+                .child(h_flex().id(id).h(px(26.)).gap(px(2.)).cursor_pointer().child(arrowhead_glyph(cur)).child(crate::os_ui::glyph(SELECT_CARET, 8., gpui_kit::rgb_static(0x333333))).on_click(toggle))
+                .children(menu)
                 .into_any_element()
         };
         let section = |title: &'static str| div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::rgb(0xefefef)).border_t_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mt(px(4.)).mb(px(8.)).child(title).into_any_element();
@@ -1059,7 +1163,8 @@ impl DrawingEditor {
                 .child(trow("Cutting line label", 125., 32., 2., font_row(FontOf::SectionLabel, vt.section_label.font.clone(), 219.)))
                 .child(label_row(9, "dp-slcolor", vt.section_label.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.section_label.color = c)))
                 .child(row("Label prefix", field(0)))
-                .child(pen_row("Hatches", ("dp-hatch", "dp-hatchc"), &vt.hatch_line, |p, v| p.view_tab.hatch_line.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.hatch_line.color = c)))
+                .child(section("View and region hatches"))
+                .child(pen_row("ANSI31 general", ("dp-hatch", "dp-hatchc"), &vt.hatch_line, |p, v| p.view_tab.hatch_line.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.hatch_line.color = c)))
                 .child(section("Detail views"))
                 .child(pen_row("Detail profile lines", ("dp-dpen", "dp-dpenc"), &vt.detail_pen, |p, v| p.view_tab.detail_pen.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.detail_pen.color = c)))
                 .child(row("Profile lines", select("dp-dline", ["Phantom", "Dashed", "Solid"][vt.detail_line.min(2) as usize].into(), detail_lines)))
@@ -1143,6 +1248,16 @@ impl DrawingEditor {
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Construction geometry"))
                 // Live 1710: Extended lines first, then column 149 with
                 // 181 px spinboxes; Centerlines from column 130.
+                // Live 1710: Created in drawing: Virtual sharps' style select
+                // (column 155) over its pen and colour, Sketch geometry's pen
+                // and colour (column 154).
+                .child(section("Created in drawing"))
+                .child(trow("Virtual sharps", 155., 44., 14., sel("dp-vsharp", if vt.virtual_sharp_extension { "Edge extension".into() } else { "Centermark".into() }, vec![
+                    ("Centermark".into(), !vt.virtual_sharp_extension, std::rc::Rc::new(|p: &mut DrawingProps| p.view_tab.virtual_sharp_extension = false) as Act),
+                    ("Edge extension".into(), vt.virtual_sharp_extension, std::rc::Rc::new(|p: &mut DrawingProps| p.view_tab.virtual_sharp_extension = true) as Act),
+                ], 204.)))
+                .child(trow("", 154., 32., 2., h_flex().items_start().child(thick_sel("dp-vsharpw", vt.virtual_sharp_line.thickness, |p, v| p.view_tab.virtual_sharp_line.thickness = v, 174.)).child(div().ml(px(6.)).child(swatch("dp-vsharpc", vt.virtual_sharp_line.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.virtual_sharp_line.color = c)))).into_any_element()))
+                .child(trow("Sketch geometry", 154., 33., 2., h_flex().items_start().child(thick_sel("dp-skw", vt.sketch_line.thickness, |p, v| p.view_tab.sketch_line.thickness = v, 174.)).child(div().ml(px(6.)).child(swatch("dp-skc", vt.sketch_line.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.sketch_line.color = c)))).into_any_element()))
                 .child(section("Centermarks"))
                 .child(check("dp-cmext", "Extended lines", vt.centermark_extended, |p, v| p.view_tab.centermark_extended = v, cx))
                 .child(trow("Thickness", 150., 33., 2., thick_sel("dp-cmthick", vt.centermark_thickness, |p, v| p.view_tab.centermark_thickness = v, 209.)))
@@ -1182,6 +1297,70 @@ impl DrawingEditor {
                 .child(section("All tables"))
                 .child(trow("Horizontal padding", 181., 32., 1., self.wt_field_w(0, &ed, Some(100.))))
                 .child(trow("Vertical padding", 181., 32., 1., self.wt_field_w(1, &ed, Some(100.))));
+            // Live 1710 / dom/drawing-wt-widgets: each kind's group from
+            // column 144: Line thickness and Font (199 px), the row texts an
+            // 85 px height, Bold / Italic and the colour.
+            const KINDS: [&str; 6] = ["BOM tables", "Custom tables", "Cut list tables", "Hole tables", "Revision tables", "Tables"];
+            const IDS: [[&str; 7]; 6] = [
+                ["dp-t0l", "dp-t0hb", "dp-t0hi", "dp-t0hc", "dp-t0cb", "dp-t0ci", "dp-t0cc"],
+                ["dp-t1l", "dp-t1hb", "dp-t1hi", "dp-t1hc", "dp-t1cb", "dp-t1ci", "dp-t1cc"],
+                ["dp-t2l", "dp-t2hb", "dp-t2hi", "dp-t2hc", "dp-t2cb", "dp-t2ci", "dp-t2cc"],
+                ["dp-t3l", "dp-t3hb", "dp-t3hi", "dp-t3hc", "dp-t3cb", "dp-t3ci", "dp-t3cc"],
+                ["dp-t4l", "dp-t4hb", "dp-t4hi", "dp-t4hc", "dp-t4cb", "dp-t4ci", "dp-t4cc"],
+                ["dp-t5l", "dp-t5hb", "dp-t5hi", "dp-t5hc", "dp-t5cb", "dp-t5ci", "dp-t5cc"],
+            ];
+            let ts = props.table_styles.clone();
+            let styles = [&ts.bom, &ts.custom, &ts.cut_list, &ts.hole, &ts.revision, &ts.general];
+            for (k, name) in KINDS.iter().enumerate() {
+                let st = styles[k];
+                let ids = IDS[k];
+                let set_line: fn(&mut DrawingProps, f64) = match k {
+                    0 => |p, v| table_style_mut(p, 0).line = v,
+                    1 => |p, v| table_style_mut(p, 1).line = v,
+                    2 => |p, v| table_style_mut(p, 2).line = v,
+                    3 => |p, v| table_style_mut(p, 3).line = v,
+                    4 => |p, v| table_style_mut(p, 4).line = v,
+                    _ => |p, v| table_style_mut(p, 5).line = v,
+                };
+                body = body
+                    .child(section(name))
+                    .child(trow("Line thickness", 145., 33., 2., thick_sel(ids[0], st.line, set_line, 199.)))
+                    .child(trow("Font", 145., 32., 2., font_row(FontOf::Table(k), st.font.clone(), 199.)));
+                if k >= 4 {
+                    body = body.child(trow("Title row text", 144., 32., 2., self.wt_field_w(14 + k - 4, &ed, Some(85.))));
+                }
+                for (header, label) in [(true, "Header row text"), (false, "Content row text")] {
+                    let rt = if header { &st.header } else { &st.content };
+                    let field = 2 + 2 * k + (!header) as usize;
+                    let (bi, ci) = if header { (1, 3) } else { (4, 6) };
+                    body = body.child(trow(
+                        label,
+                        144.,
+                        if header { 32. } else { 33. },
+                        2.,
+                        h_flex()
+                            .items_start()
+                            .child(self.wt_field_w(field, &ed, Some(85.)))
+                            .child(Self::row_text_toggles(k, header, rt, (ids[bi], ids[bi + 1]), cx))
+                            .child(div().ml(px(3.)).child(swatch(ids[ci], rt.color, std::rc::Rc::new(move |p: &mut DrawingProps, c| {
+                                let s = table_style_mut(p, k);
+                                if header { s.header.color = c } else { s.content.color = c }
+                            }))))
+                            .into_any_element(),
+                    ));
+                }
+                if k == 3 {
+                    // Hole tables' indicator and tags (live dom/drawing-wt-widgets).
+                    body = body
+                        .child(trow("Indicator style", 145., 33., 2., sel("dp-hind", if ts.hole_indicator_iso { "ISO".into() } else { "ANSI".into() }, vec![
+                            ("ANSI".into(), !ts.hole_indicator_iso, std::rc::Rc::new(|p: &mut DrawingProps| p.table_styles.hole_indicator_iso = false) as Act),
+                            ("ISO".into(), ts.hole_indicator_iso, std::rc::Rc::new(|p: &mut DrawingProps| p.table_styles.hole_indicator_iso = true) as Act),
+                        ], 199.)))
+                        .child(trow("Indicator arrowhead", 144., 32., 2., self.wt_field_w(16, &ed, Some(85.))))
+                        .child(trow("Indicator lines", 145., 33., 2., thick_sel("dp-hindl", ts.hole_indicator_line, |p, v| p.table_styles.hole_indicator_line = v, 199.)))
+                        .child(trow("Tags", 145., 32., 2., font_row(FontOf::HoleTags, ts.hole_tags_font.clone(), 199.)));
+                }
+            }
         } else if self.drawing_props.tab == 7 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
@@ -1370,9 +1549,36 @@ impl DrawingEditor {
             .into_any_element()
     }
 
+    /// A table row text's Bold and Italic (live drawing/1710 Tables: 26 px,
+    /// 3 px apart, as Inspection's).
+    fn row_text_toggles(k: usize, header: bool, rt: &RowText, ids: (&'static str, &'static str), cx: &mut Context<Self>) -> AnyElement {
+        let toggle = |id: &'static str, glyph: &'static str, italic: bool, on: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .size(px(26.))
+                .relative()
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .bg(gpui_kit::rgb(if on { 0xcfdbe5 } else { 0xf5f5f5 }))
+                .when(on, |d| d.child(div().absolute().top(px(1.)).left(px(1.)).right(px(1.)).bottom(px(1.)).border_1().border_color(gpui_kit::rgb(0x1b5faa))))
+                .child(div().text_size(px(22.)).font_weight(FontWeight::BOLD).when(italic, |d| d.italic()).text_color(gpui_kit::rgb(0x333333)).child(glyph))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    this.set_drawing_prop(&move |p| {
+                        let s = table_style_mut(p, k);
+                        let r = if header { &mut s.header } else { &mut s.content };
+                        if italic { r.italic = !r.italic } else { r.bold = !r.bold }
+                    }, cx)
+                }))
+        };
+        h_flex().gap(px(3.)).child(toggle(ids.0, "B", false, rt.bold, cx)).child(toggle(ids.1, "I", true, rt.italic, cx)).into_any_element()
+    }
+
     fn drawing_props_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
         let locked = self.drawing.props.locked;
+        let template = self.drawing.props.template.clone();
         let dwt = Button::new("dp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
             for row in noshape_ops::drawing::template_rows() {
                 let e = ed.clone();
@@ -1394,13 +1600,23 @@ impl DrawingEditor {
             // 26 px DWT button 8 px from the panel's edge), then a 41 px row with the
             // 12 px Lock checkbox 9 px in, a 12 px label and a grey help icon
             // at the right.
+            // Live "ui2 (10-26 b)": once the properties were updated from a
+            // DWT, its name in a grey read-only box (301 x 27, #eee, #ccc,
+            // 14 px #555 9 px in) and Lock drawing properties enabled;
+            // before, the Lock checkbox is greyed (no tooltip).
             .child(
                 h_flex()
-                    .h(px(30.))
+                    .h(px(if template.is_some() { 33. } else { 30. }))
                     .pt(px(4.))
                     .pr(px(7.))
                     .gap(px(19.))
-                    .child(div().flex_1().h(px(26.)).pl(px(14.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template…"))
+                    .child(match &template {
+                        Some(name) => h_flex()
+                            .flex_1()
+                            .child(div().ml(px(8.)).w(px(301.)).h(px(27.)).px(px(8.)).flex().items_center().rounded(px(4.)).bg(gpui_kit::rgb(0xeeeeee)).border_1().border_color(gpui_kit::rgb(0xcccccc)).text_size(px(14.)).text_color(gpui_kit::rgb(0x555555)).child(div().truncate().child(name.clone())))
+                            .into_any_element(),
+                        None => div().flex_1().h(px(26.)).pl(px(14.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template…").into_any_element(),
+                    })
                     .child(dwt),
             )
             .child(
@@ -1409,7 +1625,7 @@ impl DrawingEditor {
                     .pb(px(4.))
                     .pl(px(9.))
                     .pr(px(9.))
-                    .child(div().flex_1().text_size(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("dp-lock").native().label("Lock drawing properties").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
+                    .child(div().flex_1().text_size(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("dp-lock").native().label("Lock drawing properties").checked(locked).disabled(template.is_none()).on_click(cx.listener(|this, v: &bool, _, cx| {
                         let v = *v;
                         this.set_drawing_prop(&move |p| p.locked = v, cx)
                     }))))

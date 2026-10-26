@@ -911,3 +911,17 @@ option." (fullFeaturePattern), a face pattern "Pattern could not be created on t
 (live O3's one copy, M2, CP1); oracle CV1 (3 of 4 bosses, INFO) matches. Known: CP2 implies live's vertical block
 edges run −z (top to bottom; asked of live), LP2 is Parasolid's face pattern growing a straddling boss's outer half
 down to the part's bottom (kern/psb geometry).
+
+**Prewarm (26 Oct, lead):** `std_feature::prewarm()` runs once a viewport frame is presented (app viewport.rs) and when
+ops makes an OpenDoc (ops doc.rs); first frame unchanged (--demo, Xvfb). **Live origins ("fs (10-26 b)"):** evLine /
+evAxis = midpoint + the edge's own direction (as implemented); Parasolid's extrude side edges run back toward the
+sketch (a block's vertical edges point −z) and an extruded cylinder's coordSystem sits at the far end cap with z back
+toward the sketch (revolve: mid-height; Hole: its start, z along the drill). Ours come from OCCT's prism (+z, sketch
+end): CP2 and P6 are kern's. **oracle_asm** (crates/model/tests/oracle_asm.rs): 18 assembly cases of
+live/fs-oracle-asm/CASES.md built with the model API (A fixed, B at a start pose, mates on implicit connectors,
+limits, patterns); prints our transforms / mate values / DOF and compares live's (LIVE, LIVE_MATES) once
+REQUESTS fs 10-26 c is answered. Suspicious already: R1's pin turns 5.8° and sits 10 mm low.
+oracle_asm has live's numbers (live/fs-oracle-asm/raw, 10-26): F1, F3, F4, S1, P1, B1 and CP1 match; F2, F5, R1, R2, R3,
+S2, C1, B2, M1, M2 and LP1 are skb's (KNOWN in the test, each with live's and our pose): the circular-edge CENTER
+connector's Z (live: out of the part), edge MID_POINT frames, offset / rotation / slider senses, limits from a start
+outside them, the free rotation on cylinder axes, the cone limit, Revolute + Slider.

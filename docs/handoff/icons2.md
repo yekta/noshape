@@ -1208,3 +1208,25 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   three stacked = live #e7edf2, parts behind closer to live's sRGB blend). c3ae9d4b plane names are
   scene meshes now (overlay::fill_mesh + 0.7-alpha outline trace for weight), hidden by parts in front
   (live selection/02); shown-dimension labels and sketch names stay in the 2D overlay (drawn over parts).
+- (10-26) FOR PERF, sRGB blending (origin/perf-srgb 26c5c361, lead: refit icons2's overlays once it lands
+  instead of fitting around linear blending). perf's commit already restores plane fill, selected plane fill
+  and picked region. icons2 values still fitted to linear blending / linear anti-aliasing, to re-measure
+  against live after the merge (icons2 does the refit, tell icons2 when it is on main):
+  - builder PLANE_NAME_STROKE(_ALPHA) 0.6 px @ 0.7: the outline trace exists only because linear AA
+    thinned the plane names; with sRGB AA it should go (compare Front's ink to live icons2-ph-0-none).
+  - widths measured as "width - 0.4 px of ink with our AA": highlighted lines `width * 1.8 + 2.2`
+    (shaders line_vertex), plane border 3.0, region outline 3.0, hover_silhouette 2.6, dimension lines
+    1.5 (sketch_mode/shown_dims), plane resize rings 2.0, midpoint ring.
+  - point sprites' anti-aliased rims (origin ring 0.65 / dot 0.32, RING 0.61, HOLLOW 0.55) and palette
+    POINT_HOVER / POINT_SELECTED (fitted in the app).
+  - FACE_SELECTED / BODY_SELECTED (shaders): lit shading, not blending, but fitted in the app's output.
+  - EDGE_CORE: already mixed in sRGB in fs_line (0.2 of (35,48,53)); re-check the hovered edge centre.
+  - shown-dimension hover box #aa9c85 (opaque, unaffected) and DIMS_SHOWN_AMBIENT 0.035 (lighting).
+- (10-26) Plane resize rule from live ("icons2 plane resize rules"): a ring press resizes only if the
+  pointer is still in the ring's hover zone (≈ 35 × 22 px, RING_HIT_PAD_PX 5.5) ~50 ms after the first
+  move, which comes ≥ 50 ms after the press; otherwise viewport.tool_drag_to_box turns it into a box
+  select. No history merging in live (corrected): every drag is one "Change size" entry, as ours.
+  Sketch mode: an existing sketch opens with its plane field inactive (live sketch/21), so sketch curves
+  pre-highlight; sketch curves get LineSegment::CORE and highlight from at most 1.25 px (same 5 rows as
+  a part edge). Show dimensions: SceneOptions::dims_shown → Instance::ambient 0.035 (params.x bit 1,
+  extra.z) on part meshes.

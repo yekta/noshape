@@ -222,7 +222,10 @@ fn shade(world: vec3<f32>, normal_in: vec3<f32>, front: bool, base: vec3<f32>) -
     let h = normalize(light + eye);
     let c = linear_to_srgb(base);
     let spec = pow(max(dot(n, h), 0.0), max(g.specular.w * 1000.0, 1.0)) * linear_to_srgb(g.specular.rgb);
-    let lit = c * 0.5 + max(dot(n, light), 0.0) * 0.5 * c + spec;
+    // params.x bit 1: extra.z is an ambient shift, more ambient and less
+    // light (Show dimensions; reflective meshes use extra.z otherwise).
+    let s = select(0.0, inst.extra.z, (inst.params.x & 2u) != 0u);
+    let lit = c * (0.5 + s) + max(dot(n, light), 0.0) * (0.5 - s) * c + spec;
     return srgb_to_linear(clamp(lit, vec3(0.0), vec3(1.0)));
 }
 
@@ -751,7 +754,9 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     // Live (selection/03, 06b, 07b): highlighted edges and face outlines
     // put ~3.5–4.5 px of colour down (4 px here at the default width).
     let lit = (st & (HOVER | SELECTED | ERROR)) != 0u;
-    if (lit) { width = width * 1.8 + 2.2; }
+    // From at most a part edge's width: a 2 px sketch line highlights like
+    // an edge (live sketch/21, 22: the same 5 rows as selection/06b).
+    if (lit) { width = (min(l.width, 1.25) * inst.extra.x + g.viewport.w) * 1.8 + 2.2; }
     let half = max(width * g.viewport.z * 0.5, 0.5);
 
     var wa = (inst.model * vec4(l.a, 1.0)).xyz;

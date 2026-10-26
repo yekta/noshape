@@ -414,6 +414,11 @@ pub struct SheetStyle {
     /// Onshape-ISO-25 family; ANSI linear values sit inline on a broken
     /// dimension line (live asbdt-1). Default: ISO, as the default A3 sheet.
     pub iso: bool,
+    /// Construction geometry › Virtual sharps: Edge extension (else a
+    /// centermark cross), pen (mm) and colour.
+    pub virtual_sharp_extension: bool,
+    pub virtual_sharp_pen: f64,
+    pub virtual_sharp_color: Option<[u8; 3]>,
 }
 
 impl SheetStyle {
@@ -425,7 +430,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true, virtual_sharp_extension: false, virtual_sharp_pen: 0.4, virtual_sharp_color: None }
     }
 }
 
@@ -1330,12 +1335,28 @@ impl SheetGeometry {
                     }
                 }
                 AnnotationKind::VirtualSharp { view, a1, b1, a2, b2 } => {
-                    // Onshape's default style: a small cross at the intersection.
+                    // Drawing properties › Construction geometry › Virtual
+                    // sharps: a small cross at the intersection (Centermark,
+                    // Onshape's default) or both edges extended to it.
                     if let Some(x) = AnnotationKind::line_intersection(*a1, *b1, *a2, *b2) {
                         let c = env.to_sheet(*view, x);
-                        let s = 1.5;
-                        self.lines.push(Polyline2 { points: vec![[c[0] - s, c[1] - s], [c[0] + s, c[1] + s]], style: LineStyle::Thin, closed: false, pick });
-                        self.lines.push(Polyline2 { points: vec![[c[0] - s, c[1] + s], [c[0] + s, c[1] - s]], style: LineStyle::Thin, closed: false, pick });
+                        let l0 = self.lines.len();
+                        if self.style.virtual_sharp_extension {
+                            for (a, b) in [(*a1, *b1), (*a2, *b2)] {
+                                let (a, b) = (env.to_sheet(*view, a), env.to_sheet(*view, b));
+                                let d = |p: [f64; 2]| (p[0] - c[0]).hypot(p[1] - c[1]);
+                                let near = if d(a) < d(b) { a } else { b };
+                                self.lines.push(Polyline2 { points: vec![near, c], style: LineStyle::Thin, closed: false, pick });
+                            }
+                        } else {
+                            let s = 1.5;
+                            self.lines.push(Polyline2 { points: vec![[c[0] - s, c[1] - s], [c[0] + s, c[1] + s]], style: LineStyle::Thin, closed: false, pick });
+                            self.lines.push(Polyline2 { points: vec![[c[0] - s, c[1] + s], [c[0] + s, c[1] - s]], style: LineStyle::Thin, closed: false, pick });
+                        }
+                        self.pens.push(PenSpan { lines: l0..self.lines.len(), width_mm: self.style.virtual_sharp_pen, dashes: Vec::new() });
+                        if let Some(rgb) = self.style.virtual_sharp_color {
+                            self.colors.push(ColorSpan { lines: l0..self.lines.len(), texts: 0..0, fills: 0..0, rgb });
+                        }
                     }
                 }
                 // Grouped callouts are drawn after the loop, at their dimension.

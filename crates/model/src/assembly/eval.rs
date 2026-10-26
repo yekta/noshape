@@ -1337,6 +1337,27 @@ fn connector_frame(origin: DVec3, z: DVec3) -> Frame {
     Frame::from_axes(origin, z, x.normalize())
 }
 
+/// Connector frames resolved during one evaluation, by part context (its
+/// `Arc`, alive for the evaluation), body, reference and alignment: the
+/// instances of one part share them.
+#[derive(Default)]
+struct ConnectorMemo(std::cell::RefCell<HashMap<ConnectorKey, Option<Frame>>>);
+
+/// (part context address, body, reference, alignment).
+type ConnectorKey = (usize, Option<BodyId>, Reference, Option<Reference>);
+
+impl ConnectorMemo {
+    fn resolve(&self, ctx: &Arc<Context>, body: Option<&BodyId>, reference: &Reference, align: Option<&Reference>, units: &UnitPrefs) -> Option<Frame> {
+        let key = (Arc::as_ptr(ctx) as usize, body.cloned(), reference.clone(), align.cloned());
+        if let Some(f) = self.0.borrow().get(&key) {
+            return *f;
+        }
+        let f = resolve_connector_aligned(ctx, body, reference, align, units);
+        self.0.borrow_mut().insert(key, f);
+        f
+    }
+}
+
 /// Like [`resolve_connector_in`], with the primary axis taken from `align`
 /// (a face: its normal at the connector origin; an edge: its tangent there).
 /// Also resolves the inference points the regenerator does not know:
@@ -2327,6 +2348,19 @@ impl AssemblyEvaluator {
         prepared.body_of = assigned;
         let stored: HashMap<InstanceId, Frame> = active.iter().map(|i| (i.id, placement_to_frame(&i.placement))).collect();
 
+        // A part's connectors are the same in each of its instances: each is
+        // resolved once per evaluation (a face centroid integrates the face),
+        // and leaves are found by path through an index (200 pins with 300
+        // mates spent ~0.5 s here per evaluation).
+        let leaf_of: HashMap<&[InstanceId], &LeafInstance> = {
+            let mut m = HashMap::new();
+            for l in &leaves {
+                m.entry(l.path.as_slice()).or_insert(l);
+            }
+            m
+        };
+        let memo = ConnectorMemo::default();
+
         // ---------------------------------------------------- assembly mate connectors
         // Frame of a connector relative to its owner (a flexible subassembly
         // child owns the connectors on its parts).
@@ -2340,8 +2374,8 @@ impl AssemblyEvaluator {
             let mut full = vec![c.instance];
             full.extend(c.path.iter().copied());
             // Live E15: the instance is there but its part is gone.
-            let leaf = leaves.iter().find(|l| l.path == full).ok_or(if asm.instance(c.instance).is_some() { MATE_INSTANCE_LOST } else { "Instance no longer exists" })?;
-            let f = resolve_connector_aligned(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate cannot resolve mate connectors.")?;
+            let leaf = leaf_of.get(full.as_slice()).copied().ok_or(if asm.instance(c.instance).is_some() { MATE_INSTANCE_LOST } else { "Instance no longer exists" })?;
+            let f = memo.resolve(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate cannot resolve mate connectors.")?;
             Ok(match leaf.flex {
                 Some((child, rest)) => (Owner::Nested(c.instance, child), matrix_frame(&rest).mul(&f)),
                 None => (Owner::Top(c.instance), matrix_frame(&leaf.inner).mul(&f)),
@@ -2517,9 +2551,9 @@ impl AssemblyEvaluator {
                 }
                 let mut full = vec![*sid, c.instance];
                 full.extend(c.path.iter().copied());
-                let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
+                let leaf = leaf_of.get(full.as_slice()).copied().ok_or("Instance no longer exists")?;
                 let rest = leaf.flex.map(|f| f.1).unwrap_or(DMat4::IDENTITY);
-                let f = resolve_connector_aligned(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate cannot resolve mate connectors.")?;
+                let f = memo.resolve(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate cannot resolve mate connectors.")?;
                 let (b, off) = *prepared.nested_body_of.get(&(*sid, c.instance)).ok_or("Instance no longer exists")?;
                 Ok((b, off.mul(&matrix_frame(&rest)).mul(&f)))
             };

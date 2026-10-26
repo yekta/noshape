@@ -3639,7 +3639,9 @@ fn agent_usability_pass() {
     assert!(r["description"].as_str().unwrap().ends_with("Hole 1"), "{r}");
 
     // Sketch edits report the features that fail after them (none here: the hole follows its face).
-    let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": "Sketch 1", "kind": "distance", "entities": [s["created"][2]["id"], s["created"][10]["id"]], "value": "6 mm" }));
+    // The base's thickness: the bottom line (y 0) to the top of the base (y 6).
+    let line = |from: [f64; 2], to: [f64; 2]| s["created"].as_array().unwrap().iter().find(|e| e["type"] == "line" && e["start"] == json!(from) && e["end"] == json!(to)).unwrap_or_else(|| panic!("no line {from:?}-{to:?}: {s}"))["id"].clone();
+    let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": "Sketch 1", "kind": "distance", "entities": [line([0.0, 0.0], [50.0, 0.0]), line([44.0, 6.0], [0.0, 6.0])], "value": "6 mm" }));
     let dim = d["dimension"].clone();
     let ok = call(&mut ctx, "sketch_set_dimension", json!({ "sketch": "Sketch 1", "dimension": dim, "value": "8 mm" }));
     assert_eq!(ok["failed"], json!([]), "{ok}");
@@ -4067,7 +4069,7 @@ fn step_assembly_same_named_parts_get_distinct_instances() {
     call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
     let pin = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 2", "part": "Part 1" }))["instance"].as_str().unwrap().to_string();
     call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [60, 0, 0] }));
-    let step = scratch("same_names.step");
+    let step = scratch("distinct_instances.step");
     call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "STEP", "file": step.to_str().unwrap() }));
     call(&mut ctx, "document_create", json!({ "path": scratch("same_names_import.noshape").to_str().unwrap() }));
     let imp = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));

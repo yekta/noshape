@@ -1378,6 +1378,10 @@ pub struct Table {
     pub row_height: f64,
     #[serde(default = "default_table_text")]
     pub text_height: f64,
+    /// `text_height` was set on the table (Text height ▸); else its rows
+    /// follow Drawing properties › Tables.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub own_text_height: bool,
     /// Per-cell formatting (cells without an entry use the defaults).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cell_formats: Vec<CellStyle>,
@@ -1478,7 +1482,7 @@ fn default_table_text() -> f64 {
 
 impl Table {
     pub fn new(id: u64, kind: TableKind, position: [f64; 2]) -> Self {
-        Self { id, kind, position, corner: TableCorner::TopRight, col_widths: Vec::new(), row_height: default_row_height(), text_height: default_table_text(), cell_formats: Vec::new(), merges: Vec::new(), rows: None, row_heights: Vec::new(), layer: SheetLayer::Drawing }
+        Self { id, kind, position, corner: TableCorner::TopRight, col_widths: Vec::new(), row_height: default_row_height(), text_height: default_table_text(), own_text_height: false, cell_formats: Vec::new(), merges: Vec::new(), rows: None, row_heights: Vec::new(), layer: SheetLayer::Drawing }
     }
 
     /// Formatting of a cell (defaults when none is set).
@@ -2719,6 +2723,9 @@ pub struct DrawingProps {
     /// Views tab per view type and the Construction geometry tab.
     #[serde(default)]
     pub view_tab: Box<ViewTabProps>,
+    /// Tables tab: each kind's line pen, font and row texts.
+    #[serde(default)]
+    pub table_styles: Box<TableStyles>,
     /// Annotations › Center of mass › indicator diameter (mm).
     #[serde(default = "com_diameter")]
     pub com_diameter: f64,
@@ -2894,6 +2901,12 @@ pub struct ViewTabProps {
     pub centermark_thickness: f64,
     pub centerline_thickness: f64,
     pub centerline_dashes: f64,
+    /// Construction geometry › Created in drawing › Virtual sharps: Edge
+    /// extension (else Centermark) and pen (live 0.40 mm); Sketch geometry's
+    /// pen (live 0.15 mm) and colour.
+    pub virtual_sharp_extension: bool,
+    pub virtual_sharp_line: PenProps,
+    pub sketch_line: PenProps,
 }
 
 /// Cosmetic thread drawing standard (Drawing properties › Views).
@@ -2919,6 +2932,82 @@ impl ThreadStyle {
 /// down, Form tear, up, down (live defaults Solid, Solid, Solid, Center,
 /// Center).
 pub const FLAT_LINE_ROWS: [(&str, u8); 5] = [("Counterbore/Countersink up", 0), ("Counterbore/Countersink down", 0), ("Form tear", 0), ("Form up", 2), ("Form down", 2)];
+
+/// Drawing properties › Tables, per kind (live dom/drawing-wt-widgets:
+/// BOM, Custom, Cut list, Hole, Revision tables and Tables).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TableStyles {
+    pub general: TableStyle,
+    pub bom: TableStyle,
+    pub custom: TableStyle,
+    pub cut_list: TableStyle,
+    pub hole: TableStyle,
+    pub revision: TableStyle,
+    /// Hole tables › Indicator style (ISO, else ANSI; stored), Indicator
+    /// arrowhead (mm; None: the drawing's default), Indicator lines (mm;
+    /// live 0.15), Tags' font.
+    pub hole_indicator_iso: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hole_indicator_arrow: Option<f64>,
+    pub hole_indicator_line: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hole_tags_font: Option<sheet::TextFont>,
+}
+
+impl Default for TableStyles {
+    fn default() -> Self {
+        let t = TableStyle::default();
+        Self { general: t.clone(), bom: t.clone(), custom: t.clone(), cut_list: t.clone(), hole: t.clone(), revision: t, hole_indicator_iso: false, hole_indicator_arrow: None, hole_indicator_line: 0.15, hole_tags_font: None }
+    }
+}
+
+impl TableStyles {
+    pub fn of(&self, kind: &TableKind) -> &TableStyle {
+        match kind {
+            TableKind::General { .. } => &self.general,
+            TableKind::Bom { .. } => &self.bom,
+            TableKind::Custom { .. } => &self.custom,
+            TableKind::CutList { .. } => &self.cut_list,
+            TableKind::Hole { .. } => &self.hole,
+            TableKind::Revision { .. } => &self.revision,
+        }
+    }
+}
+
+/// One kind's table look: line pen (mm), font, title row height (None:
+/// 1.3 × the content's, live 0.1560 in), header and content rows.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TableStyle {
+    pub line: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font: Option<sheet::TextFont>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<f64>,
+    pub header: RowText,
+    pub content: RowText,
+}
+
+impl Default for TableStyle {
+    fn default() -> Self {
+        // Live: 0.13 mm, header row Bold.
+        Self { line: 0.13, font: None, title: None, header: RowText { bold: true, ..Default::default() }, content: RowText::default() }
+    }
+}
+
+/// A table row's text: height (mm; None: the annotations' text height,
+/// live 0.1200 in / 3.5 mm), Bold, Italic, colour.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RowText {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<f64>,
+    pub bold: bool,
+    pub italic: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<[u8; 3]>,
+}
 
 /// A line's pen (mm) and colour (None: ink).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -3021,6 +3110,9 @@ impl Default for ViewTabProps {
             centermark_thickness: 0.13,
             centerline_thickness: 0.13,
             centerline_dashes: 1.0,
+            virtual_sharp_extension: false,
+            virtual_sharp_line: PenProps::new(0.40),
+            sketch_line: PenProps::new(0.15),
         }
     }
 }
@@ -3542,6 +3634,7 @@ impl Default for DrawingProps {
             datum_size: datum_size(),
             hide_placeholder: false,
             view_tab: Box::default(),
+            table_styles: Box::default(),
             custom_colors: Vec::new(),
             weld_ansi: None,
             hide_property_background: false,
@@ -3581,6 +3674,15 @@ impl Drawing {
     }
 
     /// The drawing's standard is ANSI (its first sheet's size), else ISO.
+    /// A table's content row text height (mm): its own (Text height ▸) or
+    /// Drawing properties › Tables' for its kind.
+    pub fn table_text_height(&self, t: &Table) -> f64 {
+        if t.own_text_height {
+            return t.text_height;
+        }
+        self.props.table_styles.of(&t.kind).content.height.unwrap_or(self.props.ann_text_height)
+    }
+
     pub fn is_ansi(&self) -> bool {
         self.sheets.first().is_none_or(|s| s.size.is_ansi())
     }
