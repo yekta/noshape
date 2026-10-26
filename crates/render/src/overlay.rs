@@ -727,8 +727,15 @@ pub mod view_cube {
         for a in Arrow::ALL {
             out.fill(&place(&a.polys()), lit(a.cell(), c.frame), dpr);
         }
+        // A hovered piece keeps its own fill under the translucent highlight
+        // (live #bce2f7 = #90cef1 at 0.6 over the white face; drawn alone the
+        // back frame showed through: qa5 P1-15, (177,217,241)).
         for s in cube_shapes(rotation) {
-            out.fill(&place(std::slice::from_ref(&s.poly)), lit(s.cell, if s.frame { c.frame } else { c.face }), dpr);
+            let poly = place(std::slice::from_ref(&s.poly));
+            out.fill(&poly, if s.frame { c.frame } else { c.face }, dpr);
+            if cube.hover == Some(s.cell) {
+                out.fill(&poly, c.highlight, dpr);
+            }
         }
         for (n, contours) in &cube.face_labels {
             if (inv * CubeCell(*n).dir()).z <= 1e-6 {
