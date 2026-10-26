@@ -679,6 +679,9 @@ fn circular_and_mirror_part_pattern() {
     assert_eq!(res.context.bodies.len(), 4);
     let c: DVec3 = res.context.bodies.iter().map(|b| noshape_kernel::volume_properties(&b.shape).unwrap().center).sum::<DVec3>() / 4.0;
     assert!(c.truncate().length() < 1e-9, "instances evenly around the axis: {c:?}");
+    // Live (qa5 P1-13): the instances keep the seed's colour.
+    let seed = res.context.bodies[0].color;
+    assert!(res.context.bodies.iter().all(|b| b.color == seed), "{:?}", res.context.bodies.iter().map(|b| b.color).collect::<Vec<_>>());
     t.add("mirror", &[("entities", q(vec![body_ref(&id)])), ("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)]))]);
     let res = t.ok();
     assert_eq!(res.context.bodies.len(), 5);
@@ -1727,3 +1730,4 @@ fn feature_mirror_of_a_gusset_as_live() {
     let v = total_volume(&res.context) * 1e9;
     assert!((v - 68800.0).abs() < 1e-3, "{v}");
 }
+

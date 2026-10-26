@@ -280,8 +280,14 @@ pub fn remove_bodies(ev: &mut EvalCtx, ids: &[BodyId]) {
 
 /// Push a new body with a fresh part name and color.
 pub fn push_body(ev: &mut EvalCtx, id: BodyId, kind: BodyKind, shape: Shape, faces: Vec<Name>) {
-    let name = ev.ctx.alloc_part_name(kind);
     let color = ev.ctx.alloc_color();
+    push_body_colored(ev, id, kind, shape, faces, color);
+}
+
+/// [`push_body`] in a given colour (a copy keeps its seed's, live: Transform
+/// copies, pattern instances).
+pub fn push_body_colored(ev: &mut EvalCtx, id: BodyId, kind: BodyKind, shape: Shape, faces: Vec<Name>, color: usize) {
+    let name = ev.ctx.alloc_part_name(kind);
     let f = ev.feature;
     ev.ctx.bodies.push(Arc::new(Body::new(id, name, kind, shape, faces, color, f)));
 }

@@ -561,9 +561,11 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     let copies = copy_bodies(ev, &bodies, instances)?;
     pattern_connectors(ev, refs, instances);
     if op == "NEW" || copies.iter().all(|c| c.2 != BodyKind::Solid) {
+        // Live (qa5 P1-13): the instances keep the seed's colour.
         let nb = bodies.len().max(1);
         for (ii, bj, kind, ns) in copies {
-            push_body(ev, BodyId { feature: ev.feature, index: (ii * nb + bj) as u32 }, kind, ns.shape, ns.names.faces);
+            let color = ev.ctx.bodies[bodies[bj]].color;
+            push_body_colored(ev, BodyId { feature: ev.feature, index: (ii * nb + bj) as u32 }, kind, ns.shape, ns.names.faces, color);
         }
         return Ok(());
     }
@@ -798,7 +800,8 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             let nb = created.len();
             for (ii, bj, kind, ns) in copies {
                 let index = (f.0 as u32 & 0xFFF).wrapping_mul(1 << 20).wrapping_add((ii * nb + bj) as u32);
-                push_body(ev, BodyId { feature: ev.feature, index }, kind, ns.shape, ns.names.faces);
+                let color = ev.ctx.bodies[created[bj]].color;
+                push_body_colored(ev, BodyId { feature: ev.feature, index }, kind, ns.shape, ns.names.faces, color);
             }
         }
         // Faces the feature left on other bodies.
@@ -1742,7 +1745,8 @@ pub fn copy_part(ev: &mut EvalCtx) -> FResult<()> {
     }
     let inst = [Instance { code: 1, t: k::Transform::Translate(DVec3::ZERO) }];
     for (_, bj, kind, ns) in copy_bodies(ev, &bodies, &inst)? {
-        push_body(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces);
+        let color = ev.ctx.bodies[bodies[bj]].color;
+        push_body_colored(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces, color);
     }
     Ok(())
 }
