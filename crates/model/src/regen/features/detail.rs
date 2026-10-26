@@ -50,8 +50,11 @@ impl TangentLinks {
 
     fn neighbours(&self, ei: usize) -> Vec<usize> {
         let tangent_at = |e: &k::Shape, p: glam::DVec3| -> Option<glam::DVec3> {
+            // The parameter end at `p` (a reversed edge starts at its last
+            // parameter: extrudes since 339de774 reverse their top edges).
             let info = e.edge_info().ok()?;
-            let t = if (info.start - p).length() < (info.end - p).length() { info.first_param } else { info.last_param };
+            let at = |t: f64| e.point_at(t).map(|q| (q - p).length()).unwrap_or(f64::MAX);
+            let t = if at(info.first_param) < at(info.last_param) { info.first_param } else { info.last_param };
             e.tangent_at(t).ok().map(|v| v.normalize())
         };
         let mut out = Vec::new();
