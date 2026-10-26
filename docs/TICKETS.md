@@ -58,6 +58,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 Extrude add 308 ms (std logic 55 ms, ~250 ms in ops' add path regens): target ≤ 150 ms (PLAN 2.6).
 
 ## Part Studio UI (psui)
+- [ ] P1 DCLICK-HEAVY on a heavy part a double-click on a feature row doesn't open the feature: tests/perf/fins-400.noshape,
+  double-click Extrude 1 (or Linear pattern 1) in the feature list, clicks 1 ms or 150 ms apart → only the row gets
+  selected, no dialog (5 tries); right-click › Edit… opens it. The same double-click on a light part opens the dialog at
+  once. On fins-400 the first click's selection highlight shows ~0.9 s later (software GL, load ~25), so the click count
+  is probably measured when the event is handled instead of from the event's own timestamp; live opens the dialog on any
+  double-click (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P1 TAB-NO-PREVIEW a number typed into a feature dialog field and committed with **Tab** never reaches the preview:
   edit Extrude 1 of tests/perf/live-30-features.noshape, Depth 10 → 14, Tab → the field reads "14 mm" but no
   schedule_regen in the perf log and the preview stays at 10 mm (tickets/tab-no-preview-extrude.png); the same in Linear
