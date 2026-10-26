@@ -5,7 +5,7 @@ use noshape_kernel as k;
 use noshape_units::Dim;
 
 /// Onshape's note for a Boolean that changes nothing (live qa5 BOOL1).
-const NO_GEOMETRY_CHANGE: &str = "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.";
+use crate::regen::eval::NO_GEOMETRY_CHANGE;
 
 pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
     let tools_idx = ev.resolve_bodies(ev.query("tools"));

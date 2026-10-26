@@ -5324,7 +5324,7 @@ impl PartStudioView {
         let d = &self.display;
         let sum = |f: fn(&noshape_model::display::BodyDisplay) -> usize| d.bodies.iter().map(f).sum::<usize>();
         let sketch: usize = d.sketches.iter().map(|s| s.curves.len() + s.points.len()).sum();
-        let primitives = [("Faces", sum(|b| b.face_refs.len())), ("Edges", sum(|b| b.edge_refs.len())), ("Vertices", sum(|b| b.vertex_refs.len())), ("Sketch entities", sketch), ("Planes", d.planes.len())];
+        let primitives = [("Faces", sum(|b| b.face_refs.len())), ("Edges", sum(|b| b.mesh.edges.iter().filter(|p| !p.is_empty()).count())), ("Vertices", sum(|b| b.vertex_refs.len())), ("Sketch entities", sketch), ("Planes", d.planes.len())];
         crate::doc_panels::TabPerf { regen_ms: d.regen_ms, features, primitives: primitives.into_iter().map(|(k, n)| (k.to_string(), n)).collect() }
     }
 

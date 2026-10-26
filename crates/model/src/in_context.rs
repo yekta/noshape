@@ -282,7 +282,7 @@ pub fn display_bodies(c: &AssemblyContext, bodies: &[Arc<Body>]) -> Vec<crate::d
             levels_from: 0,
             face_refs: b.faces.iter().map(|n| Reference::Face((**n).clone())).collect(),
             edge_refs: b.edges.iter().map(|n| Reference::Edge((**n).clone())).collect(),
-            vertex_refs: b.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
+            vertex_refs: crate::regen::keep_shown(b.vertices.iter().map(|n| Reference::Vertex((**n).clone())), &crate::regen::shown_vertices(&b.shape)),
             bounds,
             composite: None,
             is_mesh: b.shape.is_mesh(),
