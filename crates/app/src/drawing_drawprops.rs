@@ -226,14 +226,26 @@ fn thread_tiles(style: ThreadStyle) -> AnyElement {
                         pieces.last_mut().expect("started").push(s[1]);
                     }
                 }
+                // Live's hairlines: 1 px, grey by their coverage (0.5 units
+                // ≈ rgb 155); straight ones on pixel centres.
+                let ink = gpui_kit::rgba(((w * 0.8).clamp(0.0, 1.0) * 255.0) as u32);
+                let snap = |v: Pixels| px(f32::from(v).floor() + 0.5);
                 for piece in pieces.iter().filter(|p| p.len() >= 2) {
-                    let mut pb = PathBuilder::stroke(px(w * k));
-                    pb.move_to(at(piece[0]));
-                    for q in &piece[1..] {
-                        pb.line_to(at(*q));
+                    let mut pts: Vec<Point<Pixels>> = piece.iter().map(|q| at(*q)).collect();
+                    if pts.len() == 2 && pts[0].y == pts[1].y {
+                        let y = snap(pts[0].y);
+                        pts.iter_mut().for_each(|q| q.y = y);
+                    } else if pts.len() == 2 && pts[0].x == pts[1].x {
+                        let x = snap(pts[0].x);
+                        pts.iter_mut().for_each(|q| q.x = x);
+                    }
+                    let mut pb = PathBuilder::stroke(px(1.));
+                    pb.move_to(pts[0]);
+                    for q in &pts[1..] {
+                        pb.line_to(*q);
                     }
                     if let Ok(path) = pb.build() {
-                        window.paint_path(path, gpui_kit::rgb_static(0x000000));
+                        window.paint_path(path, ink);
                     }
                 }
             };
@@ -392,11 +404,13 @@ fn table_style_mut(p: &mut DrawingProps, k: usize) -> &mut TableStyle {
 }
 
 /// A Tables row text: kind `k`'s header / content, 6 Hole tables' Tags,
-/// 7 Revision callouts.
+/// 7 Revision callouts, 8 / 9 Revision tables' / Tables' title row.
 fn row_text_mut(p: &mut DrawingProps, k: usize, header: bool) -> &mut RowText {
     match k {
         6 => &mut p.table_styles.hole_tags,
         7 => &mut p.table_styles.revision_callout_text,
+        8 => &mut p.table_styles.revision.title_text,
+        9 => &mut p.table_styles.general.title_text,
         _ => {
             let s = table_style_mut(p, k);
             if header { &mut s.header } else { &mut s.content }
@@ -1334,7 +1348,7 @@ impl DrawingEditor {
                 // Live 10-26 d: Dashes only for ANSI; the style's two
                 // previews under it (the tiles 33 px higher without it).
                 .when(thread_style == ThreadStyle::Ansi, |d| d.child(trow("Dashes", 105., 32., 1., self.wt_field_w(14, &ed, Some(200.)))))
-                .child(div().pl(px(79.)).pt(px(if thread_style == ThreadStyle::Ansi { 2. } else { 1. })).pb(px(5.)).child(thread_tiles(thread_style)))
+                .child(div().pl(px(77.)).pt(px(if thread_style == ThreadStyle::Ansi { 2. } else { 1. })).pb(px(5.)).child(thread_tiles(thread_style)))
                 .child(section("Flat pattern views"))
                 .child(trow("All bend lines", 131., 32., 1., thick_sel("dp-bendall", vt.bend_lines_thickness, |p, v| p.view_tab.bend_lines_thickness = v, 214.)))
                 .child(style_row("Up bend lines", 131., ("dp-bup", "dp-bupc"), vt.bend_up_line, std::rc::Rc::new(|p: &mut DrawingProps, v| p.view_tab.bend_up_line = v), vt.bend_up_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_up_color = c)))
@@ -1378,15 +1392,15 @@ impl DrawingEditor {
                 .map(|&s| (point_size_label(s), (vt.sketch_point_size - s).abs() < 1e-9, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.sketch_point_size = s) as Act))
                 .collect();
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                div().h(px(44.)).flex_none().pl(px(8.)).pb(px(3.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
                 })))
             };
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Construction geometry"))
-                // Live 1710: Extended lines first, then column 149 with
-                // 181 px spinboxes; Centerlines from column 130.
+                // Live 1710: Extended lines first (a 44 px row), then column
+                // 149 with 181 px spinboxes; Centerlines from column 130.
                 // Live 1710: Created in drawing: Virtual sharps' style select
                 // (column 155) over its pen and colour, Sketch geometry's pen
                 // and colour (column 154).
@@ -1495,7 +1509,8 @@ impl DrawingEditor {
                     .child(trow("Line thickness", 145., 33., 2., thick_sel(ids[0], st.line, set_line, 199.)))
                     .child(trow("Font", 145., 32., 2., font_row(FontOf::Table(k), st.font.clone(), 199.)));
                 if k >= 4 {
-                    body = body.child(trow("Title row text", 144., 32., 2., self.wt_field_w(14 + k - 4, &ed, Some(85.))));
+                    const TITLE_IDS: [(&str, &str, &str); 2] = [("dp-t4tb", "dp-t4ti", "dp-t4tc"), ("dp-t5tb", "dp-t5ti", "dp-t5tc")];
+                    body = body.child(trow("Title row text", 144., 32., 2., text_row(14 + k - 4, k + 4, &st.title_text, TITLE_IDS[k - 4], cx)));
                 }
                 for (header, label) in [(true, "Header row text"), (false, "Content row text")] {
                     let rt = if header { &st.header } else { &st.content };
