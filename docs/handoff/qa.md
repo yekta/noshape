@@ -16,6 +16,10 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 - Live: my own Chrome tab via /root/live-pw/rqa.mjs (copy of r.mjs; tab id in /root/qa-scratch/.qa-tab; 180 s CDP
   connect timeout). Each run costs ~2 min just to attach on this loaded box, and page.goto needs `timeout: 0`; batch
   checks into one script, or ask the live agent in REQUESTS.md.
+- CLI (v0.4.8 release, /root/qa-scratch/rel/…/noshape-cli) through a small MCP client: /root/qa-scratch/bin/nscli.py
+  (`Cli()('feature_add', {...})`). Matrices with analytic volumes: shellmatrix.py, hollowmatrix.py, filletmatrix.py,
+  featmatrix.py, holematrix.py (same dir). Hole style needs `styleV2`; a Remove extrude needs `booleanScope`.
+- Don't run the app with NOSHAPE_PERF=1 when testing section views (PERF-SECTION-PANIC freezes the viewport).
 - Mind dialog layout shifts: once a selection chip is added, every row below moves down ~16 px; screenshot before
   clicking a field.
 
@@ -31,17 +35,24 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   (Part Studio 1 + Assembly 1), "Close document" checkpoints the WAL into the .noshape. New: PATTERN-OFFPART-PARTS (P0,
   live asked), TAB-NO-PREVIEW (P1), DELETE-TAB-DIALOG (P2), VERSION-0.4.6, a 2nd SHELL-WALLS repro. Big plate (400 holes):
   regen 3.0 s (Extrude 2 2458 ms) vs live 617 ms, on a box at load ~40.
+- 21:00–21:40: CLI matrices on the v0.4.8 release: fillet / chamfer of all 12 box edges (32 cases), extrude draft (inward,
+  4 + 2 cases), partial revolve (5), feature pattern of a hole ×2…200 (0.86 s for 200), hole Simple / Counterbore /
+  Countersink × Through / Blind (12): all exact. Shell: 96-case matrix → SHELL-WALLS pattern (hole + R < t ≲ 1.5R) and
+  SHELL-SLOW (8–17 s); hollow / open-top shells of a filleted box with t > R wrong (SHELL-FILLETED-BOX, live confirmed).
+  Import g25-b x_t / sat / step: three volumes (I1). PDF export of a drawing OK (1 page letter, v1.5). Measure readouts
+  (face + edge "Perp line and plane angle") = live. New tickets: DCLICK-HEAVY, PERF-SECTION-PANIC, LOFT-PROFILE-LIST,
+  RHINO-GREEN, API-HOLE-STYLE, API-REMOVE-SCOPE; PATTERN-OFFPART-PARTS closed (live does the same).
 - Checked and same as live: R = centre-point rectangle, Shift+C = Curve/surface analysis (no Chamfer shortcut), Enter in
   Depth keeps the dialog, Esc in an open end-type list closes only the list, Hole dialog defaults (Inch tab, 1/4, 12 mm,
   118 deg), "Features …" + red badge while a new feature is invalid.
 
 ## Open findings (mine) by area
-- core: SHELL-WALLS (P0), SHELL-SLOW (P0), REGEN-SPEED (P0), PATTERN-OFFPART-PARTS (P0, live asked); carried over qa5's
-  P1-16 / P1-6.
-- psui: TAB-NO-PREVIEW (P1), DELETE-TAB-DIALOG (P2); carried over qa5's P1-8 caveat, P1-10.
-- dx: VERSION-0.4.6 (P2), USER_GUIDE undo sentence (P3).
-- Live requests open (REQUESTS.md "qa (2026-10-26 …)"): shell of a filleted plate with a hole; feature pattern copies off
-  the part with Reapply + Tab preview; Extrude depth 0 / 1e6 mm field state.
+- core: SHELL-WALLS, SHELL-FILLETED-BOX, SHELL-SLOW, REGEN-SPEED (all P0); I1 (P2); carried over qa5's P1-16 / P1-6.
+- psui: TAB-NO-PREVIEW, DCLICK-HEAVY (P1); DELETE-TAB-DIALOG, LOFT-PROFILE-LIST, PERF-SECTION-PANIC (P2); carried over
+  qa5's P1-8 caveat, P1-10.
+- dx: API-HOLE-STYLE (P1), API-REMOVE-SCOPE, VERSION-0.4.6, RHINO-GREEN (P2), USER_GUIDE undo sentence (P3).
+- Live requests open (REQUESTS.md "qa (2026-10-26 …)"): Extrude depth 0 / 1e6 field state; drawing suggested scale +
+  "Edit Boss sketch 1" menu label; sketch copy/paste placement.
 - skasm: carried over qa5's P1-4 data.
 
 ## To verify on the next green (fixed on main by qa5 after green 4d2f6b0c)
