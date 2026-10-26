@@ -2,6 +2,43 @@
 
 Checklist (kept current): `docs/parity/assembly.md` — one line per Onshape behaviour with status.
 
+## skb handoff at the halt (2026-10-26, agent "skb")
+
+**On main (all quick-checked):**
+- Sketch: solver plateau stop (8ba5475c, conflicting dimension ~10 ms); regen reuses the cached DOF analysis
+  (082f47d1); `sketch_get` names the Origin instead of the hidden stand-in (5c94bb51; tests fixed a12a4c86).
+- Assembly solver: F9 exact least change (f2cecb07); typed triad values exact + box shows the achieved value
+  (0b4a8f58, `solve_placed`); mate values in live's sense + Ball cone limits seated (9d0f292f, oracle S2/B2,
+  R2's turn); least change pulls only along free directions (215aa174, oracle M2); main fix 75669a58.
+- Assembly perf: connector memo (18cacdd5); drag steps move the built scene (`asm_scene::retransform`,
+  app `move_scene`) and Part Studios hashed once per evaluation (2d558082). perf.yml model job: sketch_perf
+  (90e6ac14) and assembly_perf steps.
+- Standard content: ASME socket button / countersunk cap screws as live (88600cd6).
+
+**On branch `agent/skb` (WIP b826d8f8, unchecked, NOT on main):**
+- F19 Width mate: `crates/ops/src/assembly.rs` mate_preview_options holds the first connector instance that isn't
+  `a`'s (cause: with both block faces as a/b the preview held the block itself, so the mate read "could not be
+  solved"); `solver::pair_width_connectors` groups the four connectors by part (called in eval.rs, both places);
+  test `crates/ops/tests/mate_flip.rs` width_mate_solves_in_any_face_order.
+- DOF cache: `solver::DOF_CACHE` / `dof_key` (numbering-independent exact key) reuses each group's DOF result.
+
+**Open items, in priority order (exact next steps):**
+1. F19: `git cherry-pick b826d8f8` (or rebase agent/skb on main); run `cargo clippy -p noshape-model -p noshape-ops
+   --all-targets -- -D warnings`, `cargo test -p noshape-ops --test mate_flip`, `cargo test -p noshape-model --lib
+   assembly::solver::tests`; push. If the DOF cache should land separately, split solver.rs (DOF_CACHE/dof_key and
+   the cache lookup/insert in solve_inner's DOF loop) from the Width parts.
+2. Assembly perf, inserting a pin into 200 pins / 300 mates still ~50 ms: the DOF key contains the global
+   `scale` (largest |origin| of all bodies), so a far insert misses every group. Next: compute a per-group
+   characteristic length for the DOF analysis (jacobian + key) in `solve_inner`. Then rerun
+   `cargo test -p noshape-ops --test assembly_perf -- --ignored --nocapture` (targets: frame < 16.7 ms, edits < 100 ms).
+3. oracle_asm R2 waits for fs's R1 connector flip (our turn already matches); CP1 broke with kern 339de774
+   (extrude swept from the far end: the pin cylinder's MidAxis connector points the other way, the pattern turns
+   the other way) — fs/kern, not in my files.
+4. Long tail: ASME socket head shoulder screw capture (geo8.js can't parse its table: write a dedicated capture).
+
+**Known failing tests in my area:** `oracle_asm` (CP1, from kern 339de774). Main was RED at e339bda0 on
+kernel_robustness `propagation_off_next_to_corner_fillets` (not mine).
+
 ## State right now
 - The shared tree **compiles** (last `cargo build -p noshape` with `CARGO_TARGET_DIR=/root/target-asb`
   finished cleanly after the Insert-dialog configuration change). No half-finished edits.
