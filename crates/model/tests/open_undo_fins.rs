@@ -99,6 +99,7 @@ fn change(regen: &mut Regenerator, ps: &PartStudio, what: &str) -> f64 {
 /// (nothing evaluated or meshed); once its upstream changed it is
 /// evaluated again.
 #[test]
+#[ignore = "T2: big model / perf"]
 fn undoing_a_delete_reuses_the_deleted_feature() {
     let (ps, lp2) = model(3);
     let (units, config) = (UnitPrefs::default(), ConfigValues::default());
@@ -128,6 +129,7 @@ fn undoing_a_delete_reuses_the_deleted_feature() {
 /// Undoing and redoing an edit takes every feature, and the body's mesh,
 /// from the cache.
 #[test]
+#[ignore = "T2: big model / perf"]
 fn undoing_an_edit_reuses_the_previous_evaluation() {
     let (ps, _) = model(3);
     let (units, config) = (UnitPrefs::default(), ConfigValues::default());
@@ -147,6 +149,7 @@ fn undoing_an_edit_reuses_the_previous_evaluation() {
 /// Planar bodies with straight edges are meshed once, at the final quality,
 /// even in the preview pass: no refine pass follows.
 #[test]
+#[ignore = "T2: big model / perf"]
 fn planar_bodies_need_no_refine_pass() {
     let (ps, _) = model(3);
     let (units, config) = (UnitPrefs::default(), ConfigValues::default());

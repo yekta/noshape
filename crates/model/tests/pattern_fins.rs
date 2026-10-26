@@ -172,6 +172,7 @@ fn status(r: &RegenResult) -> (FeatureStatus, Option<String>) {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn seed_fin_merges_into_the_front_wall() {
     // Live: the Fin alone has 8 faces and 18 edges, its front one face with
     // the block's (100 × 80 mm).
@@ -183,6 +184,7 @@ fn seed_fin_merges_into_the_front_wall() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn fin_pattern_reapplied_matches_onshape() {
     // Live (N = 25): one part, 4N + 4 faces, 12N + 6 edges, 8N + 4 vertices;
     // the front wall one 8000 mm² face, no seam at the fin root.
@@ -198,6 +200,7 @@ fn fin_pattern_reapplied_matches_onshape() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn inset_fin_pattern_reapplied_has_one_front_wall() {
     let n = 5;
     let (_, r) = fins(n, false, true);
@@ -209,6 +212,7 @@ fn inset_fin_pattern_reapplied_has_one_front_wall() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn fin_feature_pattern_without_reapply_fails_like_onshape() {
     // Live: the fins merge into the block's front and side faces, so the
     // face-based Feature pattern can't place the instances.
@@ -221,6 +225,7 @@ fn fin_feature_pattern_without_reapply_fails_like_onshape() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn fin_pattern_x1000_matches_onshape() {
     // Onshape: 4004 faces, 12006 edges, 8004 vertices.
     let (_, r) = fins(1000, true, true);
@@ -263,6 +268,7 @@ fn timed_fin_pattern_x1000_is_linear() {
 /// from the Top plane through the block, and standing on its top face.
 /// Live G45 (narrow rib, 5 × 5 mm): 11 + 4 × 5 faces, i.e. 6 + 5N.
 #[test]
+#[ignore = "T2: big model / perf"]
 fn narrow_rib_feature_pattern_without_reapply_matches_onshape() {
     for on_top in [false, true] {
         let n = 200usize;
@@ -322,6 +328,7 @@ fn overhanging_wall(reapply: bool) -> RegenResult {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn overhanging_wall_feature_pattern_matches_onshape() {
     let r = overhanging_wall(false);
     let (st, msg) = status(&r);

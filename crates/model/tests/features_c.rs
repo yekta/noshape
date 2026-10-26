@@ -1614,6 +1614,7 @@ fn parting_line_draft_on_two_parts_and_steps() {
 /// with live's volumes, 4 faces, and live's sample points on the drafted
 /// faces.
 #[test]
+#[ignore = "T2: 44 s"]
 fn parting_line_draft_on_curves_as_live() {
     use noshape_kernel as k;
     let cylinder = || k::make_cylinder(&k::Plane::from_normal(DVec3::ZERO, DVec3::Z), mm(10.0), mm(20.0), 2.0 * PI).unwrap();

@@ -122,6 +122,7 @@ fn vertical(i: &noshape_kernel::EdgeInfo) -> bool {
 /// Onshape can. Exact volume 4125.9988 mm³ (half-space construction, see
 /// docs/handoff/kernel-robustness.md); 1 mm: 1846.8729 mm³ (OCCT agrees).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn shell_block_with_fillets_and_chamfer() {
     let mut t = T::new();
     t.block(40.0, 20.0, 10.0);
@@ -153,6 +154,7 @@ fn shell_block_with_fillets_and_chamfer() {
 /// shelled 2.5 mm from the top. The hole's wall (r = 7.5 after the offset)
 /// runs into the front wall and merges with it.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn shell_plate_with_hole_near_the_edge() {
     let mut t = T::new();
     t.block(100.0, 40.0, 12.0);
@@ -173,6 +175,7 @@ fn shell_plate_with_hole_near_the_edge() {
 /// Shell variants Onshape completes: outward, hollow (no faces removed),
 /// several faces removed, a drafted (conical) wall.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn shell_common_variants() {
     let mut t = T::new();
     t.block(40.0, 20.0, 10.0);
@@ -202,6 +205,7 @@ fn shell_common_variants() {
 /// Onshape's own volumes (live capture, docs/handoff/kernel-robustness.md,
 /// /root/onshape-research/live/behaviours.md "Geometry ground truth").
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn shell_matches_onshape_volumes() {
     fn check(t: &mut T, s: FeatureId, th: &str, want: f64) {
         t.set(s, "thickness", e(th));
@@ -359,6 +363,7 @@ fn status(t: &mut T, id: FeatureId) -> (FeatureStatus, Option<String>, f64) {
 /// face as Onshape's, areas equal to 1e-7, our volume exact; Onshape's mass
 /// properties of that procedural face are ~0.1 off). See kernel/tests/blend.rs.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn blends_match_onshape() {
     fn check(t: &mut T, id: FeatureId, want: Result<f64, &str>, tol: f64, what: &str) {
         let (st, msg, v) = status(t, id);
@@ -495,6 +500,7 @@ fn write_kern_clips() {
 /// x = 40, then points along the edge (Onshape F4, G3: within 0.07 mm³ with
 /// Onshape's radius law, G6).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn variable_fillet_like_onshape() {
     use noshape_model::params::ParamValues;
     let mut t = T::new();
@@ -548,6 +554,7 @@ fn variable_fillet_like_onshape() {
 /// Move face (Offset) where the moved face changes the topology (live capture
 /// G1): through a hole, closing a hole, a hole grown until it splits the part.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn move_face_like_onshape() {
     let mut base = T::new();
     base.block(40.0, 20.0, 10.0);
@@ -579,6 +586,7 @@ fn move_face_like_onshape() {
 /// (= the profile radius) OK, R2 fails "Could not create valid swept body, check input."
 /// (OCCT builds a self-intersecting solid).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn sweep_round_tight_bend() {
     for (rb, want) in [(6.0, Ok(1114.7093352986567)), (3.0, Ok(981.4696758839505)), (2.0, Err("Could not create valid swept body, check input."))] {
         let mut t = T::new();
@@ -613,6 +621,7 @@ fn sweep_round_tight_bend() {
 /// top R2 fillet loop, Reapply fillet off (the top fillets are rolled again
 /// against the drafted faces) and on (all fillets removed and reapplied).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn draft_like_onshape() {
     let mut base = T::new();
     base.block(40.0, 20.0, 10.0);
@@ -648,6 +657,7 @@ fn draft_like_onshape() {
 /// sections are within 0.15 mm³ (Parasolid approximates them by splines; the
 /// exact conic area differs by ~0.003 mm² either way).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn fillet_options_like_onshape() {
     let mut base = T::new();
     base.block(40.0, 20.0, 10.0);
@@ -720,6 +730,7 @@ fn fillet_options_like_onshape() {
 /// Surface revolve (Onshape: Revolve, Surface): a line revolved about a
 /// parallel axis is a cylinder surface; partial angles give a part of it.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn surface_revolve() {
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();
@@ -745,6 +756,7 @@ fn surface_revolve() {
 /// Sweep twist: a 10 x 4 rectangle swept 50 mm along a straight path with half a
 /// turn keeps its volume (Pappus) and ends turned by 180°; on an arc path too.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn sweep_twist() {
     for (arc, turns) in [(false, "0.5"), (false, "1"), (true, "0.25")] {
         let mut t = T::new();
@@ -805,6 +817,7 @@ fn sweep_twist() {
 /// edge's blend runs out onto the corner cylinders; an arc on its own (or an
 /// arc with its neighbour) is refused with "Adjoining edge not filleted.".
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn propagation_off_next_to_corner_fillets() {
     let mut t = T::new();
     t.block(40.0, 20.0, 10.0);
@@ -843,6 +856,7 @@ fn propagation_off_next_to_corner_fillets() {
 /// match connections off), volumes in mm³. Through three sections the loft
 /// follows a natural cubic spline (crates/kernel/cpp/features.cpp natural_loft).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn loft_like_onshape() {
     use noshape_model::params::ParamValues;
     use std::f64::consts::{PI, TAU};
@@ -911,6 +925,7 @@ fn loft_like_onshape() {
 /// chain. Checked by the planar faces' areas (where the 1 mm and 3 mm legs
 /// fall) and Onshape's volumes.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn chamfer_distance_one_face_matches_onshape() {
     let mut base = T::new();
     base.block(40.0, 20.0, 10.0);
@@ -1090,6 +1105,7 @@ impl G46 {
 
 /// qa4 F8 / F9 as Onshape does them (live G46).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn chamfer_and_shell_on_filleted_box_match_onshape() {
     let mut g = G46 { bad: Vec::new() };
     let base = g.filleted();
@@ -1114,6 +1130,7 @@ fn chamfer_and_shell_on_filleted_box_match_onshape() {
 /// triangle (20 faces), and Onshape's failure band from 2.053 mm up to the
 /// fillet radius (2.05 works, 3 works again).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn chamfer_then_fillet_shell_matches_onshape() {
     let mut g = G46 { bad: Vec::new() };
     let t = g.chamfer_first();
@@ -1171,6 +1188,7 @@ fn shell_thickness_sweep() {
 /// or round both loops (3). At exactly 2.5 mm the hole's offset wall touches
 /// the front wall's: Onshape fails every case there (2.499 and 2.501 work).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn shell_bracket_matches_onshape() {
     fn bracket() -> T {
         let mut t = T::new();
@@ -1252,6 +1270,7 @@ fn shell_bracket_matches_onshape() {
 /// its mass properties) the check is against the exact value when we have a
 /// closed form (and Onshape's must lie in its band), else against its band.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn blend_sweep_matches_onshape() {
     fn sketch_on(t: &mut T, plane: Reference, build: impl FnOnce(&mut noshape_sketch::Sketch)) -> Vec<Reference> {
         let mut sk = noshape_sketch::Sketch::new();
@@ -1416,6 +1435,7 @@ fn blend_sweep_matches_onshape() {
 /// sweep", behaviours.md): shells and drafts Onshape builds, against its
 /// volumes and face counts (all OK there).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn shell_draft_sweep_matches_onshape() {
     let mm = |v: f64| v * 1e-3;
     let faces = |t: &mut T| t.regen().context.bodies[0].shape.count(noshape_kernel::ShapeType::Face);
@@ -1562,6 +1582,7 @@ fn shell_draft_sweep_matches_onshape() {
 /// errors. Where Onshape's mass properties are approximate, its error band
 /// (L3 dx 5: 9424.503 in [9419.257, 9429.750]; ours is the exact 9424.779).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn sweep_4_8_matches_onshape() {
     let mm = |v: f64| v * 1e-3;
     fn sketch_on(t: &mut T, plane: Reference, build: impl FnOnce(&mut noshape_sketch::Sketch) -> Vec<u32>) -> (FeatureId, Vec<Reference>, Vec<u32>) {
@@ -1826,6 +1847,7 @@ fn sweep_4_8_matches_onshape() {
 /// plane (hole wall, mid plane, a sloped face, drafts beside fillets with and
 /// without Reapply), angles that run out, parting lines.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn draft_sweep_matches_onshape() {
     fn plane_at(t: &mut T, z: f64) -> Reference {
         Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e(&format!("{z} mm")))]))
@@ -2022,6 +2044,7 @@ fn draft_sweep_matches_onshape() {
 /// fillets after a shell. Conic / curvature / variable volumes are Onshape's
 /// approximations (its bands ±6..18 mm³); ours are within 0.15.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn fillet_round_2_matches_onshape() {
     let mm = |v: f64| v * 1e-3;
     let at = |p: glam::DVec3, x: f64, y: f64, z: f64| p.distance(glam::DVec3::new(mm(x), mm(y), mm(z))) < 1e-9;
@@ -2272,6 +2295,7 @@ fn fillet_round_2_matches_onshape() {
 /// patterns"): Reapply (default off) onto curved faces, instances off the
 /// part, mirrored features.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn patterns_match_onshape() {
     fn sketch_on(t: &mut T, plane: Reference, circles: &[((f64, f64), f64)]) -> Vec<Reference> {
         let mut sk = noshape_sketch::Sketch::new();
@@ -2407,6 +2431,7 @@ fn patterns_match_onshape() {
 /// chamfer (a counterbore there fails); ribs to a boss, extended or not, and
 /// onto a cylinder that only touches the plate (a separate part: no rib).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn hole_and_rib_match_onshape() {
     fn plane(t: &mut T, from: DatumPlane, d: f64) -> Reference {
         Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(from)])), ("cplaneType", en("OFFSET")), ("offset", e(&format!("{d} mm")))]))
@@ -2551,6 +2576,7 @@ fn hole_and_rib_match_onshape() {
 /// qa5 SF2: two adjacent sketch regions extruded together are one part
 /// without a seam (live: 8000 mm³, 6 faces).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn adjacent_regions_extrude_without_a_seam() {
     let mut t = T::new();
     let (_, regions) = t.sketch(&[&[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)], &[(20.0, 0.0), (40.0, 0.0), (40.0, 20.0), (20.0, 20.0)]], &[]);
@@ -2567,6 +2593,7 @@ fn adjacent_regions_extrude_without_a_seam() {
 /// is Onshape's approximation: the exact ruled solid (the circle split at the
 /// square's corner directions, rows by arc length) is 5927.75434.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn loft_square_to_circle_matches_onshape() {
     let mut t = T::new();
     let (_, r1) = t.sketch(&[&[(-10.0, -10.0), (10.0, -10.0), (10.0, 10.0), (-10.0, 10.0)]], &[]);
@@ -2595,6 +2622,7 @@ fn loft_square_to_circle_matches_onshape() {
 /// part cut by the chamfer's plane and clipped by the bottom face: 25 mm →
 /// 30000 mm³ (live OK). Within the faces the chamfer is exact.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn chamfer_wider_than_its_face_overflows_like_onshape() {
     let mut base = T::new();
     base.block(60.0, 40.0, 20.0);

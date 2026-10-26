@@ -217,6 +217,7 @@ fn compare(name: &str) -> String {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn core_dialogs_match_std_in_every_state() {
     let report: String = STRICT.iter().map(|n| compare(n)).collect();
     assert!(report.is_empty(), "built-in dialogs differ from the std:\n{report}");
@@ -225,6 +226,7 @@ fn core_dialogs_match_std_in_every_state() {
 /// Prints the comparison of one feature: `STD_ORACLE=fillet cargo test
 /// -p noshape-model --test std_oracle print_one -- --nocapture`.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn print_one() {
     if let Ok(name) = std::env::var("STD_ORACLE") {
         for n in name.split(',') {
@@ -590,6 +592,7 @@ fn extrude_cases() -> Vec<(&'static str, Studio)> {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn extrude_regenerates_as_std() {
     let report: String = extrude_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std(name, "extrude", s)).collect();
     assert!(report.is_empty(), "native Extrude differs from std:\n{report}");
@@ -612,6 +615,7 @@ fn edit_logic(s: &Studio, old: &ParamValues, specified: &[&str]) -> Vec<String> 
 /// std's extrudeEditLogic, as the dialog runs it (app part_studio
 /// `std_edit_logic`), through the host natives.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn extrude_editing_logic_runs_std() {
     let mut s = Studio::new();
     s.cube();
@@ -819,6 +823,7 @@ fn fillet_cases() -> Vec<(&'static str, Studio)> {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn fillet_regenerates_as_std() {
     let report: String = fillet_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std(name, "fillet", s)).collect();
     assert!(report.is_empty(), "native Fillet differs from std:\n{report}");
@@ -827,6 +832,7 @@ fn fillet_regenerates_as_std() {
 /// std's filletEditLogic: the first vertex of a variable fillet takes the
 /// fillet's radius, second radius, flip (reversed) and rho.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn fillet_editing_logic_runs_std() {
     let mut s = Studio::new();
     s.cube();
@@ -911,6 +917,7 @@ fn hole_cases() -> Vec<(&'static str, Studio)> {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn hole_regenerates_as_std() {
     // A hole that hits nothing flags Merge scope (live behaviours.md "Hole"
     // 2154): std maps opHole's faulty `targets` onto it.
@@ -922,6 +929,7 @@ fn hole_regenerates_as_std() {
 /// Tap clearance linked (adjustDepthAndThreadParameters); the native rule
 /// (hole_tables::link_tapped_depths, live L49/L50) must pick the same field.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn hole_tapped_depths_link_as_std() {
     use noshape_model::features::hole_tables::link_tapped_depths;
     let units = UnitPrefs::default();
@@ -1047,6 +1055,7 @@ fn loft_cases() -> Vec<(&'static str, Studio)> {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn loft_regenerates_as_std() {
     // Known gap: loft start/end conditions. Our kernel loft has no end
     // derivatives; native warns that it ignores them, the host's opLoft
@@ -1118,6 +1127,7 @@ fn transform_cases() -> Vec<(&'static str, Studio)> {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn transform_regenerates_as_std() {
     let report: String = transform_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std(name, "transform", s)).collect();
     assert!(report.is_empty(), "native Transform differs from std:\n{report}");
@@ -1126,6 +1136,7 @@ fn transform_regenerates_as_std() {
 /// std's loftEditLogic: a new loft whose start profile lies on the cube's
 /// top face adds to the cube; one in empty space stays New.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn loft_editing_logic_runs_std() {
     let mut s = Studio::new();
     s.cube();
@@ -1193,6 +1204,7 @@ const X_EDGE: DVec3 = DVec3::new(20.0, 0.0, 0.0);
 const TOP_EDGE: DVec3 = DVec3::new(20.0, 0.0, 40.0);
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn revolve_regenerates_as_std() {
     let mut cases = Vec::new();
     let revolve = |name: &'static str, set: fn(&mut ParamValues, &RegenResult)| {
@@ -1226,6 +1238,7 @@ fn revolve_regenerates_as_std() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn chamfer_regenerates_as_std() {
     oracle(
         "chamfer",
@@ -1253,6 +1266,7 @@ fn chamfer_regenerates_as_std() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn shell_regenerates_as_std() {
     oracle(
         "shell",
@@ -1292,6 +1306,7 @@ fn shell_regenerates_as_std() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn patterns_regenerate_as_std() {
     oracle(
         "linearPattern",
@@ -1344,6 +1359,7 @@ fn patterns_regenerate_as_std() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn mirror_regenerates_as_std() {
     oracle(
         "mirror",
@@ -1363,6 +1379,7 @@ fn mirror_regenerates_as_std() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn sweep_regenerates_as_std() {
     let mut cases = Vec::new();
     let sweep = |name: &'static str, set: fn(&mut ParamValues)| {
@@ -1388,6 +1405,7 @@ fn sweep_regenerates_as_std() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn boolean_regenerates_as_std() {
     let mut cases = Vec::new();
     let two = |name: &'static str, set: fn(&mut ParamValues, &RegenResult)| {
@@ -1429,6 +1447,7 @@ fn boolean_regenerates_as_std() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn plane_regenerates_as_std() {
     oracle(
         "cPlane",
@@ -1469,6 +1488,7 @@ fn plane_regenerates_as_std() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn draft_regenerates_as_std() {
     oracle(
         "draft",
@@ -1491,6 +1511,7 @@ fn draft_regenerates_as_std() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn split_regenerates_as_std() {
     let mut cases = Vec::new();
     let split = |name: &'static str, set: fn(&mut ParamValues, &RegenResult, FeatureId)| {
@@ -1526,6 +1547,7 @@ fn split_regenerates_as_std() {
 /// std's editing logic of Split, Plane, Revolve and Mirror (run as the
 /// dialog runs it).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn more_editing_logic_runs_std() {
     // Split: a plane tool turns Keep tools on (live "Split part by the Right plane").
     let mut s = Studio::new();
@@ -1580,6 +1602,7 @@ fn more_editing_logic_runs_std() {
 /// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,
 /// live "fs (10-25 f)"; the native dialog logic does the same, live L57).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn hole_editing_logic_runs_std() {
     for on_top in [true, false] {
         let mut s = Studio::new();
@@ -1608,6 +1631,7 @@ fn hole_editing_logic_runs_std() {
 /// top one's face; Blind 5 fills Merge scope with the top part only, Depth
 /// 15 adds the part below.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn hole_scope_follows_depth_as_live() {
     let mut s = Studio::new();
     let a = s.sketch(Reference::Plane(DatumPlane::Top), &[SQUARE]).1[0].clone();

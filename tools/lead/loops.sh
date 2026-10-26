@@ -1,6 +1,6 @@
 #!/bin/bash
-# Ensure the merge queue and disk loop are running (exact match, so this script's own command line can't fool it).
-for s in disk-loop; do
+# Ensure the main watcher and disk loop are running (exact match, so this script's own command line can't fool it).
+for s in disk-loop watch-main; do
   if pgrep -fx "/bin/bash /tmp/lead/$s.sh" >/dev/null; then echo "$s: running"
   else cd /tmp && setsid nohup /bin/bash /tmp/lead/$s.sh >/dev/null 2>&1 </dev/null & echo "$s: RESTARTED"; fi
 done

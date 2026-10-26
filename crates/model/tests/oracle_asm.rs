@@ -361,6 +361,7 @@ const KNOWN: &[(&str, &str)] = &[
 ];
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn assemblies_match_live() {
     let mut parts = parts();
     let mut report = String::new();

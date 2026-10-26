@@ -1146,6 +1146,7 @@ const LIVE: &[(&str, &str, &str, f64, usize, f64, usize)] = &[
 ];
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn p1_features_match_live() {
     let mut report = String::new();
     for (name, s) in extrude_cases().into_iter().chain(revolve_cases()).chain(blend_cases()).chain(hole_cases()).chain(sweep_loft_cases()).chain(pattern_cases()).chain(boolean_split_transform_cases()).chain(plane_cases()) {
@@ -1178,6 +1179,7 @@ fn p1_features_match_live() {
 /// A Feature pattern whose instances all miss the part fails asking for
 /// Reapply features (live "qa5 bracket" †: a Remove patterned toward −x).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn feature_pattern_off_the_part_as_live() {
     let mut s = Studio::block();
     let r = s.regen();

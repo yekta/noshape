@@ -1748,6 +1748,7 @@ export const showStudio = defineFeature(function(context is Context, id is Id, d
 /// std sheet metal (sheetMetalStart & co.) through updateSheetMetalGeometry,
 /// against live dom/fs-smprobe{,2}-{1,2}.txt (tests/fs/sm_harness.fs).
 #[test]
+#[ignore = "T2: 45 s std sheet metal"]
 fn std_sheet_metal_matches_onshape() {
     let fx = Fixture::new(include_str!("fs/sm_harness.fs"));
     let mut ps = PartStudio::new();

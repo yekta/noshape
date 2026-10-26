@@ -2433,6 +2433,7 @@ fn measure_between_instances() {
 }
 
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn standard_content_parts_regenerate_with_mate_connectors() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     // Every component, reporting all that fail at once.
@@ -3229,6 +3230,7 @@ fn fastened_offset_rotates_about_x_by_default() {
 /// and the BT / T quarter cut), and the BT cut's sphere has live's radius
 /// (#8: c = (3L² − D²)/4L, R = L − c = 0.0883 in for L = 0.111, D = 0.164).
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn tapping_screw_tips_regenerate() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let c = CATALOGUE.iter().find(|c| c.name == "Flat countersunk trim head tapping screw").expect("tapping screws in the catalogue");
@@ -3263,6 +3265,7 @@ fn tapping_screw_tips_regenerate() {
 /// `pan_head_tapping_screw_mouth_fillets`). Fillister #8: III 0.112 /
 /// 0.075 in, VI Ø0.155 / Ø0.1094 / 0.055 in.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn tapping_screw_recesses_iii_and_vi() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     for name in ["Fillister head tapping screw", "Oval countersunk head tapping screw"] {
@@ -3347,6 +3350,7 @@ fn pan_head_tapping_screw_mouth_fillets() {
 /// step; hex heads with a 30° top chamfer, the indent a Ø0.9 s dish; the hex
 /// washer's disc under the hex.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn remaining_tapping_screws_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     // (head type, live's faces).
@@ -3415,6 +3419,7 @@ fn remaining_tapping_screws_match_live() {
 /// Type I = 63 faces, Hex washer 65; every face's area as live's face lists
 /// (dom/skb-sc-typeI-facelists.json, in², sorted).
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn hex_type_i_recess_matches_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     const HEX: [f64; 63] = [4.09e-05, 4.09e-05, 4.09e-05, 4.09e-05, 4.09e-05, 4.09e-05, 4.09e-05, 4.09e-05, 9.63e-05, 9.63e-05, 9.63e-05, 9.63e-05, 0.0001328, 0.0001328, 0.0001328, 0.0001328, 0.0001328, 0.0001328, 0.0001328, 0.0001328, 0.0002074, 0.0002074, 0.0002074, 0.0002074, 0.0009698, 0.0009698, 0.0009698, 0.0009698, 0.0009698, 0.0009698, 0.00117, 0.00117, 0.00117, 0.00117, 0.00117, 0.00117, 0.00117, 0.00117, 0.0018665, 0.0018665, 0.0018665, 0.0018665, 0.0018665, 0.0018665, 0.0018665, 0.0018665, 0.0025543, 0.0025543, 0.0025543, 0.0025543, 0.0053973, 0.0093266, 0.0129591, 0.0153244, 0.0153244, 0.0153244, 0.0153244, 0.0153244, 0.0153244, 0.026083, 0.0330025, 0.0551999, 0.5420305];
@@ -3444,6 +3449,7 @@ fn hex_type_i_recess_matches_live() {
 /// plane up through the head): every #8 regenerates, with the 20-edge mouth
 /// fillet where OCCT makes it (flat tops; crowns need kern's checked fillet).
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn type_i_recipe_regenerates_on_every_head() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     for (name, size) in [
@@ -3501,6 +3507,7 @@ fn pan_type_ia_recess_matches_live() {
 /// Live's Type IA recipe on every head that offers it (variants: wing length
 /// L·1.25 / 1.125 / 1, V-groove or flat-floored wings, Fillister's one arm).
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn type_ia_recipe_regenerates_on_every_head() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     for (name, size) in [
@@ -3535,6 +3542,7 @@ fn type_ia_recipe_regenerates_on_every_head() {
 /// (dom/skb-sc-comp) as live's B-rep (dom/skb-sc-geom, default size): face
 /// types and total area (m²); lock nuts at live's smallest and largest size.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn ansi_nuts_and_lock_washers_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     type Case = (&'static str, &'static [(&'static str, usize)], f64);
@@ -3687,6 +3695,7 @@ fn failing_standard_sizes_are_listed_with_live_errors() {
 /// the bore's pilot end coned to the flats) and NASM 3214 (hex on a stepped
 /// shank, Nut thickness rows); faces and total area (m²) of live's B-rep.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn nas_clinch_nuts_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let cases: [(&str, &str, usize, f64); 5] = [
@@ -3779,6 +3788,7 @@ fn b17_keys_match_live() {
 /// faces and total area (m²) of live's B-rep at live's sizes, one mid-plane
 /// connector.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn retaining_rings_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let cases: [(&str, &str, usize, f64); 19] = [
@@ -3824,6 +3834,7 @@ fn retaining_rings_match_live() {
 /// diameter select (FSRules DATA_AI_OUTSIDE_DIAMETER) sets OD and thickness.
 /// Faces and volume (m³) of live's B-rep (bodydetails).
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn internal_external_tooth_lock_washers_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     type Case<'a> = (&'a str, &'a str, Option<&'a str>, usize, Option<f64>);
@@ -3854,6 +3865,7 @@ fn internal_external_tooth_lock_washers_match_live() {
 /// slots on radial lines, external from 1.05 (ID + OD) / 2, internal from the
 /// bore to (ID + OD) / 2; faces and total area (m²) at live's sizes.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn tooth_lock_washers_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let cases: [(&str, &str, usize, f64); 10] = [
@@ -3887,6 +3899,7 @@ fn tooth_lock_washers_match_live() {
 /// negative major radius (high: -3.429 / 8.636 mm, low: -1.143 / 6.35 mm), the
 /// nose a sphere (1.524 / 2.794 mm).
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn acorn_nut_crown_is_a_torus_like_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     for (name, major, minor, nose) in [("Acorn high crown nut", -3.429, 8.636, 1.524), ("Acorn low crown nut", -1.143, 6.35, 2.794)] {
@@ -3918,6 +3931,7 @@ fn acorn_nut_crown_is_a_torus_like_live() {
 /// published table's row of its diameter (DIN 985:1987). Every size builds;
 /// M8 is s 13 across the flats and 8 high (h max) as the table says.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn din_985_nuts_build_every_live_size() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let c = CATALOGUE.iter().find(|c| c.name == "Prevailing torque hex thin nut grade A & B DIN 985").expect("DIN 985 in the catalogue");
@@ -3967,6 +3981,7 @@ fn din_985_nuts_build_every_live_size() {
 /// torus, and under the head a cone from Ø6.8 over 0.68 mm (30.47°) with a
 /// 0.25 mm torus at each end (majors 3.54299 and 3.25).
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn iso_4762_cap_screw_matches_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     use noshape_kernel::Surface;
@@ -4008,6 +4023,7 @@ fn iso_4762_cap_screw_matches_live() {
 /// the 90 degree cone, which a 0.25 mm torus (major 3.25) rounds into the
 /// shank.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn iso_10642_countersunk_screw_matches_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let c = CATALOGUE.iter().find(|c| c.name == "Hex socket countersunk head screw ISO 10642").unwrap();
@@ -4064,6 +4080,7 @@ fn iso_set_screws_match_live() {
 /// fillet torus under the head, the socket with its 120 degree drill point;
 /// the plain Hex screw 21 faces.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn asme_socket_head_cap_screw_matches_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let c = CATALOGUE.iter().find(|c| c.name == "Socket head cap screw" && c.inch).unwrap();
@@ -4106,6 +4123,7 @@ fn asme_socket_head_cap_screw_matches_live() {
 /// Both end the bearing face at FILLET_TRANSITION_DIAMETER in a torus of
 /// radius (FILLET_TRANSITION_DIAMETER - d) / 2.
 #[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn asme_socket_button_and_countersunk_screws_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     for (name, faces, cases) in [

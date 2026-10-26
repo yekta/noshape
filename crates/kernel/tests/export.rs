@@ -10,6 +10,7 @@ fn part() -> Shape {
 }
 
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn step_schemas_and_units() {
     let s = part();
     let want = volume_properties(&s).unwrap().mass;
@@ -72,6 +73,7 @@ fn xt_parts() -> Vec<(&'static str, Shape)> {
 /// Parasolid: every part written as .x_t and .x_b reads back (with the
 /// orientations from the file, not repaired) as a valid solid of the same volume.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn parasolid_round_trip() {
     let dir = std::env::temp_dir().join(format!("noshape-xt-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -105,6 +107,7 @@ fn parasolid_round_trip() {
 /// part 2 the writer's schema, the first body line naming the version's
 /// schema), and reads back with the same volume.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn parasolid_versions() {
     let dir = std::env::temp_dir().join(format!("noshape-xtv-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -144,6 +147,7 @@ fn parasolid_versions() {
 /// IGES: the Start and Global sections laid out as Onshape's (live "qa5
 /// iges header"), the part back with its volume.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn iges_header() {
     let dir = std::env::temp_dir().join(format!("noshape-igs-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -171,6 +175,7 @@ fn iges_header() {
 /// ACIS import: our own .sat of every test part back with its volume, and
 /// Onshape's SAT exports (outside the repo; skipped when absent).
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn acis_import() {
     let dir = std::env::temp_dir().join(format!("noshape-satin-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -200,6 +205,7 @@ fn acis_import() {
 /// JT import: our own JT of every test part back through its XT segment,
 /// and a JT 10.5 assembly (XZ-compressed segments) from NX when present.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn jt_import() {
     let dir = std::env::temp_dir().join(format!("noshape-jtin-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -266,6 +272,7 @@ fn write_xt_samples() {
 /// record types, coedge rings closed, partners paired with opposite senses,
 /// one lump per solid, faces' loops on their faces).
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn acis_structure() {
     let dir = std::env::temp_dir().join(format!("noshape-sat-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -334,6 +341,7 @@ fn acis_structure() {
 /// dialog offers) is one Brep that openNURBS reads back as valid. Only with
 /// openNURBS (OPENNURBS_ROOT); without it the writer must say so.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn rhino_breps_are_valid() {
     let dir = std::env::temp_dir().join(format!("noshape-3dm-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -368,6 +376,7 @@ fn rhino_breps_are_valid() {
 /// B-rep per part. (The encodings are checked against Onshape's own files in
 /// the writer's development; Onshape imports: live G21.)
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn jt_structure() {
     let dir = std::env::temp_dir().join(format!("noshape-jt-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -410,6 +419,7 @@ fn jt_structure() {
 /// structure member and one .ol geometry member per part. (Decoded against
 /// Onshape's samples in the writer's development; Onshape imports: live G23.)
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn pvz_structure() {
     let dir = std::env::temp_dir().join(format!("noshape-pvz-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -451,6 +461,7 @@ fn pvz_structure() {
 /// give Onshape's own mesh volumes, and the loft whose face meshes leave
 /// gaps stays open.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn pvz_import() {
     let dir = std::env::temp_dir().join(format!("noshape-pvz-import-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -493,6 +504,7 @@ fn pvz_import() {
 /// import as one solid of 18 faces whose rolling-ball corners (BLENDED_EDGE)
 /// give the exact volume of that geometry (kernel/tests/blend.rs).
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn parasolid_from_onshape() {
     let samples = std::path::Path::new("/root/onshape-research/live/samples");
     for (file, exact) in [("g25-b.x_t", 7583.000811), ("g25-f1r4.x_t", 7545.834615), ("g25-a.x_t", 7094.796033)] {
@@ -544,6 +556,7 @@ fn parasolid_from_onshape() {
 /// planes and cylinders: its exact volume (a 40 x 100 x 5 plate, two r 3.5
 /// holes, r 2 top fillets mitred at the corners) is checked as well.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn parasolid_from_onshape_mass_bounds() {
     let samples = std::path::Path::new("/root/onshape-research/live/samples");
     for (file, faces, lo, hi) in [
@@ -579,6 +592,7 @@ fn parasolid_from_onshape_mass_bounds() {
 }
 
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn native_cad_parts() {
     // Native part files (outside the repo; skipped when absent) against
     // Onshape's import of the same file (live G38) or another independent
@@ -638,6 +652,7 @@ fn native_cad_parts() {
 /// the component tree of the active configuration with each component's
 /// file, configuration and placement.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn native_assembly_tree() {
     let dir = std::path::Path::new("/root/kern-native-samples");
     let shaft = dir.join("sldasm/psas_Shaft_With_Plate_Asm.SLDASM");
@@ -678,6 +693,7 @@ fn native_assembly_tree() {
 /// Native parts' appearance as Onshape imports it (live G38/G38e): the part
 /// colour (and opacity) from the file; no face of its own colour.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn native_part_appearances() {
     let dir = std::path::Path::new("/root/kern-native-samples");
     for (file, rgb, alpha) in [
@@ -712,6 +728,7 @@ fn native_part_appearances() {
 /// metres, and each part's name on its product, shape representation, solid
 /// and context; entities grouped by type from #10.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn step_layout_like_onshape() {
     let cube = make_box_corners(DVec3::ZERO, DVec3::splat(0.01)).unwrap();
     // Parts 2 and 3 share Part 1's geometry, moved (as a Part pattern makes them).
@@ -773,6 +790,7 @@ fn step_layout_like_onshape() {
 /// the types only it brings are numbered first (Onshape numbers the type it
 /// created last first); AP214 / AP203 / inch variants.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn step_layout_variants_like_onshape() {
     let cube = make_box_corners(DVec3::new(0.06, 0.0, 0.0), DVec3::new(0.07, 0.01, 0.01)).unwrap();
     let block = make_box_corners(DVec3::ZERO, DVec3::new(0.04, 0.03, 0.02)).unwrap();
@@ -869,6 +887,7 @@ fn report_xt() {
 /// live 6052.697 mm³, ours 6053.32) and eight circle wire bodies (live
 /// G38d) import, nothing refused.
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn parasolid_offset_patch_and_wire_circles_from_onshape() {
     let samples = std::path::Path::new("/root/onshape-research/live/samples");
     let shell = samples.join("g50-g46-shell1.x_t");
@@ -902,6 +921,7 @@ fn parasolid_offset_patch_and_wire_circles_from_onshape() {
 }
 
 #[test]
+#[ignore = "T2: export round trips (platform last digits; 36 s)"]
 fn binary_stl_header_is_zeros() {
     let path = std::env::temp_dir().join(format!("noshape-stl-header-{}.stl", std::process::id()));
     write_stl(&part(), &path, 0.0005, StlFormat::Binary).unwrap();

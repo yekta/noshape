@@ -189,6 +189,7 @@ fn sorted_size(f: &FlatPattern) -> (f64, f64) {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn l_bracket_flat_length() {
     let mut s = extrude_model(&[(0.0, 0.0), (50.0, 0.0), (50.0, 30.0)]);
     let r = s.ok();
@@ -225,6 +226,7 @@ fn l_bracket_flat_length() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn u_channel_flat_length_and_export() {
     let mut s = extrude_model(&[(0.0, 30.0), (0.0, 0.0), (50.0, 0.0), (50.0, 30.0)]);
     let r = s.ok();
@@ -249,6 +251,7 @@ fn u_channel_flat_length_and_export() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn flange_outer_alignment_volume_and_flat() {
     let mut s = plate();
     let r = s.ok();
@@ -284,6 +287,7 @@ fn flange_outer_alignment_volume_and_flat() {
 /// Up, and the flat DXF (samples/qa5-sm-flat.dxf, model x / y) has its 3 bend
 /// lines on SHEETMETAL_BEND_LINES_UP, the flanges' at x = -0.27765 and y = -0.27765 mm.
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn sm1_bends_are_up_in_table_flat_notes_and_dxf() {
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
@@ -332,6 +336,7 @@ fn sm1_bends_are_up_in_table_flat_notes_and_dxf() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn two_flanges_make_u_channel_and_adjacent_flanges_share_corner() {
     let mut s = plate();
     let r = s.ok();
@@ -370,6 +375,7 @@ fn two_flanges_make_u_channel_and_adjacent_flanges_share_corner() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn hem_straight_and_rolled() {
     let mut s = plate();
     let r = s.ok();
@@ -426,6 +432,7 @@ fn hem_straight_and_rolled() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn bend_feature_keeps_flat_length() {
     let mut s = plate();
     let mut sk = noshape_sketch::Sketch::new();
@@ -458,6 +465,7 @@ fn bend_feature_keeps_flat_length() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn convert_box_with_bends_and_joints() {
     // An open box (top excluded) converted with its front and back bottom
     // edges as bends: walls outward (live G34d), every other corner an
@@ -537,6 +545,7 @@ fn convert_box_with_bends_and_joints() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn corner_break_and_relief_and_tab() {
     // Corner break fillet on a plate corner.
     let mut s = plate();
@@ -620,6 +629,7 @@ fn corner_break_and_relief_and_tab() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn finish_sheet_metal_deactivates() {
     let mut s = plate();
     let r = s.ok();
@@ -638,6 +648,7 @@ fn finish_sheet_metal_deactivates() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn flange_names_are_stable_across_upstream_edits() {
     let mut s = plate();
     let r = s.ok();
@@ -670,6 +681,7 @@ fn frame_on(s: &mut Studio, sid: FeatureId, ids: &[u32], profile: &str, corner: 
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn frame_rectangle_mitered_cut_list() {
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
@@ -699,6 +711,7 @@ fn frame_rectangle_mitered_cut_list() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn frame_butt_endcap_gusset_and_trim() {
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
@@ -735,6 +748,7 @@ fn frame_butt_endcap_gusset_and_trim() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn frame_trim_groups_and_face() {
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
@@ -775,6 +789,7 @@ fn frame_trim_groups_and_face() {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn frame_profiles_and_curved_path() {
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
@@ -811,6 +826,7 @@ fn frame_profiles_and_curved_path() {
 
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn frame_sketch_profile_tangent_merge_and_limit_ends() {
     // Profile sketch of this Part Studio (20 x 20 tube, 2 mm wall): only the
     // ring region is material.
@@ -893,6 +909,7 @@ fn frame_sketch_profile_tangent_merge_and_limit_ends() {
 /// meet at an edge-joint rip (each stops 0.02 short of the other's face, the
 /// outer corner open) and become two parts.
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn convert_rips_and_bends_like_onshape() {
     let block = |bend: bool| {
         let mut s = Studio::new();

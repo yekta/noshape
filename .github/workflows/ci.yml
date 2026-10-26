@@ -1,14 +1,23 @@
 name: CI
 
 on:
-  # Trunk-based (10-26): agents push to main every few minutes and a full run takes 30-40 min, so CI no longer runs per
-  # main push (every run got cancelled by the next). The lead's watcher tests every main commit on Linux and moves the
-  # tag `last-green` when it passes; CI runs on each new last-green, on all three platforms, and is never cancelled.
+  # Test tiers (docs/TESTS.md). The lead's watcher tests every main commit with T0+T1 on Linux and moves the tag
+  # `last-green` when it passes; CI runs T1 on each new last-green and on the daily release branch (release/v*), on all
+  # three platforms, and is never cancelled. T2 (deep: oracles, big models) runs weekly here on macOS and Windows and
+  # never blocks anything.
   push:
-    branches: [ci]
+    branches: [ci, 'release/v*']
     tags: [last-green]
   pull_request:
+  schedule:
+    - cron: '0 2 * * 0' # Sundays 02:00 UTC: T2 on all three platforms
   workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Tests to run: t1 (core, default) or t2 (deep)'
+        type: choice
+        options: [t1, t2]
+        default: t1
 
 concurrency:
   # A newer last-green waits for the running one instead of cancelling it (GitHub keeps only the newest pending run).
@@ -106,8 +115,16 @@ jobs:
           path: target/release/${{ matrix.exe }}
           if-no-files-found: error
 
-      - name: Test
-        run: cargo test --locked --workspace --exclude noshape
+      - name: Test (T1 core)
+        if: github.event_name != 'schedule' && inputs.tier != 't2'
+        shell: bash
+        run: tools/tiers/t1.sh --locked --no-fail-fast
+
+      - name: Test (T2 deep; never blocks)
+        if: github.event_name == 'schedule' || inputs.tier == 't2'
+        continue-on-error: true
+        shell: bash
+        run: tools/tiers/t2.sh --locked
 
       # The whole workspace (app included, tests included) must be warning-free.
       - name: Clippy (-D warnings)

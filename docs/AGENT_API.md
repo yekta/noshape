@@ -4104,7 +4104,7 @@ Examples:
 
 Geometric tolerance (feature control frame) (edits the document (one undoable history entry)).
 
-The Geometric tolerance tool and dialog: the frame at `position` (sheet mm). Each row: `symbol` (position, concentricity, symmetry, parallelism, perpendicularity, angularity, cylindricity, flatness, roundness, straightness, profile_of_a_surface, profile_of_a_line, circular_runout, total_runout; later rows default to composite), `tolerance` with optional `before` / `after` (e.g. "Ø", "Ⓜ"), up to three `datums` ("A", "B Ⓜ"), and `prefix` / `suffix` texts; `upper` / `lower` texts above and below. One edit ("Geometric tolerance").
+The Geometric tolerance tool and dialog: the frame at `position` (sheet mm). Each row: `symbol` (position, concentricity, symmetry, parallelism, perpendicularity, angularity, cylindricity, flatness, roundness, straightness, profile_of_a_surface, profile_of_a_line, circular_runout, total_runout; later rows default to composite), `tolerance` with optional `before` / `after` (e.g. "Ø", "Ⓜ"), up to three `datums` ("A", "B Ⓜ"), and `prefix` / `suffix` texts; `upper` / `lower` texts above and below; `anchor`: its leader's point on the geometry. One edit ("Geometric tolerance").
 
 Examples:
 
@@ -4122,6 +4122,7 @@ Examples:
 | `upper` | string |  | Text above the frame. |
 | `lower` | string |  | Text below the frame. |
 | `leader` | one of `leader`, `all_around`, `all_over` |  | Leader type. |
+| `anchor` | array of number |  | Where the leader points (sheet mm: a view's edge, vertex or circle point snaps to it), as clicking the geometry first does; else no leader (drawing_annotation_edit add_leader adds more). |
 
 #### drawing_surface_finish
 
@@ -4258,12 +4259,12 @@ Examples:
 
 Place a BOM, cut list or hole table of a view (edits the document (one undoable history entry)).
 
-The BOM table, Cut list table and Hole table tools: the table of `view` with its top-left corner at `position` (sheet mm). A hole table measures from `origin` (a vertex or circle center of the view, sheet mm). One edit with the tool's name.
+The BOM table, Cut list table and Hole table tools: the table of `view` with its anchor corner at `position` (sheet mm): the reply's `corner`, a BOM's top right as in Onshape (A3: [410, 287] is the frame's top right). A reply `warning` says when the table runs off the sheet. A hole table measures from `origin` (a vertex or circle center of the view, sheet mm). One edit with the tool's name.
 
 Examples:
 
 ```json
-{"drawing": "Assembly 1 Drawing 1", "kind": "bom", "view": 3, "position": [20, 280]}
+{"drawing": "Assembly 1 Drawing 1", "kind": "bom", "view": 3, "position": [410, 287]}
 {"drawing": "Part 1 Drawing 1", "kind": "hole", "view": 3, "origin": [180, 140], "position": [20, 280]}
 ```
 

@@ -113,6 +113,7 @@ fn g34() -> Studio {
 }
 
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn flanges_on_adjacent_edges_match_live() {
     let r = g34().ok();
     let faces = r.context.bodies[part(&r)].shape.faces().len();
@@ -122,6 +123,7 @@ fn flanges_on_adjacent_edges_match_live() {
 /// qa5 3.2: a default Hem on G34's top edge at x = 60 (live: 9378.1835 mm³,
 /// 33 faces: 27 plane, 6 cylinder).
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn hem_on_g34_matches_live() {
     let mut s = g34();
     let r = s.ok();
@@ -149,6 +151,7 @@ fn face_at(r: &RegenResult, p: DVec3) -> Reference {
 /// plate's top face (live: OK, like sm8 dom/fs-smprobe3-8.txt; ours said
 /// "The tab must lie in the plane of a sheet metal wall").
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn tab_merges_into_the_top_face() {
     let mut s = g34();
     let r = s.ok();
@@ -177,6 +180,7 @@ fn tab_merges_into_the_top_face() {
 /// The flat pattern of G34 (std-built, live's placement: the plate stays at
 /// x 0..60, y 0..40; bend lines on the bends' centres, up).
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn flat_pattern_keeps_the_model_placement() {
     let r = g34().ok();
     let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
@@ -196,6 +200,7 @@ fn flat_pattern_keeps_the_model_placement() {
 /// Release 14, Onshape's whole layer table, the outline on
 /// SHEETMETAL_CUT_LINES and the bend centre lines on SHEETMETAL_BEND_LINES_UP.
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn flat_dxf_is_written_as_live() {
     let r = g34().ok();
     let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
@@ -256,6 +261,7 @@ fn face_report(r: &RegenResult) -> Vec<String> {
 /// Bend (sheetMetalBend) of the 60 × 40 plate along a sketch line across
 /// it at x = 30, 90°: two walls and a bend, flat as long as the plate.
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn bend_keeps_flat_length() {
     let mut s = Studio::new();
     let region = s.rectangle(60.0, 40.0);
@@ -288,6 +294,7 @@ fn bend_keeps_flat_length() {
 /// Corner break: a 5 mm fillet at a free corner of a 60 × 40 × 2 plate
 /// (std applies it in the flat: the definition corner becomes an arc).
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn corner_break_fillets_a_free_corner() {
     let mut s = Studio::new();
     let region = s.rectangle(60.0, 40.0);
@@ -315,6 +322,7 @@ fn corner_break_fillets_a_free_corner() {
 /// line (30,0)→(30,40) on its top: 4812.566370614357 mm³, 14 faces; x < 30
 /// stays, the wall rises at x 29.7223453..31.7223453.
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn bend_matches_live() {
     let mut s = Studio::new();
     let region = s.rectangle(60.0, 40.0);
@@ -351,6 +359,7 @@ fn bend_matches_live() {
 /// which fills "Flange to merge" with the wall the profile lies on and sets
 /// the subtraction offset to the model's minimal clearance (0.02 mm).
 #[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn tab_editing_logic_fills_merge_face_and_offset() {
     let mut s = g34();
     let mut sk = noshape_sketch::Sketch::new();

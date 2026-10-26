@@ -86,6 +86,7 @@ fn part(r: &RegenResult) -> (f64, usize) {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn bracket_regenerates_like_onshape() {
     let mut s = Studio { ps: PartStudio::new(), units: UnitPrefs::default(), reg: Regenerator::new() };
     let base = s.sketch(DatumPlane::Top, &[&[(0.0, 0.0), (80.0, 0.0), (80.0, 50.0), (0.0, 50.0)]], &[]);

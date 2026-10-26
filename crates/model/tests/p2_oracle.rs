@@ -105,6 +105,7 @@ fn cv(pairs: &[(&str, &str)]) -> ConfigValues {
 /// "#a + 5 mm * cos(#ang * 1 rad)" (atan(1) is an angle, so that is rad²);
 /// built with cos(#ang).
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn p2_oracle_variables() {
     for (case, a, volume, values) in [
         ("V1", "10 mm", 18877.31, [("a", "10 mm"), ("b", "45.4 mm"), ("c", "46.488 mm"), ("n", "3"), ("ang", "45 deg"), ("w", "46.488 mm"), ("h", "30 mm"), ("d", "13.536 mm")]),
@@ -132,6 +133,7 @@ fn p2_oracle_variables() {
 }
 
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn p2_oracle_configurations() {
     // C1: configured depth, fillet suppressed only in Large.
     let mut s = Studio::new();
@@ -226,6 +228,7 @@ impl noshape_model::regen::derived::DerivedProvider for Sources {
 /// D1–D3: Derived of the C1 studio (Large; Medium at a location) and of
 /// only V1's sketch.
 #[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn p2_oracle_derived() {
     // The C1 source.
     let mut c1 = Studio::new();

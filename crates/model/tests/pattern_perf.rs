@@ -159,6 +159,7 @@ fn check(case: Case, timed: bool) {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn feature_pattern_on_top_regenerates() {
     check(Case::FeatureOnTop, false);
 }
@@ -170,6 +171,7 @@ fn timed_feature_pattern_on_top_is_linear() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn feature_pattern_through_regenerates() {
     check(Case::FeatureThrough, false);
 }
@@ -181,6 +183,7 @@ fn timed_feature_pattern_through_is_linear() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn part_pattern_regenerates() {
     check(Case::Part, false);
 }
@@ -231,6 +234,7 @@ fn g45(full_width: bool, reapply: bool) -> (RegenResult, Vec<(f64, glam::DVec3)>
 /// default Feature pattern of a rib whose sides merged into the block's
 /// faces fails, asking for Reapply features.
 #[test]
+#[ignore = "T2: big model / perf"]
 fn feature_pattern_of_merged_rib_matches_onshape() {
     let status = |r: &RegenResult| r.display.features.last().map(|f| (f.status, f.message.clone())).unwrap();
     // Narrow rib: 11 + 4 × 5 faces.

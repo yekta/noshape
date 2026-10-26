@@ -98,6 +98,7 @@ fn count() -> usize {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn second_pattern_regenerates_like_the_first() {
     for reapply in [false, true] {
         second_pattern_case(reapply, false);
@@ -252,6 +253,7 @@ fn timed_deleting_the_running_second_pattern_in_the_app_shows_the_first_at_once(
 /// from the cache (no feature evaluated). An aborted run's kernel booleans
 /// stop too.
 #[test]
+#[ignore = "T2: big model / perf"]
 fn deleting_the_running_second_pattern_aborts_it_and_reuses_the_first() {
     use noshape_model::regen::runs::{Run, Runs};
     use std::sync::{Arc, Barrier, Mutex};

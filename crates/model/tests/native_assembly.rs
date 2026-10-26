@@ -10,6 +10,7 @@ use noshape_model::{Document, TabContent};
 use noshape_units::UnitPrefs;
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn shaft_with_plate_assembly() {
     let dir = std::path::Path::new("/root/kern-native-samples");
     let asm_file = dir.join("sldasm/psas_Shaft_With_Plate_Asm.SLDASM");
@@ -59,6 +60,7 @@ fn shaft_with_plate_assembly() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn nist_crada_assembly_zip() {
     // A flat zip like Onshape's (the .SLDASM, then its 8 part files under
     // their original names), outside the repo.
@@ -126,6 +128,7 @@ fn nist_crada_assembly_zip() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn nist_crada_assembly_combined() {
     let zip = std::path::Path::new("/root/kern-native-samples/sldasm-zip/nist_mtc_crada_assembly_rev-D.zip");
     if !zip.exists() {
@@ -162,6 +165,7 @@ fn nist_crada_assembly_combined() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn solid_edge_assembly_zip() {
     // The public ktane hull (Solid Edge): plates, walls and module holders
     // must close up into the box their placements describe.
@@ -196,6 +200,7 @@ fn instances_of(doc: &Document, assembly: noshape_model::document::TabId) -> Vec
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn inventor_assembly_zips() {
     use noshape_model::native_assembly::{NativeSystem, NativeTabs, add_native_zip, read_assembly_zip};
     // MIT-licensed Autodesk sets (iam-sets/LICENSES.md); Onshape's imports
@@ -257,6 +262,7 @@ fn inventor_assembly_zips() {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn solid_edge_assembly_names_and_order() {
     use noshape_model::native_assembly::{NativeTabs, add_native_zip, read_assembly_zip};
     let zip = std::path::Path::new("/root/kern-native-samples/se-zip/SingleHull.zip");

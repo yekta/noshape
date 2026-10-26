@@ -111,6 +111,7 @@ fn assert_planar_faces(s: &Shape, m: &Tessellation) {
 }
 
 #[test]
+#[ignore = "T2: 33 s mesh stress"]
 fn planar_faces_with_many_holes_mesh_watertight_and_delaunay() {
     for (what, s) in [("plate", plate()), ("comb", comb())] {
         // The display's settings: angular Auto (~140 segments a circle), chord by the angle.

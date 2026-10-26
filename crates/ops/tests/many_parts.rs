@@ -42,6 +42,7 @@ fn coverage(bgra: &[u8]) -> (usize, usize) {
 }
 
 #[test]
+#[ignore = "T2: big model / perf"]
 fn nine_hundred_parts_and_then_a_small_studio_render() {
     let dir = std::env::temp_dir().join(format!("noshape-many-parts-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
