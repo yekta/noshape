@@ -11,6 +11,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   since then): the shell result differs on arm64.
 - [ ] P1 `model/tests/std_oracle::hole_scope_follows_depth_as_live`: "Merge scope at depth 15 mm: []" (Linux, Windows).
 - [ ] P1 `kernel/tests/draft_curve::level_parting_line_matches_occt` red on all platforms 10-26 (exact match vs OCCT).
+- [ ] P0 TWO-PROCESS-LOST-EDIT the same .noshape opened by two app processes (e.g. `noshape doc.noshape` twice, or a
+  file-manager double-click while it's open) gives two independent windows; edits from both are written, but the later
+  writer's microversion takes the earlier one as parent while carrying its own stale state, so the earlier edit silently
+  vanishes from the head. Repro: open /root/qa-scratch/l30.noshape twice; in A suppress Boss 1, in B rename Boss 2 →
+  "RenamedInB"; close both; history_list shows "Suppress" then "Rename : RenamedInB", but Boss 1 is unsuppressed
+  (feature_get suppressed: false). Inside one process, opening an open doc from Documents focuses its window (OK). Needs a
+  per-file lock / single-instance handoff, or the writer must rebase onto the head it didn't see (Onshape merges
+  concurrent edits) (qa 2026-10-26, build 4d2f6b0c; owner: core or dx — document store)
 - [ ] P0 SHELL-WALLS Shell silently drops a filleted plate's outer walls (status OK, wrong solid). Repro (live's exact
   case): Sketch 1 on Top = rectangle 80 × 50 + Ø20 circle at its centre; Extrude 1 = the outer region, 10 mm; Fillet 1 =
   the top face (its 4 outer edges + the hole rim), R2; Shell 1 = remove the top face, 2.5 mm.
