@@ -3305,6 +3305,7 @@ Examples:
 | `kind` | one of `smart`, `point_to_point`, `point_to_line`, `line_to_line`, `radius`, `diameter`, `angle`, `angle_3_point`, `arc_length`, `chamfer`, `max_min`, `foreshorten` |  | Dimension tool. |
 | `picks` | array of array of number | required | The picking clicks (sheet mm). |
 | `place` | array of number | required | Where the dimension text goes (sheet mm). |
+| `mid_quad` | boolean |  | Shift+Q (Quad & mid snap point): the clicks also snap to edge midpoints and circle quadrant points, for this dimension. |
 
 #### drawing_update
 
