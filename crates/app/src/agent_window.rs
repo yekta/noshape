@@ -120,6 +120,15 @@ impl Workspace {
                 Some(TabView::Assembly(v)) => v.update(cx, |v, cx| v.agent_list(act, cx)),
                 _ => {}
             },
+            R::ReloadToolbars => {
+                for v in self.views.values() {
+                    match v {
+                        TabView::PartStudio(v) => v.update(cx, |v, cx| v.agent_reload_toolbar(cx)),
+                        TabView::Assembly(v) => v.update(cx, |v, cx| v.agent_reload_toolbar(cx)),
+                        _ => {}
+                    }
+                }
+            }
             R::SheetZoom { tab, mv } => {
                 if let Some(TabView::Drawing(v)) = self.views.get(&tab) {
                     v.update(cx, |v, cx| {

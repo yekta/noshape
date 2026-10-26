@@ -38,6 +38,17 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
     assert_eq!((t["toolbar"]["removed"].clone(), t["shortcut_tools"].clone(), t["toolbar"]["hide_search"].clone()), (json!(["helix"]), json!(["sketch", "extrude", "fillet"]), json!(true)), "{t}");
     let e = call(&mut ctx, "ui_toolbar", json!({ "set": { "shortcut_tools": ["nope"] } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set.shortcut_tools"), "{e:?}");
+    // The assembly toolbar (an Assembly tab in a document).
+    call(&mut ctx, "document_create", json!({ "path": dir.join("tb.noshape").to_str().unwrap() })).unwrap();
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly" })).unwrap();
+    let t = call(&mut ctx, "ui_toolbar", json!({ "tab": "Assembly 1" })).unwrap();
+    assert_eq!(t["shortcut_tools"].as_array().unwrap().len(), 11, "Onshape's eleven: {t}");
+    call(&mut ctx, "ui_toolbar", json!({ "tab": "Assembly 1", "set": { "removed": ["tb-gear"], "order": [1, 0], "hide_search": true } })).unwrap();
+    let t = call(&mut Ctx::new(), "ui_toolbar", json!({ "doc": dir.join("tb.noshape").to_str().unwrap(), "tab": "Assembly 1" })).unwrap();
+    assert_eq!((t["toolbar"]["removed"].clone(), t["sets"][0]["index"].clone(), t["toolbar"]["hide_search"].clone()), (json!(["tb-gear"]), json!(1), json!(true)), "{t}");
+    assert!(!t["sets"].as_array().unwrap().iter().any(|s| s["tools"].as_array().unwrap().iter().any(|x| x["id"] == "tb-gear")), "{t}");
+    let e = call(&mut ctx, "ui_toolbar", json!({ "tab": "Assembly 1", "set": { "removed": ["helix"] } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set.removed"), "a Part Studio tool: {e:?}");
 
     // Help › Keyboard shortcuts: Onshape's keys with the user's changes.
     std::fs::write(dir.join("keyboard-shortcuts.json"), r#"{"sketch:Center point circle*": {"key": "shift-c"}, "general:Flip primary axis": {"disabled": true}}"#).unwrap();

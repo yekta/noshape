@@ -79,4 +79,10 @@ impl AssemblyView {
             ListAct::Folders { .. } | ListAct::Filter(_) => {}
         }
     }
+
+    /// The user's toolbar settings changed (ui_toolbar): as after Customize toolbar….
+    pub(crate) fn agent_reload_toolbar(&mut self, cx: &mut Context<Self>) {
+        self.ui.tb_prefs = super::toolbar::AsmToolbarPrefs::load();
+        cx.notify();
+    }
 }
