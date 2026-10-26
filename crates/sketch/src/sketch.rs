@@ -56,6 +56,13 @@ impl Sketch {
         self.cache.revision = self.cache.revision.wrapping_add(1);
     }
 
+    /// Whether the last DOF analysis (a solve with `analyze`) still
+    /// describes this sketch: nothing but solving or dragging changed it
+    /// since. A solve without `analyze` then reports that analysis.
+    pub fn analysis_current(&self) -> bool {
+        self.cache.analysis.as_ref().is_some_and(|(rev, _)| *rev == self.cache.revision)
+    }
+
     // ------------------------------------------------------------------
     // queries
 

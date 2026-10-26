@@ -280,3 +280,24 @@ fn serde_roundtrip() {
     assert!(r.is_solved());
     assert_eq!(r.dof, Some(2));
 }
+
+/// The DOF analysis stays current while only solving or dragging moves the
+/// geometry (a regeneration per drag frame reuses it); any edit drops it.
+#[test]
+fn analysis_stays_current_through_drags_only() {
+    let mut sk = Sketch::new();
+    let a = sk.add_point(DVec2::ZERO);
+    let b = sk.add_point(DVec2::new(1.0, 0.5));
+    let l = sk.add_line_between(a, b).unwrap();
+    sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+    assert!(!sk.analysis_current());
+    let full = sk.solve();
+    assert!(sk.analysis_current());
+    sk.drag(&[(DragHandle::Point(b), DVec2::new(2.0, 0.3))]);
+    assert!(sk.analysis_current());
+    let reused = sk.solve_with(&SolveOptions { analyze: false, ..Default::default() });
+    assert_eq!(reused.dof, full.dof);
+    assert_eq!(reused.entity_states, full.entity_states);
+    sk.add_constraint(ConstraintKind::Length { curve: l, value: 1.0 }).unwrap();
+    assert!(!sk.analysis_current());
+}
