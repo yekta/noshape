@@ -231,6 +231,10 @@ pub struct FeatureDialog {
     /// applies a changed value and Esc reverts it before they accept or
     /// cancel the dialog (Onshape).
     baselines: HashMap<String, String>,
+    /// Each number field's last text that evaluated as its type: the title
+    /// shows it while the field holds a value of the wrong type, and a
+    /// second Enter puts it back (live ui-var/03, 09).
+    valid_texts: HashMap<&'static str, String>,
     /// Width after the user dragged the right edge (Onshape dialogs resize).
     pub width: Option<Pixels>,
     /// Selection lists in reorder mode (their "DONE" showing), by path.
@@ -315,6 +319,7 @@ impl FeatureDialog {
             computed: HashMap::new(),
             initial_focus_done: false,
             baselines: HashMap::new(),
+            valid_texts: HashMap::new(),
             width: None,
             reordering: std::collections::HashSet::new(),
             pick_drop: None,
@@ -1126,10 +1131,10 @@ impl FeatureDialog {
                 // text stays selected); the next Enter commits the feature.
                 if *shift {
                     cx.emit(DialogEvent::Accept { repeat: true });
-                } else if !this.apply_on_enter(&path_s, state, window, cx) {
-                    cx.emit(DialogEvent::Accept { repeat: false });
-                } else {
+                } else if this.apply_on_enter(&path_s, state, window, cx) {
                     this.flush_typed(cx);
+                } else if !this.refuse_invalid_enter(&path_s, state, window, cx) {
+                    cx.emit(DialogEvent::Accept { repeat: false });
                 }
             }
             // Onshape keeps the selection field active while a number field
@@ -1535,7 +1540,11 @@ impl FeatureDialog {
     /// wrong type, a bad expression, an unknown variable): its id and live's
     /// message for it.
     pub fn value_error(&self, _cx: &App) -> Option<(&'static str, String)> {
-        self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params)).find_map(|s| {
+        self.value_errors().next()
+    }
+
+    fn value_errors(&self) -> impl Iterator<Item = (&'static str, String)> + '_ {
+        self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params)).filter_map(|s| {
             let ParamKind::Num(n) = &s.kind else { return None };
             let Some(ParamValue::Expr(e)) = self.feature.params.get(s.id) else { return None };
             let text = e.text.as_str();
@@ -1544,6 +1553,56 @@ impl FeatureDialog {
             }
             noshape_units::evaluate_as(text, n.kind.dim(), &self.units, &self.variables).err().map(|err| (s.id, crate::quantity_field::eval_message(&err)))
         })
+    }
+
+    /// `value_error` once the value is applied (Enter, or the field left):
+    /// live shows nothing red while it is still being typed (ui-var/02).
+    fn applied_value_error(&self, cx: &App) -> Option<(&'static str, String)> {
+        self.value_errors().find(|(id, _)| self.applied(id, cx))
+    }
+
+    /// The field's text is applied: not edited since it was focused or
+    /// last applied with Enter.
+    fn applied(&self, id: &str, cx: &App) -> bool {
+        self.inputs.get(id).is_none_or(|st| self.baselines.get(id).is_some_and(|b| *b == *st.read(cx).value()))
+    }
+
+    /// The feature as its title shows it: a value of the wrong type reads
+    /// as the field's last valid one (live ui-var/03: "#d = 0 mm").
+    fn shown_feature(&self) -> std::borrow::Cow<'_, Feature> {
+        let mut errors = self.value_errors().filter_map(|(id, _)| self.valid_texts.get(id).map(|t| (id, t.clone()))).peekable();
+        if errors.peek().is_none() {
+            return std::borrow::Cow::Borrowed(&self.feature);
+        }
+        let mut f = self.feature.clone();
+        for (id, text) in errors {
+            if let Some(ParamValue::Expr(e)) = f.params.get(id) {
+                let mut e = e.clone();
+                e.text = text;
+                f.params.set(id, ParamValue::Expr(e));
+            }
+        }
+        std::borrow::Cow::Owned(f)
+    }
+
+    /// The feature as the list shows its row while the dialog is open.
+    pub fn row_feature(&self) -> Feature {
+        self.shown_feature().into_owned()
+    }
+
+    /// A second Enter on a value of the wrong type keeps the dialog open
+    /// and puts the field's last valid value back, still pink (live
+    /// ui-var/09). False when `path` holds no such value.
+    fn refuse_invalid_enter(&mut self, path: &str, state: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some((id, _)) = self.value_errors().find(|(id, _)| *id == path) else { return false };
+        let Some(text) = self.valid_texts.get(id).cloned() else { return true };
+        self.baselines.insert(path.to_string(), text.clone());
+        state.update(cx, |s, cx| {
+            s.set_value(text, window, cx);
+            s.select_all(window, cx);
+        });
+        cx.notify();
+        true
     }
 
     /// A field's text into the feature's value (no preview update); false
@@ -2997,8 +3056,10 @@ impl FeatureDialog {
         let create_var_popup = self.create_var.as_ref().is_some_and(|c| c.path == path).then(|| self.render_create_variable(cx));
         // Live (part-studio/155): a value that doesn't evaluate (bad syntax,
         // an unknown #variable) is pink with a red underline and the hover
-        // tooltip "Enter a valid expression.".
-        let eval_err = num.filter(|_| !focused && !text.trim().is_empty()).and_then(|n| noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).err());
+        // tooltip "Enter a valid expression.". Live (ui-var/03): Enter
+        // shows it in the still focused field; typing hides it again.
+        let applied = !focused || self.baselines.get(path).is_some_and(|b| *b == *state.read(cx).value());
+        let eval_err = num.filter(|_| applied && !text.trim().is_empty()).and_then(|n| noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).err());
         let invalid = err.is_some() || eval_err.is_some();
         // Live (ui (10-26 c)): the hover says why ("Cannot use angle as length.").
         let invalid_tip = eval_err.as_ref().map(crate::quantity_field::eval_message).unwrap_or_else(|| crate::quantity_field::INVALID_TIP.to_string());
@@ -3238,7 +3299,17 @@ impl Render for FeatureDialog {
         // Live (ui (10-26 c), VAR-INVALID): a value that doesn't evaluate as
         // its field's type turns the title red with "A parameter value is
         // not valid." and disables ✓ (Enter doesn't commit either).
-        let value_invalid = self.value_error(cx).is_some();
+        // Only applied values count: "10" on the way to "10 deg" doesn't.
+        for spec in self.ty.params.iter().filter(|s| matches!(s.kind, ParamKind::Num(_))) {
+            if self.applied(spec.id, cx)
+                && let Some(ParamValue::Expr(e)) = self.feature.params.get(spec.id)
+                && let ParamKind::Num(n) = &spec.kind
+                && noshape_units::evaluate_as(&e.text, n.kind.dim(), &self.units, &self.variables).is_ok()
+            {
+                self.valid_texts.insert(spec.id, e.text.clone());
+            }
+        }
+        let value_invalid = self.applied_value_error(cx).is_some();
         let status = if value_invalid { Some((FeatureStatus::Error, VALUE_NOT_VALID.to_string())) } else { status };
         let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error | FeatureStatus::Warning));
         // Live: ✓ is disabled while a field shows the error (pink: an empty
@@ -3261,7 +3332,8 @@ impl Render for FeatureDialog {
         }) || !self.parse_errors.is_empty();
         let blocked = value_invalid || (invalid && pink && !status.as_ref().is_some_and(|s| s.1 == "No merge scope selected."));
         let title_color = if invalid { pal.text_invalid } else { pal.text };
-        let name = noshape_model::interaction::display_name_computed(&self.feature, &|k| self.computed.get(k).cloned().or_else(|| shown_length(&self.feature, k, &self.units, &self.variables)));
+        let shown = self.shown_feature();
+        let name = noshape_model::interaction::display_name_computed(&shown, &|k| self.computed.get(k).cloned().or_else(|| shown_length(&shown, k, &self.units, &self.variables)));
         // Live (dom/dialog-hole.txt, dialog-variable.txt): a name built from
         // the parameters ("Ø 0.25 in ↧ 0.5 in", "#? = 0 in") is followed
         // by the feature type in brackets.

@@ -3715,11 +3715,11 @@ impl PartStudioView {
             .edit
             .as_ref()
             .map(|e| {
-                let d = e.dialog.read(cx);
+                let f = e.dialog.read(cx).row_feature();
                 let units = self.doc.read(cx).session.doc.settings.units;
-                let computed = self.computed_values(d.feature.id, cx);
-                noshape_model::interaction::display_name_computed(&d.feature, &|k| {
-                    computed.iter().find(|(c, _)| c == k).map(|(_, v)| v.clone()).or_else(|| crate::feature_dialog::shown_length(&d.feature, k, &units, &self.display.variables))
+                let computed = self.computed_values(f.id, cx);
+                noshape_model::interaction::display_name_computed(&f, &|k| {
+                    computed.iter().find(|(c, _)| c == k).map(|(_, v)| v.clone()).or_else(|| crate::feature_dialog::shown_length(&f, k, &units, &self.display.variables))
                 })
             })
             .unwrap_or_default();
@@ -3771,7 +3771,7 @@ impl PartStudioView {
         let related = self.row_ctx.related.contains(&f.id);
         // The feature being edited shows its draft's name (live: a Hole's
         // row reads "Ø 6.35 mm ↧ 12 mm" while its dialog is open).
-        let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.clone()).filter(|d| d.id == f.id);
+        let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).row_feature()).filter(|d| d.id == f.id);
         // The name shows the active configuration's values (a configured
         // Variable reads "#w = 80 mm" under L; qa4 round 4 S4-a).
         let configured = draft.is_none().then(|| self.studio(cx).filter(|s| s.configuration.configured.iter().any(|c| c.feature == f.id)).map(|s| s.configuration.for_editing(f, &self.current_config(s)))).flatten();
