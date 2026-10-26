@@ -388,10 +388,13 @@ fn tangent_continues(body: &Shape, at: DVec3, dir: DVec3, skip: usize) -> bool {
             return false;
         }
         let Ok(info) = e.edge_info() else { return false };
+        // The curve's parameter at a point (start / end follow the edge's
+        // orientation, first / last parameter the curve's).
+        let param = |q: DVec3| if e.point_at(info.first_param).is_ok_and(|x| (x - q).length() < 1e-9) { info.first_param } else { info.last_param };
         let t = if (info.start - at).length() < 1e-9 {
-            e.tangent_at(info.first_param).ok()
+            e.tangent_at(param(info.start)).ok()
         } else if (info.end - at).length() < 1e-9 {
-            e.tangent_at(info.last_param).ok().map(|v| -v)
+            e.tangent_at(param(info.end)).ok().map(|v| -v)
         } else {
             None
         };
