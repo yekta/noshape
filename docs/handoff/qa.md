@@ -67,6 +67,12 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
   reorder, rollback-bar drag, Roll to end, Variable Studio (#var autocomplete, change propagates), material assign +
   mass (0.191 kg), Duplicate / Delete of a tab with an open dialog, chamfer types (equal / two / distance-angle),
   up-to-next / face / part ends, thin extrudes, draft (neutral plane), split by plane: all as expected. Slot tool = live.
+- 22:40–23:00: Add-extrude merge scope with two touched parts (empty + "No merge scope selected.", switches back to New
+  when a depth change reaches a second part) = live; configurations via CLI (list input, configured depth and
+  suppression: 11882.891 / 30000.000); sketch offset / constraints / dimensions via CLI exact; sweep along line + tangent
+  arc exact (self-intersecting → "Could not create valid swept body, check input."); circular pattern exact; sketch
+  cancel → Restore reopens the sketch with the edits; view cube arrows 15° per click (= live). New: HOLE-MISS-MSG,
+  PATTERN-REAPPLY-CUT-ONLY.
 - Checked and same as live: R = centre-point rectangle, Shift+C = Curve/surface analysis (no Chamfer shortcut), Enter in
   Depth keeps the dialog, Esc in an open end-type list closes only the list, Hole dialog defaults (Inch tab, 1/4, 12 mm,
   118 deg), "Features …" + red badge while a new feature is invalid.
@@ -76,8 +82,7 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
 - psui: TAB-NO-PREVIEW, DCLICK-HEAVY (P1); DELETE-TAB-DIALOG, LOFT-PROFILE-LIST, PERF-SECTION-PANIC (P2); carried over
   qa5's P1-8 caveat, P1-10.
 - dx: API-HOLE-STYLE (P1), API-REMOVE-SCOPE, VERSION-0.4.6, RHINO-GREEN (P2), USER_GUIDE undo sentence (P3).
-- Live requests open (REQUESTS.md "qa (2026-10-26 …)"): drawing title block MATERIAL/WEIGHT; Add-extrude merge scope with
-  two touched parts.
+- Live requests open (REQUESTS.md "qa (2026-10-26 …)"): drawing title block MATERIAL/WEIGHT.
 - skasm: carried over qa5's P1-4 data.
 
 ## qa4 round-5 routed items re-checked on green 4d2f6b0c (2026-10-26 22:00)
