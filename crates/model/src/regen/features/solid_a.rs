@@ -299,7 +299,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     // trim text when Trim ends applies, else its thicken text.
     let thin_fail = if path_open && ev.bool("trimEnds") { THIN_TRIM_FAILED } else { THIN_THICKEN_FAILED };
     let along = |f: &crate::display::PlaneFrame, m: DVec3| path_end_near(&path, m).map_or(f.normal, |(_, t)| t);
-    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&along)).map_err(|_| fe(thin_fail))? } else { ev.profiles(refs)? };
+    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&along), false).map_err(|_| fe(thin_fail))? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
         return err("No valid profiles to sweep");
     }
