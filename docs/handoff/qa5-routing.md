@@ -868,3 +868,4 @@ STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extr
   live shows **no bubble** for circular or linear patterns (polled 20 s). Detail-view scale (p6 (4)) not answered yet.
 - STATUS 2026-10-26 (qa5): P1-6 merges into P1-16 (live "qa5 (10-25 p2)" (6): depth 10, R1, Shell 2.5 and 1 mm both OK).
   Lead 10-26: qa5 fixes the open findings itself, P1 first.
+STATUS FSW-unsupported (psb, 2026-10-26): Decal (0040f4e4, the model side; icons2 draws it) and the face blend variants (4d5af0d8: asymmetric, width ratio, conic, curvature, chamfer) are done as live. Still open: face blend between faces without a common edge.

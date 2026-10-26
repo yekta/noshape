@@ -591,7 +591,24 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
             .filter(|(_, fs)| fs.len() == 2 && ((a.contains(&(fs[0] as usize)) && b.contains(&(fs[1] as usize))) || (a.contains(&(fs[1] as usize)) && b.contains(&(fs[0] as usize)))))
             .map(|(i, _)| i)
             .collect();
+        let spec = super::blend_section::BlendSpec {
+            section,
+            r1,
+            r2,
+            width: width.then_some(radius),
+            partial: None,
+            run_on: !ev.bool("propagation"),
+            cliff: false,
+            sides: Some(super::blend_section::Sides { side1: a.clone(), ratio }),
+        };
+        let blend_failed = |e: crate::regen::eval::FeatureError| if e.message == "Failed to fillet selections." { fe("Failed to blend faces.") } else { e };
         if edges.is_empty() {
+            // Faces without a common edge (live GA/GC).
+            if spine_dir.is_some() {
+                continue;
+            }
+            super::blend_section::apart_blend(ev, bi, a[0], b[0], &spec, [ev.bool("flipSide1"), ev.bool("flipSide2")]).map_err(blend_failed)?;
+            done = true;
             continue;
         }
         if ev.bool("propagation") && ev.is("propagationType", "TANGENT") {
@@ -612,17 +629,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
         if !rolling_ball {
-            let spec = super::blend_section::BlendSpec {
-                section,
-                r1,
-                r2,
-                width: width.then_some(radius),
-                partial: None,
-                run_on: !ev.bool("propagation"),
-                cliff: false,
-                sides: Some(super::blend_section::Sides { side1: a.clone(), ratio }),
-            };
-            super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| if e.message == "Failed to fillet selections." { fe("Failed to blend faces.") } else { e })?;
+            super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(blend_failed)?;
             done = true;
             continue;
         }
