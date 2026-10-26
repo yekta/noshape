@@ -39,6 +39,8 @@ pub enum UiRequest {
     Select { tab: TabId, sel: Selected },
     /// The feature or instance list (ui_list).
     List { tab: TabId, act: ListAct },
+    /// The user's toolbar settings changed (ui_toolbar): the views reload them.
+    ReloadToolbars,
 }
 
 /// A list change as the list's menus make it.
@@ -252,7 +254,7 @@ impl WindowState {
             UiRequest::Compare(c) => self.compare = c.clone(),
             UiRequest::Repair(r) => self.repair = r.clone(),
             // view_camera, view_display, ui_select and ui_list keep their state themselves.
-            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } | UiRequest::List { .. } => {}
+            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } | UiRequest::List { .. } | UiRequest::ReloadToolbars => {}
         }
     }
 }

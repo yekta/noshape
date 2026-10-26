@@ -221,7 +221,7 @@ impl<'a> SheetPick<'a> {
                     match me.geom {
                         EdgeGeom::Line { a, b } => cand.push(([(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5], PointRef::Midpoint { body: me.body.clone(), name: (*me.name).clone() })),
                         EdgeGeom::Circle { center, radius, face_on: true, mid, .. } => {
-                            let closed = me.ends[0].is_none();
+                            let closed = closed_circle(&me.ends);
                             if !closed {
                                 cand.push((mid, PointRef::Midpoint { body: me.body.clone(), name: (*me.name).clone() }));
                             }
@@ -422,5 +422,14 @@ impl<'a> SheetPick<'a> {
             return Some(Pick::Point(p));
         }
         self.line_pick().or_else(|| self.arc_pick()).or_else(|| self.hovered_edge().and_then(|_| self.circle_pick(c)))
+    }
+}
+
+/// A full circle among a view's model edges: no end vertices, or one seam
+/// vertex at both ends (an arc has two apart).
+pub fn closed_circle(ends: &[Option<(PointRef, [f64; 2])>; 2]) -> bool {
+    match (&ends[0], &ends[1]) {
+        (Some((_, a)), Some((_, b))) => (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-9,
+        _ => true,
     }
 }

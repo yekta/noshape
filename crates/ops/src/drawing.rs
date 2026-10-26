@@ -111,6 +111,11 @@ impl SheetModel {
     /// The shared tools' view of this sheet with `tool` active and the
     /// pointer at `cursor` (sheet mm), hovering what lies there.
     pub fn pick<'a>(&'a self, tool: &'a Tool, selection: &'a [Sel], cursor: [f64; 2]) -> SheetPick<'a> {
+        self.pick_snapping(tool, selection, cursor, false)
+    }
+
+    /// [`Self::pick`] with Shift+Q's midpoint and quadrant snaps on or off.
+    pub fn pick_snapping<'a>(&'a self, tool: &'a Tool, selection: &'a [Sel], cursor: [f64; 2], mid_quad: bool) -> SheetPick<'a> {
         let mut pk = SheetPick {
             drawing: &self.drawing,
             display: &self.drawing,
@@ -121,7 +126,7 @@ impl SheetModel {
             hover: None,
             cursor,
             zoom: API_ZOOM,
-            snap_mid_quad: false,
+            snap_mid_quad: mid_quad,
             selection,
             sources: &self.sources,
         };

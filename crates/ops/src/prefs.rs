@@ -176,3 +176,125 @@ impl ToolbarPrefs {
         self.shortcut_tools = Some(tools);
     }
 }
+
+// ------------------------------------------------------------ assembly toolbar
+
+/// Onshape's assembly tool sets, in order (live dom/toolbar-assembly.txt).
+pub const ASM_TOOLSETS: &[&[&str]] = &[
+    &["tb-update-refs"],
+    &["tb-insert"],
+    &["tb-mc"],
+    &["tb-fastened", "tb-revolute", "tb-slider", "tb-planar", "tb-cyl", "tb-pinslot", "tb-ball", "tb-parallel"],
+    &["tb-tangent", "tb-width"],
+    &["tb-group", "tb-snap", "tb-show-mates", "tb-replicate", "tb-replace", "tb-linpat", "tb-circpat", "tb-mirror"],
+    &["tb-gear", "tb-rack", "tb-screw", "tb-linear"],
+    &["tb-display-states", "tb-ps-in-context"],
+];
+
+/// Tools panel label and icon of a tool (live 343).
+pub fn asm_tool_info(id: &str) -> (&'static str, &'static str) {
+    match id {
+        "tb-update-refs" => ("Update all references to latest versions", "update-all-button"),
+        "tb-insert" => ("Insert", "insert"),
+        "tb-mc" => ("Mate connector", "mate-connector-assembly"),
+        "tb-fastened" => ("Fastened mate", "fastened"),
+        "tb-revolute" => ("Revolute mate", "revolute"),
+        "tb-slider" => ("Slider mate", "slider"),
+        "tb-planar" => ("Planar mate", "planar"),
+        "tb-cyl" => ("Cylindrical mate", "cylindrical"),
+        "tb-pinslot" => ("Pin slot mate", "pin-slot"),
+        "tb-ball" => ("Ball mate", "ball"),
+        "tb-parallel" => ("Parallel mate", "parallel-mate"),
+        "tb-tangent" => ("Tangent mate", "tangent-mate"),
+        "tb-width" => ("Width mate", "width-mate"),
+        "tb-group" => ("Group", "group"),
+        "tb-snap" => ("Snap mode", "snap-mode"),
+        "tb-show-mates" => ("Show mates mode", "show-mates"),
+        "tb-replicate" => ("Replicate", "replicate"),
+        "tb-replace" => ("Replace instance", "replace-part"),
+        "tb-linpat" => ("Assembly linear pattern", "linear-pattern"),
+        "tb-circpat" => ("Assembly circular pattern", "circular-pattern"),
+        "tb-mirror" => ("Assembly mirror", "mirror"),
+        "tb-gear" => ("Gear relation", "gear-relation"),
+        "tb-rack" => ("Rack and pinion relation", "rack-pinion"),
+        "tb-screw" => ("Screw relation", "screw-relation"),
+        "tb-linear" => ("Linear relation", "linear-relation"),
+        "tb-display-states" => ("Display states", "display-states"),
+        _ => ("Create Part Studio in context", "create-partstudio-incontext"),
+    }
+}
+
+/// The user's assembly toolbar: tool set order, removed tools, Search tools hidden.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct AsmToolbarPrefs {
+    #[serde(default)]
+    pub order: Vec<usize>,
+    #[serde(default)]
+    pub removed: Vec<String>,
+    #[serde(default)]
+    pub hide_search: bool,
+    /// S shortcut toolbar tools (toolbar tool ids; None = the defaults;
+    /// Preferences › Shortcut toolbars › Assembly).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shortcut_tools: Option<Vec<String>>,
+}
+
+/// The S shortcut toolbar's default tools (live behaviours "Assembly":
+/// 11 ticked of 30).
+pub const ASM_DEFAULT_SHORTCUT_TOOLS: [&str; 11] = ["tb-insert", "tb-mc", "tb-fastened", "tb-revolute", "tb-slider", "tb-planar", "tb-group", "tb-replicate", "tb-replace", "tb-linpat", "tb-circpat"];
+
+/// Tools the S toolbar offers besides the toolbar's (live: Section view,
+/// Mass and section properties, Measure at the end of the list).
+pub const ASM_SHORTCUT_EXTRAS: [(&str, &str, &str); 3] = [("tb-section", "Section view", "section-view-3d"), ("tb-mass", "Mass and section properties", "mass-properties"), ("tb-measure", "Measure", "measure")];
+
+impl AsmToolbarPrefs {
+    fn path() -> std::path::PathBuf {
+        noshape_scene::config_dir().join("assembly_toolbar.json")
+    }
+
+    pub fn load() -> Self {
+        std::fs::read_to_string(Self::path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+    }
+
+    pub fn save(&self) {
+        let p = Self::path();
+        if let Some(dir) = p.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Ok(t) = serde_json::to_string_pretty(self) {
+            let _ = std::fs::write(p, t);
+        }
+    }
+
+    /// Tool set order (every default set once, new sets appended).
+    pub fn set_order(&self) -> Vec<usize> {
+        let mut out: Vec<usize> = self.order.iter().copied().filter(|i| *i < ASM_TOOLSETS.len()).collect();
+        out.dedup();
+        for i in 0..ASM_TOOLSETS.len() {
+            if !out.contains(&i) {
+                out.push(i);
+            }
+        }
+        out
+    }
+
+    pub fn shortcut_tools(&self) -> Vec<String> {
+        self.shortcut_tools.clone().unwrap_or_else(|| ASM_DEFAULT_SHORTCUT_TOOLS.iter().map(|s| s.to_string()).collect())
+    }
+
+    pub fn toggle_shortcut(&mut self, id: &str) {
+        let mut tools = self.shortcut_tools();
+        match tools.iter().position(|t| t == id) {
+            Some(i) => {
+                tools.remove(i);
+            }
+            None => tools.push(id.to_string()),
+        }
+        self.shortcut_tools = Some(tools);
+    }
+
+    /// Tool sets as shown: (default index, tools still in the toolbar).
+    pub fn sets(&self) -> Vec<(usize, Vec<&'static str>)> {
+        self.set_order().into_iter().map(|i| (i, ASM_TOOLSETS[i].iter().copied().filter(|t| !self.removed.iter().any(|r| r == t)).collect::<Vec<_>>())).filter(|(_, t)| !t.is_empty()).collect()
+    }
+}

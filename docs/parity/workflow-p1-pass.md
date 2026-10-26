@@ -67,3 +67,23 @@ then edits, undo/redo, rollback and suppress.
 | Revolve about a profile line | full cylinder; axis chip "Sketch 4 line" | chip text? ("Edge of Sketch N" in live lists; request p3 (a)) | ? |
 | Circular pattern dialog | Axis of pattern, Angle 360 deg, Instance count 4 + ↻, ☑ Equal spacing, ☐ Centered, › ☐ Skip instances | same (behaviours 331) | ✅ |
 | Circular pattern of Part 3 about a hole rim | 3 copies around the hole axis; each copy gets a new palette colour | copies' colour? (request p3 (b)) | ? |
+| P1-4 re-check on green 62524c30 (skb 7b972911) | points snapped to the origin's horizontal: no visible point at the origin; Hole on "Vertices of Sketch 6" previews only the 2 real points. Data still holds a hidden construction "Origin stand-in" point at (0,0) with the Horizontal constraints on it (sketch_get lists it) | ✅ UI / minor data note for skb (live: no entity, constraint to the external Origin) |
+| SEL1 on green 62524c30 | Fillet: a sketch line adds nothing, a plate edge adds "Edge of Extrude 1" | ✅ |
+| Instance right-click (Part 1 <1>, mated) | Properties…, Instance properties… / Hide … Fix, Use best available tessellation, Show mates, Hide mates / Edit in context … Switch to Part Studio 1 / Copy Part 1 <1> / Move to new subassembly, Change to version…, Export…, Release… / Zoom to selection … | same order (behaviours 1259, 1357; Add comment out of scope) | ✅ |
+| Fix, then drag the fixed plate | ground glyph on Part 1 <1> and on the root row; dragging draws the fix glyph at the cursor and nothing moves | same (behaviours 1210, 1268) | ✅ (cursor shape not checked) |
+| Sketch dimension (view normal, rectangle, d on the top edge, place) | value box "78.15024 mm" selected, ± icon, ✓ ✕; 50 + Enter → label "50", width 50 | box at full precision (behaviours 4788 "12.53718 mm") | ✅ |
+| Plane (tool search; "Did you mean: Mate connector") | Entities "Top plane", type Offset, Offset distance 25 mm + flip, ☐ Flip normal; type list Offset, Plane point, Line angle, Point normal, Three point, Mid plane, Curve point, Tangent | same (behaviours 332) | ✅ |
+| Split (Part tab) of the plate by Plane 1 at 2.5 mm | dialog Part / Face, Parts, surfaces, or curves to split, Entity to split with, ☐ Keep tools, ☐ Trim to face boundaries, ☑ Keep both sides; result Parts 6 → 7 | same (behaviours 329) | ✅ |
+| Transform dialog | Entities to transform or copy, ▾ Translate by line (+ flip), Line or points, ☐ Copy part | same first type (behaviours 226) | ✅ |
+| Mass and section properties (bottom-right icon), part without material | dialog Part / Face, red "Part 2" chip, blank mass / CoM / inertia, volume 21005.949 mm³, area 4401.292 mm²; inertia header "(mm² kg)"; yellow no-material toast | header "(lb mm²)"; toast: notes disagree | ✗ **P1-14** (ui) / ? |
+| Section view (Shift+X), Front plane | dialog Exclude / Include, Section planes (+ plane button), Items to exclude, info "Select a plane, planar face, cylinder, cone, or mate connector."; chip "Section plane 1 (Front)", manipulator arrow + rotate glyph + ring, tan preview cut faces | same (behaviours 359) | ✅ |
+| Draft dialog | Neutral plane / Parting line; Neutral plane (+MC); Entities to draft; Draft angle 3 deg + ↻; ☑ Tangent propagation; ☐ Reapply fillet | same (behaviours 327) | ✅ |
+| Sweep dialog | Solid / Surface / Thin, New … Intersect; Faces and sketch regions to sweep; Sweep path (pink) + flip; ☐ Extend to full path; Profile control ▾ None; › ☐ Twist; ☐ Scale | same (behaviours 339) | ✅ |
+| Loft dialog | Profiles; ⌄ End conditions (Start / End profile condition ▾ None); ☐ Guides and continuity; ☐ Path; › ☐ Connections; ☐ Show isocurves | same (behaviours 340) | ✅ |
+| Sketch Trim (m) on a crossing line | the clicked segment past the crossing is removed; the new end is coincident with the other line | — | ✅ |
+| Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ |
+| Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ |
+| n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? |
+| View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |
+| Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ |
+| Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ |

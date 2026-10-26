@@ -1728,23 +1728,10 @@ impl PartStudioView {
         let vars = self.scope_variables(Some(index), cx);
         let later = self.studio(cx).is_some_and(|s| !is_new && index + 1 < s.features.len());
         // Missing references: their creating feature is gone or suppressed.
-        let mut live: std::collections::HashSet<FeatureId> = self.studio(cx).map(|s| s.features.iter().filter(|f| !f.suppressed).map(|f| f.id).collect()).unwrap_or_default();
-        // Derived parts keep their source studio's names: those features
-        // count as present (qa5 DER4: a fillet on a derived edge).
-        if let Some(s) = self.studio(cx) {
-            let doc = &self.doc.read(cx).session.doc;
-            for f in s.features.iter().filter(|f| f.type_id == "importDerived" && !f.suppressed) {
-                let key = f.params.text("partStudio").trim().to_string();
-                if let Some(noshape_model::document::TabContent::PartStudio(src)) = doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| &t.content) {
-                    live.extend(src.features.iter().filter(|g| !g.suppressed).map(|g| g.id));
-                }
-            }
-        }
-        let missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = Arc::new(move |r: &Reference| match r {
-            Reference::Edge(n) | Reference::Vertex(n) => edge_creator(n).is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
-            // Assembly context geometry is never missing (snapshot).
-            r => r.depends_on().is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
-        });
+        let missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx) {
+            Some(s) => Arc::new(noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s)),
+            None => Arc::new(|_: &Reference| false),
+        };
         let (configured, configurable_inputs) = self.configured_of(feature_id, cx);
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
         let vertex_sets: std::collections::HashMap<FeatureId, Vec<Reference>> = self.display.sketches.iter().map(|s| (s.feature, sketch_points(s))).collect();
@@ -4529,16 +4516,8 @@ impl Render for FeatureDragPill {
     }
 }
 
-fn edge_creator(n: &TopoName) -> Option<FeatureId> {
-    match n {
-        TopoName::Edge { faces, .. } => faces[1].creator().or_else(|| faces[0].creator()),
-        // A part corner: its faces' feature, as for edges (live "ui (10-24 c)":
-        // a vertex's menu starts Edit Extrude 1…, Edit Sketch 1…).
-        TopoName::Vertex { faces, .. } => faces.iter().rev().find_map(|f| f.creator()),
-        TopoName::Boundary { face, .. } => face.creator(),
-        other => other.creator(),
-    }
-}
+// The feature that made an edge or vertex (shared with the agent API).
+use noshape_ops::studio::edge_creator;
 
 /// Whether a picked target fits a query filter.
 /// The points a sketch offers a point field (Hole locations): its sketch

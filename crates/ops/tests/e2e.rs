@@ -551,6 +551,11 @@ fn drawing_views_and_dimensions() {
     assert!(lin["text"].as_str().unwrap().contains("80"), "{lin}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert!(hist["history"][0]["description"].as_str().unwrap().ends_with(":: Linear dimension"), "{hist}");
+    // Shift+Q: the edge's midpoint and a corner (half the edge), two quadrant points (the diameter).
+    let half = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [mid, [num(&long["a"][0]), num(&long["a"][1])]], "place": [mid[0], mid[1] + 30.0], "mid_quad": true }));
+    assert!(half["text"].as_str().unwrap().contains("40"), "{half}");
+    let quads = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [[cx + r, cy], [cx - r, cy]], "place": [cx, cy + 25.0], "mid_quad": true }));
+    assert!(quads["text"].as_str().unwrap().contains("10"), "{quads}");
     // The dimension palette: prefix, precision, a symmetrical tolerance.
     let lin_id = lin["annotation"].as_u64().unwrap();
     let ed = call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": lin_id, "prefix": "2X ", "precision": 1, "tolerance": "symmetrical", "tolerance_value": 0.1 }));
@@ -3946,4 +3951,21 @@ fn ui_search_tools_ranks_like_onshape() {
     assert_eq!(&names[..2], ["Fillet", "Fill"], "{t}");
     assert_eq!((t["tools"][0]["type"].clone(), t["tools"][0]["keys"].clone()), (json!("fillet"), json!("shift-f")), "{t}");
     assert!(call(&mut ctx, "ui_search_tools", json!({ "text": "" }))["tools"].as_array().unwrap().is_empty());
+}
+
+/// Clear missing references (feature_clear_missing): a fillet whose edges'
+/// extrude is suppressed loses them in one edit.
+#[test]
+fn clear_missing_references() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "clear_missing.noshape");
+    let edge = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }))["edges"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": [edge], "radius": "2 mm" } }));
+    let e = try_call(&mut ctx, "feature_clear_missing", json!({ "feature": "Fillet 1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("feature"), "nothing missing yet: {e:?}");
+    call(&mut ctx, "feature_suppress", json!({ "features": ["Extrude 1"], "suppressed": true }));
+    let c = call(&mut ctx, "feature_clear_missing", json!({ "feature": "Fillet 1" }));
+    assert_eq!(c["removed"], 1, "{c}");
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.ends_with(":: Edit : Fillet 1"), "{last}");
 }

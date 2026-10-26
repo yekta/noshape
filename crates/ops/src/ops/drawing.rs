@@ -152,6 +152,7 @@ pub fn ops() -> Vec<Op> {
                 opt("kind", json!({ "type": "string", "enum": DIMENSIONS.iter().map(|d| d.0).collect::<Vec<_>>(), "default": "smart" }), "Dimension tool."),
                 req("picks", json!({ "type": "array", "items": point(), "minItems": 1, "maxItems": 3 }), "The picking clicks (sheet mm)."),
                 req("place", point(), "Where the dimension text goes (sheet mm)."),
+                opt("mid_quad", json!({ "type": "boolean", "default": false }), "Shift+Q (Quad & mid snap point): the clicks also snap to edge midpoints and circle quadrant points, for this dimension."),
             ],
             mutates: true,
             destructive: false,
@@ -438,11 +439,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                     .filter_map(|(mi, e)| match e.geom {
                         EdgeGeom::Line { a, b } => Some(json!({ "type": "line", "a": pt(pl.to_sheet(a)), "b": pt(pl.to_sheet(b)) })),
                         EdgeGeom::Circle { center, radius, face_on: true, .. } => {
-                            // Closed: no end vertices, or one seam vertex at both ends.
-                            let closed = match (&e.ends[0], &e.ends[1]) {
-                                (Some((_, a)), Some((_, b))) => (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-9,
-                                _ => true,
-                            };
+                            let closed = noshape_scene::drawing_tools::closed_circle(&e.ends);
                             let mut c = json!({ "type": if closed { "circle" } else { "arc" }, "center": pt(pl.to_sheet(center)), "radius": r3(pl.len_to_sheet(radius)) });
                             if let (false, Some((_, a)), Some((_, b))) = (closed, &e.ends[0], &e.ends[1]) {
                                 c["a"] = pt(pl.to_sheet(*a));
@@ -899,12 +896,13 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let kind = DIMENSIONS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| OpError::param("kind", "unknown dimension kind"))?;
     let clicks = a.array("picks")?.iter().enumerate().map(|(i, p)| point_value(p, &format!("picks[{i}]"))).collect::<Result<Vec<_>, _>>()?;
     let place = point_value(a.get("place").expect("required"), "place")?;
+    let mid_quad = a.bool_or("mid_quad", false)?;
     let m = SheetModel::build(&od.session, tab, d.clone(), sheet, &[]);
     let mut picks: Vec<Pick> = Vec::new();
     for (i, c) in clicks.iter().enumerate() {
         let tool = Tool::Dimension { kind, picks: picks.clone() };
         let n = picks.len();
-        let pk = m.pick(&tool, &[], *c);
+        let pk = m.pick_snapping(&tool, &[], *c, mid_quad);
         match kind {
             DimTool::MaxMin | DimTool::Foreshorten => pk.more_dimension_pick(kind, &mut picks),
             _ => pk.dimension_click(kind, *c, &mut picks),

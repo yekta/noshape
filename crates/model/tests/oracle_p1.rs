@@ -119,6 +119,221 @@ fn vertex_at(r: &RegenResult, p: DVec3) -> Reference {
     panic!("no vertex at {p:?}");
 }
 
+fn edge_at(r: &RegenResult, p: DVec3) -> Reference {
+    let v = noshape_kernel::make_vertex(p * 1e-3).unwrap();
+    for b in &r.context.bodies {
+        for (i, e) in b.shape.edges().iter().enumerate() {
+            if noshape_kernel::distance(&v, e).is_ok_and(|d| d.distance < 1e-9) {
+                return Reference::Edge((*b.edges[i]).clone());
+            }
+        }
+    }
+    panic!("no edge at {p:?}");
+}
+
+/// The block's edges and faces by a point on them (mm).
+const FRONT_TOP: DVec3 = DVec3::new(30.0, 0.0, 20.0);
+const BACK_TOP: DVec3 = DVec3::new(30.0, 40.0, 20.0);
+const LEFT_TOP: DVec3 = DVec3::new(0.0, 20.0, 20.0);
+const RIGHT_TOP: DVec3 = DVec3::new(60.0, 20.0, 20.0);
+const FRONT_LEFT: DVec3 = DVec3::new(0.0, 0.0, 10.0);
+const TOP: DVec3 = DVec3::new(30.0, 20.0, 20.0);
+const BOTTOM: DVec3 = DVec3::new(30.0, 20.0, 0.0);
+const SIDES: [DVec3; 4] = [DVec3::new(30.0, 0.0, 10.0), DVec3::new(30.0, 40.0, 10.0), DVec3::new(0.0, 20.0, 10.0), DVec3::new(60.0, 20.0, 10.0)];
+
+/// One feature `ty` on BLOCK.
+fn on_block(ty: &str, set: impl FnOnce(&mut ParamValues, &RegenResult)) -> Studio {
+    let mut s = Studio::block();
+    let r = s.regen();
+    s.add(ty, |p| set(p, &r));
+    s
+}
+
+fn edges(r: &RegenResult, at: &[DVec3]) -> ParamValue {
+    ParamValue::Query(at.iter().map(|p| edge_at(r, *p)).collect())
+}
+
+/// Batch 3: Fillet; batch 4: Chamfer; batch 6: Shell and Draft (CASES.md).
+fn blend_cases() -> Vec<(&'static str, Studio)> {
+    let mut cases = Vec::new();
+    let corner = [FRONT_TOP, LEFT_TOP, FRONT_LEFT];
+    let tops = [FRONT_TOP, BACK_TOP, LEFT_TOP, RIGHT_TOP];
+    cases.push(("F1", on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &[FRONT_TOP]));
+        p.set("radius", mm(5.0));
+    })));
+    cases.push(("F2", on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &tops));
+        p.set("radius", mm(5.0));
+    })));
+    cases.push(("F3", on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &corner));
+        p.set("radius", mm(3.0));
+    })));
+    cases.push(("F4", on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &[FRONT_TOP]));
+        p.set("radius", mm(2.0));
+        p.set("isVariable", ParamValue::Bool(true));
+        let vertex = |at: DVec3, radius: f64| {
+            let mut v = ParamValues::default();
+            v.set("vertex", q(vertex_at(r, at)));
+            v.set("vertexRadius", mm(radius));
+            v
+        };
+        p.set("vertexSettings", ParamValue::Array(vec![vertex(DVec3::new(0.0, 0.0, 20.0), 2.0), vertex(DVec3::new(60.0, 0.0, 20.0), 6.0)]));
+    })));
+    cases.push(("F5", on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &[FRONT_TOP]));
+        p.set("crossSection", en("CONIC"));
+        p.set("blendControlType", en("WIDTH"));
+        p.set("width", mm(5.0));
+        p.set("rho", ParamValue::Expr(ExprValue::new("0.7")));
+    })));
+    cases.push(("F6", on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &[FRONT_TOP]));
+        p.set("crossSection", en("CURVATURE"));
+        p.set("radius", mm(5.0));
+    })));
+    cases.push(("F7", on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &[FRONT_TOP]));
+        p.set("radius", mm(25.0));
+        p.set("allowEdgeOverflow", ParamValue::Bool(false));
+    })));
+    let mut f8 = on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &[FRONT_TOP]));
+        p.set("radius", mm(5.0));
+    });
+    let r = f8.regen();
+    f8.add("fillet", |p| {
+        p.set("entities", edges(&r, &[BACK_TOP]));
+        p.set("radius", mm(5.0));
+        p.set("tangentPropagation", ParamValue::Bool(true));
+    });
+    cases.push(("F8", f8));
+    cases.push(("F9", on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &corner));
+        p.set("radius", mm(3.0));
+        p.set("smoothCorners", ParamValue::Bool(true));
+    })));
+    let chamfer = |name: &'static str, at: &[DVec3], set: &dyn Fn(&mut ParamValues)| {
+        let at = at.to_vec();
+        (name, on_block("chamfer", move |p, r| {
+            p.set("entities", edges(r, &at));
+            set(p);
+        }))
+    };
+    cases.push(chamfer("C1", &[FRONT_TOP], &|p| {
+        p.set("chamferType", en("EQUAL_OFFSETS"));
+        p.set("width", mm(3.0));
+    }));
+    cases.push(chamfer("C2", &[FRONT_TOP], &|p| {
+        p.set("chamferType", en("TWO_OFFSETS"));
+        p.set("width1", mm(3.0));
+        p.set("width2", mm(5.0));
+    }));
+    cases.push(chamfer("C3", &[FRONT_TOP], &|p| {
+        p.set("chamferType", en("OFFSET_ANGLE"));
+        p.set("width", mm(3.0));
+        p.set("angle", deg(30.0));
+    }));
+    cases.push(chamfer("C4", &tops, &|p| {
+        p.set("chamferType", en("EQUAL_OFFSETS"));
+        p.set("width", mm(2.0));
+        p.set("tangentPropagation", ParamValue::Bool(true));
+    }));
+    cases.push(chamfer("C5", &[FRONT_TOP], &|p| {
+        p.set("chamferType", en("EQUAL_OFFSETS"));
+        p.set("width", mm(25.0));
+    }));
+    let shell = |name: &'static str, set: &dyn Fn(&mut ParamValues, &RegenResult)| (name, on_block("shell", |p, r| set(p, r)));
+    cases.push(shell("S1", &|p, r| {
+        p.set("entities", q(face_at(r, TOP)));
+        p.set("thickness", mm(2.0));
+    }));
+    cases.push(shell("S2", &|p, r| {
+        p.set("entities", q(face_at(r, TOP)));
+        p.set("thickness", mm(2.0));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+    }));
+    cases.push(shell("S3", &|p, r| {
+        p.set("isHollow", ParamValue::Bool(true));
+        p.set("parts", q(Reference::Body(r.context.bodies[0].id.clone())));
+        p.set("thickness", mm(2.0));
+    }));
+    cases.push(shell("S4", &|p, r| {
+        p.set("entities", q(face_at(r, TOP)));
+        p.set("thickness", mm(25.0));
+    }));
+    let draft = |name: &'static str, set: &dyn Fn(&mut ParamValues, &RegenResult)| (name, on_block("draft", |p, r| set(p, r)));
+    cases.push(draft("D1", &|p, r| {
+        p.set("neutralPlane", q(face_at(r, TOP)));
+        p.set("draftFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(r, *x)).collect()));
+        p.set("angle", deg(5.0));
+    }));
+    cases.push(draft("D2", &|p, r| {
+        p.set("neutralPlane", q(face_at(r, BOTTOM)));
+        p.set("draftFaces", q(face_at(r, SIDES[0])));
+        p.set("angle", deg(10.0));
+    }));
+    cases.push(draft("D3", &|p, r| {
+        p.set("neutralPlane", q(face_at(r, TOP)));
+        p.set("draftFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(r, *x)).collect()));
+        p.set("angle", deg(5.0));
+        p.set("pullDirection", ParamValue::Bool(true));
+    }));
+    cases
+}
+
+/// Batch 5: Hole at a sketch point (20,20) on the block's top face (H7: at
+/// (100,20) on Top, off the part).
+fn hole_cases() -> Vec<(&'static str, Studio)> {
+    let hole = |name: &'static str, off_part: bool, set: &dyn Fn(&mut ParamValues)| {
+        let mut s = Studio::block();
+        let r = s.regen();
+        let (plane, at) = if off_part { (top(), (100.0, 20.0)) } else { (face_at(&r, TOP), (20.0, 20.0)) };
+        let mut sk = noshape_sketch::Sketch::new();
+        let point = sk.add_point(DVec2::new(at.0 * 1e-3, at.1 * 1e-3));
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", q(plane));
+            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        });
+        s.add("hole", |p| {
+            p.set("locations", q(Reference::SketchEntity { sketch, entity: point.0 }));
+            p.set("unitsSystem", en("METRIC"));
+            noshape_model::features::hole_tables::apply_table_to_params(p);
+            if !off_part {
+                p.set("scope", q(Reference::Body(r.context.bodies[0].id.clone())));
+            }
+            p.set("styleV2", en("SIMPLE"));
+            p.set("holeDiameterV3", mm(6.0));
+            set(p);
+        });
+        (name, s)
+    };
+    let blind = |p: &mut ParamValues| {
+        p.set("endStyleV2", en("BLIND"));
+        p.set("holeDepthV3", mm(10.0));
+    };
+    vec![
+        hole("H1", false, &blind),
+        hole("H2", false, &|p| p.set("endStyleV2", en("THROUGH"))),
+        hole("H3", false, &|p| {
+            p.set("endStyleV2", en("THROUGH"));
+            p.set("styleV2", en("C_BORE"));
+            p.set("cBoreDiameterV3", mm(11.0));
+            p.set("cBoreDepthV3", mm(6.0));
+        }),
+        hole("H4", false, &|p| {
+            p.set("endStyleV2", en("THROUGH"));
+            p.set("styleV2", en("C_SINK"));
+            p.set("cSinkDiameterV3", mm(12.0));
+            p.set("cSinkAngleV3", deg(90.0));
+        }),
+        hole("H6", false, &blind),
+        hole("H7", true, &blind),
+    ]
+}
+
 /// What a case gives: status, message, volume (mm³), faces, area (mm²), parts.
 #[derive(Debug)]
 struct Outcome {
@@ -344,7 +559,13 @@ const KNOWN: &[(&str, &str)] = &[
     ("E12", "psb: as E9 (start offset, the boss doesn't touch the part)"),
     ("E13", "psb: a Remove that misses its scope ends with INFO \"Selected tools and targets do not intersect.\" (ours OK)"),
     ("R4", "psb: Second end position is a start angle in the same direction (45° to 90°: 3534.29 mm³); ours sweeps 45° the other way (135°)"),
-    ("R5", "psb: Thin revolve of the rectangle: live's 1 mm wall lies inside (10178.76 mm³), ours outside (12440.71); the circle's (E8) lies outside in both"),
+    ("R5", "psb: Thin revolve wall side follows the loop direction (live fs 10-25 j): counter-clockwise in sketch coordinates inside, clockwise outside (Thin extrude: closed loops always outside, open chains right of travel); this CCW rectangle: live inside 10178.76 mm³, ours outside 12440.71"),
+    ("F2", "kern: R5 on the 4 top edges, corner blends: ours 46974.930 mm³ / 8356.638 mm², live 46976.458 / 8356.751"),
+    ("F4", "kern: variable fillet R2 → R6 along the edge: ours 47776.798 mm³, live 47776.692"),
+    ("F5", "kern: conic fillet width 5, rho 0.7: ours 47945.138 mm³ / 8747.291 mm², live 47945.028 / 8747.516"),
+    ("F6", "kern: curvature (G2) fillet R5, magnitude 0.5: ours 47755.024 mm³ / 8678.783 mm², live 47754.935 / 8679.694"),
+    ("F7", "psb: R25 with Allow edge overflow OFF: live 40608.859 mm³ / 7938.092 mm² (6 faces), ours 40002.735 / 7857.276, the overflow-on result"),
+    ("H7", "psb: a hole off the part with an empty Merge scope: live \"No target parts selected for hole.\" (HOLE_EMPTY_SCOPE), ours \"None of the holes intersected a part.\""),
 ];
 
 /// Live's results (results-*.jsonl): case, status, text, volume, faces, area, parts.
@@ -372,12 +593,41 @@ const LIVE: &[(&str, &str, &str, f64, usize, f64, usize)] = &[
     ("R4b", "OK", "", 3534.2917, 6, 1613.7167, 1),
     ("R5", "OK", "", 10178.7602, 8, 20357.5204, 1),
     ("R6", "OK", "", 47497.3452, 8, 8841.0619, 1),
+    ("F1", "OK", "", 47678.0972, 7, 8660.5088, 1),
+    ("F2", "OK", "", 46976.458, 10, 8356.751, 1),
+    ("F3", "OK", "", 47772.7499, 10, 8638.4181, 1),
+    ("F4", "OK", "", 47776.692, 7, 8688.477, 1),
+    ("F5", "OK", "", 47945.0278, 7, 8747.5155, 1),
+    ("F6", "OK", "", 47754.9351, 7, 8679.6943, 1),
+    ("F7", "OK", "", 40608.8586, 6, 7938.0924, 1),
+    ("F8", "OK", "", 47356.1945, 8, 8521.0176, 1),
+    ("F9", "OK", "", 47772.7499, 10, 8638.4181, 1),
+    ("C1", "OK", "", 47730.0, 7, 8685.5584, 1),
+    ("C2", "OK", "", 47550.0, 7, 8654.8571, 1),
+    ("C3", "OK", "", 47844.1154, 7, 8718.7269, 1),
+    ("C4", "OK", "", 47610.6667, 10, 8559.058, 1),
+    ("C5", "OK", "", 30000.0, 6, 6897.0563, 1),
+    ("H1", "OK", "", 47700.2677, 8, 8993.207, 1),
+    ("H2", "OK", "", 47434.5133, 7, 9120.4425, 1),
+    ("H3", "OK", "", 47033.9603, 9, 9214.6902, 1),
+    ("H4", "OK", "", 47321.416, 8, 9099.0286, 1),
+    ("H5", "OK", "", 47754.549, 8, 8991.7674, 1),
+    ("H6", "OK", "", 47700.2677, 8, 8993.207, 1),
+    ("H7", "ERROR", "No target parts selected for hole.", 48000.0, 6, 8800.0, 1),
+    ("H8", "OK", "", 47524.8341, 7, 9098.0586, 1),
+    ("S1", "OK", "", 11712.0, 11, 12112.0, 1),
+    ("S2", "OK", "", 13952.0, 11, 14384.0, 1),
+    ("S3", "OK", "", 15744.0, 12, 15776.0, 1),
+    ("S4", "ERROR", "Could not shell part with selections.", 48000.0, 6, 8800.0, 1),
+    ("D1", "OK", "", 51581.192, 6, 9317.9974, 1),
+    ("D2", "OK", "", 50115.9238, 6, 9100.6351, 1),
+    ("D3", "OK", "", 44582.099, 6, 8337.055, 1),
 ];
 
 #[test]
 fn p1_features_match_live() {
     let mut report = String::new();
-    for (name, s) in extrude_cases().into_iter().chain(revolve_cases()) {
+    for (name, s) in extrude_cases().into_iter().chain(revolve_cases()).chain(blend_cases()).chain(hole_cases()) {
         let got = outcome(&s.regen());
         eprintln!("{name}: {got:?}");
         let Some(&(_, status, text, volume, faces, area, parts)) = LIVE.iter().find(|l| l.0 == name) else { continue };

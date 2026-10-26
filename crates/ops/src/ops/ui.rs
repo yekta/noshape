@@ -44,9 +44,9 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "ui",
             verb: "toolbar",
-            summary: "The Part Studio toolbar's customization (Customize toolbar…) and the S shortcut toolbars",
-            description: "The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide \"Search tools\"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do.",
-            fields: vec![doc_field(), opt("set", json!({ "type": "object" }), "Settings to change (see the reply).")],
+            summary: "The Part Studio's or Assembly's toolbar customization (Customize toolbar…) and the S shortcut toolbars",
+            description: "The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide \"Search tools\"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do. With `tab` an Assembly, the assembly toolbar's: `removed` (its tool ids, `sets` lists them), `order` (the tool sets' order), `hide_search`, `shortcut_tools` (Preferences › Shortcut toolbars › Assembly: tool ids; null: Onshape's eleven). With the app open the windows' toolbars follow.",
+            fields: vec![doc_field(), opt("tab", s(), "An Assembly tab for the assembly toolbar (default: the Part Studio toolbar)."), opt("set", json!({ "type": "object" }), "Settings to change (see the reply).")],
             mutates: false,
             destructive: false,
             run: toolbar,
@@ -223,6 +223,15 @@ fn preferences(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     use crate::prefs::ToolbarPrefs;
+    if let Some(k) = a.opt_str("tab")? {
+        let od = ctx.doc(a.opt_str("doc")?)?;
+        let tab = doc::find_tab(od.doc(), k)?;
+        match od.doc().tab(tab).map(|t| &t.content) {
+            Some(TabContent::Assembly(_)) => return asm_toolbar(ctx, a),
+            Some(TabContent::PartStudio(_)) => {}
+            _ => return Err(OpError::param("tab", "a Part Studio or an Assembly")),
+        }
+    }
     let mut prefs = ToolbarPrefs::load();
     if let Some(set) = a.object("set")?.filter(|m| !m.is_empty()) {
         // Feature tool ids (a document's custom features when one is open).
@@ -258,8 +267,47 @@ fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         prefs.save();
         ctx.reload_prefs = true;
+        reload_toolbars(ctx, a)?;
     }
     Ok(json!({ "toolbar": prefs, "shortcut_tools": prefs.shortcut_tools() }).into())
+}
+
+/// The windows' toolbars follow saved settings (with a document open).
+fn reload_toolbars(ctx: &mut Ctx, a: &Args) -> Result<(), OpError> {
+    if ctx.doc(a.opt_str("doc")?).is_ok() {
+        show(ctx, a.opt_str("doc")?, UiRequest::ReloadToolbars)?;
+    }
+    Ok(())
+}
+
+/// ui_toolbar on an Assembly: its toolbar's tool sets and the S toolbar.
+fn asm_toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::prefs::{ASM_SHORTCUT_EXTRAS, ASM_TOOLSETS, AsmToolbarPrefs, asm_tool_info};
+    let mut prefs = AsmToolbarPrefs::load();
+    if let Some(set) = a.object("set")?.filter(|m| !m.is_empty()) {
+        let ids = |key: &str, v: &Value, extras: bool| -> Result<Vec<String>, OpError> {
+            let l = v.as_array().ok_or_else(|| OpError::param(&format!("set.{key}"), "a list of tool ids"))?;
+            l.iter()
+                .map(|x| match x.as_str() {
+                    Some(id) if ASM_TOOLSETS.iter().any(|s| s.contains(&id)) || (extras && ASM_SHORTCUT_EXTRAS.iter().any(|e| e.0 == id)) => Ok(id.to_string()),
+                    _ => Err(OpError::param(&format!("set.{key}"), &format!("unknown tool {x} (the reply's `sets` list them)"))),
+                })
+                .collect()
+        };
+        for (k, v) in set {
+            match k.as_str() {
+                "removed" => prefs.removed = ids(k, v, false)?,
+                "order" => prefs.order = v.as_array().and_then(|l| l.iter().map(|x| x.as_u64().map(|n| n as usize).filter(|n| *n < ASM_TOOLSETS.len())).collect()).ok_or_else(|| OpError::param("set.order", &format!("tool set indices 0 to {}", ASM_TOOLSETS.len() - 1)))?,
+                "hide_search" => prefs.hide_search = v.as_bool().ok_or_else(|| OpError::param("set.hide_search", "true or false"))?,
+                "shortcut_tools" => prefs.shortcut_tools = if v.is_null() { None } else { Some(ids(k, v, true)?) },
+                _ => return Err(OpError::param(&format!("set.{k}"), "removed, order, hide_search or shortcut_tools")),
+            }
+        }
+        prefs.save();
+        reload_toolbars(ctx, a)?;
+    }
+    let sets: Vec<Value> = prefs.sets().into_iter().map(|(i, tools)| json!({ "index": i, "tools": tools.iter().map(|id| json!({ "id": id, "name": asm_tool_info(id).0 })).collect::<Vec<_>>() })).collect();
+    Ok(json!({ "toolbar": prefs, "sets": sets, "shortcut_tools": prefs.shortcut_tools() }).into())
 }
 
 fn search_tools(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
