@@ -116,6 +116,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "feature",
+            verb: "clear_missing",
+            summary: "Clear missing references from a feature's selections",
+            description: "A feature dialog selection's Clear missing references: removes from the feature's selections (`param`, or all of them, rows of lists included) the references whose creating feature was deleted or is suppressed (a derived part's source features count as present; Assembly context geometry is never missing). One edit, as the dialog's ✓ (\"Edit : <feature>\"). Returns how many were removed.",
+            fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name."), opt("param", s(), "Only this selection field (its parameter id, feature_get).")],
+            mutates: true,
+            destructive: false,
+            run: clear_missing,
+        },
+        Op {
+            group: "feature",
             verb: "dependencies",
             summary: "Show dependencies: the features a feature uses and the features using it",
             description: "Parents are the earlier features whose geometry, sketches, planes or #variables the feature references; children are the later features referencing it. In history order.",
@@ -591,6 +601,24 @@ fn dynamic_suppression(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Ok(())
     })?;
     Ok(json!({ "feature": id.to_string(), "unsuppressed_if": expr, "regeneration": regen_report(od, tab)? }).into())
+}
+
+fn clear_missing(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?.clone();
+    let id = feature_arg(&ps, a, "feature")?;
+    let name = ps.feature(id).map(|f| f.name.clone()).unwrap_or_default();
+    let param = a.opt_str("param")?;
+    let missing = studio::missing_reference(od.doc(), &ps);
+    let n = studio::clear_missing(&mut ps.clone(), id, param, &missing);
+    if n == 0 {
+        return Err(OpError::invalid(format!("{name} has no missing references")).with_param("feature"));
+    }
+    edit_studio(od, tab, &studio::edit_description(&name), |ps| {
+        studio::clear_missing(ps, id, param, &missing);
+        Ok(())
+    })?;
+    Ok(json!({ "feature": id.to_string(), "removed": n, "regeneration": regen_report(od, tab)? }).into())
 }
 
 fn dependencies(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

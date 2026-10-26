@@ -70,4 +70,10 @@ impl PartStudioView {
             ListAct::Instances { .. } | ListAct::Mates { .. } | ListAct::Find(_) => {}
         }
     }
+
+    /// The user's toolbar settings changed (ui_toolbar): as after Customize toolbar….
+    pub(crate) fn agent_reload_toolbar(&mut self, cx: &mut Context<Self>) {
+        self.ui.toolbar = super::toolbar_prefs::ToolbarPrefs::load();
+        cx.notify();
+    }
 }
