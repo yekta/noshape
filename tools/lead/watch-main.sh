@@ -3,7 +3,7 @@
 # T0 + T1 + clippy. Green -> tag last-green (pushed: CI runs T1 on all 3 platforms) and /root/green/noshape.
 # Red -> /tmp/lead/main-status lists the failures and the commits since last-green; if exactly one commit landed since
 # last-green, it is reverted at once (PLAN 2.4: no grace period; the author re-lands it fixed).
-# Nightly (first loop after 01:00 UTC): T2 on last-green -> /tmp/lead/t2-status + /tmp/lead/t2-<date>.log. T2 never blocks.
+# Nightly (first loop between 01:00 and 05:00 UTC): T2 on last-green -> /tmp/lead/t2-status + /tmp/lead/t2-<date>.log. T2 never blocks.
 set -u
 export OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-lead  # incremental per the machine config: consecutive main commits rebuild fast
 export CC=gcc-13 CXX=g++-13  # CI (ubuntu-24.04) compiles our C++ with GCC 13; GCC 15 here accepts code CI rejects
@@ -24,7 +24,7 @@ check() {
 }
 nightly() { # T2 on last-green, once a day after 01:00 UTC
   local day; day=$(date -u +%F)
-  [ "$(date -u +%H)" -ge 1 ] || return
+  h=$(date -u +%-H); [ "$h" -ge 1 ] && [ "$h" -lt 5 ] || return  # 01:00-05:00 UTC, before the release cut
   [ "$(cat /tmp/lead/t2-day 2>/dev/null)" = "$day" ] && return
   echo "$day" > /tmp/lead/t2-day
   cd $WT; git reset -q --hard; git clean -fdq; git checkout -q --detach last-green
