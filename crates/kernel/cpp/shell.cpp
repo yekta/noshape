@@ -1827,7 +1827,7 @@ OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, con
       in.Perform();
       if (!ip.IsDone() || !in.IsDone())
         fail_op("draft: ruling end curve failed");
-      occ::handle<Geom_Curve> far = ip.Curve(), start = in.Curve();
+      occ::handle<Geom_Curve> far(ip.Curve()), start(in.Curve());  // direct-init: older GCC (CI) rejects the converting copy-init
       TopoDS_Edge e0 = BRepBuilderAPI_MakeEdge(start, a, b).Edge();
       TopoDS_Edge e1 = BRepBuilderAPI_MakeEdge(far, a, b).Edge();
       TopoDS_Face rf = BRepFill::Face(e0, e1);
