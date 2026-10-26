@@ -220,6 +220,11 @@ pub struct FeatureDialog {
     /// A sketch's vertices as a point field takes them (all of them picked
     /// show as one "Vertices of Sketch 2" row, live Hole).
     pub sketch_vertices: Arc<dyn Fn(FeatureId) -> Vec<Reference> + Send + Sync>,
+    /// Sketches whose vertices were picked as a whole (their list row; or
+    /// all of them in a reopened feature): only these show as one
+    /// "Vertices of Sketch N" row. Points clicked one by one keep a
+    /// "Vertex of Sketch N" chip each (live qa5 P1-8).
+    pub grouped_sketches: std::collections::HashSet<FeatureId>,
     /// Open `#` variable autofill list of a numeric field.
     completion: Option<crate::var_complete::VarCompletion>,
     /// Open "Create variable" popup.
@@ -362,6 +367,7 @@ impl FeatureDialog {
             missing: Arc::new(|_| false),
             sketch_region_count: Arc::new(|_| 0),
             sketch_vertices: Arc::new(|_| Vec::new()),
+            grouped_sketches: Default::default(),
             completion: None,
             create_var: None,
             external_field: None,
@@ -2376,7 +2382,7 @@ impl FeatureDialog {
                     if let Reference::SketchEntity { sketch, .. } = r {
                         let vertices = (self.sketch_vertices)(*sketch);
                         let all: Vec<usize> = refs.iter().enumerate().filter(|(_, x)| vertices.contains(x)).map(|(i, _)| i).collect();
-                        if vertices.len() >= 2 && all.len() == vertices.len() && all.contains(&k) {
+                        if groups_vertices(self.grouped_sketches.contains(sketch), vertices.len(), all.len()) && all.contains(&k) {
                             if all[0] == k {
                                 rows.push((format!("Vertices of {}", (self.labeler)(&Reference::Sketch(*sketch))), all, Reference::Sketch(*sketch)));
                             }
@@ -3783,4 +3789,27 @@ fn configure_items(m: crate::os_menu::OsMenu, view: &Entity<FeatureDialog>, para
     m.item(crate::os_menu::OsMenuItem::new(if configured { "Unconfigure" } else { "Configure" }).on_click(move |_, _, cx| {
         v.update(cx, |_, cx| cx.emit(if configured { DialogEvent::UnconfigureParam(p.clone()) } else { DialogEvent::ConfigureParam(p.clone()) }))
     }))
+}
+
+/// Whether a sketch's picked vertices show as one "Vertices of Sketch N"
+/// row: the sketch was picked as a whole (its row) and every vertex is
+/// still there. Points clicked one by one stay separate chips (live qa5
+/// (10-25 p1) (2): two clicks give two "Vertex of Sketch 1" chips).
+fn groups_vertices(picked_as_whole: bool, vertices: usize, picked: usize) -> bool {
+    picked_as_whole && vertices >= 2 && picked == vertices
+}
+
+#[cfg(test)]
+mod vertex_group_tests {
+    use super::groups_vertices;
+
+    #[::core::prelude::v1::test]
+    fn only_a_sketch_picked_whole_shows_as_vertices_of() {
+        // Two points clicked one by one: two chips (qa5 P1-8).
+        assert!(!groups_vertices(false, 2, 2));
+        // The sketch's row: one "Vertices of Sketch 3" row.
+        assert!(groups_vertices(true, 2, 2));
+        // One of them removed again: single chips.
+        assert!(!groups_vertices(true, 2, 1));
+    }
 }

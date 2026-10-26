@@ -648,6 +648,12 @@ impl PartStudioView {
 
     /// The feature's computed parameter values, formatted in the document's
     /// units ("12.7 mm", "Multiple").
+    /// The name a feature shows in the list, and in the chips that name it:
+    /// a Hole's callout, a Variable's "#name = value" (see [`listed_name`]).
+    fn shown_feature_name(&self, f: &Feature, cx: &App) -> String {
+        listed_name(f, &self.computed_values(f.id, cx), &self.doc.read(cx).session.doc.settings.units, &self.display.variables)
+    }
+
     pub(super) fn computed_values(&self, id: FeatureId, cx: &App) -> Vec<(String, String)> {
         let units = self.doc.read(cx).session.doc.settings.units;
         let Some(st) = self.display.feature_state(id) else { return Vec::new() };
@@ -1111,7 +1117,9 @@ impl PartStudioView {
     // ------------------------------------------------------------ labels
 
     fn labeler(&self, cx: &App) -> RefLabeler {
-        let names: Vec<(FeatureId, String)> = self.studio(cx).map(|s| s.features.iter().map(|f| (f.id, f.name.clone())).collect()).unwrap_or_default();
+        // Chips name a feature as its row does (live: a Hole's chip is its
+        // callout "Ø 6.35 mm ↧ 12 mm", behaviours "qa5 (10-25 p1)" (3)).
+        let names: Vec<(FeatureId, String)> = self.studio(cx).map(|s| s.features.iter().map(|f| (f.id, self.shown_feature_name(f, cx))).collect()).unwrap_or_default();
         // A part the edited feature consumes (Delete part) is named as it was
         // before the feature (live part-studio/577, qa5 DEL1: "Part 1").
         let before = self.ui.preview_before.as_ref().map(|d| d.bodies.as_slice()).unwrap_or_default();
@@ -1258,7 +1266,9 @@ impl PartStudioView {
         } else if sketch.is_some() && filter.intersects(QueryFilter::SKETCH) {
             vec![Reference::Sketch(id)]
         } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_POINT)) {
-            // Hole locations: every point of the sketch (Onshape).
+            // Hole locations: every point of the sketch (Onshape), shown as
+            // one "Vertices of Sketch N" row (qa5 P1-8).
+            dialog.update(cx, |d, _| d.grouped_sketches.insert(id));
             sketch_points(sk)
         } else if sketch.is_some() && filter.intersects(QueryFilter::SKETCH_EDGE) {
             // Curve fields (Rib's Sketch profiles, Sweep's path): the whole
@@ -1804,6 +1814,10 @@ impl PartStudioView {
             d.configured = configured;
             d.configurable_inputs = configurable_inputs;
             d.sketch_region_count = Arc::new(move |id| region_counts.get(&id).copied().unwrap_or(0));
+            // A reopened feature holding all of a sketch's vertices shows
+            // them as "Vertices of Sketch N", as picked from its row.
+            let picked = d.selected_refs();
+            d.grouped_sketches = vertex_sets.iter().filter(|(_, v)| v.len() >= 2 && v.iter().all(|r| picked.contains(r))).map(|(id, _)| *id).collect();
             d.sketch_vertices = Arc::new(move |id| vertex_sets.get(&id).cloned().unwrap_or_default());
             d.width = crate::preferences_window::ListPrefs::load().feature_dialog_widths.get(&d.feature.type_id).map(|w| px(*w as f32));
             d.variables = vars;
@@ -3043,7 +3057,9 @@ impl PartStudioView {
         let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
         let Some(studio) = self.studio(cx) else { return Vec::new() };
         let filtered = self.filtered(cx);
-        let n_features = studio.features.len();
+        // A new feature whose dialog is open counts at once (live
+        // sketch/501: "Features (5)" while Sketch 1 is being made).
+        let n_features = listed_feature_count(studio.features.len(), self.edit.as_ref().is_some_and(|e| e.is_new));
         let failed = |id: noshape_model::FeatureId| self.display.feature_state(id).is_some_and(|s| s.status == FeatureStatus::Error);
         // The open dialog counts when it can't regenerate (a new feature
         // isn't in the list yet).
@@ -3162,8 +3178,8 @@ impl PartStudioView {
                     // (Other languages: the translated title, truncated where it
                     // meets the icons, live "フィーチ…".)
                     _ if errors > 0 && crate::ui::left_panel_w() < crate::ui::LEFT_PANEL_W + 10. && crate::i18n::current() == crate::i18n::DEFAULT => "Features …".to_string(),
-                    Some(k) => format!("Features ({k} of {})", n_features + 4),
-                    None => format!("Features ({})", n_features + 4),
+                    Some(k) => format!("Features ({k} of {n_features})"),
+                    None => format!("Features ({n_features})"),
                 }))
                 .child(div().flex_1())
                 // Live (navigation/301): a version keeps only the timer.
@@ -3793,14 +3809,7 @@ impl PartStudioView {
         // Variable reads "#w = 80 mm" under L; qa4 round 4 S4-a).
         let configured = draft.is_none().then(|| self.studio(cx).filter(|s| s.configuration.configured.iter().any(|c| c.feature == f.id)).map(|s| s.configuration.for_editing(f, &self.current_config(s)))).flatten();
         let f = draft.as_ref().or(configured.as_ref()).unwrap_or(f);
-        let name = {
-            let computed = self.computed_values(f.id, cx);
-            let units = self.doc.read(cx).session.doc.settings.units;
-            let vars = &self.display.variables;
-            noshape_model::interaction::display_name_computed(f, &|k| {
-                computed.iter().find(|(c, _)| c == k).map(|(_, v)| v.clone()).or_else(|| crate::feature_dialog::shown_length(f, k, &units, vars))
-            })
-        };
+        let name = self.shown_feature_name(f, cx);
         let state = self.display.feature_state(f.id);
         let status = if editing && self.edit_invalid(cx) { FeatureStatus::Error } else { state.map(|s| s.status).unwrap_or(FeatureStatus::Ok) };
         let selected = self.selected_features.contains(&f.id);
@@ -3989,8 +3998,9 @@ impl PartStudioView {
                     // undimmed, 8 px in from the icon's top-left). An error only turns
                     // the name red (part-studio/94).
                     // Missing selections / warnings: Onshape's 12 px yellow triangle
-                    // badge on the icon's bottom right (live 2071, 2458 Refold).
-                    .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().left(px(9.)).top(px(8.)).child(crate::assets::icon("list-warning-overlay", 12., cx))))
+                    // badge on the icon's bottom right (live 2071, 2458 Refold),
+                    // also on a failed feature that lost a selection (qa5 P1-18).
+                    .when(warning_badge(status, state.map_or(0, |s| s.missing), rolled_back), |d| d.child(div().absolute().left(px(9.)).top(px(8.)).child(crate::assets::icon("list-warning-overlay", 12., cx))))
                     .when(underdefined, |d| d.child(div().absolute().left(px(9.5)).top(px(8.)).child(crate::assets::icon("list-underdefined-overlay", 12., cx)))),
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
@@ -5468,6 +5478,76 @@ mod type_tag_tests {
         assert!(needs_type_tag("Move L5 rotate no axis", "Move face"));
         assert!(!needs_type_tag("Sketch 1", "Sketch"));
         assert!(!needs_type_tag("Draft 1", ""));
+    }
+}
+
+/// A feature's listed name with the dialog's shown values: computed ones
+/// first, else lengths in the workspace units ("Ø 6.35 mm ↧ 12 mm" for a
+/// Drilled 1/4 hole in a mm document).
+fn listed_name(f: &Feature, computed: &[(String, String)], units: &noshape_units::UnitPrefs, vars: &std::collections::BTreeMap<String, noshape_units::Quantity>) -> String {
+    noshape_model::interaction::display_name_computed(f, &|k| computed.iter().find(|(c, _)| c == k).map(|(_, v)| v.clone()).or_else(|| crate::feature_dialog::shown_length(f, k, units, vars)))
+}
+
+#[cfg(test)]
+mod listed_name_tests {
+    use super::listed_name;
+    use noshape_model::partstudio::PartStudio;
+
+    /// qa5 P1-9: the name chips use for a Hole is its callout, as its row's
+    /// (live: Feature pattern › "Ø 6.35 mm ↧ 12 mm", not "Hole 1").
+    #[::core::prelude::v1::test]
+    fn a_hole_is_named_by_its_callout() {
+        let units = noshape_units::UnitPrefs::default();
+        let mut f = PartStudio::new().new_feature("hole", &units).unwrap();
+        f.name = "Hole 1".into();
+        let name = listed_name(&f, &[], &units, &Default::default());
+        assert!(name.starts_with("Ø 6.35 mm"), "{name}");
+        assert_ne!(name, "Hole 1");
+    }
+}
+
+/// Whether a feature row gets the yellow ⚠ badge on its icon: a warning, or
+/// any unresolved selection, also on a failed (red) feature (live qa5/p7
+/// "Chamfer 1", behaviours 8292: "Rows with an unresolved selection get a ⚠
+/// warning-triangle icon on the row (in addition to the red text)").
+fn warning_badge(status: FeatureStatus, missing: usize, rolled_back: bool) -> bool {
+    !rolled_back && (status == FeatureStatus::Warning || missing > 0)
+}
+
+#[cfg(test)]
+mod warning_badge_tests {
+    use super::{warning_badge, FeatureStatus};
+
+    /// qa5 P1-18: a feature that fails on a missing selection keeps the
+    /// badge; a plain error (red name only, part-studio/94) doesn't.
+    #[::core::prelude::v1::test]
+    fn missing_selection_rows_get_the_warning_badge() {
+        assert!(warning_badge(FeatureStatus::Error, 1, false));
+        assert!(warning_badge(FeatureStatus::Warning, 0, false));
+        assert!(!warning_badge(FeatureStatus::Error, 0, false));
+        assert!(!warning_badge(FeatureStatus::Ok, 0, false));
+        assert!(!warning_badge(FeatureStatus::Error, 1, true));
+    }
+}
+
+/// The "Features (N)" count: the four default geometry rows, the features,
+/// and a new feature whose dialog is open (live sketch/501, qa5 P1-1).
+fn listed_feature_count(features: usize, new_dialog_open: bool) -> usize {
+    features + 4 + usize::from(new_dialog_open)
+}
+
+#[cfg(test)]
+mod feature_count_tests {
+    use super::listed_feature_count;
+    use std::prelude::v1::test;
+
+    /// Live sketch/501: a new Part Studio with Sketch 1's dialog open reads
+    /// "Features (5)"; the new feature counts before it is accepted.
+    #[test]
+    fn features_header_counts_the_new_feature() {
+        assert_eq!(listed_feature_count(0, false), 4);
+        assert_eq!(listed_feature_count(0, true), 5);
+        assert_eq!(listed_feature_count(7, true), 12);
     }
 }
 
