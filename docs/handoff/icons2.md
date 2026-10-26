@@ -1282,3 +1282,8 @@ live reference. Scores below ~3-4 are the known anti-aliasing floor (round 8).
   DecalMapping::Cylindrical's x comes from the kernel cylinder's x_dir, which points the other way here
   (CLI-built circle at (80,10) r 10, extruded 30 mm). The wrap direction (CCW from +z) and the image's
   orientation match.
+- (10-26) Dark mode pass 1: dark/help-gray.svg (live dk-904: solid #d6d6d6 strokes on #333; ours flipped
+  to white at 0.2 opacity, ~(92,92,92)). Dark sweep (tools/darksweep.py, scratch work/darksweep26.txt):
+  528 icons, 27 with dark excess > 3, all but help-gray false alarms: their sprite symbols use literal
+  colours that live recolours by CSS (documents nav, tab bar, panels draw light grey / white in live
+  dk-910, dk-920), which our flip already does. Overlays in dark: requested REQUESTS "icons2 (10-26 g)".
