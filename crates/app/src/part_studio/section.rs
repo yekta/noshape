@@ -26,8 +26,8 @@ pub struct SectionPlane {
     pub offset: f64,
     pub flipped: bool,
     /// Where the manipulator's base starts (live qa4-r5-s9-5: the picked
-    /// face's centre, a mate connector's origin); else across the model's
-    /// centre.
+    /// face's centre, a mate connector's or plane's origin); else (a
+    /// restored or turned plane) across the model's centre.
     pub base: Option<DVec3>,
 }
 
@@ -93,7 +93,7 @@ impl PartStudioView {
         let labeler = self.labeler(cx);
         let mut frames: Vec<(String, PlaneFrame, Option<DVec3>)> = refs.iter().filter_map(|r| self.frame_of_ref(r).map(|f| (labeler(r), f, self.section_home(r, &f)))).collect();
         if frames.is_empty() {
-            frames.push(("Front plane".to_string(), PlaneFrame::FRONT, None));
+            frames.push(("Front plane".to_string(), PlaneFrame::FRONT, Some(PlaneFrame::FRONT.origin)));
         }
         frames
             .into_iter()
@@ -250,11 +250,13 @@ impl PartStudioView {
     }
 
     /// The manipulator base's start for a picked plane reference: a face's
-    /// centre (area-weighted over its display triangles), a connector's
-    /// origin; none for planes.
+    /// centre (area-weighted over its display triangles), a connector's or
+    /// a plane's origin.
     fn section_home(&self, r: &Reference, f: &PlaneFrame) -> Option<DVec3> {
         match r {
-            Reference::MateConnector { .. } => Some(f.origin),
+            // Live (ui-snapv/25): a default (or feature) plane's base is at
+            // its origin.
+            Reference::MateConnector { .. } | Reference::Plane(_) | Reference::FeaturePlane(_) => Some(f.origin),
             Reference::Face(_) => self.display.bodies.iter().filter(|b| !b.hidden).find_map(|b| {
                 let fi = b.face_refs.iter().position(|x| x == r)?;
                 let &(first, count) = b.mesh.face_ranges.get(fi)?;
@@ -299,7 +301,7 @@ impl PartStudioView {
         let at = self.ui.section_base.or(pl.base).unwrap_or(center);
         // A snapped base sits on what it snapped to, off the plane too.
         let base = match &self.ui.section_snap {
-            Some((q, _)) => *q,
+            Some((q, _, _)) => *q,
             None => at - pl.normal * pl.normal.dot(at - on_plane),
         };
         Some(super::manipulators::Arrow { base, dir: pl.normal, length: section_handle(lo, hi), param: SECTION_PARAM, flip: None })

@@ -199,7 +199,7 @@ pub struct UiState {
     pub section_base_drag: bool,
     /// What a base drag snaps to (point, entity lit) and the drag's last
     /// position (a hover pick arriving later re-snaps there).
-    pub section_snap: Option<(glam::DVec3, Reference)>,
+    pub section_snap: Option<(glam::DVec3, Reference, Option<glam::DVec3>)>,
     pub section_snap_pos: Option<glam::DVec2>,
     /// The section value box (live skb "assembly section" 2–3): shown from
     /// an arrow or ring drag until Esc; the plane's offset when the arrow
