@@ -224,7 +224,7 @@ fn core_dialogs_match_std_in_every_state() {
 }
 
 /// Prints the comparison of one feature: `STD_ORACLE=fillet cargo test
-/// -p noshape-model --test std_oracle print_one -- --nocapture`.
+/// -p noshape-model --test all std_oracle::print_one -- --nocapture`.
 #[test]
 #[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn print_one() {

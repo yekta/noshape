@@ -9,3 +9,4 @@ parking_lot.workspace = true
 log.workspace = true
 serde_json.workspace = true
 regex = "1"
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

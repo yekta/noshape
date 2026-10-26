@@ -1,5 +1,5 @@
 //! Sketch editing latency on large sketches (perf.yml, not ci.yml):
-//! `cargo test --release -p noshape-scene --test sketch_perf -- --ignored --nocapture`.
+//! `cargo test --release -p noshape-scene --test all sketch_perf:: -- --ignored --nocapture`.
 //! Dragging a point of a ~300-entity dimensioned sketch and the seed of a
 //! 50-instance linked pattern, step by step through the editor (what a
 //! pointer move does), and adding a constraint (add + solve). Targets (the

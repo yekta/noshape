@@ -5,7 +5,7 @@
 # Usage: tools/tiers/t2.sh [extra cargo args]
 set -o pipefail
 cd "$(dirname "$0")/../.."
-export OCCT_ROOT=${OCCT_ROOT:-/root/occt} CARGO_INCREMENTAL=0
+export OCCT_ROOT=${OCCT_ROOT:-/root/occt}
 PY=$(command -v python3 || command -v python)
 mapfile -t names < <("$PY" tools/tiers/t2-names.py . | tr -d "\r")
 [ ${#names[@]} -eq 0 ] && { echo "no T2 tests"; exit 0; }

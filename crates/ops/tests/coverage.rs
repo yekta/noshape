@@ -217,7 +217,7 @@ fn every_feature_type_round_trips_through_json() {
 }
 
 /// docs/AGENT_API.md's operation reference is the registry's (regenerate
-/// with `UPDATE_DOCS=1 cargo test -p noshape-ops --test coverage`).
+/// with `UPDATE_DOCS=1 cargo test -p noshape-ops --test all coverage::`).
 #[test]
 fn agent_api_reference_is_current() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/AGENT_API.md");
@@ -227,7 +227,7 @@ fn agent_api_reference_is_current() {
         std::fs::write(path, &new).expect("write docs/AGENT_API.md");
         return;
     }
-    assert!(new == doc, "docs/AGENT_API.md's operation reference is out of date: run `UPDATE_DOCS=1 cargo test -p noshape-ops --test coverage`");
+    assert!(new == doc, "docs/AGENT_API.md's operation reference is out of date: run `UPDATE_DOCS=1 cargo test -p noshape-ops --test all coverage::`");
 }
 
 /// Conditional parameters say when the dialog shows them (agent usability:

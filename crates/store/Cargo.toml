@@ -12,6 +12,7 @@ uuid.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 log.workspace = true
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [dev-dependencies]
 serde_json.workspace = true

@@ -16,7 +16,12 @@ for crate in sorted(os.listdir(os.path.join(root, 'crates'))):
             if not any(attr.search(l) for l in lines): continue
             # Module path: for src files, from the file path; inline `mod x {` blocks tracked by indentation.
             if rel.startswith('tests' + os.sep):
-                prefix = [] if rel.count(os.sep) == 1 else rel.split(os.sep)[1:-1]
+                # In tests/all.rs (merge-tests.py) a file is the module `mod <stem>;` or `#[path = "<stem>.rs"] mod <name>;`.
+                stem = os.path.basename(p)[:-3]; allrs = os.path.join(base, 'tests', 'all.rs'); prefix = []
+                if os.path.exists(allrs):
+                    a = open(allrs, encoding='utf8').read()
+                    m = re.search(r'#\[path = "' + stem + r'\.rs"\]\s*mod ([A-Za-z0-9_]+);', a) or re.search(r'^mod (' + stem + r');', a, re.M)
+                    if m: prefix = [m.group(1)]
             else:
                 parts = rel.split(os.sep)[1:]
                 parts[-1] = parts[-1][:-3]

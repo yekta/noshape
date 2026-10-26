@@ -46,6 +46,7 @@ rusqlite.workspace = true
 open = "5"
 # The selection-count cursor sets an image cursor through the platform (cursor.rs).
 raw-window-handle = "0.6"
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 x11rb = { version = "0.13", features = ["render", "cursor", "resource_manager"] }

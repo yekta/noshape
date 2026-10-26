@@ -1,6 +1,6 @@
 //! 1000 copies of one part (shared mesh, edges and vertices; own transform
 //! and pick ids): frame CPU time on the render thread and total frame time.
-//! `cargo test --release -p noshape-render --test instancing_bench -- --ignored --nocapture`
+//! `cargo test --release -p noshape-render --test all instancing_bench:: -- --ignored --nocapture`
 
 use noshape_render::renderer::{FrameRequest, Present};
 use noshape_render::*;

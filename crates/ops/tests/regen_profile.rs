@@ -1,7 +1,7 @@
 //! Regeneration profile (lead, 10-23): the slowest features of the big test
 //! models (tests/perf fixtures) and of the std sheet-metal route, each Part
 //! Studio regenerated from scratch as when a document opens. Run in release:
-//! `cargo test --release -p noshape-ops --test regen_profile -- --ignored --nocapture`
+//! `cargo test --release -p noshape-ops --test all regen_profile:: -- --ignored --nocapture`
 //! (perf.yml `model` job). Prints every feature's time and the top 5 overall
 //! as `profile:` lines.
 

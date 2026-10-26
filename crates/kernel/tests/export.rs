@@ -846,7 +846,7 @@ fn step_layout_variants_like_onshape() {
 
 /// Writes the G47 three-cube Part Studio as STEP to $NOSHAPE_STEP_OUT (for a
 /// line-by-line comparison with Onshape's samples/g47-3parts.step):
-/// `cargo test -p noshape-kernel --test export write_g47_step -- --ignored`.
+/// `cargo test -p noshape-kernel --test all export::write_g47_step -- --ignored`.
 #[test]
 #[ignore]
 fn write_g47_step() {
@@ -858,7 +858,7 @@ fn write_g47_step() {
 
 /// Prints the volume and faces (kind, area mm², box mm) of the parts of the
 /// Parasolid file $NOSHAPE_XT (comparing Onshape's bodies with ours):
-/// `cargo test -p noshape-kernel --test export report_xt -- --ignored --nocapture`.
+/// `cargo test -p noshape-kernel --test all export::report_xt -- --ignored --nocapture`.
 #[test]
 #[ignore]
 fn report_xt() {

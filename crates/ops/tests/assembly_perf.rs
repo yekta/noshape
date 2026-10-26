@@ -1,5 +1,5 @@
 //! Assembly solve latency on large assemblies (perf.yml `model` job, not
-//! ci.yml): `cargo test --release -p noshape-ops --test assembly_perf --
+//! ci.yml): `cargo test --release -p noshape-ops --test all assembly_perf:: --
 //! --ignored --nocapture --test-threads=1`.
 //!
 //! - 200 pins in 20 stacks of 10 with 300 mates: each pin Planar on the one

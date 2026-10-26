@@ -12,8 +12,12 @@ while true; do
   for d in /root/target-*/release; do [ -d "$d" ] && [ -z "$(find $d -mmin -180 -print -quit)" ] && rm -rf "$d"; done
   # Linux perf's build-id cache: a copy of every profiled binary (18 GB on 10-26). Keep only the last 2 h.
   find /root/.debug -mindepth 1 -maxdepth 3 -mmin +120 -exec rm -rf {} + 2>/dev/null
-  # Incremental caches (on since 10-25): drop per-crate caches untouched for 90 min.
+  # Incremental caches (on again since 10-26 20:00): drop per-crate caches untouched for 90 min, and keep each target
+  # dir's under 20 GB (oldest first).
   find /root/target-*/debug/incremental -mindepth 1 -maxdepth 1 -type d -mmin +90 -exec rm -rf {} + 2>/dev/null
+  for d in /root/target-*/debug/incremental; do
+    while [ "$(du -s $d 2>/dev/null | cut -f1)" -gt 20000000 ]; do o=$(ls -tr $d | head -1); [ -z "$o" ] && break; rm -rf "$d/$o"; done
+  done
   # Temp dirs left by e2e test processes that have exited (named by PID).
   for d in /tmp/noshape-ops-e2e-*; do p=${d##*-}; kill -0 $p 2>/dev/null || [ -z "$(find $d -maxdepth 0 -mmin +60)" ] || rm -rf "$d"; done
   # Old copies of the app binary that agents park in scratch dirs (12 h+).

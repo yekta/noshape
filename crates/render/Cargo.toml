@@ -3,6 +3,7 @@ name = "noshape-render"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+autotests = false
 
 [dependencies]
 wgpu.workspace = true
@@ -14,9 +15,15 @@ thiserror.workspace = true
 parking_lot.workspace = true
 # Screen overlays are tessellated exactly like GPUI's paths (same crate and version).
 lyon_tessellation = "1"
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
+
+# Integration tests (tools/tiers/merge-tests.py): tests/all.rs holds every file but the standalone ones.
+[[test]]
+name = "all"
+path = "tests/all.rs"

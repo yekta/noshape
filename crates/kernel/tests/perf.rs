@@ -1,5 +1,5 @@
 //! Performance smoke test (ignored by default):
-//! `cargo test -p noshape-kernel --release --test perf -- --ignored --nocapture`
+//! `cargo test -p noshape-kernel --release --test all perf:: -- --ignored --nocapture`
 use noshape_kernel::*;
 use std::f64::consts::PI;
 use std::time::Instant;

@@ -4,7 +4,7 @@
 # Usage: tools/tiers/t0.sh [extra cargo args]
 set -eo pipefail
 cd "$(dirname "$0")/../.."
-export OCCT_ROOT=${OCCT_ROOT:-/root/occt} CARGO_INCREMENTAL=0
+export OCCT_ROOT=${OCCT_ROOT:-/root/occt}
 E2E=(
   sketch_extrude_fillet_pattern_export_render assembly_with_mates configurations sketch_trim_extend_split
   sketch_fillet_chamfer_offset sketch_mirror_patterns_transform workspace_protection drawing_views_and_dimensions
@@ -13,5 +13,11 @@ E2E=(
   agent_benchmark_p1_fixes assembly_patterns_bom_interference sketch_dimension_menu import_every_format
 )
 SMOKE=(demo_document_regenerates demo_document_with_drawing_regenerates live_30_features_opens_and_regenerates)
+# Every tests/*.rs file must be in its crate's tests/all.rs or be a [[test]] of its own (tools/tiers/merge-tests.py).
+for f in crates/*/tests/*.rs; do
+  c=${f%/tests/*}; s=$(basename "$f" .rs); [ "$s" = all ] && continue
+  grep -qE "^(mod $s;|#\[path = \"$s.rs\"\])" "$c/tests/all.rs" 2>/dev/null || grep -q "path = \"tests/$s.rs\"" "$c/Cargo.toml" \
+    || { echo "t0: $f is in no test binary: run tools/tiers/merge-tests.py"; exit 1; }
+done
 cargo build "$@" -p noshape -p noshape-cli
-cargo test "$@" -p noshape-ops --test smoke --test e2e -- --exact "${SMOKE[@]}" "${E2E[@]}"
+cargo test "$@" -p noshape-ops --test all -- --exact "${SMOKE[@]/#/smoke::}" "${E2E[@]/#/e2e::}"

@@ -804,7 +804,7 @@ fn derived_placed_at_mate_connectors() {
 }
 
 /// Feature clipboard payloads for manual UI checks (paste with Ctrl+V):
-/// `cargo test -p noshape-model --test features_c write_clips -- --ignored`.
+/// `cargo test -p noshape-model --test all features_c::write_clips -- --ignored`.
 #[test]
 #[ignore]
 fn write_clips() {

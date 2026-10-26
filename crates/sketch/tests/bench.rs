@@ -1,4 +1,4 @@
-//! Simple timing benchmarks (run with `cargo test --release -p noshape-sketch --test bench -- --ignored --nocapture`).
+//! Simple timing benchmarks (run with `cargo test --release -p noshape-sketch --test all bench:: -- --ignored --nocapture`).
 
 use noshape_sketch::*;
 use std::time::Instant;

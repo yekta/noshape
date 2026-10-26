@@ -5,11 +5,11 @@
 # last-green, it is reverted at once (PLAN 2.4: no grace period; the author re-lands it fixed).
 # Nightly (first loop after 01:00 UTC): T2 on last-green -> /tmp/lead/t2-status + /tmp/lead/t2-<date>.log. T2 never blocks.
 set -u
-export OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-lead CARGO_INCREMENTAL=0
+export OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-lead  # incremental per the machine config: consecutive main commits rebuild fast
 export CC=gcc-13 CXX=g++-13  # CI (ubuntu-24.04) compiles our C++ with GCC 13; GCC 15 here accepts code CI rejects
 REPO=/root/projects/noshape; WT=/root/projects/noshape-wt/watch; ST=/tmp/lead/main-status; LOG=/tmp/lead/watch.log
 G="git -c user.name=yekta -c user.email=ngyekta@gmail.com"
-log() { echo "$(date -u +%H:%M:%S) $*" >> $LOG; }
+log() { echo "$(date -u "+%F %T") $*" >> $LOG; }
 fails() { grep -vE "^warning: [a-z0-9_-]+@[0-9.]+:" | grep -E "FAILED|panicked|^error|signal:|SIGSEGV|SIGABRT|stack overflow|Caused by|process didn.t exit" | head -14; }
 check() {
   cd $WT; local t0=$SECONDS o
@@ -41,7 +41,7 @@ while true; do
   if [ "$m" != "$last" ]; then
     cd $WT; git reset -q --hard; git clean -fdq; git checkout -q --detach "$m"
     # The agent API reference is generated: keep main's copy current without anyone having to.
-    UPDATE_DOCS=1 nice -n -5 cargo test -q -p noshape-ops --test coverage >/dev/null 2>&1
+    UPDATE_DOCS=1 nice -n -5 cargo test -q -p noshape-ops --test all coverage:: >/dev/null 2>&1
     if ! git diff --quiet docs/AGENT_API.md; then
       git add docs/AGENT_API.md; $G commit -q -m "lead: regenerate docs/AGENT_API.md"
       for i in 1 2 3 4 5; do git push -q origin HEAD:main 2>/dev/null && { log "pushed AGENT_API.md regen"; break; }; git fetch -q origin; git rebase -q origin/main 2>/dev/null || { git rebase --abort; break; }; done

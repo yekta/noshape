@@ -1835,7 +1835,7 @@ fn std_features_match_onshape() {
 
 /// Regeneration time of std features run from FeatureScript (sheet metal
 /// set, tests/fs/sm_harness.fs; extrude, fillet & co., tests/fs/std_reference.fs).
-/// Run in release: `cargo test --release --test custom_features -- --ignored --nocapture bench_std_regen`.
+/// Run in release: `cargo test --release --test all custom_features:: -- --ignored --nocapture bench_std_regen`.
 #[test]
 #[ignore = "benchmark"]
 fn bench_std_regen() {

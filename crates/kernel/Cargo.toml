@@ -6,6 +6,7 @@ license.workspace = true
 description = "Safe Rust wrapper over OpenCascade (OCCT) for noshape: shapes, topology, features, history, tessellation, HLR, I/O"
 build = "build.rs"
 links = "noshape_occt"
+autotests = false
 
 [dependencies]
 cxx.workspace = true
@@ -13,8 +14,26 @@ glam.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 log.workspace = true
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [build-dependencies]
 cxx-build.workspace = true
 
 [dev-dependencies]
+
+# Integration tests (tools/tiers/merge-tests.py): tests/all.rs holds every file but the standalone ones.
+[[test]]
+name = "all"
+path = "tests/all.rs"
+
+[[test]]
+name = "band_mesh"
+path = "tests/band_mesh.rs"
+
+[[test]]
+name = "boolean_budget"
+path = "tests/boolean_budget.rs"
+
+[[test]]
+name = "strip_mesh"
+path = "tests/strip_mesh.rs"

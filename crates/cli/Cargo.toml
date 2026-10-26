@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+autotests = false
 
 [[bin]]
 name = "noshape-cli"
@@ -17,3 +18,9 @@ anyhow.workspace = true
 serde_json.workspace = true
 clap = { version = "4", features = ["string"] }
 base64 = "0.22"
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+# Integration tests (tools/tiers/merge-tests.py): tests/all.rs holds every file but the standalone ones.
+[[test]]
+name = "all"
+path = "tests/all.rs"

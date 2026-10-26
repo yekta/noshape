@@ -1,4 +1,4 @@
-//! Performance benchmarks (run with `--release --test perf -- --ignored --nocapture`).
+//! Performance benchmarks (run with `--release --test all perf:: -- --ignored --nocapture`).
 
 use glam::DVec2;
 use noshape_model::configuration::ConfigValues;

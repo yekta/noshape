@@ -4,7 +4,7 @@
 //! the solver's whole drag solve (`solve_with`, no DOF analysis, as the app
 //! runs it), median of 50 pointer moves.
 //!
-//! `cargo test --release -p noshape-model --test drag_speed -- --ignored --nocapture`
+//! `cargo test --release -p noshape-model --test all drag_speed:: -- --ignored --nocapture`
 
 use glam::{DQuat, DVec3};
 use noshape_model::assembly::MateType;

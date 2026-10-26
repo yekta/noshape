@@ -390,7 +390,7 @@ jobs:
           NOSHAPE_PERF: '1'
         run: |
           status=0
-          cargo test --release --locked -p noshape-model --test big_plate -- --ignored --nocapture --test-threads=1 2>&1 | tee big_plate.log || status=$?
+          cargo test --release --locked -p noshape-model --test all -- big_plate:: --ignored --nocapture --test-threads=1 2>&1 | tee big_plate.log || status=$?
           { echo "### ${{ matrix.name }}"; grep -E "big plate:|tessellate Part 1|boolean_into Cut" big_plate.log || true; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
@@ -402,7 +402,7 @@ jobs:
           NOSHAPE_PERF: '1'
         run: |
           $ErrorActionPreference = 'Continue'
-          cargo test --release --locked -p noshape-model --test big_plate -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath big_plate.log
+          cargo test --release --locked -p noshape-model --test all -- big_plate:: --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath big_plate.log
           $status = $LASTEXITCODE
           "### ${{ matrix.name }}" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           Select-String -Path big_plate.log -Pattern 'big plate:|tessellate Part 1|boolean_into Cut' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -415,7 +415,7 @@ jobs:
         shell: bash
         run: |
           status=0
-          cargo test --release --locked -p noshape-model --test drag_speed -- --ignored --nocapture --test-threads=1 2>&1 | tee drag_speed.log || status=$?
+          cargo test --release --locked -p noshape-model --test all -- drag_speed:: --ignored --nocapture --test-threads=1 2>&1 | tee drag_speed.log || status=$?
           { echo "### ${{ matrix.name }}: drag speed"; grep -E "per drag step|panicked" drag_speed.log || true; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
@@ -424,7 +424,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          cargo test --release --locked -p noshape-model --test drag_speed -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath drag_speed.log
+          cargo test --release --locked -p noshape-model --test all -- drag_speed:: --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath drag_speed.log
           $status = $LASTEXITCODE
           "### ${{ matrix.name }}: drag speed" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           Select-String -Path drag_speed.log -Pattern 'per drag step|panicked' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -439,7 +439,7 @@ jobs:
         shell: bash
         run: |
           status=0
-          cargo test --release --locked -p noshape-model --test pattern_perf --test pattern_fins --test engine --test qa_regressions -- --ignored --nocapture --test-threads=1 timed_ 2>&1 | tee timed.log || status=$?
+          cargo test --release --locked -p noshape-model --test all -- --ignored --nocapture --test-threads=1 pattern_perf::timed_ pattern_fins::timed_ engine::timed_ qa_regressions::timed_ 2>&1 | tee timed.log || status=$?
           cargo test --release --locked -p noshape-store --lib -- --ignored --nocapture timed_ 2>&1 | tee -a timed.log || status=$?
           { echo "### ${{ matrix.name }}: timed checks"; echo '```'; grep -E "^test timed_|×[0-9]+|1 MB commit|after the abort|panicked" timed.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
@@ -449,7 +449,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          cargo test --release --locked -p noshape-model --test pattern_perf --test pattern_fins --test engine --test qa_regressions -- --ignored --nocapture --test-threads=1 timed_ 2>&1 | Tee-Object -FilePath timed.log
+          cargo test --release --locked -p noshape-model --test all -- --ignored --nocapture --test-threads=1 pattern_perf::timed_ pattern_fins::timed_ engine::timed_ qa_regressions::timed_ 2>&1 | Tee-Object -FilePath timed.log
           $status = $LASTEXITCODE
           cargo test --release --locked -p noshape-store --lib -- --ignored --nocapture timed_ 2>&1 | Tee-Object -FilePath timed_store.log
           if ($LASTEXITCODE -ne 0) { $status = $LASTEXITCODE }
@@ -472,7 +472,7 @@ jobs:
           RUST_LOG: 'perf=info'
         run: |
           status=0
-          cargo test --release --locked -p noshape-model --test pattern_second -- --include-ignored --nocapture --test-threads=1 2>&1 | tee pattern_second.log || status=$?
+          cargo test --release --locked -p noshape-model --test all -- pattern_second:: --include-ignored --nocapture --test-threads=1 2>&1 | tee pattern_second.log || status=$?
           { echo "### ${{ matrix.name }}: second pattern"; echo '```'; grep -E "×[0-9]+|panicked|assert" pattern_second.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
@@ -484,7 +484,7 @@ jobs:
           NOSHAPE_PATTERN_N: '400'
         run: |
           $ErrorActionPreference = 'Continue'
-          cargo test --release --locked -p noshape-model --test pattern_second -- --include-ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath pattern_second.log
+          cargo test --release --locked -p noshape-model --test all -- pattern_second:: --include-ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath pattern_second.log
           $status = $LASTEXITCODE
           "### ${{ matrix.name }}: second pattern" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -502,7 +502,7 @@ jobs:
         shell: bash
         run: |
           status=0
-          cargo test --release --locked -p noshape-scene --test sketch_perf -- --ignored --nocapture --test-threads=1 2>&1 | tee sketch_perf.log || status=$?
+          cargo test --release --locked -p noshape-scene --test all -- sketch_perf:: --ignored --nocapture --test-threads=1 2>&1 | tee sketch_perf.log || status=$?
           { echo "### ${{ matrix.name }}: sketch latency"; echo '```'; grep -E "big sketch|pattern:|drag|add |regions|re-solve|regeneration|panicked|assert" sketch_perf.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
@@ -511,7 +511,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          cargo test --release --locked -p noshape-scene --test sketch_perf -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath sketch_perf.log
+          cargo test --release --locked -p noshape-scene --test all -- sketch_perf:: --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath sketch_perf.log
           $status = $LASTEXITCODE
           "### ${{ matrix.name }}: sketch latency" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -527,7 +527,7 @@ jobs:
         shell: bash
         run: |
           status=0
-          cargo test --release --locked -p noshape-ops --test assembly_perf -- --ignored --nocapture --test-threads=1 2>&1 | tee assembly_perf.log || status=$?
+          cargo test --release --locked -p noshape-ops --test all -- assembly_perf:: --ignored --nocapture --test-threads=1 2>&1 | tee assembly_perf.log || status=$?
           { echo "### ${{ matrix.name }}: assembly latency"; echo '```'; grep -E "instances|pins|adding|drag|panicked|assert" assembly_perf.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
@@ -536,7 +536,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          cargo test --release --locked -p noshape-ops --test assembly_perf -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath assembly_perf.log
+          cargo test --release --locked -p noshape-ops --test all -- assembly_perf:: --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath assembly_perf.log
           $status = $LASTEXITCODE
           "### ${{ matrix.name }}: assembly latency" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -552,7 +552,7 @@ jobs:
         shell: bash
         run: |
           status=0
-          cargo test --release --locked -p noshape-ops --test regen_profile -- --ignored --nocapture --test-threads=1 2>&1 | tee regen_profile.log || status=$?
+          cargo test --release --locked -p noshape-ops --test all -- regen_profile:: --ignored --nocapture --test-threads=1 2>&1 | tee regen_profile.log || status=$?
           { echo "### ${{ matrix.name }}: regeneration profile"; echo '```'; grep -E "^profile:" regen_profile.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
@@ -562,7 +562,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          cargo test --release --locked -p noshape-ops --test regen_profile -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath regen_profile.log
+          cargo test --release --locked -p noshape-ops --test all -- regen_profile:: --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath regen_profile.log
           $status = $LASTEXITCODE
           "### ${{ matrix.name }}: regeneration profile" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

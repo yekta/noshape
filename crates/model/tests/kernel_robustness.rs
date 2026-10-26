@@ -276,7 +276,7 @@ fn shell_matches_onshape_volumes() {
 }
 
 /// Regeneration timings of booleans, blends and shell on a mid-size part
-/// (`cargo test -p noshape-model --test kernel_robustness -- --ignored --nocapture`).
+/// (`cargo test -p noshape-model --test all kernel_robustness:: -- --ignored --nocapture`).
 #[test]
 #[ignore]
 fn bench_kernel_ops() {
@@ -462,7 +462,7 @@ fn blends_match_onshape() {
 }
 
 /// Clipboard payloads of the QA3 shell cases for checking in the app (paste
-/// with Ctrl+V): `cargo test -p noshape-model --test kernel_robustness
+/// with Ctrl+V): `cargo test -p noshape-model --test all kernel_robustness::
 /// write_kern_clips -- --ignored`, files in the temp dir.
 #[test]
 #[ignore]
@@ -1158,7 +1158,7 @@ fn shell_after_chamfer_patch_matches_onshape() {
 
 /// Live G50: Shell of the chamfer-then-fillet box works up to 2.05 mm in
 /// Onshape and fails from 2.06 mm. Prints our status and faces per
-/// thickness: `cargo test -p noshape-model --test kernel_robustness
+/// thickness: `cargo test -p noshape-model --test all kernel_robustness::
 /// shell_thickness_sweep -- --ignored --nocapture`.
 #[test]
 #[ignore]

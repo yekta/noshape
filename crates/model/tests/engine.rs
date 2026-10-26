@@ -727,7 +727,7 @@ fn timed_aborted_pattern_regeneration_stops_quickly() {
 /// with Ctrl+V; then set the pattern's count to 1000 in its dialog): a
 /// 520 × 60 × 10 mm block, a 0.2 × 40 mm rib extruded 15 mm (Add) and a
 /// Feature-type Linear pattern of it (Reapply features), 0.5 mm apart.
-/// `cargo test -p noshape-model --test engine write_pending_pattern_clip -- --ignored`.
+/// `cargo test -p noshape-model --test all engine::write_pending_pattern_clip -- --ignored`.
 #[test]
 #[ignore]
 fn write_pending_pattern_clip() {
@@ -951,7 +951,7 @@ fn pending_pattern_clip_at_1000_is_one_part() {
 /// a 100 × 2000 × 40 mm block, a 1 mm fin flush with its front face, 40 mm
 /// high on top, and a Feature linear pattern of it (Reapply features, 2 mm,
 /// 2 instances; type 1000 in the dialog as live did).
-/// `cargo test -p noshape-model --test engine write_fins_clip -- --ignored`.
+/// `cargo test -p noshape-model --test all engine::write_fins_clip -- --ignored`.
 #[test]
 #[ignore]
 fn write_fins_clip() {

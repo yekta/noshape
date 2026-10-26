@@ -55,6 +55,10 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 opt-level = 3
 debug = false
+# The app crate (138k lines of UI code; the GPU does the heavy work) unoptimised in dev builds: its codegen is the
+# slowest step of every rebuild. Geometry crates stay at opt-level 1 so tests and the dev app stay fast.
+[profile.dev.package.noshape]
+opt-level = 0
 
 [profile.release]
 lto = "thin"

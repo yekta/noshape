@@ -4,5 +4,5 @@
 # Usage: tools/tiers/t1.sh [extra cargo args, e.g. --locked or -p <crate>]
 set -o pipefail
 cd "$(dirname "$0")/../.."
-export OCCT_ROOT=${OCCT_ROOT:-/root/occt} CARGO_INCREMENTAL=0
+export OCCT_ROOT=${OCCT_ROOT:-/root/occt}
 exec cargo test --workspace "$@"

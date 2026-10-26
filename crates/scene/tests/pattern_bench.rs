@@ -1,6 +1,6 @@
 //! A 1000-instance part pattern through regeneration, scene building and
 //! rendering, timed per stage (viewport-performance.md, instancing):
-//! `cargo test --release -p noshape-scene --test pattern_bench -- --ignored --nocapture`.
+//! `cargo test --release -p noshape-scene --test all pattern_bench:: -- --ignored --nocapture`.
 
 use glam::DVec2;
 use noshape_model::configuration::ConfigValues;
