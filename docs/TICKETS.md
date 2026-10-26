@@ -125,6 +125,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   sketch 1…" (no type tag; behaviours "qa (2026-10-26, P2 batch)" (2)) (qa 2026-10-26, build 4d2f6b0c)
 
 ## Sketch + assembly (skasm)
+- [ ] P1 SKETCH-DRAG-BIG dragging a corner in a 1000-entity sketch (10 × 10 rectangles + 100 circles, made with
+  sketch_draw shapes; /root/qa-scratch/cli/bigsketch.noshape) re-evaluates the sketch feature per drag step in 72–113 ms
+  (green dev build, load ~25; NOSHAPE_PERF "regen: 1 features evaluated"); budget: under one 60 Hz frame. Re-time on a
+  release build; the step looks like a full sketch regen (regions included) rather than a solver-only update (qa
+  2026-10-26, build 4d2f6b0c)
 - [ ] P2 SKETCH-PASTE Ctrl+C / Ctrl+V of a dimensioned circle in a sketch: ours pastes the copy exactly on top of the
   original (prompt "Pasted; drag or transform the selection into place"); live (behaviours "qa (2026-10-26, P2 sketch)")
   pastes it centred on the pointer, selected, with the sketch Transform tool active and its manipulator on the copy, no
