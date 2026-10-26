@@ -91,7 +91,8 @@ fn parts() -> Parts {
     Parts { doc, ev, tabs, bodies, results }
 }
 
-/// The face / edge / vertex of part `p` through the point (mm).
+/// The face / edge / vertex of part `p` through the point (mm). Circles are
+/// picked away from x = centre + r, where our cylinders have their seam.
 fn entity(parts: &Parts, p: usize, at: DVec3, kind: noshape_kernel::ShapeType) -> Reference {
     let b = &parts.results[p].context.bodies[0];
     let v = noshape_kernel::make_vertex(at * 1e-3).unwrap();
@@ -188,7 +189,7 @@ fn cases(parts: &Parts) -> Vec<(&'static str, Assembly)> {
     let r1 = pose(0.0, (-50.0, 60.0, 40.0));
     let pin_edges = |r: Placement, t: MateType, set: &dyn Fn(&mut Mate)| {
         let mut asm = two(parts, PLATE, PIN, r);
-        let mut m = mate(10, t, conn(2, edge(parts, PIN, 205.0, 0.0, 0.0), Inference::Center), conn(1, edge(parts, PLATE, 135.0, 20.0, 10.0), Inference::Center));
+        let mut m = mate(10, t, conn(2, edge(parts, PIN, 200.0, 5.0, 0.0), Inference::Center), conn(1, edge(parts, PLATE, 130.0, 25.0, 10.0), Inference::Center));
         set(&mut m);
         asm.mates.push(m);
         asm
