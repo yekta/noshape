@@ -951,11 +951,15 @@ impl AssemblyView {
                 q.set_variables(vars, cx);
                 q
             });
-            subs.push(cx.subscribe(&q, |this: &mut Self, _, ev: &QuantityEvent, cx| {
-                if matches!(ev, QuantityEvent::Committed(_)) {
+            // Live (qa5 P2-A1, behaviours "qa5 (10-25 p3)"): Enter on a
+            // changed value applies it, the next Enter accepts the pattern.
+            subs.push(cx.subscribe(&q, |this: &mut Self, _, ev: &QuantityEvent, cx| match ev {
+                QuantityEvent::Committed(_) => {
                     this.update_pattern_preview(cx);
                     cx.notify();
                 }
+                QuantityEvent::Enter => this.accept_pattern(cx),
+                _ => {}
             }));
             q
         };
