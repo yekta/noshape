@@ -56,12 +56,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop") (qa5 2026-10-26)
 - [ ] P2 P1-10 (qa5, carried over) Extrude › Remove tool preview pointing away from the part is grey; live translucent dark
   red (live part-studio/234–235) (qa5 2026-10-26)
-
 - [ ] P2 DELETE-TAB-DIALOG deleting a Part Studio used by an assembly: ours shows plain text "Deleting "Part Studio 1" may
   cause errors in the tab that use it: Assembly 1." (tickets/delete-tab-dialog-ours.png); live: a yellow warning box "⚠
   Deleting this tab will result in failed or missing features in 1 tab" and below it one row per affected tab (tab icon +
   name), [Delete] [Cancel] (live part-studio/1584-p9-tab-delete-confirm.png, behaviours "(7) Delete the "qa5 src" tab")
   (qa 2026-10-26, build 4d2f6b0c)
+
 ## Sketch + assembly (skasm)
 - [ ] P2 P1-4 data (qa5, carried over) sketches keep a hidden construction "Origin stand-in" point at (0,0) carrying the
   Horizontal/Vertical constraints (sketch_get lists it); live constrains to the external Origin (qa5 2026-10-26)
