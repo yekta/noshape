@@ -8,6 +8,11 @@
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
+#include <vector>
+#include <algorithm>
+#include <Extrema_POnSurf.hxx>
+#include <Extrema_GenLocateExtPS.hxx>
+#include <BRepTopAdaptor_FClass2d.hxx>
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRepLProp_SLProps.hxx>
@@ -451,6 +456,66 @@ P3 face_point_at_uv(const OcShape& fs, double u, double v)
   return from_pnt(s.Value(u, v));
 }
 
+// The nearest point of a face's interior to `p`: the nearest samples of a
+// UV grid inside the face, each refined by a local search. BRepExtrema's
+// global search misses interior points on some B-spline faces (ruled ones:
+// lofts, curved parting-line drafts) and falls back to the boundary.
+// False when no interior point is found.
+static bool face_interior_nearest(const TopoDS_Face& f, const gp_Pnt& p, double& u, double& v, gp_Pnt& q)
+{
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  if (!(u1 > u0) || !(v1 > v0))
+    return false;
+  BRepAdaptor_Surface     s(f, true);
+  BRepTopAdaptor_FClass2d cl(f, 1e-9);
+  struct Sample
+  {
+    double d, u, v;
+  };
+  std::vector<Sample> samples;
+  const int           N = 24;
+  for (int i = 0; i <= N; ++i)
+    for (int j = 0; j <= N; ++j)
+    {
+      const double uu = u0 + (u1 - u0) * (i + 0.5) / (N + 1), vv = v0 + (v1 - v0) * (j + 0.5) / (N + 1);
+      if (cl.Perform(gp_Pnt2d(uu, vv)) != TopAbs_IN)
+        continue;
+      samples.push_back({p.SquareDistance(s.Value(uu, vv)), uu, vv});
+    }
+  if (samples.empty())
+    return false;
+  const size_t k = std::min<size_t>(4, samples.size());
+  std::partial_sort(samples.begin(), samples.begin() + k, samples.end(), [](const Sample& a, const Sample& b) { return a.d < b.d; });
+  double best = 1e300;
+  for (size_t i = 0; i < k; ++i)
+  {
+    double bu = samples[i].u, bv = samples[i].v, bd = samples[i].d;
+    Extrema_GenLocateExtPS loc(s, 1e-12, 1e-12);
+    loc.Perform(p, bu, bv, true);
+    if (loc.IsDone() && loc.SquareDistance() < bd)
+    {
+      double lu, lv;
+      loc.Point().Parameter(lu, lv);
+      const TopAbs_State st = cl.Perform(gp_Pnt2d(lu, lv));
+      if (st == TopAbs_IN || st == TopAbs_ON)
+      {
+        bu = lu;
+        bv = lv;
+        bd = loc.SquareDistance();
+      }
+    }
+    if (bd < best)
+    {
+      best = bd;
+      u    = bu;
+      v    = bv;
+    }
+  }
+  q = s.Value(u, v);
+  return true;
+}
+
 ProjPoint face_project_point(const OcShape& fs, P3 p)
 {
   const TopoDS_Face&         f = as_face(fs.shape, "shape");
@@ -461,6 +526,21 @@ ProjPoint face_project_point(const OcShape& fs, P3 p)
   ProjPoint r{};
   r.point    = from_pnt(d.PointOnShape2(1));
   r.distance = d.Value();
+  // A boundary answer may hide a nearer interior point (see
+  // face_interior_nearest).
+  if (d.SupportTypeShape2(1) != BRepExtrema_IsInFace)
+  {
+    double iu, iv;
+    gp_Pnt iq;
+    if (face_interior_nearest(f, to_pnt(p), iu, iv, iq) && iq.Distance(to_pnt(p)) < d.Value() - 1e-12)
+    {
+      r.point    = from_pnt(iq);
+      r.distance = iq.Distance(to_pnt(p));
+      r.u        = iu;
+      r.v        = iv;
+      return r;
+    }
+  }
   if (d.SupportTypeShape2(1) == BRepExtrema_IsInFace)
   {
     d.ParOnFaceS2(1, r.u, r.v);
@@ -658,6 +738,35 @@ DistanceF min_distance(const OcShape& a, const OcShape& b)
   r.p1       = from_pnt(d.PointOnShape1(1));
   r.p2       = from_pnt(d.PointOnShape2(1));
   r.count    = d.NbSolution();
+  // A point against faces: BRepExtrema can miss interior points of some
+  // B-spline faces (face_interior_nearest); check the faces it may have.
+  for (int side = 0; side < 2; ++side)
+  {
+    const TopoDS_Shape& pt  = side == 0 ? a.shape : b.shape;
+    const TopoDS_Shape& oth = side == 0 ? b.shape : a.shape;
+    if (pt.ShapeType() != TopAbs_VERTEX)
+      continue;
+    const gp_Pnt P = BRep_Tool::Pnt(TopoDS::Vertex(pt));
+    for (TopExp_Explorer x(oth, TopAbs_FACE); x.More(); x.Next())
+    {
+      const TopoDS_Face f = TopoDS::Face(x.Current());
+      if (BRepAdaptor_Surface(f).GetType() != GeomAbs_BSplineSurface)
+        continue;
+      Bnd_Box box;
+      BRepBndLib::Add(f, box);
+      if (box.Distance(Bnd_Box(P, P)) >= r.distance)
+        continue;
+      double u, v;
+      gp_Pnt q;
+      if (face_interior_nearest(f, P, u, v, q) && q.Distance(P) < r.distance - 1e-12)
+      {
+        r.distance = q.Distance(P);
+        r.p1       = from_pnt(side == 0 ? P : q);
+        r.p2       = from_pnt(side == 0 ? q : P);
+        r.count    = 1;
+      }
+    }
+  }
   return r;
 }
 

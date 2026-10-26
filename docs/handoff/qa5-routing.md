@@ -275,6 +275,9 @@ STATUS FSW-draft (psb, 2026-10-26): curved parting lines (a sloped ellipse, a sa
   boundary edge for most interior points (e.g. 3.9 mm for a point on the face), while `classify_point` says OnBoundary and
   the face's own UV classifier says IN. Repro: crates/kernel/tests/draft_curve.rs history (test
   `ruled_loft_point_projection_control`, removed). Affects measure / picking-by-point on such faces.
+- STATUS PROJ-RULED (psb, 2026-10-26, cleared by the lead; kern's crates/kernel/cpp/geom.cpp): fixed. When BRepExtrema answers
+  with the boundary, `face_project_point` also searches the face's interior (a UV grid inside the face, refined locally) and
+  takes the nearer; `min_distance` does the same for a point against B-spline faces. Tests crates/kernel/tests/projection.rs.
 STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, constant normal thickness with Scale, Trim ends to the cap planes, the two failure texts (test thin_sweep_as_live).
 STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.
