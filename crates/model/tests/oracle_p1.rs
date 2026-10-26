@@ -951,8 +951,6 @@ fn revolve_cases() -> Vec<(&'static str, Studio)> {
 /// Differences reported to their owners (case, owner and what differs);
 /// remove a line once it matches.
 const KNOWN: &[(&str, &str)] = &[
-    ("LP2", "fs/psb: feature pattern, second direction straddling the front face (left top edge, −y): live re-extrudes those 3 bosses down the front face to z 0 (50544.69 mm³); ours patterns the geometry (49696.46)"),
-    ("CP2", "kern: circular feature pattern of BOSS about the vertical edge (60,40), 30° × 3: live OK 48802.32 mm³; the pattern now turns as live (the extrude's side edges run back toward the sketch, 10-26), ours 48565.49: the copy at 30° overhangs the block's corner and live grows its overhang down to the bottom as LP2 (+11.84 mm² × 20)"),
 ];
 
 /// Live's mass properties bands (bands.jsonl, lead 10-26): Parasolid's

@@ -712,7 +712,11 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
         };
         // Copies off the part are skipped (live oracle_p1 CV1: 3 of 4 bosses,
         // one part; CP2); all off failed above.
-        let touch: Vec<NamedShape> = tools.into_iter().filter(near).collect();
+        let mut touch: Vec<NamedShape> = tools.into_iter().filter(near).collect();
+        // Parasolid's face pattern grows a copy whose footprint hangs over
+        // the part's edge down to the part (live oracle_p1 LP2, CP2).
+        let grown: Vec<NamedShape> = touch.iter().filter_map(|t| overhang_growth(&seed_shape, t)).collect();
+        touch.extend(grown);
         if !touch.is_empty() {
             ev.boolean_into_with(&[bi], touch, k::BooleanOp::Fuse, &EvalCtx::many_tools_options())?;
         }
@@ -722,6 +726,67 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
     // copies of a hole on Part 1 never cut a part overlapping it (qa4 F12).
     let Some(bi) = index_of_body(ev, seed) else { return Ok(()) };
     ev.boolean_into_with(&[bi], tools, k::BooleanOp::Cut, &EvalCtx::many_tools_options())
+}
+
+/// The growth of a face pattern copy `tool` (a boss) whose footprint on the
+/// part hangs over its edge: Parasolid extends the copy's faces down to the
+/// part, so the overhanging part of the footprint runs down until it meets
+/// the part (live oracle_p1 LP2: three Ø6 bosses straddling the front face
+/// of a 60 × 40 × 20 block grow their outer halves down to its bottom, +3 ×
+/// 14.14 mm² × 20; CP2). The footprint swept down to the part's far side,
+/// less the part, the pieces touching the footprint (none when it rests on
+/// the part); faces named after the copy's nearest.
+fn overhang_growth(body: &Shape, tool: &NamedShape) -> Option<NamedShape> {
+    let bb = body.bounding_box(false).ok()?;
+    let reach = (bb.max - bb.min).length() * 2.0;
+    let tol = reach * 1e-9;
+    let contains = |a: &k::BoundingBox, b: &k::BoundingBox| a.min.x <= b.min.x + tol && a.min.y <= b.min.y + tol && a.min.z <= b.min.z + tol && b.max.x <= a.max.x + tol && b.max.y <= a.max.y + tol && b.max.z <= a.max.z + tol;
+    let supports: Vec<(Shape, k::Plane)> = body.faces().into_iter().filter_map(|f| f.face_plane().ok().flatten().map(|p| (f, p))).collect();
+    let mut grown: Vec<Shape> = Vec::new();
+    for f in tool.shape.faces() {
+        let Ok(Some(tp)) = f.face_plane() else { continue };
+        let d = tp.normal.normalize();
+        // A footprint: lying on a planar face of the part, facing it.
+        let on: Vec<&Shape> = supports.iter().filter(|(_, bp)| bp.normal.normalize().dot(d) < -1.0 + 1e-9 && (tp.origin - bp.origin).dot(d).abs() <= tol).map(|(s, _)| s).collect();
+        if on.is_empty() {
+            continue;
+        }
+        let Ok(fb) = f.bounding_box(false) else { continue };
+        if on.iter().any(|s| s.bounding_box(false).is_ok_and(|b| contains(&b, &fb))) {
+            continue;
+        }
+        // Down to the part's far side along `d` (its bottom), no further.
+        let corners = [bb.min.x, bb.max.x].into_iter().flat_map(|x| [bb.min.y, bb.max.y].into_iter().flat_map(move |y| [bb.min.z, bb.max.z].into_iter().map(move |z| DVec3::new(x, y, z))));
+        let depth = corners.map(|c| (c - tp.origin).dot(d)).fold(0.0, f64::max);
+        if depth <= tol {
+            continue;
+        }
+        // Swept up from the far side, as the boss is, so its side lies on the
+        // boss's surface with the same axis and merges with it (unify).
+        let Ok(prism) = k::extrude_between(&f, d * depth, DVec3::ZERO, 0.0) else { continue };
+        let Ok(column) = k::cut(&prism.shape, body) else { continue };
+        let column = column.shape;
+        for piece in column.solids() {
+            let touches = piece.vertices().iter().filter_map(|v| v.vertex_point().ok()).any(|p| (p - tp.origin).dot(d).abs() <= tol * 1e3);
+            if touches {
+                grown.push(piece);
+            }
+        }
+    }
+    if grown.is_empty() {
+        return None;
+    }
+    let shape = if grown.len() == 1 { grown.remove(0) } else { Shape::compound(&grown) };
+    let faces = tool.shape.faces();
+    let names = shape
+        .faces()
+        .iter()
+        .map(|g| {
+            let c = g.centroid().unwrap_or(DVec3::ZERO);
+            faces.iter().zip(&tool.names.faces).min_by(|a, b| a.0.centroid().unwrap_or(DVec3::ZERO).distance(c).total_cmp(&b.0.centroid().unwrap_or(DVec3::ZERO).distance(c))).map(|x| x.1.clone()).unwrap_or_else(|| tool.names.faces[0].clone())
+        })
+        .collect();
+    Some(NamedShape::new(shape, names))
 }
 
 /// Whether two boxes meet (within `tol`).
