@@ -581,7 +581,12 @@ impl System {
                 converged = true;
                 break;
             }
-            if iterations >= opts.max_iterations || stall >= 6 {
+            // A plateau (conflicting constraints at their least-squares
+            // minimum) ends the solve after two steps that gain nothing: a
+            // converging solve gains orders of magnitude a step (a
+            // conflicting dimension on a 300-entity sketch took ~40 ms of
+            // such steps).
+            if iterations >= opts.max_iterations || stall >= 2 {
                 break;
             }
             iterations += 1;
@@ -668,7 +673,7 @@ impl System {
                         for (k, &pv) in comp.vars.iter().enumerate() {
                             x[k] = self.p.values[pv as usize];
                         }
-                        if cost - c_new <= 1e-12 * cost {
+                        if cost - c_new <= 1e-6 * cost {
                             stall += 1;
                         } else {
                             stall = 0;
