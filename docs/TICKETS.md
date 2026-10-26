@@ -11,22 +11,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   since then): the shell result differs on arm64.
 - [ ] P1 `model/tests/std_oracle::hole_scope_follows_depth_as_live`: "Merge scope at depth 15 mm: []" (Linux, Windows).
 - [ ] P1 `kernel/tests/draft_curve::level_parting_line_matches_occt` red on all platforms 10-26 (exact match vs OCCT).
-- [ ] P0 SHELL-WALLS Shell silently drops a filleted plate's outer walls: Part Studio, Sketch 1 on Top = rectangle 80 × 50
-  + Ø20 circle inside; Extrude 1 the outer region 10 mm; Fillet 1 = the top face (its 4 outer edges + the hole rim), R2;
-  Shell 1 = top face removed, 2.5 mm (also 1.5 mm, i.e. below the fillet radius); live (behaviours "qa (2026-10-26, P0
-  wrong geometry check)", live/qa/qa-p0-shell-*.png): Shell OK, an open box (floor, four full-height walls, a tube around
-  the hole), **2.5 mm: 14951.9619 mm³, 19 faces; 1.5 mm: 9609.9491 mm³, 27 faces**; ours on exactly that plate (Part
-  Studio 2 with Chamfer 1 and the hole suppressed): **2.5 mm: 10220.907 mm³, walls gone**; 1.5 mm: 9609.03 mm³, walls
-  there (0.92 mm³ short of live); with the chamfer + 2 holes also 1.5 mm loses the walls. Ours, first variant:
-  Shell 1 **OK** but only the floor and the hole tube remain, no outer walls (with Chamfer 1 + 2 holes on top: 10887.66
-  mm³; ≈15.7k expected by hand); without the Fillet, or without the Ø20 hole, the walls are there. Doc
-  /root/qa-scratch/tickets/qa-1026-ps2-shell.noshape (tab Part Studio 2), shots tickets/shell-fillet-walls-missing-iso.png,
-  -front.png, shell-fillet-suppressed-walls-ok.png. Likely the same root as qa5's P1-16 (fillet offset collapsing in
-  shell.cpp, WIP on agent/qa5, docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop") (qa 2026-10-26,
-  build 4d2f6b0c). Second, simpler repro (same doc, tab Part Studio 3, tickets/qa-1026-ps3-shell-hole.noshape): Sketch 1 =
-  centre rectangle 80 × 50 (dimensioned) + a free Ø~14 circle at about (−20, −10); Extrude 1 the outer region 10 mm;
-  Fillet 1 top face R2; Shell 1 top face 2.5 mm → only the floor, the hole's tube and a stub of the left wall remain
-  (tickets/shell-walls-ps3-iso.png, -front.png); the same studio before the circle was added shelled right (14467.382 mm³)
+- [ ] P0 SHELL-WALLS Shell silently drops a filleted plate's outer walls (status OK, wrong solid). Repro (live's exact
+  case): Sketch 1 on Top = rectangle 80 × 50 + Ø20 circle at its centre; Extrude 1 = the outer region, 10 mm; Fillet 1 =
+  the top face (its 4 outer edges + the hole rim), R2; Shell 1 = remove the top face, 2.5 mm.
+  live (behaviours "qa (2026-10-26, P0 wrong geometry check)", live/qa/qa-p0-shell-*.png): an open box (floor, four
+  full-height walls, a tube around the hole), **2.5 mm 14951.9619 mm³ / 19 faces; 1.5 mm 9609.9491 mm³ / 27 faces**.
+  ours: **2.5 mm 10220.907 mm³: only the floor and the hole's tube, no outer walls**; 1.5 mm 9609.03 mm³, walls there.
+  Variants that also lose the walls: + Chamfer 1 mm on 2 bottom edges + 2 Ø6.35 holes, at 2.5 and at 1.5 mm (10887.66 mm³);
+  a centred 80 × 50 plate with one free Ø~14 hole at (−20, −10) (only a stub of one wall left). Without the fillet, or
+  without the hole, it shells right. Docs: /root/qa-scratch/tickets/qa-1026-ps2-shell.noshape (tab Part Studio 2:
+  suppress Chamfer 1 and the hole for live's case) and qa-1026-ps3-shell-hole.noshape (tab Part Studio 3); shots
+  tickets/shell-fillet-walls-missing-iso.png, -front.png, shell-walls-ps3-iso.png, -front.png. Probably the same root as
+  qa5's P1-16 (fillet offsets collapsing in shell.cpp; WIP on agent/qa5) (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P0 SHELL-SLOW Shell takes seconds: the same plate (+ chamfer, 2 holes), Shell 1 2.5 mm → Shell eval 3354 ms; edit to
   1.5 mm → 8759 ms; without the fillet 2502 ms (NOSHAPE_PERF log; box load ~35, so maybe 2–3× slower than idle); live
   shells such parts in well under a second; ours freezes the preview for seconds (qa 2026-10-26, build 4d2f6b0c)
