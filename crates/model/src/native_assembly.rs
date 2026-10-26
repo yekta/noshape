@@ -446,7 +446,7 @@ pub struct PvzImport {
 /// Assembly tab comes first. `brep` / `info` are the Import feature's data
 /// (the parts in their own coordinates, see `noshape_kernel::read_pvz_parts`).
 pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) -> Result<(TabId, TabId), String> {
-    let PvzImport { stem, root, brep, info, foreign_id, instances, names, step, options } = pvz;
+    let PvzImport { stem, root, brep, info, foreign_id, instances, names: _, step, options } = pvz;
     let (brep, info) = (brep.clone(), info.clone());
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("importForeign", units).ok_or("no Import feature")?;
@@ -463,15 +463,18 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
     let studio_name = unique_name(doc, &format!("{stem} parts"));
     let studio = doc.add_tab(&studio_name, TabContent::PartStudio(ps));
     let mut asm = Assembly::default();
-    let mut count: Vec<u32> = vec![0; names.len()];
+    // Numbered per name, as instance names are (two parts both named
+    // "Part 1" give "Part 1 <1>" and "Part 1 <2>").
+    let mut count: std::collections::HashMap<&str, u32> = std::collections::HashMap::new();
     // The occurrences in the reverse of the file's order (live: pvz-rot-asm's
     // <1> is its second, turned occurrence), as native assemblies.
     for inst in instances.iter().rev() {
         // The part's own solid (mesh parts whose mesh is open are composites: not instanced).
         let Some(body) = bodies.get(inst.part).cloned().flatten() else { continue };
-        count[inst.part] += 1;
+        let n = count.entry(inst.name.as_str()).or_insert(0);
+        *n += 1;
         let id = InstanceId(asm.next_id());
-        asm.instances.push(Instance::new(id, format!("{} <{}>", inst.name, count[inst.part]), InstanceSource::Part { studio, body, config: ConfigValues::default() }, Placement::from_dmat4(&inst.transform)));
+        asm.instances.push(Instance::new(id, format!("{} <{}>", inst.name, n), InstanceSource::Part { studio, body, config: ConfigValues::default() }, Placement::from_dmat4(&inst.transform)));
     }
     let name = if *step { unique_name(doc, if root.is_empty() { stem } else { root }) } else { pvz_assembly_name(doc, root) };
     let assembly = doc.add_tab(&name, TabContent::Assembly(Box::new(asm)));
