@@ -594,7 +594,14 @@ impl<'a> EvalCtx<'a> {
                 let (bi, ei) = *self.resolve_edges(std::slice::from_ref(r)).first()?;
                 let e = self.edge_shape(bi, ei).ok()?;
                 match e.edge_curve().ok()? {
-                    k::Curve::Line { origin, direction } => Some((origin, direction.normalize())),
+                    // The edge's own direction (its curve's), as Parasolid
+                    // gives it, not the sense of the face using it first
+                    // (live oracle_p1: an extruded block's top front edge
+                    // runs +x like its sketch line; patterns follow it).
+                    k::Curve::Line { origin, direction } => {
+                        let d = direction.normalize();
+                        Some((origin, if e.orientation() == k::Orientation::Reversed { -d } else { d }))
+                    }
                     k::Curve::Circle { center, axis, .. } => Some((center, axis.normalize())),
                     _ => {
                         let (a, b) = e.endpoints().ok()?;
