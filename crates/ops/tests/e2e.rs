@@ -3987,8 +3987,8 @@ fn agent_benchmark_p1_fixes() {
     assert_eq!(fi["feature_status"]["status"], "Ok", "{fi}");
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Fillet 1" }));
     let q = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [0, 0, 1], "curve": "line" }));
-    // As query_entities found them (before the fillet): the four corners and the hole's seam.
-    assert_eq!(g["params"]["entities"].as_array().unwrap().len(), 5, "{g} {q}");
+    // The four corners (seams aren't entities).
+    assert_eq!(g["params"]["entities"].as_array().unwrap().len(), 4, "{g} {q}");
     let e = try_call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": { "query": { "kind": "edges", "curve": "ellipse" } }, "radius": "1 mm" } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("params.entities.query"), "{e:?}");
     // A feature pattern from `entities` that are features.
