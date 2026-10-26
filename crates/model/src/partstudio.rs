@@ -260,6 +260,11 @@ pub struct PartStudio {
     /// Hidden default geometry (Origin, Top, Front, Right planes).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_defaults: Vec<Reference>,
+    /// Sketches whose visibility follows their consumers (live "psb (10-25
+    /// l)"): hidden while an unsuppressed feature uses them, until the user
+    /// shows or hides them by hand.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub auto_hidden: Vec<FeatureId>,
     /// Renamed default geometry (Onshape: Rename on Origin / Top / Front / Right).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub default_names: Vec<(Reference, String)>,

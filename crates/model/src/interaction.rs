@@ -146,28 +146,7 @@ pub fn reordered_at(features: &[Feature], moving: &[FeatureId], to: usize, after
     (rest != ids).then_some(rest)
 }
 
-/// Check that a new order keeps every feature after the features whose
-/// geometry it references. Returns the user-facing error of the first
-/// violation. A `#variable` doesn't hold a reorder back (live qa5 pass 8:
-/// the move goes through with no message, and the feature then fails with
-/// "Variable not found, is suppressed, or has not been set.").
-pub fn check_order(features: &[Feature], order: &[FeatureId]) -> Result<(), String> {
-    let pos = |id: FeatureId| order.iter().position(|i| *i == id);
-    let name = |id: FeatureId| features.iter().find(|f| f.id == id).map(|f| f.name.clone()).unwrap_or_default();
-    for (i, f) in features.iter().enumerate() {
-        let Some(p) = pos(f.id) else { continue };
-        let mut ints = HashSet::new();
-        f.params.0.values().for_each(|v| param_refs(v, &mut ints));
-        for dep in features[..i].iter().filter(|u| ints.contains(&u.id.0)).map(|u| u.id) {
-            if pos(dep).is_some_and(|d| d > p) {
-                return Err(format!("Cannot reorder: {} depends on {}.", f.name, name(dep)));
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Apply a validated order to a Part Studio. Folders follow the feature
+/// Apply an order to a Part Studio. Folders follow the feature
 /// dropped next to (a moved feature joins the folder of its new upper
 /// neighbor only if its lower neighbor is in the same folder).
 pub fn apply_order(ps: &mut PartStudio, order: &[FeatureId]) {
@@ -807,22 +786,12 @@ mod tests {
         // Moving Sketch 2 to the top is fine.
         let order = reordered(&ps.features, &[FeatureId(1005)], 0).unwrap();
         assert_eq!(order[0], FeatureId(1005));
-        assert!(check_order(&ps.features, &order).is_ok());
-        // Moving Extrude 1 above its sketch is refused with a message.
-        let order = reordered(&ps.features, &[FeatureId(1003)], 0).unwrap();
-        let err = check_order(&ps.features, &order).unwrap_err();
-        assert!(err.contains("Extrude 1") && err.contains("Sketch 1"), "{err}");
-        // Moving Sketch 1 below the extrude breaks the extrude.
+        // Moving Sketch 1 below the extrude (live: done all the same).
         let order = reordered(&ps.features, &[FeatureId(1001)], 4).unwrap();
         assert_eq!(order.last(), Some(&FeatureId(1001)));
-        assert!(check_order(&ps.features, &order).is_err());
         // Several features move together and keep their relative order.
         let order = reordered(&ps.features, &[FeatureId(1004), FeatureId(1003)], 4).unwrap();
         assert_eq!(&order[2..], &[FeatureId(1005), FeatureId(1003), FeatureId(1004)]);
-        assert!(check_order(&ps.features, &order).is_ok());
-        // A Variable moves below the feature using it (live qa5 pass 8).
-        let order = reordered(&ps.features, &[FeatureId(1002)], 4).unwrap();
-        assert!(check_order(&ps.features, &order).is_ok());
         // Live F33: the cursor's half of the hovered row decides, either way.
         assert_eq!(reordered_at(&ps.features, &[FeatureId(1001)], 3, false).unwrap()[2], FeatureId(1001), "down, upper half: before");
         assert_eq!(reordered_at(&ps.features, &[FeatureId(1001)], 3, true).unwrap()[3], FeatureId(1001), "down, lower half: after");

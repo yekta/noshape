@@ -257,6 +257,10 @@ using SlabBlend = std::function<bool(const TopoDS_Shape& slab, const std::vector
 bool blend_in_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Edge>& edges, double reach, const SlabBlend& blend,
                     TopoDS_Shape& out, occ::handle<BRepTools_History>& hist);
 
+// An OCCT seam: closes every face it bounds (`faces`, its ancestors) on
+// itself; Parasolid has no such edge (common.cpp shown_topology).
+bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces);
+
 // Convenience: build OpOut from args + output + optional history.
 OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out,
                   const BRepTools_History* h);

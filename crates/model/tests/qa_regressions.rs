@@ -405,3 +405,21 @@ fn move_face_beside_tangent_fillets_moves_one_face() {
         assert_eq!(body.faces.len(), n_faces, "{what}: faces");
     }
 }
+
+/// REORDER-INVALID (live qa4 round 5 v3 s8): an extrude moved above its
+/// sketch is moved all the same and fails on its missing region, "Select
+/// face or sketch region to extrude." with "1 missing selection".
+#[test]
+fn extrude_moved_above_its_sketch_fails_on_the_missing_region() {
+    let mut t = T::new();
+    let (s, x) = t.block();
+    assert_eq!(t.status(x).0, FeatureStatus::Ok);
+    let order = noshape_model::interaction::reordered(&t.ps.features, &[x], 0).unwrap();
+    assert_eq!(order[..2], [x, s]);
+    noshape_model::interaction::apply_order(&mut t.ps, &order);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|f| f.id == x).unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Select face or sketch region to extrude.")));
+    assert_eq!(st.missing, 1);
+    assert!(r.context.bodies.is_empty());
+}
