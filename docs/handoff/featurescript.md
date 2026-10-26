@@ -897,3 +897,14 @@ other's (HOLD_GAP). Dev build (our crates at opt-level 1), block + boss: Extrude
 the module and its imports): Extrude ~170 ms, Hole ~460 ms more (holetables.gen.fs is 2.1 MB, ~150 ms of it lexing).
 `std_feature::prewarm()` loads every STD_EDITING_LOGIC feature on a background thread; loading runs outside the
 FEATURES lock (`loaded`), so a dialog never waits on another feature's load.
+
+**Line and plane origins (26 Oct, oracle_p1 batch 10 + "qa5 bracket"):** a line edge has its curve's direction, not
+the sense of whichever face's use of it the body map stored (live: the block's front top edge runs +x, the bracket's
+back edge (80,50)→(0,50) runs −x and live's own pattern along it needed Opposite direction). evLine / evAxis of a line
+edge start at its middle (P4: (30, 0, 20) mm; host query.rs `edge_line`, regen eval.rs `raw_axis` and cplane.rs
+`ev_axis`), and the native Plane's evPlane of a face takes the middle of the face's parameter box (as the host's
+evPlane; P2's mid plane at (30, 20, 10)). Known: P6, live's tangent plane sits at the cylinder's origin z 20 (the
+extrude's end?), ours z 0; asked of live (REQUESTS fs 10-26 b, with more evLine cases). A Feature pattern whose
+instances all miss the part fails "Could not create all instances as entered. Try selecting "Reapply features"
+option." (fullFeaturePattern), a face pattern "Pattern could not be created on the same part." (pattern.rs
+`apply_tools`; test `feature_pattern_off_the_part_as_live`).

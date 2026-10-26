@@ -689,9 +689,13 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
             _ => false,
         };
         // Live L42: a face pattern fails on any instance off the part; L40:
-        // a Feature pattern skips one and fails when all are off.
-        if (strict && tools.iter().any(off)) || (!tools.is_empty() && tools.iter().all(off)) {
+        // a Feature pattern skips one and fails when all are off, asking for
+        // Reapply features (live "qa5 bracket" †; std patternUtils).
+        if strict && tools.iter().any(off) {
             return err(NOT_ON_BODY);
+        }
+        if !tools.is_empty() && tools.iter().all(off) {
+            return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
         }
     }
     if add {
