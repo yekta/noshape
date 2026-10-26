@@ -76,6 +76,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Top at z 0 under a 40×30×20 block, default direction): ours "No target parts selected for hole."; live "None of the holes
   intersected a part." with Merge scope flagged (behaviours L56/L57 and "H1 flipped"); live keeps "No target parts…" for
   a cleared scope only (qa 2026-10-26, v0.4.8 + main CLI)
+- [ ] P2 PATTERN-REAPPLY-CUT-ONLY Feature pattern with ☑ Reapply features of a Remove extrude alone (its sketch not in
+  the pattern; 40×30×10 block, Ø6 cut through all at x 10 drawn on the top face, direction = a bottom edge, 15 mm, count 4):
+  ours moves the cut to each instance (3 holes, 706.858 mm³ removed, OK); live L40 (behaviours ~8484): the reapplied cut
+  resolves its region on the unpatterned sketch, so every instance re-cuts the original hole → **INFO, no geometry
+  change** (with Reapply off ours = live: OK, copies moved, the off-part copy silently does nothing). Check against psb's
+  f202f693 / FSW-pattern (qa 2026-10-26, main CLI ~20:18)
 - [ ] P1 Extrude add 308 ms (std logic 55 ms, ~250 ms in ops' add path regens): target ≤ 150 ms (PLAN 2.6).
 
 ## Part Studio UI (psui)
