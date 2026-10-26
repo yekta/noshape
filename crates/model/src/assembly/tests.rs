@@ -2282,7 +2282,8 @@ fn flexible_subassembly_moves_in_parent_and_locks() {
     let sub = Assembly {
         instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.015), false)],
         mates: vec![mate(10, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid))],
-        named_positions: vec![NamedPosition { name: "Up".into(), placements: vec![], mate_values: vec![(MateId(10), [0.0, 0.0, 0.0, 0.03])] }],
+        // Mate values in live's sense: 30 mm up reads -30 mm.
+        named_positions: vec![NamedPosition { name: "Up".into(), placements: vec![], mate_values: vec![(MateId(10), [0.0, 0.0, 0.0, -0.03])] }],
         ..Default::default()
     };
     let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));
