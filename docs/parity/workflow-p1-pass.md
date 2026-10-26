@@ -85,3 +85,5 @@ then edits, undo/redo, rollback and suppress.
 | Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ |
 | n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? |
 | View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |
+| Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ |
+| Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ |
