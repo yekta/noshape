@@ -8,12 +8,13 @@ OCCT_TAG="${OCCT_TAG:-V8_0_1}"
 PREFIX="${1:-$HOME/.cache/noshape/occt-${OCCT_TAG}}"
 WORK="${OCCT_WORK:-$HOME/.cache/noshape/occt-build-${OCCT_TAG}}"
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$WORK"
 cd "$WORK"
 SRC="OCCT-${OCCT_TAG#V}"
 # noshape's patches to OCCT (patches/occt/*.patch, applied in name order to a
 # fresh source tree; the marker re-extracts it when the patch set changes).
-PATCHES="$(cd "$(dirname "$0")/.." && pwd)/patches/occt"
+PATCHES="$ROOT/patches/occt"
 PATCH_SET="$(cat "$PATCHES"/*.patch 2>/dev/null | cksum | cut -d' ' -f1)"
 if [ -d "$SRC" ] && [ "$(cat "$SRC/.noshape-patches" 2>/dev/null)" != "$PATCH_SET" ]; then
   rm -rf "$SRC" build

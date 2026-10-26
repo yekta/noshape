@@ -366,6 +366,12 @@ impl DrawingEditor {
     /// ↓ step, pale orange "Must be a number" when invalid), the unit as a
     /// label beside; texts 160 px.
     fn wt_field(&self, i: usize, ed: &Entity<Self>) -> AnyElement {
+        self.wt_field_w(i, ed, 169.)
+    }
+
+    /// [`Self::wt_field`] with a spinbox `spin_w` px wide (live's spinboxes
+    /// fill their table column).
+    fn wt_field_w(&self, i: usize, ed: &Entity<Self>, spin_w: f32) -> AnyElement {
         use crate::drawing_wt::{INVALID_BG, INVALID_TIP, show, show_dec, spin_step};
         let Some(f) = self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) else { return div().into_any_element() };
         // Show `v` (display units) in the field and apply it.
@@ -435,7 +441,7 @@ impl DrawingEditor {
                 let (step_up, step_dn) = (step.clone(), step.clone());
                 let boxed = div()
                     .id(SharedString::from(format!("dp-wt-spin-{i}")))
-                    .w(px(169.))
+                    .w(px(spin_w))
                     .relative()
                     .when(invalid, |d| d.bg(gpui_kit::rgba(INVALID_BG)).tooltip(crate::ui::tooltip(INVALID_TIP)))
                     .capture_action(move |_: &gpui_kit::component::input::MoveUp, window, cx| {
@@ -563,7 +569,7 @@ impl DrawingEditor {
         // centre (3 px of margin under it); group headers 30 px `#efefef`
         // with a `#ddd` rule, 500 #333, 8 px above their first row and 4 px
         // below the previous group's last one.
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).flex_none().pl(px(13.)).pr(px(11.)).child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().mb(px(3.)).child(body)).into_any_element();
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).flex_none().pl(px(13.)).pr(px(10.)).child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().mb(px(3.)).child(body)).into_any_element();
         // A table row (live 1710's Dimensions tab): each group lays its
         // controls out from its own column `col` (px from the panel's
         // border), the row `h` high, the control `top` px down, the label
@@ -713,6 +719,7 @@ impl DrawingEditor {
             // Annotations, in Onshape's groups: All annotations (Arrowhead),
             // then each type's font, text height and color with its extras.
             let field = |i: usize| self.wt_field(i, &ed);
+            let field_w = |i: usize, w: f32| self.wt_field_w(i, &ed, w);
             let arrow_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL
                 .iter()
                 .map(|&t| (t.name().to_string(), t == props.ann_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.ann_arrow_type = t) as Act))
@@ -729,12 +736,27 @@ impl DrawingEditor {
             }
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Annotations"))
+                // Live 1710: column 111, a 32 px row with the field 1 px down.
                 .child(section("All annotations"))
-                .child(row("Arrowhead", h_flex().gap(px(4.)).child(field(1)).child(select("dp-aarrow", props.ann_arrow_type.name().into(), arrow_items)).into_any_element()));
+                .child(trow("Arrowhead", 111., 32., 1., h_flex().items_start().child(field(1)).child(div().ml(px(10.)).mt(px(1.)).child(asel("dp-aarrow", props.ann_arrow_type, arrow_items))).into_any_element()));
             for (i, t) in AnnType::ALL.iter().copied().enumerate() {
                 let ts = props.ann_type(t);
                 let ids = TYPE_IDS[i];
-                let color = row("Color", swatch(ids[3], ts.color, std::rc::Rc::new(move |p: &mut DrawingProps, c| p.ann_type_mut(t).color = c)));
+                // Live 1710: Notes, Flag notes and Callouts as tables from
+                // their columns (108 / 114 / 123 px; selects 1 px further, up
+                // to 343); the groups below live's capture keep plain rows.
+                let col = match t {
+                    AnnType::Notes => Some(108.),
+                    AnnType::FlagNotes => Some(114.),
+                    AnnType::Callouts => Some(123.),
+                    _ => None,
+                };
+                let lay = |label: &'static str, select: bool, h: f32, top: f32, body: AnyElement| match col {
+                    Some(c) => trow(label, if select { c + 1. } else { c }, h, top, body),
+                    None => row(label, body),
+                };
+                let sel_w = col.map_or(164., |c| 343. - c);
+                let color = lay("Color", false, 31., 0., swatch(ids[3], ts.color, std::rc::Rc::new(move |p: &mut DrawingProps, c| p.ann_type_mut(t).color = c)));
                 body = body.child(section(t.name()));
                 if t == AnnType::WeldSymbols {
                     // The weld standard (separate from the drawing's; it
@@ -743,13 +765,13 @@ impl DrawingEditor {
                     let items: Vec<(String, bool, Act)> = [("ANSI", true), ("ISO", false)].iter().map(|&(n, v)| (n.to_string(), ansi == v, std::rc::Rc::new(move |p: &mut DrawingProps| p.weld_ansi = Some(v)) as Act)).collect();
                     body = body.child(row("Standard", select("dp-weld-std", if ansi { "ANSI".into() } else { "ISO".into() }, items)));
                 }
-                body = body.child(row("Font", font_row(FontOf::Type(t), ts.font.clone(), 164.)));
+                body = body.child(lay("Font", true, if t == AnnType::FlagNotes { 33. } else { 32. }, 2., font_row(FontOf::Type(t), ts.font.clone(), sel_w)));
                 if t == AnnType::FlagNotes {
                     let shapes = choices(&noshape_model::drawing::note::FlagShape::ALL, props.flag_shape, |s| s.name(), |p, v| p.flag_shape = v);
-                    body = body.child(row("Border shape", select("dp-flag-shape", props.flag_shape.name().into(), shapes))).child(color);
+                    body = body.child(lay("Border shape", true, 34., 2., sel("dp-flag-shape", props.flag_shape.name().into(), shapes, sel_w))).child(color);
                     continue;
                 }
-                body = body.child(row("Text height", field(2 + i)));
+                body = body.child(lay("Text height", false, 32., 2., field(2 + i)));
                 if t == AnnType::Datums {
                     body = body.child(row("Datum size", field(2 + AnnType::ALL.len())));
                 }
@@ -764,11 +786,12 @@ impl DrawingEditor {
                         let just = choices(&TextJustify::ALL, props.callout_justify, |j| j.name(), |p, v| p.callout_justify = v);
                         let stack = choices(&StackDirection::ALL, props.callout_stack, |d| d.name(), |p, v| p.callout_stack = v);
                         body = body
-                            .child(row("Text justification", select("dp-co-just", props.callout_justify.name().into(), just)))
-                            .child(row("Stack direction", select("dp-co-stack", props.callout_stack.name().into(), stack)))
-                            .child(row("Stack gap size", field(4 + AnnType::ALL.len())))
+                            .child(lay("Text justification", true, 33., 2., sel("dp-co-just", props.callout_justify.name().into(), just, sel_w)))
+                            .child(lay("Stack direction", true, 32., 2., sel("dp-co-stack", props.callout_stack.name().into(), stack, sel_w)))
+                            .child(lay("Stack gap size", false, 33., 2., field_w(4 + AnnType::ALL.len(), 192.)))
+                            // Live: column 141, a 174 px spinbox 1 px down.
                             .child(section("Center of mass"))
-                            .child(row("Diameter size", field(3 + AnnType::ALL.len())));
+                            .child(trow("Diameter size", 141., 32., 1., field_w(3 + AnnType::ALL.len(), 174.)));
                     }
                     AnnType::Datums => {
                         use noshape_model::drawing::hatch_pat::{GROUPS, display_order, pattern};
@@ -994,8 +1017,12 @@ impl DrawingEditor {
                 .bottom_0()
                 .w(px(370.))
                 .bg(gpui_kit::rgb(0xfafafa))
+                // Live 1710: a #d1d1d1 line at the left, #dbdbdb at the right
+                // (drawn in the 1 px right padding).
                 .border_l_1()
-                .border_color(pal.border)
+                .border_color(gpui_kit::rgb(0xd1d1d1))
+                .pr(px(1.))
+                .child(div().absolute().top_0().bottom_0().right_0().w(px(1.)).bg(gpui_kit::rgb(0xdbdbdb)))
                 .text_color(pal.text)
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -1067,14 +1094,14 @@ impl DrawingEditor {
             .border_color(gpui_kit::rgb(0xdddddd))
             // Live drawing/160, 1710: an input-like row 4 px under the rule
             // (13.33 px italic, its ink 15 px in, a #ddd underline up to the
-            // 26 px DWT button 8 px from the edge), then a 41 px row with the
+            // 26 px DWT button 8 px from the panel's edge), then a 41 px row with the
             // 12 px Lock checkbox 9 px in, a 12 px label and a grey help icon
             // at the right.
             .child(
                 h_flex()
                     .h(px(30.))
                     .pt(px(4.))
-                    .pr(px(8.))
+                    .pr(px(7.))
                     .gap(px(19.))
                     .child(div().flex_1().h(px(26.)).pl(px(14.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template…"))
                     .child(dwt),
@@ -1084,7 +1111,7 @@ impl DrawingEditor {
                     .h(px(41.))
                     .pb(px(4.))
                     .pl(px(9.))
-                    .pr(px(10.))
+                    .pr(px(9.))
                     .child(div().flex_1().text_size(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("dp-lock").native().label("Lock drawing properties").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
                         let v = *v;
                         this.set_drawing_prop(&move |p| p.locked = v, cx)

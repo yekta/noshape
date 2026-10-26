@@ -2921,12 +2921,9 @@ impl PartStudioView {
             },
         };
         let current: Vec<FeatureId> = studio.features.iter().map(|f| f.id).collect();
+        // Live (qa4 round 5 v3 s8, REORDER-INVALID): a move above a
+        // dependency is done; the feature then fails on its missing selection.
         let order = to.and_then(|to| interaction::reordered_at(&studio.features, &moving, to, after)).unwrap_or(current);
-        if let Err(msg) = interaction::check_order(&studio.features, &order) {
-            self.message = Some((FeatureStatus::Error, msg));
-            cx.notify();
-            return;
-        }
         let n = moving.len();
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, if n == 1 { "Reorder feature" } else { "Reorder features" }, cx, |ps| {

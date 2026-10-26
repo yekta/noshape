@@ -946,7 +946,7 @@ Examples:
 
 Move features to another place in the list (edits the document (one undoable history entry)).
 
-Like dragging rows in the feature list: refused when a feature would move above something it depends on.
+Like dragging rows in the feature list: a feature moved above something it depends on moves all the same and then fails on its missing selection (as Onshape).
 
 Examples:
 
@@ -4825,7 +4825,7 @@ Examples:
 
 The window's selection: select, clear, Select ▸ related entities, Select other…, same configuration.
 
-What is selected in a Part Studio, Assembly or Drawing window (per tab; `get` reads it). Part Studios: `set` / `add` / `remove` entity ids (query_entities: parts, faces, edges, vertices, sketches, planes), `clear` (Clear selection), `related` (the context menu's Select ▸ item `criterion` grown from the first of `refs`; Bounded faces stops at the other `refs`, which stay selected), `create_selection` (Create selection…: the same from the `refs` (its Selection field), with `patterns` (Include patterns) the pattern instances too, then Add selection: added to the selection), `select_other` (Select other…: the faces under graphics-area point `at` [x, y] through the window's camera (view_camera), nearest first; `index` picks one, else the list is returned). Assemblies: `set` / `add` / `remove` instances (ids or names), `clear`, `same_configuration` (Select instances with same configuration as the first of `refs`; `same_part` for same part and same configuration). Drawings: `clear`. With the app open the window selects the same.
+What is selected in a Part Studio, Assembly or Drawing window (per tab; `get` reads it). Part Studios: `set` / `add` / `remove` entity ids (query_entities: parts, faces, edges, vertices, sketches, planes), `clear` (Clear selection), `related` (the context menu's Select ▸ item `criterion` grown from the first of `refs`; Bounded faces stops at the other `refs`, which stay selected), `create_selection` (Create selection…: the same from the `refs` (its Selection field), with `patterns` (Include patterns) the pattern instances too, then Add selection: added to the selection), `select_other` (Select other…: the faces under graphics-area point `at` [x, y] through the window's camera (view_camera), nearest first; `index` picks one, else the list is returned; in an assembly the instances). Assemblies: `set` / `add` / `remove` instances (ids or names), `clear`, `same_configuration` (Select instances with same configuration as the first of `refs`; `same_part` for same part and same configuration). Drawings: `clear`. With the app open the window selects the same.
 
 Examples:
 

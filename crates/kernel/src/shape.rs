@@ -274,6 +274,16 @@ impl Shape {
         Ok(self.ancestor_map(ShapeType::Vertex, ShapeType::Edge)?.to_vecs())
     }
 
+    /// Which edges and vertices Onshape's (Parasolid's) topology has, in
+    /// MapShapes order: OCCT's seams and degenerated edges aren't edges there,
+    /// and a vertex is one only if it ends a shown open edge, has no edge, or
+    /// is a cone's apex (a cylinder has 3 faces, 2 edges and no vertex).
+    pub fn shown_topology(&self) -> Result<ShownTopology> {
+        let flags = ck(ffi::shown_topology(self.raw()))?;
+        let ne = self.count(ShapeType::Edge);
+        Ok(ShownTopology { edges: flags[..ne].iter().map(|&f| f != 0).collect(), vertices: flags[ne..].iter().map(|&f| f != 0).collect() })
+    }
+
     /// Faces sharing at least one edge with face `face_index`.
     pub fn adjacent_faces(&self, face_index: usize) -> Result<Vec<usize>> {
         let i = u32::try_from(face_index).map_err(|_| KernelError::invalid("index out of range"))?;
@@ -330,6 +340,14 @@ impl Shape {
     pub fn dump(&self) -> String {
         ffi::dump_shape(self.raw()).unwrap_or_default()
     }
+}
+
+/// [`Shape::shown_topology`]: per edge and per vertex (MapShapes order),
+/// whether Onshape's topology has it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShownTopology {
+    pub edges: Vec<bool>,
+    pub vertices: Vec<bool>,
 }
 
 impl Default for Shape {

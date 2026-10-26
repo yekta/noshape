@@ -184,11 +184,12 @@ fn tessellation_sanity() {
         let l = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
         assert!((l - 1.0).abs() < 1e-3, "normal length {l}");
     }
-    for (i, e) in s.edges().iter().enumerate() {
-        if !e.edge_info().unwrap().degenerated {
-            assert!(t.edge_polyline(i).len() >= 2, "edge {i} has empty polyline");
-        }
+    // Onshape's edges are drawn; the cylinder's seam isn't.
+    let shown = s.shown_topology().unwrap();
+    for i in 0..s.edges().len() {
+        assert_eq!(t.edge_polyline(i).len() >= 2, shown.edges[i], "edge {i}");
     }
+    assert_eq!(shown.edges.iter().filter(|&&e| !e).count(), 1);
     // Normals point outward: for the bottom face (z=0) normal is -Z.
     let bottom = s.faces().iter().position(|f| f.centroid().unwrap().z.abs() < 1e-9).unwrap();
     let r = t.faces[bottom];

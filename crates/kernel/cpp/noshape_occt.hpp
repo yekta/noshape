@@ -177,6 +177,7 @@ std::unique_ptr<OcShapeList> sub_shapes(const OcShape& s, uint8_t kind);
 int64_t                      index_of(const OcShape& s, const OcShape& sub, uint8_t kind);
 Csr                          ancestor_map(const OcShape& s, uint8_t kind, uint8_t ancestor_kind);
 rust::Vec<uint32_t>          adjacent_faces(const OcShape& s, uint32_t face_index);
+rust::Vec<uint8_t>           shown_topology(const OcShape& s);
 std::unique_ptr<OcShapeList> children(const OcShape& s);
 std::unique_ptr<OcShape>     make_compound(const OcShapeList& l);
 std::unique_ptr<OcShapeList> list_new();

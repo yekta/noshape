@@ -737,3 +737,6 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 - **P1-13 — psb (pattern copies' appearance)** — Circular pattern (Part pattern) copies take **new palette colours** (seed
   navy, copies grey / light blue / orange). Live: the copies **keep the seed's colour** (rgb(165,165,165) ×3, behaviours
   "qa5 (10-25 p3)"), as Transform copies do (behaviours 7252).
+- STATUS 2026-10-26 (qa5, green 62524c30): P1-4 fixed in the UI (no point at the origin; Hole ignores the stand-in). Minor for
+  skb: the sketch data keeps a hidden construction "Origin stand-in" point at (0,0) that the constraints use; live has no entity
+  and constrains to the external Origin, so agent/API reads (sketch_get) still differ.
