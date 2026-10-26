@@ -4058,6 +4058,37 @@ fn asme_socket_head_cap_screw_matches_live() {
     assert_eq!(c.size("#0-80").unwrap().values.get("Drive type").map(Vec::as_slice), Some(&["Hex".to_string()][..]));
 }
 
+/// ASME socket button and countersunk head cap screws against live's B-rep
+/// and mass properties (dom/skb-sc-geom, behaviours "skb (10-26) ASME socket
+/// button / countersunk heads"). Button: a sphere through the rim on top of
+/// the HEAD_SIDE_HEIGHT cylinder, cut flat HEAD_DIAMETER / 2 across at the
+/// head height; countersunk: an 82 degree cone tangent to the under-head
+/// torus, its socket ending in a 140 degree drill point (the button's: 120).
+/// Both end the bearing face at FILLET_TRANSITION_DIAMETER in a torus of
+/// radius (FILLET_TRANSITION_DIAMETER - d) / 2.
+#[test]
+fn asme_socket_button_and_countersunk_screws_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for (name, faces, cases) in [
+        ("Socket button head cap screw", 21, [("#4-40", "0.5", 174.1654, 103.7091), ("1/4-20", "1", 777.9013, 1006.6053), ("1/2-13", "1.5", 2611.3755, 6423.2130)]),
+        ("Socket countersunk head cap screw", 20, [("#4-40", "0.5", 166.5982, 97.2179), ("1/4-20", "1", 759.1454, 936.6143), ("1/2-13", "1.5", 2328.2045, 5392.5206)]),
+    ] {
+        let c = CATALOGUE.iter().find(|c| c.name == name && c.inch).unwrap();
+        for (size, length, area, volume) in cases {
+            let mut spec = StandardSpec::new(c);
+            spec.set_size(size);
+            spec.length = Some(length.into());
+            let r = standard::regenerate(&spec).unwrap();
+            let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+            assert_eq!(b.faces.len(), faces, "{name} {size}");
+            let total: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap() * 1e6).sum();
+            let v = b.shape.volume().unwrap() * 1e9;
+            assert!((total - area).abs() < area * 1e-6, "{name} {size}: {total} mm²");
+            assert!((v - volume).abs() < volume * 1e-6, "{name} {size}: {v} mm³");
+        }
+    }
+}
+
 /// ISO 7380 socket button head M6 x 20 against live's B-rep (dom/skb-sc-geom
 /// M6x20, behaviours "skb (10-25) ISO 7380 dome"): 20 faces; the dome is a
 /// sphere through the rim, cut flat at the head height (top plane out to
