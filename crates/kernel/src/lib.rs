@@ -21,6 +21,14 @@
 #[allow(dead_code)]
 mod ffi;
 
+/// noshape's version as files and the agent API report it: the release
+/// tag the release workflow stamps (`NOSHAPE_VERSION`, "0.4.8"), else the
+/// crate's (dev builds); the app shows the same (qa VERSION-0.4.6).
+pub const VERSION: &str = match option_env!("NOSHAPE_VERSION") {
+    Some(v) => v,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
 pub mod boolean;
 pub mod construct;
 pub mod error;

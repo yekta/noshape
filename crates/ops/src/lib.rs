@@ -7,6 +7,8 @@
 //! (the document [`session`], [`derived`] part providers) lives here and the
 //! app re-exports it. See `docs/AGENT_API.md`.
 
+pub use noshape_kernel::VERSION;
+
 pub mod analysis;
 pub mod analysis_tools;
 pub mod appearance;

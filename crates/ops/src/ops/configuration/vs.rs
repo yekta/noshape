@@ -129,6 +129,11 @@ pub(super) fn list(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::OpOutput,
 
 pub(super) fn add_input(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
+    // Live: the panel offers no Configure while the studio is inserted
+    // into all Part Studios and Assemblies.
+    if studio(od, tab).insert_into_all {
+        return Err(OpError::invalid("This Variable Studio is automatically referenced in this workspace. To add configurations, first disable the \"Insert into all Part Studios and Assemblies\" option (variable_studio_settings). This may affect regeneration.").with_param("tab"));
+    }
     let units = od.doc().settings.units;
     let kind = a.str("kind")?;
     let name = a.opt_str("name")?.map(|n| n.trim().trim_start_matches('#').to_string()).filter(|n| !n.is_empty());

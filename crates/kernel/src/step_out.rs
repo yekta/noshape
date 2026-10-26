@@ -847,7 +847,7 @@ fn header(file_name: &str, timestamp: &str, schema: Schema) -> String {
         "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(\n/* description */ {},\n/* implementation_level */ '2;1');\n\nFILE_NAME(\n{}\n/* time_stamp */ '{timestamp}',\n/* author */ (''),\n/* organization */ (''),\n/* preprocessor_version */ 'NOSHAPE',\n/* originating_system */ 'NOSHAPE {}',\n/* authorisation */ '  ');\n\nFILE_SCHEMA (('{}'));\nENDSEC;\n\nDATA;\n",
         schema.description(),
         header_str("/* name */ ", file_name, ","),
-        env!("CARGO_PKG_VERSION"),
+        crate::VERSION,
         schema.file_schema(),
     )
 }

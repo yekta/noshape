@@ -206,6 +206,27 @@ pub fn run(ctx: &mut Ctx, op: &'static Op, args: &Value) -> Result<OpOutput, OpE
     let empty = json!({});
     let args = if args.is_null() { &empty } else { args };
     let Some(obj) = args.as_object() else { return Err(OpError::invalid("arguments must be a JSON object")) };
+    // One item for a list field under its singular name (`instance` for
+    // `instances`, `part` for `parts`): what agents try first.
+    let plural = |k: &str| -> Option<&'static str> {
+        let f = op.fields.iter().find(|f| f.name.strip_suffix('s') == Some(k) && f.schema.get("type").and_then(Value::as_str) == Some("array"))?;
+        (!op.fields.iter().any(|g| g.name == k)).then_some(f.name)
+    };
+    let widened;
+    let (args, obj) = if obj.keys().any(|k| plural(k).is_some_and(|p| !obj.contains_key(p))) {
+        let mut o = obj.clone();
+        for k in obj.keys() {
+            if let Some(p) = plural(k).filter(|p| !obj.contains_key(*p))
+                && let Some(v) = o.remove(k)
+            {
+                o.insert(p.to_string(), Value::Array(vec![v]));
+            }
+        }
+        widened = Value::Object(o);
+        (&widened, widened.as_object().expect("object"))
+    } else {
+        (args, obj)
+    };
     for k in obj.keys() {
         if !op.fields.iter().any(|f| f.name == k) {
             let known: Vec<&str> = op.fields.iter().map(|f| f.name).collect();

@@ -266,7 +266,7 @@ pub fn write_iges(path: &Path, shapes: &[Shape], unit: LengthUnit) -> Result<()>
     let f = unit.mm_per_unit();
     let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
-    ck(ffi::write_iges(&l, path_str(path)?, "NOSHAPE", env!("CARGO_PKG_VERSION")))
+    ck(ffi::write_iges(&l, path_str(path)?, "NOSHAPE", crate::VERSION))
 }
 
 /// The Parasolid versions the Export dialog offers, newest first (Onshape's
@@ -287,7 +287,7 @@ pub fn write_parasolid_version(path: &Path, shapes: &[Shape], unit: LengthUnit, 
     let f = unit.mm_per_unit() * 1e-3;
     let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
-    ck(ffi::write_parasolid(&l, path_str(path)?, binary, version, concat!("noshape ", env!("CARGO_PKG_VERSION"))))
+    ck(ffi::write_parasolid(&l, path_str(path)?, binary, version, &format!("noshape {}", crate::VERSION)))
 }
 
 /// Write shapes to an ACIS save file (.sat, version 7.0), one body each, in

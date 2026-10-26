@@ -11,7 +11,7 @@
 use crate::error::OpError;
 use crate::refs;
 use noshape_model::document::Document;
-use noshape_model::params::{NumKind, ParamKind, ParamSpec, ParamValue, ParamValues, QueryFilter, fill_defaults};
+use noshape_model::params::{Hints, NumKind, ParamKind, ParamSpec, ParamValue, ParamValues, QueryFilter, fill_defaults};
 use noshape_units::{ExprValue, UnitPrefs};
 use serde_json::{Value, json};
 
@@ -24,10 +24,28 @@ fn spec<'a>(specs: &'a [ParamSpec], id: &str) -> Option<&'a ParamSpec> {
 pub fn apply(specs: &[ParamSpec], values: &mut ParamValues, params: &serde_json::Map<String, Value>, units: &UnitPrefs, doc: &Document) -> Result<(), OpError> {
     for (k, v) in params {
         let Some(s) = spec(specs, k) else {
+            // Stored values the schema no longer lists (feature_get shows
+            // them) pass back unchanged.
+            if values.get(k).is_some_and(|cur| to_json(None, cur) == *v) {
+                continue;
+            }
             let known: Vec<&str> = specs.iter().filter(|s| !matches!(s.kind, ParamKind::Sketch)).map(|s| s.id).collect();
             return Err(OpError::param(k, &format!("unknown parameter; this feature's parameters are: {}", known.join(", "))));
         };
         let pv = from_json(s, v, units, doc).map_err(|e| e.under(k).with_param_if_none(k))?;
+        // Changing a legacy parameter the dialog never shows, beside the one
+        // it does (Hole `style` / `styleV2`), would be ignored: say which to
+        // use (its current value, as feature_get lists it, passes).
+        let same = match (values.get(s.id), &pv) {
+            (Some(ParamValue::Expr(a)), ParamValue::Expr(b)) => a.text == b.text,
+            (cur, new) => cur == Some(new),
+        };
+        if !same
+            && s.hints.has(Hints::ALWAYS_HIDDEN)
+            && let Some(o) = specs.iter().find(|o| o.id != s.id && o.label == s.label && !o.hints.has(Hints::ALWAYS_HIDDEN))
+        {
+            return Err(OpError::param(k, &format!("a legacy parameter the dialog doesn't show (it would be ignored); use `{}`", o.id)));
+        }
         values.set(s.id, pv);
     }
     fill_defaults(specs, values, units);

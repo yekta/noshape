@@ -55,7 +55,7 @@ pub fn handle(ctx: &mut Ctx, msg: &Value, all_tools: bool) -> Option<Value> {
             Ok(json!({
                 "protocolVersion": version,
                 "capabilities": { "tools": { "listChanged": false } },
-                "serverInfo": { "name": "noshape", "title": "noshape CAD", "version": env!("CARGO_PKG_VERSION") },
+                "serverInfo": { "name": "noshape", "title": "noshape CAD", "version": noshape_ops::VERSION },
                 "instructions": if all_tools { INSTRUCTIONS.replace(LISTED_NOTE, ALL_NOTE) } else { INSTRUCTIONS.to_string() },
             }))
         }

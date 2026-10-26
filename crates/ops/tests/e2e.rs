@@ -584,6 +584,11 @@ fn variable_studio_configurations() {
     call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "#w" } }));
     let vol = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({}))["parts"][0]["volume"]);
     assert!((vol(&mut ctx) - 1000.0).abs() < 1e-6);
+    // Inserted into all: no configurations until that is unticked (live).
+    let e = try_call(&mut ctx, "config_add_input", json!({ "tab": vs, "kind": "list" })).unwrap_err();
+    assert!(e.message.contains("Insert into all"), "{e:?}");
+    call(&mut ctx, "variable_studio_settings", json!({ "tab": vs, "insert_into_all": false }));
+    call(&mut ctx, "variable_insert_studio", json!({ "studio": vs }));
     let i = call(&mut ctx, "config_add_input", json!({ "tab": vs, "kind": "list" }));
     assert!(i["input"].as_str().unwrap().starts_with("List_"), "{i}");
     assert_eq!(i["configuration"]["inputs"][0]["name"], "Configuration", "{i}");
@@ -669,6 +674,11 @@ fn hole_standard_sets_the_table_sizes() {
     call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "holeDiameterV3": "5.2 mm" } }));
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
     assert_eq!(g["params"]["holeDiameterV3"], "5.2 mm", "{g}");
+    // The legacy `style` (hidden, ignored) points to `styleV2` (qa API-HOLE-STYLE);
+    // feature_get's own values pass back unchanged.
+    let e = try_call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "style": "C_BORE" } })).unwrap_err();
+    assert!(e.param.as_deref() == Some("params.style") && e.message.contains("styleV2"), "{e:?}");
+    call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": g["params"].clone() }));
 }
 
 /// drawing_get lists the silhouettes of curved faces with the model edges,

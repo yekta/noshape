@@ -59,14 +59,17 @@ fn options_mut<'a>(c: &'a mut VsConfiguration, input: &str) -> Option<(&'a mut V
 }
 
 /// Configure Variable Studio ▾ / Add configuration input ▲ › List (made at
-/// once): live ei-906 "List_…" named "Configuration" (the first) or
-/// "List N", one row "Default". Returns its ID.
+/// once): live ei-906 "List_…", one row "Default", named "Configuration"
+/// when the studio has no List, else "List input N" (live: the counter
+/// goes on after the first is deleted). Returns its ID.
 pub fn add_list_input(c: &mut VsConfiguration) -> String {
-    let n = c.inputs.len() + 1;
+    let names: Vec<&str> = c.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. })).map(|i| i.name.as_str()).collect();
+    let last = names.iter().filter_map(|n| n.strip_prefix("List input ").and_then(|k| k.parse::<u32>().ok())).max().unwrap_or(0);
+    let name = if names.is_empty() { "Configuration".to_string() } else { format!("List input {}", last + 1) };
     let id = list_id();
     c.inputs.push(ConfigInput {
         id: id.clone(),
-        name: if n == 1 { "Configuration".into() } else { format!("List {n}") },
+        name,
         kind: ConfigInputKind::List { options: vec![ListOption { id: "Default".into(), name: "Default".into() }], default: "Default".into() },
         visible_when: None,
         excluded: false,
@@ -281,5 +284,18 @@ mod tests {
         assert_eq!(table_text(&c, &input), "Name\t#w Value\nDefault\t10 mm\nBig copy\t20 mm");
         delete_input(&mut c, &input);
         assert!(c.inputs.is_empty() && c.configured.is_empty());
+    }
+
+    /// New List names (live): "Configuration", then "List input 1, 2…",
+    /// the counter going on after "Configuration" is deleted.
+    #[test]
+    fn list_names_as_live() {
+        let mut c = VsConfiguration::default();
+        let first = add_list_input(&mut c);
+        add_list_input(&mut c);
+        add_list_input(&mut c);
+        delete_input(&mut c, &first);
+        add_list_input(&mut c);
+        assert_eq!(c.inputs.iter().map(|i| i.name.as_str()).collect::<Vec<_>>(), ["List input 1", "List input 2", "List input 3"]);
     }
 }
