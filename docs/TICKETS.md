@@ -24,11 +24,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   tickets/shell-fillet-walls-missing-iso.png, -front.png, shell-walls-ps3-iso.png, -front.png. Probably the same root as
   qa5's P1-16 (fillet offsets collapsing in shell.cpp; WIP on agent/qa5) (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P0 SHELL-SLOW Shell takes seconds: the same plate (+ chamfer, 2 holes), Shell 1 2.5 mm → Shell eval 3354 ms; edit to
-  1.5 mm → 8759 ms; without the fillet 2502 ms (NOSHAPE_PERF log; box load ~35, so maybe 2–3× slower than idle); live
+  1.5 mm → 8759 ms; without the fillet 2502 ms (NOSHAPE_PERF log; box load ~35; the green is the watcher's dev build:
+  our crates opt-level 1, deps 3, so re-time on a release build before chasing it); live
   shells such parts in well under a second; ours freezes the preview for seconds (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P0 REGEN-SPEED edit commit on the 30-feature part: tests/perf/live-30-features.noshape, edit Extrude 1 10 → 12, ✓ →
   28 features re-evaluated in 1007 ms (Linear pattern 1 125, Boss 6 97, Chamfer 5 81, Boss 5 75, Hole 1 67, Chamfer 4 66;
-  load ~35 on 16 cores); budget ≤ 200 ms, live's server 171 ms for the whole part; undo/redo of it 7 / 5 ms (cached, OK)
+  load ~35 on 16 cores, dev build with our crates at opt-level 1); budget ≤ 200 ms, live's server 171 ms for the whole
+  part; undo/redo of it 7 / 5 ms (cached, OK). Also big-plate.noshape: regen 3.0 s (Extrude 2 2458, Sketch 2 535 ms) vs
+  live 617 ms (491 / 116)
   (qa 2026-10-26, build 4d2f6b0c)
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
