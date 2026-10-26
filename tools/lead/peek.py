@@ -2,7 +2,9 @@
 # Show what each noshape agent is doing right now: last few tool calls/texts from its transcript tail.
 import glob, os, re, json, sys, time
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 4
-files = [f for f in glob.glob('/root/.claude*/projects/*reverse-engineer*/*.jsonl') if time.time() - os.path.getmtime(f) < 12*3600 and os.path.getsize(f) > 2_000_000]
+# Agents' transcripts (any project dir; the area agents' prompts name them "You are **<name>**").
+files = [f for f in glob.glob('/root/.claude*/projects/*/*.jsonl') if time.time() - os.path.getmtime(f) < 12*3600 and os.path.getsize(f) > 20_000]
+files = [f for f in files if open(f, 'rb').read(400_000).find(b'agent of noshape') >= 0]
 def name_of(f):
     with open(f, 'rb') as fh:
         head = fh.read(400_000).decode('utf8', 'ignore')
