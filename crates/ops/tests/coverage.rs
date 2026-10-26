@@ -251,11 +251,9 @@ fn schema_says_when_parameters_show() {
 }
 
 /// Everything a user can do in the window an agent can do too (navigation
-/// and view actions included): the UI-only entries only go down (98 before
-/// the sweep), and none may be added.
+/// and view actions included): no entry is UI-only (98 before the sweep).
 #[test]
-fn ui_only_entries_only_go_down() {
-    const CEILING: usize = 2;
+fn no_ui_only_entries() {
     let ui: Vec<&str> = SHORTCUTS.iter().chain(MENUS.iter()).filter(|(_, c)| matches!(c, Cover::Ui(_))).map(|(id, _)| *id).collect();
-    assert!(ui.len() <= CEILING, "{} UI-only entries (at most {CEILING}): give the new ones an operation\n{}", ui.len(), ui.join("\n"));
+    assert!(ui.is_empty(), "{} UI-only entries: an agent must be able to do what a user can; give each an operation (live mode doing the same in the window)\n{}", ui.len(), ui.join("\n"));
 }

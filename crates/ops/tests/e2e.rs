@@ -3952,3 +3952,20 @@ fn ui_search_tools_ranks_like_onshape() {
     assert_eq!((t["tools"][0]["type"].clone(), t["tools"][0]["keys"].clone()), (json!("fillet"), json!("shift-f")), "{t}");
     assert!(call(&mut ctx, "ui_search_tools", json!({ "text": "" }))["tools"].as_array().unwrap().is_empty());
 }
+
+/// Clear missing references (feature_clear_missing): a fillet whose edges'
+/// extrude is suppressed loses them in one edit.
+#[test]
+fn clear_missing_references() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "clear_missing.noshape");
+    let edge = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }))["edges"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": [edge], "radius": "2 mm" } }));
+    let e = try_call(&mut ctx, "feature_clear_missing", json!({ "feature": "Fillet 1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("feature"), "nothing missing yet: {e:?}");
+    call(&mut ctx, "feature_suppress", json!({ "features": ["Extrude 1"], "suppressed": true }));
+    let c = call(&mut ctx, "feature_clear_missing", json!({ "feature": "Fillet 1" }));
+    assert_eq!(c["removed"], 1, "{c}");
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.ends_with(":: Edit : Fillet 1"), "{last}");
+}

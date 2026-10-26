@@ -581,6 +581,60 @@ mod rename_tests {
     }
 }
 
+
+/// The feature that made an edge or vertex: its faces' (a part corner's
+/// menu starts Edit Extrude 1…, live "ui (10-24 c)").
+pub fn edge_creator(n: &noshape_model::reference::TopoName) -> Option<FeatureId> {
+    use noshape_model::reference::TopoName;
+    match n {
+        TopoName::Edge { faces, .. } => faces[1].creator().or_else(|| faces[0].creator()),
+        TopoName::Vertex { faces, .. } => faces.iter().rev().find_map(|f| f.creator()),
+        TopoName::Boundary { face, .. } => face.creator(),
+        other => other.creator(),
+    }
+}
+
+/// Which references of a Part Studio's features are missing (a selection
+/// row's "Clear missing references"): their creating feature is gone or
+/// suppressed. Features of a derived part's source studio count as present
+/// (its parts keep their names, qa5 DER4); Assembly context geometry is
+/// never missing (a snapshot).
+pub fn missing_reference(doc: &noshape_model::Document, ps: &PartStudio) -> impl Fn(&Reference) -> bool + Send + Sync + 'static {
+    let mut live: std::collections::HashSet<FeatureId> = ps.features.iter().filter(|f| !f.suppressed).map(|f| f.id).collect();
+    for f in ps.features.iter().filter(|f| f.type_id == "importDerived" && !f.suppressed) {
+        let key = f.params.text("partStudio").trim().to_string();
+        if let Some(noshape_model::document::TabContent::PartStudio(src)) = doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| &t.content) {
+            live.extend(src.features.iter().filter(|g| !g.suppressed).map(|g| g.id));
+        }
+    }
+    move |r: &Reference| match r {
+        Reference::Edge(n) | Reference::Vertex(n) => edge_creator(n).is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
+        r => r.depends_on().is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
+    }
+}
+
+/// Clear missing references on feature `id`'s query fields (`param`, or
+/// every field, arrays' rows included). How many were removed.
+pub fn clear_missing(ps: &mut PartStudio, id: FeatureId, param: Option<&str>, missing: &dyn Fn(&Reference) -> bool) -> usize {
+    use noshape_model::params::{ParamValue, ParamValues};
+    fn walk(v: &mut ParamValues, param: Option<&str>, missing: &dyn Fn(&Reference) -> bool) -> usize {
+        let mut n = 0;
+        for (k, p) in v.0.iter_mut() {
+            match p {
+                ParamValue::Query(q) if param.is_none_or(|x| x == k) => {
+                    let before = q.len();
+                    q.retain(|r| !missing(r));
+                    n += before - q.len();
+                }
+                ParamValue::Array(items) => n += items.iter_mut().map(|it| walk(it, param, missing)).sum::<usize>(),
+                _ => {}
+            }
+        }
+        n
+    }
+    ps.feature_mut(id).map_or(0, |f| walk(&mut f.params, param, missing))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
