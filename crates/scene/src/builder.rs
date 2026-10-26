@@ -199,6 +199,10 @@ pub struct SceneOptions {
     pub section_skip: Vec<noshape_model::BodyId>,
     /// Feature preview bodies: shaded with the preview lighting.
     pub preview_bodies: Vec<noshape_model::BodyId>,
+    /// The compare layer of every body and decal instance
+    /// ([`noshape_render::scene::compare`]; 0 none): a feature preview's
+    /// two models ([`Scene::preview_mix`]).
+    pub body_layer: u8,
     /// Bodies drawn for display only: not pickable and never highlighted
     /// (a Transform's moved preview, whose original is the selectable ghost).
     pub display_only: Vec<noshape_model::BodyId>,
@@ -292,6 +296,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.images.retain(|_, (w, _)| w.strong_count() > 0);
     let mut bodies = 0u32;
+    let bodies_from = scene.instances.len();
     for (part_index, b) in display.bodies.iter().enumerate().filter(|(_, b)| !b.hidden) {
         let colors = opts.vertex_colors.as_ref().and_then(|m| m.get(&b.id)).filter(|c| c.len() == b.mesh.positions.len());
         let replaced = opts.replaced_meshes.as_ref().and_then(|m| m.get(&b.id));
@@ -590,6 +595,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         decal_instances.push((scene.instances.len(), face, dec.feature));
         scene.instances.push(if opts.section_skip.contains(&b.id) { inst.ignore_clip() } else { inst });
     }
+    if opts.body_layer != 0 {
+        for i in &mut scene.instances[bodies_from..] {
+            i.compare = opts.body_layer;
+        }
+    }
 
     // ---------------------------------------------------------------- planes
     if opts.show_planes {
@@ -622,7 +632,10 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             // Isolate takes the names away (qa5 KB3).
             if !opts.faint_planes {
                 let asc = 0.031 * 2.0 * pl.half_height;
-                let base = pl.corner(-1.0, 1.0) + f.x * (0.25 * asc) - f.y * (1.3 * asc);
+                // Live dk-921, psui/m-01 (light, same camera): the name's
+                // ink starts 0.11 of the ascender in from the corner, its
+                // baseline 1.0 down (Front, Top, Right within 1 px).
+                let base = pl.corner(-1.0, 1.0) + f.x * (0.11 * asc) - f.y * asc;
                 let text = theme::lin(theme::pick(theme::viewport::PLANE_TEXT, theme::viewport_dark::PLANE_TEXT));
                 let to_world = |q: glam::DVec2| base + f.x * (q.x * asc) + f.y * (q.y * asc);
                 let contours = plane_name_contours(&pl.name);
@@ -945,7 +958,7 @@ pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteDa
 #[allow(clippy::too_many_arguments)]
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, error: bool, up: &Uploader) -> Scene {
     let _t = noshape_render::perf::scope("s.with_highlights");
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare, preview_mix: built.scene.preview_mix };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4], bool)> = Vec::new();
     let mut overlay_lines = LineData::default();

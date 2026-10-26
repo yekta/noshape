@@ -1298,7 +1298,8 @@ fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f3
             let mix = if c.blend < 0.5 { 2.0 * c.blend } else { 2.0 * (1.0 - c.blend) };
             ([eye.x as f32, eye.y as f32, eye.z as f32, near as f32], [far as f32, 1.0, mix.clamp(0.0, 1.0), 0.0])
         }
-        _ => ([0.0; 4], [1.0, 0.0, 0.0, 0.0]),
+        // A feature preview mixes with its slider's alpha, untinted.
+        _ => ([0.0; 4], [1.0, 0.0, scene.preview_mix.unwrap_or(0.0).clamp(0.0, 1.0), 0.0]),
     };
     Globals {
         view_proj: vp.to_cols_array_2d(),
@@ -2555,10 +2556,12 @@ impl Renderer {
         self.queue.write_buffer(&self.globals_color, 0, bytemuck::bytes_of(&globals));
         let mut lists = std::mem::take(&mut self.lists);
         // Compare mode: the frame shows the "under" version alone (the base
-        // below blend 0.5, else the target); see `scene::compare`.
+        // below blend 0.5, else the target); see `scene::compare`. A feature
+        // preview's frame is the base (`Scene::preview_mix`).
         lists.skip_compare = match req.scene.compare {
             Some(c) if c.blend < 0.5 => crate::scene::compare::TARGET,
             Some(_) => crate::scene::compare::BASE,
+            None if req.scene.preview_mix.is_some() => crate::scene::compare::TARGET,
             None => 0,
         };
         lists.lod = Some(req.style.detail);
@@ -2567,17 +2570,19 @@ impl Renderer {
         lists.apply_detail(&req.style.detail);
         let bind_inst = self.prepare_slots(SLOTS_COLOR, &lists.slots);
         // ...then both versions together, and each version's opaque faces
-        // for its depth and normal.
-        let compare_frame = req.scene.compare.map(|_| {
+        // for its depth and normal. A feature preview: the model with the
+        // feature, mixed over the frame the same way.
+        let comparing = req.scene.compare.is_some();
+        let compare_frame = (comparing || req.scene.preview_mix.is_some()).then(|| {
             let mut over = std::mem::take(&mut self.lists_over);
-            over.skip_compare = 0;
+            over.skip_compare = if comparing { 0 } else { crate::scene::compare::BASE };
             over.lod = Some(req.style.detail);
             over.mesh_error_px = req.style.detail.mesh_error_px;
             over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
             over.apply_detail(&req.style.detail);
             let bind_over = self.prepare_slots(SLOTS_COMPARE_OVER, &over.slots);
             let faces = [crate::scene::compare::BASE, crate::scene::compare::TARGET]
-                .map(|v| req.scene.instances.iter().enumerate().filter(|(_, i)| i.compare == v && !i.pick_only && i.color[3] >= 1.0 && matches!(i.drawable, Drawable::Mesh(_))).map(|(k, _)| k as u32).collect::<Vec<u32>>());
+                .map(|v| req.scene.instances.iter().enumerate().filter(|(_, i)| comparing && i.compare == v && !i.pick_only && i.color[3] >= 1.0 && matches!(i.drawable, Drawable::Mesh(_))).map(|(k, _)| k as u32).collect::<Vec<u32>>());
             let bind_faces = [self.prepare_slots(SLOTS_COMPARE_BASE, &faces[0]), self.prepare_slots(SLOTS_COMPARE_TARGET, &faces[1])];
             (over, bind_over, faces, bind_faces)
         });
@@ -2588,7 +2593,7 @@ impl Renderer {
         {
             let Self { device, compare_layout, targets, .. } = self;
             let ts = targets.get_mut(&target).expect("target");
-            if req.scene.compare.is_none() {
+            if req.scene.compare.is_none() && req.scene.preview_mix.is_none() {
                 ts.compare = None;
             } else if !ts.compare.as_ref().is_some_and(|c| c.size == (width, height, msaa)) {
                 ts.compare = Some(CompareTextures::new(device, compare_layout, width, height, msaa));
@@ -2634,7 +2639,9 @@ impl Renderer {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("frame") });
         let bind_color = bind_color.as_ref().expect("bind groups");
         // Compare mode: each version's depth and facing normal.
-        if let (Some(c), Some((_, _, faces, bind_faces))) = (ts.compare.as_ref(), compare_frame.as_ref()) {
+        if req.scene.compare.is_some()
+            && let (Some(c), Some((_, _, faces, bind_faces))) = (ts.compare.as_ref(), compare_frame.as_ref())
+        {
             for v in 0..2 {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("compare-dn"),

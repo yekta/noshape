@@ -124,7 +124,8 @@ pub struct PointSprite {
     pub size: f32,
     /// Bit 1: always on top. Bit 2: ring with a center dot. Bit 3
     /// ([`PointSprite::HOLLOW`]): white center inside a colored ring. Bit 4
-    /// ([`PointSprite::RING`]): the ring alone.
+    /// ([`PointSprite::RING`]): the ring alone. Bit 6
+    /// ([`PointSprite::THICK`]): a hollow point's thicker ring.
     pub style: u32,
     pub _pad: u32,
 }
@@ -168,6 +169,9 @@ impl PointSprite {
     pub const HOLLOW: u32 = 8;
     /// A ring alone (inner radius 0.6 of the outer), see-through inside.
     pub const RING: u32 = 16;
+    /// With [`Self::HOLLOW`]: the white inside 0.45 of the radius instead of
+    /// 0.55 (pattern instance points).
+    pub const THICK: u32 = 32;
 }
 
 /// The axis-aligned bounds of `it` (`None` when empty).
@@ -841,6 +845,12 @@ pub struct Scene {
     /// Compare mode: instances tagged [`Instance::compare`] are the two
     /// versions (see [`compare`]).
     pub compare: Option<Compare>,
+    /// A feature dialog's preview (Onshape's previewBlend, webgl bundle):
+    /// the frame is the untagged instances with the [`compare::BASE`] ones
+    /// (the model before the edited feature), mixed with the untagged and
+    /// [`compare::TARGET`] ones (the model with it) drawn on their own, by
+    /// this alpha (the dialog's preview slider; 0.7 at rest).
+    pub preview_mix: Option<f32>,
 }
 
 impl Scene {
@@ -870,6 +880,8 @@ impl Scene {
     pub fn same_as(&self, other: &Scene) -> bool {
         self.clip == other.clip
             && self.clip_extra == other.clip_extra
+            && self.compare == other.compare
+            && self.preview_mix == other.preview_mix
             && self.states == other.states
             && self.instances.len() == other.instances.len()
             && self.instances.iter().zip(&other.instances).all(|(a, b)| {
@@ -893,6 +905,7 @@ impl Scene {
                     && a.layer == b.layer
                     && a.pick_only == b.pick_only
                     && a.pick_base == b.pick_base
+                    && a.compare == b.compare
             })
     }
 

@@ -949,8 +949,11 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
     }
     // Style bit 8: a hollow point (white inside a ring of the point color),
     // Onshape's standalone sketch points and spline handles.
+    // Bit 32 makes the ring thicker (live p1audit skip-02: pattern instance
+    // points, white inside 0.45 of the radius).
     if ((i.style & 8u) != 0u) {
-        rgb = mix(rgb, vec3<f32>(1.0), clamp(0.55 * i.rpx - d + 0.5, 0.0, 1.0));
+        let inner = select(0.55, 0.45, (i.style & 32u) != 0u);
+        rgb = mix(rgb, vec3<f32>(1.0), clamp(inner * i.rpx - d + 0.5, 0.0, 1.0));
     }
     // Style bit 16: a ring only, see-through inside (live midpoint markers:
     // a 9 px ring with a 1.75 px stroke, inner radius 0.6).
