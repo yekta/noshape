@@ -137,6 +137,10 @@ pub struct DerivedSource {
     pub parts: Vec<(noshape_model::BodyId, String)>,
 }
 
+/// Live's title tooltip reason for a value of the wrong type ("#d = 0 mm
+/// [Variable] did not regenerate properly: A parameter value is not valid.").
+const VALUE_NOT_VALID: &str = "A parameter value is not valid.";
+
 pub struct FeatureDialog {
     pub feature: Feature,
     pub ty: &'static FeatureType,
@@ -1525,6 +1529,21 @@ impl FeatureDialog {
         if std::mem::take(&mut self.typed_pending) {
             cx.emit(DialogEvent::Changed);
         }
+    }
+
+    /// A shown number field whose value doesn't evaluate as its type (a
+    /// wrong type, a bad expression, an unknown variable): its id and live's
+    /// message for it.
+    pub fn value_error(&self, _cx: &App) -> Option<(&'static str, String)> {
+        self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params)).find_map(|s| {
+            let ParamKind::Num(n) = &s.kind else { return None };
+            let Some(ParamValue::Expr(e)) = self.feature.params.get(s.id) else { return None };
+            let text = e.text.as_str();
+            if text.trim().is_empty() {
+                return None;
+            }
+            noshape_units::evaluate_as(text, n.kind.dim(), &self.units, &self.variables).err().map(|err| (s.id, crate::quantity_field::eval_message(&err)))
+        })
     }
 
     /// A field's text into the feature's value (no preview update); false
@@ -2979,8 +2998,10 @@ impl FeatureDialog {
         // Live (part-studio/155): a value that doesn't evaluate (bad syntax,
         // an unknown #variable) is pink with a red underline and the hover
         // tooltip "Enter a valid expression.".
-        let unresolved = num.is_some_and(|n| !focused && !text.trim().is_empty() && noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).is_err());
-        let invalid = err.is_some() || unresolved;
+        let eval_err = num.filter(|_| !focused && !text.trim().is_empty()).and_then(|n| noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).err());
+        let invalid = err.is_some() || eval_err.is_some();
+        // Live (ui (10-26 c)): the hover says why ("Cannot use angle as length.").
+        let invalid_tip = eval_err.as_ref().map(crate::quantity_field::eval_message).unwrap_or_else(|| crate::quantity_field::INVALID_TIP.to_string());
         let field = v_flex().id(SharedString::from(format!("num-{path}")));
         let field = self.completion_keys(field, path, cx);
         // Enter in a changed field applies it; the next Enter commits.
@@ -3058,7 +3079,7 @@ impl FeatureDialog {
                         .id(SharedString::from(format!("numf-{path}")))
                         .border_b_1()
                         .border_color(if invalid { pal.error } else { pal.border })
-                        .map(|d| crate::quantity_field::invalid_field(d, invalid))
+                        .map(|d| crate::quantity_field::invalid_field_tip(d, invalid, invalid_tip))
                         .hover(|d| d.border_color(pal.accent))
                         // Live (dialogs/variable-01): the focused field has a 2 px blue underline.
                         // (A 1 px border plus a 1 px inset line above it, so
@@ -3214,6 +3235,11 @@ impl Render for FeatureDialog {
         let status = self.status.clone();
         // Onshape: the title turns red while the feature is invalid.
         // Live L27: a warning turns the title red too (has-regen-error).
+        // Live (ui (10-26 c), VAR-INVALID): a value that doesn't evaluate as
+        // its field's type turns the title red with "A parameter value is
+        // not valid." and disables ✓ (Enter doesn't commit either).
+        let value_invalid = self.value_error(cx).is_some();
+        let status = if value_invalid { Some((FeatureStatus::Error, VALUE_NOT_VALID.to_string())) } else { status };
         let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error | FeatureStatus::Warning));
         // Live: ✓ is disabled while a field shows the error (pink: an empty
         // required selection), and stays the normal green for an error of
@@ -3233,7 +3259,7 @@ impl Render for FeatureDialog {
                     _ => false,
                 }
         }) || !self.parse_errors.is_empty();
-        let blocked = invalid && pink && !status.as_ref().is_some_and(|s| s.1 == "No merge scope selected.");
+        let blocked = value_invalid || (invalid && pink && !status.as_ref().is_some_and(|s| s.1 == "No merge scope selected."));
         let title_color = if invalid { pal.text_invalid } else { pal.text };
         let name = noshape_model::interaction::display_name_computed(&self.feature, &|k| self.computed.get(k).cloned().or_else(|| shown_length(&self.feature, k, &self.units, &self.variables)));
         // Live (dom/dialog-hole.txt, dialog-variable.txt): a name built from
