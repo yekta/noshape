@@ -142,23 +142,28 @@ function Drag([int] $down, [int] $up, [double] $dx, [double] $dy, [double] $paus
   [Nav]::Mouse($up, 0)
   Start-Sleep $(if ($pause -lt 0.05) { 1.2 } else { 0.2 })
 }
-# Send a touch frame and hold it ~200 ms, repeating it as an update every
-# 25 ms, so each position reaches the app as its own event: on the runners'
-# software renderer a frame can take ~150 ms, and Windows coalesces the
-# touch updates sent meanwhile (run 40268926730: touch-pan's finger jumped
-# 60 px in one event, which Onshape's per-event pan rule drops, as it would
-# in Chrome). The repeats keep the injected contacts alive; a contact left
-# without updates is cancelled (run 40287408478, waiting on the trace).
-function TouchFrame([int[]] $xy, [int] $flags) {
+# Send a touch frame and hold it, repeating it as an update every ~30 ms
+# ($hold times), so each position reaches the app as its own event: on the
+# runners' software renderer a frame can take ~150 ms, and Windows
+# coalesces the touch updates sent meanwhile (run 40268926730: touch-pan's
+# finger jumped 60 px in one event, which Onshape's per-event pan rule
+# drops, as it would in Chrome). The repeats keep the injected contacts
+# alive (run 40287408478: contacts left without updates were cancelled).
+# Holds stay short and steps large: two fingers that stay within 10 px for
+# 750 ms start a box selection (runs 40293268330, 40299850729). Each
+# finger reports on its own, so a step may move a finger up to 50 px (pan:
+# squared moves differ by at most 2500) or 30 px (pinch, roll: the centre
+# moves at most 15 px) even when a few coalesce.
+function TouchFrame([int[]] $xy, [int] $flags, [int] $hold) {
   [Nav]::Touch($xy, $flags) | Out-Null
-  for ($i = 0; $i -lt 8; $i++) { Start-Sleep -Milliseconds 25; [Nav]::Touch($xy, (0x20000 -bor 0x2 -bor 0x4)) | Out-Null }
+  for ($i = 0; $i -lt $hold; $i++) { Start-Sleep -Milliseconds 25; [Nav]::Touch($xy, (0x20000 -bor 0x2 -bor 0x4)) | Out-Null }
 }
 function TouchGesture([object[]] $from, [object[]] $to, [int] $steps) {
   # $from / $to: arrays of logical (dx, dy) offsets from the viewport centre per finger.
   $pt = { param($f, $t) $q = Screen ($f[0] + ($t[0] - $f[0]) * $args[0]) ($f[1] + ($t[1] - $f[1]) * $args[0]); $q }
   $frame = { param($t) $xy = @(); for ($k = 0; $k -lt $from.Count; $k++) { $xy += (& $pt $from[$k] $to[$k] $t) }; [int[]]$xy }
-  TouchFrame (& $frame 0) (0x10000 -bor 0x2 -bor 0x4)
-  for ($k = 1; $k -le $steps; $k++) { TouchFrame (& $frame ($k / $steps)) (0x20000 -bor 0x2 -bor 0x4) }
+  TouchFrame (& $frame 0) (0x10000 -bor 0x2 -bor 0x4) 1
+  for ($k = 1; $k -le $steps; $k++) { TouchFrame (& $frame ($k / $steps)) (0x20000 -bor 0x2 -bor 0x4) 2 }
   Start-Sleep 0.05
   [Nav]::Touch((& $frame 1), 0x40000) | Out-Null
   Start-Sleep 1.2
@@ -173,7 +178,7 @@ Step 'middle-drag' { Drag 0x20 0x40 200 100 0.1 }
 if ([Nav]::InitializeTouchInjection(10, 1)) {
   Step 'touch-rotate' { TouchGesture @(, @(0, 0)) @(, @(-200, 0)) 20 }
   Step 'touch-pan' { TouchGesture @(@(-50, 0), @(50, 0)) @(@(100, 0), @(200, 0)) 15 }
-  Step 'touch-pinch' { TouchGesture @(@(-50, 0), @(50, 0)) @(@(-100, 0), @(100, 0)) 20 }
-  Step 'touch-roll' { TouchGesture @(@(-80, 0), @(80, 0)) @(@(-69.28, -40), @(69.28, 40)) 15 }
+  Step 'touch-pinch' { TouchGesture @(@(-50, 0), @(50, 0)) @(@(-100, 0), @(100, 0)) 5 }
+  Step 'touch-roll' { TouchGesture @(@(-80, 0), @(80, 0)) @(@(-69.28, -40), @(69.28, 40)) 5 }
 } else { Write-Host '::warning::InitializeTouchInjection failed; touch steps skipped' }
 'win replay done'

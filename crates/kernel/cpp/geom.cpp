@@ -4,6 +4,7 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <algorithm>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
@@ -13,6 +14,9 @@
 #include <Extrema_POnSurf.hxx>
 #include <Extrema_GenLocateExtPS.hxx>
 #include <BRepTopAdaptor_FClass2d.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <Precision.hxx>
+#include <gp_Pln.hxx>
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRepLProp_SLProps.hxx>
@@ -621,6 +625,57 @@ P3 vertex_point(const OcShape& vs)
   return from_pnt(BRep_Tool::Pnt(v));
 }
 
+namespace
+{
+// Whether any face of `s` lies on a surface OCCT's optimal box isn't exact
+// for (B-splines, sweeps, offsets).
+bool has_free_form_face(const TopoDS_Shape& s)
+{
+  for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
+    switch (BRepAdaptor_Surface(TopoDS::Face(e.Current()), false).GetType())
+    {
+      case GeomAbs_Plane:
+      case GeomAbs_Cylinder:
+      case GeomAbs_Cone:
+      case GeomAbs_Sphere:
+      case GeomAbs_Torus:
+        break;
+      default:
+        return true;
+    }
+  return false;
+}
+
+// OCCT's optimal box of a free-form face reaches Precision::Confusion past
+// short edges round it (BndLib_Add3dCurve's generic curve box: the corner
+// patches of an imported filleted block, g47-1part: z 10.0001 mm for 10;
+// qa5-routing BBOX-TOL). Each side is pulled in to the shape's exact extreme
+// there, the distance to a plane just outside it, by at most a few
+// Precision::Confusion (never out, never further).
+void tighten_box(const TopoDS_Shape& s, double box[6])
+{
+  const double gap = 1e3 * Precision::Confusion(), most = 10 * Precision::Confusion();
+  const double cx = (box[0] + box[3]) / 2, cy = (box[1] + box[4]) / 2, cz = (box[2] + box[5]) / 2;
+  const double half = std::max({box[3] - box[0], box[4] - box[1], box[5] - box[2]}) + 2 * gap;
+  for (int axis = 0; axis < 3; ++axis)
+    for (int side = 0; side < 2; ++side)
+    {
+      double&      v = box[side * 3 + axis];
+      const double at = side ? v + gap : v - gap;
+      gp_Dir       n(axis == 0 ? 1 : 0, axis == 1 ? 1 : 0, axis == 2 ? 1 : 0);
+      gp_Pnt       o(axis == 0 ? at : cx, axis == 1 ? at : cy, axis == 2 ? at : cz);
+      const TopoDS_Face plane = BRepBuilderAPI_MakeFace(gp_Pln(o, n), -half, half, -half, half).Face();
+      BRepExtrema_DistShapeShape d(s, plane);
+      if (!d.IsDone() || d.NbSolution() == 0)
+        continue;
+      const double exact = side ? at - d.Value() : at + d.Value();
+      const double pull  = side ? v - exact : exact - v;
+      if (pull > 0 && pull <= most)
+        v = exact;
+    }
+}
+} // namespace
+
 rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
 {
   require_non_null(s.shape, "shape");
@@ -640,10 +695,12 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
     }
   if (b.IsVoid())
     fail_invalid("shape has no geometry (void bounding box)");
-  double x0, y0, z0, x1, y1, z1;
-  b.Get(x0, y0, z0, x1, y1, z1);
+  double box[6];
+  b.Get(box[0], box[1], box[2], box[3], box[4], box[5]);
+  if (optimal && !has_mesh_faces(s.shape) && has_free_form_face(s.shape))
+    tighten_box(s.shape, box);
   rust::Vec<double> r;
-  for (double v : {x0, y0, z0, x1, y1, z1})
+  for (double v : box)
     r.push_back(v);
   return r;
 }
