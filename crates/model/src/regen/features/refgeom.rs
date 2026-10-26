@@ -41,25 +41,15 @@ fn not_found(what: &str) -> FeatureError {
 /// Point where a vertex reference lies and the normal of one adjacent face.
 fn vertex_csys(ev: &EvalCtx, r: &Reference) -> Option<Csys> {
     let p = ev.resolve_vertex_point(r)?;
-    if let Reference::Vertex(n) = r {
-        for b in &ev.ctx.bodies {
-            if let Some(&vi) = b.find_vertices(n).first() {
-                let vf = b.shape.vertex_faces().ok()?;
-                if let Some(&fi) = vf.get(vi).and_then(|f| f.first())
-                    && let Ok(face) = b.shape.sub_shape(ShapeType::Face, fi as usize)
-                    && let Ok(nrm) = face.normal_at_point(p)
-                {
-                    return Some(Csys::new(p, nrm, None));
-                }
-            }
-        }
-    }
+    // A part's vertex: the world axes at the point (live "ui (10-25 d)",
+    // ui-mass/04: a connector on a block's corner is world-aligned, not
+    // turned to a face).
     if let Reference::SketchEntity { sketch, .. } = r
         && let Some(s) = ev.ctx.sketch(*sketch)
     {
         return Some(Csys::new(p, s.frame.normal, Some(s.frame.x)));
     }
-    Some(Csys::new(p, DVec3::Z, None))
+    Some(Csys::new(p, DVec3::Z, Some(DVec3::X)))
 }
 
 fn edge_csys(e: &Shape, inference: &str) -> FResult<Csys> {
