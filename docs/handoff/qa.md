@@ -38,7 +38,7 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
 - "View in high quality" on this llvmpipe box makes viewport frames take > 10 s ("GPU frame still running after 10s;
   waiting"); the UI then stops taking input for a minute and replays the queued clicks. Click Disable on the blue bar.
 - UI fuzzer: /root/qa-scratch/bin/fuzz.py <seed> <n> (random keys / clicks / drags on :110 against the pid in
-  /tmp/qa_fzpid; actions logged to /root/qa-scratch/fuzz-actions.log). Seed 1 × 300: no crash.
+  /tmp/qa_fzpid; actions logged to /root/qa-scratch/fuzz-actions.log). Seeds 1–3 (800 actions): no crash.
 - Don't run the app with NOSHAPE_PERF=1 when testing section views (PERF-SECTION-PANIC freezes the viewport).
 - Mind dialog layout shifts: once a selection chip is added, every row below moves down ~16 px; screenshot before
   clicking a field.
