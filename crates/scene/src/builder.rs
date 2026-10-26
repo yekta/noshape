@@ -532,6 +532,28 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([fill[0], fill[1], fill[2], theme::pick(theme::viewport::PLANE_FILL_ALPHA, theme::viewport_dark::PLANE_FILL_ALPHA)]).ignore_clip().unlit().layer(5));
             }
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([outline[0], outline[1], outline[2], outline_alpha]).ignore_clip().layer(5));
+            // Its name in the plane at the top-left corner, inside: over the
+            // plane's fill, hidden by parts in front (live selection/02);
+            // Isolate takes the names away (qa5 KB3).
+            if !opts.faint_planes {
+                let asc = 0.031 * 2.0 * pl.half_height;
+                let base = pl.corner(-1.0, 1.0) + f.x * (0.25 * asc) - f.y * (1.3 * asc);
+                let text = theme::lin(theme::pick(theme::viewport::PLANE_TEXT, theme::viewport_dark::PLANE_TEXT));
+                let to_world = |q: glam::DVec2| base + f.x * (q.x * asc) + f.y * (q.y * asc);
+                let contours = plane_name_contours(&pl.name);
+                if let Some(m) = noshape_render::overlay::fill_mesh(&contours, to_world, f.normal) {
+                    scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([text[0], text[1], text[2], 1.0]).unlit().unpickable().ignore_clip().over_transparent().layer(5));
+                    // The outline traced thinly too: our anti-aliasing (in
+                    // linear light) thinned the glyphs next to the overlay's
+                    // (gamma, like live's).
+                    let mut l = LineData::default();
+                    for c in contours.iter().filter(|c| c.len() >= 3) {
+                        let pts: Vec<[f32; 3]> = c.iter().chain(c.first()).map(|&q| to_world(q).as_vec3().into()).collect();
+                        l.push_polyline(&pts, [0, 0, 0, 255], 0, PLANE_NAME_STROKE, 0);
+                    }
+                    scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).with_color([text[0], text[1], text[2], PLANE_NAME_STROKE_ALPHA]).unpickable().ignore_clip().layer(5));
+                }
+            }
         }
     }
 
@@ -714,13 +736,39 @@ fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState,
     [((hex >> 16) & 0xff) as u8, ((hex >> 8) & 0xff) as u8, (hex & 0xff) as u8, a]
 }
 
-/// Per-vertex local face id (1-based) from face index ranges.
+/// The line tracing a plane name's glyphs: width (logical px; lines are at
+/// least 1 px) and opacity, fitted to the overlay's text (Front: 185 ink
+/// pixels, 123 dark).
+const PLANE_NAME_STROKE: f32 = 0.6;
+const PLANE_NAME_STROKE_ALPHA: f32 = 0.7;
+
+/// A plane name's glyph outlines (ascender 1), laid out once per name.
+fn plane_name_contours(name: &str) -> Arc<Vec<Vec<glam::DVec2>>> {
+    thread_local! {
+        static CACHE: std::cell::RefCell<HashMap<String, Arc<Vec<Vec<glam::DVec2>>>>> = Default::default();
+    }
+    CACHE.with(|c| {
+        let mut c = c.borrow_mut();
+        if let Some(t) = c.get(name) {
+            return t.clone();
+        }
+        // Renames could grow it without bound.
+        if c.len() > 512 {
+            c.clear();
+        }
+        let t = Arc::new(noshape_sketch::text::layout_text(name, noshape_sketch::text::DEFAULT_FONT, false, false).polylines(6));
+        c.insert(name.to_string(), t.clone());
+        t
+    })
+}
+
 /// A rigid 3x4 row-major placement (`SharedMesh::transform`) as a matrix.
 fn placement_matrix(m: &[f64; 12]) -> glam::Mat4 {
     let c = |i: usize| m[i] as f32;
     glam::Mat4::from_cols(glam::Vec4::new(c(0), c(4), c(8), 0.0), glam::Vec4::new(c(1), c(5), c(9), 0.0), glam::Vec4::new(c(2), c(6), c(10), 0.0), glam::Vec4::new(c(3), c(7), c(11), 1.0))
 }
 
+/// Per-vertex local face id (1-based) from face index ranges.
 fn face_pick_ids(m: &noshape_model::display::MeshBuffers) -> Vec<u32> {
     let mut pick_ids = vec![0u32; m.positions.len()];
     for (fi, &(start, count)) in m.face_ranges.iter().enumerate() {

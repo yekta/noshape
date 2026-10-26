@@ -391,6 +391,42 @@ impl Overlay {
     }
 }
 
+/// Closed 2D contours filled even-odd (as [`Overlay`]'s fills) as a
+/// triangle mesh placed by `to_world`: text lying in a plane that the
+/// scene's depth hides (plane names behind a part, live selection/02).
+pub fn fill_mesh(contours: &[Vec<DVec2>], to_world: impl Fn(DVec2) -> DVec3, normal: DVec3) -> Option<crate::scene::MeshData> {
+    // lyon works in f32 with fixed tolerances: tessellate at a few hundred
+    // units across.
+    const K: f64 = 100.0;
+    let mut b = LPath::builder().with_svg();
+    let mut any = false;
+    for c in contours.iter().filter(|c| c.len() >= 3) {
+        b.move_to(lpoint((c[0].x * K) as f32, (c[0].y * K) as f32));
+        for q in &c[1..] {
+            b.line_to(lpoint((q.x * K) as f32, (q.y * K) as f32));
+        }
+        b.close();
+        any = true;
+    }
+    if !any {
+        return None;
+    }
+    let path = b.build();
+    let mut buf: VertexBuffers<lyon_tessellation::math::Point, u32> = VertexBuffers::new();
+    FillTessellator::new().tessellate_path(&path, &FillOptions::default(), &mut BuffersBuilder::new(&mut buf, |v: FillVertex| v.position())).ok()?;
+    let n = [normal.x as f32, normal.y as f32, normal.z as f32];
+    let positions: Vec<[f32; 3]> = buf
+        .vertices
+        .iter()
+        .map(|p| {
+            let w = to_world(DVec2::new(f64::from(p.x) / K, f64::from(p.y) / K));
+            [w.x as f32, w.y as f32, w.z as f32]
+        })
+        .collect();
+    let len = positions.len();
+    Some(crate::scene::MeshData { positions, normals: vec![n; len], pick_ids: vec![0; len], indices: buf.indices })
+}
+
 /// Onshape's view cube: geometry shared by the drawing ([`Overlay`]) and
 /// the app's hit testing (pixels from the widget center, y up).
 pub mod view_cube {
