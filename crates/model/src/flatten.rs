@@ -254,7 +254,10 @@ fn unfold(positions: &[DVec3], indices: &[u32]) -> Vec<DVec2> {
         let (ab, ac) = (b - a, c - a);
         let l = ab.length().max(1e-300);
         let x = ac.dot(ab) / l;
-        let y = (ac.length_squared() - x * x).max(0.0).sqrt();
+        // The height by the cross product: sqrt(|ac|² − x²) cancels to noise
+        // on slivers (a hole's fan), and their errors carry on to every
+        // triangle laid after them.
+        let y = ab.cross(ac).length() / l;
         let dir = (pb - pa) / (pb - pa).length().max(1e-300);
         let perp = dir.perp();
         let mut p = pa + dir * x + perp * y;
@@ -327,7 +330,12 @@ pub fn flatten(mesh: &SampleMesh, rips: &[Vec<DVec3>], iterations: usize) -> Fla
     let centroid = if area > 0.0 { centroid / area } else { DVec3::ZERO };
     let u = normal.any_orthonormal_vector();
     let v = normal.cross(u);
-    let mut flat = unfold(&positions, &indices);
+    // A planar sheet is already flat: its points in the plane, exactly (no
+    // unfolding, nothing to relax; a face with a hole is fanned into
+    // slivers, qa5-routing FLAT-HOLE).
+    let planar = positions.iter().all(|p| (*p - centroid).dot(normal).abs() <= size * 1e-9);
+    let mut flat = if planar { positions.iter().map(|p| DVec2::new((*p - centroid).dot(u), (*p - centroid).dot(v))).collect() } else { unfold(&positions, &indices) };
+    let iterations = if planar { 0 } else { iterations };
     // Turn (or mirror) the unfolded sheet to best match its projection on
     // the mean plane, so it lies the way the faces do.
     {
@@ -434,6 +442,50 @@ pub fn seam_edges(ctx: &crate::regen::context::Context, faces: &[crate::referenc
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The refinement keeps neighbours' sides matching, so the sheet stays
+    /// whole (qa5-routing FLAT-HOLE: triangles of very different sizes side
+    /// by side, a hole's fan beside wide ones, fell apart into 20 loops): an
+    /// 80 × 20 wall of two triangles, and one fanned from a corner to eight
+    /// points along its top beside one wide triangle.
+    #[test]
+    fn refined_sheets_stay_whole() {
+        let fan: Vec<[f32; 3]> = (0..=8).map(|i| [80.0 - 10.0 * i as f32, 20.0, 0.0]).collect();
+        let mut fanned = vec![[0.0f32, 0.0, 0.0], [80.0, 0.0, 0.0], [80.0, 20.0, 0.0]];
+        for w in fan.windows(2) {
+            fanned.extend_from_slice(&[[0.0, 0.0, 0.0], w[0], w[1]]);
+        }
+        let two = vec![[0.0f32, 0.0, 0.0], [80.0, 0.0, 0.0], [80.0, 20.0, 0.0], [0.0, 0.0, 0.0], [80.0, 20.0, 0.0], [0.0, 20.0, 0.0]];
+        for positions in [two, fanned] {
+            let n = positions.len();
+            let m = crate::display::MeshBuffers { normals: vec![[0.0, 0.0, 1.0]; n], indices: (0..n as u32).collect(), face_ranges: vec![(0, n as u32)], positions, ..Default::default() };
+            let r = refine_conforming(&m, crate::thickness::spacing_for(&m, 4000));
+            assert!(r.indices.len() / 3 < 40_000, "{} triangles", r.indices.len() / 3);
+            let f = flatten(&r, &[], 10);
+            assert_eq!(f.loops(false).iter().map(|l| l.1.len()).sum::<usize>(), 1);
+            let (a3, a2) = f.areas();
+            assert!((a3 - 1600.0).abs() < 1e-6 && (a2 - 1600.0).abs() < 1e-6, "{a3} {a2}");
+        }
+    }
+
+    /// qa5-routing FLAT-HOLE: an 80 × 40 face with a Ø10 hole flattens to
+    /// itself (its display triangles fan round the hole in slivers): two
+    /// loops, the flat area its 3D area.
+    #[test]
+    fn a_face_with_a_hole_flattens_to_itself() {
+        use noshape_kernel as k;
+        let mm = 1e-3;
+        let plane = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+        let corners = [(-40.0, -20.0), (40.0, -20.0), (40.0, 20.0), (-40.0, 20.0)].map(|(x, y)| DVec3::new(x * mm, y * mm, 0.0));
+        let outer = k::make_polyline(&corners, true).unwrap();
+        let hole = k::make_wire(&[k::make_circle(DVec3::ZERO, DVec3::Z, 5.0 * mm).unwrap()]).unwrap();
+        let face = k::make_face(&plane, &outer, &[hole]).unwrap();
+        let m = crate::regen::tessellate_shape(&face, 1.0).unwrap();
+        let f = flatten(&refine_conforming(&m, crate::thickness::spacing_for(&m, 4000)), &[], 300);
+        assert_eq!(f.loops(false).iter().map(|l| l.1.len()).sum::<usize>(), 2);
+        let (a3, a2) = f.areas();
+        assert!((a2 - a3).abs() <= 1e-9 * a3 && (a3 - face.area().unwrap()).abs() < 1e-3 * a3, "{a3} {a2}");
+    }
 
     /// Samples on a surface z = f(x, y) over [0, 1]², each triangle with
     /// its own vertices (like `refine`), its face from `face(centroid)`.
@@ -561,8 +613,132 @@ pub fn flatten_faces(bodies: &[crate::display::BodyDisplay], faces: &[crate::ref
         rip_lines.extend(seam_edges(ctx, faces));
     }
     let spacing = crate::thickness::spacing_for(&m, 4000);
-    let sheet = crate::thickness::refine(&m, spacing);
+    let sheet = refine_conforming(&m, spacing);
     flatten(&sheet, &rip_lines, 300)
+}
+
+/// Split the triangles of `m` until no side is longer than `spacing`, each
+/// side split at one midpoint shared by every triangle on it (longest-side
+/// bisection), so neighbours keep matching sides and weld into one sheet.
+/// Splitting each triangle on its own grid left points in the middle of
+/// its neighbours' sides where the grids differ (a face with a hole:
+/// slivers beside wide triangles), and the sheet fell apart (qa5-routing
+/// FLAT-HOLE: 20 loops and 4396 mm² flat for 3121 mm²). Out: one copy of
+/// each triangle's corners with its face (as thickness::refine).
+fn refine_conforming(m: &crate::display::MeshBuffers, spacing: f64) -> SampleMesh {
+    const MAX_TRIANGLES: usize = 400_000;
+    let p3 = |p: [f32; 3]| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
+    let mut face_of = vec![0u32; m.positions.len()];
+    for (fi, &(start, count)) in m.face_ranges.iter().enumerate() {
+        for &ix in m.indices.get(start as usize..(start + count) as usize).unwrap_or(&[]) {
+            if let Some(f) = face_of.get_mut(ix as usize) {
+                *f = fi as u32 + 1;
+            }
+        }
+    }
+    // Shared vertices: the display mesh's positions, merged where equal.
+    let mut positions: Vec<DVec3> = Vec::new();
+    let mut by_pos: HashMap<[u32; 3], u32> = HashMap::new();
+    struct Tri {
+        v: [u32; 3],
+        n: [DVec3; 3],
+        face: u32,
+    }
+    let mut tris: Vec<Tri> = Vec::new();
+    for t in m.indices.as_chunks::<3>().0 {
+        let [Some(a), Some(b), Some(c)] = t.map(|i| m.positions.get(i as usize)) else { continue };
+        let [Some(na), Some(nb), Some(nc)] = t.map(|i| m.normals.get(i as usize)) else { continue };
+        let mut v = [0u32; 3];
+        for (k, p) in [a, b, c].into_iter().enumerate() {
+            v[k] = *by_pos.entry(p.map(f32::to_bits)).or_insert_with(|| {
+                positions.push(p3(*p));
+                positions.len() as u32 - 1
+            });
+        }
+        if v[0] == v[1] || v[1] == v[2] || v[2] == v[0] {
+            continue;
+        }
+        tris.push(Tri { v, n: [p3(*na), p3(*nb), p3(*nc)], face: face_of[t[0] as usize] });
+    }
+    let key = |a: u32, b: u32| if a < b { (a, b) } else { (b, a) };
+    let mut on_side: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
+    for (ti, t) in tris.iter().enumerate() {
+        for k in 0..3 {
+            on_side.entry(key(t.v[k], t.v[(k + 1) % 3])).or_default().push(ti);
+        }
+    }
+    // A triangle's longest side (ties by vertex ids, so the two triangles on
+    // a side agree), as (length, key).
+    let longest = |tris: &[Tri], positions: &[DVec3], ti: usize| -> (f64, (u32, u32)) {
+        let t = &tris[ti];
+        (0..3)
+            .map(|k| (positions[t.v[k] as usize].distance(positions[t.v[(k + 1) % 3] as usize]), key(t.v[k], t.v[(k + 1) % 3])))
+            .max_by(|x, y| x.0.total_cmp(&y.0).then(x.1.cmp(&y.1)))
+            .unwrap_or((0.0, (0, 0)))
+    };
+    let mut todo: Vec<usize> = (0..tris.len()).collect();
+    'refine: while let Some(ti) = todo.pop() {
+        while longest(&tris, &positions, ti).0 > spacing {
+            if tris.len() >= MAX_TRIANGLES {
+                break 'refine;
+            }
+            // Longest-side propagation (Rivara): walk to the neighbour across
+            // the longest side while that side isn't its longest too; split
+            // the side where it is (or where there's no neighbour).
+            let mut cur = ti;
+            let side = loop {
+                let (_, e) = longest(&tris, &positions, cur);
+                let next = on_side.get(&e).and_then(|l| l.iter().copied().find(|&x| x != cur));
+                match next {
+                    Some(n) if longest(&tris, &positions, n).1 != e => cur = n,
+                    _ => break e,
+                }
+            };
+            let (a, b) = side;
+            let mid = positions.len() as u32;
+            positions.push((positions[a as usize] + positions[b as usize]) * 0.5);
+            // Every triangle on the side splits at the midpoint.
+            let sharing = on_side.remove(&key(a, b)).unwrap_or_default();
+            for ui in sharing {
+                let u = &tris[ui];
+                let Some(j) = (0..3).find(|&j| key(u.v[j], u.v[(j + 1) % 3]) == key(a, b)) else { continue };
+                let (p, q, r) = (u.v[j], u.v[(j + 1) % 3], u.v[(j + 2) % 3]);
+                let (np, nq, nr) = (u.n[j], u.n[(j + 1) % 3], u.n[(j + 2) % 3]);
+                let nm = ((np + nq) * 0.5).normalize_or_zero();
+                let face = u.face;
+                for side in [key(q, r), key(r, p)] {
+                    if let Some(list) = on_side.get_mut(&side) {
+                        list.retain(|&x| x != ui);
+                    }
+                }
+                // (p, mid, r) replaces u; (mid, q, r) is new.
+                tris[ui] = Tri { v: [p, mid, r], n: [np, nm, nr], face };
+                let wi = tris.len();
+                tris.push(Tri { v: [mid, q, r], n: [nm, nq, nr], face });
+                for (tj, sides) in [(ui, [key(p, mid), key(mid, r), key(r, p)]), (wi, [key(mid, q), key(q, r), key(r, mid)])] {
+                    for side in sides {
+                        let list = on_side.entry(side).or_default();
+                        if !list.contains(&tj) {
+                            list.push(tj);
+                        }
+                    }
+                }
+                todo.push(ui);
+                todo.push(wi);
+            }
+        }
+    }
+    let mut out = SampleMesh::default();
+    for t in &tris {
+        let base = out.positions.len() as u32;
+        for k in 0..3 {
+            out.positions.push(positions[t.v[k] as usize]);
+            out.normals.push(t.n[k]);
+            out.faces.push(t.face);
+        }
+        out.indices.extend_from_slice(&[base, base + 1, base + 2]);
+    }
+    out
 }
 
 /// Where the flattened sheet is placed: at a mate connector (origin, x, z),
