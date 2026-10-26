@@ -1555,17 +1555,31 @@ impl PipelineMaker {
     }
 }
 
-/// A pipeline the first frame doesn't need: compiled on its own thread,
-/// waited for where a frame first uses it.
+/// A pipeline the first frame doesn't need: compiled on its own thread once
+/// the first frame is out ([`Lazy::start`]; compiling them alongside it
+/// held it back 0.4-0.5 s on the macOS runners), or where a frame uses it
+/// first.
 struct Lazy {
     pipeline: std::sync::OnceLock<wgpu::RenderPipeline>,
-    job: std::sync::Mutex<Option<std::thread::JoinHandle<wgpu::RenderPipeline>>>,
+    job: std::sync::Mutex<Option<LazyJob>>,
+}
+
+enum LazyJob {
+    Waiting(Box<dyn FnOnce() -> wgpu::RenderPipeline + Send>),
+    Compiling(std::thread::JoinHandle<wgpu::RenderPipeline>),
 }
 
 impl Lazy {
-    fn spawn(make: impl FnOnce() -> wgpu::RenderPipeline + Send + 'static) -> Self {
-        let job = std::thread::Builder::new().name("pipeline compile".into()).spawn(make).expect("pipeline compile thread");
-        Self { pipeline: std::sync::OnceLock::new(), job: std::sync::Mutex::new(Some(job)) }
+    fn new(make: impl FnOnce() -> wgpu::RenderPipeline + Send + 'static) -> Self {
+        Self { pipeline: std::sync::OnceLock::new(), job: std::sync::Mutex::new(Some(LazyJob::Waiting(Box::new(make)))) }
+    }
+
+    /// Start compiling on a thread of its own (if not started or done yet).
+    fn start(&self) {
+        let mut job = self.job.lock().expect("pipeline job");
+        if let Some(LazyJob::Waiting(make)) = job.take() {
+            *job = Some(LazyJob::Compiling(std::thread::Builder::new().name("pipeline compile".into()).spawn(make).expect("pipeline compile thread")));
+        }
     }
 }
 
@@ -1574,8 +1588,10 @@ impl std::ops::Deref for Lazy {
     fn deref(&self) -> &wgpu::RenderPipeline {
         self.pipeline.get_or_init(|| {
             let _t = perf::scope("r.pipeline_wait");
-            let job = self.job.lock().expect("pipeline job").take().expect("pipeline job");
-            job.join().expect("pipeline compile thread")
+            match self.job.lock().expect("pipeline job").take().expect("pipeline job") {
+                LazyJob::Waiting(make) => make(),
+                LazyJob::Compiling(job) => job.join().expect("pipeline compile thread"),
+            }
         })
     }
 }
@@ -1648,6 +1664,42 @@ struct Pipelines {
     compare_dn: Lazy,
     compare_mix: Lazy,
     msaa: u32,
+    /// The [`Lazy`] pipelines are compiling (see [`Pipelines::start_deferred`]).
+    deferred_started: bool,
+}
+
+impl Pipelines {
+    /// Compile the pipelines the first frame didn't need.
+    fn start_deferred(&mut self) {
+        if std::mem::replace(&mut self.deferred_started, true) {
+            return;
+        }
+        for p in [
+            &self.mesh_outline,
+            &self.mesh_outline_depth,
+            &self.section_mask,
+            &self.section_cap,
+            &self.mesh_reflect,
+            &self.mesh_transparent_back,
+            &self.mesh_transparent_front,
+            &self.mesh_on_top,
+            &self.line_hidden,
+            &self.point_hidden,
+            &self.mesh_pick,
+            &self.mesh_pick_transparent,
+            &self.mesh_sample,
+            &self.mesh_pick_priority,
+            &self.line_pick,
+            &self.point_pick,
+            &self.image_opaque,
+            &self.image_soft,
+            &self.image_blend,
+            &self.compare_dn,
+            &self.compare_mix,
+        ] {
+            p.start();
+        }
+    }
 }
 
 /// A pass's draw order on the GPU (see [`DrawLists::slots`]).
@@ -2149,11 +2201,10 @@ impl Renderer {
             (join(background), join(mesh_opaque), join(mesh_solid), join(mesh_transparent), join(line), join(mesh_backsil), join(silhouette), join(point))
         });
         // The others (picking, sections, outlines, previews, images, compare)
-        // compile on their own threads from now on; a frame that needs one
-        // first waits for it (`Lazy`).
+        // compile once the first frame is out (`Lazy`).
         let lazy = |layout: LayoutKind, p: P, x: Extra| {
             let m = m.clone();
-            Lazy::spawn(move || m.make(layout, p, x))
+            Lazy::new(move || m.make(layout, p, x))
         };
         let mesh_outline = lazy(LayoutKind::Main, P { label: "mesh-outline", vs: "vs_outline", fs: "fs_outline", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }, PLAIN);
         let mesh_outline_depth = lazy(LayoutKind::Main, P { label: "mesh-outline-depth", vs: "vs_mesh", fs: "fs_outline_depth", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, Extra { writes: wgpu::ColorWrites::empty(), cull: None });
@@ -2212,6 +2263,7 @@ impl Renderer {
             compare_dn,
             compare_mix,
             msaa,
+            deferred_started: false,
         });
         if crate::perf::enabled() {
             log::info!(target: "perf", "renderer: first-frame pipelines for {msaa}x MSAA built in {:.0} ms ({:.0} ms since start)", built.elapsed().as_secs_f64() * 1e3, crate::perf::process_start().elapsed().as_secs_f64() * 1e3);
@@ -3009,6 +3061,11 @@ impl Renderer {
 
     fn finish(&mut self, r: PendingRead) {
         let ok = r.state.load(Ordering::Acquire) == MAP_OK;
+        if matches!(r.kind, ReadKind::Texture { .. } | ReadKind::Frame { .. })
+            && let Some(p) = &mut self.pipelines
+        {
+            p.start_deferred();
+        }
         match r.kind {
             ReadKind::Texture { seq, texture } => {
                 let result = if ok {
