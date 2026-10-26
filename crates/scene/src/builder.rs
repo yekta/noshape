@@ -275,7 +275,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.images.retain(|_, (w, _)| w.strong_count() > 0);
     let mut bodies = 0u32;
-    for b in display.bodies.iter().filter(|b| !b.hidden) {
+    for (part_index, b) in display.bodies.iter().enumerate().filter(|(_, b)| !b.hidden) {
         let colors = opts.vertex_colors.as_ref().and_then(|m| m.get(&b.id)).filter(|c| c.len() == b.mesh.positions.len());
         let replaced = opts.replaced_meshes.as_ref().and_then(|m| m.get(&b.id));
         // Pattern copies sharing one mesh (`SharedMesh`): uploaded once and
@@ -358,6 +358,10 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // planes and picked regions and its front faces over them.)
                 let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
                 let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(ISOLATE_GHOST) } else { mesh };
+                // The cap hatch's id: live's Part Studio parts read 230, 234,
+                // 238, … (occurrence id + mesh group hash; live ui (10-26),
+                // icons2 caps 3).
+                let mesh = mesh.hatch_id(230 + 4 * part_index as u32);
                 // Parts excluded from the section view are not cut.
                 scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
             }

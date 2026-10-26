@@ -538,10 +538,12 @@ impl PartStudioView {
             let density = |_: &BodyId| props.density;
             noshape_model::regen::measure::mass_properties(ctx, std::slice::from_ref(&body), &density)?.mass
         });
+        // Live (assembly/1246: "2 lb"): masses in the document's mass unit.
+        let (msym, mfac) = crate::assembly_view::mass::mass_unit(&self.doc.read(cx).session.doc.settings.units);
         let spec = MetaSpec {
             category: "Onshape Part",
             material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())),
-            computed_mass: computed.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))),
+            computed_mass: computed.map(|m| format!("{} {msym}", crate::assembly_view::mass::number(m * mfac))),
             bom_options: None,
             values: MetaValues {
                 name,
@@ -551,7 +553,7 @@ impl PartStudioView {
                 // (Release__typical_release_workflow).
                 revision: props.revision.clone().unwrap_or_default(),
                 meta: props.meta.clone(),
-                mass_override: props.mass_override.map(|m| format!("{m} kg")),
+                mass_override: props.mass_override.map(|m| format!("{} {msym}", crate::assembly_view::mass::number(m * mfac))),
                 bom: 0,
             },
         };
@@ -975,17 +977,19 @@ impl PartStudioView {
                     _ => 1.0,
                 };
                 let i = mp.inertia * scale;
-                let scale_of = [i.x_axis.x, i.y_axis.y, i.z_axis.z].into_iter().fold(0.0f64, |a, x| a.max(x.abs())) / f;
-                let v = |x: f64| mass_number(x / f, scale_of);
+                // Live: in the document's mass unit (Workspace units › Mass).
+                let (msym, mfac) = crate::assembly_view::mass::mass_unit(&units);
+                let scale_of = [i.x_axis.x, i.y_axis.y, i.z_axis.z].into_iter().fold(0.0f64, |a, x| a.max(x.abs())) * mfac / f;
+                let v = |x: f64| mass_number(x * mfac / f, scale_of);
                 mass_view = Some(MassView {
                     override_part: single.filter(|_| mp.mass.is_some()).map(|b| (b, edit.unwrap_or(stored).is_some(), shown.unwrap_or(0.0))),
                     changed: edit.is_some_and(|e| e != stored),
                     volume: self.fmt(Quantity::new(mp.volume, len3), cx),
                     area: self.fmt(Quantity::new(mp.surface_area, len2), cx),
-                    mass: mp.mass.and(shown).map(|m| format!("{} kg", mass_number(m, m))),
+                    mass: mp.mass.and(shown).map(|m| format!("{} {msym}", mass_number(m * mfac, m * mfac))),
                     // Without a material Onshape leaves the center of mass empty.
                     center: if mp.mass.is_some() { [l(c.x), l(c.y), l(c.z)] } else { Default::default() },
-                    inertia_unit: format!("{sym}² kg"),
+                    inertia_unit: format!("{msym} {sym}²"),
                     inertia: mp.mass.map(|_| [[v(i.x_axis.x), v(i.y_axis.x), v(i.z_axis.x)], [v(i.x_axis.y), v(i.y_axis.y), v(i.z_axis.y)], [v(i.x_axis.z), v(i.y_axis.z), v(i.z_axis.z)]]),
                     parts: if bodies.is_empty() { Vec::new() } else { bodies.iter().filter_map(|b| self.display.body(b).map(|d| d.name.clone())).collect() },
                     reference,
@@ -994,8 +998,9 @@ impl PartStudioView {
                 // Nothing measurable (no solid, e.g. a lone surface): live
                 // (qa4 round 4 S3, part-studio/2382) keeps the whole dialog
                 // with "Parts to measure" empty and every value blank.
-                let sym = self.doc.read(cx).session.doc.settings.units.length.symbol();
-                mass_view = Some(MassView::blank(sym, reference.map(|c| c.name)));
+                let units = self.doc.read(cx).session.doc.settings.units;
+                let (msym, _) = crate::assembly_view::mass::mass_unit(&units);
+                mass_view = Some(MassView::blank(units.length.symbol(), msym, reference.map(|c| c.name)));
             }
         } else {
             // Live (part-studio/81-82): a selection only gets the one-line
@@ -1562,13 +1567,13 @@ struct MassView {
 
 impl MassView {
     /// The dialog with nothing to measure: every row kept, every value blank.
-    fn blank(length_symbol: &str, reference: Option<String>) -> Self {
+    fn blank(length_symbol: &str, mass_symbol: &str, reference: Option<String>) -> Self {
         MassView {
             volume: String::new(),
             area: String::new(),
             mass: None,
             center: Default::default(),
-            inertia_unit: format!("{length_symbol}² kg"),
+            inertia_unit: format!("{mass_symbol} {length_symbol}²"),
             inertia: None,
             parts: Vec::new(),
             reference,
@@ -1666,7 +1671,7 @@ impl PartStudioView {
     /// is done) and hides itself ≈4.6 s later, once per session, whether or
     /// not the panel is still open (qa4 F19).
     /// The Mass box typed into (live ui-mass/12–13): Enter applies a mass
-    /// ("1" → 1 kg here; a unit converts) and keeps the box with its value
+    /// ("1" → 1 in the document's mass unit; a unit converts) and keeps the box with its value
     /// selected; leaving it applies too; text that isn't a mass stays.
     fn edit_mass_override(&mut self, body: BodyId, kg: f64, text: String, window: &mut Window, cx: &mut Context<Self>) {
         use gpui_kit::component::input::{InputEvent, InputState};
@@ -1677,10 +1682,15 @@ impl PartStudioView {
                 return;
             }
             let typed = st.read(cx).value().to_string();
-            if let Some(v) = crate::properties_dialog::parse_mass(&typed) {
+            // A bare number is in the document's mass unit ("2" → "2 lb"
+            // live); another unit converts.
+            let (msym, mfac) = crate::assembly_view::mass::mass_unit(&this.doc.read(cx).session.doc.settings.units);
+            let bare = !typed.chars().any(|c| c.is_ascii_alphabetic());
+            let parsed = if bare { typed.trim().parse::<f64>().ok().filter(|v| *v > 0.0).map(|v| v / mfac) } else { crate::properties_dialog::parse_mass(&typed) };
+            if let Some(v) = parsed {
                 this.ui.mass_override_edit = Some((body.clone(), Some(v)));
                 if enter {
-                    let shown = format!("{} kg", mass_number(v, v));
+                    let shown = format!("{} {msym}", mass_number(v * mfac, v * mfac));
                     st.update(cx, |s, cx| {
                         s.set_value(shown, window, cx);
                         s.select_all(window, cx);
@@ -1789,32 +1799,25 @@ mod mass_parts_tests {
 
     #[::core::prelude::v1::test]
     fn nothing_to_measure_keeps_every_row_blank() {
-        let m = super::MassView::blank("mm", None);
+        let m = super::MassView::blank("mm", "lb", None);
         assert!(m.parts.is_empty() && m.volume.is_empty() && m.area.is_empty() && m.mass.is_none() && m.inertia.is_none());
         assert!(m.center.iter().all(String::is_empty));
-        assert_eq!(m.inertia_unit, "mm² kg");
+        // Live (ui-mass/05): "Mass moments of inertia (lb mm²)".
+        assert_eq!(m.inertia_unit, "lb mm²");
         assert!(!m.mass_override_enabled());
         assert!(super::MassView { volume: "48 mm³".into(), ..m }.mass_override_enabled());
     }
 }
 
-/// A Mass properties number as live shows it (ui-mass/05–13, skb 10-20):
-/// up to 3 decimals without trailing zeros ("1.999", "5.77", "2"), a value
-/// under 0.001 in e-notation ("-3.307e-4"), float noise next to the
-/// largest value (`scale`) as "0".
+/// A Mass properties number as live shows it (ui-mass/05–13, skb 10-20;
+/// the assembly's `number`): up to 3 decimals without trailing zeros
+/// ("1.999", "5.77", "2"), one that would read 0.000 in e-notation
+/// ("-3.307e-4"); float noise next to the largest value (`scale`) is "0".
 fn mass_number(x: f64, scale: f64) -> String {
-    if x == 0.0 || x.abs() <= scale.abs() * 1e-9 {
+    if x.abs() <= scale.abs() * 1e-9 {
         return "0".into();
     }
-    if x.abs() < 0.001 {
-        let t = format!("{x:.3e}");
-        return match t.split_once('e') {
-            Some((m, e)) => format!("{}e{e}", m.trim_end_matches('0').trim_end_matches('.')),
-            None => t,
-        };
-    }
-    let t = format!("{x:.3}");
-    t.trim_end_matches('0').trim_end_matches('.').to_string()
+    crate::assembly_view::mass::number(x)
 }
 
 /// A point in a mate connector's frame (origin, X, Y, Z).

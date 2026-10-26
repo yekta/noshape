@@ -102,6 +102,27 @@ const SELECT_CARET: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox=
 /// Its mirror, a spinbox's ▲.
 const SELECT_CARET_UP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 6h8L4 0.5z"/></svg>"#;
 
+/// A select's field (live drawing/1710): white, 25 px high on a 1 px #ddd
+/// line (164 px wide on Units and precision; the other tabs' widths follow
+/// their table columns), the #555 value's ink 7 px in, an 8 px #777 caret
+/// 6 px from the right.
+fn select_field(id: &'static str, current: String, w: f32) -> Stateful<Div> {
+    h_flex()
+        .id(id)
+        .w(px(w))
+        .h(px(26.))
+        .pl(px(6.))
+        .pr(px(6.))
+        .bg(gpui_kit::rgb(0xffffff))
+        .border_b_1()
+        .border_color(gpui_kit::rgb(0xdddddd))
+        .text_size(px(13.33))
+        .text_color(gpui_kit::rgb(0x555555))
+        .cursor_pointer()
+        .child(div().flex_1().min_w_0().truncate().child(current))
+        .child(crate::os_ui::glyph(SELECT_CARET, 8., gpui_kit::rgb_static(0x777777)))
+}
+
 /// An arrowhead style as the Arrowhead control shows it (live drawing/1710):
 /// an 18 × 9 px #333 glyph, a shaft from the left to the tip at the right
 /// with the head 12 px long and 7 px wide.
@@ -497,24 +518,7 @@ impl DrawingEditor {
         let units = props.units.unwrap_or(if self.drawing.units_mm { DimUnits::Millimeter } else { DimUnits::Inch });
         let sel = |id: &'static str, current: String, items: Vec<(String, bool, Act)>, w: f32| {
             let ed = ed.clone();
-            // Live drawing/1710: a white field 25 px high on a 1 px #ddd line
-            // (164 px wide on Units and precision; the other tabs' widths
-            // follow their table columns), the #555 value's ink 7 px in, an
-            // 8 px #777 caret 6 px from the right.
-            h_flex()
-                .id(id)
-                .w(px(w))
-                .h(px(26.))
-                .pl(px(6.))
-                .pr(px(6.))
-                .bg(gpui_kit::rgb(0xffffff))
-                .border_b_1()
-                .border_color(gpui_kit::rgb(0xdddddd))
-                .text_size(px(13.33))
-                .text_color(gpui_kit::rgb(0x555555))
-                .cursor_pointer()
-                .child(div().flex_1().min_w_0().truncate().child(current))
-                .child(crate::os_ui::glyph(SELECT_CARET, 8., gpui_kit::rgb_static(0x777777)))
+            select_field(id, current, w)
                 .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
                     for (label, checked, f) in &items {
                         let (e, f) = (ed.clone(), f.clone());
@@ -826,15 +830,8 @@ impl DrawingEditor {
             let vd = props.view_defaults.clone();
             let proj = self.drawing.projection;
             let ed2 = ed.clone();
-            let proj_btn = Button::new("dp-proj")
-                .label(if proj == Projection::ThirdAngle { "Third angle" } else { "First angle" })
-                .ghost()
-                .small()
-                .w(px(160.))
-                .dropdown_caret(true)
-                .border_b_1()
-                .border_color(gpui_kit::rgb(0xdddddd))
-                .rounded(px(0.))
+            // Live 1710: 223 px from the group's column (121 px).
+            let proj_btn = select_field("dp-proj", if proj == Projection::ThirdAngle { "Third angle".into() } else { "First angle".into() }, 223.)
                 .os_dropdown_menu("dp-projection-dd", true, move |m, _, _| {
                     let (a, b) = (ed2.clone(), ed2.clone());
                     m.item(crate::os_menu::OsMenuItem::new("Third angle").checked(proj == Projection::ThirdAngle).on_click(move |_, _, cx| a.update(cx, |t, cx| t.edit("Projection angle", cx, |d| d.projection = Projection::ThirdAngle))))
@@ -848,18 +845,25 @@ impl DrawingEditor {
                 ("Hidden".into(), !vd.hidden_lines, std::rc::Rc::new(|p: &mut DrawingProps| p.view_defaults.hidden_lines = false) as Act),
                 ("Shown".into(), vd.hidden_lines, std::rc::Rc::new(|p: &mut DrawingProps| p.view_defaults.hidden_lines = true) as Act),
             ];
+            let on_off = |on: bool| if on { "On" } else { "Off" };
+            let on_off_items = |on: bool, set: fn(&mut DrawingProps, bool)| -> Vec<(String, bool, Act)> {
+                [("On", true), ("Off", false)].iter().map(|&(n, v)| (n.to_string(), on == v, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, v)) as Act)).collect()
+            };
             let tangent_items: Vec<(String, bool, Act)> = ["Hidden", "Solid", "Phantom"].iter().enumerate().map(|(i, n)| (n.to_string(), vd.tangent == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_defaults.tangent = i as u8) as Act)).collect();
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Views"))
                 .child(section("All views"))
-                .child(row("Projection angle", proj_btn))
+                .child(trow("Projection angle", 121., 33., 2., proj_btn))
+                // Live 1710: the column at 165 px, selects up to 343 px, in
+                // live's order; Scale label and the auto centermarks /
+                // centerlines are On / Off selects.
                 .child(section("Insert view defaults"))
-                .child(row("View simplification", select("dp-vsimp", simp_label.into(), simp_items)))
-                .child(check("dp-vcm", "Auto centermarks (Parts)", vd.auto_centermarks, |p, v| p.view_defaults.auto_centermarks = v, cx))
-                .child(check("dp-vcl", "Auto centerlines (Parts)", vd.auto_centerlines, |p, v| p.view_defaults.auto_centerlines = v, cx))
-                .child(row("Hidden lines", select("dp-vhidden", if vd.hidden_lines { "Shown".into() } else { "Hidden".into() }, hidden_items)))
-                .child(row("Tangent edges", select("dp-vtan", ["Hidden", "Solid", "Phantom"][vd.tangent.min(2) as usize].into(), tangent_items)))
-                .child(check("dp-vscale", "Scale label", vd.scale_label, |p, v| p.view_defaults.scale_label = v, cx));
+                .child(trow("View simplification", 165., 39., 2., sel("dp-vsimp", simp_label.into(), simp_items, 179.)))
+                .child(trow("Hidden lines", 165., 33., 2., sel("dp-vhidden", if vd.hidden_lines { "Shown".into() } else { "Hidden".into() }, hidden_items, 179.)))
+                .child(trow("Tangent edges", 165., 33., 2., sel("dp-vtan", ["Hidden", "Solid", "Phantom"][vd.tangent.min(2) as usize].into(), tangent_items, 179.)))
+                .child(trow("Scale label", 165., 33., 2., sel("dp-vscale", on_off(vd.scale_label).into(), on_off_items(vd.scale_label, |p, v| p.view_defaults.scale_label = v), 179.)))
+                .child(trow("Auto centermarks (Parts)", 165., 33., 2., sel("dp-vcm", on_off(vd.auto_centermarks).into(), on_off_items(vd.auto_centermarks, |p, v| p.view_defaults.auto_centermarks = v), 179.)))
+                .child(trow("Auto centerlines (Parts)", 165., 33., 2., sel("dp-vcl", on_off(vd.auto_centerlines).into(), on_off_items(vd.auto_centerlines, |p, v| p.view_defaults.auto_centerlines = v), 179.)));
             // Per view type.
             let vt = props.view_tab.clone();
             let field = |i: usize| self.wt_field(i, &ed);
@@ -904,7 +908,6 @@ impl DrawingEditor {
                 .child(row("Bend tangent edges", swatch("dp-btanc", vt.bend_tangent_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_tangent_color = c))));
         } else if self.drawing_props.tab == 4 {
             let vt = props.view_tab.clone();
-            let field = |i: usize| self.wt_field(i, &ed);
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
@@ -912,37 +915,42 @@ impl DrawingEditor {
                 })))
             };
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Construction geometry"))
-                // Live order: Mark size, Gap size, Color, Extended lines.
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Construction geometry"))
+                // Live 1710: Extended lines first, then column 149 with
+                // 181 px spinboxes; Centerlines from column 130.
                 .child(section("Centermarks"))
-                .child(row("Mark size", field(0)))
-                .child(row("Gap size", field(1)))
-                .child(row("Color", swatch("dp-cmcolor", vt.centermark_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centermark_color = c))))
                 .child(check("dp-cmext", "Extended lines", vt.centermark_extended, |p, v| p.view_tab.centermark_extended = v, cx))
+                .child(trow("Mark size", 149., 32., 2., self.wt_field_w(0, &ed, 181.)))
+                .child(trow("Gap size", 149., 32., 2., self.wt_field_w(1, &ed, 181.)))
+                .child(trow("Color", 149., 33., 2., swatch("dp-cmcolor", vt.centermark_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centermark_color = c))))
                 .child(section("Centerlines"))
-                .child(row("Color", swatch("dp-clcolor", vt.centerline_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centerline_color = c))));
+                .child(trow("Color", 130., 33., 2., swatch("dp-clcolor", vt.centerline_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centerline_color = c))));
         } else if self.drawing_props.tab == 5 {
             let color_select = |id: &'static str, cur: Option<[u8; 3]>, set: fn(&mut DrawingProps, Option<[u8; 3]>)| swatch(id, cur, std::rc::Rc::new(move |p: &mut DrawingProps, c| set(p, c)));
             let locked = props.formats_locked;
+            let lock_items: Vec<(String, bool, Act)> = vec![
+                ("Unlocked".into(), !locked, std::rc::Rc::new(|p: &mut DrawingProps| p.formats_locked = false) as Act),
+                ("Locked".into(), locked, std::rc::Rc::new(|p: &mut DrawingProps| p.formats_locked = true) as Act),
+            ];
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Formats"))
-                .child(div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("dp-flock").native().label_style(13.33, 0x666666).label("Locked").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
-                    let v = *v;
-                    this.set_drawing_prop(&move |p| p.formats_locked = v, cx);
-                }))))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Formats"))
+                // Live 1710: a Lock group with an Unlocked / Locked select
+                // (column 112, 147 px); the colours at column 111.
+                .child(section("Lock"))
+                .child(trow("Lock", 112., 33., 2., sel("dp-flock", if locked { "Locked".into() } else { "Unlocked".into() }, lock_items, 147.)))
                 .child(section("Border frame"))
-                .child(row("Color", color_select("dp-fborder", props.border_color, |p, c| p.border_color = c)))
+                .child(trow("Color", 111., 32., 1., color_select("dp-fborder", props.border_color, |p, c| p.border_color = c)))
                 .child(section("Border zone"))
-                .child(row("Color", color_select("dp-fzone", props.zone_color, |p, c| p.zone_color = c)))
+                .child(trow("Color", 111., 32., 1., color_select("dp-fzone", props.zone_color, |p, c| p.zone_color = c)))
                 .child(section("Title block"))
-                .child(row("Color", color_select("dp-ftitle", props.title_block_color, |p, c| p.title_block_color = c)));
+                .child(trow("Color", 111., 32., 1., color_select("dp-ftitle", props.title_block_color, |p, c| p.title_block_color = c)));
         } else if self.drawing_props.tab == 6 {
-            let field = |i: usize| self.wt_field(i, &ed);
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Tables"))
+                // Live 1710: column 181, 100 px spinboxes 1 px down 32 px rows.
                 .child(section("All tables"))
-                .child(row("Horizontal padding", field(0)))
-                .child(row("Vertical padding", field(1)));
+                .child(trow("Horizontal padding", 181., 32., 1., self.wt_field_w(0, &ed, 100.)))
+                .child(trow("Vertical padding", 181., 32., 1., self.wt_field_w(1, &ed, 100.)));
         } else if self.drawing_props.tab == 7 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
@@ -958,18 +966,17 @@ impl DrawingEditor {
             let border_items: Vec<(String, bool, Act)> = (0..=5u8).map(|n| (border_chars_label(n), n == props.inspection_border_chars, std::rc::Rc::new(move |p: &mut DrawingProps| p.inspection_border_chars = n) as Act)).collect();
             let field = |i: usize| self.wt_field(i, &ed);
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Inspection"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Inspection"))
                 // Live: one "Inspection items" group, then "Automatic inspection items".
+                // Live 1710: column 105 (selects 106, 253 px), the Text row's
+                // field followed by Bold and Italic.
                 .child(section("Inspection items"))
-                .child(row("Item parsing", select("dp-iparse", if props.inspection_row_parsing { "Row".into() } else { "Parameter".into() }, parse_items)))
-                .child(row("Font", font_row(FontOf::Inspection, props.inspection_font.clone(), 164.)))
-                .child(row("Text", field(0)))
-                .child(row("Border shape", select("dp-ishape", props.inspection_shape.name().into(), shape_items)))
-                .child(row("Border size", select("dp-isize", border_chars_label(props.inspection_border_chars), border_items)))
-                .child(row(
-                    "Border color",
-                    swatch("dp-icolor", props.inspection_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.inspection_color = c)),
-                ))
+                .child(trow("Item parsing", 106., 33., 2., sel("dp-iparse", if props.inspection_row_parsing { "Row".into() } else { "Parameter".into() }, parse_items, 253.)))
+                .child(trow("Font", 106., 32., 2., font_row(FontOf::Inspection, props.inspection_font.clone(), 253.)))
+                .child(trow("Text", 105., 33., 2., h_flex().items_start().child(field(0)).child(Self::font_style_toggles(FontOf::Inspection, props.inspection_font.clone(), ("dp-ifont-b", "dp-ifont-i"), cx)).into_any_element()))
+                .child(trow("Border shape", 106., 33., 2., sel("dp-ishape", props.inspection_shape.name().into(), shape_items, 253.)))
+                .child(trow("Border size", 106., 32., 2., sel("dp-isize", border_chars_label(props.inspection_border_chars), border_items, 253.)))
+                .child(trow("Border color", 105., 33., 2., swatch("dp-icolor", props.inspection_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.inspection_color = c))))
                 .child(check("dp-isolid", "Solid fill", props.inspection_solid_fill, |p, v| p.inspection_solid_fill = v, cx))
                 .child(section("Automatic inspection items"))
                 .child(check("dp-iexcl", "Exclude callouts", props.inspection_exclude_callouts, |p, v| p.inspection_exclude_callouts = v, cx));
@@ -1073,6 +1080,43 @@ impl DrawingEditor {
     /// The panel's footer (live drawing/18): "Update properties from a
     /// template…" with the DWT button (the standard templates), and
     /// ☐ Lock drawing properties.
+    /// Bold and Italic for a text style (live drawing/1710, Inspection ›
+    /// Text): 26 px buttons 3 px apart, pressed `#cfdbe5` with a 1 px
+    /// `#1b5faa` line 1 px in, else `#f5f5f5`; SHX fonts disable them.
+    fn font_style_toggles(w: FontOf, cur: Option<noshape_model::drawing::sheet::TextFont>, ids: (&'static str, &'static str), cx: &mut Context<Self>) -> AnyElement {
+        use noshape_model::drawing::sheet::{DRAWING_DEFAULT_FONT, TextFont, is_shx};
+        let (b, i) = cur.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
+        let shx = cur.as_ref().is_some_and(|f| is_shx(&f.family));
+        let toggle = |id: &'static str, glyph: &'static str, italic: bool, on: bool, f: fn(&mut TextFont), cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .size(px(26.))
+                .relative()
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(gpui_kit::rgb(if on { 0xcfdbe5 } else { 0xf5f5f5 }))
+                .when(on, |d| d.child(div().absolute().top(px(1.)).left(px(1.)).right(px(1.)).bottom(px(1.)).border_1().border_color(gpui_kit::rgb(0x1b5faa))))
+                .child(div().text_size(px(22.)).font_weight(FontWeight::BOLD).when(italic, |d| d.italic()).text_color(gpui_kit::rgb(0x333333)).child(glyph))
+                .when(shx, |d| d.opacity(0.4))
+                .when(!shx, |d| {
+                    d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.set_drawing_prop(&move |p| {
+                            let slot = font_of(p, w);
+                            let mut font = slot.clone().unwrap_or_else(|| TextFont { family: DRAWING_DEFAULT_FONT.into(), bold: false, italic: false });
+                            f(&mut font);
+                            *slot = Some(font);
+                        }, cx)
+                    }))
+                })
+        };
+        h_flex()
+            .gap(px(3.))
+            .child(toggle(ids.0, "B", false, b, |f| f.bold = !f.bold, cx))
+            .child(toggle(ids.1, "I", true, i, |f| f.italic = !f.italic, cx))
+            .into_any_element()
+    }
+
     fn drawing_props_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
         let locked = self.drawing.props.locked;
