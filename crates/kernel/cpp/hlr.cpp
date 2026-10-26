@@ -18,6 +18,8 @@
 #include <HLRBRep_FaceIterator.hxx>
 #include <HLRBRep_PolyAlgo.hxx>
 
+#include <unordered_map>
+
 namespace noshape {
 
 namespace {
@@ -31,11 +33,17 @@ enum : uint8_t
   CLS_SEAM    = 3,
 };
 
+// Source edges by their 3D curve. HLR's outliner splits edges where a
+// silhouette touches them (the rims of a slightly tilted hole); the pieces
+// are new edges that keep the source edge's curve.
+using CurveIndex = std::unordered_multimap<const Geom_Curve*, int>;
+
 struct Emitter
 {
-  HlrOut&          out;
-  const ShapeIMap& srcEdges;
-  double           defl;
+  HlrOut&           out;
+  const ShapeIMap&  srcEdges;
+  const CurveIndex& curves;
+  double            defl;
 
   void emit_points(const std::vector<gp_Pnt2d>& pts, bool visible, uint8_t cls, int source)
   {
@@ -87,12 +95,48 @@ struct Emitter
   }
 };
 
-int source_index(const ShapeIMap& src, const TopoDS_Shape& s)
+CurveIndex curve_index(const ShapeIMap& src)
+{
+  CurveIndex m;
+  for (int i = 1; i <= src.Extent(); ++i)
+  {
+    TopLoc_Location               loc;
+    double                        f, l;
+    const occ::handle<Geom_Curve> c = BRep_Tool::Curve(TopoDS::Edge(src.FindKey(i)), loc, f, l);
+    if (!c.IsNull())
+      m.emplace(c.get(), i - 1);
+  }
+  return m;
+}
+
+// The source edge of `s`: itself, else (a piece of a split edge) the source
+// edge with the same curve and location. Copies sharing a curve (patterned
+// instances) are told apart by location; still ambiguous gives none.
+int source_index(const ShapeIMap& src, const CurveIndex& curves, const TopoDS_Shape& s)
 {
   if (s.IsNull() || s.ShapeType() != TopAbs_EDGE)
     return -1;
   const int i = src.FindIndex(s);
-  return i > 0 ? i - 1 : -1;
+  if (i > 0)
+    return i - 1;
+  TopLoc_Location               loc;
+  double                        f, l;
+  const occ::handle<Geom_Curve> c = BRep_Tool::Curve(TopoDS::Edge(s), loc, f, l);
+  if (c.IsNull())
+    return -1;
+  const auto range = curves.equal_range(c.get());
+  int        only  = -1, n = 0;
+  for (auto it = range.first; it != range.second; ++it)
+  {
+    TopLoc_Location l2;
+    double          f2, e2;
+    BRep_Tool::Curve(TopoDS::Edge(src.FindKey(it->second + 1)), l2, f2, e2);
+    if (l2.IsEqual(loc))
+      return it->second;
+    only = it->second;
+    ++n;
+  }
+  return n == 1 ? only : -1;
 }
 
 void draw_edge_data(Emitter& em, HLRBRep_EdgeData& ed, bool visible, uint8_t cls, int source)
@@ -139,7 +183,7 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
   auto src_of = [&](int ie) {
     if (ie < 1 || ie > DS->EdgeMap().Extent())
       return -1;
-    return source_index(em.srcEdges, DS->EdgeMap().FindKey(ie));
+    return source_index(em.srcEdges, em.curves, DS->EdgeMap().FindKey(ie));
   };
   for (int iface = 1; iface <= nf; ++iface)
   {
@@ -228,7 +272,8 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
   HlrOut    out;
   ShapeIMap srcEdges;
   TopExp::MapShapes(s.shape, TopAbs_EDGE, srcEdges);
-  Emitter em{out, srcEdges, defl};
+  const CurveIndex curves = curve_index(srcEdges);
+  Emitter          em{out, srcEdges, curves, defl};
 
   if (exact)
   {
@@ -283,7 +328,7 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
     if (d.Modulus() <= 1e-10)
       continue;
     // Segments of real edges keep their source; silhouettes have none.
-    int     src = source_index(srcEdges, S);
+    int     src = source_index(srcEdges, curves, S);
     uint8_t cls = CLS_SHARP;
     if (intl)
     {

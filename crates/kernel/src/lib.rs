@@ -52,7 +52,7 @@ pub use io::{
 pub use mesh::{EdgeRange, FaceRange, MeshOptions, Tessellation, tessellate, tessellate_with};
 pub use ops::*;
 pub use props::{Distance, MassProperties, angle_between, distance, linear_properties, surface_properties, volume_properties};
-pub use shape::{AncestorMap, Orientation, Shape, ShapeType};
+pub use shape::{AncestorMap, Orientation, Shape, ShapeType, ShownTopology};
 pub use surfacing::{
     BSplineCurve2dData, BSplineSurfaceData, Developable, Placement2d, SurfaceFit, SurfaceFitOptions, bspline_surface_from_grid, fit_surface,
     isocline_curves, make_bspline_surface, max_deviation, wrap_faces,

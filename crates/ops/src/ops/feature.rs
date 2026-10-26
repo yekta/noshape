@@ -178,7 +178,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "reorder",
             summary: "Move features to another place in the list",
-            description: "Like dragging rows in the feature list: refused when a feature would move above something it depends on.",
+            description: "Like dragging rows in the feature list: a feature moved above something it depends on moves all the same and then fails on its missing selection (as Onshape).",
             fields: vec![doc_field(), tab_field(), req("features", strings(), "Feature ids or names to move."), req("to", json!({ "type": "integer", "minimum": 0 }), "Row index to drop them at.")],
             mutates: true,
             destructive: false,
@@ -533,7 +533,6 @@ fn reorder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let moving = features_arg(ps, a, "features")?;
     let to = a.opt_u64("to")?.unwrap_or(0) as usize;
     let order = interaction::reordered(&ps.features, &moving, to).ok_or_else(|| OpError::param("to", "nothing to move there"))?;
-    interaction::check_order(&ps.features, &order).map_err(|m| OpError::invalid(m).with_param("to"))?;
     let desc = if moving.len() == 1 { "Reorder feature" } else { "Reorder features" };
     edit_studio(od, tab, desc, |ps| {
         interaction::apply_order(ps, &order);

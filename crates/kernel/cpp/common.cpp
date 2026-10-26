@@ -508,6 +508,68 @@ Csr ancestor_map(const OcShape& s, uint8_t kind, uint8_t ancestor_kind)
   return out;
 }
 
+// Whether an edge is an OCCT seam: it closes every face it bounds on itself
+// (twice in the face's wire, BRep_Tool::IsClosed). Parasolid has no such edge.
+bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces)
+{
+  if (faces == nullptr || faces->IsEmpty())
+    return false;
+  for (NCollection_List<TopoDS_Shape>::Iterator it(*faces); it.More(); it.Next())
+    if (!BRep_Tool::IsClosed(e, TopoDS::Face(it.Value())))
+      return false;
+  return true;
+}
+
+// Onshape's (Parasolid's) edges and vertices among OCCT's: seams and
+// degenerated edges (a sphere's poles) aren't edges there; a vertex is one if
+// it ends a shown edge that isn't closed, has no edge (a point), or is a
+// cone's apex (live: a drill tip is a vertex; a cylinder's circles, a ring's
+// and a sphere have none). Flags in MapShapes order, the edges' then the
+// vertices'.
+rust::Vec<uint8_t> shown_topology(const OcShape& s)
+{
+  const ShapeIMap& em = s.map(TopAbs_EDGE);
+  const ShapeIMap& vm = s.map(TopAbs_VERTEX);
+  ShapeAncMap      ef, ve, vf;
+  if (!s.shape.IsNull())
+  {
+    TopExp::MapShapesAndAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+    TopExp::MapShapesAndAncestors(s.shape, TopAbs_VERTEX, TopAbs_EDGE, ve);
+    TopExp::MapShapesAndAncestors(s.shape, TopAbs_VERTEX, TopAbs_FACE, vf);
+  }
+  rust::Vec<uint8_t> out;
+  out.reserve((size_t)(em.Extent() + vm.Extent()));
+  std::vector<bool> open(em.Extent() + 1, false);
+  for (int i = 1; i <= em.Extent(); ++i)
+  {
+    const TopoDS_Edge& e     = TopoDS::Edge(em(i));
+    const bool         shown = !BRep_Tool::Degenerated(e) && !is_seam(e, ef.Seek(e));
+    TopoDS_Vertex      a, b;
+    TopExp::Vertices(e, a, b);
+    open[i] = shown && !a.IsSame(b);
+    out.push_back(shown ? 1 : 0);
+  }
+  for (int i = 1; i <= vm.Extent(); ++i)
+  {
+    const NCollection_List<TopoDS_Shape>* es      = ve.Seek(vm(i));
+    bool                                  shown   = es == nullptr || es->IsEmpty();
+    bool                                  anyEdge = false;
+    if (es != nullptr)
+      for (NCollection_List<TopoDS_Shape>::Iterator it(*es); it.More() && !shown; it.Next())
+      {
+        const int j = em.FindIndex(it.Value());
+        shown       = j > 0 && open[j];
+        anyEdge     = anyEdge || (j > 0 && out[(size_t)j - 1] != 0);
+      }
+    if (!shown && !anyEdge)
+      if (const NCollection_List<TopoDS_Shape>* fs = vf.Seek(vm(i)))
+        for (NCollection_List<TopoDS_Shape>::Iterator it(*fs); it.More() && !shown; it.Next())
+          shown = BRepAdaptor_Surface(TopoDS::Face(it.Value()), false).GetType() == GeomAbs_Cone;
+    out.push_back(shown ? 1 : 0);
+  }
+  return out;
+}
+
 rust::Vec<uint32_t> adjacent_faces(const OcShape& s, uint32_t face_index)
 {
   const ShapeIMap& fm = s.map(TopAbs_FACE);
@@ -757,6 +819,11 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
   for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
   {
     const TopoDS_Edge& e = TopoDS::Edge(ee.Current());
+    // Only the boundary counts: an internal edge (a union along a tangent
+    // cylinder leaves one in the face; DIN 985 M48's hex flats) bounds
+    // nothing and would add its line integral once (-0.2165 mm² a flat).
+    if (e.Orientation() == TopAbs_INTERNAL || e.Orientation() == TopAbs_EXTERNAL)
+      continue;
     double             a, b;
     const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, f, a, b);
     if (c.IsNull())

@@ -975,13 +975,14 @@ impl PartStudioView {
                     _ => 1.0,
                 };
                 let i = mp.inertia * scale;
-                let v = |x: f64| noshape_units::to_fixed(x / f, 4);
+                let scale_of = [i.x_axis.x, i.y_axis.y, i.z_axis.z].into_iter().fold(0.0f64, |a, x| a.max(x.abs())) / f;
+                let v = |x: f64| mass_number(x / f, scale_of);
                 mass_view = Some(MassView {
                     override_part: single.filter(|_| mp.mass.is_some()).map(|b| (b, edit.unwrap_or(stored).is_some(), shown.unwrap_or(0.0))),
                     changed: edit.is_some_and(|e| e != stored),
                     volume: self.fmt(Quantity::new(mp.volume, len3), cx),
                     area: self.fmt(Quantity::new(mp.surface_area, len2), cx),
-                    mass: mp.mass.and(shown).map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))),
+                    mass: mp.mass.and(shown).map(|m| format!("{} kg", mass_number(m, m))),
                     // Without a material Onshape leaves the center of mass empty.
                     center: if mp.mass.is_some() { [l(c.x), l(c.y), l(c.z)] } else { Default::default() },
                     inertia_unit: format!("{sym}² kg"),
@@ -1679,7 +1680,7 @@ impl PartStudioView {
             if let Some(v) = crate::properties_dialog::parse_mass(&typed) {
                 this.ui.mass_override_edit = Some((body.clone(), Some(v)));
                 if enter {
-                    let shown = format!("{} kg", noshape_units::to_fixed(v, 4));
+                    let shown = format!("{} kg", mass_number(v, v));
                     st.update(cx, |s, cx| {
                         s.set_value(shown, window, cx);
                         s.select_all(window, cx);
@@ -1797,6 +1798,25 @@ mod mass_parts_tests {
     }
 }
 
+/// A Mass properties number as live shows it (ui-mass/05–13, skb 10-20):
+/// up to 3 decimals without trailing zeros ("1.999", "5.77", "2"), a value
+/// under 0.001 in e-notation ("-3.307e-4"), float noise next to the
+/// largest value (`scale`) as "0".
+fn mass_number(x: f64, scale: f64) -> String {
+    if x == 0.0 || x.abs() <= scale.abs() * 1e-9 {
+        return "0".into();
+    }
+    if x.abs() < 0.001 {
+        let t = format!("{x:.3e}");
+        return match t.split_once('e') {
+            Some((m, e)) => format!("{}e{e}", m.trim_end_matches('0').trim_end_matches('.')),
+            None => t,
+        };
+    }
+    let t = format!("{x:.3}");
+    t.trim_end_matches('0').trim_end_matches('.').to_string()
+}
+
 /// A point in a mate connector's frame (origin, X, Y, Z).
 fn in_frame(p: glam::DVec3, (o, x, y, z): (glam::DVec3, glam::DVec3, glam::DVec3, glam::DVec3)) -> glam::DVec3 {
     let d = p - o;
@@ -1805,7 +1825,14 @@ fn in_frame(p: glam::DVec3, (o, x, y, z): (glam::DVec3, glam::DVec3, glam::DVec3
 
 #[cfg(test)]
 mod mass_reference_tests {
-    use super::in_frame;
+    use super::{in_frame, mass_number};
+
+    #[::core::prelude::v1::test]
+    fn mass_numbers_read_as_live() {
+        for (x, shown) in [(1.99933, "1.999"), (5.7700001, "5.77"), (2.0, "2"), (0.04797, "0.048"), (-0.0003307, "-3.307e-4"), (-0.001, "-0.001"), (0.0, "0"), (3e-19, "0"), (-9.5948, "-9.595")] {
+            assert_eq!(mass_number(x, 7.995), shown);
+        }
+    }
     use glam::DVec3;
 
     /// Live (ui-mass/07): the 40 × 20 × 10 block's centre (20, 10, 5) from

@@ -21,16 +21,31 @@ pub fn edit_description(name: &str) -> String {
 /// hides the sketch a new feature uses). Returns where it went.
 pub fn insert_feature(ps: &mut PartStudio, feature: Feature, index: usize) -> usize {
     if let Some(sid) = noshape_model::interaction::source_sketch(&ps.features, &feature)
-        && let Some(sk) = ps.feature_mut(sid)
+        && !ps.auto_hidden.contains(&sid)
     {
-        sk.hidden = true;
+        ps.auto_hidden.push(sid);
     }
     let at = index.min(ps.features.len());
     ps.features.insert(at, feature);
     if let Some(r) = ps.rollback {
         ps.rollback = Some(r + 1);
     }
+    sync_sketch_visibility(ps);
     at
+}
+
+/// Live ("psb (10-25 l)" sketch visibility): a consumed sketch is hidden
+/// while at least one unsuppressed feature uses it, shown again when the
+/// last one is suppressed or deleted; a sketch shown or hidden by hand
+/// keeps that state.
+pub fn sync_sketch_visibility(ps: &mut PartStudio) {
+    ps.auto_hidden.retain(|id| ps.features.iter().any(|f| f.id == *id));
+    for sid in ps.auto_hidden.clone() {
+        let consumed = ps.features.iter().any(|f| !f.suppressed && f.id != sid && noshape_model::interaction::source_sketch(&ps.features, f) == Some(sid));
+        if let Some(sk) = ps.feature_mut(sid) {
+            sk.hidden = consumed;
+        }
+    }
 }
 
 /// Accept an edited feature's dialog: configured parameters go to the active
@@ -54,6 +69,7 @@ pub fn delete_features(ps: &mut PartStudio, ids: &[FeatureId]) {
     for id in ids {
         ps.remove(*id);
     }
+    sync_sketch_visibility(ps);
 }
 
 /// "Suppress" / "Unsuppress".
@@ -73,6 +89,7 @@ pub fn set_suppressed(ps: &mut PartStudio, ids: &[FeatureId], suppressed: bool) 
             }
         }
     }
+    sync_sketch_visibility(ps);
 }
 
 pub fn suppression_expr_description(expr: Option<&str>) -> &'static str {
@@ -205,6 +222,8 @@ pub fn set_visibility(ps: &mut PartStudio, t: &VisibilityTargets, hidden: bool) 
         ps.part_properties.entry(b.clone()).or_default().hidden = hidden;
     }
     for f in &t.features {
+        // By hand: no longer follows its consumers (a manual Show is sticky).
+        ps.auto_hidden.retain(|x| x != f);
         if let Some(f) = ps.feature_mut(*f) {
             f.hidden = hidden;
         }
@@ -227,6 +246,7 @@ pub fn show_all(ps: &mut PartStudio) {
     for f in &mut ps.features {
         f.hidden = false;
     }
+    ps.auto_hidden.clear();
     ps.hidden_defaults.clear();
 }
 
@@ -599,5 +619,52 @@ mod tests {
         // A working tool over one part: Add into it, nothing to change.
         let ok = state(FeatureStatus::Ok, &[], vec![part]);
         assert!(boolean_choices(&f, &|_| false, &ok).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod sketch_visibility_tests {
+    use super::*;
+    use noshape_model::params::ParamValue;
+    use noshape_model::reference::Reference;
+
+    /// Live "psb (10-25 l)" steps (a)–(d).
+    #[test]
+    fn consumed_sketches_follow_their_consumers_as_live() {
+        let units = noshape_units::UnitPrefs::default();
+        let mut ps = PartStudio::new();
+        let sk = ps.new_feature("sketch", &units).unwrap();
+        let sid = sk.id;
+        ps.features.push(sk);
+        let extrude = |ps: &PartStudio| {
+            let mut f = ps.new_feature("extrude", &units).unwrap();
+            f.params.set("entities", ParamValue::Query(vec![Reference::Sketch(sid)]));
+            f
+        };
+        let e1 = extrude(&ps);
+        let id1 = e1.id;
+        insert_feature(&mut ps, e1, 1);
+        let hidden = |ps: &PartStudio| ps.feature(sid).unwrap().hidden;
+        assert!(hidden(&ps), "start: hidden");
+        set_suppressed(&mut ps, &[id1], true);
+        assert!(!hidden(&ps), "(a) consumer suppressed: shown");
+        set_suppressed(&mut ps, &[id1], false);
+        assert!(hidden(&ps), "(b) unsuppressed: hidden again");
+        // (d) a second consumer keeps it hidden.
+        let e2 = extrude(&ps);
+        let id2 = e2.id;
+        insert_feature(&mut ps, e2, 2);
+        set_suppressed(&mut ps, &[id1], true);
+        assert!(hidden(&ps), "(d1) one consumer left: hidden");
+        set_suppressed(&mut ps, &[id2], true);
+        assert!(!hidden(&ps), "(d2) none left: shown");
+        set_suppressed(&mut ps, &[id1], false);
+        assert!(hidden(&ps), "(d3) one back: hidden");
+        // (c) shown by hand: sticky.
+        let t = VisibilityTargets { features: vec![sid], ..Default::default() };
+        set_visibility(&mut ps, &t, false);
+        set_suppressed(&mut ps, &[id1], true);
+        set_suppressed(&mut ps, &[id1], false);
+        assert!(!hidden(&ps), "(c3) the manual show stays");
     }
 }

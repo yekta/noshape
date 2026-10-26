@@ -51,3 +51,19 @@ then edits, undo/redo, rollback and suppress.
 | Dimension on a straight edge (assembly drawing) | "2.362" placed | — | ✅ |
 | Dimension on a hole circle | part drawing "Ø.394" ✅; **assembly drawing: click not taken** | — | ✗ **P2-D1** |
 | BOM panel (right strip) | "Bill of materials", BOM type ▾ Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description; rows 1 | 1, 2 | 1 | same columns (behaviours 1270) | ✅ |
+
+## P2 assembly, green 461aefb0
+| Step | Ours | Live | Status |
+|---|---|---|---|
+| Linear pattern (assembly): dialog | Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction | A6 (pass 21) | ✅ |
+| Pattern the pin 20 mm along the plate edge (flipped) | preview in hole 2; ✓ → "Linear pattern 1 ▸ Part 2 <2>", Instances (3) | — | ✅ |
+| Enter twice in the pattern dialog | stays open | Part Studio dialogs commit on the 2nd Enter; assembly? (request p3) | ✗? **P2-A1** |
+| Exploded views panel → Add exploded view | "Editing Explode 1 [Done]" banner, Explode 1 row, "Build steps by dragging components" | EXV rows | ✅ |
+
+## P1 extras, green 461aefb0
+| Step | Ours | Live | Status |
+|---|---|---|---|
+| Revolve dialog | Solid / Surface / Thin, New … Intersect, Faces and sketch regions to revolve, Revolve axis (pink until set), ☑ Full revolve | same (behaviours 338, 13863) | ✅ |
+| Revolve about a profile line | full cylinder; axis chip "Sketch 4 line" | chip text? ("Edge of Sketch N" in live lists; request p3 (a)) | ? |
+| Circular pattern dialog | Axis of pattern, Angle 360 deg, Instance count 4 + ↻, ☑ Equal spacing, ☐ Centered, › ☐ Skip instances | same (behaviours 331) | ✅ |
+| Circular pattern of Part 3 about a hole rim | 3 copies around the hole axis; each copy gets a new palette colour | copies' colour? (request p3 (b)) | ? |

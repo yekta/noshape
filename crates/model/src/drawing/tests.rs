@@ -2856,3 +2856,25 @@ fn cad_export_dual_dimensions_like_onshape() {
     }
     assert!(duals > 0, "{:?}", dims.iter().map(|x| x.base().text.clone()).collect::<Vec<_>>());
 }
+
+/// qa5 P2-D1: with an instance tilted a little (a drag), exact HLR splits
+/// the hole rims where the bore's silhouette touches them. The pieces keep
+/// their source edge, so a rim stays a model circle the Dimension tool can
+/// pick (it was dropped: the pieces came out unlinked).
+#[test]
+fn tilted_assembly_view_keeps_edge_sources() {
+    let (mut doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    if let Some(TabContent::Assembly(a)) = doc.tabs.iter_mut().find(|t| t.id == asm).map(|t| &mut t.content) {
+        for inst in &mut a.instances {
+            inst.placement.rotation = [-0.00035, 0.00503, -0.00245, 0.99998];
+        }
+    }
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, asm, ViewOrientation::Top, [150.0, 150.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &ViewCache::new(), true);
+    let unlinked: Vec<EdgeClass> = g.edges.iter().filter(|e| e.visible && e.model.is_none() && e.class != EdgeClass::Outline).map(|e| e.class).collect();
+    assert!(unlinked.is_empty(), "real edges without a source: {unlinked:?}");
+    assert!(g.model_edges.iter().any(|me| matches!(me.geom, views::EdgeGeom::Circle { face_on: false, .. })), "the tilted rims are model circles");
+}
