@@ -740,3 +740,8 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 - STATUS 2026-10-26 (qa5, green 62524c30): P1-4 fixed in the UI (no point at the origin; Hole ignores the stand-in). Minor for
   skb: the sketch data keeps a hidden construction "Origin stand-in" point at (0,0) that the constraints use; live has no entity
   and constrains to the external Origin, so agent/API reads (sketch_get) still differ.
+- **P1-14 — ui (mass properties)** — Mass and section properties on a part without material (green 62524c30): the inertia
+  header reads "Mass moments of inertia **(mm² kg)**". Live: "**(lb mm²)**" (lb even in a mm document; behaviours "psb f (10-21)"
+  (2)). The rest matches (red part chip, blank mass / centre of mass / inertia, volume and area filled). Our yellow toast "One or
+  more parts do not have a material defined." also shows; live notes disagree on it (behaviours 402 says it appears, psb f (10-21)
+  says nowhere) — request "qa5 (10-26 p4)".
