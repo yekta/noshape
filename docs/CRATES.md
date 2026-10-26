@@ -11,8 +11,9 @@ target structure and the rules that keep it.
 |---|---|---|
 | 0 | `noshape-units`, `noshape-sketch`, `noshape-kernel`, `noshape-featurescript` | quantities, the sketch solver, the OCCT kernel bridge, the FeatureScript language |
 | 1 | **`noshape-model-data`** | the document data model: documents, tabs, Part Studio feature lists, feature schemas, params, references, configurations, variables, and the data types of Assemblies, Drawings (sheets, views, annotations, templates, fonts) and Feature Studios. Serde types and plain methods on them; **no evaluation** |
-| 2 | `noshape-model` (today: core) | regeneration, features, FeatureScript host/std, assembly solving, in-context, analysis |
-| 3 | `noshape-drawing` (next) | drawing views, HLR projection, sheet building, tables, export (PDF/DXF/DWG) |
+| 2 | **`noshape-model-core`** | regeneration, features, FeatureScript host/std, assembly solving, in-context, analysis |
+| 3 | **`noshape-drawing`** | drawing views, HLR projection, sheet building, tables, export (PDF/DXF/DWG/DWT), the demo documents with drawings |
+| 3 | **`noshape-model`** (facade) | re-exports model-data, model-core and drawing under the old paths; holds the model integration tests (`crates/model/tests`) |
 | 2–3 | `noshape-store`, `noshape-scene`, `noshape-render` | persistence, scene building, the wgpu renderer |
 | 4 | `noshape-ops`, `noshape-cli` | the agent API |
 | 5 | app crates (planned split of `noshape`): workspace/chrome, Part Studio UI, sketch UI, assembly UI, drawing UI, other studios, the binary | GPUI application |
@@ -37,4 +38,19 @@ target structure and the rules that keep it.
 ## Progress
 
 - 2026-10-26: `noshape-model-data` split out of `noshape-model` (26k lines moved; model 98k → 72k).
-- Next: `noshape-drawing` (13k lines of drawing logic) above the model core; then assembly logic; then the app.
+- 2026-10-26: `noshape-drawing` (13k lines) split out above the core (`noshape-model-core`, 59k lines); `noshape-model`
+  is now a facade. Measured on this machine (warm, incremental, quiet), edit → rebuild:
+
+  | edit in | rebuild | time |
+  |---|---|---|
+  | drawing logic | drawing tests | 4 s |
+  | drawing logic | the app | 35 s |
+  | model core (regen) | core unit tests | 11 s |
+  | model core | model integration tests | 15 s |
+  | model core | the app | 35 s |
+  | model data | core (check) | 9 s |
+  | app | the app | 47 s |
+
+- Next: the app (138k lines): `app-core` (widgets, viewport, shared panels; never references a studio), one crate per
+  studio UI (Part Studio 34k, drawing 27k, assembly 23k, variables), and the binary (workspace, wiring). Then assembly
+  logic out of the core.

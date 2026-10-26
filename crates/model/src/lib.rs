@@ -1,58 +1,28 @@
-//! noshape-model: the headless CAD document model.
+//! noshape-model: the headless CAD document model, as one path.
 //!
-//! * [`document`]: documents and tabs.
-//! * [`partstudio`]: feature lists; [`features`]: feature schemas;
-//!   [`params`]: generic parameter values; [`reference`]: persistent naming.
-//! * [`assembly`], [`drawing`], [`variables`], [`configuration`].
+//! A facade over the layered crates (docs/CRATES.md): `noshape-model-data` (the document data), `noshape-model-core`
+//! (regeneration, features, FeatureScript, assemblies) and `noshape-drawing` (drawing views and export). Every module
+//! keeps its old path: `noshape_model::document`, `noshape_model::regen`, `noshape_model::drawing::views`, …
 
-pub use noshape_model_data::file_tab;
-pub use noshape_model_data::quantity_text;
-pub mod analysis;
-pub mod thickness;
-pub mod flatten;
-pub mod interference;
-pub use noshape_model_data::fits;
-pub mod release;
-pub mod assembly;
-pub mod compare;
-pub use noshape_model_data::configuration;
-pub mod custom;
-pub mod demo;
-pub use noshape_model_data::default_names;
-pub mod demo_fab;
-pub mod display;
-pub use noshape_model_data::document;
-pub mod drawing;
-pub mod export_rules;
-pub use noshape_model_data::features;
-pub mod in_context;
-pub mod interaction;
-pub use noshape_model_data::material_library;
-pub mod merge;
-pub mod native_assembly;
-pub use noshape_model_data::naming;
-pub use noshape_model_data::params;
-pub use noshape_model_data::partstudio;
-pub use noshape_model_data::reference;
-pub mod regen;
-pub mod select;
-pub mod sheetmetal;
-pub use noshape_model_data::sketch_feature;
-pub use noshape_model_data::variables;
-pub use noshape_model_data::annotations;
-pub use noshape_model_data::configured_properties;
-pub use noshape_model_data::variable_table;
+pub use noshape_model_core::*;
 
-pub use document::{Document, Tab, TabContent, TabId};
-pub use params::{ParamSpec, ParamValue, ParamValues};
-pub use partstudio::{Feature, PartStudio};
-pub use reference::{BodyId, FeatureId, Reference, TopoName};
+/// Drawing data and logic.
+pub use noshape_drawing::drawing;
 
-#[cfg(test)]
-mod configuration_tests;
+/// Demo documents (the ones with drawings come from noshape-drawing).
+pub mod demo {
+    pub use noshape_drawing::demo::demo_document_with_drawing;
+    pub use noshape_model_core::demo::*;
+}
 
-/// The extension traits that give data types (`noshape_model_data`) their logic methods: `use noshape_model::prelude::*;`.
+/// Demo fabrication documents.
+pub mod demo_fab {
+    pub use noshape_drawing::demo::custom_tables_document;
+    pub use noshape_model_core::demo_fab::*;
+}
+
+/// The extension traits that give data types their logic methods: `use noshape_model::prelude::*;`.
 pub mod prelude {
-    pub use crate::drawing::{CadTables, DrawingClipboard, ModelAnnotations, SheetPaste, ViewMoves};
-    pub use crate::in_context::ContextBodies;
+    pub use noshape_drawing::prelude::*;
+    pub use noshape_model_core::prelude::*;
 }

@@ -96,7 +96,7 @@ fn part_props<'a>(doc: &'a Document, studio: TabId, body: &BodyId) -> Option<&'a
 /// `config` without the entries a Part Studio's defaults give anyway (or
 /// that aren't its inputs): instances in the same configuration share one
 /// BOM row however their values were stored (qa5 CA6).
-pub(crate) fn canonical_config(doc: &Document, studio: TabId, config: &ConfigValues) -> ConfigValues {
+pub fn canonical_config(doc: &Document, studio: TabId, config: &ConfigValues) -> ConfigValues {
     let Some(TabContent::PartStudio(ps)) = doc.tab(studio).map(|t| &t.content) else { return config.clone() };
     let defaults = ps.configuration.defaults();
     // "10 mm" typed into a variable input equals a "10mm" default.

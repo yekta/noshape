@@ -129,45 +129,5 @@ pub fn fabrication_document() -> crate::document::Document {
     doc
 }
 
-/// The live capture's Feature Studio "fs tables" (FS sizes, FS two tables;
-/// behaviours.md "Custom tables (defineTable)").
-const FS_TABLES: &str = r#"FeatureScript 3095;
-import(path : "onshape/std/geometry.fs", version : "3095.0");
 
-annotation { "Table Type Name" : "FS sizes", "Table Type Description" : "Sizes of the parts" }
-export const fsSizes = defineTable(function(context is Context, definition is map) returns Table
-    precondition
-    {
-    }
-    {
-        const columns = [tableColumnDefinition("name", "Part"), tableColumnDefinition("faces", "Faces", TableTextAlignment.RIGHT), tableColumnDefinition("x", "Width"), tableColumnDefinition("misc", "Misc")];
-        var rows = [];
-        for (var body in evaluateQuery(context, qAllModifiableSolidBodies()))
-        {
-            const bb = evBox3d(context, { "topology" : body });
-            const faces = size(evaluateQuery(context, qOwnedByBody(body, EntityType.FACE)));
-            rows = append(rows, tableRow({ "name" : templateString({ "template" : "Body #n (#w)", "n" : faces, "w" : bb.maxCorner[0] - bb.minCorner[0] }), "faces" : faces, "x" : bb.maxCorner[0] - bb.minCorner[0], "misc" : 1 / 3 }, body));
-        }
-        rows = append(rows, tableRow({ "name" : tableCellError("?", "no body"), "faces" : tableCellWithInfo(0, "an info"), "x" : valueWithUnitsAndPrecision(25.4 * millimeter, 4), "misc" : 30 * degree }));
-        rows = append(rows, tableRow({ "name" : "area", "x" : 2 * inch * inch, "misc" : 1.5 * meter ^ 3 }));
-        println("table ran");
-        return table("Sizes", columns, rows);
-    });
 
-annotation { "Table Type Name" : "FS two tables" }
-export const fsTwo = defineTable(function(context is Context, definition is map) returns TableArray
-    precondition
-    {
-    }
-    {
-        return tableArray([table("First", [tableColumnDefinition("a", "A")], [tableRow({ "a" : "one" })]), table("Second", [tableColumnDefinition("b", "B")], [])]);
-    });
-"#;
-
-/// The demo document with a drawing plus the "fs tables" Feature Studio
-/// (Part Studio Custom tables panel, drawing custom tables).
-pub fn custom_tables_document() -> crate::Document {
-    let mut doc = crate::demo::demo_document_with_drawing();
-    doc.add_tab("fs tables", crate::TabContent::FeatureStudio(crate::custom::FeatureStudio::new(FS_TABLES)));
-    doc
-}

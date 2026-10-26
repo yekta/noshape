@@ -18,6 +18,8 @@ noshape-sketch = { path = "crates/sketch" }
 noshape-kernel = { path = "crates/kernel" }
 noshape-model = { path = "crates/model" }
 noshape-model-data = { path = "crates/model-data" }
+noshape-model-core = { path = "crates/model-core" }
+noshape-drawing = { path = "crates/drawing" }
 noshape-store = { path = "crates/store" }
 noshape-render = { path = "crates/render" }
 noshape-featurescript = { path = "crates/featurescript" }

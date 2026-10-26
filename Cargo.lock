@@ -4359,6 +4359,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "noshape-drawing"
+version = "0.4.6"
+dependencies = [
+ "acadrust",
+ "ahash",
+ "earcutr",
+ "env_logger",
+ "glam 0.34.1",
+ "indexmap",
+ "log",
+ "miniz_oxide 0.8.9",
+ "nalgebra",
+ "noshape-featurescript",
+ "noshape-kernel",
+ "noshape-model-core",
+ "noshape-model-data",
+ "noshape-sketch",
+ "noshape-units",
+ "noshape-workspace-hack",
+ "parking_lot",
+ "rayon",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
 name = "noshape-featurescript"
 version = "0.4.6"
 dependencies = [
@@ -4384,6 +4413,36 @@ dependencies = [
 
 [[package]]
 name = "noshape-model"
+version = "0.4.6"
+dependencies = [
+ "acadrust",
+ "ahash",
+ "earcutr",
+ "env_logger",
+ "glam 0.34.1",
+ "indexmap",
+ "log",
+ "miniz_oxide 0.8.9",
+ "nalgebra",
+ "noshape-drawing",
+ "noshape-featurescript",
+ "noshape-kernel",
+ "noshape-model-core",
+ "noshape-model-data",
+ "noshape-sketch",
+ "noshape-units",
+ "noshape-workspace-hack",
+ "parking_lot",
+ "rayon",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
+name = "noshape-model-core"
 version = "0.4.6"
 dependencies = [
  "acadrust",
