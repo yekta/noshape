@@ -25,6 +25,23 @@ fn perf_full_detail() -> bool {
     *ON.get_or_init(|| std::env::var("NOSHAPE_PERF_DETAIL").is_ok_and(|v| v == "full"))
 }
 
+/// `NOSHAPE_PERF_SCALE=<f>`: render the viewport at this many device pixels
+/// per logical pixel instead of the window's scale factor (Retina-sized GPU
+/// work on the 1x CI runners).
+fn perf_scale() -> Option<f32> {
+    static S: std::sync::OnceLock<Option<f32>> = std::sync::OnceLock::new();
+    *S.get_or_init(|| std::env::var("NOSHAPE_PERF_SCALE").ok()?.parse().ok().filter(|s: &f32| *s > 0.0))
+}
+
+/// `NOSHAPE_PERF_BENCH_DRIVE=frames`: the benchmark moves the camera again
+/// as soon as a frame arrives, not on its 8 ms timer (which the macOS CI
+/// runners fire only every 37-67 ms), so it measures how many frames per
+/// second the viewport can deliver.
+fn bench_driven_by_frames() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_PERF_BENCH_DRIVE").is_ok_and(|v| v == "frames"))
+}
+
 /// `style` with what Onshape's interactive detail settings leave out.
 fn interactive_style(style: noshape_render::Style, d: &nav::DetailSettings) -> noshape_render::Style {
     let mut s = style;
@@ -382,8 +399,8 @@ struct OrbitBench {
     started: Option<Instant>,
     frames_at_start: u64,
     last_present: Option<Instant>,
-    /// `NOSHAPE_PERF_BENCH=zoom`: scroll-zoom instead of orbiting.
-    zoom: bool,
+    /// `NOSHAPE_PERF_BENCH=zoom|pan`: scroll-zoom or pan instead of orbiting.
+    kind: BenchKind,
     ticks: u64,
     /// GPUI renders of the viewport (window re-renders) during the run.
     renders: u64,
@@ -392,10 +409,22 @@ struct OrbitBench {
     /// UI-thread CPU time between presented frames (ms).
     ui_cpu: Vec<f32>,
     cpu_at_present: Option<Duration>,
+    /// Window draw wall time per presented frame (ms; on macOS also how
+    /// much of it waited for a drawable).
+    window_draw: Vec<f32>,
+    drawable_wait: Vec<f32>,
+    draw_at_present: Option<(Duration, Duration)>,
     /// The camera was fitted to the model before the run.
     fitted: bool,
     /// When the last tick ran (`v.bench_tick`: the timer's real period).
     last_tick: Option<Instant>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum BenchKind {
+    Orbit,
+    Zoom,
+    Pan,
 }
 
 static BENCH_CLAIMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -405,7 +434,7 @@ fn orbit_bench_from_env() -> Option<OrbitBench> {
     if BENCH_CLAIMED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         return None;
     }
-    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, zoom: false, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, fitted: false, last_tick: None })
+    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, kind: BenchKind::Orbit, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, window_draw: Vec::new(), drawable_wait: Vec::new(), draw_at_present: None, fitted: false, last_tick: None })
 }
 
 impl EventEmitter<ViewportEvent> for Viewport {}
@@ -1099,6 +1128,9 @@ impl Viewport {
             }
         }
         self.bench_presented();
+        if bench_driven_by_frames() && self.bench.as_ref().is_some_and(|b| b.started.is_some()) {
+            self.bench_tick(cx);
+        }
         self.submit_if_ready(cx);
         // A frame texture only needs GPUI to present again (it samples the
         // texture registered under `texture_id`), unless the camera moved
@@ -1292,6 +1324,11 @@ impl Viewport {
         {
             b.ui_cpu.push(cpu.saturating_sub(prev).as_secs_f32() * 1000.0);
         }
+        let draw = gpui::window_draw_time();
+        if let Some(prev) = b.draw_at_present.replace(draw) {
+            b.window_draw.push(draw.0.saturating_sub(prev.0).as_secs_f32() * 1000.0);
+            b.drawable_wait.push(draw.1.saturating_sub(prev.1).as_secs_f32() * 1000.0);
+        }
     }
 
     /// One simulated mouse-move of the orbit benchmark; false when finished.
@@ -1313,8 +1350,12 @@ impl Viewport {
             noshape_render::perf::series_start("r.gpu_ms");
             b.started = Some(Instant::now());
             b.frames_at_start = self.frames_presented;
-            b.zoom = std::env::var("NOSHAPE_PERF_BENCH").is_ok_and(|m| m == "zoom");
-            if !b.zoom {
+            b.kind = match std::env::var("NOSHAPE_PERF_BENCH").as_deref() {
+                Ok("zoom") => BenchKind::Zoom,
+                Ok("pan") => BenchKind::Pan,
+                _ => BenchKind::Orbit,
+            };
+            if b.kind != BenchKind::Zoom {
                 self.drag = Drag::Nav;
             }
         }
@@ -1327,15 +1368,26 @@ impl Viewport {
             let (over60, over120) = (over(1000.0 / 60.0 + 1.0), over(1000.0 / 120.0 + 1.0));
             let iv = noshape_render::perf::Stats::of(&mut b.intervals);
             let ui = noshape_render::perf::Stats::of(&mut b.ui_cpu);
+            let draw = noshape_render::perf::Stats::of(&mut b.window_draw);
+            let wait = noshape_render::perf::Stats::of(&mut b.drawable_wait);
             let gpu = noshape_render::perf::Stats::of(&mut noshape_render::perf::series_take("r.gpu_ms"));
             // Our GPU time per frame, where the device has timestamp queries.
             let gpu = if gpu.n > 0 { format!(" | GPU per frame mean {:.2} p95 {:.2} ms", gpu.mean, gpu.p95) } else { String::new() };
             let (w, h) = ((f32::from(self.bounds.size.width) * self.scale).round(), (f32::from(self.bounds.size.height) * self.scale).round());
             log::info!(
                 target: "perf",
-                "BENCH SUMMARY {} ({}): {w}x{h} device px, {} instances | presented {:.1} fps, {} window renders | frame interval mean {:.2} p50 {:.2} p95 {:.2} p99 {:.2} max {:.2} ms | over 16.7 ms: {over60} ({:.0}%), over 8.3 ms: {over120} ({:.0}%) | UI-thread CPU per frame mean {:.2} p95 {:.2} ms{gpu}",
-                if b.zoom { "zoom" } else { "orbit" },
-                if self.shown_texture.is_some() { "frames on the GPU" } else { "frames read back" },
+                "BENCH SUMMARY {} ({}): {w}x{h} device px, {} instances | presented {:.1} fps, {} window renders | frame interval mean {:.2} p50 {:.2} p95 {:.2} p99 {:.2} max {:.2} ms | over 16.7 ms: {over60} ({:.0}%), over 8.3 ms: {over120} ({:.0}%) | UI-thread CPU per frame mean {:.2} p95 {:.2} ms | window draw per frame mean {:.2} p95 {:.2} ms, drawable wait mean {:.2} p95 {:.2} ms{gpu}",
+                match b.kind {
+                    BenchKind::Orbit => "orbit",
+                    BenchKind::Zoom => "zoom",
+                    BenchKind::Pan => "pan",
+                },
+                match (self.shown_texture.is_some(), bench_driven_by_frames()) {
+                    (true, false) => "frames on the GPU",
+                    (true, true) => "frames on the GPU, driven by frames",
+                    (false, false) => "frames read back",
+                    (false, true) => "frames read back, driven by frames",
+                },
                 self.scene.instances.len(),
                 presented as f64 / el,
                 b.renders,
@@ -1343,6 +1395,8 @@ impl Viewport {
                 100.0 * over60 as f32 / iv.n.max(1) as f32,
                 100.0 * over120 as f32 / iv.n.max(1) as f32,
                 ui.mean, ui.p95,
+                draw.mean, draw.p95,
+                wait.mean, wait.p95,
             );
             noshape_render::perf::flush();
             self.bench = None;
@@ -1357,14 +1411,18 @@ impl Viewport {
         if let Some(t) = b.last_tick.replace(now) {
             noshape_render::perf::record("v.bench_tick", now - t);
         }
-        if b.zoom {
-            // Scroll-wheel zoom in and out around the viewport centre.
-            let factor = if (b.ticks / 15) % 2 == 0 { 1.04 } else { 1.0 / 1.04 };
-            let size = self.size();
-            self.camera.zoom_at(factor, size * 0.5, size);
-        } else {
-            let h = self.size().y;
-            self.camera.orbit(DVec2::new(3.0, 0.75), h);
+        let (kind, ticks) = (b.kind, b.ticks);
+        let size = self.size();
+        let h = size.y;
+        match kind {
+            BenchKind::Zoom => {
+                // Scroll-wheel zoom in and out around the viewport centre.
+                let factor = if (ticks / 15) % 2 == 0 { 1.04 } else { 1.0 / 1.04 };
+                self.camera.zoom_at(factor, size * 0.5, size);
+            }
+            // A drag back and forth that keeps the model in view.
+            BenchKind::Pan => self.camera.pan(if (ticks / 30) % 2 == 0 { DVec2::new(6.0, 2.0) } else { DVec2::new(-6.0, -2.0) }, h),
+            BenchKind::Orbit => self.camera.orbit(DVec2::new(3.0, 0.75), h),
         }
         self.camera_changed(cx);
         true
@@ -2350,7 +2408,7 @@ impl Render for Viewport {
             self.pick_dirty = true;
         }
         self.trace_camera();
-        self.scale = window.scale_factor();
+        self.scale = perf_scale().unwrap_or_else(|| window.scale_factor());
         self.submit_if_ready(cx);
 
         let entity = cx.entity();

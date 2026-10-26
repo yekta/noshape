@@ -580,8 +580,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     Some(c) => lin_to_u8(c),
                     None => sketch_color(&opts.graphics, p.state, false, editing, false),
                 };
-                // Live (sketch/06): vertices of the edited sketch are 7 px dots.
-                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 5.0 } else { 7.0 };
+                // Live (sketch/07, 28; with the anti-aliased rim): vertices of
+                // the edited sketch are 6.7 px dots while under-defined (blue),
+                // 6 px once defined.
+                let vertex = if p.state == SketchEntityState::Under { 6.7 } else { 6.0 };
+                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 5.0 } else { vertex };
                 // Standalone points and spline handles are hollow (live sketch/100, Point tool).
                 let style = if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
                 points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style, _pad: 0 });
@@ -745,7 +748,7 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
     let mut lines = LineData::default();
     lines.segments.reserve(m.edges.iter().map(|e| e.len().saturating_sub(1)).sum());
     for (ei, pl) in m.edges.iter().enumerate() {
-        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, 0);
+        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, LineSegment::CORE);
     }
     let points = PointData {
         points: m.vertices.iter().enumerate().map(|(i, p)| PointSprite { position: *p, color: [255; 4], pick_id: i as u32 + 1, size: 6.0, style: 0, _pad: 0 }).collect(),
@@ -962,9 +965,12 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     if let Some(h) = hover {
         mark(h, state::HOVER, &mut scene);
     }
+    // A face's boundary edges: solid, without the dark core of an edge
+    // highlighted itself (live selection/03, 04 vs 06b, 07b).
     for (e, flag) in boundary {
         for &id in built.picks.ids_for(&e) {
-            scene.add_flag(id, flag);
+            let own = scene.states.get(id as usize).is_some_and(|s| s & (state::HOVER | state::SELECTED | state::ERROR) != 0);
+            scene.add_flag(id, if own { flag } else { flag | state::OUTLINE });
         }
     }
     for f in silhouette {
@@ -1073,6 +1079,62 @@ pub fn hidden_edges_dashed(display: &StudioDisplay, faces: &[Reference], up: &Up
     }
     (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().hidden_only().layer(12))
 }
+
+/// The silhouette of `faces` in the hover orange: their edges
+/// where one neighbouring face turns toward the viewer and the other away,
+/// and their curved faces' own silhouettes (live selection/10: a feature
+/// hovered in the list outlines its part with ~2 px of #ffc685 on the
+/// outline itself; the inner edges stay black). A face boundary used by one
+/// face only (a sheet's) always shows.
+pub fn hover_silhouette(display: &StudioDisplay, faces: &[Reference], up: &Uploader) -> Option<Instance> {
+    const WIDTH: f32 = 2.6;
+    let k = theme::lin(theme::viewport::PREHIGHLIGHT);
+    let want: std::collections::HashSet<&Reference> = faces.iter().collect();
+    let q = |p: &[f32; 3]| [(p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64, (p[2] * 1e6).round() as i64];
+    let mut out = SilhouetteData::default();
+    for b in display.bodies.iter().filter(|b| !b.hidden) {
+        let m = &b.mesh;
+        let lit: Vec<bool> = (0..m.face_ranges.len()).map(|fi| b.face_refs.get(fi).is_some_and(|r| want.contains(r))).collect();
+        if !lit.contains(&true) {
+            continue;
+        }
+        out.segments.extend(silhouette_edges(m).segments.into_iter().filter(|s| lit.get(s.pick_id as usize - 1) == Some(&true)).map(|s| SilhouetteSegment { pick_id: 0, width: WIDTH, ..s }));
+        // Each face's boundary sides (used once within the face, by
+        // position: a periodic face's seam is used twice) with the facet
+        // normal, then paired across faces.
+        let mut sides: HashMap<EdgeKey, Vec<BoundarySide>> = HashMap::new();
+        for (fi, &(start, count)) in m.face_ranges.iter().enumerate() {
+            let mut own: HashMap<EdgeKey, (u32, glam::Vec3, [f32; 3], [f32; 3])> = HashMap::new();
+            for t in m.indices[start as usize..(start + count) as usize].as_chunks::<3>().0 {
+                let Some(p) = t.iter().map(|&i| m.positions.get(i as usize).copied()).collect::<Option<Vec<[f32; 3]>>>() else { continue };
+                let v = |i: usize| glam::Vec3::from_array(p[i]);
+                let n = (v(1) - v(0)).cross(v(2) - v(0)).normalize_or_zero();
+                if n == glam::Vec3::ZERO {
+                    continue;
+                }
+                for (i, j) in [(0, 1), (1, 2), (2, 0)] {
+                    let (qa, qb) = (q(&p[i]), q(&p[j]));
+                    let key = if qa <= qb { (qa, qb) } else { (qb, qa) };
+                    own.entry(key).or_insert((0, n, p[i], p[j])).0 += 1;
+                }
+            }
+            for (key, (uses, n, a, b)) in own {
+                if uses == 1 {
+                    sides.entry(key).or_default().push((fi, n, a, b));
+                }
+            }
+        }
+        for users in sides.values() {
+            let Some(&(fi, n1, a, b)) = users.iter().find(|u| lit[u.0]) else { continue };
+            let n2 = users.iter().find(|u| u.0 != fi).map_or(-n1, |u| u.1);
+            out.segments.push(SilhouetteSegment { a, b, n1: n1.into(), n2: n2.into(), pick_id: 0, width: WIDTH });
+        }
+    }
+    (!out.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_silhouettes(&out))).with_color([k[0], k[1], k[2], 1.0]).unpickable().layer(12))
+}
+
+/// A face's boundary side: face index, facet normal, ends.
+type BoundarySide = (usize, glam::Vec3, [f32; 3], [f32; 3]);
 
 /// An edge by its quantized end points.
 type EdgeKey = ([i64; 3], [i64; 3]);

@@ -47,6 +47,17 @@ fn arithmetic_and_strings() {
     assert_eq!(run_str("function f() { var x = undefined; return x ?? 5; }"), "5");
 }
 
+/// String literals: plain runs, escapes after and between them, either
+/// quote, and an unterminated string's error.
+#[test]
+fn string_literals_lex() {
+    use crate::lexer::{Tok, lex};
+    let strs = |src: &str| lex(src).unwrap().into_iter().filter_map(|t| if let Tok::Str(s) = t.tok { Some(s.to_string()) } else { None }).collect::<Vec<_>>();
+    assert_eq!(strs(r#""0.3338 in" 'a"b' "x\ty\"z" "\u00e9t\u00e9" "" 'it\'s' "é\n""#), ["0.3338 in", "a\"b", "x\ty\"z", "été", "", "it's", "é\n"]);
+    let e = lex("const s = \"ab\ncd\";").unwrap_err();
+    assert_eq!((e.pos.line, e.pos.col, e.message.as_str()), (1, 11, "token recognition error at: '\"ab'"));
+}
+
 /// Onshape's `?:` is left-associative (live behaviours.md, fs-smprobe).
 #[test]
 fn conditional_is_left_associative() {

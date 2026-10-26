@@ -24,7 +24,16 @@ const DANGLING_INK: [u8; 4] = [(DANGLING_RGB >> 16) as u8, (DANGLING_RGB >> 8) a
 /// are hairlines at the fitted zoom (1 px for visible edges, frame and
 /// dimensions on a 4.3 px/mm A sheet) and thicken as you zoom in.
 pub fn px_width(style: LineStyle, zoom: f64) -> f32 {
-    (style.width_mm() * zoom * 0.45).clamp(1.0, 7.0) as f32
+    pen_px(style, style.width_mm(), zoom)
+}
+
+/// Pixel width of a `width_mm` pen on a `style` line at a zoom: screen
+/// pixels per pen millimetre per zoom calibrated on visible edges (0.5625
+/// for their 0.40 mm pen, as 0.45 was for the 0.5 mm they had); the
+/// other styles keep 0.45 until their pens are live's too.
+pub fn pen_px(style: LineStyle, width_mm: f64, zoom: f64) -> f32 {
+    let k = if matches!(style, LineStyle::Visible | LineStyle::Hidden | LineStyle::Tangent | LineStyle::Phantom) { 0.5625 } else { 0.45 };
+    (width_mm * zoom * k).clamp(1.0, 7.0) as f32
 }
 
 /// Split a polyline into dashes following `pattern` (on, off, on, off...).
@@ -156,7 +165,7 @@ fn push_sheet_line(lines: &mut LineData, built: &BuiltSheet, li: usize, zoom: f6
     };
     // Adjust linestyle pens override the style's width and dashes.
     let (width_mm, dashes) = g.line_pen(li);
-    let width = (width_mm * zoom * 0.45).clamp(1.0, 7.0) as f32;
+    let width = pen_px(l.style, width_mm, zoom);
     for piece in dash(&l.points, l.closed, &dashes) {
         push(lines, &piece, color, if picked { l.pick } else { 0 }, width);
     }

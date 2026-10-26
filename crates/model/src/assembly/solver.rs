@@ -984,6 +984,9 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
         let problem = Problem { bodies, mates, relations, drags, terms: terms.clone(), scale };
         let dragged = terms.iter().any(|t| matches!(t, Term::Drag(_)));
         result.iterations = result.iterations.max(levenberg_marquardt(&problem, &mut poses, free, scale, dragged));
+        if !dragged && free.iter().any(|&b| poses[b] != bodies[b].pose) {
+            least_change(&problem, &mut poses, free, scale);
+        }
     }
 
     // Mate residuals only (exclude drag terms) decide convergence.
@@ -1113,6 +1116,54 @@ fn levenberg_marquardt(problem: &Problem, poses: &mut Vec<Frame>, free: &[usize]
         }
     }
     iterations
+}
+
+/// Least change, exactly (live: Transform keeps the coordinates the mates
+/// leave free; api benchmark F9: a Planar-mated part moved to [30, 5, 40] mm
+/// ends at exactly [30, 5, 12]). Levenberg-Marquardt's damped path drifts
+/// along the free directions; from its solution, one constrained
+/// Gauss-Newton step goes back toward the start poses: the step `δ` closest
+/// to the change back to the start `Δ` that zeroes the linearised mate rows,
+/// `δ = Δ + J⁺(−r − JΔ)` (for linear mates, the exact projection). Then
+/// minimum-norm Gauss-Newton steps `δ = −J⁺r` take out what the
+/// finite-difference Jacobian's error left over a large `Δ`. Kept only when
+/// the mates hold as well as before.
+fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f64) {
+    let n = free.len() * 6;
+    let mut r = Vec::new();
+    residuals(problem, poses, &mut r);
+    let cost = |r: &[f64]| r.iter().map(|v| v * v).sum::<f64>().sqrt();
+    let before = cost(&r).max(1e-10);
+    let mut trial = poses.to_vec();
+    for step in 0..5 {
+        let jac = jacobian(problem, &trial, free, &r, scale, 1e-7);
+        let mut back = DVector::<f64>::zeros(n);
+        if step == 0 {
+            for (k, &bi) in free.iter().enumerate() {
+                let (s, c) = (problem.bodies[bi].pose, trial[bi]);
+                let t = (s.origin - c.origin) / scale;
+                let w = log_rot(s.rotation * c.rotation.inverse());
+                for (j, v) in [t.x, t.y, t.z, w.x, w.y, w.z].into_iter().enumerate() {
+                    back[k * 6 + j] = v;
+                }
+            }
+        } else if cost(&r) < 1e-15 {
+            break;
+        }
+        let rhs = -DVector::from_column_slice(&r) - &jac * &back;
+        let svd = jac.svd(true, true);
+        let tol = 1e-10 * svd.singular_values.iter().fold(0.0f64, |a, v| a.max(*v));
+        let Ok(fix) = svd.solve(&rhs, tol) else { return };
+        let delta = back + fix;
+        for (k, &bi) in free.iter().enumerate() {
+            let d: Vec<f64> = (0..6).map(|j| delta[k * 6 + j] * if j < 3 { scale } else { 1.0 }).collect();
+            trial[bi] = apply_delta(&trial[bi], &d);
+        }
+        residuals(problem, &trial, &mut r);
+    }
+    if cost(&r) <= before {
+        poses.copy_from_slice(&trial);
+    }
 }
 
 fn fill_mate_status(p: &Problem, poses: &[Frame], result: &mut SolveResult) {
@@ -1468,6 +1519,33 @@ mod tests {
         ] {
             let c = g.closest_point(q);
             assert!(g.signed_distance(c).abs() < 1e-9, "{g:?}: {}", g.signed_distance(c));
+        }
+    }
+
+    /// Moving a Planar-mated part to a pose (Transform, agent
+    /// `assembly_transform`) projects the pose onto the mate's free
+    /// directions exactly: live keeps the requested X and Y (and the turn
+    /// about the normal) and fixes only Z (api benchmark F9: [30, 5, 40] mm
+    /// ended at [30.00172, 5.000287, 12]).
+    #[test]
+    fn planar_transform_keeps_the_free_coordinates() {
+        let mm = 1e-3;
+        // A 100×60×12 plate (fixed) and a 50×50×30 cup on it, the cup's
+        // bottom face picked first.
+        let top = Frame::from_axes(DVec3::new(50.0, 30.0, 12.0) * mm, DVec3::Z, DVec3::X);
+        let bottom = Frame::from_axes(DVec3::new(25.0, 25.0, 0.0) * mm, DVec3::NEG_Z, DVec3::X);
+        let mates = vec![mate(MateType::Planar, 1, bottom, 0, top)];
+        for turn in [0.0, 0.5, -2.0] {
+            let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.0, 0.0, 30.0) * mm, false)];
+            assert!(solve(&mut bodies, &mates, &[], &[]).converged);
+            let rotation = DQuat::from_rotation_z(turn);
+            bodies[1].pose = Frame::new(DVec3::new(30.0, 5.0, 40.0) * mm, rotation);
+            let r = solve(&mut bodies, &mates, &[], &[]);
+            assert!(r.converged, "{r:?}");
+            let p = bodies[1].pose;
+            let o = p.origin / mm;
+            assert!((o - DVec3::new(30.0, 5.0, 12.0)).abs().max_element() < 1e-9, "turn {turn}: at {o:?} mm");
+            assert!(p.rotation.angle_between(rotation) < 1e-12, "turn {turn}: turned {}", p.rotation.angle_between(rotation));
         }
     }
 
