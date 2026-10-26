@@ -532,7 +532,9 @@ impl Prepared {
         // except while dragging, which moves the whole connected group (live
         // assembly/587–589).
         let only_mate = opts.only_mate.filter(|_| opts.drags.is_empty());
-        let enforced: Vec<bool> = self.mates.iter().map(|(id, _, _)| only_mate.is_none_or(|only| only == *id)).collect();
+        // Pattern copies keep following their seed (their follower mates stay
+        // enforced; qa5 P2-A4: a copy left behind vanished from its hole).
+        let enforced: Vec<bool> = self.mates.iter().map(|(id, _, m)| only_mate.is_none_or(|only| only == *id) || m.follow.is_some()).collect();
         let mate_index: HashMap<MateId, usize> = self.mates.iter().enumerate().map(|(i, (id, _, _))| (*id, i)).collect();
         let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let mut rels = Vec::new();

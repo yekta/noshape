@@ -844,12 +844,16 @@ fn linear_pattern_along_an_edge() {
         suppressed: false,
     });
     let created = asm.sync_pattern(MateId(70));
-    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
-    assert!(res.pattern_errors.is_empty(), "{:?}", res.pattern_errors);
-    let seed = origin_of(&res, 2);
-    for (k, id) in created.iter().enumerate() {
-        let d = DVec3::from(res.solved.placement(*id).unwrap().translation) - seed;
-        assert!((d.x.abs() - 0.025 * (k + 1) as f64).abs() < 1e-6 && d.y.abs() < 1e-6 && d.z.abs() < 1e-6, "copy {k} along the edge (X): {d:?}");
+    // Plain solve, then while the seed's mate is being edited (qa5 P2-A4:
+    // only that mate is solved, but the copies still follow their seed).
+    for opts in [SolveOptions::default(), SolveOptions { only_mate: Some(MateId(10)), ..Default::default() }] {
+        let res = ev.evaluate(&f.doc, &asm, &opts, None);
+        assert!(res.pattern_errors.is_empty(), "{:?}", res.pattern_errors);
+        let seed = origin_of(&res, 2);
+        for (k, id) in created.iter().enumerate() {
+            let d = DVec3::from(res.solved.placement(*id).unwrap().translation) - seed;
+            assert!((d.x.abs() - 0.025 * (k + 1) as f64).abs() < 1e-6 && d.y.abs() < 1e-6 && d.z.abs() < 1e-6, "copy {k} along the edge (X), only_mate {:?}: {d:?}", opts.only_mate);
+        }
     }
 }
 
