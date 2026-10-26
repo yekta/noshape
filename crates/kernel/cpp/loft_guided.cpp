@@ -24,7 +24,10 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepGProp.hxx>
+#include <Extrema_ExtCC.hxx>
 #include <Extrema_ExtPC.hxx>
+#include <GeomConvert_SurfToAnaSurf.hxx>
+#include <ShapeFix_Face.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <GProp_GProps.hxx>
 #include <GeomAPI_Interpolate.hxx>
@@ -149,6 +152,48 @@ double forward(double a, double b, double len)
   return d < 0 ? d + len : d;
 }
 
+// Where a guide meets a profile curve: the guide parameter and the point,
+// the nearest of the curves' extrema and their ends' projections.
+double meet(const Adaptor3d_Curve& g, const Adaptor3d_Curve& p, double& tg, gp_Pnt& at)
+{
+  double best = 1e300;
+  auto   take = [&](double d2, double t, const gp_Pnt& q) {
+    if (d2 < best)
+    {
+      best = d2;
+      tg   = t;
+      at   = q;
+    }
+  };
+  Extrema_ExtCC cc(g, p);
+  if (cc.IsDone() && !cc.IsParallel())
+    for (int i = 1; i <= cc.NbExt(); ++i)
+    {
+      Extrema_POnCurv a, b;
+      cc.Points(i, a, b);
+      take(cc.SquareDistance(i), a.Parameter(), a.Value());
+    }
+  for (double e : {g.FirstParameter(), g.LastParameter()})
+  {
+    const gp_Pnt  q = g.Value(e);
+    Extrema_ExtPC x(q, p);
+    if (x.IsDone())
+      for (int i = 1; i <= x.NbExt(); ++i)
+        take(x.SquareDistance(i), e, q);
+    for (double f : {p.FirstParameter(), p.LastParameter()})
+      take(q.SquareDistance(p.Value(f)), e, q);
+  }
+  for (double f : {p.FirstParameter(), p.LastParameter()})
+  {
+    const gp_Pnt  q = p.Value(f);
+    Extrema_ExtPC x(q, g);
+    if (x.IsDone())
+      for (int i = 1; i <= x.NbExt(); ++i)
+        take(x.SquareDistance(i), x.Point(i).Parameter(), q);
+  }
+  return std::sqrt(best);
+}
+
 // A guide as a curve from its start on profile A to its end on profile B,
 // by normalized arc length.
 struct Guide
@@ -261,26 +306,18 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
       fail_op("Loft guides of several curves are not supported yet");
     Guide g;
     g.c.reset(new BRepAdaptor_Curve(edges[0]));
-    g.t0  = g.c->FirstParameter();
-    g.t1  = g.c->LastParameter();
-    g.len = GCPnts_AbscissaPoint::Length(*g.c, g.t0, g.t1);
-    const gp_Pnt p0 = g.c->Value(g.t0), p1 = g.c->Value(g.t1);
-    double       d0a, d1b, d1a, d0b;
-    const double s0a = A.abscissa(p0, d0a), s1b = b_abs(p1, d1b), s1a = A.abscissa(p1, d1a), s0b = b_abs(p0, d0b);
-    if (d0a < tol && d1b < tol)
-    {
-      g.reversed = false;
-      g.sa       = s0a;
-      g.sb       = s1b;
-    }
-    else if (d1a < tol && d0b < tol)
-    {
-      g.reversed = true;
-      g.sa       = s1a;
-      g.sb       = s0b;
-    }
-    else
+    // Trimmed to its stretch between the profiles.
+    double ta, tb;
+    gp_Pnt pa, pb;
+    if (meet(*g.c, *A.c, ta, pa) > tol || meet(*g.c, *B.c, tb, pb) > tol || std::abs(ta - tb) < 1e-12)
       fail_op("All guides should intersect each profile boundary.");
+    g.reversed = ta > tb;
+    g.t0       = std::min(ta, tb);
+    g.t1       = std::max(ta, tb);
+    g.len      = GCPnts_AbscissaPoint::Length(*g.c, g.t0, g.t1);
+    double d;
+    g.sa = A.abscissa(pa, d);
+    g.sb = b_abs(pb, d);
     gs.push_back(std::move(g));
   }
   if (gs.empty())
@@ -475,6 +512,261 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
   if (gp.Mass() <= 0)
     fail_op("Could not create loft with given information. Check profile order, guide/profile intersections or end conditions.");
   return wrap(sol);
+}
+
+
+namespace {
+
+// An open profile by arc length (no wrapping).
+struct Open
+{
+  std::unique_ptr<BRepAdaptor_CompCurve> c;
+  TopoDS_Wire                            wire;
+  double                                 t0 = 0, t1 = 0, len = 0;
+
+  explicit Open(const TopoDS_Wire& w) : c(new BRepAdaptor_CompCurve(w)), wire(w)
+  {
+    t0  = c->FirstParameter();
+    t1  = c->LastParameter();
+    len = GCPnts_AbscissaPoint::Length(*c, t0, t1);
+  }
+  gp_Pnt at(double s) const
+  {
+    s = std::clamp(s, 0.0, len);
+    if (s < 1e-15)
+      return c->Value(t0);
+    if (s > len - 1e-15)
+      return c->Value(t1);
+    GCPnts_AbscissaPoint ap(*c, s, t0);
+    return c->Value(ap.IsDone() ? ap.Parameter() : t0 + (t1 - t0) * s / len);
+  }
+  double abscissa_of(double t) const { return GCPnts_AbscissaPoint::Length(*c, t0, std::clamp(t, t0, t1)); }
+  double abscissa(const gp_Pnt& p) const
+  {
+    Extrema_ExtPC ext(p, *c);
+    double        best = 1e300, t = t0;
+    if (ext.IsDone())
+      for (int i = 1; i <= ext.NbExt(); ++i)
+        if (ext.SquareDistance(i) < best)
+        {
+          best = ext.SquareDistance(i);
+          t    = ext.Point(i).Parameter();
+        }
+    for (double e : {t0, t1})
+      if (p.SquareDistance(c->Value(e)) < best)
+      {
+        best = p.SquareDistance(c->Value(e));
+        t    = e;
+      }
+    return abscissa_of(t);
+  }
+  // Arc lengths of the interior corners (tangent breaks between edges).
+  std::vector<double> corners() const
+  {
+    std::vector<double>      out;
+    std::vector<TopoDS_Edge> edges;
+    for (BRepTools_WireExplorer x(wire); x.More(); x.Next())
+      edges.push_back(x.Current());
+    for (size_t i = 0; i + 1 < edges.size(); ++i)
+    {
+      BRepAdaptor_Curve ca(edges[i]), cb(edges[i + 1]);
+      const bool        ra = edges[i].Orientation() == TopAbs_REVERSED, rb = edges[i + 1].Orientation() == TopAbs_REVERSED;
+      gp_Pnt            pa, pb;
+      gp_Vec            da, db;
+      ca.D1(ra ? ca.FirstParameter() : ca.LastParameter(), pa, da);
+      cb.D1(rb ? cb.LastParameter() : cb.FirstParameter(), pb, db);
+      if (ra)
+        da.Reverse();
+      if (rb)
+        db.Reverse();
+      if (da.Magnitude() > 1e-12 && db.Magnitude() > 1e-12 && da.Angle(db) > 1e-6)
+        out.push_back(abscissa(pa));
+    }
+    return out;
+  }
+};
+
+// The face through a grid, as a plane or cylinder (Parasolid's simplest
+// surface) when the grid lies on one.
+TopoDS_Face simplest_face(const std::vector<std::vector<gp_Pnt>>& g, double tol)
+{
+  TopoDS_Face           f = grid_face(g);
+  occ::handle<Geom_Surface> s(BRep_Tool::Surface(f));
+  GeomConvert_SurfToAnaSurf conv(s);
+  occ::handle<Geom_Surface> ana(conv.ConvertToAnalytical(tol));
+  if (ana.IsNull() || conv.Gap() > tol)
+    return f;
+  BRepLib::BuildCurves3d(f);
+  BRepBuilderAPI_MakeFace mf(ana, BRepTools::OuterWire(f), true);
+  if (!mf.IsDone())
+    return f;
+  ShapeFix_Face fix(mf.Face());
+  fix.Perform();
+  TopoDS_Face out = fix.Face();
+  GProp_GProps a, b;
+  BRepGProp::SurfaceProperties(f, a);
+  BRepGProp::SurfaceProperties(out, b);
+  return std::abs(a.Mass() - b.Mass()) <= 1e-6 * a.Mass() ? out : f;
+}
+
+} // namespace
+
+std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShape& profile_b, const OcShapeList& guides,
+                                          bool trim_guides, bool trim_profiles)
+{
+  require_non_null(profile_a.shape, "first profile");
+  require_non_null(profile_b.shape, "second profile");
+  Open         A(outer_wire(profile_a.shape)), B(outer_wire(profile_b.shape));
+  const double size = std::max(A.len, B.len);
+  const double tol  = 1e-7 * (1 + size);
+  // B runs the way A does (its ends nearest A's).
+  const bool flip_b = A.at(0).Distance(B.at(0)) + A.at(A.len).Distance(B.at(B.len)) > A.at(0).Distance(B.at(B.len)) + A.at(A.len).Distance(B.at(0));
+  auto       b_at   = [&](double s) { return B.at(flip_b ? B.len - s : s); };
+  // Each guide from A to B: its parameters there, its arc length between
+  // them and how far it runs on past each profile.
+  struct G
+  {
+    std::unique_ptr<BRepAdaptor_Curve> c;
+    double                             ta, tb, len, before, after, sa, sb;
+    // Arc lengths from ta to the parameter range's ends.
+    double up, down;
+    gp_Pnt at(double v) const
+    {
+      // Signed arc length from ta along increasing parameter.
+      const double a     = (tb > ta ? 1.0 : -1.0) * v * len;
+      const double avail = a >= 0 ? up : down;
+      if (std::abs(a) <= avail + 1e-15)
+      {
+        GCPnts_AbscissaPoint ap(*c, a, ta);
+        if (ap.IsDone())
+          return c->Value(ap.Parameter());
+      }
+      // Past the guide's end: on along its end tangent.
+      gp_Pnt p;
+      gp_Vec d;
+      c->D1(a >= 0 ? c->LastParameter() : c->FirstParameter(), p, d);
+      return p.Translated(d.Normalized() * ((a >= 0 ? 1.0 : -1.0) * (std::abs(a) - avail)));
+    }
+  };
+  std::vector<G> gs;
+  for (const TopoDS_Shape& gx : guides.items)
+  {
+    std::vector<TopoDS_Edge> edges;
+    for (TopExp_Explorer x(gx, TopAbs_EDGE); x.More(); x.Next())
+      edges.push_back(TopoDS::Edge(x.Current()));
+    if (edges.size() != 1)
+      fail_op("Loft guides of several curves are not supported yet");
+    G g;
+    g.c.reset(new BRepAdaptor_Curve(edges[0]));
+    gp_Pnt pa, pb;
+    if (meet(*g.c, *A.c, g.ta, pa) > tol || meet(*g.c, *B.c, g.tb, pb) > tol || std::abs(g.ta - g.tb) < 1e-12)
+      fail_op("All guides should intersect each profile boundary.");
+    const double lo = g.c->FirstParameter(), hi = g.c->LastParameter();
+    g.len    = GCPnts_AbscissaPoint::Length(*g.c, std::min(g.ta, g.tb), std::max(g.ta, g.tb));
+    g.before = GCPnts_AbscissaPoint::Length(*g.c, g.ta < g.tb ? lo : g.ta, g.ta < g.tb ? g.ta : hi);
+    g.after  = GCPnts_AbscissaPoint::Length(*g.c, g.ta < g.tb ? g.tb : lo, g.ta < g.tb ? hi : g.tb);
+    g.up     = GCPnts_AbscissaPoint::Length(*g.c, g.ta, hi);
+    g.down   = GCPnts_AbscissaPoint::Length(*g.c, lo, g.ta);
+    g.sa     = A.abscissa(pa);
+    g.sb     = flip_b ? B.len - B.abscissa(pb) : B.abscissa(pb);
+    gs.push_back(std::move(g));
+  }
+  if (gs.empty())
+    fail_invalid("loft: no guides");
+  std::sort(gs.begin(), gs.end(), [](const G& x, const G& y) { return x.sa < y.sa; });
+  // The v range: the profiles, or on to the guides' ends.
+  double vlo = 0, vhi = 1;
+  if (!trim_guides)
+    for (const G& g : gs)
+    {
+      vlo = std::min(vlo, -g.before / g.len);
+      vhi = std::max(vhi, 1 + g.after / g.len);
+    }
+  // The u range: the whole profiles, or between the outermost guides.
+  double a0 = 0, a1 = A.len, b0 = 0, b1 = B.len;
+  if (trim_profiles && gs.size() > 1)
+  {
+    a0 = gs.front().sa;
+    a1 = gs.back().sa;
+    b0 = std::min(gs.front().sb, gs.back().sb);
+    b1 = std::max(gs.front().sb, gs.back().sb);
+  }
+  // Seams: the ends and the corners, as many on B as on A.
+  std::vector<double> sa{a0}, sb{b0};
+  std::vector<double> ca = A.corners(), cb = B.corners();
+  if (flip_b)
+  {
+    for (double& x : cb)
+      x = B.len - x;
+    std::sort(cb.begin(), cb.end());
+  }
+  ca.erase(std::remove_if(ca.begin(), ca.end(), [&](double x) { return x <= a0 + tol || x >= a1 - tol; }), ca.end());
+  cb.erase(std::remove_if(cb.begin(), cb.end(), [&](double x) { return x <= b0 + tol || x >= b1 - tol; }), cb.end());
+  if (ca.size() != cb.size())
+    fail_op("Loft guides need profiles with as many corners yet");
+  sa.insert(sa.end(), ca.begin(), ca.end());
+  sb.insert(sb.end(), cb.begin(), cb.end());
+  sa.push_back(a1);
+  sb.push_back(b1);
+  BRepBuilderAPI_Sewing sew(1e-6 * (1 + size));
+  const int             NU = 48, NV = 24;
+  for (size_t k = 0; k + 1 < sa.size(); ++k)
+  {
+    const double la = sa[k + 1] - sa[k], lb = sb[k + 1] - sb[k];
+    std::vector<double> ua{0.0}, ub{0.0};
+    std::vector<int>    cols{-1};
+    for (size_t i = 0; i < gs.size(); ++i)
+      if (gs[i].sa > sa[k] - tol && gs[i].sa < sa[k + 1] + tol)
+      {
+        const double u = (gs[i].sa - sa[k]) / la, w = (gs[i].sb - sb[k]) / lb;
+        if (u < 1e-9)
+          cols[0] = (int)i;
+        else if (u > 1 - 1e-9)
+          continue;
+        else
+        {
+          ua.push_back(u);
+          ub.push_back(w);
+          cols.push_back((int)i);
+        }
+      }
+    ua.push_back(1.0);
+    ub.push_back(1.0);
+    cols.push_back(-1);
+    for (size_t i = 0; i < gs.size(); ++i)
+      if (std::abs((gs[i].sa - sa[k]) / la - 1) < 1e-9)
+        cols.back() = (int)i;
+    auto bot = [&](double u) { return A.at(sa[k] + la * u); };
+    auto top = [&](double u) {
+      size_t s = 0;
+      while (s + 2 < ua.size() && u > ua[s + 1])
+        ++s;
+      const double t = (u - ua[s]) / (ua[s + 1] - ua[s]);
+      return b_at(sb[k] + lb * (ub[s] + (ub[s + 1] - ub[s]) * t));
+    };
+    std::vector<std::vector<gp_Pnt>> grid(NU + 1, std::vector<gp_Pnt>(NV + 1));
+    for (int i = 0; i <= NU; ++i)
+    {
+      const double              u = (double)i / NU;
+      const std::vector<double> w = hermite_tents(ua, u);
+      const gp_Pnt              pb = bot(u), pt = top(u);
+      for (int j = 0; j <= NV; ++j)
+      {
+        const double v = vlo + (vhi - vlo) * j / NV;
+        gp_XYZ       s = pb.XYZ() * (1 - v) + pt.XYZ() * v;
+        for (size_t m = 0; m < ua.size(); ++m)
+          if (cols[m] >= 0)
+          {
+            const gp_XYZ lin = bot(ua[m]).XYZ() * (1 - v) + top(ua[m]).XYZ() * v;
+            s += (gs[cols[m]].at(v).XYZ() - lin) * w[m];
+          }
+        grid[i][j] = gp_Pnt(s);
+      }
+    }
+    sew.Add(simplest_face(grid, 1e-6 * (1 + size)));
+  }
+  sew.Perform();
+  return wrap(sew.SewedShape());
 }
 
 } // namespace noshape

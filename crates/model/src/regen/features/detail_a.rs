@@ -540,13 +540,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         None
     };
-    if ev.bool("asymmetric") {
-        return err("Asymmetric face blends are not supported yet");
-    }
     let shape_kind = ev.enum_("crossSectionShape").to_string();
-    if shape_kind == "CONIC" || shape_kind == "CURVATURE" {
-        return err("Conic and curvature face blends are not supported yet");
-    }
     for (flag, what) in [("tangentHoldLines", "Tangent hold lines"), ("conicHoldLines", "Conic hold lines"), ("hasCliffEdges", "Cliff edges"), ("hasCaps", "Caps"), ("hasLimits", "Limits"), ("hasHelpPoint", "Help point"), ("detach", "Detached face blends")] {
         if ev.bool(flag) {
             return err(format!("{what} are not supported yet"));
@@ -555,12 +549,34 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     let side1 = ev.resolve_faces(ev.query("side1"));
     let side2 = ev.resolve_faces(ev.query("side2"));
     if side1.is_empty() || side2.is_empty() {
-        return err("Select faces for both sides of the blend");
+        return err("Select faces to blend.");
     }
-    let radius = if ev.is("blendControlType", "WIDTH") { ev.length("width")? / std::f64::consts::SQRT_2 } else { ev.length("radius")? };
+    let width = ev.is("blendControlType", "WIDTH");
+    let asym = ev.bool("asymmetric");
+    let radius = if width { ev.length("width")? } else { ev.length("radius")? };
     if radius <= 0.0 {
-        return err("Blend radius must be positive");
+        return err("Provided dimension is too small.");
     }
+    // Live (psb 10-26 b): radius is side 1's offset, second radius side 2's;
+    // a width ratio is side 1 : side 2.
+    let (mut r1, mut r2) = (radius, if asym && !width { ev.length("secondRadius")? } else { radius });
+    let mut ratio = if asym && width { ev.real("widthRatio")? } else { 1.0 };
+    if asym && ev.bool("switchAsymmetric") {
+        std::mem::swap(&mut r1, &mut r2);
+        ratio = 1.0 / ratio;
+    }
+    if r2 <= 0.0 || ratio <= 0.0 {
+        return err("Provided dimension is too small.");
+    }
+    let section = match shape_kind.as_str() {
+        "CONIC" => super::blend_section::Section::Conic(ev.real("rho")?),
+        "CURVATURE" => super::blend_section::Section::Curvature(ev.real("magnitude")?),
+        "CHAMFER" => super::blend_section::Section::Chamfer,
+        _ => super::blend_section::Section::Circular,
+    };
+    // OCCT's rolling ball is exact for a symmetric circular radius; every
+    // other section is swept and added or cut (blend_section).
+    let rolling_ball = section == super::blend_section::Section::Circular && !width && !asym && spine_dir.is_none();
     let s1 = by_body(side1);
     let s2 = by_body(side2);
     let mut done = false;
@@ -595,18 +611,33 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
                 }
             }
         }
+        if !rolling_ball {
+            let spec = super::blend_section::BlendSpec {
+                section,
+                r1,
+                r2,
+                width: width.then_some(radius),
+                partial: None,
+                run_on: !ev.bool("propagation"),
+                cliff: false,
+                sides: Some(super::blend_section::Sides { side1: a.clone(), ratio }),
+            };
+            super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| if e.message == "Failed to fillet selections." { fe("Failed to blend faces.") } else { e })?;
+            done = true;
+            continue;
+        }
         let shapes: Vec<Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-        let res = if shape_kind == "CHAMFER" {
-            k::chamfer(&body.shape, &shapes, k::ChamferSpec::Equal(radius), &[]).map_err(kerr("Face blend failed"))?
-        } else {
-            k::fillet(&body.shape, &shapes, radius).map_err(kerr("Face blend failed (radius may be too large)"))?
-        };
+        let res = k::fillet(&body.shape, &shapes, radius).map_err(kerr("Failed to blend faces."))?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
         ev.replace_body(bi, res.shape, face_names);
         done = true;
     }
     if !done {
+        // Live (psb 10-26 b FB6): sides on different parts can't attach.
+        if s1.keys().all(|b| !s2.contains_key(b)) {
+            return err("Cannot attach blended face. Select \"Detach\" to create a separate surface.");
+        }
         return err("Face blend between faces that don't share an edge is not supported yet");
     }
     Ok(())

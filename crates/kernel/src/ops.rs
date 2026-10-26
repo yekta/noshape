@@ -490,6 +490,16 @@ pub fn loft_guided_curved(a: &Shape, b: &Shape, guides: &[Shape], make_solid: bo
     Shape::from_res(ffi::loft_guided_curved(a.raw(), b.raw(), &g, make_solid))
 }
 
+/// Surface loft of two open profiles along guide curves (live psb 10-26 c):
+/// one face per span between the profiles' ends and corners, a Gordon
+/// surface through the guides as in [`loft_guided_curved`], a plane or
+/// cylinder when it lies on one. `trim_guides` off runs the loft on to the
+/// guides' ends; `trim_profiles` cuts the profiles at the outermost guides.
+pub fn loft_guided_open(a: &Shape, b: &Shape, guides: &[Shape], trim_guides: bool, trim_profiles: bool) -> Result<Shape> {
+    let g = vec_to_list(guides);
+    Shape::from_res(ffi::loft_guided_open(a.raw(), b.raw(), &g, trim_guides, trim_profiles))
+}
+
 /// Parting-line draft about curved parting `edges` (OCCT's draft can't: the
 /// drafted face is a general ruled surface): each of `faces` is replaced by
 /// the ruled surface leaving its parting edges on its side, every ruling at

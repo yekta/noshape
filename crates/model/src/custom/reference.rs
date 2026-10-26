@@ -150,7 +150,7 @@ fn csv_rows(text: &str) -> Vec<Value> {
 }
 
 /// (width, height, media type) from PNG / GIF / JPEG headers.
-fn image_size(b: &[u8]) -> (Option<u32>, Option<u32>, &'static str) {
+pub(crate) fn image_size(b: &[u8]) -> (Option<u32>, Option<u32>, &'static str) {
     let be32 = |i: usize| b.get(i..i + 4).map(|s| u32::from_be_bytes([s[0], s[1], s[2], s[3]]));
     let be16 = |i: usize| b.get(i..i + 2).map(|s| u16::from_be_bytes([s[0], s[1]]) as u32);
     let le16 = |i: usize| b.get(i..i + 2).map(|s| u16::from_le_bytes([s[0], s[1]]) as u32);
