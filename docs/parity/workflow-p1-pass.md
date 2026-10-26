@@ -80,3 +80,5 @@ then edits, undo/redo, rollback and suppress.
 | Draft dialog | Neutral plane / Parting line; Neutral plane (+MC); Entities to draft; Draft angle 3 deg + ↻; ☑ Tangent propagation; ☐ Reapply fillet | same (behaviours 327) | ✅ |
 | Sweep dialog | Solid / Surface / Thin, New … Intersect; Faces and sketch regions to sweep; Sweep path (pink) + flip; ☐ Extend to full path; Profile control ▾ None; › ☐ Twist; ☐ Scale | same (behaviours 339) | ✅ |
 | Loft dialog | Profiles; ⌄ End conditions (Start / End profile condition ▾ None); ☐ Guides and continuity; ☐ Path; › ☐ Connections; ☐ Show isocurves | same (behaviours 340) | ✅ |
+| Sketch Trim (m) on a crossing line | the clicked segment past the crossing is removed; the new end is coincident with the other line | — | ✅ |
+| Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ |
