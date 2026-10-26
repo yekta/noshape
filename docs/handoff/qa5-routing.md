@@ -815,3 +815,6 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   besides the red text (behaviours 8292; also 14734 "Fillet 1 red with a ⚠ icon", 16123, and "qa5 (10-25 p2)" (7):
   "name turns red rgb(170,37,45) with a ⚠ triangle icon"). part_studio/mod.rs draws no icon for `missing > 0` (only the
   tooltip's second line, :3824). A live crop of the icon's place/size is in live/qa5/p7-*-after.png.
+STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extrude-after.png, row "Chamfer 1"): a **yellow ⚠
+  triangle badge overlaid on the lower-right of the feature's own icon** (like the sketch's blue minus badge), about 9–10 px,
+  not a separate column. The red header badge (red disc with a down arrow) already matches.
