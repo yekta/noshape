@@ -6,7 +6,7 @@
 # Nightly (first loop between 01:00 and 05:00 UTC): T2 on last-green -> /tmp/lead/t2-status + /tmp/lead/t2-<date>.log. T2 never blocks.
 set -u
 export OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-lead  # incremental per the machine config: consecutive main commits rebuild fast
-export CC=gcc-13 CXX=g++-13  # CI (ubuntu-24.04) compiles our C++ with GCC 13; GCC 15 here accepts code CI rejects
+export CC="ccache gcc-13" CXX="ccache g++-13"  # ccache: only changed C++ files recompile. CI (ubuntu-24.04) compiles our C++ with GCC 13; GCC 15 here accepts code CI rejects
 REPO=/root/projects/noshape; WT=/root/projects/noshape-wt/watch; ST=/tmp/lead/main-status; LOG=/tmp/lead/watch.log
 G="git -c user.name=yekta -c user.email=ngyekta@gmail.com"
 log() { echo "$(date -u "+%F %T") $*" >> $LOG; }
