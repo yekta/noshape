@@ -511,7 +511,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         for pl in display.planes.iter().filter(|p| !p.hidden) {
             let id = picks.push(PickTarget { reference: pl.reference.clone(), kind: PickKind::Plane, anchor: Some(pl.frame.origin) });
             let f = &pl.frame;
-            let c = |u: f64, v: f64| -> [f32; 3] { (f.origin + f.x * u * pl.half_width + f.y * v * pl.half_height).as_vec3().into() };
+            let c = |u: f64, v: f64| -> [f32; 3] { pl.corner(u, v).as_vec3().into() };
             let corners = [c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)];
             let n: [f32; 3] = f.normal.as_vec3().into();
             let mesh = MeshData {
@@ -886,7 +886,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             && built.picks.ids_for(r).iter().any(|&id| built.picks.get(id).is_some_and(|t| t.kind == PickKind::Plane));
         if plane_lit && let Some(pl) = display.planes.iter().find(|p| !p.hidden && &p.reference == r) {
             let f = &pl.frame;
-            let c = |u: f64, v: f64| -> [f32; 3] { (f.origin + f.x * u * pl.half_width + f.y * v * pl.half_height).as_vec3().into() };
+            let c = |u: f64, v: f64| -> [f32; 3] { pl.corner(u, v).as_vec3().into() };
             let corners = [c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)];
             if flag == state::SELECTED {
                 let n: [f32; 3] = f.normal.as_vec3().into();

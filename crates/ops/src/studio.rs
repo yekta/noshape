@@ -542,8 +542,23 @@ pub fn plane_size_to_studio(display: &noshape_model::display::StudioDisplay, r: 
 }
 
 pub fn set_plane_size(ps: &mut PartStudio, r: &Reference, half_width: f64, half_height: f64) {
+    set_plane_rect(ps, r, half_width, half_height, 0.0, 0.0);
+}
+
+/// A plane's shown rectangle: half sizes and centre in its frame (a corner
+/// drag, live "icons2 plane resize handles").
+pub fn set_plane_rect(ps: &mut PartStudio, r: &Reference, half_width: f64, half_height: f64, center_x: f64, center_y: f64) {
     ps.plane_sizes.retain(|(x, ..)| x != r);
     ps.plane_sizes.push((r.clone(), half_width, half_height));
+    ps.plane_centers.retain(|(x, ..)| x != r);
+    if center_x != 0.0 || center_y != 0.0 {
+        ps.plane_centers.push((r.clone(), center_x, center_y));
+    }
+}
+
+/// History text of a plane corner drag (live "Change size : Top").
+pub fn change_size_description(plane: &str) -> String {
+    format!("Change size : {plane}")
 }
 
 /// Plane frame of a plane, planar face, sketch or mate connector (a section

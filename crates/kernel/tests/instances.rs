@@ -64,6 +64,16 @@ fn crossing_instances_cut_as_deep_copies() {
         boolean(BooleanOp::Cut, &[cylinder], &tools(copy), &BooleanOptions::default()).unwrap().shape
     };
     let (instances, copies) = (cut(false), cut(true));
+    // Two families crossing: the cut is built from the faces' classification
+    // (boolean.cpp CutByFaces); one family at a time takes OCCT's usual path.
+    let cylinder = make_cylinder(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 20.0, 10.0, 2.0 * PI).unwrap();
+    let all = tools(true);
+    let left = boolean(BooleanOp::Cut, &[cylinder], &all[..12], &BooleanOptions::default()).unwrap().shape;
+    let usual = boolean(BooleanOp::Cut, &[left], &all[12..], &BooleanOptions::default()).unwrap().shape;
+    let usual = unify_same_domain(&usual).unwrap().shape;
+    let by_faces = unify_same_domain(&instances).unwrap().shape;
+    assert_eq!(by_faces.count(ShapeType::Face), usual.count(ShapeType::Face));
+    assert!((by_faces.volume().unwrap() - usual.volume().unwrap()).abs() < 1e-7 * usual.volume().unwrap());
     assert!(instances.is_valid());
     assert_eq!(instances.count(ShapeType::Solid), 1);
     assert_eq!(instances.count(ShapeType::Face), copies.count(ShapeType::Face));

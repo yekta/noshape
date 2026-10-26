@@ -515,7 +515,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             Reference::FeaturePlane(f) => studio.feature(*f).is_some_and(|f| f.hidden),
             r => studio.hidden_defaults.contains(r),
         };
-        d.planes.push(PlaneDisplay { reference: p.reference.clone(), name: p.name.clone(), frame: p.frame, half_width: p.half_width, half_height: p.half_height, hidden });
+        d.planes.push(PlaneDisplay { reference: p.reference.clone(), name: p.name.clone(), frame: p.frame, half_width: p.half_width, half_height: p.half_height, center: glam::DVec2::ZERO, hidden });
     }
     // Renamed default planes and planes sized with "Size to Part Studio";
     // hidden default planes (they come from `StudioDisplay::defaults`, not
@@ -529,6 +529,9 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         }
         if let Some((_, w, h)) = studio.plane_sizes.iter().find(|(r, ..)| *r == p.reference) {
             (p.half_width, p.half_height) = (*w, *h);
+        }
+        if let Some((_, x, y)) = studio.plane_centers.iter().find(|(r, ..)| *r == p.reference) {
+            p.center = glam::DVec2::new(*x, *y);
         }
     }
     d.show_origin = !studio.hidden_defaults.contains(&Reference::Origin);
@@ -653,6 +656,19 @@ mod plane_override_tests {
         let pl = res.display.planes.iter().find(|p| p.reference == top).expect("top plane");
         assert_eq!(pl.name, "Base");
         assert_eq!((pl.half_width, pl.half_height), (0.2, 0.1));
+    }
+
+    /// A plane resized by a corner drag keeps its rectangle's centre.
+    #[test]
+    fn dragged_plane_rectangle() {
+        let mut ps = crate::partstudio::PartStudio::new();
+        let top = Reference::Plane(DatumPlane::Top);
+        ps.plane_sizes.push((top.clone(), 0.08, 0.05));
+        ps.plane_centers.push((top.clone(), 0.01, -0.02));
+        let res = Regenerator::new().regenerate(&ps, &Default::default(), &noshape_units::UnitPrefs::default(), &RegenOptions::default());
+        let pl = res.display.planes.iter().find(|p| p.reference == top).expect("top plane");
+        assert_eq!(pl.center, glam::DVec2::new(0.01, -0.02));
+        assert!((pl.corner(1.0, 1.0) - (pl.frame.origin + pl.frame.x * 0.09 + pl.frame.y * 0.03)).length() < 1e-12);
     }
 
     /// User bug (v0.4.0): Hide on a default plane left it drawn.

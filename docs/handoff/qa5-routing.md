@@ -264,6 +264,17 @@ STATUS FSW-draft (psb, 2026-10-24 b): parting edges on several parts (each draft
 STATUS FSW-draft (psb, 2026-10-25): curved parting lines tried with the curve's own plane as the hinge (a 30° ellipse on a
   cylinder): OCCT's draft and the wedge fallback both fail, since the drafted face becomes a general ruled surface (not a cone).
   Needs our own ruled-surface construction; left refused ("Parting lines must lie in a plane perpendicular to the pull direction").
+STATUS FSW-draft (psb, 2026-10-26): curved parting lines (a sloped ellipse, a saddle) done as live "psb (10-25 m)": the
+  faces beside them become ruled draft surfaces (every normal at the draft angle to the plane perpendicular to the pull;
+  B-spline, degrees 1 × 3), new kernel op `draft_parting_curve`; live's A1–A4 and B volumes within 0.02 mm³ (live's surface
+  is itself a B-spline fit), 4 faces, live's samples on our faces (tests parting_line_draft_on_curves_as_live, draft_curve.rs).
+
+## PROJ-RULED — kern — point projection misses points on ruled B-spline faces
+- psb, 2026-10-26: `Shape::project_point` / `k::distance` (BRepExtrema vertex-to-face) on a ruled B-spline face (degree 3 ×
+  1, e.g. `loft` with `ruled: true` between two closed splines, or a curved parting-line draft) returns the distance to a
+  boundary edge for most interior points (e.g. 3.9 mm for a point on the face), while `classify_point` says OnBoundary and
+  the face's own UV classifier says IN. Repro: crates/kernel/tests/draft_curve.rs history (test
+  `ruled_loft_point_projection_control`, removed). Affects measure / picking-by-point on such faces.
 STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, constant normal thickness with Scale, Trim ends to the cap planes, the two failure texts (test thin_sweep_as_live).
 STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.
@@ -748,3 +759,42 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 - **P1-15 — ui (view cube hover), minor** — hovering a view-cube face fills it **rgb(177,217,241) #b1d9f1**; live **#bce2f7**
   rgb(188,226,247) (behaviours 403 "View cube hover", 1x crops part-studio/5x-*-crop1x.png). Measured on green 62524c30, 1x.
 - STATUS 2026-10-26 01:5x (qa5): P2-D1 verified fixed on green af9f1e4c (the assembly drawing's hole circle picks "Ø.394").
+- **P1-16 — kern (shell op)** — live's p2 model rebuilt in noshape (CLI, green-era engine): block 75.554 × 20.245 × **10**,
+  Fillet R1 on the 3 vertical edges, Chamfer 1 mm (tangent chain), Hole Ø6.35 Blind 12 at (15, 6) / (15, 14.245) on the top,
+  Feature linear pattern +X 25 mm × 2 (4 through holes), unshelled volume 13928.664 mm³. Shell, top face removed:
+  **1 mm → ours "Could not shell part with selections."; live OK, 3998.627 mm³, 33 faces** (round tubes standing in the cavity).
+  **2.5 mm → ours OK 8487.861 mm³, 53 faces; live 8503.961 mm³, 47 faces** (bosses merged with each other and the side walls).
+  Live: behaviours "qa5 (10-25 p2)" (6). Repro script /root/qa5-scratch/pass28/build.py.
+- **P1-17 — ui (mass properties)** — Mass and section properties opened with nothing selected ("Parts to measure" empty): ours
+  measures every part (Volume 7178.097 mm³, Surface area filled) and shows the no-material toast 3.6 s after opening. Live:
+  empty field → **Mass, Volume, Surface area, CoM and inertia all blank, no toast** (behaviours "qa5 (10-26 p4)", qa4 toast
+  follow-up 11210). The toast is tied to a **measured** part without material: it shows ≈ 0.75–1.5 s after the part is
+  picked / the panel opens with it preselected, and hides itself ≈ 3.9–4.4 s later. Code: part_studio/menus.rs
+  `set_show_mass` (toast on open whenever any part lacks a material) and the empty-`bodies` case of the mass view.
+- **P2-A2 — skb (mate dialog)** — Cylindrical mate › ☑ Limits › Z max: type `5` + Enter → ours applies **and closes** the
+  dialog (assembly_mate_dialog.rs: limit fields emit Accept on every Enter). Live: Onshape number fields (`os-param-number`,
+  the same family in mate dialogs; behaviours "Input behaviour outside feature dialogs" Fastened › Offset X) apply on the 1st
+  Enter and keep the dialog; the 2nd Enter accepts (as P2-A1 and ours' own offset fields). The limit itself works: a drag
+  stops with the pin 5.0 mm along the hole connector's Z.
+- **P2-D2 — ui2 (drawing Update), no drawing-behaviour owner in WORKFLOW F; lead to reassign if needed** — an assembly
+  drawing goes out of date (Update ⟳ bright) after an **unrelated** change: a STEP import, or a feature in a Part Studio the
+  assembly doesn't use. Live: unrelated changes keep it dim; only the drawing's referenced elements count (behaviours
+  "qa5 (10-26 p5)"). Cause: crates/model/src/drawing/views.rs `source_hash` for an assembly source hashes **every** Part
+  Studio and Assembly tab of the document; it should hash only the tabs the assembly (recursively) instantiates.
+- **P2-A3 — skb (exploded views)** — green af9f1e4c, assembly with one Explode step (pin raised 25 mm). In editing
+  ("Editing Explode 1 [Done]"), **Esc with no dialog open** brings back the full toolbar and removes the banner, but the
+  graphics **stay exploded** and the Explode 1 row keeps its **active look (blue name, left bar) and the rollback bar**. A
+  double-click on Explode 1 then does **not** re-enter editing: it drops to the plain row and the unexploded model. Done
+  works correctly (plain row, unexploded; a double-click re-enters, fully exploded). Live: **Esc = Done** (behaviours
+  "Exploded views: steps, clicks, menus, rollback, Done", skb 10-20, assembly/823, 816, 824). Screens
+  /root/qa5-scratch/run/shots/a28-20/22/23/24.png.
+- **P2-A4 — skb (mate dialog preview)** — green af9f1e4c, assembly with Circular pattern 1 (seed Part 2 <1>, copy Part 2 <2>
+  in hole 3). Editing the seed's mate (double-click Cylindrical 1; also while retyping it to Revolute): **the pattern copy
+  Part 2 <2> disappears from the graphics** while the dialog is open (hole 3 empty, /root/qa5-scratch/run/shots/a28-31/32.png);
+  after ✓ it is back and follows the seed. Also during that edit the seed pin shows **z-fighting stripes** (orange preview
+  over the grey original at the same place, a28-32). Live keeps every instance drawn while a mate is edited (no capture
+  shows instances vanishing; asked in "qa5 (10-26 p6)" only for the toast, so treat this as a plain bug).
+- **P2-A5 — skb (assembly list), minor** — a suppressed mate row ("Revolute 1" › Suppress) is drawn grey with strike-through
+  but **not italic**; live: **grey italic struck-through** (behaviours 1297, assembly/198; also 1339 for instances and their
+  mates). Code: assembly_view.rs:3533 mate rows (`line_through` only), :3326 instance rows (italic only when dynamically
+  suppressed), assembly_panels.rs:889 pattern rows. Part Studio rows already do italic + line-through (part_studio/mod.rs:3572).

@@ -362,6 +362,13 @@ pub struct UiState {
     pub consumed_lines: Option<ConsumedLines>,
     /// "Show dimensions" of a sketch.
     pub shown_dims: Option<super::shown_dims::ShownDims>,
+    /// A selected plane's resize ring under the pointer (plane, corner).
+    pub plane_ring_hover: Option<(Reference, usize)>,
+    /// A plane corner being dragged (plane_handles.rs).
+    pub plane_drag: Option<super::plane_handles::PlaneDrag>,
+    /// Planes selected by a click in the graphics: only their rings drag
+    /// (live: from the list a ring press starts a box select).
+    pub planes_picked_in_graphics: Vec<Reference>,
     /// The sketch draws something with GPUI that follows the camera (set
     /// by `render_sketch_labels`: the dimension box, glyphs, counts...).
     pub sketch_follows_camera: bool,
@@ -575,6 +582,9 @@ impl UiState {
             list_menu: None,
             consumed_lines: None,
             shown_dims: None,
+            plane_ring_hover: None,
+            plane_drag: None,
+            planes_picked_in_graphics: Vec::new(),
             sketch_follows_camera: false,
             query_hover: None,
             manip_hover: false,

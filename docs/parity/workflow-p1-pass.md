@@ -93,3 +93,28 @@ then edits, undo/redo, rollback and suppress.
 | STEP import ("+" › Import…, bracket.step) | "Import to Onshape" options; Import → tab "bracket" + folder "CAD Imports" | same dialog (behaviours 1051) | ✅ |
 | Assembly drawing after the unrelated import | Update ⟳ turns saturated (out of date) | unrelated changes? (request 10-26 p5) | ? |
 | Part Studio tab menu (green af9f1e4c) | Delete / Open in new browser tab, Rename, Properties…, Show code / Duplicate, Copy to clipboard / Select as document thumbnail / Move to document… (no Export…) | the newer live captures (behaviours 6561, 7153) list exactly these; the older one (280) also had Export… | ✅ |
+
+## Pass 28, green af9f1e4c (assembly limits, live answers p2/p4/p5)
+| Step | Ours | Live | Status |
+|---|---|---|---|
+| Cylindrical mate dialog | Limits only (no Offset), 4 limit rows Z ≑ / Z ⌶ / rotation min / max, "No minimum" / "No maximum" | same (behaviours 5942, 5959); Simulation connection excluded (simulation) | ✅ |
+| Limits Z max `5` + Enter | applies and closes the dialog | 1st Enter applies, 2nd accepts | ✗ **P2-A2** (skb) |
+| Drag the pin past the limit | stops at 5.0 mm along the hole connector's Z (it points down); the unfixed plate is pulled along | — | ✅ |
+| Shell 1 mm, live's p2 model (depth 10, R1, 4 through holes) | "Could not shell part with selections." | OK 3998.627 mm³, 33 faces | ✗ **P1-16** (kern) |
+| Shell 2.5 mm, same | OK 8487.861 mm³, 53 faces | OK 8503.961 mm³, 47 faces | ✗ **P1-16** |
+| Mass properties, nothing selected | all parts measured (7178.097 mm³), toast after 3.6 s, hides by itself | field empty, values blank, no toast | ✗ **P1-17** (ui) |
+| Assembly drawing after an unrelated STEP import | Update ⟳ bright | stays dim (only referenced elements count) | ✗ **P2-D2** (ui2) |
+| Exploded views panel, Add exploded view | 712 px panel; "Editing Explode 1 [Done]", toolbar reduced to undo/redo, active row + rollback bar, "Build steps by dragging components" box, footer Add exploded view | same (behaviours 1834) | ✅ |
+| Drag the triad's Z arrow (pin) | "Explode step" dialog: Translation ▾, Instances, ☐ Specify direction, Distance 18.3 mm, ☑ Explode lines, edges field; row "↗ Explode step 1"; info box gone | same | ✅ |
+| Distance `25` + Enter, Enter | 1st applies (pin moves), 2nd accepts | Onshape number fields | ✅ |
+| Done, then double-click Explode 1 | plain row, unexploded; re-enters editing fully exploded | same | ✅ |
+| Step row right-click | Edit… / Rename / — / Delete | same (behaviours 815) | ✅ |
+| Esc with no dialog in explode editing | toolbar back but still exploded, row stays active with the rollback bar; the next double-click leaves instead of re-entering | Esc = Done | ✗ **P2-A3** (skb) |
+| Assembly circular pattern dialog | Instances, Axis of pattern (+ clock), Angle 360 deg, Instance count 2 (+ ↻), ☑ Equal spacing, ☐ Centered; ✓ pale until Instances is set | same (behaviours 6186, 8704) | ✅ |
+| Pin about the middle hole's rim, ✓ | copy in hole 3; "Circular pattern 1 ▸ Part 2 <2>", Instances (3); info bubble "1 instance(s) created." | bubble? (request 10-26 p6) | ? |
+| Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✗ **P2-A4** (skb) |
+| Mate type → Revolute | Offset, Limits (rotation min / max kept); row "Revolute 1"; Z offset 0 (the pin rises to mid-height) | same (behaviours 5942) | ✅ |
+| Fix the plate, drag the revolute pin | rotates only: axis stays on hole 1 (0.002 mm), plate unchanged; the copy follows | behaviours 5948 (1) | ✅ |
+| Mate row right-click (hidden Revolute) | Rename, Edit…, Reset / Show, Show all mates, Isolate…, Make transparent… / Edit named position driver mate… / Suppress, Dynamic suppression ▸ / Animate… / Add selection to folder… / Expand ▸, Collapse ▸ / Delete | same (behaviours 1361; Add comment is cloud) | ✅ |
+| Suppress the mate | row grey struck-through, not italic; the pin drags freely out of the hole | grey italic struck-through | ✗ **P2-A5** (skb, minor) |
+| Ctrl+Z / Ctrl+Y on the suppress | unsuppressed / suppressed again | — | ✅ |

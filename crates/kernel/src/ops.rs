@@ -481,6 +481,16 @@ pub fn draft_wedges(shape: &Shape, faces: &[Shape], pull_direction: DVec3, neutr
     op(ffi::op_draft_wedges(shape.raw(), &l, p3(pull_direction), &neutral.ffi(), angle))
 }
 
+/// Parting-line draft about curved parting `edges` (OCCT's draft can't: the
+/// drafted face is a general ruled surface): each of `faces` is replaced by
+/// the ruled surface leaving its parting edges on its side, every ruling at
+/// its angle in `angles` (one per face) to the pull (positive: into the
+/// material).
+pub fn draft_parting_curve(shape: &Shape, faces: &[Shape], edges: &[Shape], pull_direction: DVec3, angles: &[f64]) -> Result<OpResult> {
+    let (f, e) = (vec_to_list(faces), vec_to_list(edges));
+    op(ffi::op_draft_parting_curve(shape.raw(), &f, &e, p3(pull_direction), angles))
+}
+
 /// Delete faces and heal the gap by extending neighbors
 /// (BRepAlgoAPI_Defeaturing).
 pub fn delete_faces(shape: &Shape, faces: &[Shape]) -> Result<OpResult> {

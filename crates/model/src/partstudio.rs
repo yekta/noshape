@@ -271,6 +271,10 @@ pub struct PartStudio {
     /// Plane display sizes from "Size to Part Studio": (plane, half width, half height).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub plane_sizes: Vec<(Reference, f64, f64)>,
+    /// Plane display rectangles moved off centre by dragging a corner (live
+    /// "icons2 plane resize handles"): (plane, centre along its x, y).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plane_centers: Vec<(Reference, f64, f64)>,
     /// Assembly contexts (Edit in context snapshots, see
     /// [`crate::in_context`]) and the one shown (`None`: no context).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

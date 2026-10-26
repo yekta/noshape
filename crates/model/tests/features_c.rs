@@ -1607,6 +1607,113 @@ fn parting_line_draft_on_two_parts_and_steps() {
     assert!(near(volume(&r, 0), v, 1e-11), "stepped: {} vs {v}", volume(&r, 0));
 }
 
+/// FSW-draft (live "psb (10-25 m) curved parting line draft"): parting
+/// lines off any plane perpendicular to the pull, a 30° sloped ellipse and a
+/// saddle on a Ø20 × 20 cylinder, draft the faces beside them into ruled
+/// draft surfaces (every normal 5° off the plane perpendicular to the pull),
+/// with live's volumes, 4 faces, and live's sample points on the drafted
+/// faces.
+#[test]
+fn parting_line_draft_on_curves_as_live() {
+    use noshape_kernel as k;
+    let cylinder = || k::make_cylinder(&k::Plane::from_normal(DVec3::ZERO, DVec3::Z), mm(10.0), mm(20.0), 2.0 * PI).unwrap();
+    let split = |cutter: k::Shape| -> String {
+        let halves = k::split(&[cylinder()], &[cutter], &k::BooleanOptions::default()).unwrap().shape.solids();
+        assert_eq!(halves.len(), 2);
+        let joined = k::fuse_all(&halves, &k::BooleanOptions { unify: false, ..Default::default() }).unwrap().shape;
+        String::from_utf8(joined.to_brep_bytes().unwrap()).unwrap()
+    };
+    let n = DVec3::new(0.0, -0.5, 3f64.sqrt() / 2.0);
+    let sloped = split(k::make_plane_face(&k::Plane::from_normal(DVec3::new(0.0, 0.0, mm(10.0)), n), -0.05, 0.05, -0.05, 0.05).unwrap());
+    let saddle_tool = k::make_cylinder(&k::Plane::from_normal(DVec3::new(mm(-30.0), 0.0, mm(25.0)), DVec3::X), mm(15.0), mm(60.0), 2.0 * PI).unwrap();
+    let side = saddle_tool.faces().into_iter().find(|f| !f.is_planar()).unwrap();
+    let saddle = split(side);
+    // (case, live volume mm³, faces, live samples on the drafted faces)
+    let live: &[(&str, f64, usize, &[[f64; 3]])] = &[
+        ("A1", 5974.3440838, 4, &[[5.799460875479449, -7.975248451182833, 6.919026107587454], [1.1926223897340549e-15, 9.860903456816864, 17.363383455612777], [-5.79946087547943, -7.975248451182982, 6.91902610758754], [5.485933910552797, -7.515611939173613, 13.278549162453533], [1.0842021724855044e-15, 9.304517284084328, 23.722906510478868], [-5.4859339105527525, -7.515611939173795, 13.278549162453675], [5.172406945626143, -7.0559754271643955, 19.638072217319614], [1.0299920638612292e-15, 8.748131111351793, 30.082429565344956], [-5.172406945626071, -7.055975427164608, 19.638072217319806]]),
+        ("A2", 6616.0458993, 4, &[[6.583067134073691, -9.12403017582056, -8.975498526468815], [1.3552527156068805e-15, 11.251494174430329, 1.4688588215564908], [-6.583067134073806, -9.124030175820488, -8.975498526468872], [6.269634015245872, -8.664531243982609, -2.617879028540042], [1.3010426069826053e-15, 10.695274541350182, 7.826478319485273], [-6.269634015245962, -8.664531243982552, -2.6178790285400324], [5.956200896418054, -8.205032312144658, 3.7397404693887335], [1.1926223897340549e-15, 10.139054908270037, 14.184097817414063], [-5.956200896418117, -8.205032312144617, 3.739740469388809]]),
+        ("A3", 6948.9073276, 4, &[[6.583067134073694, -9.124030175820566, -8.975498526468913], [1.4094628242311558e-15, 11.251494174430338, 1.4688588215563936], [-6.583067134073812, -9.124030175820497, -8.97549852646897], [6.269634015245897, -8.664531243982644, -2.6178790285405444], [1.3010426069826053e-15, 10.695274541350226, 7.826478319484774], [-6.2696340152459875, -8.66453124398259, -2.617879028540534], [5.956200896418101, -8.205032312144724, 3.7397404693878205], [1.2468324983583301e-15, 10.139054908270117, 14.184097817413148], [-5.956200896418162, -8.205032312144683, 3.7397404693878946], [6.643239073128212, -9.080417254266479, 19.634770155408805], [1.3552527156068805e-15, 11.251579995664752, 30.079127503434147], [-6.64323907312823, -9.080417254266365, 19.634770155409004], [6.303062870276137, -8.640301843119216, 13.276714683613811], [1.2468324983583301e-15, 10.695322219813717, 23.721072031639146], [-6.3030628702761575, -8.640301843119124, 13.276714683613951], [5.962886667424062, -8.200186431971956, 6.918659211818821], [1.3010426069826053e-15, 10.139064443962685, 17.363016559844144], [-5.962886667424085, -8.200186431971883, 6.918659211818906]]),
+        ("A4", 7312.6949679, 4, &[[6.583067134073696, -9.124030175820568, -8.975498526468947], [1.4094628242311558e-15, 11.25149417443034, 1.4688588215563594], [-6.583067134073812, -9.124030175820499, -8.975498526469], [6.269634015245908, -8.66453124398266, -2.617879028540732], [1.2468324983583301e-15, 10.695274541350244, 7.826478319484586], [-6.269634015245996, -8.664531243982603, -2.6178790285407216], [5.956200896418117, -8.205032312144748, 3.7397404693874847], [1.2468324983583301e-15, 10.139054908270145, 14.18409781741281], [-5.95620089641818, -8.205032312144708, 3.7397404693875607], [7.479375637452052, -10.037783915771223, 19.62953842484463], [1.5720931501039814e-15, 12.521545134912301, 30.073895772869875], [-7.479375637452168, -10.037783915771186, 19.629538424844217], [6.767583183789376, -9.172172210621829, 13.27380816663398], [1.4094628242311558e-15, 11.400858408284588, 23.718165514659237], [-6.767583183789465, -9.17217221062181, 13.27380816663364], [6.055790730126701, -8.306560505472433, 6.918077908423329], [1.2468324983583301e-15, 10.280171681656872, 17.3624352564486], [-6.055790730126762, -8.30656050547243, 6.918077908423057]]),
+        ("B", 6099.8617685, 4, &[[-7.97661043759583, 5.882822453894209, 12.238347129987373], [9.911175892762973, 0.021198333822605595, 11.015020315051162], [-7.97854786103948, -5.880089448434165, 12.237180837686914], [-7.6844212331077975, 5.680836635500913, 16.298367459477838], [9.555970859944113, 0.020483295330935177, 15.07504064454163], [-7.686294075732567, -5.6782012169390095, 16.297201167177374], [-7.3922320286197625, 5.478850817107615, 20.358387788968304], [9.200765827125256, 0.01976825683926476, 19.1350609740321], [-7.394040290425652, -5.47631298544385, 20.357221496667837]]),
+    ];
+    for &(case, volume_mm3, n_faces, samples) in live {
+        let mut s = Studio::new();
+        let brep = if case == "B" { saddle.clone() } else { sloped.clone() };
+        s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let edges: Vec<Reference> = b
+            .shape
+            .edges()
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| {
+                let i = e.edge_info().unwrap();
+                let mid = e.point_at((i.first_param + i.last_param) * 0.5).unwrap();
+                mid.z > mm(1.0) && mid.z < mm(19.0) && !matches!(i.curve, k::Curve::Line { .. })
+            })
+            .map(|(i, _)| Reference::Edge((*b.edges[i]).clone()))
+            .collect();
+        assert!(!edges.is_empty(), "{case}");
+        s.add("draft", move |p| {
+            p.set("draftFeatureType", en("PARTING_LINE"));
+            p.set("pullDirectionEntity", q(Reference::Plane(DatumPlane::Top)));
+            p.set("partingEdges", ParamValue::Query(edges));
+            p.set("partingLineSides", en(match case {
+                "A3" => "SYMMETRIC",
+                "A4" => "TWO_SIDED",
+                _ => "ONE_SIDED",
+            }));
+            p.set("alongPull", ParamValue::Bool(case != "A2"));
+            p.set("angle", expr("5 deg"));
+            p.set("secondAngle", expr("10 deg"));
+        });
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        assert!(b.shape.is_valid(), "{case}");
+        let v = volume(&r, 0) * 1e9;
+        eprintln!("{case}: {v:.7} mm³ (live {volume_mm3})");
+        assert_eq!(b.shape.faces().len(), n_faces, "{case}");
+        // Live's samples within the part lie on our drafted faces (some are
+        // beyond the trimmed face), where the normal is 5° (10°) off the
+        // plane perpendicular to the pull.
+        let (lo, hi) = (b.shape.bounding_box(true).unwrap().min.z, b.shape.bounding_box(true).unwrap().max.z);
+        let mut checked = 0;
+        for p in samples {
+            let pt = DVec3::new(mm(p[0]), mm(p[1]), mm(p[2]));
+            if pt.z < lo + mm(0.5) || pt.z > hi - mm(0.5) {
+                continue;
+            }
+            // Our surface along the sample's radial line at its height.
+            let rl = (p[0] * p[0] + p[1] * p[1]).sqrt();
+            let dir = DVec3::new(p[0] / rl, p[1] / rl, 0.0);
+            let (mut lo_r, mut hi_r) = (rl - 0.5, rl + 0.5);
+            for _ in 0..50 {
+                let m = 0.5 * (lo_r + hi_r);
+                let q = DVec3::new(mm(dir.x * m), mm(dir.y * m), pt.z);
+                if b.shape.classify_point(q, 1e-12).unwrap() == k::PointClass::Inside { lo_r = m } else { hi_r = m }
+            }
+            // Exact where the curve is level; ~1.3e-5 mm where it slopes:
+            // live's surface is Parasolid's fit within its 1e-5 mm precision.
+            assert!((lo_r - rl).abs() < 5e-5, "{case}: live sample {p:?}: radius {rl} vs ours {lo_r}");
+            checked += 1;
+        }
+        assert!(checked >= 3, "{case}: {checked} samples inside");
+        // The drafted faces: B-splines (live: SPLINE) whose normals are all
+        // 5° (A4: 5° and 10°) off the plane perpendicular to the pull.
+        let drafted: Vec<k::Shape> = b.shape.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(k::Surface::BSpline { .. }))).collect();
+        assert_eq!(drafted.len(), if matches!(case, "A3" | "A4") { 2 } else { 1 }, "{case}");
+        for f in &drafted {
+            let bb = f.uv_bounds().unwrap();
+            let nz: Vec<f64> = [(0.1, 0.1), (0.5, 0.5), (0.9, 0.3), (0.3, 0.8)].iter().map(|(fu, fv)| f.normal_at_uv(bb[0] + fu * (bb[1] - bb[0]), bb[2] + fv * (bb[3] - bb[2])).unwrap().normalize().z.abs()).collect();
+            let ok = |deg: f64| nz.iter().all(|z| (z - deg.to_radians().sin()).abs() < 1e-6);
+            assert!(ok(5.0) || (case == "A4" && ok(10.0)), "{case}: normals {nz:?}");
+        }
+        // That fit tolerance over the drafted faces: ~4e-6 of the volume.
+        assert!((v - volume_mm3).abs() < 0.05, "{case}: {v} mm³ vs live {volume_mm3}");
+    }
+}
+
 /// Live L12 ("psb L12-13 sweep"): a Ø10 circle at the middle of a 100 mm
 /// line sweeps the half toward the path's start (3926.9908 mm³), the other
 /// half with the path's Opposite direction, the whole path (7853.9816) with

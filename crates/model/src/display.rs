@@ -291,7 +291,17 @@ pub struct PlaneDisplay {
     pub frame: PlaneFrame,
     pub half_width: f64,
     pub half_height: f64,
+    /// The rectangle's centre in the frame (moved by dragging a corner).
+    pub center: glam::DVec2,
     pub hidden: bool,
+}
+
+impl PlaneDisplay {
+    /// A point of the shown rectangle: `u`, `v` in -1..1 across it.
+    pub fn corner(&self, u: f64, v: f64) -> DVec3 {
+        let f = &self.frame;
+        f.origin + f.x * (self.center.x + u * self.half_width) + f.y * (self.center.y + v * self.half_height)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -473,6 +483,7 @@ impl StudioDisplay {
             frame,
             half_width: half,
             half_height: half,
+            center: glam::DVec2::ZERO,
             hidden: false,
         };
         StudioDisplay {
