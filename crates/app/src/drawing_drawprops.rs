@@ -203,6 +203,8 @@ enum FontOf {
     SectionLabel,
     DetailLabel,
     AuxLabel,
+    /// Tables › kind `k`'s font.
+    Table(usize),
 }
 
 fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawing::sheet::TextFont> {
@@ -214,6 +216,7 @@ fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawin
         FontOf::SectionLabel => &mut p.view_tab.section_label.font,
         FontOf::DetailLabel => &mut p.view_tab.detail_label.font,
         FontOf::AuxLabel => &mut p.view_tab.aux_label.font,
+        FontOf::Table(k) => &mut table_style_mut(p, k).font,
     }
 }
 
@@ -295,6 +298,32 @@ fn flat_slot(p: &mut DrawingProps, k: usize) -> &mut (u8, Option<[u8; 3]>) {
         rows.push((FLAT_LINE_ROWS[rows.len()].1, None));
     }
     &mut rows[k]
+}
+
+/// Drawing properties › Tables' style of kind `k` (live's order: BOM,
+/// Custom, Cut list, Hole, Revision tables, Tables).
+fn table_style_mut(p: &mut DrawingProps, k: usize) -> &mut TableStyle {
+    let s = &mut p.table_styles;
+    match k {
+        0 => &mut s.bom,
+        1 => &mut s.custom,
+        2 => &mut s.cut_list,
+        3 => &mut s.hole,
+        4 => &mut s.revision,
+        _ => &mut s.general,
+    }
+}
+
+fn set_table_header<const K: usize>(p: &mut DrawingProps, v: f64) {
+    table_style_mut(p, K).header.height = Some(v);
+}
+
+fn set_table_content<const K: usize>(p: &mut DrawingProps, v: f64) {
+    table_style_mut(p, K).content.height = Some(v);
+}
+
+fn set_table_title<const K: usize>(p: &mut DrawingProps, v: f64) {
+    table_style_mut(p, K).title = Some(v);
 }
 
 /// Sets annotation type `I`'s text height.
@@ -427,7 +456,31 @@ impl DrawingEditor {
             }
             6 => {
                 let (h, v) = (p.table_h_padding, p.table_v_padding);
-                vec![spin3(h, |p, v| p.table_h_padding = v, window, cx), spin3(v, |p, v| p.table_v_padding = v, window, cx)]
+                let ts = &p.table_styles;
+                let styles = [&ts.bom, &ts.custom, &ts.cut_list, &ts.hole, &ts.revision, &ts.general];
+                let header = |k: usize| styles[k].header.height.unwrap_or(p.ann_text_height);
+                let content = |k: usize| styles[k].content.height.unwrap_or(p.ann_text_height);
+                let title = |k: usize| styles[k].title.unwrap_or(content(k) * 1.3);
+                // 2 + 2k / 3 + 2k: kind k's header / content row text; 14 /
+                // 15: Revision tables' and Tables' title row text.
+                vec![
+                    spin3(h, |p, v| p.table_h_padding = v, window, cx),
+                    spin3(v, |p, v| p.table_v_padding = v, window, cx),
+                    dropdown(header(0), set_table_header::<0>, window, cx),
+                    dropdown(content(0), set_table_content::<0>, window, cx),
+                    dropdown(header(1), set_table_header::<1>, window, cx),
+                    dropdown(content(1), set_table_content::<1>, window, cx),
+                    dropdown(header(2), set_table_header::<2>, window, cx),
+                    dropdown(content(2), set_table_content::<2>, window, cx),
+                    dropdown(header(3), set_table_header::<3>, window, cx),
+                    dropdown(content(3), set_table_content::<3>, window, cx),
+                    dropdown(header(4), set_table_header::<4>, window, cx),
+                    dropdown(content(4), set_table_content::<4>, window, cx),
+                    dropdown(header(5), set_table_header::<5>, window, cx),
+                    dropdown(content(5), set_table_content::<5>, window, cx),
+                    dropdown(title(4), set_table_title::<4>, window, cx),
+                    dropdown(title(5), set_table_title::<5>, window, cx),
+                ]
             }
             _ => {
                 vec![dropdown(p.inspection_text_height, |p, v| p.inspection_text_height = v, window, cx)]
@@ -695,6 +748,7 @@ impl DrawingEditor {
                 FontOf::SectionLabel => "dp-slfont",
                 FontOf::DetailLabel => "dp-dlfont",
                 FontOf::AuxLabel => "dp-alfont",
+                FontOf::Table(k) => ["dp-tf0", "dp-tf1", "dp-tf2", "dp-tf3", "dp-tf4", "dp-tf5"][k.min(5)],
             };
             sel(id, label, items, width)
         };
@@ -1143,6 +1197,16 @@ impl DrawingEditor {
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Construction geometry"))
                 // Live 1710: Extended lines first, then column 149 with
                 // 181 px spinboxes; Centerlines from column 130.
+                // Live 1710: Created in drawing: Virtual sharps' style select
+                // (column 155) over its pen and colour, Sketch geometry's pen
+                // and colour (column 154).
+                .child(section("Created in drawing"))
+                .child(trow("Virtual sharps", 155., 44., 14., sel("dp-vsharp", if vt.virtual_sharp_extension { "Edge extension".into() } else { "Centermark".into() }, vec![
+                    ("Centermark".into(), !vt.virtual_sharp_extension, std::rc::Rc::new(|p: &mut DrawingProps| p.view_tab.virtual_sharp_extension = false) as Act),
+                    ("Edge extension".into(), vt.virtual_sharp_extension, std::rc::Rc::new(|p: &mut DrawingProps| p.view_tab.virtual_sharp_extension = true) as Act),
+                ], 204.)))
+                .child(trow("", 154., 32., 2., h_flex().items_start().child(thick_sel("dp-vsharpw", vt.virtual_sharp_line.thickness, |p, v| p.view_tab.virtual_sharp_line.thickness = v, 174.)).child(div().ml(px(6.)).child(swatch("dp-vsharpc", vt.virtual_sharp_line.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.virtual_sharp_line.color = c)))).into_any_element()))
+                .child(trow("Sketch geometry", 154., 33., 2., h_flex().items_start().child(thick_sel("dp-skw", vt.sketch_line.thickness, |p, v| p.view_tab.sketch_line.thickness = v, 174.)).child(div().ml(px(6.)).child(swatch("dp-skc", vt.sketch_line.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.sketch_line.color = c)))).into_any_element()))
                 .child(section("Centermarks"))
                 .child(check("dp-cmext", "Extended lines", vt.centermark_extended, |p, v| p.view_tab.centermark_extended = v, cx))
                 .child(trow("Thickness", 150., 33., 2., thick_sel("dp-cmthick", vt.centermark_thickness, |p, v| p.view_tab.centermark_thickness = v, 209.)))
@@ -1182,6 +1246,59 @@ impl DrawingEditor {
                 .child(section("All tables"))
                 .child(trow("Horizontal padding", 181., 32., 1., self.wt_field_w(0, &ed, Some(100.))))
                 .child(trow("Vertical padding", 181., 32., 1., self.wt_field_w(1, &ed, Some(100.))));
+            // Live 1710 / dom/drawing-wt-widgets: each kind's group from
+            // column 144: Line thickness and Font (199 px), the row texts an
+            // 85 px height, Bold / Italic and the colour.
+            const KINDS: [&str; 6] = ["BOM tables", "Custom tables", "Cut list tables", "Hole tables", "Revision tables", "Tables"];
+            const IDS: [[&str; 7]; 6] = [
+                ["dp-t0l", "dp-t0hb", "dp-t0hi", "dp-t0hc", "dp-t0cb", "dp-t0ci", "dp-t0cc"],
+                ["dp-t1l", "dp-t1hb", "dp-t1hi", "dp-t1hc", "dp-t1cb", "dp-t1ci", "dp-t1cc"],
+                ["dp-t2l", "dp-t2hb", "dp-t2hi", "dp-t2hc", "dp-t2cb", "dp-t2ci", "dp-t2cc"],
+                ["dp-t3l", "dp-t3hb", "dp-t3hi", "dp-t3hc", "dp-t3cb", "dp-t3ci", "dp-t3cc"],
+                ["dp-t4l", "dp-t4hb", "dp-t4hi", "dp-t4hc", "dp-t4cb", "dp-t4ci", "dp-t4cc"],
+                ["dp-t5l", "dp-t5hb", "dp-t5hi", "dp-t5hc", "dp-t5cb", "dp-t5ci", "dp-t5cc"],
+            ];
+            let ts = props.table_styles.clone();
+            let styles = [&ts.bom, &ts.custom, &ts.cut_list, &ts.hole, &ts.revision, &ts.general];
+            for (k, name) in KINDS.iter().enumerate() {
+                let st = styles[k];
+                let ids = IDS[k];
+                let set_line: fn(&mut DrawingProps, f64) = match k {
+                    0 => |p, v| table_style_mut(p, 0).line = v,
+                    1 => |p, v| table_style_mut(p, 1).line = v,
+                    2 => |p, v| table_style_mut(p, 2).line = v,
+                    3 => |p, v| table_style_mut(p, 3).line = v,
+                    4 => |p, v| table_style_mut(p, 4).line = v,
+                    _ => |p, v| table_style_mut(p, 5).line = v,
+                };
+                body = body
+                    .child(section(name))
+                    .child(trow("Line thickness", 145., 33., 2., thick_sel(ids[0], st.line, set_line, 199.)))
+                    .child(trow("Font", 145., 32., 2., font_row(FontOf::Table(k), st.font.clone(), 199.)));
+                if k >= 4 {
+                    body = body.child(trow("Title row text", 144., 32., 2., self.wt_field_w(14 + k - 4, &ed, Some(85.))));
+                }
+                for (header, label) in [(true, "Header row text"), (false, "Content row text")] {
+                    let rt = if header { &st.header } else { &st.content };
+                    let field = 2 + 2 * k + (!header) as usize;
+                    let (bi, ci) = if header { (1, 3) } else { (4, 6) };
+                    body = body.child(trow(
+                        label,
+                        144.,
+                        if header { 32. } else { 33. },
+                        2.,
+                        h_flex()
+                            .items_start()
+                            .child(self.wt_field_w(field, &ed, Some(85.)))
+                            .child(Self::row_text_toggles(k, header, rt, (ids[bi], ids[bi + 1]), cx))
+                            .child(div().ml(px(3.)).child(swatch(ids[ci], rt.color, std::rc::Rc::new(move |p: &mut DrawingProps, c| {
+                                let s = table_style_mut(p, k);
+                                if header { s.header.color = c } else { s.content.color = c }
+                            }))))
+                            .into_any_element(),
+                    ));
+                }
+            }
         } else if self.drawing_props.tab == 7 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
@@ -1368,6 +1485,32 @@ impl DrawingEditor {
             .child(toggle(ids.0, "B", false, b, |f| f.bold = !f.bold, cx))
             .child(toggle(ids.1, "I", true, i, |f| f.italic = !f.italic, cx))
             .into_any_element()
+    }
+
+    /// A table row text's Bold and Italic (live drawing/1710 Tables: 26 px,
+    /// 3 px apart, as Inspection's).
+    fn row_text_toggles(k: usize, header: bool, rt: &RowText, ids: (&'static str, &'static str), cx: &mut Context<Self>) -> AnyElement {
+        let toggle = |id: &'static str, glyph: &'static str, italic: bool, on: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .size(px(26.))
+                .relative()
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .bg(gpui_kit::rgb(if on { 0xcfdbe5 } else { 0xf5f5f5 }))
+                .when(on, |d| d.child(div().absolute().top(px(1.)).left(px(1.)).right(px(1.)).bottom(px(1.)).border_1().border_color(gpui_kit::rgb(0x1b5faa))))
+                .child(div().text_size(px(22.)).font_weight(FontWeight::BOLD).when(italic, |d| d.italic()).text_color(gpui_kit::rgb(0x333333)).child(glyph))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    this.set_drawing_prop(&move |p| {
+                        let s = table_style_mut(p, k);
+                        let r = if header { &mut s.header } else { &mut s.content };
+                        if italic { r.italic = !r.italic } else { r.bold = !r.bold }
+                    }, cx)
+                }))
+        };
+        h_flex().gap(px(3.)).child(toggle(ids.0, "B", false, rt.bold, cx)).child(toggle(ids.1, "I", true, rt.italic, cx)).into_any_element()
     }
 
     fn drawing_props_footer(&self, cx: &mut Context<Self>) -> AnyElement {

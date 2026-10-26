@@ -1257,7 +1257,7 @@ impl DrawingEditor {
             if let Some(j) = row.filter(|j| *j > 0) {
                 let mut h = heights.clone();
                 if let (Some(x), Some(r)) = (h.get_mut(j - 1), rows.get(j - 1)) {
-                    *x = noshape_model::drawing::tables::row_need(t, j - 1, r, data.padding[1]);
+                    *x = noshape_model::drawing::tables::row_need(t, &data, j - 1, r, data.padding[1]);
                 }
                 t.row_heights = h;
             }
@@ -1678,7 +1678,7 @@ impl DrawingEditor {
         out.push(MenuEntry::Submenu("Fixed corner".into(), corners));
         let mut text = Vec::new();
         for h in noshape_scene::drawing_tools::table_edit::TEXT_HEIGHTS {
-            text.push(MenuEntry::check(format!("{h} mm"), (t.text_height - h).abs() < 1e-9, move |t, _, cx| t.edit_table(id, "Table text height", cx, |t| noshape_scene::drawing_tools::table_edit::set_text_height(t, h))));
+            text.push(MenuEntry::check(format!("{h} mm"), t.own_text_height && (t.text_height - h).abs() < 1e-9, move |t, _, cx| t.edit_table(id, "Table text height", cx, |t| noshape_scene::drawing_tools::table_edit::set_text_height(t, h))));
         }
         out.push(MenuEntry::Submenu("Text height".into(), text));
         out.push(MenuEntry::item("Fit to content", move |t, _, cx| t.edit_table(id, "Fit table", cx, noshape_scene::drawing_tools::table_edit::fit_to_content)));
@@ -1775,7 +1775,7 @@ impl DrawingEditor {
             return None;
         }
         let f = t.shown_cell_format(row, col);
-        let h = f.height.filter(|v| *v > 0.0).unwrap_or(t.text_height);
+        let h = f.height.filter(|v| *v > 0.0).unwrap_or(self.drawing.table_text_height(t));
         let style = NoteStyle {
             font: (f.bold || f.italic || f.font.is_some()).then(|| noshape_model::drawing::sheet::TextFont { family: f.font.clone().unwrap_or_else(|| noshape_model::drawing::font::DEFAULT_FAMILY.into()), bold: f.bold, italic: f.italic }),
             underline: f.underline,

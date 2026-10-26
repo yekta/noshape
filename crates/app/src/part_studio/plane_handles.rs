@@ -5,8 +5,13 @@
 //! picked in the graphics) moves that corner with the pointer: the opposite
 //! corner stays, the two others slide along their edges, so width and
 //! height change apart. A corner can't pass the opposite one. The size is
-//! saved outside the feature, one undo step per drag ("Change size :
-//! <plane>").
+//! saved outside the feature, one undo step and history entry per drag
+//! ("Change size : <plane>").
+//!
+//! A press on a ring only resizes if the pointer is still in the ring's
+//! hover zone when the drag starts, about 50 ms after the first move, which
+//! itself comes 50 ms or more after the press; a flick off the ring is a
+//! box selection from it (live behaviours "icons2 plane resize rules").
 
 use super::PartStudioView;
 use glam::{DVec2, DVec3};
@@ -25,8 +30,12 @@ const RING_W: f32 = 2.0;
 const RING: [u8; 4] = [142, 176, 213, 255];
 /// Hovered or dragged: live (51,112,179).
 const RING_HOVER: [u8; 4] = [51, 112, 179, 255];
-/// How far from a corner the pointer takes its ring (px in the plane).
-const RING_HIT_PX: f64 = 14.0;
+/// How far past the ring the pointer still takes it, px on screen (live:
+/// a ≈ 35 × 22 px zone around the ≈ 26 × 13 px ring in iso).
+const RING_HIT_PAD_PX: f64 = 5.5;
+/// The press and the first move must each settle this long before a drag
+/// is a resize (live: ~50 ms).
+const DRAG_SETTLE: std::time::Duration = std::time::Duration::from_millis(50);
 
 /// The corners in `PlaneDisplay::corner` units, in the builder's order.
 pub(super) const CORNERS: [(f64, f64); 4] = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)];
@@ -38,6 +47,9 @@ pub(super) struct PlaneDrag {
     pub corner: usize,
     /// Half width, half height and centre (in the plane's frame).
     pub rect: (f64, f64, DVec2),
+    /// Until the drag is a resize: the press time, the first move's time
+    /// and the pointer then in effect.
+    pending: Option<(std::time::Instant, Option<std::time::Instant>, DVec2)>,
 }
 
 /// The rings of the selected planes, built for each frame's camera.
@@ -123,16 +135,19 @@ impl PartStudioView {
             for (i, &(u, v)) in CORNERS.iter().enumerate() {
                 let c = p.corner(u, v);
                 let (Some(cs), Some(rs)) = (vp.project(c), vp.project(c + right * 1e-3)) else { continue };
-                let r = RING_HIT_PX * 1e-3 / (rs - cs).length().max(1e-9);
+                let r = RING_R_PX * 1e-3 / (rs - cs).length().max(1e-9);
                 let (Some(xs), Some(ys)) = (vp.project(c + p.frame.x * r), vp.project(c + p.frame.y * r)) else { continue };
                 let (ex, ey) = (xs - cs, ys - cs);
                 let det = ex.perp_dot(ey);
                 if det.abs() < 1e-9 {
                     continue;
                 }
+                // In ring radii along the plane's axes; past the ring, the
+                // screen distance out along that direction.
                 let d = pos - cs;
                 let (a, b) = (d.perp_dot(ey) / det, ex.perp_dot(d) / det);
-                if a * a + b * b <= 1.0 {
+                let rho = (a * a + b * b).sqrt();
+                if rho <= 1.0 || (rho - 1.0) * (ex * (a / rho) + ey * (b / rho)).length() <= RING_HIT_PAD_PX + 0.5 * f64::from(RING_W) {
                     return Some((p.reference.clone(), i));
                 }
             }
@@ -175,13 +190,49 @@ impl PartStudioView {
             return false;
         }
         let Some(p) = self.display.planes.iter().find(|p| p.reference == r) else { return false };
-        self.ui.plane_drag = Some(PlaneDrag { plane: r, corner, rect: (p.half_width, p.half_height, p.center) });
+        self.ui.plane_drag = Some(PlaneDrag { plane: r, corner, rect: (p.half_width, p.half_height, p.center), pending: Some((std::time::Instant::now(), None, pos)) });
         true
+    }
+
+    /// Before the drag is a resize: whether it becomes one (see the module
+    /// doc). `None`: not decided yet.
+    fn plane_drag_decide(&mut self, pos: DVec2, cx: &mut Context<Self>) -> Option<bool> {
+        let d = self.ui.plane_drag.as_mut()?;
+        let (pressed, first, held) = d.pending?;
+        match settle_step(pressed, first, std::time::Instant::now()) {
+            Settle::Flick => return Some(false),
+            Settle::Wait(first) => {
+                d.pending = Some((pressed, Some(first), pos));
+                return None;
+            }
+            Settle::Decide => {}
+        }
+        let (plane, corner) = (d.plane.clone(), d.corner);
+        let ok = self.plane_ring_at(held, cx) == Some((plane, corner));
+        if let Some(d) = self.ui.plane_drag.as_mut() {
+            d.pending = None;
+        }
+        Some(ok)
     }
 
     /// The dragged corner follows the pointer in the plane; the opposite
     /// corner stays.
     pub(super) fn plane_drag_move(&mut self, pos: DVec2, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if self.ui.plane_drag.is_none() {
+            return false;
+        }
+        match self.plane_drag_decide(pos, cx) {
+            None => return true,
+            Some(true) => {}
+            // A flick off the ring: a box selection from the press, the
+            // plane untouched.
+            Some(false) => {
+                self.ui.plane_drag = None;
+                self.viewport.update(cx, |vp, cx| vp.tool_drag_to_box(pos, cx));
+                self.refresh_scene(false, cx);
+                return true;
+            }
+        }
         let Some(mut d) = self.ui.plane_drag.clone() else { return false };
         let Some(p) = self.display.planes.iter().find(|p| p.reference == d.plane) else { return true };
         let (o, dir) = self.viewport.read(cx).ray(pos);
@@ -209,7 +260,8 @@ impl PartStudioView {
     pub(super) fn plane_drag_end(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(d) = self.ui.plane_drag.take() else { return false };
         let Some(p) = self.display.planes.iter().find(|p| p.reference == d.plane) else { return true };
-        if (p.half_width, p.half_height, p.center) != d.rect {
+        // Live logs every drag that started as a resize, unmoved or not.
+        if d.pending.is_none() {
             let (tab, name) = (self.tab, p.name.clone());
             let (hw, hh, c) = d.rect;
             self.doc.update(cx, |doc, cx| {
@@ -219,5 +271,44 @@ impl PartStudioView {
         let shown = self.display.clone();
         self.apply_display(shown, window, cx);
         true
+    }
+}
+
+/// A pending ring drag at a pointer move (see the module doc).
+#[derive(Debug, PartialEq, Eq)]
+enum Settle {
+    /// The first move came too soon after the press: a box selection.
+    Flick,
+    /// Not decided yet; the first move's time.
+    Wait(std::time::Instant),
+    /// Decide from the pointer in effect (held since the first move).
+    Decide,
+}
+
+fn settle_step(pressed: std::time::Instant, first: Option<std::time::Instant>, now: std::time::Instant) -> Settle {
+    match first {
+        None if now.duration_since(pressed) < DRAG_SETTLE => Settle::Flick,
+        None => Settle::Wait(now),
+        Some(f) if now.duration_since(f) < DRAG_SETTLE => Settle::Wait(f),
+        Some(_) => Settle::Decide,
+    }
+}
+
+#[cfg(test)]
+mod settle_tests {
+    use super::{Settle, settle_step};
+    use std::time::{Duration, Instant};
+
+    /// Live "icons2 plane resize rules": a first move 0 / 30 ms after the
+    /// press is a box select; from ~50 ms it waits ~50 ms more, then the
+    /// pointer then in effect decides.
+    #[test]
+    fn a_ring_drag_settles_before_it_resizes() {
+        let t0 = Instant::now();
+        let ms = |n: u64| t0 + Duration::from_millis(n);
+        assert_eq!(settle_step(t0, None, ms(30)), Settle::Flick);
+        assert_eq!(settle_step(t0, None, ms(60)), Settle::Wait(ms(60)));
+        assert_eq!(settle_step(t0, Some(ms(60)), ms(76)), Settle::Wait(ms(60)));
+        assert_eq!(settle_step(t0, Some(ms(60)), ms(140)), Settle::Decide);
     }
 }

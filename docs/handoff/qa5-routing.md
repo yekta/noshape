@@ -283,6 +283,10 @@ STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, c
 STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.
 STATUS FSW-loft (psb, 2026-10-24 b): Path (section-sampled like Parasolid) and guides through polygon corners done; curved-profile guides, guide continuity and trims still open.
+STATUS FSW-loft (psb, 2026-10-26): curved-profile guides done as live kern G32 (f) (square → circle with a guide: 6 faces, the
+  circle divided evenly from the guide's end, ruled faces between corners, the guided face a Gordon surface with cubic Hermite
+  blending; 6379.69 vs live 6379.54 mm³); the polygon guide cases moved onto it (within 0.2 mm³ of live, were 6 mm³ off). New
+  kernel op loft_guided_curved (crates/kernel/cpp/loft_guided.cpp). Guide continuity and trims still open.
 
 ## SKV1 — ui2 — Sketch inference glyph and rubber-band end points (P1, sketch feel)
 - Source: psb app check 2026-10-24 (agent/psb build, demo document, Line tool on Top, view normal).

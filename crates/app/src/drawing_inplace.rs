@@ -201,7 +201,7 @@ impl DrawingEditor {
         let r = row + l.title as usize;
         let (Some(&xa), Some(&xb), Some(&ya), Some(&yb)) = (l.xs.get(col), l.xs.get(col + 1), l.ys.get(r), l.ys.get(r + 1)) else { return text.len() };
         let f = t.shown_cell_format(row, col);
-        let h = f.height.filter(|v| *v > 0.0).unwrap_or(t.text_height);
+        let h = f.height.filter(|v| *v > 0.0).unwrap_or(self.drawing.table_text_height(t));
         let lines: Vec<&str> = text.split('\n').collect();
         let n = lines.len().max(1) as f64;
         let line_h = h * 1.5;
@@ -243,7 +243,7 @@ impl DrawingEditor {
         let (x0, x1) = (*l.xs.get(*col)?, *l.xs.get(col + 1)?);
         let (ya, yb) = (*l.ys.get(r)?, *l.ys.get(r + 1)?);
         let f = t.shown_cell_format(*row, *col);
-        let h = f.height.filter(|v| *v > 0.0).unwrap_or(t.text_height);
+        let h = f.height.filter(|v| *v > 0.0).unwrap_or(self.drawing.table_text_height(t));
         // The Note panel's B / I show at once.
         let (bold, italic) = match &self.panel {
             Some(Panel::Cell { note: Some(n), .. }) => n.style.font.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false)),

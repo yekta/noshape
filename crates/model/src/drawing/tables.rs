@@ -37,19 +37,61 @@ pub struct TableData {
     pub col_align: Vec<CellAlign>,
     /// The header cells are bold (custom tables).
     pub header_bold: bool,
+    /// Drawing properties › Tables for the table (None: tables drawn on
+    /// their own, as in unit tests).
+    pub style: Option<AppliedStyle>,
+}
+
+/// A table's Drawing properties › Tables look, resolved: row text heights
+/// (mm), the header and content rows' Bold / Italic / colour, the font,
+/// the line pen (mm).
+#[derive(Clone, Debug, PartialEq)]
+pub struct AppliedStyle {
+    pub title: f64,
+    pub header: f64,
+    pub content: f64,
+    pub header_text: super::RowText,
+    pub content_text: super::RowText,
+    pub font: Option<super::sheet::TextFont>,
+    pub line: f64,
 }
 
 impl TableData {
     pub fn columns(&self) -> usize {
         self.header.iter().chain(self.rows.iter()).map(|r| r.len()).max().unwrap_or(0).max(1)
     }
-    /// Format of a cell the table's cell formats don't cover.
+    /// Whether display row `row` (of `rows`) is the header.
+    pub fn is_header(&self, row: usize, rows: usize) -> bool {
+        self.header.is_some() && if self.header_bottom { row + 1 == rows } else { row == 0 }
+    }
+    /// Format of a cell the table's cell formats don't cover: Drawing
+    /// properties › Tables' row Bold / Italic and font.
     pub fn default_format(&self, row: usize, col: usize, rows: usize) -> super::CellFormat {
-        let header = self.header.is_some() && if self.header_bottom { row + 1 == rows } else { row == 0 };
-        if header {
-            return super::CellFormat { bold: self.header_bold, ..Default::default() };
+        let header = self.is_header(row, rows);
+        let font = self.style.as_ref().and_then(|s| s.font.as_ref()).map(|f| f.family.clone());
+        let (bold, italic) = match (&self.style, header) {
+            (Some(s), true) => (s.header_text.bold, s.header_text.italic),
+            (Some(s), false) => (s.content_text.bold, s.content_text.italic),
+            (None, true) => (self.header_bold, false),
+            (None, false) => (false, false),
+        };
+        let align = if header { Default::default() } else { self.col_align.get(col).copied().unwrap_or_default() };
+        super::CellFormat { align, bold, italic, font, ..Default::default() }
+    }
+    /// Display row `row`'s text height (mm).
+    pub fn row_text_height(&self, table: &Table, row: usize) -> f64 {
+        match &self.style {
+            Some(s) if self.is_header(row, self.all_rows().len()) => s.header,
+            Some(s) => s.content,
+            None => table.text_height,
         }
-        super::CellFormat { align: self.col_align.get(col).copied().unwrap_or_default(), ..Default::default() }
+    }
+    /// The content rows' and the title row's text heights (mm).
+    pub fn content_height(&self, table: &Table) -> f64 {
+        self.style.as_ref().map_or(table.text_height, |s| s.content)
+    }
+    pub fn title_height(&self, table: &Table) -> f64 {
+        self.style.as_ref().map_or(table.text_height * 1.2, |s| s.title)
     }
     /// Every row in display order (header first, no title).
     pub fn all_rows(&self) -> Vec<&Vec<String>> {
@@ -304,7 +346,7 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             let header = if *header && !rows.is_empty() { Some(rows.remove(0)) } else { None };
             // Live 744–750: header cells bold and centred, body cells left-aligned.
             let col_align = vec![CellAlign::Left; cells.iter().map(|r| r.len()).max().unwrap_or(0)];
-            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), col_align, header_bold: true }
+            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), col_align, header_bold: true, style: None }
         }
         TableKind::Bom { structured, bottom_to_top, overrides, .. } => {
             // Onshape's BOM table columns (live drawing/189): Item, Quantity,
@@ -393,8 +435,15 @@ pub fn table_data_with(drawing: &Drawing, table: &Table, view_geo: Option<&ViewG
     }
 }
 
-/// A split table's part of the rows, and the drawing's cell padding.
+/// A split table's part of the rows, the drawing's cell padding and its
+/// Tables style.
 fn finish(drawing: &Drawing, table: &Table, mut data: TableData) -> TableData {
+    let st = drawing.props.table_styles.of(&table.kind);
+    let content = drawing.table_text_height(table);
+    let header = if table.own_text_height { content } else { st.header.height.unwrap_or(drawing.props.ann_text_height) };
+    // Live: Title row text 0.1560 in = 1.3 x the rows' 0.1200.
+    let title = if table.own_text_height { content * 1.2 } else { st.title.unwrap_or(content * 1.3) };
+    data.style = Some(AppliedStyle { title, header, content, header_text: st.header.clone(), content_text: st.content.clone(), font: st.font.clone(), line: st.line });
     // A split table shows its part of the rows.
     if let Some([a, b]) = table.rows {
         let n = data.rows.len();
@@ -549,8 +598,8 @@ impl TableLayout {
 }
 
 /// Text height of a cell.
-fn cell_height(table: &Table, r: usize, c: usize) -> f64 {
-    table.cell_format(r, c).height.filter(|h| *h > 0.0).unwrap_or(table.text_height)
+fn cell_height(table: &Table, data: &TableData, r: usize, c: usize) -> f64 {
+    table.cell_format(r, c).height.filter(|h| *h > 0.0).unwrap_or_else(|| data.row_text_height(table, r))
 }
 
 /// Natural column widths (mm) for content. Cells merged across columns do
@@ -558,20 +607,20 @@ fn cell_height(table: &Table, r: usize, c: usize) -> f64 {
 pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
     let n = data.columns();
     let pad = data.padding[0] * 2.0;
-    let mut w = vec![table.text_height * 3.0; n];
+    let mut w = vec![data.content_height(table) * 3.0; n];
     for (ri, row) in data.all_rows().iter().enumerate() {
         for (i, c) in row.iter().enumerate() {
             if table.merge_at(ri, i).is_some_and(|m| m.cols > 1 || (m.row, m.col) != (ri, i)) {
                 continue;
             }
-            let h = cell_height(table, ri, i);
+            let h = cell_height(table, data, ri, i);
             let tw = c.lines().map(|l| font::text_width(l, h)).fold(0.0, f64::max) * if table.shown_cell_format(ri, i).bold { 1.05 } else { 1.0 };
             w[i] = w[i].max(tw + pad);
         }
     }
     if let Some(t) = &data.title {
         let total: f64 = w.iter().sum();
-        let need = font::text_width(t, table.text_height * 1.2) + pad;
+        let need = font::text_width(t, data.title_height(table)) + pad;
         if need > total {
             let k = need / total;
             w.iter_mut().for_each(|x| *x *= k);
@@ -581,15 +630,16 @@ pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
 }
 
 /// Height (mm) a row's content needs (`vpad`: vertical padding).
-pub fn row_need(table: &Table, ri: usize, row: &[String], vpad: f64) -> f64 {
-    let mut need = table.row_height.max(table.text_height + 2.0 * vpad);
+pub fn row_need(table: &Table, data: &TableData, ri: usize, row: &[String], vpad: f64) -> f64 {
+    let th = data.row_text_height(table, ri);
+    let mut need = table.row_height.max(th + 2.0 * vpad);
     for (ci, c) in row.iter().enumerate() {
         if table.merge_at(ri, ci).is_some_and(|m| m.rows > 1 || (m.row, m.col) != (ri, ci)) {
             continue;
         }
-        let h = cell_height(table, ri, ci);
+        let h = cell_height(table, data, ri, ci);
         let lines = c.split('\n').count().max(1) as f64;
-        need = need.max(table.row_height - table.text_height + h + (lines - 1.0) * h * 1.5).max(h + 2.0 * vpad + (lines - 1.0) * h * 1.5);
+        need = need.max(table.row_height - th + h + (lines - 1.0) * h * 1.5).max(h + 2.0 * vpad + (lines - 1.0) * h * 1.5);
     }
     need
 }
@@ -598,14 +648,14 @@ pub fn layout(table: &Table, data: &TableData) -> TableLayout {
     let widths = if table.col_widths.len() == data.columns() { table.col_widths.clone() } else { auto_widths(table, data) };
     let mut heights: Vec<f64> = Vec::new();
     if data.title.is_some() {
-        heights.push(table.row_height.max(table.text_height * 1.2 + 2.0 * data.padding[1]));
+        heights.push(table.row_height.max(data.title_height(table) + 2.0 * data.padding[1]));
     }
     let all = data.all_rows();
     let set = table.row_heights.len() == all.len();
     for (ri, r) in all.iter().enumerate() {
-        let need = row_need(table, ri, r, data.padding[1]);
+        let need = row_need(table, data, ri, r, data.padding[1]);
         // A dragged height holds unless the text needs more.
-        heights.push(if set { table.row_heights[ri].max(table.text_height * 1.4) } else { need });
+        heights.push(if set { table.row_heights[ri].max(data.row_text_height(table, ri) * 1.4) } else { need });
     }
     if heights.is_empty() {
         heights.push(table.row_height);
@@ -651,13 +701,14 @@ fn grid_runs(g: &mut SheetGeometry, n: usize, keep: impl Fn(usize) -> bool, seg:
 /// show one cell; cell formats set alignment, text height and weight.
 pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableLayout, pick: u32) {
     let (lo, hi) = (l.min(), l.max());
+    let line0 = g.lines.len();
     g.lines.push(Polyline2 { points: vec![[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]], style: LineStyle::Visible, closed: true, pick });
-    let th = table.text_height;
+    let th = data.content_height(table);
     let mut row0 = 0usize;
     if let Some(t) = &data.title {
         let (ya, yb) = (l.ys[0], l.ys[1]);
         g.lines.push(Polyline2 { points: vec![[lo[0], yb], [hi[0], yb]], style: LineStyle::Thin, closed: false, pick });
-        g.texts.push(Text2 { pos: [(lo[0] + hi[0]) / 2.0, (ya + yb) / 2.0], height: th * 1.2, text: t.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+        g.texts.push(Text2 { pos: [(lo[0] + hi[0]) / 2.0, (ya + yb) / 2.0], height: data.title_height(table), text: t.clone(), angle: 0.0, anchor: Anchor::Center, pick });
         row0 = 1;
     }
     let rows = data.all_rows();
@@ -709,7 +760,8 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
             let (xa, xb) = (l.xs[ci], l.xs[(ci + cols_n).min(ncols)]);
             let (ya, yb) = (l.ys[row0 + ri], l.ys[(row0 + ri + rows_n).min(l.ys.len() - 1)]);
             let fmt = table.cell_formats.iter().find(|s| s.row == ri && s.col == ci).map(|s| s.format.clone()).unwrap_or_else(|| data.default_format(ri, ci, nrows));
-            let h = cell_height(table, ri, ci);
+            let h = cell_height(table, data, ri, ci);
+            let row_color = data.style.as_ref().and_then(|s| if data.is_header(ri, nrows) { s.header_text.color } else { s.content_text.color });
             let lines: Vec<&str> = c.split('\n').collect();
             let n = lines.len().max(1) as f64;
             let line_h = h * 1.5;
@@ -733,6 +785,10 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
                     CellAlign::Right => ([xb - pad - tw, y - h / 2.0], Anchor::BottomLeft),
                 };
                 g.texts.push(Text2 { pos, height: h, text: text.to_string(), angle: 0.0, anchor, pick });
+                if let Some(rgb) = row_color {
+                    let i = g.texts.len() - 1;
+                    g.colors.push(super::sheet::ColorSpan { lines: 0..0, texts: i..i + 1, fills: 0..0, rgb });
+                }
                 if fmt.bold || fmt.italic || fmt.font.is_some() {
                     let i = g.texts.len() - 1;
                     let family = fmt.font.clone().unwrap_or_else(|| font::DEFAULT_FAMILY.into());
@@ -748,6 +804,10 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
                 }
             }
         }
+    }
+    // Drawing properties › Tables › Line thickness: every line of the table.
+    if let Some(s) = &data.style {
+        g.pens.push(super::sheet::PenSpan { lines: line0..g.lines.len(), width_mm: s.line, dashes: Vec::new() });
     }
 }
 

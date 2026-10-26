@@ -1017,7 +1017,7 @@ impl AnnotationEnv for Env<'_> {
     }
     fn sheet_style(&self) -> super::sheet::SheetStyle {
         let p = &self.drawing.props;
-        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size, callout_justify: p.callout_justify, callout_stack: p.callout_stack, callout_stack_gap: p.callout_stack_gap, target_hatch: p.target_hatch, underline_overridden: p.underline_overridden, lock_jog_45: p.lock_jog_45, ordinate_iso: !self.drawing.ordinate_ansi(), iso: !self.drawing.is_ansi() }
+        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size, callout_justify: p.callout_justify, callout_stack: p.callout_stack, callout_stack_gap: p.callout_stack_gap, target_hatch: p.target_hatch, underline_overridden: p.underline_overridden, lock_jog_45: p.lock_jog_45, ordinate_iso: !self.drawing.ordinate_ansi(), iso: !self.drawing.is_ansi(), virtual_sharp_extension: p.view_tab.virtual_sharp_extension, virtual_sharp_pen: p.view_tab.virtual_sharp_line.thickness, virtual_sharp_color: p.view_tab.virtual_sharp_line.color }
     }
     fn inspection_style(&self) -> Option<super::sheet::InspectionStyle> {
         let p = &self.drawing.props;
@@ -1957,7 +1957,18 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let hat = |h: u64| cell.borrow_mut().id(PickTarget::Hatch(h));
         let to_sheet = |v: ViewId, p: [f64; 2]| placements.iter().find(|pl| pl.id == v).map(|pl| pl.to_sheet(p));
         let sketch_mark = g.mark();
+        let (pens0, colors0) = (g.pens.len(), g.colors.len());
         sheet.sketch.render(&mut g, &ent, &hat, &to_sheet);
+        // Construction geometry › Sketch geometry: pen and colour, ahead of
+        // each entity's own.
+        let sk = &drawing.props.view_tab.sketch_line;
+        let lines = sketch_mark.0..g.lines.len();
+        if !lines.is_empty() {
+            g.pens.insert(pens0, super::sheet::PenSpan { lines: lines.clone(), width_mm: sk.thickness, dashes: Vec::new() });
+            if let Some(rgb) = sk.color {
+                g.colors.insert(colors0, super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb });
+            }
+        }
         g.cad_since(sketch_mark, CadLayer::SketchedGeometry);
     }
 

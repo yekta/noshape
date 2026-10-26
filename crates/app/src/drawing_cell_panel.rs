@@ -46,7 +46,7 @@ impl DrawingEditor {
         self.cell_panel = want.and_then(|sel| {
             let t = self.current_sheet().table(sel.table)?;
             let f = t.shown_cell_format(sel.a.0.min(sel.b.0), sel.a.1.min(sel.b.1));
-            let h = f.height.filter(|v| *v > 0.0).unwrap_or(t.text_height);
+            let h = f.height.filter(|v| *v > 0.0).unwrap_or(self.drawing.table_text_height(t));
             let text = crate::drawing_note::note_height_text(h, self.drawing.units_mm);
             let height = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
             let sub = cx.subscribe_in(&height, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
