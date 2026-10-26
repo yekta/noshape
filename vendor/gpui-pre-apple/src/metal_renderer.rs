@@ -506,7 +506,13 @@ impl MetalRenderer {
             (viewport_size.width.ceil() as i32).into(),
             (viewport_size.height.ceil() as i32).into(),
         );
-        let drawable = if let Some(drawable) = layer.next_drawable() {
+        // NOSHAPE PATCH (agent perf): time the draw and its wait for a
+        // drawable (`gpui::window_draw_time`).
+        let started = std::time::Instant::now();
+        let drawable = layer.next_drawable();
+        let waited = started.elapsed();
+        let _timed = DrawTimer(started, waited);
+        let drawable = if let Some(drawable) = drawable {
             drawable
         } else {
             log::error!(
@@ -1782,5 +1788,14 @@ mod tests {
             assert!(blue.abs_diff(128) <= 2);
             assert_eq!(*alpha, 255);
         }
+    }
+}
+
+/// Reports a window draw's wall time when dropped (NOSHAPE PATCH, agent perf).
+struct DrawTimer(std::time::Instant, std::time::Duration);
+
+impl Drop for DrawTimer {
+    fn drop(&mut self) {
+        gpui::note_window_draw(self.0.elapsed(), self.1);
     }
 }
