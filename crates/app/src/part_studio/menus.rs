@@ -972,7 +972,11 @@ impl PartStudioView {
             let reference = self.ui.mass_reference.as_ref().and_then(|r| self.display.connectors.iter().find(|c| &c.reference == r)).cloned();
             let studio = self.studio(cx).cloned().unwrap_or_default();
             let frame = reference.as_ref().map(|c| (c.origin, c.x, c.z.cross(c.x), c.z));
-            if let Some(noshape_ops::analysis::StudioMass { props: mp, reference }) = noshape_ops::analysis::studio_mass_properties(&ctx, &self.display, &studio, &bodies, reference.as_ref()) {
+            // Live: nothing in "Parts to measure" → every value blank (not
+            // all parts; behaviours "qa5 (10-26 p4)", qa5 P1-17).
+            self.note_unmaterialed_parts(&bodies, cx);
+            let measured = if bodies.is_empty() { None } else { noshape_ops::analysis::studio_mass_properties(&ctx, &self.display, &studio, &bodies, reference.as_ref()) };
+            if let Some(noshape_ops::analysis::StudioMass { props: mp, reference }) = measured {
                 if let Some(name) = &reference {
                     rows.push(("Reference".into(), name.clone()));
                 }
@@ -1696,9 +1700,8 @@ impl PartStudioView {
     /// Open or close the Mass properties panel. A part without a material
     /// has a red chip and blank mass, centre of mass and inertia; Onshape's
     /// yellow top-centre toast "One or more parts do not have a material
-    /// defined." follows ≈3.6 s after the panel opens (when its computation
-    /// is done) and hides itself ≈4.6 s later, once per session, whether or
-    /// not the panel is still open (qa4 F19).
+    /// defined." follows once such a part is measured (see
+    /// `note_unmaterialed_parts`).
     /// The Mass box typed into (live ui-mass/12–13): Enter applies a mass
     /// ("1" → 1 in the document's mass unit; a unit converts) and keeps the box with its value
     /// selected; leaving it applies too; text that isn't a mass stays.
@@ -1779,19 +1782,36 @@ impl PartStudioView {
         self.ui.mass_reference = None;
         self.ui.mass_override_edit = None;
         self.ui.mass_override_input = None;
-        if show && !NO_MATERIAL_SHOWN.load(std::sync::atomic::Ordering::Relaxed) {
-            let props = self.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
-            if self.display.bodies.iter().any(|b| props.get(&b.id).and_then(|p| p.density).is_none()) {
-                NO_MATERIAL_SHOWN.store(true, std::sync::atomic::Ordering::Relaxed);
-                cx.spawn(async move |this, cx| {
-                    cx.background_executor().timer(std::time::Duration::from_millis(3600)).await;
-                    let _ = this.update(cx, |this, cx| this.flash_for(noshape_model::display::FeatureStatus::Warning, NO_MATERIAL.into(), std::time::Duration::from_millis(4600), cx));
-                })
-                .detach();
-            }
-        }
         cx.notify();
     }
+
+    /// The no-material notice once measured parts lack a material: live
+    /// shows it ≈ 1 s after a part without material is being measured
+    /// (picked, or preselected when the panel opens) and hides it ≈ 4.4 s
+    /// later; with nothing measured there is none (behaviours "qa5 (10-26
+    /// p4)", qa4 toast follow-up; qa5 P1-17). Once per session.
+    fn note_unmaterialed_parts(&mut self, measured: &[BodyId], cx: &mut Context<Self>) {
+        if NO_MATERIAL_SHOWN.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
+        let props = self.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
+        if !no_material_notice_due(measured, |b| props.get(b).and_then(|p| p.density)) {
+            return;
+        }
+        NO_MATERIAL_SHOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(std::time::Duration::from_millis(1000)).await;
+            let _ = this.update(cx, |this, cx| this.flash_for(noshape_model::display::FeatureStatus::Warning, NO_MATERIAL.into(), std::time::Duration::from_millis(4400), cx));
+        })
+        .detach();
+    }
+}
+
+/// Whether the measured parts call for the no-material notice: some part is
+/// measured and one of them has no material (live: none while "Parts to
+/// measure" is empty).
+fn no_material_notice_due(measured: &[BodyId], density: impl Fn(&BodyId) -> Option<f64>) -> bool {
+    measured.iter().any(|b| density(b).is_none())
 }
 
 /// The Part Studio's measurements of a selection: no part volume (live, qa5
@@ -1811,6 +1831,24 @@ fn mass_parts(display: &noshape_model::display::StudioDisplay, owners: impl Iter
         }
     }
     out
+}
+
+#[cfg(test)]
+mod no_material_tests {
+    use super::no_material_notice_due;
+    use noshape_model::reference::{BodyId, FeatureId};
+
+    /// Live (qa5 10-26 p4, qa4 toast follow-up): no notice while nothing is
+    /// measured; one once a measured part has no material.
+    #[::core::prelude::v1::test]
+    fn no_material_notice_only_for_measured_parts() {
+        let a = BodyId { feature: FeatureId(1), index: 0 };
+        let b = BodyId { feature: FeatureId(1), index: 1 };
+        let density = |x: &BodyId| (x == &a).then_some(2700.0);
+        assert!(!no_material_notice_due(&[], density));
+        assert!(!no_material_notice_due(std::slice::from_ref(&a), density));
+        assert!(no_material_notice_due(&[a.clone(), b], density));
+    }
 }
 
 #[cfg(test)]
