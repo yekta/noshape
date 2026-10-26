@@ -798,3 +798,8 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   but **not italic**; live: **grey italic struck-through** (behaviours 1297, assembly/198; also 1339 for instances and their
   mates). Code: assembly_view.rs:3533 mate rows (`line_through` only), :3326 instance rows (italic only when dynamically
   suppressed), assembly_panels.rs:889 pattern rows. Part Studio rows already do italic + line-through (part_studio/mod.rs:3572).
+- **P2-A6 — skb (assembly list header)** — Part 1 <1>, Part 2 <1> and Circular pattern 1 (3 copies, count 4): ours reads
+  **"Instances (5)"** (assembly_view.rs:4032 `a.instances.len()`, every instance). Live counts the **top-level rows**: 4 parts
+  + Replicate 1 + 2 patterns read "Instances (7)" with 10 instances (behaviours 5986, asm-06x; after the Replicate alone
+  "Instances (5)" = 4 parts + the Replicate row). Here live would read "Instances (3)". Folders and subassemblies presumably
+  count as one row each (not captured).

@@ -118,3 +118,5 @@ then edits, undo/redo, rollback and suppress.
 | Mate row right-click (hidden Revolute) | Rename, Edit…, Reset / Show, Show all mates, Isolate…, Make transparent… / Edit named position driver mate… / Suppress, Dynamic suppression ▸ / Animate… / Add selection to folder… / Expand ▸, Collapse ▸ / Delete | same (behaviours 1361; Add comment is cloud) | ✅ |
 | Suppress the mate | row grey struck-through, not italic; the pin drags freely out of the hole | grey italic struck-through | ✗ **P2-A5** (skb, minor) |
 | Ctrl+Z / Ctrl+Y on the suppress | unsuppressed / suppressed again | — | ✅ |
+| Circular pattern 1 count 4 (edit), Enter twice | stays open (P2-A1, fix 9bf8475b not in this green) | 2nd Enter accepts | ✗ P2-A1 (fixed on main, pending green) |
+| Instance list header after count 4 | "Instances (5)" | top-level rows: "Instances (3)" | ✗ **P2-A6** (skb) |
