@@ -8,10 +8,13 @@
 | psui | Part Studio UI | a2602854-3c17-421f-b5b4-37a3c7d03450 | Motile | noshape-wt/psui, /root/target-psui | :102 | /root/lead-scratch/prompt-psui.md |
 | skasm | sketch + assembly | 24cb8a1d-753a-4372-8f11-997b8d101c2a | Unbind | noshape-wt/skasm, /root/target-skasm | :103 | /root/lead-scratch/prompt-skasm.md |
 | dx | agent API, drawings, data exchange | 0a28d6c8-180a-4c59-8cfe-6bff3f4dcf71 | Stablecog | noshape-wt/dx, /root/target-dx | :105 | /root/lead-scratch/prompt-dx.md |
+| live (no builds) | live Onshape research: answers REQUESTS.md, writes specs ahead (live/SPECS.md) | 911412ff-1f48-46de-8008-a4de9c809039 | Motile | Chrome :107 | - | /root/lead-scratch/prompt-live.md |
+| qa (no builds) | tests /root/green/noshape vs live, files docs/TICKETS.md | 23cc0f7b-b7e0-47c4-979d-310631c0d2cc | Unbind | noshape-wt/qa (docs only) | :110 | /root/lead-scratch/prompt-qa.md |
 
 All on Opus 5.5. Worktrees are under /root/projects/noshape-wt/ (the repo is /root/projects/noshape). The lead's
 watcher tests main in noshape-wt/watch with /root/target-lead; releases are cut in noshape-wt/release. The rustc
 throttle (~/.local/bin/rustc-throttle) allows 4 concurrent big-crate compiles plus the watcher's own slot.
+Is it working? `bash /tmp/lead/scoreboard.sh 3` (landings per agent per day, reverts, watcher runs, releases).
 Check agents with `python3 /tmp/lead/peek.py 4` and their commits (`git log origin/main --grep '^<name>:'`).
 
 You coordinate agents that build noshape (Onshape clone). The user's rules are in docs/HANDOFF.md
