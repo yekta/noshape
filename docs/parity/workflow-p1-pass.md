@@ -75,3 +75,15 @@ then edits, undo/redo, rollback and suppress.
 | Plane (tool search; "Did you mean: Mate connector") | Entities "Top plane", type Offset, Offset distance 25 mm + flip, ☐ Flip normal; type list Offset, Plane point, Line angle, Point normal, Three point, Mid plane, Curve point, Tangent | same (behaviours 332) | ✅ |
 | Split (Part tab) of the plate by Plane 1 at 2.5 mm | dialog Part / Face, Parts, surfaces, or curves to split, Entity to split with, ☐ Keep tools, ☐ Trim to face boundaries, ☑ Keep both sides; result Parts 6 → 7 | same (behaviours 329) | ✅ |
 | Transform dialog | Entities to transform or copy, ▾ Translate by line (+ flip), Line or points, ☐ Copy part | same first type (behaviours 226) | ✅ |
+| Mass and section properties (bottom-right icon), part without material | dialog Part / Face, red "Part 2" chip, blank mass / CoM / inertia, volume 21005.949 mm³, area 4401.292 mm²; inertia header "(mm² kg)"; yellow no-material toast | header "(lb mm²)"; toast: notes disagree | ✗ **P1-14** (ui) / ? |
+| Section view (Shift+X), Front plane | dialog Exclude / Include, Section planes (+ plane button), Items to exclude, info "Select a plane, planar face, cylinder, cone, or mate connector."; chip "Section plane 1 (Front)", manipulator arrow + rotate glyph + ring, tan preview cut faces | same (behaviours 359) | ✅ |
+| Draft dialog | Neutral plane / Parting line; Neutral plane (+MC); Entities to draft; Draft angle 3 deg + ↻; ☑ Tangent propagation; ☐ Reapply fillet | same (behaviours 327) | ✅ |
+| Sweep dialog | Solid / Surface / Thin, New … Intersect; Faces and sketch regions to sweep; Sweep path (pink) + flip; ☐ Extend to full path; Profile control ▾ None; › ☐ Twist; ☐ Scale | same (behaviours 339) | ✅ |
+| Loft dialog | Profiles; ⌄ End conditions (Start / End profile condition ▾ None); ☐ Guides and continuity; ☐ Path; › ☐ Connections; ☐ Show isocurves | same (behaviours 340) | ✅ |
+| Sketch Trim (m) on a crossing line | the clicked segment past the crossing is removed; the new end is coincident with the other line | — | ✅ |
+| Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ |
+| Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ |
+| n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? |
+| View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |
+| Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ |
+| Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ |
