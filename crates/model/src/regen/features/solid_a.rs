@@ -105,97 +105,17 @@ pub(super) fn loft_end(ev: &mut EvalCtx, vals: &ParamValues, ids: [&str; 3], pro
 /// profile boundary.", live: no field marked).
 const LOFT_GUIDE_MISS: &str = "All guides should intersect each profile boundary.";
 
-/// A polygon's corners in loop order (None if an edge isn't straight).
-fn polygon(s: &Shape) -> Option<Vec<DVec3>> {
-    let wire = if s.shape_type() == ShapeType::Face { s.wires().into_iter().next()? } else { s.clone() };
-    let mut edges: Vec<(DVec3, DVec3)> = Vec::new();
-    for e in wire.edges() {
-        if !matches!(e.edge_curve(), Ok(k::Curve::Line { .. })) {
-            return None;
-        }
-        edges.push(e.endpoints().ok()?);
-    }
-    let first = edges.first().copied()?;
-    let mut out = vec![first.0];
-    let mut at = first.1;
-    let mut used = vec![false; edges.len()];
-    used[0] = true;
-    while out.len() < edges.len() {
-        let i = (0..edges.len()).find(|&i| !used[i] && (edges[i].0.distance(at) < 1e-9 || edges[i].1.distance(at) < 1e-9))?;
-        used[i] = true;
-        out.push(at);
-        at = if edges[i].0.distance(at) < 1e-9 { edges[i].1 } else { edges[i].0 };
-    }
-    Some(out)
-}
-
-/// A loft of two polygon profiles along guides through their corners (live
-/// "psb (10-24 f)": the guided corner's side edge is the guide): each side
-/// face is ruled between its two corner columns, the guide or the straight
-/// line between matching corners, and the faces are sewn with the profiles.
-/// Live's guided faces bulge a little more (one guide on □20 → □10: 5634.73
-/// vs 5628.83 here; all four corners 9511.27 vs 9511.44).
+/// A loft of two profiles along guide curves (live "psb (10-24 f)", kern
+/// G32 (f)): the kernel's guided loft. Side faces run between the profiles'
+/// corners, ruled where no guide is, a Gordon surface with cubic Hermite
+/// blending through the guides elsewhere (within 0.2 mm³ of live).
 fn loft_guided(shapes: &[Shape], guides: &[Shape], solid: bool) -> FResult<Shape> {
     let [a, b] = shapes else { return err("Loft guides with more than two profiles are not supported yet") };
-    let (Some(pa), Some(mut pb)) = (polygon(a), polygon(b)) else { return err("Loft guides are only supported between straight-edged profiles yet") };
-    if pa.len() != pb.len() {
-        return err("Loft guides need profiles with as many corners yet");
-    }
-    let n = pa.len();
-    // Turn the second loop the way the first runs (about the loft's axis).
-    let newell = |p: &[DVec3]| (0..p.len()).map(|i| p[i].cross(p[(i + 1) % p.len()])).sum::<DVec3>();
-    let ca = pa.iter().copied().sum::<DVec3>() / n as f64;
-    let cb = pb.iter().copied().sum::<DVec3>() / n as f64;
-    let axis = cb - ca;
-    if newell(&pa).dot(axis).signum() != newell(&pb).dot(axis).signum() {
-        pb.reverse();
-    }
-    // Each guide: one edge from a corner of each profile.
-    let near = |pts: &[DVec3], q: DVec3| pts.iter().position(|p| p.distance(q) < 1e-7);
-    let mut shift: Option<usize> = None;
-    let mut columns: Vec<Option<Shape>> = vec![None; n];
-    for g in guides {
-        let edges = g.edges();
-        let [e] = edges.as_slice() else { return err("Loft guides of several curves are not supported yet") };
-        let (s0, s1) = e.endpoints()?;
-        let (ia, ib, edge) = match (near(&pa, s0), near(&pb, s1), near(&pa, s1), near(&pb, s0)) {
-            (Some(i), Some(j), _, _) => (i, j, e.clone()),
-            (_, _, Some(i), Some(j)) => (i, j, e.reversed()?),
-            _ => return err(LOFT_GUIDE_MISS),
-        };
-        let k = (ib + n - ia) % n;
-        if shift.is_some_and(|s| s != k) {
-            return err(LOFT_GUIDE_MISS);
-        }
-        shift = Some(k);
-        columns[ia] = Some(k::make_wire(&[edge])?);
-    }
-    let shift = shift.unwrap_or(0);
-    let mut columns: Vec<Shape> = columns
-        .into_iter()
-        .enumerate()
-        .map(|(i, c)| match c {
-            Some(c) => Ok(c),
-            None => Ok(k::make_wire(&[k::make_line(pa[i], pb[(i + shift) % n])?])?),
-        })
-        .collect::<FResult<_>>()?;
-    columns.push(columns[0].clone());
-    let ruled = k::LoftOptions { ruled: true, ..Default::default() };
-    let mut faces: Vec<Shape> = Vec::new();
-    for i in 0..n {
-        let side = k::loft(&[columns[i].clone(), columns[i + 1].clone()], &ruled).map_err(|_| fe(LOFT_FAILED))?.shape;
-        faces.extend(side.faces());
-    }
-    if solid {
-        faces.push(a.clone());
-        faces.push(b.clone());
-    }
-    let size = (pa.iter().chain(&pb).fold(DVec3::splat(f64::MAX), |m, p| m.min(*p)) - pa.iter().chain(&pb).fold(DVec3::splat(f64::MIN), |m, p| m.max(*p))).length();
-    let sewn = k::sew(&faces, 1e-6 * (1.0 + size), solid).map_err(|_| fe(LOFT_FAILED))?.shape;
-    if solid && sewn.count(ShapeType::Solid) == 0 {
-        return err(LOFT_FAILED);
-    }
-    Ok(sewn)
+    k::loft_guided_curved(a, b, guides, solid).map_err(|e| match e {
+        k::KernelError::OperationFailed(m) if m.starts_with("All guides") => fe(LOFT_GUIDE_MISS),
+        k::KernelError::OperationFailed(m) if m.starts_with("Loft guides") => fe(m),
+        _ => fe(LOFT_FAILED),
+    })
 }
 
 /// Onshape's LOFT_FAILED.
@@ -1433,14 +1353,32 @@ mod tests {
     fn guided_loft_as_live() {
         let shapes = [square(10.0, 0.0), square(5.0, 20.0)];
         let vol = |g: Vec<Shape>| loft_guided(&shapes, &g, true).unwrap().volume().unwrap() * 1e9;
-        // Ruled guided faces: live's bulge a little more (−0.1 % per guide).
+        // Gordon faces with Hermite blending: within 0.2 mm³ of live.
         let one = vol(vec![guide(1.0, 1.0, 20.0)]);
-        assert!((one - 5634.73412077918).abs() < 8.0, "{one}");
+        assert!((one - 5634.73412077918).abs() < 0.2, "{one}");
         let two = vol(vec![guide(1.0, 1.0, 20.0), guide(-1.0, -1.0, 20.0)]);
-        assert!((two - 6602.796189766023).abs() < 16.0, "{two}");
+        assert!((two - 6602.796189766023).abs() < 0.2, "{two}");
         let four = vol(vec![guide(1.0, 1.0, 20.0), guide(-1.0, -1.0, 20.0), guide(1.0, -1.0, 20.0), guide(-1.0, 1.0, 20.0)]);
-        assert!((four - 9511.270069510634).abs() < 1.0, "{four}");
+        assert!((four - 9511.270069510634).abs() < 0.2, "{four}");
         let miss = loft_guided(&shapes, &[guide(1.0, 1.0, 18.0)], true).unwrap_err();
         assert_eq!(miss.message, LOFT_GUIDE_MISS);
+    }
+
+    /// Live kern G32 (f): □20 on Top → Ø16 circle 20 up, one guide arc
+    /// (10,0,0) → (13,0,10) → (8,0,20): 6379.53965799 mm³, 6 faces (the
+    /// circle split in 5 from the guide's end, the guide inside the +x face).
+    #[test]
+    fn guided_loft_square_to_circle_as_live() {
+        let circle = k::make_face_from_wire(&k::make_wire(&[k::make_circle(DVec3::new(0.0, 0.0, 0.02), DVec3::Z, 0.008).unwrap()]).unwrap(), true).unwrap();
+        let shapes = [square(10.0, 0.0), circle];
+        let g = k::make_wire(&[k::make_arc_3pts(DVec3::new(0.01, 0.0, 0.0), DVec3::new(0.013, 0.0, 0.01), DVec3::new(0.008, 0.0, 0.02)).unwrap()]).unwrap();
+        let r = loft_guided(&shapes, &[g], true).unwrap();
+        let v = r.volume().unwrap() * 1e9;
+        assert_eq!(r.faces().len(), 6);
+        assert!((v - 6379.53965799).abs() < 0.2, "{v}");
+        // The guided face (live 454.5765529) and a ruled one (298.9130792).
+        let mut areas: Vec<f64> = r.faces().iter().map(|f| f.area().unwrap() * 1e6).collect();
+        areas.sort_by(f64::total_cmp);
+        assert!((areas[5] - 454.5765529).abs() < 0.05 && (areas[1] - 298.9130792).abs() < 0.005, "{areas:?}");
     }
 }

@@ -482,6 +482,7 @@ pub(crate) mod ffi {
             checked: bool,
         ) -> Result<OpOut>;
         fn op_draft_wedges(solid: &OcShape, faces: &OcShapeList, pull: P3, neutral: &PlaneF, angle: f64) -> Result<OpOut>;
+        fn loft_guided_curved(profile_a: &OcShape, profile_b: &OcShape, guides: &OcShapeList, make_solid: bool) -> Result<UniquePtr<OcShape>>;
         fn op_draft_parting_curve(solid: &OcShape, faces: &OcShapeList, edges: &OcShapeList, pull: P3, angles: &[f64]) -> Result<OpOut>;
         fn op_draft(
             s: &OcShape,
