@@ -19,6 +19,11 @@
 // from it.
 
 #include "internal.hpp"
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <GeomLProp_SLProps.hxx>
+#include <GeomAPI_Interpolate.hxx>
+#include <BRepFill.hxx>
+#include <BRepAlgoAPI_Splitter.hxx>
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
@@ -1635,5 +1640,298 @@ OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, c
   HHist h = shell_history(solid.shape, r, chain, chain, sources, {});
   return make_result({solid.shape}, r, h.get());
 }
+
+
+// Parting-line draft about curved parting edges (Parasolid's taper about a
+// parting line, which OCCT's BRepOffsetAPI_DraftAngle can't do: the drafted
+// face isn't a cone). Each face in `faces` is replaced by the ruled surface
+// leaving its parting edges (those of `edges` it has) on the face's side,
+// each ruling at `angle` to the pull in the plane of the pull and the face
+// normal; positive angles lean into the material. The material between the
+// face and the ruled surface is cut away (or added): a slab of the face is
+// split by the ruled sheet and the pieces touching the face are the change.
+OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, const OcShapeList& edges, P3 pull,
+                             rust::Slice<const double> angles)
+{
+  require_non_null(solid.shape, "solid");
+  if (angles.size() != faces.items.size())
+    fail_invalid("one draft angle per face");
+  for (double angle : angles)
+    if (!(std::abs(angle) < M_PI / 2.0))
+      fail_invalid("draft angle must be less than 90 degrees");
+  const gp_Dir P = to_dir(pull, "pull direction");
+  ShapeIMap    all;
+  TopExp::MapShapes(solid.shape, TopAbs_FACE, all);
+  Bnd_Box box;
+  BRepBndLib::Add(solid.shape, box);
+  const double size = std::sqrt(box.SquareExtent()) + 1e-3;
+  const double tol  = 1e-7 * (size + 1);
+  ShapeList    removal, addition;
+  SourceMap    sources;
+  std::vector<HHist> tool_chain;
+  size_t fi = 0;
+  for (const TopoDS_Shape& fx : faces.items)
+  {
+    const double angle = angles[fi++];
+    const double ca = std::cos(angle), sa = std::sin(angle);
+    const int i = all.FindIndex(fx);
+    if (i <= 0)
+      fail_invalid("face to draft is not a face of the solid");
+    const TopoDS_Face f = TopoDS::Face(all(i));
+    gp_Pnt q;
+    gp_Dir qn;
+    if (!inner_point(f, q, qn))
+      fail_op("draft: degenerate face");
+    const occ::handle<Geom_Surface> gs = BRep_Tool::Surface(f);
+    // The face's reach along the pull from its parting edges: how long the
+    // rulings and how thick the slab must be.
+    double hmin = 1e300, hmax = -1e300;
+    for (TopExp_Explorer v(f, TopAbs_VERTEX); v.More(); v.Next())
+    {
+      const double h = gp_Vec(gp::Origin(), BRep_Tool::Pnt(TopoDS::Vertex(v.Current()))).Dot(gp_Vec(P));
+      hmin = std::min(hmin, h);
+      hmax = std::max(hmax, h);
+    }
+    // A ruling must leave the face's far side; longer ones make a long thin
+    // surface OCCT's point projection then misses. The face's extent along
+    // the pull from its (tight) box.
+    Bnd_Box fb;
+    BRepBndLib::AddOptimal(f, fb, false, false);
+    double x0, y0, z0, x1, y1, z1;
+    fb.Get(x0, y0, z0, x1, y1, z1);
+    for (double bx : {x0, x1})
+      for (double by : {y0, y1})
+        for (double bz : {z0, z1})
+        {
+          const double h = gp_Vec(bx, by, bz).Dot(gp_Vec(P));
+          hmin = std::min(hmin, h);
+          hmax = std::max(hmax, h);
+        }
+    const double len = (hmax - hmin) / std::max(ca, 1e-3) * 1.1 + size * 0.05 + 10 * tol;
+    BRepBuilderAPI_Sewing sew(1e-6);
+    int n_sheets = 0;
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge e = TopoDS::Edge(x.Current());
+      bool parting = false;
+      for (const TopoDS_Shape& pe : edges.items)
+        parting |= pe.IsSame(e);
+      if (!parting || BRep_Tool::Degenerated(e))
+        continue;
+      double a, b;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, a, b);
+      if (c.IsNull())
+        fail_op("draft: parting edge without a curve");
+      // The face's side of the edge along the pull: the face lies left of
+      // the edge seen from its outward normal.
+      double side;
+      {
+        gp_Pnt pm;
+        gp_Vec tm;
+        c->D1((a + b) / 2, pm, tm);
+        GeomAPI_ProjectPointOnSurf pr(pm, gs);
+        if (!pr.IsDone() || pr.NbPoints() == 0)
+          fail_op("draft: parting edge off its face");
+        double u, v;
+        pr.LowerDistanceParameters(u, v);
+        GeomLProp_SLProps lp(gs, u, v, 1, 1e-9);
+        if (!lp.IsNormalDefined())
+          fail_op("draft: no face normal on the parting edge");
+        gp_Vec nm = lp.Normal();
+        if (f.Orientation() == TopAbs_REVERSED)
+          nm.Reverse();
+        const gp_Vec into = nm.Crossed(tm) * edge_sense(e, f);
+        side = into.Dot(gp_Vec(P)) >= 0 ? 1.0 : -1.0;
+      }
+      const bool   closed = c->IsPeriodic() && std::abs((b - a) - c->Period()) < 1e-9;
+      // The draft surface's normal along the curve: perpendicular to the
+      // curve, at the draft angle to the plane perpendicular to the pull
+      // (live: every normal of the drafted face is), the one nearest the
+      // face normal.
+      const double target = side * sa;
+      auto normal_at = [&](double t, gp_Vec& T) -> gp_Vec {
+        gp_Pnt p;
+        c->D1(t, p, T);
+        if (T.Magnitude() < 1e-12)
+          fail_op("draft: degenerate parting edge");
+        T.Normalize();
+        GeomAPI_ProjectPointOnSurf pr(p, gs);
+        if (!pr.IsDone() || pr.NbPoints() == 0)
+          fail_op("draft: parting edge off its face");
+        double u, v;
+        pr.LowerDistanceParameters(u, v);
+        GeomLProp_SLProps lp(gs, u, v, 1, 1e-9);
+        if (!lp.IsNormalDefined())
+          fail_op("draft: no face normal on the parting edge");
+        gp_Vec n = lp.Normal();
+        if (f.Orientation() == TopAbs_REVERSED)
+          n.Reverse();
+        gp_Vec e1 = n - T * n.Dot(T);
+        if (e1.Magnitude() < 1e-12)
+          fail_op("draft: degenerate face normal");
+        e1.Normalize();
+        const gp_Vec e2 = T.Crossed(e1);
+        const double pa = e1.Dot(gp_Vec(P)), pb = e2.Dot(gp_Vec(P)), rr = std::hypot(pa, pb);
+        if (rr < std::abs(target) - 1e-12)
+          fail_op("draft: the parting edge is too steep for the draft angle");
+        const double base = std::atan2(pb, pa), dphi = std::acos(std::clamp(target / std::max(rr, 1e-300), -1.0, 1.0));
+        double best = -2, phi = 0;
+        for (double cand : {base + dphi, base - dphi})
+          if (std::cos(cand) > best)
+            best = std::cos(cand), phi = cand;
+        return e1 * std::cos(phi) + e2 * std::sin(phi);
+      };
+      const double eps = (b - a) * 1e-4;
+      // The ruling's far end at `t`: where the neighbouring tangent planes
+      // meet (N × N'), leaving the curve on the face's side along the pull.
+      auto far_at = [&](double t) -> gp_Pnt {
+        gp_Vec       T, Tq;
+        const gp_Vec Nt = normal_at(t, T);
+        const double t0 = closed ? t - eps : std::max(a, t - eps), t1 = closed ? t + eps : std::min(b, t + eps);
+        const gp_Vec dN = normal_at(t1, Tq) - normal_at(t0, Tq);
+        gp_Vec       d  = Nt.Crossed(dN);
+        if (d.Magnitude() < 1e-9 * dN.Magnitude() + 1e-15)
+          d = Nt.Crossed(T); // a plane: any line in it across the curve
+        d.Normalize();
+        if (d.Dot(gp_Vec(P)) * side < 0)
+          d.Reverse();
+        return c->Value(t).Translated(d * len);
+      };
+      // Not periodic, even around a closed curve (OCCT's point projection
+      // misses points on periodic B-spline faces); a closed curve's ends meet
+      // with the same tangent.
+      const int N = 64;
+      occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, N + 1), near = new NCollection_HArray1<gp_Pnt>(1, N + 1);
+      occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, N + 1);
+      for (int k = 0; k <= N; ++k)
+      {
+        const double t = k == N ? b : a + (b - a) * k / N;
+        const double tt = closed && k == N ? a : t; // the same point
+        near->SetValue(k + 1, c->Value(tt));
+        pts->SetValue(k + 1, far_at(tt));
+        prm->SetValue(k + 1, t);
+      }
+      // Both ends interpolated on the same parameters (the same knots), so
+      // the rulings join C(t) to its far end: a degree 3 × 1 B-spline (live:
+      // SPLINE, degrees 1 and 3).
+      GeomAPI_Interpolate ip(pts, prm, false, 1e-9), in(near, prm, false, 1e-9);
+      if (closed)
+      {
+        const gp_Vec tn = c->DN(a, 1);
+        const double h  = (b - a) * 1e-4;
+        const gp_Vec tf = gp_Vec(far_at(a - h), far_at(a + h)) / (2 * h);
+        in.Load(tn, tn, false);
+        ip.Load(tf, tf, false);
+      }
+      ip.Perform();
+      in.Perform();
+      if (!ip.IsDone() || !in.IsDone())
+        fail_op("draft: ruling end curve failed");
+      occ::handle<Geom_Curve> far = ip.Curve(), start = in.Curve();
+      TopoDS_Edge e0 = BRepBuilderAPI_MakeEdge(start, a, b).Edge();
+      TopoDS_Edge e1 = BRepBuilderAPI_MakeEdge(far, a, b).Edge();
+      TopoDS_Face rf = BRepFill::Face(e0, e1);
+      if (rf.IsNull())
+        fail_op("draft: ruled face failed");
+      sew.Add(rf);
+      ++n_sheets;
+    }
+    if (n_sheets == 0)
+      fail_invalid("a drafted face has no parting edge");
+    sew.Perform();
+    const TopoDS_Shape sheet = sew.SewedShape();
+    // The slab on the side the ruled surface goes, split by the sheet.
+    const double       thick = len * std::abs(sa) * 1.01 + 10 * tol;
+    const TopoDS_Shape sl    = slab(f, angle > 0 ? -thick : thick, f, sources);
+    if (sl.IsNull())
+      fail_op("draft: slab failed");
+    BRepAlgoAPI_Splitter sp;
+    ShapeList sp_args, sp_tools;
+    sp_args.Append(sl);
+    sp_tools.Append(sheet);
+    sp.SetArguments(sp_args);
+    sp.SetTools(sp_tools);
+    sp.SetRunParallel(true);
+    sp.Build();
+    if (sp.HasErrors())
+      fail_op("draft: split failed");
+    tool_chain.push_back(sp.History());
+    // Pieces touching the face (a face of theirs on its surface).
+    for (TopExp_Explorer z(sp.Shape(), TopAbs_SOLID); z.More(); z.Next())
+    {
+      const TopoDS_Shape w = z.Current();
+      bool touches = false;
+      for (TopExp_Explorer y(w, TopAbs_FACE); y.More() && !touches; y.Next())
+      {
+        gp_Pnt yp;
+        gp_Dir yn;
+        if (!inner_point(TopoDS::Face(y.Current()), yp, yn))
+          continue;
+        GeomAPI_ProjectPointOnSurf pr(yp, gs);
+        touches = pr.IsDone() && pr.NbPoints() > 0 && pr.LowerDistance() < 10 * tol;
+        if (touches)
+        {
+          BRepClass_FaceClassifier fc(f, yp, 10 * tol);
+          touches = fc.State() == TopAbs_IN || fc.State() == TopAbs_ON;
+        }
+      }
+      if (!touches || volume_of(w) < tol * tol * tol)
+        continue;
+      // Its faces on the ruled sheet stand for `f`.
+      for (TopExp_Explorer y(w, TopAbs_FACE); y.More(); y.Next())
+      {
+        gp_Pnt yp;
+        gp_Dir yn;
+        if (!inner_point(TopoDS::Face(y.Current()), yp, yn))
+          continue;
+        BRepExtrema_DistShapeShape dd(BRepBuilderAPI_MakeVertex(yp).Vertex(), sheet);
+        const bool on_sheet = dd.IsDone() && dd.Value() < 10 * tol;
+        sources.Bind(y.Current(), Source{f, on_sheet ? (uint8_t)REL_MODIFIED : (uint8_t)REL_GENERATED});
+      }
+      (angle > 0 ? removal : addition).Append(w);
+    }
+  }
+  TopoDS_Shape       r = solid.shape;
+  std::vector<HHist> chain;
+  if (!removal.IsEmpty())
+  {
+    ShapeList args;
+    args.Append(r);
+    BRepAlgoAPI_Cut cu;
+    cu.SetArguments(args);
+    cu.SetTools(removal);
+    cu.SetRunParallel(true);
+    cu.Build();
+    if (cu.HasErrors() || !cu.IsDone())
+      fail_op("draft: cut failed");
+    r = cu.Shape();
+    chain.push_back(cu.History());
+  }
+  if (!addition.IsEmpty())
+  {
+    ShapeList args;
+    args.Append(r);
+    BRepAlgoAPI_Fuse fu;
+    fu.SetArguments(args);
+    fu.SetTools(addition);
+    fu.SetRunParallel(true);
+    fu.Build();
+    if (fu.HasErrors() || !fu.IsDone())
+      fail_op("draft: fuse failed");
+    r = fu.Shape();
+    chain.push_back(fu.History());
+  }
+  ShapeUpgrade_UnifySameDomain usd(r, true, true, false);
+  usd.SetLinearTolerance(1e-7);
+  usd.Build();
+  chain.push_back(usd.History());
+  r = single_solid(usd.Shape());
+  if (!valid_solid(r))
+    fail_op("draft about a curved parting line gave an invalid solid");
+  HHist h = shell_history(solid.shape, r, chain, chain, sources, {});
+  return make_result({solid.shape}, r, h.get());
+}
+
+
 
 } // namespace noshape

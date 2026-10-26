@@ -264,6 +264,17 @@ STATUS FSW-draft (psb, 2026-10-24 b): parting edges on several parts (each draft
 STATUS FSW-draft (psb, 2026-10-25): curved parting lines tried with the curve's own plane as the hinge (a 30° ellipse on a
   cylinder): OCCT's draft and the wedge fallback both fail, since the drafted face becomes a general ruled surface (not a cone).
   Needs our own ruled-surface construction; left refused ("Parting lines must lie in a plane perpendicular to the pull direction").
+STATUS FSW-draft (psb, 2026-10-26): curved parting lines (a sloped ellipse, a saddle) done as live "psb (10-25 m)": the
+  faces beside them become ruled draft surfaces (every normal at the draft angle to the plane perpendicular to the pull;
+  B-spline, degrees 1 × 3), new kernel op `draft_parting_curve`; live's A1–A4 and B volumes within 0.02 mm³ (live's surface
+  is itself a B-spline fit), 4 faces, live's samples on our faces (tests parting_line_draft_on_curves_as_live, draft_curve.rs).
+
+## PROJ-RULED — kern — point projection misses points on ruled B-spline faces
+- psb, 2026-10-26: `Shape::project_point` / `k::distance` (BRepExtrema vertex-to-face) on a ruled B-spline face (degree 3 ×
+  1, e.g. `loft` with `ruled: true` between two closed splines, or a curved parting-line draft) returns the distance to a
+  boundary edge for most interior points (e.g. 3.9 mm for a point on the face), while `classify_point` says OnBoundary and
+  the face's own UV classifier says IN. Repro: crates/kernel/tests/draft_curve.rs history (test
+  `ruled_loft_point_projection_control`, removed). Affects measure / picking-by-point on such faces.
 STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, constant normal thickness with Scale, Trim ends to the cap planes, the two failure texts (test thin_sweep_as_live).
 STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.
