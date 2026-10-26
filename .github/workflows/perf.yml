@@ -333,9 +333,10 @@ jobs:
 
   # Regeneration performance (jobs: model only): qa5's 400-hole plate
   # (crates/model/tests/big_plate.rs, PERF1: holes, a 400-edge chamfer and a
-  # depth edit, each under 2 s like Onshape's ~1 s) in a release build of
-  # `ref` on each OS, and sketch editing latency; the times go to the run
-  # summary.
+  # depth edit, each under 2 s like Onshape's ~1 s), skb's drag-step speed,
+  # sketch editing latency and the timed checks in a release build of `ref`
+  # on each OS; the times go to the run summary, the logs to the
+  # model-perf-<OS> artifacts.
   model:
     name: Model perf ${{ matrix.name }}
     if: github.event_name == 'workflow_dispatch' && inputs.jobs == 'model'
@@ -405,6 +406,28 @@ jobs:
           $status = $LASTEXITCODE
           "### ${{ matrix.name }}" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           Select-String -Path big_plate.log -Pattern 'big plate:|tessellate Part 1|boolean_into Cut' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit $status
+
+      # skb's drag-step speed (crates/model/tests/drag_speed.rs): one drag
+      # solve of a 19-cube Planar stack against live's ~21 ms per step.
+      - name: Drag speed (release)
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          status=0
+          cargo test --release --locked -p noshape-model --test drag_speed -- --ignored --nocapture --test-threads=1 2>&1 | tee drag_speed.log || status=$?
+          { echo "### ${{ matrix.name }}: drag speed"; grep -E "per drag step|panicked" drag_speed.log || true; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: Drag speed (release, Windows)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          cargo test --release --locked -p noshape-model --test drag_speed -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath drag_speed.log
+          $status = $LASTEXITCODE
+          "### ${{ matrix.name }}: drag speed" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Select-String -Path drag_speed.log -Pattern 'per drag step|panicked' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
 
       # Wall-clock checks of the ci.yml tests (their `timed_` twins, ignored
@@ -521,3 +544,11 @@ jobs:
           Select-String -Path regen_profile.log -Pattern '^profile:' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
+
+      - name: Upload timings
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: model-perf-${{ runner.os }}
+          path: '*.log'
+          if-no-files-found: ignore
