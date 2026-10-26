@@ -952,8 +952,8 @@ fn revolve_cases() -> Vec<(&'static str, Studio)> {
 /// remove a line once it matches.
 const KNOWN: &[(&str, &str)] = &[
     ("LP2", "fs/psb: feature pattern, second direction straddling the front face (left top edge, −y): live re-extrudes those 3 bosses down the front face to z 0 (50544.69 mm³); ours patterns the geometry (49696.46)"),
-    ("CP2", "fs: circular feature pattern of BOSS about the vertical edge (60,40), 30° × 3, equal spacing off: live OK 48802.32 mm³ = the seed, one instance and one hanging 16 % off the left face, i.e. turning clockwise from above: live's vertical edge runs −z, ours +z (asked of live, REQUESTS fs 10-26 b (j))"),
-    ("P6", "fs: tangent plane origin: live (110, 0, 20) mm, ours (110, 0, 0): live's cylinder (evSurfaceDefinition) of a 20 mm extrude has its origin at z 20, ours at z 0; the rule is asked of live (REQUESTS fs 10-26)"),
+    ("CP2", "kern: circular feature pattern of BOSS about the vertical edge (60,40), 30° × 3: live OK 48802.32 mm³ (turning clockwise from above): Parasolid's side edges of an extrude run back toward the sketch (live \"fs (10-26 b)\" (j): (0,0,−1)), our prism's run +z"),
+    ("P6", "kern: tangent plane origin live (110, 0, 20), ours (110, 0, 0): Parasolid's cylinder of an extrude has its origin at the far end cap, z back toward the sketch (live \"fs (10-26 b)\" (a)–(g)), our prism's at the sketch end along the extrude"),
 ];
 
 /// Live's mass properties bands (bands.jsonl, lead 10-26): Parasolid's
