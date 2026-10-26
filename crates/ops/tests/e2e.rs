@@ -551,6 +551,11 @@ fn drawing_views_and_dimensions() {
     assert!(lin["text"].as_str().unwrap().contains("80"), "{lin}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert!(hist["history"][0]["description"].as_str().unwrap().ends_with(":: Linear dimension"), "{hist}");
+    // Shift+Q: the edge's midpoint and a corner (half the edge), two quadrant points (the diameter).
+    let half = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [mid, [num(&long["a"][0]), num(&long["a"][1])]], "place": [mid[0], mid[1] + 30.0], "mid_quad": true }));
+    assert!(half["text"].as_str().unwrap().contains("40"), "{half}");
+    let quads = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [[cx + r, cy], [cx - r, cy]], "place": [cx, cy + 25.0], "mid_quad": true }));
+    assert!(quads["text"].as_str().unwrap().contains("10"), "{quads}");
     // The dimension palette: prefix, precision, a symmetrical tolerance.
     let lin_id = lin["annotation"].as_u64().unwrap();
     let ed = call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": lin_id, "prefix": "2X ", "precision": 1, "tolerance": "symmetrical", "tolerance_value": 0.1 }));
