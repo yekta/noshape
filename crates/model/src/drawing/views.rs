@@ -169,8 +169,35 @@ pub fn studio_hash(studio: &PartStudio, config: &ConfigValues) -> u64 {
     h.finish()
 }
 
-/// Content hash of a source: the studio, or the assembly with every Part
-/// Studio and sub-assembly of the document (assemblies reference them).
+/// The Part Studio and Assembly tabs an assembly's instances come from,
+/// through its sub-assemblies.
+pub fn assembly_source_tabs(doc: &Document, assembly: TabId) -> std::collections::BTreeSet<TabId> {
+    use crate::assembly::InstanceSource as S;
+    let mut seen = std::collections::BTreeSet::new();
+    let mut todo = vec![assembly];
+    while let Some(tab) = todo.pop() {
+        let Some(TabContent::Assembly(a)) = doc.tab(tab).map(|t| &t.content) else { continue };
+        for i in &a.instances {
+            match &i.source {
+                S::Part { studio, .. } | S::PartStudio { studio, .. } | S::MirroredPart { studio, .. } | S::Sketch { studio, .. } => {
+                    seen.insert(*studio);
+                }
+                S::Assembly { assembly, .. } => {
+                    if seen.insert(*assembly) {
+                        todo.push(*assembly);
+                    }
+                }
+                S::External { .. } | S::Standard { .. } => {}
+            }
+        }
+    }
+    seen
+}
+
+/// Content hash of a source: the studio, or the assembly with the Part
+/// Studios and sub-assemblies it instantiates (recursively). Other tabs
+/// don't count: live keeps a drawing up to date through a STEP import or a
+/// feature in an unused Part Studio (behaviours "qa5 (10-26 p5)", P2-D2).
 pub fn source_hash(doc: &Document, key: &SourceKey) -> Option<u64> {
     match &doc.tab(key.tab)?.content {
         TabContent::PartStudio(ps) => Some(studio_hash(ps, &key.config)),
@@ -180,13 +207,14 @@ pub fn source_hash(doc: &Document, key: &SourceKey) -> Option<u64> {
             key.explode.hash(&mut h);
             key.position.hash(&mut h);
             key.display.hash(&mut h);
-            for t in &doc.tabs {
+            let used = assembly_source_tabs(doc, key.tab);
+            for t in doc.tabs.iter().filter(|t| t.id != key.tab && used.contains(&t.id)) {
                 match &t.content {
                     TabContent::PartStudio(ps) => {
                         t.id.hash(&mut h);
                         serde_json::to_vec(ps).unwrap_or_default().hash(&mut h);
                     }
-                    TabContent::Assembly(a) if t.id != key.tab => {
+                    TabContent::Assembly(a) => {
                         t.id.hash(&mut h);
                         serde_json::to_vec(a).unwrap_or_default().hash(&mut h);
                     }

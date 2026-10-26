@@ -3071,3 +3071,23 @@ fn tilted_assembly_view_keeps_edge_sources() {
     assert!(unlinked.is_empty(), "real edges without a source: {unlinked:?}");
     assert!(g.model_edges.iter().any(|me| matches!(me.geom, views::EdgeGeom::Circle { face_on: false, .. })), "the tilted rims are model circles");
 }
+
+#[test]
+fn unrelated_tabs_leave_an_assembly_source_current() {
+    // qa5 P2-D2 (live "qa5 (10-26 p5)"): a STEP import or a feature in a Part
+    // Studio the assembly doesn't use keeps its drawing up to date; an edit
+    // to a Part Studio it instantiates makes it out of date.
+    let (mut doc, _) = demo();
+    let asm = doc.tabs.iter().find(|t| matches!(t.content, TabContent::Assembly(_))).unwrap().id;
+    let used = views::assembly_source_tabs(&doc, asm);
+    assert!(!used.is_empty());
+    let key = views::SourceKey::studio(asm);
+    let before = views::source_hash(&doc, &key);
+    doc.add_tab("Unrelated", TabContent::PartStudio(crate::partstudio::PartStudio::new()));
+    assert_eq!(views::source_hash(&doc, &key), before, "an unrelated Part Studio");
+    let studio = *used.iter().next().unwrap();
+    if let Some(TabContent::PartStudio(ps)) = doc.tabs.iter_mut().find(|t| t.id == studio).map(|t| &mut t.content) {
+        ps.features.clear();
+    }
+    assert_ne!(views::source_hash(&doc, &key), before, "a Part Studio the assembly uses");
+}
