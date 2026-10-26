@@ -130,6 +130,7 @@ pub const TEXT_HEIGHTS: [f64; 4] = [2.5, 3.0, 3.5, 5.0];
 /// Text height ▸ (the columns refit).
 pub fn set_text_height(t: &mut Table, h: f64) {
     t.text_height = h;
+    t.own_text_height = true;
     t.col_widths.clear();
     t.row_height = (h * 2.2).max(7.0);
 }

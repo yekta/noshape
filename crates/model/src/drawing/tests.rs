@@ -472,6 +472,33 @@ fn formats_and_construction_geometry_pens() {
     assert!(pens(&b, sheet::LineStyle::Centerline).iter().any(|(_, d)| d == &[16.0, 3.0, 3.0, 3.0]));
 }
 
+/// Drawing properties › Tables: a kind's header / content / title row
+/// heights, Bold / Italic, colours and line pen; Text height ▸ on the table
+/// wins over them.
+#[test]
+fn table_styles_from_drawing_properties() {
+    let mut d = Drawing::default();
+    let t = Table::new(1, TableKind::General { cells: vec![vec!["H1".into(), "H2".into()], vec!["a".into(), "b".into()]], title: Some("T".into()), header: true }, [200.0, 200.0]);
+    let st = &mut d.props.table_styles.general;
+    st.header.color = Some([200, 0, 0]);
+    (st.content.height, st.content.italic, st.line) = (Some(5.0), true, 0.35);
+    let data = tables::table_data(&d, &t, None, None, None, &[], &|s| s.to_string());
+    let l = tables::layout(&t, &data);
+    let mut g = sheet::SheetGeometry::new(400.0, 300.0);
+    tables::render(&mut g, &t, &data, &l, 1);
+    let at = |s: &str| g.texts.iter().position(|x| x.text == s).unwrap();
+    let (h1, a, title) = (at("H1"), at("a"), at("T"));
+    assert!((g.texts[h1].height - d.props.ann_text_height).abs() < 1e-9 && g.text_color(h1) == Some([200, 0, 0]) && g.text_font(h1).is_some_and(|f| f.bold));
+    assert!((g.texts[a].height - 5.0).abs() < 1e-9 && g.text_font(a).is_some_and(|f| f.italic && !f.bold) && g.text_color(a).is_none());
+    assert!((g.texts[title].height - 6.5).abs() < 1e-9);
+    assert!((0..g.lines.len()).all(|i| (g.line_pen(i).0 - 0.35).abs() < 1e-9));
+    let mut own = t.clone();
+    own.text_height = 2.5;
+    own.own_text_height = true;
+    let data = tables::table_data(&d, &own, None, None, None, &[], &|s| s.to_string());
+    assert!((data.content_height(&own) - 2.5).abs() < 1e-9 && (data.row_text_height(&own, 0) - 2.5).abs() < 1e-9);
+}
+
 #[test]
 fn bom_hole_table_and_linked_balloons() {
     let (doc, mut drawing) = demo();
