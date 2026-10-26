@@ -6,6 +6,18 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 ## Daily release smoke
 (none yet: the first daily release under the new plan is due 2026-10-27 ~05:00 UTC)
 
+Checklist (30 min, on /root/green/noshape at the release commit; numbers to compare in brackets):
+1. tests/perf/live-30-features.noshape: opens, mass properties 60779.484 mm³; edit Extrude 1 10 → 12, ✓, Ctrl+Z, Ctrl+Y
+   (regen line in the NOSHAPE_PERF log; undo/redo cached).
+2. New Part Studio: centre rectangle 80×50 + dims, extrude 10; fillet top face R2; chamfer 1; sketch points + Hole
+   (counterbore); Shell top 2.5 on the plate **without** a hole (14467.382 mm³); linear pattern; mirror; boolean.
+3. Sketch: fillet R5 → R20, trim, offset, dimension edit, Esc / ✓.
+4. Assembly: insert 2 parts, revolute mate via tool search, drag (only the dragged part moves).
+5. Drawing: Create Drawing (suggested views), Update after a model change, export PDF + DXF (R14, mm).
+6. Part › Export STEP, + › Import it back (same volume); Documents window › Create › Document.
+7. Durability: kill -9 right after an edit, reopen, the edit is there.
+8. Re-run /root/qa-scratch/bin/{shellmatrix,hollowmatrix,holematrix,rimmatrix,boolmatrix}.py if a CLI is shipped.
+
 ## Setup that works
 - App: `cp /root/green/noshape /root/qa-scratch/noshape-<sha8>`, run with `NOSHAPE_PERF=1 NOSHAPE_PERF_PERIOD=1
   NOSHAPE_NO_NATIVE_DIALOGS=1 DISPLAY=:110`, window resized to 1600×1000 at 0,0 (xdotool). Helpers:
