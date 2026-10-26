@@ -1,6 +1,7 @@
 //! Looking at the model: parts, their faces, edges and vertices with stable
 //! ids and geometry, datums, measurements and mass properties.
 
+use noshape_model::prelude::*;
 use super::{doc_field, s, strings, studio_target, tab_field};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};

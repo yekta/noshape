@@ -19,6 +19,8 @@ pub mod features;
 pub mod implicit;
 pub mod measure;
 
+use crate::configured_properties::{configured_value, parse_color};
+use crate::in_context::ContextBodies;
 use crate::configuration::ConfigValues;
 use crate::display::{FeatureState, FeatureStatus, MeshBuffers, StudioDisplay};
 use crate::partstudio::PartStudio;
@@ -426,7 +428,7 @@ impl Regenerator {
         if aborted() {
             return cancelled();
         }
-        crate::configured_properties::apply_names(&mut display, studio, config);
+        apply_configured_names(&mut display, studio, config);
         // The shown Assembly context: its bodies, translucent and pickable.
         if let Some(active) = studio.active_context
             && let Some(c) = studio.contexts.iter().find(|c| c.id == active)
@@ -471,4 +473,18 @@ fn resolve_bool_exprs(params: &crate::params::ParamValues, specs: &[crate::param
 /// Live's second line for selections that no longer resolve.
 pub fn missing_text(n: usize) -> String {
     if n == 1 { "1 missing selection".into() } else { format!("{n} missing selections") }
+}
+
+/// Regeneration: a configured Name renames the part in the Parts list and
+/// a configured Appearance colors it, for configurations that have a row
+/// (live 644, 647).
+fn apply_configured_names(display: &mut crate::display::StudioDisplay, ps: &PartStudio, active: &ConfigValues) {
+    for b in &mut display.bodies {
+        if let Some(n) = configured_value(ps, &b.id, "Name", active).filter(|n| !n.trim().is_empty()) {
+            b.name = n;
+        }
+        if let Some(c) = configured_value(ps, &b.id, "Appearance", active).and_then(|v| parse_color(&v)) {
+            b.color = c;
+        }
+    }
 }

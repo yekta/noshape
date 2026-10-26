@@ -104,35 +104,12 @@ pub type CadMembers = (Vec<Option<usize>>, Vec<Option<usize>>, Vec<Option<usize>
 
 impl SheetGeometry {
     /// Line `line` is the spline with these Bézier poles.
-    pub(crate) fn add_cad_spline(&mut self, line: usize, poles: Vec<[f64; 2]>) {
+    pub fn add_cad_spline(&mut self, line: usize, poles: Vec<[f64; 2]>) {
         let obj = self.cad_objects.len();
         self.cad_objects.push(CadObject::Spline { poles });
         self.cad_members.push(CadMember { lines: line..line + 1, texts: 0..0, fills: 0..0, obj });
     }
 
-    /// Everything since `m` is this table.
-    pub(crate) fn add_cad_table(&mut self, m: super::sheet::GeomMark, layout: &super::tables::TableLayout, data: &super::tables::TableData, kind: &super::TableKind) {
-        if layout.xs.len() < 2 || layout.ys.len() < 2 {
-            return;
-        }
-        let mut cells: Vec<Vec<String>> = Vec::new();
-        if layout.title {
-            cells.push(vec![data.title.clone().unwrap_or_default()]);
-        }
-        cells.extend(data.all_rows().into_iter().cloned());
-        let widths = layout.xs.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
-        let heights: Vec<f64> = layout.ys.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
-        // Row styles (live drw2-k-dxf2018 / drw2-en-ansi-a STYLE table).
-        let [title, header, row] = table_row_styles(kind);
-        let n = heights.len();
-        let body = layout.title as usize;
-        let header_row = data.header.is_some().then(|| if data.header_bottom { n - 1 } else { body });
-        let rows = (0..n).map(|r| if layout.title && r == 0 { title } else if Some(r) == header_row { header } else { row }).collect();
-        let aligned = matches!(kind, super::TableKind::General { .. });
-        let obj = self.cad_objects.len();
-        self.cad_objects.push(CadObject::Table { corner: [layout.xs[0], layout.ys[0]], widths, heights, cells, rows, aligned });
-        self.cad_members.push(CadMember { lines: m.0..self.lines.len(), texts: m.1..self.texts.len(), fills: m.2..self.fills.len(), obj });
-    }
 
     /// The object of each line, text and fill.
     pub fn cad_members_of(&self) -> CadMembers {
@@ -152,7 +129,7 @@ impl SheetGeometry {
     /// The dimensions, feature control frames and hole callouts among the
     /// annotations laid out from `starts` (each one's first text, line and
     /// fill) to `end`.
-    pub(crate) fn add_cad_objects(&mut self, starts: &[(&Annotation, usize, usize, usize)], end: super::sheet::GeomMark, env: &dyn AnnotationEnv) {
+    pub fn add_cad_objects(&mut self, starts: &[(&Annotation, usize, usize, usize)], end: super::sheet::GeomMark, env: &dyn AnnotationEnv) {
         let base = self.style.clone();
         for (k, &(a, t0, l0, f0)) in starts.iter().enumerate() {
             let (l1, t1, f1) = starts.get(k + 1).map(|s| (s.2, s.1, s.3)).unwrap_or(end);
@@ -254,7 +231,7 @@ impl SheetGeometry {
 }
 
 /// The Title / Header / Data row text styles of a table kind (live).
-fn table_row_styles(kind: &super::TableKind) -> [&'static str; 3] {
+pub fn table_row_styles(kind: &super::TableKind) -> [&'static str; 3] {
     use super::TableKind as K;
     match kind {
         K::Bom { .. } => ["Onshape-Standard-BomTable-TitleRow", "Onshape-Standard-BomTable-HeaderRow", "Onshape-Standard-BomTable-DataRow"],

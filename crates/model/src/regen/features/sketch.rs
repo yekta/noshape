@@ -8,8 +8,7 @@ use noshape_units::Dim;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-/// Parameter id prefix of a configured sketch dimension (`sketchDim:<constraint id>`).
-pub const CONFIGURED_DIMENSION_PREFIX: &str = "sketchDim:";
+pub use noshape_model_data::sketch_feature::CONFIGURED_DIMENSION_PREFIX;
 
 pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let Some(plane_ref) = ev.query("sketchPlane").first() else {

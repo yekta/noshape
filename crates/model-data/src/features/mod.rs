@@ -143,7 +143,16 @@ static REGISTRY: LazyLock<IndexMap<&'static str, FeatureType>> = LazyLock::new(|
 /// Schema of a feature type: built-in, or a custom feature of a compiled
 /// Feature Studio (`custom:<tab>:<name>`, see [`crate::custom`]).
 pub fn get(id: &str) -> Option<&'static FeatureType> {
-    REGISTRY.get(id).or_else(|| crate::custom::lookup(id))
+    REGISTRY.get(id).or_else(|| CUSTOM_LOOKUP.get().and_then(|f| f(id)))
+}
+
+/// Schemas of custom features: compiled Feature Studios live in noshape-model, which registers its lookup here
+/// ([`set_custom_lookup`]) before it compiles any studio.
+static CUSTOM_LOOKUP: std::sync::OnceLock<fn(&str) -> Option<&'static FeatureType>> = std::sync::OnceLock::new();
+
+/// Register the custom feature schema lookup (noshape-model's `custom::lookup`); later calls are ignored.
+pub fn set_custom_lookup(f: fn(&str) -> Option<&'static FeatureType>) {
+    let _ = CUSTOM_LOOKUP.set(f);
 }
 
 pub fn all() -> impl Iterator<Item = &'static FeatureType> {

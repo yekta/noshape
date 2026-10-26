@@ -5,6 +5,7 @@
 //! Select transparent geometry and a Context transparency slider. The
 //! context is transient: going back to the assembly drops it.
 
+use noshape_model::prelude::*;
 use super::*;
 use noshape_model::assembly::InstanceId;
 use noshape_model::display::MeshBuffers;

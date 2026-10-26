@@ -278,19 +278,6 @@ pub fn parse_color(text: &str) -> Option<[f32; 4]> {
     Some([lin(byte(0)?), lin(byte(2)?), lin(byte(4)?), a])
 }
 
-/// Regeneration: a configured Name renames the part in the Parts list and
-/// a configured Appearance colors it, for configurations that have a row
-/// (live 644, 647).
-pub fn apply_names(display: &mut crate::display::StudioDisplay, ps: &PartStudio, active: &ConfigValues) {
-    for b in &mut display.bodies {
-        if let Some(n) = configured_value(ps, &b.id, "Name", active).filter(|n| !n.trim().is_empty()) {
-            b.name = n;
-        }
-        if let Some(c) = configured_value(ps, &b.id, "Appearance", active).and_then(|v| parse_color(&v)) {
-            b.color = c;
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

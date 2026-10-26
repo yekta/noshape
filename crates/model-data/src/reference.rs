@@ -36,7 +36,7 @@ impl fmt::Display for FeatureId {
     }
 }
 
-pub(crate) fn rand_u64() -> u64 {
+pub fn rand_u64() -> u64 {
     let u = uuid::Uuid::new_v4();
     let b = u.as_bytes();
     u64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]])

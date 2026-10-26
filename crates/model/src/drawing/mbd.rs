@@ -7,32 +7,16 @@
 //! them and "Show" brings them back where they were), and a view's
 //! "Show annotations from model" off hides its own.
 
+pub use noshape_model_data::drawing::mbd::*;
 use super::views::{self, Sources, ViewFrame, ViewGeometry};
 use super::{Annotation, AnnotationKind, Drawing, Sheet, ViewId};
 use crate::annotations::{Annotation as ModelAnnotation, AnnotationKind as ModelKind};
 use crate::document::{Document, TabContent, TabId};
 use glam::DVec3;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// A drawing annotation showing a Part Studio's MBD annotation.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ModelRef {
-    pub tab: TabId,
-    pub id: u32,
-    /// The view showing it.
-    pub view: ViewId,
-    /// The box's distance from the edge along the face normal (sheet mm).
-    pub offset: f64,
-    /// Deleted from the drawing (MBD status › Show restores it).
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub hidden: bool,
-}
 
-/// Live drawing/1071: the box centre sits about 0.28 in from the edge
-/// (datum size 0.12 in, a short stem, the 0.24 in box).
-pub const DEFAULT_OFFSET: f64 = 7.2;
 
 /// Is `normal` edge-on (perpendicular to the line of sight) in `frame`?
 fn edge_on(frame: &ViewFrame, normal: DVec3) -> bool {
@@ -167,10 +151,15 @@ pub fn mbd_rows(drawing: &Drawing, doc: &Document, sheet: Option<usize>) -> Vec<
     out
 }
 
-impl Drawing {
+/// Methods on [`Drawing`] that need noshape-model's logic (in scope through the module's glob re-export).
+pub trait ModelAnnotations {
     /// MBD status › Show: un-hide a model datum where it was (false when its
     /// view shows no model annotations: live's info toast).
-    pub fn show_model_annotation(&mut self, tab: TabId, id: u32) -> Option<bool> {
+    fn show_model_annotation(&mut self, tab: TabId, id: u32) -> Option<bool>;
+}
+
+impl ModelAnnotations for Drawing {
+    fn show_model_annotation(&mut self, tab: TabId, id: u32) -> Option<bool> {
         for s in &mut self.sheets {
             let shows: HashMap<ViewId, bool> = s.views.iter().map(|v| (v.id, v.model_annotations)).collect();
             for a in &mut s.annotations {

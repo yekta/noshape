@@ -1,5 +1,6 @@
 //! Assembly evaluation tests with programmatic Part Studios.
 
+use crate::prelude::*;
 use super::analysis::{auto_exploded_view, bom, interference};
 use super::eval::{AssemblyEvaluator, SolveOptions};
 use super::*;

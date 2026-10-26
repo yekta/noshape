@@ -7,6 +7,7 @@
 //! dimensions, datum targets, a formatted table with merged cells and an
 //! ISO 7200 title block (sheet 2 uses an ANSI title block).
 
+use crate::document::TabId;
 use super::views::{self, SourceKey, regenerate_sources};
 use super::*;
 use crate::document::{Document, TabContent};

@@ -5,45 +5,54 @@
 //!   [`params`]: generic parameter values; [`reference`]: persistent naming.
 //! * [`assembly`], [`drawing`], [`variables`], [`configuration`].
 
-pub mod file_tab;
-pub mod quantity_text;
+pub use noshape_model_data::file_tab;
+pub use noshape_model_data::quantity_text;
 pub mod analysis;
 pub mod thickness;
 pub mod flatten;
 pub mod interference;
-pub mod fits;
+pub use noshape_model_data::fits;
 pub mod release;
 pub mod assembly;
 pub mod compare;
-pub mod configuration;
+pub use noshape_model_data::configuration;
 pub mod custom;
 pub mod demo;
-pub mod default_names;
+pub use noshape_model_data::default_names;
 pub mod demo_fab;
 pub mod display;
-pub mod document;
+pub use noshape_model_data::document;
 pub mod drawing;
 pub mod export_rules;
-pub mod features;
+pub use noshape_model_data::features;
 pub mod in_context;
 pub mod interaction;
-pub mod material_library;
+pub use noshape_model_data::material_library;
 pub mod merge;
 pub mod native_assembly;
-pub mod naming;
-pub mod params;
-pub mod partstudio;
-pub mod reference;
+pub use noshape_model_data::naming;
+pub use noshape_model_data::params;
+pub use noshape_model_data::partstudio;
+pub use noshape_model_data::reference;
 pub mod regen;
 pub mod select;
 pub mod sheetmetal;
-pub mod sketch_feature;
-pub mod variables;
-pub mod annotations;
-pub mod configured_properties;
-pub mod variable_table;
+pub use noshape_model_data::sketch_feature;
+pub use noshape_model_data::variables;
+pub use noshape_model_data::annotations;
+pub use noshape_model_data::configured_properties;
+pub use noshape_model_data::variable_table;
 
 pub use document::{Document, Tab, TabContent, TabId};
 pub use params::{ParamSpec, ParamValue, ParamValues};
 pub use partstudio::{Feature, PartStudio};
 pub use reference::{BodyId, FeatureId, Reference, TopoName};
+
+#[cfg(test)]
+mod configuration_tests;
+
+/// The extension traits that give data types (`noshape_model_data`) their logic methods: `use noshape_model::prelude::*;`.
+pub mod prelude {
+    pub use crate::drawing::{CadTables, DrawingClipboard, ModelAnnotations, SheetPaste, ViewMoves};
+    pub use crate::in_context::ContextBodies;
+}

@@ -2,6 +2,7 @@
 //! in drawings"): dragged only along their face normal, deleted = hidden, and
 //! the MBD status panel's rows, message, badge and "Show".
 
+use noshape_model::prelude::*;
 use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_model::drawing::mbd::{self, ModelRef};

@@ -5,6 +5,7 @@
 //! `noshape_scene::drawing_tools::view_edit` and `crate::drawing`) with its
 //! edit text.
 
+use noshape_model::prelude::*;
 use super::drawing::{ORIENTATIONS, commit, drawing_field, point, reply, sheet_field};
 use super::drawing_tools::{Target, edge_at, edit_view, pt_arg, target, view_arg};
 use super::{doc_field, s};

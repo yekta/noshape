@@ -3,6 +3,7 @@
 //! labels, associative annotations, tables, border and title block, into
 //! one [`SheetGeometry`] plus a pick table for the editor.
 
+use super::CadTables;
 use super::cad_layers::{CadLayer, CadTextStyle};
 use super::font;
 use super::format::{self, DimText};

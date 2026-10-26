@@ -94,7 +94,7 @@ fn sketch_dimension_dim(k: &noshape_sketch::ConstraintKind) -> Dim {
 /// Returns the tabs that changed.
 pub fn pin_sketch_units(doc: &mut crate::document::Document, old: &UnitPrefs) -> Vec<crate::document::TabId> {
     use crate::params::ParamValue;
-    use crate::regen::features::sketch::CONFIGURED_DIMENSION_PREFIX;
+    use crate::sketch_feature::CONFIGURED_DIMENSION_PREFIX;
     let scope = noshape_units::EmptyScope;
     let pin = |text: &mut String, dim: Dim| {
         let pinned = commit_text(text, dim, old, &scope);

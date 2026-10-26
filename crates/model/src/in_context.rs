@@ -12,6 +12,7 @@
 //! listed as parts. Their topology is named from a synthetic creator
 //! feature (`context_feature`), faces `Role::New(i)` in kernel order.
 
+pub use noshape_model_data::in_context::{AssemblyContext, ContextBody};
 use crate::assembly::eval::{AssemblyResult, InstancePath};
 use crate::display::BodyKind;
 use crate::document::TabId;
@@ -20,7 +21,6 @@ use crate::reference::{BodyId, FeatureId, Reference, Role, TopoName};
 use crate::regen::context::Body;
 use glam::DMat4;
 use noshape_kernel as k;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Bit marking the synthetic creator features of context bodies.
@@ -41,52 +41,17 @@ pub fn context_of(f: FeatureId) -> Option<u32> {
     is_context_feature(f).then_some(((f.0 & !CONTEXT_BIT) >> 24) as u32)
 }
 
-/// One instance's part in the snapshot, in the Part Studio's coordinates.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ContextBody {
-    /// Instance path in the assembly (top-level first).
-    pub path: Vec<u64>,
-    /// Instance name ("Part 1 <2>") and part name.
-    pub instance: String,
-    pub part: String,
-    /// Display color (linear RGBA).
-    pub color: [f32; 4],
-    /// The geometry (OCCT BREP text, already placed).
-    pub brep: Arc<str>,
-}
 
-/// An Assembly context of a Part Studio (the "Assembly contexts" list
-/// above its Feature list).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct AssemblyContext {
-    pub id: u32,
-    pub name: String,
-    pub assembly: TabId,
-    /// The primary instance (solid context arrow) and its part.
-    pub primary: Vec<u64>,
-    #[serde(default)]
-    pub primary_body: Option<BodyId>,
-    pub bodies: Vec<ContextBody>,
-    /// Bumped by Update context (features referencing it regenerate).
-    #[serde(default)]
-    pub revision: u32,
-    /// Context instances hidden in the Part Studio (Hide/show context instances).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub hidden: Vec<Vec<u64>>,
-    /// The assembly's state when the snapshot was taken ([`state_hash`]);
-    /// a different current state means "Update available".
-    #[serde(default)]
-    pub state: u64,
-    /// Create Part Studio in context: where the Part Studio's origin sits
-    /// in the assembly (Insert and go to assembly places its parts there).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub origin: Option<crate::assembly::Placement>,
-}
 
-impl AssemblyContext {
+/// The snapshot as regeneration bodies (in scope through `noshape_model::in_context::*`).
+pub trait ContextBodies {
     /// The snapshot as regeneration bodies, named from the synthetic
     /// creators. Bodies whose BREP does not read are skipped.
-    pub fn regen_bodies(&self) -> Vec<Arc<Body>> {
+    fn regen_bodies(&self) -> Vec<Arc<Body>>;
+}
+
+impl ContextBodies for AssemblyContext {
+    fn regen_bodies(&self) -> Vec<Arc<Body>> {
         let mut out = Vec::new();
         for (i, b) in self.bodies.iter().enumerate() {
             let Ok(shape) = k::Shape::from_brep_bytes(b.brep.as_bytes()) else { continue };

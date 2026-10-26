@@ -7,6 +7,7 @@
 //! `noshape_scene::drawing_tools` (table_edit, view_edit, replicate) and the
 //! model's clipboard.
 
+use noshape_model::prelude::*;
 use super::drawing::{commit, drawing_field, part_arg, point, point_value, reply, sheet_field, source_tab};
 use super::drawing_tools::{CORNERS, Target, done, enum_arg, pt_arg, target, view_arg};
 use super::{doc_field, s};

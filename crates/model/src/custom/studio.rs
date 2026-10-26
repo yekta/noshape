@@ -185,6 +185,8 @@ pub fn compile(tab: TabId, source: &str) -> Arc<CompiledStudio> {
 /// Compile a Feature Studio (cached by tab, source and `deps`, a hash of
 /// the sources of the tabs it may import).
 pub fn compile_with(tab: TabId, source: &str, resolver: &dyn Resolver, deps: u64) -> Arc<CompiledStudio> {
+    // Custom schemas come from compiled studios: make `features::get` find them (noshape-model-data).
+    crate::features::set_custom_lookup(lookup);
     host::register();
     let hash = source_hash(source) ^ deps.rotate_left(17);
     if let Some(c) = CACHE.lock().get(&(tab.0, hash)) {

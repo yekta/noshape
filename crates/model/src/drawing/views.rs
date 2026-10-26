@@ -7,6 +7,7 @@
 //! placement maps view coordinates to sheet millimeters (see
 //! [`super::build::ViewPlacement`]); annotations store view coordinates.
 
+pub use noshape_model_data::drawing::rotate2;
 use super::{BrokenOut, Crop, Drawing, PointRef, Projection, Sheet, Simplification, ViewId, ViewKind, ViewOrientation};
 use crate::assembly::eval::{AssemblyEvaluator, AssemblyResult, SolveOptions};
 use crate::configuration::ConfigValues;
@@ -540,14 +541,6 @@ fn view_center(sheet: &Sheet, id: ViewId) -> Option<[f64; 2]> {
     sheet.view(id).map(|v| v.position)
 }
 
-/// Rotate a 2D vector counter-clockwise by `a` radians.
-pub fn rotate2(v: [f64; 2], a: f64) -> [f64; 2] {
-    if a == 0.0 {
-        return v;
-    }
-    let (s, c) = a.sin_cos();
-    [v[0] * c - v[1] * s, v[0] * s + v[1] * c]
-}
 
 /// Rotation of a view on the sheet (radians). Detail views follow their
 /// parent's rotation (they crop the parent's geometry).

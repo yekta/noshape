@@ -355,6 +355,9 @@ pub fn base64_decode(text: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// Parameter id prefix of a configured sketch dimension (`sketchDim:<constraint id>`).
+pub const CONFIGURED_DIMENSION_PREFIX: &str = "sketchDim:";
+
 #[cfg(test)]
 mod image_tests {
     use super::*;

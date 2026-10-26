@@ -2696,7 +2696,7 @@ impl AnnotationEnv for PlainEnv<'_> {
 
 /// Rotate a 2D vector counter-clockwise by `a` radians.
 pub fn rotate2(v: [f64; 2], a: f64) -> [f64; 2] {
-    super::views::rotate2(v, a)
+    super::rotate2(v, a)
 }
 
 pub fn format_scale(s: f64) -> String {

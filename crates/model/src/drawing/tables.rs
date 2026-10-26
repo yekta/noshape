@@ -6,7 +6,8 @@
 
 use super::font;
 use super::format::{default_digits, format_number, length_units};
-use super::sheet::{Anchor, LineStyle, Polyline2, SheetGeometry, Text2};
+use super::sheet::{Anchor, GeomMark, LineStyle, Polyline2, SheetGeometry, Text2};
+use super::cad_objects::{CadMember, CadObject, table_row_styles};
 use super::views::{SourceKey, SourceModel, Sources, ViewGeometry};
 use crate::custom::table::{CustomTable, TableResult, evaluate_table};
 use crate::custom::{CustomFeatureProvider, DocumentScripts};
@@ -808,6 +809,39 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
     // Drawing properties › Tables › Line thickness: every line of the table.
     if let Some(s) = &data.style {
         g.pens.push(super::sheet::PenSpan { lines: line0..g.lines.len(), width_mm: s.line, dashes: Vec::new() });
+    }
+}
+
+/// A table drawn into the CAD export layers (DWG/DXF objects); [`SheetGeometry`] is drawing data, the table
+/// layout comes from here.
+pub trait CadTables {
+    /// Everything since `m` is this table.
+    fn add_cad_table(&mut self, m: GeomMark, layout: &TableLayout, data: &TableData, kind: &TableKind);
+}
+
+impl CadTables for SheetGeometry {
+    /// Everything since `m` is this table.
+    fn add_cad_table(&mut self, m: GeomMark, layout: &TableLayout, data: &TableData, kind: &TableKind) {
+        if layout.xs.len() < 2 || layout.ys.len() < 2 {
+            return;
+        }
+        let mut cells: Vec<Vec<String>> = Vec::new();
+        if layout.title {
+            cells.push(vec![data.title.clone().unwrap_or_default()]);
+        }
+        cells.extend(data.all_rows().into_iter().cloned());
+        let widths = layout.xs.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
+        let heights: Vec<f64> = layout.ys.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
+        // Row styles (live drw2-k-dxf2018 / drw2-en-ansi-a STYLE table).
+        let [title, header, row] = table_row_styles(kind);
+        let n = heights.len();
+        let body = layout.title as usize;
+        let header_row = data.header.is_some().then(|| if data.header_bottom { n - 1 } else { body });
+        let rows = (0..n).map(|r| if layout.title && r == 0 { title } else if Some(r) == header_row { header } else { row }).collect();
+        let aligned = matches!(kind, TableKind::General { .. });
+        let obj = self.cad_objects.len();
+        self.cad_objects.push(CadObject::Table { corner: [layout.xs[0], layout.ys[0]], widths, heights, cells, rows, aligned });
+        self.cad_members.push(CadMember { lines: m.0..self.lines.len(), texts: m.1..self.texts.len(), fills: m.2..self.fills.len(), obj });
     }
 }
 

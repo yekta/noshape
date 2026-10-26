@@ -6,6 +6,7 @@
 //! surface finish and weld symbols and tables; pasted where their views
 //! don't exist they come loose (callouts lose their leader until attached).
 
+use super::ViewMoves;
 use super::views::Sources;
 use super::{Drawing, DrawingView, Sheet, TableKind, ViewId};
 use serde::{Deserialize, Serialize};
@@ -77,10 +78,19 @@ impl SheetClipboard {
     }
 }
 
-impl Drawing {
+/// Methods on [`Drawing`] that need noshape-model's logic (in scope through the module's glob re-export).
+pub trait DrawingClipboard {
     /// Copy annotations and tables of sheet `sheet` (Copy on a note,
     /// callout, GD&T frame, datum, surface finish or weld symbol, table).
-    pub fn copy_entities(&self, sheet: usize, annotations: &[u64], tables: &[u64]) -> Result<ViewClipboard, String> {
+    fn copy_entities(&self, sheet: usize, annotations: &[u64], tables: &[u64]) -> Result<ViewClipboard, String>;
+
+    /// Copy views `ids` of sheet `sheet` (with their derived views and attached
+    /// annotations and tables).
+    fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String>;
+}
+
+impl DrawingClipboard for Drawing {
+    fn copy_entities(&self, sheet: usize, annotations: &[u64], tables: &[u64]) -> Result<ViewClipboard, String> {
         let src = self.sheets.get(sheet).ok_or("No sheet")?;
         let annotations: Vec<_> = src.annotations.iter().filter(|a| annotations.contains(&a.id)).cloned().collect();
         let tables: Vec<_> = src.tables.iter().filter(|t| tables.contains(&t.id)).cloned().collect();
@@ -90,9 +100,7 @@ impl Drawing {
         Ok(ViewClipboard { noshape_drawing_views: 1, sheet: Sheet { views: vec![], annotations, tables, ..src.clone() }, anchor: None })
     }
 
-    /// Copy views `ids` of sheet `sheet` (with their derived views and attached
-    /// annotations and tables).
-    pub fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String> {
+    fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String> {
         let src = self.sheets.get(sheet).ok_or("No sheet")?;
         let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone(), active_sheet: 0, continuation: None, drawn_by: self.drawn_by.clone(), sources_at: None };
         tmp.move_views_to_sheet(0, ids, 1, sources)?;
@@ -100,10 +108,15 @@ impl Drawing {
     }
 }
 
-impl Sheet {
+/// Methods on [`Sheet`] that need noshape-model's logic (in scope through the module's glob re-export).
+pub trait SheetPaste {
     /// Paste copied views with new ids; centered on `at` (sheet millimeters),
     /// else offset 10 mm from the originals. Returns the new view ids.
-    pub fn paste_views(&mut self, clip: &ViewClipboard, at: Option<[f64; 2]>) -> Vec<ViewId> {
+    fn paste_views(&mut self, clip: &ViewClipboard, at: Option<[f64; 2]>) -> Vec<ViewId>;
+}
+
+impl SheetPaste for Sheet {
+    fn paste_views(&mut self, clip: &ViewClipboard, at: Option<[f64; 2]>) -> Vec<ViewId> {
         let c = clip.center();
         let d = match at {
             Some(p) => [p[0] - c[0], p[1] - c[1]],
