@@ -643,6 +643,40 @@ fn circle_points(c: [f64; 2], r: f64, n: usize) -> Vec<[f64; 2]> {
 
 /// One section hatch line `l` (unbroken sheet coordinates): clipped to a
 /// detail's profile, the crop, and mapped through the view's breaks.
+/// Drawing properties › Views pen `pen` on `lines`, each run with its own
+/// line type's dashes.
+fn pen_lines(g: &mut SheetGeometry, lines: std::ops::Range<usize>, pen: &super::PenProps) {
+    let mut start = lines.start;
+    while start < lines.end {
+        let st = g.lines[start].style;
+        let end = (start..lines.end).find(|&k| g.lines[k].style != st).unwrap_or(lines.end);
+        g.pens.push(super::sheet::PenSpan { lines: start..end, width_mm: pen.thickness, dashes: st.dashes().to_vec() });
+        start = end;
+    }
+}
+
+/// Colour `rgb` on the lines and fills added since `m` (not the texts).
+fn color_lines_since(g: &mut SheetGeometry, m: super::sheet::GeomMark, rgb: Option<[u8; 3]>) {
+    let Some(rgb) = rgb else { return };
+    let span = super::sheet::ColorSpan { lines: m.0..g.lines.len(), texts: 0..0, fills: m.2..g.fills.len(), rgb };
+    if !(span.lines.is_empty() && span.fills.is_empty()) {
+        g.colors.push(span);
+    }
+}
+
+/// A label's font and colour on the texts from `t0`.
+fn label_since(g: &mut SheetGeometry, t0: usize, label: &super::LabelProps) {
+    if t0 >= g.texts.len() {
+        return;
+    }
+    if let Some(font) = label.font.clone() {
+        g.fonts.push(super::sheet::FontSpan { texts: t0..g.texts.len(), font });
+    }
+    if let Some(rgb) = label.color {
+        g.colors.push(super::sheet::ColorSpan { lines: 0..0, texts: t0..g.texts.len(), fills: 0..0, rgb });
+    }
+}
+
 fn push_hatch_line(g: &mut SheetGeometry, pl: &ViewPlacement, geo: &ViewGeometry, l: [[f64; 2]; 2], pick: u32) {
     let ub = pl.unbroken();
     let mut pieces = vec![vec![ub.to_view(l[0]), ub.to_view(l[1])]];
@@ -987,7 +1021,7 @@ impl AnnotationEnv for Env<'_> {
     }
     fn inspection_style(&self) -> Option<super::sheet::InspectionStyle> {
         let p = &self.drawing.props;
-        (!p.hide_inspection).then(|| super::sheet::InspectionStyle { shape: p.inspection_shape, text_height: p.inspection_text_height, border: p.inspection_border_size, chars: p.inspection_border_chars, color: p.inspection_color, solid: p.inspection_solid_fill, font: p.inspection_font.clone() })
+        (!p.hide_inspection).then(|| super::sheet::InspectionStyle { shape: p.inspection_shape, text_height: p.inspection_text_height, border: p.inspection_border_size, chars: p.inspection_border_chars, color: p.inspection_color, solid: p.inspection_solid_fill, font: p.inspection_font.clone(), text_color: p.inspection_text_color, fill_color: p.inspection_fill_color })
     }
     fn weld_ansi(&self) -> bool {
         self.drawing.weld_ansi()
@@ -1110,6 +1144,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         g.layers.push(LayerSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer });
         if let Some(rgb) = layer.color(fp) {
             g.colors.push(super::sheet::ColorSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, rgb });
+        }
+        if let Some(width_mm) = layer.thickness(fp) {
+            let dashes = g.lines[i].style.dashes().to_vec();
+            g.pens.push(super::sheet::PenSpan { lines: i..i + 1, width_mm, dashes });
         }
     }
     for i in mark_t..end_t {
@@ -1250,6 +1288,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // Section hatching: computed on the unbroken view, then cropped and
             // broken in view coordinates.
             let cad_mark = g.mark();
+            let (hatch_pens0, hatch_colors0) = (g.pens.len(), g.colors.len());
             if !geo.section_segments.is_empty() {
                 let ub = pl.unbroken();
                 let segs: Vec<[[f64; 2]; 2]> = geo.section_segments.iter().map(|s| [ub.to_sheet(s[0]), ub.to_sheet(s[1])]).collect();
@@ -1311,6 +1350,17 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     push_hatch_line(&mut g, &pl, geo, [ub.to_sheet(l[0]), ub.to_sheet(l[1])], view_pick);
                 }
             }
+            // Drawing properties › Views › View and region hatches' pen and
+            // colour, ahead of Edit hatch section's own.
+            let hatch_lines = cad_mark.0..g.lines.len();
+            if !hatch_lines.is_empty() {
+                if let Some(rgb) = vt.hatch_line.color {
+                    g.colors.insert(hatch_colors0, super::sheet::ColorSpan { lines: hatch_lines.clone(), texts: 0..0, fills: 0..0, rgb });
+                }
+                if (vt.hatch_line.thickness - LineStyle::Thin.width_mm()).abs() > 1e-9 {
+                    g.pens.insert(hatch_pens0, super::sheet::PenSpan { lines: hatch_lines, width_mm: vt.hatch_line.thickness, dashes: Vec::new() });
+                }
+            }
             g.cad_since(cad_mark, CadLayer::ViewHatches);
             // Broken-out profiles (live: a SPLINE on SECTION_JOG_LINES over
             // the cut's edge; a polygon profile as a polyline).
@@ -1353,6 +1403,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     g.lines.push(Polyline2 { points: circle_points(pl.to_sheet(c), pl.len_to_sheet(r), 96), style: detail_line, closed: true, pick: view_pick });
                 }
             }
+            let border = cad_mark.0..g.lines.len();
+            pen_lines(&mut g, border, &vt.detail_pen);
+            color_lines_since(&mut g, cad_mark, vt.detail_pen.color);
             g.cad_since(cad_mark, CadLayer::DetailViewBorder);
             // Automatic centermarks on face-on circles and centerlines on
             // cylinders seen from the side.
@@ -1388,6 +1441,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 if let Some(c) = vt.centermark_color {
                     g.color_since(mark, c);
                 }
+                let marks = mark.0..g.lines.len();
+                pen_lines(&mut g, marks, &super::PenProps::new(vt.centermark_thickness));
                 let mark = g.mark();
                 for a in geo.axes.iter().filter(|_| auto_lines) {
                     for piece in map_polyline(&pl, &[a[0], a[1]]) {
@@ -1403,6 +1458,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
                 if let Some(c) = vt.centerline_color {
                     g.color_since(mark, c);
+                }
+                if g.lines.len() > mark.0 {
+                    let dashes = LineStyle::Centerline.dashes().iter().map(|d| d * vt.centerline_dashes.max(0.01)).collect();
+                    g.pens.push(super::sheet::PenSpan { lines: mark.0..g.lines.len(), width_mm: vt.centerline_thickness, dashes });
                 }
             }
             // Center of mass indicator: a circle with two opposite quarters filled.
@@ -1442,6 +1501,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     if let Some(c) = vt.bend_tangent_color {
                         g.color_since(mark, c);
                     }
+                    // Flat pattern views › Bend tangent edges' pen.
+                    let tangent = mark.0..g.lines.len();
+                    pen_lines(&mut g, tangent, &super::PenProps::new(vt.bend_tangent_thickness));
                     let (kind, color) = if b.up { (vt.bend_up_line, vt.bend_up_color) } else { (vt.bend_down_line, vt.bend_down_color) };
                     let style = match kind {
                         0 => LineStyle::Thin,
@@ -1456,6 +1518,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     if let Some(c) = color {
                         g.color_since(mark, c);
                     }
+                    // Flat pattern views › All bend lines' pen.
+                    let bend = mark.0..g.lines.len();
+                    pen_lines(&mut g, bend, &super::PenProps::new(vt.bend_lines_thickness));
                 }
             }
             if !v.hide_bend_notes && !geo.bends.is_empty() {
@@ -1483,8 +1548,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             // Cosmetic threads: ANSI a dashed circle at the major diameter, ISO
             // a thin three-quarter circle (the gap in the upper right).
+            let thread_mark = g.mark();
             if !geo.threads.is_empty() {
-                let ansi = sheet.size.is_ansi();
+                // Drawing properties › Views › Cosmetic threads › Thread
+                // style (JIS drawn as ISO), else the sheet's standard.
+                let ansi = vt.thread_style.map_or(sheet.size.is_ansi(), |s| s == super::ThreadStyle::Ansi);
                 for (c, r) in &geo.threads {
                     let (a0, a1) = if ansi { (0.0, std::f64::consts::TAU) } else { (std::f64::consts::FRAC_PI_2, std::f64::consts::TAU) };
                     let n = 48;
@@ -1494,14 +1562,29 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     }
                 }
             }
+            if g.lines.len() > thread_mark.0 {
+                let lines = thread_mark.0..g.lines.len();
+                let st = g.lines[lines.start].style;
+                g.pens.push(super::sheet::PenSpan { lines, width_mm: vt.thread_line.thickness, dashes: st.dashes().iter().map(|d| d * vt.thread_dashes.max(0.01)).collect() });
+            }
+            color_lines_since(&mut g, thread_mark, vt.thread_line.color);
+            // Flat pattern views › Form centermarks: style and colour.
+            let form_mark = g.mark();
+            let form_style = match vt.form_centermark_line {
+                0 => LineStyle::Thin,
+                1 => LineStyle::Hidden,
+                _ => LineStyle::Centerline,
+            };
             for m in &geo.form_marks {
                 let c = pl.to_sheet(*m);
                 let arm = 1.5;
-                g.lines.push(Polyline2 { points: vec![[c[0] - arm, c[1]], [c[0] + arm, c[1]]], style: LineStyle::Centerline, closed: false, pick: view_pick });
-                g.lines.push(Polyline2 { points: vec![[c[0], c[1] - arm], [c[0], c[1] + arm]], style: LineStyle::Centerline, closed: false, pick: view_pick });
+                g.lines.push(Polyline2 { points: vec![[c[0] - arm, c[1]], [c[0] + arm, c[1]]], style: form_style, closed: false, pick: view_pick });
+                g.lines.push(Polyline2 { points: vec![[c[0], c[1] - arm], [c[0], c[1] + arm]], style: form_style, closed: false, pick: view_pick });
             }
+            color_lines_since(&mut g, form_mark, vt.form_centermark_color);
             // Break lines.
             let cad_mark = g.mark();
+            let break_mark = g.mark();
             for br in pl.breaks() {
                 let pick = picks.id(PickTarget::BreakLine { view: v.id, index: br.index as usize });
                 let style = v.breaks.get(br.index as usize).map(|b| b.style).unwrap_or_default();
@@ -1554,6 +1637,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     g.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
                 }
             }
+            // Drawing properties › Views › Break views › Break lines.
+            if g.lines.len() > break_mark.0 && (vt.break_line.thickness - LineStyle::Thin.width_mm()).abs() > 1e-9 {
+                let lines = break_mark.0..g.lines.len();
+                pen_lines(&mut g, lines, &vt.break_line);
+            }
+            color_lines_since(&mut g, break_mark, vt.break_line.color);
             g.cad_since(cad_mark, CadLayer::BreakLines);
             if let Some(err) = &geo.error
                 && geo.edges.is_empty()
@@ -1643,7 +1732,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             pts[e] = [pts[i][0] + u[0] * t, pts[i][1] + u[1] * t];
                         }
                     }
+                    // Drawing properties › Views › Section views: the cutting
+                    // line's pen and colour, its arrowheads and label.
+                    let vtab = &drawing.props.view_tab;
+                    let cut_line = g.lines.len();
                     g.lines.push(Polyline2 { points: pts.clone(), style: LineStyle::Section, closed: false, pick });
+                    pen_lines(&mut g, cut_line..cut_line + 1, &vtab.section_line);
                     // Thick strokes at the jogs.
                     for k in 1..pts.len().saturating_sub(1) {
                         let c = pts[k];
@@ -1662,7 +1756,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     // solid shaft a twelfth of an arrow wide and an arrow long
                     // along the line of sight, the arrow beyond it (its tip
                     // two arrows out), the letter past the tip.
-                    let (a, h) = (drawing.props.ann_arrow, drawing.props.ann_text_height);
+                    let a = vtab.section_arrow.size.unwrap_or(drawing.props.ann_arrow);
+                    let h = vtab.section_label.height.unwrap_or(drawing.props.ann_text_height);
+                    let t0 = g.texts.len();
                     for (end, sight) in [(pts[0], sight0), (pts[n - 1], rotate2(sight0, turn))] {
                         let neck = [end[0] + sight[0] * a, end[1] + sight[1] * a];
                         let tip = [end[0] + sight[0] * 2.0 * a, end[1] + sight[1] * 2.0 * a];
@@ -1670,11 +1766,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         g.fills.push(Fill2 { points: vec![[end[0] - w[0], end[1] - w[1]], [neck[0] - w[0], neck[1] - w[1]], [neck[0] + w[0], neck[1] + w[1]], [end[0] + w[0], end[1] + w[1]]] });
                         // Under the fill, for picking.
                         g.lines.push(Polyline2 { points: vec![end, neck], style: LineStyle::Thin, closed: false, pick });
-                        // `arrow` scales by the (default) style's size: the drawing's here.
-                        g.arrow(tip, sight, 3.0 * a / g.style.ann_arrow.max(1e-9));
+                        g.arrow_as(tip, sight, a, vtab.section_arrow.kind);
                         let at = [tip[0] + sight[0] * 1.1 * h, tip[1] + sight[1] * 1.1 * h];
                         g.texts.push(Text2 { pos: at, height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                     }
+                    color_lines_since(&mut g, cad_mark, vtab.section_line.color);
+                    label_since(&mut g, t0, &vtab.section_label);
                 }
             }
             // Auxiliary view reference indicator: a viewing-plane line beside
@@ -1685,23 +1782,33 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 {
                     let pick = picks.id(PickTarget::AuxIndicator(v.id));
                     let sight = [-ind.ns[0], -ind.ns[1]];
+                    // Drawing properties › Views › Auxiliary views: viewing
+                    // lines, arrowheads, viewing line label.
+                    let vtab = &drawing.props.view_tab;
+                    let head = vtab.aux_arrow.size.unwrap_or(g.style.ann_arrow);
+                    let letter_h = vtab.aux_label.height.unwrap_or(AUX_LETTER);
+                    let t0 = g.texts.len();
                     // Arrow style (live u-933): one arrow from the line's middle
                     // toward the edge and the letter beside it; no line.
                     if drawing.props.view_tab.aux_arrow_format {
                         let tail = ind.mid;
                         let neck = [tail[0] + sight[0] * AUX_SHAFT, tail[1] + sight[1] * AUX_SHAFT];
                         g.lines.push(Polyline2 { points: vec![tail, neck], style: LineStyle::Thin, closed: false, pick });
-                        g.arrow([neck[0] + sight[0] * AUX_HEAD, neck[1] + sight[1] * AUX_HEAD], sight, 3.0);
-                        g.texts.push(Text2 { pos: aux_arrow_letter(&ind, a), height: AUX_LETTER, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                        g.arrow_as([neck[0] + sight[0] * AUX_HEAD, neck[1] + sight[1] * AUX_HEAD], sight, head, vtab.aux_arrow.kind);
+                        g.texts.push(Text2 { pos: aux_arrow_letter(&ind, a), height: letter_h, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                     } else {
+                        let line = g.lines.len();
                         g.lines.push(Polyline2 { points: ind.elbows.to_vec(), style: LineStyle::Phantom, closed: false, pick });
+                        pen_lines(&mut g, line..line + 1, &vtab.aux_line);
                         for ((elbow, tip), letter) in ind.elbows.into_iter().zip(ind.tips).zip(ind.letters) {
                             let neck = [elbow[0] + sight[0] * AUX_SHAFT, elbow[1] + sight[1] * AUX_SHAFT];
                             g.lines.push(Polyline2 { points: vec![elbow, neck], style: LineStyle::Thin, closed: false, pick });
-                            g.arrow(tip, sight, 3.0);
-                            g.texts.push(Text2 { pos: letter, height: AUX_LETTER, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                            g.arrow_as(tip, sight, head, vtab.aux_arrow.kind);
+                            g.texts.push(Text2 { pos: letter, height: letter_h, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         }
                     }
+                    color_lines_since(&mut g, cad_mark, vtab.aux_line.color);
+                    label_since(&mut g, t0, &vtab.aux_label);
                 }
             }
             ViewKind::Detail { parent, center, radius, label } => {
@@ -1709,6 +1816,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     let pick = picks.id(PickTarget::DetailCircle(v.id));
                     let c = ppl.to_sheet(*center);
                     let r = ppl.len_to_sheet(*radius);
+                    // Drawing properties › Views › Detail views: the profile's
+                    // pen and colour, arrowheads, label.
+                    let vtab = &drawing.props.view_tab;
+                    let h = vtab.detail_label.height.unwrap_or(drawing.props.ann_text_height);
+                    let a = vtab.detail_arrow.size.unwrap_or(drawing.props.ann_arrow);
+                    let t0 = g.texts.len();
                     // The profile in the source view.
                     let outline: Vec<[f64; 2]> = match v.detail_profile.as_ref().filter(|p| p.len() >= 3) {
                         Some(p) => p.iter().map(|q| ppl.to_sheet(*q)).collect(),
@@ -1721,23 +1834,24 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     // pointing at it, tips 0.75 of the text height away.
                     let in_line_circle = v.detail_profile.is_none() && v.detail_style != 1 && v.detail_style != 2 && v.detail_label_at.is_none();
                     if in_line_circle && r > 1e-6 {
-                        let h = drawing.props.ann_text_height;
-                        let a = drawing.props.ann_arrow;
                         let half = |chord: f64| 2.0 * (chord / (2.0 * r)).min(1.0).asin();
                         let tip_a = half(0.75 * h);
                         let base_a = (tip_a + half(a)).min(std::f64::consts::PI * 0.95);
                         let on = |t: f64| [c[0] + r * t.cos(), c[1] + r * t.sin()];
                         let n = 96;
                         let arc: Vec<[f64; 2]> = (0..=n).map(|i| on(base_a + (std::f64::consts::TAU - 2.0 * base_a) * i as f64 / n as f64)).collect();
+                        let line = g.lines.len();
                         g.lines.push(Polyline2 { points: arc, style: LineStyle::Thin, closed: false, pick });
+                        pen_lines(&mut g, line..line + 1, &vtab.detail_pen);
                         for sign in [1.0, -1.0] {
                             let (tip, base) = (on(sign * tip_a), on(sign * base_a));
-                            // `arrow` scales by the (default) style's size: the drawing's here.
-                            g.arrow(tip, [tip[0] - base[0], tip[1] - base[1]], 3.0 * a / g.style.ann_arrow.max(1e-9));
+                            g.arrow_as(tip, [tip[0] - base[0], tip[1] - base[1]], a, vtab.detail_arrow.kind);
                         }
                         g.texts.push(Text2 { pos: on(0.0), height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                     } else {
+                        let line = g.lines.len();
                         g.lines.push(Polyline2 { points: outline, style: LineStyle::Thin, closed: true, pick });
+                        pen_lines(&mut g, line..line + 1, &vtab.detail_pen);
                     }
                     match (v.detail_style, v.detail_label_at) {
                         // Connected: a dashed line from the profile to the detail view, no label.
@@ -1755,15 +1869,17 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
                             let tip = [c[0] - d[0] / l * r, c[1] - d[1] / l * r];
                             g.lines.push(Polyline2 { points: vec![at, tip], style: LineStyle::Thin, closed: false, pick });
-                            g.arrow(tip, [d[0] / l, d[1] / l], 3.5);
-                            g.texts.push(Text2 { pos: [at[0] - d[0] / l * 3.5, at[1] - d[1] / l * 3.5], height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                            g.arrow_as(tip, [d[0] / l, d[1] / l], a * 3.5 / 3.0, vtab.detail_arrow.kind);
+                            g.texts.push(Text2 { pos: [at[0] - d[0] / l * 3.5, at[1] - d[1] / l * 3.5], height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         }
                         // In line on another profile: the label beside it.
                         _ if !in_line_circle => {
-                            g.texts.push(Text2 { pos: [top_right[0] + 3.0, top_right[1] + 3.0], height: 5.0, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                            g.texts.push(Text2 { pos: [top_right[0] + 3.0, top_right[1] + 3.0], height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         }
                         _ => {}
                     }
+                    color_lines_since(&mut g, cad_mark, vtab.detail_pen.color);
+                    label_since(&mut g, t0, &vtab.detail_label);
                 }
             }
             _ => {}

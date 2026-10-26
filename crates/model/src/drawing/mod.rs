@@ -2017,6 +2017,16 @@ impl SheetLayer {
         }
     }
 
+    /// Its Formats pen (mm; Drawing properties › Formats › Thickness).
+    pub fn thickness(self, p: &DrawingProps) -> Option<f64> {
+        match self {
+            SheetLayer::Drawing => None,
+            SheetLayer::BorderFrame => Some(p.border_thickness),
+            SheetLayer::BorderZones => Some(p.zone_thickness),
+            SheetLayer::TitleBlock => Some(p.title_block_thickness),
+        }
+    }
+
     /// Its Formats color (Drawing properties › Formats).
     pub fn color(self, p: &DrawingProps) -> Option<[u8; 3]> {
         match self {
@@ -2594,11 +2604,18 @@ pub struct DrawingProps {
     /// 0: Tight Fit): the bubble is at least that wide.
     #[serde(default = "inspection_chars")]
     pub inspection_border_chars: u8,
-    /// Inspection › Border color (None = black) and Solid fill.
+    /// Inspection › Border color (None = black) and Solid fill (live
+    /// default ☑, dom/drawing-wt-widgets).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inspection_color: Option<[u8; 3]>,
     #[serde(default)]
     pub inspection_solid_fill: bool,
+    /// Inspection › Text colour (None = black) and Solid fill's colour
+    /// (None = live's orange, rgb 255 99 51; drawing/1710).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection_text_color: Option<[u8; 3]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection_fill_color: Option<[u8; 3]>,
     /// Views › Insert view defaults (new base views; derived views copy
     /// their parent).
     #[serde(default)]
@@ -2682,6 +2699,14 @@ pub struct DrawingProps {
     pub zone_color: Option<[u8; 3]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title_block_color: Option<[u8; 3]>,
+    /// Formats › Border frame / Border zone / Title block › Thickness (mm;
+    /// live 0.15 each, dom/drawing-wt-widgets).
+    #[serde(default = "format_pen")]
+    pub border_thickness: f64,
+    #[serde(default = "format_pen")]
+    pub zone_thickness: f64,
+    #[serde(default = "format_pen")]
+    pub title_block_thickness: f64,
     /// Annotations › per type (Notes, Callouts, Datums, ...): font, text
     /// height, color overrides; Datums › Datum size (mm); Notes › Hide
     /// property placeholder (empty fields show nothing instead of "----").
@@ -2831,6 +2856,103 @@ pub struct ViewTabProps {
     pub view_label_height: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub view_label_color: Option<[u8; 3]>,
+    /// Section views › Cutting lines, Arrowhead, Cutting line label; View
+    /// and region hatches' pen.
+    pub section_line: PenProps,
+    pub section_arrow: ArrowProps,
+    pub section_label: LabelProps,
+    pub hatch_line: PenProps,
+    /// Detail views › Detail profile lines (pen; style `detail_line`),
+    /// Arrowhead, Detail profile label.
+    pub detail_pen: PenProps,
+    pub detail_arrow: ArrowProps,
+    pub detail_label: LabelProps,
+    /// Auxiliary views › Viewing lines, Arrowhead, Viewing line label.
+    pub aux_line: PenProps,
+    pub aux_arrow: ArrowProps,
+    pub aux_label: LabelProps,
+    /// Break views › Break lines.
+    pub break_line: PenProps,
+    /// Cosmetic threads › Thread style (None: the sheet's, ANSI or ISO),
+    /// pen and colour, dash scale.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thread_style: Option<ThreadStyle>,
+    pub thread_line: PenProps,
+    pub thread_dashes: f64,
+    /// Flat pattern views › All bend lines' and Bend tangent edges' pens
+    /// (colours above), Form centermarks' line style (0 Solid, 1 Dashed,
+    /// 2 Center) and colour; Counterbore / Countersink up / down, Form
+    /// tear / up / down styles and colours (stored: not drawn yet).
+    pub bend_lines_thickness: f64,
+    pub bend_tangent_thickness: f64,
+    pub form_centermark_line: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub form_centermark_color: Option<[u8; 3]>,
+    pub flat_lines: Vec<(u8, Option<[u8; 3]>)>,
+    /// Construction geometry › Centermarks / Centerlines › Thickness (live
+    /// 0.13 mm) and Centerlines › Dashes (the automatic ones in views).
+    pub centermark_thickness: f64,
+    pub centerline_thickness: f64,
+    pub centerline_dashes: f64,
+}
+
+/// Cosmetic thread drawing standard (Drawing properties › Views).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ThreadStyle {
+    Ansi,
+    Iso,
+    Jis,
+}
+
+impl ThreadStyle {
+    pub const ALL: [ThreadStyle; 3] = [ThreadStyle::Ansi, ThreadStyle::Iso, ThreadStyle::Jis];
+    pub fn name(self) -> &'static str {
+        match self {
+            ThreadStyle::Ansi => "ANSI",
+            ThreadStyle::Iso => "ISO",
+            ThreadStyle::Jis => "JIS",
+        }
+    }
+}
+
+/// Flat pattern views' stored line rows: Counterbore/Countersink up and
+/// down, Form tear, up, down (live defaults Solid, Solid, Solid, Center,
+/// Center).
+pub const FLAT_LINE_ROWS: [(&str, u8); 5] = [("Counterbore/Countersink up", 0), ("Counterbore/Countersink down", 0), ("Form tear", 0), ("Form up", 2), ("Form down", 2)];
+
+/// A line's pen (mm) and colour (None: ink).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PenProps {
+    pub thickness: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<[u8; 3]>,
+}
+
+impl PenProps {
+    pub fn new(thickness: f64) -> Self {
+        Self { thickness, color: None }
+    }
+}
+
+/// An arrowhead: size (mm; None: the drawing's default for it) and type.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ArrowProps {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<f64>,
+    #[serde(default)]
+    pub kind: sheet::ArrowType,
+}
+
+/// A label's font (None: the drawing sans), height (mm; None: its default)
+/// and colour.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct LabelProps {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font: Option<sheet::TextFont>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<[u8; 3]>,
 }
 
 impl Default for ViewTabProps {
@@ -2875,6 +2997,30 @@ impl Default for ViewTabProps {
             view_label_font: None,
             view_label_height: None,
             view_label_color: None,
+            // Live dom/drawing-properties-views: 0.13 / 0.15 / 0.13 / 0.13 /
+            // 0.25 mm.
+            section_line: PenProps::new(0.13),
+            section_arrow: ArrowProps::default(),
+            section_label: LabelProps::default(),
+            hatch_line: PenProps::new(0.15),
+            detail_pen: PenProps::new(0.13),
+            detail_arrow: ArrowProps::default(),
+            detail_label: LabelProps::default(),
+            aux_line: PenProps::new(0.13),
+            aux_arrow: ArrowProps::default(),
+            aux_label: LabelProps::default(),
+            break_line: PenProps::new(0.25),
+            thread_style: None,
+            thread_line: PenProps::new(0.15),
+            thread_dashes: 1.0,
+            bend_lines_thickness: 0.13,
+            bend_tangent_thickness: 0.15,
+            form_centermark_line: 2,
+            form_centermark_color: None,
+            flat_lines: FLAT_LINE_ROWS.iter().map(|r| (r.1, None)).collect(),
+            centermark_thickness: 0.13,
+            centerline_thickness: 0.13,
+            centerline_dashes: 1.0,
         }
     }
 }
@@ -3354,6 +3500,10 @@ fn yes() -> bool {
     true
 }
 
+fn format_pen() -> f64 {
+    0.15
+}
+
 fn is_zero_u8(x: &u8) -> bool {
     *x == 0
 }
@@ -3364,7 +3514,7 @@ fn is_zero(x: &f64) -> bool {
 
 impl Default for DrawingProps {
     fn default() -> Self {
-        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true, fit_tolerance_precision: None, dual: DualDims::default(), template: None, locked: false, inspection_shape: InspectionShape::Circle, hide_inspection: false, inspection_exclude_callouts: false, inspection_row_parsing: false, inspection_text_height: 2.5, inspection_border_size: 1.2, inspection_border_chars: 2, inspection_color: None, inspection_solid_fill: false,
+        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true, fit_tolerance_precision: None, dual: DualDims::default(), template: None, locked: false, inspection_shape: InspectionShape::Circle, hide_inspection: false, inspection_exclude_callouts: false, inspection_row_parsing: false, inspection_text_height: 2.5, inspection_border_size: 1.2, inspection_border_chars: 2, inspection_color: None, inspection_solid_fill: true, inspection_text_color: None, inspection_fill_color: None,
             view_defaults: ViewDefaults::default(),
             dim_text_height: 3.5,
             dim_arrow: 3.0,
@@ -3385,6 +3535,9 @@ impl Default for DrawingProps {
             border_color: None,
             zone_color: None,
             title_block_color: None,
+            border_thickness: format_pen(),
+            zone_thickness: format_pen(),
+            title_block_thickness: format_pen(),
             ann_types: Vec::new(),
             datum_size: datum_size(),
             hide_placeholder: false,

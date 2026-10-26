@@ -104,6 +104,8 @@ fn precision_label(digits: usize) -> String {
 }
 
 type Act = std::rc::Rc<dyn Fn(&mut DrawingProps)>;
+/// Sets a line style (0 Solid, 1 Dashed, 2 Center).
+type StyleSet = std::rc::Rc<dyn Fn(&mut DrawingProps, u8)>;
 
 /// The panel's select caret (live drawing/1710): 8 px wide, about 5.5 px
 /// down to its point, steeper than the menus' caret.
@@ -197,6 +199,10 @@ enum FontOf {
     Type(AnnType),
     /// Views › All views › View labels.
     ViewLabel,
+    /// Views › Section / Detail / Auxiliary views' labels.
+    SectionLabel,
+    DetailLabel,
+    AuxLabel,
 }
 
 fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawing::sheet::TextFont> {
@@ -205,6 +211,9 @@ fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawin
         FontOf::Inspection => &mut p.inspection_font,
         FontOf::Type(t) => &mut p.ann_type_mut(t).font,
         FontOf::ViewLabel => &mut p.view_tab.view_label_font,
+        FontOf::SectionLabel => &mut p.view_tab.section_label.font,
+        FontOf::DetailLabel => &mut p.view_tab.detail_label.font,
+        FontOf::AuxLabel => &mut p.view_tab.aux_label.font,
     }
 }
 
@@ -276,6 +285,16 @@ fn border_chars_label(n: u8) -> String {
         1 => "1 Character".into(),
         n => format!("{n} Characters"),
     }
+}
+
+/// Flat pattern views' stored line row `k` (style, colour), filled in with
+/// live's defaults up to it.
+fn flat_slot(p: &mut DrawingProps, k: usize) -> &mut (u8, Option<[u8; 3]>) {
+    let rows = &mut p.view_tab.flat_lines;
+    while rows.len() <= k {
+        rows.push((FLAT_LINE_ROWS[rows.len()].1, None));
+    }
+    &mut rows[k]
 }
 
 /// Sets annotation type `I`'s text height.
@@ -362,8 +381,23 @@ impl DrawingEditor {
                 spin_scale(vt.hidden_dashes, |p, v| p.view_tab.hidden_dashes = v, window, cx),
                 spin_scale(vt.tangent_dashes, |p, v| p.view_tab.tangent_dashes = v, window, cx),
                 spin_scale(vt.exploded_dashes, |p, v| p.view_tab.exploded_dashes = v, window, cx),
+                // 8–13: Section / Detail / Auxiliary views' arrowhead size
+                // and label height.
+                dropdown(vt.section_arrow.size.unwrap_or(p.ann_arrow), |p, v| p.view_tab.section_arrow.size = Some(v), window, cx),
+                dropdown(vt.section_label.height.unwrap_or(p.ann_text_height), |p, v| p.view_tab.section_label.height = Some(v), window, cx),
+                dropdown(vt.detail_arrow.size.unwrap_or(p.ann_arrow), |p, v| p.view_tab.detail_arrow.size = Some(v), window, cx),
+                dropdown(vt.detail_label.height.unwrap_or(p.ann_text_height), |p, v| p.view_tab.detail_label.height = Some(v), window, cx),
+                dropdown(vt.aux_arrow.size.unwrap_or(p.ann_arrow), |p, v| p.view_tab.aux_arrow.size = Some(v), window, cx),
+                dropdown(vt.aux_label.height.unwrap_or(noshape_model::drawing::build::AUX_LETTER), |p, v| p.view_tab.aux_label.height = Some(v), window, cx),
+                // 14: Cosmetic threads' Dashes.
+                spin_scale(vt.thread_dashes, |p, v| p.view_tab.thread_dashes = v, window, cx),
             ],
-            4 => vec![spin(vt.centermark_mark_size, |p, v| p.view_tab.centermark_mark_size = v, window, cx), spin(vt.centermark_gap_size, |p, v| p.view_tab.centermark_gap_size = v, window, cx)],
+            4 => vec![
+                spin(vt.centermark_mark_size, |p, v| p.view_tab.centermark_mark_size = v, window, cx),
+                spin(vt.centermark_gap_size, |p, v| p.view_tab.centermark_gap_size = v, window, cx),
+                // 2: Centerlines' Dashes.
+                spin_scale(vt.centerline_dashes, |p, v| p.view_tab.centerline_dashes = v, window, cx),
+            ],
             1 => {
                 let (h, a, tg, gg, ex) = (p.dim_text_height, p.dim_arrow, p.dim_text_gap, p.dim_geometry_gap, p.dim_extension);
                 // Live raw dump: Text height / Arrowhead are Wt dropdowns, the
@@ -658,6 +692,9 @@ impl DrawingEditor {
                 FontOf::Inspection => "dp-ifont",
                 FontOf::Type(t) => TYPE_IDS[AnnType::ALL.iter().position(|x| *x == t).unwrap_or(0)][0],
                 FontOf::ViewLabel => "dp-vlfont",
+                FontOf::SectionLabel => "dp-slfont",
+                FontOf::DetailLabel => "dp-dlfont",
+                FontOf::AuxLabel => "dp-alfont",
             };
             sel(id, label, items, width)
         };
@@ -983,6 +1020,17 @@ impl DrawingEditor {
                 .child(trow("Bend notes (Parts)", 165., 33., 2., sel("dp-vbendn", on_off(vd.bend_notes).into(), on_off_items(vd.bend_notes, |p, v| p.view_defaults.bend_notes = v), 179.)));
             // Per view type.
             let field = |i: usize| self.wt_field(i, &ed);
+            let pen_row_at = |label: &'static str, col: f32, ids: (&'static str, &'static str), pen: &noshape_model::drawing::PenProps, set: fn(&mut DrawingProps, f64), set_color: crate::drawing_color::ColorSet| {
+                trow(label, col, 33., 1., h_flex().items_start().child(thick_sel(ids.0, pen.thickness, set, 313. - col)).child(div().ml(px(6.)).child(swatch(ids.1, pen.color, set_color))).into_any_element())
+            };
+            let pen_row = |label: &'static str, ids: (&'static str, &'static str), pen: &noshape_model::drawing::PenProps, set: fn(&mut DrawingProps, f64), set_color: crate::drawing_color::ColorSet| pen_row_at(label, 124., ids, pen, set, set_color);
+            let arrow_row = |id: &'static str, field_i: usize, kind: noshape_model::drawing::sheet::ArrowType, set: fn(&mut DrawingProps, noshape_model::drawing::sheet::ArrowType)| {
+                let items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL.iter().map(|&t| (t.name().to_string(), t == kind, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, t)) as Act)).collect();
+                trow("Arrowhead", 124., 33., 2., h_flex().items_start().child(self.wt_field(field_i, &ed)).child(div().ml(px(10.)).mt(px(1.)).child(asel(id, kind, items))).into_any_element())
+            };
+            let label_row = |field_i: usize, color_id: &'static str, color: Option<[u8; 3]>, set_color: crate::drawing_color::ColorSet| {
+                trow("", 124., 33., 2., h_flex().items_start().child(self.wt_field_w(field_i, &ed, Some(100.))).child(div().ml(px(7.)).child(swatch(color_id, color, set_color))).into_any_element())
+            };
             let detail_lines: Vec<(String, bool, Act)> = ["Phantom", "Dashed", "Solid"].iter().enumerate().map(|(i, n)| (n.to_string(), vt.detail_line == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.detail_line = i as u8) as Act)).collect();
             let detail_styles: Vec<(String, bool, Act)> = ["In line", "Connected", "Leader"].iter().enumerate().map(|(i, n)| (n.to_string(), vt.detail_style == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.detail_style = i as u8) as Act)).collect();
             let aux_styles: Vec<(String, bool, Act)> = vec![
@@ -1001,10 +1049,23 @@ impl DrawingEditor {
                 .child(section("Exploded lines"))
                 .child(trow("Thickness", 124., 33., 1., h_flex().items_start().child(thick_sel("dp-ethick", vt.exploded_thickness, |p, v| p.view_tab.exploded_thickness = v, 189.)).child(div().ml(px(6.)).child(swatch("dp-ecolor", vt.exploded_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.exploded_color = c)))).into_any_element()))
                 .child(trow("Dashes", 125., 32., 1., self.wt_field_w(7, &ed, Some(200.))))
+                // Live dom/drawing-properties-views (no capture of these
+                // groups yet): each pen a select and its colour, each
+                // arrowhead a size and the style's glyph, each label a font
+                // and a height with its colour, from Hidden edges' column.
                 .child(section("Section views"))
+                .child(pen_row("Cutting lines", ("dp-scut", "dp-scutc"), &vt.section_line, |p, v| p.view_tab.section_line.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.section_line.color = c)))
+                .child(arrow_row("dp-sarrow", 8, vt.section_arrow.kind, |p, t| p.view_tab.section_arrow.kind = t))
+                .child(trow("Cutting line label", 125., 32., 2., font_row(FontOf::SectionLabel, vt.section_label.font.clone(), 219.)))
+                .child(label_row(9, "dp-slcolor", vt.section_label.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.section_label.color = c)))
                 .child(row("Label prefix", field(0)))
+                .child(pen_row("Hatches", ("dp-hatch", "dp-hatchc"), &vt.hatch_line, |p, v| p.view_tab.hatch_line.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.hatch_line.color = c)))
                 .child(section("Detail views"))
+                .child(pen_row("Detail profile lines", ("dp-dpen", "dp-dpenc"), &vt.detail_pen, |p, v| p.view_tab.detail_pen.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.detail_pen.color = c)))
                 .child(row("Profile lines", select("dp-dline", ["Phantom", "Dashed", "Solid"][vt.detail_line.min(2) as usize].into(), detail_lines)))
+                .child(arrow_row("dp-darrowh", 10, vt.detail_arrow.kind, |p, t| p.view_tab.detail_arrow.kind = t))
+                .child(trow("Detail profile label", 125., 32., 2., font_row(FontOf::DetailLabel, vt.detail_label.font.clone(), 219.)))
+                .child(label_row(11, "dp-dlcolor", vt.detail_label.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.detail_label.color = c)))
                 .child(row("Label prefix", field(1)))
                 .child(row("Style", select("dp-dstyle", ["In line", "Connected", "Leader"][vt.detail_style.min(2) as usize].into(), detail_styles)))
                 .child(check("dp-dprofile", "Show detail view profile", vt.detail_show_profile, |p, v| p.view_tab.detail_show_profile = v, cx))
@@ -1013,22 +1074,63 @@ impl DrawingEditor {
                 .child(check("dp-aind", "Show view reference indicator", vt.aux_indicator, |p, v| p.view_tab.aux_indicator = v, cx))
                 .child(row("View reference format", div().into_any_element()))
                 .child(self.aux_format_tiles(vt.aux_arrow_format, cx))
+                .child(pen_row("Viewing lines", ("dp-aline", "dp-alinec"), &vt.aux_line, |p, v| p.view_tab.aux_line.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.aux_line.color = c)))
+                .child(arrow_row("dp-aarrowh", 12, vt.aux_arrow.kind, |p, t| p.view_tab.aux_arrow.kind = t))
+                .child(trow("Viewing line label", 125., 32., 2., font_row(FontOf::AuxLabel, vt.aux_label.font.clone(), 219.)))
+                .child(label_row(13, "dp-alcolor", vt.aux_label.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.aux_label.color = c)))
                 .child(row("View label prefix", field(2)))
                 .child(row("View label style", select("dp-alabel", if vt.aux_double_label { "A-A".into() } else { "A".into() }, aux_styles)))
-                .child(row("View label suffix", field(3)));
-            // Flat pattern views: up / down bend lines (style + color), bend tangent edges.
+                .child(row("View label suffix", field(3)))
+                .child(section("Break views"))
+                .child(pen_row("Break lines", ("dp-break", "dp-breakc"), &vt.break_line, |p, v| p.view_tab.break_line.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.break_line.color = c)));
+            // Cosmetic threads and Flat pattern views (live dom/drawing-
+            // properties-views): line styles as a select and the colour.
             const BEND_LINES: [&str; 3] = ["Solid", "Dashed", "Center"];
-            let bend = |id: &'static str, cur: u8, set: fn(&mut DrawingProps, u8)| {
-                let items: Vec<(String, bool, Act)> = BEND_LINES.iter().enumerate().map(|(i, n)| (n.to_string(), cur == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, i as u8)) as Act)).collect();
-                select(id, BEND_LINES[cur.min(2) as usize].into(), items)
+            // Flat pattern views' column fits "Counterbore/Countersink down".
+            const FLAT_COL: f32 = 204.;
+            let style_row = |label: &'static str, ids: (&'static str, &'static str), cur: u8, set: StyleSet, color: Option<[u8; 3]>, set_color: crate::drawing_color::ColorSet| {
+                let items: Vec<(String, bool, Act)> = BEND_LINES
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| {
+                        let set = set.clone();
+                        (n.to_string(), cur == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, i as u8)) as Act)
+                    })
+                    .collect();
+                trow(label, FLAT_COL, 33., 1., h_flex().items_start().child(sel(ids.0, BEND_LINES[cur.min(2) as usize].into(), items, 313. - FLAT_COL)).child(div().ml(px(6.)).child(swatch(ids.1, color, set_color))).into_any_element())
             };
+            let thread_style = vt.thread_style.unwrap_or(if self.current_sheet().size.is_ansi() { ThreadStyle::Ansi } else { ThreadStyle::Iso });
+            let thread_items: Vec<(String, bool, Act)> = ThreadStyle::ALL.iter().map(|&t| (t.name().to_string(), t == thread_style, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.thread_style = Some(t)) as Act)).collect();
             body = body
+                .child(section("Cosmetic threads"))
+                .child(trow("Thread style", 125., 33., 2., sel("dp-thstyle", thread_style.name().into(), thread_items, 219.)))
+                .child(pen_row("Thickness", ("dp-thpen", "dp-thpenc"), &vt.thread_line, |p, v| p.view_tab.thread_line.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.thread_line.color = c)))
+                .child(trow("Dashes", 125., 32., 1., self.wt_field_w(14, &ed, Some(200.))))
                 .child(section("Flat pattern views"))
-                .child(row("Up bend lines", bend("dp-bup", vt.bend_up_line, |p, v| p.view_tab.bend_up_line = v)))
-                .child(row("", swatch("dp-bupc", vt.bend_up_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_up_color = c))))
-                .child(row("Down bend lines", bend("dp-bdown", vt.bend_down_line, |p, v| p.view_tab.bend_down_line = v)))
-                .child(row("", swatch("dp-bdownc", vt.bend_down_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_down_color = c))))
-                .child(row("Bend tangent edges", swatch("dp-btanc", vt.bend_tangent_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_tangent_color = c))));
+                .child(trow("All bend lines", FLAT_COL, 33., 1., thick_sel("dp-bendall", vt.bend_lines_thickness, |p, v| p.view_tab.bend_lines_thickness = v, 313. - FLAT_COL)))
+                .child(style_row("Up bend lines", ("dp-bup", "dp-bupc"), vt.bend_up_line, std::rc::Rc::new(|p: &mut DrawingProps, v| p.view_tab.bend_up_line = v), vt.bend_up_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_up_color = c)))
+                .child(style_row("Down bend lines", ("dp-bdown", "dp-bdownc"), vt.bend_down_line, std::rc::Rc::new(|p: &mut DrawingProps, v| p.view_tab.bend_down_line = v), vt.bend_down_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_down_color = c)))
+                .child(pen_row_at(
+                    "Bend tangent edges",
+                    FLAT_COL,
+                    ("dp-btan", "dp-btanc"),
+                    &noshape_model::drawing::PenProps { thickness: vt.bend_tangent_thickness, color: vt.bend_tangent_color },
+                    |p, v| p.view_tab.bend_tangent_thickness = v,
+                    std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_tangent_color = c),
+                ));
+            const FLAT_IDS: [(&str, &str); 5] = [("dp-fl0", "dp-fl0c"), ("dp-fl1", "dp-fl1c"), ("dp-fl2", "dp-fl2c"), ("dp-fl3", "dp-fl3c"), ("dp-fl4", "dp-fl4c")];
+            for (k, (label, default)) in noshape_model::drawing::FLAT_LINE_ROWS.iter().enumerate() {
+                let (cur, color) = vt.flat_lines.get(k).copied().unwrap_or((*default, None));
+                body = body.child(style_row(label, FLAT_IDS[k], cur, std::rc::Rc::new(move |p: &mut DrawingProps, v| flat_slot(p, k).0 = v), color, std::rc::Rc::new(move |p: &mut DrawingProps, c| flat_slot(p, k).1 = c)));
+            }
+            body = body.child(style_row(
+                "Form centermarks",
+                ("dp-fcm", "dp-fcmc"),
+                vt.form_centermark_line,
+                std::rc::Rc::new(|p: &mut DrawingProps, v| p.view_tab.form_centermark_line = v),
+                vt.form_centermark_color,
+                std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.form_centermark_color = c),
+            ));
         } else if self.drawing_props.tab == 4 {
             let vt = props.view_tab.clone();
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
@@ -1043,11 +1145,13 @@ impl DrawingEditor {
                 // 181 px spinboxes; Centerlines from column 130.
                 .child(section("Centermarks"))
                 .child(check("dp-cmext", "Extended lines", vt.centermark_extended, |p, v| p.view_tab.centermark_extended = v, cx))
+                .child(trow("Thickness", 150., 33., 2., thick_sel("dp-cmthick", vt.centermark_thickness, |p, v| p.view_tab.centermark_thickness = v, 209.)))
                 .child(trow("Mark size", 149., 32., 2., self.wt_field_w(0, &ed, Some(181.))))
                 .child(trow("Gap size", 149., 32., 2., self.wt_field_w(1, &ed, Some(181.))))
                 .child(trow("Color", 149., 33., 2., swatch("dp-cmcolor", vt.centermark_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centermark_color = c))))
                 .child(section("Centerlines"))
-                .child(trow("Color", 130., 33., 2., swatch("dp-clcolor", vt.centerline_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centerline_color = c))));
+                .child(trow("Thickness", 130., 33., 2., h_flex().items_start().child(thick_sel("dp-clthick", vt.centerline_thickness, |p, v| p.view_tab.centerline_thickness = v, 193.)).child(div().ml(px(6.)).child(swatch("dp-clcolor", vt.centerline_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centerline_color = c)))).into_any_element()))
+                .child(trow("Dashes", 130., 32., 2., self.wt_field_w(2, &ed, Some(193.))));
         } else if self.drawing_props.tab == 5 {
             let color_select = |id: &'static str, cur: Option<[u8; 3]>, set: fn(&mut DrawingProps, Option<[u8; 3]>)| swatch(id, cur, std::rc::Rc::new(move |p: &mut DrawingProps, c| set(p, c)));
             let locked = props.formats_locked;
@@ -1061,12 +1165,16 @@ impl DrawingEditor {
                 // (column 112, 147 px); the colours at column 111.
                 .child(section("Lock"))
                 .child(trow("Lock", 112., 33., 2., sel("dp-flock", if locked { "Locked".into() } else { "Unlocked".into() }, lock_items, 147.)))
+                // Live 1710: each group's Color, then a 147 px Thickness.
                 .child(section("Border frame"))
                 .child(trow("Color", 111., 32., 1., color_select("dp-fborder", props.border_color, |p, c| p.border_color = c)))
+                .child(trow("Thickness", 112., 33., 2., thick_sel("dp-fborderw", props.border_thickness, |p, v| p.border_thickness = v, 147.)))
                 .child(section("Border zone"))
                 .child(trow("Color", 111., 32., 1., color_select("dp-fzone", props.zone_color, |p, c| p.zone_color = c)))
+                .child(trow("Thickness", 112., 33., 2., thick_sel("dp-fzonew", props.zone_thickness, |p, v| p.zone_thickness = v, 147.)))
                 .child(section("Title block"))
-                .child(trow("Color", 111., 32., 1., color_select("dp-ftitle", props.title_block_color, |p, c| p.title_block_color = c)));
+                .child(trow("Color", 111., 32., 1., color_select("dp-ftitle", props.title_block_color, |p, c| p.title_block_color = c)))
+                .child(trow("Thickness", 112., 33., 2., thick_sel("dp-ftitlew", props.title_block_thickness, |p, v| p.title_block_thickness = v, 147.)));
         } else if self.drawing_props.tab == 6 {
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Tables"))
@@ -1096,11 +1204,33 @@ impl DrawingEditor {
                 .child(section("Inspection items"))
                 .child(trow("Item parsing", 106., 33., 2., sel("dp-iparse", if props.inspection_row_parsing { "Row".into() } else { "Parameter".into() }, parse_items, 253.)))
                 .child(trow("Font", 106., 32., 2., font_row(FontOf::Inspection, props.inspection_font.clone(), 253.)))
-                .child(trow("Text", 105., 33., 2., h_flex().items_start().child(field(0)).child(Self::font_style_toggles(FontOf::Inspection, props.inspection_font.clone(), ("dp-ifont-b", "dp-ifont-i"), 3., cx)).into_any_element()))
+                .child(trow(
+                    "Text",
+                    105.,
+                    33.,
+                    2.,
+                    h_flex()
+                        .items_start()
+                        .child(field(0))
+                        .child(Self::font_style_toggles(FontOf::Inspection, props.inspection_font.clone(), ("dp-ifont-b", "dp-ifont-i"), 3., cx))
+                        .child(div().ml(px(3.)).child(swatch("dp-itcolor", props.inspection_text_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.inspection_text_color = c))))
+                        .into_any_element(),
+                ))
                 .child(trow("Border shape", 106., 33., 2., sel("dp-ishape", props.inspection_shape.name().into(), shape_items, 253.)))
                 .child(trow("Border size", 106., 32., 2., sel("dp-isize", border_chars_label(props.inspection_border_chars), border_items, 253.)))
                 .child(trow("Border color", 105., 33., 2., swatch("dp-icolor", props.inspection_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.inspection_color = c))))
-                .child(check("dp-isolid", "Solid fill", props.inspection_solid_fill, |p, v| p.inspection_solid_fill = v, cx))
+                // Live 1710: Solid fill's colour on the checkbox's row, at
+                // the group's column.
+                .child(
+                    div()
+                        .relative()
+                        .child(check("dp-isolid", "Solid fill", props.inspection_solid_fill, |p, v| p.inspection_solid_fill = v, cx))
+                        .child(div().absolute().left(px(104.)).top(px(1.)).child(swatch(
+                            "dp-ifcolor",
+                            Some(props.inspection_fill_color.unwrap_or(noshape_model::drawing::sheet::INSPECTION_FILL)),
+                            std::rc::Rc::new(|p: &mut DrawingProps, c| p.inspection_fill_color = c),
+                        ))),
+                )
                 .child(section("Automatic inspection items"))
                 .child(check("dp-iexcl", "Exclude callouts", props.inspection_exclude_callouts, |p, v| p.inspection_exclude_callouts = v, cx));
         } else {

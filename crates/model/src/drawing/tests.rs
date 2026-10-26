@@ -408,6 +408,70 @@ fn views_tab_pens_colours_and_labels() {
     assert!(v.hide_threads && v.hide_bend_lines && v.hide_bend_notes);
 }
 
+/// Drawing properties › Views › Section views: the cutting line's pen
+/// (live 0.13 mm) and colour, its arrowheads' size and type, its label's
+/// height and colour, and the hatches' pen and colour.
+#[test]
+fn section_view_indicator_and_hatch_properties() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let cut_of = |b: &build::BuiltSheet| {
+        let pick = b.picks.iter().position(|p| *p == PickTarget::SectionLine(ViewId(5))).unwrap() as u32;
+        let i = b.geometry.lines.iter().position(|l| l.pick == pick && l.style == sheet::LineStyle::Section).unwrap();
+        (pick, i)
+    };
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let (_, i) = cut_of(&b);
+    assert!((b.geometry.line_pen(i).0 - 0.13).abs() < 1e-9 && b.geometry.line_color(i).is_none());
+    let fills0 = b.geometry.fills.len();
+    let vt = &mut drawing.props.view_tab;
+    vt.section_line = PenProps { thickness: 0.5, color: Some([0, 120, 0]) };
+    vt.section_arrow.kind = sheet::ArrowType::Open;
+    (vt.section_label.height, vt.section_label.color) = (Some(6.0), Some([0, 0, 160]));
+    vt.hatch_line = PenProps { thickness: 0.3, color: Some([90, 90, 90]) };
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let (pick, i) = cut_of(&b);
+    let g = &b.geometry;
+    assert!((g.line_pen(i).0 - 0.5).abs() < 1e-9 && g.line_color(i) == Some([0, 120, 0]));
+    // Open arrowheads are lines: two fewer fills (the shafts stay).
+    assert_eq!(g.fills.len(), fills0 - 2);
+    let letters: Vec<usize> = (0..g.texts.len()).filter(|&t| g.texts[t].pick == pick).collect();
+    assert_eq!(letters.len(), 2);
+    assert!(letters.iter().all(|&t| (g.texts[t].height - 6.0).abs() < 1e-9 && g.text_color(t) == Some([0, 0, 160])));
+    let view_pick = b.picks.iter().position(|p| *p == PickTarget::View(ViewId(5))).unwrap() as u32;
+    let hatch: Vec<usize> = (0..g.lines.len()).filter(|&k| g.lines[k].pick == view_pick && g.lines[k].style == sheet::LineStyle::Thin).collect();
+    assert!(hatch.len() > 5 && hatch.iter().all(|&k| (g.line_pen(k).0 - 0.3).abs() < 1e-9 && g.line_color(k) == Some([90, 90, 90])));
+}
+
+/// Drawing properties › Formats and Construction geometry pens: the
+/// border frame (live 0.15 mm, set to 0.5) and the automatic centerlines
+/// (live 0.13 mm, dash scale 2).
+#[test]
+fn formats_and_construction_geometry_pens() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().show_centerlines = true;
+    // The view's own lines (the title block's projection symbol has
+    // centerlines too, on the title block's pen).
+    let pens = |b: &build::BuiltSheet, st: sheet::LineStyle| -> Vec<(f64, Vec<f64>)> {
+        let vp = b.picks.iter().position(|p| *p == PickTarget::View(ViewId(1))).unwrap() as u32;
+        let ok = |i: usize| b.geometry.lines[i].style == st && (st == sheet::LineStyle::Border || b.geometry.lines[i].pick == vp);
+        (0..b.geometry.lines.len()).filter(|&i| ok(i)).map(|i| b.geometry.line_pen(i)).collect()
+    };
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let border = pens(&b, sheet::LineStyle::Border);
+    assert!(!border.is_empty() && border.iter().all(|(w, _)| (*w - 0.15).abs() < 1e-9), "{border:?}");
+    let cl = pens(&b, sheet::LineStyle::Centerline);
+    assert!(!cl.is_empty() && cl.iter().all(|(w, _)| (*w - 0.13).abs() < 1e-9), "{cl:?}");
+    drawing.props.border_thickness = 0.5;
+    drawing.props.view_tab.centerline_dashes = 2.0;
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(pens(&b, sheet::LineStyle::Border).iter().all(|(w, _)| (*w - 0.5).abs() < 1e-9));
+    assert!(pens(&b, sheet::LineStyle::Centerline).iter().any(|(_, d)| d == &[16.0, 3.0, 3.0, 3.0]));
+}
+
 #[test]
 fn bom_hole_table_and_linked_balloons() {
     let (doc, mut drawing) = demo();
@@ -1497,6 +1561,14 @@ fn flat_pattern_view_shows_bend_lines_and_notes() {
     let note = g1.texts.iter().find(|t| t.text.starts_with("UP ") || t.text.starts_with("DOWN ")).expect("a bend note");
     assert!(note.text.contains("90.0°") && note.text.contains("R3"), "{}", note.text);
     let centerlines = |g: &sheet::SheetGeometry| g.lines.iter().filter(|l| l.style == sheet::LineStyle::Centerline).count();
+    // Drawing properties › Views › Flat pattern views: the bend line's pen
+    // (live 0.13 mm) and its style.
+    let bend = (0..g1.lines.len()).find(|&i| g1.lines[i].style == sheet::LineStyle::Centerline).expect("the bend line");
+    assert!((g1.line_pen(bend).0 - 0.13).abs() < 1e-9);
+    drawing.props.view_tab.bend_lines_thickness = 0.35;
+    let g3 = built(&drawing);
+    let bend = (0..g3.lines.len()).find(|&i| g3.lines[i].style == sheet::LineStyle::Centerline).expect("the bend line");
+    assert!((g3.line_pen(bend).0 - 0.35).abs() < 1e-9);
     // Show/Hide bend lines and bend notes.
     drawing.sheets[0].views[0].hide_bend_lines = true;
     drawing.sheets[0].views[0].hide_bend_notes = true;
