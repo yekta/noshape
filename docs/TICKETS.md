@@ -22,16 +22,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   without the hole, it shells right. Docs: /root/qa-scratch/tickets/qa-1026-ps2-shell.noshape (tab Part Studio 2:
   suppress Chamfer 1 and the hole for live's case) and qa-1026-ps3-shell-hole.noshape (tab Part Studio 3); shots
   tickets/shell-fillet-walls-missing-iso.png, -front.png, shell-walls-ps3-iso.png, -front.png. Probably the same root as
-  qa5's P1-16 (fillet offsets collapsing in shell.cpp; WIP on agent/qa5) (qa 2026-10-26, build 4d2f6b0c)
-- [ ] P0 SHELL-SLOW Shell takes seconds: the same plate (+ chamfer, 2 holes), Shell 1 2.5 mm → Shell eval 3354 ms; edit to
+  qa5's P1-16 (fillet offsets collapsing in shell.cpp; WIP on agent/qa5). Not a regression: the v0.4.8 release gives
+  the same 10887.660 / 10220.907 mm³ (qa 2026-10-26, build 4d2f6b0c)
+- [ ] P1 SHELL-SLOW Shell takes seconds in the green (dev build), ~0.6 s in the v0.4.8 release: the same plate (+ chamfer, 2 holes), Shell 1 2.5 mm → Shell eval 3354 ms; edit to
   1.5 mm → 8759 ms; without the fillet 2502 ms (NOSHAPE_PERF log; box load ~35; the green is the watcher's dev build:
-  our crates opt-level 1, deps 3, so re-time on a release build before chasing it); live
+  our crates opt-level 1, deps 3). v0.4.8 release CLI on the same doc: query_mass_properties 0.70 s with Shell 1 vs
+  0.09 s with it suppressed, i.e. the shell alone ≈ 0.6 s at load ~25; live
   shells such parts in well under a second; ours freezes the preview for seconds (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P0 REGEN-SPEED edit commit on the 30-feature part: tests/perf/live-30-features.noshape, edit Extrude 1 10 → 12, ✓ →
   28 features re-evaluated in 1007 ms (Linear pattern 1 125, Boss 6 97, Chamfer 5 81, Boss 5 75, Hole 1 67, Chamfer 4 66;
   load ~35 on 16 cores, dev build with our crates at opt-level 1); budget ≤ 200 ms, live's server 171 ms for the whole
   part; undo/redo of it 7 / 5 ms (cached, OK). Also big-plate.noshape: regen 3.0 s (Extrude 2 2458, Sketch 2 535 ms) vs
-  live 617 ms (491 / 116)
+  live 617 ms (491 / 116). v0.4.8 release CLI: a full regen of the 30-feature part (query_mass_properties, process
+  0.62–0.76 s, ~0.2 s of it start-up) ≈ 0.45–0.55 s at load ~25, still 2.5–3× the budget
   (qa 2026-10-26, build 4d2f6b0c)
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
