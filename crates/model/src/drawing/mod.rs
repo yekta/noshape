@@ -2907,6 +2907,9 @@ pub struct ViewTabProps {
     pub virtual_sharp_extension: bool,
     pub virtual_sharp_line: PenProps,
     pub sketch_line: PenProps,
+    /// Views › View and region hatches › Hatch pattern: (standard, pattern)
+    /// in `hatch_pat::GROUPS` (live default ANSI, "ANSI31 general").
+    pub hatch_pattern: (usize, usize),
 }
 
 /// Cosmetic thread drawing standard (Drawing properties › Views).
@@ -3113,6 +3116,7 @@ impl Default for ViewTabProps {
             virtual_sharp_extension: false,
             virtual_sharp_line: PenProps::new(0.40),
             sketch_line: PenProps::new(0.15),
+            hatch_pattern: (0, 0),
         }
     }
 }

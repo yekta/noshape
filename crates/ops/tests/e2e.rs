@@ -4043,6 +4043,11 @@ fn agent_benchmark_p1_fixes() {
     assert!(e.to_json().to_string().contains("config"), "{e:?}");
     let s = call(&mut ctx, "ops_list", json!({ "search": "pattern assembly" }));
     assert!(s["operations"].as_array().unwrap().iter().all(|o| o["tool"].as_str().unwrap().starts_with("assembly")), "{s}");
+    // An unknown tool's error names the close ones; one `part` for set_material.
+    let e = try_call(&mut ctx, "ops_describe", json!({ "tools": ["variable_edit"] })).unwrap_err();
+    assert!(e.message.contains("variable_set"), "{e:?}");
+    let m = call(&mut ctx, "part_set_material", json!({ "part": "Part 1", "material": "Aluminum - 6061" }));
+    assert!(!m.to_string().contains("error"), "{m}");
     // feature_schema: what the dialog shows; the rest by id.
     let h = call(&mut ctx, "feature_schema", json!({ "type": "hole" }));
     assert!(h["params"]["properties"].get("holeDiameterV3").is_some() && h["params"]["properties"].get("cBoreDiameterV3").is_none(), "{h}");
@@ -4069,7 +4074,9 @@ fn step_assembly_same_named_parts_get_distinct_instances() {
     call(&mut ctx, "document_create", json!({ "path": scratch("same_names_import.noshape").to_str().unwrap() }));
     let imp = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
     let asm = imp["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string();
-    let l = call(&mut ctx, "assembly_list", json!({ "tab": asm }));
+    // The import is the window's tab: tools without `tab` work on it.
+    let l = call(&mut ctx, "assembly_list", json!({}));
+    assert_eq!(call(&mut ctx, "ui_state", json!({}))["active_tab"]["name"], json!(asm));
     let mut names: Vec<&str> = l["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap()).collect();
     names.sort();
     assert_eq!(names, ["Part 1 <1>", "Part 1 <2>"], "{l}");

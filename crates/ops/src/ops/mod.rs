@@ -78,7 +78,7 @@ pub(crate) fn doc_field() -> Field {
 }
 
 pub(crate) fn tab_field() -> Field {
-    opt("tab", json!({ "type": "string" }), "Part Studio tab, by name (\"Part Studio 1\") or id. Default: the first Part Studio.")
+    opt("tab", json!({ "type": "string" }), "Part Studio tab, by name (\"Part Studio 1\") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio.")
 }
 
 pub(crate) fn s() -> Value {
@@ -94,7 +94,7 @@ pub(crate) fn strings() -> Value {
 /// The document and Part Studio tab a call names.
 pub(crate) fn studio_target<'a>(ctx: &'a mut crate::Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let tab = doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Part Studio", doc::is_part_studio)?;
+    let tab = od.tab_of_kind(a.opt_str("tab")?, "Part Studio", doc::is_part_studio)?;
     Ok((od, tab))
 }
 

@@ -110,6 +110,11 @@ edits with undo / redo, a configured part, an assembly with mates) added:
   "configuration") and `ops_list {"search": "pattern assembly"}` give summaries and examples.
 - **Feature schemas** describe the parameters the dialog shows with the defaults; `more_when_shown` names the
   others (`counterbore`: `cBoreDiameterV3`...), `all: true` describes them too.
+- **Default tabs follow the window:** tools without `tab` use the tab the window shows when it is of their kind
+  (after `tab_activate`, or an import, which shows what it made: `first`), else the first of the kind.
+- **Imports:** a STEP assembly becomes an Assembly plus a "<name> parts" Part Studio; instances are named
+  "<part> <n>", numbered per name. `query_entities` `near` ranks by the distance to the face or edge itself.
+- **Unknown tool names** get "did you mean" suggestions from the same group (`variable_edit` -> `variable_set`).
 - **Edit replies stay small:** `regeneration.features` lists only the features that need a look (not `Ok`,
   or with a message, notices, under-defined, suppressed); `features_ok` counts the rest; `feature_list` lists all.
 
@@ -730,7 +735,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `type` | string | required | Feature type id (see `feature_types`). |
 | `params` | object |  | Parameter values by parameter id (see `feature_schema`): booleans; enum option ids ("BLIND"); numbers as expression strings with units ("25 mm", "0.5 in", "30 deg", "#width / 2", "2 * #t + 1 mm"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools ("region:…", "face:…", "edge:…", "plane:top", "body:…"); array parameters as arrays of objects of their item parameters. |
 | `name` | string |  | Feature name (default: "Extrude 1", ...). |
@@ -752,7 +757,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `feature` | string | required | Feature id or name. |
 | `params` | object |  | Parameter values by parameter id (see `feature_schema`): booleans; enum option ids ("BLIND"); numbers as expression strings with units ("25 mm", "0.5 in", "30 deg", "#width / 2", "2 * #t + 1 mm"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools ("region:…", "face:…", "edge:…", "plane:top", "body:…"); array parameters as arrays of objects of their item parameters. |
 | `name` | string |  | New name. |
@@ -772,7 +777,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `feature` | string | required | Feature id or name. |
 
 #### feature_list
@@ -791,7 +796,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 
 #### feature_delete
 
@@ -808,7 +813,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `features` | array of string | required | Feature ids or names. |
 
 #### feature_suppress
@@ -827,7 +832,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `features` | array of string | required | Feature ids or names. |
 | `suppressed` | boolean |  | true: suppress, false: unsuppress. |
 
@@ -847,7 +852,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `feature` | string |  | Feature id or name. |
 | `folder` | string |  | Instead of `feature`: a folder's name (feature_list lists folders). |
 | `unsuppressed_if` | string |  | Unsuppressed if: expression. |
@@ -867,7 +872,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `feature` | string | required | Feature id or name. |
 | `param` | string |  | Only this selection field (its parameter id, feature_get). |
 
@@ -886,7 +891,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `feature` | string | required | Feature id or name. |
 
 #### feature_add_folder
@@ -904,7 +909,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `features` | array of string |  | Feature ids or names. |
 | `name` | string |  | Folder name. |
 
@@ -921,7 +926,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `folder` | integer or string | required | Folder id or name (feature_list). |
 | `name` | string | required | New name. |
 
@@ -940,7 +945,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `folder` | integer or string | required | Folder id or name (feature_list). |
 
 #### feature_rollback
@@ -959,7 +964,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `after` | string |  | Feature id or name. |
 | `index` | integer |  | Features above the bar. |
 
@@ -976,7 +981,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `feature` | string | required | Feature id or name. |
 | `name` | string | required | New name. |
 
@@ -995,7 +1000,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `features` | array of string | required | Feature ids or names to move. |
 | `to` | integer | required | Row index to drop them at. |
 
@@ -1015,7 +1020,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `targets` | array of string | required | Reference ids. |
 | `hidden` | boolean |  | true: hide, false: show. |
 
@@ -1034,7 +1039,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `plane` | string | required | Plane reference id. |
 
 #### feature_show_all
@@ -1050,7 +1055,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 
 ### sketch
 
@@ -1070,7 +1075,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `plane` | string | required | Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector. |
 | `name` | string |  | Name (default "Sketch N"). |
 | `disable_imprinting` | boolean |  | The dialog's Disable imprinting (default off). |
@@ -1112,7 +1117,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `tool` | one of `line`, `midpoint_line`, `corner_rectangle`, `center_rectangle`, `aligned_rectangle`, `circle`, `three_point_circle`, `three_point_arc`, `tangent_arc`, `center_point_arc`, `point`, `spline`, `bezier`, `conic`, `slot`, `inscribed_polygon`, `circumscribed_polygon`, `ellipse`, `elliptical_arc` |  | Drawing tool (required without `shapes`). |
 | `points` | array of array of number or string |  | The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`). |
@@ -1151,7 +1156,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `constraint` | one of `coincident`, `concentric`, `parallel`, `tangent`, `horizontal`, `vertical`, `midpoint`, `perpendicular`, `equal`, `symmetric`, `fix`, `normal`, `pierce`, `curvature` | required | Constraint. |
 | `entities` | array of string | required | Sketch entity ids, or the origin (`origin`) to constrain to it. |
@@ -1172,7 +1177,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | One or two sketch entity ids (`entity:…`) or `origin`. |
 | `value` | string or number |  | Value or expression. Without it the dimension keeps the measured value, as when the Dimension tool's value box is accepted unchanged. |
@@ -1195,7 +1200,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `dimension` | string | required | Dimension id (`dim:…` from sketch_get / sketch_dimension). |
 | `value` | string or number | required | Value or expression. |
@@ -1216,7 +1221,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `dimension` | string | required | Dimension id (`dim:…`). |
 | `driving` | boolean |  | Driving (true) or driven (false). |
@@ -1243,7 +1248,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string |  | Entity ids. |
 | `constraints` | array of string |  | Constraint or dimension ids (`con:…`, `dim:…`). |
@@ -1261,7 +1266,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | Entity ids. |
 | `construction` | boolean |  | true: construction. |
@@ -1281,7 +1286,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 
 #### sketch_paste
@@ -1299,7 +1304,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name to copy. |
 | `plane` | string | required | Plane to paste onto: `plane:top`, a Plane feature, a planar face id or a mate connector. |
 | `to_tab` | string |  | Part Studio to paste into (default: the same one). |
@@ -1320,7 +1325,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string |  | Sketch feature id or name. |
 | `face` | string |  | Instead: a planar face id (`face:…`). |
 | `file` | string | required | Output path. |
@@ -1342,7 +1347,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | Entity ids (`entity:…`) to copy. |
 | `to` | string |  | Sketch to paste into (default: the same one). |
@@ -1363,7 +1368,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `points` | array of array of number or string |  | Clicks on the pieces to remove, in sketch coordinates. |
 | `entities` | array of string |  | The curve under each click (optional). |
@@ -1384,7 +1389,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `points` | array of array of number or string | required | Clicks near the end to extend. |
 | `entities` | array of string |  | The curve under each click (optional). |
@@ -1404,7 +1409,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `points` | array of array of number or string | required | Split positions. |
 | `entities` | array of string |  | The curve under each click (optional). |
@@ -1424,7 +1429,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entity` | string | required | Spline or bezier entity id. |
 | `point` | array of number or string | required | Where on the curve (or its control polygon). |
@@ -1444,7 +1449,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | Corner points (entity ids), or pairs of curves. |
 | `radius` | string or number |  | Radius (default: the tool's, as in Onshape: 5 mm (0.5 in in inch documents) at first, then the last radius used in this Part Studio). |
@@ -1464,7 +1469,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | Corner points, or pairs of curves. |
 | `distance` | string or number |  | Chamfer distance (default: the tool's, 5 mm / 0.25 in). |
@@ -1484,7 +1489,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | Curves to offset. |
 | `distance` | string or number |  | Offset distance (default: the tool's, 5 mm / 0.25 in). |
@@ -1506,7 +1511,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | Entities to mirror. |
 | `axis` | string | required | Mirror line: a sketch line id, or an edge / plane id. |
@@ -1526,7 +1531,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string |  | Seed entities (not needed when editing). |
 | `count` | integer |  | Instances in the first direction (default 3). |
@@ -1552,7 +1557,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string |  | Seed entities (not needed when editing). |
 | `center` | array or string |  | Center: [x, y], a point entity id or `origin` (default: the origin). |
@@ -1576,7 +1581,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | Entities to transform. |
 | `translate` | array of number or string |  | Translation [dx, dy]. |
@@ -1599,7 +1604,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `references` | array of string | required | Model reference ids. |
 
@@ -1618,7 +1623,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `face` | string | required | Face id (`face:…`) crossing the sketch plane. |
 
@@ -1637,7 +1642,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `text` | string |  | The text (default "Default text" for a new box). |
 | `corner` | array of number or string |  | Lower-left corner (new text). |
@@ -1665,7 +1670,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `file` | string | required | Path of the .dxf / .dwg file. |
 | `units` | one of `From file`, `Millimeter`, `Centimeter`, `Meter`, `Inch`, `Foot`, `Yard` |  | Drawing units (default "From file"; millimeters when the file has none). |
@@ -1686,7 +1691,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `file` | string | required | Path of the image. |
 | `points` | array of array of number or string | required | [corner, opposite corner]. |
@@ -2111,7 +2116,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `source` | string | required | Part Studio or Assembly tab (name or id) to insert from. |
 | `part` | string |  | A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio as one instance. |
 | `sketch` | string |  | A sketch of that Part Studio (feature id or name): the Insert dialog's sketches. |
@@ -2132,7 +2137,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 
 #### assembly_entities
 
@@ -2150,7 +2155,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string | required | Instance id or name. |
 | `kind` | one of `faces`, `edges`, `vertices` | required | Which entities. |
 | `surface` | string |  | Faces: only this surface type (plane, cylinder, ...). |
@@ -2176,7 +2181,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string | required | Instance id or name. |
 | `entity` | string | required | Face, edge or vertex id from assembly_entities. |
 
@@ -2197,7 +2202,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `mate` | string |  | Edit this existing mate (id `mate:…` or name), as its Edit… dialog: fields not given keep their values. Without it a new mate is added (`type`, `a`, `b` required). |
 | `type` | one of `fastened`, `revolute`, `slider`, `planar`, `cylindrical`, `pinslot`, `ball`, `parallel`, `tangent`, `width` |  | Mate type. |
 | `a` | object |  | First connector (its instance moves). Width: the first tab connector. |
@@ -2230,7 +2235,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string | required | Instance id or name. |
 | `translation` | array of number or string | required | [x, y, z]. |
 | `axis` | array of number |  | Rotation axis. |
@@ -2250,7 +2255,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string | required | Instance ids or names. |
 | `fixed` | boolean |  | Fix or unfix. |
 | `hidden` | boolean |  | Hide or show. |
@@ -2270,7 +2275,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string |  | Instance ids or names. |
 | `mates` | array of string |  | Mate, relation, group, mate connector or pattern ids or names (a pattern takes its instances with it). |
 
@@ -2289,7 +2294,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `kind` | one of `linear`, `circular`, `mirror`, `part_pattern`, `replicate` |  | Pattern type (required for a new pattern). |
 | `seeds` | array of string |  | Instances to pattern (ids or names); part pattern / replicate use the first. |
 | `direction` | object |  | Linear: the direction; circular: the axis; mirror: the plane. A mate connector, as in assembly_mate (an edge, a face or {"connector": ...}). |
@@ -2321,7 +2326,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `pattern` | string | required | Pattern id or name. |
 
 #### assembly_bom
@@ -2340,7 +2345,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `type` | one of `flattened`, `structured` |  | BOM type. |
 | `columns` | array of string |  | Columns by name ("Item", "Quantity", "Part number", "Material", "Mass"...). |
 | `show_excluded` | boolean |  | Show excluded and suppressed items. |
@@ -2363,7 +2368,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `type` | one of `flattened`, `structured` |  | BOM type. |
 | `columns` | array of string |  | The columns in order (Item is always first). |
 | `show_excluded` | boolean |  | Show excluded and suppressed items. |
@@ -2385,7 +2390,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string |  | Top-level instances (ids or names); default all. |
 | `include_standard` | boolean |  | Include standard content (fasteners). |
 | `top_only` | boolean |  | Show top level only: one row per pair of top-level instances. |
@@ -2406,7 +2411,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `version` | string | required | Version name. |
 | `instances` | array of string |  | Instance ids or names (default all). |
 
@@ -2425,7 +2430,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string | required | Instance ids or names (two or more). |
 | `edit` | string |  | An existing group to edit (id or name). |
 
@@ -2444,7 +2449,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `type` | one of `gear`, `rack_and_pinion`, `screw`, `linear` | required | Relation type. |
 | `mates` | array of string | required | The two mates (ids or names); screw: one cylindrical mate. |
 | `ratio` | string or number |  | Gear / linear: the ratio (default 1); rack and pinion / screw: the distance per revolution (default 10 mm / 1 mm). |
@@ -2466,7 +2471,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `on` | object |  | Origin entity (required for a new connector): a mate connector argument as in assembly_mate ({"instance", "entity", "inference"} or {"origin": true}). |
 | `between` | object |  | Origin type Between entities: the origin is halfway between `on` and this entity (same instance). |
 | `primary_axis` | object |  | Realign: the Z axis along this entity (face normal, edge direction). |
@@ -2493,7 +2498,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string | required | Instance id or name. |
 | `source` | string | required | Part Studio or Assembly tab (name or id). |
 | `part` | string |  | A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio. |
@@ -2516,7 +2521,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string |  | Instance id or name. |
 | `feature` | string |  | Mate, relation, group, pattern or connector id or name. |
 | `name` | string | required | The new name. |
@@ -2536,7 +2541,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `features` | array of string | required | Feature ids or names. |
 | `suppressed` | boolean |  | Suppress or unsuppress. |
 | `hidden` | boolean |  | Mate connectors: hide or show. |
@@ -2557,7 +2562,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `action` | one of `add`, `update`, `apply`, `duplicate`, `delete`, `rename`, `move_up`, `move_down`, `set_value` | required | What to do. |
 | `position` | string |  | The position: its name or 1-based row (all actions but add). |
 | `name` | string |  | add: the new position's name; rename: the new name. |
@@ -2580,7 +2585,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `drivers` | array of object | required | [{"mate": id or name, "dof": "rz" \| "tx" \| "ty" \| "tz"}] |
 
 #### assembly_exploded_view
@@ -2598,7 +2603,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `action` | one of `add`, `rename`, `delete`, `lines` | required | What to do. |
 | `on` | boolean |  | lines: show (true) or hide (false) all explode lines. |
 | `view` | string |  | The view: its name or 1-based row. |
@@ -2620,7 +2625,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `view` | string | required | The view: its name or 1-based row. |
 | `instances` | array of string | required | Instance ids or names. |
 | `direction` | array or object | required | Direction / rotation axis: [x, y, z] or a mate connector (see assembly_mate). |
@@ -2646,7 +2651,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `mate` | string |  | The mate (id or name); default the first unsuppressed mate with degrees of freedom. |
 | `dof` | one of `rz`, `tx`, `ty`, `tz` |  | The degree of freedom ("Select degree of freedom"): rz = rotation about Z, tx / ty / tz = translation; needed when the mate has several. |
 | `start` | string or number |  | Start value (angle or length expression). |
@@ -2670,7 +2675,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `action` | one of `add`, `apply`, `update`, `rename`, `remove` | required | What to do. |
 | `state` | string |  | The display state: its name or 1-based row (all actions but add). |
 | `name` | string |  | add: the new state's name; rename: the new name. |
@@ -2690,7 +2695,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string | required | Instance ids or names. |
 
 #### assembly_create_subassembly
@@ -2708,7 +2713,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 
 #### assembly_dissolve_subassembly
 
@@ -2725,7 +2730,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string | required | Instance ids or names. |
 
 #### assembly_add_folder
@@ -2743,7 +2748,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string |  | Instance ids or names. |
 | `features` | array of string |  | Mate, relation, group, pattern or connector ids or names. |
 | `name` | string |  | Folder name. |
@@ -2763,7 +2768,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `folder` | string | required | Folder id or name (assembly_list `folders`). |
 
 #### assembly_copy
@@ -2781,7 +2786,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string | required | Instance ids or names. |
 | `to` | string |  | Assembly tab to paste into (default: the same one). |
 | `offset` | array of number or string |  | [x, y, z] lengths (default [0, 0, 0]). |
@@ -2801,7 +2806,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string | required | Instance id or name. |
 | `configuration` | object | required | {input id: value} (list inputs: the configuration id; checkboxes: true / false). |
 
@@ -2821,7 +2826,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string | required | Subassembly instance id or name. |
 | `lock` | string | required | "flexible", "current" or a named position name. |
 
@@ -2840,7 +2845,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string | required | Instance ids or names. |
 | `reference_designator` | string |  | Reference designator (one instance; empty clears). |
 | `best_tessellation` | boolean |  | Use best available tessellation (false: automatic). |
@@ -2860,7 +2865,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string |  | Instance id or name. |
 | `mate` | string |  | Mate id or name. |
 | `folder` | string |  | Instance folder id or name. |
@@ -2902,7 +2907,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `standard` | string |  | Standard. |
 | `category` | string |  | Category. |
 | `class` | string |  | Class. |
@@ -2933,7 +2938,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instances` | array of string | required | Standard content instance ids or names (same component). |
 | `size` | string |  | Size (default: the component's default, or auto-size from the first hole with `auto_size`). |
 | `length` | string |  | Length (default: the size's first). |
@@ -3032,7 +3037,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string | required | Instance id or name. |
 
 #### assembly_open_linked_document
@@ -3050,7 +3055,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string | required | Instance id or name. |
 
 ### context
@@ -5119,7 +5124,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `part` | string | required | Part id (`body:…` from query_parts) or name. |
 | `name` | string | required | New name. |
 
@@ -5138,7 +5143,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `part` | string | required | Part id (`body:…`) or name. |
 | `name` | string |  | Name. |
 | `description` | string |  | Description. |
@@ -5168,7 +5173,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `part` | string | required | Part id (`body:…`) or name. |
 | `action` | one of `add_property`, `set`, `delete_column`, `delete_table` |  | What to do (default: read the table). |
 | `property` | one of `Appearance`, `Name`, `Description`, `Part number`, `Revision`, `Vendor`, `Project`, `Product line`, `Material`, `Title 1`, `Title 2`, `Title 3`, `Not revision managed`, `Exclude from all BOMs`, `Unit of measure`, `Mass`, `Tessellation quality` |  | The property (column). |
@@ -5191,7 +5196,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `action` | one of `add_datum`, `delete` |  | What to do (default: list). |
 | `face` | string |  | add_datum: a planar face id. |
 | `letter` | string |  | add_datum: the datum letter. |
@@ -5212,8 +5217,9 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
-| `parts` | array of string | required | Part ids (`body:…`) or names. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
+| `parts` | array of string |  | Part ids (`body:…`) or names. |
+| `part` | string |  | One part (instead of `parts`). |
 | `material` | string |  | Library material name, e.g. "Aluminum - 6061"; or the custom material's name with `density`. |
 | `library` | string |  | Library to take it from (default: the first that has it). |
 | `density` | number |  | Custom material: density in kg/m³. |
@@ -5234,7 +5240,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `parts` | array of string |  | Part ids or names. |
 | `faces` | array of string |  | Face ids (`face:…`). |
 | `feature` | string |  | Feature id or name (its faces; a sketch: its curves). |
@@ -5257,7 +5263,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `parts` | array of string |  | Part ids or names. |
 | `appearances` | array of integer |  | Face / feature appearance indices. |
 
@@ -5276,7 +5282,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 
 ### material
 
@@ -5314,7 +5320,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `configuration` | object |  | In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown. |
 
 #### query_entities
@@ -5336,7 +5342,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `kind` | one of `faces`, `edges`, `vertices` | required | Which entities. |
 | `part` | string |  | Only this part (`body:…` id or part name). |
 | `surface` | one of `plane`, `cylinder`, `cone`, `sphere`, `torus`, `bspline`, `extruded`, `revolved`, `other` |  | Faces: only this surface type. |
@@ -5364,7 +5370,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 
 #### query_measure
 
@@ -5381,7 +5387,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `entities` | array of string | required | Reference ids. |
 
 #### query_mass_properties
@@ -5400,7 +5406,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `parts` | array of string |  | Part ids (`body:…`) or names; default all. |
 | `reference` | string |  | Mate connector id (`mc:…`) for the inertia axes. |
 | `configuration` | object |  | In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown. |
@@ -5423,7 +5429,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `parts` | array of string |  | Part ids (`body:…`) or names; default all shown parts. |
 | `kind` | one of `gaussian`, `mean`, `max_radius`, `min_radius` |  | Curvature. |
 | `points` | integer |  | Extreme spots to list. |
@@ -5444,7 +5450,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `parts` | array of string |  | Part ids (`body:…`) or names; default all shown parts. |
 | `method` | one of `rolling_ball`, `rolling_ball_gradient`, `ray`, `ray_gradient` |  | Method. |
 | `below` | number or string |  | Report surface thinner than this (a length, or % for gradients). |
@@ -5465,7 +5471,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `entities` | array of string | required | Edges, faces (`edge:…`, `face:…`) or sketch curves (`entity:…`). |
 | `extend` | boolean |  | Extend across face: include the tangent-connected faces. |
 | `u_curves` | integer |  | Faces: U curves (default 8). |
@@ -5486,7 +5492,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `first` | array of string | required | Edges / sketch curves (or faces with `surface`). |
 | `second` | array of string | required | The chain / faces to measure to. |
 | `surface` | boolean |  | Surface deviation (faces) instead of curves. |
@@ -5506,7 +5512,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `entities` | array of string | required | Edges, sketch curves and faces. |
 | `g1_deg` | number |  | G1 angle tolerance (degrees). |
 | `g2` | number |  | G2 relative tolerance. |
@@ -5527,7 +5533,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `entities` | array of string | required | Edges. |
 
 #### analysis_interference
@@ -5545,7 +5551,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `parts` | array of string |  | Parts (`body:…`). Default: every part. |
 
 #### analysis_draft
@@ -5564,7 +5570,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `pull` | string | required | Mold split direction: a plane, planar face, sketch, mate connector or straight edge id. |
 | `flip` | boolean |  | Reverse the pull direction. |
 | `angle` | number or string |  | Minimum draft angle (0–90 deg). |
@@ -5587,7 +5593,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `faces` | array of string | required | Faces to flatten. |
 | `rips` | array of string |  | Rip edges. |
 | `export` | object |  | {"format": "DXF" \| "SVG" \| "STL" \| "PARASOLID", "file": path, "inner_edges": bool, "position": mate connector id, "angle": degrees, "offset": length, "origin": vertex id} |
@@ -5610,7 +5616,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `name` | string | required | View name (empty: the next "View n"). |
 | `view` | string |  | Standard orientation to save (default isometric). |
 | `section` | array of object |  | Section planes saved with the view (as render_image). |
@@ -5732,7 +5738,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `format` | one of `PARASOLID`, `ACIS`, `STEP`, `IGES`, `PVZ`, `JT`, `RHINO`, `GLTF`, `GLB`, `OBJ`, `3MF`, `STL` | required | File format. |
 | `file` | string |  | Output path; without an extension the format's is added ("part" -> "part.x_t"); individual files go in a .zip. Required unless `options` is "store" (then only its name is used; default "<tab>.<ext>"). |
 | `options` | one of `download`, `download_and_store`, `store` |  | Options: write `file` (Download), and / or keep the file as a file tab right after the tab (Store file in a new tab; one edit "Store <file>"). |
@@ -5758,7 +5764,7 @@ Examples:
 
 Import CAD or mesh files (STEP, IGES, Parasolid, ACIS, JT, Rhino, SolidWorks/Inventor/NX/Solid Edge parts and assembly zips, STL, OBJ, 3MF, glTF) (edits the document (one undoable history entry)).
 
-The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a "CAD Imports" folder unless `keep_files` is false. One edit ("Import <files>"). Returns the new tabs and the imported parts.
+The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a "CAD Imports" folder unless `keep_files` is false. One edit ("Import <files>"). Returns the new tabs and the imported parts. The window then shows the first new tab (`first`), and tools without `tab` act on it.
 
 Examples:
 

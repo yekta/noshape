@@ -131,6 +131,19 @@ pub struct PointSprite {
 
 /// A textured quad (e.g. an image inserted in a sketch), drawn depth-tested
 /// like other geometry and never pickable.
+/// Triangles carrying an image (a decal on its face): positions with image
+/// coordinates (u right, v down from the top row, texels outside [0, 1]²
+/// not drawn) and the image as in [`ImageData`].
+#[derive(Clone, Debug, Default)]
+pub struct TexturedData {
+    pub positions: Vec<[f32; 3]>,
+    pub uvs: Vec<[f32; 2]>,
+    pub indices: Vec<u32>,
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct ImageData {
     /// Lower-left, lower-right, upper-right, upper-left corner in local
@@ -246,6 +259,12 @@ pub struct Instance {
     /// white by this much in sRGB, as a see-through layer over a white page
     /// looks, while still hiding what is behind (0: off).
     pub ghost: f32,
+    /// Draws only its selected faces (state SELECTED): the selection drawn
+    /// again over what is see-through (see [`Instance::selected_only`]).
+    pub selected_only: bool,
+    /// A decal on a selected face: the image mixed 0.4 toward the selection
+    /// amber (see [`Instance::decal_selected`]).
+    pub decal_selected: bool,
     /// Part lighting with this much more ambient and as much less of the
     /// light (see [`Instance::ambient`]; 0: the usual 0.5 / 0.5).
     pub ambient: f32,
@@ -363,6 +382,8 @@ impl Instance {
             preview: false,
             ghost: 0.0,
             ambient: 0.0,
+            selected_only: false,
+            decal_selected: false,
             layer: 0,
             line_scale: 1.0,
             hidden_only: false,
@@ -496,6 +517,23 @@ impl Instance {
     /// the right side), instead of the part lighting.
     pub fn preview(mut self) -> Self {
         self.preview = true;
+        self
+    }
+
+    /// Draw only the selected faces: with an alpha and over_transparent, the
+    /// selection shows through the datum planes in front of it as live's
+    /// (selection/04: a selected face under a plane (229,170,56), the plane
+    /// alone would give (224,174,73)).
+    pub fn selected_only(mut self) -> Self {
+        self.selected_only = true;
+        self
+    }
+
+    /// A decal whose face (or feature) is selected: live mixes the whole
+    /// image 0.4 toward (255,170,10) in sRGB (behaviours "icons2 decal
+    /// rendering" (3)); hovered it isn't tinted.
+    pub fn decal_selected(mut self) -> Self {
+        self.decal_selected = true;
         self
     }
 

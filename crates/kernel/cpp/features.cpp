@@ -283,17 +283,25 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
   HHist                     hist;
   TopoDS_Shape              base = profile.shape;
   std::unique_ptr<BRepBuilderAPI_Transform> tr;
-  if (vs.Magnitude() > 1e-12)
+  // Parasolid sweeps an extrude from its far end back toward the sketch
+  // (live "fs (10-26 b)"): the side edges run toward the sketch (a block's
+  // vertical edges −z) and a cylinder's frame sits at the far end cap, z
+  // toward the sketch, which std's patterns about an edge and tangent planes
+  // follow (oracle CP2, P6). So the profile goes to the far end and is swept
+  // back (a draft keeps the sketch end: its neutral plane).
+  const bool   back = std::abs(draft_angle) <= 1e-12;
+  const gp_Vec from = back ? ve : vs;
+  if (from.Magnitude() > 1e-12)
   {
     gp_Trsf t;
-    t.SetTranslation(vs);
+    t.SetTranslation(from);
     tr = std::make_unique<BRepBuilderAPI_Transform>(base, t, false);
     if (!tr->IsDone())
       fail_op("could not translate profile");
     base = tr->Shape();
     merge_into(hist, history_of(args, *tr));
   }
-  BRepPrimAPI_MakePrism prism(base, d, false, true);
+  BRepPrimAPI_MakePrism prism(base, back ? -d : d, false, true);
   if (!prism.IsDone())
     fail_op("extrude failed");
   TopoDS_Shape result = prism.Shape();
@@ -336,11 +344,12 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
   auto moved = [&](const TopoDS_Shape& s) -> TopoDS_Shape {
     return tr ? tr->ModifiedShape(s) : s;
   };
+  // The start cap is at the sketch end (the prism's last when swept back).
   hb.add_mapped(0, REL_FIRST, [&](const TopoDS_Shape& s) {
-    return images_of(post, prism.FirstShape(moved(s)));
+    return images_of(post, back ? prism.LastShape(moved(s)) : prism.FirstShape(moved(s)));
   });
   hb.add_mapped(0, REL_LAST, [&](const TopoDS_Shape& s) {
-    return images_of(post, prism.LastShape(moved(s)));
+    return images_of(post, back ? prism.FirstShape(moved(s)) : prism.LastShape(moved(s)));
   });
   return hb.finish();
 }

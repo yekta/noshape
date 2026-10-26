@@ -1230,3 +1230,16 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   pre-highlight; sketch curves get LineSegment::CORE and highlight from at most 1.25 px (same 5 rows as
   a part edge). Show dimensions: SceneOptions::dims_shown → Instance::ambient 0.035 (params.x bit 1,
   extra.z) on part meshes.
+- (10-26 late) After perf's sRGB blending: 4d2f6b0c selection drawn again over planes (Instance::
+  selected_only, 0.44; selected face under a plane (227,170,56) vs live (229,170,56)), plane names
+  without the trace at 0.998 (ambient occlusion off them), no pre-highlight on what is selected.
+  27c1682a mate connector glyph (scene_builder::ConnectorGlyphs camera geometry; connector_look.rs:
+  hover via graphics or feature row, selected, owner part edges #f2ff80 @ 0.86).
+  71f7b7c7 decal render path: Uploader::upload_textured (nearest texel sampler, no mips, UV outside
+  [0,1]² discarded), Instance::decal_selected (0.4 toward (255,170,10) in sRGB); test
+  decal_texels_are_exact_and_tint_when_selected. TODO once psb's b3584ce0 (Context::decals,
+  DecalRecord::uv_at) is on main: StudioDisplay.decals (+ the image bytes from the file tab), builder:
+  each decal = its face's triangles (face_ranges of the body mesh, Reference::Face(record.face)) with
+  uv = uv_at(p) → (u, 1 − v), colour [1,1,1, part alpha], unpickable; BuiltScene keeps the decal
+  instances so with_highlights sets decal_selected when the face or the Decal feature is selected.
+  Live spec: behaviours "icons2 decal rendering".

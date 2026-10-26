@@ -310,7 +310,8 @@ fn slider_respects_limits() {
     let top = face_with(&r, "CapEnd");
     let bottom = face_with(&r, "CapStart");
     let mut m = mate(10, MateType::Slider, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid));
-    m.limits = vec![("z".into(), Limits { min: Some(ExprValue::new("0 mm")), max: Some(ExprValue::new("20 mm")) })];
+    // Live's sense (oracle_asm S1): B above A reads negative.
+    m.limits = vec![("z".into(), Limits { min: Some(ExprValue::new("-20 mm")), max: Some(ExprValue::new("0 mm")) })];
     let asm = Assembly {
         instances: vec![
             part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
@@ -2083,16 +2084,17 @@ fn mate_reset_and_apply_limit_position() {
     let top = face_with(&r, "CapEnd");
     let bottom = face_with(&r, "CapStart");
     let mut m = mate(10, MateType::Slider, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid));
-    m.limits = vec![("z".into(), Limits { min: Some(ExprValue::new("0 mm")), max: Some(ExprValue::new("20 mm")) })];
+    // Live's sense (oracle_asm S1): B above A reads negative.
+    m.limits = vec![("z".into(), Limits { min: Some(ExprValue::new("-20 mm")), max: Some(ExprValue::new("0 mm")) })];
     let asm = Assembly {
         instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.025), false)],
         mates: vec![m],
         ..Default::default()
     };
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
-    // Apply limit position > Max Z: the slider value goes to 20 mm.
+    // Apply limit position > Min Z: the slider value goes to -20 mm (20 mm up).
     let mut v = res.solved.mate_values[&MateId(10)];
-    v[3] = 0.02;
+    v[3] = -0.02;
     let s = res.prepared.solve(&SolveOptions { locks: vec![(MateId(10), v)], ..Default::default() });
     assert!((s.placement(InstanceId(2)).unwrap().translation[2] - 0.03).abs() < 1e-6);
     // Reset: back to the home position (value 0, faces touching).

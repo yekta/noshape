@@ -1297,7 +1297,22 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 // Edit hatch section...: restyled regions (the rest keep the
                 // drawing's hatch; a cut that doesn't close keeps it all).
                 let regions = if v.section_hatches.is_empty() { None } else { views::section_regions(&geo.section_segments) };
+                // Drawing properties › Views › View and region hatches: a
+                // pattern other than ANSI31 hatches each cut region with it.
+                let (hstd, hpat) = vt.hatch_pattern;
+                let default_pattern = hstd == 0 && matches!(hpat, 0 | 8);
+                let patterned = (!default_pattern && regions.is_none()).then(|| views::section_regions(&geo.section_segments)).flatten();
+                if let Some(regions) = &patterned {
+                    let ring = |l: &[[f64; 2]]| l.iter().map(|q| ub.to_sheet(*q)).collect::<Vec<_>>();
+                    for (outer, holes) in regions {
+                        let hs: Vec<Vec<[f64; 2]>> = holes.iter().map(|x| ring(x)).collect();
+                        for l in super::sheet_sketch::hatch_pattern_holes(&ring(outer), &hs, hstd, hpat, 1.0, 0.0) {
+                            push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                        }
+                    }
+                }
                 match regions {
+                    None if patterned.is_some() => {}
                     None => {
                         for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
                             push_hatch_line(&mut g, &pl, geo, l, view_pick);

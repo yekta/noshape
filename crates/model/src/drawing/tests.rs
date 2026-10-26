@@ -442,6 +442,12 @@ fn section_view_indicator_and_hatch_properties() {
     let view_pick = b.picks.iter().position(|p| *p == PickTarget::View(ViewId(5))).unwrap() as u32;
     let hatch: Vec<usize> = (0..g.lines.len()).filter(|&k| g.lines[k].pick == view_pick && g.lines[k].style == sheet::LineStyle::Thin).collect();
     assert!(hatch.len() > 5 && hatch.iter().all(|&k| (g.line_pen(k).0 - 0.3).abs() < 1e-9 && g.line_color(k) == Some([90, 90, 90])));
+    // View and region hatches › Hatch pattern: ANSI32 steel (pairs of
+    // lines 0.375 in apart) hatches the cut its own way.
+    drawing.props.view_tab.hatch_pattern = (0, 1);
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let steel = (0..b.geometry.lines.len()).filter(|&k| b.geometry.lines[k].pick == view_pick && b.geometry.lines[k].style == sheet::LineStyle::Thin).count();
+    assert!(steel > 0 && steel != hatch.len(), "{steel} vs {}", hatch.len());
 }
 
 /// Drawing properties › Formats and Construction geometry pens: the

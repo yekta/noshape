@@ -389,12 +389,32 @@ fn log_rot(q: DQuat) -> DVec3 {
     v / s * angle
 }
 
-/// Free values of a mate (rotation about Z, translations) as currently posed.
+/// Free values of a mate (rotation about Z, translations) as currently posed:
+/// live's sense, the first connector relative to the second, so `relative`
+/// (the second seen from the first) negated (oracle_asm S1: B's bottom 15 mm
+/// above A's top reads −15 mm; S2's limits 0..10 mm then seat it on A, R2's
+/// 0..45° turn a pin started at 90° back to 0°).
 pub fn mate_values(bodies: &[Frame], m: &SolverMate) -> [f64; 4] {
     let r = relative(bodies, m);
     let x = r.rotation * DVec3::X;
     let angle = x.y.atan2(x.x);
-    [angle, r.origin.x, r.origin.y, r.origin.z]
+    [-angle, -r.origin.x, -r.origin.y, -r.origin.z]
+}
+
+/// `m` as a Fastened mate holding the free values `v` ([`mate_values`]'s
+/// sense): the turn `-v[0]` and the offset that puts the first connector at
+/// `v[1..]` from the second (Apply limit position, named positions, locks).
+pub fn fasten_at(m: &mut SolverMate, v: [f64; 4]) {
+    let r0 = base_rotation(m.flip_primary, m.reorient);
+    m.kind = MateType::Fastened;
+    m.rotation = -v[0];
+    m.offset = r0.inverse() * (DQuat::from_rotation_z(v[0]) * DVec3::new(v[1], v[2], v[3]));
+    m.limits.clear();
+}
+
+/// The offset along Z that holds a slider at `value` ([`mate_values`]'s sense).
+pub fn slider_offset_z(m: &SolverMate, value: f64) -> f64 {
+    (base_rotation(m.flip_primary, m.reorient).inverse() * DVec3::new(0.0, 0.0, value)).z
 }
 
 fn tangent_residuals(ga: TangentGeom, gb: TangentGeom, flip: bool, internal: bool, out: &mut Vec<f64>) {
@@ -793,6 +813,7 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
         }
     }
     orient_axial_mates(bodies, mates);
+    seat_cone_limits(bodies, mates);
     if !drags.is_empty()
         && let Some(r) = solve_dragged_only(bodies, mates, relations, drags, dof)
     {
@@ -932,6 +953,43 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
         let turn = DQuat::from_axis_angle(c.rotation * DVec3::X, std::f64::consts::PI);
         let p = bodies[moving].pose;
         bodies[moving].pose = Frame { origin: c.origin + turn * (p.origin - c.origin), rotation: (turn * p.rotation).normalize() };
+    }
+}
+
+/// A Ball mate's cone limit broken at the start is met by the least turn
+/// (live oracle_asm B2: a block started upright on a 30° cone about the
+/// face-to-face direction turns 150° about y): the moving connector's
+/// axis turns toward the cone's centre by the excess, about their cross
+/// product, about its own Y when they are exactly opposed (the limit
+/// residual has no direction there), around the connector's origin.
+fn seat_cone_limits(bodies: &mut [SolverBody], mates: &[SolverMate]) {
+    for m in mates {
+        if m.kind != MateType::Ball || m.follow.is_some() {
+            continue;
+        }
+        let Some(max) = m.limits.iter().find(|l| l.0 == 4).and_then(|l| l.2) else { continue };
+        let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let (fa, fb) = (poses[m.a].mul(&m.a_local), poses[m.b].mul(&m.b_local));
+        // The cone value is the angle between `a`'s Z and `b`'s Z with the
+        // base alignment taken out.
+        let za = fa.z();
+        let ub = fb.rotation * (base_rotation(m.flip_primary, m.reorient).inverse() * DVec3::Z);
+        let angle = za.dot(ub).clamp(-1.0, 1.0).acos();
+        if angle <= max + 1e-12 {
+            continue;
+        }
+        let (moving, conn, from, to) = if !bodies[m.a].fixed {
+            (m.a, fa, za, ub)
+        } else if !bodies[m.b].fixed {
+            (m.b, fb, ub, za)
+        } else {
+            continue;
+        };
+        let cross = from.cross(to);
+        let axis = if cross.length() > 1e-9 { cross.normalize() } else { conn.y() };
+        let turn = DQuat::from_axis_angle(axis, angle - max);
+        let p = bodies[moving].pose;
+        bodies[moving].pose = Frame { origin: conn.origin + turn * (p.origin - conn.origin), rotation: (turn * p.rotation).normalize() };
     }
 }
 
@@ -1142,14 +1200,16 @@ fn levenberg_marquardt(problem: &Problem, poses: &mut Vec<Frame>, free: &[usize]
 
 /// Least change, exactly (live: Transform keeps the coordinates the mates
 /// leave free; api benchmark F9: a Planar-mated part moved to [30, 5, 40] mm
-/// ends at exactly [30, 5, 12]). Levenberg-Marquardt's damped path drifts
-/// along the free directions; from its solution, one constrained
-/// Gauss-Newton step goes back toward the start poses: the step `δ` closest
-/// to the change back to the start `Δ` that zeroes the linearised mate rows,
-/// `δ = Δ + J⁺(−r − JΔ)` (for linear mates, the exact projection). Then
-/// minimum-norm Gauss-Newton steps `δ = −J⁺r` take out what the
-/// finite-difference Jacobian's error left over a large `Δ`. Kept only when
-/// the mates hold as well as before.
+/// ends at exactly [30, 5, 12]; oracle_asm M2: a part turning on a Revolute
+/// keeps its start turn while the part under it is fastened back from 30°).
+/// Levenberg-Marquardt's damped path drifts along the free directions; from
+/// its solution, Gauss-Newton steps `δ = N Nᵀ Δ − J⁺ r`: along the mates'
+/// free directions `N` (the null space of the Jacobian) back toward the start
+/// poses `Δ`, and the minimum-norm correction of what's left of the mate
+/// rows. A body with no free direction isn't pulled at all (its pull back to
+/// a far start would leak into the others' free directions through the
+/// finite-difference Jacobian). Kept only when the mates hold as well as
+/// before.
 fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f64) {
     let n = free.len() * 6;
     let mut r = Vec::new();
@@ -1157,31 +1217,37 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
     let cost = |r: &[f64]| r.iter().map(|v| v * v).sum::<f64>().sqrt();
     let before = cost(&r).max(1e-10);
     let mut trial = poses.to_vec();
-    for step in 0..5 {
+    for _ in 0..6 {
         let jac = jacobian(problem, &trial, free, &r, scale, 1e-7);
+        let eig = (jac.transpose() * &jac).symmetric_eigen();
+        let maxv = eig.eigenvalues.iter().fold(0.0f64, |a, v| a.max(v.abs()));
+        let null: Vec<usize> = (0..n).filter(|&i| eig.eigenvalues[i].abs() <= 1e-8 * maxv.max(1.0)).collect();
+        let basis = DMatrix::<f64>::from_fn(n, null.len(), |row, c| eig.eigenvectors[(row, null[c])]);
         let mut back = DVector::<f64>::zeros(n);
-        if step == 0 {
-            for (k, &bi) in free.iter().enumerate() {
-                let (s, c) = (problem.bodies[bi].pose, trial[bi]);
-                let t = (s.origin - c.origin) / scale;
-                let w = log_rot(s.rotation * c.rotation.inverse());
-                for (j, v) in [t.x, t.y, t.z, w.x, w.y, w.z].into_iter().enumerate() {
-                    back[k * 6 + j] = v;
-                }
+        for (k, &bi) in free.iter().enumerate() {
+            if (0..6).all(|j| (0..null.len()).all(|c| basis[(k * 6 + j, c)].abs() < 1e-6)) {
+                continue;
             }
-        } else if cost(&r) < 1e-15 {
-            break;
+            let (s, c) = (problem.bodies[bi].pose, trial[bi]);
+            let t = (s.origin - c.origin) / scale;
+            let w = log_rot(s.rotation * c.rotation.inverse());
+            for (j, v) in [t.x, t.y, t.z, w.x, w.y, w.z].into_iter().enumerate() {
+                back[k * 6 + j] = v;
+            }
         }
-        let rhs = -DVector::from_column_slice(&r) - &jac * &back;
+        let along = &basis * (basis.transpose() * &back);
         let svd = jac.svd(true, true);
         let tol = 1e-10 * svd.singular_values.iter().fold(0.0f64, |a, v| a.max(*v));
-        let Ok(fix) = svd.solve(&rhs, tol) else { return };
-        let delta = back + fix;
+        let Ok(fix) = svd.solve(&(-DVector::from_column_slice(&r)), tol) else { return };
+        let delta = along + fix;
         for (k, &bi) in free.iter().enumerate() {
             let d: Vec<f64> = (0..6).map(|j| delta[k * 6 + j] * if j < 3 { scale } else { 1.0 }).collect();
             trial[bi] = apply_delta(&trial[bi], &d);
         }
         residuals(problem, &trial, &mut r);
+        if delta.amax() < 1e-15 {
+            break;
+        }
     }
     if cost(&r) <= before {
         poses.copy_from_slice(&trial);
@@ -1569,6 +1635,26 @@ mod tests {
             assert!((o - DVec3::new(30.0, 5.0, 12.0)).abs().max_element() < 1e-9, "turn {turn}: at {o:?} mm");
             assert!(p.rotation.angle_between(rotation) < 1e-12, "turn {turn}: turned {}", p.rotation.angle_between(rotation));
         }
+    }
+
+    /// oracle_asm M2 (live): B fastened on A from a turned start, C on a
+    /// Revolute on B's top: C keeps its start turn exactly (unturned).
+    #[test]
+    fn revolute_on_a_fastened_part_keeps_its_turn() {
+        let mm = 1e-3;
+        let top = Frame::from_axes(DVec3::new(20.0, 10.0, 10.0) * mm, DVec3::Z, DVec3::X);
+        let bottom = Frame::from_axes(DVec3::new(20.0, 10.0, 0.0) * mm, DVec3::NEG_Z, DVec3::X);
+        let mut bodies = vec![
+            body(DVec3::ZERO, true),
+            SolverBody { pose: Frame::new(DVec3::new(100.0, 50.0, 30.0) * mm, DQuat::from_rotation_z(30f64.to_radians())), fixed: false },
+            body(DVec3::new(0.0, 0.0, 40.0) * mm, false),
+        ];
+        let mates = vec![mate(MateType::Fastened, 1, bottom, 0, top), mate(MateType::Revolute, 2, bottom, 1, top)];
+        let r = solve(&mut bodies, &mates, &[], &[]);
+        assert!(r.converged, "{r:?}");
+        let c = bodies[2].pose;
+        assert!(c.rotation.angle_between(DQuat::IDENTITY) < 1e-12, "C turned {}", c.rotation.angle_between(DQuat::IDENTITY));
+        assert!((c.origin / mm - DVec3::new(0.0, 0.0, 20.0)).length() < 1e-9, "{:?}", c.origin / mm);
     }
 
     #[test]

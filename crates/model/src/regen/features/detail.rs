@@ -563,7 +563,7 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         let res = k::shell_solid(&body.shape, &shapes, t, side, k::ShellMethod::Auto).map_err(|e| blend_failed("Could not shell part with selections.", e))?;
         // Live (qa5 P1-5): a shell that breaks the part into pieces fails
         // (and leaves the part as it was), it never returns the slivers.
-        if res.shape.count(ShapeType::Solid) > body.shape.count(ShapeType::Solid).max(1) {
+        if res.shape.count(ShapeType::Solid) > body.shape.count(ShapeType::Solid).max(1) || !shell_is_whole(&body.shape, &shapes, &res.shape, t) {
             return err("Could not shell part with selections.");
         }
         let names = body.shape_names();
@@ -572,6 +572,28 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         ev.replace_body(bi, res.shape, face_names);
     }
     Ok(())
+}
+
+/// Whether a shell result is the whole shelled part, not what is left of a
+/// broken one (macOS arm64 builds a single 101.7 mm³ sliver for the part of
+/// qa_regressions::shell_that_breaks_the_part_fails where Linux fails): no
+/// piece is thinner than the wall (its box is at least `t` every way, as a
+/// wall of thickness `t` is), and every face the shell keeps still lies on
+/// the result (a point inside it, within a thousandth of the wall).
+fn shell_is_whole(part: &k::Shape, removed: &[k::Shape], result: &k::Shape, t: f64) -> bool {
+    let thin = result.solids().iter().any(|s| {
+        s.bounding_box(false).is_ok_and(|b| {
+            let d = b.max - b.min;
+            d.x.min(d.y).min(d.z) < 0.99 * t
+        })
+    });
+    if thin {
+        return false;
+    }
+    part.faces().iter().filter(|f| !removed.iter().any(|r| r.is_same(f))).all(|f| {
+        let Some(p) = super::helpers_a::point_on_face(f) else { return true };
+        k::make_vertex(p).and_then(|v| k::distance(&v, result)).is_ok_and(|d| d.distance <= t * 1e-3)
+    })
 }
 
 /// Full round fillet: the center faces between two parallel planar side

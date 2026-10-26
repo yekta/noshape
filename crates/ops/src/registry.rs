@@ -169,6 +169,30 @@ pub fn all() -> &'static [Op] {
     REGISTRY.get_or_init(crate::ops::all)
 }
 
+/// Tools close to an unknown name: the same group's ("variable_edit" ->
+/// variable_set, variable_create...), else those with the same verb or
+/// containing a word of it.
+pub fn suggest(name: &str) -> Vec<String> {
+    let all = all();
+    let (group, verb) = name.split_once('_').unwrap_or((name, ""));
+    let same_group: Vec<String> = all.iter().filter(|o| o.group == group).map(|o| o.tool_name()).collect();
+    if !same_group.is_empty() {
+        return same_group;
+    }
+    let words: Vec<&str> = name.split('_').filter(|w| w.len() > 2).collect();
+    all.iter().filter(|o| (!verb.is_empty() && o.verb == verb) || words.iter().any(|w| o.tool_name().contains(w))).map(|o| o.tool_name()).take(12).collect()
+}
+
+/// "unknown tool `x`" with what is close to it.
+pub fn unknown_tool_message(name: &str) -> String {
+    let near = suggest(name);
+    if near.is_empty() {
+        format!("unknown tool `{name}`; ops_list lists every tool")
+    } else {
+        format!("unknown tool `{name}`; did you mean: {}? (ops_list lists every tool)", near.join(", "))
+    }
+}
+
 pub fn by_tool_name(name: &str) -> Option<&'static Op> {
     all().iter().find(|o| o.tool_name() == name)
 }
