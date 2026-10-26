@@ -30,7 +30,7 @@ B = Onshape client code (bundle-raw), P = an existing parity row.
 | 1.13 | Selection-count cursor macSelectionCursor-N, -5plus from 6 | L1100–1111 | ✅ P cursors 35/36 |
 | 1.14 | Left drag threshold 2 px / 50 ms (`LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE`, `_TIME_TOLERANCE`) | B | 🔧 |
 
-Replay: `.github/nav/linux-replay.sh <noshape> .github/nav/block.noshape <out> wayland|x11 interact` (in the "Navigation replay" workflow's Linux job since 10-25; run 40235651854: 8/8 on Wayland and X11 with the box check as live: no plane)
+Replay: `.github/nav/linux-replay.sh <noshape> .github/nav/block.noshape <out> wayland|x11 interact` (in the "Navigation replay" workflow's Linux job since 10-25; run 40235651854: 8/8 re-checked locally with the box check as live (no plane); run 40252517286 on CI with that check: 8/8 on Wayland and X11)
 (interact.py drives clicks, boxes, hover and keys with uinput; interact_check.py asserts the traced
 selection and hover per step, rows in brackets).
 
