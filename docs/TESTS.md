@@ -62,3 +62,5 @@ delete the line to bring it back to T1. Record the move below.
 | model/tests/features_c `parting_line_draft_on_curves_as_live` | 44 s |
 | model/tests/custom_features `std_sheet_metal_matches_onshape` | 45 s |
 | model/src/assembly/tests.rs: 18 standard-content recipe tests (`*_match_live`, `*_regenerates_on_every_head`, `standard_content_parts_regenerate_with_mate_connectors`, …) | standard content long tail (P3) vs live; 7–144 s each |
+| model/tests/features_c `face_blend_on_curved_faces_as_live` (core, 10-26) | 30 s of face blends (cylinder, cone, chamfer gap: all match live) |
+| model/tests/features_c `face_blend_on_an_elliptic_boss_as_live` (core, 10-26) | open differences from live: 10 faces vs 9, curvature section fails |
