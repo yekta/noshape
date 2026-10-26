@@ -81,6 +81,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   names in a second, grey, indented list under the field ("Face of Sketch 2 / Face of Sketch 1",
   tickets/loft-profiles-ours.png); live: one list, each entry "› Face of Sketch 1 ×" with its chevron, ↑↓ reorder button,
   nothing below the field (live ui/961-loft-two-profiles.png) (qa 2026-10-26, build 4d2f6b0c)
+- [ ] P2 PERF-SECTION-PANIC with `NOSHAPE_PERF=1` the viewport render thread panics as soon as a section view cuts a
+  part (Shift+X, pick Front plane): "wgpu error: Validation Error … In a CommandEncoder, label = 'frame' / In a pass
+  parameter / no begin or end indices were specified for pass timestamp writes" (thread 'noshape-render'), after which the
+  viewport is frozen for the rest of the session (the UI keeps working). Without NOSHAPE_PERF the section renders fine, so
+  users don't hit it, but every perf run / perf.yml benchmark with a section does. Log tickets/perf-section-panic.log,
+  doc tickets/qa-1026-main.noshape (tab Part Studio 6) (qa 2026-10-26, build 4d2f6b0c)
 
 ## Sketch + assembly (skasm)
 - [ ] P2 P1-4 data (qa5, carried over) sketches keep a hidden construction "Origin stand-in" point at (0,0) carrying the
