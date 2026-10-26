@@ -124,3 +124,4 @@ then edits, undo/redo, rollback and suppress.
 | … pending list row while open | none | "Replicate 1" row with an error badge at once | ✗ **P2-A7** (skb) |
 | Parts to find match in = plate, ✓ | pins in both free Ø10 holes; "Replicate 1" ▸ Part 2 <5>, <6>, Mate features (2) | same structure (behaviours 5973) | ✅ |
 | Linear pattern opened from tool search | red "Linear pattern 1" row with a red dot at once, kept after picking Instances | same (behaviours 5985) | ✅ |
+| Mate connector (Ctrl+M) | "Mate connector 1": On entity ▾, Origin entity, ☐ Realign, ☐ Move, flip / reorient; Realign adds Primary / Secondary axis entity; Move adds X / Y / Z 0 mm, Rotate about Z ▾, Rotation angle 0 deg | same (behaviours 5960–5965) | ✅ |
