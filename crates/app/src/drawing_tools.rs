@@ -522,6 +522,15 @@ impl DrawingEditor {
                 s.annotations.push(a);
             }
             preview = Some(d);
+        } else if matches!(self.tool, Tool::Note) && !matches!(self.panel, Some(Panel::Note { .. })) {
+            // Live (behaviours 1414, drawing/220-222): a horizontal "NOTE"
+            // preview follows the pointer until the click (qa5 P2-D3).
+            let mut d = base.clone().unwrap_or_else(|| self.drawing.clone());
+            if let Some(s) = d.sheets.get_mut(self.sheet) {
+                let a = note_tool_preview(&self.drawing, s, c);
+                s.annotations.push(a);
+            }
+            preview = Some(d);
         } else if base.is_some() {
             preview = base;
         }
@@ -1826,3 +1835,33 @@ impl DrawingEditor {
     }
 }
 
+
+/// The Note tool's preview at sheet point `at`: the text "NOTE" in the
+/// height a new note gets (Drawing properties › Notes, else all
+/// annotations'), where the click would put it.
+fn note_tool_preview(d: &Drawing, sheet: &Sheet, at: [f64; 2]) -> Annotation {
+    let h = d.props.ann_type(noshape_model::drawing::sheet::AnnType::Notes).height.unwrap_or(d.props.ann_text_height);
+    Annotation { id: sheet.next_annotation_id(), kind: AnnotationKind::note("NOTE", h), position: at, ..Default::default() }
+}
+
+#[cfg(test)]
+mod note_preview_tests {
+    use super::*;
+
+    /// qa5 P2-D3: the Note tool previews "NOTE" at the pointer in the new
+    /// note's height.
+    #[::core::prelude::v1::test]
+    fn note_tool_previews_note_at_the_pointer() {
+        let d = Drawing::default();
+        let s = Sheet::default();
+        let a = note_tool_preview(&d, &s, [100.0, 50.0]);
+        assert_eq!(a.position, [100.0, 50.0]);
+        match a.kind {
+            AnnotationKind::Note { text, height_mm, .. } => {
+                assert_eq!(text, "NOTE");
+                assert!(height_mm > 0.0);
+            }
+            k => panic!("{k:?}"),
+        }
+    }
+}
