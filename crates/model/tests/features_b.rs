@@ -187,6 +187,27 @@ fn mate_connector_on_edge_origin_and_flips() {
     assert!(c1.x.dot(c1.z).abs() < 1e-12);
 }
 
+/// Live ("ui (10-25 d)", ui-mass/04): a mate connector on a block's corner
+/// vertex is world-aligned (Z up, X along world X), whichever faces meet
+/// there.
+#[test]
+fn mate_connector_on_a_vertex_is_world_aligned() {
+    let mut s = block();
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let corner = DVec3::new(0.1, 0.05, 0.025);
+    let i = (0..b.shape.vertices().len()).min_by(|&x, &y| {
+        let d = |k: usize| (b.shape.vertices()[k].vertex_point().unwrap() - corner).length();
+        d(x).total_cmp(&d(y))
+    });
+    let vertex = Reference::Vertex((*b.vertices[i.unwrap()]).clone());
+    s.add("mateConnector", |p| p.set("originQuery", ParamValue::Query(vec![vertex])));
+    let r = s.ok();
+    let c = &r.context.connectors[0];
+    assert!(vnear(c.origin, corner), "{:?}", c.origin);
+    assert!(vnear(c.z, DVec3::Z) && vnear(c.x, DVec3::X), "z {:?} x {:?}", c.z, c.x);
+}
+
 #[test]
 fn helix_about_axis_length_and_turns() {
     let mut s = Studio::new();
