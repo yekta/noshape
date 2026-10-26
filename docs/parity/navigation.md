@@ -229,4 +229,8 @@ Shift/Ctrl+wheel, horizontal wheel, two-finger scroll up/down/sideways, pinch ou
 with its rotate centre fixed on screen, Alt+right-drag, middle-drag, touch rotate/pan/pinch/roll,
 tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection, a tap on the view cube, a drag released over the feature list, a second button pressed mid-drag, pen drag / tap / hover, arrow / Shift / Ctrl / Ctrl+Shift arrow keys, Z and Shift+Z). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
 phases and momentum, drags) and Windows (SendInput wheel, InjectTouchInput touch, drags) run in
-`.github/workflows/nav.yml`.
+`.github/workflows/nav.yml`; run 40306609140 (10-26): all three pass, Windows touch pan / pinch /
+roll included. The Windows driver warms up UI Automation before the steps (gpui's a11y otherwise
+starts mid-run and stalls the app) and holds each touch frame with keep-alive updates, steps
+sized to Onshape's per-event limits: on the runners' software renderer Windows coalesces touch
+updates, and slow fingers would start the two-finger long-press box.

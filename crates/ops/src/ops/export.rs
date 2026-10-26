@@ -124,7 +124,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn assembly(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> Result<OpOutput, OpError> {
     use noshape_model::document::TabContent;
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let tab = crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
+    let tab = od.tab_of_kind(a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
     let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| &t.content) else { unreachable!("checked") };
     let asm = asm.clone();
     let ids: Option<Vec<noshape_model::assembly::InstanceId>> = match a.opt_array("parts")? {

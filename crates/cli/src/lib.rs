@@ -74,7 +74,7 @@ fn value(s: &str) -> Value {
 }
 
 fn run_tool(ctx: &mut Ctx, tool: &str, args: &Value) -> Result<Value, Value> {
-    let op = registry::by_tool_name(tool).ok_or_else(|| json!({ "error": "not_found", "message": format!("unknown tool `{tool}`; run `noshape-cli tools`") }))?;
+    let op = registry::by_tool_name(tool).ok_or_else(|| json!({ "error": "not_found", "message": registry::unknown_tool_message(tool) }))?;
     registry::run(ctx, op, args).map(|o| output_json(&o)).map_err(|e| e.to_json())
 }
 

@@ -246,6 +246,12 @@ pub struct Instance {
     /// white by this much in sRGB, as a see-through layer over a white page
     /// looks, while still hiding what is behind (0: off).
     pub ghost: f32,
+    /// Draws only its selected faces (state SELECTED): the selection drawn
+    /// again over what is see-through (see [`Instance::selected_only`]).
+    pub selected_only: bool,
+    /// Part lighting with this much more ambient and as much less of the
+    /// light (see [`Instance::ambient`]; 0: the usual 0.5 / 0.5).
+    pub ambient: f32,
     /// Draw order within its pass (lower first). Overlays use larger values.
     pub layer: i32,
     /// Line width multiplier for line instances (Graphics preferences line widths).
@@ -359,6 +365,8 @@ impl Instance {
             back_silhouette: false,
             preview: false,
             ghost: 0.0,
+            ambient: 0.0,
+            selected_only: false,
             layer: 0,
             line_scale: 1.0,
             hidden_only: false,
@@ -492,6 +500,23 @@ impl Instance {
     /// the right side), instead of the part lighting.
     pub fn preview(mut self) -> Self {
         self.preview = true;
+        self
+    }
+
+    /// Draw only the selected faces: with an alpha and over_transparent, the
+    /// selection shows through the datum planes in front of it as live's
+    /// (selection/04: a selected face under a plane (229,170,56), the plane
+    /// alone would give (224,174,73)).
+    pub fn selected_only(mut self) -> Self {
+        self.selected_only = true;
+        self
+    }
+
+    /// Shift the part lighting toward ambient: the faces turned from the
+    /// light come up, the lit ones stay (Show dimensions, live
+    /// part-studio/40 vs selection/02).
+    pub fn ambient(mut self, shift: f32) -> Self {
+        self.ambient = shift;
         self
     }
 

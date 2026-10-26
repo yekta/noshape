@@ -40,6 +40,7 @@ mod thickness;
 mod flatten_tool;
 mod draft_tool;
 pub(crate) mod export;
+mod connector_look;
 mod plane_handles;
 mod shown_dims;
 pub(crate) mod toolbar_prefs;
@@ -831,6 +832,8 @@ impl PartStudioView {
         o.display_only = self.ui.transform_ghost.clone();
         // Isolate (live ui/iso-901): the planes fade to faint outlines; below
         // 10 % the other parts are solid washed-out ghosts.
+        // Show dimensions: the parts' shadowed faces come up a little (live).
+        o.dims_shown = self.ui.shown_dims.is_some();
         if let Some(iso) = &self.ui.isolate {
             o.faint_planes = iso.mode == behaviors::IsolateMode::Isolate;
             if matches!(behaviors::iso_look(iso.opacity), behaviors::IsoLook::Ghost) {
@@ -919,6 +922,10 @@ impl PartStudioView {
         let mut manip: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = self.manipulator_geometry(cx).into_iter().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>).collect();
         // A selected plane's resize rings (plane_handles.rs).
         manip.extend(self.plane_ring_geometry().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
+        // Mate connector glyphs and their owner parts (connector_look.rs).
+        let (mc_glyphs, mc_owners) = self.connector_overlays(&selection, cx);
+        manip.extend(mc_glyphs.map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
+        extra.extend(mc_owners);
         self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
         extra.extend(self.consumed_picks_overlay(&selection, &accent));
         extra.extend(self.select_other_overlay());
@@ -3715,11 +3722,11 @@ impl PartStudioView {
             .edit
             .as_ref()
             .map(|e| {
-                let d = e.dialog.read(cx);
+                let f = e.dialog.read(cx).row_feature();
                 let units = self.doc.read(cx).session.doc.settings.units;
-                let computed = self.computed_values(d.feature.id, cx);
-                noshape_model::interaction::display_name_computed(&d.feature, &|k| {
-                    computed.iter().find(|(c, _)| c == k).map(|(_, v)| v.clone()).or_else(|| crate::feature_dialog::shown_length(&d.feature, k, &units, &self.display.variables))
+                let computed = self.computed_values(f.id, cx);
+                noshape_model::interaction::display_name_computed(&f, &|k| {
+                    computed.iter().find(|(c, _)| c == k).map(|(_, v)| v.clone()).or_else(|| crate::feature_dialog::shown_length(&f, k, &units, &self.display.variables))
                 })
             })
             .unwrap_or_default();
@@ -3771,7 +3778,7 @@ impl PartStudioView {
         let related = self.row_ctx.related.contains(&f.id);
         // The feature being edited shows its draft's name (live: a Hole's
         // row reads "Ø 6.35 mm ↧ 12 mm" while its dialog is open).
-        let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.clone()).filter(|d| d.id == f.id);
+        let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).row_feature()).filter(|d| d.id == f.id);
         // The name shows the active configuration's values (a configured
         // Variable reads "#w = 80 mm" under L; qa4 round 4 S4-a).
         let configured = draft.is_none().then(|| self.studio(cx).filter(|s| s.configuration.configured.iter().any(|c| c.feature == f.id)).map(|s| s.configuration.for_editing(f, &self.current_config(s)))).flatten();

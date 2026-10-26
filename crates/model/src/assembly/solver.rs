@@ -389,12 +389,32 @@ fn log_rot(q: DQuat) -> DVec3 {
     v / s * angle
 }
 
-/// Free values of a mate (rotation about Z, translations) as currently posed.
+/// Free values of a mate (rotation about Z, translations) as currently posed:
+/// live's sense, the first connector relative to the second, so `relative`
+/// (the second seen from the first) negated (oracle_asm S1: B's bottom 15 mm
+/// above A's top reads −15 mm; S2's limits 0..10 mm then seat it on A, R2's
+/// 0..45° turn a pin started at 90° back to 0°).
 pub fn mate_values(bodies: &[Frame], m: &SolverMate) -> [f64; 4] {
     let r = relative(bodies, m);
     let x = r.rotation * DVec3::X;
     let angle = x.y.atan2(x.x);
-    [angle, r.origin.x, r.origin.y, r.origin.z]
+    [-angle, -r.origin.x, -r.origin.y, -r.origin.z]
+}
+
+/// `m` as a Fastened mate holding the free values `v` ([`mate_values`]'s
+/// sense): the turn `-v[0]` and the offset that puts the first connector at
+/// `v[1..]` from the second (Apply limit position, named positions, locks).
+pub fn fasten_at(m: &mut SolverMate, v: [f64; 4]) {
+    let r0 = base_rotation(m.flip_primary, m.reorient);
+    m.kind = MateType::Fastened;
+    m.rotation = -v[0];
+    m.offset = r0.inverse() * (DQuat::from_rotation_z(v[0]) * DVec3::new(v[1], v[2], v[3]));
+    m.limits.clear();
+}
+
+/// The offset along Z that holds a slider at `value` ([`mate_values`]'s sense).
+pub fn slider_offset_z(m: &SolverMate, value: f64) -> f64 {
+    (base_rotation(m.flip_primary, m.reorient).inverse() * DVec3::new(0.0, 0.0, value)).z
 }
 
 fn tangent_residuals(ga: TangentGeom, gb: TangentGeom, flip: bool, internal: bool, out: &mut Vec<f64>) {
@@ -793,6 +813,7 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
         }
     }
     orient_axial_mates(bodies, mates);
+    seat_cone_limits(bodies, mates);
     if !drags.is_empty()
         && let Some(r) = solve_dragged_only(bodies, mates, relations, drags, dof)
     {
@@ -932,6 +953,43 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
         let turn = DQuat::from_axis_angle(c.rotation * DVec3::X, std::f64::consts::PI);
         let p = bodies[moving].pose;
         bodies[moving].pose = Frame { origin: c.origin + turn * (p.origin - c.origin), rotation: (turn * p.rotation).normalize() };
+    }
+}
+
+/// A Ball mate's cone limit broken at the start is met by the least turn
+/// (live oracle_asm B2: a block started upright on a 30° cone about the
+/// face-to-face direction turns 150° about y): the moving connector's
+/// axis turns toward the cone's centre by the excess, about their cross
+/// product, about its own Y when they are exactly opposed (the limit
+/// residual has no direction there), around the connector's origin.
+fn seat_cone_limits(bodies: &mut [SolverBody], mates: &[SolverMate]) {
+    for m in mates {
+        if m.kind != MateType::Ball || m.follow.is_some() {
+            continue;
+        }
+        let Some(max) = m.limits.iter().find(|l| l.0 == 4).and_then(|l| l.2) else { continue };
+        let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let (fa, fb) = (poses[m.a].mul(&m.a_local), poses[m.b].mul(&m.b_local));
+        // The cone value is the angle between `a`'s Z and `b`'s Z with the
+        // base alignment taken out.
+        let za = fa.z();
+        let ub = fb.rotation * (base_rotation(m.flip_primary, m.reorient).inverse() * DVec3::Z);
+        let angle = za.dot(ub).clamp(-1.0, 1.0).acos();
+        if angle <= max + 1e-12 {
+            continue;
+        }
+        let (moving, conn, from, to) = if !bodies[m.a].fixed {
+            (m.a, fa, za, ub)
+        } else if !bodies[m.b].fixed {
+            (m.b, fb, ub, za)
+        } else {
+            continue;
+        };
+        let cross = from.cross(to);
+        let axis = if cross.length() > 1e-9 { cross.normalize() } else { conn.y() };
+        let turn = DQuat::from_axis_angle(axis, angle - max);
+        let p = bodies[moving].pose;
+        bodies[moving].pose = Frame { origin: conn.origin + turn * (p.origin - conn.origin), rotation: (turn * p.rotation).normalize() };
     }
 }
 

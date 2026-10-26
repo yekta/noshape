@@ -33,7 +33,8 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 doc_field(),
                 tab_field(),
-                req("parts", strings(), "Part ids (`body:…`) or names."),
+                opt("parts", strings(), "Part ids (`body:…`) or names."),
+                opt("part", s(), "One part (instead of `parts`)."),
                 opt("material", s(), "Library material name, e.g. \"Aluminum - 6061\"; or the custom material's name with `density`."),
                 opt("library", s(), "Library to take it from (default: the first that has it)."),
                 opt("density", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom material: density in kg/m³."),
@@ -95,8 +96,13 @@ fn color_json(c: [f32; 4]) -> Value {
 /// Parts by id or by the name the parts list shows.
 fn parts_arg(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, a: &Args, name: &str) -> Result<Vec<BodyId>, OpError> {
     let r = od.regenerate(tab, None)?;
-    a.array(name)?
-        .iter()
+    // `parts`, or one `part`.
+    let list: Vec<Value> = match (a.opt_array(name)?, a.opt_str("part")?) {
+        (Some(l), _) => l.clone(),
+        (None, Some(p)) => vec![json!(p)],
+        (None, None) => return Err(OpError::param(name, "the parts (ids or names), or one `part`")),
+    };
+    list.iter()
         .enumerate()
         .map(|(i, v)| {
             let key = v.as_str().ok_or_else(|| OpError::param(&format!("{name}[{i}]"), "a part id or name"))?;

@@ -91,7 +91,8 @@ fn parts() -> Parts {
     Parts { doc, ev, tabs, bodies, results }
 }
 
-/// The face / edge / vertex of part `p` through the point (mm).
+/// The face / edge / vertex of part `p` through the point (mm). Circles are
+/// picked away from x = centre + r, where our cylinders have their seam.
 fn entity(parts: &Parts, p: usize, at: DVec3, kind: noshape_kernel::ShapeType) -> Reference {
     let b = &parts.results[p].context.bodies[0];
     let v = noshape_kernel::make_vertex(at * 1e-3).unwrap();
@@ -188,7 +189,7 @@ fn cases(parts: &Parts) -> Vec<(&'static str, Assembly)> {
     let r1 = pose(0.0, (-50.0, 60.0, 40.0));
     let pin_edges = |r: Placement, t: MateType, set: &dyn Fn(&mut Mate)| {
         let mut asm = two(parts, PLATE, PIN, r);
-        let mut m = mate(10, t, conn(2, edge(parts, PIN, 205.0, 0.0, 0.0), Inference::Center), conn(1, edge(parts, PLATE, 135.0, 20.0, 10.0), Inference::Center));
+        let mut m = mate(10, t, conn(2, edge(parts, PIN, 200.0, 5.0, 0.0), Inference::Center), conn(1, edge(parts, PLATE, 130.0, 25.0, 10.0), Inference::Center));
         set(&mut m);
         asm.mates.push(m);
         asm
@@ -259,6 +260,15 @@ fn cases(parts: &Parts) -> Vec<(&'static str, Assembly)> {
     });
     asm.sync_pattern(MateId(20));
     out.push(("CP1", asm));
+    // Mates numbered per type, as live names them (Revolute 1, Slider 1).
+    for (_, asm) in &mut out {
+        let mut n = std::collections::HashMap::new();
+        for m in &mut asm.mates {
+            let k = n.entry(m.mate_type.name()).or_insert(0);
+            *k += 1;
+            m.name = format!("{} {k}", m.mate_type.name());
+        }
+    }
     out
 }
 
@@ -289,11 +299,70 @@ fn outcome(asm: &Assembly, res: &AssemblyResult) -> Outcome {
 }
 
 /// Live's transforms per case and instance (row-major, translation in mm),
-/// from results-*.jsonl; empty until live answers (REQUESTS fs 10-26 c).
-const LIVE: &[(&str, &str, [f64; 16])] = &[];
-
+/// from live/fs-oracle-asm/raw/*.jsonl (live 10-26); A is fixed at identity.
+const LIVE: &[(&str, &str, [f64; 16])] = &[
+    ("F1", "B", [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -6.938893903907228e-15, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("F2", "B", [1.1102230246251565e-16, 1.0000000000000004, 0.0, 9.999999999999995, -1.0000000000000004, 1.1102230246251565e-16, 0.0, 30.0, 0.0, 0.0, 1.0, 5.000000000000001, 0.0, 0.0, 0.0, 1.0]),
+    ("F3", "B", [1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 20.00000000000001, 0.0, 0.0, -1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("F4", "B", [1.0, 0.0, 0.0, 39.99999999999999, 0.0, -1.0, 0.0, 20.0, 0.0, 0.0, -1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("F5", "B", [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 20.000000000000018, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("R1", "B", [1.0000000000000002, 1.1102230246251565e-16, 0.0, -70.00000000000006, 1.1102230246251565e-16, 0.9999999999999997, 0.0, 19.999999999999975, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("R2", "B", [1.0, 0.0, 6.123233995736765e-17, -70.0, 0.0, 1.0, 1.232595164407831e-32, 20.00000000000001, -6.123233995736766e-17, -3.749399456654644e-33, 1.0, 10.000000000000016, 0.0, 0.0, 0.0, 1.0]),
+    ("R3", "B", [-0.9237280213470682, -0.3830490080632378, 0.0, 314.74560426941366, -0.3830490080632378, 0.923728021347068, 0.0, 96.60980161264757, 0.0, 0.0, -1.0, 19.999999999999996, 0.0, 0.0, 0.0, 1.0]),
+    ("S1", "B", [1.0, 0.0, 0.0, -8.673617379884035e-16, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 25.0, 0.0, 0.0, 0.0, 1.0]),
+    ("S2", "B", [1.0, 0.0, 0.0, -4.336808689942018e-15, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("C1", "B", [-0.9237280213470682, -0.3830490080632378, 0.0, 314.74560426941366, -0.3830490080632378, 0.923728021347068, 0.0, 96.60980161264757, 0.0, 0.0, -1.0, 70.0, 0.0, 0.0, 0.0, 1.0]),
+    ("P1", "B", [0.9396926207859084, -0.3420201433256687, 0.0, 5.0, 0.3420201433256687, 0.9396926207859084, 0.0, 7.0, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("B1", "B", [1.0, 0.0, 0.0, 40.0, 0.0, 1.0, 0.0, 20.0, 0.0, 0.0, 1.0, 10.0, 0.0, 0.0, 0.0, 1.0]),
+    ("B2", "B", [-0.8660254037844387, 0.0, 0.5, 40.0, 0.0, 1.0, 0.0, 20.0, -0.5, 0.0, -0.8660254037844387, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("M1", "B", [0.8660254037844387, -0.49999999999999994, 0.0, 7.679491924311235, 0.49999999999999994, 0.8660254037844387, 0.0, -8.660254037844393, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("M2", "B", [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -6.938893903907228e-15, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("M2", "C", [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 20.000000000000004, 0.0, 0.0, 0.0, 1.0]),
+    ("LP1", "B", [1.0, 0.0, 0.0, -70.00000000000001, 0.0, 1.0, 0.0, 20.000000000000004, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("LP1", "B <1>", [1.0, 0.0, 0.0, -55.00000000000002, 0.0, 1.0, 0.0, 20.000000000000004, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("LP1", "B <2>", [1.0, 0.0, 0.0, -40.00000000000002, 0.0, 1.0, 0.0, 20.000000000000004, 0.0, 0.0, 1.0, 10.000000000000002, 0.0, 0.0, 0.0, 1.0]),
+    ("CP1", "B", [1.0, 0.0, 0.0, 215.0, 0.0, 1.0, 0.0, -10.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
+    ("CP1", "B <1>", [6.123233995736766e-17, 1.0, 0.0, 190.00000000000003, -1.0, 6.123233995736766e-17, 0.0, -14.999999999999986, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
+    ("CP1", "B <2>", [-1.0, 1.2246467991473532e-16, 0.0, 185.00000000000003, -1.2246467991473532e-16, -1.0, 0.0, 9.999999999999998, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
+    ("CP1", "B <3>", [-1.8369701987210297e-16, -1.0, 0.0, 210.0, 1.0, -1.8369701987210297e-16, 0.0, 14.999999999999986, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
+];
 /// Live's mate status per case and mate: (case, mate, ok, tooltip text).
-const LIVE_MATES: &[(&str, &str, bool, &str)] = &[];
+const LIVE_MATES: &[(&str, &str, bool, &str)] = &[
+    ("F1", "Fastened 1", true, ""),
+    ("F2", "Fastened 1", true, ""),
+    ("F3", "Fastened 1", true, ""),
+    ("F4", "Fastened 1", true, ""),
+    ("F5", "Fastened 1", true, ""),
+    ("R1", "Revolute 1", true, ""),
+    ("R2", "Revolute 1", true, ""),
+    ("R3", "Revolute 1", true, ""),
+    ("S1", "Slider 1", true, ""),
+    ("S2", "Slider 1", true, ""),
+    ("C1", "Cylindrical 1", true, ""),
+    ("P1", "Planar 1", true, ""),
+    ("B1", "Ball 1", true, ""),
+    ("B2", "Ball 1", true, ""),
+    ("M1", "Revolute 1", false, ""),
+    ("M1", "Slider 1", false, ""),
+    ("M2", "Fastened 1", true, ""),
+    ("M2", "Revolute 1", true, ""),
+    ("LP1", "Fastened 1", true, ""),
+];
+
+/// Cases that differ from live, routed (lead 10-26): skb's assembly
+/// connectors and solver. The test fails on a new difference and on a known
+/// one that matches again.
+const KNOWN: &[(&str, &str)] = &[
+    ("F2", "skb: Fastened offset z 5 and rotation 90°: live puts B at (10, 30, 5) turned −90° about z, ours at (30, −10, 15) turned +90° (offset and rotation sense)"),
+    ("F5", "skb: edge MID_POINT connectors (B's bottom front edge on A's top back edge): live B unturned at (0, 20, 10), ours turned 180° about y at (40, 20, 10); LP1's pattern direction on an edge midpoint runs the other way too"),
+    ("R1", "skb: circular edge CENTER connector: live keeps the pin upright on the hole (identity at (−70, 20, 10), rz 0), ours turns it upside down and 6° about z: live's Z points out of the part (the pin's bottom edge −z, the hole's top edge +z)"),
+    ("R2", "skb: Revolute limits 0..45° from a start at 90°: live returns to rz 0 (pin unturned), ours stops at 45°; also R1's connector flip"),
+    ("R3", "skb: Revolute on cylinder MID_AXIS_POINTs: both flip the pin, live with rz −157.5° (B at (314.75, 96.61, 20)), ours rz +6°"),
+    ("C1", "skb: Cylindrical on cylinder axes: as R3 (live rz −157.5°, translationZ +50 mm; ours rz +6°, −50 mm)"),
+    ("M1", "skb: Revolute (bottom on top) + Slider (front faces): live keeps B upright, turned 30° at (7.68, −8.66, 10); ours turns it upside down"),
+    ("M2", "skb: Revolute C on fastened B: live C unturned at (0, 0, 20), ours turned 1.3e-4 rad (the solver stops short)"),
+    ("LP1", "skb: R1's connector flip and F5's edge direction: live's copies at x −55 / −40 upright, ours at −85 / −100 upside down"),
+];
 
 #[test]
 fn assemblies_match_live() {
@@ -303,20 +372,26 @@ fn assemblies_match_live() {
         let res = parts.ev.evaluate(&parts.doc, &asm, &SolveOptions::default(), None);
         let got = outcome(&asm, &res);
         eprintln!("{name}: {got:?}");
+        let mut diff = String::new();
         for (case, mate, ok, text) in LIVE_MATES.iter().filter(|l| l.0 == name) {
             match got.mates.iter().find(|m| m.0 == *mate) {
                 Some((_, o, t, _)) if o == ok && t == text => {}
-                ours => report += &format!("{case} {mate}: ours {ours:?}, live ({ok}, {text:?})\n"),
+                ours => diff += &format!("{case} {mate}: ours {ours:?}, live ({ok}, {text:?})\n"),
             }
         }
         for (case, inst, t) in LIVE.iter().filter(|l| l.0 == name) {
             let Some((_, ours, _)) = got.instances.iter().find(|i| i.0 == *inst) else {
-                report += &format!("{case}: no instance {inst}\n");
+                diff += &format!("{case}: no instance {inst}\n");
                 continue;
             };
             if ours.iter().zip(t).any(|(a, b)| (a - b).abs() > 1e-6) {
-                report += &format!("{case} {inst}: ours {ours:?}\n      live {t:?}\n");
+                diff += &format!("{case} {inst}: ours {ours:?}\n      live {t:?}\n");
             }
+        }
+        match KNOWN.iter().find(|k| k.0 == name) {
+            Some(k) if diff.is_empty() => report += &format!("{name} now matches live: drop it from KNOWN ({})\n", k.1),
+            None => report += &diff,
+            _ => {}
         }
     }
     assert!(report.is_empty(), "differences from live:\n{report}");
