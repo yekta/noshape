@@ -20,7 +20,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   /root/qa-scratch/tickets/qa-1026-ps2-shell.noshape (tab Part Studio 2), shots tickets/shell-fillet-walls-missing-iso.png,
   -front.png, shell-fillet-suppressed-walls-ok.png. Likely the same root as qa5's P1-16 (fillet offset collapsing in
   shell.cpp, WIP on agent/qa5, docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop") (qa 2026-10-26,
-  build 4d2f6b0c)
+  build 4d2f6b0c). Second, simpler repro (same doc, tab Part Studio 3, tickets/qa-1026-ps3-shell-hole.noshape): Sketch 1 =
+  centre rectangle 80 × 50 (dimensioned) + a free Ø~14 circle at about (−20, −10); Extrude 1 the outer region 10 mm;
+  Fillet 1 top face R2; Shell 1 top face 2.5 mm → only the floor, the hole's tube and a stub of the left wall remain
+  (tickets/shell-walls-ps3-iso.png, -front.png); the same studio before the circle was added shelled right (14467.382 mm³)
 - [ ] P0 SHELL-SLOW Shell takes seconds: the same plate (+ chamfer, 2 holes), Shell 1 2.5 mm → Shell eval 3354 ms; edit to
   1.5 mm → 8759 ms; without the fillet 2502 ms (NOSHAPE_PERF log; box load ~35, so maybe 2–3× slower than idle); live
   shells such parts in well under a second; ours freezes the preview for seconds (qa 2026-10-26, build 4d2f6b0c)
