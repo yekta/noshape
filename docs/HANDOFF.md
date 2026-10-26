@@ -1,5 +1,8 @@
 # noshape: handoff for the next lead
 
+> **2026-10-26: all agents stopped for a replan. Read [docs/PLAN.md](PLAN.md) first.** The agent table below is historical; every agent wrote its state to docs/handoff/*.md and pushed unfinished work to `agent/<name>` on GitHub.
+
+
 Read this first (new lead: start with `docs/handoff/lead.md`), then `docs/handoff/*.md` (one file per workstream, written by the agents),
 `docs/AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/ONSHAPE_UI_SPEC.md` and `docs/parity/*.md`.
 
