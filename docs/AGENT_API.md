@@ -110,6 +110,8 @@ edits with undo / redo, a configured part, an assembly with mates) added:
   "configuration") and `ops_list {"search": "pattern assembly"}` give summaries and examples.
 - **Feature schemas** describe the parameters the dialog shows with the defaults; `more_when_shown` names the
   others (`counterbore`: `cBoreDiameterV3`...), `all: true` describes them too.
+- **Edit replies stay small:** `regeneration.features` lists only the features that need a look (not `Ok`,
+  or with a message, notices, under-defined, suppressed); `features_ok` counts the rest; `feature_list` lists all.
 
 ## Concepts
 

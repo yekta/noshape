@@ -491,7 +491,7 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     dialog_logic(od, tab, &mut feature, index, &params)?;
     let (id, name) = (feature.id, feature.name.clone());
     edit_studio(od, tab, &studio::insert_description(&name), |ps| Ok(studio::insert_feature(ps, feature, index)))?;
-    let report = regen_report(od, tab)?;
+    let report = super::regen_report_with(od, tab, &[id])?;
     let st = this_feature_status(&report, &id.to_string());
     Ok(json!({ "feature": id.to_string(), "name": name, "feature_status": st, "regeneration": report }).into())
 }
@@ -524,7 +524,7 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         studio::edit_feature(ps, index, feature, &config);
         Ok(())
     })?;
-    let report = regen_report(od, tab)?;
+    let report = super::regen_report_with(od, tab, &[id])?;
     let st = this_feature_status(&report, &id.to_string());
     Ok(json!({ "feature": id.to_string(), "name": name, "feature_status": st, "regeneration": report }).into())
 }
@@ -535,7 +535,7 @@ fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = feature_arg(ps, a, "feature")?;
     let type_id = ps.feature(id).expect("found").type_id.clone();
     load_custom_types(od, &type_id);
-    let report = regen_report(od, tab)?;
+    let report = super::regen_report_with(od, tab, &[id])?;
     let ps = doc::studio(od.doc(), tab)?;
     let f = ps.feature(id).expect("found");
     let mut v = feature_json(f);
@@ -559,7 +559,7 @@ fn load_custom_types(od: &crate::OpenDoc, type_id: &str) {
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
-    let mut r = regen_report(od, tab)?;
+    let mut r = super::regen_report_all(od, tab)?;
     let ps = doc::studio(od.doc(), tab)?;
     r["tab"] = json!({ "id": tab.to_string(), "name": od.doc().tab(tab).map(|t| t.name.clone()) });
     r["folders"] = json!(ps.folders.iter().map(|f| json!({ "id": f.id, "name": f.name, "parent": f.parent, "features": ps.features.iter().filter(|x| x.folder == Some(f.id)).map(|x| x.id.to_string()).collect::<Vec<_>>() })).collect::<Vec<_>>());

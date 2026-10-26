@@ -114,9 +114,26 @@ pub(crate) fn edit_studio<R>(od: &mut OpenDoc, tab: TabId, description: &str, f:
 /// Regenerate a Part Studio and report every feature's state, the parts
 /// and the failures (what the feature list and parts list show).
 pub(crate) fn regen_report(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
+    regen_report_with(od, tab, &[])
+}
+
+/// The whole feature list's states (feature_list).
+pub(crate) fn regen_report_all(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
+    let all: Vec<noshape_model::reference::FeatureId> = doc::studio(od.doc(), tab)?.features.iter().map(|f| f.id).collect();
+    let mut r = regen_report_with(od, tab, &all)?;
+    if let Some(o) = r.as_object_mut() {
+        o.remove("features_ok");
+    }
+    Ok(r)
+}
+
+/// [`regen_report`], listing the `keep` features whatever their state (the
+/// feature a call made or edited).
+pub(crate) fn regen_report_with(od: &mut OpenDoc, tab: TabId, keep: &[noshape_model::reference::FeatureId]) -> Result<Value, OpError> {
     let r = od.regenerate(tab, None)?;
     let ps = doc::studio(od.doc(), tab)?;
     let mut features = Vec::new();
+    let mut ok = 0;
     let mut failed = Vec::new();
     let tab_name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
     for f in &ps.features {
@@ -150,7 +167,13 @@ pub(crate) fn regen_report(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpErro
         if f.suppressed {
             v["suppressed"] = json!(true);
         }
-        features.push(v);
+        // Only the features that need a look (the rest: `features_ok`;
+        // feature_list lists all).
+        if keep.contains(&f.id) || v["status"] != "Ok" || v.as_object().is_some_and(|o| o.len() > 4) {
+            features.push(v);
+        } else {
+            ok += 1;
+        }
     }
     let parts: Vec<Value> = r
         .display
@@ -158,7 +181,7 @@ pub(crate) fn regen_report(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpErro
         .iter()
         .map(|b| json!({ "id": crate::refs::body_id(&b.id), "name": b.name, "kind": format!("{:?}", b.kind), "hidden": b.hidden }))
         .collect();
-    Ok(json!({ "features": features, "parts": parts, "failed": failed, "rollback_index": ps.rollback_index() }))
+    Ok(json!({ "features": features, "features_ok": ok, "parts": parts, "failed": failed, "rollback_index": ps.rollback_index() }))
 }
 
 /// A tab as navigation replies give it: id, name and kind.

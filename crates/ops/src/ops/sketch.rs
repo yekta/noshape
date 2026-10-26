@@ -3,7 +3,7 @@
 //! snapping and automatic constraints), constrained with the constraint
 //! tools and dimensioned with the dimension tool.
 
-use super::{doc_field, edit_studio, feature_arg, regen_report, s, studio_target, tab_field};
+use super::{doc_field, edit_studio, feature_arg, s, studio_target, tab_field};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, doc, refs, studio};
@@ -535,7 +535,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     edit_studio(od, tab, &studio::insert_description(&name), |ps| Ok(studio::insert_feature(ps, f, index)))?;
     let mut v = sketch_state(od, tab, id, None)?;
     v["name"] = json!(name);
-    let report = regen_report(od, tab)?;
+    let report = super::regen_report_with(od, tab, &[id])?;
     if let Some(st) = report["features"].as_array().and_then(|fs| fs.iter().find(|x| x["id"] == id.to_string())) {
         v["feature_status"] = st.clone();
     }
