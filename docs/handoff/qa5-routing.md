@@ -885,3 +885,24 @@ STATUS FSW-unsupported (psb, 2026-10-26 b): face blend between faces without a c
   pattern row stays; app-verified), P2-A8 (no pattern bubble; app-verified), P2-D2 (only the assembly's own sources make
   its drawing stale), P2-D3 (NOTE preview). Caveat P1-8: a reopened hole whose points were all clicked one by one shows
   them as "Vertices of Sketch N" (the grouping isn't stored). P1-16 in progress (kernel shell.cpp).
+
+## qa5 open items at the 2026-10-26 stop (lead halt)
+- **P1-16 / P1-6 — kern (crates/kernel/cpp/shell.cpp), WIP on branch agent/qa5** — live's p2 model (block 75.554 x 20.245
+  x 10, R1 on 3 vertical edges, 1 mm chamfer chain, 4 Ø6.35 through holes at x 15/40, y 6/14.245, top removed): live Shell
+  1 mm → 3998.627 mm³ / 33 faces, 2.5 mm → 8503.961 mm³ / 47 faces (behaviours "qa5 (10-25 p2)" (6)). Ours (main): 1 mm
+  fails, 2.5 mm 8487.861 / 53. Cause found: the R1 fillets' inward offset collapses to the axis (1 mm) or vanishes (2.5 mm)
+  and their sector (and the chamfer's corner cone, 3 × π/12 mm³) is left out of the wall; OCCT's offset path drops it too.
+  WIP: `collapsing_blend` / `blend_sector` (sector slab for convex cylinder/cone faces within |d| of their axis; slabs
+  instead of the offset path then). State: 2.5 mm reached 8503.176 with cylinders only; cones made the Common fail;
+  1 mm: slab union 3997.85 mm³ but UnifySameDomain gives an invalid solid (and earlier threw from MergeSubSeq inside a
+  noexcept path → abort; P0 if the app hits it). Next: primitive-based sectors (draft in the WIP commit's message /
+  /root/qa5-scratch/patches/blend_sector_v2.cpp), fall back to the un-unified Common when Unify breaks it. Test:
+  crates/kernel/tests/shell.rs `shell_block_with_close_holes_like_onshape` (in the WIP commit; fails until fixed).
+- **Verify on the next green** (fixed today by qa5, not yet seen in the app): P1-1, P1-8, P1-9, P1-17, P1-18, P2-A2…A8,
+  P2-D2, P2-D3. P2-A3 / A7 / A8 have no unit test: check Esc in explode editing, the pending Replicate row and that no
+  "instance(s) created" bubble shows.
+- **P1-8 caveat — ui** — the "Vertices of Sketch N" grouping isn't stored: a reopened hole whose points were all clicked
+  one by one shows one grouped chip (live: separate chips). Storing a sketch-row pick as `Reference::Sketch` would fix it,
+  but hole.rs and the app's `sketch_points` choose a sketch's points differently (needs one rule first).
+- **P1-10 tool preview colour — icons2** — Remove extrude tool preview grey; live translucent dark red (part-studio/234–235).
+- **P1-4 data — skb** — sketches keep a hidden construction "Origin stand-in" point; live constrains to the external Origin.
