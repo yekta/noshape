@@ -140,8 +140,12 @@ def world_under(cam, at):
 
 
 def angle(a, b):
+    # atan2 of |a x b| and a . b: exact near 0, where acos of a dot that
+    # rounds a ulp below 1 reads 1.2e-6 deg for equal vectors (run
+    # 40293268330, key-ctrl-shift-right).
     d = sum(x * y for x, y in zip(a, b))
-    return math.degrees(math.acos(max(-1.0, min(1.0, d))))
+    c = (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+    return math.degrees(math.atan2(math.hypot(*c), d))
 
 
 class Checker:

@@ -50,6 +50,17 @@ pub(super) struct SectionManip {
     pub snapped: Option<(DVec3, Option<DVec3>)>,
 }
 
+/// While the base is dragged over a face (live ui-snapv/26–28): its
+/// implicit connector points (corners, edge midpoints) and its centroid
+/// with the face's normal.
+#[derive(Clone, Debug)]
+pub(super) struct FaceMarks {
+    pub corners: Vec<DVec3>,
+    pub mids: Vec<DVec3>,
+    pub centroid: DVec3,
+    pub normal: DVec3,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum SectionHandle {
     Base,
@@ -296,6 +307,51 @@ impl PartStudioView {
         }
     }
 
+    /// The hovered face's implicit points while the base is dragged.
+    pub(super) fn section_face_marks(&self) -> Option<FaceMarks> {
+        if !self.ui.section_base_drag {
+            return None;
+        }
+        let t = self.ui.hover_pick.as_ref().filter(|t| t.kind == PickKind::Face)?;
+        let p3 = |a: &[f32; 3]| DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
+        let (b, fi) = self.display.bodies.iter().filter(|b| !b.hidden).find_map(|b| Some((b, b.face_refs.iter().position(|x| *x == t.reference)?)))?;
+        let mut corners: Vec<DVec3> = Vec::new();
+        let mut mids = Vec::new();
+        for ei in b.mesh.face_edges(fi) {
+            let Some(pl) = b.mesh.edges.get(ei) else { continue };
+            let pts: Vec<DVec3> = pl.iter().map(p3).collect();
+            for q in [pts.first(), pts.last()].into_iter().flatten() {
+                if !corners.iter().any(|c| c.distance(*q) < 1e-9) {
+                    corners.push(*q);
+                }
+            }
+            // The midpoint along the edge.
+            let len: f64 = pts.windows(2).map(|w| w[0].distance(w[1])).sum();
+            let mut acc = 0.0;
+            for w in pts.windows(2) {
+                let l = w[0].distance(w[1]);
+                if acc + l >= len * 0.5 && l > 0.0 {
+                    mids.push(w[0].lerp(w[1], (len * 0.5 - acc) / l));
+                    break;
+                }
+                acc += l;
+            }
+        }
+        let &(first, count) = b.mesh.face_ranges.get(fi)?;
+        let idx = b.mesh.indices.get(first as usize..(first + count) as usize)?;
+        let v = |i: u32| b.mesh.positions.get(i as usize).map(p3);
+        let (mut sum, mut area, mut normal) = (DVec3::ZERO, 0.0, DVec3::ZERO);
+        for tri in idx.as_chunks::<3>().0 {
+            let (a, bb, c) = (v(tri[0])?, v(tri[1])?, v(tri[2])?);
+            let n = (bb - a).cross(c - a);
+            let w = n.length() * 0.5;
+            sum += (a + bb + c) / 3.0 * w;
+            area += w;
+            normal += n;
+        }
+        (area > 0.0).then(|| FaceMarks { corners, mids, centroid: sum / area, normal: normal.normalize_or(DVec3::Z) })
+    }
+
     /// A point of the active section plane.
     fn section_plane_point(&self) -> Option<DVec3> {
         let pl = self.ui.section.get(self.ui.section_dialog.as_ref()?.active)?;
@@ -466,7 +522,7 @@ fn seg_dist(p: DVec2, a: DVec2, b: DVec2) -> f64 {
 
 /// The base circle and the rings: idle light grey (≈ #e6e8e9 on #c2c7cb),
 /// the hovered handle blue (≈ #467bb1), the dragged one deeper (≈ #2861b6).
-pub(super) fn section_glyph(s: &SectionManip, hover: Option<SectionHandle>, dragging: Option<SectionHandle>, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
+pub(super) fn section_glyph(s: &SectionManip, hover: Option<SectionHandle>, dragging: Option<SectionHandle>, face: Option<&FaceMarks>, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
     let Some(wpp) = view.world_per_px(s.tip()) else { return Vec::new() };
     let bw = view.world_per_px(s.arrow.base).unwrap_or(wpp);
@@ -481,6 +537,36 @@ pub(super) fn section_glyph(s: &SectionManip, hover: Option<SectionHandle>, drag
         let x = [DVec3::X, DVec3::Y, DVec3::Z].into_iter().map(|a| a - z * z.dot(a)).find(|a| a.length() > 0.1).unwrap_or(DVec3::X);
         let f = noshape_model::assembly::solver::Frame::from_axes(o, z, x);
         noshape_scene::asm_scene::push_connector_glyph(&mut disc, &f, SNAP_DISC_PX * w);
+    }
+    // The hovered face's implicit points (live ui-snapv/26–28): white discs
+    // with a grey rim lying in the face, about 11 px across at its corners
+    // and 8 px at its edges' midpoints, and at its centroid a quartered
+    // black-and-white disc.
+    if let Some(m) = face {
+        let z = m.normal;
+        let x = [DVec3::X, DVec3::Y, DVec3::Z].into_iter().map(|a| a - z * z.dot(a)).find(|a| a.length() > 0.1).unwrap_or(DVec3::X).normalize();
+        let y = z.cross(x);
+        let mut flat_disc = |c: DVec3, r_px: f64, fill: &dyn Fn(f64) -> [u8; 4], rim: [u8; 4]| {
+            let Some(w) = view.world_per_px(c) else { return };
+            let (r, lift) = (r_px * w, z * (0.02 * w));
+            let at = |rad: f64, a: f64| f(c + (x * a.cos() + y * a.sin()) * rad + lift);
+            for k in 0..48 {
+                let a = k as f64 / 48.0 * std::f64::consts::TAU;
+                disc.push_polyline(&[f(c + lift), at(r, a)], fill(a), 0, 1.5, LineSegment::ON_TOP);
+            }
+            let ring: Vec<[f32; 3]> = (0..=32).map(|k| at(r, k as f64 / 32.0 * std::f64::consts::TAU)).collect();
+            disc.push_polyline(&ring, rim, 0, 1.0, LineSegment::ON_TOP);
+        };
+        const WHITE: [u8; 4] = [0xfd, 0xfd, 0xfd, 255];
+        const GREY: [u8; 4] = [0x9f, 0x9f, 0x9f, 255];
+        for q in &m.corners {
+            flat_disc(*q, 5.5, &|_| WHITE, GREY);
+        }
+        for q in &m.mids {
+            flat_disc(*q, 4.0, &|_| WHITE, GREY);
+        }
+        let quarters = |a: f64| if ((a / std::f64::consts::FRAC_PI_2) as usize).is_multiple_of(2) { [0x10, 0x10, 0x10, 255] } else { WHITE };
+        flat_disc(m.centroid, 4.5, &quarters, [0x10, 0x10, 0x10, 255]);
     }
     let mut back = LineData::default();
     let mut front = LineData::default();

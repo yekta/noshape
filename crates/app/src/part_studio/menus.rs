@@ -746,20 +746,28 @@ impl PartStudioView {
     /// (live part-studio/81: "Perp planes angle: 90.000 deg", the number in
     /// monospace; a point reads "Point: X↘ … Y↗ … Z↑ …" with colored axes).
     fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let sel = self.selection.clone();
-        let sel_count = sel.len();
-        let ctx = self.measure_context(&sel, cx)?;
-        let results = match &self.measure_cache {
-            Some((s, r)) if *s == sel => r.clone(),
-            _ => {
-                let r = studio_measure(&ctx, &sel);
-                self.measure_cache = Some((sel, r.clone()));
-                r
-            }
+        // Live (ui-mass/07): while Mass properties' reference field is active
+        // the readout measures its mate connector, "Point:" at its origin.
+        let line = if self.show_mass && self.ui.mass_ref_active {
+            let r = self.ui.mass_reference.as_ref()?;
+            let c = self.display.connectors.iter().find(|c| &c.reference == r)?;
+            vec![("Point".to_string(), Measurement::Point(c.origin))]
+        } else {
+            let sel = self.selection.clone();
+            let sel_count = sel.len();
+            let ctx = self.measure_context(&sel, cx)?;
+            let results = match &self.measure_cache {
+                Some((s, r)) if *s == sel => r.clone(),
+                _ => {
+                    let r = studio_measure(&ctx, &sel);
+                    self.measure_cache = Some((sel, r.clone()));
+                    r
+                }
+            };
+            // Live (psb 10-20 m): the first primary row, plus the distances
+            // of a circular context on the same line; nothing for three edges.
+            measure::quick_line(&results, sel_count)
         };
-        // Live (psb 10-20 m): the first primary row, plus the distances of a
-        // circular context on the same line; nothing for three edges.
-        let line = measure::quick_line(&results, sel_count);
         if line.is_empty() {
             return None;
         }
@@ -816,7 +824,10 @@ impl PartStudioView {
         // Measure, Analysis tools and Mass properties (20 px icons).
         let pal = p();
         let (measure_on, mass_on) = (self.ui.measure_pinned, self.show_mass);
-        let readout = (!measure_on && !mass_on && self.edit.is_none() && !self.selection.is_empty()).then(|| self.selection_readout(cx)).flatten();
+        // Live (ui-mass/07): Mass properties keeps the readout for the active
+        // field's contents; a pinned Measure panel replaces it.
+        let mass_ref = mass_on && self.ui.mass_ref_active;
+        let readout = (!measure_on && self.edit.is_none() && (mass_ref || !self.selection.is_empty())).then(|| self.selection_readout(cx)).flatten();
         h_flex()
             .id("eval-tools")
             .occlude()

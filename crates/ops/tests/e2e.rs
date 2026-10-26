@@ -961,6 +961,27 @@ fn coincident_on_one_point_is_a_no_op() {
     assert!(shown.starts_with("30") || shown.starts_with("20"), "{dim}");
 }
 
+/// A constraint to the Origin references it (live: the external Origin, no
+/// sketch entity): sketch_get lists no hidden point for it, and the
+/// constraint names `origin` (skb, qa5 P1-4 data note).
+#[test]
+fn sketch_get_names_the_origin_not_a_hidden_point() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "origin_ref.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[5, 5], [30, 20]] }));
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap().clone();
+    let start = line["start_point"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "coincident", "entities": [start, "origin"] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    let points = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "point").count();
+    assert_eq!(points, 2, "only the line's end points: {g}");
+    let ents = g["entities"].as_array().unwrap().iter().map(|e| e["id"].clone()).collect::<Vec<_>>();
+    let to_origin = g["constraints"].as_array().unwrap().iter().find(|c| c["entities"].as_array().unwrap().iter().any(|e| e == "origin")).unwrap_or_else(|| panic!("no constraint names the origin: {g}"));
+    for e in to_origin["entities"].as_array().unwrap() {
+        assert!(e == "origin" || ents.contains(e), "{to_origin}");
+    }
+}
+
 /// Named positions driven by a revolute mate, and an exploded view.
 #[test]
 fn assembly_named_positions_and_exploded_views() {
@@ -3991,6 +4012,10 @@ fn agent_benchmark_p1_fixes() {
     assert_eq!(g["params"]["entities"].as_array().unwrap().len(), 4, "{g} {q}");
     let e = try_call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": { "query": { "kind": "edges", "curve": "ellipse" } }, "radius": "1 mm" } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("params.entities.query"), "{e:?}");
+    // `near` ranks by the distance to the face, not its centroid: a point on
+    // the top face near a corner finds the top face, not the closer-centred side.
+    let n = call(&mut ctx, "query_entities", json!({ "kind": "faces", "near": [36, 16, 20], "limit": 1 }));
+    assert!((num(&n["faces"][0]["centroid"][2]) - 20.0).abs() < 1e-6, "{n}");
     // A feature pattern from `entities` that are features.
     let x = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "curve": "line" }))["edges"][0]["id"].clone();
     let ex = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().find(|f| f["name"] == "Extrude 1").unwrap()["id"].as_str().unwrap().to_string();
@@ -4022,4 +4047,28 @@ fn agent_benchmark_p1_fixes() {
     assert!(h["more_when_shown"].as_array().unwrap().contains(&json!("cBoreDiameterV3")), "{h}");
     let all = call(&mut ctx, "feature_schema", json!({ "type": "hole", "all": true }));
     assert!(all["params"]["properties"].get("cBoreDiameterV3").is_some());
+}
+
+/// A STEP assembly whose two parts share a name imports with distinct
+/// instance names ("Part 1 <1>", "Part 1 <2>"), as instance names count.
+#[test]
+fn step_assembly_same_named_parts_get_distinct_instances() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "step_names.noshape");
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio" }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "tab": "Part Studio 2", "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "sketch_draw", json!({ "tab": "Part Studio 2", "sketch": sk, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 2", "type": "extrude", "params": { "entities": [r["regions"][0]["id"]], "depth": "30 mm" } }));
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    let pin = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 2", "part": "Part 1" }))["instance"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [60, 0, 0] }));
+    let step = scratch("same_names.step");
+    call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "STEP", "file": step.to_str().unwrap() }));
+    call(&mut ctx, "document_create", json!({ "path": scratch("same_names_import.noshape").to_str().unwrap() }));
+    let imp = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let asm = imp["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string();
+    let l = call(&mut ctx, "assembly_list", json!({ "tab": asm }));
+    let mut names: Vec<&str> = l["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap()).collect();
+    names.sort();
+    assert_eq!(names, ["Part 1 <1>", "Part 1 <2>"], "{l}");
 }

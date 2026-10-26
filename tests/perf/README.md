@@ -21,9 +21,9 @@ Assembly as the first tab so the app opens on it (`crates/ops/tests/many_parts.r
 top and one under it, each patterned ×400 every 2 mm with Reapply (`crates/ops/tests/many_parts.rs`
 `write_fins_fixture`); `env` = `NOSHAPE_PERF_SCRIPT=delete-undo-last` times deleting Linear pattern 2 and undoing.
 
-Both are perf.yml `fixture`s (no baseline). Display meshes are chord based by default (Onshape's angle-based mesh,
-live 459, is gated off until its GPU cost is down: `regen::angle_display_mesh`). To compare both in one run:
-`variants` = `angle:NOSHAPE_DISPLAY_MESH=angle`.
+These are perf.yml `fixture`s (no baseline; the NIST assembly is the default and has one). Display meshes are
+Onshape's angle-based ones (live 459; `regen::angle_display_mesh`); `NOSHAPE_DISPLAY_MESH=chord` gives the older
+chord-based mesh. To compare both in one run: `variants` = `chord:NOSHAPE_DISPLAY_MESH=chord`.
 
 `live-30-features.noshape`: live's 30-feature part (qa4 round 5 REGEN-SPEED, behaviours "qa4 round 5 v2 s1 / s2"): a
 100 × 60 × 10 mm plate, 6 bosses on a plane 10 mm up, a 2-point Hole, corner fillets, boss chamfers and fillets, a

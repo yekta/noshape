@@ -114,6 +114,37 @@ pub(crate) fn invalid_field(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool
         .tooltip(crate::ui::tooltip(INVALID_TIP))
 }
 
+/// [`invalid_field`] with the hover text of why the value doesn't evaluate
+/// ([`eval_message`]).
+pub(crate) fn invalid_field_tip(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool, tip: String) -> gpui_kit::Stateful<gpui_kit::Div> {
+    use gpui_kit::{ParentElement as _, StatefulInteractiveElement as _, Styled as _, div, px};
+    if !invalid {
+        return el;
+    }
+    let pal = crate::theme::p();
+    el.relative()
+        .bg(pal.error_fill)
+        .border_b_1()
+        .border_color(pal.error)
+        .child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.error))
+        .tooltip(crate::ui::tooltip(tip))
+}
+
+/// Live's hover text for a value that doesn't evaluate as `expected` (ui
+/// (10-26 c)): "Cannot use angle as length.", "Cannot add angle and
+/// length.", "Cannot apply cos to length.", else "Enter a valid
+/// expression.".
+pub(crate) fn eval_message(err: &noshape_units::ExprError) -> String {
+    use noshape_units::{EvalError, ExprError};
+    let n = |d: Dim| if d == Dim::UNITLESS { "number".to_string() } else { d.name() };
+    match err {
+        ExprError::Eval(EvalError::WrongDimension { expected, found }) => format!("Cannot use {} as {}.", n(*found), n(*expected)),
+        ExprError::Eval(EvalError::DimensionMismatch { op, left, right }) if matches!(*op, "add" | "subtract") => format!("Cannot {op} {} and {}.", n(*left), n(*right)),
+        ExprError::Eval(EvalError::BadArgument { func, found, .. }) => format!("Cannot apply {func} to {}.", n(*found)),
+        _ => INVALID_TIP.to_string(),
+    }
+}
+
 /// The hover text of an invalid count field (live: Zebra stripes count).
 pub(crate) const INVALID_INT_TIP: &str = "Enter an integer.";
 
@@ -560,5 +591,23 @@ mod tests {
         let count = Stepping { dim: Dim::UNITLESS, prefs: &p, scope: &EmptyScope, integer: true, range: (Some(1.), None) };
         assert_eq!(step_text("2", true, StepMods { shift: true, ctrl: false }, &count).as_deref(), Some("3"));
         assert_eq!(step_text("1", false, StepMods::default(), &count), None);
+    }
+}
+
+#[cfg(test)]
+mod eval_message_tests {
+    use super::eval_message;
+    use noshape_units::{Dim, UnitPrefs, evaluate_as};
+
+    /// Live (ui (10-26 c), a Length variable's Value).
+    #[::core::prelude::v1::test]
+    fn wrong_types_read_as_live() {
+        let u = UnitPrefs::default();
+        let none = noshape_units::EmptyScope;
+        let msg = |t: &str| eval_message(&evaluate_as(t, Dim::LENGTH, &u, &none).expect_err(t));
+        assert_eq!(msg("10 deg"), "Cannot use angle as length.");
+        assert_eq!(msg("10 deg + 5 mm"), "Cannot add angle and length.");
+        assert_eq!(msg("5 mm * cos(10 mm)"), "Cannot apply cos to length.");
+        assert_eq!(msg("abc"), "Enter a valid expression.");
     }
 }

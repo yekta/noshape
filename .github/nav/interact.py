@@ -68,10 +68,13 @@ class Interact(Replay):
             time.sleep(0.6)
         return run
 
-    def box(self, a, b, steps=20):
+    def box(self, a, b, steps=20, mods=()):
         """A left drag from window point a to b."""
         def run():
             self.cursor(*a)
+            for m in mods:
+                self.keys.key(m, True)
+            time.sleep(0.05)
             self.mouse.button(ui.BTN_LEFT, True)
             time.sleep(0.05)
             dx, dy = (b[0] - a[0]) / steps, (b[1] - a[1]) / steps
@@ -83,6 +86,9 @@ class Interact(Replay):
                 time.sleep(0.016)
             time.sleep(0.2)
             self.mouse.button(ui.BTN_LEFT, False)
+            time.sleep(0.05)
+            for m in mods:
+                self.keys.key(m, False)
             time.sleep(0.5)
         return run
 
@@ -117,6 +123,17 @@ class Interact(Replay):
         # A small crossing box (right to left) over the Top plane: the plane stays out.
         self.step("crossing-box-plane", self.box((plane[0] + 12, plane[1] + 6), (plane[0] - 12, plane[1] - 6)))
         self.step("clear", self.click_at(empty))
+        # A plain click on the selected face toggles it off; the pointer
+        # still hovers it.
+        self.step("select-for-toggle", self.click_at(top))
+        self.step("click-selected-toggles", self.click_at(top))
+        # A Shift+click in empty space keeps the selection.
+        self.step("select-for-shift", self.click_at(top))
+        self.step("shift-empty-keeps", self.click_at(empty, (ui.KEY_LEFTSHIFT,)))
+        # A Ctrl crossing box over the selected face deselects it; with
+        # nothing selected it selects nothing.
+        self.step("ctrl-box-deselects", self.box((top[0] + 10, top[1] + 5), (top[0] - 10, top[1] - 5), mods=(ui.KEY_LEFTCTRL,)))
+        self.step("ctrl-box-nothing", self.box((top[0] + 10, top[1] + 5), (top[0] - 10, top[1] - 5), mods=(ui.KEY_LEFTCTRL,)))
         for d in (self.mouse, self.keys, self.pad, self.screen, self.pen):
             d.close()
 

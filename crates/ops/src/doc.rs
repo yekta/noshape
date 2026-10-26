@@ -33,6 +33,9 @@ pub struct OpenDoc {
 
 impl OpenDoc {
     pub fn new(session: Session) -> Self {
+        // std's dialog logic (Extrude, Hole, …) loads in the background, so
+        // the first feature_add doesn't parse std (fs, lead 10-26).
+        noshape_model::custom::std_feature::prewarm();
         OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: HashMap::new(), active_config: HashMap::new(), sketch_fillet_radius: HashMap::new(), window: Default::default() }
     }
 

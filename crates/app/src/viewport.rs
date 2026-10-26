@@ -1106,6 +1106,9 @@ impl Viewport {
         self.last_presented = seq;
         match result {
             Ok((frame, image)) => {
+                // Once a frame is up, std's dialog logic loads in the
+                // background (a no-op after the first call; fs, lead 10-26).
+                noshape_model::custom::std_feature::prewarm();
                 if noshape_render::perf::enabled() {
                     static FIRST: std::sync::Once = std::sync::Once::new();
                     FIRST.call_once(|| noshape_render::perf::milestone("first viewport frame presented"));
