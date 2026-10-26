@@ -165,16 +165,18 @@ fn two_blocks_fastened_face_to_face() {
     assert_eq!(b.len(), 1);
     assert_eq!(b[0].quantity, 2);
 
-    // Offset of 5 mm along Z separates them.
+    // Offset of 5 mm: the first connector (the fixed block's top, Z up)
+    // moves +5 mm along its Z relative to the second, so the second block
+    // sinks 5 mm into it (live assembly/740–748, oracle_asm F2).
     let mut asm2 = asm.clone();
     asm2.mates[0].offset_z = Some(ExprValue::new("5 mm"));
     let res = ev.evaluate(&f.doc, &asm2, &SolveOptions::default(), None);
     let o = origin_of(&res, 2);
-    assert!((o.z - 0.015).abs() < 1e-6, "offset: {o:?}");
+    assert!((o.z - 0.005).abs() < 1e-6, "offset: {o:?}");
 
     // Same-orientation connectors (live assembly/740–748: the top faces of
     // two plates, Z axes aligned): the instance picked first ends +offset
-    // along the second connector's Z, whichever of the two is fixed.
+    // along its connector's Z, whichever of the two is fixed.
     let top2 = face_with(&r, "CapEnd");
     for (first, second, expect) in [(2u64, 1u64, 0.01), (1, 2, -0.01)] {
         let mut m = mate(11, MateType::Revolute, conn(first, top2.clone(), Inference::Centroid), conn(second, top2.clone(), Inference::Centroid));
@@ -2961,7 +2963,8 @@ fn assembly_configurations_drive_suppression_and_mate_offsets() {
     assert_eq!(d.occurrences.len(), 3);
     assert_eq!(l.occurrences.len(), 2, "Block <3> suppressed in Long");
     let z = |res: &super::eval::AssemblyResult| res.occurrences.iter().find(|o| o.path == vec![InstanceId(2)]).unwrap().transform.w_axis.z;
-    assert!((z(&l) - z(&d) - 0.01).abs() < 1e-6, "Long offsets the mate by 10 mm: {} vs {}", z(&l), z(&d));
+    // The first connector is the fixed block's top: the second moves −10 mm.
+    assert!((z(&d) - z(&l) - 0.01).abs() < 1e-6, "Long offsets the mate by 10 mm: {} vs {}", z(&l), z(&d));
     // Suppressing a configured feature changes only the current configuration.
     assert!(asm.set_configured_value(ConfigTarget::Mate(MateId(10)), param::UNSUPPRESSED, &long, ParamValue::Bool(false)));
     assert!(asm.configured(&long).mate(MateId(10)).unwrap().suppressed);
