@@ -37,6 +37,9 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
   /root/qa-scratch/rel/k/main/x/noshape-cli (`NSCLI=… python3 …` with nscli.Cli(os.environ['NSCLI'])).
 - "View in high quality" on this llvmpipe box makes viewport frames take > 10 s ("GPU frame still running after 10s;
   waiting"); the UI then stops taking input for a minute and replays the queued clicks. Click Disable on the blue bar.
+- CLI modelling fuzzer: /root/qa-scratch/bin/clifuzz_dbg.py <seed> <n> (NSCLI=<cli>; random fillet / chamfer / shell /
+  extrude / draft / pattern / mirror / suppress / delete / undo; log cli/clifuzz-<seed>.log; NSCLI_ERR=<file> keeps
+  stderr); clifuzz_bisect.py replays a seed with a cold open in a fresh process after every step. Seed 1 → DRAFT-SEGV-DOC.
 - UI fuzzer: /root/qa-scratch/bin/fuzz.py <seed> <n> (random keys / clicks / drags on :110 against the pid in
   /tmp/qa_fzpid; actions logged to /root/qa-scratch/fuzz-actions.log). Seeds 1–3 (800 actions): no crash.
 - Don't run the app with NOSHAPE_PERF=1 when testing section views (PERF-SECTION-PANIC freezes the viewport).
@@ -78,7 +81,8 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
   118 deg), "Features …" + red badge while a new feature is invalid.
 
 ## Open findings (mine) by area
-- core: SHELL-WALLS, SHELL-FILLETED-BOX, SHELL-SLOW, REGEN-SPEED (all P0); I1 (P2); carried over qa5's P1-16 / P1-6.
+- core: **DRAFT-SEGV-DOC** (P0: a document that segfaults on every open), SHELL-WALLS, SHELL-FILLETED-BOX, SHELL-SLOW,
+  REGEN-SPEED, TWO-PROCESS-LOST-EDIT (all P0); I1 (P2); carried over qa5's P1-16 / P1-6.
 - psui: TAB-NO-PREVIEW, DCLICK-HEAVY (P1); DELETE-TAB-DIALOG, LOFT-PROFILE-LIST, PERF-SECTION-PANIC (P2); carried over
   qa5's P1-8 caveat, P1-10.
 - dx: API-HOLE-STYLE (P1), API-REMOVE-SCOPE, VERSION-0.4.6, RHINO-GREEN (P2), USER_GUIDE undo sentence (P3).
