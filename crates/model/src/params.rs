@@ -256,6 +256,16 @@ impl Hints {
     /// feature is edited, the first visible selection field with this hint
     /// is the active one (Draft's Entities to draft / Parting edges).
     pub const INITIAL_FOCUS_ON_EDIT: Self = Self(1 << 23);
+    /// FeatureScript `UIHint.FOCUS_ON_VISIBLE`: a selection field that
+    /// becomes the active one when an edit shows it, even while the active
+    /// field is still empty (Loft's Guides, Path, Connections).
+    pub const FOCUS_ON_VISIBLE: Self = Self(1 << 24);
+    /// FeatureScript `UIHint.ALLOW_ARRAY_FOCUS`: the array is one selection
+    /// field whose items come from clicking the feature's toggle points
+    /// (pattern Skip instances), its items' fields never shown.
+    pub const ALLOW_ARRAY_FOCUS: Self = Self(1 << 25);
+    /// FeatureScript `UIHint.PREVENT_ARRAY_REORDER`: no reorder button.
+    pub const PREVENT_ARRAY_REORDER: Self = Self(1 << 26);
 
     pub const fn or(self, other: Self) -> Self {
         Self(self.0 | other.0)

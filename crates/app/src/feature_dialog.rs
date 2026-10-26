@@ -231,6 +231,9 @@ pub struct FeatureDialog {
     /// applies a changed value and Esc reverts it before they accept or
     /// cancel the dialog (Onshape).
     baselines: HashMap<String, String>,
+    /// Edited by the user, or regenerated without an error once (live
+    /// `isDirty`): ✓ stays disabled until then.
+    dirty: bool,
     /// Each number field's last text that evaluated as its type: the title
     /// shows it while the field holds a value of the wrong type, and a
     /// second Enter puts it back (live ui-var/03, 09).
@@ -319,6 +322,7 @@ impl FeatureDialog {
             computed: HashMap::new(),
             initial_focus_done: false,
             baselines: HashMap::new(),
+            dirty: false,
             valid_texts: HashMap::new(),
             width: None,
             reordering: std::collections::HashSet::new(),
@@ -384,7 +388,7 @@ impl FeatureDialog {
             .iter()
             .filter(|s| s.is_visible(&self.feature.params))
             // Selection-driven arrays pick too (Loft's Profiles, live loft-01).
-            .find(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY))
+            .find(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS))
             .map(|s| s.id.to_string())
     }
 
@@ -496,7 +500,7 @@ impl FeatureDialog {
             .params
             .iter()
             .filter(|s| s.is_visible(params) && !s.hints.has(Hints::ALWAYS_HIDDEN))
-            .filter(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY))
+            .filter(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS))
             .map(|s| s.id)
             .collect()
     }
@@ -514,6 +518,13 @@ impl FeatureDialog {
     /// active one (ticking Extrude's Direction: live dialogs/extrude-23),
     /// unless the active field is itself empty or in error.
     fn focus_new_empty_field(&mut self, shown_before: &[&'static str]) {
+        // FOCUS_ON_VISIBLE (live p1audit loft-guides / -path / -connections):
+        // such a field takes the focus even from an empty active one.
+        let eager = self.visible_selection_fields().into_iter().find(|id| !shown_before.contains(id) && self.ty.params.iter().any(|s| s.id == *id && s.hints.has(Hints::FOCUS_ON_VISIBLE)));
+        if let Some(id) = eager {
+            self.active_query = Some(id.to_string());
+            return;
+        }
         let keep = self.active_query.as_deref().is_some_and(|a| self.selection_empty(a) || self.field_error(a).is_some());
         if keep {
             return;
@@ -614,7 +625,7 @@ impl FeatureDialog {
             && let ParamKind::Array { item, .. } = &spec.kind
         {
             self.toggle_driven_item(spec.id, item_slice(item), r);
-            cx.emit(DialogEvent::Changed);
+            self.changed(cx);
             cx.notify();
             return true;
         }
@@ -634,9 +645,48 @@ impl FeatureDialog {
         if max == Some(1) && !q.is_empty() {
             self.advance_query_focus(&path);
         }
-        cx.emit(DialogEvent::Changed);
+        self.changed(cx);
         cx.notify();
         true
+    }
+
+    /// The active field when it is an array taking the feature's toggle
+    /// points (`ALLOW_ARRAY_FOCUS`: pattern "Instances to skip").
+    pub fn toggle_points_field(&self) -> Option<&'static str> {
+        let path = self.active_query.as_deref()?;
+        self.ty.params.iter().find(|s| s.id == path && s.hints.has(Hints::ALLOW_ARRAY_FOCUS) && s.is_visible(&self.feature.params)).map(|s| s.id)
+    }
+
+    /// A toggle point clicked (linearPatternPointChange): the item for
+    /// `index` goes away if there is one, else a new item takes it.
+    pub fn toggle_instance(&mut self, index: (i64, i64), cx: &mut Context<Self>) {
+        let Some(arr) = self.toggle_points_field() else { return };
+        let Some(ParamKind::Array { item, .. }) = self.ty.params.iter().find(|s| s.id == arr).map(|s| &s.kind) else { return };
+        let item_specs = item_slice(item);
+        let two = item_specs.iter().any(|p| p.id == "index1");
+        let int = |it: &ParamValues, id: &str| it.expr(id).and_then(|e| e.text.trim().parse::<i64>().ok());
+        let mut v = ParamValues::default();
+        fill_defaults(item_specs, &mut v, &self.units);
+        let entry = self.feature.params.0.entry(arr.to_string()).or_insert_with(|| ParamValue::Array(vec![]));
+        let ParamValue::Array(items) = entry else { return };
+        let at = items.iter().position(|it| if two { int(it, "index1") == Some(index.0) && int(it, "index2") == Some(index.1) } else { int(it, "index") == Some(index.0) });
+        match at {
+            Some(k) => {
+                items.remove(k);
+            }
+            None => {
+                if two {
+                    v.set("index1", ParamValue::Expr(noshape_units::ExprValue::new(index.0.to_string())));
+                    v.set("index2", ParamValue::Expr(noshape_units::ExprValue::new(index.1.to_string())));
+                } else {
+                    v.set("index", ParamValue::Expr(noshape_units::ExprValue::new(index.0.to_string())));
+                }
+                items.push(v);
+            }
+        }
+        self.inputs.retain(|p, _| !p.starts_with(&format!("{arr}.")));
+        self.changed(cx);
+        cx.notify();
     }
 
     /// A pick in a driven array ("Vertices"): the item holding `r` goes
@@ -675,7 +725,7 @@ impl FeatureDialog {
         }
         self.inputs.retain(|k, _| !k.starts_with(key));
         self.user_set.insert(key.to_string());
-        cx.emit(DialogEvent::Changed);
+        self.changed(cx);
         cx.notify();
     }
 
@@ -732,7 +782,7 @@ impl FeatureDialog {
                                 nt.lower = v;
                             }
                             this.feature.params.set(&k, ParamValue::Text(nt.encode()));
-                            cx.emit(DialogEvent::Changed);
+                            this.changed(cx);
                         }
                     });
                     self.subs.push(sub);
@@ -811,7 +861,7 @@ impl FeatureDialog {
         let r = q.remove(from);
         q.insert(to, r);
         self.user_set.insert(path.to_string());
-        cx.emit(DialogEvent::Changed);
+        self.changed(cx);
         cx.notify();
     }
 
@@ -825,7 +875,7 @@ impl FeatureDialog {
         let it = items.remove(from);
         items.insert(to, it);
         self.user_set.insert(arr.to_string());
-        cx.emit(DialogEvent::Changed);
+        self.changed(cx);
         cx.notify();
     }
 
@@ -1066,8 +1116,20 @@ impl FeatureDialog {
         self.inputs.clear();
         self.parse_errors.clear();
         self.refocus_hidden_query();
-        cx.emit(DialogEvent::Changed);
+        self.changed(cx);
         cx.notify();
+    }
+
+    /// A user edit: the preview re-runs and ✓ may enable (live
+    /// `canSubmit`: the dialog is dirty and no value fails validation).
+    fn changed(&mut self, cx: &mut Context<Self>) {
+        self.dirty = true;
+        cx.emit(DialogEvent::Changed);
+    }
+
+    /// Live: a regeneration without an error marks the dialog dirty too.
+    pub fn note_regenerated(&mut self, ok: bool) {
+        self.dirty |= ok;
     }
 
     pub fn set_status(&mut self, s: Option<(FeatureStatus, String)>, cx: &mut Context<Self>) {
@@ -1523,13 +1585,13 @@ impl FeatureDialog {
             self.on_text_changed(&c.path, text, cx);
         }
         cx.emit(DialogEvent::CreateVariable(NewVariable { name, kind, value, description: c.description.read(cx).value().to_string(), configuration: c.configuration, range }));
-        cx.emit(DialogEvent::Changed);
+        self.changed(cx);
         cx.notify();
     }
 
     fn on_text_changed(&mut self, path: &str, text: String, cx: &mut Context<Self>) {
         if self.set_text_value(path, text) {
-            cx.emit(DialogEvent::Changed);
+            self.changed(cx);
             cx.notify();
         }
     }
@@ -1538,7 +1600,7 @@ impl FeatureDialog {
     /// a click away, Enter): live s2 "Typing does not update the preview".
     fn flush_typed(&mut self, cx: &mut Context<Self>) {
         if std::mem::take(&mut self.typed_pending) {
-            cx.emit(DialogEvent::Changed);
+            self.changed(cx);
         }
     }
 
@@ -2472,7 +2534,7 @@ impl FeatureDialog {
                                                 }
                                             }
                                         }
-                                        cx.emit(DialogEvent::Changed);
+                                        this.changed(cx);
                                         cx.notify();
                                     })),
                             ))
@@ -2503,7 +2565,7 @@ impl FeatureDialog {
                                                     vals.query_mut(&id).retain(|r| !missing(r));
                                                 }
                                                 this.user_set.insert(pc.clone());
-                                                cx.emit(DialogEvent::Changed);
+                                                this.changed(cx);
                                                 cx.notify();
                                             })
                                         }));
@@ -2665,11 +2727,14 @@ impl FeatureDialog {
                             a.remove(k);
                         }
                         this.inputs.retain(|p, _| !p.starts_with(&format!("{arr_id}.")));
-                        cx.emit(DialogEvent::Changed);
+                        this.changed(cx);
                         cx.notify();
                     }
                 };
-                if s.hints.has(Hints::DRIVEN_QUERY) {
+                // ALLOW_ARRAY_FOCUS (live p1audit skip-04): the same field, its
+                // items' values never shown, a CLEAR button in its header.
+                let focus_only = s.hints.has(Hints::ALLOW_ARRAY_FOCUS);
+                if s.hints.has(Hints::DRIVEN_QUERY) || focus_only {
                     // Live (dialogs/fillet-12): one selection field ("Vertices",
                     // active blue); each pick is a row "Vertex of Extrude 1 ×"
                     // and its item's values follow under it, indented.
@@ -2691,7 +2756,7 @@ impl FeatureDialog {
                     let mut details: Vec<AnyElement> = Vec::new();
                     // Arrays may be reordered (live: unless PREVENT_ARRAY_REORDER)
                     // once they have 2+ items: the reorder button and mode.
-                    let can_reorder = items >= 2;
+                    let can_reorder = items >= 2 && !s.hints.has(Hints::PREVENT_ARRAY_REORDER);
                     if !can_reorder {
                         self.reordering.remove(arr_id);
                     }
@@ -2739,6 +2804,9 @@ impl FeatureDialog {
                                 )
                             });
                         field = field.child(if reorder_on { self.reorder_target(row, arr_id, k, cx) } else { row });
+                        if focus_only {
+                            continue;
+                        }
                         let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
                         details.push(
                             v_flex()
@@ -2751,7 +2819,34 @@ impl FeatureDialog {
                         );
                     }
                     let path_s = path.to_string();
-                    let field = field.relative().when(can_reorder, |d| d.child(self.reorder_button(arr_id, cx))).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    // Live (os-param-array-clear-button): "CLEAR", 10.5 px
+                    // semibold black at 50 %, a 34 x 24 button 5 px in from
+                    // the header's right; "Clear all items".
+                    let clear = (focus_only && items > 0).then(|| {
+                        div()
+                            .id(SharedString::from(format!("clr-{path}")))
+                            .absolute()
+                            .top_0()
+                            .right(px(4.))
+                            .w(px(34.))
+                            .h(px(24.))
+                            .pt(px(4.))
+                            .flex()
+                            .justify_center()
+                            .text_size(px(10.5))
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                            .text_color(gpui_kit::rgba(0x00000080))
+                            .cursor_pointer()
+                            .child("CLEAR")
+                            .tooltip(crate::ui::tooltip("Clear all items"))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                this.feature.params.set(arr_id, ParamValue::Array(Vec::new()));
+                                this.inputs.retain(|p, _| !p.starts_with(&format!("{arr_id}.")));
+                                this.changed(cx);
+                                cx.notify();
+                            }))
+                    });
+                    let field = field.relative().children(clear).when(can_reorder, |d| d.child(self.reorder_button(arr_id, cx))).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         this.active_query = Some(path_s.clone());
                         window.focus(&this.focus, cx);
                         cx.emit(DialogEvent::QueryFocused);
@@ -2855,7 +2950,7 @@ impl FeatureDialog {
                                     this.active_query = Some(item_path(arr_id, a.len() - 1, q.id));
                                 }
                             }
-                            cx.emit(DialogEvent::Changed);
+                            this.changed(cx);
                             cx.notify();
                         })),
                 );
@@ -3239,7 +3334,7 @@ impl FeatureDialog {
             // holeEditLogic does it where it runs).
             noshape_model::features::hole_tables::apply_table_to_params(&mut self.feature.params);
             self.inputs.clear();
-            cx.emit(DialogEvent::Changed);
+            self.changed(cx);
         }
     }
 }
@@ -3326,25 +3421,12 @@ impl Render for FeatureDialog {
         let value_invalid = self.applied_value_error().is_some();
         let status = if value_invalid { Some((FeatureStatus::Error, VALUE_NOT_VALID.to_string())) } else { status };
         let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error | FeatureStatus::Warning));
-        // Live: ✓ is disabled while a field shows the error (pink: an empty
-        // required selection), and stays the normal green for an error of
-        // the regeneration itself ("has-regen-error", lp-over-failure-capture
-        // 10-22) and for an Add with an empty merge scope (qa5 BOOL4b).
-        // An array of selections (Loft's profiles) counts while it holds no
-        // picks (icons2: Loft with no profiles has its ✓ disabled, live).
-        let no_picks = |id: &str| match self.feature.params.get(id) {
-            Some(ParamValue::Array(items)) => items.iter().all(|it| it.0.values().all(|v| !matches!(v, ParamValue::Query(q) if !q.is_empty()))),
-            _ => false,
-        };
-        let pink = self.ty.params.iter().any(|s| {
-            s.is_visible(&self.feature.params)
-                && match s.kind {
-                    ParamKind::Query { .. } => self.field_error(s.id).is_some(),
-                    ParamKind::Array { .. } => self.field_error(s.id).is_some() && no_picks(s.id),
-                    _ => false,
-                }
-        }) || !self.parse_errors.is_empty();
-        let blocked = value_invalid || (invalid && pink && !status.as_ref().is_some_and(|s| s.1 == "No merge scope selected."));
+        // Live (`canSubmit`, woolsthorpe): ✓ waits for the dialog to be
+        // dirty (an edit, or a regeneration without an error) and for every
+        // applied value to be valid; regeneration errors and empty
+        // selections don't disable it (a new Loft with no profiles isn't
+        // dirty yet, icons2; an Add with no merge scope is, qa5 BOOL4b).
+        let blocked = value_invalid || !self.dirty;
         let title_color = if invalid { pal.text_invalid } else { pal.text };
         let shown = self.shown_feature();
         let name = noshape_model::interaction::display_name_computed(&shown, &|k| self.computed.get(k).cloned().or_else(|| shown_length(&shown, k, &self.units, &self.variables)));
@@ -3451,7 +3533,7 @@ impl Render for FeatureDialog {
                                                 this.feature.custom_name = true;
                                             }
                                             this.renaming = None;
-                                            cx.emit(DialogEvent::Changed);
+                                            this.changed(cx);
                                             cx.notify();
                                         }
                                     });
@@ -3550,7 +3632,7 @@ impl Render for FeatureDialog {
                             .tooltip("Preview the finished model instead of rolling back to this feature")
                             .on_click(cx.listener(|this, v: &bool, _, cx| {
                                 this.show_final = *v;
-                                cx.emit(DialogEvent::Changed);
+                                this.changed(cx);
                                 cx.notify();
                             })),
                     ))

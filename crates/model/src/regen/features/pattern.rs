@@ -91,7 +91,11 @@ fn code2(i: i64, j: i64) -> u32 {
     zigzag(i) | (zigzag(j) << 16)
 }
 
-fn linear_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
+/// Instances with their indices along the two directions.
+type Indexed = Vec<((i64, i64), Instance)>;
+
+/// Every instance but the seed, with its index (skipped ones included).
+fn linear_instances(ev: &EvalCtx) -> FResult<Indexed> {
     let Some(r1) = ev.query("directionOne").first() else { return crate::regen::eval::err_at(&["directionOne"], "Select a pattern direction.") };
     let Some(d1) = ev.resolve_direction(r1) else { return crate::regen::eval::err_at(&["directionOne"], "Select a pattern direction.") };
     let mut d1 = d1.normalize();
@@ -115,20 +119,19 @@ fn linear_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
     if n1 * n2 > 2500 {
         return err("Cannot have more than 2500 instances in a pattern.");
     }
-    let skip = skipped(ev, true)?;
     let mut out = Vec::new();
     for j in index_range(n2, c2) {
         for i in index_range(n1, ev.bool("isCentered")) {
-            if (i == 0 && j == 0) || skip.contains(&(i, j)) {
+            if i == 0 && j == 0 {
                 continue;
             }
-            out.push(Instance { code: code2(i, j), t: k::Transform::Translate(d1 * s1 * i as f64 + d2 * s2 * j as f64) });
+            out.push(((i, j), Instance { code: code2(i, j), t: k::Transform::Translate(d1 * s1 * i as f64 + d2 * s2 * j as f64) }));
         }
     }
     Ok(out)
 }
 
-fn circular_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
+fn circular_instances(ev: &EvalCtx) -> FResult<Indexed> {
     let Some(r) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select a pattern axis.") };
     let Some((origin, mut axis)) = ev.resolve_axis(r) else { return crate::regen::eval::err_at(&["axis"], "Select a pattern axis.") };
     if ev.bool("oppositeDirection") {
@@ -147,13 +150,12 @@ fn circular_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
     } else {
         angle
     };
-    let skip = skipped(ev, false)?;
     let mut out = Vec::new();
     for i in index_range(n, ev.bool("isCentered")) {
-        if i == 0 || skip.contains(&(i, 0)) {
+        if i == 0 {
             continue;
         }
-        out.push(Instance { code: code2(i, 0), t: k::Transform::Rotate { origin, axis, angle: step * i as f64 } });
+        out.push(((i, 0), Instance { code: code2(i, 0), t: k::Transform::Rotate { origin, axis, angle: step * i as f64 } }));
     }
     Ok(out)
 }
@@ -292,7 +294,7 @@ fn seed_box(ev: &EvalCtx) -> Option<(DVec3, DVec3)> {
 /// `TOLERANCE.zeroLength` (meters).
 const ZERO_LENGTH: f64 = 1e-8;
 
-fn curve_instances(ev: &EvalCtx) -> FResult<(Vec<Instance>, Option<&'static str>)> {
+fn curve_instances(ev: &EvalCtx) -> FResult<(Indexed, Option<&'static str>)> {
     let edges = resolve_curves(ev, ev.query("edges"))?;
     if edges.is_empty() {
         return crate::regen::eval::err_at(&["edges"], "Select a path to pattern along.");
@@ -377,12 +379,8 @@ fn curve_instances(ev: &EvalCtx) -> FResult<(Vec<Instance>, Option<&'static str>
     let (p0, t0) = path.at(0.0);
     let f0 = if faces.is_empty() { None } else { Some(frame(p0, t0)?) };
     let pn = path.plane_normal();
-    let skip = skipped(ev, false)?;
     let mut out = Vec::new();
     for i in 1..n {
-        if skip.contains(&(i, 0)) {
-            continue;
-        }
         let (p, t) = path.at(spacing * i as f64);
         let m = if orient == "KEEP_ORIENTATION" {
             DMat4::from_translation(p - p0)
@@ -399,12 +397,30 @@ fn curve_instances(ev: &EvalCtx) -> FResult<(Vec<Instance>, Option<&'static str>
             };
             DMat4::from_translation(p) * DMat4::from_quat(rot) * DMat4::from_translation(-p0)
         };
-        out.push(Instance { code: code2(i, 0), t: k::Transform::Matrix(m) });
+        out.push(((i, 0), Instance { code: code2(i, 0), t: k::Transform::Matrix(m) }));
     }
     Ok((out, info))
 }
 
 // ------------------------------------------------------------------ entry points
+
+/// The instances left after skipping. With Skip instances on, also the
+/// points to toggle them (linearPattern.fs `TOGGLE_POINTS` manipulator):
+/// the seed's bounding-box centre (patternUtils.fs `getStartPoint`) moved by
+/// each instance, the seed's own point first and not toggleable.
+fn toggle_points(ev: &mut EvalCtx, all: &[((i64, i64), Instance)], skip: &BTreeSet<(i64, i64)>) -> Vec<Instance> {
+    if ev.bool("skipInstances")
+        && let Some((lo, hi)) = seed_box(ev)
+    {
+        let c = (lo + hi) / 2.0;
+        ev.toggle_points.push(crate::display::TogglePoint { pos: c.to_array(), index: (0, 0), seed: true, selected: false });
+        for (index, inst) in all {
+            let pos = inst.t.matrix().transform_point3(c).to_array();
+            ev.toggle_points.push(crate::display::TogglePoint { pos, index: *index, seed: false, selected: skip.contains(index) });
+        }
+    }
+    all.iter().filter(|(i, _)| !skip.contains(i)).map(|(_, inst)| inst.clone()).collect()
+}
 
 /// Both linear directions set and parallel (linearPattern.fs reports it).
 fn parallel_directions(ev: &EvalCtx) -> bool {
@@ -417,7 +433,7 @@ fn parallel_directions(ev: &EvalCtx) -> bool {
 
 pub fn linear_pattern(ev: &mut EvalCtx) -> FResult<()> {
     check_seeds(ev, "pattern")?;
-    let inst = linear_instances(ev)?;
+    let all = linear_instances(ev)?;
     let two = ev.bool("hasSecondDir");
     let (n1, n2) = (ev.integer("instanceCount")?.max(1), if two { ev.integer("instanceCountTwo")?.max(1) } else { 1 });
     let (c1, c2) = (ev.bool("isCentered"), two && ev.bool("isCenteredTwo"));
@@ -426,25 +442,28 @@ pub fn linear_pattern(ev: &mut EvalCtx) -> FResult<()> {
     if parallel_directions(ev) {
         ev.infos.push("Parallel directions selected for first and second direction.".into());
     }
+    let inst = toggle_points(ev, &all, &skip);
     run_pattern(ev, inst)
 }
 
 pub fn circular_pattern(ev: &mut EvalCtx) -> FResult<()> {
     check_seeds(ev, "pattern")?;
-    let inst = circular_instances(ev)?;
+    let all = circular_instances(ev)?;
     let (n, centered) = (ev.integer("instanceCount")?.max(1), ev.bool("isCentered"));
     let skip = skipped(ev, false)?;
     skip_info(ev, &skip, (n, centered), (1, false));
+    let inst = toggle_points(ev, &all, &skip);
     run_pattern(ev, inst)
 }
 
 pub fn curve_pattern(ev: &mut EvalCtx) -> FResult<()> {
     check_seeds(ev, "pattern")?;
-    let (inst, info) = curve_instances(ev)?;
+    let (all, info) = curve_instances(ev)?;
     ev.infos.extend(info.map(String::from));
     let n = ev.integer("instanceCount")?.max(1);
     let skip = skipped(ev, false)?;
     skip_info(ev, &skip, (n, false), (1, false));
+    let inst = toggle_points(ev, &all, &skip);
     run_pattern(ev, inst)
 }
 

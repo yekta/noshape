@@ -220,7 +220,18 @@ const LOFT_FAILED: &str = "Could not create loft with given information. Check p
 
 pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let body_type = ev.enum_("bodyType").to_string();
-    // sweep.fs: a thin sweep checks its wall before the path.
+    // sweep.fs: the direction to lock is checked first (live: with no
+    // path either, "Direction to lock" is the pink field).
+    let lock_dir = match ev.enum_("profileControl") {
+        "LOCK_DIRECTION" => {
+            let no_dir = || crate::regen::eval::err_at(&["lockDirectionQuery"], "Select direction to lock.");
+            let Some(r) = ev.query("lockDirectionQuery").first() else { return no_dir() };
+            let Some(d) = ev.resolve_direction(r) else { return no_dir() };
+            Some(d)
+        }
+        _ => None,
+    };
+    // sweep.fs (thinSweep, after the direction): the wall before the path.
     if body_type == "THIN" && ev.query("wallShape").is_empty() {
         return crate::regen::eval::err_at(&["wallShape"], "Select faces or sketch regions to sweep.");
     }
@@ -253,15 +264,6 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         0.0
     };
     let mut opts = k::SweepOptions { scale_end: if ev.bool("hasScale") { ev.real("scaleFactor")? } else { 1.0 }, twist, ..Default::default() };
-    let lock_dir = match ev.enum_("profileControl") {
-        "LOCK_DIRECTION" => {
-            let no_dir = || crate::regen::eval::err_at(&["lockDirectionQuery"], "Select direction to lock.");
-            let Some(r) = ev.query("lockDirectionQuery").first() else { return no_dir() };
-            let Some(d) = ev.resolve_direction(r) else { return no_dir() };
-            Some(d)
-        }
-        _ => None,
-    };
     let keep = ev.is("profileControl", "KEEP_ORIENTATION");
     // Lock profile faces: the profile keeps its orientation relative to the
     // faces' normal along the path (which lies on them).

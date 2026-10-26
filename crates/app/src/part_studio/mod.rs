@@ -784,7 +784,9 @@ impl PartStudioView {
                 self.message = None;
             }
             self.ui.dialog_info = info;
+            let regen_ok = self.display.feature_state(id).is_some_and(|s| matches!(s.status, FeatureStatus::Ok | FeatureStatus::Info | FeatureStatus::Warning));
             e.dialog.update(cx, |d, cx| {
+                d.note_regenerated(regen_ok);
                 d.set_status(st, cx);
                 d.set_faulty(faulty, cx);
             });
@@ -954,6 +956,29 @@ impl PartStudioView {
             && (!st.debug.lines.is_empty() || !st.debug.points.is_empty() || !st.debug.colored.is_empty())
         {
             extra.extend(scene_builder::debug_geometry(&st.debug, self.gpu.uploader()));
+        }
+        // Live (p1audit skip-02..04): the instance points on top, 11 px
+        // white discs ringed #606a72, the hovered one #134e96, a skipped
+        // one #a2b9df; the seed's a 4 px white dot.
+        if let Some(pts) = self.toggle_points(cx).filter(|p| !p.is_empty()) {
+            use noshape_render::{LineSegment, PointSprite};
+            let sprites = pts
+                .iter()
+                .map(|t| {
+                    let (color, size, style) = if t.seed {
+                        ([255, 255, 255, 255], 4.0, LineSegment::ON_TOP)
+                    } else if self.ui.toggle_hover == Some(t.index) {
+                        ([0x13, 0x4e, 0x96, 255], TOGGLE_POINT_PX, LineSegment::ON_TOP | PointSprite::HOLLOW)
+                    } else if t.selected {
+                        ([0xa2, 0xb9, 0xdf, 255], TOGGLE_POINT_PX, LineSegment::ON_TOP | PointSprite::HOLLOW)
+                    } else {
+                        ([0x60, 0x6a, 0x72, 255], TOGGLE_POINT_PX, LineSegment::ON_TOP | PointSprite::HOLLOW)
+                    };
+                    PointSprite { position: glam::DVec3::from_array(t.pos).as_vec3().into(), color, pick_id: 0, size, style, _pad: 0 }
+                })
+                .collect();
+            let up = self.gpu.uploader();
+            extra.push(noshape_render::Instance::new(noshape_render::Drawable::Points(up.upload_points(&noshape_render::PointData { points: sprites }))).per_primitive_color().unpickable().ignore_clip().layer(22));
         }
         crate::nav_trace::highlights("part_studio", &selection, single_hover.as_ref());
         // Planes picked in the graphics stop dragging their rings once
@@ -1228,6 +1253,55 @@ impl PartStudioView {
         }
     }
 
+    /// The edited pattern's instance points while its "Instances to skip"
+    /// field is active (FeatureScript `TOGGLE_POINTS`).
+    fn toggle_points(&self, cx: &App) -> Option<&[noshape_model::display::TogglePoint]> {
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        d.toggle_points_field()?;
+        Some(&self.display.feature_state(d.feature.id)?.toggle_points)
+    }
+
+    /// The instance point under `p` (viewport px), the seed's excepted.
+    fn toggle_point_at(&self, p: glam::DVec2, cx: &App) -> Option<(i64, i64)> {
+        let vp = self.viewport.read(cx);
+        self.toggle_points(cx)?
+            .iter()
+            .filter(|t| !t.seed)
+            .filter_map(|t| Some((t.index, vp.project(glam::DVec3::from_array(t.pos))?.distance(p))))
+            .filter(|(_, d)| *d <= f64::from(TOGGLE_POINT_PX) / 2.0 + 1.0)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(i, _)| i)
+    }
+
+    /// Live (p1audit skip-02..04): with "Instances to skip" active, a point
+    /// under the pointer turns blue and a click skips or keeps its instance.
+    fn toggle_points_event(&mut self, ev: &ViewportEvent, cx: &mut Context<Self>) -> bool {
+        if self.toggle_points(cx).is_none() {
+            if self.ui.toggle_hover.take().is_some() {
+                self.refresh_scene(false, cx);
+            }
+            return false;
+        }
+        match ev {
+            ViewportEvent::PointerMove { position, .. } => {
+                let h = self.toggle_point_at(*position, cx);
+                if h != self.ui.toggle_hover {
+                    self.ui.toggle_hover = h;
+                    self.refresh_scene(false, cx);
+                }
+                false
+            }
+            ViewportEvent::Click { position, .. } => {
+                let Some(i) = self.toggle_point_at(*position, cx) else { return false };
+                if let Some(e) = &self.edit {
+                    e.dialog.update(cx, |d, cx| d.toggle_instance(i, cx));
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// Onshape: with a feature dialog open, clicking a feature in the list
     /// feeds the active selection field: feature fields (feature pattern)
     /// take the feature, region fields take every region of a sketch, so a
@@ -1442,6 +1516,9 @@ impl PartStudioView {
             return;
         }
         if self.sketch.is_some() && self.sketch_viewport_event(vp, ev, window, cx) {
+            return;
+        }
+        if self.sketch.is_none() && self.toggle_points_event(ev, cx) {
             return;
         }
         if self.sketch.is_none() && self.manipulator_event(ev, window, cx) {
@@ -5500,3 +5577,6 @@ mod default_row_tests {
         assert!(!kind_matches(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
     }
 }
+
+/// A pattern instance point's diameter (live p1audit skip-02: 11 px).
+const TOGGLE_POINT_PX: f32 = 11.0;

@@ -276,7 +276,7 @@ pub fn skip_instances(two_directions: bool) -> Vec<ParamSpec> {
         ParamSpec::bool("skipInstances", "Skip instances", false).hints(Hints::GROUP_HEADER),
         ParamSpec::array("skippedInstances", "Instances to skip", "instance", item)
             .item_template(template)
-            .hints(Hints::INITIAL_FOCUS)
+            .hints(Hints::INITIAL_FOCUS | Hints::ALLOW_ARRAY_FOCUS | Hints::PREVENT_ARRAY_REORDER)
             .visible(|v| v.bool("skipInstances")),
     ]
 }

@@ -354,6 +354,21 @@ pub struct FeatureState {
     /// A feature's debug geometry (FeatureScript `addDebugEntities`), drawn
     /// while its dialog is open: Helix's start and end profiles.
     pub debug: DebugGeometry,
+    /// A pattern's instance points while Skip instances is on (FeatureScript
+    /// `TOGGLE_POINTS` manipulator): clicked to skip or keep an instance.
+    pub toggle_points: Vec<TogglePoint>,
+}
+
+/// One point of a `TOGGLE_POINTS` manipulator.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TogglePoint {
+    pub pos: [f64; 3],
+    /// The instance's indices along the first and second directions.
+    pub index: (i64, i64),
+    /// The seed's point: drawn, never toggled.
+    pub seed: bool,
+    /// Skipped.
+    pub selected: bool,
 }
 
 /// Polylines and points in world coordinates (see [`FeatureState::debug`]).
