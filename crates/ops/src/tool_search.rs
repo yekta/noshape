@@ -3,7 +3,7 @@
 //! tools while sketching) and the Assembly. Shared by the app's search
 //! popovers and the agent API's ui_search_tools.
 
-use noshape_scene::sketch_mode::Tool;
+use noshape_scene::sketch_mode::{ConstraintTool, Tool};
 
 /// The Part Studio's ranking (live, menus/tool-search-*.png): the tools
 /// whose names contain the typed letters in order ("fil" finds Fillet,
@@ -128,4 +128,51 @@ pub fn sketch_search_name(t: Tool) -> &'static str {
 /// search row's key badge (live: Fillet "shift f", Offset "o").
 pub fn sketch_tool_shortcut(t: Tool) -> Option<&'static str> {
     t.label().rsplit_once(" (").and_then(|(_, k)| k.strip_suffix(')'))
+}
+
+/// Onshape's sketch toolbar groups (the button shows the group's last used tool).
+pub const SKETCH_DRAW_TOOLS: &[&[Tool]] = &[
+    &[Tool::Line, Tool::MidpointLine],
+    &[Tool::CornerRect, Tool::CenterRect, Tool::AlignedRect],
+    &[Tool::Circle, Tool::ThreePointCircle, Tool::Ellipse],
+    &[Tool::Arc3, Tool::TangentArc, Tool::CenterArc, Tool::EllipticalArc, Tool::Conic],
+    &[Tool::Polygon, Tool::CircumPolygon],
+    &[Tool::Spline, Tool::Bezier, Tool::SplinePoint],
+    &[Tool::Point],
+    &[Tool::Text],
+];
+
+pub const SKETCH_USE_TOOLS: &[&[Tool]] = &[&[Tool::Use, Tool::Intersection]];
+
+pub const SKETCH_EDIT_TOOLS: &[&[Tool]] = &[
+    &[Tool::Fillet, Tool::Chamfer],
+    &[Tool::Trim, Tool::Extend, Tool::Split],
+    &[Tool::Offset, Tool::Slot],
+    &[Tool::Mirror],
+    &[Tool::LinearPattern, Tool::CircularPattern, Tool::Transform],
+];
+
+pub const SKETCH_INSERT_TOOLS: &[&[Tool]] = &[&[Tool::InsertDxf, Tool::InsertImage]];
+
+pub const SKETCH_CONSTRAINT_TOOLS: &[ConstraintTool] = &[
+    ConstraintTool::Coincident,
+    ConstraintTool::Concentric,
+    ConstraintTool::Parallel,
+    ConstraintTool::Tangent,
+    ConstraintTool::Horizontal,
+    ConstraintTool::Vertical,
+    ConstraintTool::Perpendicular,
+    ConstraintTool::Equal,
+    ConstraintTool::Midpoint,
+    ConstraintTool::Normal,
+    ConstraintTool::Pierce,
+    ConstraintTool::Symmetric,
+    ConstraintTool::Fix,
+    ConstraintTool::Curvature,
+];
+
+/// Every sketch toolbar tool, in toolbar order (tool search).
+pub fn all_sketch_tools() -> impl Iterator<Item = Tool> {
+    let groups = SKETCH_DRAW_TOOLS.iter().chain(SKETCH_USE_TOOLS).chain(SKETCH_EDIT_TOOLS).chain(SKETCH_INSERT_TOOLS);
+    groups.flat_map(|g| g.iter().copied()).chain(std::iter::once(Tool::Dimension)).chain(SKETCH_CONSTRAINT_TOOLS.iter().map(|c| Tool::Constraint(*c)))
 }

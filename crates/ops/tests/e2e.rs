@@ -3951,6 +3951,11 @@ fn ui_search_tools_ranks_like_onshape() {
     assert_eq!(&names[..2], ["Fillet", "Fill"], "{t}");
     assert_eq!((t["tools"][0]["type"].clone(), t["tools"][0]["keys"].clone()), (json!("fillet"), json!("shift-f")), "{t}");
     assert!(call(&mut ctx, "ui_search_tools", json!({ "text": "" }))["tools"].as_array().unwrap().is_empty());
+    // In a sketch: the sketch tools only, by their plain names (live qa5-ts-sketch-*).
+    let s = call(&mut ctx, "ui_search_tools", json!({ "text": "chamfer", "sketch": true }));
+    assert_eq!(s["tools"], json!([{ "name": "Chamfer", "keys": null }]), "{s}");
+    let s = call(&mut ctx, "ui_search_tools", json!({ "text": "fillet", "sketch": true }));
+    assert_eq!(s["tools"][0], json!({ "name": "Fillet", "keys": "Shift+F" }), "{s}");
 }
 
 /// Clear missing references (feature_clear_missing): a fillet whose edges'
