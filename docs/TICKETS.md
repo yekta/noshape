@@ -74,6 +74,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Horizontal/Vertical constraints (sketch_get lists it); live constrains to the external Origin (qa5 2026-10-26)
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 RHINO-GREEN the green build (/root/green/noshape, the lead's watcher build) has no openNURBS: Part › Export… ›
+  RHINO → toast "Export failed: unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT
+  (scripts/build-opennurbs.sh)", while RHINO stays offered in the format list. Releases build it (release.yml); the
+  watcher's build should match the release configuration so QA tests what ships (lead: watcher build env); and a build
+  without openNURBS shouldn't list RHINO (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P3 docs/USER_GUIDE.md says "Undo/redo … work across sessions"; they don't (the undo history starts empty after a
   reopen, which is also live's behaviour): fix the sentence (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P2 VERSION-0.4.6 exported files and the app report version 0.4.6 (STEP header `originating_system 'NOSHAPE 0.4.6'`)
