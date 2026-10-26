@@ -582,15 +582,19 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     let mut done = false;
     let bodies: BTreeSet<usize> = s1.keys().chain(s2.keys()).copied().collect();
     for bi in bodies.into_iter().rev() {
-        let (Some(a), Some(b)) = (s1.get(&bi), s2.get(&bi)) else { continue };
-        let body = ev.ctx.bodies[bi].clone();
-        let ef = body.shape.edge_faces()?;
-        let mut edges: Vec<usize> = ef
-            .iter()
-            .enumerate()
-            .filter(|(_, fs)| fs.len() == 2 && ((a.contains(&(fs[0] as usize)) && b.contains(&(fs[1] as usize))) || (a.contains(&(fs[1] as usize)) && b.contains(&(fs[0] as usize)))))
-            .map(|(i, _)| i)
-            .collect();
+        let (Some(a0), Some(b0)) = (s1.get(&bi), s2.get(&bi)) else { continue };
+        let (mut a, mut b) = (a0.clone(), b0.clone());
+        let mut body = ev.ctx.bodies[bi].clone();
+        let between = |shape: &Shape, a: &[usize], b: &[usize]| -> FResult<Vec<usize>> {
+            Ok(shape
+                .edge_faces()?
+                .iter()
+                .enumerate()
+                .filter(|(_, fs)| fs.len() == 2 && ((a.contains(&(fs[0] as usize)) && b.contains(&(fs[1] as usize))) || (a.contains(&(fs[1] as usize)) && b.contains(&(fs[0] as usize)))))
+                .map(|(i, _)| i)
+                .collect())
+        };
+        let mut edges = between(&body.shape, &a, &b)?;
         let spec = super::blend_section::BlendSpec {
             section,
             r1,
@@ -603,14 +607,36 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         };
         let blend_failed = |e: crate::regen::eval::FeatureError| if e.message == "Failed to fillet selections." { fe("Failed to blend faces.") } else { e };
         if edges.is_empty() {
-            // Faces without a common edge (live GA/GC).
+            // Faces without a common edge (live GA/GC/NP2).
             if spine_dir.is_some() {
                 continue;
             }
-            super::blend_section::apart_blend(ev, bi, a[0], b[0], &spec, [ev.bool("flipSide1"), ev.bool("flipSide2")]).map_err(blend_failed)?;
-            done = true;
-            continue;
+            let planar = |f: usize| body.shape.sub_shape(ShapeType::Face, f).ok().and_then(|s| s.face_plane().ok().flatten()).is_some();
+            if planar(a[0]) && planar(b[0]) {
+                super::blend_section::apart_blend(ev, bi, a[0], b[0], &spec, [ev.bool("flipSide1"), ev.bool("flipSide2")]).map_err(blend_failed)?;
+                done = true;
+                continue;
+            }
+            // Curved sides: the faces between them go (healed by extending
+            // the sides, as live: NP2's chamfer), then the sides' new common
+            // edge is blended.
+            super::blend_section::apart_senses(&body.shape, a[0], b[0], &spec, [ev.bool("flipSide1"), ev.bool("flipSide2")]).map_err(blend_failed)?;
+            let Some(gap) = super::blend_section::gap_faces(&body.shape, a[0], b[0])? else { return err("Failed to blend faces.") };
+            let all = body.shape.faces();
+            let del: Vec<Shape> = gap.iter().map(|f| all[*f].clone()).collect();
+            let healed = k::delete_faces(&body.shape, &del).map_err(kerr("Failed to blend faces."))?;
+            let names = body.shape_names();
+            let face_names = ev.name_result(&[&names], &healed.history, &healed.shape, &BTreeMap::new(), None);
+            ev.replace_body(bi, healed.shape, face_names);
+            body = ev.ctx.bodies[bi].clone();
+            let mine = |q: &str| ev.resolve_faces(ev.query(q)).into_iter().filter(|(x, _)| *x == bi).map(|(_, f)| f).collect::<Vec<usize>>();
+            (a, b) = (mine("side1"), mine("side2"));
+            edges = between(&body.shape, &a, &b)?;
+            if edges.is_empty() {
+                return err("Failed to blend faces.");
+            }
         }
+        let spec = super::blend_section::BlendSpec { sides: Some(super::blend_section::Sides { side1: a.clone(), ratio }), ..spec };
         if ev.bool("propagation") && ev.is("propagationType", "TANGENT") {
             edges = super::detail::propagate_tangent(&body.shape, &edges);
         }
@@ -628,7 +654,10 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
                 }
             }
         }
-        if !rolling_ball {
+        // OCCT's rolling ball splits a blend along other curves into patches
+        // (live NE: one spline face): those go through the section sweep too.
+        let other_curves = edges.iter().any(|&e| body.shape.sub_shape(ShapeType::Edge, e).and_then(|e| e.edge_info()).is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. } | k::Curve::Circle { .. })));
+        if !rolling_ball || other_curves {
             super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(blend_failed)?;
             done = true;
             continue;

@@ -2428,9 +2428,185 @@ fn face_blend_without_a_common_edge_as_live() {
             }), "{case}: no vertex at x {x} z {z}");
         }
     }
-    let err = |poly, base, wall, r, flips| run(poly, base, wall, r, flips).2;
-    assert_eq!(err(ga, (23.5, 5.0), (5.0, 18.5), "4 mm", [false, false]), "Side 2 direction is invalid.");
-    assert_eq!(err(ga, (23.5, 5.0), (5.0, 18.5), "4 mm", [true, true]), "Side 1 direction is invalid.");
-    assert_eq!(err(gc, (25.0, 5.0), (5.0, 16.0), "8 mm", [false, false]), "Side 2 direction is invalid.");
-    assert_eq!(err(gc, (25.0, 5.0), (5.0, 16.0), "3 mm", [false, true]), "Provided dimension is too small.");
+    // Live's messages (psb 10-26 b, tooltips): default flips put side 2 on
+    // the wrong side here, Flip side 1 puts side 1 wrong.
+    let gb: &[(f64, f64)] = &[(0.0, 0.0), (40.0, 0.0), (40.0, 5.0), (7.0, 5.0), (5.0, 9.0), (5.0, 30.0), (0.0, 30.0)];
+    let gd: &[(f64, f64)] = &[(0.0, 0.0), (20.0, 0.0), (20.0, 5.0), (10.0, 5.0), (10.0, 2.0), (5.0, 2.0), (5.0, 30.0), (0.0, 30.0)];
+    type Geo<'a> = (&'a [(f64, f64)], (f64, f64), (f64, f64));
+    let geo = |g: &str| -> Geo {
+        match g {
+            "GA" => (ga, (23.5, 5.0), (5.0, 18.5)),
+            "GB" => (gb, (23.5, 5.0), (5.0, 19.5)),
+            "GC" => (gc, (25.0, 5.0), (5.0, 16.0)),
+            _ => (gd, (15.0, 5.0), (5.0, 16.0)),
+        }
+    };
+    const LARGE: &str = "Provided dimension is too large.";
+    const SIDE2: &str = "Side 2 direction is invalid.";
+    let live: &[(&str, &str, [bool; 2], &str)] = &[
+        ("GA", "1 mm", [false, false], "Failed to blend faces."),
+        ("GA", "2 mm", [false, false], SIDE2),
+        ("GA", "4 mm", [false, false], SIDE2),
+        ("GA", "4 mm", [true, true], "Side 1 direction is invalid."),
+        ("GA", "4 mm", [true, false], "Both side 1 and side 2 directions are invalid."),
+        ("GB", "2 mm", [false, false], "Failed to blend faces."),
+        ("GB", "2 mm", [false, true], "Provided dimension is too small."),
+        ("GB", "2 mm", [true, true], LARGE),
+        ("GB", "2 mm", [true, false], LARGE),
+        ("GC", "1 mm", [false, false], LARGE),
+        ("GC", "2 mm", [false, false], LARGE),
+        ("GC", "3 mm", [false, false], LARGE),
+        ("GC", "4 mm", [false, false], LARGE),
+        ("GC", "4.5 mm", [false, false], LARGE),
+        ("GC", "5 mm", [false, false], SIDE2),
+        ("GC", "6 mm", [false, false], SIDE2),
+        ("GC", "7 mm", [false, false], SIDE2),
+        ("GC", "8 mm", [false, false], SIDE2),
+        ("GC", "10 mm", [false, false], SIDE2),
+        ("GC", "30 mm", [false, false], LARGE),
+        ("GC", "3 mm", [false, true], "Provided dimension is too small."),
+        ("GC", "8 mm", [true, true], "Side 1 direction is invalid."),
+        ("GD", "17 mm", [false, false], LARGE),
+        ("GD", "17 mm", [true, false], LARGE),
+        ("GD", "17 mm", [true, true], LARGE),
+    ];
+    let mut bad = Vec::new();
+    for &(g, r, flips, want) in live {
+        let (poly, base, wall) = geo(g);
+        let (_, st, msg) = run(poly, base, wall, r, flips);
+        if st != FeatureStatus::Error || msg != want {
+            bad.push(format!("{g} r {r} flips {flips:?}: {st:?} {msg:?}, live {want:?}"));
+        }
+    }
+    assert!(bad.is_empty(), "{bad:#?}");
+}
+
+/// Face blends between a plate's top and a boss's side (live psb 10-26 b
+/// NP1/NC/NE: a 40 × 40 × 5 plate, a boss 20 high at (20, 20): a Ø16
+/// cylinder, a cone drafted 10° outward, an ellipse 10 × 6), and across a
+/// 1 mm chamfer at the cylinder's foot (NP2, no common edge).
+#[test]
+fn face_blend_on_curved_faces_as_live() {
+    let build = |boss: &str, chamfer: bool| -> Studio {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 40.0), (0.0, 40.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("5 mm"));
+        });
+        let pl = top_plane_at(&mut s, 5.0);
+        let mut sk = noshape_sketch::Sketch::new();
+        if boss == "ell" {
+            sk.add_ellipse(DVec2::new(mm(20.0), mm(20.0)), DVec2::new(mm(10.0), 0.0), mm(6.0));
+        } else {
+            sk.add_circle(DVec2::new(mm(20.0), mm(20.0)), mm(8.0));
+        }
+        let sid = s.sketch(Reference::FeaturePlane(pl), sk);
+        let region = s.region(sid);
+        let cone = boss == "cone";
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("20 mm"));
+            p.set("operationType", en("ADD"));
+            p.set("defaultScope", ParamValue::Bool(true));
+            if cone {
+                p.set("hasDraft", ParamValue::Bool(true));
+                p.set("draftAngle", expr("10 deg"));
+            }
+        });
+        if chamfer {
+            let r = s.ok();
+            let b = &r.context.bodies[0];
+            let foot = b.shape.edges().iter().position(|e| matches!(e.edge_info().unwrap().curve, noshape_kernel::Curve::Circle { center, .. } if (center - DVec3::new(mm(20.0), mm(20.0), mm(5.0))).length() < 1e-9)).unwrap();
+            let e = Reference::Edge((*b.edges[foot]).clone());
+            s.add("chamfer", move |p| {
+                p.set("entities", q(e));
+                p.set("width", expr("1 mm"));
+            });
+        }
+        s
+    };
+    let run = |boss: &str, chamfer: bool, ps: &[(&'static str, &'static str)]| -> (RegenResult, FeatureStatus, String) {
+        let mut s = build(boss, chamfer);
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let faces = b.shape.faces();
+        let top = faces.iter().position(|f| f.is_planar() && (f.centroid().unwrap().z - mm(5.0)).abs() < 1e-9).unwrap();
+        let side = (0..faces.len()).filter(|i| !faces[*i].is_planar()).max_by(|x, y| faces[*x].area().unwrap().total_cmp(&faces[*y].area().unwrap())).unwrap();
+        let (side1, side2) = (Reference::Face((*b.faces[top]).clone()), Reference::Face((*b.faces[side]).clone()));
+        let ps = ps.to_vec();
+        s.add("faceBlend", move |p| {
+            p.set("side1", q(side1));
+            p.set("side2", q(side2));
+            p.set("radius", expr("3 mm"));
+            for (k, v) in ps {
+                match v {
+                    "true" | "false" => p.set(k, ParamValue::Bool(v == "true")),
+                    _ if v.chars().next().is_some_and(|c| c.is_ascii_uppercase()) => p.set(k, en(v)),
+                    _ => p.set(k, expr(v)),
+                }
+            }
+        });
+        let res = s.regen();
+        let st = res.display.features.last().unwrap();
+        let (status, msg) = (st.status, st.message.clone().unwrap_or_default());
+        (res, status, msg)
+    };
+    let conic: &[(&str, &str)] = &[("crossSectionShape", "CONIC"), ("rho", "0.8")];
+    let asym: &[(&str, &str)] = &[("asymmetric", "true"), ("secondRadius", "5 mm")];
+    let curv: &[(&str, &str)] = &[("crossSectionShape", "CURVATURE"), ("magnitude", "0.5")];
+    // (boss, chamfer, params, live volume mm³, tolerance: exact for live's
+    // tori, live's spline volumes are approximate)
+    type Case<'a> = (&'a str, bool, &'a [(&'a str, &'a str)], f64, f64);
+    let cases: &[Case] = &[
+        ("cyl", false, &[], 12126.454190269484, 1e-3),
+        ("cyl", false, conic, 12039.098545064344, 0.3),
+        ("cyl", false, asym, 12205.795285870454, 0.3),
+        ("cyl", false, curv, 12100.650259847143, 0.3),
+        ("cyl", false, &[("blendControlType", "WIDTH"), ("width", "4 mm")], 12114.35016657624, 1e-3),
+        ("cone", false, &[], 14216.073832931994, 1e-3),
+        ("cone", false, conic, 14079.803858074943, 0.3),
+        // Live's asymmetric volumes run below the exact ones (planar FB1:
+        // 0.07, FB1s: 0.24 mm³); here 0.30.
+        ("cone", false, asym, 14348.18813667932, 0.4),
+        ("cone", false, curv, 14168.507538229507, 0.3),
+        // The ellipse: live's volumes (11877.2380437, 11788.1882055,
+        // 11957.1335869, 11850.6663925) are its mass properties of the
+        // swept side, 0.22–0.59 above the exact ones: the section's area ×
+        // the perimeter + 2π × its first moment (∮κ ds = 2π), which on the
+        // cylinder give live's torus to 1e-10.
+        ("ell", false, &[], 11876.64972941147, 0.01),
+        ("ell", false, conic, 11787.964738547293, 0.01),
+        ("ell", false, asym, 11956.844326144315, 0.01),
+        ("ell", false, curv, 11850.41619051624, 0.01),
+        // Across the chamfer with Flip side 2: the chamfer goes, as NP1.
+        ("cyl", true, &[("flipSide2", "true")], 12126.454190269484, 1e-3),
+    ];
+    let mut bad = Vec::new();
+    for &(boss, chamfer, ps, live, tol) in cases {
+        let (res, st, msg) = run(boss, chamfer, ps);
+        if st != FeatureStatus::Ok {
+            bad.push(format!("{boss} chamfer={chamfer} {ps:?}: {st:?} {msg}"));
+            continue;
+        }
+        let v = volume(&res, 0) * 1e9;
+        let faces = res.context.bodies[0].shape.faces().len();
+        if !near(v, live, tol) || faces != 9 {
+            let kinds: Vec<String> = res.context.bodies[0].shape.faces().iter().map(|f| format!("{:?} {:.3}", f.face_surface().map(|s| format!("{s:?}").chars().take(20).collect::<String>()), f.area().unwrap() * 1e6)).collect();
+            bad.push(format!("{boss} chamfer={chamfer} {ps:?}: volume {v} vs live {live}, {faces} faces {kinds:?}"));
+        }
+    }
+    // Across the chamfer with the default flips (side 2 on the wrong side)
+    // and with Flip side 1 (both wrong): live's messages.
+    for (r, flip1, want) in [("1 mm", false, "Failed to blend faces."), ("2 mm", false, "Provided dimension is too large."), ("3 mm", false, "Provided dimension is too large."), ("5 mm", false, "Provided dimension is too large."), ("8 mm", false, "Provided dimension is too large."), ("12 mm", false, "Provided dimension is too large."), ("3 mm", true, "Provided dimension is too large.")] {
+        let ps: Vec<(&'static str, &'static str)> = vec![("radius", r), ("flipSide1", if flip1 { "true" } else { "false" })];
+        let (_, st, msg) = run("cyl", true, &ps);
+        if st != FeatureStatus::Error || msg != want {
+            bad.push(format!("chamfer r {r} flip1={flip1}: {st:?} {msg:?}, live {want:?}"));
+        }
+    }
+    assert!(bad.is_empty(), "{bad:#?}");
 }

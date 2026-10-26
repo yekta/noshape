@@ -452,10 +452,61 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         return Err(fail("empty partial range"));
     }
     let partial = spec.partial.is_some();
+    // Other curves (live NE: an elliptic boss's foot): sections along the
+    // whole chain, lofted into one tool (live's blend face is one spline).
+    let general = chain.iter().any(|c| c.shape.edge_info().is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. } | k::Curve::Circle { .. })));
     let feature = ev.feature;
     let (mut cuts, mut adds) = (Vec::new(), Vec::new());
+    if general {
+        const N: usize = 64;
+        let closed = (chain[0].start - chain[chain.len() - 1].end).length() < 1e-9 && lo <= 1e-12 && hi >= total - 1e-12;
+        let station = |s: f64| -> FResult<(DVec3, Frame, bool)> {
+            let mut acc = 0.0;
+            let last = chain.len() - 1;
+            for (i, c) in chain.iter().enumerate() {
+                if s <= acc + c.length || i == last {
+                    let info = c.shape.edge_info()?;
+                    let f = ((s - acc) / c.length).clamp(0.0, 1.0);
+                    let t = info.first_param + (info.last_param - info.first_param) * if c.forward { f } else { 1.0 - f };
+                    let p = c.shape.point_at(t)?;
+                    let fs = ef.get(c.index).cloned().unwrap_or_default();
+                    if fs.len() != 2 {
+                        return Err(fail("the edge doesn't have two faces"));
+                    }
+                    let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+                    let side1_first = spec.sides.as_ref().is_none_or(|sd| sd.side1.contains(&(fs[0] as usize)));
+                    let fr = frame_at(shape, ff, p, c.shape.tangent_at(t)?.normalize(), scale)?;
+                    return Ok((p, fr, side1_first));
+                }
+                acc += c.length;
+            }
+            Err(fail("empty chain"))
+        };
+        let mut secs = Vec::new();
+        let mut convex = false;
+        let count = if closed { N } else { N + 1 };
+        for k in 0..count {
+            let (p, fr, side1_first) = station(lo + (hi - lo) * k as f64 / N as f64)?;
+            let (face, _, cv) = section_face(p, &fr, spec, side1_first)?;
+            convex = cv;
+            secs.push(face);
+        }
+        let tool = k::loft(&secs, &k::LoftOptions { solid: true, closed, ..Default::default() })?;
+        // The face touching neither support is the blend face.
+        let ename = body.edges[chain[0].index].clone();
+        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
+        let supports: Vec<&Shape> = chain.iter().flat_map(|c| ef.get(c.index).cloned().unwrap_or_default()).map(|f| &faces[f as usize]).collect();
+        let on = |f: &Shape, s: &Shape| -> bool {
+            let Some(q) = super::helpers_a::point_on_face(f) else { return false };
+            k::make_vertex(q).and_then(|v| k::distance(&v, s)).is_ok_and(|d| d.distance < scale * 1e-6)
+        };
+        let names: Vec<Name> = tool.shape.faces().iter().map(|f| if (f.is_planar() && secs.iter().any(|s| on(f, s))) || supports.iter().any(|s| on(f, s)) { generated.clone() } else { blend.clone() }).collect();
+        let named = NamedShape::new(tool.shape, names);
+        if convex { cuts.push(named) } else { adds.push(named) }
+    }
     let mut at = 0.0;
-    for (ci, c) in chain.iter().enumerate() {
+    for (ci, c) in chain.iter().enumerate().filter(|_| !general) {
         let (a, b) = ((lo - at).max(0.0), (hi - at).min(c.length));
         at += c.length;
         if b <= a {
@@ -599,35 +650,29 @@ fn tangent_dir(c: &ChainEdge, at_start: bool) -> FResult<DVec3> {
     Ok(if c.forward { t } else { -t })
 }
 
-/// A face blend between two planar faces of one body without a common edge
-/// (live psb 10-26 b, GA/GC: an L bracket with an inside chamfer, and one
-/// with a groove between base and wall). Like faceBlend.fs:
-/// - The side each face blends on comes from wallsNormalAlignment: at the
-///   faces' closest points, a face whose normal leans toward the other face
-///   is "aligned", and its normal is reversed unless aligned XOR Flip.
-/// - A side whose direction disagrees with the corner (outward on a concave
-///   corner, inward on a convex one) fails: "Side 1 direction is invalid.",
-///   then side 2. Live words the wrong side of a thin wall differently by
-///   radius ("Provided dimension is too large." for r 1–4 in GC); this
-///   always names the side.
-/// - The section runs along the planes' intersection line over both faces'
-///   common length, touching each face where the section's centre puts it;
-///   a touch point short of its face is "Provided dimension is too small.",
-///   past its far end "Provided dimension is too large.".
-/// - The walls are trimmed to the blend: on a concave corner the space
-///   between a wall's plane and the other face (GC's groove) is filled.
-pub fn apart_blend(ev: &mut EvalCtx, bi: usize, f1: usize, f2: usize, spec: &BlendSpec, flips: [bool; 2]) -> FResult<()> {
-    use super::sheetmetal_util::{body_named, bool_named};
-    let unsupported = || FeatureError::new("Face blend between faces that don't share an edge is supported between planar faces only");
-    let body = ev.ctx.bodies[bi].clone();
-    let faces = body.shape.faces();
+/// The geometry of a face blend between two faces without a common edge,
+/// from their tangent planes at their closest points, after live's checks
+/// of the sides and touch points (see [`apart_blend`]).
+struct Apart {
+    corner: DVec3,
+    line: DVec3,
+    u: [DVec3; 2],
+    fr: Frame,
+    convex: bool,
+    s: [f64; 2],
+    reach: [(f64, f64); 2],
+    along: [(f64, f64); 2],
+    scale: f64,
+}
+
+fn sides_geometry(shape: &Shape, f1: usize, f2: usize, spec: &BlendSpec, flips: [bool; 2]) -> FResult<Apart> {
+    let unsupported = || fail("faces whose closest points are tangent or touch");
+    let faces = shape.faces();
     let (fa, fb) = (&faces[f1], &faces[f2]);
-    if fa.face_plane()?.is_none() || fb.face_plane()?.is_none() {
-        return Err(unsupported());
-    }
+    let curved = !fa.is_planar() || !fb.is_planar();
     let d = k::distance(fa, fb)?;
     let (pa, pb) = (d.point_a, d.point_b);
-    let scale = body.shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
     if d.distance <= scale * 1e-9 {
         return Err(unsupported());
     }
@@ -659,12 +704,8 @@ pub fn apart_blend(ev: &mut EvalCtx, bi: usize, f1: usize, f2: usize, spec: &Ble
     // material side.
     let mat = [-o[0], -o[1]];
     let convex = u[0].dot(mat[1]) > 0.0;
-    for i in 0..2 {
-        let want = if convex { mat[i] } else { -mat[i] };
-        if n[i].dot(want) < 0.0 {
-            return Err(FeatureError::new(format!("Side {} direction is invalid.", i + 1)));
-        }
-    }
+    // A side is wrong when its blend side disagrees with the corner.
+    let wrong: [bool; 2] = std::array::from_fn(|i| n[i].dot(if convex { mat[i] } else { -mat[i] }) < 0.0);
     let fr = Frame { u, m: mat, extent: [f64::INFINITY; 2] };
     let (s1, s2) = setbacks(&fr, spec, true)?;
     // Each face's reach across and along the line, from points on its edges.
@@ -682,14 +723,87 @@ pub fn apart_blend(ev: &mut EvalCtx, bi: usize, f1: usize, f2: usize, spec: &Ble
     };
     let ((a0, l0), (a1, l1)) = (reach(fa, u[0])?, reach(fb, u[1])?);
     let tol = scale * 1e-9;
-    for (s, (lo, hi)) in [(s1, a0), (s2, a1)] {
-        if s < lo - tol {
-            return Err(FeatureError::new("Provided dimension is too small."));
+    // Where the blend with the right sides would touch each face.
+    #[derive(PartialEq)]
+    enum Touch {
+        Short,
+        On,
+        Past,
+    }
+    let touch = |s: f64, (lo, hi): (f64, f64)| if s < lo - tol { Touch::Short } else if s > hi + tol { Touch::Past } else { Touch::On };
+    let t = [touch(s1, a0), touch(s2, a1)];
+    let too_small = || FeatureError::new("Provided dimension is too small.");
+    let too_large = || FeatureError::new("Provided dimension is too large.");
+    match (wrong[0], wrong[1]) {
+        (false, false) => {
+            for ti in &t {
+                match ti {
+                    Touch::Short => return Err(too_small()),
+                    Touch::Past => return Err(too_large()),
+                    Touch::On => {}
+                }
+            }
         }
-        if s > hi + tol {
-            return Err(FeatureError::new("Provided dimension is too large."));
+        (true, true) => {
+            if curved || t.iter().any(|x| *x != Touch::On) {
+                return Err(too_large());
+            }
+            return Err(FeatureError::new("Both side 1 and side 2 directions are invalid."));
+        }
+        _ => {
+            let w = if wrong[0] { 0 } else { 1 };
+            // On curved faces live also fails at the face's edge (NP2 r1).
+            let lo = [a0.0, a1.0][w];
+            if t[w] == Touch::Short || (curved && [s1, s2][w] <= lo + scale * 1e-7) {
+                return Err(fail("the wrong side's touch point is short of its face"));
+            }
+            if curved {
+                return Err(too_large());
+            }
+            if t.iter().any(|x| *x != Touch::On) {
+                return Err(too_large());
+            }
+            return Err(FeatureError::new(format!("Side {} direction is invalid.", w + 1)));
         }
     }
+    Ok(Apart { corner, line, u, fr, convex, s: [s1, s2], reach: [a0, a1], along: [l0, l1], scale })
+}
+
+/// Live's checks of the sides and touch points for curved faces without a
+/// common edge, on their tangent planes at the closest points.
+pub fn apart_senses(shape: &Shape, f1: usize, f2: usize, spec: &BlendSpec, flips: [bool; 2]) -> FResult<()> {
+    sides_geometry(shape, f1, f2, spec, flips).map(|_| ())
+}
+
+/// A face blend between two planar faces of one body without a common edge
+/// (live psb 10-26 b, GA/GC: an L bracket with an inside chamfer, and one
+/// with a groove between base and wall). Like faceBlend.fs:
+/// - The side each face blends on comes from wallsNormalAlignment: at the
+///   faces' closest points, a face whose normal leans toward the other face
+///   is "aligned", and its normal is reversed unless aligned XOR Flip.
+/// - A side whose direction disagrees with the corner (outward on a concave
+///   corner, inward on a convex one) is wrong. Live's messages (GA–GD, 22
+///   cases), from where the blend with the right sides would touch:
+///   - one side wrong: its touch point short of its face "Failed to blend
+///     faces.", any other touch point off its face "Provided dimension is
+///     too large.", else "Side N direction is invalid.";
+///   - both wrong: a touch point off its face "Provided dimension is too
+///     large.", else "Both side 1 and side 2 directions are invalid.";
+///   - with a curved side (NP2, a cylinder; 7 cases) the direction messages
+///     become "Provided dimension is too large.", and a wrong side's touch
+///     point at its face's edge already fails.
+/// - The section runs along the planes' intersection line over both faces'
+///   common length, touching each face where the section's centre puts it;
+///   with the right sides a touch point short of its face is "Provided
+///   dimension is too small.", past its far end "Provided dimension is too
+///   large.".
+/// - The walls are trimmed to the blend: on a concave corner the space
+///   between a wall's plane and the other face (GC's groove) is filled.
+pub fn apart_blend(ev: &mut EvalCtx, bi: usize, f1: usize, f2: usize, spec: &BlendSpec, flips: [bool; 2]) -> FResult<()> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    let body = ev.ctx.bodies[bi].clone();
+    let Apart { corner, line, u, fr, convex, s: [s1, s2], reach: [a0, a1], along: [l0, l1], scale } = sides_geometry(&body.shape, f1, f2, spec, flips)?;
+    let tol = scale * 1e-9;
     let (from, to) = (l0.0.max(l1.0), l0.1.min(l1.1));
     if to - from <= tol {
         return Err(fail("the faces don't overlap along the blend"));
@@ -725,4 +839,82 @@ pub fn apart_blend(ev: &mut EvalCtx, bi: usize, f1: usize, f2: usize, spec: &Ble
     }
     ev.replace_body(bi, un.shape, names);
     Ok(())
+}
+
+/// The faces between two faces without a common edge, for a face blend
+/// that consumes them (live NP2: a chamfer between a plate and a boss; GC:
+/// a groove): in the plane through the faces' closest points across the
+/// gap, the shortest run of the body's section from one face to the other.
+/// `None` when the section doesn't join them.
+pub fn gap_faces(shape: &Shape, f1: usize, f2: usize) -> FResult<Option<Vec<usize>>> {
+    let faces = shape.faces();
+    let d = k::distance(&faces[f1], &faces[f2])?;
+    let (pa, pb) = (d.point_a, d.point_b);
+    let gap = pb - pa;
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let tol = scale * 1e-6;
+    if gap.length() <= tol {
+        return Ok(None);
+    }
+    let mut np = gap.cross(faces[f1].normal_at_point(pa)?);
+    if np.length() < 1e-9 * gap.length() {
+        np = gap.cross(faces[f2].normal_at_point(pb)?);
+    }
+    if np.length() < 1e-9 * gap.length() {
+        return Ok(None);
+    }
+    let plane = k::Plane::from_normal(pa, np.normalize());
+    // Section segments of the other faces: (face, from, to, length).
+    let mut segs: Vec<(usize, DVec3, DVec3, f64)> = Vec::new();
+    for (i, f) in faces.iter().enumerate() {
+        if i == f1 || i == f2 {
+            continue;
+        }
+        let Ok(sec) = k::section_plane(f, &plane) else { continue };
+        for e in sec.edges() {
+            let Ok((a, b)) = e.endpoints() else { continue };
+            segs.push((i, a, b, e.length().unwrap_or((b - a).length())));
+        }
+    }
+    // Dijkstra over the segments' ends from pa to pb.
+    let mut nodes: Vec<DVec3> = vec![pa, pb];
+    let mut node = |p: DVec3| -> usize {
+        if let Some(i) = nodes.iter().position(|q| (*q - p).length() < tol) {
+            return i;
+        }
+        nodes.push(p);
+        nodes.len() - 1
+    };
+    let links: Vec<(usize, usize, usize, f64)> = segs.iter().map(|&(f, a, b, l)| (node(a), node(b), f, l)).collect();
+    let n = nodes.len();
+    let mut dist = vec![f64::INFINITY; n];
+    let mut prev: Vec<Option<(usize, usize)>> = vec![None; n];
+    let mut done = vec![false; n];
+    dist[0] = 0.0;
+    while let Some(u) = (0..n).filter(|i| !done[*i] && dist[*i].is_finite()).min_by(|x, y| dist[*x].total_cmp(&dist[*y])) {
+        done[u] = true;
+        if u == 1 {
+            break;
+        }
+        for (li, &(a, b, _, l)) in links.iter().enumerate() {
+            let v = if a == u { b } else if b == u { a } else { continue };
+            if dist[u] + l < dist[v] {
+                dist[v] = dist[u] + l;
+                prev[v] = Some((u, li));
+            }
+        }
+    }
+    if !dist[1].is_finite() {
+        return Ok(None);
+    }
+    let mut out = Vec::new();
+    let mut at = 1;
+    while let Some((u, li)) = prev[at] {
+        let f = links[li].2;
+        if !out.contains(&f) {
+            out.push(f);
+        }
+        at = u;
+    }
+    Ok(Some(out))
 }
