@@ -166,7 +166,17 @@ fn cylinder_of(ev: &EvalCtx, r: &Reference) -> Option<(DVec3, DVec3, f64)> {
 /// and mate connectors.
 fn ev_plane(ev: &EvalCtx, r: &Reference) -> Option<PlaneFrame> {
     match kind(&ev.ctx, r) {
-        Kind::Face | Kind::Connector => ev.resolve_plane(r),
+        // A face's origin is the middle of its parameter box (live FS
+        // probe "fs face order": a block's side faces give their centres;
+        // oracle P2), not the sketch origin `resolve_plane` gives.
+        Kind::Face => {
+            let mut p = ev.resolve_plane(r)?;
+            if let Some(o) = face_of(ev, r).and_then(|f| f.uv_bounds().and_then(|[u0, u1, v0, v1]| f.point_at_uv(0.5 * (u0 + u1), 0.5 * (v0 + v1))).ok()) {
+                p.origin = o;
+            }
+            Some(p)
+        }
+        Kind::Connector => ev.resolve_plane(r),
         _ => None,
     }
 }
@@ -180,8 +190,16 @@ fn is_planar(ev: &EvalCtx, r: &Reference) -> bool {
 /// revolved surfaces and mate connectors (Z axis).
 fn ev_axis(ev: &EvalCtx, r: &Reference) -> Option<(DVec3, DVec3)> {
     match kind(&ev.ctx, r) {
+        // A line runs its curve's way (not the face using it's) from its
+        // middle (live oracle P4 / P5: the block's front top edge gives
+        // (30, 0, 20) mm along +x).
         Kind::Edge => match curve_of(ev, r)? {
-            k::Curve::Line { origin, direction } => Some((origin, direction.normalize())),
+            k::Curve::Line { direction, .. } => {
+                let e = edge_of(ev, r)?;
+                let (a, b) = e.endpoints().ok()?;
+                let d = direction.normalize();
+                Some((0.5 * (a + b), if e.orientation() == k::Orientation::Reversed { -d } else { d }))
+            }
             k::Curve::Circle { center, axis, .. } => Some((center, axis.normalize())),
             _ => None,
         },

@@ -423,3 +423,48 @@ fn extrude_moved_above_its_sketch_fails_on_the_missing_region() {
     assert_eq!(st.missing, 1);
     assert!(r.context.bodies.is_empty());
 }
+
+/// qa5 P1-5 (live: "Could not shell part with selections."): block 75.554 ×
+/// 20.245 × 15, R2 on 3 vertical edges, a 1 mm chamfer chain, two Ø6.35 ×
+/// 12 drilled holes and a feature pattern of them; Shell 2.5 mm off the top
+/// face broke the part into 4 slivers and reported Ok.
+#[test]
+fn shell_that_breaks_the_part_fails() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.corner_rectangle(DVec2::ZERO, DVec2::new(0.075554, 0.020245));
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let key = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions[0].key.clone();
+    t.add("extrude", &[("entities", q(vec![Reference::SketchRegion { sketch: s, key }])), ("depth", e("15 mm")), ("operationType", en("NEW"))]);
+    let edge_at = |r: &RegenResult, p: [f64; 3]| -> Reference {
+        let b = &r.context.bodies[0];
+        let v = noshape_kernel::make_vertex(glam::DVec3::from(p)).unwrap();
+        let i = b.shape.edges().iter().position(|e| noshape_kernel::distance(&v, e).is_ok_and(|d| d.distance < 1e-9)).expect("edge");
+        Reference::Edge((*b.edges[i]).clone())
+    };
+    let r = t.regen();
+    let vertical: Vec<Reference> = [[0.0, 0.0, 0.007], [0.075554, 0.0, 0.007], [0.075554, 0.020245, 0.007]].iter().map(|p| edge_at(&r, *p)).collect();
+    t.add("fillet", &[("entities", q(vertical)), ("radius", e("2 mm"))]);
+    let r = t.regen();
+    let top_edge = edge_at(&r, [0.0377, 0.0, 0.015]);
+    t.add("chamfer", &[("entities", q(vec![top_edge])), ("width", e("1 mm")), ("tangentPropagation", ParamValue::Bool(true))]);
+    let plane = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("offset", e("15 mm"))]);
+    let mut pts = noshape_sketch::Sketch::new();
+    let p0 = pts.add_point(DVec2::new(0.015, 0.006));
+    let p1 = pts.add_point(DVec2::new(0.015, 0.014245));
+    let s2 = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(plane)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: pts, ..Default::default() })))]);
+    let locs = vec![Reference::SketchEntity { sketch: s2, entity: p0.0 }, Reference::SketchEntity { sketch: s2, entity: p1.0 }];
+    let part = Reference::Body(noshape_model::BodyId { feature: t.ps.features[1].id, index: 0 });
+    let hole = t.add("hole", &[("locations", q(locs)), ("holeDiameterV3", e("6.35 mm")), ("holeDepthV3", e("12 mm")), ("endStyleV2", en("BLIND")), ("scope", q(vec![part]))]);
+    t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(hole)])), ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])), ("distance", e("25 mm")), ("instanceCount", e("2"))]);
+    let r = t.regen();
+    for f in &r.display.features {
+        assert_ne!(f.status, FeatureStatus::Error, "{:?}", f.message);
+    }
+    let b = &r.context.bodies[0];
+    let top = b.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|p| p.unit_normal().z > 0.999 && p.origin.z > 0.0149)).map(|i| Reference::Face((*b.faces[i]).clone())).expect("top face");
+    let sh = t.add("shell", &[("entities", q(vec![top])), ("thickness", e("2.5 mm"))]);
+    assert_eq!(t.status(sh), (FeatureStatus::Error, Some("Could not shell part with selections.".to_string())));
+    assert_eq!(t.regen().context.bodies.len(), 1);
+}

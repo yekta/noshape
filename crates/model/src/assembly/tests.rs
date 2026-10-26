@@ -2543,6 +2543,35 @@ fn isolate_expands_by_distance_and_connectivity() {
     assert_eq!(by_mates, vec![vec![InstanceId(2)], vec![InstanceId(3)]]);
 }
 
+/// Typed triad values (Transform) on a Planar-mated part are kept exactly
+/// (live, flip asm: a pin Planar-mated under a fixed plate, X typed
+/// 23.456789 mm → x 0.023456789000000016 m, z −30 mm and the rotation
+/// untouched; 5 mm typed along the mated Z → nothing moves).
+#[test]
+fn typed_transform_on_a_planar_mate_is_exact() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.08, 0.0, 0.0), false)], ..Default::default() };
+    let on = |i: u64, r: &Reference| MateConnectorRef::on(InstanceId(i), vec![], r.clone());
+    asm.mates.push(Mate::new(MateId(10), "Planar 1".into(), MateType::Planar, on(2, &bottom), on(1, &top)));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let p0 = res.solved.placement(InstanceId(2)).unwrap();
+    assert!((p0.translation[2] - 0.01).abs() < 1e-12, "{p0:?}");
+    let start: std::collections::HashMap<InstanceId, Placement> = res.solved.placements.iter().cloned().collect();
+    for (along, want) in [(DVec3::X, [p0.translation[0] + 0.023456789, p0.translation[1], p0.translation[2]]), (DVec3::Z, p0.translation)] {
+        let moved = Placement { translation: (DVec3::from(p0.translation) + along * 0.023456789).into(), rotation: p0.rotation };
+        let s = res.prepared.solve(&SolveOptions { targets: vec![(InstanceId(2), moved)], start: Some(start.clone()), ..Default::default() });
+        let p = s.placement(InstanceId(2)).unwrap();
+        for k in 0..3 {
+            assert!((p.translation[k] - want[k]).abs() < 1e-15, "{along}: {:?} want {want:?}", p.translation);
+        }
+        assert!(quat_of(&p).angle_between(quat_of(&p0)) < 1e-14, "{along}: turned");
+    }
+}
+
 #[test]
 fn mate_connector_between_entities_and_realign() {
     let f = doc_with(vec![block_studio()]);

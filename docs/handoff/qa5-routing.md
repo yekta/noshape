@@ -275,6 +275,9 @@ STATUS FSW-draft (psb, 2026-10-26): curved parting lines (a sloped ellipse, a sa
   boundary edge for most interior points (e.g. 3.9 mm for a point on the face), while `classify_point` says OnBoundary and
   the face's own UV classifier says IN. Repro: crates/kernel/tests/draft_curve.rs history (test
   `ruled_loft_point_projection_control`, removed). Affects measure / picking-by-point on such faces.
+- STATUS PROJ-RULED (psb, 2026-10-26, cleared by the lead; kern's crates/kernel/cpp/geom.cpp): fixed. When BRepExtrema answers
+  with the boundary, `face_project_point` also searches the face's interior (a UV grid inside the face, refined locally) and
+  takes the nearer; `min_distance` does the same for a point against B-spline faces. Tests crates/kernel/tests/projection.rs.
 STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, constant normal thickness with Scale, Trim ends to the cap planes, the two failure texts (test thin_sweep_as_live).
 STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.
@@ -748,6 +751,12 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 - **P1-13 — psb (pattern copies' appearance)** — Circular pattern (Part pattern) copies take **new palette colours** (seed
   navy, copies grey / light blue / orange). Live: the copies **keep the seed's colour** (rgb(165,165,165) ×3, behaviours
   "qa5 (10-25 p3)"), as Transform copies do (behaviours 7252).
+- STATUS 2026-10-26 (psb): P1-3 fixed (the Fillet / Chamfer arrow on the last picked edge); P1-13 fixed (part pattern, feature
+  pattern and Copy part instances keep the seed's colour; test circular_and_mirror_part_pattern); P1-5 fixed (a Shell whose
+  result has more solids than the part errors "Could not shell part with selections." and leaves the part; test
+  shell_that_breaks_the_part_fails on the P1-5 model at 15 mm); P1-10's toast: the info comes from fs 58913522 (after the
+  qa build) and the dialog shows it as the blue bubble (test remove_that_misses_the_part_reports_the_info); the red tool
+  preview stays icons2's.
 - STATUS 2026-10-26 (qa5, green 62524c30): P1-4 fixed in the UI (no point at the origin; Hole ignores the stand-in). Minor for
   skb: the sketch data keeps a hidden construction "Origin stand-in" point at (0,0) that the constraints use; live has no entity
   and constrains to the external Origin, so agent/API reads (sketch_get) still differ.
@@ -823,3 +832,14 @@ STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extr
   preview follows the pointer, always horizontal", with the usual inference glyphs over view edges (behaviours 1414,
   drawing/220–222). drawing_tools.rs overlay draws only the leader line once a leader point exists (:501); main has no
   preview either. The editor panel itself matches live (drawing/225).
+
+## P2 oracle: variables, configurations, Derived (psb, 2026-10-26; live "psb (10-26 a) P2 oracle", test p2_oracle.rs)
+- STATUS (psb): V1/V2 (variable chain with sqrt / atan / mixed units, values as the Variable table shows them), C1 (configured
+  depth and suppression), C2 (configuration variable), C3 (checkbox configuring Symmetric), D2 (Derived at a location) and D3
+  (Derived of only a sketch) match live; fixed on the way: the Variable table writes angles "45 deg" (was "45°"), and Derived of a
+  picked sketch brings only that sketch (was everything).
+- **FILLET-CORNER-3 — kern** — D1: a 40 × 20 × 35 block, Fillet 1 mm on the 4 top edges (corners where two fillets meet a sharp
+  vertical edge): ours 27974.631 mm³, live 27974.71 (ours removes 0.08 mm³ more: the corner patch shape).
+- **VAR-INVALID — ui (feature dialog)** — live: a Variable whose value doesn't evaluate to its type ("#a + 5 mm * cos(#ang * 1
+  rad)" with #ang an angle) turns the Value field red, the title "#d = 0 mm" red and ✓ disabled, so it can't be created; ours
+  creates the feature, which then fails. Check the dialog against live.

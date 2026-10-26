@@ -1711,7 +1711,8 @@ impl PartStudioView {
                 .filter(|(id, _)| *id != me)
                 .map(|(id, _)| {
                     use noshape_model::regen::derived::DerivedProvider as _;
-                    let parts = provider.context(&id).map(|c| c.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect()).unwrap_or_default();
+                    // Parts and sketches (a sketch alone can be derived, live "psb (10-26 a)" D3).
+                    let parts = provider.context(&id).map(|c| crate::fs_reference::parts_and_sketches(&c)).unwrap_or_default();
                     crate::feature_dialog::DerivedSource { tab: id, parts }
                 })
                 .collect();

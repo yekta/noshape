@@ -334,7 +334,8 @@ jobs:
   # Regeneration performance (jobs: model only): qa5's 400-hole plate
   # (crates/model/tests/big_plate.rs, PERF1: holes, a 400-edge chamfer and a
   # depth edit, each under 2 s like Onshape's ~1 s) in a release build of
-  # `ref` on each OS; the times go to the run summary.
+  # `ref` on each OS, and sketch editing latency; the times go to the run
+  # summary.
   model:
     name: Model perf ${{ matrix.name }}
     if: github.event_name == 'workflow_dispatch' && inputs.jobs == 'model'
@@ -465,6 +466,33 @@ jobs:
           "### ${{ matrix.name }}: second pattern" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           Select-String -Path pattern_second.log -Pattern '×[0-9]+|panicked|assert' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit $status
+
+      # Sketch editing latency (crates/scene/tests/sketch_perf.rs, skb): a
+      # ~300-entity dimensioned sketch and a 50-instance pattern dragged
+      # through the editor, with the regeneration; adding a free and a
+      # conflicting constraint. Fails when a median drag step misses a 60 Hz
+      # frame or a constraint takes 50 ms or more.
+      - name: Sketch latency (release)
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          status=0
+          cargo test --release --locked -p noshape-scene --test sketch_perf -- --ignored --nocapture --test-threads=1 2>&1 | tee sketch_perf.log || status=$?
+          { echo "### ${{ matrix.name }}: sketch latency"; echo '```'; grep -E "big sketch|pattern:|drag|add |regions|re-solve|regeneration|panicked|assert" sketch_perf.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: Sketch latency (release, Windows)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          cargo test --release --locked -p noshape-scene --test sketch_perf -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath sketch_perf.log
+          $status = $LASTEXITCODE
+          "### ${{ matrix.name }}: sketch latency" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Select-String -Path sketch_perf.log -Pattern 'big sketch|pattern:|drag|add |regions|re-solve|regeneration|panicked|assert' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
 

@@ -561,9 +561,11 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     let copies = copy_bodies(ev, &bodies, instances)?;
     pattern_connectors(ev, refs, instances);
     if op == "NEW" || copies.iter().all(|c| c.2 != BodyKind::Solid) {
+        // Live (qa5 P1-13): the instances keep the seed's colour.
         let nb = bodies.len().max(1);
         for (ii, bj, kind, ns) in copies {
-            push_body(ev, BodyId { feature: ev.feature, index: (ii * nb + bj) as u32 }, kind, ns.shape, ns.names.faces);
+            let color = ev.ctx.bodies[bodies[bj]].color;
+            push_body_colored(ev, BodyId { feature: ev.feature, index: (ii * nb + bj) as u32 }, kind, ns.shape, ns.names.faces, color);
         }
         return Ok(());
     }
@@ -671,7 +673,7 @@ fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances:
         tools.push(NamedShape::new(res.shape, names));
     }
     let t_copies = t0.elapsed();
-    let r = apply_tools(ev, body_id, tools, tool.add, body.kind, strict);
+    let r = apply_tools(ev, body_id, tools, tool.add, strict);
     if crate::regen::display::perf_enabled() {
         log::info!(target: "perf", "pattern_faces × {}: tool {:.1} ms, copies + names {:.1} ms, apply {:.1} ms", instances.len(), t_tool.as_secs_f64() * 1e3, (t_copies - t_tool).as_secs_f64() * 1e3, (t0.elapsed() - t_copies).as_secs_f64() * 1e3);
     }
@@ -679,7 +681,7 @@ fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances:
 }
 
 /// Fuse (boss) or cut (pocket) instance tools into the parts they touch.
-fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: bool, kind: BodyKind, strict: bool) -> FResult<()> {
+fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: bool, strict: bool) -> FResult<()> {
     if let Some(bi) = index_of_body(ev, seed) {
         let seed_box = ev.ctx.bodies[bi].shape.bounding_box(false).ok();
         let off = |t: &NamedShape| match (&seed_box, t.shape.bounding_box(false)) {
@@ -687,9 +689,13 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
             _ => false,
         };
         // Live L42: a face pattern fails on any instance off the part; L40:
-        // a Feature pattern skips one and fails when all are off.
-        if (strict && tools.iter().any(off)) || (!tools.is_empty() && tools.iter().all(off)) {
+        // a Feature pattern skips one and fails when all are off, asking for
+        // Reapply features (live "qa5 bracket" †; std patternUtils).
+        if strict && tools.iter().any(off) {
             return err(NOT_ON_BODY);
+        }
+        if !tools.is_empty() && tools.iter().all(off) {
+            return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
         }
     }
     if add {
@@ -704,12 +710,11 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
             (Some(a), Ok(b)) => boxes_meet(a, &b, 1e-7),
             _ => true,
         };
-        let (touch, free): (Vec<NamedShape>, Vec<NamedShape>) = tools.into_iter().partition(near);
+        // Copies off the part are skipped (live oracle_p1 CV1: 3 of 4 bosses,
+        // one part; CP2); all off failed above.
+        let touch: Vec<NamedShape> = tools.into_iter().filter(near).collect();
         if !touch.is_empty() {
             ev.boolean_into_with(&[bi], touch, k::BooleanOp::Fuse, &EvalCtx::many_tools_options())?;
-        }
-        for (i, t) in free.into_iter().enumerate() {
-            push_body(ev, BodyId { feature: ev.feature, index: 30_000 + i as u32 }, kind, t.shape, t.names.faces);
         }
         return Ok(());
     }
@@ -798,7 +803,8 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             let nb = created.len();
             for (ii, bj, kind, ns) in copies {
                 let index = (f.0 as u32 & 0xFFF).wrapping_mul(1 << 20).wrapping_add((ii * nb + bj) as u32);
-                push_body(ev, BodyId { feature: ev.feature, index }, kind, ns.shape, ns.names.faces);
+                let color = ev.ctx.bodies[created[bj]].color;
+                push_body_colored(ev, BodyId { feature: ev.feature, index }, kind, ns.shape, ns.names.faces, color);
             }
         }
         // Faces the feature left on other bodies.
@@ -1068,10 +1074,10 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance], merg
 
 /// Copies Onshape's face pattern (no Reapply) can't place (live "kern
 /// (10-23 22:00) patterns"): copies overlapping each other or the seed (R2:
-/// radial holes meeting at the cylinder's axis), an added copy off the part
-/// (O3) and, for a mirror, any copy off the part (M2). A removed copy off the
-/// part just does nothing (O1). The seed's tool is the feature evaluated as
-/// New where it stands.
+/// radial holes meeting at the cylinder's axis), and added or mirrored copies
+/// all off the part (O3's one copy, M2). Some copies off the part are skipped,
+/// added (oracle_p1 CV1, CP2) or removed (O1). The seed's tool is the feature
+/// evaluated as New where it stands.
 fn copies_fail(ev: &EvalCtx, f: FeatureId, targets: &[usize], instances: &[Instance]) -> bool {
     let Some(tool) = seed_tool(ev, f) else { return false };
     let add = matches!(ev.features.iter().find(|x| x.id == f).and_then(|x| x.params.get("operationType")), Some(crate::params::ParamValue::Enum(o)) if o == "ADD");
@@ -1100,7 +1106,8 @@ fn copies_fail(ev: &EvalCtx, f: FeatureId, targets: &[usize], instances: &[Insta
     // covering the block's end face, its sides one face with the block's,
     // patterned ×2 is OK).
     let target_boxes: Vec<k::BoundingBox> = targets.iter().filter_map(|&bi| ev.ctx.bodies[bi].shape.bounding_box(false).ok()).collect();
-    (mirror || (add && !merged_into(ev, f, &tool, targets))) && boxes[1..].iter().flatten().any(|b| !target_boxes.iter().any(|a| boxes_meet(a, b, 1e-7)))
+    let copies: Vec<&k::BoundingBox> = boxes[1..].iter().flatten().collect();
+    (mirror || (add && !merged_into(ev, f, &tool, targets))) && !copies.is_empty() && copies.iter().all(|b| !target_boxes.iter().any(|a| boxes_meet(a, b, 1e-7)))
 }
 
 /// Whether a planar face of `tool` lies on a face of the target parts facing
@@ -1742,7 +1749,8 @@ pub fn copy_part(ev: &mut EvalCtx) -> FResult<()> {
     }
     let inst = [Instance { code: 1, t: k::Transform::Translate(DVec3::ZERO) }];
     for (_, bj, kind, ns) in copy_bodies(ev, &bodies, &inst)? {
-        push_body(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces);
+        let color = ev.ctx.bodies[bodies[bj]].color;
+        push_body_colored(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces, color);
     }
     Ok(())
 }

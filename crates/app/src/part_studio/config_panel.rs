@@ -460,7 +460,8 @@ impl PartStudioView {
             // a ✎ that opens the feature (live 559).
             let value_cell = if matches!(r.kind.as_str(), "MEASURED" | "TABLE") {
                 let units = self.doc.read(cx).session.doc.settings.units;
-                let shown = self.display.variables.get(&r.name).map(|q| noshape_units::format_quantity(*q, &units)).unwrap_or_else(|| "Not set".into());
+                // Live ("psb (10-26 a)" V1): an angle reads "45 deg" here, as in fields.
+                let shown = self.display.variables.get(&r.name).map(|q| noshape_units::format_quantity(*q, &units).replace('°', " deg")).unwrap_or_else(|| "Not set".into());
                 h_flex()
                     .w(px(140.))
                     .h(px(34.))

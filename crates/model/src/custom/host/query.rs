@@ -1517,11 +1517,22 @@ fn line_dir(q: &QueryCx, e: &Ent) -> Option<DVec3> {
 }
 
 /// Axis of an edge (line, circle) or face (cylinder, cone, sphere, torus).
+/// A line edge as evLine / evAxis give it: from its middle along its
+/// curve's direction, whichever face's use of the edge `s` came from (live
+/// oracle P4 / P5: an extruded block's front top edge is (30, 0, 20) mm
+/// along +x; behaviours.md "qa5 bracket": its back edge runs −x).
+pub fn edge_line(s: &k::Shape) -> Option<(DVec3, DVec3)> {
+    let info = s.edge_info().ok()?;
+    let k::Curve::Line { direction, .. } = info.curve else { return None };
+    let d = direction.normalize_or_zero();
+    Some((0.5 * (info.start + info.end), if s.orientation() == k::Orientation::Reversed { -d } else { d }))
+}
+
 pub fn entity_axis(q: &QueryCx, e: &Ent) -> Option<(DVec3, DVec3)> {
     let s = q.shape(e)?;
     match entity_type_of(e) {
         EType::Edge => match s.edge_info().ok()?.curve {
-            k::Curve::Line { origin, direction } => Some((origin, direction.normalize_or_zero())),
+            k::Curve::Line { .. } => edge_line(&s),
             k::Curve::Circle { center, axis, .. } | k::Curve::Ellipse { center, axis, .. } => Some((center, axis.normalize_or_zero())),
             _ => None,
         },

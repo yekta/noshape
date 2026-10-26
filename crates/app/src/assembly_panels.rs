@@ -1674,7 +1674,7 @@ impl AssemblyView {
         let input = cx.new(|cx| QuantityInput::new(text, QuantitySpec::quantity(dim).canvas(), units, window, cx));
         let sub = cx.subscribe_in(&input, window, |this: &mut Self, _, ev: &QuantityEvent, window, cx| {
             match ev {
-                QuantityEvent::Committed(CommitVia::Enter | CommitVia::Step) => this.apply_manip_value(cx),
+                QuantityEvent::Committed(CommitVia::Enter | CommitVia::Step) => this.apply_manip_value(window, cx),
                 // Esc: the text reverts to the last committed value and the
                 // box blurs; it stays shown (live).
                 QuantityEvent::Escape => window.focus(&this.focus, cx),
@@ -1690,7 +1690,7 @@ impl AssemblyView {
         cx.notify();
     }
 
-    fn apply_manip_value(&mut self, cx: &mut Context<Self>) {
+    fn apply_manip_value(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(mv) = &self.manip_value else { return };
         // Invalid: the box is pink and nothing moves (live).
         let Some(v) = mv.input.read(cx).value() else { return };
@@ -1714,8 +1714,32 @@ impl AssemblyView {
             start.extend(mv.start.iter().map(|(k, p)| (*k, *p)));
             let solved = self.result.prepared.solve(&SolveOptions { targets, start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() });
             let name = self.assembly(cx).and_then(|a| mv.ids.first().and_then(|id| a.instance(*id)).map(|i| i.name.clone())).unwrap_or_default();
+            let (handle, axis, input) = (mv.handle, mv.axis, mv.input.clone());
+            let first = mv.ids.first().and_then(|id| mv.start.get(id).map(|p| (*id, *p)));
             self.apply_solved(solved, cx);
             self.edit(&format!("Move : {name}"), cx, |_| {});
+            // Live (behaviours "skb (10-26) typed triad value"): the box then
+            // shows how far the part went, selected: "23.457 mm" after typing
+            // 23.456789 mm, "0 mm" when the mates block the direction.
+            if let Some((id, p0)) = first
+                && let Some(p) = self.result.solved.placement(id)
+            {
+                let q = match handle {
+                    ManipHandle::Axis(_) => Some(Quantity::meters((DVec3::from(p.translation) - DVec3::from(p0.translation)).dot(axis))),
+                    ManipHandle::Ring(_) => {
+                        let d = glam::DQuat::from_array(p.rotation) * glam::DQuat::from_array(p0.rotation).inverse();
+                        let d = if d.w < 0.0 { -d } else { d };
+                        Some(Quantity::radians(2.0 * DVec3::new(d.x, d.y, d.z).dot(axis).atan2(d.w)))
+                    }
+                    ManipHandle::Plane(_) | ManipHandle::Center => None,
+                };
+                if let Some(q) = q {
+                    let text = noshape_units::format_quantity(q, &self.units(cx)).replace('°', " deg");
+                    input.update(cx, |i, cx| i.set_text(text, window, cx));
+                    let state = input.read(cx).state().clone();
+                    state.update(cx, |s, cx| s.select_all(window, cx));
+                }
+            }
         }
         // The box stays open, focused and selected (live).
         cx.notify();

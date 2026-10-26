@@ -529,7 +529,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             let outline = theme::lin(theme::pick(theme::viewport::PLANE_OUTLINE, theme::viewport_dark::PLANE_OUTLINE));
             let outline_alpha = theme::pick(theme::viewport::PLANE_OUTLINE_ALPHA, theme::viewport_dark::PLANE_OUTLINE_ALPHA) * if opts.faint_planes { FAINT_PLANE_ALPHA } else { 1.0 };
             if !opts.faint_planes {
-                scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([fill[0], fill[1], fill[2], 0.2]).ignore_clip().unlit().layer(5));
+                scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([fill[0], fill[1], fill[2], theme::pick(theme::viewport::PLANE_FILL_ALPHA, theme::viewport_dark::PLANE_FILL_ALPHA)]).ignore_clip().unlit().layer(5));
             }
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([outline[0], outline[1], outline[2], outline_alpha]).ignore_clip().layer(5));
         }

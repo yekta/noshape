@@ -2,7 +2,9 @@
 //! `cargo test --release -p noshape-scene --test sketch_perf -- --ignored --nocapture`.
 //! Dragging a point of a ~300-entity dimensioned sketch and the seed of a
 //! 50-instance linked pattern, step by step through the editor (what a
-//! pointer move does), and adding a constraint (add + solve).
+//! pointer move does), and adding a constraint (add + solve). Targets (the
+//! medians, release build): a drag step with the regeneration within a
+//! 60 Hz frame, adding a constraint (even a conflicting one) under 50 ms.
 
 use glam::DVec2;
 use noshape_model::reference::FeatureId;
@@ -17,6 +19,11 @@ use noshape_model::regen::{RegenOptions, Regenerator};
 use noshape_sketch::{ConstraintKind, Curve2, EntityId, Sketch, SolveOptions};
 use noshape_units::UnitPrefs;
 use std::time::{Duration, Instant};
+
+/// One display frame at 60 Hz.
+const FRAME: Duration = Duration::from_micros(16_667);
+/// Adding a constraint shows within this.
+const CONSTRAINT: Duration = Duration::from_millis(50);
 
 fn v(x: f64, y: f64) -> DVec2 {
     DVec2::new(x, y)
@@ -104,6 +111,7 @@ fn sketch_drag_and_constraint_latency() {
     ed.hover = Some(corner);
     let s = drag_steps(&mut ed, &mut data, from, 120);
     println!("  drag a corner: median {:.2} ms, worst {:.2} ms", s.median.as_secs_f64() * 1e3, s.worst.as_secs_f64() * 1e3);
+    assert!(s.median < FRAME, "corner drag: median {:?}", s.median);
     // Adding a dimension, as the Dimension tool does: add + solve. A
     // rectangle's height (free) and, the worst case, a second length on a
     // dimensioned line (conflicting: the solver finds the conflict).
@@ -120,6 +128,7 @@ fn sketch_drag_and_constraint_latency() {
         }
         let s = stats(adds);
         println!("  add {what} + solve: median {:.2} ms, worst {:.2} ms", s.median.as_secs_f64() * 1e3, s.worst.as_secs_f64() * 1e3);
+        assert!(s.median < CONSTRAINT, "adding {what}: median {:?}", s.median);
     }
     let t = Instant::now();
     let regions = data.sketch.regions();
@@ -167,6 +176,7 @@ fn sketch_drag_and_constraint_latency() {
     ed.tool_up(&mut data, from);
     let s = stats(frames);
     println!("  drag frame with regeneration: median {:.2} ms, worst {:.2} ms", s.median.as_secs_f64() * 1e3, s.worst.as_secs_f64() * 1e3);
+    assert!(s.median < FRAME, "drag frame with regeneration: median {:?}", s.median);
 
     // A circle patterned 50 times, linked to its seed.
     let mut data = SketchData::default();
@@ -185,6 +195,7 @@ fn sketch_drag_and_constraint_latency() {
     ed.hover = Some(c);
     let s = drag_steps(&mut ed, &mut data, grab, 120);
     println!("  drag the seed: median {:.2} ms, worst {:.2} ms", s.median.as_secs_f64() * 1e3, s.worst.as_secs_f64() * 1e3);
+    assert!(s.median < FRAME, "pattern seed drag: median {:?}", s.median);
 }
 
 /// The regeneration after each drag step alone (to profile it).
