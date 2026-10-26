@@ -224,6 +224,10 @@ pub struct SceneOptions {
     pub dims_shown: bool,
 }
 
+/// Opacity of the selection drawn again over the datum planes (fitted to
+/// live selection/04's blue: 56 under one plane, 73 under two).
+const SELECTION_OVER_PLANES: f32 = 0.44;
+
 /// [`SceneOptions::dims_shown`]'s lighting shift: ambient 0.5 → 0.535,
 /// light 0.5 → 0.465 (front face (84,111,127) vs live (86,110,124), the
 /// top face unchanged as live's).
@@ -549,16 +553,10 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let to_world = |q: glam::DVec2| base + f.x * (q.x * asc) + f.y * (q.y * asc);
                 let contours = plane_name_contours(&pl.name);
                 if let Some(m) = noshape_render::overlay::fill_mesh(&contours, to_world, f.normal) {
-                    scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([text[0], text[1], text[2], 1.0]).unlit().unpickable().ignore_clip().over_transparent().layer(5));
-                    // The outline traced thinly too: our anti-aliasing (in
-                    // linear light) thinned the glyphs next to the overlay's
-                    // (gamma, like live's).
-                    let mut l = LineData::default();
-                    for c in contours.iter().filter(|c| c.len() >= 3) {
-                        let pts: Vec<[f32; 3]> = c.iter().chain(c.first()).map(|&q| to_world(q).as_vec3().into()).collect();
-                        l.push_polyline(&pts, [0, 0, 0, 255], 0, PLANE_NAME_STROKE, 0);
-                    }
-                    scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).with_color([text[0], text[1], text[2], PLANE_NAME_STROKE_ALPHA]).unpickable().ignore_clip().layer(5));
+                    // Just under 1: drawn with the see-through meshes, so it
+                    // writes no depth and ambient occlusion leaves it alone
+                    // (it darkened the name 8 %); parts in front still hide it.
+                    scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([text[0], text[1], text[2], 0.998]).unlit().unpickable().ignore_clip().over_transparent().layer(5));
                 }
             }
         }
@@ -743,12 +741,6 @@ fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState,
     let hex = theme::sketch_color_for_theme(hex);
     [((hex >> 16) & 0xff) as u8, ((hex >> 8) & 0xff) as u8, (hex & 0xff) as u8, a]
 }
-
-/// The line tracing a plane name's glyphs: width (logical px; lines are at
-/// least 1 px) and opacity, fitted to the overlay's text (Front: 185 ink
-/// pixels, 123 dark).
-const PLANE_NAME_STROKE: f32 = 0.6;
-const PLANE_NAME_STROKE_ALPHA: f32 = 0.7;
 
 /// A plane name's glyph outlines (ascender 1), laid out once per name.
 fn plane_name_contours(name: &str) -> Arc<Vec<Vec<glam::DVec2>>> {
@@ -1018,7 +1010,9 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             }
         }
     }
-    if let Some(h) = hover {
+    // What is selected isn't pre-highlighted again (live selection/05 =
+    // 04, sketch/23 = 22, "plane and mate connector hover" (c)).
+    if let Some(h) = hover.filter(|h| !selection.contains(h)) {
         mark(h, state::HOVER, &mut scene);
     }
     // A face's boundary edges: solid, without the dark core of an edge
@@ -1033,6 +1027,27 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         for &id in built.picks.ids_for(&f) {
             scene.add_flag(id, state::OUTLINE);
         }
+    }
+    // Selected faces drawn again at SELECTION_OVER_PLANES over the planes in
+    // front of them (live selection/04: under one plane (229,170,56), two
+    // (228,176,73); the plane alone over the face gives (224,174,73)). Only
+    // the part meshes holding a selected face.
+    let selected: Vec<u32> = (1..scene.states.len() as u32).filter(|&id| scene.states[id as usize] & state::SELECTED != 0 && built.picks.get(id).is_some_and(|t| t.kind == PickKind::Face)).collect();
+    if !selected.is_empty() {
+        let mut bodies: Vec<&Instance> = scene.instances[..built.static_instances]
+            .iter()
+            .filter(|i| matches!(i.drawable, Drawable::Mesh(_)) && i.pickable && !i.pick_only && !i.back_silhouette && !i.preview && !i.unlit && i.color[3] >= 0.999)
+            .collect();
+        bodies.sort_by_key(|i| i.pick_base);
+        let mut again = Vec::new();
+        for (k, b) in bodies.iter().enumerate() {
+            let next = bodies.get(k + 1).map_or(u32::MAX, |n| n.pick_base);
+            if selected.iter().any(|&s| s > b.pick_base && (s <= next || next == b.pick_base)) {
+                let c = b.color;
+                again.push((*b).clone().with_color([c[0], c[1], c[2], SELECTION_OVER_PLANES]).over_transparent().selected_only());
+            }
+        }
+        scene.instances.extend(again);
     }
     if !overlay_pts.points.is_empty() {
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&overlay_pts))).per_primitive_color().unpickable().ignore_clip().layer(20));

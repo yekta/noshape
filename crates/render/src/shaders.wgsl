@@ -331,6 +331,9 @@ fn fs_compare_mix(i: BgOut) -> @location(0) vec4<f32> {
 fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
     let st = state_of(i.pick);
     if ((st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    // params.x bit 2: only the selected faces (the selection drawn again
+    // over the see-through datum planes, Instance::selected_only).
+    if ((inst.params.x & 4u) != 0u && (st & SELECTED) == 0u) { discard; }
     return mesh_shade(i, front, st);
 }
 
