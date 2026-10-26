@@ -21,6 +21,8 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   featmatrix.py, holematrix.py (same dir). Hole style needs `styleV2`; a Remove extrude needs `booleanScope`.
 - tools/lead/disk-loop.sh deletes files named noshape* > 100 MB older than 2 h under /root/*-scratch (maxdepth 4): touch
   the green copy or keep binaries deeper (the v0.4.8 release is in /root/qa-scratch/rel/k/v048/…, depth 5).
+- The watcher's own CLI build (target-lead, ~20:18, main d62f25e2/c9540ae6, not green) is copied to
+  /root/qa-scratch/rel/k/main/x/noshape-cli (`NSCLI=… python3 …` with nscli.Cli(os.environ['NSCLI'])).
 - Don't run the app with NOSHAPE_PERF=1 when testing section views (PERF-SECTION-PANIC freezes the viewport).
 - Mind dialog layout shifts: once a selection chip is added, every row below moves down ~16 px; screenshot before
   clicking a field.
@@ -63,9 +65,9 @@ by this build; docs made by older builds keep a sticky Hide), TOOLTIP-PARENT, ER
 region to extrude." + "1 missing selection"), CHAMFER-OVERFLOW (25 on a 20 mm edge OK; v0.4.8 still fails), SECTION-MANIP
 (ring + arrow + rotate glyph), empty rename → default name, SELECT-OTHER, BOX-PREHIGHLIGHT, MIDPOINT-MARKER (dark ring at the hovered
 edge's midpoint), READOUT-AXES, EXT-2ND-DEPTH, EXPORT-DXF-OPTIONS (DXF R14, mm, 75 LINE / 40 MTEXT / 4 CIRCLE / 4 ELLIPSE).
-Still open (tickets):
-EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
-in Extrude's regions field picks the face), FOLDER-MENU, FOLDER-EXPAND-UNDO, ORD-BASE.
+FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress | Dynamic suppression ▸ | Expand ▸ | Collapse ▸ |
+Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
+in Extrude's regions field picks the face), ORD-BASE.
 
 ## To verify on the next green (fixed on main by qa5 after green 4d2f6b0c)
 P1-1, P1-8, P1-9, P1-17, P1-18, P2-A2…A8, P2-D2, P2-D3 (docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26
