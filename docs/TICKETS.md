@@ -13,8 +13,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 `kernel/tests/draft_curve::level_parting_line_matches_occt` red on all platforms 10-26 (exact match vs OCCT).
 - [ ] P0 SHELL-WALLS Shell silently drops a filleted plate's outer walls: Part Studio, Sketch 1 on Top = rectangle 80 × 50
   + Ø20 circle inside; Extrude 1 the outer region 10 mm; Fillet 1 = the top face (its 4 outer edges + the hole rim), R2;
-  Shell 1 = top face removed, 2.5 mm (also 1.5 mm, i.e. below the fillet radius); live: an open box (floor, four walls to
-  full height, a tube around the hole; live numbers asked in REQUESTS "qa (2026-10-26, P0 wrong geometry check)"); ours:
+  Shell 1 = top face removed, 2.5 mm (also 1.5 mm, i.e. below the fillet radius); live (behaviours "qa (2026-10-26, P0
+  wrong geometry check)", live/qa/qa-p0-shell-*.png): Shell OK, an open box (floor, four full-height walls, a tube around
+  the hole), **2.5 mm: 14951.9619 mm³, 19 faces; 1.5 mm: 9609.9491 mm³, 27 faces**; ours on exactly that plate (Part
+  Studio 2 with Chamfer 1 and the hole suppressed): **2.5 mm: 10220.907 mm³, walls gone**; 1.5 mm: 9609.03 mm³, walls
+  there (0.92 mm³ short of live); with the chamfer + 2 holes also 1.5 mm loses the walls. Ours, first variant:
   Shell 1 **OK** but only the floor and the hole tube remain, no outer walls (with Chamfer 1 + 2 holes on top: 10887.66
   mm³; ≈15.7k expected by hand); without the Fillet, or without the Ø20 hole, the walls are there. Doc
   /root/qa-scratch/tickets/qa-1026-ps2-shell.noshape (tab Part Studio 2), shots tickets/shell-fillet-walls-missing-iso.png,
