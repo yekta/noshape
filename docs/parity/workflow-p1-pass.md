@@ -134,3 +134,16 @@ then edits, undo/redo, rollback and suppress.
 | Click, type "QA NOTE" | Note panel next to the note: Noto Sans ( Note ), 0.1200, B I U S colour, spacing, align, list, … ☐ Flag notes (greyed Flag (Drawing), 2 Characters); ruler bar over the text | same (drawing/225, behaviours 3277) | ✅ |
 | Drawing Detail view tool | panel: 4 shapes (circle pressed), "Create circle", View scale ▾, View label A, Profile style In line, ☑ Show detail view profile, ☐ Clip border to geometry | same (behaviours 1404, 1795) | ✅ |
 | Circle drawn on the Top view | field "Profile created", shape buttons un-pressed, View scale **2:1**, label A; preview follows the pointer; click places "DETAIL A / SCALE 2:1" | live capture filled 1:1 (parent scale unknown; request 10-26 p6 (4)) | ? |
+
+## Owner fixes re-checked on green a08e3eda
+| Item | Check | Status |
+|---|---|---|
+| P2-A1 (skb 9bf8475b) | Circular pattern Angle 300 + Enter: applied, dialog stays; 2nd Enter accepts. Count + Enter accepts at once (live 4299) | ✅ fixed |
+| P1-15 (ui 76da6649) | view-cube face hover #bce2f7 | ✅ fixed |
+| P1-12 (ui 9bc26682) | Revolve axis chip "Edge of Sketch 2" | ✅ fixed |
+| P1-7 (ui 9bc26682) | failing hidden sketch row red | ✅ fixed |
+| P1-14 (ui 2a85db38) | new document: inertia header "(lb mm²)" | ✅ fixed |
+| P1-3 (psb 44927ecb) | Fillet arrow on the last picked edge | ✅ fixed |
+| P1-13 (psb 44927ecb) | part-pattern copies keep the seed colour | ✅ fixed |
+| P1-5 (psb a52d1e44) | Shell 2.5 on the depth-15 model: "Could not shell part with selections." | ✅ fixed |
+| P1-16 (kern) | Shell 1 mm on live's p2 model still fails; 2.5 mm 8487.861 mm³ | ✗ open |
