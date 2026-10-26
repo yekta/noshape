@@ -1157,7 +1157,12 @@ impl PartStudioView {
                 }
                 Reference::Vertex(_) => "Vertex".into(),
                 Reference::Body(b) => bodies.iter().find(|(i, _)| i == b).map(|(_, n)| n.clone()).unwrap_or_else(|| "Part".into()),
-                Reference::SketchEntity { sketch, entity } => format!("{} {}", fname(*sketch), entity_kinds.get(&(*sketch, *entity)).copied().unwrap_or("entity")),
+                // Live (qa5 P1-12, behaviours 208 / 2693): a sketch curve is
+                // "Edge of Sketch N", a sketch point "Vertex of Sketch N".
+                Reference::SketchEntity { sketch, entity } => match entity_kinds.get(&(*sketch, *entity)).copied() {
+                    Some("point") => format!("Vertex of {}", fname(*sketch)),
+                    _ => format!("Edge of {}", fname(*sketch)),
+                },
                 Reference::SketchRegion { sketch, .. } => format!("Face of {}", fname(*sketch)),
                 Reference::Sketch(s) => fname(*s),
                 Reference::FeaturePlane(f) => fname(*f),
@@ -3750,10 +3755,12 @@ impl PartStudioView {
         // Suppressed directly, or by a configuration / expression (the
         // regenerated state says so).
         let suppressed = f.suppressed || (!rolled_back && status == FeatureStatus::Suppressed);
-        // Hidden features (a sketch consumed by a feature) read gray too (live part-studio/92).
+        // Hidden features (a sketch consumed by a feature) read gray too (live part-studio/92),
+        // unless they fail: a failing hidden sketch is red (qa5 P1-7, behaviours 6432 / 6491).
+        let failing = matches!(status, FeatureStatus::Error | FeatureStatus::Warning);
         let color = if rolled_back {
             pal.text_rolled_back
-        } else if suppressed || f.hidden {
+        } else if suppressed || (f.hidden && !failing) {
             pal.text_faint
         } else {
             // Live L27: a warning's row is red like an error's.
@@ -5346,7 +5353,7 @@ impl PartStudioView {
     }
 }
 
-/// What a sketch entity is, for selection labels ("Sketch 1 point"): from the
+/// What a sketch entity is, for selection labels ("Vertex of Sketch 1"): from the
 /// sketch definitions, falling back to the displayed sketches.
 fn sketch_entity_kinds(studio: Option<&PartStudio>, display: &StudioDisplay) -> std::collections::HashMap<(FeatureId, u32), &'static str> {
     use noshape_sketch::EntityKind;
