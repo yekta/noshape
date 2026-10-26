@@ -1293,3 +1293,29 @@ live reference. Scores below ~3-4 are the known anti-aliasing floor (round 8).
   528 icons, 27 with dark excess > 3, all but help-gray false alarms: their sprite symbols use literal
   colours that live recolours by CSS (documents nav, tab bar, panels draw light grey / white in live
   dk-910, dk-920), which our flip already does. Overlays in dark: requested REQUESTS "icons2 (10-26 g)".
+
+## STATE AT THE HALT (10-26, lead: stop and replan)
+On main (all pushed, quick-checked): plane/origin highlight + line-end depth fix (1f4b193d), edge core,
+row-hover silhouette, shown dimensions (8ad7c8ee), plane resize rings + drag (67cc1e0d), ring drag settle
+rule (ff2c99a4), sketch-mode hover/selection + Show-dimensions lighting (501bfc56), plane names as scene
+meshes (c3ae9d4b), sRGB refit: selection over planes, plane names, no hover on selected (4d2f6b0c), mate
+connector glyph (27c1682a), decal render path (71f7b7c7) + decal scene side (ca5bca36), icon audit +
+red-triangle fallback (a7d5033c), dark help (?) (4722be7c), dark red triangle (22ea5c4f), parity rows.
+WIP branch: origin agent/icons2 @ 2f3cd41a = plane-name placement change in scene builder.rs (base =
+corner + x·0.11·asc − y·1.06·asc; live dk-921 "Front" ink sits 2 px left / 5 px up of ours). Not built,
+not checked.
+Open items, priority order:
+1. (P1, psb) Cylinder decal centred on −x, live on +x (DecalMapping::Cylindrical x from the kernel's
+   x_dir): hand to psb; check with scratch docs/dec-in.noshape.
+2. (P2) WIP plane-name placement: build, measure Front/Top/Right ink boxes against live dk-921 (dark) and
+   part-studio/icons2-ph-0-none (light), then push to main if all three match within 1 px.
+3. (P3) Dark viewport overlays: wait for REQUESTS "icons2 (10-26 g)" (behaviours "icons2 dark viewport
+   overlays"), then match face/edge hover/selection, plane borders + rings, connector glyph, row-hover
+   outline, sketch hover, shown dimensions in dark (scratch cfg/noshape/preferences.json darkMode).
+4. (drawing owner, not icons) Hatch pattern ORDER differs from live (see "Icon audit" above).
+5. Plane resize: live merges nothing (done); the parts' 5–8 level lightening done; no open resize items.
+Known failing tests in my area: none (render offscreen decal test, model plane/decal tests, app ring
+settle test, no_onshape_assets all pass). Main was red at f2838a08 on assemblies_match_live (asm oracle,
+not icons2).
+Scratch: tools/app3.sh (app on :115; CFG=… for a private config), docs/*-in.noshape test docs,
+tools/rank.py / darksweep.py (darkref now writes under scratch tmp/).
