@@ -40,6 +40,145 @@
 namespace noshape {
 
 namespace {
+// The boundary nodes of `f` triangulated in its parameter plane (constrained
+// Delaunay, no other nodes) into the face's triangulation; false (nothing
+// written) when the face has fewer than `min_nodes` of them or isn't clean
+// (self-intersecting or seam wires, a ring the triangulation refuses).
+// `curved`: a curved surface, triangulated in its parameters scaled to
+// lengths and kept only when every triangle's centre and edge midpoints lie
+// within the face's deflection of the surface.
+bool cdt_face(const IMeshData::IFaceHandle& f, size_t min_nodes, bool curved)
+{
+  size_t total = 0;
+  for (int w = 0; w < f->WiresNb(); ++w)
+  {
+    const IMeshData::IWireHandle& W = f->GetWire(w);
+    for (int e = 0; e < W->EdgesNb(); ++e)
+      total += (size_t)W->GetEdge(e)->GetPCurve(f.get(), W->GetEdgeOrientation(e))->ParametersNb();
+  }
+  if (total < min_nodes)
+    return false;
+  std::vector<cdt::Pt>          uv;
+  std::vector<gp_Pnt>           xyz;
+  std::vector<std::vector<int>> rings;
+  uv.reserve(total);
+  xyz.reserve(total);
+  auto same = [&](int node, const gp_Pnt2d& q) { return std::abs(uv[(size_t)node].x - q.X()) + std::abs(uv[(size_t)node].y - q.Y()) < 1e-12; };
+  for (int w = 0; w < f->WiresNb(); ++w)
+  {
+    const IMeshData::IWireHandle& W = f->GetWire(w);
+    if (W->IsSet(IMeshData_SelfIntersectingWire))
+      return false;
+    std::vector<int> ring;
+    int              first = -1;
+    for (int e = 0; e < W->EdgesNb(); ++e)
+    {
+      const IMeshData::IEdgeHandle E = W->GetEdge(e);
+      const TopAbs_Orientation     o = W->GetEdgeOrientation(e);
+      // One pcurve on this face (no seams), run one way.
+      if ((o != TopAbs_FORWARD && o != TopAbs_REVERSED) || E->GetDegenerated() || E->GetPCurves(f.get()).Extent() != 1)
+        return false;
+      const IMeshData::IPCurveHandle& P = E->GetPCurve(f.get(), o);
+      const IMeshData::ICurveHandle&  C = E->GetCurve();
+      const int                       n = P->ParametersNb();
+      if (n < 2 || C->ParametersNb() != n)
+        return false;
+      for (int k = 0; k < n; ++k)
+      {
+        // The points run along the edge; a reversed edge runs the wire backwards.
+        const int      idx = o == TopAbs_REVERSED ? n - 1 - k : k;
+        const gp_Pnt2d q   = P->GetPoint(idx);
+        int            node;
+        if (k == 0 && !ring.empty() && same(ring.back(), q))
+          node = ring.back(); // the vertex shared with the edge before
+        else if (k == n - 1 && e == W->EdgesNb() - 1 && first >= 0 && same(first, q))
+          node = first; // back at the wire's start
+        else
+        {
+          node = (int)uv.size();
+          uv.push_back({q.X(), q.Y()});
+          xyz.push_back(C->GetPoint(idx));
+          ring.push_back(node);
+          if (first < 0)
+            first = node;
+        }
+        // Poly_PolygonOnTriangulation of the edge: its nodes in the face's triangulation.
+        P->GetIndex(idx) = node + 1;
+      }
+    }
+    rings.push_back(std::move(ring));
+  }
+  if (rings.empty())
+    return false;
+  // The outer ring first: the largest.
+  auto area = [&](const std::vector<int>& r) {
+    double s = 0;
+    for (size_t k = 0, j = r.size() - 1; k < r.size(); j = k++)
+      s += uv[(size_t)r[j]].x * uv[(size_t)r[k]].y - uv[(size_t)r[k]].x * uv[(size_t)r[j]].y;
+    return std::abs(s);
+  };
+  size_t outer = 0;
+  for (size_t k = 1; k < rings.size(); ++k)
+    if (area(rings[k]) > area(rings[outer]))
+      outer = k;
+  std::swap(rings[0], rings[outer]);
+  // Curved: triangulated in the parameters scaled to lengths at the
+  // domain's centre (a thin band stays thin, not a sliver of the unit
+  // square), kept only where the triangles lie on the surface.
+  std::vector<cdt::Pt> plane = uv;
+  if (curved)
+  {
+    double u0 = uv[0].x, u1 = u0, v0 = uv[0].y, v1 = v0;
+    for (const cdt::Pt& q : uv)
+    {
+      u0 = std::min(u0, q.x), u1 = std::max(u1, q.x);
+      v0 = std::min(v0, q.y), v1 = std::max(v1, q.y);
+    }
+    gp_Pnt p;
+    gp_Vec du, dv;
+    f->GetSurface()->D1((u0 + u1) / 2, (v0 + v1) / 2, p, du, dv);
+    const double su = du.Magnitude(), sv = dv.Magnitude();
+    if (!(su > 0) || !(sv > 0))
+      return false;
+    for (cdt::Pt& q : plane)
+      q = {q.x * su, q.y * sv};
+  }
+  std::vector<int> tris;
+  if (!cdt::triangulate(plane, rings, tris))
+    return false;
+  if (curved)
+  {
+    const BRepAdaptor_Surface& S   = *f->GetSurface();
+    const double               tol = f->GetDeflection();
+    auto off = [&](int a, int b, double wa, double wb) {
+      const cdt::Pt& p = uv[(size_t)a];
+      const cdt::Pt& q = uv[(size_t)b];
+      const gp_XYZ   m = xyz[(size_t)a].XYZ() * wa + xyz[(size_t)b].XYZ() * wb;
+      return S.Value(p.x * wa + q.x * wb, p.y * wa + q.y * wb).Distance(gp_Pnt(m)) > tol;
+    };
+    for (size_t t = 0; t < tris.size(); t += 3)
+    {
+      const int a = tris[t], b = tris[t + 1], c = tris[t + 2];
+      const cdt::Pt& pa = uv[(size_t)a];
+      const cdt::Pt& pb = uv[(size_t)b];
+      const cdt::Pt& pc = uv[(size_t)c];
+      const gp_Pnt   centre((xyz[(size_t)a].XYZ() + xyz[(size_t)b].XYZ() + xyz[(size_t)c].XYZ()) / 3);
+      if (S.Value((pa.x + pb.x + pc.x) / 3, (pa.y + pb.y + pc.y) / 3).Distance(centre) > tol || off(a, b, 0.5, 0.5) || off(b, c, 0.5, 0.5) || off(c, a, 0.5, 0.5))
+        return false;
+    }
+  }
+  occ::handle<Poly_Triangulation> T = new Poly_Triangulation((int)uv.size(), (int)(tris.size() / 3), true);
+  for (size_t i = 0; i < uv.size(); ++i)
+  {
+    T->SetNode((int)i + 1, xyz[i]);
+    T->SetUVNode((int)i + 1, gp_Pnt2d(uv[i].x, uv[i].y));
+  }
+  for (size_t t = 0; t < tris.size(); t += 3)
+    T->SetTriangle((int)(t / 3) + 1, Poly_Triangle(tris[t] + 1, tris[t + 1] + 1, tris[t + 2] + 1));
+  BRepMesh_ShapeTool::AddInFace(f->GetFace(), T);
+  return true;
+}
+
 // A planar face (any size: BRepMesh took 35-68 ms on a 144-node disk) through our
 // constrained Delaunay triangulation (planar_cdt.hpp) of BRepMesh's own
 // boundary nodes: the same triangles as BRepMesh's (Delaunay, no inner
@@ -69,95 +208,43 @@ public:
 private:
   static constexpr size_t MIN_NODES = 3;
 
-  static bool triangulate(const IMeshData::IFaceHandle& f)
+  static bool triangulate(const IMeshData::IFaceHandle& f) { return cdt_face(f, MIN_NODES, false); }
+
+  occ::handle<IMeshTools_MeshAlgo> myFallback;
+};
+
+// A curved face bounded by long rails of edge nodes and nothing to fill
+// between them (an imported screw's thread: helical crest, root and flank
+// bands, two helix edges of 2300-3000 nodes each and short ends): BRepMesh's
+// Delaunay took 0.5-5 s a face in the long thin parameter strip (its circle
+// cells crowded by the slivers' circumcircles, then the deflection
+// control); the NIST assembly's fine mesh 10-15 s. The boundary nodes
+// triangulated as on a plane in the parameters scaled to lengths
+// (`cdt_face`, curved), kept when the triangles lie on the surface within
+// the face's deflection, else `fallback`.
+class BandCdtAlgo : public IMeshTools_MeshAlgo
+{
+public:
+  explicit BandCdtAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback) : myFallback(fallback) {}
+
+  void Perform(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm, const Message_ProgressRange& range) override
   {
-    size_t total = 0;
-    for (int w = 0; w < f->WiresNb(); ++w)
+    bool done = false;
+    try
     {
-      const IMeshData::IWireHandle& W = f->GetWire(w);
-      for (int e = 0; e < W->EdgesNb(); ++e)
-        total += (size_t)W->GetEdge(e)->GetPCurve(f.get(), W->GetEdgeOrientation(e))->ParametersNb();
+      done = cdt_face(f, MIN_NODES, true);
     }
-    if (total < MIN_NODES)
-      return false;
-    std::vector<cdt::Pt>          uv;
-    std::vector<gp_Pnt>           xyz;
-    std::vector<std::vector<int>> rings;
-    uv.reserve(total);
-    xyz.reserve(total);
-    auto same = [&](int node, const gp_Pnt2d& q) { return std::abs(uv[(size_t)node].x - q.X()) + std::abs(uv[(size_t)node].y - q.Y()) < 1e-12; };
-    for (int w = 0; w < f->WiresNb(); ++w)
+    catch (const Standard_Failure&)
     {
-      const IMeshData::IWireHandle& W = f->GetWire(w);
-      if (W->IsSet(IMeshData_SelfIntersectingWire))
-        return false;
-      std::vector<int> ring;
-      int              first = -1;
-      for (int e = 0; e < W->EdgesNb(); ++e)
-      {
-        const IMeshData::IEdgeHandle E = W->GetEdge(e);
-        const TopAbs_Orientation     o = W->GetEdgeOrientation(e);
-        // One pcurve on this face (no seams), run one way.
-        if ((o != TopAbs_FORWARD && o != TopAbs_REVERSED) || E->GetDegenerated() || E->GetPCurves(f.get()).Extent() != 1)
-          return false;
-        const IMeshData::IPCurveHandle& P = E->GetPCurve(f.get(), o);
-        const IMeshData::ICurveHandle&  C = E->GetCurve();
-        const int                       n = P->ParametersNb();
-        if (n < 2 || C->ParametersNb() != n)
-          return false;
-        for (int k = 0; k < n; ++k)
-        {
-          // The points run along the edge; a reversed edge runs the wire backwards.
-          const int      idx = o == TopAbs_REVERSED ? n - 1 - k : k;
-          const gp_Pnt2d q   = P->GetPoint(idx);
-          int            node;
-          if (k == 0 && !ring.empty() && same(ring.back(), q))
-            node = ring.back(); // the vertex shared with the edge before
-          else if (k == n - 1 && e == W->EdgesNb() - 1 && first >= 0 && same(first, q))
-            node = first; // back at the wire's start
-          else
-          {
-            node = (int)uv.size();
-            uv.push_back({q.X(), q.Y()});
-            xyz.push_back(C->GetPoint(idx));
-            ring.push_back(node);
-            if (first < 0)
-              first = node;
-          }
-          // Poly_PolygonOnTriangulation of the edge: its nodes in the face's triangulation.
-          P->GetIndex(idx) = node + 1;
-        }
-      }
-      rings.push_back(std::move(ring));
     }
-    if (rings.empty())
-      return false;
-    // The outer ring first: the largest.
-    auto area = [&](const std::vector<int>& r) {
-      double s = 0;
-      for (size_t k = 0, j = r.size() - 1; k < r.size(); j = k++)
-        s += uv[(size_t)r[j]].x * uv[(size_t)r[k]].y - uv[(size_t)r[k]].x * uv[(size_t)r[j]].y;
-      return std::abs(s);
-    };
-    size_t outer = 0;
-    for (size_t k = 1; k < rings.size(); ++k)
-      if (area(rings[k]) > area(rings[outer]))
-        outer = k;
-    std::swap(rings[0], rings[outer]);
-    std::vector<int> tris;
-    if (!cdt::triangulate(uv, rings, tris))
-      return false;
-    occ::handle<Poly_Triangulation> T = new Poly_Triangulation((int)uv.size(), (int)(tris.size() / 3), true);
-    for (size_t i = 0; i < uv.size(); ++i)
-    {
-      T->SetNode((int)i + 1, xyz[i]);
-      T->SetUVNode((int)i + 1, gp_Pnt2d(uv[i].x, uv[i].y));
-    }
-    for (size_t t = 0; t < tris.size(); t += 3)
-      T->SetTriangle((int)(t / 3) + 1, Poly_Triangle(tris[t] + 1, tris[t + 1] + 1, tris[t + 2] + 1));
-    BRepMesh_ShapeTool::AddInFace(f->GetFace(), T);
-    return true;
+    if (!done)
+      myFallback->Perform(f, prm, range);
   }
+
+private:
+  // Only faces with many boundary nodes: smaller ones mesh fast as they are,
+  // and usually need inner nodes.
+  static constexpr size_t MIN_NODES = 1000;
 
   occ::handle<IMeshTools_MeshAlgo> myFallback;
 };
@@ -439,7 +526,8 @@ private:
 
 // Planar faces through PlanarCdtAlgo (BRepMesh's own algorithm below its
 // threshold and as its fallback; not Delabella, which crashed on macOS arm64),
-// cylinders and cones through StripAlgo, every other surface through BRepMesh's own.
+// cylinders, cones and tori through StripAlgo, every curved face StripAlgo
+// doesn't take through BandCdtAlgo, then BRepMesh's own.
 class PlanarCdtAlgoFactory : public IMeshTools_MeshAlgoFactory
 {
 public:
@@ -447,9 +535,13 @@ public:
   {
     if (type == GeomAbs_Plane)
       return new PlanarCdtAlgo(myDefault->GetAlgo(type, prm));
+    const bool bands = std::getenv("NOSHAPE_MESH_NO_BANDS") == nullptr;
+    occ::handle<IMeshTools_MeshAlgo> own = myDefault->GetAlgo(type, prm);
+    if (bands)
+      own = new BandCdtAlgo(own);
     if ((type == GeomAbs_Cylinder || type == GeomAbs_Cone || type == GeomAbs_Torus) && std::getenv("NOSHAPE_MESH_NO_STRIPS") == nullptr)
-      return new StripAlgo(myDefault->GetAlgo(type, prm), type == GeomAbs_Torus);
-    return myDefault->GetAlgo(type, prm);
+      return new StripAlgo(own, type == GeomAbs_Torus);
+    return own;
   }
 
 private:
