@@ -634,38 +634,6 @@ bool is_valid(const OcShape& s)
   return a.IsValid();
 }
 
-double mesh_volume(const TopoDS_Shape& shape)
-{
-  TopoDS_Shape s = BRepBuilderAPI_Copy(shape).Shape();
-  Bnd_Box      b;
-  BRepBndLib::Add(s, b);
-  const double size = b.IsVoid() ? 1.0 : std::sqrt(b.SquareExtent());
-  // BRepMesh rejects deflections at or under Precision::Confusion() (parts
-  // under ~5 mm across, e.g. miniature screws).
-  BRepMesh_IncrementalMesh mesh(s, std::max(size * 2e-5, 10.0 * Precision::Confusion()), false, 0.05);
-  double v = 0;
-  for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
-  {
-    const TopoDS_Face& f = TopoDS::Face(e.Current());
-    TopLoc_Location    loc;
-    const occ::handle<Poly_Triangulation>& t = BRep_Tool::Triangulation(f, loc);
-    if (t.IsNull())
-      continue;
-    for (int i = 1; i <= t->NbTriangles(); ++i)
-    {
-      int a, bb, c;
-      t->Triangle(i).Get(a, bb, c);
-      if (f.Orientation() == TopAbs_REVERSED)
-        std::swap(bb, c);
-      const gp_XYZ p = t->Node(a).Transformed(loc).XYZ(), q = t->Node(bb).Transformed(loc).XYZ(),
-                   r = t->Node(c).Transformed(loc).XYZ();
-      v += p.Dot(q.Crossed(r)) / 6.0;
-    }
-  }
-  return v;
-}
-
-
 namespace {
 
 // ---- integrals over faces that wrap a periodic surface more than once
@@ -961,7 +929,12 @@ GProp_GProps volume_props(const TopoDS_Shape& s)
 {
   TopoDS_Compound          rest;
   std::vector<TopoDS_Face> wrapping;
-  if (!has_mesh_faces(s) && split_wrapping(s, rest, wrapping))
+  // Faces OCCT doesn't integrate (wrapping, with gaps) or integrates loosely
+  // (B-spline, extruded and other non-analytic surfaces: a conic fillet
+  // +0.0013 mm³, a variable fillet -0.0165, a curvature fillet +0.030 of the
+  // exact volume, live oracle F4-F6): every face by the segmented Gauss
+  // integral.
+  if (!has_mesh_faces(s) && (split_wrapping(s, rest, wrapping) || !analytic_only(s)))
   {
     // Every face by the same divergence field: OCCT's per-face terms use
     // other fields, so they can't be mixed with these. The field is centred
@@ -986,25 +959,17 @@ GProp_GProps volume_props(const TopoDS_Shape& s)
     }
     return MomentProps(unshift(m, o));
   }
-  // OCCT's two integrators fail on different surfaces: plain Gauss on rational
-  // B-splines (a NURBS cylinder: +0.9 %), the adaptive one on strongly
-  // rational extrusions (a conic fillet with weight 4: +4.5 % on the tool).
-  // When they disagree, a fine mesh decides.
-  GProp_GProps gauss, adaptive;
-  BRepGProp::VolumeProperties(s, gauss);
   // Mesh faces: OCCT integrates their triangulation (exact for a mesh).
+  GProp_GProps out;
   if (has_mesh_faces(s))
-    return gauss;
-  BRepGProp::VolumeProperties(s, adaptive, 1e-7, true);
-  const double a = gauss.Mass(), b = adaptive.Mass();
-  if (std::abs(a - b) <= 1e-7 * std::max({std::abs(a), std::abs(b), 1e-300}))
-    return adaptive;
-  // Analytic surfaces only: the adaptive one, whose error is controlled (a Ø6
-  // hole through a Ø40 cylinder: Gauss −0.41 mm³, a mesh can't tell 5e-6).
-  if (analytic_only(s))
-    return adaptive;
-  const double m = mesh_volume(s);
-  return std::abs(a - m) < std::abs(b - m) ? gauss : adaptive;
+  {
+    BRepGProp::VolumeProperties(s, out);
+    return out;
+  }
+  // Analytic faces only: the adaptive integrator, whose error is controlled
+  // there (a Ø6 hole through a Ø40 cylinder: plain Gauss −0.41 mm³).
+  BRepGProp::VolumeProperties(s, out, 1e-7, true);
+  return out;
 }
 
 GProp_GProps surface_props(const TopoDS_Shape& s)
@@ -1017,14 +982,22 @@ GProp_GProps surface_props(const TopoDS_Shape& s)
   }
   TopoDS_Compound          rest;
   std::vector<TopoDS_Face> wrapping;
-  if (!split_wrapping(s, rest, wrapping))
-  {
-    BRepGProp::SurfaceProperties(s, out, 1e-7, true);
-    return out;
-  }
+  split_wrapping(s, rest, wrapping);
+  // OCCT's adaptive integrator controls its error on analytic faces only: on
+  // extruded B-spline sections it is far off (a conic fillet, rho 0.7:
+  // -0.235 mm² of 8747.53; a curvature fillet: -0.915 mm²; live's bounds are
+  // ±0.2). Those faces take the segmented Gauss integral too.
+  TopoDS_Compound analytic;
+  BRep_Builder    B;
+  B.MakeCompound(analytic);
+  for (TopoDS_Iterator it(rest); it.More(); it.Next())
+    if (analytic_only(it.Value()))
+      B.Add(analytic, it.Value());
+    else
+      wrapping.push_back(TopoDS::Face(it.Value()));
   out = GProp_GProps(gp::Origin());
-  if (rest.NbChildren())
-    BRepGProp::SurfaceProperties(rest, out, 1e-7, true);
+  if (analytic.NbChildren())
+    BRepGProp::SurfaceProperties(analytic, out, 1e-7, true);
   for (const TopoDS_Face& f : wrapping)
     out.Add(MomentProps(face_moments(f, false)));
   return out;
