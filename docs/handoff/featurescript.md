@@ -887,3 +887,13 @@ this its Merge scope came out empty. Hole is on STD_EDITING_LOGIC since 25 Oct (
 and the agent API's dialog_logic run std's holeEditLogic (Merge scope, flip, standard tables, tapped depths); the
 native `hole_scope_logic` (ops studio.rs), tapped-depth link (behaviors.rs) and table copy (feature_dialog.rs) stand
 down via `has_editing_logic("hole")`. Tests: `hole_editing_logic_runs_std`, `hole_scope_follows_depth_as_live` (L57).
+
+**Editing-logic speed (26 Oct, lead P0, api's F4 benchmark):** `NOSHAPE_FS_PROFILE=1` prints each editing-logic call's
+time and its slowest std lines (inclusive, run.rs `run_editing_logic`). Almost all of a pass was our evCollision:
+a kernel distance for every tool-face × target-face pair and a boolean `common` per touching solid pair. Now pairs
+whose fast boxes are apart are skipped (BOX_GAP), and containment is tried only when one solid's tight box holds the
+other's (HOLD_GAP). Dev build (our crates at opt-level 1), block + boss: Extrude 105 → 12 ms per pass, Hole 75 → 45 ms
+(its opHole probe ~16 ms, the tight evBox ~13 ms). The rest is the one-time std load per process (parse + compile of
+the module and its imports): Extrude ~170 ms, Hole ~460 ms more (holetables.gen.fs is 2.1 MB, ~150 ms of it lexing).
+`std_feature::prewarm()` loads every STD_EDITING_LOGIC feature on a background thread; loading runs outside the
+FEATURES lock (`loaded`), so a dialog never waits on another feature's load.

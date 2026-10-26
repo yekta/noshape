@@ -897,6 +897,13 @@ fn faces_cross(a: &k::Shape, b: &k::Shape, solids: bool) -> bool {
     })
 }
 
+/// How far apart two boxes may be and their shapes still touch (the
+/// collision tolerance, with room for the boxes' own rounding).
+const BOX_GAP: f64 = 1e-7;
+/// How far a solid inside another may stick out of the other's tight box
+/// (the tight boxes' own error).
+const HOLD_GAP: f64 = 1e-6;
+
 fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let tools = super::query::evaluate_refs(i, &cx, &field(&a, "tools"))?;
@@ -949,14 +956,34 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         (out, solids)
     };
     let ((ts, tool_solids), (gs, target_solids)) = (shapes(&tools), shapes(&targets));
+    // Shapes whose boxes are apart never touch: only pairs whose boxes meet
+    // need the kernel's distance (most of a Part Studio's pairs).
+    let bbox = |s: &k::Shape| s.bounding_box(false).ok();
+    let meet = |a: &Option<k::BoundingBox>, b: &Option<k::BoundingBox>| match (a, b) {
+        (Some(a), Some(b)) => (a.min - BOX_GAP).cmple(b.max).all() && (b.min - BOX_GAP).cmple(a.max).all(),
+        _ => true,
+    };
+    let (tbox, gbox): (Vec<_>, Vec<_>) = (ts.iter().map(|h| bbox(&h.2)).collect(), gs.iter().map(|h| bbox(&h.2)).collect());
+    let (tsbox, gsbox): (Vec<_>, Vec<_>) = (tool_solids.iter().map(|s| bbox(&s.1)).collect(), target_solids.iter().map(|s| bbox(&s.1)).collect());
     let one = |r: &crate::reference::Reference| super::query::query_of_refs(&cx, std::slice::from_ref(r));
     let clash = |kind: &str| std_enum("clashtype.gen.fs", "ClashType", kind).unwrap_or_else(|| Value::str(kind));
     // Solid body pairs where one holds the other (live "fs (10-25 f)"):
     // (tool body, target body, the tool is the inner one).
+    // Only a solid whose tight box holds the other's can hold the other.
+    let tight = |s: &k::Shape| s.bounding_box(true).ok();
+    let holds = |a: &Option<k::BoundingBox>, b: &Option<k::BoundingBox>| match (a, b) {
+        (Some(a), Some(b)) => (a.min - HOLD_GAP).cmple(b.min).all() && b.max.cmple(a.max + HOLD_GAP).all(),
+        _ => true,
+    };
+    let (tstight, gstight): (Vec<_>, Vec<_>) = (tool_solids.iter().map(|_| std::cell::OnceCell::new()).collect(), target_solids.iter().map(|_| std::cell::OnceCell::new()).collect());
     let mut inside = Vec::new();
-    for (tb, t) in &tool_solids {
-        for (gb, g) in &target_solids {
-            if tb == gb || !k::distance(t, g).is_ok_and(|d| d.distance <= 1e-8) {
+    for (((tb, t), tx), tt) in tool_solids.iter().zip(&tsbox).zip(&tstight) {
+        for (((gb, g), gx), gt) in target_solids.iter().zip(&gsbox).zip(&gstight) {
+            if tb == gb || !meet(tx, gx) {
+                continue;
+            }
+            let (tt, gt) = (tt.get_or_init(|| tight(t)), gt.get_or_init(|| tight(g)));
+            if (!holds(tt, gt) && !holds(gt, tt)) || !k::distance(t, g).is_ok_and(|d| d.distance <= 1e-8) {
                 continue;
             }
             let Some(common) = k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) else { continue };
@@ -972,9 +999,9 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let contained = |tb: &Option<crate::reference::Reference>, gb: &Option<crate::reference::Reference>| inside.iter().any(|(t, g, _)| Some(t) == tb.as_ref() && Some(g) == gb.as_ref());
     let mut out = Vec::new();
     let mut touched = std::collections::HashSet::new();
-    for (tr, tb, t, ts_solid) in &ts {
-        for (gr, gb, g, gs_solid) in &gs {
-            if t.is_same(g) {
+    for ((tr, tb, t, ts_solid), tx) in ts.iter().zip(&tbox) {
+        for ((gr, gb, g, gs_solid), gx) in gs.iter().zip(&gbox) {
+            if t.is_same(g) || !meet(tx, gx) {
                 continue;
             }
             let Ok(d) = k::distance(t, g) else { continue };

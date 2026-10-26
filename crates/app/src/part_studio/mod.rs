@@ -957,10 +957,10 @@ impl PartStudioView {
             }
         }
         // Live (selection/10): a feature hovered in the list outlines its
-        // part's silhouette in the hover orange; its faces keep their
-        // shading and its edges stay black.
+        // part's silhouette in the hover orange, on the outline itself; its
+        // faces keep their shading and its inner edges stay black.
         if let Some(f) = self.ui.list_hover.or(self.ui.list_menu).or(self.ui.insp.hover_feature) {
-            use noshape_render::state;
+            let mut faces = Vec::new();
             for g in self.feature_geometry(f) {
                 let face = matches!(g, Reference::Face(_));
                 if !face && !matches!(g, Reference::Edge(_)) {
@@ -968,13 +968,14 @@ impl PartStudioView {
                 }
                 for &id in built.picks.ids_for(&g) {
                     if let Some(s) = scene.states.get_mut(id as usize) {
-                        *s &= !state::ACCENT;
-                        if face {
-                            *s |= state::OUTLINE | state::HOVER;
-                        }
+                        *s &= !noshape_render::state::ACCENT;
                     }
                 }
+                if face {
+                    faces.push(g);
+                }
             }
+            scene.instances.extend(scene_builder::hover_silhouette(&self.display, &faces, self.gpu.uploader()));
         }
         // Live (lp wall over 2258): the pattern's other inputs (its
         // Direction) are drawn red; the seed keeps the selection colors.
@@ -4322,6 +4323,8 @@ impl PartStudioView {
             let color = if selected { [sel.r, sel.g, sel.b, 1.0] } else { [0.0, 0.0, 0.0, 1.0] };
             fills.push(noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color });
         }
+        // Shown dimensions' labels, in their sketch plane.
+        fills.extend(self.shown_dims_fills(cx));
         // The sketch's name, in its plane.
         let name = self.sketch_name_contours(cx);
         if !name.is_empty() {

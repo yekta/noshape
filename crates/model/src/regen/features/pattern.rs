@@ -1528,7 +1528,18 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
             let sc = EvalCtx::new(ev.feature, &seeds[si].name, &seeds[si].params, ev.units, ev.ctx.clone(), ev.outer_vars);
             super::extrude::scope(&sc)
         };
+        // Instances that miss the part leave the pattern OK, without the
+        // Add / Remove infos (live "kern (10-23 22:00) patterns": O3, M2).
+        let n = ev.infos.len();
         ev.apply_operation(t, &ops[si], scope, BodyKind::Solid)?;
+        let mut i = n;
+        while i < ev.infos.len() {
+            if ev.infos[i] == crate::regen::eval::NO_GEOMETRY_CHANGE || ev.infos[i] == crate::regen::eval::TOOLS_MISS_TARGETS {
+                ev.infos.remove(i);
+            } else {
+                i += 1;
+            }
+        }
     }
     // Instances that failed are skipped silently (patternUtils.fs).
     if !failures.is_empty() {

@@ -219,7 +219,13 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
         if c == b'"' || c == b'\'' {
             let quote = c;
             i += 1;
-            let mut s = String::new();
+            // Up to the first quote, escape or line end in one piece (most
+            // strings, e.g. std's 2 MB hole tables); the loop does the rest.
+            let s0 = i;
+            while i < bytes.len() && !matches!(bytes[i], b'\\' | b'\n') && bytes[i] != quote {
+                i += 1;
+            }
+            let mut s = String::from(&src[s0..i]);
             loop {
                 if i >= bytes.len() || bytes[i] == b'\n' {
                     return Err(LexError { pos, message: format!("token recognition error at: '{}'", &src[start..i.min(bytes.len())]) });
@@ -266,7 +272,7 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
         }
         // Operators.
         let rest = &src[i..];
-        if let Some((s, op)) = OPS.iter().find(|(s, _)| rest.starts_with(s)) {
+        if let Some((s, op)) = OPS.iter().find(|(s, _)| s.as_bytes()[0] == c && rest.starts_with(s)) {
             i += s.len();
             out.push(Token { tok: Tok::Op(*op), pos, start, end: i });
             continue;

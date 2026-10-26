@@ -128,6 +128,8 @@ const FACE_SELECTED: vec3<f32> = vec3<f32>(0.887, 0.414, 0.018);
 // plane lies over it (selection/09).
 const BODY_SELECTED: vec3<f32> = vec3<f32>(1.0, 0.536, 0.074);
 const BODY_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.527, 0.073);
+// A highlighted part edge's dark core, sRGB (see fs_line).
+const EDGE_CORE: vec3<f32> = vec3<f32>(0.137, 0.188, 0.208);
 
 // ---------------------------------------------------------------- background
 
@@ -639,6 +641,10 @@ struct LineOut {
     @location(3) world: vec3<f32>,
     @location(4) @interpolate(flat) style: u32,
     @location(5) @interpolate(flat) slot: u32,
+    // Signed distance from the centre line and the half width of a part
+    // edge's dark core (0: none), in physical px.
+    @location(6) across: f32,
+    @location(7) @interpolate(flat) core: f32,
 };
 
 fn clip_near(p: vec4<f32>, q: vec4<f32>) -> vec4<f32> {
@@ -696,11 +702,25 @@ fn vs_silhouette(@builtin(vertex_index) index: u32, s: SilhouetteIn) -> LineOut 
     l.color = vec4(0.0);
     l.pick = s.pick;
     l.width = s.width;
-    l.style = 0u;
+    // Lifted: a hovered part's silhouette over the part edges it runs on.
+    l.style = 32u;
     // A face's hover and selection show on its boundary edges, not here.
     var o = line_vertex(index, l, ~(HOVER | SELECTED));
     if (dot(n1, view) * dot(n2, view) >= 0.0) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
+}
+
+// `w` moved toward the eye by `px` physical pixels' worth of world length
+// there (along the eye ray: it stays at the same place on screen).
+fn toward_eye(w: vec3<f32>, px: f32) -> vec3<f32> {
+    let persp = g.camera_pos.w > 0.5;
+    let fwd = g.camera_fwd.xyz;
+    let u = normalize(cross(fwd, select(vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), abs(fwd.z) > 0.9)));
+    let p0 = g.view_proj * vec4(w, 1.0);
+    let p1 = g.view_proj * vec4(w + u, 1.0);
+    let per_unit = length((p1.xy / p1.w - p0.xy / p0.w) * g.viewport.xy * 0.5);
+    let dir = select(-fwd, normalize(g.camera_pos.xyz - w), persp);
+    return w + dir * (px / max(per_unit, 1e-9));
 }
 
 fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
@@ -711,28 +731,38 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     let t = ts[vi];
     let side = ss[vi];
 
-    let wa = (inst.model * vec4(l.a, 1.0)).xyz;
-    let wb = (inst.model * vec4(l.b, 1.0)).xyz;
+    let half_vp = g.viewport.xy * 0.5;
+    let pick = global_pick(l.pick);
+    let st = state_of(pick) & state_mask;
+    var width = l.width * inst.extra.x + g.viewport.w;
+    let base_half = width * g.viewport.z * 0.5;
+    // Live (selection/03, 06b, 07b): highlighted edges and face outlines
+    // put ~3.5–4.5 px of colour down (4 px here at the default width).
+    let lit = (st & (HOVER | SELECTED | ERROR)) != 0u;
+    if (lit) { width = width * 1.8 + 2.2; }
+    let half = max(width * g.viewport.z * 0.5, 0.5);
+
+    var wa = (inst.model * vec4(l.a, 1.0)).xyz;
+    var wb = (inst.model * vec4(l.b, 1.0)).xyz;
+    // A highlighted line comes toward the eye by its half width (same place
+    // on screen), so its own faces' depth slope doesn't eat the face side of
+    // the band (live selection/06b: centred on the edge).
+    // Lifted lines too (a hovered part's silhouette over its own faces).
+    if (lit || (l.style & 32u) != 0u) {
+        wa = toward_eye(wa, 1.5 * half);
+        wb = toward_eye(wb, 1.5 * half);
+    }
     var ca = g.view_proj * vec4(wa, 1.0);
     var cb = g.view_proj * vec4(wb, 1.0);
     ca = clip_near(ca, cb);
     cb = clip_near(cb, ca);
 
-    let half_vp = g.viewport.xy * 0.5;
     let sa = ca.xy / ca.w * half_vp;
     let sb = cb.xy / cb.w * half_vp;
     var d = sb - sa;
     let len = length(d);
     if (len < 1e-5) { d = vec2(1.0, 0.0); } else { d = d / len; }
     let nrm = vec2(-d.y, d.x);
-
-    let pick = global_pick(l.pick);
-    let st = state_of(pick) & state_mask;
-    var width = l.width * inst.extra.x + g.viewport.w;
-    // Live (selection/03, 06b, 07b): highlighted edges and face outlines
-    // put ~3.5–4.5 px of colour down (4 px here at the default width).
-    if ((st & (HOVER | SELECTED | ERROR)) != 0u) { width = width * 1.8 + 2.2; }
-    let half = max(width * g.viewport.z * 0.5, 0.5);
 
     var c = select(ca, cb, t > 0.5);
     let ext = select(-1.0, 1.0, t > 0.5);
@@ -772,6 +802,9 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     o.along = t * len;
     o.world = mix(wa, wb, t);
     o.style = l.style;
+    o.across = side * half;
+    let core = (l.style & 64u) != 0u && (st & (HOVER | SELECTED)) != 0u && (st & OUTLINE) == 0u;
+    o.core = select(0.0, max(base_half, 0.5), core);
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
 }
@@ -792,6 +825,12 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let period = max(g.dash.x + g.dash.y + g.dash.z + g.dash.w, 1.0);
         let t = fract(i.along / (period * g.viewport.z)) * period;
         if ((t > g.dash.x && t < g.dash.x + g.dash.y) || t > g.dash.x + g.dash.y + g.dash.z) { discard; }
+    }
+    // A hovered / selected part edge: the edge shows through the highlight
+    // (live selection/06b, 07b: 0.2 of (35,48,53) in sRGB at the centre).
+    if (i.core > 0.0) {
+        let k = 0.2 * clamp(i.core + 0.5 - abs(i.across), 0.0, 1.0);
+        return vec4(srgb_to_linear(mix(linear_to_srgb(i.color.rgb), EDGE_CORE, k)), i.color.a);
     }
     return i.color;
 }

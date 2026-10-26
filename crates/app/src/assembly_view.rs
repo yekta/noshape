@@ -2688,17 +2688,31 @@ impl AssemblyView {
                 }
                 cx.notify();
             }
-            ViewportEvent::BoxSelect { ids, modifiers, .. } => {
-                // Live ("nav2 selection" (7), 10-25): a box (with nothing
-                // selected; otherwise the drag moves the selection) selects
-                // whole part occurrences, window or crossing.
+            ViewportEvent::BoxSelect { ids, modifiers, crossing, rect } => {
+                // Live ("nav2 selection" (7), 10-25; ui-asmbox 10-26): a box
+                // (with nothing selected; otherwise the drag moves the
+                // selection) selects whole part occurrences: a crossing box
+                // those it touches, a window only those wholly inside it.
                 if self.pick_mode(cx).is_some() || self.placing.is_some() {
                     return;
                 }
                 if !(modifiers.shift || modifiers.secondary()) {
                     self.clear_selection();
                 }
-                let occurrences: Vec<InstanceId> = ids.iter().filter_map(|id| self.pick(Some(*id))).map(|t| t.path[0]).collect();
+                let mut occurrences: Vec<InstanceId> = ids.iter().filter_map(|id| self.pick(Some(*id))).map(|t| t.path[0]).collect();
+                if !*crossing {
+                    let (lo, hi) = (rect.0.min(rect.1), rect.0.max(rect.1));
+                    let vp = self.viewport.read(cx);
+                    let inside = |top: InstanceId| {
+                        self.result.occurrences.iter().filter(|o| o.top() == top && !o.hidden).all(|o| {
+                            o.mesh.positions.iter().all(|p| {
+                                let w = o.transform.transform_point3(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
+                                vp.project(w).is_some_and(|s| s.x >= lo.x && s.x <= hi.x && s.y >= lo.y && s.y <= hi.y)
+                            })
+                        })
+                    };
+                    occurrences.retain(|o| inside(*o));
+                }
                 for o in occurrences {
                     if !self.selected.contains(&o) {
                         self.selected.push(o);
