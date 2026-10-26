@@ -55,6 +55,8 @@ impl PartStudioView {
         let kind = target.as_ref().map(|t| t.kind);
         let body = target_ref.as_ref().and_then(|r| self.owning_body(r));
         let body_name = body.as_ref().and_then(|b| self.display.body(b)).map(|b| b.name.clone()).unwrap_or_else(|| "part".into());
+        let has_material = body.as_ref().is_some_and(|b| self.studio(cx).and_then(|s| s.part_properties.get(b)).is_some_and(|p| p.material.is_some()));
+        let com_shown = body.as_ref().is_some_and(|b| self.ui.com.as_ref().is_some_and(|(c, _)| c == b));
         let creator = target_ref.as_ref().and_then(|r| self.creating_feature(r));
         let studio = self.studio(cx);
         let creator_name = creator.and_then(|id| studio.and_then(|s| s.feature(id)).map(|f| f.name.clone()));
@@ -339,6 +341,12 @@ impl PartStudioView {
                                 this.set_part_hidden(&b1, true, cx);
                                 this.hover = None;
                             })));
+                        // Live (ui-com/01, 03): a part with a material offers
+                        // its center of mass (then "Hide center of mass").
+                        if has_material {
+                            let bm = b.clone();
+                            m = m.item(icon_item(if com_shown { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", Box::new(move |this, _, cx| this.toggle_center_of_mass(&bm, cx))));
+                        }
                         if k == PickKind::Edge {
                             let re = r.clone();
                             m = m.item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
@@ -358,7 +366,13 @@ impl PartStudioView {
                                 this.hover = None;
                                 this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
                             })));
-                        if k == PickKind::Face {
+                        if k == PickKind::Face && section {
+                            // Live (ui-com/03): with a section view on, its
+                            // edit and off items take Section view…'s place.
+                            m = m
+                                .item(item("Edit section view…", Box::new(|this, w, cx| this.edit_section(w, cx))))
+                                .item(item("Turn off section view", Box::new(|this, w, cx| this.toggle_section(w, cx))));
+                        } else if k == PickKind::Face {
                             let rs = r.clone();
                             m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| {
                                 if this.frame_of_ref(&rs).is_some() {
@@ -401,6 +415,9 @@ impl PartStudioView {
                     }
                     if planar {
                         m = m.item(normal_to(&r));
+                        if section && k == PickKind::Face {
+                            m = m.item(item("View normal to section plane", Box::new(|this, _, cx| this.view_normal_to_section(cx))));
+                        }
                     } else if linear_edge {
                         let ra = r.clone();
                         m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| this.align_view_vertical(&ra, cx))));
@@ -418,7 +435,8 @@ impl PartStudioView {
                         let (b1, b2) = (b.clone(), b.clone());
                         m = m
                             .separator()
-                            .item(item(&format!("Assign material for {body_name}…"), Box::new(move |this, w, cx| this.open_material_panel(vec![b1.clone()], w, cx))))
+                            // Live: "Edit material for …" once one is assigned.
+                            .item(item(&format!("{} material for {body_name}…", if has_material { "Edit" } else { "Assign" }), Box::new(move |this, w, cx| this.open_material_panel(vec![b1.clone()], w, cx))))
                             .item(item(&format!("Edit appearance for {body_name}…"), Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Parts(vec![b2.clone()]), w, cx))));
                         if k == PickKind::Face {
                             let fs = faces.clone();
@@ -468,7 +486,7 @@ impl PartStudioView {
             if section && target_ref.is_none() {
                 exits.push(item("Edit section view…", Box::new(|this, w, cx| this.edit_section(w, cx))));
             }
-            if section {
+            if section && !(kind == Some(PickKind::Face) && body.is_some() && !editing && !in_sketch) {
                 exits.push(item("Turn off section view", Box::new(|this, w, cx| this.toggle_section(w, cx))));
             }
             if !exits.is_empty() {
@@ -1722,6 +1740,26 @@ impl PartStudioView {
         }
         self.set_show_mass(false, cx);
         self.refresh_scene(true, cx);
+    }
+
+    /// Show / hide a part's center of mass (live ui-com/02: a quartered
+    /// black-and-white disc at the point, over everything).
+    pub(super) fn toggle_center_of_mass(&mut self, body: &BodyId, cx: &mut Context<Self>) {
+        if self.ui.com.as_ref().is_some_and(|(b, _)| b == body) {
+            self.ui.com = None;
+        } else {
+            let props = self.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
+            let at = self.context.as_ref().and_then(|ctx| noshape_model::regen::measure::mass_properties(ctx, std::slice::from_ref(body), &|b| props.get(b).and_then(|p| p.density))).map(|mp| mp.center_of_mass);
+            self.ui.com = at.map(|p| (body.clone(), p));
+        }
+        cx.notify();
+    }
+
+    /// The shown center of mass indicator (18 px, as the assembly's).
+    pub(super) fn render_center_of_mass(&self, cx: &App) -> Option<AnyElement> {
+        let (_, at) = self.ui.com.as_ref()?;
+        let p = self.viewport.read(cx).project(*at)?;
+        Some(div().absolute().left(px(p.x as f32 - 9.)).top(px(p.y as f32 - 9.)).child(crate::assets::icon(&crate::assets::icon_path("com-indicator"), 18., cx)).into_any_element())
     }
 
     pub(super) fn set_show_mass(&mut self, show: bool, cx: &mut Context<Self>) {

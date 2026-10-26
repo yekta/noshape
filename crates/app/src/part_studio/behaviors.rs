@@ -252,6 +252,8 @@ pub struct UiState {
     /// Mass properties: "Mate connector for reference frame" is the active
     /// field (a mate connector picked in the list or graphics fills it), and
     /// the connector it holds.
+    /// A part's shown center of mass (part, world point).
+    pub com: Option<(BodyId, glam::DVec3)>,
     pub mass_ref_active: bool,
     pub mass_reference: Option<Reference>,
     /// Mass Override changed in the open dialog (live ui-mass/10–15): the
@@ -521,6 +523,7 @@ impl UiState {
             show_part_props: crate::preferences_window::parts_list_properties(),
             list_collapsed: false,
             mass_faces: false,
+            com: None,
             mass_ref_active: false,
             mass_reference: None,
             mass_override_edit: None,
