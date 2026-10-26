@@ -258,7 +258,9 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
     // Fillet, Loft: the app's `std_edit_logic`) get the same here, on the
     // model before the feature, until it settles.
     if noshape_model::custom::std_feature::has_editing_logic(&feature.type_id) {
+        let tq = std::time::Instant::now();
         let ctx = od.regenerate_with(tab, None, |o| o.upto = Some(index))?.context;
+        eprintln!("TMP dialog regen upto: {:?}", tq.elapsed());
         let specified: Vec<String> = given.keys().cloned().collect();
         let mut old = noshape_model::params::ParamValues::default();
         for _ in 0..3 {
@@ -488,10 +490,14 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(i) => (i as usize).min(ps.features.len()),
         None => ps.rollback_index(),
     };
+    let t0 = std::time::Instant::now();
     dialog_logic(od, tab, &mut feature, index, &params)?;
+    let t1 = std::time::Instant::now();
     let (id, name) = (feature.id, feature.name.clone());
     edit_studio(od, tab, &studio::insert_description(&name), |ps| Ok(studio::insert_feature(ps, feature, index)))?;
+    let t2 = std::time::Instant::now();
     let report = super::regen_report_with(od, tab, &[id])?;
+    eprintln!("TMP add: dialog {:?}, insert {:?}, report {:?}", t1 - t0, t2 - t1, t2.elapsed());
     let st = this_feature_status(&report, &id.to_string());
     Ok(json!({ "feature": id.to_string(), "name": name, "feature_status": st, "regeneration": report }).into())
 }
