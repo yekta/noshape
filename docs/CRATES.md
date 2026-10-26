@@ -51,6 +51,9 @@ target structure and the rules that keep it.
   | model data | core (check) | 9 s |
   | app | the app | 47 s |
 
-- Next: the app (138k lines): `app-core` (widgets, viewport, shared panels; never references a studio), one crate per
-  studio UI (Part Studio 34k, drawing 27k, assembly 23k, variables), and the binary (workspace, wiring). Then assembly
-  logic out of the core.
+- Next: the app (138k lines), one studio at a time, each at a moment agreed with its owner: variables (3.5k) first,
+  then drawing UI (27k), assembly UI (23k), Part Studio (34k), with `app-core` (widgets, viewport, shared panels) under
+  them. What has to be cut first (measured 10-26): the base widgets reach the whole app through `ui`/`navigation` →
+  `files::config_dir` (move to a base `paths` module), `os_ui` → `preferences_window::show` (a hook), `actions` →
+  `shortcuts::init` (call it from main); the studios reach `files`, `workspace`, `release_dialog`, `preferences_window`,
+  `history_panel`, `start_library` (hooks or moves). Then assembly logic out of the model core.
