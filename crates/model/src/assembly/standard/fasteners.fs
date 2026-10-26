@@ -375,18 +375,24 @@ function screwHead(context is Context, id is Id, def is map) returns array
         // dome"): a sphere of radius rf centred on the axis through the rim
         // (dk at the bearing face), cut flat at the head height k: the top is
         // a plane out to dt / 2 (HEAD_TOP_DIA), where the sphere meets it.
+        // Live's ASME button head: the same dome over a cylindrical side of
+        // height hs (HEAD_SIDE_HEIGHT), the top flat dk / 2 across.
         const rb = def.dk / 2;
-        const zc = -sqrt(max(def.rf * def.rf - rb * rb, Z * Z));
+        const hs = def.hs != undefined ? def.hs : Z;
+        const zc = hs - sqrt(max(def.rf * def.rf - rb * rb, Z * Z));
+        var base = [{ "p" : rz(Z, Z) }, { "p" : rz(rb, Z) }];
+        if (hs > EPS)
+            base = append(base, { "p" : rz(rb, hs) });
         if (zc + def.rf > def.k + EPS)
         {
             const rt = sqrt(max(def.rf * def.rf - (def.k - zc) * (def.k - zc), Z * Z));
             const rm = (rb + rt) / 2;
-            revolveProfile(context, id + "round", [{ "p" : rz(Z, Z) }, { "p" : rz(rb, Z) }, { "p" : rz(rt, def.k), "mid" : rz(rm, zc + sqrt(def.rf * def.rf - rm * rm)) }, { "p" : rz(Z, def.k) }]);
+            revolveProfile(context, id + "round", concatenateArrays([base, [{ "p" : rz(rt, def.k), "mid" : rz(rm, zc + sqrt(def.rf * def.rf - rm * rm)) }, { "p" : rz(Z, def.k) }]]));
         }
         else
         {
             const rm = rb / 2;
-            revolveProfile(context, id + "round", [{ "p" : rz(Z, Z) }, { "p" : rz(rb, Z) }, { "p" : rz(Z, zc + def.rf), "mid" : rz(rm, zc + sqrt(def.rf * def.rf - rm * rm)) }]);
+            revolveProfile(context, id + "round", append(base, { "p" : rz(Z, zc + def.rf), "mid" : rz(rm, zc + sqrt(def.rf * def.rf - rm * rm)) }));
         }
         return [qCreatedBy(id, EntityType.BODY), def.k];
     }
@@ -441,7 +447,21 @@ function screwHead(context is Context, id is Id, def is map) returns array
         // Live's ISO 10642 (behaviours "skb (10-25) ISO 4762 / ISO 10642
         // tables"): HEAD_FILLET rounds the cone into the shank, a torus
         // tangent to both whose centre is ru outside the shank.
-        if (def.ru != undefined && def.ru > EPS && def.undercut != 1 && def.cskFillet != 1)
+        // Live's ASME socket countersunk head: the 82 degree cone from the
+        // rim (c below the top) tangent to the FILLET_TRANSITION_DIAMETER
+        // torus, whose centre is ru outside the shank at the head height k.
+        if (def.filletAtK != undefined && def.filletAtK == 1 && def.ru != undefined && def.ru > EPS)
+        {
+            const ca = cos(41 * degree);
+            const sa = sin(41 * degree);
+            const cr = def.d / 2 + def.ru;
+            const tangent = rz(cr - def.ru * ca, -def.k + def.ru * sa);
+            const m = normalize(vector(-1 - ca, sa));
+            // The rim's depth from the tangency (the table's c, unrounded).
+            const rim = def.k + (cr - def.dk / 2 - def.ru / ca) * ca / sa;
+            pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : tangent, "mid" : rz(cr + def.ru * m[0], -def.k + def.ru * m[1]) }, { "p" : rz(def.dk / 2, -rim) }, { "p" : rz(def.dk / 2, Z) }];
+        }
+        else if (def.ru != undefined && def.ru > EPS && def.undercut != 1 && def.cskFillet != 1)
         {
             const u = normalize(vector(def.dk / 2 - def.d / 2, def.k - def.c));
             const nr = u[1];
@@ -1037,6 +1057,10 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isLength(definition.lx, LENGTH_0);
         annotation { "Name" : "Dome through the rim" }
         isInteger(definition.rimDome, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Head side height" }
+        isLength(definition.hs, LENGTH_0);
+        annotation { "Name" : "Countersink fillet at k" }
+        isInteger(definition.filletAtK, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
         annotation { "Name" : "d" }
         isLength(definition.d, NONNEGATIVE_LENGTH_BOUNDS);
         annotation { "Name" : "l" }

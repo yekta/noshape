@@ -140,9 +140,10 @@ fn every_menu_item_is_listed() {
     assert!(labels.len() > 300, "parsed {} menu labels; did the menus change shape?", labels.len());
     let listed: BTreeSet<&str> = MENUS.iter().map(|(id, _)| *id).collect();
     let missing: Vec<&String> = labels.iter().filter(|l| !listed.contains(l.as_str())).collect();
-    assert!(missing.is_empty(), "menu items with no entry in crates/ops/src/coverage.rs MENUS: {missing:?}");
+    let lines = |v: Vec<String>| v.join("\n");
+    assert!(missing.is_empty(), "menu items with no entry in crates/ops/src/coverage.rs MENUS; add these lines (each mapped to the operation that does it):\n{}", lines(missing.iter().map(|l| format!("    ({l:?}, Op(\"…\")),")).collect()));
     let stale: Vec<&&str> = listed.iter().filter(|l| !labels.contains(**l)).collect();
-    assert!(stale.is_empty(), "MENUS lists items the UI no longer has: {stale:?}");
+    assert!(stale.is_empty(), "MENUS lists items the UI no longer has; remove these lines:\n{}", lines(stale.iter().map(|l| format!("    ({l:?}, …),")).collect()));
     for (id, c) in MENUS {
         if let Cover::Op(t) = c {
             assert!(tool_exists(t), "{id}: no operation `{t}`");

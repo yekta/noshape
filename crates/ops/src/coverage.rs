@@ -566,6 +566,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Use", Op("sketch_use")),
     ("partStudio:View normal to sketch plane", Op("view_camera")),
     ("partStudio:View normal to", Op("view_camera")),
+    ("partStudio:View normal to section plane", Op("view_camera")),
     ("partStudio:Visibility conditions…", Op("config_visibility")),
     ("partStudio:Zoom to fit", Op("view_camera")),
     ("partStudio:Zoom to selection", Op("view_camera")),

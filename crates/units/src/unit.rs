@@ -297,7 +297,12 @@ impl Default for UnitPrefs {
             angle: AngleUnit::Degree,
             length_precision: 3,
             angle_precision: 3,
-            other: OTHER_UNITS.map(|o| (o.3, 3)),
+            // Live (Preferences › Units, behaviours 2665; a mm document's
+            // Workspace units, 6760): Onshape's defaults for the other units
+            // are the imperial ones (Pound, Pound per cubic inch, Pound-force…),
+            // kept when only the length is switched to millimeters, so mass
+            // properties read "(lb mm²)" (qa5 P1-14).
+            other: OTHER_UNITS.map(|o| (o.4, 3)),
         }
     }
 }
@@ -329,6 +334,15 @@ impl UnitPrefs {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live: a millimeter document still has Onshape's default (imperial)
+    /// mechanical units: Mass Pound (qa5 P1-14, "(lb mm²)").
+    #[test]
+    fn default_mass_unit_is_pound() {
+        let u = UnitPrefs::default();
+        assert_eq!(u.length, LengthUnit::Millimeter);
+        assert_eq!(u.other_unit_name(2), "Pound");
+    }
 
     #[test]
     fn shown_unit_lists_are_onshapes() {

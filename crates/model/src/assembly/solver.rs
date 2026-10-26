@@ -808,6 +808,28 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
     solve_inner(bodies, mates, relations, drags, dof)
 }
 
+/// Bodies set to a requested pose (`placed`: Transform's typed values, the
+/// triad's rotation) projected onto the mates exactly: the placed bodies
+/// alone first, every other body held (as a drag moves only the dragged
+/// part); when their mates can't hold that way, the whole assembly from the
+/// requested poses. Either way the least change from the request
+/// ([`least_change`]): live keeps a typed in-plane value of a Planar-mated
+/// part exactly.
+pub fn solve_placed(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], placed: &[usize], dof: bool) -> SolveResult {
+    let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || !placed.contains(&i) }).collect();
+    let r = solve_with(&mut trial, mates, relations, &[], false);
+    let held = if relations.is_empty() { mates.iter().enumerate().filter(|(_, m)| mate_bodies(m).any(|b| placed.contains(&b))).all(|(i, _)| r.mate_ok[i]) } else { r.converged };
+    if !held {
+        return solve_with(bodies, mates, relations, &[], dof);
+    }
+    for (b, t) in bodies.iter_mut().zip(&trial) {
+        if !b.fixed {
+            b.pose = t.pose;
+        }
+    }
+    if dof { solve_with(bodies, mates, relations, &[], true) } else { r }
+}
+
 /// Least change first (live DRAG-RUNAWAY: dragging the top cube of a Planar
 /// stack moves only that cube; Onshape answers each step in ≈20 ms whatever
 /// the stack's size): the dragged bodies alone are solved, every other body

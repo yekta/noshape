@@ -2543,6 +2543,35 @@ fn isolate_expands_by_distance_and_connectivity() {
     assert_eq!(by_mates, vec![vec![InstanceId(2)], vec![InstanceId(3)]]);
 }
 
+/// Typed triad values (Transform) on a Planar-mated part are kept exactly
+/// (live, flip asm: a pin Planar-mated under a fixed plate, X typed
+/// 23.456789 mm → x 0.023456789000000016 m, z −30 mm and the rotation
+/// untouched; 5 mm typed along the mated Z → nothing moves).
+#[test]
+fn typed_transform_on_a_planar_mate_is_exact() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.08, 0.0, 0.0), false)], ..Default::default() };
+    let on = |i: u64, r: &Reference| MateConnectorRef::on(InstanceId(i), vec![], r.clone());
+    asm.mates.push(Mate::new(MateId(10), "Planar 1".into(), MateType::Planar, on(2, &bottom), on(1, &top)));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let p0 = res.solved.placement(InstanceId(2)).unwrap();
+    assert!((p0.translation[2] - 0.01).abs() < 1e-12, "{p0:?}");
+    let start: std::collections::HashMap<InstanceId, Placement> = res.solved.placements.iter().cloned().collect();
+    for (along, want) in [(DVec3::X, [p0.translation[0] + 0.023456789, p0.translation[1], p0.translation[2]]), (DVec3::Z, p0.translation)] {
+        let moved = Placement { translation: (DVec3::from(p0.translation) + along * 0.023456789).into(), rotation: p0.rotation };
+        let s = res.prepared.solve(&SolveOptions { targets: vec![(InstanceId(2), moved)], start: Some(start.clone()), ..Default::default() });
+        let p = s.placement(InstanceId(2)).unwrap();
+        for k in 0..3 {
+            assert!((p.translation[k] - want[k]).abs() < 1e-15, "{along}: {:?} want {want:?}", p.translation);
+        }
+        assert!(quat_of(&p).angle_between(quat_of(&p0)) < 1e-14, "{along}: turned");
+    }
+}
+
 #[test]
 fn mate_connector_between_entities_and_realign() {
     let f = doc_with(vec![block_studio()]);
@@ -4056,6 +4085,37 @@ fn asme_socket_head_cap_screw_matches_live() {
     }
     // A size without drilled heads offers only Hex.
     assert_eq!(c.size("#0-80").unwrap().values.get("Drive type").map(Vec::as_slice), Some(&["Hex".to_string()][..]));
+}
+
+/// ASME socket button and countersunk head cap screws against live's B-rep
+/// and mass properties (dom/skb-sc-geom, behaviours "skb (10-26) ASME socket
+/// button / countersunk heads"). Button: a sphere through the rim on top of
+/// the HEAD_SIDE_HEIGHT cylinder, cut flat HEAD_DIAMETER / 2 across at the
+/// head height; countersunk: an 82 degree cone tangent to the under-head
+/// torus, its socket ending in a 140 degree drill point (the button's: 120).
+/// Both end the bearing face at FILLET_TRANSITION_DIAMETER in a torus of
+/// radius (FILLET_TRANSITION_DIAMETER - d) / 2.
+#[test]
+fn asme_socket_button_and_countersunk_screws_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for (name, faces, cases) in [
+        ("Socket button head cap screw", 21, [("#4-40", "0.5", 174.1654, 103.7091), ("1/4-20", "1", 777.9013, 1006.6053), ("1/2-13", "1.5", 2611.3755, 6423.2130)]),
+        ("Socket countersunk head cap screw", 20, [("#4-40", "0.5", 166.5982, 97.2179), ("1/4-20", "1", 759.1454, 936.6143), ("1/2-13", "1.5", 2328.2045, 5392.5206)]),
+    ] {
+        let c = CATALOGUE.iter().find(|c| c.name == name && c.inch).unwrap();
+        for (size, length, area, volume) in cases {
+            let mut spec = StandardSpec::new(c);
+            spec.set_size(size);
+            spec.length = Some(length.into());
+            let r = standard::regenerate(&spec).unwrap();
+            let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+            assert_eq!(b.faces.len(), faces, "{name} {size}");
+            let total: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap() * 1e6).sum();
+            let v = b.shape.volume().unwrap() * 1e9;
+            assert!((total - area).abs() < area * 1e-6, "{name} {size}: {total} mm²");
+            assert!((v - volume).abs() < volume * 1e-6, "{name} {size}: {v} mm³");
+        }
+    }
 }
 
 /// ISO 7380 socket button head M6 x 20 against live's B-rep (dom/skb-sc-geom

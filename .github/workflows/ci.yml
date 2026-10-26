@@ -1,16 +1,19 @@
 name: CI
 
 on:
+  # Trunk-based (10-26): agents push to main every few minutes and a full run takes 30-40 min, so CI no longer runs per
+  # main push (every run got cancelled by the next). The lead's watcher tests every main commit on Linux and moves the
+  # tag `last-green` when it passes; CI runs on each new last-green, on all three platforms, and is never cancelled.
   push:
-    branches: [main, ci]
+    branches: [ci]
+    tags: [last-green]
   pull_request:
   workflow_dispatch:
 
 concurrency:
+  # A newer last-green waits for the running one instead of cancelling it (GitHub keeps only the newest pending run).
   group: ci-${{ github.ref }}
-  # Trunk-based (10-25): agents push to main many times a day, so only the newest main commit is built; a newer push
-  # cancels the older run. Releases are cut from the lead's last-green tag and get their own release workflow run.
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always

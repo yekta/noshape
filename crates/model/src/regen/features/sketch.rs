@@ -126,11 +126,16 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // geometry moves, live SK5), not as a fresh solve of everything.
     let mut problems = Vec::new();
     let mut changed: Vec<ConstraintId> = Vec::new();
+    // An unchanged value isn't set again: that would count as an edit and
+    // drop the sketch's cached DOF analysis (re-done every drag frame).
     let mut set_value = |sk: &mut noshape_sketch::Sketch, id: ConstraintId, v: f64| {
-        if sk.constraint(id).and_then(|c| c.kind.value()).is_some_and(|old| (old - v).abs() > 1e-12 * old.abs().max(1.0)) {
+        let old = sk.constraint(id).and_then(|c| c.kind.value());
+        if old.is_some_and(|old| (old - v).abs() > 1e-12 * old.abs().max(1.0)) {
             changed.push(id);
         }
-        let _ = sk.set_dimension_value(id, v);
+        if old != Some(v) {
+            let _ = sk.set_dimension_value(id, v);
+        }
     };
     for (cid, expr) in &data.dimension_exprs {
         let id = ConstraintId(*cid);
@@ -194,6 +199,10 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             let opts = sk.dimension_edit_options(*one);
             sk.solve_with(&opts)
         }
+        // The DOF analysis (fully / under defined) depends on the
+        // constraints, not on where a drag moved the geometry: the sketch's
+        // cached one is reused while nothing else changed.
+        _ if sk.analysis_current() => sk.solve_with(&noshape_sketch::SolveOptions { analyze: false, ..Default::default() }),
         _ => sk.solve(),
     };
     // Live (qa4 DIM-UNSOLVED-GEOM): a sketch that can't be solved keeps its

@@ -210,7 +210,8 @@ impl PartStudioView {
             }
             "fillet" | "chamfer" => {
                 let param = if d.feature.type_id == "fillet" { "radius" } else { "width" };
-                let (base, dir) = p.query("entities").iter().find_map(|r| noshape_model::select::edge_inward(ctx, r))?;
+                // Live (behaviours "Fillet", qa5 P1-3): on the last picked edge.
+                let (base, dir) = p.query("entities").iter().rev().find_map(|r| noshape_model::select::edge_inward(ctx, r))?;
                 Some(Arrow { base, dir, length: value(param)?, param, flip: None })
             }
             _ => None,

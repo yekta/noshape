@@ -151,6 +151,26 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   400-fin plate) 2.7-3 s (kernel fuse 0.8-1.4 s + naming / unify) vs live 55 ms: the same local-face boolean as
   the LP2 = LP1 follow-up above. Not cancellable yet: `schedule_preview_before` / `schedule_tool_preview` and the
   sketch `regen_sync` take the same Regenerator lock without a cancel (short when the prefix is cached).
+- **Knurl speed (10-25/26, lead; live "kern (10-25) knurl timing", perf test kernel `knurl_like_onshape`,
+  KNURL=straight|diagonal|diamond):** live Straight 0.75 s / Diagonal 3.80 s / Diamond 32.05 s (8142 faces). Ours on
+  this loaded box: Straight 1.0 s, Diagonal 7.1 s (was 29 s), Diamond **completes: 210 s, 8142 faces, 75409.76 mm³**
+  (live 75405.80; the sweep's +4 as Diagonal), peak ~3.9 GB under the 4 GB guard (before: failed at the guard after
+  ~300 s). What did it: helix sweeps on a corrected frame (12068058); `group_disjoint` passes tools that can't touch as
+  one compound (c1ca2e95); pattern / mirror instances are located shapes sharing one TShape (ac218b46, dc4ba9f2;
+  `mirror_instance` caches one mirrored copy); OCCT patch `patches/occt/0001-congruent-pair-reuse.patch`
+  (BOPAlgo_PaveFiller_3-6, Builder_3, BOP): congruent EE/EF/FF pairs computed once and moved, vertex-face results by
+  the vertex's point in the face's frame (TreatVerticesEE 120 s → 9 s, in parallel), located faces intersected in
+  their own frame (one projector per surface), GetStickVertices through an index, and a cut whose many tools cross
+  (≥ 8 tools, ≥ 2 touching groups: boolean.cpp `CutByFaces`) built by BuildBOP from the faces' classification
+  without OCCT's split solids of the target and every tool (those took minutes and the gigabytes). The shared
+  /root/occt is the patched build (swap only lib/libTKBO.a from `scripts`' build tree when the patch changes;
+  /root/occt-unpatched kept). **PARKED (lead 10-26) — Diamond phases** (`NOSHAPE_BOP_STATS` builds of the patch
+  print them): VV-VF ~12 s, EF ~50-60 s with its serial post-processing (ReduceIntersectionRange, projections over
+  815,332 pairs, 91 % copies), RepeatIntersection ~8 s, FF ~10 s (43,170 pairs, 93 % copies), MakeBlocks ~60-100 s
+  (its PostTreatFF sub-filler: EE among the ~section edges ~35-50 s and 2 GB; section edges are new shapes, so no
+  congruence key), MakePCurves ~21 s, then BuildBOP. Next steps if resumed: section edges of copied FF pairs as
+  located instances of the representative's (pcurves resolve by relative location), and the EF result loop in
+  parallel.
 - **qa4 r5 blends (10-25, lead):** FILLET-OVERFLOW was retracted (live: R21-R45 on a top edge of a 60x40x20
   block are OK, the same clipped quarter cylinder as ours; nothing changed). CHAMFER-OVERFLOW fixed: a chamfer wider
   than a face it runs over (25 mm on that block's 20 mm face, live OK 30000 mm3) is the part cut by the chamfer's

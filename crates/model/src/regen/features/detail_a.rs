@@ -351,8 +351,10 @@ fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
 /// [`parting_line_draft`] on one part. False when nothing was drafted.
 fn parting_line_draft_body(ev: &mut EvalCtx, bi: usize, edges: &[usize], pull: DVec3) -> FResult<bool> {
     let body = ev.ctx.bodies[bi].clone();
-    // Hinge planes (origin, normal), each with its edges.
+    // Hinge planes (origin, normal), each with its edges; curved edges off
+    // such a plane are drafted about the curve itself.
     let mut planes: Vec<(DVec3, DVec3, Vec<usize>)> = Vec::new();
+    let mut curved: Vec<usize> = Vec::new();
     for &ei in edges {
         let e = body.shape.sub_shape(ShapeType::Edge, ei)?;
         let info = e.edge_info()?;
@@ -364,7 +366,8 @@ fn parting_line_draft_body(ev: &mut EvalCtx, bi: usize, edges: &[usize], pull: D
             let d = direction.normalize();
             (pts[0], (pull - d * pull.dot(d)).normalize())
         } else {
-            return err("Parting lines must lie in a plane perpendicular to the pull direction");
+            curved.push(ei);
+            continue;
         };
         match planes.iter_mut().find(|(o, n, _)| n.dot(normal) > 1.0 - 1e-9 && (origin - *o).dot(*n).abs() < 1e-7) {
             Some(pl) => pl.2.push(ei),
@@ -428,7 +431,72 @@ fn parting_line_draft_body(ev: &mut EvalCtx, bi: usize, edges: &[usize], pull: D
             ev.replace_body(bi, res.shape, face_names);
         }
     }
+    if !curved.is_empty() {
+        drafted |= curved_parting_draft(ev, bi, &curved, &done, &orig, pull, (angle, second, sides.as_str(), along))?;
+    }
     Ok(drafted)
+}
+
+/// Parting-line draft about curved parting edges (a sloped ellipse, a
+/// saddle): each face beside them is replaced by the ruled surface leaving
+/// the curve at the draft angle to the pull (`k::draft_parting_curve`).
+/// Sides and angles as for a hinge plane, the faces above the curve along
+/// the pull being "above".
+fn curved_parting_draft(ev: &mut EvalCtx, bi: usize, edges: &[usize], done: &[usize], orig: &[Name], pull: DVec3, (angle, second, sides, along): (f64, f64, &str, bool)) -> FResult<bool> {
+    let body = ev.ctx.bodies[bi].clone();
+    let ef = body.shape.edge_faces()?;
+    let faces = body.shape.faces();
+    let edge_names: Vec<Name> = edges.iter().filter_map(|&e| body.edges.get(e).cloned()).collect();
+    let (mut above, mut below): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
+    for &ei in edges {
+        let e = body.shape.sub_shape(ShapeType::Edge, ei)?;
+        let info = e.edge_info()?;
+        let mid = e.point_at((info.first_param + info.last_param) * 0.5)?;
+        for &f in ef.get(ei).map(|v| v.as_slice()).unwrap_or(&[]) {
+            let f = f as usize;
+            if done.contains(&f) || above.contains(&f) || below.contains(&f) {
+                continue;
+            }
+            let Some(p) = point_on_face(&faces[f]) else { continue };
+            let Some((_, n)) = face_normal_near(&faces[f], p) else { continue };
+            if n.normalize().dot(pull).abs() > 1.0 - 1e-9 {
+                continue;
+            }
+            if (p - mid).dot(pull) >= 0.0 { above.push(f) } else { below.push(f) }
+        }
+    }
+    // (faces, OCCT-convention angle, above): as `parting_line_draft_body`.
+    let sets: Vec<(Vec<usize>, f64, bool)> = match sides {
+        "SYMMETRIC" => vec![(below, angle, false), (above, -angle, true)],
+        "TWO_SIDED" => vec![(below, angle, false), (above, second, true)],
+        _ => {
+            if along { vec![(above, angle, true)] } else { vec![(below, angle, false)] }
+        }
+    };
+    // All sides at once (a drafted side renames the edges the other needs).
+    // OCCT's angle leans the faces above the hinge into the material when
+    // positive, those below when negative; ours always into it.
+    let body = ev.ctx.bodies[bi].clone();
+    let (mut shapes, mut angles) = (Vec::new(), Vec::new());
+    for (set, ang, is_above) in sets {
+        if ang.abs() < 1e-12 {
+            continue;
+        }
+        for name in set.iter().filter_map(|&f| orig.get(f)) {
+            for f in body.find_faces(name) {
+                shapes.push(body.shape.sub_shape(ShapeType::Face, f)?);
+                angles.push(if is_above { ang } else { -ang });
+            }
+        }
+    }
+    if shapes.is_empty() {
+        return Ok(false);
+    }
+    let parting: Vec<Shape> = edge_names.iter().flat_map(|n| body.find_edges(n)).filter_map(|e| body.shape.sub_shape(ShapeType::Edge, e).ok()).collect();
+    let res = k::draft_parting_curve(&body.shape, &shapes, &parting, pull, &angles).map_err(|_| fe(DRAFT_FAILED))?;
+    let face_names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, res.shape, face_names);
+    Ok(true)
 }
 
 /// Add faces tangent-connected to the selection that are steeper than the

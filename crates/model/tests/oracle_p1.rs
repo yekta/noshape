@@ -329,8 +329,24 @@ fn hole_cases() -> Vec<(&'static str, Studio)> {
             p.set("cSinkDiameterV3", mm(12.0));
             p.set("cSinkAngleV3", deg(90.0));
         }),
+        // Tapped M6 (1.00 mm coarse, Normal fit: the table's defaults), the
+        // standard's depths as live built it: 12 mm deep, tapped 12 mm.
+        hole("H5", false, &|p| {
+            p.set("isoHoleTableEx", ParamValue::Lookup(["Tapped", "Straight tap", "M6"].map(String::from).to_vec()));
+            noshape_model::features::hole_tables::apply_table_to_params(p);
+            p.set("endStyleV2", en("BLIND"));
+            p.set("holeDepthV3", mm(12.0));
+            p.set("tappedDepthV3", mm(12.0));
+            p.set("tapClearance", ParamValue::Expr(ExprValue::new("0")));
+        }),
         hole("H6", false, &blind),
         hole("H7", true, &blind),
+        // Clearance M5, Normal fit (set as live did): Ø 5.5 mm through.
+        hole("H8", false, &|p| {
+            p.set("isoHoleTableEx", ParamValue::Lookup(["Clearance", "M5", "Normal"].map(String::from).to_vec()));
+            noshape_model::features::hole_tables::apply_table_to_params(p);
+            p.set("endStyleV2", en("THROUGH"));
+        }),
     ]
 }
 
@@ -652,6 +668,69 @@ fn boolean_split_transform_cases() -> Vec<(&'static str, Studio)> {
     cases
 }
 
+/// Batch 10: Plane (CASES.md); the plane itself is compared too (PLANES).
+fn plane_cases() -> Vec<(&'static str, Studio)> {
+    let mut cases = Vec::new();
+    let plane = |ty: &'static str, set: &dyn Fn(&mut ParamValues, &RegenResult)| {
+        on_block("cPlane", |p, r| {
+            p.set("cplaneType", en(ty));
+            set(p, r);
+        })
+    };
+    cases.push(("P1", plane("OFFSET", &|p, _| {
+        p.set("entities", q(top()));
+        p.set("offset", mm(10.0));
+    })));
+    cases.push(("P2", plane("MID_PLANE", &|p, r| p.set("entities", ParamValue::Query(vec![face_at(r, SIDES[2]), face_at(r, SIDES[3])])))));
+    cases.push(("P3", plane("THREE_POINT", &|p, r| {
+        let at = [DVec3::new(0.0, 0.0, 20.0), DVec3::new(60.0, 0.0, 20.0), DVec3::new(0.0, 40.0, 0.0)];
+        p.set("entities", ParamValue::Query(at.iter().map(|x| vertex_at(r, *x)).collect()));
+    })));
+    cases.push(("P4", plane("LINE_ANGLE", &|p, r| {
+        p.set("entities", q(edge_at(r, FRONT_TOP)));
+        p.set("angle", deg(30.0));
+    })));
+    cases.push(("P5", plane("LINE_POINT", &|p, r| p.set("entities", ParamValue::Query(vec![vertex_at(r, DVec3::new(60.0, 40.0, 20.0)), edge_at(r, FRONT_TOP)])))));
+    // A cylinder Ø20 at (100,0) and a sketch point at (110,0) on Top.
+    let mut s = Studio::block();
+    let c = s.sketch(top(), |sk| circle(sk, (100.0, 0.0), 20.0));
+    s.add("extrude", |p| {
+        p.set("entities", q(c[0].clone()));
+        p.set("operationType", en("NEW"));
+        p.set("depth", mm(20.0));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let point = sk.add_point(pt(110.0, 0.0));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", q(top()));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.regen();
+    s.add("cPlane", |p| {
+        p.set("cplaneType", en("TANGENT_PLANE"));
+        p.set("entities", ParamValue::Query(vec![face_at(&r, DVec3::new(90.0, 0.0, 10.0)), Reference::SketchEntity { sketch, entity: point.0 }]));
+    });
+    cases.push(("P6", s));
+    cases.push(("P7", plane("OFFSET", &|_, _| {})));
+    cases
+}
+
+/// Live's plane of a Plane case (mm): origin and normal (evPlane).
+const PLANES: &[(&str, [f64; 3], [f64; 3])] = &[
+    ("P1", [0.0, 0.0, 10.0], [0.0, 0.0, 1.0]),
+    ("P2", [30.0, 20.0, 10.0], [-1.0, 0.0, 0.0]),
+    ("P3", [20.0, 13.333333333333334, 13.333333333333334], [0.0, -0.447213595499958, -0.894427190999916]),
+    ("P4", [30.0, 0.0, 20.0], [0.0, 0.8660254037844387, 0.49999999999999994]),
+    ("P5", [60.0, 40.0, 20.0], [1.0, 0.0, 0.0]),
+    ("P6", [110.0, 0.0, 20.0], [1.0, 0.0, 0.0]),
+];
+
+/// The plane the case's (last) feature made: origin (mm) and normal.
+fn feature_plane(s: &Studio, r: &RegenResult) -> Option<(DVec3, DVec3)> {
+    let id = s.ps.features.last()?.id;
+    r.context.planes.iter().find(|p| p.reference == Reference::FeaturePlane(id)).map(|p| (p.frame.origin * 1e3, p.frame.normal))
+}
+
 /// What a case gives: status, message, volume (mm³), faces, area (mm²), parts.
 #[derive(Debug)]
 struct Outcome {
@@ -873,8 +952,8 @@ fn revolve_cases() -> Vec<(&'static str, Studio)> {
 /// remove a line once it matches.
 const KNOWN: &[(&str, &str)] = &[
     ("LP2", "fs/psb: feature pattern, second direction straddling the front face (left top edge, −y): live re-extrudes those 3 bosses down the front face to z 0 (50544.69 mm³); ours patterns the geometry (49696.46)"),
-    ("CP2", "fs/psb: circular feature pattern of BOSS about the vertical edge (60,40), 30° × 3, equal spacing off: live OK 48802.32 mm³ (10 faces); ours \"Could not create all instances as entered\""),
-    ("CV1", "fs/psb: curve pattern of BOSS along the front top edge × 4: live INFO \"For best results ensure that the path start point and pattern seed are touching.\" with 3 bosses (48848.23 mm³); ours \"Could not create all instances as entered\""),
+    ("CP2", "fs: circular feature pattern of BOSS about the vertical edge (60,40), 30° × 3, equal spacing off: live OK 48802.32 mm³ = the seed, one instance and one hanging 16 % off the left face, i.e. turning clockwise from above: live's vertical edge runs −z, ours +z (asked of live, REQUESTS fs 10-26 b (j))"),
+    ("P6", "fs: tangent plane origin: live (110, 0, 20) mm, ours (110, 0, 0): live's cylinder (evSurfaceDefinition) of a 20 mm extrude has its origin at z 20, ours at z 0; the rule is asked of live (REQUESTS fs 10-26)"),
 ];
 
 /// Live's mass properties bands (bands.jsonl, lead 10-26): Parasolid's
@@ -1060,27 +1139,69 @@ const LIVE: &[(&str, &str, &str, f64, usize, f64, usize)] = &[
     ("T3", "OK", "", 48000.0, 6, 8800.0, 1),
     ("T4", "OK", "", 384000.0, 6, 35200.0, 1),
     ("T5", "ERROR", "Translation by distance requires two vertices, an edge, a plane, or a cylindrical face.", 48000.0, 6, 8800.0, 1),
+    ("P1", "OK", "", 48000.0, 6, 8800.0, 1),
+    ("P2", "OK", "", 48000.0, 6, 8800.0, 1),
+    ("P3", "OK", "", 48000.0, 6, 8800.0, 1),
+    ("P4", "INFO", "Select an additional point, plane, or axis to specify where the angle is measured from.", 48000.0, 6, 8800.0, 1),
+    ("P5", "OK", "", 48000.0, 6, 8800.0, 1),
+    ("P6", "OK", "", 54283.1853, 9, 10684.9556, 2),
+    ("P7", "ERROR", "Offset plane requires a plane, circle, ellipse, or arc to offset from.", 48000.0, 6, 8800.0, 1),
 ];
 
 #[test]
 fn p1_features_match_live() {
     let mut report = String::new();
-    for (name, s) in extrude_cases().into_iter().chain(revolve_cases()).chain(blend_cases()).chain(hole_cases()).chain(sweep_loft_cases()).chain(pattern_cases()).chain(boolean_split_transform_cases()) {
-        let got = outcome(&s.regen());
+    for (name, s) in extrude_cases().into_iter().chain(revolve_cases()).chain(blend_cases()).chain(hole_cases()).chain(sweep_loft_cases()).chain(pattern_cases()).chain(boolean_split_transform_cases()).chain(plane_cases()) {
+        let r = s.regen();
+        let got = outcome(&r);
         eprintln!("{name}: {got:?}");
+        // Plane cases: the plane too (origin mm, normal).
+        let plane = PLANES.iter().find(|p| p.0 == name).map(|(_, o, n)| (DVec3::from(*o), DVec3::from(*n), feature_plane(&s, &r)));
+        let plane_ok = plane.is_none_or(|(o, n, ours)| ours.is_some_and(|(po, pn)| po.distance(o) <= 1e-6 && pn.distance(n) <= 1e-9));
         let Some(&(_, status, text, volume, faces, area, parts)) = LIVE.iter().find(|l| l.0 == name) else { continue };
         let near = |a: f64, b: f64| (a - b).abs() <= 1e-3 * b.abs().max(1.0) * 1e-3 + 1e-4;
         let within = |x: f64, [lo, hi]: [f64; 2]| x >= lo - 1e-6 * lo.abs() && x <= hi + 1e-6 * hi.abs();
         let band = BANDS.iter().find(|b| b.0 == name);
         let volume_ok = band.map_or(near(got.volume, volume), |b| within(got.volume, b.1));
         let area_ok = band.map_or(near(got.area, area), |b| within(got.area, b.2));
-        if got.status != status || got.text != text || !volume_ok || got.faces != faces || !area_ok || got.parts != parts {
+        if got.status != status || got.text != text || !volume_ok || got.faces != faces || !area_ok || got.parts != parts || !plane_ok {
             if !KNOWN.iter().any(|k| k.0 == name) {
                 report += &format!("{name}: ours {got:?}\n      live ({status}, {text:?}, {volume}, {faces}, {area}, {parts})\n");
+                if let Some((o, n, ours)) = plane {
+                    report += &format!("      our plane {ours:?}, live ({o}, {n})\n");
+                }
             }
         } else if let Some(k) = KNOWN.iter().find(|k| k.0 == name) {
             report += &format!("{name} now matches live: drop it from KNOWN ({})\n", k.1);
         }
     }
     assert!(report.is_empty(), "differences from live:\n{report}");
+}
+
+/// A Feature pattern whose instances all miss the part fails asking for
+/// Reapply features (live "qa5 bracket" †: a Remove patterned toward −x).
+#[test]
+fn feature_pattern_off_the_part_as_live() {
+    let mut s = Studio::block();
+    let r = s.regen();
+    let c = s.sketch(face_at(&r, TOP), |sk| circle(sk, (10.0, 10.0), 6.0));
+    let cut = s.add("extrude", |p| {
+        p.set("entities", q(c[0].clone()));
+        p.set("operationType", en("REMOVE"));
+        p.set("booleanScope", q(body(&r, 0)));
+        p.set("endBound", en("THROUGH_ALL"));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+    });
+    let r = s.regen();
+    assert_eq!(outcome(&r).faces, 7, "the cut");
+    s.add("linearPattern", |p| {
+        p.set("patternType", en("FEATURE"));
+        p.set("instanceFunction", q(Reference::Feature(cut)));
+        p.set("directionOne", q(edge_at(&r, FRONT_TOP)));
+        p.set("distance", mm(25.0));
+        p.set("instanceCount", ParamValue::Expr(ExprValue::new("3")));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+    });
+    let got = outcome(&s.regen());
+    assert_eq!((got.status, got.text.as_str()), ("ERROR", "Could not create all instances as entered. Try selecting \"Reapply features\" option."));
 }

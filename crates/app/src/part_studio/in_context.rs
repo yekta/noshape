@@ -70,8 +70,9 @@ type StudioAct = Rc<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartSt
 const CONTEXT_REF_FILL: u32 = 0xc573e4;
 const CONTEXT_REF_OUTLINE: [u8; 4] = crate::theme::rgb8(0xdc62f7);
 /// A selected context face outside a dialog: amber at 80 % over the
-/// see-through face (blended in linear light; fitted to live assembly/706–707).
-const CONTEXT_SELECTED_FILL: u32 = 0xe9b94d;
+/// see-through face (live assembly/706: rgb(226,191,123) over 704's
+/// rgb(200,210,217)).
+const CONTEXT_SELECTED_FILL: u32 = 0xe8ba64;
 const CONTEXT_SELECTED_ALPHA: f32 = 0.8;
 
 /// The boundary polylines of face `fi`: the mesh edges whose points all
@@ -239,7 +240,7 @@ impl PartStudioView {
     /// The scene's display: the model plus the shown Assembly context's
     /// bodies at the banner's transparency, without hidden instances.
     pub(super) fn display_for_scene(&self) -> Arc<StudioDisplay> {
-        let d = self.display_for_scene_inner();
+        let d = self.with_plane_drag(self.display_for_scene_inner());
         if d.context_bodies.is_empty() {
             return d;
         }

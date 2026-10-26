@@ -77,6 +77,18 @@ for ($i = 0; $i -lt 120 -and -not $proc; $i++) {
 if (-not $proc) { throw 'no noshape window' }
 $hwnd = $proc.MainWindowHandle
 [Nav]::SetForegroundWindow($hwnd) | Out-Null
+# Windows turns UI Automation on for the app at some point of the run (run
+# 40252517286: during touch-pinch, "Accessibility activated" in the app log);
+# the app's one-time accessibility build then holds its UI thread for a few
+# hundred ms and the OS coalesces the touch frames sent meanwhile (the pinch's
+# 20 frames arrived as 2, so its per-frame steps were lost). Turn it on before
+# any step and let it settle.
+try {
+  Add-Type -AssemblyName UIAutomationClient
+  $root = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
+  $null = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+} catch { Write-Host "::warning::UI Automation warm-up failed: $_" }
+Start-Sleep 2
 $o = New-Object Nav+POINT; [Nav]::ClientToScreen($hwnd, [ref]$o) | Out-Null
 
 # The viewport (wait for its first traced camera; nudge it with a wheel).

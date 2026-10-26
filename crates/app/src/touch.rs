@@ -54,8 +54,11 @@ pub enum TouchAction {
     BoxStart { a: DVec2, b: DVec2 },
     Box { a: DVec2, b: DVec2 },
     BoxStop,
-    /// `count` taps of `fingers` fingers centred at `center`.
-    Tap { count: usize, fingers: usize, center: DVec2 },
+    /// `count` taps of `fingers` fingers centred at `center`; `exceeding`
+    /// of them had a finger past the drag threshold (Onshape's
+    /// `tapsExceedingDragThreshold`: such a tap selects nothing, and a
+    /// two-finger one opens no menu).
+    Tap { count: usize, fingers: usize, center: DVec2, exceeding: usize },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -103,6 +106,7 @@ struct Tap {
     fingers: usize,
     up_time: Duration,
     position_sum: DVec2,
+    exceeded: bool,
 }
 
 #[derive(Debug, Default)]
@@ -174,7 +178,8 @@ impl TouchRecognizer {
                 && taps.iter().all(|t| t.fingers == first.fingers)
             {
                 let last = taps.last().expect("taps");
-                out.push(TouchAction::Tap { count: taps.len(), fingers: first.fingers, center: last.position_sum / first.fingers as f64 });
+                let exceeding = taps.iter().filter(|t| t.exceeded).count();
+                out.push(TouchAction::Tap { count: taps.len(), fingers: first.fingers, center: last.position_sum / first.fingers as f64, exceeding });
             }
         }
         out
@@ -201,8 +206,9 @@ impl TouchRecognizer {
                     Some(t) if p.down_time < t.up_time => {
                         t.fingers += 1;
                         t.position_sum += p.down_at;
+                        t.exceeded |= p.dragging;
                     }
-                    _ => self.taps.push(Tap { fingers: 1, up_time: now, position_sum: p.down_at }),
+                    _ => self.taps.push(Tap { fingers: 1, up_time: now, position_sum: p.down_at, exceeded: p.dragging }),
                 }
             }
         }
@@ -281,14 +287,14 @@ mod tests {
         assert!(r.up(1, ms(80)).is_empty());
         // Reported only after the 200 ms wait.
         assert!(r.tick(ms(200)).is_empty());
-        assert_eq!(r.tick(ms(280)), vec![TouchAction::Tap { count: 1, fingers: 1, center: v(100.0, 100.0) }]);
+        assert_eq!(r.tick(ms(280)), vec![TouchAction::Tap { count: 1, fingers: 1, center: v(100.0, 100.0), exceeding: 0 }]);
         // Double tap.
         r.down(2, v(50.0, 60.0), ms(1000));
         r.up(2, ms(1060));
         r.down(3, v(51.0, 61.0), ms(1150));
         r.up(3, ms(1200));
         assert!(r.tick(ms(1300)).is_empty());
-        assert_eq!(r.tick(ms(1400)), vec![TouchAction::Tap { count: 2, fingers: 1, center: v(51.0, 61.0) }]);
+        assert_eq!(r.tick(ms(1400)), vec![TouchAction::Tap { count: 2, fingers: 1, center: v(51.0, 61.0), exceeding: 0 }]);
         // A slow press is no tap.
         r.down(4, v(0.0, 0.0), ms(2000));
         r.up(4, ms(2300));
@@ -302,7 +308,7 @@ mod tests {
         r.down(2, v(200.0, 100.0), ms(20));
         r.up(1, ms(90));
         r.up(2, ms(100));
-        assert_eq!(r.tick(ms(300)), vec![TouchAction::Tap { count: 1, fingers: 2, center: v(150.0, 100.0) }]);
+        assert_eq!(r.tick(ms(300)), vec![TouchAction::Tap { count: 1, fingers: 2, center: v(150.0, 100.0), exceeding: 0 }]);
     }
 
     #[test]
@@ -373,5 +379,20 @@ mod tests {
         r.up(2, ms(400));
         let a = r.moved(1, v(150.0, 100.0), ms(450));
         assert!(!a.iter().any(|x| matches!(x, TouchAction::DragStart { .. } | TouchAction::Drag { .. })), "{a:?}");
+    }
+
+    /// Onshape (`isTwoFingerTap`: tapsExceedingDragThreshold 0): two
+    /// fingers that pinched and lifted within the tap time are no tap of
+    /// the context menu; their tap carries the drag.
+    #[test]
+    fn a_quick_pinch_is_a_tap_that_exceeded_the_drag_threshold() {
+        let mut r = TouchRecognizer::default();
+        r.down(1, v(100.0, 100.0), ms(0));
+        r.down(2, v(200.0, 100.0), ms(1));
+        r.moved(1, v(50.0, 100.0), ms(10));
+        r.moved(2, v(250.0, 100.0), ms(11));
+        r.up(1, ms(40));
+        r.up(2, ms(41));
+        assert_eq!(r.tick(ms(400)), vec![TouchAction::Tap { count: 1, fingers: 2, center: v(150.0, 100.0), exceeding: 1 }]);
     }
 }

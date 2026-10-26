@@ -58,7 +58,8 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
         }
         return err("The source Part Studio could not be regenerated (a circular reference)");
     };
-    // Selected source parts (BodyIds of the source studio); empty = all parts.
+    // Selected source parts and sketches (BodyIds of the source studio, a
+    // sketch as `sketch_body_id`); empty = everything.
     let wanted: Vec<crate::reference::BodyId> = ev
         .query("parts")
         .iter()
@@ -67,6 +68,7 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
             _ => None,
         })
         .collect();
+    let picked_sketches: Vec<FeatureId> = wanted.iter().filter(|b| b.index == u32::MAX).map(|b| b.feature).collect();
     // Placement: each location (mate connector or point) receives an
     // instance with the source origin, or the base mate connector, on it.
     let mut frames: Vec<DMat4> = Vec::new();
@@ -147,7 +149,8 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     // A whole studio with no parts left (its Extrude suppressed) still
     // brings its sketches and stays OK (live "qa5 derived"); only picked
     // parts that are gone fail.
-    if n == 0 && !wanted.is_empty() {
+    // Live ("psb (10-26 a)" D3): only a sketch picked brings no parts.
+    if n == 0 && wanted.iter().any(|b| b.index != u32::MAX) {
         return err("The selected parts no longer exist in the source Part Studio");
     }
     // A whole studio brings its sketches too (live "qa5 derived" (1)/(4): the
@@ -156,11 +159,11 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     // location gets a copy (live ui 10-22 b: drawn at both, the ▸ lists
     // "Sketch 1" twice); picks and references resolve to the first copy.
     let already: Vec<FeatureId> = ev.ctx.sketches.iter().map(|x| x.feature).collect();
-    for frame in frames.iter().filter(|_| wanted.is_empty()) {
+    for frame in frames.iter().filter(|_| wanted.is_empty() || !picked_sketches.is_empty()) {
         let m = *frame * inv;
         let moved = !m.abs_diff_eq(DMat4::IDENTITY, 1e-15);
         for s in &src.sketches {
-            if already.contains(&s.feature) {
+            if already.contains(&s.feature) || (!wanted.is_empty() && !picked_sketches.contains(&s.feature)) {
                 continue;
             }
             let s = if moved {

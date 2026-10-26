@@ -740,12 +740,13 @@ fn image_quad_is_textured_and_depth_tested() {
                 image::save_buffer(format!("{dir}/image_{projection:?}_{msaa}.png"), &rgba, w, h, image::ExtendedColorType::Rgba8).unwrap();
             }
         }
-        // Faded with the instance alpha: red over white turns pink.
+        // Faded with the instance alpha: red over white turns pink, mixed in
+        // sRGB values as a WebGL canvas blends: (255, 128, 128).
         let mut faded = scene.clone();
         faded.instances[2].color[3] = 0.5;
         let f = render(&mut r, &faded, &cam, 4);
         let ((r8, g8, b8), _) = at(&f, &cam, [-0.005, -0.005, 0.0]);
-        assert!(r8 > 240 && (150..225).contains(&g8) && (150..225).contains(&b8), "{projection:?}: faded image should be pink, got {:?}", (r8, g8, b8));
+        assert!(r8 > 240 && (120..136).contains(&g8) && (120..136).contains(&b8), "{projection:?}: faded image should be pink, got {:?}", (r8, g8, b8));
         let (c, _) = at(&f, &cam, [0.0055, 0.0055, 0.003]);
         assert!(is_gray(c), "{projection:?}: a faded image stays behind the box, got {c:?}");
         // Section clipping removes y < 0 of the image unless it ignores clipping.

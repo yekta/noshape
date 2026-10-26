@@ -77,7 +77,7 @@ fn ev_line(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let s = q.shape(e)?;
         let info = s.edge_info().ok()?;
         match info.curve {
-            k::Curve::Line { direction, .. } => Some((info.start, direction.normalize_or_zero())),
+            k::Curve::Line { .. } => super::query::edge_line(&s),
             // A degree-1 B-spline through two poles is a straight segment
             // (what some operations leave instead of a line).
             k::Curve::BSpline { degree: 1, nb_poles: 2, .. } => Some((info.start, (info.end - info.start).normalize_or_zero())),
@@ -102,15 +102,7 @@ fn ev_axis(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             Some((sk.frame.to_world(sk.sketch.point(noshape_sketch::EntityId(*id))?), sk.frame.normal))
         }
         Ent::Datum(_) | Ent::Plane(_) => q.plane(e).map(|p| (p.origin, p.normal)),
-        _ => entity_axis(q, e).map(|(o, d)| {
-            // Lines start at their start point.
-            if let Some(info) = q.shape(e).and_then(|s| s.edge_info().ok())
-                && matches!(info.curve, k::Curve::Line { .. })
-            {
-                return (info.start, d);
-            }
-            (o, d)
-        }),
+        _ => entity_axis(q, e),
     })?;
     Ok(line_value(o, d))
 }

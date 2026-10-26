@@ -700,3 +700,55 @@ changes. I write the renderer part first (my files) and show crops before touchi
   later launches: window ~0.4 s, viewport 0.56-0.73 s. Cold app init varies a lot between runs (0.25-0.72 s on
   macOS 14). Next: compile the first frame's pipelines first and the rest (pick, compare, section, reflection,
   outline) after it.
+- **2026-10-26 (perf): orbit/pan/zoom at Retina scale; what the macOS runners measure.** perf.yml switches (main
+  2920cd23..c49f9859): `NOSHAPE_PERF_SCALE=<f>` renders the viewport at <f> device px per logical px (the runners
+  are 1x: 1194x794 logical on macOS 14, 778x575 on 15), `NOSHAPE_PERF_BENCH=pan` (bench.sh runs orbit, zoom, pan),
+  `NOSHAPE_PERF_BENCH_DRIVE=frames` (the camera moves on every arriving frame), `cold` input (Metal shader cache
+  cleared before every launch), GPUI window draw and drawable wait per frame in the summary, startup milestones
+  between GPUI's creation, its launch and each init step.
+  - The runners' presented fps measured the bench timer, not the viewport: its 8 ms timer fires every 37 ms
+    (fast state) or 67 ms (slow state; `v.bench_tick`), one camera step per tick, so 33-34 / 19 fps whatever the
+    model. GPUI is not the limit: window draw 0.15-0.35 ms per frame, drawable wait < 0.25 ms, UI-thread CPU
+    0.3-0.6 ms. The same throttling stretches every main-thread hop in the slow state (commit latency 360 ms in
+    a second launch whose regen + display took 135 ms; 149 ms in the first).
+  - GPU time (`w.gpu_wait` p50, paravirtual Metal) never goes below ~9.2 ms, for any scene (the 30-feature part
+    too): a completion-latency floor of the device, so the runners can't show 120 fps.
+  - Pixels: fins x400 flat (6-9 ms at 0.45, 1.8, 3.8, 6.1 and 13 MP); big plate 10-11 ms at 1x, 12.5-15 at 2x,
+    17-25 at 3.7x (6.1-13 MP): the only fill-bound model of the three.
+  - Frame-driven at 2x (runs 40259977084 fins, 40259986505 plate, 40259996069 pins assembly; macOS 14 / 15):
+    fins 75-101 fps (1-15% of frames over 16.7 ms), 1000-pin assembly (9002 draw instances) 71-87 fps (3-8%),
+    big plate 58-67 fps (12-37%).
+  - Found: the render thread blocked on the GPU for each frame while its target's second slot was free, so the
+    UI's next frame waited for the previous one (one frame in flight; delivered rate 1 / GPU latency, the
+    "9.2 ms floor" above). Fixed (365280a9): it waits in 1 ms slices while a slot is free. Frame-driven at 2x
+    after (runs 40267031577 fins / 40267041238 plate): fins orbit 134 / 145 fps (p50 6.6 ms), zoom 117 / 93,
+    pan 88 / 100; big plate orbit 93 / 102, zoom 110 / 102, pan 86 / 75; 2-14% of frames over 16.7 ms
+    (pan is a job's third launch, slow state). GPU wait p50 ~5.2 ms.
+  - Commit latency with the planar CDT threshold at 3 nodes (67a5b066; run 40249637876, first launch):
+    commit shown 174 / 149 ms (was 222 / 345), undo 25 / 28, redo 17 / 25 ms.
+- **2026-10-26 (perf): cold start, first frame's pipelines first.** Cold launches (`cold`, 6 per runner, runs
+  40256165121 base / 40256174634): the 8 pipelines a plain frame needs compile first (median 911 -> 505 ms on
+  macOS 14, 1448 -> 513 ms on 15); the other 21 (`Lazy`) compiled alongside the first frame held it back
+  (pipelines done to first frame 0.22 -> 0.64 s / 0.30 -> 0.84 s; first frame median 1565 -> 1782 ms on 14,
+  2709 -> 1799 on 15), so they start once the first frame is out: first frame median 1449 ms on 14, 1675 ms
+  on 15 (run 40267050748; -0.12 / -1.03 s against compiling all first). Milestones of those launches (typical /
+  the job's first, OS caches cold too): process to GPUI created 140-190 ms; NSApplication launched +30-130 ms;
+  gpui_kit::init 65-160 ms (365 / 827 ms in a job's first launch); theme, preferences, files::init < 5 ms;
+  app initialized to document window 340-550 ms; window to first frame 550-950 ms (cold shader cache).
+- **2026-10-26 (perf): the viewport blends in sRGB values, like Chrome's WebGL canvas (on main).** The color target
+  is plain BGRA8 holding sRGB-encoded values (it was an sRGB view: blending and the MSAA resolve ran in linear
+  light, so anti-aliased edges and every translucent overlay came out lighter / bluer than live, e.g. icons2's
+  selected face under a plane 105 vs live 73). Fragment shaders return encoded colors (`enc` in shaders.wgsl);
+  the background gradient mixes encoded values; images are premultiplied in encoded values; compare mode reads
+  the encoded frame. **For everyone fitting colours: blend live's CSS / measured values directly now**
+  (result = α·color + (1−α)·below, all in 0-255 sRGB, as in the browser); fits made for linear blending are
+  wrong after this. Already moved back to live / CSS values (scene palette, builder, asm_scene, app
+  drawing_watermark, part_studio/in_context): error fill α 0.60; plane fill #cedbe5 @ 0.2 (icons2's #c3d2e0 @
+  0.173 fit undone), plane outline #1d60aa @ 0.35, dark plane fill #666, dark outline α 0.35; selected plane
+  #ffc862 @ 0.77; picked region #cd9d3c @ 0.34; translucent display 0.35; edited sketch regions 0.265 / dark 0.2;
+  watermark editor fill #c0c0c0 @ 0.25; selected context face #e8ba64 @ 0.8; feature preview shading refitted
+  (ambient 0.58, diffuse 0.64). Feature previews: Onshape draws the preview opaque into its own texture and mixes
+  it over the frame (`uPreviewTexture` / `uPreviewAlpha`: one layer); ours stays see-through (back then front
+  faces), which double-darkens; a one-layer preview plus a refit of FEATURE_PREVIEW (live's top / right faces
+  imply a colour near #779cb3 lit in sRGB) is open for the preview's owner. AO now multiplies encoded values
+  (as Onshape's SSAO on its canvas); not re-checked against live yet.

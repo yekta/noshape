@@ -1193,3 +1193,18 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   Open (asked the lead, no answer yet): selected-plane corner ring handles (blue ~26×13 px ellipses at the 4
   corners, 2 px (142,176,213)); shown-dimension labels in the plane's perspective at 16 px + part opacity;
   hovered-edge dark centre line; feature-row hover silhouette orange.
+- (10-26, lead cleared all four look items, other owners' files named in each commit) Landed:
+  8ad7c8ee edge core (LineSegment::CORE; boundary-only edges get OUTLINE → solid), highlighted lines
+  lifted toward the eye by half their width (shader toward_eye; LIFTED lines too), row-hover outline =
+  builder hover_silhouette (silhouette lines, lifted), shown dimensions in-plane glyph labels + line gap,
+  parts opaque while shown; 67cc1e0d plane resize rings + drag (part_studio/plane_handles.rs; model
+  PartStudio::plane_centers + PlaneDisplay::center/corner(); ops set_plane_rect / change_size_description;
+  drag only for planes picked in the graphics: ui.planes_picked_in_graphics, pruned in refresh_scene).
+  Open vs live: history doesn't merge consecutive resizes; live ignored some long inward drags (rule
+  unknown, behaviours "icons2 plane resize handles" (5)); the parts' 5–8 level lightening while
+  dimensions are shown isn't reproduced (our alpha path shows hidden edges).
+  Next: selected face under a plane reads bluer (linear vs sRGB blend), then P3 dark polish.
+- (10-26 later) 3317dd97 plane fill #c3d2e0 at 0.173 (light; fitted with one plane over white fixed:
+  three stacked = live #e7edf2, parts behind closer to live's sRGB blend). c3ae9d4b plane names are
+  scene meshes now (overlay::fill_mesh + 0.7-alpha outline trace for weight), hidden by parts in front
+  (live selection/02); shown-dimension labels and sketch names stay in the 2D overlay (drawn over parts).

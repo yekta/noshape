@@ -130,9 +130,8 @@ pub fn studio_fit_box(display: &StudioDisplay, base: Option<(DVec3, DVec3)>, ori
         add(DVec3::ZERO);
     }
     for pl in display.planes.iter().filter(|p| planes(p)) {
-        let f = &pl.frame;
         for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
-            add(f.origin + f.x * (sx * pl.half_width) + f.y * (sy * pl.half_height));
+            add(pl.corner(sx, sy));
         }
     }
     acc
@@ -165,7 +164,7 @@ pub fn selection_bounds(display: &StudioDisplay, refs: &[Reference]) -> Option<(
             Reference::Plane(_) | Reference::FeaturePlane(_) => {
                 if let Some(pl) = display.planes.iter().find(|p| &p.reference == r) {
                     for (u, v) in [(-1.0, -1.0), (1.0, 1.0), (-1.0, 1.0), (1.0, -1.0)] {
-                        add(pl.frame.origin + pl.frame.x * (u * pl.half_width) + pl.frame.y * (v * pl.half_height));
+                        add(pl.corner(u, v));
                     }
                 }
             }

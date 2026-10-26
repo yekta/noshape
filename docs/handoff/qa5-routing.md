@@ -258,12 +258,27 @@ STATUS FSW-draft (psb, 2026-10-24): parallel parting edge (7c3821e8), edit logic
 STATUS FSW-pattern (psb, 2026-10-24 b): circular/curve flush variants and W4/W5 ×2 match live "psb (10-24) flush wall follow-up" (test feature_pattern_of_a_flush_wall_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24): Rib draft done (live G33c 27048.1556 matched, test rib_draft_as_live); Body draft, Decal, face blend variants still open.
 STATUS FSW-fill (psb, 2026-10-24): guide rules as live "psb (10-24 d)" and Precise curve guides done (test fill_guides_as_fs); Add on surface edges (SF7) still open.
+STATUS FSW-fill (psb, 2026-10-26): SF7 done: picking open edges of a surface sets Add (surfaceOperationTypeEditLogic, behaviors.rs), and Add with Merge with all knits the open box into one solid, 8000 mm³, 6 faces (test fill_on_an_open_box_knits_a_solid).
 STATUS FSW-bsurf (psb, 2026-10-24): profile arrays are driven-query rows "[None] Edges of …" (live L28: no 2-pick cap); conditions wait for the loft end-derivative rule.
 STATUS FSW-loft (psb, 2026-10-24): end conditions (Normal/Tangent to profile, Normal/Tangent to direction) applied with live's corner rule and loft.fs texts; every connection used (profiles split at the connection points), "Select a point on each profile to define a connection."; guides, path and trims still open.
 STATUS FSW-draft (psb, 2026-10-24 b): parting edges on several parts (each drafted on its own) and stepped / sloped straight parting lines (each edge's own hinge plane) done (test parting_line_draft_on_two_parts_and_steps); curved non-planar parting lines still refused.
 STATUS FSW-draft (psb, 2026-10-25): curved parting lines tried with the curve's own plane as the hinge (a 30° ellipse on a
   cylinder): OCCT's draft and the wedge fallback both fail, since the drafted face becomes a general ruled surface (not a cone).
   Needs our own ruled-surface construction; left refused ("Parting lines must lie in a plane perpendicular to the pull direction").
+STATUS FSW-draft (psb, 2026-10-26): curved parting lines (a sloped ellipse, a saddle) done as live "psb (10-25 m)": the
+  faces beside them become ruled draft surfaces (every normal at the draft angle to the plane perpendicular to the pull;
+  B-spline, degrees 1 × 3), new kernel op `draft_parting_curve`; live's A1–A4 and B volumes within 0.02 mm³ (live's surface
+  is itself a B-spline fit), 4 faces, live's samples on our faces (tests parting_line_draft_on_curves_as_live, draft_curve.rs).
+
+## PROJ-RULED — kern — point projection misses points on ruled B-spline faces
+- psb, 2026-10-26: `Shape::project_point` / `k::distance` (BRepExtrema vertex-to-face) on a ruled B-spline face (degree 3 ×
+  1, e.g. `loft` with `ruled: true` between two closed splines, or a curved parting-line draft) returns the distance to a
+  boundary edge for most interior points (e.g. 3.9 mm for a point on the face), while `classify_point` says OnBoundary and
+  the face's own UV classifier says IN. Repro: crates/kernel/tests/draft_curve.rs history (test
+  `ruled_loft_point_projection_control`, removed). Affects measure / picking-by-point on such faces.
+- STATUS PROJ-RULED (psb, 2026-10-26, cleared by the lead; kern's crates/kernel/cpp/geom.cpp): fixed. When BRepExtrema answers
+  with the boundary, `face_project_point` also searches the face's interior (a UV grid inside the face, refined locally) and
+  takes the nearer; `min_distance` does the same for a point against B-spline faces. Tests crates/kernel/tests/projection.rs.
 STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, constant normal thickness with Scale, Trim ends to the cap planes, the two failure texts (test thin_sweep_as_live).
 STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.
@@ -737,6 +752,12 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 - **P1-13 — psb (pattern copies' appearance)** — Circular pattern (Part pattern) copies take **new palette colours** (seed
   navy, copies grey / light blue / orange). Live: the copies **keep the seed's colour** (rgb(165,165,165) ×3, behaviours
   "qa5 (10-25 p3)"), as Transform copies do (behaviours 7252).
+- STATUS 2026-10-26 (psb): P1-3 fixed (the Fillet / Chamfer arrow on the last picked edge); P1-13 fixed (part pattern, feature
+  pattern and Copy part instances keep the seed's colour; test circular_and_mirror_part_pattern); P1-5 fixed (a Shell whose
+  result has more solids than the part errors "Could not shell part with selections." and leaves the part; test
+  shell_that_breaks_the_part_fails on the P1-5 model at 15 mm); P1-10's toast: the info comes from fs 58913522 (after the
+  qa build) and the dialog shows it as the blue bubble (test remove_that_misses_the_part_reports_the_info); the red tool
+  preview stays icons2's.
 - STATUS 2026-10-26 (qa5, green 62524c30): P1-4 fixed in the UI (no point at the origin; Hole ignores the stand-in). Minor for
   skb: the sketch data keeps a hidden construction "Origin stand-in" point at (0,0) that the constraints use; live has no entity
   and constrains to the external Origin, so agent/API reads (sketch_get) still differ.
@@ -748,3 +769,78 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 - **P1-15 — ui (view cube hover), minor** — hovering a view-cube face fills it **rgb(177,217,241) #b1d9f1**; live **#bce2f7**
   rgb(188,226,247) (behaviours 403 "View cube hover", 1x crops part-studio/5x-*-crop1x.png). Measured on green 62524c30, 1x.
 - STATUS 2026-10-26 01:5x (qa5): P2-D1 verified fixed on green af9f1e4c (the assembly drawing's hole circle picks "Ø.394").
+- **P1-16 — kern (shell op)** — live's p2 model rebuilt in noshape (CLI, green-era engine): block 75.554 × 20.245 × **10**,
+  Fillet R1 on the 3 vertical edges, Chamfer 1 mm (tangent chain), Hole Ø6.35 Blind 12 at (15, 6) / (15, 14.245) on the top,
+  Feature linear pattern +X 25 mm × 2 (4 through holes), unshelled volume 13928.664 mm³. Shell, top face removed:
+  **1 mm → ours "Could not shell part with selections."; live OK, 3998.627 mm³, 33 faces** (round tubes standing in the cavity).
+  **2.5 mm → ours OK 8487.861 mm³, 53 faces; live 8503.961 mm³, 47 faces** (bosses merged with each other and the side walls).
+  Live: behaviours "qa5 (10-25 p2)" (6). Repro script /root/qa5-scratch/pass28/build.py.
+- **P1-17 — ui (mass properties)** — Mass and section properties opened with nothing selected ("Parts to measure" empty): ours
+  measures every part (Volume 7178.097 mm³, Surface area filled) and shows the no-material toast 3.6 s after opening. Live:
+  empty field → **Mass, Volume, Surface area, CoM and inertia all blank, no toast** (behaviours "qa5 (10-26 p4)", qa4 toast
+  follow-up 11210). The toast is tied to a **measured** part without material: it shows ≈ 0.75–1.5 s after the part is
+  picked / the panel opens with it preselected, and hides itself ≈ 3.9–4.4 s later. Code: part_studio/menus.rs
+  `set_show_mass` (toast on open whenever any part lacks a material) and the empty-`bodies` case of the mass view.
+- **P2-A2 — skb (mate dialog)** — Cylindrical mate › ☑ Limits › Z max: type `5` + Enter → ours applies **and closes** the
+  dialog (assembly_mate_dialog.rs: limit fields emit Accept on every Enter). Live: Onshape number fields (`os-param-number`,
+  the same family in mate dialogs; behaviours "Input behaviour outside feature dialogs" Fastened › Offset X) apply on the 1st
+  Enter and keep the dialog; the 2nd Enter accepts (as P2-A1 and ours' own offset fields). The limit itself works: a drag
+  stops with the pin 5.0 mm along the hole connector's Z.
+- **P2-D2 — ui2 (drawing Update), no drawing-behaviour owner in WORKFLOW F; lead to reassign if needed** — an assembly
+  drawing goes out of date (Update ⟳ bright) after an **unrelated** change: a STEP import, or a feature in a Part Studio the
+  assembly doesn't use. Live: unrelated changes keep it dim; only the drawing's referenced elements count (behaviours
+  "qa5 (10-26 p5)"). Cause: crates/model/src/drawing/views.rs `source_hash` for an assembly source hashes **every** Part
+  Studio and Assembly tab of the document; it should hash only the tabs the assembly (recursively) instantiates.
+- **P2-A3 — skb (exploded views)** — green af9f1e4c, assembly with one Explode step (pin raised 25 mm). In editing
+  ("Editing Explode 1 [Done]"), **Esc with no dialog open** brings back the full toolbar and removes the banner, but the
+  graphics **stay exploded** and the Explode 1 row keeps its **active look (blue name, left bar) and the rollback bar**. A
+  double-click on Explode 1 then does **not** re-enter editing: it drops to the plain row and the unexploded model. Done
+  works correctly (plain row, unexploded; a double-click re-enters, fully exploded). Live: **Esc = Done** (behaviours
+  "Exploded views: steps, clicks, menus, rollback, Done", skb 10-20, assembly/823, 816, 824). Screens
+  /root/qa5-scratch/run/shots/a28-20/22/23/24.png.
+- **P2-A4 — skb (mate dialog preview)** — green af9f1e4c, assembly with Circular pattern 1 (seed Part 2 <1>, copy Part 2 <2>
+  in hole 3). Editing the seed's mate (double-click Cylindrical 1; also while retyping it to Revolute): **the pattern copy
+  Part 2 <2> disappears from the graphics** while the dialog is open (hole 3 empty, /root/qa5-scratch/run/shots/a28-31/32.png);
+  after ✓ it is back and follows the seed. Also during that edit the seed pin shows **z-fighting stripes** (orange preview
+  over the grey original at the same place, a28-32). Live keeps every instance drawn while a mate is edited (no capture
+  shows instances vanishing; asked in "qa5 (10-26 p6)" only for the toast, so treat this as a plain bug).
+- **P2-A5 — skb (assembly list), minor** — a suppressed mate row ("Revolute 1" › Suppress) is drawn grey with strike-through
+  but **not italic**; live: **grey italic struck-through** (behaviours 1297, assembly/198; also 1339 for instances and their
+  mates). Code: assembly_view.rs:3533 mate rows (`line_through` only), :3326 instance rows (italic only when dynamically
+  suppressed), assembly_panels.rs:889 pattern rows. Part Studio rows already do italic + line-through (part_studio/mod.rs:3572).
+- **P2-A6 — skb (assembly list header)** — Part 1 <1>, Part 2 <1> and Circular pattern 1 (3 copies, count 4): ours reads
+  **"Instances (5)"** (assembly_view.rs:4032 `a.instances.len()`, every instance). Live counts the **top-level rows**: 4 parts
+  + Replicate 1 + 2 patterns read "Instances (7)" with 10 instances (behaviours 5986, asm-06x; after the Replicate alone
+  "Instances (5)" = 4 parts + the Replicate row). Here live would read "Instances (3)". Folders and subassemblies presumably
+  count as one row each (not captured).
+- **P2-A7 — skb (assembly list while a dialog is open)** — Replicate (tool search "replicate"), Instances = Part 2 <1>:
+  "Mate to be matched" auto-fills "Revolute 1" as live, but **no pending "Replicate 1" row** appears in the instance list
+  while the dialog is open (a28-52.png). Live: "a 'Replicate 1' row (with an error badge) appears in the instance list right
+  away" (behaviours 5970). Linear and circular patterns do show their red pending row with a red dot at open (✅); once,
+  though, the circular pattern's pending row vanished after the axis was picked (a28-26 → a28-28; not reproduced on Linear).
+  The accepted result matches live: "Replicate 1" ▸ Part 2 <5>, Part 2 <6>, "Mate features (2)".
+- **P1-18 — ui (feature list)** — drag "Extrude 3" above its own Sketch 3: accepted, the row fails red rgb(170,37,45), the
+  header turns "Features …" with the red badge, tooltip "…did not regenerate properly: …\n1 missing selection" (all as
+  live), but the row keeps the plain extrude icon. Live: **rows with an unresolved selection get a ⚠ warning-triangle icon**
+  besides the red text (behaviours 8292; also 14734 "Fillet 1 red with a ⚠ icon", 16123, and "qa5 (10-25 p2)" (7):
+  "name turns red rgb(170,37,45) with a ⚠ triangle icon"). part_studio/mod.rs draws no icon for `missing > 0` (only the
+  tooltip's second line, :3824). A live crop of the icon's place/size is in live/qa5/p7-*-after.png.
+STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extrude-after.png, row "Chamfer 1"): a **yellow ⚠
+  triangle badge overlaid on the lower-right of the feature's own icon** (like the sketch's blue minus badge), about 9–10 px,
+  not a separate column. The red header badge (red disc with a down arrow) already matches.
+- **P2-D3 — ui2 (drawing Note tool visuals)** — Note tool (n) in a drawing: the prompt "Click a point for the leader, or
+  click to place the note" shows, but **no "NOTE" text preview follows the pointer** (a28-69/70.png). Live: "a 'NOTE' text
+  preview follows the pointer, always horizontal", with the usual inference glyphs over view edges (behaviours 1414,
+  drawing/220–222). drawing_tools.rs overlay draws only the leader line once a leader point exists (:501); main has no
+  preview either. The editor panel itself matches live (drawing/225).
+
+## P2 oracle: variables, configurations, Derived (psb, 2026-10-26; live "psb (10-26 a) P2 oracle", test p2_oracle.rs)
+- STATUS (psb): V1/V2 (variable chain with sqrt / atan / mixed units, values as the Variable table shows them), C1 (configured
+  depth and suppression), C2 (configuration variable), C3 (checkbox configuring Symmetric), D2 (Derived at a location) and D3
+  (Derived of only a sketch) match live; fixed on the way: the Variable table writes angles "45 deg" (was "45°"), and Derived of a
+  picked sketch brings only that sketch (was everything).
+- **FILLET-CORNER-3 — kern** — D1: a 40 × 20 × 35 block, Fillet 1 mm on the 4 top edges (corners where two fillets meet a sharp
+  vertical edge): ours 27974.631 mm³, live 27974.71 (ours removes 0.08 mm³ more: the corner patch shape).
+- **VAR-INVALID — ui (feature dialog)** — live: a Variable whose value doesn't evaluate to its type ("#a + 5 mm * cos(#ang * 1
+  rad)" with #ang an angle) turns the Value field red, the title "#d = 0 mm" red and ✓ disabled, so it can't be created; ours
+  creates the feature, which then fails. Check the dialog against live.

@@ -679,6 +679,9 @@ fn circular_and_mirror_part_pattern() {
     assert_eq!(res.context.bodies.len(), 4);
     let c: DVec3 = res.context.bodies.iter().map(|b| noshape_kernel::volume_properties(&b.shape).unwrap().center).sum::<DVec3>() / 4.0;
     assert!(c.truncate().length() < 1e-9, "instances evenly around the axis: {c:?}");
+    // Live (qa5 P1-13): the instances keep the seed's colour.
+    let seed = res.context.bodies[0].color;
+    assert!(res.context.bodies.iter().all(|b| b.color == seed), "{:?}", res.context.bodies.iter().map(|b| b.color).collect::<Vec<_>>());
     t.add("mirror", &[("entities", q(vec![body_ref(&id)])), ("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)]))]);
     let res = t.ok();
     assert_eq!(res.context.bodies.len(), 5);
@@ -1726,4 +1729,25 @@ fn feature_mirror_of_a_gusset_as_live() {
     assert_eq!(res.context.bodies.len(), 1);
     let v = total_volume(&res.context) * 1e9;
     assert!((v - 68800.0).abs() < 1e-3, "{v}");
+}
+
+/// qa5 P1-10 (live part-studio/234–235): Extrude › Remove of a circle on Top
+/// under a plate (z 0..5), Merge scope Part 1, going down away from the part:
+/// the cut misses, a blue info "Selected tools and targets do not
+/// intersect." (the dialog shows it as the bubble); flipped, it cuts.
+#[test]
+fn remove_that_misses_the_part_reports_the_info() {
+    let mut t = T::new();
+    let (_, plate) = t.block(-0.03, -0.02, 0.03, 0.02, "5 mm");
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::ZERO, 0.005));
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "10 mm", "REMOVE");
+    t.set(x, "defaultScope", b(false));
+    t.set(x, "booleanScope", q(vec![body_ref(&BodyId { feature: plate, index: 0 })]));
+    for (opposite, status, message) in [(true, FeatureStatus::Info, Some("Selected tools and targets do not intersect.")), (false, FeatureStatus::Ok, None)] {
+        t.set(x, "oppositeDirection", b(opposite));
+        let res = t.regen();
+        let st = res.display.features.iter().find(|f| f.id == x).unwrap();
+        assert_eq!((st.status, st.message.as_deref()), (status, message), "opposite {opposite}");
+    }
 }

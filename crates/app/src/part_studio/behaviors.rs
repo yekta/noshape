@@ -199,7 +199,7 @@ pub struct UiState {
     pub section_base_drag: bool,
     /// What a base drag snaps to (point, entity lit) and the drag's last
     /// position (a hover pick arriving later re-snaps there).
-    pub section_snap: Option<(glam::DVec3, Reference)>,
+    pub section_snap: Option<(glam::DVec3, Reference, Option<glam::DVec3>)>,
     pub section_snap_pos: Option<glam::DVec2>,
     /// The section value box (live skb "assembly section" 2–3): shown from
     /// an arrow or ring drag until Esc; the plane's offset when the arrow
@@ -362,6 +362,13 @@ pub struct UiState {
     pub consumed_lines: Option<ConsumedLines>,
     /// "Show dimensions" of a sketch.
     pub shown_dims: Option<super::shown_dims::ShownDims>,
+    /// A selected plane's resize ring under the pointer (plane, corner).
+    pub plane_ring_hover: Option<(Reference, usize)>,
+    /// A plane corner being dragged (plane_handles.rs).
+    pub plane_drag: Option<super::plane_handles::PlaneDrag>,
+    /// Planes selected by a click in the graphics: only their rings drag
+    /// (live: from the list a ring press starts a box select).
+    pub planes_picked_in_graphics: Vec<Reference>,
     /// The sketch draws something with GPUI that follows the camera (set
     /// by `render_sketch_labels`: the dimension box, glyphs, counts...).
     pub sketch_follows_camera: bool,
@@ -575,6 +582,9 @@ impl UiState {
             list_menu: None,
             consumed_lines: None,
             shown_dims: None,
+            plane_ring_hover: None,
+            plane_drag: None,
+            planes_picked_in_graphics: Vec::new(),
             sketch_follows_camera: false,
             query_hover: None,
             manip_hover: false,
@@ -3313,6 +3323,23 @@ impl PartStudioView {
                     && params.bool("alongPull") != want
                 {
                     changes.push(("alongPull", ParamValue::Bool(want)));
+                }
+            }
+            // surfaceOperationTypeEditLogic (live SF7: Fill on an open box's
+            // edges knits into the box): Add when a picked edge is an open
+            // edge of a surface, else New, until the user picks one.
+            "fill" if !user_set.contains("surfaceOperationType") => {
+                let joinable = |r: &Reference| -> bool {
+                    let Reference::Edge(name) = r else { return false };
+                    let Some(c) = ctx else { return false };
+                    c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Surface).any(|b| {
+                        b.edges.iter().position(|e| **e == *name).is_some_and(|i| b.shape.edge_faces().is_ok_and(|ef| ef.get(i).is_some_and(|f| f.len() == 1)))
+                    })
+                };
+                let any = params.array("edges").iter().any(|row| row.query("entities").iter().any(joinable));
+                let want = if any { "ADD" } else { "NEW" };
+                if !params.is("surfaceOperationType", want) {
+                    changes.push(("surfaceOperationType", ParamValue::Enum(want.into())));
                 }
             }
             // Live L22: a new Rib's Parts holds the studio's parts.

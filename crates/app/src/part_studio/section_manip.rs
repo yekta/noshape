@@ -47,7 +47,7 @@ pub(super) struct SectionManip {
     pub start: Option<DVec3>,
     /// A base drag snapped here (live skb-sv s009–s141: an implicit mate
     /// connector's disc and triad under the base ring).
-    pub snapped: Option<DVec3>,
+    pub snapped: Option<(DVec3, Option<DVec3>)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -158,7 +158,7 @@ impl PartStudioView {
             (true, None, Some(s0), Some(o)) => Some(arrow.base - arrow.dir * (o - s0)),
             _ => None,
         };
-        let snapped = self.ui.section_snap.as_ref().map(|s| s.0);
+        let snapped = self.ui.section_snap.as_ref().map(|s| (s.0, s.2));
         Some(SectionManip { arrow, axes: ring_axes(arrow.dir), start, snapped })
     }
 
@@ -270,7 +270,7 @@ impl PartStudioView {
                     self.ui.section_base = None;
                     self.ui.section_snap_pos = None;
                     self.hover = None;
-                    if let Some((q, _)) = snap
+                    if let Some((q, _, _)) = snap
                         && let Some(i) = self.ui.section_dialog.as_ref().map(|d| d.active)
                         && let Some(pl) = self.ui.section.get_mut(i)
                     {
@@ -322,7 +322,10 @@ impl PartStudioView {
     /// ~32 px: a circle's centre, else the edge's point nearest the cursor
     /// (a straight edge as a whole line); else the hovered face's point.
     /// Off the part nothing but vertices snaps.
-    fn section_snap(&self, p: DVec2, cx: &App) -> Option<(DVec3, Reference)> {
+    /// The third value is the snapped entity's implicit connector Z (live
+    /// ui-snapv 10-26: a face's normal, a circle's axis, a vertex world Z),
+    /// None for an edge hovered on its own (the section plane's normal).
+    fn section_snap(&self, p: DVec2, cx: &App) -> Option<(DVec3, Reference, Option<DVec3>)> {
         let vp = self.viewport.read(cx);
         let s = |q: DVec3| vp.project(q);
         let (o, r) = vp.ray(p);
@@ -350,13 +353,22 @@ impl PartStudioView {
         }
         let near_vertex = verts.into_iter().filter_map(|(v, r)| Some(((s(v)? - p).length(), v, r))).filter(|x| x.0 <= VERTEX_SNAP_PX).min_by(|a, b| a.0.total_cmp(&b.0));
         if let Some((_, q, r)) = near_vertex {
-            return Some((q, r));
+            return Some((q, r, Some(DVec3::Z)));
         }
-        let on_edge = |b: &BodyDisplay, ei: usize| -> Option<(DVec3, Reference)> {
+        // A face's outward normal (its first triangle; faces snapped here are
+        // planar in practice).
+        let face_normal = |b: &BodyDisplay, fi: usize| -> Option<DVec3> {
+            let &(first, _) = b.mesh.face_ranges.get(fi)?;
+            let t = b.mesh.indices.get(first as usize..first as usize + 3)?;
+            let v = |i: u32| b.mesh.positions.get(i as usize).map(p3);
+            let (a, bb, c) = (v(t[0])?, v(t[1])?, v(t[2])?);
+            (bb - a).cross(c - a).try_normalize()
+        };
+        let on_edge = |b: &BodyDisplay, ei: usize, face_z: Option<DVec3>| -> Option<(DVec3, Reference, Option<DVec3>)> {
             let pts: Vec<DVec3> = b.mesh.edges.get(ei)?.iter().map(p3).collect();
             let entity = b.edge_refs.get(ei)?.clone();
-            if let Some(c) = circle_center(&pts) {
-                return Some((c, entity));
+            if let Some((c, n)) = circle_center(&pts) {
+                return Some((c, entity, Some(n)));
             }
             let (a, z) = (*pts.first()?, *pts.last()?);
             let straight = (z - a).try_normalize().filter(|d| pts.iter().all(|q| (*q - a).cross(*d).length() <= 1e-6 + 1e-4 * a.distance(z)));
@@ -364,10 +376,10 @@ impl PartStudioView {
                 Some(d) => a + d * line_param(o, r, a, d)?,
                 None => pts.iter().copied().filter_map(|q| Some(((s(q)? - p).length(), q))).min_by(|x, y| x.0.total_cmp(&y.0))?.1,
             };
-            Some((q, entity))
+            Some((q, entity, face_z))
         };
         if let Some((b, ei)) = edge {
-            return on_edge(b, ei);
+            return on_edge(b, ei, None);
         }
         let (b, fi) = face?;
         let reach = |ei: usize| -> Option<f64> {
@@ -376,13 +388,13 @@ impl PartStudioView {
         };
         let nearest = b.mesh.face_edges(fi).into_iter().filter_map(|ei| Some((reach(ei)?, ei))).filter(|x| x.0 <= EDGE_SNAP_PX).min_by(|x, y| x.0.total_cmp(&y.0));
         if let Some((_, ei)) = nearest {
-            return on_edge(b, ei);
+            return on_edge(b, ei, face_normal(b, fi));
         }
         let &(first, count) = b.mesh.face_ranges.get(fi)?;
         let tris = b.mesh.indices.get(first as usize..(first + count) as usize)?;
         let v = |i: u32| b.mesh.positions.get(i as usize).map(p3);
         let t = tris.as_chunks::<3>().0.iter().filter_map(|t| ray_triangle(o, r, v(t[0])?, v(t[1])?, v(t[2])?)).min_by(f64::total_cmp)?;
-        Some((o + r * t, b.face_refs.get(fi)?.clone()))
+        Some((o + r * t, b.face_refs.get(fi)?.clone(), face_normal(b, fi)))
     }
 
     /// Turn the active plane to `r.deg` about `r.axis` from where the drag
@@ -427,8 +439,8 @@ fn ray_triangle(o: DVec3, r: DVec3, a: DVec3, b: DVec3, c: DVec3) -> Option<f64>
     (u >= 0.0 && v >= 0.0 && u + v <= 1.0 && t > 0.0).then_some(t)
 }
 
-/// Centre of an edge polyline that is a circle or an arc of one.
-fn circle_center(pts: &[DVec3]) -> Option<DVec3> {
+/// Centre and axis of an edge polyline that is a circle or an arc of one.
+fn circle_center(pts: &[DVec3]) -> Option<(DVec3, DVec3)> {
     if pts.len() < 4 {
         return None;
     }
@@ -442,7 +454,7 @@ fn circle_center(pts: &[DVec3]) -> Option<DVec3> {
     let r = center.distance(a);
     let n = n.normalize();
     let tol = 1e-3 * r + 1e-7;
-    pts.iter().all(|p| (p.distance(center) - r).abs() <= tol && (*p - center).dot(n).abs() <= tol).then_some(center)
+    pts.iter().all(|p| (p.distance(center) - r).abs() <= tol && (*p - center).dot(n).abs() <= tol).then_some((center, n))
 }
 
 /// Screen distance from `p` to the segment (a, b).
@@ -459,12 +471,14 @@ pub(super) fn section_glyph(s: &SectionManip, hover: Option<SectionHandle>, drag
     let Some(wpp) = view.world_per_px(s.tip()) else { return Vec::new() };
     let bw = view.world_per_px(s.arrow.base).unwrap_or(wpp);
     let mut disc = LineData::default();
-    if let Some(o) = s.snapped
+    if let Some((o, z)) = s.snapped
         && let Some(w) = view.world_per_px(o)
     {
-        // The disc lies in the section plane, its notch toward world X.
-        let z = s.arrow.dir;
-        let x = [DVec3::X, DVec3::Y].into_iter().map(|a| a - z * z.dot(a)).find(|a| a.length() > 0.1).unwrap_or(DVec3::X);
+        // The snapped entity's implicit connector (live ui-snapv: a face's
+        // normal up, a vertex world-aligned), X the first world axis off Z
+        // (X, then Y, then Z: a +X face gets X = +Y).
+        let z = z.unwrap_or(s.arrow.dir);
+        let x = [DVec3::X, DVec3::Y, DVec3::Z].into_iter().map(|a| a - z * z.dot(a)).find(|a| a.length() > 0.1).unwrap_or(DVec3::X);
         let f = noshape_model::assembly::solver::Frame::from_axes(o, z, x);
         noshape_scene::asm_scene::push_connector_glyph(&mut disc, &f, SNAP_DISC_PX * w);
     }
