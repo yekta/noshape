@@ -421,7 +421,8 @@ pub fn decal(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         ev.custom.clone().unwrap_or_else(crate::custom::fallback_provider).file(&tab)
     };
-    let size = file.and_then(|f| f.bytes()).map(|b| crate::custom::reference::image_size(&b));
+    let bytes = file.and_then(|f| f.bytes()).map(std::sync::Arc::new);
+    let size = bytes.as_ref().map(|b| crate::custom::reference::image_size(b));
     let Some((Some(iw), Some(ih), _)) = size else { return err_at(&["image"], "Select image for decal") };
     if iw > 4096 || ih > 4096 {
         return err_at(&["image"], "Inserted image exceeds 4k x 4k size limit");
@@ -472,7 +473,7 @@ pub fn decal(ev: &mut EvalCtx) -> FResult<()> {
             let y = z.cross(x);
             let origin = origin_mc.as_ref().map(|c| c.origin).unwrap_or(face.centroid()?) + x * u_shift + y * v_shift;
             let (uv_linear, uv_translation) = uv(angle);
-            DecalRecord { feature: ev.feature, body: body.id.clone(), face: body.faces[fi].clone(), image: tab, mapping: DecalMapping::Planar { origin, x, y, z }, uv_linear, uv_translation }
+            DecalRecord { feature: ev.feature, body: body.id.clone(), face: body.faces[fi].clone(), image: tab, image_bytes: bytes.clone(), mapping: DecalMapping::Planar { origin, x, y, z }, uv_linear, uv_translation }
         }
         k::Surface::Cylinder { origin, axis, x_dir, radius } => {
             let (mut z, mut x) = (axis.normalize(), x_dir.normalize());
@@ -529,7 +530,7 @@ pub fn decal(ev: &mut EvalCtx) -> FResult<()> {
                 href_angle = -(pz / n).atan2(py / n);
             }
             let (uv_linear, uv_translation) = uv(href_angle + angle);
-            DecalRecord { feature: ev.feature, body: body.id.clone(), face: body.faces[fi].clone(), image: tab, mapping: DecalMapping::Cylindrical { origin: o, x, y, z, radius }, uv_linear, uv_translation }
+            DecalRecord { feature: ev.feature, body: body.id.clone(), face: body.faces[fi].clone(), image: tab, image_bytes: bytes.clone(), mapping: DecalMapping::Cylindrical { origin: o, x, y, z, radius }, uv_linear, uv_translation }
         }
         _ => return err_at(&["face"], "Select face for decal"),
     };

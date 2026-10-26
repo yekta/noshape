@@ -510,6 +510,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
     }
     log::debug!("display: sketches {:?}", t_sk.elapsed());
     d.derived_sketches = ctx.derived_sketches.clone();
+    d.decals = ctx.decals.clone();
     for p in &ctx.planes {
         let hidden = match &p.reference {
             Reference::FeaturePlane(f) => studio.feature(*f).is_some_and(|f| f.hidden),

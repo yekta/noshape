@@ -320,6 +320,8 @@ pub struct DecalRecord {
     pub face: crate::naming::Name,
     /// The image's file tab.
     pub image: String,
+    /// Its encoded bytes (PNG / JPEG …), for display.
+    pub image_bytes: Option<std::sync::Arc<Vec<u8>>>,
     pub mapping: DecalMapping,
     /// TransformUV: uv = translation + linear · local.
     pub uv_linear: [[f64; 2]; 2],

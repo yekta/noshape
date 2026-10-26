@@ -1270,3 +1270,15 @@ live reference. Scores below ~3-4 are the known anti-aliasing floor (round 8).
 - Everything else referenced matches structurally (residual = anti-aliasing / sub-pixel offsets), checked on
   the sheets: toolbar, feature list, dialogs, menus, assembly / drawing toolbars, sketch toolbar, status bar.
   ui-dropdown-arrow's score is a false alarm (drawn as a #666 mask glyph in the app, as live).
+- (10-26) Decal scene side: StudioDisplay.decals (+ DecalRecord.image_bytes, psb's), builder draws each
+  decal from its face's triangles (uv_at per vertex, v flipped; on a cylinder triangles spanning more
+  than half a turn in u or v are the seam's and are skipped), colour [1,1,1, part alpha], unpickable;
+  BuiltScene.decals → decal_selected when the face, Reference::Feature or the selected feature row is
+  selected. Checked in the app (planes hidden, as live's capture): texels exact and unlit
+  ((0,255,0), (255,255,0), black, G = 80 gradient), selected tint exact ((102,221,4), (102,68,4),
+  (255,221,4)), hover untinted, clicking the decal selects its face.
+  FOR PSB (model, not rendering): on a cylinder ours puts the image's centre on −x and the gap on +x;
+  live (behaviours "icons2 decal rendering" (2)) centres it on the sketch circle's start direction (+x).
+  DecalMapping::Cylindrical's x comes from the kernel cylinder's x_dir, which points the other way here
+  (CLI-built circle at (80,10) r 10, extruded 30 mm). The wrap direction (CCW from +z) and the image's
+  orientation match.

@@ -965,6 +965,14 @@ impl PartStudioView {
         // A plane being resized: its highlight follows the drag.
         let shown = self.with_plane_drag(self.display.clone());
         let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
+        // A selected Decal row tints its image like a selected face (live).
+        for (i, _, f) in &built.decals {
+            if self.selected_features.contains(f)
+                && let Some(inst) = scene.instances.get_mut(*i)
+            {
+                inst.decal_selected = true;
+            }
+        }
         // Overlays the active field can't take (a shown sketch line on a
         // part edge for Fillet's edges) leave the pick pass, so what lies
         // under them is picked. Faces keep hiding what's behind them.

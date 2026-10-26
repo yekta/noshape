@@ -406,6 +406,8 @@ pub struct StudioDisplay {
     pub derived_sketches: Vec<(FeatureId, FeatureId)>,
     pub planes: Vec<PlaneDisplay>,
     pub connectors: Vec<ConnectorDisplay>,
+    /// Decals: images on faces (drawn by the scene).
+    pub decals: Vec<crate::regen::context::DecalRecord>,
     pub features: Vec<FeatureState>,
     /// Origin visible.
     pub show_origin: bool,
