@@ -124,8 +124,9 @@ pub(crate) struct GpuPoints {
     pub(crate) bounds: Option<(Vec3, Vec3)>,
 }
 pub(crate) struct GpuImage {
-    /// Six [`ImageVertex`]es (two triangles).
+    /// [`ImageVertex`]es, three per triangle (an image's quad: six).
     vertices: wgpu::Buffer,
+    count: u32,
     /// Texture view and sampler (group 2 of the image pipelines); keeps the
     /// texture alive.
     bind_group: wgpu::BindGroup,
@@ -1118,7 +1119,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
                 Drawable::Image(img) => {
                     pass.set_bind_group(2, &img.0.bind_group, &[]);
                     pass.set_vertex_buffer(0, img.0.vertices.slice(..));
-                    pass.draw(0..6, slots);
+                    pass.draw(0..img.0.count, slots);
                 }
             }
             calls.0.set(calls.0.get() + 1);
@@ -1739,6 +1740,7 @@ pub struct Renderer {
     image_layout: wgpu::BindGroupLayout,
     image_pipeline_layout: wgpu::PipelineLayout,
     image_sampler: wgpu::Sampler,
+    texel_sampler: wgpu::Sampler,
     /// Section cap passes, and the cap pipeline's layout (group 2: its
     /// plane and textures).
     section_caps: crate::section_caps::SectionCaps,
@@ -2048,6 +2050,18 @@ impl Renderer {
             anisotropy_clamp: 8,
             ..Default::default()
         });
+        // Decals: texels as they are, no filtering and no mip chain (live
+        // behaviours "icons2 decal rendering" (4)).
+        let texel_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("texel"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
+        });
 
         let section_caps = crate::section_caps::SectionCaps::new(&device);
         let cap_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -2096,6 +2110,7 @@ impl Renderer {
             image_layout,
             image_pipeline_layout,
             image_sampler,
+            texel_sampler,
             section_caps,
             cap_pipeline_layout,
             pipelines: None,
@@ -2142,7 +2157,7 @@ impl Renderer {
 
     /// A cloneable handle for uploading geometry from any thread.
     pub fn uploader(&self) -> Uploader {
-        Uploader { device: self.device.clone(), queue: self.queue.clone(), image_layout: self.image_layout.clone(), image_sampler: self.image_sampler.clone() }
+        Uploader { device: self.device.clone(), queue: self.queue.clone(), image_layout: self.image_layout.clone(), image_sampler: self.image_sampler.clone(), texel_sampler: self.texel_sampler.clone() }
     }
     pub fn upload_mesh(&self, mesh: &MeshData) -> MeshHandle {
         self.uploader().upload_mesh(mesh)
@@ -2158,6 +2173,9 @@ impl Renderer {
     }
     pub fn upload_image(&self, image: &ImageData) -> ImageHandle {
         self.uploader().upload_image(image)
+    }
+    pub fn upload_textured(&self, t: &TexturedData) -> ImageHandle {
+        self.uploader().upload_textured(t)
     }
 
     // ------------------------------------------------------------ setup
@@ -2375,7 +2393,7 @@ impl Renderer {
                 model: model.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
-                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32 | (((inst.reflection.is_none() && inst.ambient != 0.0) as u32) << 1) | ((inst.selected_only as u32) << 2) | (inst.hatch_id << 8), inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5) | (((inst.ghost > 0.0) as u32) << 7), inst.pickable as u32, inst.pick_base],
+                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32 | (((inst.reflection.is_none() && inst.ambient != 0.0) as u32) << 1) | ((inst.selected_only as u32) << 2) | ((inst.decal_selected as u32) << 3) | (inst.hatch_id << 8), inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5) | (((inst.ghost > 0.0) as u32) << 7), inst.pickable as u32, inst.pick_base],
                 extra: match &inst.reflection {
                     Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, r.lock as u32 as f32],
                     None => [inst.line_scale, inst.ghost, inst.ambient, 0.0],
@@ -3357,28 +3375,30 @@ pub struct Uploader {
     queue: wgpu::Queue,
     image_layout: wgpu::BindGroupLayout,
     image_sampler: wgpu::Sampler,
+    texel_sampler: wgpu::Sampler,
 }
 
 impl Uploader {
-    /// Upload an image as an sRGB texture (alpha premultiplied in linear
-    /// space) with a full mip chain built on the CPU. Images larger than the
-    /// device's texture limit are downscaled; invalid data (zero size or
-    /// short `rgba`) uploads a transparent texel.
-    pub fn upload_image(&self, image: &ImageData) -> ImageHandle {
-        let (mut w, mut h) = (image.width, image.height);
-        let mut level: std::borrow::Cow<[u8]> = if w == 0 || h == 0 || image.rgba.len() < w as usize * h as usize * 4 {
-            log::warn!("invalid image data: {}x{} with {} bytes", w, h, image.rgba.len());
+    /// An image as an sRGB texture (alpha premultiplied in linear space)
+    /// with a full mip chain built on the CPU, and its bind group (group 2 of
+    /// the image pipelines). Images larger than the device's texture limit
+    /// are downscaled; invalid data (zero size or short `rgba`) uploads a
+    /// transparent texel.
+    fn image_bind_group(&self, width: u32, height: u32, rgba: &[u8], texels: bool) -> wgpu::BindGroup {
+        let (mut w, mut h) = (width, height);
+        let mut level: std::borrow::Cow<[u8]> = if w == 0 || h == 0 || rgba.len() < w as usize * h as usize * 4 {
+            log::warn!("invalid image data: {}x{} with {} bytes", w, h, rgba.len());
             (w, h) = (1, 1);
             vec![0u8; 4].into()
         } else {
-            premultiply_rgba(&image.rgba[..w as usize * h as usize * 4]).into()
+            premultiply_rgba(&rgba[..w as usize * h as usize * 4]).into()
         };
         let max = self.device.limits().max_texture_dimension_2d.max(1);
         while w > max || h > max {
             let (next, nw, nh) = downsample_rgba(&level, w, h);
             (level, w, h) = (next.into(), nw, nh);
         }
-        let mip_level_count = 32 - w.max(h).leading_zeros();
+        let mip_level_count = if texels { 1 } else { 32 - w.max(h).leading_zeros() };
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("image"),
             size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -3402,14 +3422,19 @@ impl Uploader {
             );
         }
         let view = texture.create_view(&Default::default());
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("image"),
             layout: &self.image_layout,
             entries: &[
                 wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&self.image_sampler) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(if texels { &self.texel_sampler } else { &self.image_sampler }) },
             ],
-        });
+        })
+    }
+
+    /// Upload an image: its texture on the quad of its corners.
+    pub fn upload_image(&self, image: &ImageData) -> ImageHandle {
+        let bind_group = self.image_bind_group(image.width, image.height, &image.rgba, false);
         // Texture rows run top to bottom: v = 0 is the upper edge.
         let [ll, lr, ur, ul] = image.corners;
         let v = |pos, uv| ImageVertex { pos, uv };
@@ -3419,7 +3444,22 @@ impl Uploader {
             contents: bytemuck::cast_slice(&quad),
             usage: wgpu::BufferUsages::VERTEX,
         });
-        ImageHandle(Arc::new(GpuImage { vertices, bind_group, bounds: image.bounds() }))
+        ImageHandle(Arc::new(GpuImage { vertices, count: 6, bind_group, bounds: image.bounds() }))
+    }
+
+    /// Textured triangles (a decal on its face): drawn like an image,
+    /// sampled texel by texel (no filtering, no mips), the texels outside UV
+    /// [0, 1]² left out.
+    pub fn upload_textured(&self, t: &TexturedData) -> ImageHandle {
+        let bind_group = self.image_bind_group(t.width, t.height, &t.rgba, true);
+        let verts: Vec<ImageVertex> = t.indices.iter().filter_map(|&i| Some(ImageVertex { pos: *t.positions.get(i as usize)?, uv: *t.uvs.get(i as usize)? })).collect();
+        let vertices = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("textured"),
+            contents: if verts.is_empty() { &[0u8; std::mem::size_of::<ImageVertex>()] } else { bytemuck::cast_slice(&verts) },
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let bounds = crate::scene::bounds_of(t.positions.iter().copied());
+        ImageHandle(Arc::new(GpuImage { vertices, count: verts.len() as u32, bind_group, bounds }))
     }
 
     pub fn upload_mesh(&self, mesh: &MeshData) -> MeshHandle {
