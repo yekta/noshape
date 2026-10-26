@@ -129,3 +129,6 @@ then edits, undo/redo, rollback and suppress.
 | Drop above the feature's own sketch | accepted, no message; row red (170,37,45), "Features …" + red badge, tooltip "… did not regenerate properly: …" / "1 missing selection" | same | ✅ |
 | … row icon | plain extrude icon | ⚠ warning triangle on the row | ✗ **P1-18** (ui) |
 | Ctrl+Z | one step restores the order | same | ✅ |
+| Assembly mirror dialog | Instances to mirror, Mirror plane (+ connector button), [Mirror strategy…] | same (behaviours 8704) | ✅ |
+| Drawing Note tool (n), hover | prompt only, no preview | "NOTE" preview at the pointer | ✗ **P2-D3** (ui2) |
+| Click, type "QA NOTE" | Note panel next to the note: Noto Sans ( Note ), 0.1200, B I U S colour, spacing, align, list, … ☐ Flag notes (greyed Flag (Drawing), 2 Characters); ruler bar over the text | same (drawing/225, behaviours 3277) | ✅ |

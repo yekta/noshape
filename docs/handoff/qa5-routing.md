@@ -818,3 +818,8 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
 STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extrude-after.png, row "Chamfer 1"): a **yellow ⚠
   triangle badge overlaid on the lower-right of the feature's own icon** (like the sketch's blue minus badge), about 9–10 px,
   not a separate column. The red header badge (red disc with a down arrow) already matches.
+- **P2-D3 — ui2 (drawing Note tool visuals)** — Note tool (n) in a drawing: the prompt "Click a point for the leader, or
+  click to place the note" shows, but **no "NOTE" text preview follows the pointer** (a28-69/70.png). Live: "a 'NOTE' text
+  preview follows the pointer, always horizontal", with the usual inference glyphs over view edges (behaviours 1414,
+  drawing/220–222). drawing_tools.rs overlay draws only the leader line once a leader point exists (:501); main has no
+  preview either. The editor panel itself matches live (drawing/225).
