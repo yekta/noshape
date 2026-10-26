@@ -3325,6 +3325,23 @@ impl PartStudioView {
                     changes.push(("alongPull", ParamValue::Bool(want)));
                 }
             }
+            // surfaceOperationTypeEditLogic (live SF7: Fill on an open box's
+            // edges knits into the box): Add when a picked edge is an open
+            // edge of a surface, else New, until the user picks one.
+            "fill" if !user_set.contains("surfaceOperationType") => {
+                let joinable = |r: &Reference| -> bool {
+                    let Reference::Edge(name) = r else { return false };
+                    let Some(c) = ctx else { return false };
+                    c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Surface).any(|b| {
+                        b.edges.iter().position(|e| **e == *name).is_some_and(|i| b.shape.edge_faces().is_ok_and(|ef| ef.get(i).is_some_and(|f| f.len() == 1)))
+                    })
+                };
+                let any = params.array("edges").iter().any(|row| row.query("entities").iter().any(joinable));
+                let want = if any { "ADD" } else { "NEW" };
+                if !params.is("surfaceOperationType", want) {
+                    changes.push(("surfaceOperationType", ParamValue::Enum(want.into())));
+                }
+            }
             // Live L22: a new Rib's Parts holds the studio's parts.
             "rib" if !user_set.contains("parts") && params.query("parts").is_empty() => {
                 let solids: Vec<Reference> = ctx.map(|c| c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect()).unwrap_or_default();

@@ -952,9 +952,8 @@ fn revolve_cases() -> Vec<(&'static str, Studio)> {
 /// remove a line once it matches.
 const KNOWN: &[(&str, &str)] = &[
     ("LP2", "fs/psb: feature pattern, second direction straddling the front face (left top edge, −y): live re-extrudes those 3 bosses down the front face to z 0 (50544.69 mm³); ours patterns the geometry (49696.46)"),
-    ("CP2", "fs/psb: circular feature pattern of BOSS about the vertical edge (60,40), 30° × 3, equal spacing off: live OK 48802.32 mm³ (10 faces); ours \"Could not create all instances as entered\""),
+    ("CP2", "fs: circular feature pattern of BOSS about the vertical edge (60,40), 30° × 3, equal spacing off: live OK 48802.32 mm³ = the seed, one instance and one hanging 16 % off the left face, i.e. turning clockwise from above: live's vertical edge runs −z, ours +z (asked of live, REQUESTS fs 10-26 b (j))"),
     ("P6", "fs: tangent plane origin: live (110, 0, 20) mm, ours (110, 0, 0): live's cylinder (evSurfaceDefinition) of a 20 mm extrude has its origin at z 20, ours at z 0; the rule is asked of live (REQUESTS fs 10-26)"),
-    ("CV1", "fs/psb: curve pattern of BOSS along the front top edge × 4: live INFO \"For best results ensure that the path start point and pattern seed are touching.\" with 3 bosses (48848.23 mm³); ours \"Could not create all instances as entered\""),
 ];
 
 /// Live's mass properties bands (bands.jsonl, lead 10-26): Parasolid's

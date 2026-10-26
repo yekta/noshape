@@ -608,7 +608,12 @@ impl SheetGeometry {
     /// the default 3 mm (scaled by the dimension / annotation style).
     pub fn arrow(&mut self, tip: [f64; 2], dir: [f64; 2], len: f64) {
         let (size, kind) = if self.in_dim { (self.style.dim_arrow, self.style.dim_arrow_type) } else { (self.style.ann_arrow, self.style.ann_arrow_type) };
-        let len = len * size / 3.0;
+        self.arrow_as(tip, dir, len * size / 3.0, kind);
+    }
+
+    /// An arrowhead `len` mm long of type `kind` (Drawing properties ›
+    /// Views' own arrowheads).
+    pub fn arrow_as(&mut self, tip: [f64; 2], dir: [f64; 2], len: f64, kind: ArrowType) {
         let l = (dir[0] * dir[0] + dir[1] * dir[1]).sqrt().max(1e-12);
         let (dx, dy) = (dir[0] / l, dir[1] / l);
         // A third as wide as long (live DXF SOLIDs: ANSI 0.18 x 0.06 in,
@@ -992,26 +997,27 @@ impl SheetGeometry {
             S::Triangle => vec![[c[0] - rx - 1.5, c[1] - ry], [c[0] + rx + 1.5, c[1] - ry], [c[0], c[1] + ry + 2.0]],
             S::Flag => vec![[c[0] - rx, c[1] - ry], [c[0] + rx, c[1] - ry], [c[0] + rx + 1.5, c[1]], [c[0] + rx, c[1] + ry], [c[0] - rx, c[1] + ry]],
         };
-        let ink = style.color.unwrap_or([0, 0, 0]);
         if style.solid {
-            // Solid fill: the shape filled in the border color, the number white.
+            // Solid fill: the shape filled in its own colour (live: orange
+            // under a black border and number, drawing/1710).
             for i in 1..pts.len().saturating_sub(1) {
                 self.fills.push(Fill2 { points: vec![pts[0], pts[i], pts[i + 1]] });
             }
+            let fill = ColorSpan { lines: 0..0, texts: 0..0, fills: m.2..self.fills.len(), rgb: style.fill_color.unwrap_or(INSPECTION_FILL) };
+            self.colors.push(fill);
         }
+        let border = self.lines.len();
         self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: true, pick });
-        if style.color.is_some() || style.solid {
-            self.color_since(m, ink);
+        if let Some(rgb) = style.color {
+            self.colors.push(ColorSpan { lines: border..border + 1, texts: 0..0, fills: 0..0, rgb });
         }
         let mt = self.mark();
         self.texts.push(Text2 { pos: c, height: h, text, angle: 0.0, anchor: Anchor::Center, pick });
         if let Some(f) = &style.font {
             self.fonts.push(FontSpan { texts: mt.1..self.texts.len(), font: f.clone() });
         }
-        if style.solid {
-            self.color_since(mt, [255, 255, 255]);
-        } else if style.color.is_some() {
-            self.color_since(mt, ink);
+        if let Some(rgb) = style.text_color {
+            self.color_since(mt, rgb);
         }
     }
 
@@ -2549,7 +2555,7 @@ pub trait AnnotationEnv {
     }
     /// Inspection item bubbles' look, None while hidden.
     fn inspection_style(&self) -> Option<InspectionStyle> {
-        Some(InspectionStyle { shape: super::InspectionShape::Circle, text_height: 2.5, border: 1.2, chars: 2, color: None, solid: false, font: None })
+        Some(InspectionStyle { shape: super::InspectionShape::Circle, text_height: 2.5, border: 1.2, chars: 2, color: None, solid: false, font: None, text_color: None, fill_color: None })
     }
     /// Weld symbols follow ANSI (else ISO).
     fn weld_ansi(&self) -> bool {
@@ -2641,7 +2647,13 @@ pub struct InspectionStyle {
     pub color: Option<[u8; 3]>,
     pub solid: bool,
     pub font: Option<TextFont>,
+    /// The number's colour and the solid fill's (None: live's orange).
+    pub text_color: Option<[u8; 3]>,
+    pub fill_color: Option<[u8; 3]>,
 }
+
+/// Inspection › Solid fill's default colour (live drawing/1710).
+pub const INSPECTION_FILL: [u8; 3] = [255, 99, 51];
 
 /// The `i`th zone letter (0 = A), skipping O; past Z the letters double
 /// (AA, BB, ...).
@@ -2730,4 +2742,24 @@ pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[
         out.push(LeaderPath { points, head: n });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Drawing properties › Inspection: Solid fill in its own colour (live's
+    /// orange by default) under the border and number, which keep theirs.
+    #[test]
+    fn inspection_bubble_fill_text_and_border_colours() {
+        let style = |solid, text_color, fill_color| InspectionStyle { shape: super::super::InspectionShape::Circle, text_height: 2.5, border: 1.2, chars: 2, color: Some([0, 0, 200]), solid, font: None, text_color, fill_color };
+        let mut g = SheetGeometry::new(100.0, 100.0);
+        g.inspection_bubble([50.0, 50.0], 3, &style(true, None, None), 1);
+        assert!(!g.fills.is_empty() && (0..g.fills.len()).all(|i| g.fill_color(i) == Some(INSPECTION_FILL)));
+        assert_eq!(g.line_color(0), Some([0, 0, 200]));
+        assert_eq!(g.text_color(0), None);
+        let mut g = SheetGeometry::new(100.0, 100.0);
+        g.inspection_bubble([50.0, 50.0], 3, &style(false, Some([10, 20, 30]), Some([1, 2, 3])), 1);
+        assert!(g.fills.is_empty() && g.text_color(0) == Some([10, 20, 30]));
+    }
 }

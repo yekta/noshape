@@ -46,3 +46,21 @@ behaviours.md "Frame rate"), so fps numbers below are for the perf owner, not a 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app)
 | REG1 | times read "617ms" / "1.02s" (ui::regen_time_text), Regeneration times dialog as live | ✅ fixed |
 | PERF1 | not re-measured (debug build; perf's area) | perf |
+
+## Re-measured by perf (2026-10-26, release builds on the macOS CI runners, Apple Paravirtual Metal; macOS 14 / 15)
+
+Runs: perf.yml 40275443374 (NIST, main 5226055b+), 40249720571 / 40259986505 / 40267041238 (big plate fixture),
+40277627211 (model job: big_plate.rs). The runners' presented fps is capped by their timer (33-34 fps fast state,
+19 fps slow; see docs/handoff/viewport-performance.md), so frame-time rows give the GPU time and the
+frame-driven delivered rate.
+
+| Row | Then (qa5, llvmpipe, debug) | Now | Status |
+|---|---|---|---|
+| NIST open | preview 6.1 s, refine 25.3 s | first frame 0.67 / 0.51 s; regen[preview] 0.95 / 0.65 s (133094 tris); regen[refine] 15.1 / 10.2 s in the background (991130 tris, the threaded screws' fine meshes) | ✅ open; refine still long (perf, next) |
+| NIST orbit | ≈2 renders/s | 32.5 / 29.6 fps presented (timer-bound), GPU ~5 ms per frame, UI CPU 0.4 ms | ✅ |
+| Big plate: 400 holes (Extrude Remove) | 132 s | 1.15 s (macOS-latest; Windows 1.31 s); live 617 ms | ✅ PERF1 under 2 s; 2x live |
+| Big plate: Chamfer 0.5 × 400 | 133 s | 1.08 s (Windows 1.69 s); live 1.02 s | ✅ |
+| Big plate: Extrude 1 10 → 12 | 150 s | 1.62 s (Windows **2.88 s**, over big_plate.rs's 2 s); live 1.03 s | ✅ macOS / ✗ Windows (kern: these doubled since 10-25's 0.49 / 0.71 / 1.04 s on macOS) |
+| Big plate: open in the app | ~10 min | first frame 1.9 / 3.4 s (preview 1.1 / 2.4 s, fine mesh 0.24 / 0.36 s after) | ✅ |
+| Big plate: orbit / pan / zoom | frame 0.75-3.6 s behind | frame-driven at 2x Retina: orbit 93 / 102 fps, zoom 110 / 102, pan 86 / 75; 2-14% of frames over 16.7 ms | ✅ 60 fps |
+| Click on the plate top selects a Point | — | not re-checked (pick priority, ADV 1.7) | ? |

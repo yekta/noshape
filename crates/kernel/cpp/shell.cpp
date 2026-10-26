@@ -1800,7 +1800,7 @@ OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, con
       // Not periodic, even around a closed curve (OCCT's point projection
       // misses points on periodic B-spline faces); a closed curve's ends meet
       // with the same tangent.
-      const int N = 64;
+      const int N = 128;
       occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, N + 1), near = new NCollection_HArray1<gp_Pnt>(1, N + 1);
       occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, N + 1);
       for (int k = 0; k <= N; ++k)

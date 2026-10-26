@@ -45,7 +45,10 @@ fn level_parting_line_matches_occt() {
     let frustum = PI * h / 3.0 * (r0 * r0 + r0 * r1 + r1 * r1);
     let v = volume(&ours);
     let expect = PI * r0 * r0 * h + frustum;
-    assert!((v - expect).abs() < 1e-12, "{v} vs {expect}");
+    // The exact frustum (live's Parasolid cone); ours is a B-spline through
+    // sampled rulings: within 0.005 mm³ (live's own curved cases differ from
+    // the exact surface by more, ~0.03 mm³).
+    assert!((v - expect).abs() < 5e-12, "{v} vs {expect}");
     let neutral = k::Plane::from_normal(DVec3::new(0.0, 0.0, 0.01), DVec3::Z);
     for occt_angle in [a, -a] {
         if let Ok(r) = k::draft(&s, std::slice::from_ref(&lower), DVec3::Z, &neutral, occt_angle) {
@@ -56,7 +59,7 @@ fn level_parting_line_matches_occt() {
     let out = volume(&k::draft_parting_curve(&s, std::slice::from_ref(&lower), &parting, DVec3::Z, &[-a]).unwrap().shape);
     let r1 = r0 + h * tn;
     let expect = PI * r0 * r0 * h + PI * h / 3.0 * (r0 * r0 + r0 * r1 + r1 * r1);
-    assert!((out - expect).abs() < 1e-12, "{out} vs {expect}");
+    assert!((out - expect).abs() < 5e-12, "{out} vs {expect}");
 }
 
 /// A 30° sloped ellipse: the ruled construction drafts it (OCCT can't).

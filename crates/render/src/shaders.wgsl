@@ -150,7 +150,7 @@ fn vs_background(@builtin(vertex_index) vi: u32) -> BgOut {
 @fragment
 fn fs_background(i: BgOut) -> @location(0) vec4<f32> {
     let t = clamp(i.t, 0.0, 1.0);
-    return vec4(mix(g.bg_bottom.rgb, g.bg_top.rgb, t), 1.0);
+    return vec4(mix(linear_to_srgb(g.bg_bottom.rgb), linear_to_srgb(g.bg_top.rgb), t), 1.0);
 }
 
 // ---------------------------------------------------------------- meshes
@@ -237,8 +237,12 @@ fn shade_preview(normal_in: vec3<f32>, front: bool, base: vec3<f32>) -> vec3<f32
     let light = normalize(right * 0.866 - g.camera_up.xyz * 0.5);
     return base * (PREVIEW_AMBIENT + PREVIEW_DIFFUSE * max(dot(n, light), 0.0));
 }
-const PREVIEW_AMBIENT: f32 = 0.5;
-const PREVIEW_DIFFUSE: f32 = 0.74;
+// Fitted to live part-studio/230 with the target blending in sRGB values
+// (see-through: the box's back faces, then its front faces, at the preview
+// alpha). Onshape draws the preview opaque into a texture of its own and
+// mixes that over the frame (uPreviewTexture, uPreviewAlpha): one layer.
+const PREVIEW_AMBIENT: f32 = 0.58;
+const PREVIEW_DIFFUSE: f32 = 0.64;
 
 // Zebra stripes (Onshape's analysis tool): the reflection of a room with
 // black and white stripes around the viewer, horizontal unless flipped
@@ -318,7 +322,7 @@ fn fs_compare_dn(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0)
 @fragment
 fn fs_compare_mix(i: BgOut) -> @location(0) vec4<f32> {
     let c = textureLoad(compare_over, vec2<i32>(floor(i.pos.xy)), 0);
-    return vec4(linear_to_srgb(c.rgb), g.compare2.z);
+    return vec4(c.rgb, g.compare2.z);
 }
 
 fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
@@ -366,7 +370,7 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
 @fragment
 fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     load_inst(i.slot);
-    return mesh_color(i, front);
+    return enc(mesh_color(i, front));
 }
 
 // `fs_mesh` for meshes nothing hides or clips (renderer `DrawLists::solid`):
@@ -374,7 +378,7 @@ fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<
 @fragment
 fn fs_mesh_solid(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     load_inst(i.slot);
-    return mesh_shade(i, front, state_of(i.pick));
+    return enc(mesh_shade(i, front, state_of(i.pick)));
 }
 
 // Onshape's image-based silhouettes (`vs-backfacesil-faces`): back faces
@@ -420,7 +424,7 @@ fn fs_backsil(i: BackSilOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     let st = state_of(i.pick);
     if ((st & HIDDEN) != 0u || clipped(i.world)) { discard; }
-    return vec4(inst.color.rgb, 1.0);
+    return enc(vec4(inst.color.rgb, 1.0));
 }
 
 // Part outline (state OUTLINE): the faces turned away from the viewer,
@@ -455,9 +459,9 @@ fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
     if (dot(normalize(i.normal), v) > 0.0) { discard; }
     // Hovered, not selected: the light-orange hover color (live G35, a
     // hovered mesh part).
-    if ((st & HOVER) != 0u && (st & SELECTED) == 0u) { return vec4(g.hover.rgb, 1.0); }
-    if ((st & BODY) != 0u) { return vec4(BODY_OUTLINE, 1.0); }
-    return vec4(g.select.rgb, 1.0);
+    if ((st & HOVER) != 0u && (st & SELECTED) == 0u) { return enc(vec4(g.hover.rgb, 1.0)); }
+    if ((st & BODY) != 0u) { return enc(vec4(BODY_OUTLINE, 1.0)); }
+    return enc(vec4(g.select.rgb, 1.0));
 }
 
 // Depth of outlined parts only (no color): see mesh_outline_depth.
@@ -476,6 +480,14 @@ fn fs_outline_depth(i: MeshOut) -> @location(0) vec4<f32> {
 // faces, alpha + 16 per part), so where the plane cuts material the mask
 // holds that part's color and part count. An edge pass outlines the regions
 // (section_caps.wgsl), then a quad on each plane draws the hatched cap.
+
+// The color target is plain BGRA8 holding sRGB-encoded values, like the
+// WebGL canvas Onshape draws on: blending and the MSAA resolve mix the
+// encoded values (as Chrome does), so a color computed linear leaves its
+// fragment shader through `enc`.
+fn enc(c: vec4<f32>) -> vec4<f32> {
+    return vec4(linear_to_srgb(c.rgb), c.a);
+}
 
 fn linear_to_srgb(c: vec3<f32>) -> vec3<f32> {
     let lo = c * 12.92;
@@ -610,7 +622,7 @@ fn fs_section_cap(i: CapOut) -> @location(0) vec4<f32> {
     col = mix(col, vec3(0.0), edge);
     var a = alpha;
     if (parts > 1.0) { a = clamp(alpha + 0.1, 0.0, 1.0); }
-    return vec4(srgb_to_linear(col), a);
+    return vec4(col, a);
 }
 
 @fragment
@@ -830,9 +842,9 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
     // (live selection/06b, 07b: 0.2 of (35,48,53) in sRGB at the centre).
     if (i.core > 0.0) {
         let k = 0.2 * clamp(i.core + 0.5 - abs(i.across), 0.0, 1.0);
-        return vec4(srgb_to_linear(mix(linear_to_srgb(i.color.rgb), EDGE_CORE, k)), i.color.a);
+        return vec4(mix(linear_to_srgb(i.color.rgb), EDGE_CORE, k), i.color.a);
     }
-    return i.color;
+    return enc(i.color);
 }
 
 @fragment
@@ -936,7 +948,7 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
     // a 9 px ring with a 1.75 px stroke, inner radius 0.6).
     if ((i.style & 16u) != 0u) { cov = cov * clamp(d - 0.61 * i.rpx + 0.5, 0.0, 1.0); }
     if (cov <= 0.0) { discard; }
-    return vec4<f32>(rgb, i.color.a * cov);
+    return vec4<f32>(linear_to_srgb(rgb), i.color.a * cov);
 }
 
 @fragment
@@ -979,12 +991,15 @@ fn vs_image(v: ImageIn, @builtin(instance_index) slot: u32) -> ImageOut {
 }
 
 // The texture is sRGB (samples are linear like the instance color) with
-// premultiplied alpha; so is the result (premultiplied blending).
+// alpha premultiplied in linear space; the result is premultiplied in the
+// encoded values (premultiplied blending in the target's sRGB values, as
+// WebGL blends a canvas).
 fn image_color(i: ImageOut) -> vec4<f32> {
     let t = textureSample(image_tex, image_sampler, i.uv);
     if (clipped(i.world)) { discard; }
     let a = inst.color.a;
-    return vec4(t.rgb * inst.color.rgb * a, t.a * a);
+    let straight = select(vec3(0.0), t.rgb / max(t.a, 1e-6), t.a > 0.0);
+    return vec4(linear_to_srgb(straight * inst.color.rgb) * t.a * a, t.a * a);
 }
 
 // Opaque instances draw twice: mostly opaque texels first, writing depth...
@@ -1041,5 +1056,5 @@ fn fs_mesh_reflect(i: MeshOut, @builtin(front_facing) front: bool) -> @location(
     let st = state_of(i.pick);
     var c = env;
     if ((st & SELECTED) != 0u) { c = mix(c, FACE_SELECTED, 0.5); }
-    return vec4(c, base.a);
+    return enc(vec4(c, base.a));
 }

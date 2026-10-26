@@ -735,3 +735,20 @@ changes. I write the renderer part first (my files) and show crops before touchi
   the job's first, OS caches cold too): process to GPUI created 140-190 ms; NSApplication launched +30-130 ms;
   gpui_kit::init 65-160 ms (365 / 827 ms in a job's first launch); theme, preferences, files::init < 5 ms;
   app initialized to document window 340-550 ms; window to first frame 550-950 ms (cold shader cache).
+- **2026-10-26 (perf): the viewport blends in sRGB values, like Chrome's WebGL canvas (on main).** The color target
+  is plain BGRA8 holding sRGB-encoded values (it was an sRGB view: blending and the MSAA resolve ran in linear
+  light, so anti-aliased edges and every translucent overlay came out lighter / bluer than live, e.g. icons2's
+  selected face under a plane 105 vs live 73). Fragment shaders return encoded colors (`enc` in shaders.wgsl);
+  the background gradient mixes encoded values; images are premultiplied in encoded values; compare mode reads
+  the encoded frame. **For everyone fitting colours: blend live's CSS / measured values directly now**
+  (result = α·color + (1−α)·below, all in 0-255 sRGB, as in the browser); fits made for linear blending are
+  wrong after this. Already moved back to live / CSS values (scene palette, builder, asm_scene, app
+  drawing_watermark, part_studio/in_context): error fill α 0.60; plane fill #cedbe5 @ 0.2 (icons2's #c3d2e0 @
+  0.173 fit undone), plane outline #1d60aa @ 0.35, dark plane fill #666, dark outline α 0.35; selected plane
+  #ffc862 @ 0.77; picked region #cd9d3c @ 0.34; translucent display 0.35; edited sketch regions 0.265 / dark 0.2;
+  watermark editor fill #c0c0c0 @ 0.25; selected context face #e8ba64 @ 0.8; feature preview shading refitted
+  (ambient 0.58, diffuse 0.64). Feature previews: Onshape draws the preview opaque into its own texture and mixes
+  it over the frame (`uPreviewTexture` / `uPreviewAlpha`: one layer); ours stays see-through (back then front
+  faces), which double-darkens; a one-layer preview plus a refit of FEATURE_PREVIEW (live's top / right faces
+  imply a colour near #779cb3 lit in sRGB) is open for the preview's owner. AO now multiplies encoded values
+  (as Onshape's SSAO on its canvas); not re-checked against live yet.
