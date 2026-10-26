@@ -925,3 +925,30 @@ oracle_asm has live's numbers (live/fs-oracle-asm/raw, 10-26): F1, F3, F4, S1, P
 S2, C1, B2, M1, M2 and LP1 are skb's (KNOWN in the test, each with live's and our pose): the circular-edge CENTER
 connector's Z (live: out of the part), edge MID_POINT frames, offset / rotation / slider senses, limits from a start
 outside them, the free rotation on cylinder axes, the cone limit, Revolute + Slider.
+
+## STOP snapshot (26 Oct, lead halt)
+**On main (fs, this session):** f428abfc assembly connectors as live (circular-edge CENTER faces out of the part, line
+edges run their own way, offsets / rotations move the first connector; skb's fasten_at / slider_offset_z hold values
+directly); 63be4e72 / e9282705 / daca61d0 oracle_asm (18 live cases); 6ab01d25 std prewarm (app first frame, ops
+OpenDoc); a122ed68 feature pattern skips added copies off the part; b363f85d oracle batch 10 + H5/H8 + evLine/evAxis
+midpoint + Plane evPlane origins; f3ee3e13 lexer 2.5x; 8d23b920 evCollision box prefilters (editing logic ~9x).
+**WIP branch:** agent/fs = 81ab300e (speed probes only, not for main): crates/model/tests/tmp_speed.rs,
+crates/ops/tests/tmp_speed_ops.rs, temporary phase timers in crates/ops/src/ops/feature.rs add().
+
+**Oracle status.** oracle_p1: all live cases match except KNOWN LP2 (kern: Parasolid face pattern grows a straddling
+boss's outer half to the part's bottom) and CP2 (kern: since 339de774 its turn is as live, differs only as LP2).
+oracle_asm (live/fs-oracle-asm/raw): F1–F5, R2, S1, S2, P1, B1, B2, M2, LP1 match; KNOWN: R1 (skb: pin upright as
+live, solver turns it −6° about the axis keeping the part origin near its start; live rz 0), R3 / C1 (kern + skb:
+MID_AXIS_POINT Z = cylinder axis, live toward the sketch, ours away since 339de774; then the solver's turn),
+CP1 (kern: same cylinder axis, the circular pattern turns the other way), M1 (skb: live's two mates aren't OK,
+over-constrained; ours flips B).
+
+**Open items, in order (next steps exact):**
+1. P0 Extrude-add speed (lead): api F4's 2.8 s is not std's editing logic any more. tmp_speed_ops on the imported
+   bracket: feature_add 308 ms, editing logic 55 ms (+0.7 ms second pass). Next: run tmp_speed_ops (agent/fs) with
+   the phase timers (dialog_logic's regenerate_with upto, edit_studio regen, regen_report_with) to find the other
+   ~250 ms, then cut the biggest (likely the before-regeneration done twice: dialog_logic's upto regen and the
+   insert's full regen) — ops is api's: agree the fix with api. Target < 150 ms.
+2. kern: cylinder axis toward the sketch (CP1, R3, C1 follow); then re-run oracle_asm and drop them from KNOWN.
+3. skb: R1's free turn (keep orientation, not the part origin) and M1.
+4. oracle_p1 LP2 (kern face-pattern geometry).
