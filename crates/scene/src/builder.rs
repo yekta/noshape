@@ -622,7 +622,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             // Isolate takes the names away (qa5 KB3).
             if !opts.faint_planes {
                 let asc = 0.031 * 2.0 * pl.half_height;
-                let base = pl.corner(-1.0, 1.0) + f.x * (0.25 * asc) - f.y * (1.3 * asc);
+                // Live dk-921 / part-studio/00: the name's ink starts 0.11
+                // of the ascender in from the corner, its baseline 1.06 down.
+                let base = pl.corner(-1.0, 1.0) + f.x * (0.11 * asc) - f.y * (1.06 * asc);
                 let text = theme::lin(theme::pick(theme::viewport::PLANE_TEXT, theme::viewport_dark::PLANE_TEXT));
                 let to_world = |q: glam::DVec2| base + f.x * (q.x * asc) + f.y * (q.y * asc);
                 let contours = plane_name_contours(&pl.name);
