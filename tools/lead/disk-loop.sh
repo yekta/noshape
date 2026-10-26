@@ -1,14 +1,15 @@
 #!/bin/bash
 # Every 30 min: delete stale test executables, and prune old artifact variants (keep the newest 6 per crate).
 while true; do
-  for d in /root/target-shared /root/target-behave /root/target-engine /root/target-qa; do
+  for d in /root/target-core /root/target-psui /root/target-skasm /root/target-dx; do
     find $d/debug/deps -maxdepth 1 -type f -executable ! -name '*.so' -mmin +45 -amin +30 -delete 2>/dev/null
   done
   find /root/target-lead/debug/deps -maxdepth 1 -type f -executable ! -name "*.so" -mmin +120 -amin +60 -delete 2>/dev/null
-  python3 /tmp/lead/prune-build.py /root/target-shared /root/target-behave /root/target-engine /root/target-lead /root/target-qa >> /tmp/lead/disk-loop.log 2>&1
-  python3 /tmp/lead/prune-deps.py /root/target-qa/debug/deps /root/target-shared/debug/deps /root/target-engine/debug/deps /root/target-behave/debug/deps /root/target-lead/debug/deps >> /tmp/lead/disk-loop.log 2>&1
-  python3 /tmp/lead/fix-fingerprints.py /root/target-qa /root/target-shared /root/target-engine /root/target-behave /root/target-lead >> /tmp/lead/disk-loop.log 2>&1
-  rm -rf /root/target-*/release 2>/dev/null
+  python3 /tmp/lead/prune-build.py /root/target-core /root/target-psui /root/target-skasm /root/target-dx /root/target-lead >> /tmp/lead/disk-loop.log 2>&1
+  python3 /tmp/lead/prune-deps.py /root/target-core/debug/deps /root/target-psui/debug/deps /root/target-skasm/debug/deps /root/target-dx/debug/deps /root/target-lead/debug/deps >> /tmp/lead/disk-loop.log 2>&1
+  python3 /tmp/lead/fix-fingerprints.py /root/target-core /root/target-psui /root/target-skasm /root/target-dx /root/target-lead >> /tmp/lead/disk-loop.log 2>&1
+  # Release builds (perf checks) untouched for 3 h.
+  for d in /root/target-*/release; do [ -d "$d" ] && [ -z "$(find $d -mmin -180 -print -quit)" ] && rm -rf "$d"; done
   # Linux perf's build-id cache: a copy of every profiled binary (18 GB on 10-26). Keep only the last 2 h.
   find /root/.debug -mindepth 1 -maxdepth 3 -mmin +120 -exec rm -rf {} + 2>/dev/null
   # Incremental caches (on since 10-25): drop per-crate caches untouched for 90 min.

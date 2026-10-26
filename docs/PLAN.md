@@ -122,8 +122,11 @@ How:
 - Lead scripts (watcher, disk loop, release cut, transcript peek, menu-coverage check): tools/lead/ (copied 10-26 from
   /tmp/lead and /root/.config/noshape/lead).
 - Agent WIP branches on GitHub: `agent/<name>` (api, fs, icons2, kern, psb, qa5, skb, ui, ui2, perf), pushed 10-26.
-- Worktrees: /root/wt/<name>. Target dirs: /root/target-{shared,behave,engine,qa,lead}.
-  Under 2.3, each of the 4 agents gets its own dir.
+- **The repo is /root/projects/noshape** (Motile's project; its local `main` is kept equal to origin/main by
+  tools/lead/loops.sh, never committed on). /root/noshape and /root/wt/* are the retired pre-10-26 clone and its worktrees.
+- Worktrees (of /root/projects/noshape): /root/projects/noshape-wt/<name>: `watch` (the watcher), `release` (release
+  cuts), and one per area agent: `core`, `psui`, `skasm`, `dx`. Target dirs: /root/target-<same name>, plus
+  /root/target-lead for the watcher.
 - Patched OCCT: /root/occt (the unpatched build is kept in /root/occt-unpatched); patches are in patches/occt/.
 - Live Onshape capture: Chrome on DISPLAY=:107 (CDP 9333); helpers in /root/live-pw/; findings in
   /root/onshape-research/live/behaviours.md.

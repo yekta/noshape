@@ -1,7 +1,7 @@
 #!/bin/bash
 # usage: sheet.sh <names-file-or-glob-prefix> <outname>
 set -e
-SRC=/root/noshape/crates/app/assets/icons
+SRC=/root/projects/noshape/crates/app/assets/icons
 OUT=/tmp/icon-sheets
 mkdir -p $OUT/png20 $OUT/png48
 names=$(cat "$1")

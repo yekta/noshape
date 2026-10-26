@@ -1,6 +1,6 @@
 import re, os, sys
 import xml.etree.ElementTree as ET
-D='/root/noshape/crates/app/assets/icons'
+D='/root/projects/noshape/crates/app/assets/icons'
 def pts_from_d(d):
     toks=re.findall(r'[MLCQHVAZmlcqhvaz]|-?\d*\.?\d+(?:e-?\d+)?',d)
     out=[];cmd=None;i=0;cur=(0,0);nums=[]

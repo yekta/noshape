@@ -1,5 +1,5 @@
 #!/bin/bash
-# Main watcher (docs/PLAN.md, docs/TESTS.md; 10-26). Tests the newest main in /root/noshape-lead (target-lead) with
+# Main watcher (docs/PLAN.md, docs/TESTS.md; 10-26). Tests the newest main in /root/projects/noshape-wt/watch (target-lead) with
 # T0 + T1 + clippy. Green -> tag last-green (pushed: CI runs T1 on all 3 platforms) and /root/green/noshape.
 # Red -> /tmp/lead/main-status lists the failures and the commits since last-green; if exactly one commit landed since
 # last-green, it is reverted at once (PLAN 2.4: no grace period; the author re-lands it fixed).
@@ -7,7 +7,7 @@
 set -u
 export OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-lead CARGO_INCREMENTAL=0
 export CC=gcc-13 CXX=g++-13  # CI (ubuntu-24.04) compiles our C++ with GCC 13; GCC 15 here accepts code CI rejects
-REPO=/root/noshape; WT=/root/noshape-lead; ST=/tmp/lead/main-status; LOG=/tmp/lead/watch.log
+REPO=/root/projects/noshape; WT=/root/projects/noshape-wt/watch; ST=/tmp/lead/main-status; LOG=/tmp/lead/watch.log
 G="git -c user.name=yekta -c user.email=ngyekta@gmail.com"
 log() { echo "$(date -u +%H:%M:%S) $*" >> $LOG; }
 fails() { grep -vE "^warning: [a-z0-9_-]+@[0-9.]+:" | grep -E "FAILED|panicked|^error|signal:|SIGSEGV|SIGABRT|stack overflow|Caused by|process didn.t exit" | head -14; }

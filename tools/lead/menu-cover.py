@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Reimplements ops/tests/coverage.rs every_menu_item_is_listed on a git tree: prints missing / stale menu ids.
 import subprocess, re, sys
-R='/root/noshape'
+R='/root/projects/noshape'
 def git(*a): return subprocess.run(['git','-C',R,*a],capture_output=True,text=True).stdout
 def labels(tree):
     out=set()
