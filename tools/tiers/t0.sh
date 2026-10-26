@@ -16,6 +16,7 @@ SMOKE=(demo_document_regenerates demo_document_with_drawing_regenerates live_30_
 # Every tests/*.rs file must be in its crate's tests/all.rs or be a [[test]] of its own (tools/tiers/merge-tests.py).
 for f in crates/*/tests/*.rs; do
   c=${f%/tests/*}; s=$(basename "$f" .rs); [ "$s" = all ] && continue
+  [ -f "$c/tests/all.rs" ] || continue  # crates without all.rs keep cargo's one binary per file
   grep -qE "^(mod $s;|#\[path = \"$s.rs\"\])" "$c/tests/all.rs" 2>/dev/null || grep -q "path = \"tests/$s.rs\"" "$c/Cargo.toml" \
     || { echo "t0: $f is in no test binary: run tools/tiers/merge-tests.py"; exit 1; }
 done
