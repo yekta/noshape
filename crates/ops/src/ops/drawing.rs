@@ -551,6 +551,20 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(ti) = data.title {
                 j["title"] = json!(ti);
             }
+            // A BOM's rows by part (the table shows numbers and descriptions only).
+            if let (noshape_model::drawing::TableKind::Bom { structured, bottom_to_top, .. }, Some(s)) = (&t.kind, source) {
+                let mut names: Vec<String> = if s.assembly && *structured {
+                    s.bom_structured.iter().map(|r| r.name.clone()).collect()
+                } else if s.assembly {
+                    s.bom.iter().map(|r| r.name.clone()).collect()
+                } else {
+                    s.parts.iter().map(|p| p.name.clone()).collect()
+                };
+                if *bottom_to_top {
+                    names.reverse();
+                }
+                j["row_names"] = json!(names);
+            }
             // The table menus' state.
             j["corner"] = json!(variant_name(&t.corner));
             j["text_height"] = json!(t.text_height);

@@ -606,7 +606,7 @@ pub fn ops() -> Vec<Op> {
             summary: "Geometric tolerance (feature control frame)",
             description: Box::leak(
                 format!(
-                    "The Geometric tolerance tool and dialog: the frame at `position` (sheet mm). Each row: `symbol` ({}; later rows default to composite), `tolerance` with optional `before` / `after` (e.g. \"Ø\", \"Ⓜ\"), up to three `datums` (\"A\", \"B Ⓜ\"), and `prefix` / `suffix` texts; `upper` / `lower` texts above and below. One edit (\"Geometric tolerance\").",
+                    "The Geometric tolerance tool and dialog: the frame at `position` (sheet mm). Each row: `symbol` ({}; later rows default to composite), `tolerance` with optional `before` / `after` (e.g. \"Ø\", \"Ⓜ\"), up to three `datums` (\"A\", \"B Ⓜ\"), and `prefix` / `suffix` texts; `upper` / `lower` texts above and below; `anchor`: its leader's point on the geometry. One edit (\"Geometric tolerance\").",
                     GDT_SYMBOLS.iter().map(|s| s.0).collect::<Vec<_>>().join(", ")
                 )
                 .into_boxed_str(),
@@ -627,6 +627,7 @@ pub fn ops() -> Vec<Op> {
                     opt("upper", json!({ "type": "string" }), "Text above the frame."),
                     opt("lower", json!({ "type": "string" }), "Text below the frame."),
                     opt("leader", json!({ "type": "string", "enum": ["leader", "all_around", "all_over"], "default": "leader" }), "Leader type."),
+                    opt("anchor", point(), "Where the leader points (sheet mm: a view's edge, vertex or circle point snaps to it), as clicking the geometry first does; else no leader (drawing_annotation_edit add_leader adds more)."),
                 ],
             ),
             mutates: true,
@@ -724,7 +725,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "view_table",
             summary: "Place a BOM, cut list or hole table of a view",
-            description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its top-left corner at `position` (sheet mm). A hole table measures from `origin` (a vertex or circle center of the view, sheet mm). One edit with the tool's name.",
+            description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its anchor corner at `position` (sheet mm): the reply's `corner`, a BOM's top right as in Onshape (A3: [410, 287] is the frame's top right). A reply `warning` says when the table runs off the sheet. A hole table measures from `origin` (a vertex or circle center of the view, sheet mm). One edit with the tool's name.",
             fields: with(
                 common(),
                 vec![
@@ -786,6 +787,16 @@ pub(super) fn done(od: &mut OpenDoc, t: Target, description: &str, key: &str, id
     commit(od, t.tab, t.sheet, t.d, description)?;
     let mut out = reply(od, t.tab, t.sheet, false)?;
     out[key] = json!(id);
+    // A table placed (partly) off the sheet: say so, with its anchor corner.
+    if key == "table"
+        && let Some(tb) = out["tables"].as_array().and_then(|l| l.iter().find(|x| x["id"] == id)).cloned()
+    {
+        let (w, h) = (out["size_mm"][0].as_f64().unwrap_or(f64::MAX), out["size_mm"][1].as_f64().unwrap_or(f64::MAX));
+        let b = |k: &str, i: usize| tb["bounds"][k][i].as_f64().unwrap_or(0.0);
+        if b("min", 0) < 0.0 || b("min", 1) < 0.0 || b("max", 0) > w || b("max", 1) > h {
+            out["warning"] = json!(format!("the table runs off the {w} x {h} mm sheet (from [{:.1}, {:.1}] to [{:.1}, {:.1}]): `position` is its {} corner", b("min", 0), b("min", 1), b("max", 0), b("max", 1), tb["corner"].as_str().unwrap_or("anchor")));
+        }
+    }
     Ok(out.into())
 }
 
@@ -1487,7 +1498,16 @@ fn gdt(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (frame, extra) = dt::gdt_values(&rows, a.opt_str("upper")?.unwrap_or(""), a.opt_str("lower")?.unwrap_or(""), leader).ok_or_else(|| OpError::param("rows", "nothing entered"))?;
     let sheet = t.sheet;
     let id = t.d.sheets[sheet].next_annotation_id();
-    t.d.sheets[sheet].annotations.push(dt::gdt(id, pt_arg(a, "position")?, frame, extra));
+    let ann = dt::gdt(id, pt_arg(a, "position")?, frame, extra);
+    let start = noshape_scene::drawing_tools::annotation_edit::note_leader_start(&ann);
+    t.d.sheets[sheet].annotations.push(ann);
+    // Clicking the geometry first: the frame's leader goes there.
+    if let Some(v) = a.get("anchor") {
+        use noshape_scene::drawing_tools::annotation_edit as ae;
+        let p = point_value(v, "anchor")?;
+        let leader = ae::leader_to(&t.m.pick(&Tool::GdtLeader { id }, &[], p), p);
+        ae::add_leader(&mut t.d.sheets[sheet], id, leader, start);
+    }
     done(od, t, "Geometric tolerance", "annotation", id)
 }
 

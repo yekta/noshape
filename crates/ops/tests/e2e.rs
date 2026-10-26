@@ -1346,6 +1346,11 @@ fn drawing_callouts_ordinates_and_datums() {
     let g = call(&mut ctx, "drawing_gdt", json!({ "drawing": tab, "position": [60, 60], "rows": [{ "symbol": "position", "before": "Ø", "tolerance": "0.1", "datums": ["A", "B"] }] }));
     assert_eq!(kind_of(&mut ctx, g["annotation"].as_u64().unwrap()), "Gdt");
     assert!(last(&mut ctx).ends_with(":: Geometric tolerance"));
+    // With `anchor`: its leader goes to the geometry, as clicking it first does.
+    let ga = call(&mut ctx, "drawing_gdt", json!({ "drawing": tab, "position": [70, 70], "anchor": a0, "rows": [{ "symbol": "flatness", "tolerance": "0.05" }] }));
+    let gid = ga["annotation"].clone();
+    let ann = ga["annotations"].as_array().unwrap().iter().find(|x| x["id"] == gid).unwrap().clone();
+    assert!(ann.to_string().contains("leader"), "{ann}");
     let e = try_call(&mut ctx, "drawing_gdt", json!({ "drawing": tab, "position": [60, 60], "rows": [{ "symbol": "wobble" }] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("rows[0].symbol"), "{e:?}");
 
@@ -2904,7 +2909,11 @@ fn drawing_table_menu_edits() {
 
     // A BOM table: type and order; no cell formats.
     let bt = call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "bom", "view": base, "position": [20, 280] }));
+    // Its top right corner at x 20: off the sheet, and the reply says so.
+    assert!(bt["warning"].as_str().is_some_and(|w| w.contains("TopRight")), "{bt}");
     let bid = bt["table"].clone();
+    let t0 = table(&mut ctx, &bid);
+    assert_eq!(t0["row_names"].as_array().map(|l| l.len()), t0["rows"].as_array().map(|l| l.len()), "a part name per row: {t0}");
     call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "bom_type", "to": "structured" }));
     assert_eq!(last(&mut ctx), "BOM type");
     call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "order", "to": "bottom_to_top" }));

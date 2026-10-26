@@ -293,7 +293,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("drawing_revision_callout", &[r##"{"drawing": "Part 1 Drawing 1", "position": [100, 100], "revision": "B"}"##]),
     ("drawing_table", &[r##"{"drawing": "Part 1 Drawing 1", "position": [20, 280], "rows": 3, "columns": 2, "header_row": true}"##]),
     ("drawing_table_cell", &[r##"{"drawing": "Part 1 Drawing 1", "table": 5, "row": 0, "column": 0, "text": "Finish"}"##]),
-    ("drawing_view_table", &[r##"{"drawing": "Assembly 1 Drawing 1", "kind": "bom", "view": 3, "position": [20, 280]}"##, r##"{"drawing": "Part 1 Drawing 1", "kind": "hole", "view": 3, "origin": [180, 140], "position": [20, 280]}"##]),
+    ("drawing_view_table", &[r##"{"drawing": "Assembly 1 Drawing 1", "kind": "bom", "view": 3, "position": [410, 287]}"##, r##"{"drawing": "Part 1 Drawing 1", "kind": "hole", "view": 3, "origin": [180, 140], "position": [20, 280]}"##]),
 ];
 
 /// The groups whose every operation must have examples (the coverage test).
