@@ -64,6 +64,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Deleting this tab will result in failed or missing features in 1 tab" and below it one row per affected tab (tab icon +
   name), [Delete] [Cancel] (live part-studio/1584-p9-tab-delete-confirm.png, behaviours "(7) Delete the "qa5 src" tab")
   (qa 2026-10-26, build 4d2f6b0c)
+- [ ] P2 LOFT-PROFILE-LIST Loft dialog with two profiles: ours lists the chips without live's › expander and repeats the
+  names in a second, grey, indented list under the field ("Face of Sketch 2 / Face of Sketch 1",
+  tickets/loft-profiles-ours.png); live: one list, each entry "› Face of Sketch 1 ×" with its chevron, ↑↓ reorder button,
+  nothing below the field (live ui/961-loft-two-profiles.png) (qa 2026-10-26, build 4d2f6b0c)
 
 ## Sketch + assembly (skasm)
 - [ ] P2 P1-4 data (qa5, carried over) sketches keep a hidden construction "Origin stand-in" point at (0,0) carrying the
