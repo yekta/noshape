@@ -57,9 +57,15 @@ pub mod viewport {
     pub const DEBUG_MAGENTA: u32 = 0xff2bc1;
     pub const DEBUG_MAGENTA_POINT: u32 = 0xe224e3;
     pub const ERROR_FILL_ALPHA: f32 = 0.75;
-    /// Construction plane fill (`--os-construction-plane-ambient-color`),
-    /// drawn unlit at 20%: one plane reads `#f5f8fa`, three stacked `#e7edf2`.
-    pub const PLANE_FILL: u32 = 0xcedbe5;
+    /// Construction plane fill (`--os-construction-plane-ambient-color`
+    /// #cedbe5 at 20 %, which the browser blends in sRGB), drawn unlit at
+    /// [`PLANE_FILL_ALPHA`]. Fitted for our linear blending: one plane over
+    /// white reads `#f6f8fa`, three stacked `#e7edf2` (live), and the parts
+    /// behind come out as live's (selection/02: the dark face (111,131,144)
+    /// vs live (104,127,140), was (119,138,149); a selected face's blue 105
+    /// vs live 73, was 114).
+    pub const PLANE_FILL: u32 = 0xc3d2e0;
+    pub const PLANE_FILL_ALPHA: f32 = 0.173;
     /// Construction plane outline (`--os-construction-plane-outline-color`
     /// `#1d60aa` at 35%, which the browser blends in sRGB). Our renderer
     /// blends in linear light, so the fit is this color at
@@ -94,6 +100,7 @@ pub mod viewport {
 pub mod viewport_dark {
     /// Viewport background (`--os-background-primary`).
     pub const BACKGROUND: u32 = 0x333333;
+    pub const PLANE_FILL_ALPHA: f32 = 0.2;
     /// Construction plane fill: `#666` at 20%, which the browser blends in
     /// sRGB; fitted for our linear blending, one plane reads `#3d3d3d` and
     /// three stacked `#4c4c4c` like live.
