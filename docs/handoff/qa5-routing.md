@@ -770,3 +770,10 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   assembly doesn't use. Live: unrelated changes keep it dim; only the drawing's referenced elements count (behaviours
   "qa5 (10-26 p5)"). Cause: crates/model/src/drawing/views.rs `source_hash` for an assembly source hashes **every** Part
   Studio and Assembly tab of the document; it should hash only the tabs the assembly (recursively) instantiates.
+- **P2-A3 — skb (exploded views)** — green af9f1e4c, assembly with one Explode step (pin raised 25 mm). In editing
+  ("Editing Explode 1 [Done]"), **Esc with no dialog open** brings back the full toolbar and removes the banner, but the
+  graphics **stay exploded** and the Explode 1 row keeps its **active look (blue name, left bar) and the rollback bar**. A
+  double-click on Explode 1 then does **not** re-enter editing: it drops to the plain row and the unexploded model. Done
+  works correctly (plain row, unexploded; a double-click re-enters, fully exploded). Live: **Esc = Done** (behaviours
+  "Exploded views: steps, clicks, menus, rollback, Done", skb 10-20, assembly/823, 816, 824). Screens
+  /root/qa5-scratch/run/shots/a28-20/22/23/24.png.

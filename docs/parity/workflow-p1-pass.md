@@ -104,3 +104,9 @@ then edits, undo/redo, rollback and suppress.
 | Shell 2.5 mm, same | OK 8487.861 mm³, 53 faces | OK 8503.961 mm³, 47 faces | ✗ **P1-16** |
 | Mass properties, nothing selected | all parts measured (7178.097 mm³), toast after 3.6 s, hides by itself | field empty, values blank, no toast | ✗ **P1-17** (ui) |
 | Assembly drawing after an unrelated STEP import | Update ⟳ bright | stays dim (only referenced elements count) | ✗ **P2-D2** (ui2) |
+| Exploded views panel, Add exploded view | 712 px panel; "Editing Explode 1 [Done]", toolbar reduced to undo/redo, active row + rollback bar, "Build steps by dragging components" box, footer Add exploded view | same (behaviours 1834) | ✅ |
+| Drag the triad's Z arrow (pin) | "Explode step" dialog: Translation ▾, Instances, ☐ Specify direction, Distance 18.3 mm, ☑ Explode lines, edges field; row "↗ Explode step 1"; info box gone | same | ✅ |
+| Distance `25` + Enter, Enter | 1st applies (pin moves), 2nd accepts | Onshape number fields | ✅ |
+| Done, then double-click Explode 1 | plain row, unexploded; re-enters editing fully exploded | same | ✅ |
+| Step row right-click | Edit… / Rename / — / Delete | same (behaviours 815) | ✅ |
+| Esc with no dialog in explode editing | toolbar back but still exploded, row stays active with the rollback bar; the next double-click leaves instead of re-entering | Esc = Done | ✗ **P2-A3** (skb) |
