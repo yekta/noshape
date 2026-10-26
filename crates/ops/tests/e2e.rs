@@ -14,7 +14,14 @@ fn try_call(ctx: &mut Ctx, tool: &str, args: Value) -> Result<Value, OpError> {
     registry::run(ctx, op, &args).map(|o| o.value)
 }
 
+/// A file of this run's scratch directory. Tests run in parallel: a name
+/// used by two tests would let one overwrite the other's file (flaky), so
+/// that fails here, naming both.
 fn scratch(name: &str) -> std::path::PathBuf {
+    static OWNERS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, String>>> = std::sync::LazyLock::new(Default::default);
+    let me = std::thread::current().name().unwrap_or("?").to_string();
+    let owner = OWNERS.lock().unwrap().entry(name.to_string()).or_insert_with(|| me.clone()).clone();
+    assert_eq!(owner, me, "scratch file `{name}` is used by two tests ({owner} and {me}): give each its own name");
     let dir = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.join(name);
@@ -995,7 +1002,9 @@ fn assembly_named_positions_and_exploded_views() {
     call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disc], "depth": "50 mm", "operationType": "NEW" } }));
     let parts = call(&mut ctx, "query_parts", json!({}));
     let (block, pin) = (parts["parts"][0]["id"].as_str().unwrap().to_string(), parts["parts"][1]["id"].as_str().unwrap().to_string());
-    let b = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": block }))["instance"].as_str().unwrap().to_string();
+    let ins = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": block }));
+    assert_eq!(ins["name"], "Part 1 <1>", "the reply names the new instance: {ins}");
+    let b = ins["instance"].as_str().unwrap().to_string();
     let p = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": pin }))["instance"].as_str().unwrap().to_string();
     call(&mut ctx, "assembly_set_state", json!({ "instances": [b], "fixed": true }));
     let cyl = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "surface": "cylinder" }))["faces"][0]["id"].as_str().unwrap().to_string();
@@ -1081,6 +1090,8 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!(ev["exploded_views"][0]["name"], "Explode 1", "{ev}");
     let st = call(&mut ctx, "assembly_explode_step", json!({ "view": "Explode 1", "instances": [p], "direction": [0, 0, 1], "distance": "30 mm" }));
     assert_eq!(st["steps"], 1, "{st}");
+    // The reply says where the step puts the pin.
+    assert!((num(&st["exploded"][0]["offset"][2]) - 30.0).abs() < 1e-6 && st["exploded"].as_array().unwrap().len() == 1, "{st}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Edit : Explode step");
     call(&mut ctx, "assembly_exploded_view", json!({ "action": "rename", "view": "Explode 1", "name": "Pin out" }));
     assert_eq!(last(&mut ctx), "Assembly 1 :: Rename : Pin out");
