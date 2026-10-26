@@ -2084,16 +2084,21 @@ impl Viewport {
                         self.finish_box(a, b, false, Modifiers::default(), cx);
                     }
                 }
-                A::Tap { count, fingers, center } => {
+                A::Tap { count, fingers, center, exceeding } => {
                     let p = center / s;
+                    // Onshape (`onPointerGesture` TAP): a tap whose finger
+                    // passed the drag threshold clicks nothing; a double tap
+                    // clicks once per tap that didn't; a two-finger tap opens
+                    // the menu only if neither finger did (`isTwoFingerTap`).
                     match (fingers, count) {
-                        (1, 1) => self.click_at(p, Modifiers::default(), cx),
+                        (1, 1) if exceeding == 0 => self.click_at(p, Modifiers::default(), cx),
                         // A double tap is a double click (two clicks in a row).
                         (1, 2) => {
-                            self.click_at(p, Modifiers::default(), cx);
-                            self.click_at(p, Modifiers::default(), cx);
+                            for _ in exceeding..2 {
+                                self.click_at(p, Modifiers::default(), cx);
+                            }
                         }
-                        (2, 1) => {
+                        (2, 1) if exceeding == 0 => {
                             let window_position = point(px(p.x as f32), px(p.y as f32)) + self.bounds.origin;
                             self.context_menu_at(p, window_position, cx);
                         }
