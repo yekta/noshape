@@ -658,6 +658,11 @@ fn linear_part_pattern_new_add_and_skip() {
     t.set(lp, "skippedInstances", ParamValue::Array(vec![item]));
     let res = t.ok();
     assert_eq!(solids(&res.context).len(), 2);
+    // linearPattern.fs TOGGLE_POINTS: the seed's box centre and each
+    // instance's, 20 mm apart along x, instance 1 shown skipped.
+    let pts = &res.display.features.last().unwrap().toggle_points;
+    assert_eq!(pts.iter().map(|p| (p.index, p.seed, p.selected)).collect::<Vec<_>>(), vec![((0, 0), true, false), ((1, 0), false, true), ((2, 0), false, false)]);
+    assert!(near(pts[2].pos[0] - pts[0].pos[0], 0.04, 1e-9));
     // Add with overlapping instances merges into one part.
     t.set(lp, "skipInstances", b(false));
     t.set(lp, "distance", e("5 mm"));

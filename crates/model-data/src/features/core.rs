@@ -185,7 +185,7 @@ pub fn fillet() -> FeatureType {
                 ParamSpec::num("variableMagnitude", "Magnitude", NumSpec::real(0.5, 0.0, 0.99999)).hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.is("crossSection", "CURVATURE")),
             ],
         )
-        .hints(Hints::DRIVEN_QUERY)
+        .hints(Hints::DRIVEN_QUERY | Hints::PREVENT_ARRAY_REORDER)
         .item_template("[#vertexRadius] #vertex")
         .visible(variable),
         ParamSpec::array(
@@ -204,6 +204,7 @@ pub fn fillet() -> FeatureType {
             ],
         )
         .item_template("[#pointOnEdgeRadius] #edge")
+        .hints(Hints::PREVENT_ARRAY_REORDER)
         .visible(variable),
         ParamSpec::bool("smoothTransition", "Smooth transition", false).visible(variable),
         ParamSpec::bool("allowEdgeOverflow", "Allow edge overflow", true).hints(Hints::GROUP_HEADER).visible(not_curvature),

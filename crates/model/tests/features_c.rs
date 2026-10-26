@@ -1454,6 +1454,20 @@ fn failed_extrude_reads_onshape_text() {
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Failed to extrude selections, check input.".to_string()));
 }
 
+/// sweep.fs: "Lock profile direction" checks its direction before the
+/// wall and the path (live p1audit sweep-lockdir: "Direction to lock" pink).
+#[test]
+fn sweep_checks_the_lock_direction_first() {
+    for body in ["SOLID", "THIN"] {
+        let mut s = block();
+        s.add("sweep", move |p| {
+            p.set("bodyType", en(body));
+            p.set("profileControl", en("LOCK_DIRECTION"));
+        });
+        assert_eq!(s.last_status(), (FeatureStatus::Error, "Select direction to lock.".to_string()));
+    }
+}
+
 /// sweep.fs: a thin sweep checks its wall before the path.
 #[test]
 fn thin_sweep_checks_the_wall_first() {

@@ -215,7 +215,7 @@ pub fn loft() -> FeatureType {
         ("endCondition", "adjacentFacesEnd", "endMagnitude", "endDirection", ["End profile condition", "End magnitude", "End direction"]),
     ] {
         p.push(ParamSpec::enum_(cond, label[0], LOFT_END_CONDITION).hints(Hints::SHOW_LABEL).visible(ends));
-        p.push(ParamSpec::query(faces, "Adjacent faces", QueryFilter::ANY_FACE).visible(move |v| ends(v) && is_match_condition(v.enum_(cond))));
+        p.push(ParamSpec::query(faces, "Adjacent faces", QueryFilter::ANY_FACE).hints(Hints::FOCUS_ON_VISIBLE).visible(move |v| ends(v) && is_match_condition(v.enum_(cond))));
         p.push(ParamSpec::num(mag, label[1], CLAMP_MAGNITUDE).visible(move |v| ends(v) && !v.is(cond, "DEFAULT")));
         p.push(ParamSpec::query1(dir, label[2], QueryFilter::DIRECTION).visible(move |v| ends(v) && is_direction_condition(v.enum_(cond))));
     }
@@ -234,12 +234,12 @@ pub fn loft() -> FeatureType {
             ],
         )
         .item_template("#guideEntities")
-        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
+        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY | Hints::FOCUS_ON_VISIBLE)
         .visible(|v| v.bool("addGuides")),
     );
     p.push(ParamSpec::bool("trimGuidesByProfiles", "Trim guides", true).visible(|v| v.bool("addGuides") && !v.is("bodyType", "SOLID")));
     p.push(ParamSpec::bool("addSections", "Path", false));
-    p.push(ParamSpec::query("spine", "Edges, curves and sketches", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY).visible(|v| v.bool("addSections")));
+    p.push(ParamSpec::query("spine", "Edges, curves and sketches", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY).hints(Hints::FOCUS_ON_VISIBLE).visible(|v| v.bool("addSections")));
     p.push(ParamSpec::num("sectionCount", "Section count", NumSpec::integer(5, 1, 50)).visible(|v| v.bool("addSections")));
     p.push(ParamSpec::bool("matchConnections", "Connections", false).hints(Hints::GROUP_HEADER));
     p.push(
@@ -255,7 +255,7 @@ pub fn loft() -> FeatureType {
             ],
         )
         .item_template("#connectionEntities")
-        .hints(Hints::DRIVEN_QUERY)
+        .hints(Hints::DRIVEN_QUERY | Hints::FOCUS_ON_VISIBLE)
         .visible(|v| v.bool("matchConnections")),
     );
     p.push(ParamSpec::bool("showIsocurves", "Show isocurves", false));
