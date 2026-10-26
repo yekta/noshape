@@ -139,13 +139,15 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         .iter()
         .map(|b| {
             let d = r.display.body(&b.id);
+            let shown = b.shape.shown_topology().unwrap_or_default();
             let mut v = json!({
                 "id": refs::body_id(&b.id),
                 "name": d.map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone()),
                 "kind": format!("{:?}", b.kind),
                 "faces": b.shape.count(ShapeType::Face),
-                "edges": b.shape.count(ShapeType::Edge),
-                "vertices": b.shape.count(ShapeType::Vertex),
+                // Onshape's topology: no seams, no vertices on full circles.
+                "edges": shown.edges.iter().filter(|&&e| e).count(),
+                "vertices": shown.vertices.iter().filter(|&&v| v).count(),
                 "hidden": d.is_some_and(|d| d.hidden),
             });
             if let Ok(vol) = b.shape.volume()
@@ -367,7 +369,12 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 }
             }
             "edges" => {
+                // Onshape's edges only (no seams or degenerated edges).
+                let shown = b.shape.shown_topology().unwrap_or_default();
                 for i in 0..b.edges.len() {
+                    if !shown.edges.get(i).copied().unwrap_or(true) {
+                        continue;
+                    }
                     if created_by.is_some_and(|f| b.edges[i].creator() != Some(f) && !edge_touches(&b.edges[i], f)) {
                         continue;
                     }
@@ -386,7 +393,12 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 }
             }
             "vertices" => {
+                // Onshape's vertices only (none at seam ends or on full circles).
+                let shown = b.shape.shown_topology().unwrap_or_default();
                 for i in 0..b.vertices.len() {
+                    if !shown.vertices.get(i).copied().unwrap_or(true) {
+                        continue;
+                    }
                     let Ok(vx) = b.shape.sub_shape(ShapeType::Vertex, i) else { continue };
                     let Ok(p) = vx.vertex_point() else { continue };
                     let v = json!({ "id": refs::to_id(&Reference::Vertex((*b.vertices[i]).clone())), "part": refs::body_id(&b.id), "position": pt(p, k) });

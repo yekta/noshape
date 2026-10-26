@@ -691,13 +691,15 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         .filter(|&bi| probes.iter().any(|(s, dir)| ray_intervals(&ev.ctx.bodies[bi].shape, *s, -*dir, back).iter().any(|(a, b)| *b > 1e-9 && *a < back)))
         .map(|i| ev.ctx.bodies[i].id.clone())
         .collect();
-    if !any_hit {
-        return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
-    }
     // Live L56: an empty Merge scope is an error (the dialog fills it with
-    // the parts reached). Holes saved before that cut every part.
+    // the parts reached), checked before the holes (std produceHoles'
+    // HOLE_EMPTY_SCOPE; live oracle_p1 H7: off the part, empty scope). Holes
+    // saved before that cut every part.
     if explicit_scope.is_empty() && !ev.params.bool("legacyAllParts") {
         return crate::regen::eval::err_at(&["scope"], "No target parts selected for hole.");
+    }
+    if !any_hit {
+        return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
     }
     // Live L53: a location that makes no hole fails the whole feature.
     if missed > 0 {

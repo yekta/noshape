@@ -43,6 +43,9 @@ pub fn err<T>(m: impl Into<String>) -> FResult<T> {
 /// An error caused by the given parameters (see [`FeatureError::faulty`]).
 /// The prefix of a kernel failure's message (`From<KernelError>`).
 pub const KERNEL_FAILURE: &str = "Geometry operation failed: ";
+/// Onshape's infos for an Add / Remove that leaves its merge scope as it was.
+pub const NO_GEOMETRY_CHANGE: &str = "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.";
+pub const TOOLS_MISS_TARGETS: &str = "Selected tools and targets do not intersect.";
 
 pub fn err_at<T>(faulty: &[&'static str], m: impl Into<String>) -> FResult<T> {
     Err(FeatureError { faulty: faulty.to_vec(), ..FeatureError::new(m) })
@@ -781,7 +784,22 @@ impl<'a> EvalCtx<'a> {
                 };
                 // Many tools (pattern instances): the many-tools options.
                 let opts = if tools.len() >= 8 { Self::many_tools_options() } else { k::BooleanOptions::default() };
-                self.boolean_into_with(&targets, tools, bop, &opts)
+                let before: Vec<(BodyId, f64)> = if kind == BodyKind::Solid && op != "INTERSECT" {
+                    targets.iter().map(|&i| (self.ctx.bodies[i].id.clone(), self.ctx.bodies[i].shape.volume().unwrap_or(0.0))).collect()
+                } else {
+                    Vec::new()
+                };
+                self.boolean_into_with(&targets, tools, bop, &opts)?;
+                // Every part in the merge scope as it was: Onshape's infos
+                // (live oracle_p1 E9/E11/E12: a tool inside the part or apart
+                // from it, the latter kept as its own part; E13: a cut that
+                // misses).
+                let unchanged = !before.is_empty()
+                    && before.iter().all(|(id, v)| self.ctx.bodies.iter().find(|b| &b.id == id).and_then(|b| b.shape.volume().ok()).is_some_and(|after| (after - v).abs() <= 1e-9 * v.abs().max(1e-12)));
+                if unchanged {
+                    self.infos.push(if op == "ADD" { NO_GEOMETRY_CHANGE } else { TOOLS_MISS_TARGETS }.into());
+                }
+                Ok(())
             }
             other => err(format!("Unknown operation {other}")),
         }

@@ -85,6 +85,19 @@ pub fn set_angle_display_mesh(angle: bool) {
     DISPLAY_MESH.store(if angle { 2 } else { 1 }, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// Which of `shape`'s vertices Onshape's topology has (none at seam ends or
+/// on full circles: [`noshape_kernel::Shape::shown_topology`]), in MapShapes
+/// order. Display meshes and vertex references keep only those, together.
+pub fn shown_vertices(shape: &noshape_kernel::Shape) -> Vec<bool> {
+    shape.shown_topology().map(|t| t.vertices).unwrap_or_default()
+}
+
+/// `items` (one per vertex, MapShapes order) without the vertices Onshape
+/// hasn't (all of them when `shown` is empty).
+pub fn keep_shown<T>(items: impl IntoIterator<Item = T>, shown: &[bool]) -> Vec<T> {
+    items.into_iter().enumerate().filter(|(i, _)| shown.get(*i).copied().unwrap_or(true)).map(|(_, x)| x).collect()
+}
+
 /// Tessellates one body shape at an angle factor relative to Auto (smaller
 /// = finer, [`display_deflection`]), e.g. for an assembly instance's "Use
 /// best available tessellation".
@@ -98,7 +111,7 @@ pub fn tessellate_shape(shape: &noshape_kernel::Shape, quality: f64) -> Option<M
             positions: t.positions,
             normals: t.normals,
             indices: t.indices,
-            vertices: t.vertices,
+            vertices: keep_shown(t.vertices, &shown_vertices(shape)),
             mesh_lines: Vec::new(),
         }
         .with_mesh_lines(shape),
@@ -161,7 +174,7 @@ fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts
                 positions: t.positions,
                 normals: t.normals,
                 indices: t.indices,
-                vertices: t.vertices,
+                vertices: keep_shown(t.vertices, &shown_vertices(shape)),
                 mesh_lines: Vec::new(),
             }
             .with_mesh_lines(shape),
@@ -466,7 +479,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             levels_from,
             face_refs: b.faces.iter().map(|n| Reference::Face((**n).clone())).collect(),
             edge_refs: b.edges.iter().map(|n| Reference::Edge((**n).clone())).collect(),
-            vertex_refs: b.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
+            vertex_refs: keep_shown(b.vertices.iter().map(|n| Reference::Vertex((**n).clone())), &shown_vertices(&b.shape)),
             bounds,
             composite: b.composite.clone(),
             is_mesh: b.shape.is_mesh(),

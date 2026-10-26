@@ -517,7 +517,8 @@ fn revolve_up_to_vertex_face_and_next() {
     assert!(names.iter().any(|n| format!("{n:?}").contains("CapEnd")), "{names:?}");
 
     // Up to next: a wall block at -X stops the revolve at 180 degrees... and
-    // a second end blind 45 degrees backwards.
+    // a blind second end position at 45 degrees, the start of the sweep
+    // (std revolve.fs, live oracle_p1 R4).
     let mut t = T::new();
     t.block(-0.03, -0.001, -0.005, 0.001, "20 mm");
     let rv = setup(&mut t);
@@ -528,9 +529,9 @@ fn revolve_up_to_vertex_face_and_next() {
     let res = t.ok();
     let rbody = res.context.bodies.iter().find(|b| b.id.feature == rv).unwrap();
     let v = rbody.shape.volume().unwrap();
-    // 0 .. ~(180 - asin(1/r)) degrees plus 45 back: between 3/4 and 1 of a half turn + 45.
+    // 45 .. ~(180 - asin(1/r)) degrees.
     let full = PI * (0.02f64.powi(2) - 0.01f64.powi(2)) * 0.01;
-    assert!(v > full * (170.0 + 45.0) / 360.0 && v < full * (180.0 + 45.0) / 360.0, "{v} vs {full}");
+    assert!(v > full * (170.0 - 45.0) / 360.0 && v < full * (180.0 - 45.0) / 360.0, "{v} vs {full}");
 }
 
 // ------------------------------------------------------------------ query variables

@@ -554,18 +554,10 @@ fn revolve_cases() -> Vec<(&'static str, Studio)> {
 /// Differences reported to their owners (case, owner and what differs);
 /// remove a line once it matches.
 const KNOWN: &[(&str, &str)] = &[
-    ("E9", "psb: an Add that changes nothing ends with INFO \"Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.\" (ours OK)"),
-    ("E11", "psb: as E9 (Up to part)"),
-    ("E12", "psb: as E9 (start offset, the boss doesn't touch the part)"),
-    ("E13", "psb: a Remove that misses its scope ends with INFO \"Selected tools and targets do not intersect.\" (ours OK)"),
-    ("R4", "psb: Second end position is a start angle in the same direction (45° to 90°: 3534.29 mm³); ours sweeps 45° the other way (135°)"),
-    ("R5", "psb: Thin revolve wall side follows the loop direction (live fs 10-25 j): counter-clockwise in sketch coordinates inside, clockwise outside (Thin extrude: closed loops always outside, open chains right of travel); this CCW rectangle: live inside 10178.76 mm³, ours outside 12440.71"),
     ("F2", "kern: R5 on the 4 top edges, corner blends: ours 46974.930 mm³ / 8356.638 mm², live 46976.458 / 8356.751"),
     ("F4", "kern: variable fillet R2 → R6 along the edge: ours 47776.798 mm³, live 47776.692"),
     ("F5", "kern: conic fillet width 5, rho 0.7: ours 47945.138 mm³ / 8747.291 mm², live 47945.028 / 8747.516"),
     ("F6", "kern: curvature (G2) fillet R5, magnitude 0.5: ours 47755.024 mm³ / 8678.783 mm², live 47754.935 / 8679.694"),
-    ("F7", "psb: R25 with Allow edge overflow OFF: live 40608.859 mm³ / 7938.092 mm² (6 faces), ours 40002.735 / 7857.276, the overflow-on result"),
-    ("H7", "psb: a hole off the part with an empty Merge scope: live \"No target parts selected for hole.\" (HOLE_EMPTY_SCOPE), ours \"None of the holes intersected a part.\""),
 ];
 
 /// Live's results (results-*.jsonl): case, status, text, volume, faces, area, parts.

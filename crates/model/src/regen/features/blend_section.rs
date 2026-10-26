@@ -44,6 +44,9 @@ pub struct BlendSpec {
     pub partial: Option<Partial>,
     /// Run on past ends that continue tangentially into unselected edges.
     pub run_on: bool,
+    /// Allow edge overflow off: a ball wider than a face rests on that face's
+    /// far edge (the cliff) instead (live oracle_p1 F7).
+    pub cliff: bool,
 }
 
 /// A partial fillet bound along the selected chain (position 0 = the chain's
@@ -170,6 +173,8 @@ pub fn check_partial(shape: &Shape, edges: &[usize], p: &Partial) -> FResult<()>
 struct Frame {
     u: [DVec3; 2],
     m: [DVec3; 2],
+    /// How far each face reaches from the edge along `u` (infinite: unknown).
+    extent: [f64; 2],
 }
 
 fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f64) -> FResult<Frame> {
@@ -195,7 +200,7 @@ fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f
             return Err(fail("could not orient a face at the edge"));
         }
     }
-    Ok(Frame { u, m })
+    Ok(Frame { u, m, extent: [f64::INFINITY; 2] })
 }
 
 /// The section face at `p` (2D region between the corner, the tangent points
@@ -216,6 +221,31 @@ fn section_face(p: DVec3, f: &Frame, spec: &BlendSpec) -> FResult<(Shape, [Shape
         None => (spec.r1 * half.tan(), spec.r2 * half.tan()),
     };
     let (t1, t2) = (p + f.u[0] * s1, p + f.u[1] * s2);
+    // A ball wider than a face: tangent to the other face, through the
+    // cliff (that face's far edge).
+    if spec.cliff && matches!(spec.section, Section::Circular) && (s1 - s2).abs() <= 1e-12 * s1.max(s2) && (s1 > f.extent[0] || s2 > f.extent[1]) {
+        let i = if s1 > f.extent[0] { 0 } else { 1 };
+        let j = 1 - i;
+        if [s1, s2][j] > f.extent[j] {
+            return Err(fail("the fillet is wider than both faces"));
+        }
+        let r = s1 / half.tan();
+        let cliff = p + f.u[i] * f.extent[i];
+        let w = if convex { f.m[j] } else { -f.m[j] } * r;
+        let v = w - f.u[i] * f.extent[i];
+        let b = f.u[j].dot(v);
+        let disc = b * b - v.length_squared() + r * r;
+        let s = if disc >= 0.0 { [-b + disc.sqrt(), -b - disc.sqrt()].into_iter().filter(|s| *s > 0.0 && *s <= [s1, s2][j] * (1.0 + 1e-9)).fold(f64::NAN, f64::max) } else { f64::NAN };
+        if !s.is_finite() {
+            return Err(fail("no cliff fillet fits"));
+        }
+        let t = p + f.u[j] * s;
+        let c = t + w;
+        let arc = k::make_arc_3pts(t, c + ((t - c) + (cliff - c)).normalize() * r, cliff)?;
+        let edges = if j == 0 { [k::make_line(p, t)?, arc, k::make_line(cliff, p)?] } else { [k::make_line(p, cliff)?, arc, k::make_line(t, p)?] };
+        let wire = k::make_wire(&edges)?;
+        return Ok((k::make_face_from_wire(&wire, true)?, edges, convex));
+    }
     let curve = match spec.section {
         Section::Circular if (s1 - s2).abs() <= 1e-12 * s1.max(s2) => {
             let r = s1 / half.tan();
@@ -409,14 +439,17 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         let (tool, names, convex) = match &info.curve {
             k::Curve::Line { .. } => {
                 let d = (c.end - c.start).normalize();
-                let fr = frame_at(shape, ff, c.start + d * ((a + b) / 2.0), d, scale)?;
-                // The ball must touch both faces within them (otherwise Onshape fails too).
+                let mut fr = frame_at(shape, ff, c.start + d * ((a + b) / 2.0), d, scale)?;
+                // The ball must touch both faces within them (otherwise Onshape
+                // fails too), or rest on a face's far edge with overflow off.
                 let half = fr.m[0].dot(fr.m[1]).clamp(-1.0, 1.0).acos() / 2.0;
-                for (fi, r) in ff.iter().zip([spec.r1, spec.r2]) {
+                for (k, (fi, r)) in ff.iter().zip([spec.r1, spec.r2]).enumerate() {
                     let setback = spec.width.map(|w| w / (2.0 * half.cos())).unwrap_or(r * half.tan());
                     let line_dist = |q: DVec3| (q - c.start - d * (q - c.start).dot(d)).length();
                     let width = fi.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(line_dist).fold(0.0, f64::max);
-                    if width < setback * (1.0 - 1e-9) {
+                    if spec.cliff {
+                        fr.extent[k] = width;
+                    } else if width < setback * (1.0 - 1e-9) {
                         return Err(fail("the fillet is wider than a face"));
                     }
                 }
@@ -459,7 +492,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                 // Frame at p0: rotate the mid frame back.
                 let back = (f0 - (f0 + f1) / 2.0) * span - g0;
                 let rot = |v: DVec3| glam::DQuat::from_axis_angle(ax, back) * v;
-                let fr0 = Frame { u: [rot(fr.u[0]), rot(fr.u[1])], m: [rot(fr.m[0]), rot(fr.m[1])] };
+                let fr0 = Frame { u: [rot(fr.u[0]), rot(fr.u[1])], m: [rot(fr.m[0]), rot(fr.m[1])], extent: fr.extent };
                 let (face, edges3, convex) = section_face(p0, &fr0, spec)?;
                 let mut angle = (f1 - f0) * span + g0 + g1;
                 // A closed circle (live K3: a conic on a Ø20 boss's top edge) is

@@ -1027,7 +1027,7 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
         levels_from: 0,
         face_refs: region_refs,
         edge_refs: body.edges.iter().map(|n| Reference::Edge((**n).clone())).collect(),
-        vertex_refs: body.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
+        vertex_refs: crate::regen::keep_shown(body.vertices.iter().map(|n| Reference::Vertex((**n).clone())), &crate::regen::shown_vertices(&body.shape)),
         bounds,
         composite: None,
         is_mesh: false,
