@@ -2170,3 +2170,144 @@ fn sheet_metal_loft_add_bends_onto_the_plate() {
     let data = r.context.sheet_metal.get(&b.id).unwrap();
     assert_eq!((data.walls.len(), data.bends.len()), (2, 1));
 }
+
+/// Face blends on an L bracket (a 40 × 5 base and a wall leaning at `angle`
+/// to it, 30 deep) as live (psb 10-26 b): volumes, the blend face's type
+/// and where it touches each side (x, z in mm).
+#[test]
+fn face_blend_variants_as_live() {
+    use noshape_kernel::Surface;
+    let s3 = 3f64.sqrt();
+    // (case, angle, params, live volume mm³, blend face: 'c' cylinder, 'p' plane, 's' spline, live touch points)
+    type Case = (&'static str, u32, &'static [(&'static str, &'static str)], f64, char, [(f64, f64); 2]);
+    let cases: &[Case] = &[
+        ("FB1", 90, &[("asymmetric", "true"), ("secondRadius", "6 mm")], 9904.440680582753, 's', [(11.0, 5.0), (5.0, 9.0)]),
+        ("FB1s", 90, &[("asymmetric", "true"), ("secondRadius", "6 mm"), ("switchAsymmetric", "true")], 9904.275085834035, 's', [(9.0, 5.0), (5.0, 11.0)]),
+        ("FB2a", 90, &[("crossSectionShape", "CONIC"), ("rho", "0.5")], 9830.006692532796, 's', [(9.0, 5.0), (5.0, 9.0)]),
+        ("FB2b", 90, &[("crossSectionShape", "CONIC"), ("rho", "0.8")], 9768.217268772429, 's', [(9.0, 5.0), (5.0, 9.0)]),
+        ("FB3", 90, &[("crossSectionShape", "CURVATURE"), ("magnitude", "0.5")], 9828.421602052736, 's', [(9.0, 5.0), (5.0, 9.0)]),
+        ("FB3b", 90, &[("crossSectionShape", "CURVATURE"), ("magnitude", "0.2")], 9917.298277252374, 's', [(9.0, 5.0), (5.0, 9.0)]),
+        ("FB4", 90, &[("blendControlType", "WIDTH"), ("width", "6 mm")], 9865.884991765379, 'c', [(9.2426407, 5.0), (5.0, 9.2426407)]),
+        ("FB4r", 90, &[("blendControlType", "WIDTH"), ("width", "6 mm"), ("asymmetric", "true"), ("widthRatio", "1.5")], 9856.776031419187, 's', [(8.3282012, 5.0), (5.0, 9.9923018)]),
+        ("FB5", 90, &[("crossSectionShape", "CHAMFER")], 9990.0, 'p', [(9.0, 5.0), (5.0, 9.0)]),
+        ("A135_G1", 135, &[], 8260.326950723696, 'c', [(6.6568542, 5.0), (3.8284271, 6.1715729)]),
+        ("A135_G4", 135, &[("crossSectionShape", "CURVATURE"), ("magnitude", "0.5")], 8259.549952527617, 's', [(6.6568542, 5.0), (3.8284271, 6.1715729)]),
+        ("A135_G5", 135, &[("crossSectionShape", "CONIC"), ("rho", "0.8")], 8252.217828529532, 's', [(6.6568542, 5.0), (3.8284271, 6.1715729)]),
+        ("A135_G6", 135, &[("crossSectionShape", "CHAMFER")], 8279.116882454315, 'p', [(6.6568542, 5.0), (3.8284271, 6.1715729)]),
+        ("A135_G7", 135, &[("blendControlType", "WIDTH"), ("width", "6 mm")], 8289.66571712116, 'c', [(8.2471766, 5.0), (2.7038994, 7.2961006)]),
+        ("A60_G1", 60, &[], 8926.805774412007, 'c', [(11.9282032, 5.0), (8.4641016, 11.0)]),
+        ("A60_G2", 60, &[("asymmetric", "true"), ("secondRadius", "6 mm")], 9109.366306219343, 's', [(14.2376043, 5.0), (9.0414519, 12.0)]),
+        ("A60_G2s", 60, &[("asymmetric", "true"), ("secondRadius", "6 mm"), ("switchAsymmetric", "true")], 9109.356781369284, 's', [(13.0829038, 5.0), (9.6188022, 13.0)]),
+        ("A60_G3", 60, &[("blendControlType", "WIDTH"), ("width", "6 mm"), ("asymmetric", "true"), ("widthRatio", "1.5")], 8840.266392326057, 's', [(10.5630359, 5.0), (8.1788777, 10.5059776)]),
+        ("A60_G4", 60, &[("crossSectionShape", "CURVATURE"), ("magnitude", "0.5")], 8801.814807214252, 's', [(11.9282032, 5.0), (8.4641016, 11.0)]),
+        ("A60_G5", 60, &[("crossSectionShape", "CONIC"), ("rho", "0.8")], 8645.079765214492, 's', [(11.9282032, 5.0), (8.4641016, 11.0)]),
+        ("A60_G6", 60, &[("crossSectionShape", "CHAMFER")], 9221.614502078108, 'p', [(11.9282032, 5.0), (8.4641016, 11.0)]),
+        ("A60_G7", 60, &[("blendControlType", "WIDTH"), ("width", "6 mm")], 8844.623383647333, 'c', [(11.0, 5.0), (8.0, 10.1961524)]),
+    ];
+    let bracket = |angle: u32| -> (Studio, (f64, f64)) {
+        let (poly, wall): (Vec<(f64, f64)>, (f64, f64)) = match angle {
+            90 => (vec![(0.0, 0.0), (40.0, 0.0), (40.0, 5.0), (5.0, 5.0), (5.0, 30.0), (0.0, 30.0)], (5.0, 17.5)),
+            135 => (vec![(0.0, 0.0), (40.0, 0.0), (40.0, 5.0), (5.0, 5.0), (-10.0, 20.0), (-15.0, 20.0), (0.0, 5.0)], (-2.5, 12.5)),
+            _ => (vec![(0.0, 0.0), (40.0, 0.0), (40.0, 5.0), (5.0, 5.0), (15.0, 5.0 + 10.0 * s3), (10.0, 5.0 + 10.0 * s3), (0.0, 5.0)], (10.0, 5.0 + 5.0 * s3)),
+        };
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &poly, true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("30 mm"));
+        });
+        (s, wall)
+    };
+    // The planar face whose centroid is at (x, z) mm.
+    let face_xz = |r: &RegenResult, x: f64, z: f64| -> Reference {
+        let b = &r.context.bodies[0];
+        let i = b.shape.faces().iter().position(|f| f.is_planar() && {
+            let c = f.centroid().unwrap();
+            (c.x - mm(x)).abs() < 1e-9 && (c.z - mm(z)).abs() < 1e-9
+        });
+        Reference::Face((*b.faces[i.unwrap_or_else(|| panic!("no face at x {x} z {z}"))]).clone())
+    };
+    let blend = |s: &mut Studio, wall: (f64, f64), ps: &[(&'static str, &'static str)]| {
+        let r = s.ok();
+        let (side1, side2) = (face_xz(&r, 22.5, 5.0), face_xz(&r, wall.0, wall.1));
+        let ps = ps.to_vec();
+        s.add("faceBlend", move |p| {
+            p.set("side1", q(side1));
+            p.set("side2", q(side2));
+            p.set("radius", expr("4 mm"));
+            for (k, v) in ps {
+                match v {
+                    "true" | "false" => p.set(k, ParamValue::Bool(v == "true")),
+                    _ if v.chars().next().is_some_and(|c| c.is_ascii_uppercase()) => p.set(k, en(v)),
+                    _ => p.set(k, expr(v)),
+                }
+            }
+        });
+    };
+    for &(case, angle, ps, live, kind, touch) in cases {
+        let (mut s, wall) = bracket(angle);
+        eprintln!("DBG case {case}");
+        blend(&mut s, wall, ps);
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let v = volume(&r, 0) * 1e9;
+        // Live's mass properties of spline faces are approximate (FB1 and its
+        // mirror FB1s differ by 0.17 mm³); planes and cylinders agree exactly.
+        let tol = if kind == 's' { 0.25 } else { 1e-6 };
+        assert!(near(v, live, tol), "{case}: volume {v} vs live {live}");
+        let faces = b.shape.faces();
+        assert_eq!(faces.len(), if angle == 90 { 9 } else { 10 }, "{case}: faces");
+        let curved: Vec<Surface> = faces.iter().filter(|f| !f.is_planar()).map(|f| f.face_surface().unwrap()).collect();
+        match kind {
+            'p' => assert!(curved.is_empty(), "{case}: {curved:?}"),
+            'c' => assert!(curved.len() == 1 && matches!(curved[0], Surface::Cylinder { .. }), "{case}: {curved:?}"),
+            _ => assert!(curved.len() == 1 && !matches!(curved[0], Surface::Cylinder { .. }), "{case}: {curved:?}"),
+        }
+        for (x, z) in touch {
+            let hit = b.shape.vertices().iter().any(|v| {
+                let p = v.vertex_point().unwrap();
+                (p.x - mm(x)).abs() < 1e-9 && (p.z - mm(z)).abs() < 1e-9
+            });
+            assert!(hit, "{case}: no vertex at x {x} z {z}");
+        }
+    }
+    // Live: asymmetric at 135° puts a touch point behind the corner.
+    for ps in [&[("asymmetric", "true"), ("secondRadius", "6 mm")][..], &[("blendControlType", "WIDTH"), ("width", "6 mm"), ("asymmetric", "true"), ("widthRatio", "1.5")][..]] {
+        let (mut s, wall) = bracket(135);
+        blend(&mut s, wall, ps);
+        assert_eq!(s.last_status(), (FeatureStatus::Error, "Provided dimension is too small.".to_string()));
+    }
+    // Live FB6: sides on different parts.
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 5.0), (0.0, 5.0)], true);
+    polyline(&mut sk, &[(20.0, 10.0), (25.0, 10.0), (25.0, 30.0), (20.0, 30.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let r = s.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == sid).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: sid, key: g.key.clone() }).collect();
+    s.add("extrude", move |p| {
+        p.set("entities", ParamValue::Query(regions));
+        p.set("depth", expr("30 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 2);
+    let at = |bi: usize, x: f64, z: f64| {
+        let b = &r.context.bodies[bi];
+        let i = b.shape.faces().iter().position(|f| {
+            let c = f.centroid().unwrap();
+            (c.x - mm(x)).abs() < 1e-9 && (c.z - mm(z)).abs() < 1e-9
+        });
+        i.map(|i| Reference::Face((*b.faces[i]).clone()))
+    };
+    let side1 = at(0, 20.0, 5.0).or_else(|| at(1, 20.0, 5.0)).unwrap();
+    let side2 = at(0, 20.0, 20.0).or_else(|| at(1, 20.0, 20.0)).unwrap();
+    s.add("faceBlend", move |p| {
+        p.set("side1", q(side1));
+        p.set("side2", q(side2));
+        p.set("radius", expr("6 mm"));
+    });
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Cannot attach blended face. Select \"Detach\" to create a separate surface.".to_string()));
+}
