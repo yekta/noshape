@@ -87,3 +87,5 @@ then edits, undo/redo, rollback and suppress.
 | View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |
 | Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ |
 | Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ |
+| Group dialog (assembly) | one "Instances" field | same (behaviours 1333) | ✅ |
+| Split of an inserted part in the Part Studio | the halves are new parts (ids from Split, renamed Part 6 / 7, others renumbered); the assembly instance of the old part fails "Failed to resolve instance." and its mate / pattern error | live Split re-identifies the same way (old id gone, halves new, renumbered; behaviours "qa5 (10-25 p3)" Split) | ✅ (consistent) |
