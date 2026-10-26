@@ -817,11 +817,13 @@ impl AssemblyView {
         .into_any_element()
     }
 
-    /// A new pattern whose dialog can't make it yet (live qa5 A19: an empty
-    /// Replicate is listed red, "Replicate 1", with an error badge).
+    /// A new pattern's row while its dialog is open: listed at once (live
+    /// "(6) Patterns": "The pattern rows appear in the list as soon as the
+    /// dialog opens"), red with an error badge while the dialog can't make
+    /// it yet (live qa5 A19: an empty Replicate, "Replicate 1"; qa5 P2-A7).
     pub(super) fn pending_pattern_row(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let s = self.pattern.as_ref().filter(|s| s.editing.is_none())?;
-        let Err(e) = self.pattern_from_session(s, cx) else { return None };
+        let err = self.pattern_from_session(s, cx).err();
         let pal = p();
         let icon = match s.kind {
             PatternDialogKind::Linear | PatternDialogKind::PartPattern => "linear-pattern",
@@ -837,12 +839,12 @@ impl AssemblyView {
                 .pr_1()
                 .gap_1p5()
                 .text_sm()
-                .text_color(pal.error)
+                .text_color(if err.is_some() { pal.error } else { pal.text })
                 .bg(pal.accent_soft)
                 .child(div().w(px(12.)))
                 .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
                 .child(div().flex_1().truncate().child(crate::ui::user_text(s.name.clone())))
-                .child(div().id("pat-pending-err").size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx)))
+                .when_some(err, |d, e| d.child(div().id("pat-pending-err").size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
                 .into_any_element(),
         )
     }
@@ -886,7 +888,7 @@ impl AssemblyView {
                     })),
             )
             .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
-            .child(div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(crate::ui::user_text(pat.name.clone())))
+            .child(crate::assembly_view::suppressed_text(div().flex_1().truncate(), suppressed).child(crate::ui::user_text(pat.name.clone())))
             .when_some(error, |d, e| d.child(div().id(SharedString::from(format!("pat-err-{}", id.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 let new = if *h { Some(id) } else { None };
@@ -1229,10 +1231,9 @@ impl AssemblyView {
         self.pattern = None;
         let id = pat.id;
         let desc = noshape_ops::assembly::pattern_description(&pat.name, editing);
-        let created = self.edit(&desc, cx, move |a| noshape_ops::assembly::commit_pattern(a, pat, targets));
-        if let Some(c) = created {
-            self.message = Some((false, format!("{} instance(s) created.", c.len())));
-        }
+        // Live shows no message after accepting an assembly pattern (polled
+        // 20 s; behaviours "qa5 (10-26 p6)" (1), qa5 P2-A8).
+        let _created = self.edit(&desc, cx, move |a| noshape_ops::assembly::commit_pattern(a, pat, targets));
         self.expanded.insert(vec![InstanceId(id.0)]);
         self.update_capture(cx);
         cx.notify();

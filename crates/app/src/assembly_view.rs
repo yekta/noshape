@@ -3335,7 +3335,7 @@ impl AssemblyView {
             .child(match self.rename_field(behaviors::RenameRow::Instance(top)).filter(|_| is_top) {
                 Some(field) => field,
                 // The state glyphs follow the name (Onshape), not the row's right edge.
-                None => div().min_w_0().truncate().mr(px(2.)).when(suppressed, |d| d.line_through()).when(dyn_suppressed, |d| d.italic()).child(crate::ui::user_text(name.clone())).into_any_element(),
+                None => suppressed_text(div().min_w_0().truncate().mr(px(2.)), suppressed || dyn_suppressed).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
             .when_some(state, |d, s| d.child(Self::state_pill(s)))
             // Live (assembly/530, E3): with two or more fixed, the fix icon
@@ -3542,7 +3542,7 @@ impl AssemblyView {
             .child(div().flex_none().when(dim, |d| d.opacity(0.5)).child(crate::assets::icon(&icon, 14., cx)))
             .child(match self.rename_field(behaviors::RenameRow::Feature(id)) {
                 Some(field) => field,
-                None => div().flex_1().truncate().when(inactive, |d| d.line_through()).child(crate::ui::user_text(name.clone())).into_any_element(),
+                None => suppressed_text(div().flex_1().truncate(), inactive).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
             .when(has_limits, |d| {
                 let n = name.clone();
@@ -4041,7 +4041,10 @@ impl AssemblyView {
     /// the rows cached (the filter notifies them when it changes).
     fn render_list_head(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
-        let instances = self.assembly(cx).map(|a| a.instances.len()).unwrap_or(0);
+        let instances = self.assembly(cx).map(|a| {
+            let generated: std::collections::HashSet<InstanceId> = a.patterns.iter().flat_map(|p| p.generated.iter().map(|g| g.instance)).collect();
+            top_level_rows(a.instances.iter().map(|i| i.id), &generated, a.patterns.len())
+        }).unwrap_or(0);
         // A configured assembly: the Configurations box above the list (live 191).
         let mut head: Vec<AnyElement> = self.render_asm_config_box(cx).into_iter().collect();
         head.push(self.render_list_filter(cx));
@@ -5720,7 +5723,10 @@ impl AssemblyView {
             self.refresh_scene(false, cx);
             cx.notify();
         } else if self.explode_edit {
-            self.explode_edit = false;
+            // Live (qa5 P2-A3, behaviours "qa5 (10-26 p6)" (3)): Esc leaves
+            // exactly as Done: plain row, no rollback bar, assembled again.
+            self.message = None;
+            self.activate_explode(None, cx);
             cx.notify();
         } else if self.ui.ctx_menu.is_some() || self.ui.mini_toolbar.is_some() || self.ui.show_shortcuts || self.ui.select_other.is_some() {
             self.ui.select_other = None;
@@ -5993,5 +5999,50 @@ mod tests {
         assert_eq!(feature_row_color(false, true, false), pal.text);
         assert_eq!(feature_row_color(false, false, true), pal.error);
         assert_eq!(pal.text_faint, gpui_kit::rgb(0x999999));
+    }
+}
+
+/// A suppressed row's name in the instance list (instances, mates,
+/// patterns): grey italic struck through, as Onshape's `suppressed` rows
+/// (live assembly/198 "Revolute 1", 140–142; qa5 P2-A5).
+pub(crate) fn suppressed_text(d: Div, suppressed: bool) -> Div {
+    d.when(suppressed, |d| d.italic().line_through())
+}
+
+#[cfg(test)]
+mod suppressed_text_tests {
+    use super::*;
+
+    #[::core::prelude::v1::test]
+    fn suppressed_rows_are_italic_and_struck_through() {
+        let mut d = suppressed_text(div(), true);
+        let t = d.text_style();
+        assert_eq!(t.font_style, Some(FontStyle::Italic));
+        assert!(t.strikethrough.is_some());
+        let mut plain = suppressed_text(div(), false);
+        let t = plain.text_style();
+        assert!(t.font_style.is_none() && t.strikethrough.is_none());
+    }
+}
+
+/// The "Instances (N)" count: live counts the list's top-level rows, an
+/// instance outside any pattern or a pattern / Replicate row, not every
+/// instance (4 parts + Replicate 1 + 2 patterns read "Instances (7)" with
+/// 10 instances; behaviours "(6) Patterns"; qa5 P2-A6).
+fn top_level_rows(instances: impl Iterator<Item = InstanceId>, generated: &std::collections::HashSet<InstanceId>, patterns: usize) -> usize {
+    instances.filter(|i| !generated.contains(i)).count() + patterns
+}
+
+#[cfg(test)]
+mod instance_count_tests {
+    use super::*;
+
+    #[::core::prelude::v1::test]
+    fn instances_header_counts_top_level_rows() {
+        // Part 1 <1>, Part 2 <1> and Circular pattern 1 with 3 copies.
+        let ids: Vec<InstanceId> = (1..=5).map(InstanceId).collect();
+        let generated: std::collections::HashSet<InstanceId> = ids[2..].iter().copied().collect();
+        assert_eq!(top_level_rows(ids.iter().copied(), &generated, 1), 3);
+        assert_eq!(top_level_rows(ids.iter().copied(), &Default::default(), 0), 5);
     }
 }
