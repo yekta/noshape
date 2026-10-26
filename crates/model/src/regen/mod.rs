@@ -13,7 +13,7 @@ pub mod derived;
 mod display;
 pub mod runs;
 pub use display::flat_view_display;
-pub use display::{PART_COLORS, angle_display_mesh, set_angle_display_mesh, tessellate_shape};
+pub use display::{PART_COLORS, angle_display_mesh, keep_shown, set_angle_display_mesh, shown_vertices, tessellate_shape};
 pub mod eval;
 pub mod features;
 pub mod implicit;

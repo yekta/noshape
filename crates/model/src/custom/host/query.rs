@@ -146,37 +146,13 @@ impl<'a> QueryCx<'a> {
             }
         }
         let edge_faces = shape.edge_faces().unwrap_or_default();
-        let solid = self.st.ctx.bodies[b].kind == BodyKind::Solid;
-        let faces = shape.faces();
-        let edges = shape.edges();
-        let infos: Vec<Option<k::EdgeInfo>> = edges.iter().map(|e| e.edge_info().ok()).collect();
-        let seam = |e: usize| -> bool {
-            let [f] = edge_faces[e].as_slice() else { return false };
-            if solid {
-                return true;
-            }
-            // A sheet's edge on the periodic boundary of a closed surface.
-            let (Some(face), Some(info)) = (faces.get(*f as usize), infos[e].as_ref()) else { return false };
-            let Ok([u0, u1, v0, v1]) = face.uv_bounds() else { return false };
-            let tau = std::f64::consts::TAU;
-            let Ok(p) = edges[e].point_at(info.first_param + (info.last_param - info.first_param) * 0.5) else { return false };
-            let Ok(pr) = face.project_point(p) else { return false };
-            let on = |x: f64, a: f64, b: f64| (b - a - tau).abs() < 1e-9 && ((x - a).abs() < 1e-7 || (x - b).abs() < 1e-7);
-            on(pr.u, u0, u1) || on(pr.v, v0, v1)
-        };
-        let shown_edges: Vec<bool> = (0..edges.len()).map(|e| !infos[e].as_ref().is_some_and(|i| i.degenerated) && !seam(e)).collect();
-        // A vertex counts if it ends a shown open edge, is a point body's, or
-        // is a cone's apex (live dom/fs-ophole.txt: a drill tip is a vertex;
-        // a sphere's poles and a cylinder's seam ends are not).
+        // Onshape's topology (the kernel's shown_topology): no seams or
+        // degenerated edges; a vertex counts if it ends a shown open edge, is
+        // a point body's, or is a cone's apex (live dom/fs-ophole.txt: a drill
+        // tip is a vertex; a sphere's poles and a cylinder's seam ends are not).
         let vertex_faces = shape.vertex_faces().unwrap_or_default();
-        let shown_edge = |e: usize| shown_edges.get(e).copied().unwrap_or(false);
-        let open = |e: usize| shown_edge(e) && !infos.get(e).and_then(|i| i.as_ref()).is_some_and(|i| i.closed);
-        let cone = |f: &u32| faces.get(*f as usize).is_some_and(|f| matches!(f.face_surface(), Ok(k::Surface::Cone { .. })));
-        let shown_vertices: Vec<bool> = vertex_edges
-            .iter()
-            .enumerate()
-            .map(|(v, es)| es.is_empty() || es.iter().any(|e| open(*e as usize)) || (!es.iter().any(|e| shown_edge(*e as usize)) && vertex_faces.get(v).is_some_and(|fs| fs.iter().any(cone))))
-            .collect();
+        let shown = shape.shown_topology().unwrap_or_default();
+        let (shown_edges, shown_vertices) = (shown.edges, shown.vertices);
         let t = Arc::new(Topo { edge_faces, vertex_faces, vertex_edges, edge_vertices, shown_edges, shown_vertices });
         self.topo.borrow_mut().insert(b, t.clone());
         t

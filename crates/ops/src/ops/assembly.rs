@@ -502,7 +502,12 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 }
             }
             "edges" => {
+                // Onshape's edges only (no seams or degenerated edges).
+                let shown = body.shape.shown_topology().unwrap_or_default();
                 for (i, name) in body.edges.iter().enumerate() {
+                    if !shown.edges.get(i).copied().unwrap_or(true) {
+                        continue;
+                    }
                     let Ok(e) = body.shape.sub_shape(ShapeType::Edge, i) else { continue };
                     let Ok(info) = e.edge_info() else { continue };
                     let mid = noshape_kernel::linear_properties(&e).map(|p| p.center).unwrap_or((info.start + info.end) * 0.5);
@@ -532,7 +537,12 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 }
             }
             "vertices" => {
+                // Onshape's vertices only (none at seam ends or on full circles).
+                let shown = body.shape.shown_topology().unwrap_or_default();
                 for (i, name) in body.vertices.iter().enumerate() {
+                    if !shown.vertices.get(i).copied().unwrap_or(true) {
+                        continue;
+                    }
                     let Ok(p) = body.shape.sub_shape(ShapeType::Vertex, i).and_then(|x| x.vertex_point()) else { continue };
                     out.push((m.transform_point3(p), json!({ "id": refs::to_id(&Reference::Vertex((**name).clone())), "position": pt(m.transform_point3(p), k) }), None));
                 }
