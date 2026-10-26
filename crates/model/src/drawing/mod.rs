@@ -3665,7 +3665,8 @@ impl Default for DrawingProps {
             com_diameter: com_diameter(),
             dim_font: None,
             ann_font: None,
-            inspection_font: None,
+            // Live 1710: Inspection › Text with Bold pressed.
+            inspection_font: Some(sheet::TextFont { family: sheet::DRAWING_DEFAULT_FONT.into(), bold: true, italic: false }),
         }
     }
 }
