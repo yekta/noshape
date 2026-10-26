@@ -15,9 +15,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (SIGSEGV, null deref in OCCT `Extrema_ExtCS::Points` ← `Draft_Modification::Perform` ← `BRepOffsetAPI_DraftAngle::Build`
   ← noshape::op_draft, cpp/features.cpp:3815 ← model regen/features/detail_a.rs:96 draft_robust). The user can't open the
   document any more (data loss). Found by the CLI fuzzer (/root/qa-scratch/bin/clifuzz.py seed 1 on the watcher's main
-  CLI ~20:18; the same document also kills v0.4.8): step 81 added a Draft that regenerated OK, step 82's next Draft
-  segfaulted the CLI, and the saved document (history ends "Insert feature : Draft 7") now segfaults on open in the green
-  app and both CLIs. Doc: /root/qa-scratch/tickets/cli-draft-segv.noshape; backtrace tickets/cli-draft-segv-bt.txt; the
+  CLI ~20:18; the same document also kills v0.4.8): after step 81 the document still opened fine in a fresh process
+  (checked after every step by clifuzz_bisect.py); step 82's feature_add of a Draft segfaulted, and that Draft ("Insert
+  feature : Draft 7", the last history entry) had already been **committed before its regeneration ran**, so the saved
+  document now segfaults on every open in the green app and both CLIs. Doc: /root/qa-scratch/tickets/cli-draft-segv.noshape; backtrace tickets/cli-draft-segv-bt.txt; the
   fuzz log /root/qa-scratch/cli/clifuzz-1.log has every step's args. Needs (1) the null guard / OCCT patch, (2) a crash in
   one feature must never make the document unopenable (run kernel ops so a signal fails the feature, or open with the
   failing feature marked) (qa 2026-10-26, build 4d2f6b0c + main CLI)
