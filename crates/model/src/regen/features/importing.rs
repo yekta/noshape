@@ -407,8 +407,240 @@ fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
     }
 }
 
-pub fn decal(_ev: &mut EvalCtx) -> FResult<()> {
-    err("Decal is not supported yet")
+/// Decal (std decal.fs): the image's placement on a planar or cylindrical
+/// face, recorded for display (`Context::decals`); the part is unchanged.
+pub fn decal(ev: &mut EvalCtx) -> FResult<()> {
+    use crate::regen::context::{DecalMapping, DecalRecord};
+    use crate::regen::eval::err_at;
+    let Some(&(bi, fi)) = ev.resolve_faces(ev.query("face")).first() else { return err_at(&["face"], "Select face for decal") };
+    let tab = ev.params.text("image").to_string();
+    let file = if tab.is_empty() {
+        None
+    } else if tab.starts_with("ext:") || tab.contains('/') {
+        ev.derived.as_ref().and_then(|d| d.file(&tab))
+    } else {
+        ev.custom.clone().unwrap_or_else(crate::custom::fallback_provider).file(&tab)
+    };
+    let size = file.and_then(|f| f.bytes()).map(|b| crate::custom::reference::image_size(&b));
+    let Some((Some(iw), Some(ih), _)) = size else { return err_at(&["image"], "Select image for decal") };
+    if iw > 4096 || ih > 4096 {
+        return err_at(&["image"], "Inserted image exceeds 4k x 4k size limit");
+    }
+    let angle = ev.angle("angle")? * if ev.bool("angleOppositeDirection") { -1.0 } else { 1.0 };
+    let (mut w, mut h) = (ev.length("width")?, ev.length("height")?);
+    let aspect = iw as f64 / ih.max(1) as f64;
+    if ev.bool("maintainAspectRatio") {
+        if ev.is("aspectRatioConstraint", "HEIGHT_DRIVING") {
+            w = h * aspect;
+        } else {
+            h = w / aspect;
+        }
+    }
+    let (u_shift, v_shift) = (ev.length("uShift")?, ev.length("vShift")?);
+    let realign = ev.bool("realign");
+    let origin_mc = if realign { ev.query("originConnector").first().and_then(|r| ev.resolve_connector(r)) } else { None };
+    let href = if realign { ev.query("horizontalReference").first().and_then(|r| ev.resolve_direction(r)) } else { None };
+    let body = ev.ctx.bodies[bi].clone();
+    let face = body.shape.sub_shape(ShapeType::Face, fi)?;
+    let bad_reference = || err_at(&["horizontalReference"], "A valid reference direction could not be created from selection.");
+    let parallel = |a: DVec3, b: DVec3| a.normalize().cross(b.normalize()).length() < 1e-9;
+    // TransformUV: scale by 1/size after rotating; the origin at the image's
+    // centre, or at the chosen one of its 3 × 3 points with a placement origin.
+    let uv = |turn: f64| -> ([[f64; 2]; 2], [f64; 2]) {
+        let (c, s) = (turn.cos(), turn.sin());
+        let lin = [[c / w, -s / w], [s / h, c / h]];
+        let i = if origin_mc.is_some() { ev.integer("imageOriginIndex").unwrap_or(4).clamp(0, 8) } else { 4 };
+        (lin, [0.5 * (i % 3) as f64, 0.5 * (i / 3) as f64])
+    };
+    // Points of the face at its parameter box's corners and centre (std
+    // evFaceTangentPlane at (0,0) … (1,1)).
+    let [u0, u1, v0, v1] = face.uv_bounds()?;
+    let at = |a: f64, b: f64| face.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b);
+    let record = match face.face_surface()? {
+        k::Surface::Plane(_) => {
+            let z = face.normal_at_point(face.centroid()?)?.normalize();
+            let x = match href {
+                Some(d) => {
+                    if parallel(z, d) {
+                        return bad_reference();
+                    }
+                    let x = z.cross(d).normalize().cross(z);
+                    if x.x < 0.0 { -x } else { x }
+                }
+                None => in_plane_perpendicular_to_z(z),
+            };
+            let y = z.cross(x);
+            let origin = origin_mc.as_ref().map(|c| c.origin).unwrap_or(face.centroid()?) + x * u_shift + y * v_shift;
+            let (uv_linear, uv_translation) = uv(angle);
+            DecalRecord { feature: ev.feature, body: body.id.clone(), face: body.faces[fi].clone(), image: tab, mapping: DecalMapping::Planar { origin, x, y, z }, uv_linear, uv_translation }
+        }
+        k::Surface::Cylinder { origin, axis, x_dir, radius } => {
+            let (mut z, mut x) = (axis.normalize(), x_dir.normalize());
+            // The axis toward world up.
+            if z.z < 0.0 {
+                (z, x) = (-z, -x);
+            }
+            let mut o = origin;
+            let y_of = |z: DVec3, x: DVec3| z.cross(x);
+            let angle_of = |o: DVec3, x: DVec3, z: DVec3, p: DVec3| {
+                let d = p - o;
+                let (a, b) = (d.dot(x), d.dot(y_of(z, x)));
+                if a * a + b * b < 1e-16 {
+                    return 0.0;
+                }
+                let t = b.atan2(a);
+                if t < 0.0 { t + std::f64::consts::TAU } else { t }
+            };
+            // getFaceCylinderProjectionInformation.
+            let (pmin, pmid, pmax) = (at(0.0, 0.0)?, at(0.5, 0.5)?, at(1.0, 1.0)?);
+            let (mut zmin, mut zmax) = ((pmin - o).dot(z), (pmax - o).dot(z));
+            if zmin > zmax {
+                std::mem::swap(&mut zmin, &mut zmax);
+            }
+            let (mut amin, amid, mut amax) = (angle_of(o, x, z, pmin), angle_of(o, x, z, pmid), angle_of(o, x, z, pmax));
+            let (amin, amax) = if (amax - amin).abs() < 1e-12 {
+                (-std::f64::consts::PI, std::f64::consts::PI)
+            } else {
+                if amin > amax {
+                    std::mem::swap(&mut amin, &mut amax);
+                }
+                if (amin - amid) * (amid - amax) < 0.0 { (amax - std::f64::consts::TAU, amin) } else { (amin, amax) }
+            };
+            let (mut zc, mut ac) = ((zmax + zmin) / 2.0, (amax + amin) / 2.0);
+            if let Some(c) = &origin_mc {
+                ac = angle_of(o, x, z, c.origin);
+                zc = (c.origin - o).dot(z);
+            }
+            let t = ac + u_shift / radius;
+            let on = o + z * (zc + v_shift) + (x * t.cos() + y_of(z, x) * t.sin()) * radius;
+            let to = on - o;
+            if !parallel(to, z) {
+                o += z * to.dot(z);
+                x = (on - o).normalize();
+            }
+            let y = y_of(z, x);
+            let mut href_angle = 0.0;
+            if let Some(d) = href {
+                if parallel(x, d) {
+                    return bad_reference();
+                }
+                let (py, pz) = (d.dot(y), d.dot(z));
+                let n = (py * py + pz * pz).sqrt().max(1e-300);
+                href_angle = -(pz / n).atan2(py / n);
+            }
+            let (uv_linear, uv_translation) = uv(href_angle + angle);
+            DecalRecord { feature: ev.feature, body: body.id.clone(), face: body.faces[fi].clone(), image: tab, mapping: DecalMapping::Cylindrical { origin: o, x, y, z, radius }, uv_linear, uv_translation }
+        }
+        _ => return err_at(&["face"], "Select face for decal"),
+    };
+    // isDecalNearFace.
+    let near = match &record.mapping {
+        DecalMapping::Planar { .. } => {
+            let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
+            for (a, b) in [(0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0)] {
+                let q = record.uv_at(at(a, b)?);
+                for i in 0..2 {
+                    lo[i] = lo[i].min(q[i]);
+                    hi[i] = hi[i].max(q[i]);
+                }
+            }
+            lo[0] < 1.0 && hi[0] > 0.0 && lo[1] < 1.0 && hi[1] > 0.0
+        }
+        DecalMapping::Cylindrical { origin, z, .. } => {
+            // The image's corners (0,0) and (1,1) on the cylinder, against the
+            // face's height range.
+            let (pmin, pmax) = (at(0.0, 0.0)?, at(1.0, 1.0)?);
+            let (fz0, fz1) = ((pmin - *origin).dot(*z), (pmax - *origin).dot(*z));
+            let (fz0, fz1) = (fz0.min(fz1), fz0.max(fz1));
+            // The height of an image point: inverse TransformUV's second row.
+            let world_z = |uvp: [f64; 2]| -> f64 {
+                let l = &record.uv_linear;
+                let (a, b) = (uvp[0] - record.uv_translation[0], uvp[1] - record.uv_translation[1]);
+                (-l[1][0] * a + l[0][0] * b) / (l[0][0] * l[1][1] - l[0][1] * l[1][0])
+            };
+            let (bz, tz) = (world_z([0.0, 0.0]), world_z([1.0, 1.0]));
+            (bz < tz && bz < fz1 && tz > fz0) || (bz >= tz && tz < fz1 && bz > fz0)
+        }
+    };
+    ev.ctx.decals.push(record);
+    if !near {
+        return err("Decal is not on target face.");
+    }
+    Ok(())
+}
+
+/// std decal.fs onDecalFeatureChange: once the dialog has both a face and an
+/// image, the decal's width and height fit the face (getDefaultDecalSize:
+/// the face's extent in the decal's plane, or round and along the
+/// cylinder) with the image's aspect. `image`: the image file's bytes;
+/// `href`: Realign's horizontal reference direction, if any.
+pub fn decal_default_size(ctx: &crate::regen::context::Context, params: &crate::params::ParamValues, href: Option<DVec3>, image: &[u8]) -> Option<(f64, f64)> {
+    let (Some(iw), Some(ih), _) = crate::custom::reference::image_size(image) else { return None };
+    let aspect = iw as f64 / ih.max(1) as f64;
+    let face = crate::regen::measure::resolve_shapes(ctx, params.query("face").first()?).into_iter().next()?;
+    let (w, h) = match face.face_surface().ok()? {
+        k::Surface::Plane(_) => {
+            let z = face.normal_at_point(face.centroid().ok()?).ok()?.normalize();
+            let x = match href.filter(|_| params.bool("realign")) {
+                Some(d) if d.normalize().cross(z).length() > 1e-9 => {
+                    let x = z.cross(d).normalize().cross(z);
+                    if x.x < 0.0 { -x } else { x }
+                }
+                _ => in_plane_perpendicular_to_z(z),
+            };
+            let y = z.cross(x);
+            // projectBox3d of the face's tight box.
+            let b = face.bounding_box(true).ok()?;
+            let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
+            for i in 0..8 {
+                let c = DVec3::new([b.min.x, b.max.x][i & 1], [b.min.y, b.max.y][(i >> 1) & 1], [b.min.z, b.max.z][i >> 2]);
+                for (k, a) in [x, y].into_iter().enumerate() {
+                    lo[k] = lo[k].min(c.dot(a));
+                    hi[k] = hi[k].max(c.dot(a));
+                }
+            }
+            (hi[0] - lo[0], hi[1] - lo[1])
+        }
+        k::Surface::Cylinder { origin, axis, x_dir, radius } => {
+            let (mut z, mut x) = (axis.normalize(), x_dir.normalize());
+            if z.z < 0.0 {
+                (z, x) = (-z, -x);
+            }
+            let y = z.cross(x);
+            let [u0, u1, v0, v1] = face.uv_bounds().ok()?;
+            let at = |a: f64, b: f64| face.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok();
+            let angle = |p: DVec3| {
+                let d = p - origin;
+                let t = d.dot(y).atan2(d.dot(x));
+                if t < 0.0 { t + std::f64::consts::TAU } else { t }
+            };
+            let (pmin, pmid, pmax) = (at(0.0, 0.0)?, at(0.5, 0.5)?, at(1.0, 1.0)?);
+            let (mut a0, am, mut a1) = (angle(pmin), angle(pmid), angle(pmax));
+            let span = if (a1 - a0).abs() < 1e-12 {
+                std::f64::consts::TAU
+            } else {
+                if a0 > a1 {
+                    std::mem::swap(&mut a0, &mut a1);
+                }
+                if (a0 - am) * (am - a1) < 0.0 { std::f64::consts::TAU - (a1 - a0) } else { a1 - a0 }
+            };
+            (span * radius, ((pmax - origin).dot(z) - (pmin - origin).dot(z)).abs())
+        }
+        _ => return None,
+    };
+    Some(if w / aspect > h { (h * aspect, h) } else { (w, w / aspect) })
+}
+
+/// std decal.fs vectorInPlanePerpendicularToZ: the plane's x direction,
+/// level with world Z (world X on a horizontal plane).
+fn in_plane_perpendicular_to_z(n: DVec3) -> DVec3 {
+    let z = DVec3::Z;
+    if n.normalize().cross(z).length() > 1e-9 {
+        let projected = (z - n * n.dot(z) / n.length_squared()).normalize();
+        projected.cross(n.normalize())
+    } else {
+        DVec3::X
+    }
 }
 
 /// A `Role::New` face name moved on by `base` (other names as they are).

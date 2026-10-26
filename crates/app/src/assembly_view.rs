@@ -876,6 +876,18 @@ impl AssemblyView {
         self.refresh_scene(geometry_changed, cx);
     }
 
+    /// After a drag step: the built scene's instances follow the new
+    /// placements (no rebuild of picks and instances; 1000 pins rebuilt
+    /// every frame cost ~20 ms), or a rebuild when the occurrences changed.
+    fn move_scene(&mut self, cx: &mut Context<Self>) {
+        let moved = self.built.as_mut().is_some_and(|b| assembly_scene::retransform(b, &self.result));
+        if moved {
+            self.refresh_scene(true, cx);
+        } else {
+            self.rebuild_scene(true, cx);
+        }
+    }
+
     fn triad_size(&self) -> f64 {
         self.result.bounds().map(|(a, b)| (b - a).length() * 0.06).unwrap_or(0.01).clamp(0.002, 1.0)
     }
@@ -1839,7 +1851,7 @@ impl AssemblyView {
     /// Re-apply placements + explode to the current result (display only).
     fn reapply_display(&mut self, cx: &mut Context<Self>) {
         self.apply_display(cx);
-        self.rebuild_scene(true, cx);
+        self.move_scene(cx);
         cx.notify();
     }
 
@@ -3029,7 +3041,7 @@ impl AssemblyView {
                 let again = d.pending.is_some();
                 let t = std::time::Instant::now();
                 this.apply_solved(solved, cx);
-                this.rebuild_scene(true, cx);
+                this.move_scene(cx);
                 noshape_render::perf::record("a.drag_apply", t.elapsed());
                 noshape_render::perf::record("a.drag_step", asked.elapsed());
                 if again {

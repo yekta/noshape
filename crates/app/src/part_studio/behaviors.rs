@@ -290,6 +290,9 @@ pub struct UiState {
     /// std's editing logic running off the UI thread (std Extrude runs a
     /// whole trial extrude for its boolean heuristics).
     pub std_edit_task: Option<Task<()>>,
+    /// The Decal dialog's face and image when they last were both set
+    /// (onDecalFeatureChange sizes the decal when they first are).
+    pub decal_sized: Option<(noshape_model::reference::FeatureId, String)>,
     pub preview_task: Option<Task<()>>,
     /// Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
@@ -547,6 +550,7 @@ impl UiState {
             preview_opacity: 1.0,
             preview_before: None,
             before_context: None,
+            decal_sized: None,
             std_edit_old: None,
             std_edit_task: None,
             preview_task: None,
@@ -3296,6 +3300,7 @@ impl PartStudioView {
         };
         let ctx = self.ui.before_context.as_ref().or(self.context.as_ref());
         let mut changes: Vec<(&'static str, ParamValue)> = Vec::new();
+        let mut decal_sized = None;
         match ty.as_str() {
             "deleteFace" if !user_set.contains("healType") => {
                 let faces = params.query("deleteFaces");
@@ -3342,6 +3347,34 @@ impl PartStudioView {
                     changes.push(("surfaceOperationType", ParamValue::Enum(want.into())));
                 }
             }
+            // onDecalFeatureChange: once face and image are both set, the
+            // width and height fit the face with the image's aspect.
+            "decal" => {
+                let id = dialog.read(cx).feature.id;
+                let image = params.text("image").to_string();
+                let ready = !image.is_empty() && !params.query("face").is_empty();
+                let was = self.ui.decal_sized.as_ref().is_some_and(|(f, _)| *f == id);
+                if ready && !was {
+                    let bytes = {
+                        let doc = &self.doc.read(cx).session.doc;
+                        doc.tabs.iter().find(|t| t.id.to_string() == image).and_then(|t| match &t.content {
+                            noshape_model::TabContent::File(f) => f.bytes(),
+                            _ => None,
+                        })
+                    };
+                    if let (Some(c), Some(bytes)) = (ctx, bytes)
+                        && let Some((w, h)) = noshape_model::regen::features::importing::decal_default_size(c, &params, None, &bytes)
+                    {
+                        let units = self.doc.read(cx).session.doc.settings.units;
+                        let q = |v: f64| ParamValue::Expr(noshape_units::ExprValue::from_quantity(noshape_units::Quantity::meters(v), &units));
+                        changes.push(("width", q(w)));
+                        changes.push(("height", q(h)));
+                    }
+                }
+                if ready != was {
+                    decal_sized = Some(ready.then_some((id, image)));
+                }
+            }
             // Live L22: a new Rib's Parts holds the studio's parts.
             "rib" if !user_set.contains("parts") && params.query("parts").is_empty() => {
                 let solids: Vec<Reference> = ctx.map(|c| c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect()).unwrap_or_default();
@@ -3379,6 +3412,9 @@ impl PartStudioView {
                 }
             }
             _ => {}
+        }
+        if let Some(sized) = decal_sized {
+            self.ui.decal_sized = sized;
         }
         if changes.is_empty() {
             return;

@@ -442,6 +442,12 @@ fn section_view_indicator_and_hatch_properties() {
     let view_pick = b.picks.iter().position(|p| *p == PickTarget::View(ViewId(5))).unwrap() as u32;
     let hatch: Vec<usize> = (0..g.lines.len()).filter(|&k| g.lines[k].pick == view_pick && g.lines[k].style == sheet::LineStyle::Thin).collect();
     assert!(hatch.len() > 5 && hatch.iter().all(|&k| (g.line_pen(k).0 - 0.3).abs() < 1e-9 && g.line_color(k) == Some([90, 90, 90])));
+    // View and region hatches › Hatch pattern: ANSI32 steel (pairs of
+    // lines 0.375 in apart) hatches the cut its own way.
+    drawing.props.view_tab.hatch_pattern = (0, 1);
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let steel = (0..b.geometry.lines.len()).filter(|&k| b.geometry.lines[k].pick == view_pick && b.geometry.lines[k].style == sheet::LineStyle::Thin).count();
+    assert!(steel > 0 && steel != hatch.len(), "{steel} vs {}", hatch.len());
 }
 
 /// Drawing properties › Formats and Construction geometry pens: the
@@ -470,6 +476,55 @@ fn formats_and_construction_geometry_pens() {
     let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(pens(&b, sheet::LineStyle::Border).iter().all(|(w, _)| (*w - 0.5).abs() < 1e-9));
     assert!(pens(&b, sheet::LineStyle::Centerline).iter().any(|(_, d)| d == &[16.0, 3.0, 3.0, 3.0]));
+}
+
+/// Construction geometry › Part Studio sketches: a shown sketch's solid and
+/// construction lines take their pens and colours; only its free point gets
+/// a marker, of the Sketch points shape and size.
+#[test]
+fn part_studio_sketches_in_views() {
+    let (mut doc, mut drawing) = demo();
+    let ps = doc.tabs.iter_mut().find_map(|t| match &mut t.content {
+        TabContent::PartStudio(ps) => Some(ps),
+        _ => None,
+    });
+    let f = &mut ps.expect("demo has a Part Studio").features[0];
+    let Some(crate::params::ParamValue::Sketch(mut sd)) = f.params.get("sketch").cloned() else { panic!("the first feature is a sketch") };
+    let c = sd.sketch.add_line(glam::DVec2::new(-0.05, -0.03), glam::DVec2::new(0.05, 0.03));
+    sd.sketch.set_construction(c, true).unwrap();
+    sd.sketch.add_point(glam::DVec2::new(0.02, 0.01));
+    f.params.set("sketch", crate::params::ParamValue::Sketch(sd));
+    let fid = f.id;
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().shown_sketches = vec![fid];
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let construction = |b: &build::BuiltSheet| (0..b.geometry.lines.len()).filter(|&i| b.geometry.line_pen(i).1 == SKETCH_CONSTRUCTION_DASHES).map(|i| (b.geometry.line_pen(i).0, b.geometry.line_color(i))).collect::<Vec<_>>();
+    let markers = |b: &build::BuiltSheet, r: f64| {
+        let g = &b.geometry;
+        (0..g.lines.len())
+            .filter(|&i| {
+                let l = &g.lines[i];
+                let n = l.points.len() as f64;
+                let c = l.points.iter().fold([0.0, 0.0], |a, p| [a[0] + p[0] / n, a[1] + p[1] / n]);
+                l.closed && l.points.len() == 32 && l.points.iter().all(|p| ((p[0] - c[0]).hypot(p[1] - c[1]) - r).abs() < 1e-6)
+            })
+            .count()
+    };
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let cl = construction(&b);
+    assert!(!cl.is_empty() && cl.iter().all(|(w, c)| (*w - 0.13).abs() < 1e-9 && c.is_none()), "{cl:?}");
+    assert_eq!(markers(&b, 0.5), 1, "one Ø1 circle at the free point");
+    let vt = &mut drawing.props.view_tab;
+    vt.sketch_construction = PenProps { thickness: 0.5, color: Some([0, 0, 255]) };
+    vt.sketch_point_shape = SketchPointShape::CentermarkCircle;
+    vt.sketch_point_size = 2.0;
+    let n0 = b.geometry.lines.len();
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(construction(&b).iter().all(|(w, c)| (*w - 0.5).abs() < 1e-9 && *c == Some([0, 0, 255])));
+    assert_eq!((markers(&b, 1.0), b.geometry.lines.len()), (1, n0 + 2), "Ø2 circle and a 4 mm \"+\"");
+    drawing.props.view_tab.sketch_point_shape = SketchPointShape::None;
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(b.geometry.lines.len(), n0 - 1);
 }
 
 /// Drawing properties › Tables: a kind's header / content / title row

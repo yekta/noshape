@@ -88,7 +88,7 @@ pub fn circular_pattern() -> FeatureType {
 pub fn curve_pattern() -> FeatureType {
     let mut p = pattern_type_block(PATTERN_TYPE, "Pattern type", false);
     p.extend([
-        ParamSpec::query("edges", "Path to pattern along", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY).hints(Hints::ALLOW_QUERY_ORDER),
+        ParamSpec::query("edges", "Path to pattern along", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY),
         ParamSpec::enum_("spacingType", "Spacing type", &[("EQUAL", "Equal spacing"), ("DISTANCE", "Distance")]),
         ParamSpec::num("distance", "Distance", NumSpec::positive_length(25.0, 1.0)).visible(|v| v.is("spacingType", "DISTANCE")),
         ParamSpec::num("instanceCount", "Instance count", NumSpec::integer(2, 1, 2500)),

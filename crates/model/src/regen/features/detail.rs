@@ -197,7 +197,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             } else {
                 Section::Conic(ev.real("rho")?)
             };
-            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation"), cliff: false })
+            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation"), cliff: false, sides: None })
         } else {
             None
         }
@@ -210,7 +210,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
-        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false };
+        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false, sides: None };
         if !propagate && curved_edge_left_open(&body.shape, &edges) {
             return err("Adjoining edge not filleted.");
         }
@@ -413,7 +413,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         {
             // OCCT runs a chamfer on along tangent edges; Onshape stops at the
             // selection and runs the section out onto the neighbour (G7).
-            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1: d, r2: d, width: None, partial: None, run_on: true, cliff: false };
+            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1: d, r2: d, width: None, partial: None, run_on: true, cliff: false, sides: None };
             super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| blend_failed("Failed to chamfer selections.", e.message))?;
             continue;
         }
@@ -563,7 +563,7 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         let res = k::shell_solid(&body.shape, &shapes, t, side, k::ShellMethod::Auto).map_err(|e| blend_failed("Could not shell part with selections.", e))?;
         // Live (qa5 P1-5): a shell that breaks the part into pieces fails
         // (and leaves the part as it was), it never returns the slivers.
-        if res.shape.count(ShapeType::Solid) > body.shape.count(ShapeType::Solid).max(1) {
+        if res.shape.count(ShapeType::Solid) > body.shape.count(ShapeType::Solid).max(1) || !shell_is_whole(&body.shape, &shapes, &res.shape, t) {
             return err("Could not shell part with selections.");
         }
         let names = body.shape_names();
@@ -572,6 +572,28 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         ev.replace_body(bi, res.shape, face_names);
     }
     Ok(())
+}
+
+/// Whether a shell result is the whole shelled part, not what is left of a
+/// broken one (macOS arm64 builds a single 101.7 mm³ sliver for the part of
+/// qa_regressions::shell_that_breaks_the_part_fails where Linux fails): no
+/// piece is thinner than the wall (its box is at least `t` every way, as a
+/// wall of thickness `t` is), and every face the shell keeps still lies on
+/// the result (a point inside it, within a thousandth of the wall).
+fn shell_is_whole(part: &k::Shape, removed: &[k::Shape], result: &k::Shape, t: f64) -> bool {
+    let thin = result.solids().iter().any(|s| {
+        s.bounding_box(false).is_ok_and(|b| {
+            let d = b.max - b.min;
+            d.x.min(d.y).min(d.z) < 0.99 * t
+        })
+    });
+    if thin {
+        return false;
+    }
+    part.faces().iter().filter(|f| !removed.iter().any(|r| r.is_same(f))).all(|f| {
+        let Some(p) = super::helpers_a::point_on_face(f) else { return true };
+        k::make_vertex(p).and_then(|v| k::distance(&v, result)).is_ok_and(|d| d.distance <= t * 1e-3)
+    })
 }
 
 /// Full round fillet: the center faces between two parallel planar side

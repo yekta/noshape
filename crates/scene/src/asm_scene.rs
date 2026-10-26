@@ -105,6 +105,45 @@ pub struct AsmBuilt {
     pub scene: Scene,
     pub picks: AsmPickMap,
     pub static_instances: usize,
+    /// Each drawn occurrence's scene instances, for [`retransform`].
+    pub spans: Vec<OccSpan>,
+    /// The result's occurrence count when built.
+    pub occurrences: usize,
+}
+
+/// The scene instances `start..end` of occurrence `occ`, all drawn at its
+/// transform except its bounding-box level of detail (`lod`: instance index
+/// and its box matrix in the occurrence's frame).
+#[derive(Clone, Debug)]
+pub struct OccSpan {
+    pub occ: usize,
+    pub start: usize,
+    pub end: usize,
+    pub lod: Option<(usize, Mat4)>,
+}
+
+/// Moves the built scene's occurrences to `result`'s transforms without
+/// rebuilding it (a drag step: 1000 pins rebuilt every frame cost ~20 ms
+/// of picks and instances). False when the occurrences changed (rebuild).
+pub fn retransform(built: &mut AsmBuilt, result: &AssemblyResult) -> bool {
+    if built.occurrences != result.occurrences.len() {
+        return false;
+    }
+    for span in &built.spans {
+        let o = &result.occurrences[span.occ];
+        if o.hidden {
+            return false;
+        }
+        let t = to_mat4(&o.transform);
+        for i in span.start..span.end {
+            let inst = &mut built.scene.instances[i];
+            inst.transform = match span.lod {
+                Some((li, local)) if li == i => t * local,
+                _ => t,
+            };
+        }
+    }
+    true
 }
 
 #[derive(Clone, Default)]
@@ -152,6 +191,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     use crate::builder::{DisplayMode, TangentEdges};
     let mode = opts.display_mode;
     let mut bodies = 0u32;
+    let mut spans = Vec::new();
     for (oi, o) in result.occurrences.iter().enumerate() {
         if o.hidden {
             continue;
@@ -316,12 +356,15 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         for i in &mut scene.instances[first_instance..] {
             i.body = bodies;
         }
+        let mut lod_at = None;
         if let Some(bounds) = cached.mesh.bounds().filter(|_| !sketch) {
             let unit = cache.lod_box.get_or_insert_with(|| up.upload_mesh(&noshape_render::scene::lod_box_mesh())).clone();
             let mut lod = Instance::lod_box(unit, bodies, bounds, color);
+            lod_at = Some((scene.instances.len(), lod.transform));
             lod.transform = t * lod.transform;
             scene.instances.push(lod);
         }
+        spans.push(OccSpan { occ: oi, start: first_instance, end: scene.instances.len(), lod: lod_at });
     }
     let static_instances = scene.instances.len();
     scene.states = vec![0; picks.len() + 1];
@@ -331,7 +374,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     if let Some(slot) = opts.section_selected.and_then(|i| scene.clip_selected.get_mut(i)) {
         *slot = true;
     }
-    AsmBuilt { scene, picks, static_instances }
+    AsmBuilt { scene, picks, static_instances, spans, occurrences: result.occurrences.len() }
 }
 
 fn upload_body(m: &MeshBuffers, up: &Uploader) -> CachedBody {

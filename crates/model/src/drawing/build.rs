@@ -1017,7 +1017,7 @@ impl AnnotationEnv for Env<'_> {
     }
     fn sheet_style(&self) -> super::sheet::SheetStyle {
         let p = &self.drawing.props;
-        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size, callout_justify: p.callout_justify, callout_stack: p.callout_stack, callout_stack_gap: p.callout_stack_gap, target_hatch: p.target_hatch, underline_overridden: p.underline_overridden, lock_jog_45: p.lock_jog_45, ordinate_iso: !self.drawing.ordinate_ansi(), iso: !self.drawing.is_ansi(), virtual_sharp_extension: p.view_tab.virtual_sharp_extension, virtual_sharp_pen: p.view_tab.virtual_sharp_line.thickness, virtual_sharp_color: p.view_tab.virtual_sharp_line.color }
+        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size, callout_justify: p.callout_justify, callout_stack: p.callout_stack, callout_stack_gap: p.callout_stack_gap, target_hatch: p.target_hatch, underline_overridden: p.underline_overridden, lock_jog_45: p.lock_jog_45, ordinate_iso: !self.drawing.ordinate_ansi(), iso: !self.drawing.is_ansi(), virtual_sharp_extension: p.view_tab.virtual_sharp_extension, virtual_sharp_pen: p.view_tab.virtual_sharp_line.thickness, virtual_sharp_color: p.view_tab.virtual_sharp_line.color, revision_callout: super::sheet::RevisionCalloutStyle { shape: p.table_styles.revision_callout_shape, chars: p.table_styles.revision_callout_chars, font: p.table_styles.revision_callout_font.clone(), text: p.table_styles.revision_callout_text.clone() } }
     }
     fn inspection_style(&self) -> Option<super::sheet::InspectionStyle> {
         let p = &self.drawing.props;
@@ -1216,6 +1216,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         continue;
                     }
                     let style = match (e.visible, e.class) {
+                        _ if e.sketch != views::SketchEdge::None => continue,
                         (_, EdgeClass::Seam) => continue,
                         (_, _) if marked => LineStyle::Visible,
                         (false, EdgeClass::Sharp | EdgeClass::Outline) if v.editing_edges => LineStyle::Hidden,
@@ -1284,6 +1285,56 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     }
                 }
             }
+            // Sketches drawn in the view: Construction geometry › Part
+            // Studio sketches' Solid / Construction lines pens and colours,
+            // then their free points (live 10-26 c: "+" arms and "×"
+            // diagonals of the size, circle Ø size; the Solid lines pen).
+            for kind in [views::SketchEdge::Solid, views::SketchEdge::Construction] {
+                let mark = g.mark();
+                let (pen, style, dashes) = match kind {
+                    views::SketchEdge::Construction => (&vt.sketch_construction, LineStyle::Centerline, super::SKETCH_CONSTRUCTION_DASHES.to_vec()),
+                    _ => (&vt.sketch_solid, LineStyle::Visible, Vec::new()),
+                };
+                for (i, e) in geo.edges.iter().enumerate().filter(|(_, e)| e.sketch == kind) {
+                    let pick = picks.id(PickTarget::Edge { view: v.id, edge: i as u32 });
+                    for piece in map_polyline(&pl, &e.points) {
+                        g.lines.push(Polyline2 { points: piece, style, closed: false, pick });
+                    }
+                }
+                if mark.0 < g.lines.len() {
+                    g.pens.push(super::sheet::PenSpan { lines: mark.0..g.lines.len(), width_mm: pen.thickness, dashes });
+                    color_lines_since(&mut g, mark, pen.color);
+                }
+            }
+            let shape = vt.sketch_point_shape;
+            if !geo.sketch_points.is_empty() && shape != super::SketchPointShape::None {
+                use super::SketchPointShape as S;
+                let mark = g.mark();
+                let s = vt.sketch_point_size;
+                let d = s * std::f64::consts::FRAC_1_SQRT_2;
+                for p in &geo.sketch_points {
+                    let Some(c) = map_polyline(&pl, &[*p, *p]).into_iter().find_map(|x| x.first().copied()) else { continue };
+                    let mut strokes = Vec::new();
+                    if matches!(shape, S::Centermark | S::CentermarkCircle) {
+                        strokes.push(vec![[c[0] - s, c[1]], [c[0] + s, c[1]]]);
+                        strokes.push(vec![[c[0], c[1] - s], [c[0], c[1] + s]]);
+                    }
+                    if matches!(shape, S::Cross | S::CrossCircle) {
+                        strokes.push(vec![[c[0] - d, c[1] - d], [c[0] + d, c[1] + d]]);
+                        strokes.push(vec![[c[0] - d, c[1] + d], [c[0] + d, c[1] - d]]);
+                    }
+                    for points in strokes {
+                        g.lines.push(Polyline2 { points, style: LineStyle::Visible, closed: false, pick: view_pick });
+                    }
+                    if matches!(shape, S::Circle | S::CentermarkCircle | S::CrossCircle) {
+                        g.lines.push(Polyline2 { points: circle_points(c, s / 2.0, 32), style: LineStyle::Visible, closed: true, pick: view_pick });
+                    }
+                }
+                if mark.0 < g.lines.len() {
+                    g.pens.push(super::sheet::PenSpan { lines: mark.0..g.lines.len(), width_mm: vt.sketch_solid.thickness, dashes: Vec::new() });
+                    color_lines_since(&mut g, mark, vt.sketch_point_color);
+                }
+            }
             g.view_edges.push((v.id, edges0..g.lines.len()));
             // Section hatching: computed on the unbroken view, then cropped and
             // broken in view coordinates.
@@ -1297,7 +1348,22 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 // Edit hatch section...: restyled regions (the rest keep the
                 // drawing's hatch; a cut that doesn't close keeps it all).
                 let regions = if v.section_hatches.is_empty() { None } else { views::section_regions(&geo.section_segments) };
+                // Drawing properties › Views › View and region hatches: a
+                // pattern other than ANSI31 hatches each cut region with it.
+                let (hstd, hpat) = vt.hatch_pattern;
+                let default_pattern = hstd == 0 && matches!(hpat, 0 | 8);
+                let patterned = (!default_pattern && regions.is_none()).then(|| views::section_regions(&geo.section_segments)).flatten();
+                if let Some(regions) = &patterned {
+                    let ring = |l: &[[f64; 2]]| l.iter().map(|q| ub.to_sheet(*q)).collect::<Vec<_>>();
+                    for (outer, holes) in regions {
+                        let hs: Vec<Vec<[f64; 2]>> = holes.iter().map(|x| ring(x)).collect();
+                        for l in super::sheet_sketch::hatch_pattern_holes(&ring(outer), &hs, hstd, hpat, 1.0, 0.0) {
+                            push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                        }
+                    }
+                }
                 match regions {
+                    None if patterned.is_some() => {}
                     None => {
                         for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
                             push_hatch_line(&mut g, &pl, geo, l, view_pick);
@@ -1547,14 +1613,21 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
             }
             // Cosmetic threads: ANSI a dashed circle at the major diameter, ISO
-            // a thin three-quarter circle (the gap in the upper right).
+            // and JIS a thin arc of about three quarters (live 10-26 d, sheet
+            // y up: ISO's gap from 188.5° to 270.5°, JIS's from 7.5° to
+            // 79.5°).
             let thread_mark = g.mark();
             if !geo.threads.is_empty() {
                 // Drawing properties › Views › Cosmetic threads › Thread
-                // style (JIS drawn as ISO), else the sheet's standard.
-                let ansi = vt.thread_style.map_or(sheet.size.is_ansi(), |s| s == super::ThreadStyle::Ansi);
+                // style, else the sheet's standard.
+                let style = vt.thread_style.unwrap_or(if sheet.size.is_ansi() { super::ThreadStyle::Ansi } else { super::ThreadStyle::Iso });
+                let ansi = style == super::ThreadStyle::Ansi;
                 for (c, r) in &geo.threads {
-                    let (a0, a1) = if ansi { (0.0, std::f64::consts::TAU) } else { (std::f64::consts::FRAC_PI_2, std::f64::consts::TAU) };
+                    let (a0, a1) = match style {
+                        super::ThreadStyle::Ansi => (0.0, std::f64::consts::TAU),
+                        super::ThreadStyle::Iso => ((-89.5f64).to_radians(), 188.5f64.to_radians()),
+                        super::ThreadStyle::Jis => (79.5f64.to_radians(), 367.5f64.to_radians()),
+                    };
                     let n = 48;
                     let pts: Vec<[f64; 2]> = (0..=n).map(|i| a0 + (a1 - a0) * i as f64 / n as f64).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]).collect();
                     for piece in map_polyline(&pl, &pts) {
@@ -2029,19 +2102,26 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     g.arrow(yt, [0.0, sy], 2.0);
                 }
             }
+            color_lines_since(&mut g, origin_mark, ts.hole_indicator_color);
             g.texts.push(Text2 { pos: [xt[0] + 1.5 * sx - if sx < 0.0 { 1.8 } else { 0.0 }, xt[1] - 0.9], height: 1.8, text: "X".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
             g.texts.push(Text2 { pos: [yt[0] - 0.6, yt[1] + if sy > 0.0 { 1.0 } else { -2.8 }], height: 1.8, text: "Y".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
             g.fills.push(Fill2 { points: circle_points(os, 0.8, 8) });
             g.cad_since(origin_mark, CadLayer::OriginIndicators);
             let tag_mark = g.texts.len();
+            let tags = &ts.hole_tags;
             for hrow in tables::hole_rows(geo, o) {
                 let c = pl.to_sheet(hrow.center);
                 let r = pl.len_to_sheet(hrow.diameter / 2.0);
-                g.texts.push(Text2 { pos: [c[0] + r * 0.75 + 0.8, c[1] + r * 0.75 + 0.8], height: 2.5, text: hrow.tag, angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                g.texts.push(Text2 { pos: [c[0] + r * 0.75 + 0.8, c[1] + r * 0.75 + 0.8], height: tags.height.unwrap_or(drawing.props.ann_text_height), text: hrow.tag, angle: 0.0, anchor: Anchor::BottomLeft, pick });
             }
             g.cad_text_style_since(tag_mark, CadTextStyle::HoleTag);
-            if let Some(font) = drawing.props.table_styles.hole_tags_font.clone().filter(|_| g.texts.len() > tag_mark) {
+            // Hole tables › Tags: font, Bold / Italic and colour.
+            let tags_font = ts.hole_tags_font.clone().map(|f| super::sheet::TextFont { bold: tags.bold, italic: tags.italic, ..f }).or_else(|| (tags.bold || tags.italic).then(|| super::sheet::TextFont { family: super::sheet::DRAWING_DEFAULT_FONT.into(), bold: tags.bold, italic: tags.italic }));
+            if let Some(font) = tags_font.filter(|_| g.texts.len() > tag_mark) {
                 g.fonts.push(super::sheet::FontSpan { texts: tag_mark..g.texts.len(), font });
+            }
+            if let Some(rgb) = tags.color.filter(|_| g.texts.len() > tag_mark) {
+                g.colors.push(super::sheet::ColorSpan { lines: 0..0, texts: tag_mark..g.texts.len(), fills: 0..0, rgb });
             }
         }
         table_layouts.push((t.id, layout));

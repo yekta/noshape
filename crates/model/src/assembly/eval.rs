@@ -496,18 +496,19 @@ impl Prepared {
         {
             let (_, kind, _) = self.mates[i];
             let m = &mut mates[i];
+            // `value` in the mate values' sense (solver::mate_values).
             match kind {
                 MateType::Revolute => {
                     m.kind = MateType::Fastened;
-                    m.rotation = value;
+                    m.rotation = -value;
                 }
                 MateType::Cylindrical => {
                     m.kind = MateType::Slider;
-                    m.rotation = value;
+                    m.rotation = -value;
                 }
                 MateType::Slider => {
                     m.kind = MateType::Fastened;
-                    m.offset.z = value;
+                    m.offset.z = solver::slider_offset_z(m, value);
                 }
                 _ => {}
             }
@@ -519,11 +520,7 @@ impl Prepared {
                 continue;
             }
             // Every free value fixed: the mate becomes a fastened one at those values.
-            let m = &mut mates[i];
-            m.kind = MateType::Fastened;
-            m.rotation = v[0];
-            m.offset = DVec3::new(v[1], v[2], v[3]);
-            m.limits.clear();
+            solver::fasten_at(&mut mates[i], *v);
         }
         for (mid, ix, v) in &opts.hold_values {
             let Some(i) = self.mates.iter().position(|(id, _, _)| id == mid) else { continue };
@@ -966,6 +963,13 @@ pub struct AssemblyEvaluator {
     /// Regeneration options for Part Studios with Derived or custom
     /// features (their sources: the app's / agent API's providers).
     studio_options: Option<StudioOptions>,
+    /// Part Studios (and configurations) already checked against the
+    /// document during the current `evaluate` (each instance of a part
+    /// asked again; hashing the Part Studio per instance cost ~40 ms for
+    /// 1000 pins). Empty outside `evaluate`.
+    studios_checked: HashSet<(TabId, String)>,
+    /// Inside `evaluate` (the document can't change meanwhile).
+    evaluating: bool,
 }
 
 /// Builds the regeneration options (derived parts' sources, custom
@@ -1718,6 +1722,11 @@ impl AssemblyEvaluator {
         };
         let cfg = effective_config(doc, tab, config);
         let key = (tab, serde_json::to_string(&cfg).unwrap_or_default());
+        if self.studios_checked.contains(&key)
+            && let Some(e) = self.studios.get(&key)
+        {
+            return Some(e.result.clone());
+        }
         let mut hash = hash_of(&(ps, &doc.settings.units));
         // Derived parts and custom features need their sources (qa5 DER8:
         // a Part Studio of derived parts listed nothing in Insert); the
@@ -1738,6 +1747,9 @@ impl AssemblyEvaluator {
                     hash = hash.rotate_left(5) ^ hash_of(&serde_json::to_string(&t.content).unwrap_or_default());
                 }
             }
+        }
+        if self.evaluating {
+            self.studios_checked.insert(key.clone());
         }
         let entry = self.studios.entry(key).or_insert_with(|| StudioCacheEntry { hash: hash ^ 1, regen: Regenerator::new(), result: Arc::new(RegenResult::default()) });
         if entry.hash != hash {
@@ -1848,7 +1860,11 @@ impl AssemblyEvaluator {
     pub fn evaluate(&mut self, doc: &Document, assembly: &Assembly, opts: &SolveOptions, explode: Option<usize>) -> AssemblyResult {
         let t0 = Instant::now();
         let mut visited = Vec::new();
+        self.evaluating = true;
+        self.studios_checked.clear();
         let (leaves, nodes, prepared) = self.prepare_inner(doc, assembly, &mut visited);
+        self.evaluating = false;
+        self.studios_checked.clear();
         let solved = prepared.solve(opts);
         let mut occurrences = Vec::new();
         let best: std::collections::HashSet<InstanceId> = assembly.instances.iter().filter(|i| i.best_tessellation).map(|i| i.id).collect();

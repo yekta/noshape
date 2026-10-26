@@ -1230,3 +1230,43 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   pre-highlight; sketch curves get LineSegment::CORE and highlight from at most 1.25 px (same 5 rows as
   a part edge). Show dimensions: SceneOptions::dims_shown → Instance::ambient 0.035 (params.x bit 1,
   extra.z) on part meshes.
+- (10-26 late) After perf's sRGB blending: 4d2f6b0c selection drawn again over planes (Instance::
+  selected_only, 0.44; selected face under a plane (227,170,56) vs live (229,170,56)), plane names
+  without the trace at 0.998 (ambient occlusion off them), no pre-highlight on what is selected.
+  27c1682a mate connector glyph (scene_builder::ConnectorGlyphs camera geometry; connector_look.rs:
+  hover via graphics or feature row, selected, owner part edges #f2ff80 @ 0.86).
+  71f7b7c7 decal render path: Uploader::upload_textured (nearest texel sampler, no mips, UV outside
+  [0,1]² discarded), Instance::decal_selected (0.4 toward (255,170,10) in sRGB); test
+  decal_texels_are_exact_and_tint_when_selected. TODO once psb's b3584ce0 (Context::decals,
+  DecalRecord::uv_at) is on main: StudioDisplay.decals (+ the image bytes from the file tab), builder:
+  each decal = its face's triangles (face_ranges of the body mesh, Reference::Face(record.face)) with
+  uv = uv_at(p) → (u, 1 − v), colour [1,1,1, part alpha], unpickable; BuiltScene keeps the decal
+  instances so with_highlights sets decal_selected when the face or the Decal feature is selected.
+  Live spec: behaviours "icons2 decal rendering".
+
+## Icon audit (10-26, lead: every icon vs live at 1x / 2x before dark mode)
+Method: scratch tools/rank.py (all 676 icons with a live reference, scored at 20 px = 1x and 40 px = 2x,
+sheets in scratch sheets/audit26-*.png) restricted to the 548 the code references (string literals or a
+feature type's icon), contact sheets of every referenced icon scoring > 4.5 (scan.py, scratch v/aud1-2.png),
+plus every feature type's icon (CLI feature_types through feature_icon) and the 45 used icons without a
+live reference. Scores below ~3-4 are the known anti-aliasing floor (round 8).
+- MISSING / PLACEHOLDER (fixed): copyPart, nameEntity, sheetMetalRecognize had no icon, so the feature list
+  showed the `part` fallback. Live (behaviours "icons2 (10-23) feature-list row icons") shows its client
+  fallback, the red warning triangle (#svg-icon-feature-studio-error, #bd3039), for every type without an
+  icon of its own, and explicitly for Point, Copy part, Rip, Unfold and Refold whatever their status. New
+  hand-drawn feature-studio-error.svg (score 3.2) and feature_icon now uses it for those types and as its
+  fallback (part_studio/mod.rs).
+- DELIBERATE (brand marks, not copied): document / new-document (live: the Onshape "On" logo; ours a part
+  cube), file-pdf (live: the Adobe mark; ours "PDF").
+- UNUSED in the app (no reference in the code, not shown): front/back/left/right/top/bottom/iso-view,
+  check-repeat, export-step/-stl, file-x_b/x_t, hidden-lines, merge-card-*, onshape-labs, save,
+  shaded-edges, sheet-metal-rip, unsuppress, weld-menu-double-*, wireframe. (The view icons also differ from
+  live's view-cube menu art: the emphasised face is a filled band in ours, an outline in live; redraw only if
+  they get used.)
+- APPROXIMATE, refs too coarse to judge: drawing hatch swatches hatch-0-* / hatch-2-* (live refs are
+  23 x 16 px browser captures). General 2-6 Herringbone, 2-18 Houndstooth, 2-24 Stars, 2-28 Wood read
+  differently in live's capture; attempts against the blurred refs scored worse than the current art. Needs
+  a sharper live capture (the hatch picker at 2x / 4x zoom) before redrawing (P2).
+- Everything else referenced matches structurally (residual = anti-aliasing / sub-pixel offsets), checked on
+  the sheets: toolbar, feature list, dialogs, menus, assembly / drawing toolbars, sketch toolbar, status bar.
+  ui-dropdown-arrow's score is a false alarm (drawn as a #666 mask glyph in the app, as live).

@@ -48,6 +48,10 @@ CHECKS = [
     ("shift-empty-keeps", "1.4", "a Shift+click in empty space keeps the selection", lambda s: kinds(s) == ["Face"]),
     ("ctrl-box-deselects", "1.11", "a Ctrl crossing box over the selected face deselects it", lambda s: kinds(s) == []),
     ("ctrl-box-nothing", "1.11", "a Ctrl box with nothing selected selects nothing", lambda s: kinds(s) == []),
+    ("select-for-jitter", "1.14", "(setup) a face selected", lambda s: kinds(s) == ["Face"]),
+    ("jitter-click-clears", "1.14", "a 1 px move in empty space is still a click: it clears", lambda s: kinds(s) == []),
+    ("select-for-drag", "1.14", "(setup) a face selected", lambda s: kinds(s) == ["Face"]),
+    ("small-drag-keeps", "1.14", "a 4 px move in empty space is a box: the selection stays", lambda s: kinds(s) == ["Face"]),
 ]
 
 

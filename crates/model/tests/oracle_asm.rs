@@ -358,11 +358,8 @@ const KNOWN: &[(&str, &str)] = &[
     ("R1", "skb: circular edge CENTER connector: live keeps the pin upright on the hole (identity at (−70, 20, 10), rz 0), ours turns it upside down and 6° about z: live's Z points out of the part (the pin's bottom edge −z, the hole's top edge +z)"),
     ("R2", "skb: Revolute limits 0..45° from a start at 90°: live returns to rz 0 (pin unturned), ours stops at 45°; also R1's connector flip"),
     ("R3", "skb: Revolute on cylinder MID_AXIS_POINTs: both flip the pin, live with rz −157.5° (B at (314.75, 96.61, 20)), ours rz +6°"),
-    ("S2", "skb: Slider limits 0..10 mm: live leaves B on A (z 10, translationZ 0), ours lifts it to z 20; S1's value is −15 mm in live, +15 in ours (the slider's sense)"),
     ("C1", "skb: Cylindrical on cylinder axes: as R3 (live rz −157.5°, translationZ +50 mm; ours rz +6°, −50 mm)"),
-    ("B2", "skb: Ball with a 30° cone limit: live turns B 150° about y at (40, 20, 10), ours elsewhere"),
     ("M1", "skb: Revolute (bottom on top) + Slider (front faces): live keeps B upright, turned 30° at (7.68, −8.66, 10); ours turns it upside down"),
-    ("M2", "skb: Revolute C on fastened B: live C unturned at (0, 0, 20), ours turned 1.3e-4 rad (the solver stops short)"),
     ("LP1", "skb: R1's connector flip and F5's edge direction: live's copies at x −55 / −40 upright, ours at −85 / −100 upside down"),
 ];
 

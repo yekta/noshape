@@ -1751,3 +1751,154 @@ fn remove_that_misses_the_part_reports_the_info() {
         assert_eq!((st.status, st.message.as_deref()), (status, message), "opposite {opposite}");
     }
 }
+
+/// Live "psb (10-26 c)": surface lofts along guides. Arcs in x = 0 and
+/// x = 30; the guide a 40 long block edge (LG1/LG2: Trim guides on stops at
+/// the profiles, off runs on to x = 40), a 50 long sheet edge (LG4) or an
+/// arc in y = 0 (LG5); LG3 trims straight profiles at two guides. Continuity
+/// either holds (the same surface) or conflicts.
+#[test]
+fn loft_guides_trims_and_continuity_as_live() {
+    use noshape_model::display::BodyKind;
+    let mm = |v: f64| v * 1e-3;
+    // An arc in a Right-offset sketch (sketch x = world Y, y = Z).
+    let arc = |t: &mut T, plane: Reference, c: (f64, f64), a: (f64, f64), b: (f64, f64)| -> Reference {
+        let mut sk = noshape_sketch::Sketch::new();
+        let e = sk.add_arc(DVec2::new(mm(c.0), mm(c.1)), DVec2::new(mm(a.0), mm(a.1)), DVec2::new(mm(b.0), mm(b.1)));
+        let s = t.sketch(plane, sk);
+        Reference::SketchEntity { sketch: s, entity: e.0 }
+    };
+    let line = |t: &mut T, plane: Reference, a: (f64, f64), b: (f64, f64)| -> Reference {
+        let mut sk = noshape_sketch::Sketch::new();
+        let e = sk.add_line(DVec2::new(mm(a.0), mm(a.1)), DVec2::new(mm(b.0), mm(b.1)));
+        let s = t.sketch(plane, sk);
+        Reference::SketchEntity { sketch: s, entity: e.0 }
+    };
+    let x30 = |t: &mut T| Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("cplaneType", en("OFFSET")), ("offset", e("30 mm"))]));
+    let edge_at = |t: &mut T, p: DVec3| -> Reference {
+        let r = t.regen();
+        for b in &r.context.bodies {
+            for (i, ed) in b.shape.edges().iter().enumerate() {
+                let (a, c) = ed.endpoints().unwrap();
+                if ((a + c) * 0.5 - p).length() < 1e-9 {
+                    return Reference::Edge((*b.edges[i]).clone());
+                }
+            }
+        }
+        panic!("no edge at {p:?}");
+    };
+    let loft = |t: &mut T, profiles: [Reference; 2], guides: Vec<(Reference, &str)>, trims: [Option<bool>; 2]| {
+        let item = |r: &Reference| {
+            let mut v = ParamValues::default();
+            v.set("wireProfileEntities", q(vec![r.clone()]));
+            v
+        };
+        let guide = |(r, c): &(Reference, &str)| {
+            let mut v = ParamValues::default();
+            v.set("guideEntities", q(vec![r.clone()]));
+            v.set("guideDerivativeType", en(c));
+            v
+        };
+        let mut ps = vec![
+            ("bodyType", en("SURFACE")),
+            ("wireProfilesArray", ParamValue::Array(profiles.iter().map(item).collect())),
+            ("addGuides", b(true)),
+            ("guidesArray", ParamValue::Array(guides.iter().map(guide).collect())),
+        ];
+        if let Some(v) = trims[0] {
+            ps.push(("trimGuidesByProfiles", b(v)));
+        }
+        if let Some(v) = trims[1] {
+            ps.push(("trimProfiles", b(v)));
+        }
+        t.add("loft", &ps);
+    };
+    // The loft's area (mm²), or its error.
+    let result = |t: &mut T| -> Result<f64, String> {
+        let r = t.regen();
+        let s = r.display.features.last().unwrap();
+        if s.status != FeatureStatus::Ok {
+            return Err(s.message.clone().unwrap_or_default());
+        }
+        let b = r.context.bodies.iter().rev().find(|b| b.kind == BodyKind::Surface).unwrap();
+        Ok(b.shape.faces().iter().map(|f| f.area().unwrap()).sum::<f64>() * 1e6)
+    };
+    // LG1 / LG2: arcs through (0,10) (10,14) (20,10), the block's top front edge.
+    let lg1 = |cont: &str, trim: Option<bool>| {
+        let mut t = T::new();
+        t.block(0.0, 0.0, mm(40.0), mm(20.0), "10 mm");
+        let a = arc(&mut t, Reference::Plane(DatumPlane::Right), (10.0, -0.5), (20.0, 10.0), (0.0, 10.0));
+        let p = x30(&mut t);
+        let b2 = arc(&mut t, p, (10.0, -0.5), (20.0, 10.0), (0.0, 10.0));
+        let g = edge_at(&mut t, DVec3::new(mm(20.0), 0.0, mm(10.0)));
+        loft(&mut t, [a, b2], vec![(g, cont)], [trim, None]);
+        result(&mut t)
+    };
+    let near_area = |got: Result<f64, String>, want: f64, tol: f64, case: &str| {
+        let got = got.unwrap_or_else(|m| panic!("{case}: {m}"));
+        assert!((got - want).abs() < tol, "{case}: area {got} vs live {want}");
+    };
+    // Live: a cylinder, x 0..30 (r 14.5).
+    near_area(lg1("DEFAULT", None), 662.0810962, 1e-4, "LG1n");
+    near_area(lg1("DEFAULT", Some(true)), 662.0810962, 1e-4, "LG2on");
+    // Live's surface run on to x = 40 is a spline fit (882.7494955); the
+    // cylinder it fits is 882.7748.
+    near_area(lg1("DEFAULT", Some(false)), 882.7494955, 0.05, "LG2off");
+    let conflict = Err("The selected end condition or guide constraint may be in conflict.".to_string());
+    assert_eq!(lg1("MATCH_TANGENT", None), conflict, "LG1t");
+    assert_eq!(lg1("MATCH_CURVATURE", None), conflict, "LG1c");
+    let planar = Err("Only planar guides are valid for Normal/Tangent to guide continuity.".to_string());
+    assert_eq!(lg1("NORMAL_TO_GUIDE", None), planar, "LG1nt");
+    assert_eq!(lg1("TANGENT_TO_GUIDE", None), planar, "LG1tt");
+
+    // LG4 / LG5: quarter arcs R10 at x 0 and R15 at x 30 leaving (y 0, z 10)
+    // along +Y; the guide a horizontal sheet's edge or an arc in y = 0.
+    let lg45 = |sheet: bool, cont: &str| {
+        let mut t = T::new();
+        let a = arc(&mut t, Reference::Plane(DatumPlane::Right), (0.0, 20.0), (0.0, 10.0), (10.0, 20.0));
+        let p = x30(&mut t);
+        let b2 = arc(&mut t, p, (0.0, 25.0), (0.0, 10.0), (15.0, 25.0));
+        let g = if sheet {
+            // Front: sketch x = X, y = Z; extruded 10 toward -Y.
+            let l = line(&mut t, Reference::Plane(DatumPlane::Front), (-5.0, 10.0), (45.0, 10.0));
+            t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![l])), ("depth", e("10 mm"))]);
+            edge_at(&mut t, DVec3::new(mm(20.0), 0.0, mm(10.0)))
+        } else {
+            arc(&mut t, Reference::Plane(DatumPlane::Front), (15.0, -16.125), (30.0, 10.0), (0.0, 10.0))
+        };
+        loft(&mut t, [a, b2], vec![(g, cont)], [None, None]);
+        result(&mut t)
+    };
+    // Live's surface only fits its profiles here (its R15 edge is 23.56118
+    // long, the arc 23.56194); ours runs through them, as live's does with
+    // Match curvature (590.89566): within 0.03 mm².
+    near_area(lg45(true, "DEFAULT"), 590.8767528, 0.03, "LG4n");
+    near_area(lg45(true, "MATCH_TANGENT"), 590.8767528, 0.03, "LG4t");
+    near_area(lg45(true, "MATCH_CURVATURE"), 590.89566, 0.01, "LG4c");
+    near_area(lg45(false, "DEFAULT"), 550.3797286, 0.03, "LG5n");
+    near_area(lg45(false, "NORMAL_TO_GUIDE"), 550.3797286, 0.03, "LG5nt");
+    assert_eq!(lg45(false, "TANGENT_TO_GUIDE"), conflict, "LG5tt");
+    // A guide that is a sketch curve has no face to match.
+    assert_eq!(lg45(false, "MATCH_TANGENT"), Err("A guide has no adjacent faces to match tangent or curvature to.".to_string()), "no face");
+
+    // LG3: lines y −25..25 at (x 0, z 10) and (x 30, z 15), guides in y = 0
+    // and y = −20 (Front offset 20) from z 10 to 15: one plane.
+    let lg3 = |trim: bool| {
+        let mut t = T::new();
+        let a = line(&mut t, Reference::Plane(DatumPlane::Right), (-25.0, 10.0), (25.0, 10.0));
+        let p = x30(&mut t);
+        let b2 = line(&mut t, p, (-25.0, 15.0), (25.0, 15.0));
+        let g1 = line(&mut t, Reference::Plane(DatumPlane::Front), (0.0, 10.0), (30.0, 15.0));
+        let f20 = Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Front)])), ("cplaneType", en("OFFSET")), ("offset", e("20 mm"))]));
+        let g2 = line(&mut t, f20, (0.0, 10.0), (30.0, 15.0));
+        loft(&mut t, [a, b2], vec![(g1, "DEFAULT"), (g2, "DEFAULT")], [None, Some(trim)]);
+        let r = result(&mut t);
+        let planar = t.regen().context.bodies.iter().rev().find(|b| b.kind == BodyKind::Surface).is_some_and(|b| b.shape.faces().iter().all(|f| f.is_planar()));
+        (r, planar)
+    };
+    let (off, planar_off) = lg3(false);
+    near_area(off, 1520.6906326, 1e-4, "LG3off");
+    let (on, planar_on) = lg3(true);
+    near_area(on, 608.2762530, 1e-4, "LG3on");
+    assert!(planar_off && planar_on, "LG3: live's loft face is a plane");
+}

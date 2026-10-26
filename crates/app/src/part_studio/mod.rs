@@ -40,6 +40,7 @@ mod thickness;
 mod flatten_tool;
 mod draft_tool;
 pub(crate) mod export;
+mod connector_look;
 mod plane_handles;
 mod shown_dims;
 pub(crate) mod toolbar_prefs;
@@ -50,7 +51,7 @@ pub use in_context::{AssemblyContext, ContextOccurrence, PartStudioEvent, contex
 
 use crate::actions::*;
 use crate::sketch_mode::SketchEditor;
-use crate::assets::icon_path;
+use crate::assets::{has_icon, icon_path};
 use crate::doc_model::{DocEvent, DocModel};
 use crate::feature_dialog::{DialogEvent, FeatureDialog, RefLabeler};
 use crate::gpu::Gpu;
@@ -126,7 +127,10 @@ pub fn feature_icon(type_id: &str) -> SharedString {
     }
     let name = match type_id {
         "cPlane" => "plane",
-        "cPoint" => "point",
+        // Live (behaviours "icons2 (10-23) feature-list row icons"): these
+        // have no icon of their own; the client shows its fallback, the red
+        // warning triangle, whatever the feature's status.
+        "cPoint" | "copyPart" | "sheetMetalRip" | "sheetMetalUnfold" | "sheetMetalRefold" => "feature-studio-error",
         "assignVariable" => "variable",
         "queryVariable" => "query-variable",
         "booleanBodies" => "boolean",
@@ -143,8 +147,6 @@ pub fn feature_icon(type_id: &str) -> SharedString {
         "sheetMetalBendRelief" => "bend-relief",
         "sheetMetalCornerBreak" => "corner-break",
         "sheetMetalCorner" => "corner-relief",
-        "sheetMetalUnfold" => "unfold",
-        "sheetMetalRefold" => "refold",
         "sheetMetalJoint" => "joint",
         "sheetMetalMakeJoint" => "sheet-metal-make-joint",
         "sheetMetalJog" => "jog",
@@ -168,7 +170,8 @@ pub fn feature_icon(type_id: &str) -> SharedString {
                 }
                 s.push(ch.to_ascii_lowercase());
             }
-            return icon_path(&s);
+            // A type without an icon: the client's fallback (live), not a part.
+            return icon_path(if has_icon(&s) { &s } else { "feature-studio-error" });
         }
     };
     icon_path(name)
@@ -921,6 +924,10 @@ impl PartStudioView {
         let mut manip: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = self.manipulator_geometry(cx).into_iter().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>).collect();
         // A selected plane's resize rings (plane_handles.rs).
         manip.extend(self.plane_ring_geometry().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
+        // Mate connector glyphs and their owner parts (connector_look.rs).
+        let (mc_glyphs, mc_owners) = self.connector_overlays(&selection, cx);
+        manip.extend(mc_glyphs.map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
+        extra.extend(mc_owners);
         self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
         extra.extend(self.consumed_picks_overlay(&selection, &accent));
         extra.extend(self.select_other_overlay());

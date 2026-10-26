@@ -47,6 +47,22 @@ pub struct BlendSpec {
     /// Allow edge overflow off: a ball wider than a face rests on that face's
     /// far edge (the cliff) instead (live oracle_p1 F7).
     pub cliff: bool,
+    /// Face blend: the radii are offsets of side 1 and side 2 (see [`Sides`]).
+    pub sides: Option<Sides>,
+}
+
+/// Face blend sizes (live psb 10-26 b, L brackets at 60°, 90° and 135°): the
+/// section's centre lies at `r1` from side 1 and `r2` from side 2 and it
+/// touches each side at the foot of the perpendicular from that centre, so
+/// a setback is (d_other + d_own·cos θ) / sin θ, θ the angle between the
+/// sides. A width is the chord between the touch points, with the offsets in
+/// the ratio side 1 : side 2 = `ratio`. A setback at or behind the corner
+/// fails like live ("Provided dimension is too small.").
+#[derive(Clone, Debug)]
+pub struct Sides {
+    /// Faces of side 1 (indices in the body).
+    pub side1: Vec<usize>,
+    pub ratio: f64,
 }
 
 /// A partial fillet bound along the selected chain (position 0 = the chain's
@@ -185,7 +201,15 @@ fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f
         let n = faces[i].normal_at_point(p)?.normalize();
         let dir = n.cross(tangent).normalize();
         let mut found = false;
-        'search: for su in [1.0, -1.0] {
+        // Along the face: the side the face lies on (at a concave edge both
+        // sides of the edge have material below them).
+        let on_face = |su: f64| -> FResult<bool> {
+            let q = k::make_vertex(p + dir * (su * d))?;
+            Ok(k::distance(&q, faces[i])?.distance < d * 1e-3)
+        };
+        let sides: Vec<f64> = [1.0, -1.0].into_iter().filter(|su| on_face(*su).unwrap_or(false)).collect();
+        let sides = if sides.is_empty() { vec![1.0, -1.0] } else { sides };
+        'search: for su in sides {
             for sn in [-1.0, 1.0] {
                 let q = p + dir * (su * d) + n * (sn * d);
                 if body.classify_point(q, d * 1e-3)? == k::PointClass::Inside {
@@ -203,9 +227,43 @@ fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f
     Ok(Frame { u, m, extent: [f64::INFINITY; 2] })
 }
 
+/// Setbacks along the two faces of a frame (face 0, face 1); `first_is_side1`
+/// says which face is side 1 of a face blend.
+fn setbacks(f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> FResult<(f64, f64)> {
+    let half = f.m[0].dot(f.m[1]).clamp(-1.0, 1.0).acos() / 2.0;
+    let Some(sides) = &spec.sides else {
+        return Ok(match spec.width {
+            Some(w) => {
+                let s = w / (2.0 * half.cos());
+                (s, s)
+            }
+            None => (spec.r1 * half.tan(), spec.r2 * half.tan()),
+        });
+    };
+    let c = f.u[0].dot(f.u[1]).clamp(-1.0, 1.0);
+    let sn = (1.0 - c * c).sqrt();
+    if sn < 1e-9 {
+        return Err(fail("the faces at the edge are tangent"));
+    }
+    let (mut d0, mut d1) = if spec.width.is_some() { (sides.ratio, 1.0) } else { (spec.r1, spec.r2) };
+    if !first_is_side1 {
+        std::mem::swap(&mut d0, &mut d1);
+    }
+    let (mut t0, mut t1) = ((d1 + d0 * c) / sn, (d0 + d1 * c) / sn);
+    if let Some(w) = spec.width {
+        let k = w / (f.u[0] * t0 - f.u[1] * t1).length().max(1e-300);
+        (t0, t1) = (t0 * k, t1 * k);
+    }
+    let size = t0.abs().max(t1.abs()).max(1e-300);
+    if t0 <= size * 1e-9 || t1 <= size * 1e-9 {
+        return Err(FeatureError::new("Provided dimension is too small."));
+    }
+    Ok((t0, t1))
+}
+
 /// The section face at `p` (2D region between the corner, the tangent points
 /// and the curve) and its three edges (corner → T1, curve, T2 → corner).
-fn section_face(p: DVec3, f: &Frame, spec: &BlendSpec) -> FResult<(Shape, [Shape; 3], bool)> {
+fn section_face(p: DVec3, f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> FResult<(Shape, [Shape; 3], bool)> {
     let convex = f.u[0].dot(f.m[1]) > 0.0;
     let cos_phi = f.m[0].dot(f.m[1]).clamp(-1.0, 1.0);
     let phi = cos_phi.acos();
@@ -213,13 +271,7 @@ fn section_face(p: DVec3, f: &Frame, spec: &BlendSpec) -> FResult<(Shape, [Shape
         return Err(fail("the faces at the edge are tangent"));
     }
     let half = phi / 2.0;
-    let (s1, s2) = match spec.width {
-        Some(w) => {
-            let s = w / (2.0 * half.cos());
-            (s, s)
-        }
-        None => (spec.r1 * half.tan(), spec.r2 * half.tan()),
-    };
+    let (s1, s2) = setbacks(f, spec, first_is_side1)?;
     let (t1, t2) = (p + f.u[0] * s1, p + f.u[1] * s2);
     // A ball wider than a face: tangent to the other face, through the
     // cliff (that face's far edge).
@@ -414,6 +466,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
             return Err(fail("the edge doesn't have two faces"));
         }
         let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+        let side1_first = spec.sides.as_ref().is_none_or(|sd| sd.side1.contains(&(fs[0] as usize)));
         let info = c.shape.edge_info()?;
         let ename = body.edges[c.index].clone();
         let r_ext = 2.0 * spec.r1.max(spec.r2).max(spec.width.unwrap_or(0.0));
@@ -432,6 +485,11 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
             let mid_prm = (info.first_param + info.last_param) / 2.0;
             let mid = c.shape.point_at(mid_prm)?;
             let fr = frame_at(shape, ff, mid, c.shape.tangent_at(mid_prm)?.normalize(), scale)?;
+            // A concave edge's section is added: running on past the part's
+            // end would stick out of it.
+            if fr.u[0].dot(fr.m[1]) <= 0.0 {
+                return Ok(0.0);
+            }
             let probe = p + out * (r_ext * 0.5) + (fr.u[0] + fr.u[1]) * (r_ext * 0.05);
             Ok(if shape.classify_point(probe, scale * 1e-9)? == k::PointClass::Outside { r_ext } else { 0.0 })
         };
@@ -442,9 +500,8 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                 let mut fr = frame_at(shape, ff, c.start + d * ((a + b) / 2.0), d, scale)?;
                 // The ball must touch both faces within them (otherwise Onshape
                 // fails too), or rest on a face's far edge with overflow off.
-                let half = fr.m[0].dot(fr.m[1]).clamp(-1.0, 1.0).acos() / 2.0;
-                for (k, (fi, r)) in ff.iter().zip([spec.r1, spec.r2]).enumerate() {
-                    let setback = spec.width.map(|w| w / (2.0 * half.cos())).unwrap_or(r * half.tan());
+                let sb = setbacks(&fr, spec, side1_first)?;
+                for (k, (fi, setback)) in ff.iter().zip([sb.0, sb.1]).enumerate() {
                     let line_dist = |q: DVec3| (q - c.start - d * (q - c.start).dot(d)).length();
                     let width = fi.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(line_dist).fold(0.0, f64::max);
                     if spec.cliff {
@@ -463,7 +520,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                     let limit = (bb.max - bb.min).length() + ext;
                     let mut e = ext;
                     while e < limit {
-                        let (f, _, _) = section_face(end + out * e, &fr, spec)?;
+                        let (f, _, _) = section_face(end + out * e, &fr, spec, side1_first)?;
                         if k::distance(&f, shape)?.distance > scale * 1e-9 && shape.classify_point(f.centroid()?, scale * 1e-9)? == k::PointClass::Outside {
                             return Ok(e);
                         }
@@ -473,7 +530,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                 };
                 let (e0, e1) = (reach(c.start + d * a, -d, e0)?, reach(c.start + d * b, d, e1)?);
                 let p0 = c.start + d * (a - e0);
-                let (face, edges3, convex) = section_face(p0, &fr, spec)?;
+                let (face, edges3, convex) = section_face(p0, &fr, spec, side1_first)?;
                 let tool = k::extrude(&face, d * (b - a + e0 + e1))?;
                 let names = tool_names(feature, &tool, &face, &edges3[1], &ename);
                 (tool.shape, names, convex)
@@ -493,7 +550,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                 let back = (f0 - (f0 + f1) / 2.0) * span - g0;
                 let rot = |v: DVec3| glam::DQuat::from_axis_angle(ax, back) * v;
                 let fr0 = Frame { u: [rot(fr.u[0]), rot(fr.u[1])], m: [rot(fr.m[0]), rot(fr.m[1])], extent: fr.extent };
-                let (face, edges3, convex) = section_face(p0, &fr0, spec)?;
+                let (face, edges3, convex) = section_face(p0, &fr0, spec, side1_first)?;
                 let mut angle = (f1 - f0) * span + g0 + g1;
                 // A closed circle (live K3: a conic on a Ø20 boss's top edge) is
                 // blended all round; an arc never runs on past a full turn.

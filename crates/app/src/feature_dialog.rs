@@ -1550,50 +1550,55 @@ impl FeatureDialog {
     }
 
     fn value_errors(&self) -> impl Iterator<Item = (&'static str, String)> + '_ {
-        self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params)).filter_map(|s| {
+        self.eval_errors(|_, typed| typed.to_string())
+    }
+
+    /// Each shown number field's `text` that doesn't evaluate as its type,
+    /// with live's message for it.
+    fn eval_errors<'a>(&'a self, text: impl Fn(&str, &str) -> String + 'a) -> impl Iterator<Item = (&'static str, String)> + 'a {
+        self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params)).filter_map(move |s| {
             let ParamKind::Num(n) = &s.kind else { return None };
             let Some(ParamValue::Expr(e)) = self.feature.params.get(s.id) else { return None };
-            let text = e.text.as_str();
+            let text = text(s.id, &e.text);
             if text.trim().is_empty() {
                 return None;
             }
-            noshape_units::evaluate_as(text, n.kind.dim(), &self.units, &self.variables).err().map(|err| (s.id, crate::quantity_field::eval_message(&err)))
+            noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).err().map(|err| (s.id, crate::quantity_field::eval_message(&err)))
         })
     }
 
-    /// `value_error` once the value is applied (Enter, or the field left):
-    /// live shows nothing red while it is still being typed (ui-var/02).
-    fn applied_value_error(&self, cx: &App) -> Option<(&'static str, String)> {
-        self.value_errors().find(|(id, _)| self.applied(id, cx))
+    /// A number field's applied text: what Enter or leaving the field last
+    /// committed. Live (ui-var2/02-07): the title, the row, the pink field
+    /// and ✓ follow it, never the text being typed.
+    fn applied_text(&self, id: &str, typed: &str) -> String {
+        if self.inputs.contains_key(id) { self.baselines.get(id).cloned().unwrap_or_else(|| typed.to_string()) } else { typed.to_string() }
     }
 
-    /// The field's text is applied: not edited since it was focused or
-    /// last applied with Enter.
-    fn applied(&self, id: &str, cx: &App) -> bool {
-        self.inputs.get(id).is_none_or(|st| self.baselines.get(id).is_some_and(|b| *b == *st.read(cx).value()))
+    fn applied_value_error(&self) -> Option<(&'static str, String)> {
+        self.eval_errors(|id, typed| self.applied_text(id, typed)).next()
     }
 
-    /// The feature as its title shows it: a value of the wrong type reads
-    /// as the field's last valid one (live ui-var/03: "#d = 0 mm").
-    fn shown_feature(&self) -> std::borrow::Cow<'_, Feature> {
-        let mut errors = self.value_errors().filter_map(|(id, _)| self.valid_texts.get(id).map(|t| (id, t.clone()))).peekable();
-        if errors.peek().is_none() {
-            return std::borrow::Cow::Borrowed(&self.feature);
-        }
+    /// The feature as its title shows it: each number field's applied
+    /// value, or its last valid one while that is of the wrong type (live
+    /// ui-var/03: "#d = 0 mm").
+    fn shown_feature(&self) -> Feature {
         let mut f = self.feature.clone();
-        for (id, text) in errors {
-            if let Some(ParamValue::Expr(e)) = f.params.get(id) {
+        for s in self.ty.params.iter().filter(|s| matches!(s.kind, ParamKind::Num(_))) {
+            let Some(ParamValue::Expr(e)) = self.feature.params.get(s.id) else { continue };
+            let applied = self.applied_text(s.id, &e.text);
+            let text = if self.eval_errors(|_, _| applied.clone()).any(|(id, _)| id == s.id) { self.valid_texts.get(s.id).cloned().unwrap_or(applied) } else { applied };
+            if text != e.text {
                 let mut e = e.clone();
                 e.text = text;
-                f.params.set(id, ParamValue::Expr(e));
+                f.params.set(s.id, ParamValue::Expr(e));
             }
         }
-        std::borrow::Cow::Owned(f)
+        f
     }
 
     /// The feature as the list shows its row while the dialog is open.
     pub fn row_feature(&self) -> Feature {
-        self.shown_feature().into_owned()
+        self.shown_feature()
     }
 
     /// A second Enter on a value of the wrong type keeps the dialog open
@@ -1602,7 +1607,6 @@ impl FeatureDialog {
     fn refuse_invalid_enter(&mut self, path: &str, state: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some((id, _)) = self.value_errors().find(|(id, _)| *id == path) else { return false };
         let Some(text) = self.valid_texts.get(id).cloned() else { return true };
-        self.baselines.insert(path.to_string(), text.clone());
         state.update(cx, |s, cx| {
             s.set_value(text, window, cx);
             s.select_all(window, cx);
@@ -3036,7 +3040,11 @@ impl FeatureDialog {
             _ => return None,
         };
         let state = self.ensure_input(path, &text, window, cx);
-        let err = self.parse_errors.get(path).cloned();
+        // Live (ui-var2/04, 07): the field shows the applied text's error,
+        // not the typed one's: "10 d" being typed isn't pink yet, and an
+        // applied bad value stays pink while the next one is typed.
+        let editing = state.read(cx).focus_handle(cx).is_focused(window) && self.baselines.get(path).is_some_and(|b| *b != *state.read(cx).value());
+        let err = if editing { self.baselines.get(path).and_then(|b| noshape_units::parse(b).err()).map(|e| e.to_string()) } else { self.parse_errors.get(path).cloned() };
         let pal = p();
         let num = match &s.kind {
             ParamKind::Num(n) => Some(*n),
@@ -3064,8 +3072,8 @@ impl FeatureDialog {
         // an unknown #variable) is pink with a red underline and the hover
         // tooltip "Enter a valid expression.". Live (ui-var/03): Enter
         // shows it in the still focused field; typing hides it again.
-        let applied = !focused || self.baselines.get(path).is_some_and(|b| *b == *state.read(cx).value());
-        let eval_err = num.filter(|_| applied && !text.trim().is_empty()).and_then(|n| noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).err());
+        let applied = self.baselines.get(path).cloned().unwrap_or_else(|| text.clone());
+        let eval_err = num.filter(|_| !applied.trim().is_empty()).and_then(|n| noshape_units::evaluate_as(&applied, n.kind.dim(), &self.units, &self.variables).err());
         let invalid = err.is_some() || eval_err.is_some();
         // Live (ui (10-26 c)): the hover says why ("Cannot use angle as length.").
         let invalid_tip = eval_err.as_ref().map(crate::quantity_field::eval_message).unwrap_or_else(|| crate::quantity_field::INVALID_TIP.to_string());
@@ -3306,16 +3314,16 @@ impl Render for FeatureDialog {
         // its field's type turns the title red with "A parameter value is
         // not valid." and disables ✓ (Enter doesn't commit either).
         // Only applied values count: "10" on the way to "10 deg" doesn't.
-        for spec in self.ty.params.iter().filter(|s| matches!(s.kind, ParamKind::Num(_))) {
-            if self.applied(spec.id, cx)
-                && let Some(ParamValue::Expr(e)) = self.feature.params.get(spec.id)
+        for spec in self.ty.params.iter() {
+            if let Some(ParamValue::Expr(e)) = self.feature.params.get(spec.id)
                 && let ParamKind::Num(n) = &spec.kind
-                && noshape_units::evaluate_as(&e.text, n.kind.dim(), &self.units, &self.variables).is_ok()
+                && let applied = self.applied_text(spec.id, &e.text)
+                && noshape_units::evaluate_as(&applied, n.kind.dim(), &self.units, &self.variables).is_ok()
             {
-                self.valid_texts.insert(spec.id, e.text.clone());
+                self.valid_texts.insert(spec.id, applied);
             }
         }
-        let value_invalid = self.applied_value_error(cx).is_some();
+        let value_invalid = self.applied_value_error().is_some();
         let status = if value_invalid { Some((FeatureStatus::Error, VALUE_NOT_VALID.to_string())) } else { status };
         let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error | FeatureStatus::Warning));
         // Live: ✓ is disabled while a field shows the error (pink: an empty

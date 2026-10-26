@@ -49,8 +49,8 @@ pub fn decal() -> FeatureType {
     const IMAGE_SIZE: NumSpec = NumSpec::positive_length(25.0, 1.0).bounded(1e-5, 1e8);
     let keep = |v: &ParamValues| v.bool("maintainAspectRatio");
     let p = vec![
-        // ImageData reference (image tab / blob).
-        ParamSpec::text("image", "Image", ""),
+        // ImageData: an image file tab.
+        ParamSpec::reference("image", "Image", crate::params::ReferenceKind::Image),
         ParamSpec::query1("face", "Face", QueryFilter::PLANAR_FACE | QueryFilter::CYLINDRICAL_FACE).hints(Hints::INITIAL_FOCUS),
         ParamSpec::num("angle", "Angle", angle_360(0.0)),
         ParamSpec::bool("angleOppositeDirection", "Angle opposite direction", false).hints(Hints::OPPOSITE_DIRECTION_CIRCULAR),
