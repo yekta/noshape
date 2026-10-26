@@ -101,3 +101,45 @@ fn axial_mates_default_align_and_flip_turns_over() {
         assert!(near(t, [0.0, 0.0, 50.0], 1e-2) && near(z, [0.0, 0.0, -1.0], 1e-6), "{kind} from upside down: t {t:?} Z {z:?}");
     }
 }
+
+/// A Width mate in any pick order (api benchmark F19): the block's two X
+/// faces and the base's two X faces, given as the documented roles or both
+/// block faces first: the block is centred between the base's faces and the
+/// mate solves (live: OK in every order).
+#[test]
+fn width_mate_solves_in_any_face_order() {
+    let dir = std::env::temp_dir().join(format!("noshape-width-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    for (k, order) in ["ab|cd", "ba|cd", "ab|dc", "ba|dc", "documented"].iter().enumerate() {
+        let path = dir.join(format!("width-{k}.noshape"));
+        let _ = std::fs::remove_file(&path);
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        studio(&mut ctx, "Part Studio 1", json!({ "tool": "corner_rectangle", "points": [[-50, -30], [50, 30]] }), "10 mm");
+        call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "block" }));
+        studio(&mut ctx, "block", json!({ "tool": "corner_rectangle", "points": [[-10, -10], [10, 10]] }), "10 mm");
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "block", "part": "Part 1" }));
+        call(&mut ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
+        call(&mut ctx, "assembly_transform", json!({ "instance": "Part 1 <2>", "translation": [17, 5, 10] }));
+        let (bl, br) = (face(&mut ctx, "Part 1 <2>", [-1.0, 0.0, 0.0]), face(&mut ctx, "Part 1 <2>", [1.0, 0.0, 0.0]));
+        let (wl, wr) = (face(&mut ctx, "Part 1 <1>", [-1.0, 0.0, 0.0]), face(&mut ctx, "Part 1 <1>", [1.0, 0.0, 0.0]));
+        let c = |inst: &str, f: &str| json!({ "instance": inst, "entity": f });
+        let (blk, base) = ("Part 1 <2>", "Part 1 <1>");
+        let picks = match *order {
+            "ab|cd" => [c(blk, &bl), c(blk, &br), c(base, &wl), c(base, &wr)],
+            "ba|cd" => [c(blk, &br), c(blk, &bl), c(base, &wl), c(base, &wr)],
+            "ab|dc" => [c(blk, &bl), c(blk, &br), c(base, &wr), c(base, &wl)],
+            "ba|dc" => [c(blk, &br), c(blk, &bl), c(base, &wr), c(base, &wl)],
+            _ => [c(blk, &bl), c(base, &wl), c(base, &wr), c(blk, &br)],
+        };
+        let [a, b, cc, d] = picks;
+        let r = call(&mut ctx, "assembly_mate", json!({ "type": "width", "a": a, "b": b, "c": cc, "d": d }));
+        assert_eq!(r["mate_ok"], json!(true), "{order}: {r}");
+        let list = call(&mut ctx, "assembly_list", json!({}));
+        let block = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == "Part 1 <2>").unwrap().clone();
+        let x = block["translation"][0].as_f64().unwrap();
+        assert!(x.abs() < 1e-6, "{order}: centred, x {x}");
+        let _ = std::fs::remove_file(&path);
+    }
+}

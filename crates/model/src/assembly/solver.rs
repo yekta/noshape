@@ -401,6 +401,25 @@ pub fn mate_values(bodies: &[Frame], m: &SolverMate) -> [f64; 4] {
     [-angle, -r.origin.x, -r.origin.y, -r.origin.z]
 }
 
+/// A Width mate's connectors grouped by part (api benchmark F19: the
+/// block's two faces given first, the base's two after, placed the block
+/// right but read as conflicting): the tab pair is the connectors on the
+/// first one's part, the width pair the two on the other part, in whatever
+/// order they were picked (live solves every order). Layout: `a` tab 1, `b`
+/// width 1, `extra` [width 2, tab 2?].
+pub fn pair_width_connectors(m: &mut SolverMate) {
+    let mut all = vec![(m.a, m.a_local), (m.b, m.b_local)];
+    all.extend(m.extra.iter().copied());
+    let first = all[0].0;
+    let (tabs, widths): (Vec<_>, Vec<_>) = all.into_iter().partition(|c| c.0 == first);
+    if widths.len() != 2 || widths[0].0 != widths[1].0 || !(1..=2).contains(&tabs.len()) {
+        return;
+    }
+    (m.a, m.a_local) = tabs[0];
+    (m.b, m.b_local) = widths[0];
+    m.extra = std::iter::once(widths[1]).chain(tabs.get(1).copied()).collect();
+}
+
 /// `m` as a Fastened mate holding the free values `v` ([`mate_values`]'s
 /// sense): the turn `-v[0]` and the offset that puts the first connector at
 /// `v[1..]` from the second (Apply limit position, named positions, locks).
@@ -1094,6 +1113,14 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
             }
             continue;
         }
+        let (key, ids) = dof_key(&nodrag, &poses, free);
+        if let Some((d, ranks)) = DOF_CACHE.get_or_init(Default::default).lock().ok().and_then(|c| c.get(&key).cloned()) {
+            result.dof += d;
+            for &bi in free {
+                result.body_dof[bi] = ranks[ids[&bi]];
+            }
+            continue;
+        }
         let mut base = Vec::new();
         residuals(&nodrag, &poses, &mut base);
         let j = jacobian(&nodrag, &poses, free, &base, scale, eps);
@@ -1114,6 +1141,16 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
             let rank = if null.is_empty() { 0 } else { m.svd(false, false).singular_values.iter().filter(|s| **s > 1e-6).count() };
             result.body_dof[bi] = rank.min(6);
         }
+        if let Ok(mut c) = DOF_CACHE.get_or_init(Default::default).lock() {
+            if c.len() > 4096 {
+                c.clear();
+            }
+            let mut ranks = vec![0; ids.len()];
+            for &bi in free {
+                ranks[ids[&bi]] = result.body_dof[bi];
+            }
+            c.insert(key, (null.len(), ranks));
+        }
     }
 
     for (b, p) in bodies.iter_mut().zip(poses) {
@@ -1122,6 +1159,64 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
         }
     }
     result
+}
+
+/// DOF analyses of mate groups (degrees of freedom; each body's, by its
+/// number in [`dof_key`]) by an exact key of what decides them: an evaluation after adding one mate
+/// re-analyses only the groups it changed (200 pins in 20 stacks spent ~40 ms
+/// of eigen-decompositions on every evaluation).
+type DofCache = std::sync::Mutex<HashMap<u64, (usize, Vec<usize>)>>;
+static DOF_CACHE: std::sync::OnceLock<DofCache> = std::sync::OnceLock::new();
+
+/// The group's terms (every field of their mates and relations), the poses
+/// of the bodies they read and which are fixed, the free bodies and the
+/// scale, hashed exactly (`Debug` writes floats round-trip). Bodies are
+/// numbered by first use in the terms, so the key survives a renumbering
+/// (an instance inserted elsewhere); returns the key and each body's number.
+fn dof_key(p: &Problem, poses: &[Frame], free: &[usize]) -> (u64, HashMap<usize, usize>) {
+    use std::fmt::Write;
+    use std::hash::{Hash, Hasher};
+    let mut ids: HashMap<usize, usize> = HashMap::new();
+    for &t in &p.terms {
+        for b in term_bodies(p, t) {
+            let n = ids.len();
+            ids.entry(b).or_insert(n);
+        }
+    }
+    let canon = |m: &SolverMate| {
+        let mut m = m.clone();
+        m.a = ids[&m.a];
+        m.b = ids[&m.b];
+        for e in &mut m.extra {
+            e.0 = ids[&e.0];
+        }
+        if let Some(f) = &mut m.follow {
+            f.axis_body = ids[&f.axis_body];
+        }
+        m
+    };
+    let mut s = String::new();
+    let _ = write!(s, "{:?}|", p.scale);
+    for &t in &p.terms {
+        match t {
+            Term::Mate(i) => {
+                let _ = write!(s, "M{:?}", canon(&p.mates[i]));
+            }
+            Term::Relation(i) => {
+                let r = SolverRelation { mate_a: 0, mate_b: 0, ..p.relations[i].clone() };
+                let _ = write!(s, "R{r:?}{:?}{:?}", canon(&p.mates[p.relations[i].mate_a]), canon(&p.mates[p.relations[i].mate_b]));
+            }
+            Term::Drag(_) | Term::Stay(_) => {}
+        }
+    }
+    let mut by_id: Vec<(usize, usize)> = ids.iter().map(|(&b, &n)| (n, b)).collect();
+    by_id.sort_unstable();
+    for (n, b) in by_id {
+        let _ = write!(s, "B{n}{:?}{}{}", poses[b], p.bodies[b].fixed, free.contains(&b));
+    }
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    s.hash(&mut h);
+    (h.finish(), ids)
 }
 
 /// Damped Gauss-Newton on one group's terms over its free bodies' poses (in

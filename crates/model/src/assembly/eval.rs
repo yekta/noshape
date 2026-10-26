@@ -2533,6 +2533,7 @@ impl AssemblyEvaluator {
                         prepared.failed_mates.push((m.id, e));
                         continue;
                     }
+                    solver::pair_width_connectors(&mut sm);
                 }
             }
             if sm.a == sm.b && m.mate_type != MateType::Width {
@@ -2605,6 +2606,7 @@ impl AssemblyEvaluator {
                         Ok(e) if !e.is_empty() => sm.extra = e,
                         _ => continue,
                     }
+                    solver::pair_width_connectors(&mut sm);
                 }
                 if sm.a == sm.b && m.mate_type != MateType::Width {
                     continue;

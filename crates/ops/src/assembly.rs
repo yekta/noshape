@@ -125,8 +125,11 @@ pub fn mate_preview_moving(a: &Assembly, m: &Mate) -> InstanceId {
 pub fn mate_preview_options(a: &Assembly, m: &Mate) -> noshape_model::assembly::eval::SolveOptions {
     let mut opts = noshape_model::assembly::eval::SolveOptions::default();
     let fixed = |id: InstanceId| a.instance(id).is_some_and(|i| i.fixed);
-    if !fixed(m.a.instance) && !fixed(m.b.instance) {
-        opts.hold.push(m.b.instance);
+    // The other part stays (a Width mate's second pick may be on the moving
+    // part too: its tabs given first, api benchmark F19).
+    let other = m.connectors().map(|c| c.instance).find(|i| *i != m.a.instance).unwrap_or(m.b.instance);
+    if !fixed(m.a.instance) && !fixed(other) {
+        opts.hold.push(other);
     }
     opts.only_mate = Some(m.id);
     opts
