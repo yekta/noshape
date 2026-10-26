@@ -7,6 +7,50 @@ ground truth (kern)", built through Onshape's REST API with exact numbers; scrip
 requests in `live/REQUESTS.md`, lines starting `kern`). Build dir `/root/target-kern`, display `:106`. Scratch C++
 experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`make <name>`; `common.hpp`).
 
+## HALT 2026-10-26 ~18:00 (lead: all agents stop to replan) — kern state
+
+**On main (all finished work; nothing unpushed, no WIP).** Newest first: 493bbd23 blend_section tangent_continues
+(curve parameter at a reversed edge's end); a68eaf69 LP2/CP2 face-pattern overhang growth (pattern.rs
+`overhang_growth`); 339de774 CP2/P6 extrude swept from its far end (features.cpp `op_prism`); b7dc01bf BBOX-TOL
+(geom.cpp `tighten_box`) + FLAT-HOLE (flatten.rs `refine_conforming`, planar sheets exact); c8c06915 Windows fix
+(common.cpp `face_moments` segments split at the surface's knots); 3ad58ca0 Diamond knurl completes (OCCT patch
+CutByFaces); f6daac1a GetStickVertices index; dc4ba9f2 native pattern/mirror instances located; 4a37cafb + 0565f5de
+SEAM (kernel `shown_topology`, every consumer); d838ae83 exact B-spline areas/volumes; 78383a9e/ac218b46 OCCT patch
+0001 + instances; c1ca2e95 compound grouping. Branch agent/kern = main (no WIP).
+
+**OCCT.** `patches/occt/0001-congruent-pair-reuse.patch` (BOPAlgo_PaveFiller_3/4/5/6, BOPAlgo_Builder_3, BOPAlgo_BOP):
+congruent EE/EF/FF reuse, vertex-face by local point (incl. TreatVerticesEE, parallel), located faces in their own
+frame, GetStickVertices index, `noshape_bop_cut_by_faces` (used by boolean.cpp `CutByFaces`). The kernel REQUIRES the
+patched OCCT (it links `noshape_bop_cut_by_faces`); CI rebuilds it from the patch (setup-occt cache key hashes
+patches/occt/**). Local layout: `/root/occt` = patched install (headers + 50 libs; its libTKBO.a is from the
+incremental build tree `/root/kern-scratch/occt-build`, `cmake --build build --target TKBO` after copying the patched
+.cxx into `OCCT-8_0_1/src/...`; swap ONLY lib/libTKBO.a, never a fresh partial install); `/root/occt-unpatched` =
+the old unpatched install (can go once CI on all platforms has been green with the patch for a while);
+`/root/occt-kern` = scratch copy with a stats-instrumented TKBO (`NOSHAPE_BOP_STATS=1`), patch sources in
+`/root/kern-scratch/occt-patch/{a,b,c}` (a pristine, b = the patch, c = b + timers), `mklib.sh` builds it.
+
+**Open items, priority order.**
+1. oracle_asm `assemblies_match_live` red at f2838a08 (17:30): not yet diagnosed. Suspect 339de774 (an extruded
+   cylinder's surface frame origin moved to the far end cap, so mate connectors / frames taken from cylinder faces
+   move). Next: `cargo test -p noshape-model --test oracle_asm -- --nocapture`, compare the failing cases' connector
+   origins with live; if it's the cylinder frame, also flip OCCT's swept-cylinder axis to live's (toward the sketch;
+   re-parameterise: 180° about y, pcurves u' = π − u, v' = −v) or adjust skb's connector code.
+2. Edge orientation consistency (kernel API): `EdgeInfo.start/end` follow the edge's orientation in the map but
+   `first_param/last_param` and `curve` the TShape's; many model call sites pair `info.start` with `first_param`
+   (grep `tangent_at(info.first_param)`: refgeom.rs:67, query.rs:1692, select.rs:341, surfaces.rs:673, frames.rs:190,
+   solid_a.rs:1282, cplane.rs:559). Proposal: `Shape::edges()` / edge sub-shapes FORWARD-oriented (the edge's own
+   direction = Parasolid's) so start/end, parameters and tangents agree. Needs lead routing (touches every owner).
+3. P6 remainder (live "fs (10-26 b)"): extruded cylinder axis sense (ours away from the sketch), revolve frame at
+   mid-height, Hole frame at its start (z along the drill) — not done.
+4. Diamond knurl speed (parked by lead): 210 s / 8142 faces / ~3.9 GB vs live 32 s. Phases (NOSHAPE_BOP_STATS):
+   VF ~10 s, EF ~50-60 s (serial result loop over 815k pairs), FF ~10 s, MakeBlocks ~60-100 s (PostTreatFF sub-filler
+   EE ~35-50 s), MakePCurves ~21 s, BuildBOP. Next: section edges of copied FF pairs as located instances; EF result
+   loop in parallel. Perf test: `KNURL=diamond cargo test -p noshape-kernel --test perf knurl_like_onshape -- --ignored`.
+5. FILLET-CORNER-3: not a defect (live band [27970.996, 27978.426], ours 27974.631 = exact mitre); close it.
+6. BBOX-TOL / FLAT-HOLE / F2-F6 / LP2 / CP2 / P6 / Windows Rhino: done (above).
+
+**Known failing in my area:** oracle_asm (item 1). Everything else I own passed its quick checks.
+
 ## kern (new account) 2026-10-21 19:00 → — state
 - Pending-pattern-2 test (`pattern_fins::narrow_rib_feature_pattern_without_reapply_matches_onshape`) was already
   appended; it passes (2.1 s).
