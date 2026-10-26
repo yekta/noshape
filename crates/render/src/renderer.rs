@@ -25,7 +25,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 use wgpu::util::DeviceExt;
 
-const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
+const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 const PICK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Uint;
 /// Depth of the pick passes: no stencil (they use none), so the small
 /// visible-depth sampling pass ([`PickRect::depth_samples`]) can copy it out.

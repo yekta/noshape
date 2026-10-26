@@ -17,16 +17,15 @@ pub mod viewport {
     pub const SELECTION: u32 = 0xffa90a;
     /// The fill of a picked sketch region, flat at `PICKED_REGION_ALPHA`
     /// over everything see-through, a feature preview included (live
-    /// part-studio/230: the region tints the preview from above). Fitted in
-    /// the app to live's (156,150,124) / (176,177,154) where the region shows
-    /// through the preview's front-left / right faces (ours (162,152,121) /
-    /// (173,169,149)).
-    pub const PICKED_REGION: u32 = 0xb69d4c;
+    /// part-studio/230: the region tints the preview from above): live's
+    /// (156,150,124) / (176,177,154) where the region shows through the
+    /// preview's front-left / right faces, over live's preview colours.
+    pub const PICKED_REGION: u32 = 0xcd9d3c;
     pub const PICKED_REGION_ALPHA: f32 = 0.34;
     /// A selected datum plane: filled amber over its own fill, outlined in
     /// solid selection amber (live selection/01: (253,211,133) inside a
-    /// 2 px #ffa90a border, Top view).
-    pub const PLANE_SELECTED_FILL: u32 = 0xffc524;
+    /// 2 px #ffa90a border, Top view, over the plane's (245,248,250)).
+    pub const PLANE_SELECTED_FILL: u32 = 0xffc862;
     pub const PLANE_SELECTED_ALPHA: f32 = 0.77;
     /// A point target (vertex, edge midpoint): an 11 px disc, a darker ring
     /// 3–4 px out and a light centre; [disc, ring, centre] hovered and
@@ -47,33 +46,24 @@ pub mod viewport {
     /// Faces of a failed feature's error geometry (a Feature pattern's
     /// ghost instances). Live "lp wall over" 2258, solved over two
     /// backgrounds: rgb(123,30,36) at α 0.60 on both the top and the front
-    /// faces (so drawn flat here; the browser blends in sRGB). Our renderer
-    /// blends in linear light, where [`ERROR_FILL_ALPHA`] gives the live
-    /// results (#825d6b over the top, #693c45 over the front) within a few
-    /// levels.
+    /// faces (so drawn flat here; blended in sRGB values like the browser's).
     pub const ERROR_FILL: u32 = 0x7b1e24;
     /// FeatureScript debug entities (`DebugColor.MAGENTA`; live 2111: the
     /// Helix end profiles' circles read #ff2bc1, their centre dots #e224e3).
     pub const DEBUG_MAGENTA: u32 = 0xff2bc1;
     pub const DEBUG_MAGENTA_POINT: u32 = 0xe224e3;
-    pub const ERROR_FILL_ALPHA: f32 = 0.75;
+    pub const ERROR_FILL_ALPHA: f32 = 0.60;
     /// Construction plane fill (`--os-construction-plane-ambient-color`
-    /// #cedbe5 at 20 %, which the browser blends in sRGB), drawn unlit at
-    /// [`PLANE_FILL_ALPHA`]. Fitted for our linear blending: one plane over
-    /// white reads `#f6f8fa`, three stacked `#e7edf2` (live), and the parts
-    /// behind come out as live's (selection/02: the dark face (111,131,144)
-    /// vs live (104,127,140), was (119,138,149); a selected face's blue 105
-    /// vs live 73, was 114).
-    pub const PLANE_FILL: u32 = 0xc3d2e0;
-    pub const PLANE_FILL_ALPHA: f32 = 0.173;
+    /// #cedbe5 at 20 %), drawn unlit: one plane over white reads `#f5f8fa`,
+    /// three stacked `#e7edf2` (live).
+    pub const PLANE_FILL: u32 = 0xcedbe5;
+    pub const PLANE_FILL_ALPHA: f32 = 0.2;
     /// Construction plane outline (`--os-construction-plane-outline-color`
-    /// `#1d60aa` at 35%, which the browser blends in sRGB). Our renderer
-    /// blends in linear light, so the fit is this color at
-    /// [`PLANE_OUTLINE_ALPHA`]: one edge reads `#aac3de` on the plane fill
-    /// like live, and the two edges of a plane seen edge-on (a sketch's
-    /// normal view) add up darker, `#79a1cc` live (sketch/03).
-    pub const PLANE_OUTLINE: u32 = 0x4191c8;
-    pub const PLANE_OUTLINE_ALPHA: f32 = 0.6;
+    /// `#1d60aa` at 35%): one edge reads `#aac3de` on the plane fill like
+    /// live, and the two edges of a plane seen edge-on (a sketch's normal
+    /// view) add up darker, `#79a1cc` live (sketch/03).
+    pub const PLANE_OUTLINE: u32 = 0x1d60aa;
+    pub const PLANE_OUTLINE_ALPHA: f32 = 0.35;
     /// Construction plane label (`--os-construction-plane-text-color`).
     pub const PLANE_TEXT: u32 = 0x1651b0;
     /// Origin and point bodies (`--os-origin-color`).
@@ -101,14 +91,13 @@ pub mod viewport_dark {
     /// Viewport background (`--os-background-primary`).
     pub const BACKGROUND: u32 = 0x333333;
     pub const PLANE_FILL_ALPHA: f32 = 0.2;
-    /// Construction plane fill: `#666` at 20%, which the browser blends in
-    /// sRGB; fitted for our linear blending, one plane reads `#3d3d3d` and
+    /// Construction plane fill: `#666` at 20%: one plane reads `#3d3d3d` and
     /// three stacked `#4c4c4c` like live.
-    pub const PLANE_FILL: u32 = 0x595959;
-    /// Construction plane outline: `#fff` at 35% in sRGB; an edge peaks at
-    /// `#848484` on the plane like live.
+    pub const PLANE_FILL: u32 = 0x666666;
+    /// Construction plane outline: `#fff` at 35%; an edge peaks at `#848484`
+    /// on the plane like live.
     pub const PLANE_OUTLINE: u32 = 0xffffff;
-    pub const PLANE_OUTLINE_ALPHA: f32 = 0.2;
+    pub const PLANE_OUTLINE_ALPHA: f32 = 0.35;
     pub const PLANE_TEXT: u32 = 0xffffff;
     pub const ORIGIN: u32 = 0xffffff;
     pub const SKETCH_FULL: u32 = 0xffffff;
