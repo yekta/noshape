@@ -101,6 +101,9 @@ pub struct MateDialog {
     use_limits: bool,
     offsets: [Entity<crate::quantity_field::QuantityInput>; 4],
     limits: HashMap<&'static str, (Entity<InputState>, Entity<InputState>)>,
+    /// Each limit field's text as last applied (Enter or leaving it): an
+    /// Enter that brings nothing new accepts the mate.
+    limit_applied: HashMap<EntityId, String>,
     labeler: ConnectorLabeler,
     /// The mate's regeneration error (the red title's tooltip).
     pub status: Option<String>,
@@ -142,6 +145,13 @@ fn commit_limit_text(text: &str, dim: noshape_units::Dim, units: &noshape_units:
     }
     let out = noshape_model::quantity_text::commit_text(t, dim, units, variables);
     (out != text).then_some(out)
+}
+
+/// Whether Enter in a limit field accepts the mate: its committed text is
+/// what was applied already (nothing new). A new value is applied first
+/// and the dialog stays (live qa5 P2-A2).
+fn limit_enter_accepts(applied: Option<&str>, committed: &str) -> bool {
+    applied.is_some_and(|a| a.trim() == committed.trim())
 }
 
 fn text_of(e: &Option<ExprValue>) -> String {
@@ -212,6 +222,7 @@ impl MateDialog {
             let hi = mk(l.as_ref().map(|l| text_of(&l.max)).unwrap_or_default(), if key == "cone" { "No maximum angle" } else { "No maximum" }, window, cx);
             limits.insert(key, (lo, hi));
         }
+        let limit_applied: HashMap<EntityId, String> = limits.values().flat_map(|(a, b)| [a, b]).map(|e| (e.entity_id(), e.read(cx).value().to_string())).collect();
         let mut subs = Vec::new();
         // A committed offset previews; Enter with nothing new to apply
         // accepts the mate (like a feature dialog).
@@ -230,12 +241,22 @@ impl MateDialog {
                 InputEvent::Change => cx.emit(MateDialogEvent::Changed),
                 InputEvent::PressEnter { .. } | InputEvent::Blur => {
                     let text = st.read(cx).value().to_string();
-                    if let Some(t) = commit_limit_text(&text, dim, &this.units, &this.variables) {
+                    let rewritten = commit_limit_text(&text, dim, &this.units, &this.variables);
+                    let committed = rewritten.clone().unwrap_or_else(|| text.clone());
+                    if let Some(t) = rewritten {
                         st.update(cx, |s, cx| s.set_value(t, window, cx));
                         cx.emit(MateDialogEvent::Changed);
                     }
+                    // Live (qa5 P2-A2, behaviours "qa5 (10-26 p6)" (2)): Enter
+                    // on a new value applies it and keeps the dialog (the
+                    // value selected); Enter with nothing new accepts.
+                    let applied = this.limit_applied.insert(st.entity_id(), committed.clone());
                     if matches!(ev, InputEvent::PressEnter { .. }) {
-                        cx.emit(MateDialogEvent::Accept);
+                        if limit_enter_accepts(applied.as_deref(), &committed) {
+                            cx.emit(MateDialogEvent::Accept);
+                        } else {
+                            st.update(cx, |s, cx| s.select_all(window, cx));
+                        }
                     }
                 }
                 _ => {}
@@ -276,6 +297,7 @@ impl MateDialog {
             use_limits,
             offsets,
             limits,
+            limit_applied,
             labeler,
             status: None,
             lost: HashMap::new(),
@@ -956,5 +978,20 @@ mod limit_text_tests {
         assert_eq!(commit_limit_text("No minimum", limit_dim("z"), &units, &vars), None);
         assert_eq!(commit_limit_text("", limit_dim("x"), &units, &vars), None);
         assert_eq!(commit_limit_text("50 mm", limit_dim("x"), &units, &vars), None);
+    }
+}
+
+#[cfg(test)]
+mod limit_enter_tests {
+    use super::limit_enter_accepts;
+
+    /// Live (qa5 10-26 p6 (2)): Z max "No maximum" → `5` + Enter applies
+    /// "5 mm" and keeps the dialog; the second Enter accepts.
+    #[::core::prelude::v1::test]
+    fn enter_on_a_new_limit_applies_then_accepts() {
+        assert!(!limit_enter_accepts(Some(""), "5 mm"));
+        assert!(limit_enter_accepts(Some("5 mm"), "5 mm"));
+        // Nothing typed: Enter accepts at once.
+        assert!(limit_enter_accepts(Some(""), ""));
     }
 }
