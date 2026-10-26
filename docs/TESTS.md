@@ -42,12 +42,11 @@ delete the line to bring it back to T1. Record the move below.
 - Before the split: 98 binaries, 616 s of test time. Dominated by single tests: standard-content recipes vs live
   (144 s, 90 s, 34 s, 29 s, 28 s…), std_oracle (69 s), custom_features' std sheet metal (45 s), parting-line draft
   (44 s), NIST/Inventor assembly imports (41 s each), Parasolid import (36 s), planar mesh stress (33 s).
-- After the split: see "T1 time" below.
+- After the split (T1, `cargo test --workspace`, 108 binaries, all green on d7926161): **118 s of test time**, the
+  longest binary 10 s. T0's tests: 3 s.
 - Building is the real cost: a cold `cargo test --workspace --no-run` takes 24 min here. Incremental compilation stays
   off, so after an edit in `model` expect several minutes of rebuild. The T0 and T1 budgets count test time on a
   warm build.
-
-T1 time: _filled in below_.
 
 ## What moved to T2 (2026-10-26) and why
 
