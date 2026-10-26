@@ -496,18 +496,19 @@ impl Prepared {
         {
             let (_, kind, _) = self.mates[i];
             let m = &mut mates[i];
+            // `value` in the mate values' sense (solver::mate_values).
             match kind {
                 MateType::Revolute => {
                     m.kind = MateType::Fastened;
-                    m.rotation = value;
+                    m.rotation = -value;
                 }
                 MateType::Cylindrical => {
                     m.kind = MateType::Slider;
-                    m.rotation = value;
+                    m.rotation = -value;
                 }
                 MateType::Slider => {
                     m.kind = MateType::Fastened;
-                    m.offset.z = value;
+                    m.offset.z = solver::slider_offset_z(m, value);
                 }
                 _ => {}
             }
@@ -519,11 +520,7 @@ impl Prepared {
                 continue;
             }
             // Every free value fixed: the mate becomes a fastened one at those values.
-            let m = &mut mates[i];
-            m.kind = MateType::Fastened;
-            m.rotation = v[0];
-            m.offset = DVec3::new(v[1], v[2], v[3]);
-            m.limits.clear();
+            solver::fasten_at(&mut mates[i], *v);
         }
         for (mid, ix, v) in &opts.hold_values {
             let Some(i) = self.mates.iter().position(|(id, _, _)| id == mid) else { continue };
