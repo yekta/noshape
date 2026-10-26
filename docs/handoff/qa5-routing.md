@@ -745,3 +745,5 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   (2)). The rest matches (red part chip, blank mass / centre of mass / inertia, volume and area filled). Our yellow toast "One or
   more parts do not have a material defined." also shows; live notes disagree on it (behaviours 402 says it appears, psb f (10-21)
   says nowhere) — request "qa5 (10-26 p4)".
+- **P1-15 — ui (view cube hover), minor** — hovering a view-cube face fills it **rgb(177,217,241) #b1d9f1**; live **#bce2f7**
+  rgb(188,226,247) (behaviours 403 "View cube hover", 1x crops part-studio/5x-*-crop1x.png). Measured on green 62524c30, 1x.

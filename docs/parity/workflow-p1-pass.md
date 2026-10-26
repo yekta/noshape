@@ -84,3 +84,4 @@ then edits, undo/redo, rollback and suppress.
 | Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ |
 | Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ |
 | n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? |
+| View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |
