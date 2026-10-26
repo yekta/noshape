@@ -134,6 +134,12 @@ class Interact(Replay):
         # nothing selected it selects nothing.
         self.step("ctrl-box-deselects", self.box((top[0] + 10, top[1] + 5), (top[0] - 10, top[1] - 5), mods=(ui.KEY_LEFTCTRL,)))
         self.step("ctrl-box-nothing", self.box((top[0] + 10, top[1] + 5), (top[0] - 10, top[1] - 5), mods=(ui.KEY_LEFTCTRL,)))
+        # The 2 px drag threshold: a 1 px move between press and release in
+        # empty space is still a click (clears), a 4 px one a box (keeps).
+        self.step("select-for-jitter", self.click_at(top))
+        self.step("jitter-click-clears", self.box(empty, (empty[0] + 1, empty[1]), steps=1))
+        self.step("select-for-drag", self.click_at(top))
+        self.step("small-drag-keeps", self.box(empty, (empty[0] + 4, empty[1]), steps=4))
         for d in (self.mouse, self.keys, self.pad, self.screen, self.pen):
             d.close()
 
