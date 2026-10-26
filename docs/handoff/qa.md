@@ -62,6 +62,11 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
   Import g25-b x_t / sat / step: three volumes (I1). PDF export of a drawing OK (1 page letter, v1.5). Measure readouts
   (face + edge "Perp line and plane angle") = live. New tickets: DCLICK-HEAVY, PERF-SECTION-PANIC, LOFT-PROFILE-LIST,
   RHINO-GREEN, API-HOLE-STYLE, API-REMOVE-SCOPE; PATTERN-OFFPART-PARTS closed (live does the same).
+- 22:00–22:40: two app processes on one file → TWO-PROCESS-LOST-EDIT (P0); bad files open silently (OPEN-ERROR-SILENT);
+  UI fuzzer 1300 random actions over Part Studio / drawing / assembly tabs, no crash (PANEL-BLEED found); feature-row drag
+  reorder, rollback-bar drag, Roll to end, Variable Studio (#var autocomplete, change propagates), material assign +
+  mass (0.191 kg), Duplicate / Delete of a tab with an open dialog, chamfer types (equal / two / distance-angle),
+  up-to-next / face / part ends, thin extrudes, draft (neutral plane), split by plane: all as expected. Slot tool = live.
 - Checked and same as live: R = centre-point rectangle, Shift+C = Curve/surface analysis (no Chamfer shortcut), Enter in
   Depth keeps the dialog, Esc in an open end-type list closes only the list, Hole dialog defaults (Inch tab, 1/4, 12 mm,
   118 deg), "Features …" + red badge while a new feature is invalid.
@@ -71,8 +76,8 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
 - psui: TAB-NO-PREVIEW, DCLICK-HEAVY (P1); DELETE-TAB-DIALOG, LOFT-PROFILE-LIST, PERF-SECTION-PANIC (P2); carried over
   qa5's P1-8 caveat, P1-10.
 - dx: API-HOLE-STYLE (P1), API-REMOVE-SCOPE, VERSION-0.4.6, RHINO-GREEN (P2), USER_GUIDE undo sentence (P3).
-- Live requests open (REQUESTS.md "qa (2026-10-26 …)"): Extrude depth 0 / 1e6 field state; drawing suggested scale +
-  "Edit Boss sketch 1" menu label; sketch copy/paste placement.
+- Live requests open (REQUESTS.md "qa (2026-10-26 …)"): drawing title block MATERIAL/WEIGHT; Add-extrude merge scope with
+  two touched parts.
 - skasm: carried over qa5's P1-4 data.
 
 ## qa4 round-5 routed items re-checked on green 4d2f6b0c (2026-10-26 22:00)
