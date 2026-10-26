@@ -42,6 +42,12 @@ CHECKS = [
     # Live ("nav2 selection" 5, 10-25): a box never takes a default plane,
     # enclosed or crossed; it takes the faces and edges it reaches.
     ("crossing-box-plane", "1.8", "a crossing box over the Top plane leaves the plane out", lambda s: s is not None and not any(r.startswith("Plane") for r in s["selection"])),
+    ("select-for-toggle", "1.2", "(setup) a face selected", lambda s: kinds(s) == ["Face"]),
+    ("click-selected-toggles", "1.2", "a plain click on the selected face toggles it off, still hovered", lambda s: kinds(s) == [] and (s["hover"] or "").startswith("Face")),
+    ("select-for-shift", "1.4", "(setup) a face selected", lambda s: kinds(s) == ["Face"]),
+    ("shift-empty-keeps", "1.4", "a Shift+click in empty space keeps the selection", lambda s: kinds(s) == ["Face"]),
+    ("ctrl-box-deselects", "1.11", "a Ctrl crossing box over the selected face deselects it", lambda s: kinds(s) == []),
+    ("ctrl-box-nothing", "1.11", "a Ctrl box with nothing selected selects nothing", lambda s: kinds(s) == []),
 ]
 
 
