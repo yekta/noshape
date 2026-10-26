@@ -39,7 +39,7 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
   waiting"); the UI then stops taking input for a minute and replays the queued clicks. Click Disable on the blue bar.
 - CLI modelling fuzzer: /root/qa-scratch/bin/clifuzz_dbg.py <seed> <n> (NSCLI=<cli>; random fillet / chamfer / shell /
   extrude / draft / pattern / mirror / suppress / delete / undo; log cli/clifuzz-<seed>.log; NSCLI_ERR=<file> keeps
-  stderr); clifuzz_bisect.py replays a seed with a cold open in a fresh process after every step. Seed 1 → DRAFT-SEGV-DOC.
+  stderr); clifuzz_bisect.py replays a seed with a cold open in a fresh process after every step. Seed 1, 5 → DRAFT-SEGV-DOC; seed 7 → SHELL-SLAB-GPF; seeds 2, 3, 4 clean. clifuzz_nodraft.py skips drafts.
 - UI fuzzer: /root/qa-scratch/bin/fuzz.py <seed> <n> (random keys / clicks / drags on :110 against the pid in
   /tmp/qa_fzpid; actions logged to /root/qa-scratch/fuzz-actions.log). Seeds 1–3 (800 actions): no crash.
 - Don't run the app with NOSHAPE_PERF=1 when testing section views (PERF-SECTION-PANIC freezes the viewport).
@@ -81,7 +81,8 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
   118 deg), "Features …" + red badge while a new feature is invalid.
 
 ## Open findings (mine) by area
-- core: **DRAFT-SEGV-DOC** (P0: a document that segfaults on every open), SHELL-WALLS, SHELL-FILLETED-BOX, SHELL-SLOW,
+- core: **DOC-POISON, DRAFT-SEGV-DOC, SHELL-SLAB-GPF** (P0 crashes that leave unopenable documents; SHELL-SLAB-GPF is a
+  regression on main after green), SHELL-WALLS, SHELL-FILLETED-BOX, SHELL-SLOW,
   REGEN-SPEED, TWO-PROCESS-LOST-EDIT (all P0); I1 (P2); carried over qa5's P1-16 / P1-6.
 - psui: TAB-NO-PREVIEW, DCLICK-HEAVY (P1); DELETE-TAB-DIALOG, LOFT-PROFILE-LIST, PERF-SECTION-PANIC (P2); carried over
   qa5's P1-8 caveat, P1-10.
