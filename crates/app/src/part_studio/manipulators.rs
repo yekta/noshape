@@ -255,6 +255,7 @@ impl PartStudioView {
             } else {
                 self.manip_drag.map(|_| super::section_manip::SectionHandle::Arrow)
             },
+            section_face: self.section_face_marks(),
         }))
     }
 
@@ -431,6 +432,8 @@ pub(super) struct ManipGeometry {
     triad_dragging: bool,
     section_hover: Option<super::section_manip::SectionHandle>,
     section_dragging: Option<super::section_manip::SectionHandle>,
+    /// The face under a dragged section base (its implicit points).
+    section_face: Option<super::section_manip::FaceMarks>,
 }
 
 impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
@@ -442,7 +445,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
             Manip::Section(s) => {
                 use super::section_manip::SectionHandle;
                 let mut out = arrow_glyph(&s.arrow, self.section_hover == Some(SectionHandle::Arrow), self.section_dragging == Some(SectionHandle::Arrow), view, up);
-                out.extend(super::section_manip::section_glyph(&s, self.section_hover, self.section_dragging, view, up));
+                out.extend(super::section_manip::section_glyph(&s, self.section_hover, self.section_dragging, self.section_face.as_ref(), view, up));
                 out
             }
         }
