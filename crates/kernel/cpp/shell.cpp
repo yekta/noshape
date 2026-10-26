@@ -19,6 +19,8 @@
 // from it.
 
 #include "internal.hpp"
+#include <cstdio>
+#include <cstdlib>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <GeomLProp_SLProps.hxx>
 #include <GeomAPI_Interpolate.hxx>
@@ -712,6 +714,88 @@ double edge_sense(const TopoDS_Edge& e, const TopoDS_Face& f)
 // The solid swept by face `f` moving `d` along its outward normal (d < 0:
 // into the solid). Faces of the slab other than `f` itself are recorded as
 // Generated from `src`.
+TopoDS_Face polygon_face(const std::vector<gp_Pnt>& pts);
+
+// The axis of a cylinder or cone face.
+bool blend_axis(const BRepAdaptor_Surface& s, gp_Ax1& axis)
+{
+  if (s.GetType() == GeomAbs_Cylinder)
+    axis = s.Cylinder().Axis();
+  else if (s.GetType() == GeomAbs_Cone)
+    axis = s.Cone().Axis();
+  else
+    return false;
+  return true;
+}
+
+// A convex cylinder or cone face (a fillet, a chamfer's corner cone: its
+// outward normal points away from the axis) whose offset by `d` (d < 0:
+// inward) reaches or passes its axis everywhere: the face lies within |d|
+// of its axis.
+bool collapsing_blend(const TopoDS_Face& f, double d)
+{
+  if (!(d < 0))
+    return false;
+  BRepAdaptor_Surface s(f);
+  gp_Ax1              axis;
+  if (!blend_axis(s, axis))
+    return false;
+  gp_Pnt p;
+  gp_Dir n;
+  if (!inner_point(f, p, n))
+    return false;
+  const gp_Lin ax(axis);
+  const gp_Pnt c = ElCLib::Value(ElCLib::Parameter(ax, p), ax);
+  if (!(gp_Vec(c, p).Dot(gp_Vec(n)) > 0))
+    return false;
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  double rmax = 0;
+  for (double v : {v0, v1})
+    for (int k = 0; k <= 4; ++k)
+      rmax = std::max(rmax, ax.Distance(s.Value(u0 + (u1 - u0) * k / 4, v)));
+  return -d >= rmax * (1 - 1e-9);
+}
+
+// The solid sector of a cylinder or cone face: its angular span and axial
+// extent, from the axis out to the face (a revolved quadrilateral, a
+// triangle at a cone's apex).
+TopoDS_Shape blend_sector(const TopoDS_Face& f)
+{
+  BRepAdaptor_Surface s(f);
+  gp_Ax1              axis;
+  if (!blend_axis(s, axis))
+    return TopoDS_Shape();
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  const gp_Lin ax(axis);
+  auto         on_axis = [&](const gp_Pnt& q) { return ElCLib::Value(ElCLib::Parameter(ax, q), ax); };
+  const gp_Pnt a0 = s.Value(u0, v0), a1 = s.Value(u0, v1);
+  std::vector<gp_Pnt> poly;
+  for (const gp_Pnt& q : {on_axis(a0), a0, a1, on_axis(a1)})
+    if (poly.empty() || (q.Distance(poly.back()) > 1e-9 && q.Distance(poly.front()) > 1e-9))
+      poly.push_back(q);
+  if (poly.size() < 3 || !(u1 - u0 > 1e-9))
+    return TopoDS_Shape();
+  TopoDS_Face sec = polygon_face(poly);
+  if (sec.IsNull())
+    return TopoDS_Shape();
+  // Revolve towards u1: the sense of the surface's angle about the axis.
+  const gp_Pnt ref = ax.Distance(a0) > ax.Distance(a1) ? a0 : a1;
+  const double vr = ax.Distance(a0) > ax.Distance(a1) ? v0 : v1;
+  const double du = std::min(1e-3, (u1 - u0) / 2);
+  gp_Pnt       q = ref;
+  q.Rotate(axis, du);
+  const double sense = q.Distance(s.Value(u0 + du, vr)) < ref.Distance(s.Value(u0 + du, vr)) ? 1.0 : -1.0;
+  BRepPrimAPI_MakeRevol mk(sec, axis, sense * (u1 - u0));
+  if (!mk.IsDone())
+    return TopoDS_Shape();
+  TopoDS_Shape r = mk.Shape();
+  if (!BRepCheck_Analyzer(r).IsValid() || !(volume_of(r) > 0))
+    return TopoDS_Shape();
+  return r;
+}
+
 TopoDS_Shape slab(const TopoDS_Face& f, double d, const TopoDS_Shape& src, SourceMap& sources)
 {
   gp_Pnt p;
@@ -720,7 +804,18 @@ TopoDS_Shape slab(const TopoDS_Face& f, double d, const TopoDS_Shape& src, Sourc
     return TopoDS_Shape();
   BRepAdaptor_Surface s(f);
   TopoDS_Shape        r;
-  if (s.GetType() == GeomAbs_Plane)
+  if (collapsing_blend(f, d))
+  {
+    // A convex blend whose inward offset reaches its axis (the wall at
+    // least as thick as the fillet radius): every point of its sector is
+    // within the wall, so the slab is the whole sector, axis to face
+    // (qa5 P1-16: R1 fillets shelled 1 and 2.5 mm; the offset collapses
+    // to the axis or vanishes, and the sector was left out of the wall).
+    r = blend_sector(f);
+    if (r.IsNull())
+      return TopoDS_Shape();
+  }
+  else if (s.GetType() == GeomAbs_Plane)
   {
     BRepPrimAPI_MakePrism mk(f, gp_Vec(n) * d);
     if (!mk.IsDone())
@@ -1337,11 +1432,18 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   }
   TopoDS_Shape r;
   HHist        hb;
+  const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
+  if (dbg)
+    std::fprintf(stderr, "slabs: %d tools, union volume %.6g\n", tools.Extent(), volume_of(union_));
   if (sign < 0)
   {
     BRepAlgoAPI_Common co(solid, union_);
     if (co.HasErrors() || !co.IsDone())
+    {
+      if (dbg)
+        std::fprintf(stderr, "slabs: common failed\n");
       return false;
+    }
     r = co.Shape();
     hb = co.History();
   }
@@ -1381,6 +1483,8 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   usd.Build();
   HHist hs = usd.History();
   r = single_solid(usd.Shape());
+  if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+    std::fprintf(stderr, "slabs: result valid %d volume %.6g (solid %.6g)\n", (int)valid_solid(r), r.IsNull() ? 0.0 : volume_of(r), volume_of(solid));
   if (!valid_solid(r))
     return false;
   const double vr = volume_of(r);
@@ -1421,7 +1525,17 @@ OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thic
   // Walls that nearly touch (within ten times OCCT's offset tolerance) merge
   // or part by less than it sees: its offset keeps both faces whole and
   // overlapping (2.501 mm: 0.003 mm³ off). The slab construction trims them.
-  const bool offset_ok = gap > 1e-5;
+  // OCCT's offset drops the sector of a fillet whose offset collapses or
+  // vanishes (16 mm³ short on qa5 P1-16's block at 2.5 mm): slabs then.
+  bool collapses = false;
+  {
+    ShapeIMap rmset;
+    for (const TopoDS_Shape& f : removed)
+      rmset.Add(f);
+    for (TopExp_Explorer e(solid.shape, TopAbs_FACE); e.More() && !collapses; e.Next())
+      collapses = !rmset.Contains(e.Current()) && collapsing_blend(TopoDS::Face(e.Current()), sign * thickness);
+  }
+  const bool offset_ok = gap > 1e-5 && !collapses;
   Built      b;
   // method: 0 = automatic, 1 = offset only, 2 = slabs only (tests).
   const bool done = (method == 0 && by_regions(solid.shape, removed, thickness, sign, b)) ||

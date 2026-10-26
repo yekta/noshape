@@ -196,3 +196,43 @@ fn inward_shell_of_a_part_far_from_its_planes_origin() {
     assert!((r.shape.volume().unwrap() * 1e9 - 2653.5).abs() < 1e-6, "{}", r.shape.volume().unwrap() * 1e9);
     assert_eq!(r.shape.count(ShapeType::Face), 11);
 }
+
+/// Live "qa5 (10-25 p2)" (6) (qa5 P1-16), in metres as the model regenerates
+/// it: block 75.554 x 20.245 x 10 mm, R1 on three vertical edges, a 1 mm
+/// chamfer round the top (the tangent chain), four Ø6.35 through holes at
+/// x 15 / 40, y 6 / 14.245; the top face removed. Onshape: 1 mm → 3998.627
+/// mm³ (33 faces, the hole walls stand as tubes), 2.5 mm → 8503.961 mm³
+/// (47 faces, the tubes merge with each other and the side walls).
+#[test]
+fn shell_block_with_close_holes_like_onshape() {
+    let mm = 1e-3;
+    let (a, b, h) = (75.554 * mm, 20.245 * mm, 10.0 * mm);
+    let mut s = bx([0.0; 3], [a, b, h]);
+    let v = edges_where(&s, |i| (i.start.z - i.end.z).abs() > 1e-9 && !(i.start.x.abs() < 1e-9 && (i.start.y - b).abs() < 1e-9));
+    assert_eq!(v.len(), 3);
+    s = fillet_checked(&s, &v, &[1.0 * mm]).unwrap().shape;
+    let t = edges_where(&s, |i| (i.start.z - h).abs() < 1e-9 && (i.end.z - h).abs() < 1e-9);
+    s = chamfer_checked(&s, &t, ChamferSpec::Equal(1.0 * mm), &[]).unwrap().shape;
+    for (x, y) in [(15.0, 6.0), (15.0, 14.245), (40.0, 6.0), (40.0, 14.245)] {
+        let c = make_cylinder(&Plane::from_normal(DVec3::new(x * mm, y * mm, -mm), DVec3::Z), 3.175 * mm, 12.0 * mm, std::f64::consts::TAU).unwrap();
+        s = cut(&s, &c).unwrap().shape;
+    }
+    eprintln!("solid {:.3} mm³, {} faces", vol(&s) * 1e9, s.count(ShapeType::Face));
+    let faces = faces_where(&s, |c| c.z > h - 1e-9);
+    assert_eq!(faces.len(), 1);
+    for th in [1.0, 2.5] {
+        for m in [ShellMethod::Offset, ShellMethod::Slabs] {
+            match shell_solid(&s, &faces, th * mm, ShellSide::Inside, m) {
+                Ok(r) => eprintln!("{th} {m:?}: {:.3} mm³ {} faces valid {}", vol(&r.shape) * 1e9, r.shape.count(ShapeType::Face), r.shape.is_valid()),
+                Err(e) => eprintln!("{th} {m:?}: {e}"),
+            }
+        }
+    }
+    for (th, want, nf) in [(1.0, 3998.627, 33), (2.5, 8503.961, 47)] {
+        let r = shell_solid(&s, &faces, th * mm, ShellSide::Inside, ShellMethod::Auto).unwrap_or_else(|e| panic!("{th} mm: {e}")).shape;
+        let v = vol(&r) * 1e9;
+        assert!(r.is_valid());
+        assert!((v - want).abs() < 0.01, "{th} mm: {v} vs {want}");
+        assert_eq!(r.count(ShapeType::Face), nf, "{th} mm");
+    }
+}
