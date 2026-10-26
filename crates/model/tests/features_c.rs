@@ -2311,3 +2311,62 @@ fn face_blend_variants_as_live() {
     });
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Cannot attach blended face. Select \"Detach\" to create a separate surface.".to_string()));
 }
+
+/// Decal (std decal.fs): a 200 × 100 image on a 40 × 20 × 10 block's top
+/// face, 25 wide with the aspect kept, centred on the face, image X along
+/// world X; on a side face the image's up is world Z; shifted off the face
+/// it fails like std.
+#[test]
+fn decal_places_its_image_as_std() {
+    use noshape_model::regen::context::DecalMapping;
+    use noshape_model::{Document, TabContent};
+    let mut doc = Document::new();
+    let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+    png.extend_from_slice(&[0, 0, 0, 200, 0, 0, 0, 100, 8, 2, 0, 0, 0]);
+    let img = doc.add_tab("logo.png", TabContent::File(noshape_model::file_tab::FileTab::new("logo.png", &png, 0)));
+    let run = |face_p: DVec3, image: bool, u_shift: &str| -> (Option<noshape_model::regen::context::DecalRecord>, FeatureStatus, String) {
+        let mut s = Studio::new();
+        s.opts.custom_features = Some(noshape_model::custom::DocumentScripts::from_document(&doc));
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+        });
+        let r = s.ok();
+        let face = face_at(&r, 0, face_p);
+        let tab = if image { img.to_string() } else { String::new() };
+        let u_shift = u_shift.to_string();
+        s.add("decal", move |p| {
+            p.set("image", ParamValue::Text(tab));
+            p.set("face", q(face));
+            p.set("uShift", expr(&u_shift));
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        (r.context.decals.last().cloned(), st.status, st.message.clone().unwrap_or_default())
+    };
+    let (d, st, msg) = run(DVec3::new(mm(20.0), mm(10.0), mm(10.0)), true, "0 mm");
+    assert_eq!(st, FeatureStatus::Ok, "{msg}");
+    let d = d.unwrap();
+    let DecalMapping::Planar { origin, x, z, .. } = d.mapping else { panic!("{:?}", d.mapping) };
+    assert!((origin - DVec3::new(mm(20.0), mm(10.0), mm(10.0))).length() < 1e-12 && (x - DVec3::X).length() < 1e-12 && (z - DVec3::Z).length() < 1e-12, "{:?}", d.mapping);
+    // 25 × 12.5: the centre is (½, ½), the right edge's middle (1, ½), the top (½, 1).
+    let uv = |p: DVec3| d.uv_at(p);
+    let close = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-9 && (a[1] - b[1]).abs() < 1e-9;
+    assert!(close(uv(origin), [0.5, 0.5]));
+    assert!(close(uv(origin + DVec3::X * mm(12.5)), [1.0, 0.5]), "{:?}", uv(origin + DVec3::X * mm(12.5)));
+    assert!(close(uv(origin + DVec3::Y * mm(6.25)), [0.5, 1.0]), "{:?}", uv(origin + DVec3::Y * mm(6.25)));
+    // The +X side: image X along world Y, up along world Z.
+    let (d, st, msg) = run(DVec3::new(mm(40.0), mm(10.0), mm(5.0)), true, "0 mm");
+    assert_eq!(st, FeatureStatus::Ok, "{msg}");
+    let DecalMapping::Planar { x, y, .. } = d.unwrap().mapping else { panic!() };
+    assert!((x - DVec3::Y).length() < 1e-12 && (y - DVec3::Z).length() < 1e-12, "side x {x:?} y {y:?}");
+    // No image; shifted off the face.
+    let (_, st, msg) = run(DVec3::new(mm(20.0), mm(10.0), mm(10.0)), false, "0 mm");
+    assert_eq!((st, msg.as_str()), (FeatureStatus::Error, "Select image for decal"));
+    let (_, st, msg) = run(DVec3::new(mm(20.0), mm(10.0), mm(10.0)), true, "40 mm");
+    assert_eq!((st, msg.as_str()), (FeatureStatus::Error, "Decal is not on target face."));
+}
