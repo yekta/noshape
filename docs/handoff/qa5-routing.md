@@ -857,3 +857,10 @@ STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extr
     shell part with selections.".
   - **P1-16 still open** on the green kernel: depth 10 / R1, Shell 1 mm still fails; 2.5 mm still 8487.861 mm³ (live 8503.961).
   - P1-18 still open (the failing rows above show no ⚠ badge).
+- STATUS 2026-10-26 (qa5, live answer "qa5 (10-26 p6)"): **P2-A2 confirmed** (live: 1st Enter in a mate limit field applies,
+  "5 mm" selected, dialog open; 2nd Enter accepts). **P2-A3 confirmed** (live Esc = Done: plain row, no rollback bar,
+  unexploded; double-click re-enters). New **P2-A8 — skb (assembly patterns)**: ours shows an info bubble "N instance(s)
+  created." after accepting an assembly pattern (assembly_panels.rs:1234; also "0 instance(s) created." after an edit);
+  live shows **no bubble** for circular or linear patterns (polled 20 s). Detail-view scale (p6 (4)) not answered yet.
+- STATUS 2026-10-26 (qa5): P1-6 merges into P1-16 (live "qa5 (10-25 p2)" (6): depth 10, R1, Shell 2.5 and 1 mm both OK).
+  Lead 10-26: qa5 fixes the open findings itself, P1 first.
