@@ -2907,10 +2907,53 @@ pub struct ViewTabProps {
     pub virtual_sharp_extension: bool,
     pub virtual_sharp_line: PenProps,
     pub sketch_line: PenProps,
+    /// Created in drawing › Sketch driven dimensions color (live #666666).
+    pub sketch_driven_dim_color: [u8; 3],
+    /// Part Studio sketches shown in views (live 10-26 c): Solid lines (0.40
+    /// mm) and Construction lines (0.13 mm, long-short dashes) pens; Sketch
+    /// points' shape, size (sheet mm; live Circle, 1 mm) and colour.
+    pub sketch_solid: PenProps,
+    pub sketch_construction: PenProps,
+    pub sketch_point_shape: SketchPointShape,
+    pub sketch_point_size: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sketch_point_color: Option<[u8; 3]>,
     /// Views › View and region hatches › Hatch pattern: (standard, pattern)
     /// in `hatch_pat::GROUPS` (live default ANSI, "ANSI31 general").
     pub hatch_pattern: (usize, usize),
 }
+
+/// Construction geometry › Part Studio sketches › Sketch points shape.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SketchPointShape {
+    None,
+    Centermark,
+    Cross,
+    Circle,
+    CentermarkCircle,
+    CrossCircle,
+}
+
+impl SketchPointShape {
+    pub const ALL: [SketchPointShape; 6] = [Self::None, Self::Centermark, Self::Cross, Self::Circle, Self::CentermarkCircle, Self::CrossCircle];
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::None => "None",
+            Self::Centermark => "Centermark",
+            Self::Cross => "Cross",
+            Self::Circle => "Circle",
+            Self::CentermarkCircle => "Centermark circle",
+            Self::CrossCircle => "Cross circle",
+        }
+    }
+}
+
+/// Sketch points sizes (mm), listed ".25 mm" … "5 mm".
+pub const SKETCH_POINT_SIZES: [f64; 7] = [0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0];
+
+/// Construction lines of shown sketches: long dash, gap, short dash, gap
+/// (paper mm, live 10-26 c).
+pub const SKETCH_CONSTRUCTION_DASHES: [f64; 4] = [8.5, 1.4, 2.0, 1.4];
 
 /// Cosmetic thread drawing standard (Drawing properties › Views).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -2956,12 +2999,34 @@ pub struct TableStyles {
     pub hole_indicator_line: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hole_tags_font: Option<sheet::TextFont>,
+    /// Hole tables › Indicator lines' colour and the Tags' text (live 1710:
+    /// the annotations' height).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hole_indicator_color: Option<[u8; 3]>,
+    pub hole_tags: RowText,
+    /// Revision tables › Revision callouts: border (live Triangle), fit in
+    /// characters (0: Tight Fit; live 1), font and text.
+    pub revision_callout_shape: CalloutBorder,
+    pub revision_callout_chars: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision_callout_font: Option<sheet::TextFont>,
+    pub revision_callout_text: RowText,
 }
 
 impl Default for TableStyles {
     fn default() -> Self {
         let t = TableStyle::default();
-        Self { general: t.clone(), bom: t.clone(), custom: t.clone(), cut_list: t.clone(), hole: t.clone(), revision: t, hole_indicator_iso: false, hole_indicator_arrow: None, hole_indicator_line: 0.15, hole_tags_font: None }
+        Self { general: t.clone(), bom: t.clone(), custom: t.clone(), cut_list: t.clone(), hole: t.clone(), revision: t, hole_indicator_iso: false,
+            hole_indicator_arrow: None,
+            hole_indicator_line: 0.15,
+            hole_tags_font: None,
+            hole_indicator_color: None,
+            hole_tags: RowText::default(),
+            revision_callout_shape: CalloutBorder::Triangle,
+            revision_callout_chars: 1,
+            revision_callout_font: None,
+            revision_callout_text: RowText::default(),
+        }
     }
 }
 
@@ -3116,6 +3181,12 @@ impl Default for ViewTabProps {
             virtual_sharp_extension: false,
             virtual_sharp_line: PenProps::new(0.40),
             sketch_line: PenProps::new(0.15),
+            sketch_driven_dim_color: [102, 102, 102],
+            sketch_solid: PenProps::new(0.40),
+            sketch_construction: PenProps::new(0.13),
+            sketch_point_shape: SketchPointShape::Circle,
+            sketch_point_size: 1.0,
+            sketch_point_color: None,
             hatch_pattern: (0, 0),
         }
     }

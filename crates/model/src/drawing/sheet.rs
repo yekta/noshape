@@ -419,6 +419,71 @@ pub struct SheetStyle {
     pub virtual_sharp_extension: bool,
     pub virtual_sharp_pen: f64,
     pub virtual_sharp_color: Option<[u8; 3]>,
+    /// Tables › Revision tables › Revision callouts.
+    pub revision_callout: RevisionCalloutStyle,
+}
+
+/// Revision callouts' border, fit (characters; 0: Tight Fit), font and text
+/// (Drawing properties › Tables › Revision tables).
+#[derive(Clone, Debug, PartialEq)]
+pub struct RevisionCalloutStyle {
+    pub shape: super::CalloutBorder,
+    pub chars: u8,
+    pub font: Option<TextFont>,
+    pub text: super::RowText,
+}
+
+impl Default for RevisionCalloutStyle {
+    fn default() -> Self {
+        Self { shape: super::CalloutBorder::Triangle, chars: 1, font: None, text: super::RowText::default() }
+    }
+}
+
+/// A callout border's half extents (mm) around a `w` wide label `h` high.
+fn callout_extent(border: super::CalloutBorder, w: f64, h: f64) -> (f64, f64) {
+    use super::CalloutBorder as B;
+    match border {
+        B::Circle | B::DoubleCircle | B::SquareCircle | B::Octagon => {
+            let r = (w / 2.0 + h * 0.8).max(h * 1.2);
+            (r, r)
+        }
+        B::SplitCircle => {
+            let r = (w / 2.0 + h * 0.9).max(h * 1.6);
+            (r, r)
+        }
+        B::Rectangle | B::Underline | B::None | B::Flag => (w / 2.0 + h * 0.5, h * 0.8),
+        B::Hexagon => (w / 2.0 + h * 0.9, h * 0.95),
+        B::Diamond => (w / 2.0 + h * 1.2, h * 1.3),
+        B::Triangle => {
+            let r = (w / 2.0 + h * 0.6) * 1.6;
+            (r, r)
+        }
+    }
+}
+
+/// A callout border's outlines (polyline, closed) centred on `ck`.
+fn callout_outlines(border: super::CalloutBorder, ck: [f64; 2], rx: f64, ry: f64) -> Vec<(Vec<[f64; 2]>, bool)> {
+    use super::CalloutBorder as B;
+    let ring = |r: f64, n: usize, a0: f64| -> Vec<[f64; 2]> { (0..n).map(|i| a0 + i as f64 / n as f64 * std::f64::consts::TAU).map(|t| [ck[0] + r * t.cos(), ck[1] + r * t.sin()]).collect() };
+    match border {
+        B::None => vec![],
+        B::Circle | B::SplitCircle => vec![(ring(rx, 40, 0.0), true)],
+        B::DoubleCircle => vec![(ring(rx, 40, 0.0), true), (ring(rx * 0.82, 40, 0.0), true)],
+        B::SquareCircle => {
+            let q = rx * 1.08;
+            vec![(ring(rx, 40, 0.0), true), (vec![[ck[0] - q, ck[1] - q], [ck[0] + q, ck[1] - q], [ck[0] + q, ck[1] + q], [ck[0] - q, ck[1] + q]], true)]
+        }
+        B::Octagon => vec![(ring(rx / (std::f64::consts::PI / 8.0).cos(), 8, std::f64::consts::PI / 8.0), true)],
+        B::Rectangle => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry], [ck[0] + rx, ck[1] + ry], [ck[0] - rx, ck[1] + ry]], true)],
+        B::Underline => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry]], false)],
+        B::Flag => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry], [ck[0] + rx + ry, ck[1]], [ck[0] + rx, ck[1] + ry], [ck[0] - rx, ck[1] + ry]], true)],
+        B::Hexagon => {
+            let e = ry * 0.6;
+            vec![(vec![[ck[0] - rx, ck[1]], [ck[0] - rx + e, ck[1] - ry], [ck[0] + rx - e, ck[1] - ry], [ck[0] + rx, ck[1]], [ck[0] + rx - e, ck[1] + ry], [ck[0] - rx + e, ck[1] + ry]], true)]
+        }
+        B::Diamond => vec![(vec![[ck[0] - rx, ck[1]], [ck[0], ck[1] - ry], [ck[0] + rx, ck[1]], [ck[0], ck[1] + ry]], true)],
+        B::Triangle => vec![(ring(rx, 3, std::f64::consts::FRAC_PI_2).into_iter().map(|q| [q[0], q[1] - ry * 0.25]).collect(), true)],
+    }
 }
 
 impl SheetStyle {
@@ -430,7 +495,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true, virtual_sharp_extension: false, virtual_sharp_pen: 0.4, virtual_sharp_color: None }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true, virtual_sharp_extension: false, virtual_sharp_pen: 0.4, virtual_sharp_color: None, revision_callout: RevisionCalloutStyle::default() }
     }
 }
 
@@ -1871,8 +1936,12 @@ impl SheetGeometry {
             if let Some(font) = font {
                 self.fonts.push(FontSpan { texts: t0..t1, font });
             }
-            let Some(c) = c else { continue };
-            self.colors.push(ColorSpan { lines: l0..l1, texts: t0..t1, fills: f0..f1, rgb: c });
+            if let Some(c) = c {
+                self.colors.push(ColorSpan { lines: l0..l1, texts: t0..t1, fills: f0..f1, rgb: c });
+            }
+            if matches!(a.kind, AnnotationKind::RevisionCallout { group: None, .. }) {
+                self.revision_spans(l0..l1, t0..t1);
+            }
         }
         self.add_cad_objects(&starts, end, env);
         // Callouts grouped with a dimension: at the upper right of its text.
@@ -1908,6 +1977,7 @@ impl SheetGeometry {
         for (p, label, pick) in grouped {
             self.revision_callout(p, label, ah0, pick);
         }
+        let revisions_end = self.mark();
         for (a, c) in grouped_balloons {
             let ah = self.style.type_style(&a.kind).height.unwrap_or(ah0);
             self.balloon(a, c, env, ah, (a.id & 0xFFFF_FFFF) as u32);
@@ -1915,6 +1985,7 @@ impl SheetGeometry {
         if let Some(c) = self.style.ann_color {
             self.color_since(m, c);
         }
+        self.revision_spans(m.0..revisions_end.0, m.1..revisions_end.1);
         // (Inspection bubbles measure the annotations' own geometry only.)
         if let Some(style) = env.inspection_style() {
             for (k, &(a, t0, l0, _)) in starts.iter().enumerate() {
@@ -2006,49 +2077,14 @@ impl SheetGeometry {
         // Border size: characters (Tight Fit = the text).
         let w = if cs.chars == 0 { widest_main } else { widest_main.max(cs.chars as f64 * h * 0.6) };
         let split = cs.border == B::SplitCircle;
-        let (rx, ry) = match cs.border {
-            B::Circle | B::DoubleCircle | B::SquareCircle | B::Octagon => {
-                let r = (w / 2.0 + h * 0.8).max(h * 1.2);
-                (r, r)
-            }
-            B::SplitCircle => {
-                let r = (w / 2.0 + h * 0.9).max(h * 1.6);
-                (r, r)
-            }
-            B::Rectangle | B::Underline | B::None | B::Flag => (w / 2.0 + h * 0.5, h * 0.8),
-            B::Hexagon => (w / 2.0 + h * 0.9, h * 0.95),
-            B::Diamond => (w / 2.0 + h * 1.2, h * 1.3),
-            B::Triangle => {
-                let r = (w / 2.0 + h * 0.6) * 1.6;
-                (r, r)
-            }
-        };
+        let (rx, ry) = callout_extent(cs.border, w, h);
         let step = self.style.callout_stack.step([c[0] - p[0], c[1] - p[1]]);
         let pitch = if step[0] != 0.0 { 2.0 * rx } else { 2.0 * ry } + self.style.callout_stack_gap;
         let just = self.style.callout_justify;
         let leader_left = p[0] < c[0];
-        let ring = |ck: [f64; 2], r: f64, n: usize, a0: f64| -> Vec<[f64; 2]> { (0..n).map(|i| a0 + i as f64 / n as f64 * std::f64::consts::TAU).map(|t| [ck[0] + r * t.cos(), ck[1] + r * t.sin()]).collect() };
         for (k, item) in items.iter().enumerate() {
             let ck = [c[0] + step[0] * pitch * k as f64, c[1] + step[1] * pitch * k as f64];
-            let mut outlines: Vec<(Vec<[f64; 2]>, bool)> = match cs.border {
-                B::None => vec![],
-                B::Circle | B::SplitCircle => vec![(ring(ck, rx, 40, 0.0), true)],
-                B::DoubleCircle => vec![(ring(ck, rx, 40, 0.0), true), (ring(ck, rx * 0.82, 40, 0.0), true)],
-                B::SquareCircle => {
-                    let q = rx * 1.08;
-                    vec![(ring(ck, rx, 40, 0.0), true), (vec![[ck[0] - q, ck[1] - q], [ck[0] + q, ck[1] - q], [ck[0] + q, ck[1] + q], [ck[0] - q, ck[1] + q]], true)]
-                }
-                B::Octagon => vec![(ring(ck, rx / (std::f64::consts::PI / 8.0).cos(), 8, std::f64::consts::PI / 8.0), true)],
-                B::Rectangle => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry], [ck[0] + rx, ck[1] + ry], [ck[0] - rx, ck[1] + ry]], true)],
-                B::Underline => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry]], false)],
-                B::Flag => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry], [ck[0] + rx + ry, ck[1]], [ck[0] + rx, ck[1] + ry], [ck[0] - rx, ck[1] + ry]], true)],
-                B::Hexagon => {
-                    let e = ry * 0.6;
-                    vec![(vec![[ck[0] - rx, ck[1]], [ck[0] - rx + e, ck[1] - ry], [ck[0] + rx - e, ck[1] - ry], [ck[0] + rx, ck[1]], [ck[0] + rx - e, ck[1] + ry], [ck[0] - rx + e, ck[1] + ry]], true)]
-                }
-                B::Diamond => vec![(vec![[ck[0] - rx, ck[1]], [ck[0], ck[1] - ry], [ck[0] + rx, ck[1]], [ck[0], ck[1] + ry]], true)],
-                B::Triangle => vec![(ring(ck, rx, 3, std::f64::consts::FRAC_PI_2).into_iter().map(|q| [q[0], q[1] - ry * 0.25]).collect(), true)],
-            };
+            let mut outlines = callout_outlines(cs.border, ck, rx, ry);
             if split {
                 outlines.push((vec![[ck[0] - rx, ck[1]], [ck[0] + rx, ck[1]]], false));
             }
@@ -2138,14 +2174,40 @@ impl SheetGeometry {
         }
     }
 
-    /// A revision callout: an equilateral triangle around the label, base
-    /// below it, centered on `p`.
+    /// A revision callout centred on `p`: Revision tables › Revision
+    /// callouts' border (Triangle: equilateral, base below the label), at
+    /// least its fit's characters wide, and text height.
     fn revision_callout(&mut self, p: [f64; 2], label: String, ah: f64, pick: u32) {
-        let s = (font::text_width(&label, ah) + ah * 2.4).max(ah * 3.2);
-        let h = s * 0.866;
-        let y0 = p[1] - h / 3.0;
-        self.lines.push(Polyline2 { points: vec![[p[0] - s / 2.0, y0], [p[0] + s / 2.0, y0], [p[0], y0 + h]], style: LineStyle::Thin, closed: true, pick });
-        self.texts.push(Text2 { pos: p, height: ah, text: label, angle: 0.0, anchor: Anchor::Center, pick });
+        let rc = &self.style.revision_callout;
+        let (shape, chars, h) = (rc.shape, rc.chars, rc.text.height.unwrap_or(ah));
+        let tw = font::text_width(&label, h);
+        let w = if chars == 0 { tw } else { tw.max(chars as f64 * h * 0.6) };
+        if shape == super::CalloutBorder::Triangle {
+            let s = if chars == 0 { w + h * 2.4 } else { (w + h * 2.4).max(h * 3.2) };
+            let th = s * 0.866;
+            let y0 = p[1] - th / 3.0;
+            self.lines.push(Polyline2 { points: vec![[p[0] - s / 2.0, y0], [p[0] + s / 2.0, y0], [p[0], y0 + th]], style: LineStyle::Thin, closed: true, pick });
+        } else {
+            let (rx, ry) = callout_extent(shape, w, h);
+            for (points, closed) in callout_outlines(shape, p, rx, ry) {
+                self.lines.push(Polyline2 { points, style: LineStyle::Thin, closed, pick });
+            }
+        }
+        self.texts.push(Text2 { pos: p, height: h, text: label, angle: 0.0, anchor: Anchor::Center, pick });
+    }
+
+    /// Revision callouts' font, Bold / Italic and colour on a callout's
+    /// lines and texts (over the annotations' own).
+    fn revision_spans(&mut self, lines: std::ops::Range<usize>, texts: std::ops::Range<usize>) {
+        let rc = &self.style.revision_callout;
+        if rc.font.is_some() || rc.text.bold || rc.text.italic {
+            let family = rc.font.as_ref().or(self.style.ann_font.as_ref()).map_or(DRAWING_DEFAULT_FONT, |f| f.family.as_str()).to_string();
+            let font = TextFont { family, bold: rc.text.bold, italic: rc.text.italic };
+            self.fonts.push(FontSpan { texts: texts.clone(), font });
+        }
+        if let Some(rgb) = rc.text.color {
+            self.colors.push(ColorSpan { lines, texts, fills: 0..0, rgb });
+        }
     }
 
     /// Width (mm) of a dimension label.
@@ -2782,5 +2844,29 @@ mod tests {
         let mut g = SheetGeometry::new(100.0, 100.0);
         g.inspection_bubble([50.0, 50.0], 3, &style(false, Some([10, 20, 30]), Some([1, 2, 3])), 1);
         assert!(g.fills.is_empty() && g.text_color(0) == Some([10, 20, 30]));
+    }
+
+    /// Tables › Revision callouts: the border shape, fit and text height;
+    /// font and colour over the callout's lines and text.
+    #[test]
+    fn revision_callout_shape_fit_and_text() {
+        let mut g = SheetGeometry::new(100.0, 100.0);
+        g.revision_callout([50.0, 50.0], "A".into(), 3.0, 1);
+        assert_eq!((g.lines.len(), g.lines[0].points.len(), g.texts[0].height), (1, 3, 3.0), "the default triangle");
+        let span = |g: &SheetGeometry| g.lines[0].points.iter().map(|p| p[0]).fold(f64::MIN, f64::max) - g.lines[0].points.iter().map(|p| p[0]).fold(f64::MAX, f64::min);
+        let mut g = SheetGeometry::new(100.0, 100.0);
+        g.style.revision_callout = RevisionCalloutStyle { shape: super::super::CalloutBorder::Rectangle, chars: 0, font: None, text: super::super::RowText { height: Some(5.0), bold: true, italic: false, color: Some([200, 0, 0]) } };
+        g.revision_callout([50.0, 50.0], "A".into(), 3.0, 1);
+        let tight = span(&g);
+        assert_eq!((g.lines[0].points.len(), g.texts[0].height), (4, 5.0));
+        g.revision_spans(0..1, 0..1);
+        assert_eq!((g.line_color(0), g.text_color(0)), (Some([200, 0, 0]), Some([200, 0, 0])));
+        assert!(g.fonts.last().is_some_and(|f| f.font.bold && f.font.family == DRAWING_DEFAULT_FONT));
+        let mut g2 = SheetGeometry::new(100.0, 100.0);
+        g2.style.revision_callout.shape = super::super::CalloutBorder::Rectangle;
+        g2.style.revision_callout.chars = 4;
+        g2.style.revision_callout.text.height = Some(5.0);
+        g2.revision_callout([50.0, 50.0], "A".into(), 3.0, 1);
+        assert!(span(&g2) > tight + 5.0, "4 characters wide");
     }
 }

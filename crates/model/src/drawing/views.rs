@@ -854,6 +854,18 @@ pub struct ViewEdge {
     pub class: EdgeClass,
     /// Index into [`ViewGeometry::model_edges`].
     pub model: Option<u32>,
+    /// A sketch's line (Drawing properties › Construction geometry › Part
+    /// Studio sketches).
+    pub sketch: SketchEdge,
+}
+
+/// What kind of sketch line a view edge is.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SketchEdge {
+    #[default]
+    None,
+    Solid,
+    Construction,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -895,6 +907,8 @@ pub struct ViewGeometry {
     /// radius (view coordinates).
     pub threads: Vec<([f64; 2], f64)>,
     pub form_marks: Vec<[f64; 2]>,
+    /// Free points of the sketches drawn in the view.
+    pub sketch_points: Vec<[f64; 2]>,
     /// Crop boundary of a cropped view (view coordinates).
     pub crop: Option<Crop>,
     /// Axes of cylindrical faces seen from the side (for automatic
@@ -1733,20 +1747,15 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             }
         }
     }
-    // Shown source sketches, drawn over the model; their free points as
-    // small crosses (0.6 mm on the sheet) unless hidden.
+    // Shown source sketches, drawn over the model; their free points unless
+    // hidden (live 10-26 c: line ends get no marker).
     if !v.shown_sketches.is_empty() {
-        let arm = 0.6 / (view_scale(sheet, id) * 1000.0).max(1e-9);
         for f in &v.shown_sketches {
             let sg = sketch_geometry(id, &ctx, f, &frame);
             g.edges.extend(sg.edges);
-            g.snaps.extend(sg.snaps.iter().cloned());
+            g.snaps.extend(sg.snaps);
             if !v.hide_sketch_points {
-                for s in &sg.snaps {
-                    let p = s.p;
-                    g.edges.push(ViewEdge { points: vec![[p[0] - arm, p[1]], [p[0] + arm, p[1]]], visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None });
-                    g.edges.push(ViewEdge { points: vec![[p[0], p[1] - arm], [p[0], p[1] + arm]], visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None });
-                }
+                g.sketch_points.extend(sg.sketch_points);
             }
         }
         g.update_bounds();
@@ -1833,7 +1842,7 @@ fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
     let edges = std::mem::take(&mut g.edges);
     for e in edges {
         for piece in clip_to_crop(&e.points, crop) {
-            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model: e.model });
+            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model: e.model, sketch: e.sketch });
         }
     }
     let poly = crop_polygon(crop);
@@ -1843,6 +1852,7 @@ fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
         _ => true,
     };
     g.snaps.retain(|s| inside(s.p));
+    g.sketch_points.retain(|p| inside(*p));
     // Section boundaries stay whole; hatch lines are cropped at build time.
     let axes = std::mem::take(&mut g.axes);
     for a in axes {
@@ -2090,6 +2100,7 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             visible: pe.visibility == Visibility::Visible,
             class: pe.class,
             model,
+            sketch: SketchEdge::None,
         });
     }
     // Snap points: vertices (on the kept side of a section) and centers of
@@ -2586,7 +2597,7 @@ fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: 
                     (g.model_edges.len() - 1) as u32
                 })
             });
-            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model });
+            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model, sketch: e.sketch });
         }
     }
     let inside = |p: [f64; 2]| match poly {
@@ -2594,6 +2605,7 @@ fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: 
         None => (p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2) <= radius * radius * (1.0 + 1e-9),
     };
     g.snaps = parent.snaps.iter().filter(|s| inside(s.p)).cloned().collect();
+    g.sketch_points = parent.sketch_points.iter().copied().filter(|p| inside(*p)).collect();
     // Section boundaries stay whole (closed loops) so hatching works; the
     // hatch lines are clipped to the detail circle when the sheet is built.
     g.section_segments = parent.section_segments.clone();
@@ -2674,8 +2686,6 @@ pub fn sketch_frame(ctx: &Context, feature: &crate::FeatureId) -> Option<[[f64; 
     Some([(-s.frame.normal).to_array(), s.frame.y.to_array()])
 }
 
-/// A sketch view: the sketch's (non-construction) curves projected into the
-/// view; its points are snap points.
 /// Major diameter (m) of a thread designation: metric "M6x1.0" / "M10",
 /// unified "1/4-20" or numbered "#10-24".
 pub fn thread_major_diameter(designation: &str) -> Option<f64> {
@@ -2720,13 +2730,13 @@ fn flat_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewF
         for w in pts.windows(2) {
             g.snaps.push(Snap { p: w[0], kind: SnapKind::Vertex, point: None });
         }
-        g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None });
+        g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::None });
     }
     for f in &flat.forms {
         for l in f.loops.iter().filter(|l| l.len() >= 2) {
             let mut pts: Vec<[f64; 2]> = l.iter().map(|p| pt(*p)).collect();
             pts.push(pts[0]);
-            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None });
+            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None, sketch: SketchEdge::None });
         }
         g.form_marks.push(pt(f.center));
         g.snaps.push(Snap { p: pt(f.center), kind: SnapKind::Center, point: None });
@@ -2742,6 +2752,8 @@ fn flat_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewF
     g
 }
 
+/// A sketch's curves projected into a view (construction ones marked so),
+/// its free points; the solid curves' ends and free points are snap points.
 fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame: &ViewFrame) -> ViewGeometry {
     let mut g = ViewGeometry { id, frame: Some(*frame), exact: true, ..Default::default() };
     let Some(s) = ctx.sketches.iter().find(|s| &s.feature == feature) else {
@@ -2750,23 +2762,23 @@ fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame:
     };
     let sk = &s.sketch;
     for e in sk.entities() {
-        if e.construction {
-            continue;
-        }
         if let noshape_sketch::Geometry::Point { pos } = e.geometry {
-            if sk.users_of_point(e.id).is_empty() {
-                g.snaps.push(Snap { p: frame.project(s.frame.to_world(pos)), kind: SnapKind::Vertex, point: None });
+            if sk.users_of_point(e.id).is_empty() && !e.construction {
+                let p = frame.project(s.frame.to_world(pos));
+                g.snaps.push(Snap { p, kind: SnapKind::Vertex, point: None });
+                g.sketch_points.push(p);
             }
             continue;
         }
         let Some(c) = sk.curve(e.id) else { continue };
         let pts: Vec<[f64; 2]> = c.tessellate(1e-5).into_iter().map(|p| frame.project(s.frame.to_world(p))).collect();
         if pts.len() >= 2 {
-            if let Some((a, b)) = e.endpoints().and_then(|(a, b)| Some((sk.point(a)?, sk.point(b)?))) {
+            if !e.construction && let Some((a, b)) = e.endpoints().and_then(|(a, b)| Some((sk.point(a)?, sk.point(b)?))) {
                 g.snaps.push(Snap { p: frame.project(s.frame.to_world(a)), kind: SnapKind::Vertex, point: None });
                 g.snaps.push(Snap { p: frame.project(s.frame.to_world(b)), kind: SnapKind::Vertex, point: None });
             }
-            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None });
+            let sketch = if e.construction { SketchEdge::Construction } else { SketchEdge::Solid };
+            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None, sketch });
         }
     }
     let (mut lo, mut hi) = ([f64::MAX; 2], [f64::MIN; 2]);

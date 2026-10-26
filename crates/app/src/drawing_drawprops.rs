@@ -193,6 +193,76 @@ fn arrowhead_glyph(t: noshape_model::drawing::sheet::ArrowType) -> impl IntoElem
     .h(px(9.))
 }
 
+/// Drawing properties › Views › Cosmetic threads: the Thread style's top
+/// and side view previews, two 96 × 96 tiles 14 px apart (live 10-26 d:
+/// pictures, not buttons; a 100-unit tile, white with a #333 0.5 frame).
+fn thread_tiles(style: ThreadStyle) -> AnyElement {
+    let tile = move |side: bool| {
+        canvas(|_, _, _| {}, move |b, _, window, _| {
+            let k = 0.96;
+            // Tile units from the frame's outer corner (the canvas sits inside it).
+            let at = |p: [f32; 2]| point(b.left() - px(1.) + px(p[0] * k), b.top() - px(1.) + px(p[1] * k));
+            // A polyline (tile units) with an on/off dash pattern.
+            let stroke = |window: &mut Window, pts: &[[f32; 2]], w: f32, dash: &[f32]| {
+                let mut pieces: Vec<Vec<[f32; 2]>> = vec![vec![pts[0]]];
+                let (mut k_dash, mut left, mut on) = (0, dash.first().copied().unwrap_or(f32::MAX), true);
+                for s in pts.windows(2) {
+                    let len = ((s[1][0] - s[0][0]).powi(2) + (s[1][1] - s[0][1]).powi(2)).sqrt();
+                    let mut t = 0.0;
+                    while len - t > left {
+                        t += left;
+                        let q = [s[0][0] + (s[1][0] - s[0][0]) * t / len, s[0][1] + (s[1][1] - s[0][1]) * t / len];
+                        if on {
+                            pieces.last_mut().expect("started").push(q);
+                        } else {
+                            pieces.push(vec![q]);
+                        }
+                        on = !on;
+                        k_dash = (k_dash + 1) % dash.len().max(1);
+                        left = dash.get(k_dash).copied().unwrap_or(f32::MAX);
+                    }
+                    left -= len - t;
+                    if on {
+                        pieces.last_mut().expect("started").push(s[1]);
+                    }
+                }
+                for piece in pieces.iter().filter(|p| p.len() >= 2) {
+                    let mut pb = PathBuilder::stroke(px(w * k));
+                    pb.move_to(at(piece[0]));
+                    for q in &piece[1..] {
+                        pb.line_to(at(*q));
+                    }
+                    if let Ok(path) = pb.build() {
+                        window.paint_path(path, gpui_kit::rgb_static(0x000000));
+                    }
+                }
+            };
+            // Arc from `a0` to `a1` degrees, clockwise on screen from 3 o'clock.
+            let arc = |r: f32, a0: f32, a1: f32| (0..=96).map(|i| (a0 + (a1 - a0) * i as f32 / 96.0).to_radians()).map(|t| [50.0 + r * t.cos(), 50.0 + r * t.sin()]).collect::<Vec<_>>();
+            let ansi = style == ThreadStyle::Ansi;
+            if side {
+                for (y, w, dash) in [(39.75, 0.5, false), (36.75, 0.5, true), (61.75, 0.5, true), (58.75, 0.5, false)] {
+                    let (y, w) = if dash && !ansi { (y + 0.125, 0.25) } else { (y, w) };
+                    let pattern: &[f32] = if dash && ansi { &[2.0, 2.0] } else { &[] };
+                    stroke(window, &[[0.0, y], [100.0, y]], w, pattern);
+                }
+            } else {
+                match style {
+                    ThreadStyle::Ansi => stroke(window, &arc(12.75, 0.0, 360.0), 0.5, &[2.0, 2.0]),
+                    ThreadStyle::Iso => stroke(window, &arc(12.75, 175.5, 454.5), 0.5, &[]),
+                    ThreadStyle::Jis => stroke(window, &arc(12.75, -4.5, 274.5), 0.5, &[]),
+                }
+                stroke(window, &arc(9.75, 0.0, 360.0), 0.5, &[]);
+                stroke(window, &[[68.0, 50.25], [32.0, 50.25]], 0.5, &[6.0, 1.0, 2.0, 1.0]);
+                stroke(window, &[[49.745, 67.995], [49.745, 31.995]], 0.5, &[6.0, 1.0, 2.0, 1.0]);
+            }
+        })
+        .size_full()
+    };
+    let frame = |side: bool| div().w(px(96.)).h(px(96.)).flex_none().bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(0x9b9b9b)).child(tile(side));
+    h_flex().items_start().gap(px(14.)).child(frame(false)).child(frame(true)).into_any_element()
+}
+
 /// Which text a Font row sets.
 #[derive(Clone, Copy)]
 enum FontOf {
@@ -208,6 +278,8 @@ enum FontOf {
     /// Tables › kind `k`'s font, Hole tables' tags.
     Table(usize),
     HoleTags,
+    /// Tables › Revision tables › Revision callouts.
+    RevisionCallout,
 }
 
 fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawing::sheet::TextFont> {
@@ -221,6 +293,7 @@ fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawin
         FontOf::AuxLabel => &mut p.view_tab.aux_label.font,
         FontOf::Table(k) => &mut table_style_mut(p, k).font,
         FontOf::HoleTags => &mut p.table_styles.hole_tags_font,
+        FontOf::RevisionCallout => &mut p.table_styles.revision_callout_font,
     }
 }
 
@@ -315,6 +388,19 @@ fn table_style_mut(p: &mut DrawingProps, k: usize) -> &mut TableStyle {
         3 => &mut s.hole,
         4 => &mut s.revision,
         _ => &mut s.general,
+    }
+}
+
+/// A Tables row text: kind `k`'s header / content, 6 Hole tables' Tags,
+/// 7 Revision callouts.
+fn row_text_mut(p: &mut DrawingProps, k: usize, header: bool) -> &mut RowText {
+    match k {
+        6 => &mut p.table_styles.hole_tags,
+        7 => &mut p.table_styles.revision_callout_text,
+        _ => {
+            let s = table_style_mut(p, k);
+            if header { &mut s.header } else { &mut s.content }
+        }
     }
 }
 
@@ -484,8 +570,11 @@ impl DrawingEditor {
                     dropdown(content(5), set_table_content::<5>, window, cx),
                     dropdown(title(4), set_table_title::<4>, window, cx),
                     dropdown(title(5), set_table_title::<5>, window, cx),
-                    // 16: Hole tables' Indicator arrowhead.
+                    // 16: Hole tables' Indicator arrowhead; 17 / 18: Tags' and
+                    // Revision callouts' text height.
                     dropdown(ts.hole_indicator_arrow.unwrap_or(p.ann_arrow * 2.0 / 3.0), |p, v| p.table_styles.hole_indicator_arrow = Some(v), window, cx),
+                    dropdown(ts.hole_tags.height.unwrap_or(p.ann_text_height), |p, v| p.table_styles.hole_tags.height = Some(v), window, cx),
+                    dropdown(ts.revision_callout_text.height.unwrap_or(p.ann_text_height), |p, v| p.table_styles.revision_callout_text.height = Some(v), window, cx),
                 ]
             }
             _ => {
@@ -756,6 +845,7 @@ impl DrawingEditor {
                 FontOf::AuxLabel => "dp-alfont",
                 FontOf::Table(k) => ["dp-tf0", "dp-tf1", "dp-tf2", "dp-tf3", "dp-tf4", "dp-tf5"][k.min(5)],
                 FontOf::HoleTags => "dp-htags",
+                FontOf::RevisionCallout => "dp-rcfont",
             };
             sel(id, label, items, width)
         };
@@ -1241,7 +1331,10 @@ impl DrawingEditor {
                 .child(section("Cosmetic threads"))
                 .child(trow("Thread style", 105., 34., 2., sel("dp-thstyle", thread_style.name().into(), thread_items, 239.)))
                 .child(pen_at("Thickness", 105., 306., 314., 33., 1., ("dp-thpen", "dp-thpenc"), &vt.thread_line, |p, v| p.view_tab.thread_line.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.thread_line.color = c)))
-                .child(trow("Dashes", 105., 32., 1., self.wt_field_w(14, &ed, Some(200.))))
+                // Live 10-26 d: Dashes only for ANSI; the style's two
+                // previews under it (the tiles 33 px higher without it).
+                .when(thread_style == ThreadStyle::Ansi, |d| d.child(trow("Dashes", 105., 32., 1., self.wt_field_w(14, &ed, Some(200.)))))
+                .child(div().pl(px(79.)).pt(px(if thread_style == ThreadStyle::Ansi { 2. } else { 1. })).pb(px(5.)).child(thread_tiles(thread_style)))
                 .child(section("Flat pattern views"))
                 .child(trow("All bend lines", 131., 32., 1., thick_sel("dp-bendall", vt.bend_lines_thickness, |p, v| p.view_tab.bend_lines_thickness = v, 214.)))
                 .child(style_row("Up bend lines", 131., ("dp-bup", "dp-bupc"), vt.bend_up_line, std::rc::Rc::new(|p: &mut DrawingProps, v| p.view_tab.bend_up_line = v), vt.bend_up_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_up_color = c)))
@@ -1274,6 +1367,16 @@ impl DrawingEditor {
             ));
         } else if self.drawing_props.tab == 4 {
             let vt = props.view_tab.clone();
+            let point_shapes: Vec<(String, bool, Act)> = noshape_model::drawing::SketchPointShape::ALL
+                .iter()
+                .map(|&s| (s.name().to_string(), vt.sketch_point_shape == s, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.sketch_point_shape = s) as Act))
+                .collect();
+            // Live: ".25 mm", ".5 mm", "1 mm" … (no leading zero).
+            let point_size_label = |s: f64| format!("{} mm", format!("{s}").trim_start_matches('0'));
+            let point_sizes: Vec<(String, bool, Act)> = noshape_model::drawing::SKETCH_POINT_SIZES
+                .iter()
+                .map(|&s| (point_size_label(s), (vt.sketch_point_size - s).abs() < 1e-9, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.sketch_point_size = s) as Act))
+                .collect();
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
@@ -1288,12 +1391,31 @@ impl DrawingEditor {
                 // (column 155) over its pen and colour, Sketch geometry's pen
                 // and colour (column 154).
                 .child(section("Created in drawing"))
-                .child(trow("Virtual sharps", 155., 44., 14., sel("dp-vsharp", if vt.virtual_sharp_extension { "Edge extension".into() } else { "Centermark".into() }, vec![
+                // (Its label centred on the select, 13 px under the header.)
+                .child(div().pt(px(13.)).child(trow("Virtual sharps", 155., 31., 1., sel("dp-vsharp", if vt.virtual_sharp_extension { "Edge extension".into() } else { "Centermark".into() }, vec![
                     ("Centermark".into(), !vt.virtual_sharp_extension, std::rc::Rc::new(|p: &mut DrawingProps| p.view_tab.virtual_sharp_extension = false) as Act),
                     ("Edge extension".into(), vt.virtual_sharp_extension, std::rc::Rc::new(|p: &mut DrawingProps| p.view_tab.virtual_sharp_extension = true) as Act),
-                ], 204.)))
+                ], 204.))))
                 .child(trow("", 154., 32., 2., h_flex().items_start().child(thick_sel("dp-vsharpw", vt.virtual_sharp_line.thickness, |p, v| p.view_tab.virtual_sharp_line.thickness = v, 174.)).child(div().ml(px(6.)).child(swatch("dp-vsharpc", vt.virtual_sharp_line.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.virtual_sharp_line.color = c)))).into_any_element()))
                 .child(trow("Sketch geometry", 154., 33., 2., h_flex().items_start().child(thick_sel("dp-skw", vt.sketch_line.thickness, |p, v| p.view_tab.sketch_line.thickness = v, 174.)).child(div().ml(px(6.)).child(swatch("dp-skc", vt.sketch_line.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.sketch_line.color = c)))).into_any_element()))
+                .child(trow("Sketch driven dimensions color", 214., 32., 1., swatch("dp-sddc", Some(vt.sketch_driven_dim_color), std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.sketch_driven_dim_color = c.unwrap_or([0, 0, 0])))))
+                // Live 1710: Part Studio sketches from column 138: 190 px pens
+                // (Sketch points: 104 px shape and 80 px size), swatches at 334.
+                .child(section("Part Studio sketches"))
+                .child(trow("Solid lines", 138., 32., 1., h_flex().items_start().child(thick_sel("dp-pssw", vt.sketch_solid.thickness, |p, v| p.view_tab.sketch_solid.thickness = v, 190.)).child(div().ml(px(6.)).child(swatch("dp-pssc", vt.sketch_solid.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.sketch_solid.color = c)))).into_any_element()))
+                .child(trow("Construction lines", 138., 32., 1., h_flex().items_start().child(thick_sel("dp-pscw", vt.sketch_construction.thickness, |p, v| p.view_tab.sketch_construction.thickness = v, 190.)).child(div().ml(px(6.)).child(swatch("dp-pscc", vt.sketch_construction.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.sketch_construction.color = c)))).into_any_element()))
+                .child(trow(
+                    "Sketch points",
+                    138.,
+                    32.,
+                    1.,
+                    h_flex()
+                        .items_start()
+                        .child(sel("dp-psptshape", vt.sketch_point_shape.name().into(), point_shapes, 104.))
+                        .child(div().ml(px(6.)).child(sel("dp-psptsize", point_size_label(vt.sketch_point_size), point_sizes, 80.)))
+                        .child(div().ml(px(6.)).child(swatch("dp-psptc", vt.sketch_point_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.sketch_point_color = c))))
+                        .into_any_element(),
+                ))
                 .child(section("Centermarks"))
                 .child(check("dp-cmext", "Extended lines", vt.centermark_extended, |p, v| p.view_tab.centermark_extended = v, cx))
                 .child(trow("Thickness", 150., 33., 2., thick_sel("dp-cmthick", vt.centermark_thickness, |p, v| p.view_tab.centermark_thickness = v, 209.)))
@@ -1347,6 +1469,16 @@ impl DrawingEditor {
             ];
             let ts = props.table_styles.clone();
             let styles = [&ts.bom, &ts.custom, &ts.cut_list, &ts.hole, &ts.revision, &ts.general];
+            // A text row of its own: field `field` (85 px), Bold / Italic and
+            // the colour of row text `k` (see `row_text_mut`).
+            let text_row = |field: usize, k: usize, rt: &RowText, ids: (&'static str, &'static str, &'static str), cx: &mut Context<Self>| {
+                h_flex()
+                    .items_start()
+                    .child(self.wt_field_w(field, &ed, Some(85.)))
+                    .child(Self::row_text_toggles(k, false, rt, (ids.0, ids.1), cx))
+                    .child(div().ml(px(3.)).child(swatch(ids.2, rt.color, std::rc::Rc::new(move |p: &mut DrawingProps, c| row_text_mut(p, k, false).color = c))))
+                    .into_any_element()
+            };
             for (k, name) in KINDS.iter().enumerate() {
                 let st = styles[k];
                 let ids = IDS[k];
@@ -1393,8 +1525,31 @@ impl DrawingEditor {
                             ("ISO".into(), ts.hole_indicator_iso, std::rc::Rc::new(|p: &mut DrawingProps| p.table_styles.hole_indicator_iso = true) as Act),
                         ], 199.)))
                         .child(trow("Indicator arrowhead", 144., 32., 2., self.wt_field_w(16, &ed, Some(85.))))
-                        .child(trow("Indicator lines", 145., 33., 2., thick_sel("dp-hindl", ts.hole_indicator_line, |p, v| p.table_styles.hole_indicator_line = v, 199.)))
-                        .child(trow("Tags", 145., 32., 2., font_row(FontOf::HoleTags, ts.hole_tags_font.clone(), 199.)));
+                        // Live 1710: Indicator lines' colour at 319; the Tags'
+                        // height, Bold / Italic and colour under their font.
+                        .child(trow("Indicator lines", 145., 33., 2., h_flex().items_start().child(thick_sel("dp-hindl", ts.hole_indicator_line, |p, v| p.table_styles.hole_indicator_line = v, 169.)).child(div().ml(px(6.)).child(swatch("dp-hindc", ts.hole_indicator_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.table_styles.hole_indicator_color = c)))).into_any_element()))
+                        .child(trow("Tags", 145., 32., 2., font_row(FontOf::HoleTags, ts.hole_tags_font.clone(), 199.)))
+                        .child(trow("", 144., 33., 2., text_row(17, 6, &ts.hole_tags, ("dp-htb", "dp-hti", "dp-htc"), cx)));
+                }
+                if k == 4 {
+                    // Live 1710: Revision callouts' border (98 px) and fit
+                    // (97 px), then its font and text rows.
+                    let shapes: Vec<(String, bool, Act)> = CalloutBorder::ALL
+                        .iter()
+                        .filter(|&&b| b != CalloutBorder::SplitCircle)
+                        .map(|&b| (b.name().to_string(), b == ts.revision_callout_shape, std::rc::Rc::new(move |p: &mut DrawingProps| p.table_styles.revision_callout_shape = b) as Act))
+                        .collect();
+                    let fits: Vec<(String, bool, Act)> = (0..=5u8).map(|n| (border_chars_label(n), n == ts.revision_callout_chars, std::rc::Rc::new(move |p: &mut DrawingProps| p.table_styles.revision_callout_chars = n) as Act)).collect();
+                    body = body
+                        .child(trow(
+                            "Revision callouts",
+                            144.,
+                            32.,
+                            1.,
+                            h_flex().items_start().child(sel("dp-rcshape", ts.revision_callout_shape.name().into(), shapes, 98.)).child(div().ml(px(6.)).child(sel("dp-rcfit", border_chars_label(ts.revision_callout_chars), fits, 97.))).into_any_element(),
+                        ))
+                        .child(trow("", 145., 32., 2., font_row(FontOf::RevisionCallout, ts.revision_callout_font.clone(), 199.)))
+                        .child(trow("", 144., 33., 2., text_row(18, 7, &ts.revision_callout_text, ("dp-rcb", "dp-rci", "dp-rcc"), cx)));
                 }
             }
         } else if self.drawing_props.tab == 7 {
@@ -1602,8 +1757,7 @@ impl DrawingEditor {
                 .child(div().text_size(px(22.)).font_weight(FontWeight::BOLD).when(italic, |d| d.italic()).text_color(gpui_kit::rgb(0x333333)).child(glyph))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     this.set_drawing_prop(&move |p| {
-                        let s = table_style_mut(p, k);
-                        let r = if header { &mut s.header } else { &mut s.content };
+                        let r = row_text_mut(p, k, header);
                         if italic { r.italic = !r.italic } else { r.bold = !r.bold }
                     }, cx)
                 }))
