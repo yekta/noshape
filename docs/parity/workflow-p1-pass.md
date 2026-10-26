@@ -125,3 +125,7 @@ then edits, undo/redo, rollback and suppress.
 | Parts to find match in = plate, ✓ | pins in both free Ø10 holes; "Replicate 1" ▸ Part 2 <5>, <6>, Mate features (2) | same structure (behaviours 5973) | ✅ |
 | Linear pattern opened from tool search | red "Linear pattern 1" row with a red dot at once, kept after picking Instances | same (behaviours 5985) | ✅ |
 | Mate connector (Ctrl+M) | "Mate connector 1": On entity ▾, Origin entity, ☐ Realign, ☐ Move, flip / reorient; Realign adds Primary / Secondary axis entity; Move adds X / Y / Z 0 mm, Rotate about Z ▾, Rotation angle 0 deg | same (behaviours 5960–5965) | ✅ |
+| Feature row drag (Extrude 3 up) | pill #1651B0 with white text at the pointer; 2 px #1651B0 drop line across the list with a hollow ring at its left end; hovered row (224,240,251) | same (live (222,241,251); "qa5 (10-25 p2)" (7)) | ✅ |
+| Drop above the feature's own sketch | accepted, no message; row red (170,37,45), "Features …" + red badge, tooltip "… did not regenerate properly: …" / "1 missing selection" | same | ✅ |
+| … row icon | plain extrude icon | ⚠ warning triangle on the row | ✗ **P1-18** (ui) |
+| Ctrl+Z | one step restores the order | same | ✅ |

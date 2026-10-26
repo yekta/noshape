@@ -809,3 +809,9 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   away" (behaviours 5970). Linear and circular patterns do show their red pending row with a red dot at open (✅); once,
   though, the circular pattern's pending row vanished after the axis was picked (a28-26 → a28-28; not reproduced on Linear).
   The accepted result matches live: "Replicate 1" ▸ Part 2 <5>, Part 2 <6>, "Mate features (2)".
+- **P1-18 — ui (feature list)** — drag "Extrude 3" above its own Sketch 3: accepted, the row fails red rgb(170,37,45), the
+  header turns "Features …" with the red badge, tooltip "…did not regenerate properly: …\n1 missing selection" (all as
+  live), but the row keeps the plain extrude icon. Live: **rows with an unresolved selection get a ⚠ warning-triangle icon**
+  besides the red text (behaviours 8292; also 14734 "Fillet 1 red with a ⚠ icon", 16123, and "qa5 (10-25 p2)" (7):
+  "name turns red rgb(170,37,45) with a ⚠ triangle icon"). part_studio/mod.rs draws no icon for `missing > 0` (only the
+  tooltip's second line, :3824). A live crop of the icon's place/size is in live/qa5/p7-*-after.png.
