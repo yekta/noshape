@@ -75,7 +75,7 @@ pub fn ops() -> Vec<Op> {
             verb: "create",
             summary: "Create a sketch on a plane or planar face",
             description: "Inserts a Sketch feature (\"Insert feature : Sketch 1\") at the rollback bar. Returns its id and plane frame: sketch coordinates (x, y) map to world = origin + x*xdir + y*ydir. On `plane:top` x = world X, y = world Y; on `plane:front` x = X, y = Z; on `plane:right` x = Y, y = Z.",
-            fields: vec![doc_field(), tab_field(), req("plane", s(), "Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector."), opt("name", s(), "Name (default \"Sketch N\")."), opt("disable_imprinting", json!({ "type": "boolean" }), "The dialog's Disable imprinting (default off).")],
+            fields: vec![doc_field(), tab_field(), req("plane", json!({ "type": ["string", "object"] }), "Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector; or `{\"query\": {query_entities arguments}}` matching one planar face (e.g. the top face: {\"query\": {\"kind\": \"faces\", \"normal\": [0, 0, 1], \"near\": [0, 0, 1000], \"limit\": 1}})."), opt("name", s(), "Name (default \"Sketch N\")."), opt("disable_imprinting", json!({ "type": "boolean" }), "The dialog's Disable imprinting (default off).")],
             mutates: true,
             destructive: false,
             run: create,
@@ -528,9 +528,17 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
 // ------------------------------------------------------------ handlers
 
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let mut plane = a.get("plane").expect("required").clone();
+    if let Some(q) = plane.get("query").filter(|_| plane.as_object().is_some_and(|o| o.len() == 1)) {
+        let ids = super::feature::query_ids(ctx, a, q).map_err(|e| e.under("plane"))?;
+        if ids.len() > 1 {
+            return Err(OpError::invalid(format!("the query matched {} entities; a sketch needs one plane or planar face: narrow it (query_entities lists them)", ids.len())).with_param("plane"));
+        }
+        plane = ids[0].clone();
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
-    let plane = refs::parse(a.get("plane").expect("required")).map_err(|e| e.with_param("plane"))?;
+    let plane = refs::parse(&plane).map_err(|e| e.with_param("plane"))?;
     let ps = doc::studio(od.doc(), tab)?;
     let mut f = ps.new_feature("sketch", &units).expect("sketch type");
     f.params.set("sketchPlane", ParamValue::Query(vec![plane]));

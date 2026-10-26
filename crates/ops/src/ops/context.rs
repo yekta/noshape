@@ -330,7 +330,10 @@ fn update(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let old = find_context(&ps, a.str("context")?)?.clone();
     let asm = assembly_of(od.doc(), old.assembly).cloned().ok_or_else(|| OpError::param("context", "its assembly is gone"))?;
     let result = solve_assembly(od, old.assembly, &asm, &SolveOptions::default());
-    let fresh = ic::refreshed(&old, &result, &asm, None).ok_or_else(|| OpError::param("context", "its primary instance is gone; update it from the assembly (assembly_update_context)"))?;
+    let fresh = ic::refreshed(&old, &result, &asm, None).ok_or_else(|| {
+        let why = if old.primary.is_empty() { "it has no primary instance (a Part Studio created in context): update it from the assembly (assembly_update_context on an instance of this Part Studio)" } else { "its primary instance is gone; update it from the assembly (assembly_update_context)" };
+        OpError::param("context", why)
+    })?;
     commit_update(od, tab, fresh, &old.name)?;
     list(ctx, a)
 }

@@ -227,6 +227,45 @@ pub fn ops() -> Vec<Op> {
     ]
 }
 
+/// The Hole dialog's Standard logic for the parameters a call gave (`set`):
+/// a Standard without Units picks the Units tab that shows it; a Standard,
+/// Units or Style change copies the visible Standard's values into the
+/// fields not given.
+fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> bool) {
+    use noshape_model::features::hole_tables as ht;
+    use noshape_model::params::ParamValue;
+    // A Standard given without Units: the tab that shows it.
+    if !set("unitsSystem") {
+        if set("isoHoleTableEx") || set("isoHoleTable") {
+            feature.params.set("unitsSystem", ParamValue::Enum("METRIC".into()));
+        } else if set("ansiHoleTableEx") || set("ansiHoleTable") {
+            feature.params.set("unitsSystem", ParamValue::Enum("INCH".into()));
+        }
+    }
+    // Its default size when none is chosen (an ISO M6 tapped hole drills
+    // 5 mm, not the new hole's 1/4 in).
+    if ["ansiHoleTableEx", "ansiHoleTable", "isoHoleTableEx", "isoHoleTable", "unitsSystem", "styleV2"].iter().any(|k| set(k)) {
+        let mut v = feature.params.clone();
+        let (pid, table) = ht::hole_table_param(&v);
+        // Every level chosen, as the dialog's dropdowns leave it (a path
+        // given down to the size takes the default pitch; the thread
+        // callout and cosmetic threads read the whole path).
+        let path = ht::complete_path(table, v.lookup(pid));
+        if !path.is_empty() {
+            v.set(pid, ParamValue::Lookup(path.clone()));
+            feature.params.set(pid, ParamValue::Lookup(path));
+        }
+        let applied = if set(pid) { ht::apply_table_to_params(&mut v) } else { ht::sync_hole_standard(&mut v) };
+        if applied {
+            for (k, val) in v.0 {
+                if !set(&k) {
+                    feature.params.set(&k, val);
+                }
+            }
+        }
+    }
+}
+
 /// What the feature's dialog decides on its own for a new feature, for the
 /// fields not given (as the Part Studio's dialog does, with the same shared
 /// rules): a tapped hole's linked depths, Thicken's / Extrude's operation and
@@ -248,6 +287,7 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
         any
     };
     if feature.type_id == "hole" {
+        hole_standard(feature, &set);
         let ps = doc::studio(od.doc(), tab)?;
         if let Some(defaults) = ps.new_feature(&feature.type_id, &units) {
             let linked = noshape_model::features::hole_tables::link_tapped_depths(&defaults.params, &feature.params, &units);
@@ -391,6 +431,26 @@ fn this_feature_status(report: &Value, id: &str) -> Value {
     report["features"].as_array().and_then(|fs| fs.iter().find(|f| f["id"] == id)).cloned().unwrap_or(Value::Null)
 }
 
+/// The ids `query_entities` finds for `q` (its arguments; `doc` and `tab`
+/// default to the call's), at least one.
+pub(super) fn query_ids(ctx: &mut Ctx, a: &Args, q: &Value) -> Result<Vec<Value>, OpError> {
+    let mut args = q.as_object().cloned().ok_or_else(|| OpError::param("query", "query_entities arguments: {\"kind\": \"edges\", \"direction\": [0, 0, 1], ...}"))?;
+    for k in ["doc", "tab"] {
+        if let Some(v) = a.get(k) {
+            args.entry(k).or_insert(v.clone());
+        }
+    }
+    let kind = args.get("kind").and_then(Value::as_str).unwrap_or("").to_string();
+    let op = crate::registry::by_tool_name("query_entities").expect("query_entities");
+    let value = Value::Object(args);
+    let found = super::query::entities(ctx, &Args { op, value: &value }).map_err(|e| e.under("query"))?;
+    let ids: Vec<Value> = found.value[kind.as_str()].as_array().map(|l| l.iter().map(|x| x["id"].clone()).collect()).unwrap_or_default();
+    if ids.is_empty() {
+        return Err(OpError::invalid("the query matched nothing (try it with query_entities)").with_param("query"));
+    }
+    Ok(ids)
+}
+
 /// Selections given as `{"query": {query_entities arguments}}` (alone, or
 /// among ids in a list) become the ids it finds on the Part Studio as it
 /// stands: no copying ids out of query_entities.
@@ -400,7 +460,7 @@ fn resolve_queries(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Map<Str
     }
     fn walk(ctx: &mut Ctx, a: &Args, v: &Value) -> Result<Value, OpError> {
         match v {
-            _ if is_query(v) => run(ctx, a, &v["query"]).map(Value::Array),
+            _ if is_query(v) => query_ids(ctx, a, &v["query"]).map(Value::Array),
             Value::Array(items) => {
                 let mut out = Vec::new();
                 for (i, it) in items.iter().enumerate() {
@@ -416,26 +476,26 @@ fn resolve_queries(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Map<Str
             _ => Ok(v.clone()),
         }
     }
-    fn run(ctx: &mut Ctx, a: &Args, q: &Value) -> Result<Vec<Value>, OpError> {
-        let mut args = q.as_object().cloned().ok_or_else(|| OpError::param("query", "query_entities arguments: {\"kind\": \"edges\", \"direction\": [0, 0, 1], ...}"))?;
-        for k in ["doc", "tab"] {
-            if let Some(v) = a.get(k) {
-                args.entry(k).or_insert(v.clone());
-            }
-        }
-        let kind = args.get("kind").and_then(Value::as_str).unwrap_or("").to_string();
-        let op = crate::registry::by_tool_name("query_entities").expect("query_entities");
-        let value = Value::Object(args);
-        let found = super::query::entities(ctx, &Args { op, value: &value }).map_err(|e| e.under("query"))?;
-        let ids: Vec<Value> = found.value[kind.as_str()].as_array().map(|l| l.iter().map(|x| x["id"].clone()).collect()).unwrap_or_default();
-        if ids.is_empty() {
-            return Err(OpError::invalid("the query matched nothing (try it with query_entities)").with_param("query"));
-        }
-        Ok(ids)
-    }
     let Some(params) = a.object("params")? else { return Ok(None) };
     let params = params.clone();
     params.iter().map(|(k, v)| walk(ctx, a, v).map(|x| (k.clone(), x)).map_err(|e| e.under(&format!("params.{k}")))).collect::<Result<_, _>>().map(Some)
+}
+
+/// Derived's source Part Studio given by tab name or id: stored as the
+/// tab's id (what the dialog's picker stores); anything else is refused.
+fn derived_source(doc: &noshape_model::Document, type_id: &str, mut params: serde_json::Map<String, Value>) -> Result<serde_json::Map<String, Value>, OpError> {
+    if !matches!(type_id, "importDerived" | "derivedMirror") {
+        return Ok(params);
+    }
+    if let Some(Value::String(key)) = params.get("partStudio").filter(|v| v.as_str().is_some_and(|k| !k.trim().is_empty())) {
+        let id = crate::doc::find_tab(doc, key).map_err(|e| e.with_param("params.partStudio"))?;
+        let t = doc.tabs.iter().find(|t| t.id == id).expect("found");
+        if !matches!(t.content, noshape_model::document::TabContent::PartStudio(_)) {
+            return Err(OpError::invalid(format!("`{}` is a {}, not a Part Studio", t.name, t.content.kind_name())).with_param("params.partStudio"));
+        }
+        params.insert("partStudio".into(), json!(id.to_string()));
+    }
+    Ok(params)
 }
 
 /// A pattern's `entities` that are all features (`feature:…`) or all faces
@@ -473,6 +533,7 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let units = od.doc().settings.units;
     let ps = doc::studio(od.doc(), tab)?;
     let mut feature = ps.new_feature(ty.id, &units).ok_or_else(|| OpError::param("type", "unknown feature type"))?;
+    let params = derived_source(od.doc(), ty.id, params)?;
     values::apply(&ty.params, &mut feature.params, &params, &units, od.doc()).map_err(|e| e.under("params"))?;
     // Plane: the type follows the selection when none is given (cPlaneLogic).
     if ty.id == "cPlane" && !params.contains_key("cplaneType") && !feature.params.query("entities").is_empty() {
@@ -513,7 +574,11 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         if feature.type_id == "sketch" && params.contains_key("sketch") {
             return Err(OpError::param("params.sketch", "edit sketch geometry with the sketch tools"));
         }
-        values::apply(&ty.params, &mut feature.params, params, &units, od.doc()).map_err(|e| e.under("params"))?;
+        let params = derived_source(od.doc(), ty.id, params.clone())?;
+        values::apply(&ty.params, &mut feature.params, &params, &units, od.doc()).map_err(|e| e.under("params"))?;
+        if feature.type_id == "hole" {
+            hole_standard(&mut feature, &|k| params.contains_key(k));
+        }
     }
     if let Some(n) = a.opt_str("name")? {
         feature.name = n.trim().to_string();

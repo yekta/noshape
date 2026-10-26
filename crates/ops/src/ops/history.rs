@@ -50,6 +50,26 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "history",
+            verb: "version_properties",
+            summary: "A version's or workspace's Properties… (name and description)",
+            description: "The Versions and history panel's row menu › Properties…: renames `version` or `branch` (a workspace) and sets its description. Not an undoable edit (as in the app).",
+            fields: vec![doc_field(), opt("version", s(), "Version name or id."), opt("branch", s(), "Branch (workspace) name or id."), opt("name", s(), "New name."), opt("description", s(), "New description (empty clears it).")],
+            mutates: true,
+            destructive: false,
+            run: version_properties,
+        },
+        Op {
+            group: "history",
+            verb: "publish",
+            summary: "A version's Publish FeatureScript…: publish its custom features and tables",
+            description: "The version row menu › Publish FeatureScript…: allowed once every requirement is met (at least one custom feature or table, a PDF in the document, no FeatureScript errors or warnings, every custom feature described and used in a Part Studio, every Feature Studio committed); the error lists the unmet ones. Published versions are found by the documents page's advanced search (Published FeatureScript).",
+            fields: vec![doc_field(), req("version", s(), "Version name or id.")],
+            mutates: true,
+            destructive: false,
+            run: publish,
+        },
+        Op {
+            group: "history",
             verb: "create_branch",
             summary: "Create a branch (workspace) from the current state and switch to it",
             description: "",
@@ -168,4 +188,56 @@ fn restore(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     od.session.restore(mv)?;
     Ok(json!({ "restored_to": mv.to_string() }).into())
+}
+
+fn io(e: impl std::fmt::Display) -> OpError {
+    OpError::new("io", e.to_string())
+}
+
+fn version_info(od: &crate::OpenDoc, key: &str) -> Result<noshape_store::VersionInfo, OpError> {
+    let list = od.session.store.list_versions().map_err(|e| OpError::new("io", e.to_string()))?;
+    list.iter().find(|v| v.id.to_string() == key || v.name == key).cloned().ok_or_else(|| OpError::not_found(if list.is_empty() { "the document has no versions (history_create_version)".into() } else { format!("no version `{key}`; versions: {}", list.iter().map(|v| v.name.clone()).collect::<Vec<_>>().join(", ")) }).with_param("version"))
+}
+
+fn version_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let (name, desc) = (a.opt_str("name")?.map(str::trim), a.opt_str("description")?);
+    if name.is_some_and(str::is_empty) {
+        return Err(OpError::param("name", "must not be empty"));
+    }
+    match (a.opt_str("version")?, a.opt_str("branch")?) {
+        (Some(v), None) => {
+            let info = version_info(od, v)?;
+            let (n, d) = (name.unwrap_or(&info.name).to_string(), desc.unwrap_or(&info.description).to_string());
+            od.session.store.update_version(info.id, &n, &d).map_err(io)?;
+            Ok(json!({ "version": info.id.to_string(), "name": n, "description": d }).into())
+        }
+        (None, Some(b)) => {
+            let id = branch_id(od, b)?;
+            let key = format!("{}{id}", crate::versions::WORKSPACE_DESCRIPTION_KEY);
+            if let Some(n) = name {
+                od.session.store.rename_branch(id, n).map_err(io)?;
+            }
+            if let Some(d) = desc {
+                od.session.store.set_meta(&key, (!d.is_empty()).then_some(d.as_bytes())).map_err(io)?;
+            }
+            let d = od.session.store.get_meta(&key).ok().flatten().map(|d| String::from_utf8_lossy(&d).into_owned()).unwrap_or_default();
+            let n = od.session.store.list_branches().map_err(io)?.into_iter().find(|x| x.id == id).map(|x| x.name).unwrap_or_default();
+            Ok(json!({ "branch": id.to_string(), "name": n, "description": d }).into())
+        }
+        _ => Err(OpError::invalid("give `version` or `branch`").with_param("version")),
+    }
+}
+
+fn publish(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let info = version_info(od, a.str("version")?)?;
+    let at = noshape_model::document::Document::from_blobs(&od.session.store.read_all(info.microversion).map_err(io)?).map_err(io)?;
+    let checks = crate::versions::publish_checklist(&at);
+    let unmet: Vec<&str> = checks.iter().filter(|c| !c.1).map(|c| c.0).collect();
+    if !unmet.is_empty() {
+        return Err(OpError::invalid(format!("Requirements to publish not met: {}", unmet.join("; "))).with_param("version"));
+    }
+    od.session.store.set_meta(&format!("{}{}", crate::versions::PUBLISHED_FS_KEY, info.id), Some(b"1")).map_err(io)?;
+    Ok(json!({ "version": info.id.to_string(), "name": info.name, "published": true }).into())
 }

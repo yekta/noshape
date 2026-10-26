@@ -170,7 +170,9 @@ pub(super) fn activate(ctx: &mut Ctx, args: &Args) -> Result<crate::registry::Op
     }
     od.active_config.insert(tab, chosen);
     let x = asm(od, tab);
-    Ok(json!({ "active": values(od, tab, x).0 }).into())
+    let mut v = json!({ "active": values(od, tab, x).0 });
+    super::one_shot_note(ctx, &mut v);
+    Ok(v.into())
 }
 
 pub(super) fn add_input(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::OpOutput, OpError> {

@@ -39,6 +39,8 @@ pub mod studio;
 pub mod tool_search;
 pub mod values;
 pub mod variable_studio;
+pub mod versions;
+pub mod vs_config;
 pub mod window;
 
 pub use doc::{Ctx, OpenDoc};

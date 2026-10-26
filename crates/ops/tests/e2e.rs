@@ -246,6 +246,10 @@ fn configurations() {
     let act = call(&mut ctx, "config_activate", json!({ "values": { "Size": "Large", "w": "50 mm" } }));
     assert!(act["regeneration"]["failed"].as_array().is_none_or(|f| f.is_empty()), "{act}");
     assert!((volume(&mut ctx) - 50.0 * 20.0 * 30.0).abs() < 1e-3, "{act}");
+    assert!(act.get("note").is_none(), "{act}");
+    // Mass properties follow the active configuration (qa4 CFG-MASS).
+    let m = call(&mut ctx, "query_mass_properties", json!({}));
+    assert!((num(&m["volume"]) - 50.0 * 20.0 * 30.0).abs() < 1e-3, "{m}");
     // Out of range: the Configurations box's message; nothing changes.
     let e = try_call(&mut ctx, "config_activate", json!({ "values": { "w": "500 mm" } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("values.w"));
@@ -266,7 +270,11 @@ fn configurations() {
     call(&mut ctx, "config_set_value", json!({ "feature": ext, "param": "suppressed", "configuration": true, "value": true }));
     call(&mut ctx, "config_activate", json!({ "values": { "Hide block": true } }));
     assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 0);
-    call(&mut ctx, "config_activate", json!({ "reset": true }));
+    // One call per process (noshape-cli call): the reply says the choice ends with it.
+    ctx.one_shot = true;
+    let act = call(&mut ctx, "config_activate", json!({ "reset": true }));
+    assert!(act["note"].as_str().is_some_and(|n| n.contains("`configuration`")), "{act}");
+    ctx.one_shot = false;
     assert!((volume(&mut ctx) - 40.0 * 20.0 * 10.0).abs() < 1e-3);
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert_eq!(hist["history"][0]["description"], "Part Studio 1 :: Edit configured value");
@@ -412,6 +420,12 @@ fn sketch_use_intersection_and_model_references() {
     let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].as_str().unwrap().to_string();
     // Use the top face: its four edges, linked to the model.
     let s2 = call(&mut ctx, "sketch_create", json!({ "plane": top.clone() }))["sketch"].as_str().unwrap().to_string();
+    // The same face by a query; a query that matches several faces is refused.
+    let q = call(&mut ctx, "sketch_create", json!({ "plane": { "query": { "kind": "faces", "normal": [0, 0, 1] } }, "name": "By query" }));
+    assert!((num(&q["frame"]["origin"][2]) - 10.0).abs() < 1e-6, "{q}");
+    call(&mut ctx, "feature_delete", json!({ "features": [q["sketch"].clone()] }));
+    let e = try_call(&mut ctx, "sketch_create", json!({ "plane": { "query": { "kind": "faces", "surface": "plane" } } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("plane"), "{e:?}");
     let used = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": [top.clone()] }));
     let lines = created(&used, "line");
     assert_eq!(lines.len(), 4, "{used}");
@@ -502,6 +516,182 @@ fn block_with_hole(ctx: &mut Ctx, file: &str) {
     let plate = st["regions"].as_array().unwrap().iter().find(|r| r["holes"] == 1).unwrap()["id"].as_str().unwrap().to_string();
     let ex = call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [plate], "depth": "20 mm" } }));
     assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+}
+
+/// Variable Studio tables in a Part Studio's Variable table: create, insert,
+/// reorder (the later table's variable wins), remove, settings.
+#[test]
+fn variable_studio_tables_in_part_studios() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "vs-tables.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [10, 10]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    // The first studio is inserted into all Part Studios and Assemblies.
+    let c = call(&mut ctx, "variable_create_studio", json!({}));
+    assert_eq!(c["created"]["name"], "Variable Studio 1", "{c}");
+    assert_eq!(c["tables"][0]["automatic"], true, "{c}");
+    call(&mut ctx, "variable_create", json!({ "tab": "Variable Studio 1", "name": "w", "value": "30 mm" }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "#w" } }));
+    let vol = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((vol(&mut ctx) - 3000.0).abs() < 1e-6);
+    // A second studio is inserted explicitly; the later table wins.
+    call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "Sizes" }));
+    call(&mut ctx, "variable_create", json!({ "tab": "Sizes", "name": "w", "value": "50 mm" }));
+    let t = call(&mut ctx, "variable_insert_studio", json!({ "studio": "Sizes" }));
+    assert_eq!(t["tables"].as_array().unwrap().iter().map(|x| x["studio"].as_str().unwrap()).collect::<Vec<_>>(), ["Variable Studio 1", "Sizes"], "{t}");
+    assert!((vol(&mut ctx) - 5000.0).abs() < 1e-6);
+    call(&mut ctx, "variable_move_studio", json!({ "studio": "Sizes", "by": -1 }));
+    assert!((vol(&mut ctx) - 3000.0).abs() < 1e-6);
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Move table up"));
+    let e = try_call(&mut ctx, "variable_move_studio", json!({ "studio": "Sizes", "by": -1 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("by"), "{e:?}");
+    // Remove the automatic one here: Sizes' w.
+    let r = call(&mut ctx, "variable_remove_studio", json!({ "studio": "Variable Studio 1" }));
+    assert_eq!(r["tables"].as_array().unwrap().len(), 1, "{r}");
+    assert!((vol(&mut ctx) - 5000.0).abs() < 1e-6);
+    let l = call(&mut ctx, "variable_list", json!({}));
+    assert_eq!(l["studio_tables"][0]["studio"], "Sizes", "{l}");
+    // Errors name the parameter.
+    let e = try_call(&mut ctx, "variable_insert_studio", json!({ "studio": "Variable Studio 1", "variables": ["nope"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("variables[0]"), "{e:?}");
+    let e = try_call(&mut ctx, "variable_insert_studio", json!({ "studio": "Part Studio 1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("studio"), "{e:?}");
+    let e = try_call(&mut ctx, "variable_insert_studio", json!({ "studio": "Sizes", "configuration": { "Size": "L" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("configuration.Size"), "{e:?}");
+    // Only some variables.
+    call(&mut ctx, "variable_create", json!({ "tab": "Variable Studio 1", "name": "h", "value": "5 mm" }));
+    let t = call(&mut ctx, "variable_insert_studio", json!({ "studio": "Variable Studio 1", "variables": ["#h"] }));
+    assert_eq!(t["tables"][1]["variables"], json!(["#h"]), "{t}");
+    assert!((vol(&mut ctx) - 5000.0).abs() < 1e-6, "Variable Studio 1's w stays out");
+    // The studio's "Insert into all" checkbox.
+    let s = call(&mut ctx, "variable_studio_settings", json!({ "tab": "Sizes", "insert_into_all": true }));
+    assert_eq!(s["insert_into_all"], true, "{s}");
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Insert into all Part Studios and Assemblies"));
+}
+
+/// A Variable Studio's Configuration panel through the config ops: a List
+/// input, a row, a configured Value, the configuration a Part Studio
+/// inserts the studio in, the row menu and Unconfigure.
+#[test]
+fn variable_studio_configurations() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "vs-config.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [10, 10]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "variable_create_studio", json!({}));
+    let vs = "Variable Studio 1";
+    call(&mut ctx, "variable_create", json!({ "tab": vs, "name": "w", "value": "10 mm" }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "#w" } }));
+    let vol = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((vol(&mut ctx) - 1000.0).abs() < 1e-6);
+    let i = call(&mut ctx, "config_add_input", json!({ "tab": vs, "kind": "list" }));
+    assert!(i["input"].as_str().unwrap().starts_with("List_"), "{i}");
+    assert_eq!(i["configuration"]["inputs"][0]["name"], "Configuration", "{i}");
+    let o = call(&mut ctx, "config_add_option", json!({ "tab": vs, "input": "Configuration", "name": "Big" }));
+    assert_eq!(o["option"], "Big", "{o}");
+    call(&mut ctx, "config_configure", json!({ "tab": vs, "variable": "w", "input": "Configuration" }));
+    let c = call(&mut ctx, "config_set_value", json!({ "tab": vs, "variable": "#w", "configuration": "Big", "value": "40 mm" }));
+    assert_eq!(c["configuration"]["configured"][0]["values"]["Big"], "40 mm", "{c}");
+    // A Part Studio inserts the studio in one configuration.
+    call(&mut ctx, "variable_insert_studio", json!({ "studio": vs, "configuration": { "Configuration": "Big" } }));
+    assert!((vol(&mut ctx) - 4000.0).abs() < 1e-6);
+    let a = call(&mut ctx, "config_activate", json!({ "tab": vs, "values": { "Configuration": "Big" } }));
+    assert_eq!(a["active"][i["input"].as_str().unwrap()], "Big", "{a}");
+    call(&mut ctx, "variable_insert_studio", json!({ "studio": vs, "configuration": "default" }));
+    assert!((vol(&mut ctx) - 1000.0).abs() < 1e-6);
+    let t = call(&mut ctx, "variable_insert_studio", json!({ "studio": vs, "configuration": "last_viewed" }));
+    assert!((vol(&mut ctx) - 4000.0).abs() < 1e-6, "{t}");
+    // The row menu: Duplicate row; Copy table.
+    let d = call(&mut ctx, "config_edit_option", json!({ "tab": vs, "input": "Configuration", "option": "Big", "duplicate": true }));
+    assert_eq!(d["option"], "Big_copy", "{d}");
+    let l = call(&mut ctx, "config_list", json!({ "tab": vs, "copy": true }));
+    assert!(l["copied"][i["input"].as_str().unwrap()].as_str().unwrap().contains("Big copy\t40 mm"), "{l}");
+    // Unconfigure; errors name the parameter.
+    let u = call(&mut ctx, "config_configure", json!({ "tab": vs, "variable": "w", "unconfigure": true }));
+    assert_eq!(u["configuration"]["configured"], json!([]), "{u}");
+    let e = try_call(&mut ctx, "config_configure", json!({ "tab": vs, "input": "Configuration" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("variable"), "{e:?}");
+    let e = try_call(&mut ctx, "config_configure", json!({ "variable": "w", "input": "Configuration", "param": "depth" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("variable"), "{e:?}");
+    let e = try_call(&mut ctx, "config_add_input", json!({ "tab": vs, "kind": "checkbox" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"), "{e:?}");
+    let cb = call(&mut ctx, "config_add_input", json!({ "tab": vs, "kind": "checkbox", "name": "Lite" }));
+    assert_eq!(cb["input"], "Lite", "{cb}");
+}
+
+/// The Versions and history panel's Properties… and Publish FeatureScript….
+#[test]
+fn version_properties_and_publish() {
+    let mut ctx = Ctx::new();
+    new_sketch(&mut ctx, "versions.noshape", "plane:top");
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let v = call(&mut ctx, "history_version_properties", json!({ "version": "V1", "name": "Proto", "description": "First try" }));
+    assert_eq!((v["name"].as_str(), v["description"].as_str()), (Some("Proto"), Some("First try")), "{v}");
+    let l = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(l["versions"][0]["name"], "Proto", "{l}");
+    // Nothing to publish: the unmet requirements.
+    let e = try_call(&mut ctx, "history_publish", json!({ "version": "Proto" })).unwrap_err();
+    assert!(e.message.contains("at least one custom feature"), "{e:?}");
+    call(&mut ctx, "history_create_branch", json!({ "name": "exp" }));
+    let b = call(&mut ctx, "history_version_properties", json!({ "branch": "exp", "description": "Thinner walls" }));
+    assert_eq!((b["name"].as_str(), b["description"].as_str()), (Some("exp"), Some("Thinner walls")), "{b}");
+    let e = try_call(&mut ctx, "history_version_properties", json!({ "version": "V9" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+}
+
+/// A Hole's Standard through the API does what the dialog does: the Units
+/// tab that shows it and the table's sizes in the fields not given.
+#[test]
+fn hole_standard_sets_the_table_sizes() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "hole-standard.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-20, -15], [20, 15]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": { "query": { "kind": "faces", "normal": [0, 0, 1] } } }))["sketch"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[5, 0, 10]] }));
+    let pt: Vec<Value> = p["created"].as_array().unwrap().iter().filter(|x| x["type"] == "point").map(|x| x["id"].clone()).collect();
+    let h = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": pt, "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "endStyleV2": "BLIND", "holeDepthV3": "8 mm", "tappedDepthV3": "8 mm" } }));
+    assert_eq!(h["feature_status"]["status"], "Ok", "{h}");
+    let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
+    assert_eq!((g["params"]["unitsSystem"].as_str(), g["params"]["holeDiameterV3"].as_str(), g["params"]["majorDiameter"].as_str()), (Some("METRIC"), Some("5 mm"), Some("6 mm")), "{g}");
+    // The whole path, each level's default below the size, as the dialog stores it.
+    assert_eq!(g["params"]["isoHoleTableEx"], json!(["Tapped", "Straight tap", "M6", "1.00 mm (Coarse)", "None"]), "{g}");
+    // The 5 mm drill, 8 mm deep, with its 118° tip.
+    let r: f64 = 2.5;
+    let drill = std::f64::consts::PI * r * r * (8.0 + r / 59f64.to_radians().tan() / 3.0);
+    let vol = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((vol - (12000.0 - drill)).abs() < 0.5, "{vol} vs {}", 12000.0 - drill);
+    // Edit to M8: its 6.8 mm drill; a size given with it wins.
+    call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M8"] } }));
+    let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
+    assert_eq!(g["params"]["holeDiameterV3"], "6.8 mm", "{g}");
+    call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "holeDiameterV3": "5.2 mm" } }));
+    let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
+    assert_eq!(g["params"]["holeDiameterV3"], "5.2 mm", "{g}");
+}
+
+/// drawing_get lists the silhouettes of curved faces with the model edges,
+/// and a callout anchors on one (qa4 DRW-SIL).
+#[test]
+fn drawing_lists_silhouettes() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "drawing-sil.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [10, 0]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "30 mm" } }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    // The side views: the cylinder's sides are silhouettes (no model edge).
+    let sil: Vec<Value> = g["views"].as_array().unwrap().iter().flat_map(|v| v["edges"].as_array().cloned().unwrap_or_default()).filter(|e| e["type"] == "silhouette").collect();
+    assert!(sil.len() >= 2, "{g}");
+    let s = &sil[0];
+    let (a, b) = (&s["a"], &s["b"]);
+    assert!(a.is_array() && b.is_array(), "a straight silhouette is a segment: {s}");
+    let mid = [(num(&a[0]) + num(&b[0])) / 2.0, (num(&a[1]) + num(&b[1])) / 2.0];
+    let c = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": mid, "position": [mid[0] + 20.0, mid[1] + 20.0] }));
+    assert!(c["annotation"].is_u64(), "{c}");
 }
 
 /// A new drawing knows the document state its views come from, so a model
@@ -1269,6 +1459,13 @@ fn variable_studio_table() {
     let l = call(&mut ctx, "variable_list", json!({ "tab": "vs all" }));
     assert!(l["variables"][1]["value"].as_str().unwrap().starts_with("30"), "{l}");
     call(&mut ctx, "variable_set", json!({ "tab": "vs all", "variable": "count", "name": "n" }));
+    // `name` alone names the variable to change; `new_name` renames.
+    let r = call(&mut ctx, "variable_set", json!({ "tab": "vs all", "name": "#n", "value": 4 }));
+    assert!(r["variables"].as_array().unwrap().iter().any(|v| v["name"] == "#n" && v["expression"] == "4"), "{r}");
+    call(&mut ctx, "variable_set", json!({ "tab": "vs all", "variable": "n", "new_name": "m" }));
+    call(&mut ctx, "variable_set", json!({ "tab": "vs all", "variable": "m", "new_name": "n" }));
+    let e = try_call(&mut ctx, "variable_set", json!({ "tab": "vs all", "value": 1 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("variable"), "{e:?}");
     let r = call(&mut ctx, "variable_move", json!({ "tab": "vs all", "variable": "n", "by": -1 }));
     assert_eq!(r["variables"][1]["name"], "#n", "{r}");
     assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Move variable up"));
@@ -2630,7 +2827,13 @@ fn configuration_panel_inputs() {
     let again = call(&mut ctx, "config_copy_inputs", json!({ "from": "Part Studio 1", "tab": "Holder" }));
     assert_eq!(again["pasted"], json!([]));
     // A Derived feature of Part Studio 1 follows Holder's Size.
-    call(&mut ctx, "feature_add", json!({ "tab": "Holder", "type": "importDerived", "params": { "partStudio": ps1 } }));
+    // By tab name (stored as the tab's id); not a Part Studio: refused (qa4 CFG-MASS).
+    let e = try_call(&mut ctx, "feature_add", json!({ "tab": "Holder", "type": "importDerived", "params": { "partStudio": "Assembly 1" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("params.partStudio"), "{e:?}");
+    let d = call(&mut ctx, "feature_add", json!({ "tab": "Holder", "type": "importDerived", "params": { "partStudio": "Part Studio 1" } }));
+    assert_eq!(d["feature_status"]["status"], "Ok", "{d}");
+    let g = call(&mut ctx, "feature_get", json!({ "tab": "Holder", "feature": d["feature"].clone() }));
+    assert_eq!(g["params"]["partStudio"], ps1.as_str(), "{g}");
     let p = call(&mut ctx, "config_propagate", json!({ "tab": "Holder", "input": "Size" }));
     assert_eq!(p["candidates"][0]["propagated"], true, "{p}");
     let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
@@ -3853,6 +4056,11 @@ fn insert_configuration_menu_and_variable_table_copy() {
     let text = v["copied"].as_str().unwrap();
     assert!(text.starts_with("Name\tVariable type\tValue\tDescription\n"), "{v}");
     assert!(text.lines().any(|l| l.starts_with("w\tLength\t") && l.ends_with("\tWidth")), "{v}");
+    // variable_set by `name` (as variable_create names it), then `new_name`.
+    call(&mut ctx, "variable_set", json!({ "name": "w", "value": "25 mm" }));
+    call(&mut ctx, "variable_set", json!({ "variable": "#w", "new_name": "width" }));
+    let v = call(&mut ctx, "variable_list", json!({}));
+    assert!(v.to_string().contains("#width") && v.to_string().contains("25"), "{v}");
 }
 
 /// The line tool's Line/tangent arc switch (Shift+A while chaining): the

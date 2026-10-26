@@ -11,10 +11,11 @@ use noshape_model::partstudio::PartStudio;
 use serde_json::{Value, json};
 
 pub(crate) mod asm;
+pub(crate) mod vs;
 
 /// The `tab` of the config ops: a Part Studio or an Assembly.
 fn cfg_tab_field() -> crate::registry::Field {
-    opt("tab", json!({ "type": "string" }), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio.")
+    opt("tab", json!({ "type": "string" }), "Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio.")
 }
 
 pub fn ops() -> Vec<Op> {
@@ -23,8 +24,8 @@ pub fn ops() -> Vec<Op> {
             group: "config",
             verb: "list",
             summary: "The Part Studio's configuration inputs, configurations and configured parameters",
-            description: "Inputs (List with its configurations, Checkbox, Variable with default and range) with ids, and every configured parameter with its value per configuration.",
-            fields: vec![doc_field(), cfg_tab_field()],
+            description: "Inputs (List with its configurations, Checkbox, Variable with default and range) with ids, and every configured parameter with its value per configuration. A Variable Studio's configured cells are a variable's Value or Description, and `active` is the configuration it shows (saved with it).",
+            fields: vec![doc_field(), cfg_tab_field(), opt("copy", json!({ "type": "boolean" }), "Variable Studio: each input's ⋯ › Copy table text (`copied`: input id -> tab-separated text).")],
             mutates: false,
             destructive: false,
             run: list,
@@ -88,8 +89,18 @@ pub fn ops() -> Vec<Op> {
             group: "config",
             verb: "edit_option",
             summary: "Rename or delete a configuration of a List input",
-            description: "A List keeps at least one configuration.",
-            fields: vec![doc_field(), cfg_tab_field(), req("input", s(), "List input id or name."), req("option", s(), "Configuration id or name."), opt("name", s(), "New name."), opt("delete", json!({ "type": "boolean" }), "Delete it.")],
+            description: "A List keeps at least one configuration. A Variable Studio's row menu also has Set as default, Move up / down and Duplicate row (one edit each).",
+            fields: vec![
+                doc_field(),
+                cfg_tab_field(),
+                req("input", s(), "List input id or name."),
+                req("option", s(), "Configuration id or name."),
+                opt("name", s(), "New name."),
+                opt("delete", json!({ "type": "boolean" }), "Delete it."),
+                opt("set_default", json!({ "type": "boolean" }), "Variable Studio: Set as default."),
+                opt("move", json!({ "type": "integer", "enum": [-1, 1] }), "Variable Studio: Move up (-1) / down (1)."),
+                opt("duplicate", json!({ "type": "boolean" }), "Variable Studio: Duplicate row (\"<name> copy\" under it, with its values)."),
+            ],
             mutates: true,
             destructive: false,
             run: edit_option,
@@ -97,9 +108,20 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "config",
             verb: "configure",
-            summary: "Make a parameter (or suppression) of a feature, assembly instance or mate configured by a List or Checkbox input",
-            description: "Every configuration starts with the current value; then set values with config_set_value. Part Studio: `feature` and `param`, a parameter id of the feature (see feature_schema) or \"suppressed\" (Configure suppression). Assembly: `instance` with `param` \"suppressed\", or `mate` with \"suppressed\", \"offset\", \"offset_x\", \"offset_y\", \"offset_z\", \"rotation\" or \"flip_primary\".",
-            fields: vec![doc_field(), cfg_tab_field(), opt("feature", s(), "Feature id or name (Part Studio)."), opt("instance", s(), "Instance id or name (Assembly)."), opt("mate", s(), "Mate id or name (Assembly)."), req("param", s(), "Parameter id, or \"suppressed\"."), req("input", s(), "List or Checkbox input id or name.")],
+            summary: "Make a parameter (or suppression) of a feature, assembly instance or mate, or a Variable Studio cell, configured by an input",
+            description: "Every configuration starts with the current value; then set values with config_set_value. Part Studio: `feature` and `param`, a parameter id of the feature (see feature_schema) or \"suppressed\" (Configure suppression). Assembly: `instance` with `param` \"suppressed\", or `mate` with \"suppressed\", \"offset\", \"offset_x\", \"offset_y\", \"offset_z\", \"rotation\" or \"flip_primary\". Variable Studio: `variable` and `field` (the cell's Configure with <input>; a configuration Variable `input` is the Value's \"Set to #<input>\"), or `unconfigure`.",
+            fields: vec![
+                doc_field(),
+                cfg_tab_field(),
+                opt("feature", s(), "Feature id or name (Part Studio)."),
+                opt("instance", s(), "Instance id or name (Assembly)."),
+                opt("mate", s(), "Mate id or name (Assembly)."),
+                opt("variable", s(), "Variable name (Variable Studio)."),
+                opt("field", json!({ "type": "string", "enum": ["value", "description"] }), "Variable Studio: the Value (default) or Description cell."),
+                opt("param", s(), "Parameter id, or \"suppressed\" (Part Studio, Assembly; required there)."),
+                opt("input", s(), "List or Checkbox input id or name (required, except to unconfigure)."),
+                opt("unconfigure", json!({ "type": "boolean" }), "Variable Studio: the configured cell's Unconfigure from <input>."),
+            ],
             mutates: true,
             destructive: false,
             run: configure,
@@ -115,7 +137,9 @@ pub fn ops() -> Vec<Op> {
                 opt("feature", s(), "Feature id or name (Part Studio)."),
                 opt("instance", s(), "Instance id or name (Assembly)."),
                 opt("mate", s(), "Mate id or name (Assembly)."),
-                req("param", s(), "Parameter id, or \"suppressed\" (see config_configure)."),
+                opt("variable", s(), "Variable name (Variable Studio)."),
+                opt("field", json!({ "type": "string", "enum": ["value", "description"] }), "Variable Studio: the Value (default) or Description cell."),
+                opt("param", s(), "Parameter id, or \"suppressed\" (see config_configure; Part Studio, Assembly)."),
                 req("configuration", json!({ "type": ["string", "boolean"] }), "Configuration id/name, or true/false."),
                 req("value", json!({}), "The value."),
             ],
@@ -127,7 +151,7 @@ pub fn ops() -> Vec<Op> {
             group: "config",
             verb: "activate",
             summary: "Choose the configuration the Part Studio shows (the Configurations box)",
-            description: "Sets the active value of configuration inputs; later regenerations, queries, renders, exports and feature edits use it (feature_edit then edits that configuration's configured values). `values` maps each input (id or name) to a List configuration (id or name), true/false for a Checkbox, or an expression for a configuration Variable (\"40 mm\"). Inputs not given keep their current value; `reset: true` returns every input to its default first. View state: no history entry, as in the app.",
+            description: "Sets the active value of configuration inputs; later regenerations, queries, renders, exports and feature edits use it (feature_edit then edits that configuration's configured values). A Variable Studio's shown configuration is saved with it (one edit per input changed, \"Change configuration\"). `values` maps each input (id or name) to a List configuration (id or name), true/false for a Checkbox, or an expression for a configuration Variable (\"40 mm\"). Inputs not given keep their current value; `reset: true` returns every input to its default first. View state: no history entry, as in the app.",
             fields: vec![
                 doc_field(),
                 cfg_tab_field(),
@@ -141,8 +165,8 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "config",
             verb: "copy_inputs",
-            summary: "Copy configuration inputs from another Part Studio or an Assembly",
-            description: "Copy input / Copy all inputs in `from` (a Part Studio, or an Assembly's Copy all inputs), then Paste inputs in this Part Studio: the inputs whose ids this Part Studio doesn't have yet (with their options and visibility conditions; conditions on inputs not pasted are repaired). Inputs with the same id can then drive Derived features (config_propagate).",
+            summary: "Copy configuration inputs from another Part Studio, an Assembly or a Variable Studio",
+            description: "Copy input / Copy all inputs in `from` (a Part Studio, or an Assembly's Copy all inputs), then Paste inputs in this Part Studio: the inputs whose ids this Part Studio doesn't have yet (with their options and visibility conditions; conditions on inputs not pasted are repaired). Inputs with the same id can then drive Derived features (config_propagate). A Variable Studio pastes into its own panel (`tab`) and can be `from`.",
             fields: vec![doc_field(), cfg_tab_field(), req("from", s(), "Part Studio or Assembly to copy from."), opt("inputs", json!({ "type": "array", "items": { "type": "string" } }), "Input ids or names (default all).")],
             mutates: true,
             destructive: false,
@@ -315,6 +339,9 @@ fn describe_configured(ps: &PartStudio) -> Value {
 }
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::list(ctx, a);
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::list(ctx, a);
     }
@@ -332,6 +359,9 @@ fn active(od: &OpenDoc, tab: TabId) -> Result<Value, OpError> {
 }
 
 fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::activate(ctx, a);
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::activate(ctx, a);
     }
@@ -343,7 +373,17 @@ fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         chosen.0.extend(studio_values(ps, &units, values, "values")?.0);
     }
     od.active_config.insert(tab, chosen);
-    Ok(json!({ "active": active(od, tab)?, "regeneration": regen_report(od, tab)? }).into())
+    let mut v = json!({ "active": active(od, tab)?, "regeneration": regen_report(od, tab)? });
+    one_shot_note(ctx, &mut v);
+    Ok(v.into())
+}
+
+/// The active configuration lasts for the session: say so when the
+/// session is this one call.
+pub(super) fn one_shot_note(ctx: &Ctx, v: &mut Value) {
+    if ctx.one_shot {
+        v["note"] = json!("The active configuration lasts for this session only, and this command is one: later `noshape-cli call`s start from the default configuration. Pass `configuration` to the queries (query_parts, query_mass_properties...), or use `noshape-cli batch`, the MCP server or the open app (live mode).");
+    }
 }
 
 /// Configuration values given by input and option ids or names
@@ -387,6 +427,9 @@ fn text(v: &Value, field: &str) -> Result<String, OpError> {
 }
 
 fn add_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::add_input(ctx, a);
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::add_input(ctx, a);
     }
@@ -425,6 +468,9 @@ fn add_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn edit_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::edit_input(ctx, a);
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::edit_input(ctx, a);
     }
@@ -459,6 +505,9 @@ fn edit_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn delete_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::delete_input(ctx, a);
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::delete_input(ctx, a);
     }
@@ -471,6 +520,9 @@ fn delete_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn add_option(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::add_option(ctx, a);
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::add_option(ctx, a);
     }
@@ -484,6 +536,12 @@ fn add_option(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn edit_option(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::edit_option(ctx, a);
+    }
+    if let Some(k) = ["set_default", "move", "duplicate"].into_iter().find(|k| a.get(k).is_some()) {
+        return Err(OpError::param(k, "Variable Studios only"));
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::edit_option(ctx, a);
     }
@@ -505,6 +563,12 @@ fn edit_option(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn configure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::configure(ctx, a);
+    }
+    if let Some(k) = ["variable", "field", "unconfigure"].into_iter().find(|k| a.get(k).is_some()) {
+        return Err(OpError::param(k, "Variable Studios only (`tab` names one)"));
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::configure(ctx, a);
     }
@@ -526,6 +590,12 @@ fn configure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn set_value(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::set_value(ctx, a);
+    }
+    if let Some(k) = ["variable", "field", "unconfigure"].into_iter().find(|k| a.get(k).is_some()) {
+        return Err(OpError::param(k, "Variable Studios only (`tab` names one)"));
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::set_value(ctx, a);
     }
@@ -562,6 +632,9 @@ fn set_value(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn reorder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::reorder(ctx, a);
+    }
     if asm::is_assembly(ctx, a)? {
         return Err(OpError::param("tab", "assembly configuration inputs keep their order"));
     }
@@ -576,6 +649,9 @@ fn reorder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn duplicate_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return Err(OpError::param("tab", "an Assembly: in a Variable Studio, Copy input copies to the clipboard (config_copy_inputs pastes)"));
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::duplicate_input(ctx, a);
     }
@@ -583,17 +659,21 @@ fn duplicate_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn copy_inputs(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::copy_inputs(ctx, a);
+    }
     if asm::is_assembly(ctx, a)? {
         return Err(OpError::param("tab", "a Part Studio: an Assembly's panel has no Paste inputs"));
     }
     let (od, tab) = studio_target(ctx, a)?;
-    let from = doc::tab_of_kind(od.doc(), Some(a.str("from")?), "Part Studio or Assembly", |c| matches!(c, noshape_model::document::TabContent::PartStudio(_) | noshape_model::document::TabContent::Assembly(_))).map_err(|e| e.with_param("from"))?;
+    let from = doc::tab_of_kind(od.doc(), Some(a.str("from")?), "Part Studio, Assembly or Variable Studio", |c| matches!(c, noshape_model::document::TabContent::PartStudio(_) | noshape_model::document::TabContent::Assembly(_) | noshape_model::document::TabContent::VariableStudio(_))).map_err(|e| e.with_param("from"))?;
     if from == tab {
-        return Err(OpError::param("from", "another Part Studio or an Assembly"));
+        return Err(OpError::param("from", "another Part Studio, an Assembly or a Variable Studio"));
     }
     let src_inputs: Vec<noshape_model::configuration::ConfigInput> = match od.doc().tab(from).map(|t| &t.content) {
         Some(noshape_model::document::TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
         Some(noshape_model::document::TabContent::Assembly(x)) => x.configuration.inputs.clone(),
+        Some(noshape_model::document::TabContent::VariableStudio(v)) => v.configuration.inputs.clone(),
         _ => Vec::new(),
     };
     let find = |key: &str, field: &str| -> Result<noshape_model::configuration::ConfigInput, OpError> {
@@ -622,6 +702,10 @@ fn copy_inputs(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn propagate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        // The panel's Input propagation… says "No references in the tab."
+        return Err(OpError::param("tab", "a Variable Studio has no references to propagate to (\"No references in the tab.\")"));
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::propagate(ctx, a);
     }
@@ -657,6 +741,9 @@ fn propagate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn edit_ids(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::edit_ids(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;
     let input = find_input(ps, a.str("input")?, "input")?;
@@ -709,6 +796,9 @@ pub(super) fn visibility_arg(a: &Args) -> Result<Option<noshape_model::configura
 }
 
 fn visibility(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if vs::is_vs(ctx, a)? {
+        return vs::visibility(ctx, a);
+    }
     if asm::is_assembly(ctx, a)? {
         return asm::visibility(ctx, a);
     }

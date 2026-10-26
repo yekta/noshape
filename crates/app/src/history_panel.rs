@@ -560,7 +560,7 @@ type CreateFn = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
 
 /// Store meta key marking a version as published FeatureScript ("Publish
 /// custom features and tables"; advanced search › Published FeatureScript).
-pub const PUBLISHED_FS_KEY: &str = "published_featurescript:";
+pub const PUBLISHED_FS_KEY: &str = noshape_ops::versions::PUBLISHED_FS_KEY;
 
 /// Onshape's "Create version from **<workspace>**" dialog (Versions and
 /// history, the rail button, Ctrl+Alt+V; live document/20).
@@ -830,7 +830,7 @@ fn publish_row(on: Rc<std::cell::Cell<bool>>, cx: &App) -> AnyElement {
 fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, window: &mut Window, cx: &mut App) {
     let key = format!("{PUBLISHED_FS_KEY}{id}");
     let Ok(info) = doc.read(cx).session.store.version(id) else { return };
-    let checks = doc.read(cx).session.store.read_all(info.microversion).ok().and_then(|b| noshape_model::document::Document::from_blobs(&b).ok()).map(|d| publish_checklist(&d)).unwrap_or_default();
+    let checks = doc.read(cx).session.store.read_all(info.microversion).ok().and_then(|b| noshape_model::document::Document::from_blobs(&b).ok()).map(|d| noshape_ops::versions::publish_checklist(&d)).unwrap_or_default();
     // Compiling the version's studios replaced the current ones' cached results.
     let _ = doc.read(cx).custom_features();
     let ready = !checks.is_empty() && checks.iter().all(|(_, ok)| *ok);
@@ -880,23 +880,6 @@ fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, wind
     });
 }
 
-/// The Publish FeatureScript requirements for a document (at a version),
-/// in Onshape's order.
-fn publish_checklist(doc: &noshape_model::document::Document) -> Vec<(&'static str, bool)> {
-    use noshape_model::custom::studio::Severity;
-    let scripts = noshape_model::custom::DocumentScripts::from_document(doc);
-    let studios: Vec<_> = scripts.studios().map(|(_, _, c)| c.clone()).collect();
-    let features: Vec<_> = studios.iter().flat_map(|c| c.features.iter()).collect();
-    let used = |type_id: &str| doc.tabs.iter().any(|t| matches!(&t.content, TabContent::PartStudio(ps) if ps.features.iter().any(|f| f.type_id == type_id)));
-    vec![
-        ("Document must define at least one custom feature or table", studios.iter().any(|c| !c.features.is_empty() || !c.tables.is_empty())),
-        ("Document contains a PDF", doc.tabs.iter().any(|t| matches!(&t.content, TabContent::File(f) if f.kind() == noshape_model::file_tab::FileKind::Pdf))),
-        ("Feature Studios contain no FeatureScript errors or warnings", studios.iter().all(|c| c.diagnostics.iter().all(|d| !matches!(d.severity, Severity::Error | Severity::Warning)))),
-        ("All custom features have descriptions", features.iter().all(|f| !f.description.trim().is_empty())),
-        ("All custom features are used in at least one Part Studio", features.iter().all(|f| used(&f.type_id))),
-        ("All Feature Studios are committed.", doc.tabs.iter().all(|t| !matches!(&t.content, TabContent::FeatureStudio(f) if f.has_uncommitted()))),
-    ]
-}
 
 fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>) -> AnyElement {
     let pal = p();

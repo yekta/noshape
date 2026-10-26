@@ -117,19 +117,27 @@ fn menu_labels() -> BTreeSet<String> {
 #[test]
 fn every_operation_has_examples() {
     use noshape_ops::examples;
+    let mut bad_enums = Vec::new();
     for (tool, list) in examples::EXAMPLES {
         let op = registry::by_tool_name(tool).unwrap_or_else(|| panic!("examples for unknown operation {tool}"));
         for e in *list {
             let v: serde_json::Value = serde_json::from_str(e).unwrap_or_else(|err| panic!("{tool}: example {e} isn't JSON: {err}"));
             let o = v.as_object().unwrap_or_else(|| panic!("{tool}: example {e} isn't an object"));
-            for k in o.keys() {
-                assert!(op.fields.iter().any(|f| f.name == k), "{tool}: example {e} names `{k}`, not a field");
+            for (k, val) in o {
+                let f = op.fields.iter().find(|f| f.name == k).unwrap_or_else(|| panic!("{tool}: example {e} names `{k}`, not a field"));
+                // A value of an enum field is one of its options.
+                if let (Some(options), Some(x)) = (f.schema.get("enum").and_then(serde_json::Value::as_array), val.as_str())
+                    && !options.iter().any(|o| o == x)
+                {
+                    bad_enums.push(format!("{tool}: example {e}: `{k}` is not one of {options:?}"));
+                }
             }
             for f in op.fields.iter().filter(|f| f.required) {
                 assert!(o.contains_key(f.name), "{tool}: example {e} lacks required `{}`", f.name);
             }
         }
     }
+    assert!(bad_enums.is_empty(), "examples with values their schema doesn't allow:\n{}", bad_enums.join("\n"));
     let missing: Vec<String> = registry::all().iter().filter(|o| examples::REQUIRED_GROUPS.contains(&o.group) && examples::of(&o.tool_name()).is_empty()).map(|o| o.tool_name()).collect();
     assert!(missing.is_empty(), "operations without examples (crates/ops/src/examples.rs): {missing:?}");
 }

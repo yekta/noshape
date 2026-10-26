@@ -29,45 +29,11 @@ pub enum InsertTarget {
 
 /// Apply `r` (or remove the reference when None) to the target.
 pub fn set_ref(doc: &Entity<DocModel>, target: InsertTarget, studio: TabId, r: Option<StudioRef>, cx: &mut App) {
-    let (tab, desc) = match target {
-        InsertTarget::Studio(t) => (t, if r.is_some() { "Insert Variable Studio" } else { "Remove reference" }),
-        InsertTarget::Element(e) => (e, if r.is_some() { "Insert Variable Studio" } else { "Remove reference" }),
+    let tab = match target {
+        InsertTarget::Studio(t) | InsertTarget::Element(t) => t,
     };
     doc.update(cx, |d, cx| {
-        d.edit_tab(tab, desc, cx, |c| match (c, &r) {
-            (TabContent::VariableStudio(v), Some(r)) => vars::insert_into_studio(v, r.clone()),
-            (TabContent::VariableStudio(v), None) => v.inserted.retain(|x| x.studio != studio),
-            (TabContent::PartStudio(ps), Some(r)) => vars::insert_studio(&mut ps.variable_studios, r.clone()),
-            (TabContent::PartStudio(ps), None) => vars::remove_studio(&mut ps.variable_studios, studio),
-            (TabContent::Assembly(a), Some(r)) => vars::insert_studio(&mut a.variable_studios, r.clone()),
-            (TabContent::Assembly(a), None) => vars::remove_studio(&mut a.variable_studios, studio),
-            _ => {}
-        });
-    });
-}
-
-/// Move `studio`'s table in `element`'s panel up or down (its explicit
-/// references are reordered; auto-inserted tables become explicit).
-pub fn move_table(doc: &Entity<DocModel>, element: TabId, studio: TabId, down: bool, cx: &mut App) {
-    let list = vars::element_studios(&doc.read(cx).session.doc, element);
-    let Some(k) = list.iter().position(|r| r.studio == studio) else { return };
-    let j = if down { k + 1 } else { k.wrapping_sub(1) };
-    if j >= list.len() {
-        return;
-    }
-    let mut order = list.clone();
-    order.swap(k, j);
-    doc.update(cx, |d, cx| {
-        d.edit_tab(element, if down { "Move table down" } else { "Move table up" }, cx, |c| {
-            let refs = match c {
-                TabContent::PartStudio(ps) => &mut ps.variable_studios,
-                TabContent::Assembly(a) => &mut a.variable_studios,
-                _ => return,
-            };
-            // Pin the whole order explicitly so it survives.
-            refs.inserted = order.clone();
-            refs.removed.retain(|t| !order.iter().any(|r| r.studio == *t));
-        });
+        d.edit_tab(tab, noshape_ops::variable_studio::reference_description(r.is_some()), cx, |c| noshape_ops::variable_studio::set_reference(c, studio, r));
     });
 }
 
@@ -832,23 +798,8 @@ fn version_rows(state: &Rc<RefCell<DialogState>>, path: &std::path::Path, rows: 
 /// one, unticked, is referenced by `element`).
 pub fn create_studio(doc: &Entity<DocModel>, element: TabId, cx: &mut App) {
     doc.update(cx, |d, cx| {
-        d.edit_document("Insert tab : Variable Studio", cx, |doc| {
-            let name = doc.next_tab_name("Variable Studio");
-            let studio = vars::new_studio(doc);
-            let all = studio.insert_into_all;
-            let id = doc.add_tab(&name, TabContent::VariableStudio(studio));
-            if !all {
-                let r = StudioRef { studio: id, variables: None, external: None, config: Default::default() };
-                match doc.tab_mut(element).map(|t| &mut t.content) {
-                    Some(TabContent::PartStudio(ps)) => vars::insert_studio(&mut ps.variable_studios, r),
-                    Some(TabContent::Assembly(a)) => vars::insert_studio(&mut a.variable_studios, r),
-                    _ => {}
-                }
-            }
-            let order = &mut doc.settings.tab_order;
-            order.retain(|t| *t != id);
-            let at = order.iter().position(|t| *t == element).map(|i| i + 1).unwrap_or(order.len());
-            order.insert(at, id);
+        d.edit_document(noshape_ops::variable_studio::CREATE_STUDIO_DESCRIPTION, cx, |doc| {
+            noshape_ops::variable_studio::create_studio(doc, element);
         });
     });
 }
@@ -1017,21 +968,11 @@ pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRe
 
 /// Move a reference up or down in its target.
 pub fn move_ref(doc: &Entity<DocModel>, target: InsertTarget, studio: TabId, down: bool, cx: &mut App) {
-    match target {
-        InsertTarget::Element(e) => move_table(doc, e, studio, down, cx),
-        InsertTarget::Studio(t) => doc.update(cx, |d, cx| {
-            d.edit_tab(t, if down { "Move table down" } else { "Move table up" }, cx, |c| {
-                if let TabContent::VariableStudio(v) = c
-                    && let Some(k) = v.inserted.iter().position(|r| r.studio == studio)
-                {
-                    let j = if down { k + 1 } else { k.wrapping_sub(1) };
-                    if j < v.inserted.len() {
-                        v.inserted.swap(k, j);
-                    }
-                }
-            });
-        }),
-    }
+    let tab = match target {
+        InsertTarget::Studio(t) | InsertTarget::Element(t) => t,
+    };
+    let Some(edit) = noshape_ops::variable_studio::move_reference(&doc.read(cx).session.doc, tab, studio, down) else { return };
+    doc.update(cx, |d, cx| d.edit_tab(tab, noshape_ops::variable_studio::move_table_description(down), cx, edit));
 }
 
 /// The dialog opened on another document (its "Update linked document").

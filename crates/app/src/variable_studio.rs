@@ -442,7 +442,7 @@ impl VariableStudioView {
                     .when(configured, |b| gpui_kit::component::Disableable::disabled(b, true).opacity(0.5))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if !configured {
-                            this.edit(if on { "Do not insert into all Part Studios and Assemblies" } else { "Insert into all Part Studios and Assemblies" }, cx, |s| s.insert_into_all = !on)
+                            this.edit(noshape_ops::variable_studio::insert_into_all_description(!on), cx, |s| s.insert_into_all = !on)
                         }
                     })),
             )
@@ -528,11 +528,7 @@ impl VariableStudioView {
     /// Tab-separated copy of the table (Onshape's "Copy table").
     fn copy_table(&self, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
-        let mut out = String::from("Name\tVariable type\tValue\tDescription\n");
-        for v in &studio.variables {
-            out.push_str(&format!("{}\t{:?}\t{}\t{}\n", v.name, v.kind.unwrap_or(VarKind::Any), v.expr.text, v.description));
-        }
-        cx.write_to_clipboard(ClipboardItem::new_string(out));
+        cx.write_to_clipboard(ClipboardItem::new_string(noshape_ops::variable_studio::studio_table_text(studio)));
     }
 }
 

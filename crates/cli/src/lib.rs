@@ -104,6 +104,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
             return 0;
         }
         Some(("call", sm)) => {
+            ctx.one_shot = true;
             let tool = sm.get_one::<String>("tool").cloned().unwrap_or_default();
             let text = match sm.get_one::<String>("json") {
                 Some(t) => t.clone(),
@@ -146,6 +147,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
         Some((group, gm)) => {
             let Some((verb, om)) = gm.subcommand() else { return 1 };
             let Some(op) = registry::by_command(group, verb) else { return 1 };
+            ctx.one_shot = true;
             let mut args = match om.get_one::<String>("__json") {
                 Some(j) => match serde_json::from_str::<Value>(j) {
                     Ok(v @ Value::Object(_)) => v,

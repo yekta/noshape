@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// A workspace's description (store meta; the branches table has none).
-pub const WORKSPACE_DESCRIPTION_KEY: &str = "workspace_description:";
+pub const WORKSPACE_DESCRIPTION_KEY: &str = noshape_ops::versions::WORKSPACE_DESCRIPTION_KEY;
 
 #[derive(Clone, Copy)]
 pub enum Item {

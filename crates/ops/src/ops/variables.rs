@@ -131,8 +131,8 @@ pub fn ops() -> Vec<Op> {
             group: "variable",
             verb: "list",
             summary: "The variables of a Part Studio or a Variable Studio, with their values",
-            description: "Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables). Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).",
-            fields: vec![doc_field(), var_tab(), opt("copy", json!({ "type": "boolean" }), "Part Studio: the Variables panel's Copy table, `copied` being the text it puts on the clipboard (a header row, then name, type, value, description per variable, tab-separated). A row's Copy copies its description (`description` here).")],
+            description: "Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables) and the inserted Variable Studio tables (`studio_tables`). Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).",
+            fields: vec![doc_field(), var_tab(), opt("copy", json!({ "type": "boolean" }), "The table's Copy table (Part Studio: the Variables panel's; Variable Studio: its ⋯ menu's), `copied` being the text it puts on the clipboard (a header row, then name, type, value, description per variable, tab-separated). A row's Copy copies its description (`description` here).")],
             mutates: false,
             destructive: false,
             run: list,
@@ -162,10 +162,11 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 doc_field(),
                 var_tab(),
-                req("variable", s(), "Variable name (with or without #) or its feature id."),
+                opt("variable", s(), "The variable to change: its name (with or without #) or feature id. When omitted, `name` names it."),
                 opt("value", json!({ "type": ["string", "number"] }), "New expression."),
                 opt("kind", kind, "New kind."),
-                opt("name", s(), "New name."),
+                opt("new_name", s(), "New name (renames it)."),
+                opt("name", s(), "With `variable`: the new name (as `new_name`). Without it: the variable to change, as variable_create names it."),
                 opt("description", s(), "New description."),
             ],
             mutates: true,
@@ -192,7 +193,273 @@ pub fn ops() -> Vec<Op> {
             destructive: false,
             run: move_row,
         },
+        Op {
+            group: "variable",
+            verb: "insert_studio",
+            summary: "Insert a Variable Studio (or some of its variables) into a Part Studio, Assembly or Variable Studio",
+            description: "The Variable table's Insert Variable Studio dialog: the studio's variables become #names in `tab`'s expressions, shown as a read-only table under its own variables. Inserting a studio again replaces its reference. `variables` inserts only those (the dialog's variable rows); a configured studio is inserted in one configuration (`configuration`: its inputs by name or id, e.g. {\"Size\": \"Large\"}; default: its defaults); `document` + `version` insert another document's studio at a named version. One edit (\"Insert Variable Studio\"). The document's first Variable Studio is inserted into every Part Studio and Assembly already (\"Insert into all Part Studios and Assemblies\", variable_studio_settings). Returns `tab`'s inserted tables.",
+            fields: vec![
+                doc_field(),
+                target_tab(),
+                req("studio", s(), "The Variable Studio tab, by name or id (in `document` when given)."),
+                opt("variables", json!({ "type": "array", "items": { "type": "string" }, "minItems": 1 }), "Only these variables (names, with or without #). Default: the whole table."),
+                opt("configuration", json!({ "type": ["object", "string"] }), "A configured studio's configuration: input name or id -> option name or id (List), true/false (Checkbox), an expression (Variable); or \"default\" (Reset to default) or \"last_viewed\" (Set to last viewed: the configuration the studio shows)."),
+                opt("document", s(), "Another .noshape document's studio (with `version`)."),
+                opt("version", s(), "With `document`: the name of one of its versions (the dialog lists named versions only)."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: insert_studio,
+        },
+        Op {
+            group: "variable",
+            verb: "remove_studio",
+            summary: "Remove an inserted Variable Studio from a Variable table (Remove reference)",
+            description: "The inserted table's menu › Remove reference: its variables stop being available in `tab` (expressions using them then fail). Also removes an automatically inserted studio from this one tab. One edit (\"Remove reference\").",
+            fields: vec![doc_field(), target_tab(), req("studio", s(), "The inserted Variable Studio, by tab name or id.")],
+            mutates: true,
+            destructive: true,
+            run: remove_studio,
+        },
+        Op {
+            group: "variable",
+            verb: "move_studio",
+            summary: "Move an inserted Variable Studio's table up or down (its menu's Move up / Move down)",
+            description: "The order decides which table's variable wins when two define the same name (the later one). One edit (\"Move table up\" / \"Move table down\").",
+            fields: vec![doc_field(), target_tab(), req("studio", s(), "The inserted Variable Studio, by tab name or id."), req("by", json!({ "type": "integer", "enum": [-1, 1] }), "-1: up, 1: down.")],
+            mutates: true,
+            destructive: false,
+            run: move_studio,
+        },
+        Op {
+            group: "variable",
+            verb: "create_studio",
+            summary: "Create a Variable Studio from a Part Studio's or Assembly's Variable table",
+            description: "The Variable table's Create Variable Studio: a new Variable Studio tab right after `tab` (\"Variable Studio N\"), shown in `tab`'s Variable table at once (the document's first studio is inserted into all Part Studios and Assemblies; a later one only into `tab`). One edit (\"Insert tab : Variable Studio\"). Then add its variables with variable_create {\"tab\": <its name>, ...}.",
+            fields: vec![doc_field(), opt("tab", s(), "Part Studio or Assembly, by name or id. Default: the first Part Studio.")],
+            mutates: true,
+            destructive: false,
+            run: create_studio,
+        },
+        Op {
+            group: "variable",
+            verb: "studio_settings",
+            summary: "A Variable Studio's \"Insert into all Part Studios and Assemblies\" checkbox",
+            description: "On: the studio's variables are available in every Part Studio and Assembly of the document (except where its reference was removed). A configured studio can't be inserted into all (the checkbox is greyed). One edit (\"Insert into all Part Studios and Assemblies\" / \"Do not insert into all Part Studios and Assemblies\").",
+            fields: vec![doc_field(), req("tab", s(), "The Variable Studio, by name or id."), req("insert_into_all", json!({ "type": "boolean" }), "The checkbox.")],
+            mutates: true,
+            destructive: false,
+            run: studio_settings,
+        },
     ]
+}
+
+fn target_tab() -> crate::registry::Field {
+    opt("tab", s(), "The Part Studio, Assembly or Variable Studio whose Variable table gets it, by name or id. Default: the first Part Studio.")
+}
+
+/// The tab whose Variable table an insert_studio-like call edits.
+fn target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = match a.opt_str("tab")? {
+        Some(k) => {
+            let id = doc::find_tab(od.doc(), k).map_err(|e| e.with_param("tab"))?;
+            match od.doc().tab(id).map(|t| &t.content) {
+                Some(TabContent::PartStudio(_) | TabContent::Assembly(_) | TabContent::VariableStudio(_)) => id,
+                _ => return Err(OpError::param("tab", "not a Part Studio, Assembly or Variable Studio")),
+            }
+        }
+        None => od.tab_of_kind(None, "Part Studio", doc::is_part_studio)?,
+    };
+    Ok((od, tab))
+}
+
+/// A Variable Studio tab of `d` by name or id.
+fn studio_tab(d: &noshape_model::Document, key: &str) -> Result<TabId, OpError> {
+    let id = doc::find_tab(d, key).map_err(|e| e.with_param("studio"))?;
+    match d.tab(id).map(|t| &t.content) {
+        Some(TabContent::VariableStudio(_)) => Ok(id),
+        _ => Err(OpError::param("studio", "not a Variable Studio")),
+    }
+}
+
+/// The Variable Studio tables `tab`'s Variable table shows, in order.
+fn shown_refs(d: &noshape_model::Document, tab: TabId) -> Vec<noshape_model::variables::StudioRef> {
+    match d.tab(tab).map(|t| &t.content) {
+        Some(TabContent::VariableStudio(v)) => v.inserted.clone(),
+        _ => noshape_model::variables::element_studios(d, tab),
+    }
+}
+
+/// An inserted table's studio name (in its own document).
+fn studio_name(d: &noshape_model::Document, r: &noshape_model::variables::StudioRef) -> String {
+    let src = r.external.as_ref().and_then(noshape_model::variables::external_document);
+    src.as_deref().unwrap_or(d).tab(r.studio).map(|t| t.name.clone()).unwrap_or_else(|| "missing Variable Studio".into())
+}
+
+/// [`shown_refs`] as JSON, with the tab's name.
+fn tables_json(d: &noshape_model::Document, tab: TabId) -> Value {
+    use noshape_model::variables as vars;
+    let list: Vec<Value> = shown_refs(d, tab)
+        .iter()
+        .map(|r| {
+            let mut j = json!({ "studio": studio_name(d, r), "id": r.studio.to_string() });
+            if r.external.is_none() && vars::is_auto_referenced(d, tab, r.studio) {
+                j["automatic"] = json!(true);
+            }
+            if let Some(v) = &r.variables {
+                j["variables"] = json!(v.iter().map(|n| format!("#{n}")).collect::<Vec<_>>());
+            }
+            if !r.config.is_empty() {
+                j["configuration"] = json!(r.config.0);
+            }
+            if let Some(e) = &r.external {
+                j["document"] = json!(e.path);
+                j["version"] = json!(e.version);
+            }
+            j
+        })
+        .collect();
+    json!({ "tab": d.tab(tab).map(|t| t.name.clone()), "tables": list })
+}
+
+/// Configuration values for a studio's inputs, by input / option name or id.
+fn studio_config(inputs: &[noshape_model::configuration::ConfigInput], values: &serde_json::Map<String, Value>) -> Result<noshape_model::configuration::ConfigValues, OpError> {
+    use noshape_model::configuration::ConfigInputKind;
+    let mut out = noshape_model::configuration::ConfigValues::default();
+    let names = || inputs.iter().map(|i| i.name.clone()).collect::<Vec<_>>().join(", ");
+    for (key, v) in values {
+        let field = format!("configuration.{key}");
+        let input = inputs
+            .iter()
+            .find(|i| i.id == *key)
+            .or_else(|| inputs.iter().find(|i| i.name.eq_ignore_ascii_case(key)))
+            .ok_or_else(|| OpError::not_found(if inputs.is_empty() { "the studio has no configuration".into() } else { format!("no configuration input `{key}`; inputs: {}", names()) }).with_param(&field))?;
+        let value = match (&input.kind, v) {
+            (ConfigInputKind::List { options, .. }, Value::String(o)) => options
+                .iter()
+                .find(|x| x.id == *o)
+                .or_else(|| options.iter().find(|x| x.name.eq_ignore_ascii_case(o)))
+                .map(|x| x.id.clone())
+                .ok_or_else(|| OpError::not_found(format!("no configuration `{o}`; configurations: {}", options.iter().map(|x| x.name.clone()).collect::<Vec<_>>().join(", "))).with_param(&field))?,
+            (ConfigInputKind::Checkbox { .. }, Value::Bool(b)) => b.to_string(),
+            (ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. }, Value::String(t)) => t.clone(),
+            (ConfigInputKind::Variable { .. }, Value::Number(n)) => n.to_string(),
+            (ConfigInputKind::List { .. }, _) => return Err(OpError::param(&field, "a configuration name or id")),
+            (ConfigInputKind::Checkbox { .. }, _) => return Err(OpError::param(&field, "true or false")),
+            _ => return Err(OpError::param(&field, "a string")),
+        };
+        out.0.insert(input.id.clone(), value);
+    }
+    Ok(out)
+}
+
+fn insert_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::variables as vars;
+    let (od, tab) = target(ctx, a)?;
+    // The studio: this document's, or another document's at a version.
+    let (src, external): (std::sync::Arc<noshape_model::Document>, Option<vars::ExternalStudio>) = match (a.opt_str("document")?, a.opt_str("version")?) {
+        (Some(path), Some(version)) => {
+            let path = std::path::Path::new(path);
+            let path = path.canonicalize().map_err(|e| OpError::param("document", &format!("{}: {e}", path.display())))?;
+            let info = crate::derived::external_doc_info(&path).map_err(|e| OpError::param("document", &format!("can't read it: {e}")))?;
+            let named: Vec<&crate::derived::VersionChoice> = info.versions.iter().filter(|v| v.label != "Current state").collect();
+            let v = named.iter().find(|v| v.label == version).ok_or_else(|| OpError::not_found(if named.is_empty() { "the document has no versions: create one in it first (history_create_version)".into() } else { format!("no version `{version}`; versions: {}", named.iter().map(|v| v.label.as_str()).collect::<Vec<_>>().join(", ")) }).with_param("version"))?;
+            let snapshot = crate::derived::external_snapshot(&path, v.microversion).map_err(|e| OpError::param("version", &format!("can't read it: {e}")))?;
+            (snapshot, Some(vars::ExternalStudio { path, microversion: v.microversion.to_string(), version: v.label.clone() }))
+        }
+        (Some(_), None) => return Err(OpError::param("version", "required with `document`: one of its named versions")),
+        (None, Some(_)) => return Err(OpError::param("document", "required with `version`")),
+        (None, None) => (std::sync::Arc::new(od.doc().clone()), None),
+    };
+    let studio = studio_tab(&src, a.str("studio")?)?;
+    if external.is_none() && studio == tab {
+        return Err(OpError::param("studio", "a Variable Studio can't insert itself"));
+    }
+    let Some(TabContent::VariableStudio(def)) = src.tab(studio).map(|t| &t.content) else { unreachable!("checked") };
+    let variables = match a.opt_array("variables")? {
+        Some(list) => Some(
+            list.iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    let n = v.as_str().ok_or_else(|| OpError::param(&format!("variables[{i}]"), "a variable name"))?.trim().trim_start_matches('#');
+                    def.variables.iter().any(|x| x.name == n).then(|| n.to_string()).ok_or_else(|| OpError::not_found(format!("no variable `{n}` in the studio; variables: {}", def.variables.iter().map(|x| format!("#{}", x.name)).collect::<Vec<_>>().join(", "))).with_param(&format!("variables[{i}]")))
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        None => None,
+    };
+    let config = match a.get("configuration") {
+        None | Some(Value::Null) => Default::default(),
+        Some(Value::String(k)) if k == "default" => Default::default(),
+        Some(Value::String(k)) if k == "last_viewed" => def.configuration.active.clone(),
+        Some(Value::Object(values)) => studio_config(&def.configuration.inputs, values)?,
+        Some(_) => return Err(OpError::param("configuration", "an object of input values, \"default\" or \"last_viewed\"")),
+    };
+    let r = vars::StudioRef { studio, variables, external, config };
+    od.session.edit_tab(tab, vs::reference_description(true), |c| vs::set_reference(c, studio, Some(r)))?;
+    Ok(tables_json(od.doc(), tab).into())
+}
+
+fn remove_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let studio = inserted(od.doc(), tab, a.str("studio")?)?;
+    od.session.edit_tab(tab, vs::reference_description(false), |c| vs::set_reference(c, studio, None))?;
+    Ok(tables_json(od.doc(), tab).into())
+}
+
+/// A table `tab`'s Variable table shows, by its studio's name or id.
+fn inserted(d: &noshape_model::Document, tab: TabId, key: &str) -> Result<TabId, OpError> {
+    let shown = shown_refs(d, tab);
+    let k = key.trim();
+    let name = |r: &noshape_model::variables::StudioRef| studio_name(d, r);
+    shown
+        .iter()
+        .find(|r| r.studio.to_string() == k)
+        .or_else(|| shown.iter().find(|r| name(r).eq_ignore_ascii_case(k)))
+        .map(|r| r.studio)
+        .ok_or_else(|| OpError::not_found(format!("`{key}` is not inserted here; tables: {}", shown.iter().map(name).collect::<Vec<_>>().join(", "))).with_param("studio"))
+}
+
+fn move_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let studio = inserted(od.doc(), tab, a.str("studio")?)?;
+    let down = a.get("by").and_then(Value::as_i64).ok_or_else(|| OpError::param("by", "-1 or 1"))? > 0;
+    let edit = vs::move_reference(od.doc(), tab, studio, down).ok_or_else(|| OpError::invalid(format!("the table is already the {}", if down { "last" } else { "first" })).with_param("by"))?;
+    od.session.edit_tab(tab, vs::move_table_description(down), edit)?;
+    Ok(tables_json(od.doc(), tab).into())
+}
+
+fn create_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let element = match a.opt_str("tab")? {
+        Some(k) => {
+            let id = doc::find_tab(od.doc(), k).map_err(|e| e.with_param("tab"))?;
+            match od.doc().tab(id).map(|t| &t.content) {
+                Some(TabContent::PartStudio(_) | TabContent::Assembly(_)) => id,
+                _ => return Err(OpError::param("tab", "not a Part Studio or Assembly")),
+            }
+        }
+        None => od.tab_of_kind(None, "Part Studio", doc::is_part_studio)?,
+    };
+    let id = od.session.edit_document(vs::CREATE_STUDIO_DESCRIPTION, |d| vs::create_studio(d, element))?;
+    let mut v = tables_json(od.doc(), element);
+    v["created"] = json!({ "id": id.to_string(), "name": od.doc().tab(id).map(|t| t.name.clone()) });
+    Ok(v.into())
+}
+
+fn studio_settings(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = studio_tab(od.doc(), a.str("tab")?).map_err(|e| e.with_param("tab"))?;
+    let on = a.get("insert_into_all").and_then(Value::as_bool).ok_or_else(|| OpError::param("insert_into_all", "true or false"))?;
+    let s = vs_studio(od, tab)?;
+    if on && !s.configuration.is_empty() {
+        return Err(OpError::invalid("a configured Variable Studio can't be inserted into all Part Studios and Assemblies (insert it with variable_insert_studio in one configuration)").with_param("insert_into_all"));
+    }
+    if s.insert_into_all != on {
+        vs_edit(od, tab, vs::insert_into_all_description(on), |s| s.insert_into_all = on)?;
+    }
+    Ok(json!({ "studio": od.doc().tab(tab).map(|t| t.name.clone()), "insert_into_all": on }).into())
 }
 
 fn name_error(e: NameError, name: &str) -> OpError {
@@ -259,7 +526,13 @@ fn list_value(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
         })
         .collect();
     let all: serde_json::Map<String, Value> = r.context.variables.iter().map(|(k, q)| (format!("#{k}"), json!(shown(q)))).collect();
-    Ok(json!({ "variables": rows, "visible_at_end": all }))
+    let mut v = json!({ "variables": rows, "visible_at_end": all });
+    // The Variable Studio tables shown under them (variable_insert_studio).
+    let tables = tables_json(od.doc(), tab)["tables"].clone();
+    if tables.as_array().is_some_and(|t| !t.is_empty()) {
+        v["studio_tables"] = tables;
+    }
+    Ok(v)
 }
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -271,7 +544,13 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             Ok(v.into())
         }
-        (od, Table::Vs(tab)) => Ok(vs_list(od, tab)?.into()),
+        (od, Table::Vs(tab)) => {
+            let mut v = vs_list(od, tab)?;
+            if a.bool_or("copy", false)? {
+                v["copied"] = json!(vs::studio_table_text(vs_studio(od, tab)?));
+            }
+            Ok(v.into())
+        }
     }
 }
 
@@ -303,11 +582,23 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     reply(od, tab, repaired)
 }
 
+/// variable_set's variable and new name: `variable` + `new_name` (or
+/// `name`), or `name` alone as the variable (what agents try first).
+fn set_target<'a>(a: &'a Args) -> Result<(&'a str, Option<&'a str>), OpError> {
+    match (a.opt_str("variable")?, a.opt_str("name")?, a.opt_str("new_name")?) {
+        (Some(_), Some(_), Some(_)) => Err(OpError::param("new_name", "give the new name once: `new_name` or `name`, not both")),
+        (Some(v), n, nn) => Ok((v, nn.or(n))),
+        (None, Some(n), nn) => Ok((n, nn)),
+        (None, None, _) => Err(OpError::param("variable", "required: the variable to change (its name or feature id)")),
+    }
+}
+
 fn set(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (var, rename) = set_target(a)?;
     let (od, tab) = match table(ctx, a)? {
         (od, Table::Vs(tab)) => {
-            let i = vs_find(vs_studio(od, tab)?, a.str("variable")?)?;
-            let new_name = match a.opt_str("name")? {
+            let i = vs_find(vs_studio(od, tab)?, var)?;
+            let new_name = match rename {
                 Some(n) => Some(vs_name(vs_studio(od, tab)?, n, Some(i))?),
                 None => None,
             };
@@ -323,7 +614,7 @@ fn set(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         (od, Table::Studio(tab)) => (od, tab),
     };
     let units = od.doc().settings.units;
-    let id = find(doc::studio(od.doc(), tab)?, a.str("variable")?)?;
+    let id = find(doc::studio(od.doc(), tab)?, var)?;
     let mut all = Vec::new();
     if let Some(k) = a.opt_str("kind")? {
         if !KINDS.contains(&k) {
@@ -349,7 +640,7 @@ fn set(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             Ok(())
         })?.1);
     }
-    if let Some(n) = a.opt_str("name")? {
+    if let Some(n) = rename {
         let n = n.to_string();
         all.extend(edit_table(od, tab, "Rename variable", |ps| vt::rename(ps, id, &n).map_err(|e| name_error(e, &n)))?.1);
     }

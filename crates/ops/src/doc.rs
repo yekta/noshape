@@ -165,6 +165,9 @@ pub struct Ctx {
     pub ui_requests: Vec<UiRequest>,
     /// The user's preference files changed (live mode: the app reloads them).
     pub reload_prefs: bool,
+    /// One call per process (`noshape-cli call` / `<group> <verb>`): session
+    /// state such as the active configuration ends with it.
+    pub one_shot: bool,
 }
 
 pub use crate::window::UiRequest;

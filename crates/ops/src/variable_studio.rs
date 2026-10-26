@@ -108,3 +108,116 @@ pub fn part_studio_table_text(ps: &noshape_model::partstudio::PartStudio) -> Str
     }
     lines.join("\n")
 }
+
+/// A Variable Studio's table ⋯ › Copy table: a header row, then name,
+/// type, value and description per variable, tab-separated.
+pub fn studio_table_text(s: &VariableStudio) -> String {
+    let mut out = String::from("Name\tVariable type\tValue\tDescription\n");
+    for v in &s.variables {
+        out.push_str(&format!("{}\t{:?}\t{}\t{}\n", v.name, v.kind.unwrap_or(VarKind::Any), v.expr.text, v.description));
+    }
+    out
+}
+
+// ------------------------------------------------- inserted Variable Studios
+
+use noshape_model::document::{Document, TabContent, TabId};
+use noshape_model::variables::{self as vars, StudioRef};
+
+/// The history text of the Insert Variable Studio dialog's edits: a table
+/// (or some of its variables) inserted, or its reference removed.
+pub fn reference_description(insert: bool) -> &'static str {
+    if insert { "Insert Variable Studio" } else { "Remove reference" }
+}
+
+/// Insert `r` into a target's Variable table (a Part Studio's or Assembly's,
+/// or another Variable Studio's), replacing an earlier reference to the same
+/// studio; None removes `studio`'s reference ("Remove reference", also of an
+/// auto-inserted table).
+pub fn set_reference(c: &mut TabContent, studio: TabId, r: Option<StudioRef>) {
+    match (c, r) {
+        (TabContent::VariableStudio(v), Some(r)) => vars::insert_into_studio(v, r),
+        (TabContent::VariableStudio(v), None) => v.inserted.retain(|x| x.studio != studio),
+        (TabContent::PartStudio(ps), Some(r)) => vars::insert_studio(&mut ps.variable_studios, r),
+        (TabContent::PartStudio(ps), None) => vars::remove_studio(&mut ps.variable_studios, studio),
+        (TabContent::Assembly(a), Some(r)) => vars::insert_studio(&mut a.variable_studios, r),
+        (TabContent::Assembly(a), None) => vars::remove_studio(&mut a.variable_studios, studio),
+        _ => {}
+    }
+}
+
+/// "Move table up" / "Move table down".
+pub fn move_table_description(down: bool) -> &'static str {
+    if down { "Move table down" } else { "Move table up" }
+}
+
+/// An edit of one tab's content.
+pub type TabEdit = Box<dyn FnOnce(&mut TabContent)>;
+
+/// An inserted table's Move up / Move down in `tab`'s Variable table: the
+/// edit to apply to `tab`, or None when it can't move. A Part Studio's or
+/// Assembly's whole order is pinned explicitly, so auto-inserted tables
+/// become explicit references and the order survives.
+pub fn move_reference(doc: &Document, tab: TabId, studio: TabId, down: bool) -> Option<TabEdit> {
+    let step = |k: usize, n: usize| {
+        let j = if down { k + 1 } else { k.wrapping_sub(1) };
+        (j < n).then_some(j)
+    };
+    match &doc.tab(tab)?.content {
+        TabContent::VariableStudio(v) => {
+            let k = v.inserted.iter().position(|r| r.studio == studio)?;
+            let j = step(k, v.inserted.len())?;
+            Some(Box::new(move |c| {
+                if let TabContent::VariableStudio(v) = c
+                    && k.max(j) < v.inserted.len()
+                {
+                    v.inserted.swap(k, j);
+                }
+            }))
+        }
+        TabContent::PartStudio(_) | TabContent::Assembly(_) => {
+            let mut order = vars::element_studios(doc, tab);
+            let k = order.iter().position(|r| r.studio == studio)?;
+            let j = step(k, order.len())?;
+            order.swap(k, j);
+            Some(Box::new(move |c| {
+                let refs = match c {
+                    TabContent::PartStudio(ps) => &mut ps.variable_studios,
+                    TabContent::Assembly(a) => &mut a.variable_studios,
+                    _ => return,
+                };
+                refs.removed.retain(|t| !order.iter().any(|r| r.studio == *t));
+                refs.inserted = order;
+            }))
+        }
+        _ => None,
+    }
+}
+
+/// The history text of [`create_studio`].
+pub const CREATE_STUDIO_DESCRIPTION: &str = "Insert tab : Variable Studio";
+
+/// A Variable table's "Create Variable Studio": a new studio tab right
+/// after `element`, shown in its Variable table at once (the document's
+/// first studio is inserted into all; a later one, unticked, is referenced
+/// by `element`). Returns the new tab.
+pub fn create_studio(doc: &mut Document, element: TabId) -> TabId {
+    let name = doc.next_tab_name("Variable Studio");
+    let studio = vars::new_studio(doc);
+    let all = studio.insert_into_all;
+    let id = doc.add_tab(&name, TabContent::VariableStudio(studio));
+    if !all && let Some(c) = doc.tab_mut(element).map(|t| &mut t.content) {
+        set_reference(c, id, Some(StudioRef::whole(id)));
+    }
+    let order = &mut doc.settings.tab_order;
+    order.retain(|t| *t != id);
+    let at = order.iter().position(|t| *t == element).map(|i| i + 1).unwrap_or(order.len());
+    order.insert(at, id);
+    id
+}
+
+/// A Variable Studio's "Insert into all Part Studios and Assemblies"
+/// checkbox: its history text for the new state.
+pub fn insert_into_all_description(on: bool) -> &'static str {
+    if on { "Insert into all Part Studios and Assemblies" } else { "Do not insert into all Part Studios and Assemblies" }
+}
