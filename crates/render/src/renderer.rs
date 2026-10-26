@@ -2504,6 +2504,12 @@ impl Renderer {
         })
     }
 
+    /// Whether a target with frames in flight could take another one now
+    /// (the UI may send it any moment: don't block on the GPU for long).
+    pub fn frame_slot_free(&self) -> bool {
+        self.targets.values().any(|t| t.in_flight > 0 && t.in_flight < self.frames_in_flight)
+    }
+
     /// Whether reads are outstanding (call [`Self::wait_oldest`] / [`Self::collect`]).
     pub fn has_pending(&self) -> bool {
         !self.pending.is_empty() || !self.ready.is_empty()
@@ -3015,15 +3021,20 @@ impl Renderer {
     /// not a failed one: dropping it while the GPU still works on it made
     /// every following frame time out behind it too, a blank viewport.)
     pub fn wait_oldest(&mut self) {
+        self.wait_oldest_for(self.wait_slice);
+    }
+
+    /// [`Self::wait_oldest`], returning after `slice` at most.
+    pub fn wait_oldest_for(&mut self, slice: std::time::Duration) {
         let Some(front) = self.pending.front() else { return };
         if front.state.load(Ordering::Acquire) != MAP_PENDING {
             return;
         }
         let read = Arc::as_ptr(&front.state) as usize;
-        match self.device.poll(wgpu::PollType::Wait { submission_index: Some(front.submission.clone()), timeout: Some(self.wait_slice) }) {
+        match self.device.poll(wgpu::PollType::Wait { submission_index: Some(front.submission.clone()), timeout: Some(slice) }) {
             Ok(_) => {}
             Err(wgpu::PollError::Timeout) => {
-                if self.slow_warned != read {
+                if slice >= self.wait_slice && self.slow_warned != read {
                     log::warn!("GPU frame still running after {:?}; waiting", self.wait_slice);
                     self.slow_warned = read;
                 }
