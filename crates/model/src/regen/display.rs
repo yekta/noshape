@@ -553,7 +553,11 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
     // Interior spline control points (not curve endpoints).
     let mut handles = std::collections::HashSet::new();
     let mut ends = std::collections::HashSet::new();
+    // Points some other entity uses (one pass: asking per point was
+    // quadratic, a third of a 300-entity sketch's drag frame).
+    let mut used = std::collections::HashSet::new();
     for e in s.sketch.entities() {
+        used.extend(e.point_refs().iter().copied().filter(|p| *p != e.id));
         if let Some((a, b)) = e.endpoints() {
             ends.insert(a);
             ends.insert(b);
@@ -575,7 +579,7 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
                 continue;
             }
             let Some(p) = s.sketch.point(e.id) else { continue };
-            let standalone = s.sketch.users_of_point(e.id).is_empty();
+            let standalone = !used.contains(&e.id);
             let handle = handles.contains(&e.id) && !ends.contains(&e.id);
             points.push(SketchPointDisplay { entity: e.id.0, position: f3(frame.to_world(p)), state: state_of(e.id), standalone, handle, external: e.external });
         } else {

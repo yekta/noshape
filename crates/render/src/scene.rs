@@ -58,6 +58,10 @@ impl LineSegment {
     /// Onshape's inferred-direction dash over a sketch rubber band: 4 px on,
     /// 4 px off, starting 1.25 px from the segment's start (live sketch/51).
     pub const INFERRED: u32 = 16;
+    /// Depth tested but a little in front of other edges: wins over a line
+    /// drawn at the same place (a lit datum plane's border over the plane's
+    /// own), still hidden behind faces in front.
+    pub const LIFTED: u32 = 32;
 }
 
 impl LineData {
