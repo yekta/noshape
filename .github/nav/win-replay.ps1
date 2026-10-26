@@ -149,8 +149,11 @@ function Drag([int] $down, [int] $up, [double] $dx, [double] $dy, [double] $paus
 # finger jumped 60 px in one event, which Onshape's per-event pan rule
 # drops, as it would in Chrome). The repeats keep the injected contacts
 # alive (run 40287408478: contacts left without updates were cancelled).
-# Holds stay short and steps small: two fingers that stay within 10 px for
-# 750 ms start a box selection (run 40293268330, 400 ms holds).
+# Holds stay short and steps large: two fingers that stay within 10 px for
+# 750 ms start a box selection (runs 40293268330, 40299850729). Each
+# finger reports on its own, so a step may move a finger up to 50 px (pan:
+# squared moves differ by at most 2500) or 30 px (pinch, roll: the centre
+# moves at most 15 px) even when a few coalesce.
 function TouchFrame([int[]] $xy, [int] $flags, [int] $hold) {
   [Nav]::Touch($xy, $flags) | Out-Null
   for ($i = 0; $i -lt $hold; $i++) { Start-Sleep -Milliseconds 25; [Nav]::Touch($xy, (0x20000 -bor 0x2 -bor 0x4)) | Out-Null }
@@ -160,7 +163,7 @@ function TouchGesture([object[]] $from, [object[]] $to, [int] $steps) {
   $pt = { param($f, $t) $q = Screen ($f[0] + ($t[0] - $f[0]) * $args[0]) ($f[1] + ($t[1] - $f[1]) * $args[0]); $q }
   $frame = { param($t) $xy = @(); for ($k = 0; $k -lt $from.Count; $k++) { $xy += (& $pt $from[$k] $to[$k] $t) }; [int[]]$xy }
   TouchFrame (& $frame 0) (0x10000 -bor 0x2 -bor 0x4) 1
-  for ($k = 1; $k -le $steps; $k++) { TouchFrame (& $frame ($k / $steps)) (0x20000 -bor 0x2 -bor 0x4) 4 }
+  for ($k = 1; $k -le $steps; $k++) { TouchFrame (& $frame ($k / $steps)) (0x20000 -bor 0x2 -bor 0x4) 2 }
   Start-Sleep 0.05
   [Nav]::Touch((& $frame 1), 0x40000) | Out-Null
   Start-Sleep 1.2
@@ -174,8 +177,8 @@ Step 'right-drag-fling' { Drag 0x8 0x10 -200 0 0.0 }
 Step 'middle-drag' { Drag 0x20 0x40 200 100 0.1 }
 if ([Nav]::InitializeTouchInjection(10, 1)) {
   Step 'touch-rotate' { TouchGesture @(, @(0, 0)) @(, @(-200, 0)) 20 }
-  Step 'touch-pan' { TouchGesture @(@(-50, 0), @(50, 0)) @(@(100, 0), @(200, 0)) 30 }
-  Step 'touch-pinch' { TouchGesture @(@(-50, 0), @(50, 0)) @(@(-100, 0), @(100, 0)) 15 }
-  Step 'touch-roll' { TouchGesture @(@(-80, 0), @(80, 0)) @(@(-69.28, -40), @(69.28, 40)) 10 }
+  Step 'touch-pan' { TouchGesture @(@(-50, 0), @(50, 0)) @(@(100, 0), @(200, 0)) 15 }
+  Step 'touch-pinch' { TouchGesture @(@(-50, 0), @(50, 0)) @(@(-100, 0), @(100, 0)) 5 }
+  Step 'touch-roll' { TouchGesture @(@(-80, 0), @(80, 0)) @(@(-69.28, -40), @(69.28, 40)) 5 }
 } else { Write-Host '::warning::InitializeTouchInjection failed; touch steps skipped' }
 'win replay done'
