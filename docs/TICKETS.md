@@ -21,7 +21,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   document now segfaults on every open in the green app and both CLIs. Doc: /root/qa-scratch/tickets/cli-draft-segv.noshape; backtrace tickets/cli-draft-segv-bt.txt; the
   fuzz log /root/qa-scratch/cli/clifuzz-1.log has every step's args. Needs (1) the null guard / OCCT patch, (2) a crash in
   one feature must never make the document unopenable (run kernel ops so a signal fails the feature, or open with the
-  failing feature marked) (qa 2026-10-26, build 4d2f6b0c + main CLI)
+  failing feature marked). Frequent: seed 5 died the same way (same crash address) at its step 102 draft, i.e. 2 of 5
+  fuzz runs of ~120 random ops (qa 2026-10-26, build 4d2f6b0c + main CLI)
 - [ ] P0 TWO-PROCESS-LOST-EDIT the same .noshape opened by two app processes (e.g. `noshape doc.noshape` twice, or a
   file-manager double-click while it's open) gives two independent windows; edits from both are written, but the later
   writer's microversion takes the earlier one as parent while carrying its own stale state, so the earlier edit silently

@@ -86,7 +86,7 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
 - psui: TAB-NO-PREVIEW, DCLICK-HEAVY (P1); DELETE-TAB-DIALOG, LOFT-PROFILE-LIST, PERF-SECTION-PANIC (P2); carried over
   qa5's P1-8 caveat, P1-10.
 - dx: API-HOLE-STYLE (P1), API-REMOVE-SCOPE, VERSION-0.4.6, RHINO-GREEN (P2), USER_GUIDE undo sentence (P3).
-- Live requests open (REQUESTS.md "qa (2026-10-26 …)"): drawing title block MATERIAL/WEIGHT.
+- Live requests: none open (title block: live's ANSI templates have no MATERIAL/WEIGHT fields either = ours).
 - skasm: carried over qa5's P1-4 data.
 
 ## qa4 round-5 routed items re-checked on green 4d2f6b0c (2026-10-26 22:00)
