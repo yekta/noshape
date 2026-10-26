@@ -115,3 +115,6 @@ then edits, undo/redo, rollback and suppress.
 | Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✗ **P2-A4** (skb) |
 | Mate type → Revolute | Offset, Limits (rotation min / max kept); row "Revolute 1"; Z offset 0 (the pin rises to mid-height) | same (behaviours 5942) | ✅ |
 | Fix the plate, drag the revolute pin | rotates only: axis stays on hole 1 (0.002 mm), plate unchanged; the copy follows | behaviours 5948 (1) | ✅ |
+| Mate row right-click (hidden Revolute) | Rename, Edit…, Reset / Show, Show all mates, Isolate…, Make transparent… / Edit named position driver mate… / Suppress, Dynamic suppression ▸ / Animate… / Add selection to folder… / Expand ▸, Collapse ▸ / Delete | same (behaviours 1361; Add comment is cloud) | ✅ |
+| Suppress the mate | row grey struck-through, not italic; the pin drags freely out of the hole | grey italic struck-through | ✗ **P2-A5** (skb, minor) |
+| Ctrl+Z / Ctrl+Y on the suppress | unsuppressed / suppressed again | — | ✅ |

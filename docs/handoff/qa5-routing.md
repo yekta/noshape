@@ -794,3 +794,7 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   after ✓ it is back and follows the seed. Also during that edit the seed pin shows **z-fighting stripes** (orange preview
   over the grey original at the same place, a28-32). Live keeps every instance drawn while a mate is edited (no capture
   shows instances vanishing; asked in "qa5 (10-26 p6)" only for the toast, so treat this as a plain bug).
+- **P2-A5 — skb (assembly list), minor** — a suppressed mate row ("Revolute 1" › Suppress) is drawn grey with strike-through
+  but **not italic**; live: **grey italic struck-through** (behaviours 1297, assembly/198; also 1339 for instances and their
+  mates). Code: assembly_view.rs:3533 mate rows (`line_through` only), :3326 instance rows (italic only when dynamically
+  suppressed), assembly_panels.rs:889 pattern rows. Part Studio rows already do italic + line-through (part_studio/mod.rs:3572).
