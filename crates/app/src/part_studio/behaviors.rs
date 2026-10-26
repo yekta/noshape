@@ -390,6 +390,9 @@ pub struct UiState {
     pub dim_invalid: bool,
     /// The translate triad's hovered handle and running drag (triad.rs).
     pub triad_hover: Option<usize>,
+    /// The pattern instance point under the pointer while "Instances to
+    /// skip" is active (its index).
+    pub toggle_hover: Option<(i64, i64)>,
     pub triad_drag: Option<super::triad::TriadDrag>,
     /// Parts an open Transform moves (not copies): drawn moved and
     /// display-only, with the original as a faded, selectable ghost.
@@ -596,6 +599,7 @@ impl UiState {
             dim_box_offset: Point::default(),
             dim_invalid: false,
             triad_hover: None,
+            toggle_hover: None,
             triad_drag: None,
             transform_ghost: Vec::new(),
             dg_renaming: None,
@@ -767,9 +771,10 @@ impl PartStudioView {
         let mut out = self.variable_users(cx);
         // A hovered Characteristics row lights up its feature (live tl-99a).
         out.extend(self.ui.insp.hover_feature);
-        // In a feature dialog: what its fields picked (live part-studio/440:
-        // Part 1 in Transform's field lights up Extrude 1).
-        let picked = self.edit.as_ref().map(|e| e.dialog.read(cx).selected_refs());
+        // In a feature dialog: what its active field picked (live
+        // part-studio/440: Part 1 in Transform's field lights up Extrude 1;
+        // psui/m-03: not while another field is active).
+        let picked = self.edit.as_ref().map(|e| e.dialog.read(cx).active_refs());
         for r in picked.as_ref().unwrap_or(&self.selection) {
             match r {
                 Reference::Body(b) => {

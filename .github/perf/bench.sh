@@ -4,7 +4,9 @@
 #   bench.sh <noshape binary> <document> <output dir> <modes...>
 #
 # For every presentation mode (`texture`, `readback`) and bench kind (orbit,
-# zoom, pan) the app opens a fresh copy of the document with NOSHAPE_PERF=1 and the
+# zoom, pan; `BENCH_ENV` NOSHAPE_PERF_BENCH=drag makes every run a tool drag
+# of what is under the viewport centre, for assemblies) the app opens a fresh
+# copy of the document with NOSHAPE_PERF=1 and the
 # built-in benchmark (viewport.rs `OrbitBench`), which logs a `BENCH SUMMARY`
 # line. Screenshots: `<mode>-still.png` of the settled view before the orbit
 # starts (the correctness check compares these across modes) and two taken

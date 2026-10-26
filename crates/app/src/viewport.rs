@@ -399,8 +399,12 @@ struct OrbitBench {
     started: Option<Instant>,
     frames_at_start: u64,
     last_present: Option<Instant>,
-    /// `NOSHAPE_PERF_BENCH=zoom|pan`: scroll-zoom or pan instead of orbiting.
+    /// `NOSHAPE_PERF_BENCH=zoom|pan|drag`: scroll-zoom, pan or a tool drag
+    /// instead of orbiting.
     kind: BenchKind,
+    /// Drag: where the tool grabbed, and ticks spent waiting for the hover.
+    grab: Option<DVec2>,
+    hover_wait: u32,
     ticks: u64,
     /// GPUI renders of the viewport (window re-renders) during the run.
     renders: u64,
@@ -425,6 +429,9 @@ enum BenchKind {
     Orbit,
     Zoom,
     Pan,
+    /// The tool drags what is under the viewport centre back and forth
+    /// (an assembly instance: solve, scene move, frame), as a mouse would.
+    Drag,
 }
 
 static BENCH_CLAIMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -434,7 +441,13 @@ fn orbit_bench_from_env() -> Option<OrbitBench> {
     if BENCH_CLAIMED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         return None;
     }
-    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, kind: BenchKind::Orbit, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, window_draw: Vec::new(), drawable_wait: Vec::new(), draw_at_present: None, fitted: false, last_tick: None })
+    let kind = match std::env::var("NOSHAPE_PERF_BENCH").as_deref() {
+        Ok("zoom") => BenchKind::Zoom,
+        Ok("pan") => BenchKind::Pan,
+        Ok("drag") => BenchKind::Drag,
+        _ => BenchKind::Orbit,
+    };
+    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, kind, grab: None, hover_wait: 0, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, window_draw: Vec::new(), drawable_wait: Vec::new(), draw_at_present: None, fitted: false, last_tick: None })
 }
 
 impl EventEmitter<ViewportEvent> for Viewport {}
@@ -1359,20 +1372,42 @@ impl Viewport {
                 self.zoom_to_fit(false, cx);
                 return true;
             }
+            if b.kind == BenchKind::Drag && b.grab.is_none() {
+                // Point at the centre until the hover pick finds something there.
+                let waited = b.hover_wait;
+                b.hover_wait += 1;
+                let centre = self.size() * 0.5;
+                if self.hover.is_none() {
+                    if waited >= 300 {
+                        log::warn!(target: "perf", "drag bench: nothing under the viewport centre");
+                        self.bench = None;
+                        return false;
+                    }
+                    if waited % 30 == 0 {
+                        self.pointer_inside = true;
+                        self.last_pos = centre;
+                        self.request_hover();
+                    }
+                    return true;
+                }
+                if let Some(b) = &mut self.bench {
+                    b.grab = Some(centre);
+                }
+                cx.emit(ViewportEvent::ToolDown { position: centre, modifiers: Modifiers::default(), click_count: 1 });
+            }
+            let Some(b) = &mut self.bench else { return false };
             log::info!(target: "perf", "orbit bench: start ({} frames, {} instances, {:.0}x{:.0} logical px, scale {})", b.frames, self.scene.instances.len(), f32::from(self.bounds.size.width), f32::from(self.bounds.size.height), self.scale);
             noshape_render::perf::reset();
             noshape_render::perf::series_start("r.gpu_ms");
             b.started = Some(Instant::now());
             b.frames_at_start = self.frames_presented;
-            b.kind = match std::env::var("NOSHAPE_PERF_BENCH").as_deref() {
-                Ok("zoom") => BenchKind::Zoom,
-                Ok("pan") => BenchKind::Pan,
-                _ => BenchKind::Orbit,
-            };
-            if b.kind != BenchKind::Zoom {
-                self.drag = Drag::Nav;
+            match b.kind {
+                BenchKind::Zoom => {}
+                BenchKind::Drag => self.drag = Drag::Tool,
+                BenchKind::Orbit | BenchKind::Pan => self.drag = Drag::Nav,
             }
         }
+        let Some(b) = &mut self.bench else { return false };
         let presented = self.frames_presented - b.frames_at_start;
         if presented >= b.frames {
             let el = b.started.map(|t| t.elapsed().as_secs_f64()).unwrap_or(1.0);
@@ -1395,6 +1430,7 @@ impl Viewport {
                     BenchKind::Orbit => "orbit",
                     BenchKind::Zoom => "zoom",
                     BenchKind::Pan => "pan",
+                    BenchKind::Drag => "drag",
                 },
                 match (self.shown_texture.is_some(), bench_driven_by_frames()) {
                     (true, false) => "frames on the GPU",
@@ -1413,6 +1449,9 @@ impl Viewport {
                 wait.mean, wait.p95,
             );
             noshape_render::perf::flush();
+            if let Some(g) = b.grab {
+                cx.emit(ViewportEvent::ToolUp { position: g, modifiers: Modifiers::default() });
+            }
             self.bench = None;
             self.drag = Drag::None;
             self.pick_dirty = true;
@@ -1425,7 +1464,7 @@ impl Viewport {
         if let Some(t) = b.last_tick.replace(now) {
             noshape_render::perf::record("v.bench_tick", now - t);
         }
-        let (kind, ticks) = (b.kind, b.ticks);
+        let (kind, ticks, grab) = (b.kind, b.ticks, b.grab);
         let size = self.size();
         let h = size.y;
         match kind {
@@ -1437,6 +1476,13 @@ impl Viewport {
             // A drag back and forth that keeps the model in view.
             BenchKind::Pan => self.camera.pan(if (ticks / 30) % 2 == 0 { DVec2::new(6.0, 2.0) } else { DVec2::new(-6.0, -2.0) }, h),
             BenchKind::Orbit => self.camera.orbit(DVec2::new(3.0, 0.75), h),
+            // A triangle wave ±60 px about the grab point; the camera stays.
+            BenchKind::Drag => {
+                let phase = (ticks % 120) as f64;
+                let dx = 2.0 * if phase < 60.0 { phase } else { 120.0 - phase } - 60.0;
+                cx.emit(ViewportEvent::ToolDrag { position: grab.unwrap_or_default() + DVec2::new(dx, 0.0) });
+                return true;
+            }
         }
         self.camera_changed(cx);
         true
