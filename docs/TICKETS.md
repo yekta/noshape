@@ -123,6 +123,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   0 mm matches ("Failed to extrude selections, check input.", no pink) (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P2 MENU-SKETCH-TAG feature row menu: ours "Edit Boss sketch 1 [Sketch]…" for a custom-named sketch; live "Edit Boss
   sketch 1…" (no type tag; behaviours "qa (2026-10-26, P2 batch)" (2)) (qa 2026-10-26, build 4d2f6b0c)
+- [ ] P2 PANEL-BLEED with a feature dialog open (Revolve, Shift+W), Shift+D opens the Dihedral analysis panel on top of it,
+  and the Revolve dialog's rows ("Faces and sketch regions to revolve", the clock button, "Full revolve") show through
+  the analysis panel's body (tickets/dihedral-over-revolve.png); the panel also comes back with the previous run's pick
+  ("Edge of Chamfer 4"). Either the panel must be opaque or the analysis tool must replace the feature dialog as live
+  does for tool switches (live: Shift+E with a dialog open replaces it, behaviours 7371) (qa 2026-10-26, build 4d2f6b0c)
 
 ## Sketch + assembly (skasm)
 - [ ] P1 SKETCH-DRAG-BIG dragging a corner in a 1000-entity sketch (10 × 10 rectangles + 100 circles, made with

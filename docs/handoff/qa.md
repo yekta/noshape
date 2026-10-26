@@ -35,6 +35,10 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
   the green copy or keep binaries deeper (the v0.4.8 release is in /root/qa-scratch/rel/k/v048/…, depth 5).
 - The watcher's own CLI build (target-lead, ~20:18, main d62f25e2/c9540ae6, not green) is copied to
   /root/qa-scratch/rel/k/main/x/noshape-cli (`NSCLI=… python3 …` with nscli.Cli(os.environ['NSCLI'])).
+- "View in high quality" on this llvmpipe box makes viewport frames take > 10 s ("GPU frame still running after 10s;
+  waiting"); the UI then stops taking input for a minute and replays the queued clicks. Click Disable on the blue bar.
+- UI fuzzer: /root/qa-scratch/bin/fuzz.py <seed> <n> (random keys / clicks / drags on :110 against the pid in
+  /tmp/qa_fzpid; actions logged to /root/qa-scratch/fuzz-actions.log). Seed 1 × 300: no crash.
 - Don't run the app with NOSHAPE_PERF=1 when testing section views (PERF-SECTION-PANIC freezes the viewport).
 - Mind dialog layout shifts: once a selection chip is added, every row below moves down ~16 px; screenshot before
   clicking a field.
