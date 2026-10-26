@@ -98,6 +98,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   with a red chevron but never gets focus. live (behaviours "qa4 round 5 s7 dialogs"): on ticking, Extrude direction is
   the active field (border rgb(22,81,176), fill rgb(222,241,251)), title red rgb(170,37,45), chevron rgb(189,48,57);
   after a pick focus moves on (qa 2026-10-26)
+- [ ] P2 CHIP-HOVER (qa4 round 5, still open on green) hovering a selection chip in a feature dialog (e.g. "Face of
+  Sketch 1" in Extrude 1) shows the chip's tooltip but the viewport doesn't change at all (pixel-identical); live turns the
+  hovered chip's entity yellow-green #f2ff80 (qa 2026-10-26)
+- [ ] P2 FOLDER-NAME-INLINE (qa4 round 5, still open on green) feature rows › Add selection to folder… opens a separate
+  "Folder name" box (tickets/folder-name-box-ours.png); live names the new folder inline in its row (input prefilled
+  "New folder"); the separate box belongs to the header's New folder button (behaviours "qa4 round 5 s8") (qa 2026-10-26)
 
 ## Sketch + assembly (skasm)
 - [ ] P2 P1-4 data (qa5, carried over) sketches keep a hidden construction "Origin stand-in" point at (0,0) carrying the

@@ -61,9 +61,8 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 Fixed ✅: DRAG-RUNAWAY (19-cube planar stack: only the dragged cube moves), SUPPRESSED-MENU, SKETCH-UNCONSUMED (docs made
 by this build; docs made by older builds keep a sticky Hide), TOOLTIP-PARENT, ERR-MISSING-REGION ("Select face or sketch
 region to extrude." + "1 missing selection"), CHAMFER-OVERFLOW (25 on a 20 mm edge OK; v0.4.8 still fails), SECTION-MANIP
-(ring + arrow + rotate glyph), empty rename → default name. Still open: EXT-DIRECTION (ticket). Not re-checked yet:
-SEL-REJECT-TOAST, CHIP-HOVER, BOX-PREHIGHLIGHT, SELECT-OTHER, READOUT-AXES, MIDPOINT-MARKER, FOLDER-NAME-INLINE,
-FOLDER-MENU, FOLDER-EXPAND-UNDO, EXT-2ND-DEPTH, ORD-BASE, EXPORT-DXF-OPTIONS.
+(ring + arrow + rotate glyph), empty rename → default name, SELECT-OTHER, BOX-PREHIGHLIGHT. Still open (tickets):
+EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST, READOUT-AXES, MIDPOINT-MARKER, FOLDER-MENU, FOLDER-EXPAND-UNDO, EXT-2ND-DEPTH, ORD-BASE, EXPORT-DXF-OPTIONS.
 
 ## To verify on the next green (fixed on main by qa5 after green 4d2f6b0c)
 P1-1, P1-8, P1-9, P1-17, P1-18, P2-A2…A8, P2-D2, P2-D3 (docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26
