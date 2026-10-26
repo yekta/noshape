@@ -347,9 +347,8 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 };
                 let mesh = match opts.display_mode {
                     DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color).zebra(opts.zebra.filter(|_| replaced.is_none())).reflection(opts.reflection.clone().filter(|_| replaced.is_none())),
-                    // Onshape (part-studio/62): the shaded part at ~35% in sRGB,
-                    // which is ~0.48 in the renderer's linear blending.
-                    DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
+                    // Onshape (part-studio/62): the shaded part at ~35%.
+                    DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.35)]),
                     // Faces drawn flat in the background color hide what is behind
                     // them (live part-studio/61: white, unlit, only the edges show).
                     DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)).unlit(),
@@ -673,14 +672,13 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             if !mesh.indices.is_empty() {
                 // The sketch being edited shows its closed regions filled
                 // (`#9aa5af`; live sketch/17: rgb(221,226,230) over the plane's
-                // rgb(245,248,250), which our linear blending reaches at 0.34).
-                // Dark: `#f2f2f2` at 20% (`--os-sketch-face-color`), #616161
-                // over one plane's #3d3d3d: 0.09 in linear light.
+                // rgb(245,248,250): 0.265). Dark: `#f2f2f2` at 20%
+                // (`--os-sketch-face-color`), #616161 over one plane's #3d3d3d.
                 let fill = if editing {
                     let c = theme::lin(theme::pick(theme::viewport::SKETCH_REGION, theme::viewport_dark::SKETCH_REGION));
                     // Flat: lit, the fill came out darker and grayer
                     // ((215,218,221) over the plane).
-                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], theme::pick(0.34, 0.09)]).unlit()
+                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], theme::pick(0.265, 0.2)]).unlit()
                 } else {
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 0.0]).pick_only()
                 };
