@@ -62,6 +62,10 @@ impl LineSegment {
     /// drawn at the same place (a lit datum plane's border over the plane's
     /// own), still hidden behind faces in front.
     pub const LIFTED: u32 = 32;
+    /// A part edge: hovered or selected itself (not as a face's boundary,
+    /// state OUTLINE) it keeps a dark core under the highlight (live
+    /// selection/06b, 07b).
+    pub const CORE: u32 = 64;
 }
 
 impl LineData {
@@ -686,7 +690,7 @@ pub fn edge_line_lods(edges: &[Vec<[f32; 3]>], diagonal: f32) -> Vec<LineData> {
         .map(|t| {
             let mut l = LineData::default();
             for (ei, pl) in edges.iter().enumerate() {
-                l.push_polyline(&simplify_polyline(pl, t * diagonal), [0, 0, 0, 255], ei as u32 + 1, 1.25, 0);
+                l.push_polyline(&simplify_polyline(pl, t * diagonal), [0, 0, 0, 255], ei as u32 + 1, 1.25, LineSegment::CORE);
             }
             l
         })

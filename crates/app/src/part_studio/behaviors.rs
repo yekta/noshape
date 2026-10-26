@@ -2114,14 +2114,9 @@ impl PartStudioView {
                 return Arc::new(d);
             }
         }
-        // Show dimensions: the parts turn see-through (Onshape).
-        if self.ui.shown_dims.is_some() {
-            let mut d = (*self.display).clone();
-            for b in &mut d.bodies {
-                b.color[3] = b.color[3].min(0.35);
-            }
-            return Arc::new(d);
-        }
+        // Show dimensions leaves the parts opaque (live part-studio/40 vs
+        // selection/02: no hidden edges show, the top face is unchanged and
+        // the side faces read 5–8 levels lighter at most).
         let Some(iso) = &self.ui.isolate else { return self.display.clone() };
         let transparent = self.isolation_transparent();
         let look = iso_look(iso.opacity);
