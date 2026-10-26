@@ -159,6 +159,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Horizontal/Vertical constraints (sketch_get lists it); live constrains to the external Origin (qa5 2026-10-26)
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 API-DERIVED-BY-NAME feature_add importDerived with `partStudio: "Part Studio 1"` (the tab's name) is accepted and
+  the feature fails "Error regenerating."; only the tab id works. Accept the name as tab_* ops do, or refuse it as an
+  invalid_argument naming the expected id (main CLI ~20:18) (qa 2026-10-26)
 - [ ] P2 OPEN-ERROR-SILENT `noshape bad.noshape` with a truncated file ("sqlite: database disk image is malformed") or a
   non-noshape file ("not a noshape document") opens the Documents window with no message; the error is only in the log.
   Show it (an error dialog/toast naming the file and the reason) (qa 2026-10-26, build 4d2f6b0c)
