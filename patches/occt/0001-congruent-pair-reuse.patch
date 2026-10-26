@@ -448,7 +448,7 @@
        // Warn about failed intersection of sub-shapes
 --- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
 +++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
-@@ -75,6 +75,10 @@
+@@ -75,6 +75,11 @@
  #include <TopoDS_Vertex.hxx>
  #include <TopoDS_Shape.hxx>
  #include <TopTools_ShapeMapHasher.hxx>
@@ -456,10 +456,11 @@
 +#include <cstdio>
 +#include <string>
 +#include <unordered_map>
++#include <vector>
  class BOPDS_PaveBlock;
  
  static double ToleranceFF(const BRepAdaptor_Surface& aBAS1, const BRepAdaptor_Surface& aBAS2);
-@@ -202,7 +206,7 @@
+@@ -202,7 +207,7 @@
    void Perform() override
    {
      Message_ProgressScope aPS(myProgressRange, nullptr, 1);
@@ -468,7 +469,7 @@
      {
        return;
      }
-@@ -212,7 +216,17 @@
+@@ -212,7 +217,17 @@
  
        gp_Trsf     aTrsf;
        TopoDS_Face aF1 = myF1, aF2 = myF2;
@@ -487,7 +488,7 @@
        {
          // Shapes are located far from origin, move the shapes to the origin,
          // to increase the accuracy of intersection.
-@@ -264,6 +278,47 @@
+@@ -264,6 +279,47 @@
      }
    }
  
@@ -535,7 +536,7 @@
    //
  protected:
    int         myIF1;
-@@ -274,8 +329,25 @@
+@@ -274,8 +330,25 @@
    Bnd_Box     myBox1;
    Bnd_Box     myBox2;
    gp_Trsf     myTrsf;
@@ -561,7 +562,7 @@
  //=================================================================================================
  
  typedef NCollection_DynamicArray<BOPAlgo_FaceFace> BOPAlgo_VectorOfFaceFace;
-@@ -361,6 +433,9 @@
+@@ -361,6 +434,9 @@
  
    // Prepare the pairs of faces for intersection
    BOPAlgo_VectorOfFaceFace aVFaceFace;
@@ -571,7 +572,7 @@
    myIterator->Initialize(TopAbs_FACE, TopAbs_FACE);
    for (; myIterator->More(); myIterator->Next())
    {
-@@ -505,6 +580,19 @@
+@@ -505,6 +581,19 @@
        //
        aFaceFace.SetParameters(bApprox, bCompC2D1, bCompC2D2, anApproxTol);
        aFaceFace.SetFuzzyValue(myFuzzyValue);
@@ -591,7 +592,7 @@
      }
      else
      {
-@@ -542,6 +630,11 @@
+@@ -542,6 +631,11 @@
      }
      BOPAlgo_FaceFace& aFaceFace = aVFaceFace(k);
      aFaceFace.Indices(nF1, nF2);
@@ -603,7 +604,7 @@
      if (!aFaceFace.IsDone() || aFaceFace.HasErrors())
      {
        BOPDS_InterfFF& aFF = aFFs.Appended();
-@@ -555,9 +648,12 @@
+@@ -555,9 +649,12 @@
      bool   bTangentFaces = aFaceFace.TangentFaces();
      double aTolFF        = aFaceFace.TolFF();
      //
@@ -619,3 +620,135 @@
      //
      const NCollection_Sequence<IntTools_Curve>&       aCvsX  = aFaceFace.Lines();
      const NCollection_Sequence<IntTools_PntOn2Faces>& aPntsX = aFaceFace.Points();
+@@ -644,6 +741,90 @@
+   }
+ }
+ 
++// noshape: GetStickVertices for many face pairs. The interferences that
++// made a new vertex, by the shapes taking part (built once): a face pair
++// looks at those of its own sub-shapes instead of every interference of the
++// DS (quadratic: 43,000 face pairs against 800,000 interferences in a
++// diamond knurl).
++namespace
++{
++struct StickIndex
++{
++  // shape index -> (type 0..4 = VV, VE, EE, VF, EF; interference index)
++  std::unordered_map<int, std::vector<std::pair<int, int>>> by;
++};
++
++StickIndex MakeStickIndex(BOPDS_DS* theDS)
++{
++  StickIndex aX;
++  auto       add = [&](int theType, int theI, const BOPDS_Interf& theInt) {
++    if (!theInt.HasIndexNew())
++      return;
++    int n1, n2;
++    theInt.Indices(n1, n2);
++    aX.by[n1].emplace_back(theType, theI);
++    if (n2 != n1)
++      aX.by[n2].emplace_back(theType, theI);
++  };
++  for (int i = 0; i < theDS->InterfVV().Length(); ++i)
++    add(0, i, theDS->InterfVV()(i));
++  for (int i = 0; i < theDS->InterfVE().Length(); ++i)
++    add(1, i, theDS->InterfVE()(i));
++  for (int i = 0; i < theDS->InterfEE().Length(); ++i)
++    add(2, i, theDS->InterfEE()(i));
++  for (int i = 0; i < theDS->InterfVF().Length(); ++i)
++    add(3, i, theDS->InterfVF()(i));
++  for (int i = 0; i < theDS->InterfEF().Length(); ++i)
++    add(4, i, theDS->InterfEF()(i));
++  return aX;
++}
++
++const BOPDS_Interf& StickInterf(BOPDS_DS* theDS, int theType, int theI)
++{
++  switch (theType)
++  {
++    case 0:
++      return theDS->InterfVV()(theI);
++    case 1:
++      return theDS->InterfVE()(theI);
++    case 2:
++      return theDS->InterfEE()(theI);
++    case 3:
++      return theDS->InterfVF()(theI);
++    default:
++      return theDS->InterfEF()(theI);
++  }
++}
++// The new vertices of the interferences among the sub-shapes `theMI` of a
++// face pair (GetStickVertices' result).
++void StickVertices(BOPDS_DS*                   theDS,
++                   const StickIndex&           theX,
++                   const NCollection_Map<int>& theMI,
++                   NCollection_Map<int>&       theMVStick,
++                   NCollection_Map<int>&       theMVEF)
++{
++  for (NCollection_Map<int>::Iterator aItS(theMI); aItS.More(); aItS.Next())
++  {
++    const auto aIt = theX.by.find(aItS.Value());
++    if (aIt == theX.by.end())
++      continue;
++    for (const auto& [aType, aI] : aIt->second)
++    {
++      const BOPDS_Interf& aInt = StickInterf(theDS, aType, aI);
++      int                 nS1, nS2;
++      aInt.Indices(nS1, nS2);
++      if (!theMI.Contains(nS1) || !theMI.Contains(nS2))
++        continue;
++      int nVNew = aInt.IndexNew();
++      theDS->HasShapeSD(nVNew, nVNew);
++      theMVStick.Add(nVNew);
++      if (aType == 4)
++        theMVEF.Add(nVNew);
++    }
++  }
++}
++} // namespace
++
+ //=================================================================================================
+ 
+ void BOPAlgo_PaveFiller::MakeBlocks(const Message_ProgressRange& theRange)
+@@ -722,6 +903,7 @@
+   // some of Face-Face intersections to avoid missing section edges
+   // aNbFF will be increased to the number of potentially problematic Face-Face intersections
+   const int aNbFFPrev = aNbFF;
++  const StickIndex aStick = MakeStickIndex(myDS);
+   for (i = 0; i < aNbFF; ++i, aPS.Next())
+   {
+     if (UserBreak(aPS))
+@@ -791,7 +973,11 @@
+     }
+     //
+     // 2. Treat Curves
+-    GetStickVertices(nF1, nF2, aMVStick, aMVEF, aMI);
++    // noshape: GetStickVertices through the index (same result).
++    aMI.Clear();
++    GetFullShapeMap(nF1, aMI);
++    GetFullShapeMap(nF2, aMI);
++    StickVertices(myDS, aStick, aMI, aMVStick, aMVEF);
+     //
+     for (j = 0; j < aNbC; ++j)
+     {
+@@ -1201,6 +1387,7 @@
+   //
+ 
+   // Find unused vertices
++  const StickIndex                                              aStick = MakeStickIndex(myDS);
+   NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> VertsUnused;
+   NCollection_Map<int>                                          IndMap;
+   for (int i = 0; i < aNbFF; i++)
+@@ -1210,7 +1397,10 @@
+     aFF.Indices(nF1, nF2);
+ 
+     NCollection_Map<int> aMV, aMVEF, aMI;
+-    GetStickVertices(nF1, nF2, aMV, aMVEF, aMI);
++    // noshape: GetStickVertices through the index (same result).
++    GetFullShapeMap(nF1, aMI);
++    GetFullShapeMap(nF2, aMI);
++    StickVertices(myDS, aStick, aMI, aMV, aMVEF);
+     NCollection_DynamicArray<BOPDS_Curve>& aVC = aFF.ChangeCurves();
+     RemoveUsedVertices(aVC, aMV);
+ 
