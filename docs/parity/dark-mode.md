@@ -31,7 +31,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-913b-create-menu-hover | | | ☐ |
 | dk-914-new-document-modal | | | ☐ |
 | dk-915-state | | | ☐ |
-| dk-920-partstudio | dk2/dk3 | viewport #333, planes, cube, navbar, toolbar, rail #2c2c2c, panel #333 = live; static icons outlined (icons2) | ◐ icons |
+| dk-920-partstudio | dk2/dk3 | viewport #333, planes, cube, navbar, toolbar, rail #2c2c2c, panel #333 = live; toolbar icons = live dk-921 (icons2, re-checked 10-26) | ☑ |
 | dk-921-partstudio | | | ☐ |
 | dk-922-feature-hover | | | ☐ |
 | dk-923-feature-selected | | | ☐ |
@@ -45,7 +45,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-931-sketch-line | dksk2 | under-defined #3e94ff, sketch box #90cef1, white origin; regions #f2f2f2 at 20% (#616161 on a plane) | ☑ |
 | dk-932-sketch-dimension |  | dimension lines white (scene); edit box follows the palette | ◐ box not compared |
 | dk-933-sketch-after |  | dimension values white, driven #ccc, conflicts #ff6b6b | ☑ |
-| dk-940-assembly | dkasm | chrome, list and viewport match; static icons outlined (icons2) | ◐ icons |
+| dk-940-assembly | dkasm | chrome, list and viewport match; toolbar icons = live (icons2, re-checked 10-26; the Search tools box sits ~2 px right: ui) | ☑ |
 | dk-941-mate-dialog | | | ☐ |
 | dk-942-bom | | | ☐ |
 | dk-950-drawing | dkdraw | shell dark (navbar, rail, tab bar), toolbar, sheet surround and sheet light | ☑ |
@@ -117,7 +117,7 @@ theme in dom/icons2-dark-icon-fills.json). Ours: literal fills/strokes (#333 ×9
 Primary buttons stay #1651b0 in dark (kit theme pinned; live Create, Share, Try Professional); a disabled one is
 #1651b0 at 40% (#283f65, text #858585: button_disabled roles for the solid ones, static colours under the 40%
 opacity ones); "My account" in emphasis #90cef1; links #b2ddf6 (link role); the beta pill static #1651b0.
-Open: the (?) help icon reads darker than live's #d6d6d6 (icons2: help-gray dark art).
+The (?) help icon: dark/help-gray.svg, solid #d6d6d6 as live (icons2, 4722be7c).
 
 ## Lead conditions (10-22)
 - Light mode: one relaxed atomic load in rgb()/rgba() (drafts/color_hook.rs: `HEX_THEME_ON` + `#[cold]` slow path).
