@@ -142,12 +142,31 @@ function Drag([int] $down, [int] $up, [double] $dx, [double] $dy, [double] $paus
   [Nav]::Mouse($up, 0)
   Start-Sleep $(if ($pause -lt 0.05) { 1.2 } else { 0.2 })
 }
+# The touch events the app has logged in its trace so far (read shared: the
+# app keeps the file open).
+function TouchCount {
+  $fs = [IO.FileStream]::new($Trace, 'Open', 'Read', 'ReadWrite')
+  try { $text = [IO.StreamReader]::new($fs).ReadToEnd() } finally { $fs.Dispose() }
+  ([regex]::Matches($text, '"input":"touch"')).Count
+}
+# Send a touch frame and wait (up to 2 s) until the app has handled it, so
+# each frame reaches it on its own: on the runners' software renderer a
+# frame can take ~150 ms, and Windows coalesces the touch updates sent
+# meanwhile (run 40268926730: touch-pan's finger jumped 60 px in one event,
+# which Onshape's per-event pan rule drops, as it would in Chrome).
+function TouchFrame([int[]] $xy, [int] $flags, [int] $fingers) {
+  $before = TouchCount
+  [Nav]::Touch($xy, $flags) | Out-Null
+  $deadline = (Get-Date).AddSeconds(2)
+  while ((TouchCount) -lt $before + $fingers -and (Get-Date) -lt $deadline) { Start-Sleep 0.01 }
+  Start-Sleep 0.016
+}
 function TouchGesture([object[]] $from, [object[]] $to, [int] $steps) {
   # $from / $to: arrays of logical (dx, dy) offsets from the viewport centre per finger.
   $pt = { param($f, $t) $q = Screen ($f[0] + ($t[0] - $f[0]) * $args[0]) ($f[1] + ($t[1] - $f[1]) * $args[0]); $q }
   $frame = { param($t) $xy = @(); for ($k = 0; $k -lt $from.Count; $k++) { $xy += (& $pt $from[$k] $to[$k] $t) }; [int[]]$xy }
-  [Nav]::Touch((& $frame 0), 0x10000 -bor 0x2 -bor 0x4) | Out-Null; Start-Sleep 0.016
-  for ($k = 1; $k -le $steps; $k++) { [Nav]::Touch((& $frame ($k / $steps)), 0x20000 -bor 0x2 -bor 0x4) | Out-Null; Start-Sleep 0.016 }
+  TouchFrame (& $frame 0) (0x10000 -bor 0x2 -bor 0x4) $from.Count
+  for ($k = 1; $k -le $steps; $k++) { TouchFrame (& $frame ($k / $steps)) (0x20000 -bor 0x2 -bor 0x4) $from.Count }
   Start-Sleep 0.05
   [Nav]::Touch((& $frame 1), 0x40000) | Out-Null
   Start-Sleep 1.2
