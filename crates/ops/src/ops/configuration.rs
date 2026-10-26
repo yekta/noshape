@@ -339,8 +339,20 @@ fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let units = od.doc().settings.units;
     let ps = doc::studio(od.doc(), tab)?;
     let mut chosen = if a.bool_or("reset", false)? { Default::default() } else { od.active_config.get(&tab).cloned().unwrap_or_default() };
-    for (key, v) in a.object("values")?.into_iter().flatten() {
-        let field = format!("values.{key}");
+    if let Some(values) = a.object("values")? {
+        chosen.0.extend(studio_values(ps, &units, values, "values")?.0);
+    }
+    od.active_config.insert(tab, chosen);
+    Ok(json!({ "active": active(od, tab)?, "regeneration": regen_report(od, tab)? }).into())
+}
+
+/// Configuration values given by input and option ids or names
+/// ({"Size": "Large"}), checked: what config_activate and the queries'
+/// `configuration` take.
+pub(crate) fn studio_values(ps: &noshape_model::partstudio::PartStudio, units: &noshape_units::UnitPrefs, values: &serde_json::Map<String, Value>, field_prefix: &str) -> Result<noshape_model::configuration::ConfigValues, OpError> {
+    let mut out = noshape_model::configuration::ConfigValues::default();
+    for (key, v) in values {
+        let field = format!("{field_prefix}.{key}");
         let id = find_input(ps, key, &field)?;
         let input = ps.configuration.inputs.iter().find(|i| i.id == id).expect("found");
         let value = match (&input.kind, v) {
@@ -350,9 +362,9 @@ fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             (ConfigInputKind::Variable { kind, .. }, v) => {
                 let t = text(v, &field)?;
                 if let Some(dim) = config::kind_dim(*kind) {
-                    noshape_units::evaluate_as(&t, dim, &units, &noshape_units::EmptyScope).map_err(|e| OpError::param(&field, &e.to_string()))?;
+                    noshape_units::evaluate_as(&t, dim, units, &noshape_units::EmptyScope).map_err(|e| OpError::param(&field, &e.to_string()))?;
                 }
-                if let Some(msg) = config::value_error(input, &t, &units) {
+                if let Some(msg) = config::value_error(input, &t, units) {
                     return Err(OpError::param(&field, &msg));
                 }
                 t
@@ -361,10 +373,9 @@ fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             (ConfigInputKind::List { .. }, _) => return Err(OpError::param(&field, "a configuration id or name")),
             (ConfigInputKind::Checkbox { .. }, _) => return Err(OpError::param(&field, "true or false")),
         };
-        chosen.0.insert(id, value);
+        out.0.insert(id, value);
     }
-    od.active_config.insert(tab, chosen);
-    Ok(json!({ "active": active(od, tab)?, "regeneration": regen_report(od, tab)? }).into())
+    Ok(out)
 }
 
 fn text(v: &Value, field: &str) -> Result<String, OpError> {

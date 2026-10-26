@@ -747,3 +747,4 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   says nowhere) — request "qa5 (10-26 p4)".
 - **P1-15 — ui (view cube hover), minor** — hovering a view-cube face fills it **rgb(177,217,241) #b1d9f1**; live **#bce2f7**
   rgb(188,226,247) (behaviours 403 "View cube hover", 1x crops part-studio/5x-*-crop1x.png). Measured on green 62524c30, 1x.
+- STATUS 2026-10-26 01:5x (qa5): P2-D1 verified fixed on green af9f1e4c (the assembly drawing's hole circle picks "Ø.394").

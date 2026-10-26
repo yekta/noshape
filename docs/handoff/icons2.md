@@ -1182,3 +1182,14 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   Open: live keeps a hovered edge's dark line in the middle of its orange band, and draws the silhouette
   edge orange on a feature-row hover (ours black over the band); planes under a selected face read bluer
   (linear vs sRGB blending). Requested: plane hover/origin highlight captures (REQUESTS icons2 10-25 b).
+- (10-25/26, TRUNK) Landed on main: 2e262f5f outlines over planes + feature-row hover outline, acc22cfa
+  sketch region fill flat, 5235483d origin 11 px, 1f4b193d plane hover/selected (border ~3 px #ffc685 /
+  #ffa90a, fill only when selected) and origin hovered/selected = filled 13 px disc (live behaviours
+  "icons2 plane/origin highlight"). The plane border is LineSegment::LIFTED (bit 32: depth tested, z×(1+1e-5)
+  nearer; parts in front still hide it: box-mm, Right's far edge behind the box). Line ends now extend in
+  clip space along the segment, depth included (before, a wider line's depth drifted from a narrower one's
+  along the edge, so the 3 px border lost to the plane's 2 px line on far edges). Note: onshape_depth_unit
+  is 0 with no bounds (only planes shown), so unit offsets do nothing in an empty studio.
+  Open (asked the lead, no answer yet): selected-plane corner ring handles (blue ~26×13 px ellipses at the 4
+  corners, 2 px (142,176,213)); shown-dimension labels in the plane's perspective at 16 px + part opacity;
+  hovered-edge dark centre line; feature-row hover silhouette orange.

@@ -20,7 +20,7 @@ const fn c(tool: &'static str, brief: &'static str, fields: &'static [(&'static 
 
 pub const CORE: &[Core] = &[
     // Discovering the rest.
-    c("ops_list", "Every tool by group with its summary, including the ones not in this list (run those with ops_call).", &[("group", "Only this group: drawing, assembly, config, sketch, analysis, part...")]),
+    c("ops_list", "Every tool, including the ones not in this list (run those with ops_call): names and groups; with `group` or `search`, summaries and examples.", &[("group", "Only this group: drawing, assembly, config, sketch, analysis, part, view, ui..."), ("search", "Only tools whose name or summary holds these words")]),
     c("ops_describe", "Full description, examples and input schema of tools (any tool; the list here is abridged).", &[("tools", "")]),
     c("ops_call", "Run any tool by name, e.g. one ops_list shows that isn't in this list.", &[("tool", ""), ("args", "")]),
     // Documents and tabs.
@@ -37,7 +37,7 @@ pub const CORE: &[Core] = &[
     ),
     c(
         "feature_add",
-        "Add a feature (accepting its dialog) and regenerate. `params` by parameter id (feature_schema): enum option ids, expressions with units (\"10 mm\", \"#w / 2\"), selections as id lists (region:… face:… edge:… body:… plane:top). A failing feature is still added: check `feature_status` and `regeneration.failed`. E.g. {\"type\": \"extrude\", \"params\": {\"entities\": [\"region:…\"], \"depth\": \"10 mm\"}}; {\"type\": \"fillet\", \"params\": {\"entities\": [\"edge:…\"], \"radius\": \"3 mm\"}}.",
+        "Add a feature (accepting its dialog) and regenerate. `params` by parameter id (feature_schema): enum option ids, expressions with units (\"10 mm\", \"#w / 2\"), selections as id lists (region:… face:… edge:… body:… plane:top) or a query {\"query\": {query_entities args}} (e.g. the vertical edges: {\"query\": {\"kind\": \"edges\", \"direction\": [0, 0, 1]}}). A failing feature is still added: check `feature_status` and `regeneration.failed`. E.g. {\"type\": \"extrude\", \"params\": {\"entities\": [\"region:…\"], \"depth\": \"10 mm\"}}; {\"type\": \"fillet\", \"params\": {\"entities\": {\"query\": {\"kind\": \"edges\", \"direction\": [0, 0, 1]}}, \"radius\": \"3 mm\"}}; a feature pattern: {\"type\": \"linearPattern\", \"params\": {\"entities\": [\"feature:…\"], \"directionOne\": [\"edge:…\"], \"distance\": \"20 mm\", \"instanceCount\": 3}}.",
         &[("type", "Feature type id (feature_types)."), ("params", "Parameter values by id."), ("name", ""), ("tab", "")],
     ),
     c("feature_edit", "Change a feature's parameters (only those given) or name, and regenerate.", &[("feature", ""), ("params", "Parameter values by id."), ("name", ""), ("tab", "")]),
@@ -65,7 +65,7 @@ pub const CORE: &[Core] = &[
     c("sketch_get", "A sketch's entities, constraints and dimensions (`dim:` ids, expressions), solve state, regions and frame.", &[("sketch", ""), ("tab", "")]),
     c("variable_create", "Create a #variable usable in any expression (\"#width / 2\").", &[("name", ""), ("value", ""), ("kind", ""), ("tab", "")]),
     // Queries and output.
-    c("query_parts", "The parts: id, name, volume, surface area, bounding box, face / edge counts.", &[("tab", "")]),
+    c("query_parts", "The parts: id, name, volume, surface area, bounding box, face / edge counts.", &[("tab", ""), ("configuration", "")]),
     c(
         "query_entities",
         "Faces / edges / vertices with ids and geometry (centroid, normal, axis, radius, endpoints, direction...). Filters: surface, curve, normal (faces facing it), direction (edges along it), created_by, part, near (closest first); `at` [[x, y, z], ...] returns the entity at each point, in order (several picks in one call).",

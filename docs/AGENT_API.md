@@ -96,6 +96,21 @@ re-exported) gave these rules:
 - **Undo:** `history_undo` names the edit it undid (`description`). `feature_delete` takes a list `features`.
 - Replies give numbers to 12 significant digits (no `3.3000000000000007`, no `-0`).
 
+A second run (the Part Studio workflows end to end: sketch, extrude, fillet, holes, a feature pattern, shell,
+edits with undo / redo, a configured part, an assembly with mates) added:
+
+- **Select by query, not by copied ids.** Any selection in `feature_add` / `feature_edit` takes
+  `{"query": {query_entities arguments}}`, alone or among ids in a list: the four vertical edges are
+  `"entities": {"query": {"kind": "edges", "direction": [0, 0, 1]}}`. A query that finds nothing is an error.
+- **Patterns:** give a pattern the features to repeat as its `entities` (`feature:…` ids from `feature_list`):
+  that makes it a Feature pattern; faces make it a Face pattern.
+- **Configurations:** `query_parts` and `query_mass_properties` take `configuration` by input and option
+  names (`{"Size": "Large"}`); no need to activate and switch back.
+- **Finding tools:** `ops_list` alone is short (names and groups); `ops_list {"group": "config"}` (or
+  "configuration") and `ops_list {"search": "pattern assembly"}` give summaries and examples.
+- **Feature schemas** describe the parameters the dialog shows with the defaults; `more_when_shown` names the
+  others (`counterbore`: `cBoreDiameterV3`...), `all: true` describes them too.
+
 ## Concepts
 
 - **Documents** are `.noshape` files holding every tab and the whole history. There is no Save: every edit

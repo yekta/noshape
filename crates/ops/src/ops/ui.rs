@@ -55,8 +55,8 @@ pub fn ops() -> Vec<Op> {
             group: "ui",
             verb: "search_tools",
             summary: "Search tools… (Alt+C): the tools a text finds, in Onshape's order",
-            description: "The toolbar's Search tools box: in a Part Studio the tools (features, custom features included) whose names hold the typed letters in order, ranked by where the first letter matches, then how tightly the letters sit; in an Assembly the toolbar tools whose names start with the text, then contain it, then hold its letters in order (shorter names first; at most 10). Each with its id (feature_add `type` / the assembly tool's icon) and key. Start one with feature_add or the assembly ops.",
-            fields: vec![doc_field(), opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the window's tab."), req("text", s(), "The search text.")],
+            description: "The toolbar's Search tools box: in a Part Studio the tools (features, custom features included; with `sketch`, in a sketch: the sketch toolbar's tools by their plain names) whose names hold the typed letters in order, ranked by where the first letter matches, then how tightly the letters sit; in an Assembly the toolbar tools whose names start with the text, then contain it, then hold its letters in order (shorter names first; at most 10). Each with its id (feature_add `type` / the assembly tool's icon) and key. Start one with feature_add or the assembly ops.",
+            fields: vec![doc_field(), opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the window's tab."), req("text", s(), "The search text."), opt("sketch", json!({ "type": "boolean" }), "Part Studio: search as in a sketch (the sketch tools).")],
             mutates: false,
             destructive: false,
             run: search_tools,
@@ -321,6 +321,11 @@ fn search_tools(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let text = a.str("text")?;
     let tools: Vec<Value> = match d.tab(tab).map(|t| &t.content) {
         Some(TabContent::Assembly(_)) => assembly_rank(&ASSEMBLY_TOOLS.iter().map(|t| t.1).collect::<Vec<_>>(), text).into_iter().map(|i| json!({ "name": ASSEMBLY_TOOLS[i].1, "icon": ASSEMBLY_TOOLS[i].0, "keys": ASSEMBLY_TOOLS[i].2 })).collect(),
+        Some(TabContent::PartStudio(_)) if a.bool_or("sketch", false)? => {
+            use crate::tool_search::{all_sketch_tools, sketch_search_name, sketch_tool_shortcut};
+            let tools: Vec<_> = all_sketch_tools().collect();
+            studio_rank(&tools.iter().map(|t| sketch_search_name(*t)).collect::<Vec<_>>(), text).into_iter().map(|i| json!({ "name": sketch_search_name(tools[i]), "keys": sketch_tool_shortcut(tools[i]) })).collect()
+        }
         Some(TabContent::PartStudio(_)) => {
             // Only tools: hidden feature types are not in live's tool search either.
             let scripts = noshape_model::custom::DocumentScripts::from_document(d);
