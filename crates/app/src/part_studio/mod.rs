@@ -40,6 +40,7 @@ mod thickness;
 mod flatten_tool;
 mod draft_tool;
 pub(crate) mod export;
+mod connector_look;
 mod plane_handles;
 mod shown_dims;
 pub(crate) mod toolbar_prefs;
@@ -921,6 +922,10 @@ impl PartStudioView {
         let mut manip: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = self.manipulator_geometry(cx).into_iter().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>).collect();
         // A selected plane's resize rings (plane_handles.rs).
         manip.extend(self.plane_ring_geometry().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
+        // Mate connector glyphs and their owner parts (connector_look.rs).
+        let (mc_glyphs, mc_owners) = self.connector_overlays(&selection, cx);
+        manip.extend(mc_glyphs.map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
+        extra.extend(mc_owners);
         self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
         extra.extend(self.consumed_picks_overlay(&selection, &accent));
         extra.extend(self.select_other_overlay());

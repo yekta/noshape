@@ -700,13 +700,15 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         let id = picks.push(PickTarget { reference: mc.reference.clone(), kind: PickKind::Connector, anchor: Some(mc.origin) });
         let o: [f32; 3] = mc.origin.as_vec3().into();
         let y = mc.z.cross(mc.x);
+        // Drawn by `connector_glyphs` for each frame's camera; these short
+        // axes only take the picks.
         let mut l = LineData::default();
-        let len = 0.008f64;
-        for (axis, color) in [(mc.x, theme::rgb8(theme::pick(theme::viewport::AXIS_X, theme::viewport_dark::AXIS_X))), (y, theme::rgb8(theme::pick(theme::viewport::AXIS_Y, theme::viewport_dark::AXIS_Y))), (mc.z, theme::rgb8(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)))] {
+        let len = 0.004f64;
+        for axis in [mc.x, y, mc.z, -mc.x, -y] {
             let tip: [f32; 3] = (mc.origin + axis * len).as_vec3().into();
-            l.segments.push(LineSegment { a: o, b: tip, color, pick_id: id, width: 2.0, style: LineSegment::ON_TOP });
+            l.segments.push(LineSegment { a: o, b: tip, color: [0, 0, 0, 0], pick_id: id, width: 12.0, style: LineSegment::ON_TOP });
         }
-        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).per_primitive_color().ignore_clip().layer(12));
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).per_primitive_color().pick_only().ignore_clip().layer(12));
     }
 
     let mut planes = opts.section.iter().map(|(n, d)| noshape_render::ClipPlane::new(n.as_vec3(), *d as f32));
@@ -1202,6 +1204,109 @@ pub fn hover_silhouette(display: &StudioDisplay, faces: &[Reference], up: &Uploa
         }
     }
     (!out.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_silhouettes(&out))).with_color([k[0], k[1], k[2], 1.0]).unpickable().layer(12))
+}
+
+/// A mate connector's state for its glyph.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConnectorLook {
+    Rest,
+    Hovered,
+    Selected,
+}
+
+/// Mate connector glyphs, built for each frame's camera (constant screen
+/// size, live behaviours "icons2 (10-26) plane and mate connector hover"):
+/// a ring between 12.5 and 18 px in the connector's XY plane and the wedge
+/// between +X and +Y filled (white at rest, MATE_CONNECTOR_PRE_SELECTED /
+/// SELECTED amber hovered / selected), outlined (dark at rest, navy
+/// `MATE_CONNECTOR_STROKE` lit), a blue Z axis up from the centre and short
+/// red X / green Y ticks outside the ring.
+pub struct ConnectorGlyphs {
+    items: Vec<(DVec3, DVec3, DVec3, DVec3, ConnectorLook)>,
+}
+
+const MC_R_IN_PX: f64 = 12.5;
+const MC_R_OUT_PX: f64 = 18.0;
+const MC_RIM_PX: f32 = 1.3;
+/// Fill (sRGB) and opacity: live's wedge reads (250,251,252) at rest over
+/// (245,248,250), (241,220,151) hovered, (243,215,128) selected.
+const MC_FILL_REST: ([u8; 3], f32) = ([255, 255, 255], 0.5);
+const MC_FILL_HOVER: ([u8; 3], f32) = ([235, 178, 13], 0.4);
+const MC_FILL_SELECTED: ([u8; 3], f32) = ([235, 178, 13], 0.5);
+const MC_RIM_REST: [u8; 4] = [40, 44, 46, 255];
+const MC_RIM_LIT: [u8; 4] = [0, 40, 71, 255];
+
+impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
+    fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
+        let mut out = Vec::new();
+        let f = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
+        for &(o, x, y, z, look) in &self.items {
+            let Some(px) = view.world_per_px(o) else { continue };
+            let (ri, ro) = (MC_R_IN_PX * px, MC_R_OUT_PX * px);
+            let at = |r: f64, a: f64| o + x * (r * a.cos()) + y * (r * a.sin());
+            let n = 64usize;
+            let ang = |k: usize| k as f64 / n as f64 * std::f64::consts::TAU;
+            // Fill: the ring, plus the wedge from +X to +Y (0..90°).
+            let mut m = MeshData { positions: Vec::new(), normals: Vec::new(), pick_ids: Vec::new(), indices: Vec::new() };
+            let quad = |a: DVec3, b: DVec3, c: DVec3, d: DVec3, m: &mut MeshData| {
+                let base = m.positions.len() as u32;
+                m.positions.extend([f(a), f(b), f(c), f(d)]);
+                m.indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+            };
+            for k in 0..n {
+                let (a0, a1) = (ang(k), ang(k + 1));
+                quad(at(ri, a0), at(ro, a0), at(ro, a1), at(ri, a1), &mut m);
+                if a1 <= std::f64::consts::FRAC_PI_2 + 1e-9 {
+                    quad(o, at(ri, a0), at(ri, a1), o, &mut m);
+                }
+            }
+            let nrm: [f32; 3] = z.as_vec3().into();
+            m.normals = vec![nrm; m.positions.len()];
+            m.pick_ids = vec![0; m.positions.len()];
+            let (rgb, alpha) = match look {
+                ConnectorLook::Rest => MC_FILL_REST,
+                ConnectorLook::Hovered => MC_FILL_HOVER,
+                ConnectorLook::Selected => MC_FILL_SELECTED,
+            };
+            let c = theme::lin(u32::from(rgb[0]) << 16 | u32::from(rgb[1]) << 8 | u32::from(rgb[2]));
+            out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([c[0], c[1], c[2], alpha]).unlit().unpickable().ignore_clip().on_top().layer(30));
+            // Outline: outer circle, the inner circle outside the wedge, the
+            // wedge's two sides.
+            let rim = if look == ConnectorLook::Rest { MC_RIM_REST } else { MC_RIM_LIT };
+            let mut l = LineData::default();
+            let outer: Vec<[f32; 3]> = (0..=n).map(|k| f(at(ro, ang(k)))).collect();
+            let inner: Vec<[f32; 3]> = (n / 4..=n).map(|k| f(at(ri, ang(k)))).collect();
+            l.push_polyline(&outer, rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
+            l.push_polyline(&inner, rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
+            l.push_polyline(&[f(o), f(at(ro, 0.0))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
+            l.push_polyline(&[f(o), f(at(ro, std::f64::consts::FRAC_PI_2))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
+            // Axes: Z up from the centre, X / Y ticks outside the ring.
+            let axis = |hex: u32| theme::rgb8(hex);
+            l.push_polyline(&[f(o), f(o + z * (18.0 * px))], axis(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)), 0, 3.0, LineSegment::ON_TOP);
+            l.push_polyline(&[f(o + x * (19.5 * px)), f(o + x * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_X, theme::viewport_dark::AXIS_X)), 0, 2.5, LineSegment::ON_TOP);
+            l.push_polyline(&[f(o + y * (19.5 * px)), f(o + y * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_Y, theme::viewport_dark::AXIS_Y)), 0, 2.5, LineSegment::ON_TOP);
+            out.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().layer(31));
+        }
+        out
+    }
+}
+
+/// The mate connectors' glyphs: `lit` gives each one's look.
+pub fn connector_glyphs(display: &StudioDisplay, lit: impl Fn(&Reference) -> ConnectorLook) -> Option<Arc<ConnectorGlyphs>> {
+    let items: Vec<_> = display.connectors.iter().map(|c| (c.origin, c.x, c.z.cross(c.x), c.z, lit(&c.reference))).collect();
+    (!items.is_empty()).then(|| Arc::new(ConnectorGlyphs { items }))
+}
+
+/// A hovered / selected mate connector's owner part: its edges in the
+/// secondary yellow-green (#f2ff80; live (235,246,146) / (208,219,117) /
+/// (218,235,137) across an edge: 0.86 over the black edge and the face).
+pub fn owner_secondary(display: &StudioDisplay, body: &noshape_model::BodyId, up: &Uploader) -> Option<Instance> {
+    let b = display.body(body).filter(|b| !b.hidden)?;
+    let mut lines = LineData::default();
+    for pl in &b.mesh.edges {
+        lines.push_polyline(pl, [0xf2, 0xff, 0x80, 219], 0, 3.0, LineSegment::LIFTED);
+    }
+    (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(12))
 }
 
 /// A face's boundary side: face index, facet normal, ends.
