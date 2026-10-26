@@ -1263,10 +1263,16 @@ live reference. Scores below ~3-4 are the known anti-aliasing floor (round 8).
   shaded-edges, sheet-metal-rip, unsuppress, weld-menu-double-*, wireframe. (The view icons also differ from
   live's view-cube menu art: the emphasised face is a filled band in ours, an outline in live; redraw only if
   they get used.)
-- APPROXIMATE, refs too coarse to judge: drawing hatch swatches hatch-0-* / hatch-2-* (live refs are
-  23 x 16 px browser captures). General 2-6 Herringbone, 2-18 Houndstooth, 2-24 Stars, 2-28 Wood read
-  differently in live's capture; attempts against the blurred refs scored worse than the current art. Needs
-  a sharper live capture (the hatch picker at 2x / 4x zoom) before redrawing (P2).
+- Drawing hatch swatches: MATCH. The live sources are 23 x 16 PNGs (behaviours "icons2 hatch swatches",
+  saved for reading in live/drawing/icons2-hatch-src); compared at native size every swatch (Aluminium,
+  Titanium, Glass, ANSI36, Zigzag, Zinc, Wood, Herringbone, Stars, Houndstooth, Insulation, Solid…) lines
+  up; rank.py's high scores come from squaring a 23 x 16 image. NOT icons, for the drawing owner (behaviour,
+  model hatch_pat.rs GROUPS): live's pattern ORDER differs. General in live: Solid, AEC 8x16, AEC 8x8, AEC
+  Herringbone, AEC Parquet, AEC Roof shingle, AEC Roof wood shake, Aluminium, Concrete, Copper, Dash lines,
+  Dots, Electric, Glass, Grated area, Honeycomb, Houndstooth, Insulation, Iron, Mud/ Sand, Netting, Parallel
+  lines, Plastic, Squares, Stars, Steel, Titanium, Triangles, Wood, Zigzag, Zinc (ours puts Parallel lines,
+  Netting, Dots right after Solid); ANSI in live: ANSI31 general, ANSI31 general (drawing), ANSI32 … ANSI38
+  (ours has "(drawing)" last). Reordering also renames the hatch-<group>-<index> assets (by index).
 - Everything else referenced matches structurally (residual = anti-aliasing / sub-pixel offsets), checked on
   the sheets: toolbar, feature list, dialogs, menus, assembly / drawing toolbars, sketch toolbar, status bar.
   ui-dropdown-arrow's score is a false alarm (drawn as a #666 mask glyph in the app, as live).
