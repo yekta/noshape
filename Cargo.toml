@@ -148,5 +148,6 @@ gpui-pre-wgpu = { path = "vendor/gpui-pre-wgpu" }
 # src/metal_atlas.rs `metal_texture`), reports its GPU (`note_renderer_gpu`)
 # and when each frame finished on the GPU (`gpu_frame_completed`, so a
 # texture is only rendered into again once no frame samples it; src/
-# metal_renderer.rs). Only the lines marked "NOSHAPE PATCH" differ from 0.3.9.
+# metal_renderer.rs), and times its draws (`note_window_draw`: wall time and
+# the wait for a drawable). Only the lines marked "NOSHAPE PATCH" differ from 0.3.9.
 gpui-pre-apple = { path = "vendor/gpui-pre-apple" }

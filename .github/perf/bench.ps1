@@ -22,7 +22,7 @@ function WaitFor($pattern, $log, $seconds) {
   return $false
 }
 foreach ($mode in $Modes) {
-  foreach ($kind in 'orbit', 'zoom') {
+  foreach ($kind in 'orbit', 'zoom', 'pan') {
     $log = Join-Path $Out "$mode-$kind.log"
     $work = Join-Path $env:RUNNER_TEMP "bench-$mode-$kind"
     New-Item -ItemType Directory -Force -Path $work | Out-Null

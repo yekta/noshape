@@ -22,6 +22,7 @@ SUMMARY = re.compile(
     r"presented (?P<fps>[\d.]+) fps(?:, (?P<renders>\d+) window renders)? \| frame interval mean (?P<mean>[\d.]+) "
     r"p50 (?P<p50>[\d.]+) p95 (?P<p95>[\d.]+) p99 (?P<p99>[\d.]+) max (?P<max>[\d.]+) ms \| over 16.7 ms: (?P<o16>\d+) "
     r"\((?P<o16p>\d+)%\), over 8.3 ms: (?P<o8>\d+) \((?P<o8p>\d+)%\) \| UI-thread CPU per frame mean (?P<cpu>[\d.]+) p95 (?P<cpup95>[\d.]+) ms"
+    r"(?: \| window draw per frame mean (?P<draw>[\d.]+) p95 (?P<drawp95>[\d.]+) ms, drawable wait mean (?P<wait>[\d.]+) p95 (?P<waitp95>[\d.]+) ms)?"
     r"(?: \| GPU per frame mean (?P<gpu>[\d.]+) p95 (?P<gpup95>[\d.]+) ms)?")
 
 # (metric, label, higher is better) compared against the baseline.
@@ -97,16 +98,17 @@ def main():
     args = ap.parse_args()
     rows = runs(args.out)
     lines = [f"### Viewport benchmark: {args.label}", "",
-             "| run | path | device px | fps | p95 interval | p99 | max | >8.3 ms | >16.7 ms | UI CPU/frame (mean, p95) | GPU/frame (mean, p95) | renders |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+             "| run | path | device px | fps | p95 interval | p99 | max | >8.3 ms | >16.7 ms | UI CPU/frame (mean, p95) | window draw/frame, drawable wait (mean) | GPU/frame (mean, p95) | renders |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         if r.get("missing"):
-            lines.append(f"| {r['mode']} {r.get('kind')} | **no BENCH SUMMARY** | | | | | | | | | | |")
+            lines.append(f"| {r['mode']} {r.get('kind')} | **no BENCH SUMMARY** | | | | | | | | | | | |")
             continue
         gpu = f"{r['gpu']:.2f}, {r['gpup95']:.2f} ms" if r.get("gpu") is not None else "n/a"
+        draw = f"{r['draw']:.2f}, {r['wait']:.2f} ms" if r.get("draw") is not None else "n/a"
         renders = int(r["renders"]) if r.get("renders") else ""
         lines.append(f"| {r['mode']} {r['kind']} | {r['path']} | {r['px']} | {r['fps']:.1f} | {r['p95']:.2f} ms | {r['p99']:.2f} | {r['max']:.2f} | "
-                     f"{int(r['o8'])} ({int(r['o8p'])}%) | {int(r['o16'])} ({int(r['o16p'])}%) | {r['cpu']:.2f}, {r['cpup95']:.2f} ms | {gpu} | {renders} |")
+                     f"{int(r['o8'])} ({int(r['o8p'])}%) | {int(r['o16'])} ({int(r['o16p'])}%) | {r['cpu']:.2f}, {r['cpup95']:.2f} ms | {draw} | {gpu} | {renders} |")
     if rows:
         lines += ["", f"GPU: {rows[0]['adapter']}"]
     # Launch order: texture orbit (the job's first: cold shader caches), then

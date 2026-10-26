@@ -142,6 +142,23 @@ pub fn gpu_frames_completed_through(n: u64) -> bool {
     GPU_FRAMES.lock().running.first().is_none_or(|&first| first > n)
 }
 
+static DRAW_WAIT_NS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static DRAW_NS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Renderers: a window draw took `total` wall time on the calling thread,
+/// `wait` of it waiting for a drawable (Metal `nextDrawable`).
+pub fn note_window_draw(total: std::time::Duration, wait: std::time::Duration) {
+    DRAW_NS.fetch_add(total.as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
+    DRAW_WAIT_NS.fetch_add(wait.as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Wall time spent in window draws so far, and the part of it waiting for
+/// drawables (see [`note_window_draw`]).
+pub fn window_draw_time() -> (std::time::Duration, std::time::Duration) {
+    let ns = |a: &std::sync::atomic::AtomicU64| std::time::Duration::from_nanos(a.load(std::sync::atomic::Ordering::Relaxed));
+    (ns(&DRAW_NS), ns(&DRAW_WAIT_NS))
+}
+
 static RENDERER_GPUS: Mutex<Vec<u64>> = Mutex::new(Vec::new());
 
 /// Renderers: the GPU they draw with (Metal: the device's `registryID`).

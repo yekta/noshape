@@ -4,7 +4,7 @@
 #   bench.sh <noshape binary> <document> <output dir> <modes...>
 #
 # For every presentation mode (`texture`, `readback`) and bench kind (orbit,
-# zoom) the app opens a fresh copy of the document with NOSHAPE_PERF=1 and the
+# zoom, pan) the app opens a fresh copy of the document with NOSHAPE_PERF=1 and the
 # built-in benchmark (viewport.rs `OrbitBench`), which logs a `BENCH SUMMARY`
 # line. Screenshots: `<mode>-still.png` of the settled view before the orbit
 # starts (the correctness check compares these across modes) and two taken
@@ -37,7 +37,7 @@ wait_for() { # pattern log seconds
   return 1
 }
 RUNS=()
-for mode in "${MODES[@]}"; do RUNS+=("$mode:orbit:" "$mode:zoom:"); done
+for mode in "${MODES[@]}"; do RUNS+=("$mode:orbit:" "$mode:zoom:" "$mode:pan:"); done
 for v in ${VARIANTS:-}; do RUNS+=("texture+${v%%:*}:orbit:${v#*:}"); done
 for run in "${RUNS[@]}"; do
   label=${run%%:*}; rest=${run#*:}; kind=${rest%%:*}; extra=${rest#*:}
