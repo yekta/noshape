@@ -28,12 +28,26 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   28 features re-evaluated in 1007 ms (Linear pattern 1 125, Boss 6 97, Chamfer 5 81, Boss 5 75, Hole 1 67, Chamfer 4 66;
   load ~35 on 16 cores); budget ≤ 200 ms, live's server 171 ms for the whole part; undo/redo of it 7 / 5 ms (cached, OK)
   (qa 2026-10-26, build 4d2f6b0c)
+- [ ] P0 PATTERN-OFFPART-PARTS (live check asked) a Feature pattern with Reapply features whose copies land off the part
+  makes each off-part copy a new floating part: tests/perf/live-30-features.noshape, edit Linear pattern 1 (Boss 6, Right
+  plane, 20 mm, Reapply ☑) count 2 → 6, ✓ → status OK, Parts (5) (plate + 4 floating bosses); fs's a122ed68 (in this
+  green) says live drops added copies off the part and keeps one part (oracle CV1) — that rule doesn't reach the Reapply
+  path; live answer asked in REQUESTS "qa (2026-10-26, P0 check)"; shot tickets/pattern-offpart-new-parts.png (qa
+  2026-10-26, build 4d2f6b0c)
 - [ ] P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
   (live OK 3998.627 mm³ / 33 faces), 2.5 mm 8487.861 / 53 faces (live 8503.961 / 47); cause, WIP branch agent/qa5 and test
   in docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop" (qa5 2026-10-26, green a08e3eda)
 - [ ] P1 Extrude add 308 ms (std logic 55 ms, ~250 ms in ops' add path regens): target ≤ 150 ms (PLAN 2.6).
 
 ## Part Studio UI (psui)
+- [ ] P1 TAB-NO-PREVIEW a number typed into a feature dialog field and committed with **Tab** never reaches the preview:
+  edit Extrude 1 of tests/perf/live-30-features.noshape, Depth 10 → 14, Tab → the field reads "14 mm" but no
+  schedule_regen in the perf log and the preview stays at 10 mm (tickets/tab-no-preview-extrude.png); the same in Linear
+  pattern 1 (Instance count, Distance + Tab: nothing until Enter or a checkbox change, which then shows all the pending
+  values; tickets/tab-no-preview-pattern.png). Enter previews fine. live: Tab commits the field and the preview follows
+  (behaviours "Input behaviour"; qa4's verified 66563c00 "Tab → 40 mm and the preview follows"); feature_dialog.rs
+  InputEvent::Blur → commit_number + flush_typed looks right, so the Changed event seems lost on the way (qa 2026-10-26,
+  build 4d2f6b0c)
 - [ ] P2 P1-8 caveat (qa5, carried over) a reopened Hole whose points were clicked one by one shows one grouped chip
   "Vertices of Sketch N"; live keeps one "Vertex of Sketch N" chip per click (the grouping isn't stored; details in
   docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop") (qa5 2026-10-26)
@@ -45,4 +59,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Horizontal/Vertical constraints (sketch_get lists it); live constrains to the external Origin (qa5 2026-10-26)
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 VERSION-0.4.6 exported files and the app report version 0.4.6 (STEP header `originating_system 'NOSHAPE 0.4.6'`)
+  while the releases are v0.4.7 / v0.4.8: the workspace `version` in Cargo.toml was never bumped; the daily release cut
+  should bump it (lead's release script) (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P2 `kernel/tests/export::rhino_breps_are_valid` red on Windows 10-26 (sphere volume 4e-5 off).
