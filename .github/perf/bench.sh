@@ -13,7 +13,8 @@
 # for diagnosis, `name:VAR=value[,VAR=value]` separated by spaces, e.g.
 # `msaa1:NOSHAPE_PERF_MSAA=1 nolines:NOSHAPE_PERF_SKIP=lines`; logged as
 # `texture+<name>-orbit.log`), BENCH_ENV (`VAR=value[,VAR=value]` for every
-# run, before a variant's own).
+# run, before a variant's own), COLD (macOS: clear the Metal shader cache
+# before every launch, so each launch is a cold start).
 #
 # The macOS runners: only the first run of a job (the texture orbit, about a
 # minute in) is reliable for presented fps. A few minutes into a job the
@@ -47,6 +48,11 @@ for run in "${RUNS[@]}"; do
     work=$(mktemp -d)
     cp "$DOC" "$work/bench.noshape"
     echo "== $label $kind ${extra//,/ }"
+    if [[ -n ${COLD:-} && "$(uname)" == Darwin ]]; then
+      cache=$(getconf DARWIN_USER_CACHE_DIR)
+      echo "cold start: clearing $(du -sk "$cache" 2>/dev/null | cut -f1) KB cache, Metal: $(find "$cache" -maxdepth 3 -type d -name com.apple.metal | tr '\n' ' ')"
+      find "$cache" -maxdepth 3 -type d -name com.apple.metal -prune -exec rm -rf {} +
+    fi
     env NOSHAPE_PERF=1 NOSHAPE_PERF_ORBIT="$FRAMES" NOSHAPE_PERF_ORBIT_DELAY="$DELAY" \
       NOSHAPE_PERF_BENCH="$kind" NOSHAPE_PRESENT="$mode" RUST_LOG=info ${BENCH_ENV//,/ } ${extra//,/ } \
       "$BIN" "$work/bench.noshape" > "$log" 2>&1 &
