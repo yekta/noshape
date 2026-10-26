@@ -278,6 +278,8 @@ OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, c
                       double angle);
 std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcShape& profile_b, const OcShapeList& guides,
                                             bool make_solid);
+std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShape& profile_b, const OcShapeList& guides,
+                                          bool trim_guides, bool trim_profiles);
 OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, const OcShapeList& edges, P3 pull,
                              rust::Slice<const double> angles);
 OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir,

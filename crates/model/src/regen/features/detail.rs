@@ -197,7 +197,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             } else {
                 Section::Conic(ev.real("rho")?)
             };
-            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation"), cliff: false })
+            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation"), cliff: false, sides: None })
         } else {
             None
         }
@@ -210,7 +210,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
-        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false };
+        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false, sides: None };
         if !propagate && curved_edge_left_open(&body.shape, &edges) {
             return err("Adjoining edge not filleted.");
         }
@@ -413,7 +413,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         {
             // OCCT runs a chamfer on along tangent edges; Onshape stops at the
             // selection and runs the section out onto the neighbour (G7).
-            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1: d, r2: d, width: None, partial: None, run_on: true, cliff: false };
+            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1: d, r2: d, width: None, partial: None, run_on: true, cliff: false, sides: None };
             super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| blend_failed("Failed to chamfer selections.", e.message))?;
             continue;
         }

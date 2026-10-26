@@ -285,6 +285,8 @@ pub struct Context {
     // --- end batch SM ---
     /// Holes made by Hole features (drawings' hole / thread callouts).
     pub holes: Vec<HoleRecord>,
+    /// Images Decal features put on faces (std decalUtils.fs DecalData).
+    pub decals: Vec<DecalRecord>,
     /// Appearances features gave their parts (Import: the file's colours),
     /// linear RGBA; a part's own appearance (part properties) wins.
     pub part_appearance: BTreeMap<BodyId, [f32; 4]>,
@@ -305,6 +307,53 @@ pub struct Context {
     /// Derived source's): `renumber_default_names` leaves them as they are
     /// (live, qa5 NAME3).
     pub own_names: std::collections::BTreeSet<BodyId>,
+}
+
+/// A Decal's image on a face (std decalUtils.fs `DecalData`, the "decals"
+/// attribute): a face point maps to image coordinates by `mapping` (meters
+/// in the plane, or arc length and height on the cylinder), then by the UV
+/// transform; the image covers UV [0, 1]².
+#[derive(Clone, Debug, PartialEq)]
+pub struct DecalRecord {
+    pub feature: FeatureId,
+    pub body: BodyId,
+    pub face: crate::naming::Name,
+    /// The image's file tab.
+    pub image: String,
+    pub mapping: DecalMapping,
+    /// TransformUV: uv = translation + linear · local.
+    pub uv_linear: [[f64; 2]; 2],
+    pub uv_translation: [f64; 2],
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum DecalMapping {
+    /// Local coordinates along `x` and `y` from `origin`.
+    Planar { origin: DVec3, x: DVec3, y: DVec3, z: DVec3 },
+    /// Arc length round `z` from `x` (radius · angle) and height along `z`.
+    Cylindrical { origin: DVec3, x: DVec3, y: DVec3, z: DVec3, radius: f64 },
+}
+
+impl DecalRecord {
+    /// Image coordinates of a point on the face (std getDecalUvSpacePosition).
+    pub fn uv_at(&self, p: DVec3) -> [f64; 2] {
+        let local = match &self.mapping {
+            DecalMapping::Planar { origin, x, y, .. } => [(p - *origin).dot(*x), (p - *origin).dot(*y)],
+            DecalMapping::Cylindrical { origin, x, y, z, radius } => {
+                let d = p - *origin;
+                let r = d.normalize_or_zero();
+                let mut theta = r.dot(*y).atan2(r.dot(*x));
+                if self.uv_translation[0] <= 0.0 && theta < 0.0 {
+                    theta += std::f64::consts::TAU;
+                } else if self.uv_translation[0] >= 1.0 && theta > 0.0 {
+                    theta -= std::f64::consts::TAU;
+                }
+                [theta * radius, d.dot(*z)]
+            }
+        };
+        let l = &self.uv_linear;
+        [self.uv_translation[0] + l[0][0] * local[0] + l[0][1] * local[1], self.uv_translation[1] + l[1][0] * local[0] + l[1][1] * local[1]]
+    }
 }
 
 /// One hole of a Hole feature: where it starts, its direction into the

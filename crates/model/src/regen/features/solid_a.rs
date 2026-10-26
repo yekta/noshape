@@ -111,11 +111,108 @@ const LOFT_GUIDE_MISS: &str = "All guides should intersect each profile boundary
 /// blending through the guides elsewhere (within 0.2 mm³ of live).
 fn loft_guided(shapes: &[Shape], guides: &[Shape], solid: bool) -> FResult<Shape> {
     let [a, b] = shapes else { return err("Loft guides with more than two profiles are not supported yet") };
-    k::loft_guided_curved(a, b, guides, solid).map_err(|e| match e {
+    k::loft_guided_curved(a, b, guides, solid).map_err(guided_error)
+}
+
+fn guided_error(e: k::KernelError) -> crate::regen::eval::FeatureError {
+    match e {
         k::KernelError::OperationFailed(m) if m.starts_with("All guides") => fe(LOFT_GUIDE_MISS),
         k::KernelError::OperationFailed(m) if m.starts_with("Loft guides") => fe(m),
         _ => fe(LOFT_FAILED),
-    })
+    }
+}
+
+/// Onshape's LOFT_CONFLICTING_CONDITIONS.
+const LOFT_CONFLICT: &str = "The selected end condition or guide constraint may be in conflict.";
+
+/// loft.fs collectGuideDerivatives (live "psb (10-26 c)"): a guide's
+/// continuity is checked where it meets each profile. Normal / Tangent to
+/// guide need a planar guide (its sketch's plane, else the plane of its
+/// edges) and a profile leaving the guide along / across that plane's
+/// normal; Match tangent / curvature need a face at the guide edge the
+/// profile leaves tangent to. Otherwise Parasolid reports a conflict. Where
+/// the profiles comply, live's surface is the unconstrained one (areas equal
+/// to 7 digits; Match curvature within 0.02 mm² of 590.9), so ours is too.
+fn guide_conditions(ev: &EvalCtx, profiles: &[Shape]) -> FResult<()> {
+    for g in ev.params.array("guidesArray") {
+        let kind = g.enum_("guideDerivativeType");
+        if kind == "DEFAULT" {
+            continue;
+        }
+        let refs = g.query("guideEntities");
+        let edges = resolve_curves(ev, refs)?;
+        let Some(guide) = wires_from(&edges)?.into_iter().next() else { continue };
+        // The profile's tangent where the guide meets it.
+        let tangents = || -> FResult<Vec<(DVec3, DVec3)>> {
+            let mut out = Vec::new();
+            for p in profiles {
+                if p.shape_type() == ShapeType::Vertex {
+                    continue;
+                }
+                let d = k::distance(&guide, p)?;
+                let pe = p.edges().into_iter().min_by(|a, b| {
+                    let da = k::make_vertex(d.point_b).and_then(|v| k::distance(&v, a)).map(|x| x.distance).unwrap_or(f64::MAX);
+                    let db = k::make_vertex(d.point_b).and_then(|v| k::distance(&v, b)).map(|x| x.distance).unwrap_or(f64::MAX);
+                    da.total_cmp(&db)
+                });
+                if let Some(e) = pe {
+                    out.push((d.point_b, edge_tangent_near(&e, d.point_b)?));
+                }
+            }
+            Ok(out)
+        };
+        const TOL: f64 = 1e-6;
+        if kind == "NORMAL_TO_GUIDE" || kind == "TANGENT_TO_GUIDE" {
+            let sketch_plane = match refs.first() {
+                Some(Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch)) => ev.ctx.sketch(*sketch).map(|s| s.frame.normal),
+                _ => None,
+            };
+            let Some(n) = sketch_plane.or_else(|| guide.find_plane(1e-7).ok().flatten().map(|p| p.unit_normal())) else {
+                return err("Only planar guides are valid for Normal/Tangent to guide continuity.");
+            };
+            for (_, t) in tangents()? {
+                let c = t.normalize().dot(n.normalize()).abs();
+                if (kind == "NORMAL_TO_GUIDE" && c < 1.0 - TOL) || (kind == "TANGENT_TO_GUIDE" && c > TOL) {
+                    return err(LOFT_CONFLICT);
+                }
+            }
+        } else {
+            // Faces at the guide's edges.
+            let mut faces: Vec<Shape> = Vec::new();
+            for (bi, ei) in ev.resolve_edges(refs) {
+                let body = &ev.ctx.bodies[bi].shape;
+                let all = body.faces();
+                for f in body.edge_faces()?.get(ei).cloned().unwrap_or_default() {
+                    faces.push(all[f as usize].clone());
+                }
+            }
+            if faces.is_empty() {
+                return err("A guide has no adjacent faces to match tangent or curvature to.");
+            }
+            for (p, t) in tangents()? {
+                if !faces.iter().any(|f| f.normal_at_point(p).is_ok_and(|n| t.normalize().dot(n.normalize()).abs() <= TOL)) {
+                    return err(LOFT_CONFLICT);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Unit tangent of an edge at its point nearest `p`.
+fn edge_tangent_near(e: &Shape, p: DVec3) -> FResult<DVec3> {
+    let info = e.edge_info()?;
+    let (mut lo, mut hi) = (info.first_param, info.last_param);
+    let d = |t: f64| e.point_at(t).map(|q| (q - p).length()).unwrap_or(f64::MAX);
+    let n = 64;
+    let best = (0..=n).map(|i| lo + (hi - lo) * i as f64 / n as f64).min_by(|a, b| d(*a).total_cmp(&d(*b))).unwrap_or(lo);
+    let step = (hi - lo) / n as f64;
+    (lo, hi) = ((best - step).max(lo), (best + step).min(hi));
+    for _ in 0..60 {
+        let (m1, m2) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
+        if d(m1) < d(m2) { hi = m2 } else { lo = m1 }
+    }
+    Ok(e.tangent_at((lo + hi) / 2.0)?)
 }
 
 /// Onshape's LOFT_FAILED.
@@ -620,7 +717,16 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     let guide_refs: Vec<Reference> = if ev.bool("addGuides") { ev.params.array("guidesArray").iter().flat_map(|g| g.query("guideEntities").to_vec()).collect() } else { Vec::new() };
     if !guide_refs.is_empty() {
         let guides = wires_from(&resolve_curves(ev, &guide_refs)?)?;
-        let shape = loft_guided(&shapes, &guides, solid)?;
+        guide_conditions(ev, &shapes)?;
+        // Surface lofts of open profiles (live "psb (10-26 c)"): Trim guides
+        // and Trim profiles.
+        let open = !solid && shapes.iter().all(|s| s.shape_type() != ShapeType::Face && s.is_closed().is_ok_and(|c| !c));
+        let shape = if open {
+            let [a, b] = shapes.as_slice() else { return err("Loft guides with more than two profiles are not supported yet") };
+            k::loft_guided_open(a, b, &guides, ev.bool("trimGuidesByProfiles"), ev.bool("trimProfiles")).map_err(guided_error)?
+        } else {
+            loft_guided(&shapes, &guides, solid)?
+        };
         let names = name_new(ev, &shape);
         let kind = if solid { BodyKind::Solid } else { BodyKind::Surface };
         let op = ev.enum_(if solid { "operationType" } else { "surfaceOperationType" }).to_string();

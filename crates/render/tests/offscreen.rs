@@ -764,6 +764,57 @@ fn image_quad_is_textured_and_depth_tested() {
     }
 }
 
+/// Decals (live behaviours "icons2 decal rendering"): textured triangles on
+/// a face show their texels exactly (unlit, over the face they lie on),
+/// nothing outside the image's UV square, and a selected decal mixes 0.4
+/// toward (255,170,10).
+#[test]
+fn decal_texels_are_exact_and_tint_when_selected() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    // 2x1 texels: blue-ish left, orange right (image A's gradient ends).
+    let rgba = vec![15u8, 80, 239, 255, 240, 80, 14, 255];
+    let s = 0.01f32;
+    // The face's square, the image on its middle half (UV -0.5..1.5).
+    let positions = vec![[-s, -s, 0.0], [s, -s, 0.0], [s, s, 0.0], [-s, s, 0.0]];
+    let uvs = vec![[-0.5, 1.5], [1.5, 1.5], [1.5, -0.5], [-0.5, -0.5]];
+    let decal = r.upload_textured(&TexturedData { positions, uvs, indices: vec![0, 1, 2, 0, 2, 3], width: 2, height: 1, rgba });
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.004], [0.01, 0.01, 0.0], 1)))));
+    scene.instances.push(Instance::new(Drawable::Image(decal)).unpickable().layer(3));
+    let (w, h) = (400u32, 300u32);
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::NEG_Z, glam::DVec3::Y), ..Default::default() };
+    cam.fit_box(glam::DVec3::new(-0.01, -0.01, -0.004), glam::DVec3::new(0.01, 0.01, 0.0), w as f64 / h as f64);
+    let render = |r: &mut Renderer, scene: &Scene| {
+        let style = Style { msaa: 4, ..Style::default() };
+        r.render(RenderParams { scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap()
+    };
+    let at = |f: &Frame, p: [f64; 3]| {
+        let q = cam.project(glam::DVec3::from(p), vp, 0.02).unwrap();
+        let px = &f.bgra[((q.y as u32 * w + q.x as u32) * 4) as usize..][..3];
+        (px[2] as i32, px[1] as i32, px[0] as i32)
+    };
+    let near = |a: (i32, i32, i32), b: (i32, i32, i32)| (a.0 - b.0).abs() <= 1 && (a.1 - b.1).abs() <= 1 && (a.2 - b.2).abs() <= 1;
+    let f = render(&mut r, &scene);
+    let (left, right, outside) = (at(&f, [-0.0025, 0.0, 0.0]), at(&f, [0.0025, 0.0, 0.0]), at(&f, [-0.0075, 0.0, 0.0]));
+    assert!(near(left, (15, 80, 239)), "the left texel exactly, unlit: {left:?}");
+    assert!(near(right, (240, 80, 14)), "the right texel exactly: {right:?}");
+    assert!(!near(outside, (15, 80, 239)) && !near(outside, (240, 80, 14)), "outside the image the face shows: {outside:?}");
+    let mut sel = scene.clone();
+    sel.instances[1].decal_selected = true;
+    let f = render(&mut r, &sel);
+    let tinted = at(&f, [-0.0025, 0.0, 0.0]);
+    // 0.6 * (15,80,239) + 0.4 * (255,170,10) = (111,116,147).
+    assert!(near(tinted, (111, 116, 147)), "selected: mixed 0.4 toward the amber: {tinted:?}");
+}
+
 /// A large image (mip chain on the CPU, odd sizes) uploads and renders.
 #[test]
 fn image_with_odd_size_uploads_mips() {

@@ -1005,9 +1005,15 @@ fn vs_image(v: ImageIn, @builtin(instance_index) slot: u32) -> ImageOut {
 fn image_color(i: ImageOut) -> vec4<f32> {
     let t = textureSample(image_tex, image_sampler, i.uv);
     if (clipped(i.world)) { discard; }
+    // A decal's face runs past its image (upload_textured).
+    if (any(i.uv < vec2(0.0)) || any(i.uv > vec2(1.0))) { discard; }
     let a = inst.color.a;
     let straight = select(vec3(0.0), t.rgb / max(t.a, 1e-6), t.a > 0.0);
-    return vec4(linear_to_srgb(straight * inst.color.rgb) * t.a * a, t.a * a);
+    var c = linear_to_srgb(straight * inst.color.rgb);
+    // params.x bit 3: a decal on a selected face, 0.4 toward the selection
+    // amber (255,170,10) in sRGB (live).
+    if ((inst.params.x & 8u) != 0u) { c = mix(c, vec3(1.0, 170.0 / 255.0, 10.0 / 255.0), 0.4); }
+    return vec4(c * t.a * a, t.a * a);
 }
 
 // Opaque instances draw twice: mostly opaque texels first, writing depth...
