@@ -306,7 +306,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
 - **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
-- **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
+- **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_duplicate_input`](#config_duplicate_input), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
@@ -331,7 +331,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 
 List every operation (tool) of the noshape API.
 
-Returns each operation's tool name, CLI command and summary, by group. Use `feature_types` and `feature_schema` for the Part Studio features and their parameters.
+Without filters: every tool's name and the groups with their sizes (short). With `group` (a group's name, its start or a word in it: "configuration" finds config) or `search` (words all found in a tool's name or summary): each tool's name, CLI command, summary and examples. Use `feature_types` and `feature_schema` for the Part Studio features and their parameters, ops_describe for a tool's full documentation.
 
 Examples:
 
@@ -342,7 +342,8 @@ Examples:
 
 | field | type | | description |
 |---|---|---|---|
-| `group` | string |  | Only this group (document, tab, feature, sketch, variable, config, part, material, query, analysis, render, export, import, featurestudio, history, assembly, context, drawing). |
+| `group` | string |  | Only this group (document, tab, feature, sketch, variable, config, part, material, query, analysis, render, export, import, featurestudio, history, assembly, context, drawing, view, ui...). |
+| `search` | string |  | Only tools whose name or summary holds all these words ("pattern assembly"). |
 
 #### ops_describe
 
@@ -694,7 +695,7 @@ Examples:
 
 The parameters of a feature type (JSON schema, defaults, options, units).
 
-The same parameters, defaults, options and visibility rules as the feature's dialog. Parameters shown only for some values of others are ignored while hidden; each says whether the dialog shows it with the defaults and which other parameter's values show or hide it (e.g. hole `holeDepthV3`: "shown with the defaults; hidden, and ignored, when endStyleV2 is UP_TO_NEXT or UP_TO_ENTITY or THROUGH"). `feature_get` lists a feature's currently `visible` parameters.
+The same parameters, defaults, options and visibility rules as the feature's dialog. Parameters shown only for some values of others are ignored while hidden; each says whether the dialog shows it with the defaults and which other parameter's values show or hide it (e.g. hole `holeDepthV3`: "shown with the defaults; hidden, and ignored, when endStyleV2 is UP_TO_NEXT or UP_TO_ENTITY or THROUGH"). `feature_get` lists a feature's currently `visible` parameters. By default only the parameters the dialog shows with the defaults are described; `more_when_shown` names the others (`all` describes every one).
 
 Examples:
 
@@ -707,12 +708,13 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `type` | string | required | Feature type id, e.g. "extrude". |
+| `all` | boolean |  | Describe every parameter, also those the dialog shows only for other values. |
 
 #### feature_add
 
 Add a feature to a Part Studio (what accepting its dialog does) (edits the document (one undoable history entry)).
 
-Creates the feature with the dialog's defaults, applies `params`, makes the dialog's own choices for the fields not given (Extrude / Revolve / Sweep / Loft: Add into the one part the new body touches, with that part as merge scope, else New; a Remove Extrude on a part points into it; Thicken from the faces' parts; Hole: merge scope = the parts it reaches, flipped when more lie behind; a tapped hole's linked depths), inserts it at the rollback bar (or `index`) and regenerates. As in Onshape, a feature that fails is still added and shown with its error: check `feature_status` and `failed` in the reply. Sketches are made with `sketch_create`.
+Creates the feature with the dialog's defaults, applies `params`, makes the dialog's own choices for the fields not given (Extrude / Revolve / Sweep / Loft: Add into the one part the new body touches, with that part as merge scope, else New; a Remove Extrude on a part points into it; Thicken from the faces' parts; Hole: merge scope = the parts it reaches, flipped when more lie behind; a tapped hole's linked depths), inserts it at the rollback bar (or `index`) and regenerates. A selection may be given as a query instead of ids: `{"query": {query_entities arguments}}` (e.g. `"entities": {"query": {"kind": "edges", "direction": [0, 0, 1]}}`), alone or among ids in a list. A pattern's `entities` that are all features (`feature:…`) or faces make it a Feature or Face pattern. As in Onshape, a feature that fails is still added and shown with its error: check `feature_status` and `failed` in the reply. Sketches are made with `sketch_create`.
 
 Examples:
 
@@ -847,6 +849,25 @@ Examples:
 | `feature` | string |  | Feature id or name. |
 | `folder` | string |  | Instead of `feature`: a folder's name (feature_list lists folders). |
 | `unsuppressed_if` | string |  | Unsuppressed if: expression. |
+
+#### feature_clear_missing
+
+Clear missing references from a feature's selections (edits the document (one undoable history entry)).
+
+A feature dialog selection's Clear missing references: removes from the feature's selections (`param`, or all of them, rows of lists included) the references whose creating feature was deleted or is suppressed (a derived part's source features count as present; Assembly context geometry is never missing). One edit, as the dialog's ✓ ("Edit : <feature>"). Returns how many were removed.
+
+Examples:
+
+```json
+{"feature": "Fillet 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `feature` | string | required | Feature id or name. |
+| `param` | string |  | Only this selection field (its parameter id, feature_get). |
 
 #### feature_dependencies
 
@@ -4784,32 +4805,35 @@ Examples:
 
 #### ui_toolbar
 
-The Part Studio toolbar's customization (Customize toolbar…) and the S shortcut toolbars.
+The Part Studio's or Assembly's toolbar customization (Customize toolbar…) and the S shortcut toolbars.
 
-The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide "Search tools"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do.
+The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide "Search tools"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do. With `tab` an Assembly, the assembly toolbar's: `removed` (its tool ids, `sets` lists them), `order` (the tool sets' order), `hide_search`, `shortcut_tools` (Preferences › Shortcut toolbars › Assembly: tool ids; null: Onshape's eleven). With the app open the windows' toolbars follow.
 
 Examples:
 
 ```json
 {}
 {"set": {"removed": ["helix"], "shortcut_tools": ["sketch", "extrude", "fillet"]}}
+{"tab": "Assembly 1", "set": {"removed": ["tb-gear"], "hide_search": true}}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | An Assembly tab for the assembly toolbar (default: the Part Studio toolbar). |
 | `set` | object |  | Settings to change (see the reply). |
 
 #### ui_search_tools
 
 Search tools… (Alt+C): the tools a text finds, in Onshape's order.
 
-The toolbar's Search tools box: in a Part Studio the tools (features, custom features included) whose names hold the typed letters in order, ranked by where the first letter matches, then how tightly the letters sit; in an Assembly the toolbar tools whose names start with the text, then contain it, then hold its letters in order (shorter names first; at most 10). Each with its id (feature_add `type` / the assembly tool's icon) and key. Start one with feature_add or the assembly ops.
+The toolbar's Search tools box: in a Part Studio the tools (features, custom features included; with `sketch`, in a sketch: the sketch toolbar's tools by their plain names) whose names hold the typed letters in order, ranked by where the first letter matches, then how tightly the letters sit; in an Assembly the toolbar tools whose names start with the text, then contain it, then hold its letters in order (shorter names first; at most 10). Each with its id (feature_add `type` / the assembly tool's icon) and key. Start one with feature_add or the assembly ops.
 
 Examples:
 
 ```json
 {"text": "fil"}
+{"text": "rect", "sketch": true}
 {"tab": "Assembly 1", "text": "mate"}
 ```
 
@@ -4818,6 +4842,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the window's tab. |
 | `text` | string | required | The search text. |
+| `sketch` | boolean |  | Part Studio: search as in a sketch (the sketch tools). |
 
 #### ui_shortcuts
 
@@ -5288,6 +5313,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `configuration` | object |  | In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown. |
 
 #### query_entities
 
@@ -5375,6 +5401,7 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `parts` | array of string |  | Part ids (`body:…`) or names; default all. |
 | `reference` | string |  | Mate connector id (`mc:…`) for the inertia axes. |
+| `configuration` | object |  | In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown. |
 
 ### analysis
 
