@@ -586,8 +586,14 @@ impl Prepared {
             }
             drags.push(DragTarget { body: *b, local_point: lp, target: *target });
         }
-        // Placement targets (triad rotate / typed values).
+        // Placement targets (triad rotate / typed values). Without pointer
+        // drags they are placed and projected onto the mates exactly (live:
+        // a typed 23.456789 mm along a Planar-mated pin's X lands at exactly
+        // that, Z and the rotation untouched; along the mated Z it doesn't
+        // move); with drags they pull like drags.
         let scale = self.instances.iter().map(|(_, p)| DVec3::from(p.translation).length()).fold(0.01f64, f64::max) * 0.5;
+        let exact = drags.is_empty();
+        let mut placed = Vec::new();
         for (id, p) in &opts.targets {
             let Some((b, off)) = self.body_of.get(id) else { continue };
             if bodies[*b].fixed {
@@ -598,11 +604,16 @@ impl Prepared {
                 bodies[*b].pose = want;
                 continue;
             }
+            if exact {
+                bodies[*b].pose = want;
+                placed.push(*b);
+                continue;
+            }
             for lp in [DVec3::ZERO, DVec3::X * scale, DVec3::Y * scale, DVec3::Z * scale] {
                 drags.push(DragTarget { body: *b, local_point: lp, target: want.transform_point(lp) });
             }
         }
-        let mut r = solver::solve_with(&mut bodies, &active, &rels, &drags, !opts.skip_dof);
+        let mut r = if placed.is_empty() { solver::solve_with(&mut bodies, &active, &rels, &drags, !opts.skip_dof) } else { solver::solve_placed(&mut bodies, &active, &rels, &placed, !opts.skip_dof) };
         // Degrees of freedom of the whole assembly with the mate being
         // defined (the instance list), not of the one-mate preview solve:
         // every mate and relation, nothing held, at the previewed poses.
