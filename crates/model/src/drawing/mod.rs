@@ -2935,7 +2935,7 @@ pub const FLAT_LINE_ROWS: [(&str, u8); 5] = [("Counterbore/Countersink up", 0), 
 
 /// Drawing properties › Tables, per kind (live dom/drawing-wt-widgets:
 /// BOM, Custom, Cut list, Hole, Revision tables and Tables).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TableStyles {
     pub general: TableStyle,
@@ -2944,6 +2944,22 @@ pub struct TableStyles {
     pub cut_list: TableStyle,
     pub hole: TableStyle,
     pub revision: TableStyle,
+    /// Hole tables › Indicator style (ISO, else ANSI; stored), Indicator
+    /// arrowhead (mm; None: the drawing's default), Indicator lines (mm;
+    /// live 0.15), Tags' font.
+    pub hole_indicator_iso: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hole_indicator_arrow: Option<f64>,
+    pub hole_indicator_line: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hole_tags_font: Option<sheet::TextFont>,
+}
+
+impl Default for TableStyles {
+    fn default() -> Self {
+        let t = TableStyle::default();
+        Self { general: t.clone(), bom: t.clone(), custom: t.clone(), cut_list: t.clone(), hole: t.clone(), revision: t, hole_indicator_iso: false, hole_indicator_arrow: None, hole_indicator_line: 0.15, hole_tags_font: None }
+    }
 }
 
 impl TableStyles {

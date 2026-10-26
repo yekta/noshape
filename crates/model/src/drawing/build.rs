@@ -2012,10 +2012,23 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // The tag axis: X and Y arrows in the table's directions.
             let (sx, sy) = (if *flip_x { -1.0 } else { 1.0 }, if *flip_y { -1.0 } else { 1.0 });
             let (xt, yt) = ([os[0] + 8.0 * sx, os[1]], [os[0], os[1] + 8.0 * sy]);
+            // Drawing properties › Tables › Hole tables: Indicator lines'
+            // pen and arrowhead size.
+            let ts = &drawing.props.table_styles;
+            let l0 = g.lines.len();
             g.lines.push(Polyline2 { points: vec![os, xt], style: LineStyle::Thin, closed: false, pick });
             g.lines.push(Polyline2 { points: vec![os, yt], style: LineStyle::Thin, closed: false, pick });
-            g.arrow(xt, [sx, 0.0], 2.0);
-            g.arrow(yt, [0.0, sy], 2.0);
+            g.pens.push(super::sheet::PenSpan { lines: l0..l0 + 2, width_mm: ts.hole_indicator_line, dashes: Vec::new() });
+            match ts.hole_indicator_arrow {
+                Some(a) => {
+                    g.arrow_as(xt, [sx, 0.0], a, super::sheet::ArrowType::Filled);
+                    g.arrow_as(yt, [0.0, sy], a, super::sheet::ArrowType::Filled);
+                }
+                None => {
+                    g.arrow(xt, [sx, 0.0], 2.0);
+                    g.arrow(yt, [0.0, sy], 2.0);
+                }
+            }
             g.texts.push(Text2 { pos: [xt[0] + 1.5 * sx - if sx < 0.0 { 1.8 } else { 0.0 }, xt[1] - 0.9], height: 1.8, text: "X".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
             g.texts.push(Text2 { pos: [yt[0] - 0.6, yt[1] + if sy > 0.0 { 1.0 } else { -2.8 }], height: 1.8, text: "Y".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
             g.fills.push(Fill2 { points: circle_points(os, 0.8, 8) });
@@ -2027,6 +2040,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 g.texts.push(Text2 { pos: [c[0] + r * 0.75 + 0.8, c[1] + r * 0.75 + 0.8], height: 2.5, text: hrow.tag, angle: 0.0, anchor: Anchor::BottomLeft, pick });
             }
             g.cad_text_style_since(tag_mark, CadTextStyle::HoleTag);
+            if let Some(font) = drawing.props.table_styles.hole_tags_font.clone().filter(|_| g.texts.len() > tag_mark) {
+                g.fonts.push(super::sheet::FontSpan { texts: tag_mark..g.texts.len(), font });
+            }
         }
         table_layouts.push((t.id, layout));
     }

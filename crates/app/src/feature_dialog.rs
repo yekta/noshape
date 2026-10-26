@@ -368,6 +368,12 @@ impl FeatureDialog {
             extra: None,
         };
         d.active_query = d.first_visible_query();
+        // A sketch opened on its plane lets the filled plane field go
+        // (defocusFilledSketchPlaneQLV, live sketch/21: editing Sketch 1 the
+        // field is white and sketch curves pre-highlight).
+        if d.feature.type_id == "sketch" && d.active_query.as_deref().is_some_and(|q| !d.feature.params.query(q).is_empty()) {
+            d.active_query = None;
+        }
         d
     }
 

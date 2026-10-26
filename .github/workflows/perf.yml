@@ -519,6 +519,31 @@ jobs:
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
 
+      # Assembly solve latency (crates/ops/tests/assembly_perf.rs, skb): 200
+      # pins with 300 mates and 1000 free pins; the evaluation after adding a
+      # mate (under 100 ms) and drag steps (a 60 Hz frame).
+      - name: Assembly latency (release)
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          status=0
+          cargo test --release --locked -p noshape-ops --test assembly_perf -- --ignored --nocapture --test-threads=1 2>&1 | tee assembly_perf.log || status=$?
+          { echo "### ${{ matrix.name }}: assembly latency"; echo '```'; grep -E "instances|pins|adding|drag|panicked|assert" assembly_perf.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: Assembly latency (release, Windows)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          cargo test --release --locked -p noshape-ops --test assembly_perf -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath assembly_perf.log
+          $status = $LASTEXITCODE
+          "### ${{ matrix.name }}: assembly latency" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Select-String -Path assembly_perf.log -Pattern 'instances|pins|adding|drag|panicked|assert' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit $status
+
       # Regeneration profile (crates/ops/tests/regen_profile.rs): every feature
       # of the tests/perf fixtures and of the std sheet-metal route, top 15.
       - name: Regeneration profile (release)

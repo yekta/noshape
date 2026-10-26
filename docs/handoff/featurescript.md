@@ -921,3 +921,7 @@ end): CP2 and P6 are kern's. **oracle_asm** (crates/model/tests/oracle_asm.rs): 
 live/fs-oracle-asm/CASES.md built with the model API (A fixed, B at a start pose, mates on implicit connectors,
 limits, patterns); prints our transforms / mate values / DOF and compares live's (LIVE, LIVE_MATES) once
 REQUESTS fs 10-26 c is answered. Suspicious already: R1's pin turns 5.8° and sits 10 mm low.
+oracle_asm has live's numbers (live/fs-oracle-asm/raw, 10-26): F1, F3, F4, S1, P1, B1 and CP1 match; F2, F5, R1, R2, R3,
+S2, C1, B2, M1, M2 and LP1 are skb's (KNOWN in the test, each with live's and our pose): the circular-edge CENTER
+connector's Z (live: out of the part), edge MID_POINT frames, offset / rotation / slider senses, limits from a start
+outside them, the free rotation on cylinder axes, the cone limit, Revolute + Slider.

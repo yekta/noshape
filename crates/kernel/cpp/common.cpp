@@ -686,22 +686,67 @@ void integrand(const BRepAdaptor_Surface& s, double u, double v, bool volume, co
   g              = {a, x * a, y * a, z * a, x * x * a, y * y * a, z * z * a, x * y * a, y * z * a, z * x * a};
 }
 
-// ∫ g(u, v) du over [a, b] in segments of at most `step`.
-Moments inner(const BRepAdaptor_Surface& s, double a, double b, double v, double step, bool volume, const gp_XYZ& o)
+// Segments of at most `step` over a length (a hair over a whole number of
+// steps is that number: π / (π/8) is 8, not 9).
+int segments(double length, double step)
 {
-  Moments   out{};
-  const int n = std::max(1, (int)std::ceil(std::abs(b - a) / step));
-  for (int k = 0; k < n; ++k)
+  return std::max(1, (int)std::ceil(std::abs(length) / step - 1e-9));
+}
+
+// ∫ g(u, v) du over [a, b] in segments of at most `step`, split first at
+// `breaks` (the surface's u knots: g is only C0 or C1 there, and a segment
+// across one integrates to second order only: a NURBS sphere read back from
+// Rhino, +4e-5 of its volume).
+Moments inner(const BRepAdaptor_Surface& s, double a, double b, double v, double step, bool volume, const gp_XYZ& o,
+              const std::vector<double>& breaks)
+{
+  Moments             out{};
+  std::vector<double> pts{a};
+  for (double k : breaks)
+    if (k > std::min(a, b) + 1e-12 && k < std::max(a, b) - 1e-12)
+      pts.push_back(k);
+  pts.push_back(b);
+  std::sort(pts.begin() + 1, pts.end() - 1);
+  if (b < a)
+    std::reverse(pts.begin() + 1, pts.end() - 1);
+  for (size_t piece = 0; piece + 1 < pts.size(); ++piece)
   {
-    const double s0 = a + (b - a) * k / n, h = (b - a) / n;
-    for (int i = 0; i < 8; ++i)
+    const double pa = pts[piece], pb = pts[piece + 1];
+    const int    n  = segments(pb - pa, step);
+    for (int k = 0; k < n; ++k)
     {
-      Moments g;
-      integrand(s, s0 + h * (kGaussX[i] + 1) / 2, v, volume, o, g);
-      for (int j = 0; j < 10; ++j)
-        out[(size_t)j] += g[(size_t)j] * kGaussW[i] * h / 2;
+      const double s0 = pa + (pb - pa) * k / n, h = (pb - pa) / n;
+      for (int i = 0; i < 8; ++i)
+      {
+        Moments g;
+        integrand(s, s0 + h * (kGaussX[i] + 1) / 2, v, volume, o, g);
+        for (int j = 0; j < 10; ++j)
+          out[(size_t)j] += g[(size_t)j] * kGaussW[i] * h / 2;
+      }
     }
   }
+  return out;
+}
+
+// The surface's parameter values where it's less than C2 along u (`along_u`)
+// or v (B-spline knots, a sweep's section knots), repeated a period either
+// side on a periodic surface.
+std::vector<double> surface_breaks(const BRepAdaptor_Surface& s, bool along_u)
+{
+  std::vector<double> out;
+  const int           n = along_u ? s.NbUIntervals(GeomAbs_C2) : s.NbVIntervals(GeomAbs_C2);
+  if (n <= 1)
+    return out;
+  NCollection_Array1<double> t(1, n + 1);
+  if (along_u)
+    s.UIntervals(t, GeomAbs_C2);
+  else
+    s.VIntervals(t, GeomAbs_C2);
+  const bool   per    = along_u ? s.IsUPeriodic() : s.IsVPeriodic();
+  const double period = per ? (along_u ? s.UPeriod() : s.VPeriod()) : 0;
+  for (int i = 1; i <= n + 1; ++i)
+    for (int k = per ? -1 : 0; k <= (per ? 1 : 0); ++k)
+      out.push_back(t(i) + k * period);
   return out;
 }
 
@@ -772,12 +817,13 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
   const double vstep = step(vper, vper ? s.VPeriod() : 0, nvs, s.FirstVParameter(), s.LastVParameter());
   const double ust   = std::min(ustep, std::max(u1 - u0, 1e-300) / 4) / 2; // halved: converged to 1e-7 relative on a threaded screw
   const double vst   = std::min(vstep, std::max(v1 - v0, 1e-300) / 4) / 2;
+  const std::vector<double> ubreaks = surface_breaks(s, true), vbreaks = surface_breaks(s, false);
   const auto G = [&](double u, double v) {
     const double turns = uper ? std::floor((u - u0) / period) : 0;
-    Moments      out   = inner(s, u0, u - turns * period, v, ust, volume, o);
+    Moments      out   = inner(s, u0, u - turns * period, v, ust, volume, o, ubreaks);
     if (turns != 0)
     {
-      const Moments full = inner(s, u0, u0 + period, v, ust, volume, o);
+      const Moments full = inner(s, u0, u0 + period, v, ust, volume, o, ubreaks);
       for (int j = 0; j < 10; ++j)
         out[(size_t)j] += turns * full[(size_t)j];
     }
@@ -810,7 +856,38 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
         for (int k = 1; k <= bs->NbKnots(); ++k)
           if (bs->Knot(k) > cuts[0] && bs->Knot(k) < cuts[1])
             cuts.push_back(bs->Knot(k));
+      // Where the pcurve crosses the surface's knots: the integrand of the
+      // boundary integral is only C0 or C1 across them.
+      const double lo = cuts[0], hi = cuts[1];
+      const int    ns = 64;
+      for (int k = 0; k < ns; ++k)
+      {
+        const double ta = lo + (hi - lo) * k / ns, tb = lo + (hi - lo) * (k + 1) / ns;
+        const gp_Pnt2d pa = c->Value(ta), pb = c->Value(tb);
+        for (int axis = 0; axis < 2; ++axis)
+          for (double kv : axis ? vbreaks : ubreaks)
+          {
+            const double fa = (axis ? pa.Y() : pa.X()) - kv, fb = (axis ? pb.Y() : pb.X()) - kv;
+            if (!(fa * fb < 0))
+              continue;
+            double x = ta, y = tb, fx = fa;
+            for (int it = 0; it < 60; ++it)
+            {
+              const double m  = (x + y) / 2;
+              const double fm = (axis ? c->Value(m).Y() : c->Value(m).X()) - kv;
+              if ((fm < 0) == (fx < 0))
+              {
+                x  = m;
+                fx = fm;
+              }
+              else
+                y = m;
+            }
+            cuts.push_back((x + y) / 2);
+          }
+      }
       std::sort(cuts.begin(), cuts.end());
+      cuts.erase(std::unique(cuts.begin(), cuts.end(), [&](double p, double q) { return q - p <= 1e-12 * std::max(1.0, hi - lo); }), cuts.end());
       if (b < a)
         std::reverse(cuts.begin(), cuts.end());
     }
@@ -824,7 +901,7 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
         du += std::abs(q.X() - p.X());
         dv += std::abs(q.Y() - p.Y());
       }
-      const int n = std::min(20000, std::max(1, (int)std::ceil(2 * (du / ust + dv / vst))));
+      const int n = std::min(20000, segments(2 * (du / ust + dv / vst), 1.0));
       for (int k = 0; k < n; ++k)
       {
         const double t0 = p0 + (p1 - p0) * k / n, h = (p1 - p0) / n;
