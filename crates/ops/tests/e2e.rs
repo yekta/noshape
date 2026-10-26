@@ -4027,3 +4027,27 @@ fn agent_benchmark_p1_fixes() {
     let all = call(&mut ctx, "feature_schema", json!({ "type": "hole", "all": true }));
     assert!(all["params"]["properties"].get("cBoreDiameterV3").is_some());
 }
+
+/// A STEP assembly whose two parts share a name imports with distinct
+/// instance names ("Part 1 <1>", "Part 1 <2>"), as instance names count.
+#[test]
+fn step_assembly_same_named_parts_get_distinct_instances() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "step_names.noshape");
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio" }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "tab": "Part Studio 2", "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "sketch_draw", json!({ "tab": "Part Studio 2", "sketch": sk, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 2", "type": "extrude", "params": { "entities": [r["regions"][0]["id"]], "depth": "30 mm" } }));
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    let pin = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 2", "part": "Part 1" }))["instance"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [60, 0, 0] }));
+    let step = scratch("same_names.step");
+    call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "STEP", "file": step.to_str().unwrap() }));
+    call(&mut ctx, "document_create", json!({ "path": scratch("same_names_import.noshape").to_str().unwrap() }));
+    let imp = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let asm = imp["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string();
+    let l = call(&mut ctx, "assembly_list", json!({ "tab": asm }));
+    let mut names: Vec<&str> = l["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap()).collect();
+    names.sort();
+    assert_eq!(names, ["Part 1 <1>", "Part 1 <2>"], "{l}");
+}
