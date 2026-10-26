@@ -1,5 +1,41 @@
 # Agent API: CLI + MCP server (agent: api)
 
+## STATUS 2026-10-26 ~18:30 (halt for replanning)
+
+**On main (346854a0 and before), all quick-checked:**
+- Coverage: UI-only entries 0 (`crates/ops/tests/coverage.rs` `no_ui_only_entries` enforces it). MENUS kept
+  current by api; `tools/menu-coverage.py` + shared pre-push hook (`.git/hooks/pre-push`, not in the repo)
+  refuse a push to main that leaves MENUS out of step with the app's menus.
+- Window ops (live mode via `crates/app/src/agent_window.rs` + `agent_window/{studio,assembly}.rs`, child
+  modules of the views): view_camera, view_display, ui_select, ui_list, ui_search_tools, ui_shortcuts,
+  ui_toolbar (Part Studio + Assembly), tab/history/compare/repair navigation. Camera math in
+  `crates/scene/src/camera_ops.rs`; tool search / sketch tool order in `noshape_ops::tool_search`;
+  prefs (graphics, toolbars) in `noshape_ops::prefs`; missing-reference check in `noshape_ops::studio`.
+- Agent benchmarks 2-6 (notes: /root/api-scratch/bench/notes.md, MCP bridge mcpd.py + c.py there) and their
+  fixes: selections as `{"query": {...}}`, feature patterns from `entities`, configured queries, compact MCP
+  JSON, short ops_list / feature_schema, trimmed edit replies, drawing source/view caches (~20 ms dims),
+  `near` by true distance, default tab = window's tab (imports activate theirs), distinct STEP instance
+  names, part/parts, unknown-tool suggestions, insert/explode replies, drawing_gdt `anchor`, table off-sheet
+  warning, BOM `row_names`.
+- Test robustness: `doc::gpu_lock()` serializes offscreen Vulkan use (fixed a 1-3/8 SIGSEGV in ops e2e);
+  e2e `scratch()` fails when two tests share a file name.
+
+**WIP branch:** `agent/api` = 346854a0 (same as main; nothing unpushed).
+
+**Open items, in priority order (exact next steps):**
+1. F19 width mate reports ok=false while placed right (routed to skb): when fixed, add an e2e
+   `assembly_mate {"type": "width", ...}` test (block X faces between base X faces; expect ok, DOF 5).
+2. F4 Extrude / Hole add = 0.6-2.8 s in std editing logic (routed to fs; fs prewarm 6ab01d25 helps):
+   re-time with the bench (`feature_add` extrude vs `feature_edit` of it) once fs lands more.
+3. F17 minor: variable_set's selector is `variable` (its `name` = new name); consider accepting
+   `{"name": old, "new_name": ...}` or a clearer error. Also: `sketch_create` `plane` can't take a query.
+4. Benchmark next: sheet metal / Variable Studios / in-context (P3 after P1/P2), and render_image of the
+   window camera through MCP (image content size).
+5. Drawing PDF of one A3 sheet is 680 KB (fonts?) - check against live's size.
+
+**Known failing tests in my area:** none (ops e2e 90/90 x8, coverage 9/9 on my last runs). Main is red on
+model tests outside ops (oracle_asm, kernel_robustness), not api's.
+
 ## Goal (user, 2026-10-20)
 "Our app will have a CLI and an MCP server as well. I want all the features and functions of this app to be
 usable by agents. They should be able to create models just like I can."
