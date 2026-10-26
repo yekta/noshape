@@ -752,3 +752,61 @@
      NCollection_DynamicArray<BOPDS_Curve>& aVC = aFF.ChangeCurves();
      RemoveUsedVertices(aVC, aMV);
  
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_Builder_3.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_Builder_3.cxx
+@@ -52,6 +52,18 @@
+ 
+ #include <algorithm>
+ 
++// noshape: a cut whose many tools cross each other (a diamond knurl: 148
++// grooves) builds its result from the faces' classification (BuildBOP), so
++// the split solids of the target and of every tool aren't needed: building
++// them took minutes and gigabytes. Set by the caller around one boolean
++// (noshape_bop_cut_by_faces); BOPAlgo_BOP::BuildShape reads it.
++thread_local bool noshape_cut_by_faces = false;
++
++extern "C" Standard_EXPORT void noshape_bop_cut_by_faces(const bool theOn)
++{
++  noshape_cut_by_faces = theOn;
++}
++
+ static void OwnInternalShapes(const TopoDS_Shape&,
+                               NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher>&);
+ 
+@@ -82,6 +94,11 @@
+   {
+     return;
+   }
++  // noshape: the result is built from the faces (see noshape_cut_by_faces).
++  if (noshape_cut_by_faces)
++  {
++    return;
++  }
+   // Build split of the solids
+   BuildSplitSolids(aDraftSolids, aPS.Next(5));
+   if (HasErrors())
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_BOP.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_BOP.cxx
+@@ -39,6 +39,8 @@
+ #include <NCollection_Map.hxx>
+ #include <Precision.hxx>
+ 
++extern thread_local bool noshape_cut_by_faces; // BOPAlgo_Builder_3.cxx
++
+ static TopAbs_ShapeEnum TypeToExplore(const int theDim);
+ //
+ static void CollectContainers(const TopoDS_Shape& theS, NCollection_List<TopoDS_Shape>& theLSC);
+@@ -872,6 +874,13 @@
+ {
+   Message_ProgressScope aPS(theRange, nullptr, 10.);
+ 
++  // noshape: a cut of solids built from the faces' classification, without
++  // split solids (BOPAlgo_Builder::FillImagesSolids skipped them).
++  if (noshape_cut_by_faces && myOperation == BOPAlgo_CUT && myDims[0] == 3 && myDims[1] == 3)
++  {
++    BuildBOP(myArguments, myTools, myOperation, aPS.Next(10.), myReport);
++    return;
++  }
+   if (myDims[0] == 3 && myDims[1] == 3)
+   {
+     // For the Boolean operation on solids we need to check first

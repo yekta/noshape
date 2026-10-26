@@ -160,6 +160,20 @@ private:
 
 // Build `algo`, stoppable through the thread's cancel flag and the memory
 // budget.
+// OCCT patch 0001 (BOPAlgo_Builder_3.cxx): the next boolean on this thread,
+// if a cut of solids, is built from its faces' classification without the
+// split solids of the target and the tools.
+extern "C" void noshape_bop_cut_by_faces(bool on);
+
+// Sets it for one scope (cleared on any exit, so later booleans run as usual).
+struct CutByFaces
+{
+  explicit CutByFaces(bool on) { noshape_bop_cut_by_faces(on); }
+  ~CutByFaces() { noshape_bop_cut_by_faces(false); }
+  CutByFaces(const CutByFaces&)            = delete;
+  CutByFaces& operator=(const CutByFaces&) = delete;
+};
+
 template <class A> void build_cancellable(A& algo)
 {
   occ::handle<CancelIndicator> pi = new CancelIndicator(t_cancel);
@@ -1686,8 +1700,27 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   // pairs runs in parallel.
   first.parallel = first.parallel || n_tools >= 8;
   apply_opts(*b, first);
-  build_cancellable(*b);
+  // Many tools crossing each other (a diamond knurl's two families of
+  // grooves: the groups above touch): the cut is built from the faces'
+  // classification. OCCT's split solids of the target and of every tool
+  // (each cut up by the crossing ones) took minutes and gigabytes, and a cut
+  // keeps none of the tools'.
+  const bool by_faces = op == 1 && n_tools >= 8 && t.size() >= 2 && t.size() < n_tools;
+  {
+    const CutByFaces scope(by_faces);
+    build_cancellable(*b);
+  }
   fail_if_cancelled();
+  if (by_faces && (b->HasErrors() || !b->IsDone()))
+  {
+    // As usual, with the split solids.
+    b = make();
+    b->SetArguments(to_list(a));
+    b->SetTools(to_list(t));
+    apply_opts(*b, first);
+    build_cancellable(*b);
+    fail_if_cancelled();
+  }
   // Checked glue (patterns): GlueShift is only right when the arguments
   // merely touch; then the union's volume is the sum of theirs. Tools that
   // reach into the arguments: trimmed first (fuse_trimmed). Otherwise (a
