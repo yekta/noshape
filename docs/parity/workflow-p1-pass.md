@@ -89,3 +89,4 @@ then edits, undo/redo, rollback and suppress.
 | Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ |
 | Group dialog (assembly) | one "Instances" field | same (behaviours 1333) | ✅ |
 | Split of an inserted part in the Part Studio | the halves are new parts (ids from Split, renamed Part 6 / 7, others renumbered); the assembly instance of the old part fails "Failed to resolve instance." and its mate / pattern error | live Split re-identifies the same way (old id gone, halves new, renumbered; behaviours "qa5 (10-25 p3)" Split) | ✅ (consistent) |
+| P2-D1 on green af9f1e4c (fix 817d9cb1) | assembly drawing, tilted plate: d on the middle hole rim → "Ø.394" preview, prompt "Click to place the dimension, or select a second entity" | — | ✅ **fixed** |
