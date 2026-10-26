@@ -608,6 +608,17 @@ impl Viewport {
         DVec2::new(f64::from(f32::from(self.bounds.size.width)), f64::from(f32::from(self.bounds.size.height)))
     }
 
+    /// A left drag the tool captured goes on as a box selection from the
+    /// press (a plane corner ring flicked off before its drag started, live
+    /// behaviours "icons2 plane resize rules").
+    pub fn tool_drag_to_box(&mut self, p: DVec2, cx: &mut Context<Self>) {
+        if self.drag == Drag::Tool {
+            self.drag = Drag::Box;
+            self.box_rect = Some((self.press_pos, p, p.x <= self.press_pos.x));
+            cx.notify();
+        }
+    }
+
     /// World-space ray through a viewport-local position.
     pub fn ray(&self, local: DVec2) -> (DVec3, DVec3) {
         self.camera.ray(local, self.size())

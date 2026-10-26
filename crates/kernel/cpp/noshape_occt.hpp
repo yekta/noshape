@@ -276,6 +276,8 @@ OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& 
                  uint8_t mode, double d1, double d2, bool checked);
 OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, const PlaneF& neutral,
                       double angle);
+std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcShape& profile_b, const OcShapeList& guides,
+                                            bool make_solid);
 OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, const OcShapeList& edges, P3 pull,
                              rust::Slice<const double> angles);
 OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir,

@@ -481,6 +481,15 @@ pub fn draft_wedges(shape: &Shape, faces: &[Shape], pull_direction: DVec3, neutr
     op(ffi::op_draft_wedges(shape.raw(), &l, p3(pull_direction), &neutral.ffi(), angle))
 }
 
+/// A loft of two profiles with curved edges along guide curves (each one
+/// edge from a point of the first profile to a point of the second): side
+/// faces between the corners, ruled without a guide, a Gordon surface
+/// through the guides inside them; the profiles' faces close a solid.
+pub fn loft_guided_curved(a: &Shape, b: &Shape, guides: &[Shape], make_solid: bool) -> Result<Shape> {
+    let g = vec_to_list(guides);
+    Shape::from_res(ffi::loft_guided_curved(a.raw(), b.raw(), &g, make_solid))
+}
+
 /// Parting-line draft about curved parting `edges` (OCCT's draft can't: the
 /// drafted face is a general ruled surface): each of `faces` is replaced by
 /// the ruled surface leaving its parting edges on its side, every ruling at
