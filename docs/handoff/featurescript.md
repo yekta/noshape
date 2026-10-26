@@ -907,4 +907,7 @@ evPlane; P2's mid plane at (30, 20, 10)). Known: P6, live's tangent plane sits a
 extrude's end?), ours z 0; asked of live (REQUESTS fs 10-26 b, with more evLine cases). A Feature pattern whose
 instances all miss the part fails "Could not create all instances as entered. Try selecting "Reapply features"
 option." (fullFeaturePattern), a face pattern "Pattern could not be created on the same part." (pattern.rs
-`apply_tools`; test `feature_pattern_off_the_part_as_live`).
+`apply_tools`; test `feature_pattern_off_the_part_as_live`). Some copies off the part are skipped, added or removed; all off fails
+(live O3's one copy, M2, CP1); oracle CV1 (3 of 4 bosses, INFO) matches. Known: CP2 implies live's vertical block
+edges run −z (top to bottom; asked of live), LP2 is Parasolid's face pattern growing a straddling boss's outer half
+down to the part's bottom (kern/psb geometry).
