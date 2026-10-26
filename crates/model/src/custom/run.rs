@@ -351,7 +351,21 @@ pub(crate) fn run_editing_logic(
             .spawn_scoped(s, || {
                 let mut i = Interp::new();
                 i.set_deadline(Some(Instant::now() + TIME_LIMIT));
+                // NOSHAPE_FS_PROFILE=1: the call's time and its slowest std lines.
+                let profile = std::env::var_os("NOSHAPE_FS_PROFILE").is_some();
+                if profile {
+                    i.profile = Some(Default::default());
+                }
+                let t = Instant::now();
                 let out = i.call_value(&func, args);
+                if profile {
+                    let mut lines: Vec<_> = i.profile.take().map(|p| p.times.into_iter().collect()).unwrap_or_default();
+                    lines.sort_by_key(|l| std::cmp::Reverse(l.1));
+                    eprintln!("[fs edit profile] {name}: {:?}", t.elapsed());
+                    for ((m, l), d) in lines.iter().take(25) {
+                        eprintln!("  {d:>10.2?} {m}:{l}");
+                    }
+                }
                 if host::trace_ops() {
                     eprintln!("[fs edit] {:?}", out.as_ref().map(noshape_featurescript::value::to_display).map_err(|e| e.message()));
                 }

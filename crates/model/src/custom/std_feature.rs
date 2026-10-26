@@ -30,6 +30,32 @@ type Loaded = HashMap<&'static str, Option<Arc<StdFeature>>>;
 
 static FEATURES: LazyLock<Mutex<Loaded>> = LazyLock::new(Default::default);
 
+/// Std's feature `name` from `module`, loaded once. Loading (parsing and
+/// compiling std, ~0.2 s, Hole's tables ~0.7 s) runs outside the lock, so a
+/// dialog asking for a loaded feature never waits on another's load.
+fn loaded(module: &str, name: &'static str) -> Option<Arc<StdFeature>> {
+    if let Some(f) = FEATURES.lock().get(name) {
+        return f.clone();
+    }
+    let f = load(module, name);
+    FEATURES.lock().entry(name).or_insert(f).clone()
+}
+
+/// Load the std features whose editing logic dialogs run, on a background
+/// thread (at startup: the first dialog then doesn't wait for std).
+pub fn prewarm() {
+    static STARTED: std::sync::Once = std::sync::Once::new();
+    STARTED.call_once(|| {
+        let _ = std::thread::Builder::new().name("std prewarm".into()).spawn(|| {
+            for ty in STD_EDITING_LOGIC {
+                if let Some((module, name)) = std_name(ty) {
+                    loaded(module, name);
+                }
+            }
+        });
+    });
+}
+
 fn load(module: &str, name: &str) -> Option<Arc<StdFeature>> {
     // Natives bind when std compiles: register them first.
     super::host::register();
@@ -61,8 +87,7 @@ fn load(module: &str, name: &str) -> Option<Arc<StdFeature>> {
 /// "sheetMetalFlange.fs", "sheetMetalFlange").
 pub fn evaluate(ev: &mut EvalCtx, module: &'static str, name: &'static str) -> FResult<()> {
     super::host::register();
-    let f = FEATURES.lock().entry(name).or_insert_with(|| load(module, name)).clone();
-    let Some(f) = f else { return err(format!("The standard library has no feature {name}")) };
+    let Some(f) = loaded(module, name) else { return err(format!("The standard library has no feature {name}")) };
     super::run::run_feature(ev, &f.cell, &f.params, &f.specs, name.to_string(), None)
 }
 
@@ -211,7 +236,7 @@ const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sw
 /// Whether std has editing logic for built-in feature `type_id` and the
 /// dialog runs it (std runs the feature, or it is in STD_EDITING_LOGIC).
 pub fn has_editing_logic(type_id: &str) -> bool {
-    (evaluator(type_id).is_some() || STD_EDITING_LOGIC.contains(&type_id)) && std_name(type_id).and_then(|(module, name)| FEATURES.lock().entry(name).or_insert_with(|| load(module, name)).clone()).is_some_and(|f| f.editing.is_some())
+    (evaluator(type_id).is_some() || STD_EDITING_LOGIC.contains(&type_id)) && std_name(type_id).and_then(|(module, name)| loaded(module, name)).is_some_and(|f| f.editing.is_some())
 }
 
 /// [`editing_logic`] in `ctx`, the Part Studio just before the feature (a
@@ -229,7 +254,7 @@ pub fn editing_logic_in(
     creating: bool,
 ) -> Option<crate::params::ParamValues> {
     let (module, std) = std_name(type_id)?;
-    let f = FEATURES.lock().entry(std).or_insert_with(|| load(module, std)).clone()?;
+    let f = loaded(module, std)?;
     let editing = f.editing.as_ref()?;
     super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, old, new, specified, creating)
 }
@@ -239,6 +264,6 @@ pub fn editing_logic_in(
 /// is compared with (tests/std_oracle.rs).
 pub fn std_dialog(type_id: &str) -> Option<Vec<crate::params::ParamSpec>> {
     let (module, name) = std_name(type_id)?;
-    let f = FEATURES.lock().entry(name).or_insert_with(|| load(module, name)).clone()?;
+    let f = loaded(module, name)?;
     Some(super::studio::param_specs(&f.params))
 }
