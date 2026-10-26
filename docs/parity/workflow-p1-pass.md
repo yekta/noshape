@@ -92,3 +92,4 @@ then edits, undo/redo, rollback and suppress.
 | P2-D1 on green af9f1e4c (fix 817d9cb1) | assembly drawing, tilted plate: d on the middle hole rim → "Ø.394" preview, prompt "Click to place the dimension, or select a second entity" | — | ✅ **fixed** |
 | STEP import ("+" › Import…, bracket.step) | "Import to Onshape" options; Import → tab "bracket" + folder "CAD Imports" | same dialog (behaviours 1051) | ✅ |
 | Assembly drawing after the unrelated import | Update ⟳ turns saturated (out of date) | unrelated changes? (request 10-26 p5) | ? |
+| Part Studio tab menu (green af9f1e4c) | Delete / Open in new browser tab, Rename, Properties…, Show code / Duplicate, Copy to clipboard / Select as document thumbnail / Move to document… (no Export…) | the newer live captures (behaviours 6561, 7153) list exactly these; the older one (280) also had Export… | ✅ |
