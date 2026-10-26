@@ -1100,3 +1100,37 @@ fn move_boundary_between_arcs_extends_them() {
         }
     }
 }
+
+/// Live SF7 (workflow-surfaces 10): Fill on the open edges of an open box
+/// (a 20 mm box surface without its top) with Add, Merge with all: knits into
+/// one solid, 8000 mm³, 6 faces.
+#[test]
+fn fill_on_an_open_box_knits_a_solid() {
+    use noshape_kernel as k;
+    let cube = k::make_box(&k::Plane::xy(), 0.02, 0.02, 0.02).unwrap();
+    let walls: Vec<k::Shape> = cube.faces().into_iter().filter(|f| f.centroid().unwrap().z < 0.0199).collect();
+    assert_eq!(walls.len(), 5);
+    let open = k::sew(&walls, 1e-7, false).unwrap().shape;
+    let brep = String::from_utf8(open.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    assert_eq!(r.context.bodies[0].kind, BodyKind::Surface);
+    let b = &r.context.bodies[0];
+    let rim: Vec<Reference> = b.shape.edges().iter().enumerate().filter(|(_, e)| { let i = e.edge_info().unwrap(); i.start.z > 0.0199 && i.end.z > 0.0199 }).map(|(i, _)| Reference::Edge((*b.edges[i]).clone())).collect();
+    assert_eq!(rim.len(), 4);
+    s.add("fill", move |p| {
+        let mut row = ParamValues::default();
+        row.set("entities", ParamValue::Query(rim));
+        row.set("continuity", ParamValue::Enum("G0".into()));
+        p.set("edges", ParamValue::Array(vec![row]));
+        p.set("surfaceOperationType", ParamValue::Enum("ADD".into()));
+        p.set("defaultSurfaceScope", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let b = &r.context.bodies[0];
+    assert_eq!(b.kind, BodyKind::Solid);
+    assert_eq!(b.shape.faces().len(), 6);
+    assert!((b.shape.volume().unwrap() * 1e9 - 8000.0).abs() < 1e-6);
+}
