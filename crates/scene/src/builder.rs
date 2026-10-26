@@ -580,8 +580,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     Some(c) => lin_to_u8(c),
                     None => sketch_color(&opts.graphics, p.state, false, editing, false),
                 };
-                // Live (sketch/06): vertices of the edited sketch are 7 px dots.
-                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 5.0 } else { 7.0 };
+                // Live (sketch/07, 28; with the anti-aliased rim): vertices of
+                // the edited sketch are 6.7 px dots while under-defined (blue),
+                // 6 px once defined.
+                let vertex = if p.state == SketchEntityState::Under { 6.7 } else { 6.0 };
+                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 5.0 } else { vertex };
                 // Standalone points and spline handles are hollow (live sketch/100, Point tool).
                 let style = if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
                 points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style, _pad: 0 });
