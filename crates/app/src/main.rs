@@ -338,6 +338,7 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
     // Initializes the GPU on a background thread; the first use waits for it.
     let gpu = gpu::Gpu::new().expect("could not start the GPU thread");
+    noshape_render::perf::milestone("GPU thread started");
     // Feature Studio imports of other documents / versions read their snapshots.
     noshape_model::custom::set_external_tab_loader(derived::external_tab);
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -345,6 +346,7 @@ fn main() {
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);
 
     let app = gpui_kit::application().with_assets(assets::AppAssets);
+    noshape_render::perf::milestone("GPUI application created");
     // macOS: clicking the dock icon with no windows open shows the start window.
     app.on_reopen(|cx| {
         if cx.windows().is_empty() {
@@ -354,10 +356,12 @@ fn main() {
     app.run(move |cx| {
         noshape_render::perf::milestone("GPUI app started");
         gpui_kit::init(cx);
+        noshape_render::perf::milestone("gpui-kit initialized");
         // Onshape's text (Chrome) is grayscale anti-aliased, without the
         // colour fringes of subpixel rendering.
         cx.set_text_rendering_mode(gpui_kit::TextRenderingMode::Grayscale);
         apply_theme(cx);
+        noshape_render::perf::milestone("theme applied");
         graphics_prefs::init(cx);
         actions::bind_default_keys(cx);
         feature_studio::bind_keys(cx);
@@ -367,6 +371,7 @@ fn main() {
         units_prefs::apply();
         cx.set_global(gpu::GpuGlobal(gpu.clone()));
         cx.on_action(|_: &actions::Quit, cx| cx.quit());
+        noshape_render::perf::milestone("preferences and keys set");
 
         files::init(cx);
         noshape_render::perf::milestone("app initialized");
