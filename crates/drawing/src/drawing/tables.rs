@@ -51,6 +51,7 @@ pub struct AppliedStyle {
     pub title: f64,
     pub header: f64,
     pub content: f64,
+    pub title_text: super::RowText,
     pub header_text: super::RowText,
     pub content_text: super::RowText,
     pub font: Option<super::sheet::TextFont>,
@@ -444,7 +445,7 @@ fn finish(drawing: &Drawing, table: &Table, mut data: TableData) -> TableData {
     let header = if table.own_text_height { content } else { st.header.height.unwrap_or(drawing.props.ann_text_height) };
     // Live: Title row text 0.1560 in = 1.3 x the rows' 0.1200.
     let title = if table.own_text_height { content * 1.2 } else { st.title.unwrap_or(content * 1.3) };
-    data.style = Some(AppliedStyle { title, header, content, header_text: st.header.clone(), content_text: st.content.clone(), font: st.font.clone(), line: st.line });
+    data.style = Some(AppliedStyle { title, header, content, title_text: st.title_text.clone(), header_text: st.header.clone(), content_text: st.content.clone(), font: st.font.clone(), line: st.line });
     // A split table shows its part of the rows.
     if let Some([a, b]) = table.rows {
         let n = data.rows.len();
@@ -710,6 +711,18 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
         let (ya, yb) = (l.ys[0], l.ys[1]);
         g.lines.push(Polyline2 { points: vec![[lo[0], yb], [hi[0], yb]], style: LineStyle::Thin, closed: false, pick });
         g.texts.push(Text2 { pos: [(lo[0] + hi[0]) / 2.0, (ya + yb) / 2.0], height: data.title_height(table), text: t.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+        // Drawing properties › Tables › Title row text: Bold / Italic, colour.
+        if let Some(s) = &data.style {
+            let i = g.texts.len() - 1;
+            let tt = &s.title_text;
+            if tt.bold || tt.italic || s.font.is_some() {
+                let family = s.font.as_ref().map_or_else(|| font::DEFAULT_FAMILY.into(), |f| f.family.clone());
+                g.fonts.push(super::sheet::FontSpan { texts: i..i + 1, font: super::sheet::TextFont { family, bold: tt.bold, italic: tt.italic } });
+            }
+            if let Some(rgb) = tt.color {
+                g.colors.push(super::sheet::ColorSpan { lines: 0..0, texts: i..i + 1, fills: 0..0, rgb });
+            }
+        }
         row0 = 1;
     }
     let rows = data.all_rows();

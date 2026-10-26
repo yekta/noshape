@@ -545,7 +545,7 @@ fn table_styles_from_drawing_properties() {
     let (h1, a, title) = (at("H1"), at("a"), at("T"));
     assert!((g.texts[h1].height - d.props.ann_text_height).abs() < 1e-9 && g.text_color(h1) == Some([200, 0, 0]) && g.text_font(h1).is_some_and(|f| f.bold));
     assert!((g.texts[a].height - 5.0).abs() < 1e-9 && g.text_font(a).is_some_and(|f| f.italic && !f.bold) && g.text_color(a).is_none());
-    assert!((g.texts[title].height - 6.5).abs() < 1e-9);
+    assert!((g.texts[title].height - 6.5).abs() < 1e-9 && g.text_font(title).is_some_and(|f| f.bold), "title row Bold by default");
     assert!((0..g.lines.len()).all(|i| (g.line_pen(i).0 - 0.35).abs() < 1e-9));
     let mut own = t.clone();
     own.text_height = 2.5;

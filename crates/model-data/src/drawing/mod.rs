@@ -3044,7 +3044,8 @@ impl TableStyles {
 }
 
 /// One kind's table look: line pen (mm), font, title row height (None:
-/// 1.3 × the content's, live 0.1560 in), header and content rows.
+/// 1.3 × the content's, live 0.1560 in) and its Bold (live pressed) /
+/// Italic / colour, header and content rows.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TableStyle {
@@ -3053,14 +3054,15 @@ pub struct TableStyle {
     pub font: Option<sheet::TextFont>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<f64>,
+    pub title_text: RowText,
     pub header: RowText,
     pub content: RowText,
 }
 
 impl Default for TableStyle {
     fn default() -> Self {
-        // Live: 0.13 mm, header row Bold.
-        Self { line: 0.13, font: None, title: None, header: RowText { bold: true, ..Default::default() }, content: RowText::default() }
+        // Live: 0.13 mm, title and header rows Bold.
+        Self { line: 0.13, font: None, title: None, title_text: RowText { bold: true, ..Default::default() }, header: RowText { bold: true, ..Default::default() }, content: RowText::default() }
     }
 }
 
