@@ -1537,3 +1537,31 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
 - **Loft guides** (live "psb (10-24 f)"): `solid_a::loft_guided` for two polygon profiles and one-curve guides through
   corners: side faces ruled between corner columns (guide or straight line, arc-length pairing), sewn with the caps.
   Unit test `solid_a::tests::guided_loft_as_live` (kernel shapes; the live guide arcs lie in x = ±y planes).
+
+## psb status at the halt (2026-10-26, 18:xx UTC)
+
+### On main
+- **Face blend variants:** asymmetric, width ratio, conic, curvature, chamfer and width (4d5af0d8). Test: features_c face_blend_variants_as_live (22 live cases).
+- **Face blend without a common edge, planar sides** (ad4f19fc). Test: features_c face_blend_without_a_common_edge_as_live.
+- **Loft guides:** Trim guides, Trim profiles, continuity checks; kernel `loft_guided_open` (17ed9355). Test: features_a loft_guides_trims_and_continuity_as_live.
+- **Decal, model side** (0040f4e4): `Context::decals` and `decal_default_size`. Test: features_c decal_places_its_image_as_std. icons2 draws the decals.
+- **Fix main:** TangentLinks with reversed edges (21f3beb6).
+- **Fix main (macOS):** a shell that leaves a sliver now fails (80707054).
+- Earlier today: curved parting-line draft, PROJ-RULED, loft guides on curved profiles, P2 oracle.
+
+### WIP branch: agent/psb, 2845b418 (not on main)
+On top of main:
+- **The face blend message rule from live.** Planar sides: GA–GE, 31 cases, in the test table. Curved sides: NP2, the cylinder (see behaviours.md "Face blend messages and curved faces").
+- **Face blend between curved faces without a common edge.** The faces between the sides are found (`blend_section::gap_faces`, the shortest section run from side to side) and deleted with healing; then the new edge is blended.
+- **The section sweep along other curves.** `section_blend` lofts sections along the whole chain when it has non-line/arc edges (the elliptic boss).
+- Test: features_c face_blend_on_curved_faces_as_live. These pass: NP1 cylinder (5 variants), NC cone (4), NP2 across the chamfer, and NP2's 7 error messages.
+
+### Open items, in priority order
+1. **WIP: the elliptic boss gives 10 faces, live 9.** Volumes are within 0.0012 mm³ of exact (live's own mass properties are 0.22–0.59 off). Next: print the faces (the test's failure message lists their types and areas). The likely cause is a seam split of the lofted blend face or of the support face that UnifySameDomain doesn't merge. Try `closed` lofts starting at the edge's seam, or unify the tool before the boolean.
+2. **WIP: curvature section on the elliptic boss: "Failed to blend faces.".** Next: re-add `eprintln!` in `blend_section::fail` to get the reason. Most likely `k::loft` of the degree-5 B-spline section wires; try `ruled: false` with wires instead of faces, or more stations.
+3. **WIP: model clippy has not been rerun since the `type Case` / `type Geo` fix.** Then the regression set: features_c face_blend, kernel_robustness fillet, oracle_p1, std_oracle. Then land on main.
+4. **Live disagreements still open:** none known beyond 1 and 2. Agent API for Decal: an image tab via ops (api's area).
+
+### Known failing tests in my area
+- None on main that I know of.
+- On the WIP branch: features_c face_blend_on_curved_faces_as_live, the 4 elliptic-boss cases (items 1 and 2).
