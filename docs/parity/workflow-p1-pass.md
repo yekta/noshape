@@ -90,3 +90,5 @@ then edits, undo/redo, rollback and suppress.
 | Group dialog (assembly) | one "Instances" field | same (behaviours 1333) | ✅ |
 | Split of an inserted part in the Part Studio | the halves are new parts (ids from Split, renamed Part 6 / 7, others renumbered); the assembly instance of the old part fails "Failed to resolve instance." and its mate / pattern error | live Split re-identifies the same way (old id gone, halves new, renumbered; behaviours "qa5 (10-25 p3)" Split) | ✅ (consistent) |
 | P2-D1 on green af9f1e4c (fix 817d9cb1) | assembly drawing, tilted plate: d on the middle hole rim → "Ø.394" preview, prompt "Click to place the dimension, or select a second entity" | — | ✅ **fixed** |
+| STEP import ("+" › Import…, bracket.step) | "Import to Onshape" options; Import → tab "bracket" + folder "CAD Imports" | same dialog (behaviours 1051) | ✅ |
+| Assembly drawing after the unrelated import | Update ⟳ turns saturated (out of date) | unrelated changes? (request 10-26 p5) | ? |
