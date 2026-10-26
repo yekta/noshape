@@ -777,3 +777,9 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   works correctly (plain row, unexploded; a double-click re-enters, fully exploded). Live: **Esc = Done** (behaviours
   "Exploded views: steps, clicks, menus, rollback, Done", skb 10-20, assembly/823, 816, 824). Screens
   /root/qa5-scratch/run/shots/a28-20/22/23/24.png.
+- **P2-A4 — skb (mate dialog preview)** — green af9f1e4c, assembly with Circular pattern 1 (seed Part 2 <1>, copy Part 2 <2>
+  in hole 3). Editing the seed's mate (double-click Cylindrical 1; also while retyping it to Revolute): **the pattern copy
+  Part 2 <2> disappears from the graphics** while the dialog is open (hole 3 empty, /root/qa5-scratch/run/shots/a28-31/32.png);
+  after ✓ it is back and follows the seed. Also during that edit the seed pin shows **z-fighting stripes** (orange preview
+  over the grey original at the same place, a28-32). Live keeps every instance drawn while a mate is edited (no capture
+  shows instances vanishing; asked in "qa5 (10-26 p6)" only for the toast, so treat this as a plain bug).

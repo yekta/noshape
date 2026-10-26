@@ -110,3 +110,8 @@ then edits, undo/redo, rollback and suppress.
 | Done, then double-click Explode 1 | plain row, unexploded; re-enters editing fully exploded | same | ✅ |
 | Step row right-click | Edit… / Rename / — / Delete | same (behaviours 815) | ✅ |
 | Esc with no dialog in explode editing | toolbar back but still exploded, row stays active with the rollback bar; the next double-click leaves instead of re-entering | Esc = Done | ✗ **P2-A3** (skb) |
+| Assembly circular pattern dialog | Instances, Axis of pattern (+ clock), Angle 360 deg, Instance count 2 (+ ↻), ☑ Equal spacing, ☐ Centered; ✓ pale until Instances is set | same (behaviours 6186, 8704) | ✅ |
+| Pin about the middle hole's rim, ✓ | copy in hole 3; "Circular pattern 1 ▸ Part 2 <2>", Instances (3); info bubble "1 instance(s) created." | bubble? (request 10-26 p6) | ? |
+| Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✗ **P2-A4** (skb) |
+| Mate type → Revolute | Offset, Limits (rotation min / max kept); row "Revolute 1"; Z offset 0 (the pin rises to mid-height) | same (behaviours 5942) | ✅ |
+| Fix the plate, drag the revolute pin | rotates only: axis stays on hole 1 (0.002 mm), plate unchanged; the copy follows | behaviours 5948 (1) | ✅ |
