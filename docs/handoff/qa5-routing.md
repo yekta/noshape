@@ -844,3 +844,23 @@ STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extr
 - **VAR-INVALID — ui (feature dialog)** — live: a Variable whose value doesn't evaluate to its type ("#a + 5 mm * cos(#ang * 1
   rad)" with #ang an angle) turns the Value field red, the title "#d = 0 mm" red and ✓ disabled, so it can't be created; ours
   creates the feature, which then fails. Check the dialog against live.
+- STATUS 2026-10-26 (qa5, green a08e3eda), verified in the app:
+  - **P2-A1 fixed**: Circular pattern › Angle 360 → 300 + Enter applies ("300 deg" selected, dialog open); the 2nd Enter
+    accepts. Instance count + Enter accepts at once, as live (behaviours 4299).
+  - **P1-15 fixed**: hovered view-cube face rgb(188,226,247) #bce2f7.
+  - **P1-12 fixed**: Revolve axis = a profile sketch line → chip "Edge of Sketch 2".
+  - **P1-7 fixed**: a hidden sketch on a suppressed extrude's face → its row is red (and loses the minus badge, as live).
+  - **P1-14 fixed**: a new document (Create › Document…) shows "Mass moments of inertia (lb mm²)".
+  - **P1-3 fixed**: the Fillet radius arrow follows the last picked edge (both pick orders tried).
+  - **P1-13 fixed**: Circular pattern (Part pattern) copies keep the seed's colour.
+  - **P1-5 fixed**: depth 15 / R2 / blind holes, Shell 2.5 off the top → "Shell 1 did not regenerate properly: Could not
+    shell part with selections.".
+  - **P1-16 still open** on the green kernel: depth 10 / R1, Shell 1 mm still fails; 2.5 mm still 8487.861 mm³ (live 8503.961).
+  - P1-18 still open (the failing rows above show no ⚠ badge).
+- STATUS 2026-10-26 (qa5, live answer "qa5 (10-26 p6)"): **P2-A2 confirmed** (live: 1st Enter in a mate limit field applies,
+  "5 mm" selected, dialog open; 2nd Enter accepts). **P2-A3 confirmed** (live Esc = Done: plain row, no rollback bar,
+  unexploded; double-click re-enters). New **P2-A8 — skb (assembly patterns)**: ours shows an info bubble "N instance(s)
+  created." after accepting an assembly pattern (assembly_panels.rs:1234; also "0 instance(s) created." after an edit);
+  live shows **no bubble** for circular or linear patterns (polled 20 s). Detail-view scale (p6 (4)) not answered yet.
+- STATUS 2026-10-26 (qa5): P1-6 merges into P1-16 (live "qa5 (10-25 p2)" (6): depth 10, R1, Shell 2.5 and 1 mm both OK).
+  Lead 10-26: qa5 fixes the open findings itself, P1 first.

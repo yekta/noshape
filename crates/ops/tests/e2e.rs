@@ -961,6 +961,27 @@ fn coincident_on_one_point_is_a_no_op() {
     assert!(shown.starts_with("30") || shown.starts_with("20"), "{dim}");
 }
 
+/// A constraint to the Origin references it (live: the external Origin, no
+/// sketch entity): sketch_get lists no hidden point for it, and the
+/// constraint names `origin` (skb, qa5 P1-4 data note).
+#[test]
+fn sketch_get_names_the_origin_not_a_hidden_point() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "origin_ref.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[5, 5], [30, 20]] }));
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap().clone();
+    let start = line["start_point"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "coincident", "entities": [start, "origin"] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    let points = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "point").count();
+    assert_eq!(points, 2, "only the line's end points: {g}");
+    let ents = g["entities"].as_array().unwrap().iter().map(|e| e["id"].clone()).collect::<Vec<_>>();
+    let to_origin = g["constraints"].as_array().unwrap().iter().find(|c| c["entities"].as_array().unwrap().iter().any(|e| e == "origin")).unwrap_or_else(|| panic!("no constraint names the origin: {g}"));
+    for e in to_origin["entities"].as_array().unwrap() {
+        assert!(e == "origin" || ents.contains(e), "{to_origin}");
+    }
+}
+
 /// Named positions driven by a revolute mate, and an exploded view.
 #[test]
 fn assembly_named_positions_and_exploded_views() {
