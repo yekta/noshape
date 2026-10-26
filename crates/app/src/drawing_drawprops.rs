@@ -26,9 +26,16 @@ use noshape_model::drawing::*;
 pub enum FieldKind {
     Dropdown,
     /// ↑ / ↓ step in an inch and in a mm drawing, decimals shown (live
-    /// dom/drawing-wt-widgets: gaps 4, table padding 3).
-    Spin { step_in: f64, step_mm: f64, decimals: usize },
+    /// dom/drawing-wt-widgets: gaps 4, table padding 3); `unitless`: a
+    /// plain number (Dashes), no unit.
+    Spin { step_in: f64, step_mm: f64, decimals: usize, unitless: bool },
     Text,
+}
+
+/// Millimetres per shown unit of a field of `kind` (lengths in the
+/// drawing's units, unitless spinboxes as typed).
+fn unit_k(kind: FieldKind, inch: bool) -> f64 {
+    if inch && !matches!(kind, FieldKind::Spin { unitless: true, .. }) { 25.4 } else { 1.0 }
 }
 
 /// A panel field: its input, kind, the value it shows (mm), whether a
@@ -188,6 +195,8 @@ enum FontOf {
     Dims,
     Inspection,
     Type(AnnType),
+    /// Views › All views › View labels.
+    ViewLabel,
 }
 
 fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawing::sheet::TextFont> {
@@ -195,6 +204,7 @@ fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawin
         FontOf::Dims => &mut p.dim_font,
         FontOf::Inspection => &mut p.inspection_font,
         FontOf::Type(t) => &mut p.ann_type_mut(t).font,
+        FontOf::ViewLabel => &mut p.view_tab.view_label_font,
     }
 }
 
@@ -231,7 +241,7 @@ struct FieldCommit {
 fn commit_number(this: &mut DrawingEditor, f: &FieldCommit, inch: bool, window: &mut Window, cx: &mut Context<DrawingEditor>) {
     use crate::drawing_wt::{leading_number, show, spin_number};
     let FieldCommit { st, kind, val, inv, set } = f.clone();
-    let k = if inch { 25.4 } else { 1.0 };
+    let k = unit_k(kind, inch);
     let text = st.read(cx).value().to_string();
     match kind {
         FieldKind::Dropdown => {
@@ -297,8 +307,8 @@ impl DrawingEditor {
         // Lengths in the drawing's units ("0.1200 in", "3 mm"); typing a unit
         // overrides them.
         let inch = !self.drawing.units_mm;
-        let k = if inch { 25.4 } else { 1.0 };
         let make = move |v: f64, kind: FieldKind, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| {
+            let k = unit_k(kind, inch);
             let shown = match kind {
                 FieldKind::Spin { decimals, .. } => crate::drawing_wt::show_dec(v / k, decimals),
                 _ => crate::drawing_wt::show(v / k),
@@ -322,9 +332,11 @@ impl DrawingEditor {
         };
         let dropdown = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Dropdown, set, window, cx);
         // Steps: live 0.05 in; mm Stack gap 0.05, Text gap 0.1.
-        let spin = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.05, step_mm: 0.1, decimals: 4 }, set, window, cx);
-        let spin_fine = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.05, step_mm: 0.05, decimals: 4 }, set, window, cx);
-        let spin3 = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.05, step_mm: 0.1, decimals: 3 }, set, window, cx);
+        let spin = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.05, step_mm: 0.1, decimals: 4, unitless: false }, set, window, cx);
+        let spin_fine = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.05, step_mm: 0.05, decimals: 4, unitless: false }, set, window, cx);
+        let spin3 = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.05, step_mm: 0.1, decimals: 3, unitless: false }, set, window, cx);
+        // Dash scales (live "1.00").
+        let spin_scale = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.1, step_mm: 0.1, decimals: 2, unitless: true }, set, window, cx);
         // Text fields (label prefixes): applied on Enter / blur.
         let text_field = |v: String, set: fn(&mut DrawingProps, String), window: &mut Window, cx: &mut Context<Self>| {
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(v));
@@ -344,6 +356,12 @@ impl DrawingEditor {
                 text_field(vt.detail_prefix, |p, v| p.view_tab.detail_prefix = v, window, cx),
                 text_field(vt.aux_prefix, |p, v| p.view_tab.aux_prefix = v, window, cx),
                 text_field(vt.aux_suffix, |p, v| p.view_tab.aux_suffix = v, window, cx),
+                // 4: View labels' height; 5–7: Hidden / Tangent edges' and
+                // Exploded lines' Dashes.
+                dropdown(vt.view_label_height.unwrap_or(p.ann_text_height), |p, v| p.view_tab.view_label_height = Some(v), window, cx),
+                spin_scale(vt.hidden_dashes, |p, v| p.view_tab.hidden_dashes = v, window, cx),
+                spin_scale(vt.tangent_dashes, |p, v| p.view_tab.tangent_dashes = v, window, cx),
+                spin_scale(vt.exploded_dashes, |p, v| p.view_tab.exploded_dashes = v, window, cx),
             ],
             4 => vec![spin(vt.centermark_mark_size, |p, v| p.view_tab.centermark_mark_size = v, window, cx), spin(vt.centermark_gap_size, |p, v| p.view_tab.centermark_gap_size = v, window, cx)],
             1 => {
@@ -389,18 +407,18 @@ impl DrawingEditor {
     /// ↓ step, pale orange "Must be a number" when invalid), the unit as a
     /// label beside; texts 160 px.
     fn wt_field(&self, i: usize, ed: &Entity<Self>) -> AnyElement {
-        self.wt_field_w(i, ed, 169.)
+        self.wt_field_w(i, ed, None)
     }
 
-    /// [`Self::wt_field`] with a spinbox `spin_w` px wide (live's spinboxes
-    /// fill their table column).
-    fn wt_field_w(&self, i: usize, ed: &Entity<Self>, spin_w: f32) -> AnyElement {
+    /// [`Self::wt_field`] `w` px wide (live's fields fill their table
+    /// column; default 141 with a ▾, 169 as a spinbox).
+    fn wt_field_w(&self, i: usize, ed: &Entity<Self>, w: Option<f32>) -> AnyElement {
         use crate::drawing_wt::{INVALID_BG, INVALID_TIP, show, show_dec, spin_step};
         let Some(f) = self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) else { return div().into_any_element() };
         // Show `v` (display units) in the field and apply it.
         let apply = {
             let (ed, st, val, set, inv) = (ed.clone(), f.state.clone(), f.value.clone(), f.set, f.invalid.clone());
-            let k = if self.drawing.units_mm { 1.0 } else { 25.4 };
+            let k = unit_k(f.kind, !self.drawing.units_mm);
             let decimals = match f.kind {
                 FieldKind::Spin { decimals, .. } => decimals,
                 _ => 4,
@@ -432,8 +450,9 @@ impl DrawingEditor {
             .text_size(px(13.33))
             .text_color(gpui_kit::rgb(0x555555))
             .when(f.invalid.get(), |i| i.bg(gpui_kit::rgba(INVALID_BG)));
-        let unit = div().w(px(24.)).flex_none().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).opacity(0.65).flex().justify_center().child(if self.drawing.units_mm { "mm" } else { "in" });
-        let k = if self.drawing.units_mm { 1.0 } else { 25.4 };
+        let unitless = matches!(f.kind, FieldKind::Spin { unitless: true, .. });
+        let unit = (!unitless).then(|| div().w(px(24.)).flex_none().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).opacity(0.65).flex().justify_center().child(if self.drawing.units_mm { "mm" } else { "in" }));
+        let k = unit_k(f.kind, !self.drawing.units_mm);
         match f.kind {
             FieldKind::Dropdown => {
                 // ▾: the preset heights (as the Styles panel's list).
@@ -474,7 +493,7 @@ impl DrawingEditor {
                             .absolute()
                             .top(px(25.))
                             .left_0()
-                            .w(px(141.))
+                            .w(px(w.unwrap_or(141.)))
                             .bg(gpui_kit::rgb(0xffffff))
                             .border_1()
                             .border_color(gpui_kit::rgb(0xcccccc))
@@ -509,8 +528,8 @@ impl DrawingEditor {
                 });
                 h_flex()
                     .gap(px(6.))
-                    .child(div().w(px(141.)).relative().child(input).child(caret.absolute().right_0().top_0()).children(list))
-                    .child(unit)
+                    .child(div().w(px(w.unwrap_or(141.))).relative().child(input).child(caret.absolute().right_0().top_0()).children(list))
+                    .children(unit)
                     .into_any_element()
             }
             FieldKind::Spin { step_in, step_mm, .. } => {
@@ -530,7 +549,7 @@ impl DrawingEditor {
                 let (step_up, step_dn) = (step.clone(), step.clone());
                 let boxed = div()
                     .id(SharedString::from(format!("dp-wt-spin-{i}")))
-                    .w(px(spin_w))
+                    .w(px(w.unwrap_or(169.)))
                     .relative()
                     .when(invalid, |d| d.bg(gpui_kit::rgba(INVALID_BG)).tooltip(crate::ui::tooltip(INVALID_TIP)))
                     .capture_action(move |_: &gpui_kit::component::input::MoveUp, window, cx| {
@@ -544,7 +563,7 @@ impl DrawingEditor {
                     .child(input)
                     .child(arrow(format!("dp-wt-up-{i}"), true))
                     .child(arrow(format!("dp-wt-dn-{i}"), false));
-                h_flex().gap(px(6.)).child(boxed).child(unit).into_any_element()
+                h_flex().gap(px(6.)).child(boxed).children(unit).into_any_element()
             }
             FieldKind::Text => div().w(px(160.)).child(input).into_any_element(),
         }
@@ -597,6 +616,11 @@ impl DrawingEditor {
                 .into_any_element()
         };
         let select = |id: &'static str, current: String, items: Vec<(String, bool, Act)>| sel(id, current, items, 164.);
+        // A pen select (live: 0.13 mm … 2.00 mm).
+        let thick_sel = |id: &'static str, cur: f64, set: fn(&mut DrawingProps, f64), w: f32| {
+            let items: Vec<(String, bool, Act)> = noshape_model::drawing::LINE_THICKNESSES.iter().map(|&t| (format!("{t:.2} mm"), (t - cur).abs() < 1e-6, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, t)) as Act)).collect();
+            sel(id, format!("{cur:.2} mm"), items, w)
+        };
         // Color swatch (live drawing/1710): a 26 px square of the colour; a
         // click opens the color dialog.
         let swatch = |id: &'static str, cur: Option<[u8; 3]>, set: crate::drawing_color::ColorSet| -> AnyElement {
@@ -633,6 +657,7 @@ impl DrawingEditor {
                 FontOf::Dims => "dp-dfont",
                 FontOf::Inspection => "dp-ifont",
                 FontOf::Type(t) => TYPE_IDS[AnnType::ALL.iter().position(|x| *x == t).unwrap_or(0)][0],
+                FontOf::ViewLabel => "dp-vlfont",
             };
             sel(id, label, items, width)
         };
@@ -791,7 +816,7 @@ impl DrawingEditor {
             // Annotations, in Onshape's groups: All annotations (Arrowhead),
             // then each type's font, text height and color with its extras.
             let field = |i: usize| self.wt_field(i, &ed);
-            let field_w = |i: usize, w: f32| self.wt_field_w(i, &ed, w);
+            let field_w = |i: usize, w: f32| self.wt_field_w(i, &ed, Some(w));
             let arrow_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL
                 .iter()
                 .map(|&t| (t.name().to_string(), t == props.ann_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.ann_arrow_type = t) as Act))
@@ -896,6 +921,7 @@ impl DrawingEditor {
                 })))
             };
             let vd = props.view_defaults.clone();
+            let vt = props.view_tab.clone();
             let proj = self.drawing.projection;
             let ed2 = ed.clone();
             // Live 1710: 223 px from the group's column (121 px).
@@ -920,8 +946,25 @@ impl DrawingEditor {
             let tangent_items: Vec<(String, bool, Act)> = ["Hidden", "Solid", "Phantom"].iter().enumerate().map(|(i, n)| (n.to_string(), vd.tangent == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_defaults.tangent = i as u8) as Act)).collect();
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Views"))
+                // Live 1710: Visible edges a 193 px pen select and its colour
+                // 6 px on; View labels a font select, then a row of the
+                // 100 px height, Bold / Italic and the colour.
                 .child(section("All views"))
                 .child(trow("Projection angle", 121., 33., 2., proj_btn))
+                .child(trow("Visible edges", 120., 33., 2., h_flex().items_start().child(thick_sel("dp-vthick", vt.visible_thickness, |p, v| p.view_tab.visible_thickness = v, 193.)).child(div().ml(px(6.)).child(swatch("dp-vcolor", vt.visible_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.visible_color = c)))).into_any_element()))
+                .child(trow("View labels", 121., 32., 2., font_row(FontOf::ViewLabel, vt.view_label_font.clone(), 223.)))
+                .child(trow(
+                    "",
+                    120.,
+                    33.,
+                    2.,
+                    h_flex()
+                        .items_start()
+                        .child(self.wt_field_w(4, &ed, Some(100.)))
+                        .child(div().ml(px(7.)).child(Self::font_style_toggles(FontOf::ViewLabel, vt.view_label_font.clone(), ("dp-vlfont-b", "dp-vlfont-i"), 6., cx)))
+                        .child(div().ml(px(5.)).child(swatch("dp-vlcolor", vt.view_label_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.view_label_color = c))))
+                        .into_any_element(),
+                ))
                 // Live 1710: the column at 165 px, selects up to 343 px, in
                 // live's order; Scale label and the auto centermarks /
                 // centerlines are On / Off selects.
@@ -931,9 +974,14 @@ impl DrawingEditor {
                 .child(trow("Tangent edges", 165., 33., 2., sel("dp-vtan", ["Hidden", "Solid", "Phantom"][vd.tangent.min(2) as usize].into(), tangent_items, 179.)))
                 .child(trow("Scale label", 165., 33., 2., sel("dp-vscale", on_off(vd.scale_label).into(), on_off_items(vd.scale_label, |p, v| p.view_defaults.scale_label = v), 179.)))
                 .child(trow("Auto centermarks (Parts)", 165., 33., 2., sel("dp-vcm", on_off(vd.auto_centermarks).into(), on_off_items(vd.auto_centermarks, |p, v| p.view_defaults.auto_centermarks = v), 179.)))
-                .child(trow("Auto centerlines (Parts)", 165., 33., 2., sel("dp-vcl", on_off(vd.auto_centerlines).into(), on_off_items(vd.auto_centerlines, |p, v| p.view_defaults.auto_centerlines = v), 179.)));
+                .child(trow("Auto centerlines (Parts)", 165., 33., 2., sel("dp-vcl", on_off(vd.auto_centerlines).into(), on_off_items(vd.auto_centerlines, |p, v| p.view_defaults.auto_centerlines = v), 179.)))
+                .child(trow("Threads (Parts)", 165., 33., 2., sel("dp-vthreads", if vd.threads { "Shown".into() } else { "Hidden".into() }, vec![
+                    ("Hidden".into(), !vd.threads, std::rc::Rc::new(|p: &mut DrawingProps| p.view_defaults.threads = false) as Act),
+                    ("Shown".into(), vd.threads, std::rc::Rc::new(|p: &mut DrawingProps| p.view_defaults.threads = true) as Act),
+                ], 179.)))
+                .child(trow("Bend lines (Parts)", 165., 33., 2., sel("dp-vbend", on_off(vd.bend_lines).into(), on_off_items(vd.bend_lines, |p, v| p.view_defaults.bend_lines = v), 179.)))
+                .child(trow("Bend notes (Parts)", 165., 33., 2., sel("dp-vbendn", on_off(vd.bend_notes).into(), on_off_items(vd.bend_notes, |p, v| p.view_defaults.bend_notes = v), 179.)));
             // Per view type.
-            let vt = props.view_tab.clone();
             let field = |i: usize| self.wt_field(i, &ed);
             let detail_lines: Vec<(String, bool, Act)> = ["Phantom", "Dashed", "Solid"].iter().enumerate().map(|(i, n)| (n.to_string(), vt.detail_line == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.detail_line = i as u8) as Act)).collect();
             let detail_styles: Vec<(String, bool, Act)> = ["In line", "Connected", "Leader"].iter().enumerate().map(|(i, n)| (n.to_string(), vt.detail_style == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.detail_style = i as u8) as Act)).collect();
@@ -942,10 +990,17 @@ impl DrawingEditor {
                 ("A-A".into(), vt.aux_double_label, std::rc::Rc::new(|p: &mut DrawingProps| p.view_tab.aux_double_label = true) as Act),
             ];
             body = body
+                // Live 1710: column 124, a 189 px pen select and its colour,
+                // Dashes a 200 px spinbox 1 px further.
                 .child(section("Hidden edges"))
-                .child(row("Color", swatch("dp-hcolor", vt.hidden_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.hidden_color = c))))
+                .child(trow("Thickness", 124., 33., 1., h_flex().items_start().child(thick_sel("dp-hthick", vt.hidden_thickness, |p, v| p.view_tab.hidden_thickness = v, 189.)).child(div().ml(px(6.)).child(swatch("dp-hcolor", vt.hidden_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.hidden_color = c)))).into_any_element()))
+                .child(trow("Dashes", 125., 32., 1., self.wt_field_w(5, &ed, Some(200.))))
                 .child(section("Tangent edges"))
-                .child(row("Color", swatch("dp-tcolor", vt.tangent_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.tangent_color = c))))
+                .child(trow("Thickness", 124., 33., 1., h_flex().items_start().child(thick_sel("dp-tthick", vt.tangent_thickness, |p, v| p.view_tab.tangent_thickness = v, 189.)).child(div().ml(px(6.)).child(swatch("dp-tcolor", vt.tangent_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.tangent_color = c)))).into_any_element()))
+                .child(trow("Dashes", 125., 32., 1., self.wt_field_w(6, &ed, Some(200.))))
+                .child(section("Exploded lines"))
+                .child(trow("Thickness", 124., 33., 1., h_flex().items_start().child(thick_sel("dp-ethick", vt.exploded_thickness, |p, v| p.view_tab.exploded_thickness = v, 189.)).child(div().ml(px(6.)).child(swatch("dp-ecolor", vt.exploded_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.exploded_color = c)))).into_any_element()))
+                .child(trow("Dashes", 125., 32., 1., self.wt_field_w(7, &ed, Some(200.))))
                 .child(section("Section views"))
                 .child(row("Label prefix", field(0)))
                 .child(section("Detail views"))
@@ -988,8 +1043,8 @@ impl DrawingEditor {
                 // 181 px spinboxes; Centerlines from column 130.
                 .child(section("Centermarks"))
                 .child(check("dp-cmext", "Extended lines", vt.centermark_extended, |p, v| p.view_tab.centermark_extended = v, cx))
-                .child(trow("Mark size", 149., 32., 2., self.wt_field_w(0, &ed, 181.)))
-                .child(trow("Gap size", 149., 32., 2., self.wt_field_w(1, &ed, 181.)))
+                .child(trow("Mark size", 149., 32., 2., self.wt_field_w(0, &ed, Some(181.))))
+                .child(trow("Gap size", 149., 32., 2., self.wt_field_w(1, &ed, Some(181.))))
                 .child(trow("Color", 149., 33., 2., swatch("dp-cmcolor", vt.centermark_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centermark_color = c))))
                 .child(section("Centerlines"))
                 .child(trow("Color", 130., 33., 2., swatch("dp-clcolor", vt.centerline_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centerline_color = c))));
@@ -1017,8 +1072,8 @@ impl DrawingEditor {
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(-4.)).child("Tables"))
                 // Live 1710: column 181, 100 px spinboxes 1 px down 32 px rows.
                 .child(section("All tables"))
-                .child(trow("Horizontal padding", 181., 32., 1., self.wt_field_w(0, &ed, 100.)))
-                .child(trow("Vertical padding", 181., 32., 1., self.wt_field_w(1, &ed, 100.)));
+                .child(trow("Horizontal padding", 181., 32., 1., self.wt_field_w(0, &ed, Some(100.))))
+                .child(trow("Vertical padding", 181., 32., 1., self.wt_field_w(1, &ed, Some(100.))));
         } else if self.drawing_props.tab == 7 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
@@ -1041,7 +1096,7 @@ impl DrawingEditor {
                 .child(section("Inspection items"))
                 .child(trow("Item parsing", 106., 33., 2., sel("dp-iparse", if props.inspection_row_parsing { "Row".into() } else { "Parameter".into() }, parse_items, 253.)))
                 .child(trow("Font", 106., 32., 2., font_row(FontOf::Inspection, props.inspection_font.clone(), 253.)))
-                .child(trow("Text", 105., 33., 2., h_flex().items_start().child(field(0)).child(Self::font_style_toggles(FontOf::Inspection, props.inspection_font.clone(), ("dp-ifont-b", "dp-ifont-i"), cx)).into_any_element()))
+                .child(trow("Text", 105., 33., 2., h_flex().items_start().child(field(0)).child(Self::font_style_toggles(FontOf::Inspection, props.inspection_font.clone(), ("dp-ifont-b", "dp-ifont-i"), 3., cx)).into_any_element()))
                 .child(trow("Border shape", 106., 33., 2., sel("dp-ishape", props.inspection_shape.name().into(), shape_items, 253.)))
                 .child(trow("Border size", 106., 32., 2., sel("dp-isize", border_chars_label(props.inspection_border_chars), border_items, 253.)))
                 .child(trow("Border color", 105., 33., 2., swatch("dp-icolor", props.inspection_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.inspection_color = c))))
@@ -1149,9 +1204,9 @@ impl DrawingEditor {
     /// template…" with the DWT button (the standard templates), and
     /// ☐ Lock drawing properties.
     /// Bold and Italic for a text style (live drawing/1710, Inspection ›
-    /// Text): 26 px buttons 3 px apart, pressed `#cfdbe5` with a 1 px
+    /// Text, Views › View labels): 26 px buttons `gap` px apart, pressed `#cfdbe5` with a 1 px
     /// `#1b5faa` line 1 px in, else `#f5f5f5`; SHX fonts disable them.
-    fn font_style_toggles(w: FontOf, cur: Option<noshape_model::drawing::sheet::TextFont>, ids: (&'static str, &'static str), cx: &mut Context<Self>) -> AnyElement {
+    fn font_style_toggles(w: FontOf, cur: Option<noshape_model::drawing::sheet::TextFont>, ids: (&'static str, &'static str), gap: f32, cx: &mut Context<Self>) -> AnyElement {
         use noshape_model::drawing::sheet::{DRAWING_DEFAULT_FONT, TextFont, is_shx};
         let (b, i) = cur.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
         let shx = cur.as_ref().is_some_and(|f| is_shx(&f.family));
@@ -1179,7 +1234,7 @@ impl DrawingEditor {
                 })
         };
         h_flex()
-            .gap(px(3.))
+            .gap(px(gap))
             .child(toggle(ids.0, "B", false, b, |f| f.bold = !f.bold, cx))
             .child(toggle(ids.1, "I", true, i, |f| f.italic = !f.italic, cx))
             .into_any_element()

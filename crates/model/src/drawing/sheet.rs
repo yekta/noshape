@@ -21,13 +21,16 @@ pub enum LineStyle {
 }
 
 impl LineStyle {
-    /// Pen width in millimeters (ISO 128 line weights).
+    /// Pen width in millimeters. Model edges as Onshape's Drawing
+    /// properties › Views defaults (live dom/drawing-wt-widgets: Visible
+    /// edges 0.40 mm, Hidden / Tangent edges 0.15 mm; its DXF lineweights,
+    /// `cad_layers`); the others ISO 128.
     pub fn width_mm(self) -> f64 {
         match self {
-            LineStyle::Visible => 0.5,
+            LineStyle::Visible => 0.4,
             LineStyle::Border => 0.7,
             LineStyle::Section => 0.7,
-            LineStyle::Hidden | LineStyle::Tangent | LineStyle::Phantom => 0.35,
+            LineStyle::Hidden | LineStyle::Tangent | LineStyle::Phantom => 0.15,
             LineStyle::Centerline | LineStyle::Thin => 0.25,
         }
     }

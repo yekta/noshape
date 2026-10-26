@@ -2808,6 +2808,29 @@ pub struct ViewTabProps {
     pub bend_down_color: Option<[u8; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bend_tangent_color: Option<[u8; 3]>,
+    /// Views › All views › Visible edges: pen (mm) and colour (None: ink).
+    pub visible_thickness: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visible_color: Option<[u8; 3]>,
+    /// Views › Hidden edges / Tangent edges / Exploded lines: pen (mm) and
+    /// dash scale (1 = the line type's own dashes); the colours above.
+    pub hidden_thickness: f64,
+    pub hidden_dashes: f64,
+    pub tangent_thickness: f64,
+    pub tangent_dashes: f64,
+    pub exploded_thickness: f64,
+    pub exploded_dashes: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exploded_color: Option<[u8; 3]>,
+    /// Views › All views › View labels: font (None: the drawing sans),
+    /// height (mm; None: the annotations' text height, as Onshape's
+    /// templates: 0.12 in / 3.5 mm) and colour.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub view_label_font: Option<sheet::TextFont>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub view_label_height: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub view_label_color: Option<[u8; 3]>,
 }
 
 impl Default for ViewTabProps {
@@ -2839,6 +2862,19 @@ impl Default for ViewTabProps {
             bend_up_color: None,
             bend_down_color: None,
             bend_tangent_color: None,
+            // Live dom/drawing-wt-widgets (ANSI inch and ISO mm alike).
+            visible_thickness: sheet::LineStyle::Visible.width_mm(),
+            visible_color: None,
+            hidden_thickness: sheet::LineStyle::Hidden.width_mm(),
+            hidden_dashes: 1.0,
+            tangent_thickness: sheet::LineStyle::Tangent.width_mm(),
+            tangent_dashes: 1.0,
+            exploded_thickness: 0.13,
+            exploded_dashes: 1.0,
+            exploded_color: None,
+            view_label_font: None,
+            view_label_height: None,
+            view_label_color: None,
         }
     }
 }
@@ -3250,11 +3286,19 @@ pub struct ViewDefaults {
     /// Tangent edges: 0 Hidden, 1 Solid, 2 Phantom.
     pub tangent: u8,
     pub scale_label: bool,
+    /// Threads (Parts) Shown, Bend lines (Parts) On, Bend notes (Parts) On
+    /// (live's defaults).
+    #[serde(default = "yes")]
+    pub threads: bool,
+    #[serde(default = "yes")]
+    pub bend_lines: bool,
+    #[serde(default = "yes")]
+    pub bend_notes: bool,
 }
 
 impl Default for ViewDefaults {
     fn default() -> Self {
-        Self { simplification: Simplification::Auto, auto_centermarks: true, auto_centerlines: false, hidden_lines: false, tangent: 1, scale_label: true }
+        Self { simplification: Simplification::Auto, auto_centermarks: true, auto_centerlines: false, hidden_lines: false, tangent: 1, scale_label: true, threads: true, bend_lines: true, bend_notes: true }
     }
 }
 
@@ -3268,6 +3312,9 @@ impl ViewDefaults {
         v.auto_centerlines = Some(self.auto_centerlines);
         v.simplification = Some(self.simplification);
         v.scale_label = (!self.scale_label).then_some(false);
+        v.hide_threads = !self.threads;
+        v.hide_bend_lines = !self.bend_lines;
+        v.hide_bend_notes = !self.bend_notes;
     }
 }
 

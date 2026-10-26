@@ -373,6 +373,41 @@ fn automatic_centerlines_on_hole_axes() {
     assert!(v.style == RenderStyle::HiddenLinesVisible && v.tangent_phantom && v.show_centerlines && v.auto_centerlines == Some(false));
 }
 
+/// Drawing properties › Views: the edges' pens (live's 0.40 / 0.15 mm by
+/// default), dash scale and colour, the view labels' height and colour, and
+/// the new insert defaults.
+#[test]
+fn views_tab_pens_colours_and_labels() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let style_pens = |b: &build::BuiltSheet, st: sheet::LineStyle| -> Vec<(f64, Vec<f64>, Option<[u8; 3]>)> {
+        let g = &b.geometry;
+        (0..g.lines.len()).filter(|&i| g.lines[i].style == st).map(|i| { let (w, d) = g.line_pen(i); (w, d, g.line_color(i)) }).collect()
+    };
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().style = RenderStyle::HiddenLinesVisible;
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let vis = style_pens(&b, sheet::LineStyle::Visible);
+    assert!(!vis.is_empty() && vis.iter().all(|(w, _, c)| (*w - 0.4).abs() < 1e-9 && c.is_none()), "{vis:?}");
+    let hid = style_pens(&b, sheet::LineStyle::Hidden);
+    assert!(!hid.is_empty() && hid.iter().all(|(w, d, _)| (*w - 0.15).abs() < 1e-9 && d == &[3.0, 1.5]), "{hid:?}");
+    let vt = &mut drawing.props.view_tab;
+    (vt.visible_thickness, vt.visible_color) = (0.7, Some([200, 0, 0]));
+    (vt.hidden_thickness, vt.hidden_dashes) = (0.25, 2.0);
+    (vt.view_label_height, vt.view_label_color) = (Some(4.0), Some([0, 0, 200]));
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().label = Some("FRONT".into());
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(style_pens(&b, sheet::LineStyle::Visible).iter().all(|(w, _, c)| (*w - 0.7).abs() < 1e-9 && *c == Some([200, 0, 0])));
+    assert!(style_pens(&b, sheet::LineStyle::Hidden).iter().all(|(w, d, _)| (*w - 0.25).abs() < 1e-9 && d == &[6.0, 3.0]));
+    let g = &b.geometry;
+    let label = g.texts.iter().position(|t| t.text == "FRONT").expect("view label");
+    assert!((g.texts[label].height - 4.0).abs() < 1e-9 && g.text_color(label) == Some([0, 0, 200]));
+    // Threads / bend lines / bend notes defaults on a new view.
+    let mut v = DrawingView::default();
+    ViewDefaults { threads: false, bend_lines: false, bend_notes: false, ..Default::default() }.apply(&mut v);
+    assert!(v.hide_threads && v.hide_bend_lines && v.hide_bend_notes);
+}
+
 #[test]
 fn bom_hole_table_and_linked_balloons() {
     let (doc, mut drawing) = demo();

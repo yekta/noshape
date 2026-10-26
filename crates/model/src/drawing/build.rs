@@ -1166,6 +1166,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             let edges0 = g.lines.len();
             for pass in 0..3 {
                 let mark = g.mark();
+                // The pass's own pen and colour go in ahead of the per-edge
+                // ones (Adjust linestyle wins: the last span covering a line).
+                let (pens0, colors0) = (g.pens.len(), g.colors.len());
                 for (i, e) in geo.edges.iter().enumerate() {
                     // Show/hide edges: hidden edges are left out, except while
                     // the dialog is open (thick grey, like occluded edges).
@@ -1216,9 +1219,31 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         }
                     }
                 }
-                match (pass, vt.tangent_color, vt.hidden_color) {
-                    (1, Some(c), _) | (2, _, Some(c)) => g.color_since(mark, c),
-                    _ => {}
+                // Drawing properties › Views › Visible / Tangent / Hidden edges:
+                // thickness, dash scale and colour.
+                let lines = mark.0..g.lines.len();
+                let (thickness, dash_scale, color) = match pass {
+                    0 => (vt.visible_thickness, 1.0, vt.visible_color),
+                    1 => (vt.tangent_thickness, vt.tangent_dashes, vt.tangent_color),
+                    _ => (vt.hidden_thickness, vt.hidden_dashes, vt.hidden_color),
+                };
+                if !lines.is_empty() {
+                    if let Some(rgb) = color {
+                        g.colors.insert(colors0, super::sheet::ColorSpan { lines: lines.clone(), texts: 0..0, fills: 0..0, rgb });
+                    }
+                    let style = g.lines[lines.start].style;
+                    if (thickness - style.width_mm()).abs() > 1e-9 || (dash_scale - 1.0).abs() > 1e-9 {
+                        // Phantom tangent edges share the pass: each run gets
+                        // its own line type's dashes.
+                        let mut start = lines.start;
+                        while start < lines.end {
+                            let st = g.lines[start].style;
+                            let end = (start..lines.end).find(|&k| g.lines[k].style != st).unwrap_or(lines.end);
+                            let dashes = st.dashes().iter().map(|d| d * dash_scale.max(0.01)).collect();
+                            g.pens.insert(pens0, super::sheet::PenSpan { lines: start..end, width_mm: thickness, dashes });
+                            start = end;
+                        }
+                    }
                 }
             }
             g.view_edges.push((v.id, edges0..g.lines.len()));
@@ -1539,18 +1564,21 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     l.pick = view_pick;
                 }
             }
-            // Labels below the view.
+            // Labels below the view, every line at Drawing properties › Views ›
+            // View labels' height (live drawing/1030: "DETAIL B" and "SCALE
+            // 4:1" alike, 0.12 in).
+            let lh = vt.view_label_height.unwrap_or(drawing.props.ann_text_height);
             let mut label_lines: Vec<(String, f64)> = Vec::new();
             match &v.kind {
-                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => label_lines.push((format!("{} {label} - {label}", vt.section_prefix).trim().to_string(), 5.0)),
+                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => label_lines.push((format!("{} {label} - {label}", vt.section_prefix).trim().to_string(), lh)),
                 ViewKind::Detail { label, .. } => {
-                    label_lines.push((format!("{} {label}", vt.detail_prefix).trim().to_string(), 5.0));
-                    label_lines.push((format!("SCALE {}", format_scale(pl.scale)), 3.5));
+                    label_lines.push((format!("{} {label}", vt.detail_prefix).trim().to_string(), lh));
+                    label_lines.push((format!("SCALE {}", format_scale(pl.scale)), lh));
                 }
                 ViewKind::Auxiliary { .. } => {
                     if let Some(a) = v.aux_ref.as_ref().filter(|a| !a.letter.is_empty()) {
                         let l = if vt.aux_double_label { format!("{0} - {0}", a.letter) } else { a.letter.clone() };
-                        label_lines.push((format!("{} {l} {}", vt.aux_prefix, vt.aux_suffix).trim().to_string(), 5.0));
+                        label_lines.push((format!("{} {l} {}", vt.aux_prefix, vt.aux_suffix).trim().to_string(), lh));
                     }
                 }
                 _ => {}
@@ -1558,12 +1586,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
             let user_label = v.label.as_ref().filter(|l| !l.is_empty() && !auto_label);
             if let Some(l) = user_label {
-                label_lines.push((expand(l), 5.0));
+                label_lines.push((expand(l), lh));
             }
             // Scale label: View properties › Scale label, else with a view label
             // when the view has its own scale.
             if !matches!(v.kind, ViewKind::Detail { .. }) && v.scale_label.unwrap_or(user_label.is_some() && v.scale.is_some()) {
-                label_lines.push((format!("SCALE {}", format_scale(pl.scale)), 3.5));
+                label_lines.push((format!("SCALE {}", format_scale(pl.scale)), lh));
             }
             // Live (behaviours "view labels", asb 10-20 u): the label is its
             // own selectable item, moved freely by `label_at`.
@@ -1577,6 +1605,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 y -= 2.0;
             }
             g.cad_text_style_since(label_mark, CadTextStyle::ViewLabel);
+            if let Some(font) = vt.view_label_font.clone().filter(|_| g.texts.len() > label_mark) {
+                g.fonts.push(super::sheet::FontSpan { texts: label_mark..g.texts.len(), font });
+            }
+            if let Some(rgb) = vt.view_label_color {
+                g.color_since((g.lines.len(), label_mark, g.fills.len()), rgb);
+            }
         }
         // A linked view's parent is on another sheet: its indicator is drawn there.
         if sheet.parent_of(v.id).is_some_and(|p| p.is_ghost()) {
