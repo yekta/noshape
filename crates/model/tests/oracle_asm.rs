@@ -360,7 +360,6 @@ const KNOWN: &[(&str, &str)] = &[
     ("R3", "skb: Revolute on cylinder MID_AXIS_POINTs: both flip the pin, live with rz −157.5° (B at (314.75, 96.61, 20)), ours rz +6°"),
     ("C1", "skb: Cylindrical on cylinder axes: as R3 (live rz −157.5°, translationZ +50 mm; ours rz +6°, −50 mm)"),
     ("M1", "skb: Revolute (bottom on top) + Slider (front faces): live keeps B upright, turned 30° at (7.68, −8.66, 10); ours turns it upside down"),
-    ("M2", "skb: Revolute C on fastened B: live C unturned at (0, 0, 20), ours turned 1.3e-4 rad (the solver stops short)"),
     ("LP1", "skb: R1's connector flip and F5's edge direction: live's copies at x −55 / −40 upright, ours at −85 / −100 upside down"),
 ];
 
