@@ -1408,6 +1408,55 @@ fn compare_blend_follows_onshape() {
     assert!(near(shots[1].1, [half[0], half[1], half[2]], 6.0), "target-only at 0.25: {:?}, want {half:?}", shots[1].1);
 }
 
+/// A feature dialog's preview (live previewBlend, `Scene::preview_mix`):
+/// the model before the feature (BASE: a box) under the model with it
+/// (TARGET: the box moved and a second box), mixed by the slider's alpha.
+/// Untagged geometry (a datum line) is in both and doesn't change; each
+/// pixel is (1 − alpha) × the base frame + alpha × the preview frame.
+#[test]
+fn preview_mix_blends_the_model_before_and_after() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let blue = [0.25f32, 0.4, 0.6, 1.0];
+    let (w, h) = (400u32, 300u32);
+    let boxm = |r: &Renderer, x: f32| r.upload_mesh(&primitives::box_mesh([x - 0.01, -0.01, 0.0], [x + 0.01, 0.01, 0.01], 1));
+    let base = Instance::new(Drawable::Mesh(boxm(&r, -0.012))).with_color(blue).compare_layer(compare::BASE);
+    let moved = Instance::new(Drawable::Mesh(boxm(&r, 0.012))).with_color(blue).compare_layer(compare::TARGET);
+    let mut line = LineData::default();
+    line.push_polyline(&[[-0.03, -0.012, 0.0], [0.03, -0.012, 0.0]], [255, 0, 0, 255], 0, 3.0, 0);
+    let datum = Instance::new(Drawable::Lines(r.upload_lines(&line)));
+    let mut cam = Camera::default();
+    cam.fit_box(glam::DVec3::new(-0.03, -0.012, 0.0), glam::DVec3::new(0.03, 0.012, 0.01), w as f64 / h as f64);
+    let render = |r: &mut Renderer, instances: Vec<Instance>, mix: Option<f32>| {
+        let scene = Scene { instances, preview_mix: mix, ..Default::default() };
+        r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap().bgra
+    };
+    let untag = |i: &Instance| i.clone().compare_layer(0);
+    let before = render(&mut r, vec![untag(&base), datum.clone()], None);
+    let after = render(&mut r, vec![untag(&moved), datum.clone()], None);
+    let mixed = render(&mut r, vec![base.clone(), moved.clone(), datum.clone()], Some(0.7));
+    let at = |p: [f64; 3]| {
+        let q = cam.project(glam::DVec3::from_array(p), glam::DVec2::new(w as f64, h as f64), 0.05).unwrap();
+        ((q.y as u32 * w + q.x as u32) * 4) as usize
+    };
+    for (what, p) in [("box before", [-0.012, 0.0, 0.01]), ("box after", [0.012, 0.0, 0.01]), ("background", [0.0, 0.03, 0.0]), ("datum", [0.0, -0.012, 0.0])] {
+        let o = at(p);
+        for c in 0..3 {
+            let want = 0.3 * before[o + c] as f32 + 0.7 * after[o + c] as f32;
+            let got = mixed[o + c] as f32;
+            assert!((got - want).abs() <= 3.0, "{what}: channel {c} {got} vs {want} (before {}, after {})", before[o + c], after[o + c]);
+        }
+    }
+    let o = at([-0.012, 0.0, 0.01]);
+    assert!(before[o..o + 3] != after[o..o + 3], "the boxes should differ there");
+}
+
 /// Label quads and shadows are drawn like GPUI draws a div with
 /// `.rounded(4).border_1().shadow_xs()` (overlay.wgsl `fs_quad` /
 /// `fs_shadow`): solid background inside, the full border color on the
