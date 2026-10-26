@@ -56,11 +56,13 @@ pub struct DrawingPropsUi {
     /// The body's scroll and whether it overflows (Chrome's scrollbar).
     pub scroll: ScrollHandle,
     pub overflow: std::rc::Rc<std::cell::Cell<bool>>,
+    /// The number field whose ▾ list is open.
+    pub wt_list: Option<usize>,
 }
 
 impl Default for DrawingPropsUi {
     fn default() -> Self {
-        Self { open: false, tab: 0, inspection_inputs: None, focused: None, scroll: ScrollHandle::new(), overflow: Default::default() }
+        Self { open: false, tab: 0, inspection_inputs: None, focused: None, scroll: ScrollHandle::new(), overflow: Default::default(), wt_list: None }
     }
 }
 
@@ -425,6 +427,8 @@ impl DrawingEditor {
             .bg(gpui_kit::rgb(0xffffff))
             .border_b_1()
             .border_color(gpui_kit::rgb(0xdddddd))
+            // Focused (live 1731): a 2 px #1b5ea9 line instead.
+            .when(self.drawing_props.focused == Some(i) || self.drawing_props.wt_list == Some(i), |d| d.border_b_2().border_color(gpui_kit::rgb(0x1b5ea9)))
             .text_size(px(13.33))
             .text_color(gpui_kit::rgb(0x555555))
             .when(f.invalid.get(), |i| i.bg(gpui_kit::rgba(INVALID_BG)));
@@ -436,14 +440,78 @@ impl DrawingEditor {
                 let val = f.value.clone();
                 // Live: the selects' ▾ 6 px from the field's right, inside
                 // its right padding (20 px).
-                let caret = div().id(SharedString::from(format!("dp-wt-dd-{i}"))).w(px(20.)).h(px(23.)).pr(px(6.)).flex().items_center().justify_end().cursor_pointer().child(crate::os_ui::glyph(SELECT_CARET, 8., gpui_kit::rgb_static(0x777777)));
-                let caret = caret.os_dropdown_menu(SharedString::from(format!("dp-wt-ddm-{i}")), false, move |menu, _, _| {
-                    // Live: the list holds only the current value.
+                // Live 1731: a click opens the field's list under it, 1 px
+                // down and as wide as the field (white, a #ccc line and a
+                // soft shadow), holding only the current value: a 21 px row,
+                // #333 14 px text 7 px in. The field keeps a 2 px #1b5ea9 line
+                // while it is open.
+                let open = self.drawing_props.wt_list == Some(i);
+                let caret = {
+                    let ed = ed.clone();
+                    div()
+                        .id(SharedString::from(format!("dp-wt-dd-{i}")))
+                        .w(px(20.))
+                        .h(px(23.))
+                        .pr(px(6.))
+                        .flex()
+                        .items_center()
+                        .justify_end()
+                        .cursor_pointer()
+                        .child(crate::os_ui::glyph(SELECT_CARET, 8., gpui_kit::rgb_static(0x777777)))
+                        .on_click(move |_, _, cx| {
+                            ed.update(cx, |this, cx| {
+                                this.drawing_props.wt_list = if open { None } else { Some(i) };
+                                cx.notify();
+                            })
+                        })
+                };
+                let list = open.then(|| {
                     let v = val.get() / k;
-                    let apply = apply.clone();
-                    menu.item(crate::os_menu::OsMenuItem::new(show(v)).checked(true).on_click(move |_, window, cx| apply(v, window, cx)))
+                    let (ed, close) = (ed.clone(), ed.clone());
+                    deferred(
+                        div()
+                            .id(SharedString::from(format!("dp-wt-list-{i}")))
+                            .absolute()
+                            .top(px(25.))
+                            .left_0()
+                            .w(px(141.))
+                            .bg(gpui_kit::rgb(0xffffff))
+                            .border_1()
+                            .border_color(gpui_kit::rgb(0xcccccc))
+                            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.18), offset: point(px(0.), px(3.)), blur_radius: px(6.), spread_radius: px(0.), inset: false }])
+                            .occlude()
+                            .on_mouse_down_out(move |_, _, cx| {
+                                close.update(cx, |this, cx| {
+                                    this.drawing_props.wt_list = None;
+                                    cx.notify();
+                                })
+                            })
+                            .child(
+                                div()
+                                    .id(SharedString::from(format!("dp-wt-item-{i}")))
+                                    .h(px(21.))
+                                    .pl(px(5.))
+                                    .flex()
+                                    .items_center()
+                                    .text_size(px(14.))
+                                    .text_color(gpui_kit::rgb(0x333333))
+                                    .cursor_pointer()
+                                    .child(show(v))
+                                    .on_click(move |_, window, cx| {
+                                        apply(v, window, cx);
+                                        ed.update(cx, |this, cx| {
+                                            this.drawing_props.wt_list = None;
+                                            cx.notify();
+                                        })
+                                    }),
+                            ),
+                    )
                 });
-                h_flex().gap(px(6.)).child(div().w(px(141.)).relative().child(input).child(caret.absolute().right_0().top_0())).child(unit).into_any_element()
+                h_flex()
+                    .gap(px(6.))
+                    .child(div().w(px(141.)).relative().child(input).child(caret.absolute().right_0().top_0()).children(list))
+                    .child(unit)
+                    .into_any_element()
             }
             FieldKind::Spin { step_in, step_mm, .. } => {
                 let step_by = if self.drawing.units_mm { step_mm } else { step_in };
