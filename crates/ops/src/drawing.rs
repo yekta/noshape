@@ -71,7 +71,7 @@ impl SheetModel {
     pub fn build(session: &crate::session::Session, tab: TabId, drawing: Drawing, sheet: usize, extra: &[SourceKey]) -> Self {
         let doc = &session.doc;
         let versions = |id: &str| session.document_at_version(id).ok().flatten();
-        let mut sources = views::regenerate_sources_with(doc, &drawing, &versions);
+        let mut sources = cached_sources(doc, &drawing, &versions);
         let mut assemblies = crate::derived::assembly_evaluator(Default::default());
         // Views not updated since a change: their sources as they were made.
         let old = old_state(session, &drawing);
@@ -90,7 +90,7 @@ impl SheetModel {
             }
         }
         let sheet = sheet.min(drawing.sheets.len().saturating_sub(1));
-        let cache = ViewCache::new();
+        let cache = view_cache();
         let mut geoms = HashMap::new();
         if let Some(s) = drawing.sheets.get(sheet) {
             views::compute_sheet_views(&drawing, s, &sources, &cache, true);
@@ -133,6 +133,54 @@ impl SheetModel {
         pk.hover = pk.hover_at();
         pk
     }
+}
+
+/// Drawing sources and view geometry kept between calls, keyed by content
+/// hashes (`source_hash`, `view_key` include them), so an edit makes new
+/// entries and nothing stale is reused: a drawing op no longer regenerates
+/// the source Part Studios and projects every view on each call.
+static SOURCES: std::sync::LazyLock<parking_lot::Mutex<HashMap<(SourceKey, u64), views::SourceModel>>> = std::sync::LazyLock::new(Default::default);
+static VIEWS: std::sync::LazyLock<parking_lot::Mutex<(usize, Arc<ViewCache>)>> = std::sync::LazyLock::new(|| parking_lot::Mutex::new((0, Arc::new(ViewCache::new()))));
+
+/// The shared view cache (started afresh every 200 uses, to bound it).
+fn view_cache() -> Arc<ViewCache> {
+    let mut v = VIEWS.lock();
+    v.0 += 1;
+    if v.0 > 200 {
+        *v = (0, Arc::new(ViewCache::new()));
+    }
+    v.1.clone()
+}
+
+/// [`views::regenerate_sources_with`], reusing the sources whose content
+/// hash is unchanged.
+fn cached_sources(doc: &Document, drawing: &Drawing, versions: &dyn Fn(&str) -> Option<Document>) -> Sources {
+    let mut out = Sources::new();
+    let mut assemblies = noshape_model::assembly::eval::AssemblyEvaluator::new();
+    let mut cache = SOURCES.lock();
+    if cache.len() > 64 {
+        cache.clear();
+    }
+    for key in views::referenced_sources(drawing) {
+        let at = key.version.as_deref().map(versions);
+        let d = match &at {
+            Some(Some(d)) => d,
+            Some(None) => continue,
+            None => doc,
+        };
+        let hash = views::source_hash(d, &key);
+        if let Some(src) = hash.and_then(|h| cache.get(&(key.clone(), h))) {
+            out.insert(key, src.clone());
+            continue;
+        }
+        if let Some(src) = views::regenerate_source(d, &key, &mut noshape_model::regen::Regenerator::new(), &mut assemblies) {
+            if let Some(h) = hash {
+                cache.insert((key.clone(), h), src.clone());
+            }
+            out.insert(key, src);
+        }
+    }
+    out
 }
 
 /// The title block's document facts (as the editor's `update_info`).

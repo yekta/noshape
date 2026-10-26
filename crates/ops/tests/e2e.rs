@@ -3991,6 +3991,10 @@ fn agent_benchmark_p1_fixes() {
     assert_eq!(g["params"]["entities"].as_array().unwrap().len(), 4, "{g} {q}");
     let e = try_call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": { "query": { "kind": "edges", "curve": "ellipse" } }, "radius": "1 mm" } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("params.entities.query"), "{e:?}");
+    // `near` ranks by the distance to the face, not its centroid: a point on
+    // the top face near a corner finds the top face, not the closer-centred side.
+    let n = call(&mut ctx, "query_entities", json!({ "kind": "faces", "near": [36, 16, 20], "limit": 1 }));
+    assert!((num(&n["faces"][0]["centroid"][2]) - 20.0).abs() < 1e-6, "{n}");
     // A feature pattern from `entities` that are features.
     let x = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "curve": "line" }))["edges"][0]["id"].clone();
     let ex = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().find(|f| f["name"] == "Extrude 1").unwrap()["id"].as_str().unwrap().to_string();
