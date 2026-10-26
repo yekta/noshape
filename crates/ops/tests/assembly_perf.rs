@@ -6,13 +6,15 @@
 //!   below, and from the fifth up also Parallel to its stack's fixed base.
 //! - 1000 free pins on a 40 × 25 grid (tests/perf/pins-assembly-1000).
 //!
-//! Timed as the app runs them: the evaluation after an edit (a mate added:
-//! solve, DOF, mate status), and drag steps (one solve per pointer move,
-//! no DOF). Targets: a drag step within a 60 Hz frame, adding a mate without
+//! Timed as the app runs them: the evaluation after an edit (a mate added, a
+//! pin inserted: solve, DOF, mate status), the scene built from scratch, and
+//! drag steps (one solve per pointer move, no DOF, then the scene's
+//! instances moved). Targets: a drag step within a 60 Hz frame, adding a mate without
 //! a stall (under 100 ms).
 
 use glam::DVec3;
-use noshape_model::assembly::eval::SolveOptions;
+use noshape_model::assembly::eval::{AssemblyResult, SolveOptions};
+use noshape_scene::asm_scene::{self, AsmBuilt, AsmGpuCache, AsmSceneOptions};
 use noshape_model::assembly::{Assembly, InstanceId, Mate, MateId, MateType, Placement};
 use noshape_model::document::TabContent;
 use noshape_ops::Ctx;
@@ -103,27 +105,77 @@ fn mate(asm: &mut Assembly, seed: &Mate, kind: MateType, a: InstanceId, b: Insta
     asm.mates.push(m);
 }
 
-/// Drag `inst`'s top centre in `steps` pointer moves along `dir` (mm per
-/// step), each a solve as the app runs it (from the last step's poses, no
-/// DOF).
-fn drag(ctx: &mut Ctx, path: &str, inst: InstanceId, dir: DVec3, steps: usize) -> Stats {
+/// The assembly's scene as the app builds it on the UI thread after an
+/// evaluation (the GPU cache kept between builds) and its build time; `None`
+/// without a GPU adapter.
+fn scene(ctx: &mut Ctx, res: &AssemblyResult, cache: &mut AsmGpuCache) -> Option<(Duration, AsmBuilt)> {
+    let off = ctx.offscreen().ok()?;
+    let up = off.renderer.uploader();
+    let t = Instant::now();
+    let built = asm_scene::build(res, &AsmSceneOptions::default(), cache, &up);
+    Some((t.elapsed(), built))
+}
+
+/// The solved placements kept in the document, as the app does after each
+/// edit: later evaluations start solved.
+fn fold_solved(ctx: &mut Ctx, path: &str) {
+    let res = evaluated(ctx, path);
+    let od = ctx.doc(Some(path)).unwrap();
+    let tab = noshape_ops::doc::find_tab(od.doc(), "Assembly 1").unwrap();
+    od.session
+        .edit_tab(tab, "Solve", |c| {
+            if let TabContent::Assembly(a) = c {
+                for i in &mut a.instances {
+                    if let Some(p) = res.solved.placement(i.id) {
+                        i.placement = p;
+                    }
+                }
+            }
+        })
+        .unwrap();
+}
+
+fn evaluated(ctx: &mut Ctx, path: &str) -> AssemblyResult {
     let od = ctx.doc(Some(path)).unwrap();
     let tab = noshape_ops::doc::find_tab(od.doc(), "Assembly 1").unwrap();
     let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| t.content.clone()) else { panic!() };
-    let res = od.evaluate_assembly(tab, &asm, &SolveOptions::default());
+    od.evaluate_assembly(tab, &asm, &SolveOptions::default())
+}
+
+/// Drag `inst`'s top centre in `steps` pointer moves along `dir` (mm per
+/// step), each a solve as the app runs it (from the last step's poses, no
+/// DOF), then the placements applied and the scene rebuilt (the frame).
+fn drag(ctx: &mut Ctx, path: &str, inst: InstanceId, dir: DVec3, steps: usize) -> (Stats, Option<Stats>) {
+    let mut res = evaluated(ctx, path);
+    let mut cache = AsmGpuCache::default();
+    let mut built = scene(ctx, &res, &mut cache).map(|s| s.1);
     let local = DVec3::new(0.0, 0.0, 0.01);
     let p0 = res.solved.placement(inst).unwrap();
     let grab = DVec3::from(p0.translation) + local;
     let mut start: HashMap<InstanceId, Placement> = res.solved.placements.iter().cloned().collect();
-    let mut times = Vec::new();
+    let (mut solves, mut frames) = (Vec::new(), Vec::new());
     for i in 1..=steps {
         let target = grab + dir * 1e-3 * i as f64;
         let t = Instant::now();
         let s = res.prepared.solve(&SolveOptions { drags: vec![(inst, local, target)], start: Some(start.clone()), skip_dof: true, ..Default::default() });
-        times.push(t.elapsed());
+        solves.push(t.elapsed());
         start = s.placements.iter().cloned().collect();
+        // The app's drag step (assembly_view move_scene): the scene's
+        // instances follow, no rebuild.
+        res.apply_placements(s, None);
+        if let Some(b) = built.as_mut() {
+            assert!(asm_scene::retransform(b, &res));
+            frames.push(t.elapsed());
+        }
     }
-    stats(times)
+    // The moved scene draws what a fresh build draws.
+    if let (Some(b), Some((_, fresh))) = (built.as_ref(), scene(ctx, &res, &mut cache)) {
+        assert_eq!(b.scene.instances.len(), fresh.scene.instances.len());
+        for (x, y) in b.scene.instances.iter().zip(&fresh.scene.instances) {
+            assert!(x.transform.abs_diff_eq(y.transform, 1e-6), "{:?} vs {:?}", x.transform, y.transform);
+        }
+    }
+    (stats(solves), (!frames.is_empty()).then(|| stats(frames)))
 }
 
 fn evaluate(ctx: &mut Ctx, path: &str, edit: impl FnOnce(&mut Assembly)) -> Duration {
@@ -166,8 +218,9 @@ fn assembly_drag_and_mate_latency() {
         assert_eq!(asm.mates.len(), 300);
     });
     let first = evaluate(&mut ctx, &path, |_| {});
+    fold_solved(&mut ctx, &path);
     let again = stats((0..7).map(|_| evaluate(&mut ctx, &path, |_| {})).collect()).median;
-    println!("200 instances, 300 mates: first evaluation {:.1} ms (with the Part Studio), again {:.1} ms (median of 7)", ms(first), ms(again));
+    println!("200 instances, 300 mates: first evaluation {:.1} ms (opening: the Part Studio, the solve from the unsolved start), again {:.1} ms (median of 7)", ms(first), ms(again));
     let template = {
         let od = ctx.doc(Some(path.as_str())).unwrap();
         let tab = noshape_ops::doc::find_tab(od.doc(), "Assembly 1").unwrap();
@@ -179,10 +232,19 @@ fn assembly_drag_and_mate_latency() {
     println!("  adding a mate: {:.1} ms (median of 7)", ms(add));
     // In the stack's plane (the top pin alone moves), and off it with the
     // pointer in the view plane (the stack's Planar mates hold it down).
-    let s = drag(&mut ctx, &path, tops[3], DVec3::new(0.5, 0.3, 0.0), 60);
-    println!("  drag a top pin in its plane: median {:.2} ms, worst {:.2} ms", ms(s.median), ms(s.worst));
-    let f = drag(&mut ctx, &path, tops[5], DVec3::new(0.5, 0.0, 0.4), 60);
-    println!("  drag a top pin off its plane: median {:.2} ms, worst {:.2} ms", ms(f.median), ms(f.worst));
+    let frame_text = |f: &Option<Stats>| f.as_ref().map(|f| format!("; frame with the scene {:.2} ms, worst {:.2} ms", ms(f.median), ms(f.worst))).unwrap_or_default();
+    let (s, s_frame) = drag(&mut ctx, &path, tops[3], DVec3::new(0.5, 0.3, 0.0), 60);
+    println!("  drag a top pin in its plane: solve median {:.2} ms, worst {:.2} ms{}", ms(s.median), ms(s.worst), frame_text(&s_frame));
+    let (f, f_frame) = drag(&mut ctx, &path, tops[5], DVec3::new(0.5, 0.0, 0.4), 60);
+    println!("  drag a top pin off its plane: solve median {:.2} ms, worst {:.2} ms{}", ms(f.median), ms(f.worst), frame_text(&f_frame));
+    // Inserting one more pin (the evaluation), and the whole scene from scratch (opening).
+    let insert = stats((0..5).map(|i| evaluate(&mut ctx, &path, |asm| {
+        let seed = asm.instances[1].clone();
+        pin_at(asm, &seed, DVec3::new(500.0 + 10.0 * i as f64, 0.0, 0.0), false);
+    })).collect()).median;
+    let full = evaluated(&mut ctx, &path);
+    let scene_200 = scene(&mut ctx, &full, &mut AsmGpuCache::default());
+    println!("  inserting a pin: {:.1} ms (median of 5); the whole scene from scratch {}", ms(insert), scene_200.map(|d| format!("{:.1} ms", ms(d.0))).unwrap_or("(no GPU)".into()));
 
     // 1000 free pins.
     let mut grid = Vec::new();
@@ -195,13 +257,25 @@ fn assembly_drag_and_mate_latency() {
         }
     });
     let first2 = evaluate(&mut ctx2, &path2, |_| {});
+    fold_solved(&mut ctx2, &path2);
     let again2 = stats((0..7).map(|_| evaluate(&mut ctx2, &path2, |_| {})).collect()).median;
     println!("1000 free pins: first evaluation {:.1} ms, again {:.1} ms (median of 7)", ms(first2), ms(again2));
-    let g = drag(&mut ctx2, &path2, grid[500], DVec3::new(0.5, 0.3, 0.0), 60);
-    println!("  drag a pin: median {:.2} ms, worst {:.2} ms", ms(g.median), ms(g.worst));
+    let (g, g_frame) = drag(&mut ctx2, &path2, grid[500], DVec3::new(0.5, 0.3, 0.0), 60);
+    println!("  drag a pin: solve median {:.2} ms, worst {:.2} ms{}", ms(g.median), ms(g.worst), frame_text(&g_frame));
+    let insert2 = stats((0..5).map(|i| evaluate(&mut ctx2, &path2, |asm| {
+        let seed = asm.instances[0].clone();
+        pin_at(asm, &seed, DVec3::new(300.0 + 10.0 * i as f64, 0.0, 0.0), false);
+    })).collect()).median;
+    let full2 = evaluated(&mut ctx2, &path2);
+    let scene_1000 = scene(&mut ctx2, &full2, &mut AsmGpuCache::default());
+    println!("  inserting a pin: {:.1} ms (median of 5); the whole scene from scratch {}", ms(insert2), scene_1000.map(|d| format!("{:.1} ms", ms(d.0))).unwrap_or("(no GPU)".into()));
 
     assert!(add < EDIT, "adding a mate took {add:?}");
-    for (what, s) in [("in-plane drag", &s), ("off-plane drag", &f), ("1000-pin drag", &g)] {
-        assert!(s.median < FRAME, "{what}: median {:?}", s.median);
+    assert!(insert < EDIT && insert2 < EDIT, "inserting a pin took {insert:?} / {insert2:?}");
+    for (what, solve, frame) in [("in-plane drag", &s, &s_frame), ("off-plane drag", &f, &f_frame), ("1000-pin drag", &g, &g_frame)] {
+        assert!(solve.median < FRAME, "{what}: solve median {:?}", solve.median);
+        if let Some(fr) = frame {
+            assert!(fr.median < FRAME, "{what}: frame median {:?}", fr.median);
+        }
     }
 }
