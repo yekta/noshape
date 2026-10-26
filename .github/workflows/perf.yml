@@ -357,7 +357,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config libfontconfig-dev libfreetype-dev libzstd-dev
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config libfontconfig-dev libfreetype-dev libzstd-dev libx11-dev
 
       - name: Install (macOS)
         if: runner.os == 'macOS'
