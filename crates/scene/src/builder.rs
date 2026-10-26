@@ -219,7 +219,15 @@ pub struct SceneOptions {
     /// Isolate's planes (live ui/iso-901): no fill, the outline at
     /// [`FAINT_PLANE_ALPHA`] of its opacity (172 → 252 over white).
     pub faint_planes: bool,
+    /// Show dimensions is on: the parts' faces turned from the light come
+    /// up 5–8 levels (live part-studio/40 vs selection/02).
+    pub dims_shown: bool,
 }
+
+/// [`SceneOptions::dims_shown`]'s lighting shift: ambient 0.5 → 0.535,
+/// light 0.5 → 0.465 (front face (84,111,127) vs live (86,110,124), the
+/// top face unchanged as live's).
+const DIMS_SHOWN_AMBIENT: f32 = 0.035;
 
 /// See [`SceneOptions::faint_planes`].
 pub const FAINT_PLANE_ALPHA: f32 = 0.04;
@@ -346,7 +354,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     None => Instance::new(Drawable::Mesh(cached.mesh.clone())).pick_base(face_base),
                 };
                 let mesh = match opts.display_mode {
-                    DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color).zebra(opts.zebra.filter(|_| replaced.is_none())).reflection(opts.reflection.clone().filter(|_| replaced.is_none())),
+                    DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color).zebra(opts.zebra.filter(|_| replaced.is_none())).reflection(opts.reflection.clone().filter(|_| replaced.is_none())).ambient(if opts.dims_shown { DIMS_SHOWN_AMBIENT } else { 0.0 }),
                     // Onshape (part-studio/62): the shaded part at ~35%.
                     DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.35)]),
                     // Faces drawn flat in the background color hide what is behind
@@ -585,7 +593,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     Some(c) => lin_to_u8(c),
                     None => sketch_color(&opts.graphics, c.state, c.construction, editing, c.external),
                 };
-                let style = if c.construction { LineSegment::CONSTRUCTION } else { 0 };
+                // Hovered / selected it keeps a dark core like a part edge
+                // (live sketch/21, 22).
+                let style = LineSegment::CORE | if c.construction { LineSegment::CONSTRUCTION } else { 0 };
                 // Graphics preferences: active 2 px, inactive 1 px by default.
                 let width = if editing { opts.graphics.sketch_line_width } else { 1.5 * opts.graphics.inactive_line_width };
                 lines.push_polyline(&c.points, color, id, width, style);

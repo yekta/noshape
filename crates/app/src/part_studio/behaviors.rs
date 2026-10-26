@@ -2125,8 +2125,8 @@ impl PartStudioView {
             }
         }
         // Show dimensions leaves the parts opaque (live part-studio/40 vs
-        // selection/02: no hidden edges show, the top face is unchanged and
-        // the side faces read 5–8 levels lighter at most).
+        // selection/02: no hidden edges show); their lighting shifts a
+        // little (SceneOptions::dims_shown).
         let Some(iso) = &self.ui.isolate else { return self.display.clone() };
         let transparent = self.isolation_transparent();
         let look = iso_look(iso.opacity);

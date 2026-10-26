@@ -831,6 +831,8 @@ impl PartStudioView {
         o.display_only = self.ui.transform_ghost.clone();
         // Isolate (live ui/iso-901): the planes fade to faint outlines; below
         // 10 % the other parts are solid washed-out ghosts.
+        // Show dimensions: the parts' shadowed faces come up a little (live).
+        o.dims_shown = self.ui.shown_dims.is_some();
         if let Some(iso) = &self.ui.isolate {
             o.faint_planes = iso.mode == behaviors::IsolateMode::Isolate;
             if matches!(behaviors::iso_look(iso.opacity), behaviors::IsoLook::Ghost) {
