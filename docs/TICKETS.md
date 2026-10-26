@@ -93,6 +93,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   viewport is frozen for the rest of the session (the UI keeps working). Without NOSHAPE_PERF the section renders fine, so
   users don't hit it, but every perf run / perf.yml benchmark with a section does. Log tickets/perf-section-panic.log,
   doc tickets/qa-1026-main.noshape (tab Part Studio 6) (qa 2026-10-26, build 4d2f6b0c)
+- [ ] P2 EXT-DIRECTION (qa4 round 5, still open on green 4d2f6b0c) ticking Extrude › Direction leaves the new "Extrude
+  direction" field inactive (white) and the regions field active, chevron grey; after a region pick the field turns pink
+  with a red chevron but never gets focus. live (behaviours "qa4 round 5 s7 dialogs"): on ticking, Extrude direction is
+  the active field (border rgb(22,81,176), fill rgb(222,241,251)), title red rgb(170,37,45), chevron rgb(189,48,57);
+  after a pick focus moves on (qa 2026-10-26)
 
 ## Sketch + assembly (skasm)
 - [ ] P2 P1-4 data (qa5, carried over) sketches keep a hidden construction "Origin stand-in" point at (0,0) carrying the

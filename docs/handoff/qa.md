@@ -19,6 +19,8 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 - CLI (v0.4.8 release, /root/qa-scratch/rel/…/noshape-cli) through a small MCP client: /root/qa-scratch/bin/nscli.py
   (`Cli()('feature_add', {...})`). Matrices with analytic volumes: shellmatrix.py, hollowmatrix.py, filletmatrix.py,
   featmatrix.py, holematrix.py (same dir). Hole style needs `styleV2`; a Remove extrude needs `booleanScope`.
+- tools/lead/disk-loop.sh deletes files named noshape* > 100 MB older than 2 h under /root/*-scratch (maxdepth 4): touch
+  the green copy or keep binaries deeper (the v0.4.8 release is in /root/qa-scratch/rel/k/v048/…, depth 5).
 - Don't run the app with NOSHAPE_PERF=1 when testing section views (PERF-SECTION-PANIC freezes the viewport).
 - Mind dialog layout shifts: once a selection chip is added, every row below moves down ~16 px; screenshot before
   clicking a field.
@@ -54,6 +56,14 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 - Live requests open (REQUESTS.md "qa (2026-10-26 …)"): Extrude depth 0 / 1e6 field state; drawing suggested scale +
   "Edit Boss sketch 1" menu label; sketch copy/paste placement.
 - skasm: carried over qa5's P1-4 data.
+
+## qa4 round-5 routed items re-checked on green 4d2f6b0c (2026-10-26 22:00)
+Fixed ✅: DRAG-RUNAWAY (19-cube planar stack: only the dragged cube moves), SUPPRESSED-MENU, SKETCH-UNCONSUMED (docs made
+by this build; docs made by older builds keep a sticky Hide), TOOLTIP-PARENT, ERR-MISSING-REGION ("Select face or sketch
+region to extrude." + "1 missing selection"), CHAMFER-OVERFLOW (25 on a 20 mm edge OK; v0.4.8 still fails), SECTION-MANIP
+(ring + arrow + rotate glyph), empty rename → default name. Still open: EXT-DIRECTION (ticket). Not re-checked yet:
+SEL-REJECT-TOAST, CHIP-HOVER, BOX-PREHIGHLIGHT, SELECT-OTHER, READOUT-AXES, MIDPOINT-MARKER, FOLDER-NAME-INLINE,
+FOLDER-MENU, FOLDER-EXPAND-UNDO, EXT-2ND-DEPTH, ORD-BASE, EXPORT-DXF-OPTIONS.
 
 ## To verify on the next green (fixed on main by qa5 after green 4d2f6b0c)
 P1-1, P1-8, P1-9, P1-17, P1-18, P2-A2…A8, P2-D2, P2-D3 (docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26
