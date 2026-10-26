@@ -829,3 +829,14 @@ STATUS P1-18 (qa5, 2026-10-26): live look of the icon (live/qa5/p7-up-above-extr
   preview follows the pointer, always horizontal", with the usual inference glyphs over view edges (behaviours 1414,
   drawing/220–222). drawing_tools.rs overlay draws only the leader line once a leader point exists (:501); main has no
   preview either. The editor panel itself matches live (drawing/225).
+
+## P2 oracle: variables, configurations, Derived (psb, 2026-10-26; live "psb (10-26 a) P2 oracle", test p2_oracle.rs)
+- STATUS (psb): V1/V2 (variable chain with sqrt / atan / mixed units, values as the Variable table shows them), C1 (configured
+  depth and suppression), C2 (configuration variable), C3 (checkbox configuring Symmetric), D2 (Derived at a location) and D3
+  (Derived of only a sketch) match live; fixed on the way: the Variable table writes angles "45 deg" (was "45°"), and Derived of a
+  picked sketch brings only that sketch (was everything).
+- **FILLET-CORNER-3 — kern** — D1: a 40 × 20 × 35 block, Fillet 1 mm on the 4 top edges (corners where two fillets meet a sharp
+  vertical edge): ours 27974.631 mm³, live 27974.71 (ours removes 0.08 mm³ more: the corner patch shape).
+- **VAR-INVALID — ui (feature dialog)** — live: a Variable whose value doesn't evaluate to its type ("#a + 5 mm * cos(#ang * 1
+  rad)" with #ang an angle) turns the Value field red, the title "#d = 0 mm" red and ✓ disabled, so it can't be created; ours
+  creates the feature, which then fails. Check the dialog against live.
