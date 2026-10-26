@@ -33,6 +33,15 @@ fn perf_scale() -> Option<f32> {
     *S.get_or_init(|| std::env::var("NOSHAPE_PERF_SCALE").ok()?.parse().ok().filter(|s: &f32| *s > 0.0))
 }
 
+/// `NOSHAPE_PERF_BENCH_DRIVE=frames`: the benchmark moves the camera again
+/// as soon as a frame arrives, not on its 8 ms timer (which the macOS CI
+/// runners fire only every 37-67 ms), so it measures how many frames per
+/// second the viewport can deliver.
+fn bench_driven_by_frames() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_PERF_BENCH_DRIVE").is_ok_and(|v| v == "frames"))
+}
+
 /// `style` with what Onshape's interactive detail settings leave out.
 fn interactive_style(style: noshape_render::Style, d: &nav::DetailSettings) -> noshape_render::Style {
     let mut s = style;
@@ -1119,6 +1128,9 @@ impl Viewport {
             }
         }
         self.bench_presented();
+        if bench_driven_by_frames() && self.bench.as_ref().is_some_and(|b| b.started.is_some()) {
+            self.bench_tick(cx);
+        }
         self.submit_if_ready(cx);
         // A frame texture only needs GPUI to present again (it samples the
         // texture registered under `texture_id`), unless the camera moved
@@ -1370,7 +1382,12 @@ impl Viewport {
                     BenchKind::Zoom => "zoom",
                     BenchKind::Pan => "pan",
                 },
-                if self.shown_texture.is_some() { "frames on the GPU" } else { "frames read back" },
+                match (self.shown_texture.is_some(), bench_driven_by_frames()) {
+                    (true, false) => "frames on the GPU",
+                    (true, true) => "frames on the GPU, driven by frames",
+                    (false, false) => "frames read back",
+                    (false, true) => "frames read back, driven by frames",
+                },
                 self.scene.instances.len(),
                 presented as f64 / el,
                 b.renders,
