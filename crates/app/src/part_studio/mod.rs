@@ -51,7 +51,7 @@ pub use in_context::{AssemblyContext, ContextOccurrence, PartStudioEvent, contex
 
 use crate::actions::*;
 use crate::sketch_mode::SketchEditor;
-use crate::assets::icon_path;
+use crate::assets::{has_icon, icon_path};
 use crate::doc_model::{DocEvent, DocModel};
 use crate::feature_dialog::{DialogEvent, FeatureDialog, RefLabeler};
 use crate::gpu::Gpu;
@@ -127,7 +127,10 @@ pub fn feature_icon(type_id: &str) -> SharedString {
     }
     let name = match type_id {
         "cPlane" => "plane",
-        "cPoint" => "point",
+        // Live (behaviours "icons2 (10-23) feature-list row icons"): these
+        // have no icon of their own; the client shows its fallback, the red
+        // warning triangle, whatever the feature's status.
+        "cPoint" | "copyPart" | "sheetMetalRip" | "sheetMetalUnfold" | "sheetMetalRefold" => "feature-studio-error",
         "assignVariable" => "variable",
         "queryVariable" => "query-variable",
         "booleanBodies" => "boolean",
@@ -144,8 +147,6 @@ pub fn feature_icon(type_id: &str) -> SharedString {
         "sheetMetalBendRelief" => "bend-relief",
         "sheetMetalCornerBreak" => "corner-break",
         "sheetMetalCorner" => "corner-relief",
-        "sheetMetalUnfold" => "unfold",
-        "sheetMetalRefold" => "refold",
         "sheetMetalJoint" => "joint",
         "sheetMetalMakeJoint" => "sheet-metal-make-joint",
         "sheetMetalJog" => "jog",
@@ -169,7 +170,8 @@ pub fn feature_icon(type_id: &str) -> SharedString {
                 }
                 s.push(ch.to_ascii_lowercase());
             }
-            return icon_path(&s);
+            // A type without an icon: the client's fallback (live), not a part.
+            return icon_path(if has_icon(&s) { &s } else { "feature-studio-error" });
         }
     };
     icon_path(name)
