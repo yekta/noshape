@@ -120,3 +120,7 @@ then edits, undo/redo, rollback and suppress.
 | Ctrl+Z / Ctrl+Y on the suppress | unsuppressed / suppressed again | — | ✅ |
 | Circular pattern 1 count 4 (edit), Enter twice | stays open (P2-A1, fix 9bf8475b not in this green) | 2nd Enter accepts | ✗ P2-A1 (fixed on main, pending green) |
 | Instance list header after count 4 | "Instances (5)" | top-level rows: "Instances (3)" | ✗ **P2-A6** (skb) |
+| Replicate dialog, Instances = Part 2 <1> | Mate to be matched auto-filled "Revolute 1"; Match faces in parts ▾; Parts to find match in (red) | same (behaviours 5969–5970) | ✅ |
+| … pending list row while open | none | "Replicate 1" row with an error badge at once | ✗ **P2-A7** (skb) |
+| Parts to find match in = plate, ✓ | pins in both free Ø10 holes; "Replicate 1" ▸ Part 2 <5>, <6>, Mate features (2) | same structure (behaviours 5973) | ✅ |
+| Linear pattern opened from tool search | red "Linear pattern 1" row with a red dot at once, kept after picking Instances | same (behaviours 5985) | ✅ |

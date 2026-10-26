@@ -803,3 +803,9 @@ rendering … vulkan drivers/libraries could not be loaded`. The ubuntu runner h
   + Replicate 1 + 2 patterns read "Instances (7)" with 10 instances (behaviours 5986, asm-06x; after the Replicate alone
   "Instances (5)" = 4 parts + the Replicate row). Here live would read "Instances (3)". Folders and subassemblies presumably
   count as one row each (not captured).
+- **P2-A7 — skb (assembly list while a dialog is open)** — Replicate (tool search "replicate"), Instances = Part 2 <1>:
+  "Mate to be matched" auto-fills "Revolute 1" as live, but **no pending "Replicate 1" row** appears in the instance list
+  while the dialog is open (a28-52.png). Live: "a 'Replicate 1' row (with an error badge) appears in the instance list right
+  away" (behaviours 5970). Linear and circular patterns do show their red pending row with a red dot at open (✅); once,
+  though, the circular pattern's pending row vanished after the axis was picked (a28-26 → a28-28; not reproduced on Linear).
+  The accepted result matches live: "Replicate 1" ▸ Part 2 <5>, Part 2 <6>, "Mate features (2)".
