@@ -4301,7 +4301,7 @@ dependencies = [
 
 [[package]]
 name = "noshape"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -4337,7 +4337,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-app-core"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4372,7 +4372,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-assembly"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "glam 0.34.1",
  "nalgebra",
@@ -4389,7 +4389,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-cli"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4401,7 +4401,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-custom"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "glam 0.34.1",
  "log",
@@ -4419,7 +4419,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-drawing"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "acadrust",
  "ahash",
@@ -4450,7 +4450,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-featurescript"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "log",
  "noshape-workspace-hack",
@@ -4461,7 +4461,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-kernel"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -4474,7 +4474,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-model"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "acadrust",
  "ahash",
@@ -4506,7 +4506,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-model-core"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "acadrust",
  "ahash",
@@ -4533,7 +4533,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-model-data"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "ahash",
  "earcutr",
@@ -4555,7 +4555,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-ops"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "anyhow",
  "glam 0.34.1",
@@ -4580,7 +4580,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-render"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "bytemuck",
  "glam 0.34.1",
@@ -4597,7 +4597,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-scene"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "dirs 6.0.0",
  "glam 0.34.1",
@@ -4614,7 +4614,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-sketch"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "cadkit-core",
  "cadkit-dwg",
@@ -4634,7 +4634,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-store"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "blake3",
  "log",
@@ -4649,7 +4649,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-units"
-version = "0.4.6"
+version = "0.4.9"
 dependencies = [
  "indexmap",
  "noshape-workspace-hack",
