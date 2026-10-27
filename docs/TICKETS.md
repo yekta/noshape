@@ -253,7 +253,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   viewport is frozen for the rest of the session (the UI keeps working). Without NOSHAPE_PERF the section renders fine, so
   users don't hit it, but every perf run / perf.yml benchmark with a section does. Log tickets/perf-section-panic.log,
   doc tickets/qa-1026-main.noshape (tab Part Studio 6) (qa 2026-10-26, build 4d2f6b0c)
-- [ ] P2 EXT-DIRECTION (psui 10-27: on main the captured case works: a face picked, ticking Direction makes "Extrude
+- [x] P2 EXT-DIRECTION not a bug on main (live behaviours "psui (10-27, EXT-DIRECTION)": ticking Direction with nothing
+  picked keeps the empty regions field active in live too; with a region picked first the new field takes the focus,
+  as ours) (psui 10-27: on main the captured case works: a face picked, ticking Direction makes "Extrude
   direction" the active field, title and chevron red, as live; with nothing picked yet ours keeps the empty regions field
   active, live asked (REQUESTS "psui (10-27, EXT-DIRECTION)")) (qa4 round 5, still open on green 4d2f6b0c) ticking Extrude › Direction leaves the new "Extrude
   direction" field inactive (white) and the regions field active, chevron grey; after a region pick the field turns pink
