@@ -49,7 +49,7 @@ Sketch P1: no open items (parity/sketch.md all ✅; workflow-sketch-tools.md rec
 3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; left:
    A10 a toolbar tooltip staying after a click (app-core tooltips)), workflow-configured-assembly (1, 2, 8 ✅; left: CA3
    Change configuration dialog body translucent, CA4 Tab leaving that dialog, A15 selection colours / root row),
-   workflow-exploded-named-positions (2–4, 7, 11, 14, 16 ✅; left: 5 minor, EXV6 pill (in code, unverified), NP2).
+   workflow-exploded-named-positions (2–4, 7, 11, 14–16 ✅; left: 5 minor, NP2).
 4. Which part moves when neither is fixed in an exact flip (live's rule open, behaviours R3 note); ours moves the first
    connector's part (as live in 10 of 14 runs).
 5. Slot: live shows all 3 offset glyphs at the end cap; after the commit live's centre line is plain dark blue (ours

@@ -24,7 +24,7 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/x01�
 | # | Step | Live | Ours | Status |
 |---|---|---|---|---|
 | 14 | Drag the Z-tip ring | dialog Rotation ▾, Instances, ☐ Specify axis, **Rotation angle 55 deg**, ☑ Explode lines, field; curved arrow; row "⟲ Explode step 2" (810) | same fields and row; angle **"-37.565°"** (live writes "55 deg"; its drags look rounded: also "Distance 18.9 mm" vs our "12.436 mm") (cmp-y03) | ✅ (fixed in e66fea97 (EXV5), on main; skasm 10-27) |
-| 15 | Drag the rollback bar above step 2 | blue pill "Rollback bar" under the cursor + blue drop line; drop slot = nearest row boundary (upper half → above); step 2 italic grey, only step 1 shown (820, 821) | drop works with the cursor on the boundary: step 2 italic grey, only step 1 applied ✅ (y07); but **no "Rollback bar" pill** (a grey ghost bar instead), and at 4 px into step 2's upper half the drop line went **below** step 2 (y04) | ✗ **EXV6** (ui, minor) |
+| 15 | Drag the rollback bar above step 2 | blue pill "Rollback bar" under the cursor + blue drop line; drop slot = nearest row boundary (upper half → above); step 2 italic grey, only step 1 shown (820, 821) | skasm 10-27 on main 8993154b (asm1, one Z step on Part 1 <2>): the blue "Rollback bar" pill under the cursor and the blue drop line above the step (cursor in the step's upper half); dropped: the step italic grey, the pin back at its base; dragged back to the end the step applies again | ✅ |
 | 16 | Revolute row menu (normal mode) | … Isolate…, Make transparent… \| Edit named position driver mate… \| Suppress, Dynamic suppression ▸ \| Animate… … (separators around the driver item) | same items; **no separators** around "Edit named position driver mate…" (y08) | ✅ (GUI green 19555ca3, skasm 10-27: separators around "Edit named position driver mate…") |
 | 17 | Edit named position driver mate… | banner "Editing Named position 1 [Done]", 220 px "Driving mate selector": "Mates to drive positions" › Revolute 1 › ☐ ↻ - Z (152) | same; checkbox label "⟳ - z" (lower-case) (y09) | ✅ (case ?) |
 | 18 | Tick + ✓ | two-level header "Revolute 1" over "⟳ - z"; each row "0 deg" (154) | same (y10) | ✅ |
@@ -41,4 +41,4 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/x01�
 | EXV6 rollback pill | not re-checked (my drag made no step this run) | – |
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871)
-| EXV6 rollback pill | in code (assembly_panels.rs: 100 × 31 blue "Rollback bar" pill under the cursor, live 820); not re-dragged in the app | ✅ (code) |
+| EXV6 rollback pill | in code (assembly_panels.rs: 100 × 31 blue "Rollback bar" pill under the cursor, live 820); re-dragged in the app by skasm 10-27 (row 15) | ✅ |
