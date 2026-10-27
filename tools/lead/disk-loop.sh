@@ -1,6 +1,20 @@
 #!/bin/bash
+# Floor (every 5 min): below 40 GB free, clear the incremental caches of target dirs that no running cargo uses, biggest
+# first (safe: cargo rebuilds them; never touches a dir mid-build). 10-27 01:40 the disk filled to 0 after the crate splits.
+free_gb() { df -BG --output=avail / | tail -1 | tr -dc 0-9; }
+busy() { local p; for p in $(pgrep -x cargo); do tr '\0' '\n' < /proc/$p/environ 2>/dev/null | grep -qx "CARGO_TARGET_DIR=$1" && return 0; done; return 1; }
+floor() {
+  [ "$(free_gb)" -ge 40 ] && return
+  for d in $(du -s /root/target-*/debug/incremental 2>/dev/null | sort -rn | awk '{print $2}'); do
+    t=${d%/debug/incremental}; busy "$t" && continue
+    rm -rf "$d"/* && echo "$(date -u +%H:%M) floor: cleared $d, $(free_gb) GB free" >> /tmp/lead/disk-loop.log
+    [ "$(free_gb)" -ge 40 ] && return
+  done
+}
 # Every 30 min: delete stale test executables, and prune old artifact variants (keep the newest 6 per crate).
+n=0
 while true; do
+  floor; n=$((n+1)); [ $((n % 6)) -ne 1 ] && { sleep 300; continue; }
   for d in /root/target-core /root/target-psui /root/target-skasm /root/target-dx /root/target-exp; do
     find $d/debug/deps -maxdepth 1 -type f -executable ! -name '*.so' -mmin +45 -amin +30 -delete 2>/dev/null
   done
@@ -13,15 +27,15 @@ while true; do
   # Linux perf's build-id cache: a copy of every profiled binary (18 GB on 10-26). Keep only the last 2 h.
   find /root/.debug -mindepth 1 -maxdepth 3 -mmin +120 -exec rm -rf {} + 2>/dev/null
   # Incremental caches (on again since 10-26 20:00): drop per-crate caches untouched for 90 min, and keep each target
-  # dir's under 20 GB (oldest first).
+  # dir's under 10 GB (oldest first).
   find /root/target-*/debug/incremental -mindepth 1 -maxdepth 1 -type d -mmin +90 -exec rm -rf {} + 2>/dev/null
   for d in /root/target-*/debug/incremental; do
-    while [ "$(du -s $d 2>/dev/null | cut -f1)" -gt 20000000 ]; do o=$(ls -tr $d | head -1); [ -z "$o" ] && break; rm -rf "$d/$o"; done
+    while [ "$(du -s $d 2>/dev/null | cut -f1)" -gt 10000000 ]; do o=$(ls -tr $d | head -1); [ -z "$o" ] && break; rm -rf "$d/$o"; done
   done
   # Temp dirs left by e2e test processes that have exited (named by PID).
   for d in /tmp/noshape-ops-e2e-*; do p=${d##*-}; kill -0 $p 2>/dev/null || [ -z "$(find $d -maxdepth 0 -mmin +60)" ] || rm -rf "$d"; done
   # Old copies of the app binary that agents park in scratch dirs (12 h+).
   find /root/*-scratch /tmp -maxdepth 4 -type f -name "noshape*" -size +100M -mmin +120 -delete 2>/dev/null
   echo "$(date -u +%H:%M) $(df -h / | tail -1 | awk '{print $4}') free" >> /tmp/lead/disk-loop.log
-  sleep 1800
+  sleep 300
 done
