@@ -95,6 +95,9 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   (planar-face fields take no cylinder, `face_fits`) + DIALOG-OK-STATE (range errors disable ✓, "Syntax error in
   expression."); dea57d5c TAB-EXPORT-MISSING; 2044128a HOLE-SIZE-NO-DIAMETER (the size table applies with std logic
   too; overridden info for unsynced holes); b0a4cab0 VAR-BARE-UNIT + SKETCH-RMB-ITEMS (curve).
+- 10-27 17:00–18:20: 08673b8b section overlap flat red in Part Studios (live re-capture) + part hover = its outline
+  in hover orange; 1a5a255a PLANE-MENU-SELECTED; 15f1128b SKETCH-S-EXTRUDE; 595549a3 LOFT-PROFILES-PINK (array
+  field error look; any set_value makes the dialog dirty); a80013c6 `NOSHAPE_PREWARM=early` switch (off).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -143,14 +146,19 @@ that touches the model: ~12 min.
 0. Live answers pending (REQUESTS psui 10-27): the part hover look in a part field (PART-HOVER-RED look), the
    section cap colour where two parts overlap (reopened PS-SECTION item: ours sums the colours to white), the mate
    connector disc over a face (interaction 3.4), MENU-TRUNCATE. Apply each as answered.
-0b. Cold start: with the Metal shader cache cleared (perf.yml 40526882894, COLD=1) the first frame is 1.28–1.96 s:
+0a. P2 P1-8 caveat (Hole chips): a sketch's vertices picked from its row and clicked one by one are stored the same,
+   so a reopened Hole can't tell them apart; needs the row pick stored as such (a model change).
+0b. Cold start (COLD=1 run 40547478509 compared it: base 1.55–1.93 s, early 1.42–1.59 s, the window drawn later with
+   early; default unchanged): with the Metal shader cache cleared (perf.yml 40526882894, COLD=1) the first frame is 1.28–1.96 s:
    our 8 first-frame pipelines (already compiled in parallel; naga 29 already compacts each to its entry point)
    take 480–670 ms and start only after the first window draws (`hold_prewarm`). Experiment ready in
    /root/psui-scratch/prewarm-early.diff (`NOSHAPE_PREWARM=early`: compile at device-ready on utility-QoS threads);
    measure it with a COLD=1 run whose variants set it, before landing as default. Bigger lever: precompiled
    metallibs (wgpu 29 passthrough `metallib`) built by the macOS release job.
 0c. Retina orbit 76 fps (target 120) is GPU-bound (submit→done ≈ 17 ms mean, 45 ms p95 at 2388×1588, 4× MSAA):
-   diagnostic run 40537102560 (variants msaa1 / noao / nosil / nolines / nobacksil at 2×) shows where it goes.
+   diagnostic run 40537102560 at 2×: base 71 fps (done 18.8 / 46.0 ms), MSAA 1 70.7, no AO 69.3, no back
+   silhouettes 65.8, **no lines 81.8 fps (13.2 / 24.9 ms)**, no silhouettes 73.4 (p95 26.4). The edge lines are the
+   GPU cost at Retina: next, a cheaper line pass (fewer vertices per segment, LOD while orbiting).
 
 1. Our base part shading differs a few units from live's (block top (140,185,212) vs (145,181,203)), which is what
    the preview samples still differ by.
