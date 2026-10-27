@@ -95,7 +95,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.16 | Scroll wheel up zooms in, down zooms out, about the cursor (also when zooming out) | help; `zoomOnCanvasPoint`, `USE_CENTRAL_ZOOM_OUT` 0; live navigation/11–14 (fixed point = pointer both ways) | ✅ L, R (Wayland value120, X11 valuators, both directions, fixed point < 0.5 px) |
 | 1.17 | Zoom per notch: scale 2^(−i/6) with i = 0.5 per notch (×3 on Windows): ×1.06 per notch on macOS/Linux, ×1.19 on Windows | `zoomOnMouseWheelScroll`; live (Linux Chrome): ×1.060 per notch, up then down returns exactly | ✅ L: 2^(−W/1440) for W = 120, 60, 30, 12, 3, −3, −120, 360; R: hi-res 30 and 7 → wheelDelta 30 and 7, exact |
 | 1.18 | Perspective zoom dollies the eye along the cursor ray by distance × i/6, within 0.05–50 scene diameters | `zoomPoint`, `dollyAlong` | ✅ live "nav2 perspective zoom" (10-25): fit 446.8626 mm and nine wheel events at the live pointer match to 2 µm (U `perspective_wheel_matches_live_onshape`); right-drag 3 turns/diagonal as in ortho. ⏳ the zoom-out stop (live 3240.83 mm, ours one step earlier) awaits the live `canZoom` values (REQUESTS "nav2 (P1) (10-25 b") |
-| 1.19 | Zoom limits: no zoom out once the model is under 100 px across, no zoom in past 2^24 px/m | `canZoom` | 🔧 |
+| 1.19 | Zoom limits: no zoom out once the model is under 100 px across, no zoom in past 2^24 px/m | `canZoom` | ✅ U `zoom_limits_like_can_zoom` (app-core navigation, from the bundle) |
 | 1.20 | Horizontal scroll (tilt wheel, sideways swipe) does nothing | `zoomOnMouseWheelScroll` (`wheelDeltaX > wheelDeltaY` → ignored); live navigation/17 | ✅ R: horizontal wheel → no zoom (X11 and Wayland) |
 | 1.20b | Shift+wheel and Ctrl+wheel zoom exactly like the wheel (Linux; macOS and Chrome on Windows turn Shift+wheel horizontal before Onshape sees it, so it does nothing there) | live navigation/15–16 | ✅ R: Shift / Ctrl+wheel zoom like the wheel; Windows Shift+wheel now zooms too (Chromium keeps it vertical) |
 | 1.21 | Scrolling during a box selection does nothing | `onMouseWheelScroll` | ✅ R: three wheel notches during a left-drag box → no camera change |
@@ -135,7 +135,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 |---|---|---|---|
 | 4.1 | Click a face: plane view; a corner/edge: that view — each zoomed to fit at the new orientation | help; `animateToStandardView` → `animateToFrameWithZoomFit` | ✅ qa4 10-23 (Top / Front, each zoomed to fit); R: a tap on the cube lands on a face, edge or corner view |
 | 4.4 | Shift+1–7 standard views zoom to fit too | `handleFrontView` … | ✅ qa4 10-23 (Shift+1 = Front, zoomed to fit) |
-| 4.5 | Zoom to fit (F, double middle click) frames the visible planes as well as parts and sketches (the model node's bounds), their box's projected corners padded ×1.05 | `getFitBounds`, `zoomToFit`, `CAMERA_ZOOM_TO_FIT_PADDING` | 🔧 (parts only, ×1.12: the part looked ~1.39× bigger than in Onshape) |
+| 4.5 | Zoom to fit (F, double middle click) frames the visible planes as well as parts and sketches (the model node's bounds), their box's projected corners padded ×1.05 | `getFitBounds`, `zoomToFit`, `CAMERA_ZOOM_TO_FIT_PADDING` | ✅ U `zoom_to_fit_frames_like_onshape` (parts only, ×1.12: the part looked ~1.39× bigger than in Onshape) |
 | 4.2 | Click the ◀ ▶ ▲ ▼ arrows: rotate 15° (Shift 90°, Ctrl 5°), same animation as the keys | help | ✅ qa4 10-23 (▶ turns 15°, the Right face edge comes in) |
 | 4.3 | Curved arrows: roll 15° about the line of sight | `rotateInDirection("clockwise")` | ✅ qa4 10-23 (the curved arrow rolls 15°) |
 
@@ -144,11 +144,11 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 5.1 | Section "Mouse controls" after Units, before Part Studio settings: "View settings" dropdown (170 px) | live DOM | 🔧 (first section of our page: Language/Units sections are not local) |
-| 5.2 | Presets: Onshape (default), SOLIDWORKS, NX 10, Creo, AutoCAD | client `viewManipulationMapping`; live 62 | 🔧 |
-| 5.3 | Table "3D Part & Assembly" / "2D Drawing" with rows Rotate, Constrained rotate, Pan, Zoom per preset; "Alt + " prefix on Constrained rotate (moves to Rotate when constrained is the default) | live DOM; `mouseActionSettingsMap` | 🔧 |
+| 5.2 | Presets: Onshape (default), SOLIDWORKS, NX 10, Creo, AutoCAD | client `viewManipulationMapping`; live 62 | ✅ U `presets_follow_their_tables` (app-core navigation, from the bundle) |
+| 5.3 | Table "3D Part & Assembly" / "2D Drawing" with rows Rotate, Constrained rotate, Pan, Zoom per preset; "Alt + " prefix on Constrained rotate (moves to Rotate when constrained is the default) | live DOM; `mouseActionSettingsMap` | ✅ U `presets_follow_their_tables` (app-core navigation, from the bundle) |
 | 5.4 | ☐ Reverse scroll wheel zoom direction | live DOM; `isScrollZoomDefault` | 🔧 |
 | 5.5 | Choosing SOLIDWORKS ticks Reverse scroll wheel zoom direction (other presets leave it; switching back does not untick) | `setDefaultMouseScrollDirection`; live navigation/63–64 | 🔧 |
-| 5.6 | ☐ Set default rotation behavior to constrained rotate (Alt then gives free rotate) | live DOM; `axisRotationLock` | 🔧 |
+| 5.6 | ☐ Set default rotation behavior to constrained rotate (Alt then gives free rotate) | live DOM; `axisRotationLock` | ✅ U `constrained_rotate_default_swaps_alt` (app-core navigation, from the bundle) |
 | 5.7 | ☐ Use pen input as mouse | live DOM | ✅ 10-25: stored and applied (`gpui::set_pen_as_mouse`): off = pen contacts are touches on every platform (row 7.10), on = mouse events |
 | 5.8 | "Save mouse controls" (disabled until changed) saves and applies at once; nothing applies before saving | live DOM; live 61 | 🔧 |
 
