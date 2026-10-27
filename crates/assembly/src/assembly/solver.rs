@@ -833,8 +833,20 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
             bodies[m.b].pose = e.mul(&m.b_local.inverse());
         }
     }
-    orient_axial_mates(bodies, mates);
+    let stays = orient_axial_mates(bodies, mates);
     seat_cone_limits(bodies, mates);
+    // Live (behaviours "skasm (2026-10-27): oracle_asm R3 rule"): after an
+    // exact flip with nothing fixed only the turned part moves; the other
+    // keeps its transform exactly. Solve with it held first.
+    if !stays.is_empty() && drags.is_empty() {
+        let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || stays.contains(&i) }).collect();
+        let r = solve_inner(&mut trial, mates, relations, &[], false);
+        if r.converged && r.mate_ok.iter().all(|ok| *ok) {
+            for (b, t) in bodies.iter_mut().zip(&trial) {
+                b.pose = t.pose;
+            }
+        }
+    }
     if !drags.is_empty()
         && let Some(r) = solve_dragged_only(bodies, mates, relations, drags, dof)
     {
@@ -958,7 +970,10 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
 /// moving connector's axis, w the constant [`HALF_TURN_W`] (behaviours
 /// "skasm (2026-10-27): oracle_asm R3 rule for a flipped part": the part's
 /// own turn about the axis carries through).
-fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
+/// Returns the free bodies an exact flip left unturned (their partner
+/// turned), which live keeps in place.
+fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<usize> {
+    let mut stays = Vec::new();
     for m in mates {
         if m.follow.is_some() || !matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel) {
             continue;
@@ -982,12 +997,17 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
         } else {
             continue;
         };
+        let other = if moving == m.a { m.b } else { m.a };
+        if exact && !bodies[other].fixed {
+            stays.push(other);
+        }
         let c = bodies[moving].pose.mul(&local);
         let axis = exact.then(|| (c.rotation * DVec3::Z).cross(HALF_TURN_W).try_normalize()).flatten().unwrap_or(c.rotation * DVec3::X);
         let turn = DQuat::from_axis_angle(axis, std::f64::consts::PI);
         let p = bodies[moving].pose;
         bodies[moving].pose = Frame { origin: c.origin + turn * (p.origin - c.origin), rotation: (turn * p.rotation).normalize() };
     }
+    stays
 }
 
 /// The first coordinate of `v` (x, then y, then z) that isn't zero.
@@ -1613,6 +1633,9 @@ mod tests {
             assert!(solve(&mut bodies, &[m], &[], &[]).converged, "{z:?}");
             let turned = |b: &SolverBody| b.pose.rotation.angle_between(DQuat::IDENTITY) > 3.0;
             assert_eq!((turned(&bodies[0]), turned(&bodies[1])), (first, !first), "{z:?}");
+            // ... and only it moves: the other keeps its place exactly.
+            let (stay, start) = if first { (1, DVec3::new(-0.03, 0.01, 0.04)) } else { (0, DVec3::new(0.05, 0.02, 0.0)) };
+            assert!((bodies[stay].pose.origin - start).length() < 1e-12, "{z:?}: {:?}", bodies[stay].pose.origin);
         }
     }
 
