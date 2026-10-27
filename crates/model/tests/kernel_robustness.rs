@@ -2643,3 +2643,49 @@ fn chamfer_wider_than_its_face_overflows_like_onshape() {
         assert!((v - want).abs() < 5e-3, "{d} mm: volume {v}, want {want}");
     }
 }
+
+/// qa FEATURE-PATTERN-ADD-Y, as live (behaviours "qa (2026-10-27)
+/// FEATURE-PATTERN-ADD-Y"): a Ø10 boss 10 high at (20, 20) on a 300 × 200 × 3
+/// plate, Feature pattern without Reapply. The plate's left edge points −Y
+/// (off the plate): along it every copy misses the part and the pattern fails;
+/// flipped it makes them. A second direction off the plate drops its copies
+/// silently (status OK) when the first direction's are made.
+#[test]
+fn feature_pattern_of_an_added_boss_off_the_plate_as_live() {
+    let mut t = T::new();
+    t.block(300.0, 200.0, 3.0);
+    let top = Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("3 mm"))]));
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.02, 0.02), 0.005);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![top])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    let boss = t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    let front = t.edges_where(|i| i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && i.start.z.abs() < 1e-9 && i.end.z.abs() < 1e-9);
+    let left = t.edges_where(|i| i.start.x.abs() < 1e-9 && i.end.x.abs() < 1e-9 && i.start.z.abs() < 1e-9 && i.end.z.abs() < 1e-9);
+    assert_eq!((front.len(), left.len()), (1, 1));
+    let boss_v = std::f64::consts::PI * 25.0 * 10.0;
+    const NOT_ALL: &str = "Could not create all instances as entered. Try selecting \"Reapply features\" option.";
+    // (label, the pattern's direction parameters, bosses made or None: fails).
+    type Case = (&'static str, Vec<(&'static str, ParamValue)>, Option<usize>);
+    let cases: Vec<Case> = vec![
+        ("left edge as picked (−Y)", vec![("directionOne", q(left.clone()))], None),
+        ("left edge flipped", vec![("directionOne", q(left.clone())), ("oppositeDirection", ParamValue::Bool(true))], Some(3)),
+        ("second direction as picked", vec![("directionOne", q(front.clone())), ("hasSecondDir", ParamValue::Bool(true)), ("directionTwo", q(left.clone())), ("distanceTwo", e("40 mm")), ("instanceCountTwo", e("2"))], Some(3)),
+        ("second direction flipped", vec![("directionOne", q(front.clone())), ("hasSecondDir", ParamValue::Bool(true)), ("directionTwo", q(left.clone())), ("oppositeDirectionTwo", ParamValue::Bool(true)), ("distanceTwo", e("40 mm")), ("instanceCountTwo", e("2"))], Some(6)),
+    ];
+    for (label, extra, bosses) in cases {
+        let mut u = t.fork();
+        let mut params = vec![("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(boss)])), ("distance", e("40 mm")), ("instanceCount", e("3"))];
+        params.extend(extra);
+        let p = u.add("linearPattern", &params);
+        let (st, msg, v) = status(&mut u, p);
+        match bosses {
+            None => assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some(NOT_ALL)), "{label}"),
+            Some(n) => {
+                assert_eq!(st, FeatureStatus::Ok, "{label}: {msg:?}");
+                assert!((v - (180000.0 + n as f64 * boss_v)).abs() < 1e-3, "{label}: {v} mm³, want {n} bosses");
+            }
+        }
+    }
+}

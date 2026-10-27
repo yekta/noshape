@@ -37,7 +37,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli-shell-gpf, cli-fillet-segv, cli-fillet2-segv and cli-draft-segv.noshape** (/root/qa-scratch/tickets/; green 19555ca3
   opens all five).
 ## Core modelling (core)
-- [ ] P1 FEATURE-PATTERN-ADD-Y a Feature pattern of an **Add** extrude loses the instances along some directions:
+- [x] no change, as live (core 10-27: live's answer, behaviours "qa (2026-10-27) FEATURE-PATTERN-ADD-Y": the plate's left edge points −Y, off the plate; as picked live fails the same way and drops a second direction's off-plate copies silently, status OK; Opposite direction gives all of them, in ours too. T1 test kernel_robustness::feature_pattern_of_an_added_boss_off_the_plate_as_live) P1 FEATURE-PATTERN-ADD-Y a Feature pattern of an **Add** extrude loses the instances along some directions:
   steps (bin/fp2var.py): plate 300 × 200 × 3 (Top), sketch Ø10 on its top face at (20,20), Extrude Add 10 mm; Linear
   pattern › Feature pattern of it, 40 mm. Along the plate's X edge 3 instances: right. Along its Y edge (direction
   either way), 3 instances: **Error "Could not create all instances as entered. Try selecting "Reapply features""**,
