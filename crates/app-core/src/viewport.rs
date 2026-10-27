@@ -871,7 +871,8 @@ impl Viewport {
     /// Refresh the hover id at the last pointer position from the GPU (one
     /// query in flight at a time).
     fn request_hover(&mut self) {
-        if self.drag == Drag::Nav || self.anim.is_some() || !self.pointer_inside {
+        // Live: nothing pre-highlights while a box is dragged either.
+        if matches!(self.drag, Drag::Nav | Drag::Box) || self.anim.is_some() || !self.pointer_inside {
             return;
         }
         if self.hover_query {
@@ -916,7 +917,7 @@ impl Viewport {
             PickPurpose::Hover => {
                 self.avg_pick_ms = average_pick_ms(self.avg_pick_ms, asked.elapsed().as_secs_f64() * 1000.0);
                 self.hover_query = false;
-                if !self.pointer_inside {
+                if !self.pointer_inside || self.drag == Drag::Box {
                     self.hover_query_again = false;
                 } else if self.paused_hover.is_some() {
                     // A fast move: the pick waits for the pause.
@@ -1859,6 +1860,8 @@ impl Viewport {
                 // only while the pointer is right of the press.
                 self.box_rect = Some((self.press_pos, p, p.x <= self.press_pos.x));
                 self.ctrl_in_box = e.modifiers.control;
+                // A hover picked as the box started (a pick in flight) goes.
+                self.set_hover(None, cx);
                 cx.notify();
             }
             Drag::Tool => {

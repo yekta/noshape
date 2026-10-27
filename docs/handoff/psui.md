@@ -58,8 +58,7 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-1. A black ring shows at a selected edge's midpoint after a box selection (green build too; live none): find what
-   draws it (implicit point / hover sprite?) and drop it. Delete part ghost outline (255,192,76). Dihedral panel
+1. Delete part ghost outline (255,192,76). Dihedral panel
    (item 5). part-studio.md rows done 10-27: 1.12, 1.18, 1.19, 1.22, 1.27, 2.11, 2.13, 2.16, 2.17, 2.18, 3.6, 3.11,
    3.14, 3.16, 4.4, 4.9, 5.22, 6.6, 6.10, 6.11, 6.25, 6.28, 7.4, 9.2, 9.6, 9.7. 3.6: live asked whether the crossing
    box is really blue (spec) or our yellow dashed #FFC20E (bundle CROSS_SELECT_COLOR; kept).
