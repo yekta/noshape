@@ -12,6 +12,8 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (569dabca19a397e932f2db54) in noshape mm test.
 
 ## Landed on main
+- 44180351 sketch edit fuzz (T2) `fuzz::random_sketch_edits_never_panic` (`SKETCH_FUZZ_SEEDS=1..100 SKETCH_FUZZ_STEPS=150
+  cargo test -p noshape-sketch --test all fuzz::random_sketch_edits -- --ignored`: clean, 744 s).
 - be0dd33e new mate between two free parts: the part live keeps stays (`eval::new_mate_stays`: exact flip → sign rule,
   else the smaller part moves; ties → the negative-Z one), in the mate dialog and assembly_mate (was: the second
   connector's part always stayed). Live runs in my own tab, behaviours "skasm (2026-10-27) follow-up: which part
