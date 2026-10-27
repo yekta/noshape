@@ -43,16 +43,25 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-1. End of day (~04:00): walk the Part Studio workflows in /root/green/noshape against live; regressions to TICKETS.
+1. part-studio.md rows with live specs waiting (SPECS.md "psui: part-studio.md …"): 5.22 wheel on a focused number
+   field, 6.25 paused regeneration, 3.6 box selection, 6.10 / 6.11 filter box, 1.12 Delete key, 6.6 Shift+click range,
+   7.4 eye, 4.4 tool clicked again, 2.18 Shift+I with parts selected (isolates them, clears the selection; not yet
+   re-checked), 9.6 cube hover. Done today: 1.18, 1.19, 1.22, 1.27, 2.11, 2.13, 2.16, 2.17, 3.11, 9.7.
 2. Preview blend residuals (behaviours "psui (10-26, P1) Feature preview look"; SPECS CORRECTION 10-27: live's Remove
    cuts the part and draws the grey tool over it, as ours, so Remove / Intersect are right unblended); live draws the active field's picked region outline
    full orange over the preview (ours: 30 % behind the tool); at slider 1 live's top face is lighter than ours.
 3. Edge selected + hovered (live: the hover's dark outline round a (255,188,64) core): ours never hovers a selected
    entity (builder `hover.filter(|h| !selection.contains(h))`).
-4. Dihedral panel layout (P2; live asked for the full spec): Units ▾ row, Max / Min read-outs, Scale row, grey ✕;
+4. Part lighting's specular varies across the screen in live, ours is flat: three blocks (behaviours "spec: psui
+   part-studio.md 2.18 / 2.19": Part 3 blue at the right reads top (62,96,171), ours (53,87,161); Part 1 / 2 match
+   within 2). Live's Part 3 = 0.905 × colour + ~8 (a specular term), Part 1 none; live notes a highlight near the
+   front-right corner of one block. Look at the bundle's lightFragment view vector (eye-space position?) before
+   changing shaders.wgsl `shade()`; test `part_faces_are_lit_like_onshape`.
+5. Dihedral panel layout (P2; live asked for the full spec): Units ▾ row, Max / Min read-outs, Scale row, grey ✕;
    Curve/surface's "☑ Previewed edges and faces" row over a dialog.
-5. Cold start (viewport-performance.md 10-27): per-(source, options) MTLLibrary cache in the vendored wgpu-hal.
-6. interaction.md 🔧 rows left: 1.12, 3.1, 3.7, 4.x, 5.x, 6.x, 2.3, 2.6.
+6. Cold start (viewport-performance.md 10-27): per-(source, options) MTLLibrary cache in the vendored wgpu-hal.
+7. interaction.md 🔧 rows left: 4.1–4.4, 4.7–4.9, 5.1, 5.3, 6.2–6.8, 2.3, 2.6. Ctrl+M Mate connector defaults
+   (live asked: owner entity / attachment with one part).
 
 ## Requests to the lead
 
