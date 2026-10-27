@@ -225,6 +225,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   budget is spent or the regeneration is cancelled"), but scheduling a new regen doesn't cancel the running one. Same
   shape as DRAFT-HANG's stuck app (there forever). PRIORITIES P0 "aborting stale work"; live never makes a cheap edit wait (qa 2026-10-27,
   green 502416cc)
+  Likely cause (docs/handoff/kernel-robustness.md, gate (a)): `schedule_regen` aborts each running run "it doesn't
+  extend"; a rollback above the running feature is a prefix of the running run, so it is treated as extended and waits
+  for the whole run instead of taking the cached prefix at once.
 - [ ] P2 LOFT-SKETCH-HIDE a Loft hides only its first profile's sketch: Sketch 1 = 40×40 square on Top, Plane 1 = Top
   offset 40, Sketch 2 = Ø24 circle on it (/root/qa-scratch/loft2.noshape); Loft, pick the circle then the square, ✓: Sketch 2
   goes grey with the eye-slash, Sketch 1 stays shown (its menu says Hide) and its outline stays drawn; pick the square first
