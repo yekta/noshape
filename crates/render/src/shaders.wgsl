@@ -353,7 +353,9 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
     } else if (!unlit) {
         if ((st & SELECTED) != 0u && (st & ERROR) == 0u) {
             let sel = select(FACE_SELECTED, BODY_SELECTED, (st & BODY) != 0u);
-            c = mix(sel * 0.97, shade(i.world, i.normal, front, sel), 0.45);
+            // A whole part keeps more of its shading (live "psui (10-27, interaction 5.x)": top (243,183,72), front (192,144,57), right (224,169,66)).
+            let body = (st & BODY) != 0u;
+            c = mix(sel * select(0.97, 1.0, body), shade(i.world, i.normal, front, sel), select(0.45, 0.6, body));
         } else if ((inst.params.y & 16u) != 0u) {
             c = shade_preview(i.normal, front, c);
         } else {
