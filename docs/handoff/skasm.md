@@ -169,6 +169,9 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
 ## Requests to the lead
+- **20:40 main doesn't build on Linux**: crates/kernel/cpp/features.cpp:3296/3300/3305/3418 (core's ab192d94
+  fillet_square_corner) use `far` as a variable; fea4d943 defines near/far empty on Linux, so `const TopoDS_Vertex
+  far = …` fails ("expected unqualified-id before '='"). Rename it there (core's file; I haven't touched it).
 - "Show calculation variance" in Mass properties (live: behaviours "skasm (2026-10-27) calculation variance": every
   value gets " ± 4.000e-1 mm³"-style text, 3-decimal scientific, not persisted). The assembly panel
   (assembly-ui/assembly_mass.rs) is mine, the Part Studio one psui's (part-studio-ui menus.rs ~1329), and the numbers
