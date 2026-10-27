@@ -227,3 +227,42 @@ pub fn materials_of(lib: &AddedLibrary) -> MaterialLibrary {
 pub fn open_add_material_library(on_add: impl Fn(Option<AddedLibrary>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     (hooks().open_add_material_library)(Box::new(on_add), window, cx)
 }
+
+/// Inert hooks for UI tests on GPUI's test platform (docs/TESTS.md "UI keystroke tests"): nothing above the Part
+/// Studio exists there.
+#[cfg(test)]
+pub fn register_for_tests() {
+    register(Hooks {
+        open_document_window: |_, _, _| Ok(()),
+        library_docs: Vec::new,
+        other_documents: |_| Vec::new(),
+        release_log: |_| ReleaseLog::default(),
+        release_part_items: |_, _, _, _, _| Vec::new(),
+        open_release_candidate: |_, _, _, _| {},
+        open_revision_history: |_, _, _, _| {},
+        note_viewed_config: |_, _| {},
+        last_viewed_config: |_| None,
+        create_version: |_, _, _| {},
+        show_keyboard_shortcuts: |_| {},
+        show_shortcuts_page: |_, _| {},
+        key_chip: |text, _| div().child(text),
+        export_rules_link: |id| div().id(id),
+        parts_list_properties: || false,
+        set_parts_list_properties: |_| {},
+        feature_dialog_width: |_| None,
+        set_feature_dialog_width: |_, _| {},
+        variable_table: |_, _, _, _, cx| cx.new(|_| gpui_kit::Empty).into(),
+        readonly_variable_table: |_, _, _, _, _, _| None,
+        variable_panel_footer: |_, _, _| div().into_any_element(),
+        variable_type_cell: |_, _, _, _| div(),
+        compare_blend: |_, _| None,
+        compare_documents: |_, _| None,
+        compare_panel: |_, _, _| None,
+        compare_slider: |_, _| None,
+        repair_open: |_, _| false,
+        repair_close: |_, _| {},
+        repair_panel: |_, _, _| None,
+        materials_of: |_| MaterialLibrary::default(),
+        open_add_material_library: |_, _, _| {},
+    });
+}

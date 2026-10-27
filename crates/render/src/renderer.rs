@@ -1984,6 +1984,20 @@ impl Renderer {
         }
     }
 
+    /// A renderer on wgpu's no-op backend: no GPU, nothing drawn (buffers
+    /// exist and map, frames read back empty). For UI tests on GPUI's test
+    /// platform; an error unless wgpu's `noop` feature is on (only
+    /// noshape-ui-test-support turns it on, never a normal build).
+    pub fn noop() -> Result<Self, RenderError> {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::NOOP,
+            backend_options: wgpu::BackendOptions { noop: wgpu::NoopBackendOptions { enable: true }, ..Default::default() },
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
+        });
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).map_err(|e| RenderError::Device(e.to_string()))?;
+        pollster::block_on(Self::on_adapter(adapter))
+    }
+
     async fn on_adapter(adapter: wgpu::Adapter) -> Result<Self, RenderError> {
         let (device, queue) = Self::request_device(&adapter).await.map_err(RenderError::Device)?;
         Ok(Self::with_device(&adapter, device, queue))

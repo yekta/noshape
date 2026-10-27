@@ -25,3 +25,9 @@ platforms = [
 
 # Write out exact versions rather than a semver range. (Defaults to false.)
 # exact-versions = true
+
+# UI keystroke tests (docs/TESTS.md): noshape-ui-test-support turns on GPUI's
+# `test-support` and wgpu's `noop`; it is only ever a dev-dependency, and not
+# traversed here, so none of that reaches workspace-hack or normal builds.
+[traversal-excludes]
+workspace-members = ["noshape-ui-test-support"]

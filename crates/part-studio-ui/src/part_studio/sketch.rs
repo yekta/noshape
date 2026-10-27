@@ -4352,3 +4352,7 @@ fn sketch_screen_map(vp: &crate::viewport::Viewport, ed: &crate::sketch_mode::Sk
     let o = at(0.0, 0.0)?;
     Some((o, at(1.0, 0.0)? - o, at(0.0, 1.0)? - o))
 }
+
+#[cfg(test)]
+#[path = "sketch_ui_tests.rs"]
+mod ui_tests;

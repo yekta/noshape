@@ -57,60 +57,9 @@ pub struct Gpu {
 impl Gpu {
     pub fn new() -> anyhow::Result<Self> {
         let routes = Arc::new(Mutex::new(Routes { senders: HashMap::new(), viewport_senders: HashMap::new(), pick_senders: HashMap::new(), submitted: HashMap::new(), oneshots: HashMap::new() }));
-        let r2 = routes.clone();
+        let on_done = route_frames(routes.clone());
         let cell: Arc<OnceLock<Result<(RenderWorker, Present), String>>> = Arc::new(OnceLock::new());
         let cell2 = cell.clone();
-        let on_done = move |done: Completed| {
-            let (target, seq, result) = match done {
-                Completed::Frame { target, seq, result } => (target, seq, result),
-                Completed::Pick { target, token, result } => {
-                    let sender = r2.lock().pick_senders.get(&target).cloned();
-                    if let Some(tx) = sender {
-                        let _ = tx.try_send((token, result.map(Arc::new).map_err(|e| e.to_string())));
-                    }
-                    return;
-                }
-            };
-            let oneshot = r2.lock().oneshots.remove(&target);
-            if let Some(tx) = oneshot {
-                let _ = tx.try_send(result.map_err(|e| e.to_string()));
-                return;
-            }
-            let started = {
-                let mut routes = r2.lock();
-                let q = routes.submitted.entry(target).or_default();
-                let mut started = None;
-                while q.front().is_some_and(|(s, _)| *s <= seq) {
-                    let (s, t) = q.pop_front().expect("front");
-                    if s == seq {
-                        started = Some(t);
-                    }
-                }
-                started
-            };
-            let ms = started.map(|t| t.elapsed().as_secs_f32() * 1000.0).unwrap_or(0.0);
-            noshape_render::perf::record_ms("g.submit_to_frame", ms);
-            let viewport = r2.lock().viewport_senders.get(&target).cloned();
-            if let Some(tx) = viewport {
-                let result = result.map_err(|e| e.to_string()).and_then(|mut frame| {
-                    let image = match frame.texture.take() {
-                        Some(texture) => FrameImage::Texture(texture),
-                        None => FrameImage::Image(frame_image(&mut frame)?),
-                    };
-                    Ok((frame, image))
-                });
-                let _ = tx.try_send((seq, result, ms));
-                return;
-            }
-            let result = result.map_err(|e| e.to_string()).and_then(|mut frame| {
-                let image = frame_image(&mut frame)?;
-                Ok((frame, image))
-            });
-            let sender = r2.lock().senders.get(&target).cloned();
-            if let Some(tx) = sender {
-                let _ = tx.try_send((seq, result, ms));
-            }
-        };
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         gpui_wgpu::request_device_features(noshape_render::Renderer::WANTED_FEATURES);
         if noshape_render::perf::enabled() {
@@ -130,6 +79,18 @@ impl Gpu {
             let _ = cell2.set(worker);
         })?;
         Ok(Self { worker: cell, routes, next_target: Arc::new(AtomicU64::new(1)) })
+    }
+
+    /// A GPU stand-in for UI tests on GPUI's test platform: the render
+    /// worker runs on wgpu's no-op backend (nothing is drawn), so views that
+    /// render and upload work without a GPU. Frames and picks never come back
+    /// (the render thread may not wake the test's deterministic scheduler).
+    /// An error unless wgpu's `noop` feature is on (noshape-ui-test-support).
+    pub fn headless() -> anyhow::Result<Self> {
+        let routes = Arc::new(Mutex::new(Routes { senders: HashMap::new(), viewport_senders: HashMap::new(), pick_senders: HashMap::new(), submitted: HashMap::new(), oneshots: HashMap::new() }));
+        let renderer = noshape_render::Renderer::noop()?;
+        let worker = RenderWorker::spawn_with(renderer, |_| {});
+        Ok(Self { worker: Arc::new(OnceLock::from(Ok((worker, Present::Readback)))), routes, next_target: Arc::new(AtomicU64::new(1)) })
     }
 
     /// The GPU adapter ("name (Backend)") once the renderer is up.
@@ -274,6 +235,62 @@ impl Gpu {
     /// Frames a viewport should keep in flight.
     pub fn frames_in_flight(&self) -> usize {
         self.worker().frames_in_flight()
+    }
+}
+
+/// The render worker's completion callback: each frame, pick or one-off
+/// render goes back to whoever registered its target.
+fn route_frames(r2: Arc<Mutex<Routes>>) -> impl Fn(Completed) + Send + 'static {
+    move |done: Completed| {
+        let (target, seq, result) = match done {
+            Completed::Frame { target, seq, result } => (target, seq, result),
+            Completed::Pick { target, token, result } => {
+                let sender = r2.lock().pick_senders.get(&target).cloned();
+                if let Some(tx) = sender {
+                    let _ = tx.try_send((token, result.map(Arc::new).map_err(|e| e.to_string())));
+                }
+                return;
+            }
+        };
+        let oneshot = r2.lock().oneshots.remove(&target);
+        if let Some(tx) = oneshot {
+            let _ = tx.try_send(result.map_err(|e| e.to_string()));
+            return;
+        }
+        let started = {
+            let mut routes = r2.lock();
+            let q = routes.submitted.entry(target).or_default();
+            let mut started = None;
+            while q.front().is_some_and(|(s, _)| *s <= seq) {
+                let (s, t) = q.pop_front().expect("front");
+                if s == seq {
+                    started = Some(t);
+                }
+            }
+            started
+        };
+        let ms = started.map(|t| t.elapsed().as_secs_f32() * 1000.0).unwrap_or(0.0);
+        noshape_render::perf::record_ms("g.submit_to_frame", ms);
+        let viewport = r2.lock().viewport_senders.get(&target).cloned();
+        if let Some(tx) = viewport {
+            let result = result.map_err(|e| e.to_string()).and_then(|mut frame| {
+                let image = match frame.texture.take() {
+                    Some(texture) => FrameImage::Texture(texture),
+                    None => FrameImage::Image(frame_image(&mut frame)?),
+                };
+                Ok((frame, image))
+            });
+            let _ = tx.try_send((seq, result, ms));
+            return;
+        }
+        let result = result.map_err(|e| e.to_string()).and_then(|mut frame| {
+            let image = frame_image(&mut frame)?;
+            Ok((frame, image))
+        });
+        let sender = r2.lock().senders.get(&target).cloned();
+        if let Some(tx) = sender {
+            let _ = tx.try_send((seq, result, ms));
+        }
     }
 }
 

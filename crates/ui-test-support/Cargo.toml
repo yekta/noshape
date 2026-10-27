@@ -1,0 +1,12 @@
+[package]
+name = "noshape-ui-test-support"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Turns on what UI keystroke tests need (docs/TESTS.md): GPUI's test platform and wgpu's no-op backend (for Gpu::headless). Only ever a dev-dependency; cargo hakari doesn't traverse it, so none of it reaches workspace-hack or normal builds."
+
+[dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.9", features = ["test-support"] }
+# `Renderer::noop` / `Gpu::headless` need wgpu's no-op backend.
+wgpu = { workspace = true, features = ["noop"] }

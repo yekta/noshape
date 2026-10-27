@@ -36,6 +36,31 @@ Every test that isn't `#[ignore]`d. A T1 test must be:
 - **fast:** a test over ~5 s on this machine belongs in T2 unless it guards a P0/P1 path nothing faster covers;
 - **free of known-difference lists** (KNOWN in the oracles): progress must never turn T1 red.
 
+## UI keystroke tests
+
+Keyboard and focus behaviour (what qa's OTF-FIRST-KEY-style tickets are about) is tested on GPUI's test platform,
+T1, no GPU, no display: the real view in a test window, its `Gpu` a no-op stand-in (`Gpu::headless()`: the render
+worker on wgpu's no-op backend), keys through GPUI's dispatch. Example: part-studio-ui
+`part_studio/sketch_ui_tests.rs` (Line, click, click, `5 0 Enter` → a 50 mm dimension).
+- The crate dev-depends on `noshape-ui-test-support` (turns on GPUI's `test-support` and wgpu's `noop`) and on
+  `gpui = { package = "gpui-pre", version = "=0.3.9" }` (for `#[gpui::test]`). Only part-studio-ui does so far; others
+  opt in the same way. Never put those features on a normal dependency: `.config/hakari.toml` doesn't traverse
+  noshape-ui-test-support, so `cargo hakari generate --diff` stays empty, and
+  `cargo tree -p noshape -e features -e normal | grep -c test-support` must print 0.
+- Write the test inside the module whose private state it reads (`#[cfg(test)] #[path = "…_ui_tests.rs"] mod
+  ui_tests;`), with `#[gpui::test] fn …(cx: &mut TestAppContext)`, and import gpui_kit names one by one (a glob brings
+  GPUI's `test` macro in, and `#[gpui::test]`'s own `#[test]` then recurses). Set up: `cx.update(gpui_kit::init)`,
+  `part_studio_hooks::register_for_tests()` (inert app hooks), a document from `Session::create` in a temp dir,
+  `gpui_kit::open_window(…, |w, cx| cx.new(|cx| View::new(doc, tab, Gpu::headless().unwrap(), w, cx)))`, then
+  `window.activate_window()`: focus events (an input's select-on-focus) only run in an active window, and without it
+  a test passes where the app fails.
+- Drive it as the user does, and draw a frame between steps (`window.draw(cx).clear(cx)`, then
+  `cx.run_until_parked()`: a newly focused input registers its text handler when painted). Keys:
+  `window.dispatch_keystroke(Keystroke::parse("5"), cx)` with `key_char` set for a character key; clicks in the 3D view
+  as the viewport's tool events (`ViewportEvent::ToolDown` / `ToolUp` at viewport pixels through the view's
+  `on_viewport_event`), since the viewport's own hit testing needs real frames.
+- Assert on the model (the sketch's constraints, the document), not on pixels. Each test well under a second.
+
 ## T2 deep
 
 Marked `#[ignore = "T2: <reason>"]`; `tools/tiers/t2-names.py` lists them and `t2.sh` runs exactly those (other
