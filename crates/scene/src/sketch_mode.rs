@@ -1120,7 +1120,13 @@ impl SketchEditor {
 
     pub fn set_tool(&mut self, tool: Tool) {
         // Pressing the active tool's key again toggles back to select.
+        let previous = self.tool;
         self.tool = if self.tool == tool && tool != Tool::Select { Tool::Select } else { tool };
+        // Live: a polygon tool session starts at 6 sides; within it the next
+        // polygon keeps the last count.
+        if self.tool != previous && matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) {
+            self.polygon_sides = 6;
+        }
         // Choosing a drawing tool clears the selection (live: L with a line
         // selected deselects it).
         if self.tool.draws() {
@@ -6835,6 +6841,10 @@ mod tests {
         // the click commits and doesn't start the next polygon.
         assert!(ed.clicks.is_empty(), "no next polygon at the click");
         assert_eq!(ed.tool, Tool::Polygon);
+        assert_eq!(ed.polygon_sides, 7, "the next polygon of the session keeps the count");
+        ed.set_tool(Tool::Line);
+        ed.set_tool(Tool::Polygon);
+        assert_eq!(ed.polygon_sides, 6, "a new polygon tool session starts at 6 (live)");
     }
 
     /// Live (skasm 10-26, PS "skasm poly"): the Inscribed polygon's second
