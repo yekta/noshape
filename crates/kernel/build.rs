@@ -84,6 +84,7 @@ const BRIDGE_SOURCES: &[&str] = &[
     "cpp/mesh_formats.cpp",
     "cpp/jt_read.cpp",
     "cpp/xz_read.cpp",
+    "cpp/seh.cpp",
 ];
 
 /// openNURBS static libraries (scripts/build-opennurbs.sh), dependents first.

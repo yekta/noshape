@@ -26,6 +26,7 @@ class IntCurvesFace_ShapeIntersector; // geom.cpp line_crossings
 #include <map>
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <exception>
 #include <memory>
 #include <mutex>
@@ -55,6 +56,19 @@ extern thread_local int         crash_signal;
 void                            install_crash_guard();
 } // namespace noshape
 #endif
+#if defined(_WIN32) && defined(_MSC_VER)
+namespace noshape {
+// Windows crash guard (cpp/seh.cpp, WIN-CRASH-GUARD): runs fn(ctx) under
+// __try / __except; 0, or the code of the structured exception (an access
+// violation, a division by zero, std::terminate...) that ended it.
+unsigned long seh_call(void (*fn)(void*), void* ctx) noexcept;
+template <class F>
+unsigned long seh_run(F& f) noexcept
+{
+  return seh_call([](void* c) { (*static_cast<F*>(c))(); }, &f);
+}
+} // namespace noshape
+#endif
 
 namespace noshape {
 // The calling thread's regeneration cancel flag (set_thread_cancel), or null.
@@ -70,22 +84,27 @@ extern thread_local double                  budget_limit;
 extern thread_local int                     budget_reason;
 extern thread_local const std::atomic<bool>* budget_cancel;
 extern thread_local int                     budget_hold;
-// CPU seconds a blend, draft or shell may take (30; NOSHAPE_BLEND_BUDGET).
-double                                      blend_budget_seconds();
-// While one lives on a budgeted thread the budget doesn't jump (it does at
-// the next tick after): around work shared with OCCT's thread pool, whose
-// workers would go on using the abandoned stack frames.
-struct BudgetHold
-{
-  BudgetHold() { ++budget_hold; std::atomic_signal_fence(std::memory_order_seq_cst); }
-  ~BudgetHold() { std::atomic_signal_fence(std::memory_order_seq_cst); --budget_hold; }
-  BudgetHold(const BudgetHold&)            = delete;
-  BudgetHold& operator=(const BudgetHold&) = delete;
-};
 bool                                        budget_timer_start(void*& timer);
 void                                        budget_timer_stop(void* timer);
 double                                      thread_cpu_seconds();
 #endif
+// CPU seconds a blend, draft or shell may take (30; NOSHAPE_BLEND_BUDGET).
+double blend_budget_seconds();
+// While one lives on a budgeted thread the budget doesn't jump (it does at
+// the next tick after): around work shared with OCCT's thread pool, whose
+// workers would go on using the abandoned stack frames. Linux only (the
+// budget's timer); a no-op elsewhere.
+struct BudgetHold
+{
+#ifdef __linux__
+  BudgetHold() { ++budget_hold; std::atomic_signal_fence(std::memory_order_seq_cst); }
+  ~BudgetHold() { std::atomic_signal_fence(std::memory_order_seq_cst); --budget_hold; }
+#else
+  BudgetHold() {}
+#endif
+  BudgetHold(const BudgetHold&)            = delete;
+  BudgetHold& operator=(const BudgetHold&) = delete;
+};
 template <class F>
 int run_budgeted(double cpu_seconds, F&& f)
 {
@@ -159,7 +178,23 @@ struct KernelTimer
 template <class F>
 bool run_guarded(F&& f) noexcept
 {
-#ifndef _WIN32
+  bool ok      = true;
+  auto guarded = [&] {
+    try
+    {
+      f();
+    }
+    catch (...)
+    {
+      ok = false;
+    }
+  };
+#if defined(_WIN32) && defined(_MSC_VER)
+  return seh_run(guarded) == 0 && ok;
+#elif defined(_WIN32)
+  guarded();
+  return ok;
+#else
   install_crash_guard();
   sigjmp_buf        env;
   sigjmp_buf* const outer = crash_guard;
@@ -170,20 +205,10 @@ bool run_guarded(F&& f) noexcept
   }
   crash_guard = &env;
   std::atomic_signal_fence(std::memory_order_seq_cst);
-#endif
-  bool ok = true;
-  try
-  {
-    f();
-  }
-  catch (...)
-  {
-    ok = false;
-  }
-#ifndef _WIN32
+  guarded();
   crash_guard = outer;
-#endif
   return ok;
+#endif
 }
 } // namespace noshape
 
@@ -238,7 +263,16 @@ static void trycatch(Try&& func, Fail&& fail) noexcept
 template <typename Try, typename Fail>
 static void trycatch_timed(Try&& func, Fail&& fail) noexcept
 {
-#ifdef _WIN32
+#if defined(_WIN32) && defined(_MSC_VER)
+  auto                guarded = [&] { trycatch_guarded(func, fail); };
+  const unsigned long code    = noshape::seh_run(guarded);
+  if (code != 0)
+  {
+    char hex[16];
+    std::snprintf(hex, sizeof hex, "%08lx", code);
+    fail(std::string("occt: the kernel crashed (exception 0x") + hex + ")");
+  }
+#elif defined(_WIN32)
   trycatch_guarded(func, fail);
 #else
   noshape::install_crash_guard();

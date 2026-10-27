@@ -325,8 +325,8 @@ fn shell_solid() {
 
 /// A crash inside a kernel call fails that call with an error (qa
 /// DRAFT-SEGV-DOC: a Draft's null dereference in OCCT killed the app on
-/// every open of the document); the process and later calls go on.
-#[cfg(unix)]
+/// every open of the document); the process and later calls go on. On
+/// Windows by structured exceptions (cpp/seh.cpp, WIN-CRASH-GUARD).
 #[test]
 fn a_crash_inside_the_kernel_fails_only_that_call() {
     for kind in [0, 1, 2, 0] {

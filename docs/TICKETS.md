@@ -48,6 +48,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   CI run 40469839948 died with STATUS_ACCESS_VIOLATION in crash_inputs; that test is now cfg(unix)). Add the Windows
   equivalent (SEH: __try/__except around the bridge call, or a vectored exception handler + longjmp-safe unwinding)
   and turn the test back on for all platforms (lead 2026-10-27)
+  core 10-27: cpp/seh.cpp (MSVC): __try/__except around every bridge call and run_guarded, std::terminate inside a
+  guarded call raised as a structured exception; crash_inputs and kernel_core::a_crash_inside_the_kernel_fails_only_that_call
+  on all platforms again (crash_inside_kernel makes real faults on Windows). To verify on Windows CI.
 - [ ] P2 MASS-INERTIA-APPROX inertia and centre of mass aren't exact on curved parts: a Steel tube (Ø40 / Ø20 × 30,
   revolved; /root/qa-scratch/rev.noshape Part 1, part_set_material Steel 7850.021 kg/m³) → query_mass_properties: mass
   0.221954 kg and Izz 55.488606 right, but Ixx 44.391247 / Iyy 44.390476 (both exactly m(3(R²+r²)+h²)/12 = 44.39082),

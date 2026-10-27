@@ -1219,6 +1219,16 @@ void install_crash_guard()
 namespace noshape {
 void crash_inside_kernel(uint8_t kind)
 {
+#ifdef _WIN32
+  // Real faults: Windows' raise() goes to the C runtime's signals, not to
+  // structured exceptions.
+  volatile int  zero = 0;
+  volatile int* null = nullptr;
+  if (kind == 1)
+    zero = 1 / zero;
+  else if (kind == 0)
+    *null = 1;
+#endif
   if (kind == 1)
     std::raise(SIGFPE);
   else if (kind == 2)
