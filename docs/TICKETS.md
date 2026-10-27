@@ -34,6 +34,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli-shell-gpf, cli-fillet-segv, cli-fillet2-segv and cli-draft-segv.noshape** (/root/qa-scratch/tickets/; green 19555ca3
   opens all five).
 ## Core modelling (core)
+- [ ] P3 PLDRAFT-VOLUME curved parting-line drafts build as live (4 faces, all OK) but a little large: live's "psb (10-25 m)
+  curved parting line draft" cases (cylinder Ø20×20, Plane 1 Line angle 120° on a Front line at z 10, Split face, Draft ›
+  Parting line from Top, bin/pldraft.py, watcher CLI 08:30): A1 one sided 5° 5974.3559 (live 5974.3441, +2.0e-6), A2 other
+  side 6616.0612 (6616.0459), A3 symmetric 6948.9371 (6948.9073, +4.3e-6), A4 5°/10° 7312.7271 (7312.6950, +4.4e-6).
+  Shows at 3 decimals in Mass properties; live's drafted faces are exact ruled B-splines (deg 1 × 3, 2 × 66 poles)
+  (qa 2026-10-27)
 - [ ] P0 BUDGET-LONGJMP the CPU budgets (97081557 blends, a117663d drafts / face deletion) jump out of OCCT with
   `siglongjmp` from a timer-signal handler (crates/kernel/cpp/common.cpp `on_budget_tick`, SIGRTMIN+3 on a
   CLOCK_THREAD_CPUTIME_ID timer, SA_RESTART); the jump can land inside malloc/free or any non-reentrant OCCT state.
