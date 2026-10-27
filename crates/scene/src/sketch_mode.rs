@@ -2373,7 +2373,7 @@ impl SketchEditor {
                         self.chain_end = Some(end);
                         self.clicks = vec![Click { pos: sk.point(end).unwrap_or(click.pos), inference: None }];
                         self.finish_create(data, &ids.curves);
-                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px, None)]);
+                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px, tangent_arc_box(&data.sketch, arc, self.world_per_px))]);
                         EditOutcome::changed()
                     }
                     Err(e) => {
@@ -2468,13 +2468,23 @@ impl SketchEditor {
                 // Live (sketch/05-06): the width and height boxes sit on the
                 // two edges through the first corner (edges run bottom,
                 // right, top, left).
+                let mid = |id: EntityId| match data.sketch.curve(id) {
+                    Some(Curve2::Line { a, b }) => (a + b) * 0.5,
+                    _ => DVec2::ZERO,
+                };
                 let (horizontal, vertical) = if self.tool == Tool::CornerRect {
                     let (lo, hi) = (first.pos.min(click.pos), first.pos.max(click.pos));
                     let top = (first.pos.y - hi.y).abs() < (first.pos.y - lo.y).abs();
                     let left = (first.pos.x - lo.x).abs() < (first.pos.x - hi.x).abs();
                     (ids.curves[if top { 2 } else { 0 }], ids.curves[if left { 3 } else { 1 }])
                 } else {
-                    (ids.curves[0], ids.curves[1])
+                    // Live (behaviours "… center point rectangle and tangent
+                    // arc", request 1503): the width on the bottom edge, the
+                    // height on the vertical edge opposite the corner click.
+                    let edge = |key: fn(DVec2) -> f64| ids.curves.iter().copied().take(4).min_by(|x, y| key(mid(*x)).total_cmp(&key(mid(*y))));
+                    let bottom = edge(|m| m.y).unwrap_or(ids.curves[0]);
+                    let opposite = if click.pos.x > first.pos.x { edge(|m| m.x) } else { edge(|m| -m.x) };
+                    (bottom, opposite.unwrap_or(ids.curves[1]))
                 };
                 let mut fields = vec![length_field(&data.sketch, horizontal, w)];
                 if !self.alt_held {
@@ -2485,11 +2495,22 @@ impl SketchEditor {
                 // height as blue text outside the first click's vertical edge,
                 // 16 px off; once it is the box, inside 14 px from the other
                 // vertical edge.
+                if self.tool == Tool::CenterRect {
+                    // Live (request 1503), in every direction: the width box
+                    // 14 px below the bottom edge; the height as blue text
+                    // 16 px left of the left edge, then its box centred 40 px
+                    // screen-left of its edge (outside the left edge, or
+                    // inside the right one).
+                    let left = ids.curves.iter().copied().take(4).min_by(|x, y| mid(*x).x.total_cmp(&mid(*y).x));
+                    let width = BoxPlace::Edge { line: horizontal, u: DVec2::NEG_Y, gap: 14.0 };
+                    fields[0].place = Some(width);
+                    fields[0].place_active = Some(width);
+                    if let Some(f) = fields.get_mut(1) {
+                        f.place = left.map(|l| BoxPlace::Edge { line: l, u: DVec2::NEG_X, gap: 16.0 });
+                        f.place_active = Some(BoxPlace::Edge { line: vertical, u: DVec2::NEG_X, gap: 14.0 });
+                    }
+                }
                 if self.tool == Tool::CornerRect {
-                    let mid = |id: EntityId| match data.sketch.curve(id) {
-                        Some(Curve2::Line { a, b }) => (a + b) * 0.5,
-                        _ => DVec2::ZERO,
-                    };
                     let centre = (first.pos + click.pos) * 0.5;
                     let out_h = DVec2::new(0.0, (mid(horizontal).y - centre.y).signum());
                     let out_v = DVec2::new((mid(vertical).x - centre.x).signum(), 0.0);
@@ -2652,7 +2673,7 @@ impl SketchEditor {
                         self.chain_end = end;
                         self.clicks = vec![click];
                         self.finish_create(data, &ids.curves);
-                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px, None)]);
+                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px, tangent_arc_box(&data.sketch, arc, self.world_per_px))]);
                         EditOutcome::changed()
                     }
                     Err(e) => {
@@ -5335,6 +5356,16 @@ fn length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
         _ => DVec2::ZERO,
     };
     OtfField { kind: ConstraintKind::Length { curve: line, value: 0.0 }, scale: 1.0, label, place: None, place_active: None }
+}
+
+/// A tangent arc's radius box (live, behaviours "… center point rectangle and
+/// tangent arc", request 1503): on the ray from the centre through the middle
+/// of the sweep, 30 px inside the arc.
+fn tangent_arc_box(sk: &Sketch, arc: EntityId, wpp: f64) -> Option<BoxPlace> {
+    match sk.curve(arc)? {
+        Curve2::Arc { center, radius, start_angle, end_angle } => Some(BoxPlace::At(center + DVec2::from_angle((start_angle + end_angle) * 0.5) * (radius - 30.0 * wpp).max(0.0))),
+        _ => None,
+    }
 }
 
 fn radius_field(sk: &Sketch, arc: EntityId, wpp: f64, place: Option<BoxPlace>) -> OtfField {
@@ -8065,6 +8096,44 @@ mod tests {
         }
         let b = ed.otf_boxes(&d, &units);
         assert!((b[0].0 - v(0.030, 0.030)).length() < 1e-6, "box on the chord: {:?}", b[0].0);
+    }
+
+    /// Live (behaviours "skasm (2026-10-27, P1) sketch value boxes: center
+    /// point rectangle and tangent arc", request 1503): a center point
+    /// rectangle's width box 14 px below the bottom edge, its height text left
+    /// of the left edge and, as the box, centred 40 px left of the vertical
+    /// edge opposite the corner click (outside the left edge, inside the
+    /// right one); a tangent arc's radius box 30 px inside the arc on the ray
+    /// through its sweep's middle.
+    #[test]
+    fn center_rectangle_and_tangent_arc_value_boxes_as_live() {
+        let units = UnitPrefs::default();
+        for (corner, opposite_x) in [(v(0.040, 0.010), 0.020), (v(0.020, 0.010), 0.040)] {
+            let (mut ed, mut d) = editor(Tool::CenterRect);
+            click(&mut ed, &mut d, v(0.030, 0.020));
+            click(&mut ed, &mut d, corner);
+            let b = ed.otf_boxes(&d, &units);
+            assert!(b[0].0.y < 0.010 - 14.0 * PX && (b[0].0.x - 0.030).abs() < 1e-9, "width box below the bottom edge: {:?}", b[0].0);
+            assert!(b[1].0.x < 0.020 - 16.0 * PX && (b[1].0.y - 0.020).abs() < 1e-9, "height text left of the left edge: {:?}", b[1].0);
+            ed.otf_step(1);
+            let b = ed.otf_boxes(&d, &units);
+            let left_of = opposite_x - b[1].0.x;
+            assert!(left_of > 14.0 * PX && left_of < 60.0 * PX && (b[1].0.y - 0.020).abs() < 1e-9, "height box left of x {opposite_x}: {:?}", b[1].0);
+            let Some(ConstraintKind::Length { curve, .. }) = ed.otf.as_ref().map(|o| o.fields[1].kind.clone()) else { panic!() };
+            let Some(Curve2::Line { a, .. }) = d.sketch.curve(curve) else { panic!() };
+            assert!((a.x - opposite_x).abs() < 1e-9, "the height on the edge opposite the corner");
+        }
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, v(0.020, 0.0));
+        ed.set_tool(Tool::TangentArc);
+        click(&mut ed, &mut d, v(0.020, 0.0));
+        click(&mut ed, &mut d, v(0.030, 0.010));
+        let b = ed.otf_boxes(&d, &units);
+        let arc = d.sketch.entities().find(|e| e.kind() == EntityKind::Arc).map(|e| e.id).unwrap();
+        let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = d.sketch.curve(arc) else { panic!() };
+        let want = center + DVec2::from_angle((start_angle + end_angle) * 0.5) * (radius - 30.0 * PX);
+        assert!((b[0].0 - want).length() < 1e-9, "radius box {:?}, want {want:?}", b[0].0);
     }
 
     /// Live (behaviours "spec: skasm sketch tools"): a center point

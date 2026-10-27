@@ -101,8 +101,8 @@ theme owner's; I15 / LA50–LA55 are standard content) → mates/assembly workfl
 live, REQUESTS "assembly sweep leftovers") → standard content. 10-27 15:00: ISO 10511 / 7040 on live's template and
 tables (fbfe810c). The other missing components (DIN 7050 / 7051 / 967 / 923, ISO 7379, NASM 45938 + /4, NAS 1129 ×2,
 PEM ×52) need live's /features (the recipe; one size's surfaces don't give the formulas), 429 until ~10-28 03:00.
-Sketch P1: value boxes done for every tool live measured (center rectangle and tangent arc not measured: default
-place). parity/sketch.md all ✅. Assembly P2:
+Sketch P1: value boxes as live for every tool live measured (center rectangle and tangent arc added 10-27
+from request 1503). parity/sketch.md all ✅. Assembly P2:
 1. docs/parity/workflow-assembly-sweep.md: all rows ✅ 10-27 (34 left UNCONFIRMED: the 2° snap window). Filed
    PS-SECTION-RED for psui (Part Studio caps red where parts overlap; live only in the assembly). GUI docs:
    /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins), asm2 (a pin through the plate), ps2 (Part Studio overlap).
