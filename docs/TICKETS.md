@@ -10,7 +10,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   crash markers / open rollback (DOC-POISON) and 7a04ba4d (SHELL-WALLS / SHELL-FILLETED-BOX). As cut it ships the Shell
   and Fillet segfaults that leave documents unopenable (SHELL-SLAB-GPF, FILLET-SEGV: regressions since v0.4.8; the green
   app 4d2f6b0c crashed on them, 19555ca3 doesn't). Cherry-pick those fixes onto the release branch (PLAN 2.2) or cut from
-  19555ca3. qa will smoke the release build when CI publishes it.
+  19555ca3. **Confirmed on the release CI's Linux build (run 40434076347, artifact noshape-Linux-X64): it segfaults opening
+  cli-shell-gpf, cli-fillet-segv, cli-fillet2-segv and cli-draft-segv.noshape** (/root/qa-scratch/tickets/; green 19555ca3
+  opens all five).
 ## Core modelling (core)
 - [ ] P0 COMMIT-LATENCY edit commit on tests/perf/live-30-features.noshape is over budget on main (perf.yml run
   40421862773, abac9266, 10-27): "commit shown in" 315–378 ms (macOS 14) and 241–635 ms (macOS 15), budget ≤ 200 ms
