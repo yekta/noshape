@@ -196,3 +196,134 @@ fn inward_shell_of_a_part_far_from_its_planes_origin() {
     assert!((r.shape.volume().unwrap() * 1e9 - 2653.5).abs() < 1e-6, "{}", r.shape.volume().unwrap() * 1e9);
     assert_eq!(r.shape.count(ShapeType::Face), 11);
 }
+
+/// qa's SHELL-WALLS (live "qa (2026-10-26, P0 wrong geometry check)"), in
+/// metres as the model regenerates it: plate 80 x 50 x 10 mm with a Ø20
+/// through hole at its centre, R2 fillets round the top face (its four
+/// outer edges and the hole's rim), the top face removed. Onshape: 2.5 mm
+/// → 14951.9619 mm³ / 19 faces, 1.5 mm → 9609.9491 mm³ / 27 faces (an
+/// open box with a tube round the hole). The fillets' inward offset
+/// collapses past their axis (t > R): the walls must stay.
+#[test]
+fn shell_of_a_filleted_plate_with_a_hole_keeps_its_walls() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let mut s = cut(&bx([0.0; 3], [80.0 * mm, 50.0 * mm, 10.0 * mm]), &cyl_z(40.0 * mm, 25.0 * mm, -mm, 10.0 * mm, 12.0 * mm)).unwrap().shape;
+    let t = edges_where(&s, |i| (i.start.z - 10.0 * mm).abs() < 1e-9 && (i.end.z - 10.0 * mm).abs() < 1e-9);
+    assert_eq!(t.len(), 5);
+    s = fillet_checked(&s, &t, &[2.0 * mm]).unwrap().shape;
+    let faces = faces_where(&s, |c| c.z > 10.0 * mm - 1e-9);
+    assert_eq!(faces.len(), 1);
+    for th in [1.5, 2.5] {
+        for m in [ShellMethod::Offset, ShellMethod::Slabs] {
+            match shell_solid(&s, &faces, th * mm, ShellSide::Inside, m) {
+                Ok(r) => eprintln!("{th} {m:?}: {:.4} mm³ {} faces valid {}", vol(&r.shape) * 1e9, r.shape.count(ShapeType::Face), r.shape.is_valid()),
+                Err(e) => eprintln!("{th} {m:?}: {e}"),
+            }
+        }
+    }
+    // Within 1 mm³: live's fillets meeting at the plate's sharp vertical
+    // corners keep ~1 mm³ more than OCCT's mitre (live "core (2026-10-26
+    // b)"; the same offset at t ≤ R, before any collapse). At 1.5 mm ours
+    // has 28 faces, live 27 (open).
+    for (th, want, nf) in [(2.5, 14951.9619, Some(19)), (1.5, 9609.9491, None)] {
+        let r = shell_solid(&s, &faces, th * mm, ShellSide::Inside, ShellMethod::Auto).unwrap_or_else(|e| panic!("{th} mm: {e}")).shape;
+        let v = vol(&r) * 1e9;
+        assert!(r.is_valid());
+        assert!((v - want).abs() < 1.0, "{th} mm: {v} vs {want}");
+        if let Some(nf) = nf {
+            assert_eq!(r.count(ShapeType::Face), nf, "{th} mm");
+        }
+    }
+}
+
+/// Live "qa5 (10-25 p2)" (6) (qa5 P1-16), in metres as the model regenerates
+/// it: block 75.554 x 20.245 x 10 mm, R1 on three vertical edges, a 1 mm
+/// chamfer round the top (the tangent chain), four Ø6.35 through holes at
+/// x 15 / 40, y 6 / 14.245; the top face removed. Onshape: 1 mm → 3998.627
+/// mm³ (33 faces, the hole walls stand as tubes), 2.5 mm → 8503.961 mm³
+/// (47 faces, the tubes merge with each other and the side walls).
+#[test]
+#[ignore = "T2: open differences from live (P1-16: the chamfer-corner cones get no wall, 3·π/12 mm³ short; 53 faces vs 47)"]
+fn shell_block_with_close_holes_like_onshape() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let (a, b, h) = (75.554 * mm, 20.245 * mm, 10.0 * mm);
+    let mut s = bx([0.0; 3], [a, b, h]);
+    let v = edges_where(&s, |i| (i.start.z - i.end.z).abs() > 1e-9 && !(i.start.x.abs() < 1e-9 && (i.start.y - b).abs() < 1e-9));
+    assert_eq!(v.len(), 3);
+    s = fillet_checked(&s, &v, &[1.0 * mm]).unwrap().shape;
+    let t = edges_where(&s, |i| (i.start.z - h).abs() < 1e-9 && (i.end.z - h).abs() < 1e-9);
+    s = chamfer_checked(&s, &t, ChamferSpec::Equal(1.0 * mm), &[]).unwrap().shape;
+    for (x, y) in [(15.0, 6.0), (15.0, 14.245), (40.0, 6.0), (40.0, 14.245)] {
+        let c = make_cylinder(&Plane::from_normal(DVec3::new(x * mm, y * mm, -mm), DVec3::Z), 3.175 * mm, 12.0 * mm, std::f64::consts::TAU).unwrap();
+        s = cut(&s, &c).unwrap().shape;
+    }
+    eprintln!("solid {:.3} mm³, {} faces", vol(&s) * 1e9, s.count(ShapeType::Face));
+    let faces = faces_where(&s, |c| c.z > h - 1e-9);
+    assert_eq!(faces.len(), 1);
+    for th in [1.0, 2.5] {
+        for m in [ShellMethod::Offset, ShellMethod::Slabs] {
+            match shell_solid(&s, &faces, th * mm, ShellSide::Inside, m) {
+                Ok(r) => eprintln!("{th} {m:?}: {:.3} mm³ {} faces valid {}", vol(&r.shape) * 1e9, r.shape.count(ShapeType::Face), r.shape.is_valid()),
+                Err(e) => eprintln!("{th} {m:?}: {e}"),
+            }
+        }
+    }
+    for (th, want, nf) in [(1.0, 3998.627, 33), (2.5, 8503.961, 47)] {
+        let r = shell_solid(&s, &faces, th * mm, ShellSide::Inside, ShellMethod::Auto).unwrap_or_else(|e| panic!("{th} mm: {e}")).shape;
+        let v = vol(&r) * 1e9;
+        assert!(r.is_valid());
+        assert!((v - want).abs() < 0.01, "{th} mm: {v} vs {want}");
+        assert_eq!(r.count(ShapeType::Face), nf, "{th} mm");
+    }
+}
+
+/// qa's SHELL-FILLETED-BOX (live "qa (2026-10-26, P0 shell check 2)"): a
+/// 40 x 30 x 20 mm box with its 12 edges filleted R1, shelled thicker than
+/// the radius: the fillets' and corners' inner offsets collapse and the
+/// cavity is a sharp box. Live: hollow 2 mm 8948.0826 mm³ / 32 faces, open
+/// top 2 mm 7076.0826 / 31, hollow 4 mm 15476.0826 / 32 (the hand math).
+#[test]
+fn shell_of_a_box_filleted_all_round_has_a_sharp_cavity() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let b = bx([0.0; 3], [40.0 * mm, 30.0 * mm, 20.0 * mm]);
+    let all = edges_where(&b, |_| true);
+    assert_eq!(all.len(), 12);
+    let s = fillet_checked(&b, &all, &[1.0 * mm]).unwrap().shape;
+    let top = faces_where(&s, |c| c.z > 20.0 * mm - 1e-9);
+    assert_eq!(top.len(), 1);
+    for (t, open, want, nf) in [(2.0, false, 8948.0826, 32), (2.0, true, 7076.0826, 31), (4.0, false, 15476.0826, 32)] {
+        let faces: &[Shape] = if open { &top } else { &[] };
+        let r = shell_solid(&s, faces, t * mm, ShellSide::Inside, ShellMethod::Auto).unwrap_or_else(|e| panic!("{t} mm open {open}: {e}")).shape;
+        let v = vol(&r) * 1e9;
+        eprintln!("{t} mm open {open}: {v:.4} mm³ {} faces", r.count(ShapeType::Face));
+        assert!(r.is_valid());
+        assert!((v - want).abs() < 0.01, "{t} mm open {open}: {v} vs {want}");
+        assert_eq!(r.count(ShapeType::Face), nf, "{t} mm open {open}");
+    }
+}
+
+/// qa's shell matrix against live's oracle (live "spec: core SHELL-WALLS /
+/// SHELL-FILLETED-BOX", cases 22–24, 27, 28): 80 x 50 x 10 mm plates with a
+/// centred Ø20 hole and the top face filleted R, shelled t > R with the top
+/// removed; v0.4.8 lost walls in every one (#22 6305.5 vs 9559.7). Within
+/// 0.55·R mm³: live's top fillets keep more at the plate's sharp corners
+/// than OCCT's mitre (R1 −0.47, R2 −0.96 in every case, before any collapse).
+#[test]
+fn shell_matrix_cases_with_a_hole_keep_their_walls() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    for (r, t, want) in [(1.0, 1.5, 9559.7209), (1.0, 2.5, 15158.7320), (1.0, 4.0, 22340.1910), (2.0, 4.0, 22133.4210)] {
+        let mut s = cut(&bx([0.0; 3], [80.0 * mm, 50.0 * mm, 10.0 * mm]), &cyl_z(40.0 * mm, 25.0 * mm, -mm, 10.0 * mm, 12.0 * mm)).unwrap().shape;
+        let top = edges_where(&s, |i| (i.start.z - 10.0 * mm).abs() < 1e-9 && (i.end.z - 10.0 * mm).abs() < 1e-9);
+        s = fillet_checked(&s, &top, &[r * mm]).unwrap().shape;
+        let faces = faces_where(&s, |c| c.z > 10.0 * mm - 1e-9);
+        let out = shell_solid(&s, &faces, t * mm, ShellSide::Inside, ShellMethod::Auto).unwrap_or_else(|e| panic!("R{r} t{t}: {e}")).shape;
+        let v = vol(&out) * 1e9;
+        eprintln!("R{r} t{t}: {v:.4} mm³ (live {want}) {} faces", out.count(ShapeType::Face));
+        assert!(out.is_valid(), "R{r} t{t}");
+        assert!((v - want).abs() < 0.55 * r, "R{r} t{t}: {v} vs {want}");
+    }
+}
