@@ -1090,6 +1090,10 @@ impl AssemblyView {
                 s.scope_refs = scope_refs.clone();
             }
         }
+        // Live (behaviours "qa (2026-10-27, P2) ASM-PATTERN-EDIT-TAKES-SELECTION"):
+        // an edit opens with its stored queries and ignores the selection,
+        // which becomes the feature's own Instances while the dialog is open.
+        self.selected = s.seeds.clone();
         self.pattern = Some(s);
         self.update_pattern_preview(cx);
         self.update_capture(cx);

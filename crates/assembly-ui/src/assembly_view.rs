@@ -5696,8 +5696,12 @@ impl AssemblyView {
         } else if self.ui.mass.is_some() {
             self.ui.mass = None;
             cx.notify();
-        } else if self.pattern.is_some() {
-            self.pattern = None;
+        } else if let Some(p) = self.pattern.take() {
+            // Live: cancelling an edit leaves nothing selected (nor its row).
+            if p.editing.is_some() {
+                self.selected.clear();
+                self.selected_mate = None;
+            }
             cx.notify();
         } else if self.ui.group.is_some() {
             self.ui.group = None;
