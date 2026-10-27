@@ -13,7 +13,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 09:50, CI artifact of fcd301e2 (run 40480068401, Linux): the five crash documents open; cli-fillet-hang opens in
   43 s; **cli-draft-hang still never finishes (> 200 s)**: DRAFT-HANG ships unless a117663d is taken. Note for testers:
   this build lacks c30baf56, so markers left by any killed process roll back copies of the same document.
-- [ ] P0 release/v0.4.9 recut 7ee597e0: CI run 40452492018 **Windows x86_64 (MSVC) failed in "Build (release)"**:
+- [x] resolved (qa 11:30: v0.4.9 was published 09:41 from tag 819c2b47 = 7ee597e0 + the lead's own `<cxxabi.h>` guard, with Linux, macOS and Windows assets; same code as the fcd301e2 artifact checked at 09:50 except crash_inputs.rs) P0 release/v0.4.9 recut 7ee597e0: CI run 40452492018 **Windows x86_64 (MSVC) failed in "Build (release)"**:
   `crates/kernel/cpp/common.cpp(1273): fatal error C1083: Cannot open include file: 'cxxabi.h'` (the kernel profile's
   `#include <cxxabi.h>`, GCC/Clang only, unguarded; blame d85c3029, REGEN-SPEED). Still on main, so main's Windows build
   is broken too (the watcher builds Linux only). Guard it (`#if !defined(_MSC_VER)`) or demangle another way. Linux and
@@ -21,7 +21,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Fixed on main by 2d6719c2 (qa 08:20: not yet on release/v0.4.9, still 7ee597e0); with a117663d (DRAFT-HANG) and 011aaf43
   (BOOL-THREAD-CRASH, serial booleans) it is what a recut needs
   core 10-27: the lead's 2d6719c2 guards it on main (the release branch needs it too).
-- [ ] P0 the recut ships DRAFT-HANG: on the release's Linux artifact (run 40452492018, 0.4.9.7ee597e05af9) a copy of
+- [ ] P0 (qa 11:30: published v0.4.9 = 819c2b47 ships it, as do BUDGET-LONGJMP and BOOL-THREAD-CRASH; v0.4.10 from e8858e61 has a117663d / 011aaf43) the recut ships DRAFT-HANG: on the release's Linux artifact (run 40452492018, 0.4.9.7ee597e05af9) a copy of
   tickets/cli-draft-hang.noshape never finishes its opening regen (> 150 s, spinner); the draft budget a117663d came after
   the release's base 502416cc. Cherry-pick a117663d (and c30baf56 for markers) or recut. Same artifact: the five crash
   documents open (6.7–32 s regen; cli-delete-crash 148 s because of a 120 s Shell 3), cli-fillet-hang opens in 68 s,
