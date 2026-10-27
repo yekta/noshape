@@ -297,6 +297,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 PERF-TOTAL-MISMATCH the Performance panel and its Regeneration times dialog give two totals for the same studio:
+  live-30-features.noshape just opened (regen from cache) → panel "Total regeneration time: 46ms", stopwatch › dialog footer
+  "Total regen time: 314ms" (the per-feature column sums to ~314). Live reads one number in both places (behaviours 17899);
+  show the same (tickets/perf-total-mismatch.png) (qa 2026-10-27, green dacce5e7)
 - [ ] P3 LEFT-RAIL-WHERE-USED the Part Studio's left rail is Versions and history, Create version…, Document notes, Performance
   errors detected, Release drafts; live's is Versions and history, Create version…, Comments, Document notes, **Where used**,
   Performance errors detected, AI Advisor (behaviours 1559 / 1563). Comments and AI Advisor are cloud; "Where used" (which
