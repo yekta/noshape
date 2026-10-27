@@ -90,7 +90,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 3.2 | Replicate result | **one** new pin in hole 1 (the only other Ø10 face), row "Replicate 1" with Part 3 <2> + Mate features (1) | A7 confirmed |
 | 3.4–3.5 | Linear pattern | Instances, Direction, Distance 25 mm, Instance count **2**, ☐ Equal spacing, ☐ Centered, ☐ Second direction; plate edge → copies along X | A6, A9 confirmed |
 | 3.6 | Circular pattern | Instances, Axis, Angle 360, count 2, ☑ Equal spacing, ☐ Centered | ✅ result |
-| list | Instance list | pattern rows appear while the dialog is open; header counts top-level rows ("Instances (7)") | ? not checked in ours |
+| list | Instance list | pattern rows appear while the dialog is open; header counts top-level rows ("Instances (7)") | ✅ (qa5 P2-A6 / P2-A7, 9703d9b9, verified 21d6a89e; skasm 10-27 saw the pending "Replicate 1" row) |
 | 4.5 | BOM | Flattened default; Item/Quantity/Part number/Description | ✅ |
 
 ## Re-run pass 3 (2026-10-21 14:55–15:00, /tmp/qa5/noshape-1433 = target-shared 14:32; new Assembly 2 + Assembly 1)
