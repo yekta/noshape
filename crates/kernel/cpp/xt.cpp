@@ -1842,6 +1842,27 @@ StepImport read_parasolid_parts(rust::Str path)
   return import_of(read_xt_parts(std::string(path)));
 }
 
+StepTree read_parasolid_tree(rust::Str path)
+{
+  XtTree   t = read_xt_tree(std::string(path));
+  StepTree out;
+  out.root  = rust::String(t.root);
+  out.parts = import_of(t.parts);
+  for (size_t i = 0; i < t.instances.size(); ++i)
+  {
+    PvzInstance inst;
+    inst.part = (uint32_t)t.instances[i].first;
+    inst.name = rust::String(t.names[i]);
+    inst.root = rust::String(t.root);
+    const gp_Trsf& m = t.instances[i].second;
+    for (int r = 1; r <= 3; ++r)
+      for (int k = 1; k <= 4; ++k)
+        inst.transform.push_back(m.Value(r, k));
+    out.instances.push_back(std::move(inst));
+  }
+  return out;
+}
+
 StepImport read_rhino_parts_ffi(rust::Str path)
 {
   return import_of(read_rhino_parts(std::string(path)));

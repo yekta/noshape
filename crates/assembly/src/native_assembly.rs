@@ -460,7 +460,9 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
     }
     ps.insert_at_rollback(f);
     let bodies = bodies_of_parts(&ps, units, |k| k == crate::display::BodyKind::Solid);
-    let studio_name = unique_name(doc, &format!("{stem} parts"));
+    // Live (dx speed (2)): a STEP / Parasolid assembly's Part Studio keeps
+    // its name on a repeat import (no " (1)"); the Assembly is numbered.
+    let studio_name = if *step { format!("{stem} parts") } else { unique_name(doc, &format!("{stem} parts")) };
     let studio = doc.add_tab(&studio_name, TabContent::PartStudio(ps));
     let mut asm = Assembly::default();
     // Numbered per name, as instance names are (two parts both named

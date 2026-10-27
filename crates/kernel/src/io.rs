@@ -113,6 +113,18 @@ pub fn read_step_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAs
     Ok(Some((t.root.clone(), step_shapes(&t.parts, unit)?, pvz_instances_of(&t.instances))))
 }
 
+/// A Parasolid transmit file (.x_t / .x_b) holding an assembly: the top
+/// assembly's name, its distinct bodies (each in its own coordinates, in
+/// `unit`) and every placed body instance (file order, metres). `None` for
+/// files of bodies only.
+pub fn read_parasolid_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAssembly>> {
+    let t = ck(ffi::read_parasolid_tree(path_str(path)?))?;
+    if t.instances.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some((t.root.clone(), step_shapes(&t.parts, unit)?, pvz_instances_of(&t.instances))))
+}
+
 /// A shape to export with optional name and color.
 #[derive(Debug, Clone)]
 pub struct ExportShape {

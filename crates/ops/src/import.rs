@@ -211,7 +211,23 @@ fn read_step_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
     if !std::fs::read(path)?.windows(NAUO.len()).any(|w| w.eq_ignore_ascii_case(NAUO)) {
         return Ok(None);
     }
-    let Some((root, parts, mut instances)) = k::read_step_assembly(path, k::LengthUnit::Meter)? else { return Ok(None) };
+    let Some(a) = k::read_step_assembly(path, k::LengthUnit::Meter)? else { return Ok(None) };
+    pvz_of_tree(path, a).map(Some)
+}
+
+/// A Parasolid file holding an assembly: imported as a STEP assembly is
+/// (live "dx speed: … NIST import": an Assembly named after the top
+/// assembly with its 36 instances and a Part Studio "<file> parts" of the
+/// 8 distinct parts); `None` for files of bodies only.
+fn read_xt_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
+    use noshape_kernel as k;
+    let Some(a) = k::read_parasolid_assembly(path, k::LengthUnit::Meter)? else { return Ok(None) };
+    pvz_of_tree(path, a).map(Some)
+}
+
+/// An assembly file's tree (STEP, Parasolid) as the Assembly + Part Studio import.
+fn pvz_of_tree(path: &Path, (root, parts, mut instances): noshape_kernel::StepAssembly) -> anyhow::Result<PvzAssembly> {
+    use noshape_kernel as k;
     let mut order: Vec<usize> = Vec::new();
     for i in instances.iter().rev() {
         if i.part < parts.len() && !order.contains(&i.part) {
@@ -230,7 +246,7 @@ fn read_step_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
     let shape = k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>());
     let foreign = Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts: serde_json::to_string(&info)? };
     let (name, file) = import_names(path);
-    Ok(Some(PvzAssembly { name, file, root, foreign, names, instances, step: true }))
+    Ok(PvzAssembly { name, file, root, foreign, names, instances, step: true })
 }
 
 /// Files read for an import (before the document edit).
@@ -282,9 +298,11 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
                 }
             }
         }
-        // A STEP assembly: Assembly + Part Studio (not when combining).
-        if !c.combine && path.extension().is_some_and(|e| e.eq_ignore_ascii_case("step") || e.eq_ignore_ascii_case("stp")) {
-            match read_step_assembly(path) {
+        // A STEP or Parasolid assembly: Assembly + Part Studio (not when combining).
+        let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        if !c.combine && matches!(ext.as_str(), "step" | "stp" | "x_t" | "x_b") {
+            let tree = if ext.starts_with('x') { read_xt_assembly(path) } else { read_step_assembly(path) };
+            match tree {
                 Ok(Some(a)) => {
                     pvz.push(a);
                     continue;

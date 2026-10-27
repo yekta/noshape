@@ -567,6 +567,7 @@ pub(crate) mod ffi {
         fn bin_from_bytes(bytes: &[u8]) -> Result<UniquePtr<OcShape>>;
         fn read_step(path: &str) -> Result<StepImport>;
         fn read_step_tree(path: &str) -> Result<StepTree>;
+        fn read_parasolid_tree(path: &str) -> Result<StepTree>;
         fn write_step(
             shapes: &OcShapeList,
             names: &[String],

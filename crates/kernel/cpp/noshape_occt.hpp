@@ -619,6 +619,7 @@ void                     write_iges(const OcShapeList& shapes, rust::Str path, r
 void                     write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary, rust::Str version, rust::Str application);
 std::unique_ptr<OcShape> read_parasolid(rust::Str path);
 StepImport               read_parasolid_parts(rust::Str path);
+StepTree                 read_parasolid_tree(rust::Str path);
 StepImport               read_rhino_parts_ffi(rust::Str path);
 StepImport               read_native_parts_ffi(rust::Str path);
 StepImport               read_native_parts_config_ffi(rust::Str path, int32_t config);

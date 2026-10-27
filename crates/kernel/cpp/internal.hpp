@@ -8,6 +8,7 @@
 #include <GProp_GProps.hxx>
 #include <Geom_Surface.hxx>
 #include <TopExp.hxx>
+#include <gp_Trsf.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Edge.hxx>
@@ -195,6 +196,18 @@ struct XtPart
 std::vector<XtPart> read_xt_parts(const std::string& path);
 // The same from a transmit file's bytes (or a bare binary stream "PS\0\0…").
 std::vector<XtPart> read_xt_data(std::string data);
+// A transmit file's assembly: the top assembly's name, its distinct bodies
+// (healed, in their own coordinates) and every placed body instance (index
+// into `parts`, placement in metres, the body's name), in file order. No
+// instances without an assembly.
+struct XtTree
+{
+  std::string                          root;
+  std::vector<XtPart>                  parts;
+  std::vector<std::pair<int, gp_Trsf>> instances;
+  std::vector<std::string>             names;
+};
+XtTree read_xt_tree(const std::string& path);
 // Pcurves, tolerances, seams and apexes for an imported body (xt_read.cpp),
 // shared by the Parasolid and ACIS readers.
 TopoDS_Shape heal_import(TopoDS_Shape shape, double tol);

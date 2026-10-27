@@ -2180,7 +2180,26 @@ std::vector<XtPart> read_xt_parts(const std::string& path)
   return read_xt_data(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()));
 }
 
-std::vector<XtPart> read_xt_data(std::string data)
+namespace
+{
+std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree);
+}
+
+std::vector<XtPart> read_xt_data(std::string data) { return read_xt_impl(std::move(data), nullptr); }
+
+XtTree read_xt_tree(const std::string& path)
+{
+  std::ifstream in(path, std::ios::binary);
+  if (!in)
+    fail_io("cannot read " + path);
+  XtTree t;
+  read_xt_impl(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()), &t);
+  return t;
+}
+
+namespace
+{
+std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
 {
   Parser p(std::move(data));
   {
@@ -2212,6 +2231,15 @@ std::vector<XtPart> read_xt_data(std::string data)
     }
     else if (n.type == 10)
     {
+      // The top assembly's name (SDL/TYSA_NAME).
+      if (tree && depth == 0 && tree->root.empty())
+      {
+        std::array<double, 3> c{};
+        bool                  has = false;
+        b.attributes(idx, tree->root, c, has);
+        if (tree->root.empty())
+          tree->root = "Assembly";
+      }
       for (long long inst = n.ptr("sub_instance"); inst && p.has(inst); inst = p.at_index(inst).ptr("next_in_part"))
       {
         const XNode& I = p.at_index(inst);
@@ -2255,6 +2283,25 @@ std::vector<XtPart> read_xt_data(std::string data)
     TopoDS_Shape       h;
     healed[k] = run_guarded([&] { h = heal_import(raw, tol); }) && !h.IsNull() ? h : raw;
   });
+  // The assembly tree: each distinct body once, unplaced, then the placed
+  // instances (only when the file has an assembly).
+  if (tree && !tree->root.empty())
+  {
+    std::map<long long, int> part_of;
+    for (size_t k : uniq)
+    {
+      XtPart part = out[k];
+      part.shape  = healed[k];
+      b.face_colours_of(part);
+      part_of[pending[k].body] = (int)tree->parts.size();
+      tree->parts.push_back(std::move(part));
+    }
+    for (size_t k = 0; k < pending.size(); ++k)
+    {
+      tree->instances.emplace_back(part_of[pending[k].body], pending[k].place);
+      tree->names.push_back(out[k].name);
+    }
+  }
   for (size_t k = 0; k < pending.size(); ++k)
   {
     out[k].shape = healed[first[pending[k].body]];
@@ -2266,5 +2313,6 @@ std::vector<XtPart> read_xt_data(std::string data)
     fail_invalid("parasolid: no parts in the file");
   return out;
 }
+} // namespace
 
 } // namespace noshape

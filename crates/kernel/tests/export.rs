@@ -954,3 +954,25 @@ fn parasolid_spun_spline_to_the_axis() {
     let v = volume_properties(&back).unwrap().mass;
     assert!((v - want).abs() < 1e-6 * want, "{v} vs {want}");
 }
+
+/// A Parasolid assembly (live's export of the NIST MTC CRADA assembly,
+/// tests/perf): the top assembly's name, its 8 distinct bodies and their 36
+/// placed instances, as live imports it (behaviours "dx speed: … NIST import").
+#[test]
+#[ignore = "T2: reads a 3.5 MB transmit file (a few seconds)"]
+fn parasolid_assembly_tree() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf/nist-mtc-crada-assembly.x_t");
+    let (root, parts, instances) = read_parasolid_assembly(&path, LengthUnit::Millimeter).unwrap().expect("an assembly");
+    assert_eq!(root, "nist_mtc_crada_assembly_rev-D");
+    assert_eq!(parts.len(), 8, "{:?}", parts.iter().map(|p| p.name.clone()).collect::<Vec<_>>());
+    assert_eq!(instances.len(), 36);
+    assert!(parts.iter().all(|p| p.shape.count(ShapeType::Solid) == 1 && p.shape.is_valid()));
+    assert!(parts.iter().any(|p| p.name.as_deref() == Some("nist_mtc_crada_box_rev-D-1")), "{:?}", parts.iter().map(|p| p.name.clone()).collect::<Vec<_>>());
+    // Bodies alone: no tree.
+    let dir = std::env::temp_dir().join(format!("noshape-xt-tree-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let one = dir.join("block.x_t");
+    write_parasolid(&one, &[make_box_corners(DVec3::ZERO, DVec3::splat(0.01)).unwrap()], LengthUnit::Meter, false).unwrap();
+    assert!(read_parasolid_assembly(&one, LengthUnit::Meter).unwrap().is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
