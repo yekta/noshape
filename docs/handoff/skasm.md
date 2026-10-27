@@ -12,6 +12,9 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (569dabca19a397e932f2db54) in noshape mm test.
 
 ## Landed on main
+- 10-27 afternoon (after the app split): 3d99e40d sketch value boxes as live's rule capture (corner rectangle, 3 point
+  circle, center point arc, 3 point arc); 12740dfc REPLICATE-EDGE-DEFAULT; 71bc6f56 ISO 10512 nut (= live's B-rep);
+  DIN 6908 washer (= live).
 - e5e45de1 + 3f354c8c center point circle's value box opposite the rim click (4 live samples in my tab); the
   committed dimension keeps its usual place (where live puts it after Enter is not recorded). 4b5ac4fe used circle /
   arc centre is construction (live).
@@ -57,15 +60,12 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
   the shape; API polygon descriptions.
 
 ## WIP on agent/skasm
-(none: the branch equals main. PAUSED 10-27 ~09:50 UTC on the lead's order (app split first); no builds or tests
-running. On resume: rebase, then the next items below; live requests pending: PEM crawl, 11 standard content
-components, mate edits between free parts (UI), calculation variance, sketch value box placement.)
+(none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
+"tools/tiers/land.sh".)
 
 ## Next, in order
-Sketch P1: value boxes right after drawing: where live puts them differs from ours (center circle: done e5e45de1; 3 point circle: live below; rectangle height box after Enter: two live samples, no rule
-yet). Samples in behaviours "skasm (2026-10-27) sketch value boxes right after drawing"; asked live for a
-systematic set (REQUESTS 10-27); implement the rule once it lands (scene sketch_mode.rs `diameter_field` /
-`length_field` labels). Otherwise parity/sketch.md all ✅. Assembly P2:
+Sketch P1: value boxes done for every tool live measured (center rectangle and tangent arc not measured: default
+place). parity/sketch.md all ✅. Assembly P2:
 1. docs/parity/workflow-assembly-sweep.md: all rows ✅ 10-27 (34 left UNCONFIRMED: the 2° snap window). Filed
    PS-SECTION-RED for psui (Part Studio caps red where parts overlap; live only in the assembly). GUI docs:
    /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins), asm2 (a pin through the plate), ps2 (Part Studio overlap).
@@ -82,8 +82,12 @@ systematic set (REQUESTS 10-27); implement the rule once it lands (scene sketch_
    highlighted centre line was not reproduced.
 6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
    isn't back within 300 ticks); fine on CI runners presumably.
-7. Standard content PEM®: our catalogue has no PEM component (live lists 40 under 6 standards); asked live for the
-   component FeatureScript / features crawl (REQUESTS 10-27). Implement from that data once it lands. 11 non-PEM
+7. Standard content (tests say P3 long tail): PEM® data crawled by live (52 components: FSRules, configuration,
+   bodydetails at each Part Studio's default; /features still 429 until ~10-28 03:00) in dom/skb-sc-fsrules/PEM_*.
+   Of the 11 others: ISO 10512 and DIN 6908 done; left DIN 7050/7051/967 (tapping, cross recess), DIN 923 (needs a
+   head-shoulder-neck form: live's configuration lists the inputs), ISO 7379 (shoulder screw with neck widths /
+   fillets), NASM 45938 + /4, NAS 1129 ×2. Live's volumes for each studio default are in behaviours "skasm
+   (2026-10-27) standard content gaps"; asked for ISO 10511 / 7040 B-reps (ours come from the published tables). 11 non-PEM
    components are missing too (/root/skasm-scratch/sc/compare.py lists them: DIN 7050/7051/967 tapping, DIN 923, 6908,
    ISO 7379, 10512, NASM 45938 + /4, NAS 1129 ×2); their tables exist for some (dom/skb-sc-fsrules, skb-sc-comp) but
    skb's generator (/root/skb-scratch/gen) maps other column names; asked live for each default size's volume / faces
