@@ -9,6 +9,7 @@ mod misc;
 mod onshape_ux;
 mod regions;
 mod shapes;
+mod solve_time;
 mod solver_basic;
 mod text_and_tools;
 mod tools;

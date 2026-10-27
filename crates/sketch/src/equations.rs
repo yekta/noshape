@@ -6,7 +6,8 @@ use crate::constraints::{dist_rank, fix_items, tangent_rank, Constraint, Constra
 use crate::dual::{Dual, Num, V2};
 use crate::entities::{EntityKind, Geometry};
 use crate::ids::EntityId;
-use crate::nurbs::Nurbs;
+use crate::linalg::BandLu;
+use crate::nurbs::{chord_params, handle_ends, FitSystem, Nurbs};
 use crate::sketch::Sketch;
 use smallvec::SmallVec;
 #[cfg(test)]
@@ -83,6 +84,24 @@ impl CurvSide {
                     return 0.0;
                 }
                 d1.perp_dot(d[2]) / (l * l * l)
+            }
+        }
+    }
+}
+
+impl CurvSide {
+    /// Curvature and its gradient (added to `g`).
+    fn curvature_grad(&self, x: &[f64], g: &mut [f64]) -> f64 {
+        match self {
+            CurvSide::Spec(s) => {
+                let mut gs: SmallVec<[f64; 8]> = smallvec::smallvec![0.0; x.len()];
+                let v = small_grad(|q| curv(s, q), x, &mut gs);
+                g.iter_mut().zip(&gs).for_each(|(a, b)| *a += b);
+                v
+            }
+            CurvSide::Fit { n, at_end, handles } => {
+                let s = if *at_end { -1.0 } else { 1.0 };
+                fit_end_grad(x, *n, *handles, *at_end, true, |q| curv_of(glam::DVec2::new(q[0], q[1]), glam::DVec2::new(q[2], q[3]), s), g).unwrap_or(0.0)
             }
         }
     }
@@ -317,6 +336,248 @@ fn fit_curve(x: &[f64], n: usize) -> Option<Nurbs> {
     Nurbs::interpolate(&pts)
 }
 
+/// A fit spline at its inputs (points, then the two handles if it has
+/// them) with its factored system, for gradients of values on it in O(n)
+/// per value. A numeric gradient re-fitted the spline once per input,
+/// O(n²) fits a Jacobian row: minutes for a 94-point spline
+/// (SKETCH-SOLVE-SPLINE-SLOW).
+struct FitDiff {
+    pts: Vec<glam::DVec2>,
+    handles: Option<(glam::DVec2, glam::DVec2)>,
+    ub: Vec<f64>,
+    total: f64,
+    sys: FitSystem,
+    lu: BandLu,
+    curve: Nurbs,
+    frame: Nurbs,
+    /// Each row's first control point (at the base knots).
+    first: Vec<usize>,
+}
+
+/// A value on a fit spline and its gradient with respect to the spline's
+/// inputs, per component.
+#[derive(Clone)]
+struct Probe {
+    v: glam::DVec2,
+    gx: Vec<f64>,
+    gy: Vec<f64>,
+}
+
+impl FitDiff {
+    fn new(x: &[f64], n: usize, handles: bool) -> Option<Self> {
+        if n < 2 {
+            return None;
+        }
+        let pts: Vec<glam::DVec2> = (0..n).map(|i| glam::DVec2::new(x[2 * i], x[2 * i + 1])).collect();
+        let handles = handles.then(|| (glam::DVec2::new(x[2 * n], x[2 * n + 1]), glam::DVec2::new(x[2 * n + 2], x[2 * n + 3])));
+        let (ub, total) = chord_params(&pts);
+        let sys = FitSystem::new(&ub, &pts, handles.map(|(h0, h1)| handle_ends(&pts, h0, h1)));
+        let lu = sys.factor()?;
+        let curve = sys.solve_with(&lu);
+        let frame = sys.frame();
+        let first = sys.rows.iter().map(|r| frame.find_span(r.0) - sys.degree).collect();
+        Some(FitDiff { pts, handles, ub, total, sys, lu, curve, frame, first })
+    }
+
+    fn row_dot(&self, first: usize, c: &[f64; 4]) -> glam::DVec2 {
+        c[..=self.sys.degree].iter().enumerate().map(|(j, v)| self.curve.ctrl[first + j] * *v).sum()
+    }
+
+    /// The `der`-th derivatives at the parameters `at` and their gradients:
+    /// v = Lᵀ A⁻¹ R, so dv = wᵀ dR + (∂v/∂ub) dub with w = A⁻ᵀ L; the
+    /// parameters' part by central differences, each touching only the
+    /// rows whose knots move.
+    fn probes(&self, at: &[(f64, usize)]) -> Vec<Probe> {
+        use glam::DVec2;
+        let n = self.pts.len();
+        let nc = self.sys.rows.len();
+        let p = self.sys.degree;
+        let ni = 2 * n + if self.handles.is_some() { 4 } else { 0 };
+        let mut out = Vec::with_capacity(at.len());
+        let mut ws = Vec::with_capacity(at.len());
+        for &(u, der) in at {
+            let (f0, l) = FitSystem::basis_row(&self.frame, u, der);
+            let mut w = vec![0.0; nc];
+            for (j, v) in l[..=p].iter().enumerate() {
+                w[f0 + j] = *v;
+            }
+            self.lu.solve_t(&mut w);
+            out.push(Probe { v: self.row_dot(f0, &l), gx: vec![0.0; ni], gy: vec![0.0; ni] });
+            ws.push(w);
+        }
+        // Coefficient of each chord length in each probe's components.
+        let mut cl = vec![vec![DVec2::ZERO; n - 1]; at.len()];
+        for (k, (pr, w)) in out.iter_mut().zip(&ws).enumerate() {
+            let mut add = |gi: usize, wv: f64| {
+                pr.gx[2 * gi] += wv;
+                pr.gy[2 * gi + 1] += wv;
+            };
+            match self.handles {
+                None => (0..n).for_each(|i| add(i, w[i])),
+                Some((h0, h1)) => {
+                    add(0, w[0]);
+                    (1..n - 1).for_each(|i| add(i, w[i + 1]));
+                    add(n - 1, w[nc - 1]);
+                    // d0 = (h0 - P0) 3T / first, d1 = (P[n-1] - h1) 3T / last.
+                    let t = self.total.max(1e-300);
+                    for (end, wv, q, seg) in [(0, w[1], h0 - self.pts[0], 0), (1, w[nc - 2], self.pts[n - 1] - h1, n - 2)] {
+                        let l = (self.pts[seg + 1] - self.pts[seg]).length();
+                        let len = l.max(t * 1e-9);
+                        let s = 3.0 * t / len;
+                        let (hi, pi, sign) = if end == 0 { (n, 0, 1.0) } else { (n + 1, n - 1, -1.0) };
+                        add(hi, sign * wv * s);
+                        add(pi, -sign * wv * s);
+                        if self.total > 1e-300 {
+                            let q = q * wv;
+                            for c in cl[k].iter_mut() {
+                                *c += q * (3.0 / len);
+                            }
+                            let dl = -q * (3.0 * t / (len * len));
+                            if l >= t * 1e-9 {
+                                cl[k][seg] += dl;
+                            } else {
+                                for c in cl[k].iter_mut() {
+                                    *c += dl * 1e-9;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if self.total > 1e-300 && n > 2 {
+            let h = 1e-7;
+            let ends = self.handles.is_some();
+            let mut frame = self.frame.clone();
+            let mut ub = self.ub.clone();
+            // dv/dub_j per probe
+            let mut g = vec![vec![DVec2::ZERO; n]; at.len()];
+            let mut s = vec![[DVec2::ZERO; 2]; at.len()];
+            let mut rows: Vec<usize> = Vec::new();
+            for j in 1..n - 1 {
+                s.iter_mut().for_each(|v| *v = [DVec2::ZERO; 2]);
+                for (si, sign) in [1.0, -1.0].into_iter().enumerate() {
+                    ub[j] = self.ub[j] + sign * h;
+                    FitSystem::set_knots(&ub, p, ends, &mut frame.knots);
+                    if si == 0 {
+                        let moved = |k: &usize| frame.knots[*k] != self.sys.knots[*k];
+                        let klo = (0..frame.knots.len()).find(moved).unwrap_or(usize::MAX);
+                        let khi = (0..frame.knots.len()).rev().find(moved).unwrap_or(0);
+                        rows.clear();
+                        rows.extend((0..nc).filter(|&r| self.sys.row_param(r, ends) == Some(j) || (self.first[r] <= khi + 1 && self.first[r] + 2 * p + 2 >= klo)));
+                    }
+                    for &r in &rows {
+                        let (u0, der, _) = self.sys.rows[r];
+                        let u = self.sys.row_param(r, ends).map_or(u0, |k| ub[k]);
+                        let (f, c) = FitSystem::basis_row(&frame, u, der);
+                        let rv = self.row_dot(f, &c);
+                        for (k, w) in ws.iter().enumerate() {
+                            s[k][si] -= rv * w[r];
+                        }
+                    }
+                    for (k, &(u, der)) in at.iter().enumerate() {
+                        let (f, c) = FitSystem::basis_row(&frame, u, der);
+                        s[k][si] += self.row_dot(f, &c);
+                    }
+                }
+                ub[j] = self.ub[j];
+                for k in 0..at.len() {
+                    g[k][j] = (s[k][0] - s[k][1]) / (2.0 * h);
+                }
+            }
+            // ub_k = S_k / T: dub_k = (dS_k - ub_k dT) / T, so chord i's
+            // coefficient is (sum of g_k for k > i - sum of g_k ub_k) / T.
+            for k in 0..at.len() {
+                let gamma: DVec2 = (1..n - 1).map(|j| g[k][j] * self.ub[j]).sum();
+                let mut suffix = DVec2::ZERO;
+                for i in (0..n - 1).rev() {
+                    cl[k][i] += (suffix - gamma) / self.total;
+                    suffix += g[k][i];
+                }
+            }
+        }
+        for (k, pr) in out.iter_mut().enumerate() {
+            for i in 0..n - 1 {
+                let d = self.pts[i + 1] - self.pts[i];
+                let l = d.length();
+                if l <= 0.0 {
+                    continue;
+                }
+                let e = d / l;
+                let c = cl[k][i];
+                for (gv, cv) in [(&mut pr.gx, c.x), (&mut pr.gy, c.y)] {
+                    gv[2 * i + 2] += cv * e.x;
+                    gv[2 * i + 3] += cv * e.y;
+                    gv[2 * i] -= cv * e.x;
+                    gv[2 * i + 1] -= cv * e.y;
+                }
+            }
+        }
+        out
+    }
+}
+
+/// A point-on-fit-spline gradient: its inputs from the parameter on, handles, probe, S'(t).
+type FitPointGrad = (Vec<f64>, bool, Probe, glam::DVec2);
+
+thread_local! {
+    /// The last point-on-fit-spline gradient.
+    static FIT_POINT_LAST: std::cell::RefCell<Option<FitPointGrad>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Gradient by central differences of a small closed-form `f`.
+fn small_grad(f: impl Fn(&[f64]) -> f64, x: &[f64], g: &mut [f64]) -> f64 {
+    let mut xx: SmallVec<[f64; 16]> = SmallVec::from_slice(x);
+    for i in 0..x.len() {
+        let h = 1e-7 * x[i].abs().max(1e-3);
+        xx[i] = x[i] + h;
+        let fp = f(&xx);
+        xx[i] = x[i] - h;
+        let fm = f(&xx);
+        xx[i] = x[i];
+        g[i] = (fp - fm) / (2.0 * h);
+    }
+    f(x)
+}
+
+/// Sine (cosine if `perp`) of the angle between `t` and `o`.
+fn dir_rel(t: glam::DVec2, o: glam::DVec2, perp: bool) -> f64 {
+    let den = t.length() * o.length();
+    if den < 1e-300 {
+        return 0.0;
+    }
+    if perp { t.dot(o) / den } else { t.perp_dot(o) / den }
+}
+
+/// Oriented curvature from the first two derivatives (`s` = ±1 orients the first).
+fn curv_of(d1: glam::DVec2, d2: glam::DVec2, s: f64) -> f64 {
+    let d1 = d1 * s;
+    let l = d1.length();
+    if l < 1e-300 {
+        return 0.0;
+    }
+    d1.perp_dot(d2) / (l * l * l)
+}
+
+/// Fills `g` with a fit spline end's gradient of `f(d1, d2)` (its first and,
+/// if `second`, second derivative at the end).
+fn fit_end_grad(x: &[f64], n: usize, handles: bool, at_end: bool, second: bool, f: impl Fn(&[f64]) -> f64, g: &mut [f64]) -> Option<f64> {
+    let fd = FitDiff::new(x, n, handles)?;
+    let (a, b) = fd.curve.domain();
+    let u = if at_end { b } else { a };
+    let at: SmallVec<[(f64, usize); 2]> = if second { [(u, 1), (u, 2)].into_iter().collect() } else { [(u, 1)].into_iter().collect() };
+    let pr = fd.probes(&at);
+    let q: SmallVec<[f64; 4]> = pr.iter().flat_map(|p| [p.v.x, p.v.y]).collect();
+    let mut dq = [0.0; 4];
+    let v = small_grad(f, &q, &mut dq[..q.len()]);
+    for (k, p) in pr.iter().enumerate() {
+        for (i, gv) in g.iter_mut().enumerate() {
+            *gv += dq[2 * k] * p.gx[i] + dq[2 * k + 1] * p.gy[i];
+        }
+    }
+    Some(v)
+}
+
 impl Eq {
     /// Residual value. `x` holds the input values in input order.
     pub fn eval(&self, x: &[f64]) -> f64 {
@@ -367,7 +628,70 @@ impl Eq {
     pub fn eval_grad(&self, x: &[f64], g: &mut [f64]) -> f64 {
         match &self.kind {
             EqKind::SplinePoint { comp, curve } => return spline_point_eval(curve, *comp as usize, x, Some(g)),
-            EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::CurvatureNum { .. } => return self.numeric_grad(x, g),
+            EqKind::FitPoint { comp, handles } => {
+                g.iter_mut().for_each(|v| *v = 0.0);
+                let c = *comp as usize;
+                // A point's two equations come one after the other with the same inputs.
+                let hit = FIT_POINT_LAST.with(|l| l.borrow().as_ref().filter(|(k, h, ..)| *h == *handles && k[..] == x[2..]).map(|(_, _, pr, d)| (pr.clone(), *d)));
+                let (pr, d1) = match hit {
+                    Some(v) => v,
+                    None => {
+                        let n = (x.len() - 3) / 2 - if *handles { 2 } else { 0 };
+                        let Some(fd) = FitDiff::new(&x[3..], n, *handles) else { return 0.0 };
+                        let (a, b) = fd.curve.domain();
+                        let t = x[2].clamp(a, b);
+                        let pr = fd.probes(&[(t, 0)]).remove(0);
+                        let d1 = if x[2] > a && x[2] < b { fd.curve.eval_ders(t)[1] } else { glam::DVec2::ZERO };
+                        FIT_POINT_LAST.with(|l| *l.borrow_mut() = Some((x[2..].to_vec(), *handles, pr.clone(), d1)));
+                        (pr, d1)
+                    }
+                };
+                g[c] = -1.0;
+                g[2] = d1[c];
+                g[3..].copy_from_slice(if c == 0 { &pr.gx } else { &pr.gy });
+                return pr.v[c] - x[c];
+            }
+            EqKind::FitEndDir { at_end, perp, n } => {
+                g.iter_mut().for_each(|v| *v = 0.0);
+                let (n, perp) = (*n, *perp);
+                let s = if *at_end { -1.0 } else { 1.0 };
+                let o = glam::DVec2::new(x[2 * n + 2] - x[2 * n], x[2 * n + 3] - x[2 * n + 1]);
+                let mut go = [0.0; 2];
+                let Some(v) = fit_end_grad(&x[..2 * n], n, false, *at_end, false, |q| dir_rel(glam::DVec2::new(q[0], q[1]) * s, o, perp), &mut g[..2 * n]) else { return 0.0 };
+                let t = FitDiff::new(&x[..2 * n], n, false).map(|fd| {
+                    let (a, b) = fd.curve.domain();
+                    fd.curve.eval_ders(if *at_end { b } else { a })[1] * s
+                });
+                if let Some(t) = t {
+                    small_grad(|q| dir_rel(t, glam::DVec2::new(q[0], q[1]), perp), &[o.x, o.y], &mut go);
+                }
+                g[2 * n] = -go[0];
+                g[2 * n + 1] = -go[1];
+                g[2 * n + 2] = go[0];
+                g[2 * n + 3] = go[1];
+                return v;
+            }
+            EqKind::FitFitDir { na, end_a, end_b, perp } => {
+                g.iter_mut().for_each(|v| *v = 0.0);
+                let (na, perp) = (*na, *perp);
+                let nb = x.len() / 2 - na;
+                let end_dir = |xs: &[f64], n: usize, at_end: bool| {
+                    let c = fit_curve(xs, n)?;
+                    let (a, b) = c.domain();
+                    Some(c.eval_ders(if at_end { b } else { a })[1])
+                };
+                let (Some(ta), Some(tb)) = (end_dir(&x[..2 * na], na, *end_a), end_dir(&x[2 * na..], nb, *end_b)) else { return 0.0 };
+                let (ga, gb) = g.split_at_mut(2 * na);
+                fit_end_grad(&x[..2 * na], na, false, *end_a, false, |q| dir_rel(glam::DVec2::new(q[0], q[1]), tb, perp), ga);
+                fit_end_grad(&x[2 * na..], nb, false, *end_b, false, |q| dir_rel(ta, glam::DVec2::new(q[0], q[1]), perp), gb);
+                return dir_rel(ta, tb, perp);
+            }
+            EqKind::CurvatureNum { a, b } => {
+                g.iter_mut().for_each(|v| *v = 0.0);
+                let na = a.arity();
+                let (ga, gb) = g.split_at_mut(na);
+                return a.curvature_grad(&x[..na], ga) + b.curvature_grad(&x[na..], gb);
+            }
             _ => {}
         }
         let n = x.len();
@@ -1431,6 +1755,50 @@ mod tests {
         let xs = [0.5, 0.5, 0.37, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 4.0, 0.0, 6.0, 1.0];
         for comp in 0..2 {
             check_grad(&Eq { kind: EqKind::SplinePoint { comp, curve: Arc::new(sp.clone()) }, inputs: (0..13).collect() }, &xs);
+        }
+    }
+
+    /// Fit points on a wavy line (uneven spacing), then handles near the ends.
+    fn fit_inputs(n: usize, handles: bool) -> Vec<f64> {
+        let mut x: Vec<f64> = (0..n).flat_map(|i| {
+            let t = i as f64 + 0.3 * (i as f64 * 1.7).sin();
+            [0.01 * t, 0.004 * (t * 0.9).sin() + 0.001 * i as f64]
+        }).collect();
+        if handles {
+            let (a, b) = ((x[0], x[1]), (x[2 * n - 2], x[2 * n - 1]));
+            x.extend([a.0 + 0.003, a.1 + 0.002, b.0 + 0.004, b.1 - 0.001]);
+        }
+        x
+    }
+
+    /// The fit spline equations' gradients (SKETCH-SOLVE-SPLINE-SLOW) match
+    /// finite differences, with and without handles, from 2 to 30 points.
+    #[test]
+    fn fit_spline_gradients_match_finite_differences() {
+        for n in [2usize, 3, 4, 5, 8, 30] {
+            for handles in [false, true] {
+                let fit = fit_inputs(n, handles);
+                for comp in 0..2u8 {
+                    let mut x = vec![0.02, 0.003, 0.37];
+                    x.extend(&fit);
+                    check_grad(&Eq { kind: EqKind::FitPoint { comp, handles }, inputs: (0..x.len() as u32).collect() }, &x);
+                }
+                for at_end in [false, true] {
+                    let side = CurvSide::Fit { n, at_end, handles };
+                    let mut x = fit.clone();
+                    x.extend([0.0, 0.0, 0.01, 0.002]);
+                    let a = CurvSpec::Arc { sign: 1.0 };
+                    check_grad(&Eq { kind: EqKind::CurvatureNum { a: side, b: CurvSide::Spec(a) }, inputs: (0..x.len() as u32).collect() }, &x);
+                    if !handles {
+                        for perp in [false, true] {
+                            check_grad(&Eq { kind: EqKind::FitEndDir { at_end, perp, n }, inputs: (0..x.len() as u32).collect() }, &x);
+                            let mut xx = fit.clone();
+                            xx.extend(fit_inputs(4, false).iter().map(|v| v * 1.3 + 0.01));
+                            check_grad(&Eq { kind: EqKind::FitFitDir { na: n, end_a: at_end, end_b: !at_end, perp }, inputs: (0..xx.len() as u32).collect() }, &xx);
+                        }
+                    }
+                }
+            }
         }
     }
 }

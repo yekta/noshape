@@ -232,6 +232,101 @@ fn pseudo_peripheral(adj: &[Vec<usize>], deg: &[usize], s: usize, blocked: &[boo
     last
 }
 
+/// LU factorization with partial pivoting of a square matrix whose nonzeros
+/// lie in a band (`kl` below, `ku` above the diagonal), as LAPACK's gbtrf:
+/// the multipliers stay where they were computed and the row interchanges
+/// are replayed in the solves, so factor and solves stay inside the band
+/// (fit splines' interpolation systems: O(n) instead of O(n³)).
+#[derive(Clone, Debug)]
+pub(crate) struct BandLu {
+    n: usize,
+    kl: usize,
+    /// Upper bandwidth of U (`ku + kl` after interchanges).
+    ku: usize,
+    /// Row-major n × n: U on and above the diagonal, the multipliers below.
+    a: Vec<f64>,
+    /// Row swapped with row k at step k.
+    piv: Vec<usize>,
+}
+
+#[allow(clippy::needless_range_loop)]
+impl BandLu {
+    /// `a` row-major n × n. `None` if a pivot is exactly zero (singular).
+    pub fn factor(mut a: Vec<f64>, n: usize, kl: usize, ku: usize) -> Option<Self> {
+        let mut piv = vec![0; n];
+        let ku = ku + kl;
+        for k in 0..n {
+            let rmax = n.min(k + kl + 1);
+            let cmax = n.min(k + ku + 1);
+            let mut p = k;
+            for i in k + 1..rmax {
+                if a[i * n + k].abs() > a[p * n + k].abs() {
+                    p = i;
+                }
+            }
+            piv[k] = p;
+            let d = a[p * n + k];
+            if d == 0.0 || !d.is_finite() {
+                return None;
+            }
+            if p != k {
+                for j in k..cmax {
+                    a.swap(k * n + j, p * n + j);
+                }
+            }
+            for i in k + 1..rmax {
+                let f = a[i * n + k] / d;
+                a[i * n + k] = f;
+                if f != 0.0 {
+                    for j in k + 1..cmax {
+                        a[i * n + j] -= f * a[k * n + j];
+                    }
+                }
+            }
+        }
+        Some(BandLu { n, kl, ku, a, piv })
+    }
+
+    /// Solves A x = b in place.
+    pub fn solve(&self, b: &mut [f64]) {
+        let n = self.n;
+        for k in 0..n {
+            b.swap(k, self.piv[k]);
+            let bk = b[k];
+            for i in k + 1..n.min(k + self.kl + 1) {
+                b[i] -= self.a[i * n + k] * bk;
+            }
+        }
+        for i in (0..n).rev() {
+            let mut s = b[i];
+            for j in i + 1..n.min(i + self.ku + 1) {
+                s -= self.a[i * n + j] * b[j];
+            }
+            b[i] = s / self.a[i * n + i];
+        }
+    }
+
+    /// Solves Aᵀ x = b in place.
+    pub fn solve_t(&self, b: &mut [f64]) {
+        let n = self.n;
+        for i in 0..n {
+            let mut s = b[i];
+            for j in i.saturating_sub(self.ku)..i {
+                s -= self.a[j * n + i] * b[j];
+            }
+            b[i] = s / self.a[i * n + i];
+        }
+        for k in (0..n).rev() {
+            let mut s = b[k];
+            for i in k + 1..n.min(k + self.kl + 1) {
+                s -= self.a[i * n + k] * b[i];
+            }
+            b[k] = s;
+            b.swap(k, self.piv[k]);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,6 +369,37 @@ mod tests {
         s.solve(&mut b);
         for i in 0..n {
             assert!((b[i] - x[i]).abs() < 1e-10);
+        }
+    }
+
+    /// Banded LU against nalgebra on a band with zero diagonals (pivoting needed), both solves.
+    #[test]
+    #[allow(clippy::needless_range_loop)]
+    fn band_lu_matches_dense() {
+        let (n, kl, ku) = (40, 2, 3);
+        let mut seed = 99u64;
+        let mut rnd = || {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            ((seed >> 33) as f64) / (1u64 << 31) as f64 - 0.5
+        };
+        let mut a = vec![0.0; n * n];
+        for i in 0..n {
+            for j in i.saturating_sub(kl)..n.min(i + ku + 1) {
+                a[i * n + j] = if i == j && i % 3 == 0 { 0.0 } else { rnd() };
+            }
+        }
+        let b: Vec<f64> = (0..n).map(|_| rnd()).collect();
+        let m = nalgebra::DMatrix::from_row_slice(n, n, &a);
+        let lu = BandLu::factor(a.clone(), n, kl, ku).unwrap();
+        let x0 = m.clone().lu().solve(&nalgebra::DVector::from_column_slice(&b)).unwrap();
+        let mut x = b.clone();
+        lu.solve(&mut x);
+        let t0 = m.transpose().lu().solve(&nalgebra::DVector::from_column_slice(&b)).unwrap();
+        let mut t = b.clone();
+        lu.solve_t(&mut t);
+        for i in 0..n {
+            assert!((x[i] - x0[i]).abs() < 1e-9 * (1.0 + x0[i].abs()), "solve {i}: {} vs {}", x[i], x0[i]);
+            assert!((t[i] - t0[i]).abs() < 1e-9 * (1.0 + t0[i].abs()), "solve_t {i}: {} vs {}", t[i], t0[i]);
         }
     }
 }

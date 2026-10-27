@@ -170,6 +170,74 @@ impl Nurbs {
         ders
     }
 
+    /// [`Nurbs::basis_ders`] for degree ≤ 3 and `nd` ≤ 2 without allocating.
+    pub(crate) fn basis_ders3(&self, span: usize, u: f64, nd: usize) -> [[f64; 4]; 3] {
+        let p = self.degree;
+        debug_assert!(p <= 3 && nd <= 2);
+        let kn = &self.knots;
+        let mut ndu = [[0.0; 4]; 4];
+        let mut left = [0.0; 4];
+        let mut right = [0.0; 4];
+        ndu[0][0] = 1.0;
+        for j in 1..=p {
+            left[j] = u - kn[span + 1 - j];
+            right[j] = kn[span + j] - u;
+            let mut saved = 0.0;
+            for r in 0..j {
+                ndu[j][r] = right[r + 1] + left[j - r];
+                let temp = if ndu[j][r] != 0.0 { ndu[r][j - 1] / ndu[j][r] } else { 0.0 };
+                ndu[r][j] = saved + right[r + 1] * temp;
+                saved = left[j - r] * temp;
+            }
+            ndu[j][j] = saved;
+        }
+        let mut ders = [[0.0; 4]; 3];
+        for j in 0..=p {
+            ders[0][j] = ndu[j][p];
+        }
+        let ndc = nd.min(p);
+        let mut a = [[0.0; 4]; 2];
+        for r in 0..=p {
+            let (mut s1, mut s2) = (0usize, 1usize);
+            a[0][0] = 1.0;
+            for k in 1..=ndc {
+                let mut d = 0.0;
+                let rk = r as isize - k as isize;
+                let pk = p - k;
+                if r >= k {
+                    let den = ndu[pk + 1][rk as usize];
+                    a[s2][0] = if den != 0.0 { a[s1][0] / den } else { 0.0 };
+                    d = a[s2][0] * ndu[rk as usize][pk];
+                }
+                let j1: usize = if rk >= -1 { 1 } else { (-rk) as usize };
+                let j2: usize = if (r as isize - 1) <= pk as isize { k - 1 } else { p - r };
+                let mut j = j1;
+                while j <= j2 {
+                    let idx = (rk + j as isize) as usize;
+                    let den = ndu[pk + 1][idx];
+                    a[s2][j] = if den != 0.0 { (a[s1][j] - a[s1][j - 1]) / den } else { 0.0 };
+                    d += a[s2][j] * ndu[idx][pk];
+                    j += 1;
+                }
+                if r <= pk {
+                    let den = ndu[pk + 1][r];
+                    a[s2][k] = if den != 0.0 { -a[s1][k - 1] / den } else { 0.0 };
+                    d += a[s2][k] * ndu[r][pk];
+                }
+                ders[k][r] = d;
+                std::mem::swap(&mut s1, &mut s2);
+            }
+        }
+        let mut f = p as f64;
+        for (k, row) in ders.iter_mut().enumerate().take(ndc + 1).skip(1) {
+            for v in row.iter_mut() {
+                *v *= f;
+            }
+            f *= (p - k) as f64;
+        }
+        ders
+    }
+
     /// Point and first two derivatives at `u`.
     pub fn eval_ders(&self, u: f64) -> [DVec2; 3] {
         let p = self.degree;
@@ -326,68 +394,21 @@ impl Nurbs {
     /// Global interpolation through `pts` with chord-length parameterization
     /// (The NURBS Book, A9.1). Degree is `min(3, n-1)`.
     pub fn interpolate(pts: &[DVec2]) -> Option<Nurbs> {
-        let n = pts.len();
-        if n < 2 {
+        if pts.len() < 2 {
             return None;
         }
-        let p = 3.min(n - 1);
-        let mut total = 0.0;
-        for w in pts.windows(2) {
-            total += (w[1] - w[0]).length();
-        }
-        let mut ub = vec![0.0; n];
-        if total <= 1e-300 {
-            for (k, u) in ub.iter_mut().enumerate() {
-                *u = k as f64 / (n - 1) as f64;
-            }
-        } else {
-            for k in 1..n {
-                ub[k] = ub[k - 1] + (pts[k] - pts[k - 1]).length() / total;
-            }
-            ub[n - 1] = 1.0;
-        }
-        let m = n + p;
-        let mut knots = vec![0.0; m + 1];
-        for k in knots.iter_mut().skip(m - p) {
-            *k = 1.0;
-        }
-        for j in 1..n - p {
-            let s: f64 = ub[j..j + p].iter().sum();
-            knots[j + p] = s / p as f64;
-        }
-        if p == n - 1 {
-            // Bézier: control points solved below
-        }
-        let tmp = Nurbs { degree: p, knots: knots.clone(), ctrl: vec![DVec2::ZERO; n], weights: None };
-        let mut a = nalgebra::DMatrix::<f64>::zeros(n, n);
-        for (k, &u) in ub.iter().enumerate() {
-            let span = tmp.find_span(u);
-            let d = tmp.basis_ders(span, u, 0);
-            for j in 0..=p {
-                a[(k, span - p + j)] = d[0][j];
-            }
-        }
-        let lu = a.lu();
-        let bx = nalgebra::DVector::from_iterator(n, pts.iter().map(|q| q.x));
-        let by = nalgebra::DVector::from_iterator(n, pts.iter().map(|q| q.y));
-        let x = lu.solve(&bx)?;
-        let y = lu.solve(&by)?;
-        let ctrl = (0..n).map(|i| DVec2::new(x[i], y[i])).collect();
-        Some(Nurbs { degree: p, knots, ctrl, weights: None })
+        FitSystem::new(&chord_params(pts).0, pts, None).solve()
     }
 
     /// Interpolation through `pts` with tangent handles `h0` (start) and
     /// `h1` (end): like Bezier control points, a handle at a third of the
     /// first / last segment gives the natural-looking end tangent.
     pub fn interpolate_with_handles(pts: &[DVec2], h0: DVec2, h1: DVec2) -> Option<Nurbs> {
-        let n = pts.len();
-        if n < 2 {
+        if pts.len() < 2 {
             return None;
         }
-        let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum::<f64>().max(1e-300);
-        let first = (pts[1] - pts[0]).length().max(total * 1e-9);
-        let last = (pts[n - 1] - pts[n - 2]).length().max(total * 1e-9);
-        Self::interpolate_with_ends(pts, (h0 - pts[0]) * (3.0 * total / first), (pts[n - 1] - h1) * (3.0 * total / last))
+        let (d0, d1) = handle_ends(pts, h0, h1);
+        Self::interpolate_with_ends(pts, d0, d1)
     }
 
     /// The seam derivative (chord-length parameter on [0, 1]) of the
@@ -442,49 +463,10 @@ impl Nurbs {
     /// `d1` (with respect to the chord-length parameter on [0, 1]); cubic
     /// with `n + 2` control points (The NURBS Book, section 9.2.2).
     pub fn interpolate_with_ends(pts: &[DVec2], d0: DVec2, d1: DVec2) -> Option<Nurbs> {
-        let n = pts.len();
-        if n < 2 {
+        if pts.len() < 2 {
             return None;
         }
-        let p = 3usize;
-        let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum();
-        let mut ub = vec![0.0; n];
-        for k in 1..n {
-            ub[k] = if total <= 1e-300 { k as f64 / (n - 1) as f64 } else { ub[k - 1] + (pts[k] - pts[k - 1]).length() / total };
-        }
-        ub[n - 1] = 1.0;
-        let nc = n + 2;
-        let mut knots = vec![0.0; nc + p + 1];
-        for k in knots.iter_mut().skip(nc) {
-            *k = 1.0;
-        }
-        // Internal knots: averages of the parameters (eq. 9.22).
-        for j in 0..nc.saturating_sub(p + 1) {
-            let s: f64 = (j..j + p).map(|i| ub[i.min(n - 1)]).sum();
-            knots[p + 1 + j] = s / p as f64;
-        }
-        let tmp = Nurbs { degree: p, knots: knots.clone(), ctrl: vec![DVec2::ZERO; nc], weights: None };
-        let mut a = nalgebra::DMatrix::<f64>::zeros(nc, nc);
-        let mut bx = nalgebra::DVector::<f64>::zeros(nc);
-        let mut by = nalgebra::DVector::<f64>::zeros(nc);
-        // Rows: position at 0, derivative at 0, interior positions, derivative at 1, position at 1.
-        let mut rows: Vec<(f64, usize, DVec2)> = vec![(0.0, 0, pts[0]), (0.0, 1, d0)];
-        rows.extend((1..n - 1).map(|k| (ub[k], 0, pts[k])));
-        rows.extend([(1.0, 1, d1), (1.0, 0, pts[n - 1])]);
-        for (row, (u, der, rhs)) in rows.into_iter().enumerate() {
-            let span = tmp.find_span(u);
-            let d = tmp.basis_ders(span, u, der);
-            for j in 0..=p {
-                a[(row, span - p + j)] = d[der][j];
-            }
-            bx[row] = rhs.x;
-            by[row] = rhs.y;
-        }
-        let lu = a.lu();
-        let x = lu.solve(&bx)?;
-        let y = lu.solve(&by)?;
-        let ctrl = (0..nc).map(|i| DVec2::new(x[i], y[i])).collect();
-        Some(Nurbs { degree: p, knots, ctrl, weights: None })
+        FitSystem::new(&chord_params(pts).0, pts, Some((d0, d1))).solve()
     }
 
     /// Least-squares cubic B-spline with `n_ctrl` control points (clamped
@@ -602,6 +584,138 @@ impl Nurbs {
         let q1 = p / (u[pd + 2] - u[2]);
         let f = (p - 1.0) / (u[pd + 1] - u[2]);
         (alpha, f * q1, f * alpha)
+    }
+}
+
+/// The end derivatives (chord-length parameter on [0, 1]) of handles `h0`,
+/// `h1` on the fit spline through `pts` (at least 2 points).
+pub(crate) fn handle_ends(pts: &[DVec2], h0: DVec2, h1: DVec2) -> (DVec2, DVec2) {
+    let n = pts.len();
+    let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum::<f64>().max(1e-300);
+    let first = (pts[1] - pts[0]).length().max(total * 1e-9);
+    let last = (pts[n - 1] - pts[n - 2]).length().max(total * 1e-9);
+    ((h0 - pts[0]) * (3.0 * total / first), (pts[n - 1] - h1) * (3.0 * total / last))
+}
+
+/// Chord-length parameters of `pts` on [0, 1] (uniform when all points
+/// coincide) and the polyline's length.
+pub(crate) fn chord_params(pts: &[DVec2]) -> (Vec<f64>, f64) {
+    let n = pts.len();
+    let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum();
+    let mut ub = vec![0.0; n];
+    for k in 1..n {
+        ub[k] = if total <= 1e-300 { k as f64 / (n - 1) as f64 } else { ub[k - 1] + (pts[k] - pts[k - 1]).length() / total };
+    }
+    ub[n - 1] = 1.0;
+    (ub, total)
+}
+
+/// The linear system of a fit spline (The NURBS Book, 9.2.1 / 9.2.2):
+/// through `pts` at the parameters `ub`, with averaged knots; with `ends`,
+/// a cubic with the end derivatives prescribed as well (`n + 2` control
+/// points), else degree min(3, n - 1) with `n`. Nonzero only in a band, so
+/// it factors in O(n).
+pub(crate) struct FitSystem {
+    pub degree: usize,
+    pub knots: Vec<f64>,
+    /// One row per control point: parameter, derivative order, right-hand side.
+    pub rows: Vec<(f64, usize, DVec2)>,
+}
+
+impl FitSystem {
+    pub(crate) fn new(ub: &[f64], pts: &[DVec2], ends: Option<(DVec2, DVec2)>) -> Self {
+        let n = pts.len();
+        let degree = if ends.is_some() { 3 } else { 3.min(n - 1) };
+        let nc = if ends.is_some() { n + 2 } else { n };
+        let mut knots = vec![0.0; nc + degree + 1];
+        for k in knots.iter_mut().skip(nc) {
+            *k = 1.0;
+        }
+        Self::set_knots(ub, degree, ends.is_some(), &mut knots);
+        let rows = match ends {
+            None => ub.iter().zip(pts).map(|(&u, &q)| (u, 0, q)).collect(),
+            // Rows: position at 0, derivative at 0, interior positions, derivative at 1, position at 1.
+            Some((d0, d1)) => {
+                let mut rows: Vec<(f64, usize, DVec2)> = vec![(0.0, 0, pts[0]), (0.0, 1, d0)];
+                rows.extend((1..n - 1).map(|k| (ub[k], 0, pts[k])));
+                rows.extend([(1.0, 1, d1), (1.0, 0, pts[n - 1])]);
+                rows
+            }
+        };
+        FitSystem { degree, knots, rows }
+    }
+
+    /// The internal knots: averages of the parameters (eq. 9.22).
+    pub(crate) fn set_knots(ub: &[f64], p: usize, ends: bool, knots: &mut [f64]) {
+        let n = ub.len();
+        if ends {
+            for j in 0..n.saturating_sub(2) {
+                let s: f64 = (j..j + p).map(|i| ub[i.min(n - 1)]).sum();
+                knots[p + 1 + j] = s / p as f64;
+            }
+        } else {
+            for j in 1..n - p {
+                let s: f64 = ub[j..j + p].iter().sum();
+                knots[j + p] = s / p as f64;
+            }
+        }
+    }
+
+    /// The parameter index row `r` sits at (`None`: an end row).
+    pub(crate) fn row_param(&self, r: usize, ends: bool) -> Option<usize> {
+        let nc = self.rows.len();
+        if !ends {
+            Some(r)
+        } else if r >= 2 && r + 2 < nc {
+            Some(r - 1)
+        } else {
+            None
+        }
+    }
+
+    /// A curve with this system's knots (control points zero) for basis evaluations.
+    pub(crate) fn frame(&self) -> Nurbs {
+        Nurbs { degree: self.degree, knots: self.knots.clone(), ctrl: vec![DVec2::ZERO; self.rows.len()], weights: None }
+    }
+
+    /// The `der`-th derivative basis at `u`: the first control point index and the p + 1 coefficients.
+    /// Entries past the degree are zero.
+    pub(crate) fn basis_row(frame: &Nurbs, u: f64, der: usize) -> (usize, [f64; 4]) {
+        let span = frame.find_span(u);
+        (span - frame.degree, frame.basis_ders3(span, u, der)[der])
+    }
+
+    pub(crate) fn factor(&self) -> Option<crate::linalg::BandLu> {
+        let nc = self.rows.len();
+        let frame = self.frame();
+        let mut a = vec![0.0; nc * nc];
+        let (mut kl, mut ku) = (0usize, 0usize);
+        for (r, &(u, der, _)) in self.rows.iter().enumerate() {
+            let (first, c) = Self::basis_row(&frame, u, der);
+            for (j, v) in c[..=self.degree].iter().enumerate() {
+                let col = first + j;
+                a[r * nc + col] = *v;
+                if *v != 0.0 {
+                    kl = kl.max(r.saturating_sub(col));
+                    ku = ku.max(col.saturating_sub(r));
+                }
+            }
+        }
+        crate::linalg::BandLu::factor(a, nc, kl, ku)
+    }
+
+    /// The interpolating curve, `None` if the system is singular.
+    pub(crate) fn solve(&self) -> Option<Nurbs> {
+        Some(self.solve_with(&self.factor()?))
+    }
+
+    pub(crate) fn solve_with(&self, lu: &crate::linalg::BandLu) -> Nurbs {
+        let mut x: Vec<f64> = self.rows.iter().map(|r| r.2.x).collect();
+        let mut y: Vec<f64> = self.rows.iter().map(|r| r.2.y).collect();
+        lu.solve(&mut x);
+        lu.solve(&mut y);
+        let ctrl = x.into_iter().zip(y).map(|(x, y)| DVec2::new(x, y)).collect();
+        Nurbs { degree: self.degree, knots: self.knots.clone(), ctrl, weights: None }
     }
 }
 
