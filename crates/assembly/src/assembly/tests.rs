@@ -4389,3 +4389,22 @@ fn secondary_axis_parallel_to_the_primary_fails_as_live() {
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert_eq!(res.connectors[0].message.as_deref(), Some("Failed to resolve mate connector. Secondary axis conflicts with primary axis."));
 }
+
+/// Live (docs/parity/workflow-assembly-sweep.md row 11): Replicate on a
+/// plate whose only hole is the seed's says so in Onshape's words.
+#[test]
+fn replicate_with_nothing_to_match_says_so_as_live() {
+    let f = doc_with(vec![plate_with_hole(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (plate, rp) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true), part_instance(2, "Pin <1>", f.studios[1], pin, DVec3::new(0.0, 0.05, 0.0), false)],
+        mates: vec![mate(10, MateType::Revolute, conn(1, cylinder_face(&rp), Inference::MidAxis), conn(2, cylinder_face(&rq), Inference::MidAxis))],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    asm.patterns.push(InstancePattern { id: MateId(80), name: "Replicate 1".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: false, scope: None, scope_refs: vec![] }, seeds: vec![InstanceId(2)], generated: vec![], suppressed: false });
+    let err = analysis::matched_targets(&res, &asm, &asm.patterns[0], &UnitPrefs::default()).unwrap_err();
+    assert_eq!(err, "Selected target did not contain identical geometry.");
+}

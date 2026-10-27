@@ -25,7 +25,7 @@ the error-string table's.
 | 8 | Width with one connector | "Two width mate connectors are required." | "Width mate needs two width mate connectors" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
 | 9 | Secondary axis ∥ primary | "Failed to resolve mate connector. Secondary axis conflicts with primary axis." | "Secondary axis can't be parallel to the primary axis" | ✅ (T: assembly `secondary_axis_parallel_to_the_primary_fails_as_live`, skasm 10-27) |
 | 10 | Tangent on unsupported geometry / on a connector | "Geometry is not supported for tangent mate." | two long texts of ours | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) (E9: cylinder–cylinder is supported; connectors are not pickable) |
-| 11 | Replicate, nothing matches | "Selected target did not contain identical geometry." | "No matching geometry found (on the target instance)" | 🔧 |
+| 11 | Replicate, nothing matches | "Selected target did not contain identical geometry." | "No matching geometry found (on the target instance)" | ✅ (T: assembly `replicate_with_nothing_to_match_says_so_as_live`, skasm 10-27) |
 | 12 | Both connectors on one instance | "Mate connectors are on same instance." | "Both mate connectors are on the same rigid set" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) (E1: the dialog refuses the pick, row 24) |
 | 13 | Both in one group | "Mate cannot be added between member of same group." | same as 12 | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) (E2 confirmed) |
 | 14 | Both instances fixed (E3) | "Mate is between fixed instances."; the fix icons get a yellow ⚠, the root an error badge | no check (solves as fixed) | ✅ (GUI green dc3a03f6, skasm 10-27) |
