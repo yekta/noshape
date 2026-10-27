@@ -218,11 +218,11 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 7.1 | Parts with colour swatch and count | features_and_parts_lists | ✅ |  |
-| 7.2 | Click selects (or fills a part field in a dialog, filtered) | features_and_parts_lists | ✅ (10-27: Delete part takes the clicked row's part) |  |
-| 7.3 | Hover highlights the part in the graphics area | features_and_parts_lists | ✅ |  |
-| 7.4 | Eye on hover ("Hide Part N", 20 × 20 at x 210) hides/shows the part; hidden parts greyed | features_and_parts_lists | ✅ |  |
-| 7.5 | Parts list menu (live order): Rename, Properties…, Assign material…, Edit appearance… | Create Drawing of Part…, Export… | Hide, Isolate…, Make transparent… | Zoom to selection | Delete… | live | ✅ (Copy Part N after Copy here… as live; Release… and Revision history: see 13.14) |  |
+| 7.1 | Parts with colour swatch and count | features_and_parts_lists | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 7.2 | Click selects (or fills a part field in a dialog, filtered) | features_and_parts_lists | ✅ (10-27: Delete part takes the clicked row's part) | 0.4.10+ / 2d9a275c 10-27 |
+| 7.3 | Hover highlights the part in the graphics area | features_and_parts_lists | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 7.4 | Eye on hover ("Hide Part N", 20 × 20 at x 210) hides/shows the part; hidden parts greyed | features_and_parts_lists | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 7.5 | Parts list menu (live order): Rename, Properties…, Assign material…, Edit appearance… | Create Drawing of Part…, Export… | Hide, Isolate…, Make transparent… | Zoom to selection | Delete… | live | ✅ (Copy Part N after Copy here… as live; Release… and Revision history: see 13.14) | 0.4.10+ / 2d9a275c 10-27 |
 | 7.6 | Separate Parts / Surfaces / Curves sections (collapsible, eye hides a section); "Composite parts (N)" after Parts (collapsed at first, eye "Hide all composite parts", row tooltip "Composite part 1 (open\|closed) (N parts)"; closed: members leave Parts, stay drawn and selectable) | features_and_parts_lists, live part-studio/470–474 | ✅ |  |
 | 7.7 | Show parts list properties (part number, revision) from the section header menu | features_and_parts_lists | 🔧 |  |
 
