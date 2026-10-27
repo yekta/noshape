@@ -7,6 +7,7 @@ mod coverage;
 mod crop_fixtures;
 mod derived_mirror;
 mod drawing_drawn_by;
+mod dx_perf;
 mod e2e;
 mod hidden_edges;
 mod live;

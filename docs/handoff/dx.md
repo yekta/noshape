@@ -105,6 +105,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Live answered the derived colour question: the target's next default colour unless the source part's appearance is
   explicit (then carried); ours now does both.
 
+## Speed (PLAN 2.7: ≥ 2× faster than live; crates/ops/tests/dx_perf.rs, `--ignored --nocapture`)
+- Drawing of the qa5 bracket with the 4 standard views (drawing_create, Suggested views: every view computed):
+  **178 ms** median of 5 (first 360 ms), dev build, 10-27 14:15; one more Front view 13 ms. Live: pending
+  (REQUESTS dx 10-27 P1 speed). Release number: next perf.yml `model` run.
+- NIST assembly import, STEP / Parasolid (live's own exports, to go in tests/perf/): pending live's files.
+
 ## Next (in order, after landing)
 0. Import numbers: the remaining ✗ rows of docs/parity/workflow-import-matrix.md (g50 F8 / F19, McMaster helix) and
    I1 (x_t blend trims). (Configurations C1–C8, Derived DER1–14, Variable Studio VS1–4: all closed in the docs.)
