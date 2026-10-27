@@ -2813,11 +2813,11 @@ impl AssemblyEvaluator {
                     let leaves_ref = &leaves;
                     let stored_ref = &stored;
                     // A "-Mirrored" Part Studio's parts are their source's
-                    // mirrored in its YZ plane.
+                    // mirrored in its XY plane (live).
                     let mirrored_tabs: Vec<_> = mirrored_studios.iter().map(|(_, m)| *m).collect();
                     let reflection_of = move |id: InstanceId| match asm.instance(id).map(|i| &i.source) {
                         Some(InstanceSource::MirroredPart { point, normal, .. }) => Some((DVec3::from(*point), DVec3::from(*normal))),
-                        Some(InstanceSource::Part { studio, .. }) if mirrored_tabs.contains(studio) => Some((DVec3::ZERO, DVec3::X)),
+                        Some(InstanceSource::Part { studio, .. }) if mirrored_tabs.contains(studio) => Some((DVec3::ZERO, DVec3::Z)),
                         _ => None,
                     };
                     Box::new(move |_, seed, copy| {

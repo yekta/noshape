@@ -19,16 +19,20 @@ fn derived_mirror_studio_mirrors_the_source_parts() {
     assert_eq!(r.context.bodies.iter().map(|b| b.id.clone()).collect::<Vec<_>>(), ids);
     let (a, b) = (&source.context.bodies[0], &r.context.bodies[0]);
     assert_eq!(b.name, format!("{}-Mirrored", a.name));
-    // Mirrored in the source's YZ plane: the same volume, x bounds negated.
+    // Mirrored in the source's XY plane (live: z 0..40 -> -40..0): the same
+    // volume, z bounds negated, x and y kept.
     assert!((a.shape.volume().unwrap() - b.shape.volume().unwrap()).abs() < 1e-12);
     let (ba, bb) = (a.shape.bounding_box(false).unwrap(), b.shape.bounding_box(false).unwrap());
-    assert!((ba.min.x + bb.max.x).abs() < 1e-7 && (ba.max.x + bb.min.x).abs() < 1e-7, "{ba:?} {bb:?}");
+    assert!((ba.min.z + bb.max.z).abs() < 1e-7 && (ba.max.z + bb.min.z).abs() < 1e-7, "{ba:?} {bb:?}");
+    assert!((ba.min.x - bb.min.x).abs() < 1e-7 && (ba.max.y - bb.max.y).abs() < 1e-7, "{ba:?} {bb:?}");
 }
 
 /// The assembly's Derived copy (the "-Mirrored" part, its reflection
-/// completed in the source's YZ plane) is the true mirror image of the seed:
+/// completed in the source's XY plane) is the true mirror image of the seed:
 /// its world centre of mass is the seed's reflected (the plate's holes are
-/// off-centre, so a rigid copy would differ).
+/// off-centre, so a rigid copy would differ), with live's transform: the
+/// seed's turned 180 degrees about Y and mirrored in the plane (live: plane
+/// x = 50, seed at identity -> diag(-1, 1, -1), (100, 0, 0) mm).
 #[test]
 fn derived_copy_is_the_mirror_image() {
     use noshape_model::assembly::eval::SolveOptions;
@@ -76,4 +80,9 @@ fn derived_copy_is_the_mirror_image() {
     };
     let (a, b) = (center(InstanceId(1)), center(created[0]));
     assert!((b - glam::DVec3::new(-a.x, a.y, a.z)).length() < 1e-7, "seed {a:?} copy {b:?}");
+    let p = res.solved.placement(created[0]).unwrap();
+    let t = glam::DVec3::from(p.translation);
+    let r = glam::DQuat::from_array(p.rotation);
+    assert!((t - glam::DVec3::new(-0.1, 0.02, 0.0)).length() < 1e-9, "{t:?}");
+    assert!(r.angle_between(glam::DQuat::from_rotation_y(std::f64::consts::PI)) < 1e-9, "{r:?}");
 }
