@@ -45,13 +45,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   the Open dialog's failures show it); app's image menu and Mirror dialog call the shared ops functions. Removed the
   stale MENUS line sk-dim-tol (skasm's 4c58bbd4 dropped that menu item; coverage:: failed on main).
 
-- (this commit) P0 TWO-PROCESS-LOST-EDIT: a Session remembers the microversion its document was read from; when
+- fad02aa1 P0 TWO-PROCESS-LOST-EDIT: a Session remembers the microversion its document was read from; when
   another process moved the head, a commit merges this edit's names three-way onto it (tabs feature by feature,
   noshape_model::merge) and reloads, so neither writer loses an edit (live: one workspace, writers append). Test
   session::tests::two_writers_of_one_file_keep_both_edits. Left: (a) two writers changing different fields of the
   *same* feature: merge_part_studio keeps ours for a feature changed on both sides (core's merge.rs could merge the
-  feature's params field by field); (b) live shows B's edit in A's open tab within seconds; the app only picks it up at
-  A's next edit (needs a file watch / head poll in the app).
+  feature's params field by field); (b) live shows B's edit in A's open tab within seconds: `Session::sync_external()`
+  (ops, this commit) loads a head another process moved; the app has to poll it (request to the lead below).
 
 ## Next (in order, after landing)
 1. Audit leftovers: Part Studio "Move configuration input" (config input order outside Variable Studios), "Move
@@ -65,6 +65,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- App-core (doc_model.rs is in your move): TWO-PROCESS-LOST-EDIT's live half. A ~1.5 s timer per open document:
+  `if !self.has_pending() && self.session.sync_external()? { self.reloaded(cx) }` (one SQLite query when nothing
+  changed). Then the other window of the same file shows each edit within seconds, as live; edits were already
+  merged instead of lost (fad02aa1).
 - App (after the app split): crates/app/src/part_studio/sheet_metal_panel.rs has the same logic as the new
   `noshape_ops::sheetmetal` (joint_rows, joint_edit_index, insert_joint_edit, bend_faces, bend_row_order, plain, the
   Radius / K factor edit, Convert to rip, Move up / down); its handlers should call that module (dx can do it once the

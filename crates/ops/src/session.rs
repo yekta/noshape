@@ -421,6 +421,22 @@ impl Session {
         Ok(any)
     }
 
+    /// Another process committed to this branch (the file open in a second
+    /// window, an agent writing it): load its head, as live shows another
+    /// writer's edit in an open tab within seconds. True when `doc` changed.
+    /// Nothing while viewing history. Cheap (one query): the app polls it.
+    pub fn sync_external(&mut self) -> Result<bool> {
+        if self.viewing.is_some() {
+            return Ok(false);
+        }
+        let head = self.head()?;
+        if head == self.seen {
+            return Ok(false);
+        }
+        self.reload(head)?;
+        Ok(true)
+    }
+
     fn reload(&mut self, mv: MicroversionId) -> Result<()> {
         self.doc = Document::from_blobs(&self.store.read_all(mv)?)?;
         self.seen = mv;
@@ -801,6 +817,10 @@ mod tests {
         .unwrap();
         let both = |ps: &noshape_model::partstudio::PartStudio| ps.features[0].suppressed && ps.features[1].name == "Renamed in B";
         assert!(both(&studio(&b)), "B shows A's edit after its own");
+        // A picks B's edit up without editing (the app polls).
+        assert!(!studio(&a).features[1].name.starts_with("Renamed"));
+        assert!(a.sync_external().unwrap() && both(&studio(&a)));
+        assert!(!a.sync_external().unwrap(), "nothing new");
         // A's next edit keeps B's too (a tab added: the whole document is written).
         a.edit_document("Insert tab", |d| d.add_tab("Part Studio 2", TabContent::PartStudio(Default::default()))).unwrap();
         assert!(both(&studio(&a)));
