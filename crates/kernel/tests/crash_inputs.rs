@@ -70,6 +70,9 @@ fn replay(name: &str) -> String {
     }
 }
 
+// fillet-blend-segv returns only through the crash guard, which is POSIX-only (signals); on Windows it still
+// kills the process (ticket WIN-CRASH-GUARD).
+#[cfg(unix)]
 #[test]
 fn crashing_kernel_inputs_return() {
     let _ = set_working_scale(1000.0);
