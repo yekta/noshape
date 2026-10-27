@@ -816,7 +816,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   while the releases are v0.4.7 / v0.4.8: the workspace `version` in Cargo.toml was never bumped; the daily release cut
   should bump it (lead's release script) (qa 2026-10-26, build 4d2f6b0c)
 - [x] (dx c63d2bf5: bound 1e-4, live's spline bands are ±0.1 %) P2 `kernel/tests/export::rhino_breps_are_valid` red on Windows 10-26 (sphere volume 4e-5 off).
-- [ ] P3 FLAT-FORM-STYLES (dx 10-27, live spec behaviours "dx (2026-10-27, P3) flat pattern line styles in a drawing"):
+- [ ] (dx 10-27: forms done: the flat pattern knows a form's direction (FlatForm.up, native and std routes) and a drawing's flat view draws up forms in Form up's style (Center), down ones only with hidden lines in Form down's; left: the counterbore / countersink heads) P3 FLAT-FORM-STYLES (dx 10-27, live spec behaviours "dx (2026-10-27, P3) flat pattern line styles in a drawing"):
   a drawing's flat pattern view draws "up" features always and "down" ones only with Show hidden lines, each in its
   Drawing properties › Flat pattern views row: a counterbore / countersink from the top = the hole and its Ø head as
   two solid circles (Counterbore/Countersink up); from the bottom = the hole only, its head with hidden lines shown

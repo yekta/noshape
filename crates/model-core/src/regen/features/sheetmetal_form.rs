@@ -177,7 +177,7 @@ pub fn form(ev: &mut EvalCtx) -> FResult<()> {
             .filter(|f| f.count(noshape_kernel::ShapeType::Face) > 0)
             .and_then(|f| f.translated(-ref_n * (mid.origin - ref_origin).dot(ref_n)).ok());
         let center = o - ref_n * (o - ref_origin).dot(ref_n);
-        data.marks.push(FlatMark { feature, wall, kind: FlatMarkKind::Form, loops, origin: Some(center), fill });
+        data.marks.push(FlatMark { feature, wall, kind: FlatMarkKind::Form, loops, origin: Some(center), fill, direction: Some(z) });
         put_data(ev, bi, data);
         placed += 1;
     }
@@ -287,7 +287,7 @@ pub fn corner(ev: &mut EvalCtx) -> FResult<()> {
     ev.replace_body(bi, shape, names);
     let loop3: Vec<DVec3> = outline.iter().map(|q| center + ex * q.x + ey * q.y).collect();
     let cut = k::make_face_2d(&k::Plane::new(center, n, ex), &segs, &[]).ok();
-    data.marks.push(FlatMark { feature, wall: b1.parent, kind: FlatMarkKind::Cut, loops: vec![loop3], origin: Some(center), fill: cut });
+    data.marks.push(FlatMark { feature, wall: b1.parent, kind: FlatMarkKind::Cut, loops: vec![loop3], origin: Some(center), fill: cut, direction: None });
     put_data(ev, bi, data);
     Ok(())
 }

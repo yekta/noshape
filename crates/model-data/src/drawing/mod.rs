@@ -2889,7 +2889,8 @@ pub struct ViewTabProps {
     /// Flat pattern views › All bend lines' and Bend tangent edges' pens
     /// (colours above), Form centermarks' line style (0 Solid, 1 Dashed,
     /// 2 Center) and colour; Counterbore / Countersink up / down, Form
-    /// tear / up / down styles and colours (stored: not drawn yet).
+    /// tear / up / down styles and colours (Form up / down drawn; the
+    /// counterbore / countersink rows wait for hole heads in the flat).
     pub bend_lines_thickness: f64,
     pub bend_tangent_thickness: f64,
     pub form_centermark_line: u8,

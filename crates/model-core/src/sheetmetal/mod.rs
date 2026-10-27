@@ -199,6 +199,9 @@ pub struct FlatMark {
     pub origin: Option<DVec3>,
     /// Exact planar region filled in the flat (form footprint), if any.
     pub fill: Option<noshape_kernel::Shape>,
+    /// A form's direction (its tools stand out along it), folded
+    /// coordinates: the flat pattern tells up from down with it.
+    pub direction: Option<DVec3>,
 }
 
 impl FlatMark {

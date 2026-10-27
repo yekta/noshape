@@ -1606,6 +1606,28 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     pen_lines(&mut g, bend, &super::PenProps::new(vt.bend_lines_thickness));
                 }
             }
+            // Forms (live "dx (2026-10-27, P3) flat pattern line styles"): an
+            // up form always, in Flat pattern views › Form up's style (Center
+            // by default); a down form only with hidden lines shown, in Form
+            // down's.
+            for (pts, up) in &geo.flat_forms {
+                if !up && v.style != RenderStyle::HiddenLinesVisible {
+                    continue;
+                }
+                let (kind, color) = vt.flat_lines.get(if *up { 3 } else { 4 }).copied().unwrap_or((2, None));
+                let style = match kind {
+                    0 => LineStyle::Visible,
+                    1 => LineStyle::Hidden,
+                    _ => LineStyle::Centerline,
+                };
+                let mark = g.mark();
+                for piece in map_polyline(&pl, pts) {
+                    g.lines.push(Polyline2 { points: piece, style, closed: false, pick: view_pick });
+                }
+                if let Some(c) = color {
+                    g.color_since(mark, c);
+                }
+            }
             if !v.hide_bend_notes && !geo.bends.is_empty() {
                 let ts = drawing.props.ann_type(super::sheet::AnnType::BendNotes);
                 let th = ts.height.unwrap_or(drawing.props.ann_text_height);

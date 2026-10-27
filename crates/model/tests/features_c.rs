@@ -351,6 +351,11 @@ fn form_adds_and_cuts_and_shows_in_flat() {
         let r_avg = l.iter().map(|p| (*p - f.center).length()).sum::<f64>() / l.len() as f64;
         assert!(near(r_avg, mm(5.0), 1e-5), "outline radius {r_avg}");
     }
+    // Both stand out along +z: "up" when the flat is seen from +z (a
+    // drawing's flat view draws up forms always, down ones with hidden lines).
+    for f in &fp.forms {
+        assert_eq!(f.up, fp.frame.normal.z > 0.0, "form direction vs the flat's viewing side {:?}", fp.frame.normal);
+    }
     let g = fp.to_sheet_geometry();
     assert!(g.lines.iter().any(|l| l.style == noshape_model::drawing::sheet::LineStyle::Centerline));
     // Untagged studio: no form tools (std derive finds no Tag-marked parts).

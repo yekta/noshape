@@ -30,6 +30,9 @@ pub struct FlatBendLine {
 pub struct FlatForm {
     pub loops: Vec<Vec<DVec2>>,
     pub center: DVec2,
+    /// It stands out toward the viewer (the flat's reference side): live
+    /// draws "up" forms always, "down" ones with hidden lines only.
+    pub up: bool,
 }
 
 /// The unfolded part: outline loops and bend lines in the flat plane.
@@ -348,7 +351,8 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
                     pieces.extend(f.faces());
                 }
                 let center = mk.center().map(|c| frame.to_local(m.transform_point3(c))).unwrap_or_default();
-                forms.push(FlatForm { loops: loops3.iter().map(|l| l.iter().map(|p| frame.to_local(*p)).collect()).collect(), center });
+                let up = mk.direction.is_none_or(|d| m.transform_vector3(d).dot(frame.normal) > 0.0);
+                forms.push(FlatForm { loops: loops3.iter().map(|l| l.iter().map(|p| frame.to_local(*p)).collect()).collect(), center, up });
             }
             super::FlatMarkKind::Cut => cuts.extend(face),
         }

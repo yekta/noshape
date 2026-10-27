@@ -928,6 +928,9 @@ pub struct ViewGeometry {
     /// radius (view coordinates).
     pub threads: Vec<([f64; 2], f64)>,
     pub form_marks: Vec<[f64; 2]>,
+    /// Flat pattern views: form outlines (closed, view coordinates) and
+    /// whether the form points up (toward the viewer).
+    pub flat_forms: Vec<(Vec<[f64; 2]>, bool)>,
     /// Free points of the sketches drawn in the view.
     pub sketch_points: Vec<[f64; 2]>,
     /// Crop boundary of a cropped view (view coordinates).
@@ -2811,7 +2814,7 @@ fn flat_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewF
         for l in f.loops.iter().filter(|l| l.len() >= 2) {
             let mut pts: Vec<[f64; 2]> = l.iter().map(|p| pt(*p)).collect();
             pts.push(pts[0]);
-            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None, sketch: SketchEdge::None });
+            g.flat_forms.push((pts, f.up));
         }
         g.form_marks.push(pt(f.center));
         g.snaps.push(Snap { p: pt(f.center), kind: SnapKind::Center, point: None });

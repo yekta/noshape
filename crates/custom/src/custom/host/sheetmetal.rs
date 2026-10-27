@@ -1525,9 +1525,13 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
         }
         let Some(first) = loops.first() else { continue };
         let center = first.iter().copied().sum::<DVec3>() / first.len() as f64;
+        // Up: the tools stand out of the wall toward the flat's viewer (+z).
+        let side = tools.bounding_box(false).map(|b| ((b.min + b.max) * 0.5 - o).dot(n)).unwrap_or(1.0);
+        let up = m.transform_vector3(n * side.signum()).z > 0.0;
         flat_forms.push(crate::sheetmetal::flat::FlatForm {
             loops: loops.iter().map(|l| l.iter().map(|p| frame.to_local(m.transform_point3(*p))).collect()).collect(),
             center: frame.to_local(m.transform_point3(center)),
+            up,
         });
     }
     let mut lines = Vec::new();
