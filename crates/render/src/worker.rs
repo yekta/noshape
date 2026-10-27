@@ -34,8 +34,30 @@ pub fn release_prewarm() {
     PREWARM_RELEASED.store(true, Ordering::Relaxed);
 }
 
+/// `NOSHAPE_PREWARM=early` (a startup experiment for the perf runs): compile at once instead of after the first
+/// window draw, on low-priority threads ([`low_priority_compile`]) so the window's own work comes first.
+pub fn prewarm_early() -> bool {
+    static EARLY: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *EARLY.get_or_init(|| std::env::var("NOSHAPE_PREWARM").is_ok_and(|v| v == "early"))
+}
+
+/// macOS: run this thread's work (and the Metal compiler work it asks for) at utility priority.
+pub fn low_priority_compile() {
+    #[cfg(target_os = "macos")]
+    {
+        unsafe extern "C" {
+            fn pthread_set_qos_class_self_np(qos_class: u32, relative_priority: i32) -> i32;
+        }
+        const QOS_CLASS_UTILITY: u32 = 0x11;
+        // SAFETY: sets the calling thread's own QoS class; no memory is involved.
+        unsafe {
+            pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+        }
+    }
+}
+
 fn wait_for_prewarm() {
-    if !PREWARM_HELD.load(Ordering::Relaxed) {
+    if !PREWARM_HELD.load(Ordering::Relaxed) || prewarm_early() {
         return;
     }
     let deadline = Instant::now() + PREWARM_MAX_HOLD;

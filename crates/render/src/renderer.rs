@@ -1533,10 +1533,16 @@ struct PipelineMaker {
     main: wgpu::PipelineLayout,
     image: wgpu::PipelineLayout,
     cap: wgpu::PipelineLayout,
+    /// Compile at utility priority (the first-frame pipelines under `NOSHAPE_PREWARM=early`; each runs on a
+    /// thread of its own).
+    early: bool,
 }
 
 impl PipelineMaker {
     fn make(&self, layout: LayoutKind, p: P, x: Extra) -> wgpu::RenderPipeline {
+        if self.early {
+            crate::worker::low_priority_compile();
+        }
         let sh = &self.shader;
         self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(p.label),
@@ -2255,6 +2261,7 @@ impl Renderer {
             main: self.pipeline_layout.clone(),
             image: self.image_pipeline_layout.clone(),
             cap: self.cap_pipeline_layout.clone(),
+            early: false,
         };
         let mask_format = self.section_caps.mask_format;
         let ge = wgpu::CompareFunction::GreaterEqual;
@@ -2267,22 +2274,23 @@ impl Renderer {
         // The first frame's pipelines, compiled in parallel (one thread
         // each): a fresh install compiles every shader (1.6 s on the macOS 14
         // runners one by one, 4.3 s on 15).
+        let first = PipelineMaker { early: crate::worker::prewarm_early(), ..m.clone() };
         let (background, mesh_opaque, mesh_solid, mesh_transparent, line, mesh_backsil, silhouette, point) = std::thread::scope(|s| {
-            let background = s.spawn(|| m.make(LayoutKind::Main, P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }, PLAIN));
-            let mesh_opaque = s.spawn(|| m.make(LayoutKind::Main, P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN));
-            let mesh_solid = s.spawn(|| m.make(LayoutKind::Main, P { label: "mesh-solid", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN));
+            let background = s.spawn(|| first.make(LayoutKind::Main, P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }, PLAIN));
+            let mesh_opaque = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN));
+            let mesh_solid = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-solid", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN));
             // Strictly in front: a transparent plane coplanar with a sketch
             // image (drawn just before, without bias) doesn't veil it. Opaque
             // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
-            let mesh_transparent = s.spawn(|| m.make(LayoutKind::Main, P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, PLAIN));
+            let mesh_transparent = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, PLAIN));
             // Lines test depth but don't write it: the ambient occlusion pass reads the depth buffer, and a highlight
             // band brought toward the eye left a step there that it shaded as a crease, a noisy shadow along a
             // hovered edge (EDGE-HIGHLIGHT-LOOK; live has none).
-            let line = s.spawn(|| m.make(LayoutKind::Main, P { label: "line", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
+            let line = s.spawn(|| first.make(LayoutKind::Main, P { label: "line", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
             // Front faces culled, like Onshape's pass (`setOverrideFaceCullingMode(FRONT)`).
-            let mesh_backsil = s.spawn(|| m.make(LayoutKind::Main, P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) }));
-            let silhouette = s.spawn(|| m.make(LayoutKind::Main, P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: SILHOUETTE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
-            let point = s.spawn(|| m.make(LayoutKind::Main, P { label: "point", vs: "vs_point", fs: "fs_point", buffers: POINT_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: msaa }, PLAIN));
+            let mesh_backsil = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) }));
+            let silhouette = s.spawn(|| first.make(LayoutKind::Main, P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: SILHOUETTE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
+            let point = s.spawn(|| first.make(LayoutKind::Main, P { label: "point", vs: "vs_point", fs: "fs_point", buffers: POINT_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: msaa }, PLAIN));
             let join = |h: std::thread::ScopedJoinHandle<wgpu::RenderPipeline>| h.join().expect("pipeline compile thread");
             (join(background), join(mesh_opaque), join(mesh_solid), join(mesh_transparent), join(line), join(mesh_backsil), join(silhouette), join(point))
         });
