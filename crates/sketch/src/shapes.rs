@@ -6,7 +6,7 @@ use crate::ids::{ConstraintId, EntityId};
 use crate::sketch::{Result, Sketch, SketchError};
 use glam::DVec2;
 use serde::{Deserialize, Serialize};
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::PI;
 
 /// Entities and constraints created by a shape tool.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -127,41 +127,64 @@ impl Sketch {
         Ok(out)
     }
 
-    /// Regular polygon with `n` sides. `inscribed`: `vertex` is a polygon
-    /// vertex (vertices on the construction circle); otherwise `vertex` is an
-    /// edge midpoint (polygon circumscribed about the construction circle).
-    pub fn polygon(&mut self, center: DVec2, vertex: DVec2, n: usize, inscribed: bool) -> Result<ShapeIds> {
+    /// Regular polygon with `n` sides, as live Onshape builds it (behaviours
+    /// "skasm (2026-10-26) Sketch polygon commits"): a construction circle
+    /// about the centre, one seed edge at the click and a circular pattern
+    /// of it about the circle's centre (each copy's ends linked to the
+    /// seed's; the first copy's start Coincident with the seed's end, the
+    /// pattern holds the other joints). `on_vertex` (Circumscribed polygon):
+    /// `click` is a vertex, the seed ends there and lies on the circle.
+    /// Otherwise (Inscribed polygon) `click` is the middle of the seed, a
+    /// construction point there is its Midpoint and the circle is Tangent to
+    /// it. `points[0]` is the point at the click, the last the centre.
+    pub fn polygon(&mut self, center: DVec2, click: DVec2, n: usize, on_vertex: bool) -> Result<ShapeIds> {
         if n < 3 {
             return Err(SketchError::InvalidGeometry("polygon needs at least 3 sides".into()));
         }
-        let r0 = (vertex - center).length();
-        if r0 < 1e-12 {
+        let r = (click - center).length();
+        if r < 1e-12 {
             return Err(SketchError::InvalidGeometry("degenerate polygon".into()));
         }
-        let a0 = (vertex - center).to_angle();
-        let (big_r, start) = if inscribed { (r0, a0) } else { (r0 / (PI / n as f64).cos(), a0 - PI / n as f64) };
+        let a0 = (click - center).to_angle();
+        let half = PI / n as f64;
+        // The seed runs counter-clockwise: ending at the clicked vertex, or through the click.
+        let (s0, s1) = if on_vertex {
+            (center + DVec2::from_angle(a0 - 2.0 * half) * r, click)
+        } else {
+            let big_r = r / half.cos();
+            (center + DVec2::from_angle(a0 - half) * big_r, center + DVec2::from_angle(a0 + half) * big_r)
+        };
         let cp = self.add_point(center);
-        let pts: Vec<EntityId> = (0..n)
-            .map(|k| self.add_point(center + DVec2::from_angle(start + TAU * k as f64 / n as f64) * big_r))
-            .collect();
-        let l = self.closed_polyline(&pts);
-        let mut out = ShapeIds { points: pts.clone(), curves: l.clone(), ..Default::default() };
-        out.points.push(cp);
-        let outer = self.add_circle_at(cp, big_r)?;
-        self.set_construction(outer, true)?;
-        out.construction.push(outer);
-        for p in &pts {
-            self.c(&mut out, ConstraintKind::Coincident { a: *p, b: outer });
-        }
+        let circle = self.add_circle_at(cp, r)?;
+        self.set_construction(circle, true)?;
+        let (p0, p1) = (self.add_point(s0), self.add_point(s1));
+        let seed = self.add_line_between(p0, p1)?;
+        let mut out = ShapeIds { curves: vec![seed], construction: vec![circle], ..Default::default() };
+        let mut corners = vec![p0, p1];
         for k in 1..n {
-            self.c(&mut out, ConstraintKind::Equal { a: l[0], b: l[k] });
+            let angle = 2.0 * half * k as f64;
+            let turn = |p: DVec2| center + DVec2::from_angle(angle).rotate(p - center);
+            let (q0, q1) = (self.add_point(turn(s0)), self.add_point(turn(s1)));
+            out.curves.push(self.add_line_between(q0, q1)?);
+            self.c(&mut out, ConstraintKind::CircularPatternLink { seed: p0, inst: q0, center: cp, angle });
+            self.c(&mut out, ConstraintKind::CircularPatternLink { seed: p1, inst: q1, center: cp, angle });
+            if k == 1 {
+                self.c(&mut out, ConstraintKind::Coincident { a: q0, b: p1 });
+            }
+            corners.extend([q0, q1]);
         }
-        if !inscribed {
-            let inner = self.add_circle_at(cp, r0)?;
-            self.set_construction(inner, true)?;
-            out.construction.push(inner);
-            self.c(&mut out, ConstraintKind::Tangent { a: l[0], b: inner });
-        }
+        let at_click = if on_vertex {
+            self.c(&mut out, ConstraintKind::Coincident { a: p1, b: circle });
+            p1
+        } else {
+            let m = self.add_point(click);
+            self.set_construction(m, true)?;
+            out.construction.push(m);
+            self.c(&mut out, ConstraintKind::Tangent { a: seed, b: circle });
+            self.c(&mut out, ConstraintKind::Midpoint { point: m, curve: seed });
+            m
+        };
+        out.points = std::iter::once(at_click).chain(corners.into_iter().filter(|p| *p != at_click)).chain(std::iter::once(cp)).collect();
         Ok(out)
     }
 

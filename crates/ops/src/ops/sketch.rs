@@ -40,8 +40,8 @@ const DRAW_TOOLS: [(&str, Tool, &str); 19] = [
     ("bezier", Tool::Bezier, "Bezier through control points."),
     ("conic", Tool::Conic, "[start, end, control]."),
     ("slot", Tool::Slot, "Click on an existing line/arc (its centerline), then a point setting the width."),
-    ("inscribed_polygon", Tool::Polygon, "[center, vertex]; `sides` sets the number of sides (default 6)."),
-    ("circumscribed_polygon", Tool::CircumPolygon, "[center, edge midpoint]; `sides` as above."),
+    ("inscribed_polygon", Tool::Polygon, "[center, the middle of an edge] (the construction circle touches the edges); `sides` sets the number of sides (default 6)."),
+    ("circumscribed_polygon", Tool::CircumPolygon, "[center, vertex] (the construction circle goes through the vertices); `sides` as above."),
     ("ellipse", Tool::Ellipse, "[center, major axis end, point setting the minor radius]."),
     ("elliptical_arc", Tool::EllipticalArc, "[center, major axis end, start point (also sets the minor radius), end point] (counter-clockwise)."),
 ];

@@ -1396,14 +1396,22 @@ impl SketchEditor {
     }
 
     /// Polygon waiting for its side count (circumference locked).
+    /// Live (skasm 10-26): the Circumscribed polygon's second click is a
+    /// vertex (the construction circle through the vertices); the Inscribed
+    /// polygon's is an edge midpoint (the circle tangent to the edges).
+    fn polygon_on_vertex(&self) -> bool {
+        self.tool == Tool::CircumPolygon
+    }
+
     pub fn polygon_sides_pending(&self) -> bool {
         matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) && self.clicks.len() == 2
     }
 
-    /// The side-count spinner "◀ 6 ▶" (live sketch/91): 24 px outside the
-    /// middle of the edge after the clicked vertex, laid along that edge's
-    /// outward normal (◀ inward, ▶ outward; measured: the ◀ / ▶ axis is
-    /// perpendicular to the edge); (centre, outward direction, sides).
+    /// The side-count spinner "◀ 6 ▶": 24 px outside the middle of an edge,
+    /// laid along that edge's outward normal (◀ inward, ▶ outward; measured:
+    /// the ◀ / ▶ axis is perpendicular to the edge); (centre, outward
+    /// direction, sides). Inscribed: the clicked edge (live sketch/91 and
+    /// skasm 10-26); circumscribed: the edge after the clicked vertex.
     pub fn polygon_side_control(&self) -> Option<(DVec2, DVec2, usize)> {
         if !self.polygon_sides_pending() {
             return None;
@@ -1412,11 +1420,7 @@ impl SketchEditor {
         let n = self.polygon_sides.clamp(3, 50) as f64;
         let r = (rim - c).length();
         let start = (rim - c).to_angle();
-        // Inscribed: the vertex is on the click; circumscribed: the edge midpoint.
-        let (rv, off) = if self.tool == Tool::Polygon { (r, 0.0) } else { (r / (PI / n).cos(), PI / n) };
-        let v0 = c + DVec2::from_angle(start + off) * rv;
-        let v1 = c + DVec2::from_angle(start + off + TAU / n) * rv;
-        let mid = (v0 + v1) * 0.5;
+        let mid = if self.polygon_on_vertex() { (c + DVec2::from_angle(start) * r + c + DVec2::from_angle(start + TAU / n) * r) * 0.5 } else { rim };
         let out = (mid - c).try_normalize().unwrap_or(DVec2::Y);
         Some((mid + out * self.world_per_px * POLYGON_SPINNER_PX, out, self.polygon_sides))
     }
@@ -1833,7 +1837,9 @@ impl SketchEditor {
                     if let Some(kind) = make_constraint(&data.sketch, c, &ids)
                         && data.sketch.add_constraint(kind).is_ok()
                     {
-                        solve_after_constraint(&mut data.sketch, c, &ids);
+                        if !solve_after_constraint(&mut data.sketch, c, &ids) {
+                            self.toast = Some(SKETCH_NOT_SOLVED.into());
+                        }
                         return EditOutcome::changed();
                     }
                 }
@@ -2311,7 +2317,11 @@ impl SketchEditor {
         let sk = &mut data.sketch;
         match self.tool {
             Tool::Point => {
-                let (pid, autos) = Self::point_for(sk, &click);
+                // Always a new point: on an existing point (the Origin too)
+                // it is Coincident with it (live, behaviours "dx (2026-10-26,
+                // for skasm) Point tool on the Origin").
+                let pid = sk.add_point(click.pos);
+                let autos = click.inference.as_ref().map(|i| i.constraints.clone()).unwrap_or_default();
                 Self::apply_auto(sk, pid, None, &autos);
                 self.finish_create(data, &[pid]);
                 EditOutcome::changed()
@@ -2658,23 +2668,15 @@ impl SketchEditor {
                 let next_center = ((click.pos - rim.pos).length() > self.world_per_px * 9.0).then_some(click);
                 let sides = self.polygon_sides.clamp(3, 50);
                 self.polygon_typed.clear();
-                match sk.polygon(c.pos, rim.pos, sides, self.tool == Tool::Polygon) {
+                match sk.polygon(c.pos, rim.pos, sides, self.polygon_on_vertex()) {
                     Ok(ids) => {
                         if let Some(&cp) = ids.points.last() {
                             attach(sk, cp, None, &c);
                         }
-                        let drawn = (rim.pos - c.pos).length();
-                        let circle = ids.construction.iter().copied().min_by(|x, y| {
-                            let r = |e: EntityId| match sk.curve(e) {
-                                Some(Curve2::Circle { radius, .. }) => (radius - drawn).abs(),
-                                _ => f64::INFINITY,
-                            };
-                            r(*x).total_cmp(&r(*y))
-                        });
+                        // The click's inferences (live: Horizontal with the centre) go to its point.
+                        attach(sk, ids.points[0], None, &rim);
+                        // Live makes no dimension (its boxed Ø is a readout).
                         self.finish_create(data, &ids.curves);
-                        if let Some(circle) = circle {
-                            self.set_otf(data, vec![diameter_field(&data.sketch, circle, self.world_per_px)]);
-                        }
                         if let Some(center) = next_center {
                             self.clicks.push(center);
                         }
@@ -4102,7 +4104,24 @@ impl SketchEditor {
     pub fn paste_clipboard(&mut self, data: &mut SketchData, text: &str) -> bool {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return false };
         let Some(clip) = v.get("noshape_sketch_entities").and_then(|c| serde_json::from_value::<Sketch>(c.clone()).ok()) else { return false };
-        self.paste_entities(data, &clip, DVec2::ZERO)
+        // Live (behaviours "qa (2026-10-26, P2 sketch) Copy/paste inside a
+        // sketch"): the copy lands centred on the pointer, selected, with
+        // the Transform tool on it, and nothing is said.
+        let b = clip.bbox();
+        let offset = match self.cursor {
+            Some(c) if !b.is_empty() => c - b.center(),
+            _ => DVec2::ZERO,
+        };
+        if !self.paste_entities(data, &clip, offset) {
+            return false;
+        }
+        let pasted = std::mem::take(&mut self.selection);
+        if self.tool != Tool::Transform {
+            self.set_tool(Tool::Transform);
+        }
+        self.selection = pasted;
+        self.message = None;
+        true
     }
 
     /// Paste sketch entities (copied with [`Sketch::extract`]) moved by
@@ -4114,7 +4133,6 @@ impl SketchEditor {
         }
         data.sketch.solve();
         self.selection = created;
-        self.message = Some("Pasted; drag or transform the selection into place".into());
         true
     }
 
@@ -4220,7 +4238,9 @@ impl SketchEditor {
         if !self.selection.is_empty() && constraint_applicable(&data.sketch, c, &self.selection) {
             match apply_constraint(&mut data.sketch, c, &self.selection) {
                 Ok(n) if n > 0 => {
-                    solve_after_constraint(&mut data.sketch, c, &self.selection);
+                    if !solve_after_constraint(&mut data.sketch, c, &self.selection) {
+                        self.toast = Some(SKETCH_NOT_SOLVED.into());
+                    }
                     self.selection.clear();
                     return true;
                 }
@@ -4491,10 +4511,14 @@ impl SketchEditor {
                         let r = (c - *a).length();
                         let n = self.polygon_sides.clamp(3, 50);
                         let start = (c - *a).to_angle();
-                        // Inscribed: vertices on the circle; circumscribed: edge midpoints on it.
-                        let (rv, off) = if self.tool == Tool::Polygon { (r, 0.0) } else { (r / (PI / n as f64).cos(), PI / n as f64) };
+                        // Circumscribed: vertices on the circle; inscribed: edge midpoints on it.
+                        let (rv, off) = if self.polygon_on_vertex() { (r, 0.0) } else { (r / (PI / n as f64).cos(), PI / n as f64) };
                         let pts: Vec<DVec2> = (0..=n).map(|i| *a + DVec2::from_angle(start + off + i as f64 / n as f64 * TAU) * rv).collect();
                         poly(&pts, preview_color, false);
+                        // Live (skasm 10-26): dots at the centre and every vertex.
+                        for p in std::iter::once(a).chain(&pts[..n]) {
+                            points.points.push(PointSprite { position: w(*p), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                        }
                         // Live (sketch/91): the construction circle is dash-dot.
                         dash_dot.push(circle_pts(*a, r, 72));
                     }
@@ -6157,17 +6181,22 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
 /// Solve after constraint `c` was added on `ids`. Live (qa4 round 5 v3 s6,
 /// CON-TANGENT-APPLY): Tangent between a line and a circle moves the
 /// circle and keeps its radius, so only the circle's centre takes the change.
-pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
+/// Solve after constraint `c` was added to `ids`. Live (qa4 round 5 s6 (1)):
+/// a constraint the sketch can't be solved with is kept, the shape stays as
+/// it was and Onshape says "Sketch could not be solved."; returns false then.
+pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) -> bool {
     let centers: Vec<EntityId> = if c == ConstraintTool::Tangent && ids.iter().any(|e| sk.kind(*e) == Some(EntityKind::Line)) {
         ids.iter().filter(|e| sk.kind(**e) == Some(EntityKind::Circle)).filter_map(|e| sk.entity(*e).and_then(|x| x.center())).collect()
     } else {
         Vec::new()
     };
-    if centers.is_empty() {
-        sk.solve();
-    } else {
-        sk.solve_with(&noshape_sketch::SolveOptions { light: centers, ..Default::default() });
+    let before = sk.clone();
+    let report = if centers.is_empty() { sk.solve() } else { sk.solve_with(&noshape_sketch::SolveOptions { light: centers, ..Default::default() }) };
+    if !report.is_solved() {
+        *sk = before;
+        return false;
     }
+    true
 }
 
 /// Whether constraint tool `c` takes `e` after `picks` (live: it doesn't
@@ -6425,6 +6454,37 @@ mod tests {
         assert_eq!(ed.enter_target(), EnterTarget::Nothing, "a selection");
         assert!(!ed.cancel(), "Esc with a selection does nothing");
         assert!(!ed.selection.is_empty(), "and keeps it");
+    }
+
+    /// Live (behaviours "dx (2026-10-26, for skasm) Point tool on the
+    /// Origin"): the Point tool clicked on the Origin makes a sketch point
+    /// there, Coincident with the Origin (a Hole can then use it).
+    #[test]
+    fn point_tool_on_the_origin_makes_a_point_coincident_with_it() {
+        let (mut ed, mut d) = editor(Tool::Point);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        let points: Vec<EntityId> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Point && !e.external).map(|e| e.id).collect();
+        assert_eq!(points.len(), 1, "one new sketch point");
+        assert!(d.sketch.point(points[0]).unwrap().length() < 1e-12);
+        let origin = d.sketch.entities().find(|e| e.external).map(|e| e.id).expect("the Origin stand-in");
+        assert!(d.sketch.constraints().any(|c| c.kind == ConstraintKind::Coincident { a: points[0], b: origin }), "Coincident with the Origin");
+    }
+
+    /// Live (qa4 round 5 s6 (1)): V on a Horizontal line is added anyway,
+    /// the line keeps its shape and Onshape says "Sketch could not be
+    /// solved.".
+    #[test]
+    fn vertical_on_a_horizontal_line_does_not_solve() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let a = d.sketch.add_point(v(0.0, 0.0));
+        let b = d.sketch.add_point(v(0.03, 0.0));
+        let line = d.sketch.add_line_between(a, b).unwrap();
+        d.sketch.add_constraint(ConstraintKind::Horizontal { a: line, b: None }).unwrap();
+        ed.selection = vec![line];
+        assert!(ed.constraint_command(&mut d, ConstraintTool::Vertical));
+        assert_eq!(ed.toast.as_deref(), Some(SKETCH_NOT_SOLVED));
+        assert!((d.sketch.point(a).unwrap() - v(0.0, 0.0)).length() < 1e-12 && (d.sketch.point(b).unwrap() - v(0.03, 0.0)).length() < 1e-12, "the line stays");
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { .. })), "the constraint is kept");
     }
 
     /// Live (qa5 dim conflict, SK1): a value the sketch can't be solved with
@@ -6726,12 +6786,11 @@ mod tests {
         assert_eq!(count(&data, EntityKind::Line), 0, "circumference is still a preview");
         ed.adjust_polygon_sides(1);
         assert_eq!(ed.polygon_side_control().map(|c| c.2), Some(7));
-        // Outside the middle of the edge after the clicked vertex (0.03, 0.02),
+        // Inscribed: outside the middle of the clicked edge (0.03, 0.02),
         // along its outward normal.
         let (at, out, _) = ed.polygon_side_control().unwrap();
-        let edge_mid = (v(0.03, 0.02) + v(0.02, 0.02) + DVec2::from_angle(TAU / 7.0) * 0.01) * 0.5;
-        assert!((at - v(0.02, 0.02)).length() > (edge_mid - v(0.02, 0.02)).length() && (at - edge_mid).length() < 0.003, "{at} {edge_mid}");
-        assert!((out - (edge_mid - v(0.02, 0.02)).normalize()).length() < 1e-9, "{out}");
+        assert!(at.x > 0.03 && at.x < 0.033 && (at.y - 0.02).abs() < 1e-12, "{at}");
+        assert!((out - DVec2::X).length() < 1e-9, "{out}");
         ed.pointer_move(&mut data, v(0.08, 0.06), false, false);
         assert_eq!(ed.polygon_sides, 7, "spinner's explicit value stays locked");
         click(&mut ed, &mut data, v(0.08, 0.06));
@@ -6741,6 +6800,30 @@ mod tests {
         ed.cancel();
         assert_eq!(ed.tool, Tool::Select);
         assert_eq!(count(&data, EntityKind::Line), 7, "only the new preview is discarded");
+    }
+
+    /// Live (skasm 10-26, PS "skasm poly"): the Inscribed polygon's second
+    /// click is the middle of an edge (the dash-dot circle touches the
+    /// edges), the Circumscribed polygon's a vertex (the circle through the
+    /// vertices); the Ø box is the circle's through the click.
+    #[test]
+    fn polygon_second_click_is_an_edge_middle_inscribed_and_a_vertex_circumscribed() {
+        for (tool, on_vertex) in [(Tool::Polygon, false), (Tool::CircumPolygon, true)] {
+            let (mut ed, mut data) = editor(tool);
+            click(&mut ed, &mut data, v(0.02, 0.02));
+            click(&mut ed, &mut data, v(0.03, 0.02));
+            assert!(ed.finish_polygon(&mut data).changed);
+            let rim = v(0.03, 0.02);
+            let lines: Vec<_> = data.sketch.entities().filter(|e| e.kind() == EntityKind::Line && !e.construction).map(|e| data.sketch.curve(e.id).unwrap()).collect();
+            assert_eq!(lines.len(), 6);
+            let at_vertex = lines.iter().any(|c| (c.start_point() - rim).length() < 1e-9);
+            let at_middle = lines.iter().any(|c| ((c.start_point() + c.end_point()) * 0.5 - rim).length() < 1e-9);
+            assert_eq!((at_vertex, at_middle), (on_vertex, !on_vertex), "{tool:?}");
+            assert!(ed.otf.is_none(), "live makes no Ø dimension");
+            assert!(data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::CircularPatternLink { .. })), "the edges are a circular pattern");
+            let circle = data.sketch.entities().find(|e| e.kind() == EntityKind::Circle).map(|e| data.sketch.curve(e.id).unwrap());
+            assert!(matches!(circle, Some(Curve2::Circle { radius, .. }) if (radius - 0.01).abs() < 1e-9), "{tool:?}: the circle goes through the click");
+        }
     }
 
     #[test]
@@ -7738,7 +7821,7 @@ mod tests {
         assert_eq!(ed.polygon_sides, 5);
         click(&mut ed, &mut d, v(0.031, 0.013));
         assert_eq!(count(&d, EntityKind::Line), 5);
-        assert!(ed.otf.is_some(), "diameter box");
+        assert!(ed.otf.is_none(), "no diameter box (live makes no dimension)");
         let (mut ed, mut d) = editor(Tool::MidpointLine);
         click(&mut ed, &mut d, v(0.021, 0.023));
         click(&mut ed, &mut d, v(0.031, 0.027));
@@ -7791,10 +7874,16 @@ mod tests {
         let l = d.sketch.add_line(v(0.0, 0.0), v(0.01, 0.0));
         ed.selection = vec![l];
         let clip = ed.copy_selection(&d).unwrap();
+        ed.pointer_move(&mut d, v(0.05, 0.03), false, false);
         assert!(ed.paste_clipboard(&mut d, &clip));
         assert_eq!(count(&d, EntityKind::Line), 2);
         assert_eq!(ed.selection.len(), 1);
         assert_ne!(ed.selection[0], l);
+        // Live: centred on the pointer, the Transform tool on it, no prompt.
+        let c = d.sketch.curve(ed.selection[0]).unwrap();
+        assert!(((c.start_point() + c.end_point()) * 0.5 - v(0.05, 0.03)).length() < 1e-9);
+        assert_eq!(ed.tool, Tool::Transform);
+        assert_eq!(ed.message, None);
         assert!(!ed.paste_clipboard(&mut d, "hello"));
     }
 
@@ -7816,7 +7905,7 @@ mod tests {
         assert!(!pick_fits(&sk, ConstraintTool::Tangent, &[], p));
         assert!(pick_fits(&sk, ConstraintTool::Horizontal, &[], p) && !pick_fits(&sk, ConstraintTool::Horizontal, &[p], circle));
         sk.add_constraint(ConstraintKind::Tangent { a: line, b: circle }).unwrap();
-        solve_after_constraint(&mut sk, ConstraintTool::Tangent, &[line, circle]);
+        assert!(solve_after_constraint(&mut sk, ConstraintTool::Tangent, &[line, circle]));
         let Some(Curve2::Circle { center, radius }) = sk.curve(circle) else { panic!() };
         assert!((radius - 0.004).abs() < 1e-12, "radius {radius}");
         assert!((center.y.abs() - 0.004).abs() < 1e-9, "{center:?}");

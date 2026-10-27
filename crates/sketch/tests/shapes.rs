@@ -62,16 +62,16 @@ fn rectangle_variants_dof() {
 
 #[test]
 fn polygons_and_slot() {
-    for inscribed in [true, false] {
+    for on_vertex in [true, false] {
         for n in [3, 4, 6] {
             let mut sk = Sketch::new();
-            let p = sk.polygon(v(0.0, 0.0), v(1.0, 0.0), n, inscribed).unwrap();
+            let p = sk.polygon(v(0.0, 0.0), v(1.0, 0.0), n, on_vertex).unwrap();
             let rep = sk.solve();
             assert!(rep.is_solved(), "{rep:?}");
-            assert_eq!(rep.dof, Some(4), "n={n} inscribed={inscribed} {rep:?}");
+            assert_eq!(rep.dof, Some(4), "n={n} on_vertex={on_vertex} {rep:?}");
             let regions = sk.regions();
             assert_eq!(regions.len(), 1);
-            let big_r = if inscribed { 1.0 } else { 1.0 / (PI / n as f64).cos() };
+            let big_r = if on_vertex { 1.0 } else { 1.0 / (PI / n as f64).cos() };
             let area = 0.5 * n as f64 * big_r * big_r * (2.0 * PI / n as f64).sin();
             assert!((regions[0].area() - area).abs() < 1e-9);
             let _ = p;
