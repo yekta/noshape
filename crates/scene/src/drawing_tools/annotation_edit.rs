@@ -41,6 +41,46 @@ pub fn add_jog(s: &mut Sheet, id: u64, k: usize, jog: ExtJog, grow: f64) {
     }
 }
 
+/// A linear dimension's menu › Horizontal / Vertical / Aligned ("Dimension
+/// orientation"). False when it isn't a linear dimension.
+pub fn set_dimension_orientation(s: &mut Sheet, id: u64, o: noshape_model::drawing::DimOrientation) -> bool {
+    match find(s, id).map(|x| &mut x.kind) {
+        Some(AnnotationKind::LinearDimension { orientation, .. }) => {
+            *orientation = o;
+            true
+        }
+        _ => false,
+    }
+}
+
+/// A selected dimension's flip node: its arrows the other way ("Flip arrows").
+pub fn flip_arrows(s: &mut Sheet, id: u64) -> bool {
+    find(s, id).map(|x| x.flip_arrows = !x.flip_arrows).is_some()
+}
+
+/// A maximum / minimum dimension's "Arc condition (end N)" › Center /
+/// Minimum / Maximum ("Arc condition"); `end` 0 or 1.
+pub fn set_arc_condition(s: &mut Sheet, id: u64, end: usize, c: noshape_model::drawing::ArcCondition) -> bool {
+    match find(s, id).map(|x| &mut x.kind) {
+        Some(AnnotationKind::MaxMinDimension { ca, cb, .. }) => {
+            if end == 0 { *ca = c } else { *cb = c }
+            true
+        }
+        _ => false,
+    }
+}
+
+/// A section view's "Cutting line angle" panel: the two-point cutting line
+/// turned to `deg` about its middle, its length kept. False without one.
+pub fn set_cutting_line_angle(s: &mut Sheet, view: ViewId, deg: f64) -> bool {
+    let Some(p) = s.section_points(view).filter(|p| p.len() == 2) else { return false };
+    let m = [(p[0][0] + p[1][0]) / 2.0, (p[0][1] + p[1][1]) / 2.0];
+    let h = (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]) / 2.0;
+    let (sn, c) = deg.to_radians().sin_cos();
+    s.set_section_points(view, vec![[m[0] - c * h, m[1] - sn * h], [m[0] + c * h, m[1] + sn * h]]);
+    true
+}
+
 /// Remove jog on extension line `k`.
 pub fn remove_jog(s: &mut Sheet, id: u64, k: usize) {
     if let Some(x) = find(s, id) {

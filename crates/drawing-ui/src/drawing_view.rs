@@ -1117,9 +1117,7 @@ impl DrawingEditor {
         });
         let Some(id) = hit else { return false };
         self.edit_sheet("Flip arrows", cx, |s| {
-            if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
-                a.flip_arrows = !a.flip_arrows;
-            }
+            noshape_scene::drawing_tools::annotation_edit::flip_arrows(s, id);
         });
         true
     }

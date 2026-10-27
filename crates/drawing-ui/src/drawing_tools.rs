@@ -1675,9 +1675,7 @@ impl DrawingEditor {
                         for (label, o) in [("Horizontal", DimOrientation::Horizontal), ("Vertical", DimOrientation::Vertical), ("Aligned", DimOrientation::Aligned)] {
                             out.push(MenuEntry::check(label, orientation == o, move |t, _, cx| {
                                 t.edit_sheet("Dimension orientation", cx, |s| {
-                                    if let Some(AnnotationKind::LinearDimension { orientation, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                        *orientation = o;
-                                    }
+                                    noshape_scene::drawing_tools::annotation_edit::set_dimension_orientation(s, id, o);
                                 })
                             }));
                         }

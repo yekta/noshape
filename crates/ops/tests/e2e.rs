@@ -4743,3 +4743,39 @@ fn assembly_configuration_by_names() {
     let e = try_call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": part, "configuration": { "Size": "Huge" } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("configuration.Size"), "{e:?}");
 }
+
+/// Drawing edits the API lacked (the audit of the app's edit texts): a
+/// linear dimension's orientation and Flip arrows, a section view's
+/// Cutting line angle.
+#[test]
+fn drawing_orientation_flip_and_cutting_line_angle() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "dim_orient.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let dw = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": dw, "edges": true }));
+    let views = g["views"].as_array().unwrap().clone();
+    let front = views.iter().find(|v| v["orientation"] == "front").unwrap();
+    let mut vertical: Vec<Value> = front["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][0]) - num(&e["b"][0])).abs() < 1e-6).cloned().collect();
+    vertical.sort_by(|a, b| num(&a["a"][0]).total_cmp(&num(&b["a"][0])));
+    let (l, r) = (vertical.first().unwrap(), vertical.last().unwrap());
+    let mid = |e: &Value| json!([num(&e["a"][0]), (num(&e["a"][1]) + num(&e["b"][1])) / 2.0]);
+    let out = call(&mut ctx, "drawing_dimension", json!({ "drawing": dw, "picks": [mid(l), mid(r)], "place": [(num(&l["a"][0]) + num(&r["a"][0])) / 2.0, num(&l["a"][1]).max(num(&l["b"][1])) + 15.0] }));
+    let dim = out["annotations"].as_array().unwrap().last().unwrap()["id"].as_u64().unwrap();
+    call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": dw, "annotation": dim, "action": "orientation", "value": "aligned" }));
+    assert!(last(&mut ctx).ends_with(":: Dimension orientation"));
+    call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": dw, "annotation": dim, "action": "flip_arrows" }));
+    assert!(last(&mut ctx).ends_with(":: Flip arrows"));
+    let e = try_call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": dw, "annotation": dim, "action": "arc_condition", "end": 0, "value": "minimum" })).unwrap_err();
+    assert!(e.message.contains("maximum / minimum"), "{e:?}");
+    // A section through the hole, its cutting line turned to 45°.
+    let top = views.iter().find(|v| v["edges"].as_array().unwrap().iter().any(|e| e["type"] == "circle")).unwrap();
+    let circle = top["edges"].as_array().unwrap().iter().find(|e| e["type"] == "circle").unwrap();
+    let s = call(&mut ctx, "drawing_section_view", json!({ "drawing": dw, "parent": top["id"], "point": circle["center"], "position": [num(&top["bounds"]["max"][0]) + 60.0, num(&circle["center"][1])] }));
+    let sid = s["view"].as_u64().unwrap();
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": dw, "view": sid, "action": "cutting_line_angle", "to": 45 }));
+    assert!(last(&mut ctx).ends_with(":: Cutting line angle"));
+    let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": dw, "view": top["id"], "action": "cutting_line_angle", "to": 45 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
+}

@@ -4500,6 +4500,7 @@ The view menu's actions, one edit each:
 - `align`: Align views ▸ Vertically / Horizontally (`direction`): the view's center lines up with view `with`'s.
 - `suppress_alignment`: (Un)suppress alignment with parent (`on`, default true); projected, auxiliary and section views; a rotated view can't be re-aligned.
 - `flip_direction`: section views: Flip direction (the view looks the other way across the cutting line).
+- `cutting_line_angle`: section views with a two-point cutting line: Cutting line angle… `to` degrees (the line turned about its middle, its length kept). "Cutting line angle".
 - `remove_crop`, `remove_breaks` (Remove all breaks), `remove_broken_out` (Remove section, broken-out section `index`); a removed crop or broken-out section leaves its boundary on the sheet as a sketch circle, polygon or spline (live).
 - `move_to_sheet`: Move to sheet… `to_sheet` (number or name; omitted: a new sheet); the view moves alone, linked to its parent.
 - `unpin_reference`: Unpin view reference (every view of the same source and part shows the workspace again).
@@ -4519,7 +4520,7 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `view` | integer | required | View id (drawing_get). |
-| `action` | one of `rotate`, `rotate_to_edge`, `order`, `align`, `suppress_alignment`, `flip_direction`, `remove_crop`, `remove_breaks`, `remove_broken_out`, `move_to_sheet`, `unpin_reference`, `copy` | required | The menu action. |
+| `action` | one of `rotate`, `rotate_to_edge`, `order`, `align`, `suppress_alignment`, `flip_direction`, `cutting_line_angle`, `remove_crop`, `remove_breaks`, `remove_broken_out`, `move_to_sheet`, `unpin_reference`, `copy` | required | The menu action. |
 | `by` | number |  | rotate: degrees counter-clockwise to add. |
 | `to` | number or string |  | rotate: the absolute angle (degrees); order: "front" or "back". |
 | `edge` | array of number |  | rotate_to_edge: a point on a straight edge of the view (sheet mm). |
@@ -4692,6 +4693,7 @@ The annotation context menus, one edit each with the menu's edit text:
 - Centermarks: `align_centermark` to the straight edge at `point`.
 - Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).
 - Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).
+- Linear dimensions: `orientation` (`value` horizontal / vertical / aligned: "Dimension orientation"); dimensions: `flip_arrows` (the flip node: "Flip arrows"); maximum / minimum dimensions: `arc_condition` (`end` 0 / 1, `value` center / minimum / maximum: "Arc condition").
 
 Examples:
 
@@ -4707,7 +4709,7 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `annotation` | integer | required | Annotation id (drawing_get). |
-| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break`, `reset_ordinate` | required | The menu action. |
+| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break`, `reset_ordinate`, `orientation`, `flip_arrows`, `arc_condition` | required | The menu action. |
 | `line` | one of 0, 1 |  | add_jog / remove_jog: the extension line. |
 | `point` | array of number |  | add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge (sheet mm). |
 | `leader` | integer |  | add_node / remove_node / delete_leader / move_leader: the leader (a note's 0 = first; a callout's 0 = the one to its anchor). |
@@ -4718,6 +4720,8 @@ Examples:
 | `with` | array of integer |  | group / group_annotation: the other annotations. |
 | `parts` | array of string |  | stacked_callouts: part names. |
 | `on` | boolean |  | break: Break (true) or Unbreak (false) dimension. |
+| `value` | one of `horizontal`, `vertical`, `aligned`, `center`, `minimum`, `maximum` |  | orientation: horizontal / vertical / aligned; arc_condition: center / minimum / maximum. |
+| `end` | one of 0, 1 |  | arc_condition: the end (0 = end 1). |
 
 #### drawing_mbd
 

@@ -352,9 +352,7 @@ impl DrawingEditor {
                             };
                             MenuEntry::check(n, cur == cnd, move |t, _, cx| {
                                 t.edit_sheet("Arc condition", cx, |s| {
-                                    if let Some(AnnotationKind::MaxMinDimension { ca, cb, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                        if end == 0 { *ca = cnd } else { *cb = cnd }
-                                    }
+                                    noshape_scene::drawing_tools::annotation_edit::set_arc_condition(s, id, end, cnd);
                                 })
                             })
                         })
@@ -602,13 +600,11 @@ impl DrawingEditor {
             }
             Panel::CutAngle { view, input } => match num(val(&input, cx).trim_end_matches('°').to_string()) {
                 Some(deg) => {
-                    let Some(p) = self.current_sheet().section_points(view).filter(|p| p.len() == 2) else { return };
-                    let m = [(p[0][0] + p[1][0]) / 2.0, (p[0][1] + p[1][1]) / 2.0];
-                    let h = len(sub(p[1], p[0])) / 2.0;
-                    let (s, c) = deg.to_radians().sin_cos();
-                    let pts = vec![[m[0] - c * h, m[1] - s * h], [m[0] + c * h, m[1] + s * h]];
+                    if self.current_sheet().section_points(view).filter(|p| p.len() == 2).is_none() {
+                        return;
+                    }
                     self.edit_sheet("Cutting line angle", cx, |sh| {
-                        sh.set_section_points(view, pts);
+                        noshape_scene::drawing_tools::annotation_edit::set_cutting_line_angle(sh, view, deg);
                     });
                 }
                 None => self.status = Some("Invalid angle".into()),

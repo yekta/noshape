@@ -15,7 +15,7 @@ use noshape_scene::drawing_tools::Tool;
 use noshape_scene::drawing_tools::annotation_edit as ae;
 use serde_json::{Value, json};
 
-const ACTIONS: [&str; 21] = [
+const ACTIONS: [&str; 24] = [
     "add_jog",
     "remove_jog",
     "add_leader",
@@ -37,6 +37,9 @@ const ACTIONS: [&str; 21] = [
     "stacked_callouts",
     "break",
     "reset_ordinate",
+    "orientation",
+    "flip_arrows",
+    "arc_condition",
 ];
 
 pub fn ops() -> Vec<Op> {
@@ -45,7 +48,7 @@ pub fn ops() -> Vec<Op> {
         group: "drawing",
         verb: "annotation_edit",
         summary: "Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, detach, align centermark, stacked callouts",
-        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).\n- Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- `detach` (Detach from geometry: stays put, no longer follows the model).\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).\n- Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).",
+        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).\n- Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- `detach` (Detach from geometry: stays put, no longer follows the model).\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).\n- Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).\n- Linear dimensions: `orientation` (`value` horizontal / vertical / aligned: \"Dimension orientation\"); dimensions: `flip_arrows` (the flip node: \"Flip arrows\"); maximum / minimum dimensions: `arc_condition` (`end` 0 / 1, `value` center / minimum / maximum: \"Arc condition\").",
         fields: vec![
             doc_field(),
             drawing_field(),
@@ -62,6 +65,8 @@ pub fn ops() -> Vec<Op> {
             opt("with", json!({ "type": "array", "items": int() }), "group / group_annotation: the other annotations."),
             opt("parts", json!({ "type": "array", "items": { "type": "string" } }), "stacked_callouts: part names."),
             opt("on", json!({ "type": "boolean", "default": true }), "break: Break (true) or Unbreak (false) dimension."),
+            opt("value", json!({ "type": "string", "enum": ["horizontal", "vertical", "aligned", "center", "minimum", "maximum"] }), "orientation: horizontal / vertical / aligned; arc_condition: center / minimum / maximum."),
+            opt("end", json!({ "type": "integer", "enum": [0, 1] }), "arc_condition: the end (0 = end 1)."),
         ],
         mutates: true,
         destructive: false,
@@ -127,6 +132,45 @@ fn annotation_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             ae::remove_jog(&mut t.d.sheets[s], id, k);
             "Remove jog"
+        }
+        "orientation" => {
+            use noshape_model::drawing::DimOrientation as O;
+            let o = match a.opt_str("value")? {
+                Some("horizontal") => O::Horizontal,
+                Some("vertical") => O::Vertical,
+                Some("aligned") => O::Aligned,
+                _ => return Err(OpError::param("value", "horizontal, vertical or aligned")),
+            };
+            if !ae::set_dimension_orientation(&mut t.d.sheets[s], id, o) {
+                return refuse("linear dimensions only");
+            }
+            "Dimension orientation"
+        }
+        "flip_arrows" => {
+            if !ann.kind.is_dimension() {
+                return refuse("dimensions only");
+            }
+            ae::flip_arrows(&mut t.d.sheets[s], id);
+            "Flip arrows"
+        }
+        "arc_condition" => {
+            use noshape_model::drawing::ArcCondition as C;
+            let c = match a.opt_str("value")? {
+                Some("center") => C::Center,
+                Some("minimum") => C::Min,
+                Some("maximum") => C::Max,
+                _ => return Err(OpError::param("value", "center, minimum or maximum")),
+            };
+            let end = uint(a, "end")?;
+            let has_arc = match &ann.kind {
+                AnnotationKind::MaxMinDimension { ra, rb, .. } => [*ra, *rb].get(end).is_some_and(|r| *r > 0.0),
+                _ => return refuse("maximum / minimum dimensions only"),
+            };
+            if !has_arc {
+                return Err(OpError::param("end", "that end isn't on an arc"));
+            }
+            ae::set_arc_condition(&mut t.d.sheets[s], id, end, c);
+            "Arc condition"
         }
         "break" => {
             let on = a.bool_or("on", true)?;
