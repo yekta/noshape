@@ -69,4 +69,11 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
 ## Requests to the lead
-- (none)
+- Forward-oriented edges (kern's proposal, P0 class: EdgeInfo.start/end follow a reversed edge but its parameters,
+  tangents and circle frame don't, and many callers pair them): handing every edge out FORWARD (common.cpp
+  `sub_shape`/`sub_shapes`, patch in /root/core-scratch/forward-edges.patch) passes every kernel, model, model-core,
+  assembly, custom and oracle test unchanged, and ops' 119 others, but breaks two drawing flows: ops e2e
+  `drawing_callouts_ordinates_and_datums` (an ordinate "0 39.8 79.8" where 40 is expected) and
+  `drawing_section_detail_views_and_annotations` (drawing_virtual_sharp "Select a straight edge"). The drawing code
+  (dx) relies on the stored orientation. Not landed: needs dx to adapt those two (or route it to me with leave to edit
+  crates/drawing).
