@@ -1312,15 +1312,25 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     views::SketchEdge::Construction => (&vt.sketch_construction, LineStyle::Centerline, super::SKETCH_CONSTRUCTION_DASHES.to_vec()),
                     _ => (&vt.sketch_solid, LineStyle::Visible, Vec::new()),
                 };
+                // View properties › Show sketch appearances: each sketch in
+                // its appearance colour (live asb 10-23 (9)), else the pen's.
+                let mut own: Vec<(std::ops::Range<usize>, [u8; 3])> = Vec::new();
                 for (i, e) in geo.edges.iter().enumerate().filter(|(_, e)| e.sketch == kind) {
                     let pick = picks.id(PickTarget::Edge { view: v.id, edge: i as u32 });
+                    let edge_mark = g.mark();
                     for piece in map_polyline(&pl, &e.points) {
                         g.lines.push(Polyline2 { points: piece, style, closed: false, pick });
+                    }
+                    if v.sketch_appearances && let Some((_, c)) = geo.sketch_colors.iter().find(|(k, _)| *k == i) {
+                        own.push((edge_mark.0..g.lines.len(), *c));
                     }
                 }
                 if mark.0 < g.lines.len() {
                     g.pens.push(super::sheet::PenSpan { lines: mark.0..g.lines.len(), width_mm: pen.thickness, dashes });
                     color_lines_since(&mut g, mark, pen.color);
+                }
+                for (lines, rgb) in own {
+                    g.colors.push(super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb });
                 }
             }
             let shape = vt.sketch_point_shape;

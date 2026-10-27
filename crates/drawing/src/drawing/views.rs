@@ -112,6 +112,9 @@ pub struct SourceModel {
     /// Assemblies: the assembly's own Properties (name, part number, …),
     /// which an assembly drawing's part property fields show.
     pub own: Option<PartInfo>,
+    /// Part Studios: their sketches' appearances (Edit sketch appearance…),
+    /// sRGB, drawn by views with Show sketch appearances.
+    pub sketch_colors: Vec<(crate::FeatureId, [u8; 3])>,
 }
 
 /// One row of a Structured BOM.
@@ -303,6 +306,13 @@ fn part_info(ps: &PartStudio, b: &Body) -> PartInfo {
     }
 }
 
+/// Linear 0..1 to sRGB 0..255.
+fn lin_to_srgb(c: f32) -> u8 {
+    let c = c.clamp(0.0, 1.0);
+    let s = if c <= 0.0031308 { c * 12.92 } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 };
+    (s * 255.0).round() as u8
+}
+
 /// Regenerate / evaluate one source. `regen` is reused for Part Studios
 /// (incremental), `assemblies` caches studio regenerations for assemblies.
 pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerator, assemblies: &mut AssemblyEvaluator) -> Option<SourceModel> {
@@ -314,7 +324,15 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
             let opts = RegenOptions { custom_features: has_scripts.then(|| crate::custom::DocumentScripts::from_document(doc) as Arc<dyn crate::custom::CustomFeatureProvider>), ..Default::default() };
             let r = regen.regenerate(ps, &key.config, &doc.settings.units, &opts);
             let parts = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| part_info(ps, b)).collect();
-            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], model_annotations: ps.annotations.clone(), own: None })
+            let sketch_colors = ps
+                .appearances
+                .iter()
+                .filter_map(|a| match &a.target {
+                    crate::partstudio::AppearanceTarget::Feature(f) => Some((*f, [0, 1, 2].map(|i| lin_to_srgb(a.color[i])))),
+                    _ => None,
+                })
+                .collect();
+            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors })
         }
         TabContent::Assembly(asm) => {
             // A named position: its placements and mate values; a display
@@ -408,7 +426,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
             row.name = r.name.clone();
         }
     }
-    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), model_annotations: Vec::new(), own: None }
+    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new() }
 }
 
 /// Regenerate every source a drawing references (headless helper for
@@ -936,6 +954,9 @@ pub struct ViewGeometry {
     pub flat_heads: Vec<(Vec<[f64; 2]>, bool)>,
     /// Free points of the sketches drawn in the view.
     pub sketch_points: Vec<[f64; 2]>,
+    /// Sketch edges whose sketch has an appearance (edge index, sRGB): drawn
+    /// in it with View properties › Show sketch appearances.
+    pub sketch_colors: Vec<(usize, [u8; 3])>,
     /// Crop boundary of a cropped view (view coordinates).
     pub crop: Option<Crop>,
     /// Axes of cylindrical faces seen from the side (for automatic
@@ -1754,7 +1775,10 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
         }
         ViewKind::Base { .. } if v.flat => flat_geometry(id, &ctx, part.as_ref(), &frame),
         // Sketch views (and views projected from them): the sketch's curves.
-        ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } if sketch_of(sheet, id).is_some() => sketch_geometry(id, &ctx, &sketch_of(sheet, id).expect("checked"), &frame),
+        ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } if sketch_of(sheet, id).is_some() => {
+            let f = sketch_of(sheet, id).expect("checked");
+            sketch_geometry(id, &ctx, &f, &frame, sketch_color(sources.get(&skey), &f))
+        }
         // Shift+click: a projected view with the parent section's cut.
         ViewKind::Projected { parent, .. } if projects_section(sheet, id) => {
             let (Some(cut), Some(sf), Some(pf)) = (section_cut(sheet, *parent), view_frame(drawing, sheet, *parent), sheet.parent_of(*parent).and_then(|gp| view_frame(drawing, sheet, gp))) else {
@@ -1805,7 +1829,9 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
     // hidden (live 10-26 c: line ends get no marker).
     if !v.shown_sketches.is_empty() {
         for f in &v.shown_sketches {
-            let sg = sketch_geometry(id, &ctx, f, &frame);
+            let sg = sketch_geometry(id, &ctx, f, &frame, sketch_color(sources.get(&skey), f));
+            let n = g.edges.len();
+            g.sketch_colors.extend(sg.sketch_colors.iter().map(|(i, c)| (i + n, *c)));
             g.edges.extend(sg.edges);
             g.snaps.extend(sg.snaps);
             if !v.hide_sketch_points {
@@ -2837,9 +2863,15 @@ fn flat_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewF
     g
 }
 
+/// A sketch's appearance in its source, if it has one.
+fn sketch_color(src: Option<&SourceModel>, feature: &crate::FeatureId) -> Option<[u8; 3]> {
+    src?.sketch_colors.iter().find(|(f, _)| f == feature).map(|x| x.1)
+}
+
 /// A sketch's curves projected into a view (construction ones marked so),
 /// its free points; the solid curves' ends and free points are snap points.
-fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame: &ViewFrame) -> ViewGeometry {
+/// `color`: the sketch's appearance, kept for its edges.
+fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame: &ViewFrame, color: Option<[u8; 3]>) -> ViewGeometry {
     let mut g = ViewGeometry { id, frame: Some(*frame), exact: true, ..Default::default() };
     let Some(s) = ctx.sketches.iter().find(|s| &s.feature == feature) else {
         g.error = Some("The sketch was not found".into());
@@ -2863,6 +2895,9 @@ fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame:
                 g.snaps.push(Snap { p: frame.project(s.frame.to_world(b)), kind: SnapKind::Vertex, point: None });
             }
             let sketch = if e.construction { SketchEdge::Construction } else { SketchEdge::Solid };
+            if let Some(c) = color {
+                g.sketch_colors.push((g.edges.len(), c));
+            }
             g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None, sketch });
         }
     }

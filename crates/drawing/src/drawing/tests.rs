@@ -3091,3 +3091,28 @@ fn unrelated_tabs_leave_an_assembly_source_current() {
     }
     assert_ne!(views::source_hash(&doc, &key), before, "a Part Studio the assembly uses");
 }
+
+/// View properties › Show sketch appearances (live asb 10-23 (9)): a shown
+/// sketch with an appearance (Edit sketch appearance…) draws in its colour
+/// when ticked, as a plain sketch (the Solid lines pen) when not.
+#[test]
+fn shown_sketch_takes_its_appearance() {
+    let (mut doc, mut drawing) = demo();
+    let ps = doc.tabs.iter_mut().find_map(|t| match &mut t.content {
+        TabContent::PartStudio(ps) => Some(ps),
+        _ => None,
+    });
+    let ps = ps.expect("demo has a Part Studio");
+    let fid = ps.features[0].id;
+    ps.appearances.push(crate::partstudio::FaceAppearance { target: crate::partstudio::AppearanceTarget::Feature(fid), color: [1.0, 0.0, 0.0, 1.0] });
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().shown_sketches = vec![fid];
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let red = |d: &Drawing| {
+        let b = render_sheet(d, 0, &sources, &cache, false).unwrap();
+        (0..b.geometry.lines.len()).filter(|&i| b.geometry.line_color(i) == Some([255, 0, 0])).count()
+    };
+    assert_eq!(red(&drawing), 0, "unticked: plain");
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().sketch_appearances = true;
+    assert!(red(&drawing) > 0, "ticked: the sketch in red");
+}
