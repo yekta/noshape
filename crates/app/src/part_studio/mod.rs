@@ -1662,6 +1662,15 @@ impl PartStudioView {
                             self.edit_feature(sketch, window, cx);
                         }
                     }
+                    // Live ("psui (10-27, interaction 5.x)"): Mass and section
+                    // properties on its Part tab takes the whole part on a
+                    // face / edge / vertex click (the part shaded amber, its
+                    // row selected); the Face tab takes faces.
+                    Some(t) if self.show_mass && !self.ui.mass_faces && self.edit.is_none() && !self.ui.mass_ref_active && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) && self.owning_body(&t.reference).is_some() => {
+                        if let Some(b) = self.owning_body(&t.reference) {
+                            self.pick_body(b, cx);
+                        }
+                    }
                     Some(t) => {
                         // Only planes picked here drag their rings (live).
                         if t.kind == PickKind::Plane && !self.ui.planes_picked_in_graphics.contains(&t.reference) {

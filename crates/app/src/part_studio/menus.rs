@@ -24,7 +24,7 @@ type MenuAction = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<Part
 
 impl PartStudioView {
     /// Body owning a referenced entity.
-    fn owning_body(&self, r: &Reference) -> Option<BodyId> {
+    pub(super) fn owning_body(&self, r: &Reference) -> Option<BodyId> {
         match r {
             Reference::Body(b) => Some(b.clone()),
             _ => self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r) || b.vertex_refs.contains(r)).map(|b| b.id.clone()),
