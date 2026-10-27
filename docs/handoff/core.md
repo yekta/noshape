@@ -80,6 +80,11 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   (`in_own_code`, common.cpp), so never out of malloc/free. classify_point keeps its loaded classifier on the shape.
   NOSHAPE_KERNEL_PROFILE=cpu: kernel profile in thread CPU time (use it on this loaded machine).
 
+- e01fe6b3 OCCT patch 0003 (TKMesh BRepMesh_FaceChecker: skip wire pairs whose boxes miss; the display mesh's linear
+  deflection is the part's diagonal, so this was quadratic in hole loops); cut_slabs checks slabs in parallel.
+  594ea0d7 `cut_through_holes` (boolean.cpp): holes straight through two opposite planar faces built directly.
+  203c4d6f SURF-EXTRUDE-SKETCH-EDGES.
+
 - a01dca62 Hole add speed: line_crossings keeps OCCT's loaded line intersector on the shape. Left in std's hole probe:
   min_distance (~140 calls, ~0.8 ms each, BRepExtrema rebuilt per call).
 
@@ -103,6 +108,17 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - Side faces of an extrude: x = the direction of its bottom (sketch) edge; check ours.
 - SHELL-SLOW: live shells qa's plates in 4–7 ms of server time; our slabs take 1–3 s (serial booleans). Needs a
   different construction for prismatic parts (by_regions extended to holes / collapsing fillets), not tuning.
+
+## Speed targets (PLAN 2.7), current numbers (10-27 ~16:30, this machine, load ~30)
+- live-30-features full regen: **247 ms** release (target ≤ 80; live 171). Probe: `cargo test --release -p noshape-ops
+  --test all regen_profile::regen_profile -- --ignored --nocapture` (NOSHAPE_PROFILE_ONLY=live-30 for one fixture).
+- edit commit on it: **249 ms** release / ~205 ms dev quiet (target ≤ 100). Probe `regen_profile::edit_commit_profile`.
+- Shell on qa's filleted plates with a hole: **177–229 ms** a feature, dev (target ≤ 200). Probe
+  `kernel_robustness::shell_feature_time_probe` (model, ignored).
+- big-plate regen: **835–1254 ms** dev (was ~2.1 s; target ≤ 250, live 617): Extrude 2 ~310 ms (400 prisms 75, sketch
+  faces 62, cut by `cut_through_holes` ~90, naming), display mesh 400–750 ms (BRepMesh; OCCT patch 0003 halved it).
+- Measuring: NOSHAPE_KERNEL_PROFILE=1 (wall), =cpu (this thread), =proc (process CPU, pool threads too). Timed
+  perf.yml / T2 tests for each target: not yet written.
 
 ## Next, in order
 1. P0 REGEN-SPEED (open): per regeneration ~15 ms per boolean (OCCT build), fillet/chamfer ~10 ms + ~6 ms check, the
