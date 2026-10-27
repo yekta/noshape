@@ -3,11 +3,11 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Release blockers seen by qa (updated 2026-10-27 03:55, green 16cdcf6d)
-- Fixed and verified on 19555ca3: the crash documents (DRAFT/SHELL-SLAB/FILLET/FILLET-BLEND), SHELL-WALLS,
-  SHELL-FILLETED-BOX. Still open P0: FILLET-HANG and the new DRAFT-HANG (OCCT blend approximation / defeaturing spin with
-  no budget; in the app a stuck regen blocks every later one, the Part Studio never updates again), SHELL-SLOW (shells
-  5–9 s), REGEN-SPEED (commit 1.0–1.7 s at load ~35 on 16cdcf6d; undo 3 back 886 ms), TWO-PROCESS-LOST-EDIT.
+## Release blockers seen by qa (updated 2026-10-27 04:40, green bcf401ca)
+- Verified in the green app bcf401ca: the five crash documents open (DOC-POISON guard), TWO-PROCESS-LOST-EDIT (both edits
+  kept). Still open P0: DRAFT-HANG (draft defeaturing spins; the app's regen never ends and blocks later ones), FILLET-HANG
+  (budget 97081557 on main, checked on the watcher CLI: fillet / chamfer fail after ~30 s; not in green yet), SHELL-SLOW,
+  REGEN-SPEED (commit 1.0–1.7 s at load ~35; undo 3 back 886 ms).
 
 ### Earlier (P0, green 4d2f6b0c)
 - DOC-POISON + SHELL-SLAB-GPF + FILLET-SEGV: ordinary Shell / Fillet / Delete operations can segfault the green app and
@@ -125,6 +125,14 @@ edge's midpoint), READOUT-AXES, EXT-2ND-DEPTH, EXPORT-DXF-OPTIONS (DXF R14, mm, 
 FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress | Dynamic suppression ▸ | Expand ▸ | Collapse ▸ |
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
+
+## Green bcf401ca (2026-10-27 04:10–04:40)
+- Verified: OPEN-ERROR-SILENT (my 16cdcf6d reopen was wrong: that build lacked 3dfa5710), SKETCH-PASTE, PERF-SECTION-PANIC,
+  MENU-SKETCH-TAG, crash documents in the app, TWO-PROCESS-LOST-EDIT, API-REMOVE-SCOPE, USER_GUIDE; P1-16 / P1-6 shell on the
+  watcher CLI 04:06 (live's numbers).
+- New: API-REMOVE-DIR (P2 dx), EXPORT-MESH-SHARED (P2 dx: 3MF/OBJ not welded); FILLET-HANG gained a chamfer repro
+  (bin/chrepro.py + tickets/cli-chamfer-hang-*). STL export OK (watertight, −0.009 % volume at Medium).
+- Watcher CLI copies: rel/k/main/y = 19555ca3, rel/k/main/z = 04:06 build (has the blend budget).
 
 ## Green 16cdcf6d (2026-10-27 03:25–03:55)
 - Verified: LOFT-PROFILE-LIST (› entries, ↑↓, nothing under the field), DRAWING-SCALE (1:2, centre mark on the hole only).
