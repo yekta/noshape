@@ -396,6 +396,8 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist)
   HHist                          h = new BRepTools_History();
   std::vector<TopoDS_Shape>      gone; // inner edges and vertices of merged groups
   bool                           any = false;
+  // Face -> the merged face it became (null: merged into another's).
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> merged_into;
   BRep_Builder                   B;
   for (const auto& [r, g] : groups)
   {
@@ -499,8 +501,19 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist)
         outer = (int)i, ++outers;
     if (outers != 1)
       continue;
-    // The merged face on the first face's surface, in its orientation.
-    const TopoDS_Face& f0  = TopoDS::Face(faces(g[0]));
+    // The merged face on the surface of the group's face with the most edges
+    // (its edges' pcurves are there already: the 400-fin plate's front face
+    // has 800), in its orientation.
+    int lead = g[0], most = -1;
+    for (int fi : g)
+    {
+      int n = 0;
+      for (TopExp_Explorer ex(faces(fi), TopAbs_EDGE); ex.More(); ex.Next())
+        ++n;
+      if (n > most)
+        most = n, lead = fi;
+    }
+    const TopoDS_Face& f0  = TopoDS::Face(faces(lead));
     const bool         rev = f0.Orientation() == TopAbs_REVERSED;
     TopLoc_Location    loc;
     const occ::handle<Geom_Surface>& surf = BRep_Tool::Surface(f0, loc);
@@ -520,12 +533,21 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist)
         add_loop(loops[i]);
     for (const auto& loop : loops)
       for (const TopoDS_Edge& e : loop)
-        BRepLib::BuildPCurveForEdgeOnPlane(e, nf_);
+      {
+        double f, l;
+        bool   stored = false;
+        BRep_Tool::CurveOnSurface(e, surf, loc, f, l, &stored);
+        if (!stored)
+          BRepLib::BuildPCurveForEdgeOnPlane(e, nf_);
+      }
     if (rev)
       nf_.Reverse();
     rs->Replace(faces(g[0]), nf_);
     for (size_t i = 1; i < g.size(); ++i)
       rs->Remove(faces(g[i]));
+    merged_into.Bind(faces(g[0]), nf_);
+    for (size_t i = 1; i < g.size(); ++i)
+      merged_into.Bind(faces(g[i]), TopoDS_Shape());
     for (int fi : g)
       h->AddModified(faces(fi), nf_);
     // Inner edges, and vertices only they used, disappear.
@@ -546,7 +568,41 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist)
     any = true;
   }
   TopoDS_Shape r = s;
-  if (any)
+  // One solid of one shell: the shell rebuilt with the merged faces (ReShape
+  // copied the whole part: most of the time on the 400-fin plate).
+  TopoDS_Shape solid, shell;
+  int          nsolid = 0, nshell = 0;
+  for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next(), ++nsolid)
+    solid = e.Current();
+  if (nsolid == 1 && s.ShapeType() == TopAbs_SOLID)
+    for (TopoDS_Iterator it(solid); it.More(); it.Next(), ++nshell)
+      shell = it.Value();
+  if (any && nshell == 1 && shell.ShapeType() == TopAbs_SHELL)
+  {
+    TopoDS_Shell ns;
+    B.MakeShell(ns);
+    for (TopoDS_Iterator it(shell); it.More(); it.Next())
+    {
+      const TopoDS_Shape* m = merged_into.Seek(it.Value());
+      if (m == nullptr)
+        B.Add(ns, it.Value());
+      else if (!m->IsNull())
+        B.Add(ns, *m);
+    }
+    ns.Closed(shell.Closed());
+    TopoDS_Solid so;
+    B.MakeSolid(so);
+    B.Add(so, ns.Oriented(shell.Orientation()));
+    so.Orientation(solid.Orientation());
+    r = so;
+    for (const TopoDS_Shape& x : gone)
+      if (!h->IsRemoved(x))
+        h->Remove(x);
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    hist->Merge(h);
+  }
+  else if (any)
   {
     r = rs->Apply(s);
     for (const TopoDS_Shape& x : gone)
@@ -682,11 +738,15 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist)
 // merged first by merge_planar).
 TopoDS_Shape unify(const TopoDS_Shape& s0, HHist& hist)
 {
+  std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("unify.candidates");
   if (!same_domain_candidates(s0))
     return s0;
+  lap                  = std::make_unique<KernelTimer>("unify.merge_planar");
   const TopoDS_Shape s = merge_planar(s0, hist);
+  lap                  = std::make_unique<KernelTimer>("unify.candidates_again");
   if (!same_domain_candidates(s))
     return s;
+  lap = std::make_unique<KernelTimer>("unify.usd");
   ShapeUpgrade_UnifySameDomain u(s, true, true, false);
   u.Build();
   if (!u.History().IsNull())

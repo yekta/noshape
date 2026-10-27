@@ -162,7 +162,15 @@ Phase 2 (local Booleans), first step landed:
   the region's boundary edges get split.
 - Corpus: 0 mismatches over 974 cases; it takes the two fin fuses: 412 faces 117 ms (OCCT ~700 ms dev), 1612
   faces 370–413 ms (OCCT 1.57 s dev). T1: kernel `boolean_groups::a_small_fuse_on_a_big_part_is_done_locally`.
-- Extrude 3 of fins-400 (dev, whole feature): 1681 → 1336 ms. What's left there is around the Boolean: the
+- Extrude 3 of fins-400 (dev, whole feature): 1681 → 1336 ms (local Boolean) → ~1000 ms (merge_planar, below).
+  Breakdown (pattern_second ×400, NOSHAPE_PERF): kernel ~580 ms (local Boolean, mostly OCCT's general fuse of the
+  two 800-edge faces the fins merge into), naming + unify ~230 ms, split ~50 ms; then the display re-meshes the whole
+  part (~1 s, every regeneration).
+- The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
+  most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
+  BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region
+  (UnifySameDomain on a compound, boundary kept) was tried and dropped: 518 ms vs 183 on Extrude 3 (the region holds
+  the 800-edge faces). Older notes below: What's left there is around the Boolean: the
   regen's unify_same_domain over the whole 1600-face result after every Boolean (~390 ms for 4 calls), the auto
   scope's classify_point loading a classifier per new body (~140 ms / 4), ancestor maps (4816 calls, 365 ms),
   shown_topology (223 ms), and inside the local Boolean the general fuse of the two 800-edge front / back faces
