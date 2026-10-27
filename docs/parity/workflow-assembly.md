@@ -20,7 +20,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 1.3 | Assembly, i | "Insert parts and assemblies", Current document › Part Studios, filters, tree with thumbnails, "Inserted: 0", "Undo to remove instances" | same | ✅ |
 | 1.4 | Click Part 1 (empty assembly) | instance at identity, **amber (selected)**, row selected, view zooms to fit it | at identity, but **not amber, row not selected**; the zoom-to-fit crops the plate at the right edge | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 |
 | 1.5 | Click Part 2, move to graphics, click | follows the cursor amber; drops at the click | same | ✅ |
-| 1.6 | Bracket (Part 1 of "bracket") | ? (asked live 10-27: numbering per name or per part) | instance named "Part 1 <2>" (ours numbers per name) | ? |
+| 1.6 | Bracket (Part 1 of "bracket") | "Part 1 <2>": live numbers by name across parts, lowest free number (behaviours "skasm (2026-10-27) instance numbering") | instance named "Part 1 <2>" (`next_instance_name`: by name, lowest free) | ✅ |
 | 1.7 | ✓, F | – | 5 instances | ✅ |
 | 1.8 | Part 1 <1> › right-click | menu (skb list) | same items (Add comment omitted, cloud) | ✅ |
 | 1.9 | Fix | ground glyph on the row and on Assembly 1 | same | ✅ |
