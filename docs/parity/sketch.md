@@ -56,8 +56,8 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 3.2 | q Construction, Shift+F Fillet, m Trim, x Extend, o Offset, u Use, d Dimension | B§8.1 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 3.3 | i Coincident, Shift+O Concentric, b Parallel, t Tangent, h Horizontal, v Vertical, Shift+L Perpendicular, e Equal, Shift+M Midpoint, Shift+K Normal, Shift+G Pierce, Shift+Q Symmetric, Shift+J Fix, Shift+U Curvature | B§8.1 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 3.4 | Shift+A switches Line ↔ Tangent arc while chaining (keeps the chain) | H:line | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 3.5 | Shift (hold) suppresses inferences while drawing / dragging | H:automatic_inferencing | ✅ |  |
-| 3.6 | Shift (hold) shows all constraint glyphs while moving | H:working_with_constraints | ✅ |  |
+| 3.5 | Shift (hold) suppresses inferences while drawing / dragging | H:automatic_inferencing | ✅ | 0.4.10+ / dd1b5037 10-27 (Line: Shift drops the horizontal inference) |
+| 3.6 | Shift (hold) shows all constraint glyphs while moving | H:working_with_constraints | ✅ | 0.4.10+ / dd1b5037 10-27 (Show constraints off: Shift shows the glyphs) |
 | 3.7 | Alt (hold) while drawing a rectangle makes a square | H:corner_rectangle | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 3.8 | Alt+←/→ switches between on-the-fly dimension boxes | H:sketch_basics | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 3.9 | Delete / Backspace deletes selected entities, constraints and dimensions | H:dimension, H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
@@ -186,7 +186,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.3 | Tool-first: each pair picked is constrained; tool stays on until clicked again or another tool | H:coincident | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.4 | Coincident: point-point, point-curve, collinear lines, same circle | H:coincident | ✅ | 0.4.10+ / 965d3f56 10-27 (two line ends + i: both move halfway, coincident glyph) |
 | 8.5 | Concentric, Parallel, Tangent, Horizontal, Vertical, Perpendicular, Equal, Fix | constraint pages | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 8.6 | Midpoint: point + line/arc, or 3 points (start, end, middle) | H:midpoint | ✅ |  |
+| 8.6 | Midpoint: point + line/arc, or 3 points (start, end, middle) | H:midpoint | ✅ | 0.4.10+ / dd1b5037 10-27 (point + line → Midpoint, point on the middle) |
 | 8.7 | Normal: line + curve, in either pick order | H:normal; live qa4 round 5 v3 s6 (3) | ✅ (test `constraint_picks_and_application_as_live`) |  |
 | 8.7a | A constraint tool doesn't take a pick it can't use (no message); constraint errors never show internal ids | live qa4 round 5 v3 s6 (CON-MSG) | ✅ (`pick_fits`; failed constraint adds are silent, no ids reach the status bar) |  |
 | 8.7b | Vertical on a Horizontal line (anything collapsing a line to a point): "Sketch could not be solved.", the line stays, red | live qa4 round 5 v3 s6 (1) | ✅ (the shape before the solve is kept and the toast raised, `solve_after_constraint`; test `vertical_on_a_horizontal_line_does_not_solve`; GUI :103 skasm 10-26: line stays, red, glyphs red, title red) | 0.4.10+ / 203c4d6f 10-27 |
@@ -254,7 +254,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.18 | Transform: triad manipulator (move, rotate, scale, free-drag center), Enter commits, Esc cancels | H:sketch_transform | ✅ (click in space / Enter commit, Esc cancel) | 0.4.10+ / 965d3f56 10-27 (paste shows the triad: ring, scale arrow, move square; Enter commits, Esc leaves) |
 | 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ✅ (planar curves project exactly; non-planar edges project to a fitted spline like Onshape; other sketches; linked); a used circle / arc has a construction centre point, its line ends are not (live "skb (10-25) sketch Use on a face sketch", 4b5ac4fe) | 0.4.10+ / 965d3f56 10-27 (U, block edge → black line + use glyphs) |
 | 11.20 | Use: hover preview of the projection | H:use | ✅ (GUI :103 m8.png: hovering the cylinder top edge highlights it and previews the projected circle on the sketch plane; click creates it) | 0.4.10+ / 965d3f56 10-27 (hover preview orange) |
-| 11.21 | Use silhouette edges | H:use | ✅ (cylinders, cones, spheres, tori; verified on the demo plate) |  |
+| 11.21 | Use silhouette edges | H:use | ✅ (cylinders, cones, spheres, tori; verified on the demo plate) | 0.4.10+ / dd1b5037 10-27 (Front sketch, U on the pin's cylinder face: two silhouette lines + end edges) |
 | 11.22 | Intersection: face crossing the sketch plane | H:intersection | ✅ |  |
 | 11.23 | Text cannot be patterned / mirrored in a sketch | H:text | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 
