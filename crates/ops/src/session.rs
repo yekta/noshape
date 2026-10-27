@@ -84,9 +84,9 @@ fn marker_key(path: &Path) -> String {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()).to_string_lossy().to_string()
 }
 
-/// Note that this process has `path` open (see [`docs_file`]).
-fn note_open(path: &Path) {
-    let Some(dir) = noshape_model::regen::crash_guard::dir() else { return };
+/// Note that this process has `path` open (see [`docs_file`]) in marker
+/// folder `dir`.
+fn note_open(dir: &Path, path: &Path) {
     let file = docs_file(dir, std::process::id());
     let key = marker_key(path);
     let known = std::fs::read_to_string(&file).unwrap_or_default();
@@ -148,11 +148,21 @@ impl Session {
         // The document's features may need the FeatureScript host (custom features, std-run features).
         noshape_model::custom::register();
         noshape_model::regen::crash_guard::enable(noshape_model::regen::crash_guard::default_dir());
-        note_open(&path);
+        if let Some(dir) = noshape_model::regen::crash_guard::dir() {
+            note_open(dir, &path);
+        }
         Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false, seen })
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        noshape_model::regen::crash_guard::enable(noshape_model::regen::crash_guard::default_dir());
+        Self::open_with_markers(path, noshape_model::regen::crash_guard::dir().map(|d| d.as_path()))
+    }
+
+    /// [`Session::open`] with the crash markers read from `markers` (the
+    /// process's marker folder; a test passes its own, so tests running in
+    /// parallel in one process never see each other's markers).
+    pub fn open_with_markers(path: impl AsRef<Path>, markers: Option<&Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         // One line for the user (qa OPEN-ERROR-SILENT): the store error's own
         // text, not its cause chain, which repeats SQLite's message.
@@ -166,11 +176,10 @@ impl Session {
         // Undo works across sessions: rebuild the stack from the history.
         let undo = UndoStack::from_history(&store, branch, 500).unwrap_or_else(|_| UndoStack::new(branch).with_limit(500));
         let mut s = Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false, seen: head };
-        noshape_model::regen::crash_guard::enable(noshape_model::regen::crash_guard::default_dir());
-        if let Some(dir) = noshape_model::regen::crash_guard::dir() {
+        if let Some(dir) = markers {
             s.recovered = s.recover_crashed_features(dir);
+            note_open(dir, &s.path);
         }
-        note_open(&s.path);
         Ok(s)
     }
 
@@ -702,18 +711,20 @@ mod tests {
         let copy = dir.join("copy.noshape");
         std::fs::copy(&path, &copy).unwrap();
         // The marker a crashed process left (no such process runs; pids stop
-        // at 2^22), with the files it had open: p.noshape only.
-        let markers = noshape_model::regen::crash_guard::default_dir();
+        // at 2^22), with the files it had open: p.noshape only. In this
+        // test's own marker folder: tests run in parallel in one process.
+        let markers = dir.join("markers");
+        let _ = std::fs::remove_dir_all(&markers);
         std::fs::create_dir_all(&markers).unwrap();
         let dead = 4_000_000_000 + std::process::id() % 100_000;
         let marker = markers.join(format!("{dead}-1.marker"));
         std::fs::write(&marker, format!("{dead}\n{bad}\n{name}\n")).unwrap();
         let docs = super::docs_file(&markers, dead);
         std::fs::write(&docs, format!("{}\n", super::marker_key(&path))).unwrap();
-        let c = Session::open(&copy).unwrap();
+        let c = Session::open_with_markers(&copy, Some(&markers)).unwrap();
         assert!(c.recovered.is_empty() && marker.exists(), "the copy is left alone: {:?}", c.recovered);
         drop(c);
-        let s = Session::open(&path).unwrap();
+        let s = Session::open_with_markers(&path, Some(&markers)).unwrap();
         let TabContent::PartStudio(ps) = &s.doc.tab(tab_id).unwrap().content else { unreachable!() };
         assert_eq!(ps.rollback, Some(1), "the rollback bar above the feature");
         assert!(s.recovered.len() == 1 && s.recovered[0].contains(&name), "{:?}", s.recovered);
@@ -722,7 +733,7 @@ mod tests {
         assert!(last.ends_with(&format!(":: Roll back above {name}: noshape stopped while regenerating it")), "{last}");
         drop(s);
         // Opened again: nothing more to do.
-        assert!(Session::open(&path).unwrap().recovered.is_empty());
+        assert!(Session::open_with_markers(&path, Some(&markers)).unwrap().recovered.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
