@@ -244,7 +244,6 @@ fn shell_of_a_filleted_plate_with_a_hole_keeps_its_walls() {
 /// mm³ (33 faces, the hole walls stand as tubes), 2.5 mm → 8503.961 mm³
 /// (47 faces, the tubes merge with each other and the side walls).
 #[test]
-#[ignore = "T2: open differences from live (P1-16: the chamfer-corner cones get no wall, 3·π/12 mm³ short; 53 faces vs 47)"]
 fn shell_block_with_close_holes_like_onshape() {
     let _ = set_working_scale(1000.0);
     let mm = 1e-3;

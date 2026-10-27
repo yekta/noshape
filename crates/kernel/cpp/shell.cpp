@@ -20,6 +20,7 @@
 
 #include "internal.hpp"
 #include <chrono>
+#include <ShapeFix_Shape.hxx>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -775,14 +776,21 @@ bool collapsing_blend(const TopoDS_Face& f, double d)
     return -d >= s.Torus().MinorRadius() * (1 - 1e-9);
   if (s.GetType() == GeomAbs_Sphere)
     return -d >= s.Sphere().Radius() * (1 - 1e-9);
-  double u0, u1, v0, v1;
-  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  // The farthest point from the axis, on the face's edges (its UV box can
+  // reach past a cone's apex triangle: P1-16's chamfer corners).
   const gp_Lin ax(s.GetType() == GeomAbs_Cylinder ? s.Cylinder().Axis() : s.Cone().Axis());
   double       rmax = 0;
-  for (double v : {v0, v1})
-    for (int k = 0; k <= 4; ++k)
-      rmax = std::max(rmax, ax.Distance(s.Value(u0 + (u1 - u0) * k / 4, v)));
-  return -d >= rmax * (1 - 1e-9);
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    if (BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
+      continue;
+    BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+    for (int k = 0; k <= 8; ++k)
+      rmax = std::max(rmax, ax.Distance(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 8)));
+  }
+  if (std::getenv("NOSHAPE_SHELL_DEBUG") && s.GetType() == GeomAbs_Cone)
+    std::fprintf(stderr, "slabs: cone rmax %g, wall %g\n", rmax, -d);
+  return rmax > 0 && -d >= rmax * (1 - 1e-6);
 }
 
 // The solid sector of a convex blend face: everything between the face and
@@ -845,22 +853,50 @@ TopoDS_Shape blend_sector(const TopoDS_Face& f)
   {
     const gp_Lin ax(axis);
     const gp_Pnt a0 = s.Value(u0, v0), a1 = s.Value(u0, v1);
-    const double h0 = ElCLib::Parameter(ax, a0), h1 = ElCLib::Parameter(ax, a1);
-    const double r0 = ax.Distance(a0), r1 = ax.Distance(a1);
+    double       h0 = ElCLib::Parameter(ax, a0), h1 = ElCLib::Parameter(ax, a1);
+    double       r0 = ax.Distance(a0), r1 = ax.Distance(a1);
+    if (s.GetType() == GeomAbs_Cone)
+    {
+      // The axial extent from the face's edges, the radii from the cone
+      // (the UV box can reach past an apex triangle's apex: P1-16).
+      h0 = 1e300;
+      h1 = -1e300;
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+      {
+        BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+        for (int k = 0; k <= 8; ++k)
+        {
+          const double h = ElCLib::Parameter(ax, c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 8));
+          h0 = std::min(h0, h);
+          h1 = std::max(h1, h);
+        }
+      }
+      const gp_Cone cone = s.Cone();
+      const double  t    = std::tan(cone.SemiAngle());
+      const double  hl   = ElCLib::Parameter(ax, cone.Location());
+      auto          rad  = [&](double h) {
+        const double r = cone.RefRadius() + (h - hl) * t;
+        return std::abs(r) < 1e-9 * (1 + cone.RefRadius()) ? 0.0 : std::abs(r);
+      };
+      r0 = rad(h0);
+      r1 = rad(h1);
+      if (!(h1 > h0) || (r0 == 0 && r1 == 0))
+        return TopoDS_Shape();
+    }
     // Base at the lower end along z, x towards the face's u0 side.
     const double hz0 = h0 * axis.Direction().Dot(z), hz1 = h1 * axis.Direction().Dot(z);
     const bool   base0 = hz0 <= hz1;
     const gp_Pnt base = ElCLib::Value(base0 ? h0 : h1, ax);
-    const gp_Pnt ref = r0 >= r1 ? a0 : a1;
-    gp_Vec       xv(ElCLib::Value(ElCLib::Parameter(ax, ref), ax), ref);
-    const double H = std::abs(h1 - h0);
+    // Towards the face's u0 side: the frame's direction at angle u0.
+    const gp_Vec xv = gp_Vec(frame.XDirection()) * std::cos(u0) + gp_Vec(frame.YDirection()) * std::sin(u0);
+    const double H  = std::abs(h1 - h0);
     if (xv.Magnitude() < 1e-12 || !(H > 1e-12))
       return TopoDS_Shape();
     const gp_Ax2 fr(base, z, gp_Dir(xv));
-    if (s.GetType() == GeomAbs_Cylinder)
-      r = BRepPrimAPI_MakeCylinder(fr, s.Cylinder().Radius(), H, u1 - u0).Shape();
-    else
-      r = BRepPrimAPI_MakeCone(fr, base0 ? r0 : r1, base0 ? r1 : r0, H, u1 - u0).Shape();
+    // A cone's sector as the cylinder wedge of its larger radius: the
+    // common with the solid trims the rest, and a wedge with the cone's apex
+    // made the booleans fail (P1-16's chamfer corners).
+    r = BRepPrimAPI_MakeCylinder(fr, s.GetType() == GeomAbs_Cylinder ? s.Cylinder().Radius() : std::max(r0, r1), H, u1 - u0).Shape();
   }
   if (r.IsNull() || !BRepCheck_Analyzer(r).IsValid() || !(volume_of(r) > 0))
     return TopoDS_Shape();
@@ -1814,6 +1850,27 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   {
     r = split;
     hs = HHist();
+  }
+  // Still invalid (P1-16's chamfer corners: the volume is live's, the
+  // check fails): healed, when that keeps the volume.
+  if (!valid_solid(r) && !r.IsNull())
+  {
+    ShapeFix_Shape fix(r);
+    fix.Perform();
+    const TopoDS_Shape fixed = single_solid(fix.Shape());
+    const double       v0    = volume_of(r);
+    if (valid_solid(fixed) && std::abs(volume_of(fixed) - v0) <= 1e-6 * std::abs(v0))
+    {
+      const HHist fh = fix.Context().IsNull() ? HHist() : fix.Context()->History();
+      if (!fh.IsNull())
+      {
+        if (hs.IsNull())
+          hs = fh;
+        else
+          hs->Merge(fh);
+      }
+      r = fixed;
+    }
   }
   if (std::getenv("NOSHAPE_SHELL_DEBUG"))
     std::fprintf(stderr, "slabs: result valid %d volume %.6g (solid %.6g)\n", (int)valid_solid(r), r.IsNull() ? 0.0 : volume_of(r), volume_of(solid));
