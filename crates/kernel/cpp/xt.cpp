@@ -33,6 +33,8 @@
 #include "internal.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepTools_Modifier.hxx>
+#include <ShapeCustom_SweptToElementary.hxx>
 #include <BRepClass3d.hxx>
 #include <BRepLProp_SLProps.hxx>
 #include <BRepTools.hxx>
@@ -1593,18 +1595,47 @@ struct BodyWriter
   }
 };
 
+// OCCT 8.0.1's BRepTools_Modifier::CreateOtherVertices asks NewCurve2d with a
+// null new face ("does this pcurve change?"), which SweptToElementary then
+// reads (a crash on parts of the NIST assembly). Answer as it would: a copied
+// pcurve, so changed.
+class SafeSweptToElementary : public ShapeCustom_SweptToElementary
+{
+public:
+  bool NewCurve2d(const TopoDS_Edge& E, const TopoDS_Face& F, const TopoDS_Edge& NewE, const TopoDS_Face& NewF, occ::handle<Geom2d_Curve>& C, double& Tol) override
+  {
+    if (!NewF.IsNull())
+      return ShapeCustom_SweptToElementary::NewCurve2d(E, F, NewE, NewF, C, Tol);
+    double f, l;
+    C   = BRep_Tool::CurveOnSurface(E, F, f, l);
+    Tol = BRep_Tool::Tolerance(E);
+    return true;
+  }
+};
+
+TopoDS_Shape swept_to_elementary(const TopoDS_Shape& s)
+{
+  occ::handle<SafeSweptToElementary>                                       se = new SafeSweptToElementary();
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> context;
+  BRepTools_Modifier                                                       md;
+  return ShapeCustom::ApplyModifier(s, se, context, md);
+}
+
 // Prepare a shape for XT: elementary surfaces where swept/revolved ones are,
 // B-splines for the other swept and offset surfaces (same parameterisation),
 // revolved ones too unless `keep_spun` (and all of them when one has a profile
 // the writer can't keep), and faces closed on a surface that isn't periodic split.
 TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun)
 {
-  TopoDS_Shape r = ShapeCustom::SweptToElementary(s);
+  TopoDS_Shape r = swept_to_elementary(s);
   for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && keep_spun; ef.Next())
   {
     TopLoc_Location                 loc;
     const occ::handle<Geom_Surface> fs = basis_surface(BRep_Tool::Surface(TopoDS::Face(ef.Current()), loc));
     keep_spun = occ::down_cast<Geom_SurfaceOfRevolution>(fs).IsNull() || spun(fs);
+    // A profile reaching the axis (a pole: a degenerated edge) isn't kept spun.
+    for (TopExp_Explorer ee(ef.Current(), TopAbs_EDGE); ee.More() && keep_spun && !occ::down_cast<Geom_SurfaceOfRevolution>(fs).IsNull(); ee.Next())
+      keep_spun = !BRep_Tool::Degenerated(TopoDS::Edge(ee.Current()));
   }
   r = ShapeCustom::ConvertToBSpline(r, true, !keep_spun, true, false);
   bool split     = false;

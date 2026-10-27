@@ -934,3 +934,23 @@ fn binary_stl_header_is_zeros() {
     let n = u32::from_le_bytes(bytes[80..84].try_into().unwrap()) as usize;
     assert!(n > 0 && bytes.len() == 84 + 50 * n);
 }
+
+/// A spline profile revolved to the axis (a pole: a degenerated edge with no
+/// 3D curve) writes as Parasolid: OCCT's modifier asked SweptToElementary
+/// about it with a null face and crashed (parts of the NIST assembly). Its
+/// spun face goes as a B-spline (split, as other closed ones).
+#[test]
+fn parasolid_spun_spline_to_the_axis() {
+    let mm = 1e-3;
+    let prof = make_bspline(&[DVec3::new(8.0, 0.0, 0.0) * mm, DVec3::new(9.0, 0.0, 5.0) * mm, DVec3::new(4.0, 0.0, 9.0) * mm, DVec3::new(0.0, 0.0, 10.0) * mm], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
+    let w = make_wire(&[make_line(DVec3::ZERO, DVec3::new(8.0, 0.0, 0.0) * mm).unwrap(), prof, make_line(DVec3::new(0.0, 0.0, 10.0) * mm, DVec3::ZERO).unwrap()]).unwrap();
+    let dome = revolve(&make_face_from_wire(&w, true).unwrap(), DVec3::ZERO, DVec3::Z, std::f64::consts::TAU).unwrap().shape;
+    let want = volume_properties(&dome).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-xt-dome-{}.x_t", std::process::id()));
+    write_parasolid(&path, std::slice::from_ref(&dome), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
+    assert!(back.is_valid());
+    let _ = std::fs::remove_file(&path);
+    let v = volume_properties(&back).unwrap().mass;
+    assert!((v - want).abs() < 1e-6 * want, "{v} vs {want}");
+}
