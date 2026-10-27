@@ -5651,7 +5651,10 @@ impl PartStudioView {
         let sum = |f: fn(&noshape_model::display::BodyDisplay) -> usize| d.bodies.iter().map(f).sum::<usize>();
         let sketch: usize = d.sketches.iter().map(|s| s.curves.len() + s.points.len()).sum();
         let primitives = [("Faces", sum(|b| b.face_refs.len())), ("Edges", sum(|b| b.mesh.edges.iter().filter(|p| !p.is_empty()).count())), ("Vertices", sum(|b| b.vertex_refs.len())), ("Sketch entities", sketch), ("Planes", d.planes.len())];
-        TabPerf { regen_ms: d.regen_ms, features, primitives: primitives.into_iter().map(|(k, n)| (k.to_string(), n)).collect() }
+        // Live: one total, the feature times' sum (the Regeneration times dialog's footer), not this run's wall time
+        // (a regeneration from the cache took 46 ms where the features read 314; PERF-TOTAL-MISMATCH).
+        let regen_ms = d.features.iter().map(|f| f.time_ms).sum();
+        TabPerf { regen_ms, features, primitives: primitives.into_iter().map(|(k, n)| (k.to_string(), n)).collect() }
     }
 
     /// Performance panel › the stopwatch: the feature list's regeneration times.
