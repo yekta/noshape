@@ -167,6 +167,15 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
+## 09:40–10:00 (greens dacce5e7 → 3197362b, watcher CLI 09:50)
+- Verified: UNDO-NOOP-SHIFT (minimal repro + bin/undochk_noop.py seed 5 full path; note history_list returns 50 entries,
+  the checkers now track the head id), API-MATE-RETYPE-NAME.
+- Live answers applied: CONFIG-CELL-EDIT confirmed; an unchanged ✓ is an edit in live too.
+- New: PLDRAFT-VOLUME (P3: curved parting-line drafts +2e-6..4e-6 of live's 4 cases, bin/pldraft.py).
+- v0.4.9 fcd301e2 CI artifact: crash documents open; DRAFT-HANG still ships.
+- OK: depth field 0 / 500 m / −5 mm as live, tab Duplicate (independent copy) + inline rename, assembly STEP export →
+  import (3 instances, positions kept), assembly tab after the Assembly-UI crate split.
+
 ## 09:10–09:40 (green dacce5e7 → eab98680, watcher CLI 08:30)
 - **BUDGET-LONGJMP (P0 core, new)**: the budgets siglongjmp out of OCCT from a timer signal. Fuzz seed 120 deadlocked
   on glibc's main_arena lock (backtrace + 2.6 GB core in tickets/). Seed 93 with NOSHAPE_BLEND_BUDGET=100000 ran
