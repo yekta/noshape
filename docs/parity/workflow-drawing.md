@@ -34,7 +34,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 2.5 | Datum on an edge | filled triangle + leader + framed "A" | same; next label "B" | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (A then B) |
 | 2.6 | GTol dialog | Upper text, Prefix, Type ⌖▾, Tolerance, 3 Datums, Suffix, + / Ø, Lower text; **✓ enabled once something is entered** | same fields; **typing right after opening is lost** although Tolerance shows focus (needs a click); ✓ stays dimmed with content | ✗ D7 |  |
 | 2.7 | Each click places another frame, Esc ends | yes | yes | ✅ |  |
-| 2.8 | Note (n), click, type, ✓ | in-place editor with ruler, formatting toolbar | same | ✅ |  |
+| 2.8 | Note (n), click, type, ✓ | in-place editor with ruler, formatting toolbar | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (editor with ruler + formatting toolbar) |
 
 ## 3. BOM table, balloons, sheet properties
 
@@ -42,7 +42,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 |---|---|---|---|---|---|
 | 3.1 | BOM table, place top right | Item / Quantity / Part number / Description, rows from the assembly BOM | same; quantities 1/1/6/1/1, PN-001 | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (Item / Quantity / Part number / Description: 1 / 1, 2 / 2) |
 | 3.2 | Callout on a part edge in the assembly view (BOM table present) | balloon shows the **BOM item number** | balloon shows **"----"** | ✗ D8 |  |
-| 3.3 | Right-click sheet › Sheet properties… | Scale / Format / Size / Reference | same; scale "1:2" Enter + ✓ updates the title block SCALE | ✅ |  |
+| 3.3 | Right-click sheet › Sheet properties… | Scale / Format / Size / Reference | same; scale "1:2" Enter + ✓ updates the title block SCALE | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (1:2 + ✓: SCALE 1:2, views shrink; datums stay put: DATUM-SCALE-DETACHED) |
 
 ## 4. Export
 
