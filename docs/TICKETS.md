@@ -348,6 +348,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
+  List → id "Configuration" (renamed "Size", the id stays "Configuration"), Checkbox → "Checkbox_2" (ops/config.rs
+  add_input → fs_identifier(name)). Live gives a List a random internal id `List_8iFesnytxapQpg` (behaviours 5915, 6098:
+  config string `List_YC7FakBBQ6r7FX=Default;…`), which our Variable Studio already copies (ops/vs_config.rs:35). The id
+  shows in Edit FeatureScript IDs… and in configuration strings (Derived, API, export names), so Part Studio and
+  Variable Studio disagree. Use the List_… form (and live's Checkbox form, unknown: one capture of Edit FeatureScript
+  IDs for a new Checkbox settles it). Rest of the configuration matrix fine: List × Checkbox (suppression) × config
+  Variable (#h as Extrude 2 depth), 8 / 8 volumes exact, activation leaves history alone, reset right
+  (bin/cfgmatrix.py, CLI 09:50) (qa 2026-10-27 10:44, CLI 09:50)
 - [ ] P2 FS-EDITOR-COMPLETE the Feature Studio editor has no code completion, and Ctrl+Space in it leaves the tab. Steps:
   /root/qa-scratch/tickets/cfs2.noshape › Feature Studio 1 › end of the source, type `opExt` (wait), then Ctrl+Space.
   Ours (green e8858e61): nothing drops down while typing; Ctrl+Space runs the document-wide "back to the previous tab"
