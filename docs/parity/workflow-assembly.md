@@ -16,11 +16,11 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | # | Step | Live | Ours | Status |
 |---|---|---|---|---|
 | 1.1 | + › Import… → STEP | file prompt, then the Import dialog | path prompt (no-native-dialog mode), "Import to Onshape" dialog: Import to this document / Combine to a single Part Studio, ☑ Import appearances, ☐ Y axis up, ☐ composite, ☐ join surfaces | ✅ (see kern G38h for live's dialog) |
-| 1.2 | Import | Part Studio tab named after the file | tab "bracket" (Import 1 → Part 1) + folder tab "CAD Imports"; the new tab is placed after Part Studio 1, not at the end | ? |
+| 1.2 | Import | Part Studio tab named after the file; the new tabs go right after the open tab (SPECS 10-27, behaviours Import "inserted right after the active tab") | tab "bracket" (Import 1 → Part 1) + folder tab "CAD Imports"; the new tab is placed after Part Studio 1, not at the end | ✅ (= live with Part Studio 1 open) |
 | 1.3 | Assembly, i | "Insert parts and assemblies", Current document › Part Studios, filters, tree with thumbnails, "Inserted: 0", "Undo to remove instances" | same | ✅ |
 | 1.4 | Click Part 1 (empty assembly) | instance at identity, **amber (selected)**, row selected, view zooms to fit it | at identity, but **not amber, row not selected**; the zoom-to-fit crops the plate at the right edge | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 |
 | 1.5 | Click Part 2, move to graphics, click | follows the cursor amber; drops at the click | same | ✅ |
-| 1.6 | Bracket (Part 1 of "bracket") | ? | instance named "Part 1 <2>" | ? |
+| 1.6 | Bracket (Part 1 of "bracket") | ? (asked live 10-27: numbering per name or per part) | instance named "Part 1 <2>" (ours numbers per name) | ? |
 | 1.7 | ✓, F | – | 5 instances | ✅ |
 | 1.8 | Part 1 <1> › right-click | menu (skb list) | same items (Add comment omitted, cloud) | ✅ |
 | 1.9 | Fix | ground glyph on the row and on Assembly 1 | same | ✅ |
