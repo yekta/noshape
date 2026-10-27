@@ -1912,9 +1912,13 @@ pub struct RenderParams<'a> {
     pub pick: bool,
 }
 
+/// An adapter with its device and queue.
+type Gpu = (wgpu::Adapter, wgpu::Device, wgpu::Queue);
+
 /// The process's GPU: the first high-performance adapter, its device and queue (see [`Renderer::new_async`]).
-fn shared_device() -> Result<&'static (wgpu::Adapter, wgpu::Device, wgpu::Queue), RenderError> {
-    static SHARED: std::sync::OnceLock<Result<(wgpu::Adapter, wgpu::Device, wgpu::Queue), (bool, String)>> = std::sync::OnceLock::new();
+/// The error says whether the device (`true`) or the adapter failed.
+fn shared_device() -> Result<&'static Gpu, RenderError> {
+    static SHARED: std::sync::OnceLock<Result<Gpu, (bool, String)>> = std::sync::OnceLock::new();
     let made = SHARED.get_or_init(|| {
         pollster::block_on(async {
             let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
