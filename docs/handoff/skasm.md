@@ -15,6 +15,8 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 - cdde1c06 F19 Width mate in any pick order + DOF cache across evaluations, per-group DOF length scale.
 - c76cdcf4 assembly least change measured at the bodies' mate connectors (oracle_asm R1 matches live; R1 out of KNOWN;
   R3/C1 now keep rz 0, still KNOWN for live's −157.5°).
+- 3bcb5145 SKETCH-DRAG-BIG: sketch regions' hole search by bounding box (regions 38 → 3.5 ms, regen 47 → 12 ms per
+  drag step on 1000 entities; perf test scene sketch_perf::big_shape_sketch_drag_step_parts).
 - 6329b168 sketch: polygons as live (seed + circular pattern; Inscribed = edge middle, Circumscribed = vertex; no Ø
   dimension), Point tool on the Origin, paste at the pointer + Transform (SKETCH-PASTE), unsolvable constraint keeps
   the shape; API polygon descriptions.
@@ -25,16 +27,20 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
   precision…" (parity 8.7d 🔧 until then). Land after the lead's app split (rebase, re-find the file).
 
 ## Next, in order
-1. P1 SKETCH-DRAG-BIG (qa): a drag step in a 1000-entity sketch re-evaluates the sketch feature (72–113 ms). Per step
-   the feature regen clones the sketch, solves it again (already solved by the drag), computes regions (pairwise
-   curve intersections, hole assignment by winding) and wires. Perf test ready to add:
-   `python3 /root/skasm-scratch/dragbig_patch.py` (scene tests/sketch_perf.rs `big_shape_sketch_drag_step_parts`,
-   times solve / regions / regen apart). Then make the slow part incremental (sketch crate / model-core regen).
-2. agent/perf 7594798b assembly drag bench (viewport.rs; app: after the app split). Patch /root/skasm-scratch/bench.patch.
-3. Assembly perf: `cargo test -p noshape-ops --test all assembly_perf:: -- --ignored --nocapture`.
-4. GUI-verify docs/parity/workflow-assembly-sweep.md's 🔧 rows (their messages are on main in code).
+1. After the app split (app files frozen until then): land the WIP app commit; then LIMIT-PLACEHOLDER (found 10-27 on
+   green dc3a03f6): the mate dialog's empty limit fields hold "No minimum" / "No maximum" as text, so clicking in and
+   typing 10 gives "No ma10ximum"; live shows them as placeholders (behaviours 8689, 16619). File
+   assembly_mate_dialog.rs.
+2. agent/perf 7594798b assembly drag bench (viewport.rs; app). Patch /root/skasm-scratch/bench.patch.
+3. Sketch regen per drag step still ~12 ms on 1000 entities (dev): the regen re-solves an already solved sketch and
+   recomputes wires; a release build is well inside the frame, so only if a budget run says otherwise.
+4. GUI-verify the rest of docs/parity/workflow-assembly-sweep.md's 🔧 rows (14, 18, 25 ✅ 10-27).
 5. oracle_asm R3/C1 (live turns the flipped pin −157.5°); M1 is live's own failing case.
 6. End-of-day walk of sketch + assembly workflows in /root/green/noshape against live (~04:00 UTC).
+
+Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_perf:: -- --ignored --nocapture`):
+200 pins / 300 mates: evaluation again 6.5 ms, adding a mate 16.5 ms, inserting a pin 7.8 ms (was ~50), drag steps
+1.9–2.8 ms (frame with the scene 2.2–3.1 ms); 1000 free pins: drag 0.55 ms, insert 3.8 ms. All inside the budgets.
 
 ## Build times (10-26, load 30–55, 4 agents building)
 - First build of app + cli on this target dir: 60 min. First test build of ops tests: 20 min.

@@ -28,17 +28,17 @@ the error-string table's.
 | 11 | Replicate, nothing matches | "Selected target did not contain identical geometry." | "No matching geometry found (on the target instance)" | 🔧 |
 | 12 | Both connectors on one instance | "Mate connectors are on same instance." | "Both mate connectors are on the same rigid set" | 🔧 (E1: the dialog refuses the pick, row 24) |
 | 13 | Both in one group | "Mate cannot be added between member of same group." | same as 12 | 🔧 (E2 confirmed) |
-| 14 | Both instances fixed (E3) | "Mate is between fixed instances."; the fix icons get a yellow ⚠, the root an error badge | no check (solves as fixed) | 🔧 |
+| 14 | Both instances fixed (E3) | "Mate is between fixed instances."; the fix icons get a yellow ⚠, the root an error badge | no check (solves as fixed) | ✅ (GUI green dc3a03f6, skasm 10-27) |
 | 15 | Mated instance suppressed (E4) | not an error: "Revolute 2 (Inactive: One or more instances is suppressed)" | inactive, no reason | 🔧 |
 | 16 | Relations fighting (E8: two gears, ratios 1 and 2, one pair) | no error | "Relation could not be solved (conflicts with other mates or relations)" | 🔧 |
 | 17 | Relation on a suppressed / inactive mate (E4, E5) | Inactive: "Gear 1 (Inactive: One or more mates is inactive or suppressed)" | error "One or more mates in this relation are suppressed." (row 6) | 🔧 |
-| 18 | Mate limits min > max (E11) | "Minimum mate limit should be smaller than maximum limit. A parameter value is not valid.", both limit inputs pink | no check (both limits kept) | 🔧 |
+| 18 | Mate limits min > max (E11) | "Minimum mate limit should be smaller than maximum limit. A parameter value is not valid.", both limit inputs pink | no check (both limits kept) | ✅ (GUI green dc3a03f6, skasm 10-27) |
 | 19 | Replicate without target scope / mate (E12) | "A target scope must be selected." / "Missing mate to be matched." (dialog title) | "Select parts to find match in" / our own | 🔧 |
 | 20 | Pattern count 0 or 2501 (E13) | count pink, title black, tooltip "… did not regenerate properly:  A parameter value is not valid." (two spaces) | pink, no tooltip | 🔧 |
 | 21 | Pattern distance / angle 0 (E13) | "Linear pattern distance must be positive. A parameter value is not valid." / "Circular pattern angle must be positive. …" | no check | 🔧 |
 | 22 | Insert the assembly into itself (E14) | not offered; search "No assemblies match current search." | not offered; "No results." | 🔧 |
 | 24 | Second pick on the same instance (E1) | not accepted; title "Fastened 1 did not regenerate properly: Mate needs two mate connectors." | a yellow alert "Select a mate connector on a different instance" | 🔧 |
-| 25 | Dialog errors (all assembly feature dialogs) | red title with tooltip "<name> did not regenerate properly: <text>" (mate, relation, pattern) | red title, no tooltip; mate errors in a yellow alert box | 🔧 |
+| 25 | Dialog errors (all assembly feature dialogs) | red title with tooltip "<name> did not regenerate properly: <text>" (mate, relation, pattern) | red title, no tooltip; mate errors in a yellow alert box | ✅ (GUI green dc3a03f6, skasm 10-27) |
 | 26 | Tangent dialog fields | two "Face, edge or vertex" fields; incomplete: "Tangent mate needs two entities." | one "Mate connectors" field | 🔧 |
 | 27 | Width tab field | "Tab mate connector(s)" | "Tab mate connectors" | 🔧 |
 | 28 | Part deleted (E15) | instance rows red "Failed to resolve instance."; connector mate "Failed to resolve the instance for mate." (its chip red); face mate "Selection is invalid." with "Missing entity of …" chips; mate connector "Failed to resolve mate connector origin."; badges "Assembly contains error" / "Mate error" | "Part no longer exists in its Part Studio …", "Instance no longer exists"; no badge tooltips | 🔧 |
