@@ -43,8 +43,13 @@ pub fn add_input(ps: &mut PartStudio, label: &str) -> String {
     } else {
         (1..).map(|k| format!("List input {k}")).find(|c| !names.contains(&c.as_str())).unwrap_or_default()
     };
-    // FeatureScript ids from the names (Edit FeatureScript IDs… shows them).
-    let id = fs_identifier(&name, &taken);
+    // Live (CONFIG-INPUT-ID): a List gets a random internal id ("List_8iFesnytxapQpg", as the Variable Studio's);
+    // the others FeatureScript ids from their names (Edit FeatureScript IDs… shows them).
+    let id = if label == "List" || !matches!(label, "Checkbox" | "Variable") {
+        std::iter::repeat_with(crate::vs_config::list_id).find(|i| !taken.contains(i)).unwrap_or_default()
+    } else {
+        fs_identifier(&name, &taken)
+    };
     ps.configuration.inputs.push(ConfigInput { id: id.clone(), name, kind, visible_when: None, excluded: false });
     id
 }
@@ -330,6 +335,20 @@ pub fn set_visibility(ps: &mut PartStudio, input: &str, v: Option<noshape_model:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// CONFIG-INPUT-ID: a new List's internal id is live's random "List_" + 14 letters and digits (the Variable
+    /// Studio's form), unique, not its name; a Checkbox keeps a FeatureScript id from its name.
+    #[test]
+    fn a_new_list_gets_a_random_internal_id() {
+        let mut ps = PartStudio::new();
+        let (a, b) = (add_input(&mut ps, "List"), add_input(&mut ps, "List"));
+        for id in [&a, &b] {
+            assert!(id.starts_with("List_") && id.len() == 19 && id[5..].chars().all(|c| c.is_ascii_alphanumeric()), "{id}");
+        }
+        assert_ne!(a, b);
+        let c = add_input(&mut ps, "Checkbox");
+        assert!(!c.starts_with("List_"), "{c}");
+    }
 
     /// qa5 C1: the first List is "Configuration" (also after a variable
     /// input), then "List input 1", "List input 2".

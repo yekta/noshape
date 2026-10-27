@@ -394,7 +394,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     (`vs_backsil` divided by a finite step's on-screen length, which can come out as nothing); its push is now
     analytic, test a_thin_plate_draws_nothing_past_its_outline (1× and 2×). The edge looks wait for live's 2×
     capture.
-- [ ] P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
+- [x] COMMIT P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
   List → id "Configuration" (renamed "Size", the id stays "Configuration"), Checkbox → "Checkbox_2" (ops/config.rs
   add_input → fs_identifier(name)). Live gives a List a random internal id `List_8iFesnytxapQpg` (behaviours 5915, 6098:
   config string `List_YC7FakBBQ6r7FX=Default;…`), which our Variable Studio already copies (ops/vs_config.rs:35). The id
@@ -403,6 +403,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   IDs for a new Checkbox settles it). Rest of the configuration matrix fine: List × Checkbox (suppression) × config
   Variable (#h as Extrude 2 depth), 8 / 8 volumes exact, activation leaves history alone, reset right
   (bin/cfgmatrix.py, CLI 09:50) (qa 2026-10-27 10:44, CLI 09:50)
+  psui: a new List input's id is live's random List_… form (`vs_config::list_id`, as the Variable Studio's);
+  Checkbox and Variable keep FeatureScript ids from their names until a capture shows live's Checkbox form.
 - [ ] P2 FS-EDITOR-COMPLETE the Feature Studio editor has no code completion, and Ctrl+Space in it leaves the tab. Steps:
   /root/qa-scratch/tickets/cfs2.noshape › Feature Studio 1 › end of the source, type `opExt` (wait), then Ctrl+Space.
   Ours (green e8858e61): nothing drops down while typing; Ctrl+Space runs the document-wide "back to the previous tab"
@@ -459,7 +461,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     covering the linear and circular ones, so `EDGE && ALLOWS_AXIS` takes linear, circular and sketch edges, `EDGE &&
     GeometryType.LINE` linear and sketch edges, `EDGE && CIRCLE` circular ones (model test
     custom_features::compound_edge_filters_take_model_edges).
-- [x] COMMIT P3 PERF-TOTAL-MISMATCH the Performance panel and its Regeneration times dialog give two totals for the same studio:
+- [x] 8cdd189f P3 PERF-TOTAL-MISMATCH the Performance panel and its Regeneration times dialog give two totals for the same studio:
   live-30-features.noshape just opened (regen from cache) → panel "Total regeneration time: 46ms", stopwatch › dialog footer
   "Total regen time: 314ms" (the per-feature column sums to ~314). Live reads one number in both places (behaviours 17899);
   show the same (tickets/perf-total-mismatch.png) (qa 2026-10-27, green dacce5e7)
