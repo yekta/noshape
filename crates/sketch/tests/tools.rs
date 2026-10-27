@@ -415,3 +415,18 @@ fn offset_lone_line_and_circle_stay_offsets() {
     };
     assert!(close(r(&sk, copy) - r(&sk, c), 2.0, 1e-7), "{} {}", r(&sk, copy), r(&sk, c));
 }
+
+/// Live "skb (10-25) sketch Use on a face sketch": a used circle's centre
+/// point is construction; a used line's end points are not.
+#[test]
+fn used_circle_centre_is_construction() {
+    let mut sk = Sketch::new();
+    let res = sk.use_external(&Curve2::Circle { center: v(10.0, 10.0), radius: 3.0 }).unwrap();
+    let circle = *res.created.last().unwrap();
+    let centre = sk.entity(circle).and_then(|e| e.center()).unwrap();
+    assert!(sk.entity(centre).unwrap().construction && sk.entity(centre).unwrap().external);
+    let res = sk.use_external(&Curve2::Line { a: v(40.0, 20.0), b: v(0.0, 20.0) }).unwrap();
+    let line = *res.created.last().unwrap();
+    let (a, b) = sk.endpoints(line).unwrap();
+    assert!(!sk.entity(a).unwrap().construction && !sk.entity(b).unwrap().construction);
+}

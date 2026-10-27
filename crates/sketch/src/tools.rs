@@ -896,11 +896,18 @@ impl Sketch {
             res.created.push(id);
             id
         };
+        // Live (behaviours "skb (10-25) sketch Use on a face sketch"): a used
+        // circle's centre point is construction (still drawn as a dot).
+        let centre = |sk: &mut Sketch, p: DVec2, res: &mut EditResult| -> EntityId {
+            let id = sk.add_entity(Geometry::Point { pos: p }, true, true).unwrap();
+            res.created.push(id);
+            id
+        };
         let g = match curve {
             Curve2::Line { a, b } => Geometry::Line { start: pt(self, *a, &mut res), end: pt(self, *b, &mut res) },
-            Curve2::Circle { center, radius } => Geometry::Circle { center: pt(self, *center, &mut res), radius: *radius },
+            Curve2::Circle { center, radius } => Geometry::Circle { center: centre(self, *center, &mut res), radius: *radius },
             Curve2::Arc { center, radius, start_angle, end_angle } => {
-                let c = pt(self, *center, &mut res);
+                let c = centre(self, *center, &mut res);
                 let s = pt(self, *center + DVec2::from_angle(*start_angle) * *radius, &mut res);
                 let e = pt(self, *center + DVec2::from_angle(*end_angle) * *radius, &mut res);
                 Geometry::Arc { center: c, start: s, end: e }
