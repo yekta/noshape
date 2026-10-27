@@ -2661,3 +2661,45 @@ fn face_blend_on_curved_faces_filtered(ellipse: bool, curvature_only: bool) {
     }
     assert!(bad.is_empty(), "{bad:#?}");
 }
+
+/// Live (behaviours "dx (2026-10-27, P3) flat pattern line styles in a
+/// drawing"): a counterbore shows in the flat as its through hole and its
+/// head's circle, "up" when the head is on the side the flat is seen from.
+#[test]
+fn counterbore_head_shows_in_flat() {
+    // From the top (the side the flat is seen from), then from the bottom.
+    for from_top in [true, false] {
+        let mut s = plate();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = sk.add_point(DVec2::new(mm(50.0), mm(20.0)));
+        let sid = if from_top {
+            let pl = s.add("cPlane", |p| {
+                p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+                p.set("offset", expr("2 mm"));
+            });
+            s.sketch(Reference::FeaturePlane(pl), sk)
+        } else {
+            s.sketch(Reference::Plane(DatumPlane::Top), sk)
+        };
+        let part = s.ok().context.bodies[0].id.clone();
+        s.add("hole", move |h| {
+            h.set("scope", q(Reference::Body(part)));
+            h.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: p.0 }]));
+            h.set("oppositeDirection", ParamValue::Bool(!from_top));
+            h.set("unitsSystem", en("METRIC"));
+            h.set("styleV2", en("C_BORE"));
+            h.set("endStyleV2", en("THROUGH"));
+            h.set("holeDiameterV3", expr("4 mm"));
+            h.set("cBoreDiameterV3", expr("8 mm"));
+            h.set("cBoreDepthV3", expr("1 mm"));
+        });
+        let r = s.ok();
+        let fp = flat(&r, 0);
+        let radii: Vec<f64> = fp.loops.iter().skip(1).map(|l| l.iter().map(|p| (*p - DVec2::new(mm(50.0), mm(20.0))).length()).sum::<f64>() / l.len() as f64).collect();
+        assert_eq!(radii.len(), 1, "{radii:?}");
+        assert!(near(radii[0], mm(2.0), 1e-4), "the through hole: {radii:?}");
+        assert_eq!(fp.heads.len(), 1, "{:?}", fp.heads);
+        assert!(near(fp.heads[0].radius, mm(4.0), 1e-6), "{:?}", fp.heads);
+        assert_eq!(fp.heads[0].up, from_top == (fp.frame.normal.z > 0.0), "from top {from_top}: {:?} {:?}", fp.heads, fp.frame.normal);
+    }
+}

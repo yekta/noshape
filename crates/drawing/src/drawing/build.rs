@@ -1609,12 +1609,15 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // Forms (live "dx (2026-10-27, P3) flat pattern line styles"): an
             // up form always, in Flat pattern views › Form up's style (Center
             // by default); a down form only with hidden lines shown, in Form
-            // down's.
-            for (pts, up) in &geo.flat_forms {
+            // down's. Counterbore / countersink heads the same way, in
+            // Counterbore/Countersink up / down's.
+            let forms = geo.flat_forms.iter().map(|(pts, up)| (pts, *up, if *up { 3 } else { 4 }));
+            let heads = geo.flat_heads.iter().map(|(pts, up)| (pts, *up, if *up { 0 } else { 1 }));
+            for (pts, up, row) in forms.chain(heads) {
                 if !up && v.style != RenderStyle::HiddenLinesVisible {
                     continue;
                 }
-                let (kind, color) = vt.flat_lines.get(if *up { 3 } else { 4 }).copied().unwrap_or((2, None));
+                let (kind, color) = vt.flat_lines.get(row).copied().unwrap_or((2, None));
                 let style = match kind {
                     0 => LineStyle::Visible,
                     1 => LineStyle::Hidden,

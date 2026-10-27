@@ -35,6 +35,18 @@ pub struct FlatForm {
     pub up: bool,
 }
 
+/// A counterbore / countersink head shown in the flat pattern: the head's
+/// circle around the through hole (live: Flat pattern views ›
+/// Counterbore/Countersink up / down).
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlatHead {
+    pub center: DVec2,
+    pub radius: f64,
+    /// The head is on the side the flat is seen from: live draws it always,
+    /// one on the other side with hidden lines only.
+    pub up: bool,
+}
+
 /// The unfolded part: outline loops and bend lines in the flat plane.
 #[derive(Clone, Debug)]
 pub struct FlatPattern {
@@ -47,6 +59,8 @@ pub struct FlatPattern {
     pub bend_lines: Vec<FlatBendLine>,
     /// Form outlines and center marks (drawn over the flat region).
     pub forms: Vec<FlatForm>,
+    /// Counterbore / countersink heads (the flat itself shows the through hole).
+    pub heads: Vec<FlatHead>,
     /// The flat region as planar face(s) in model space.
     pub shape: Option<Shape>,
     pub thickness: f64,
@@ -357,6 +371,50 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
             super::FlatMarkKind::Cut => cuts.extend(face),
         }
     }
+    // Counterbore / countersink heads: a circle on one sheet side around a
+    // smaller one on the other. The flat shows the through hole (the
+    // reference side's bigger circle is filled back to it) and the head.
+    let mut heads = Vec::new();
+    let resolve = |names: &[crate::naming::Name]| -> Vec<Shape> {
+        let mut v: Vec<usize> = names.iter().flat_map(|n| body.find_faces(n)).collect();
+        v.sort_unstable();
+        v.dedup();
+        v.into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()).filter(|f| f.is_planar()).collect()
+    };
+    for (w, wall) in data.walls.iter().enumerate() {
+        let Some(m) = xf[w] else { continue };
+        let circles = |faces: &[Shape]| -> Vec<(DVec2, f64)> {
+            faces
+                .iter()
+                .flat_map(|f| {
+                    let mut ls: Vec<Vec<DVec2>> = f.wires().iter().map(|w| wire_points(w).into_iter().map(|p| frame.to_local(m.transform_point3(p))).collect()).collect();
+                    // The outer boundary is not a hole.
+                    ls.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
+                    ls.into_iter().skip(1).filter_map(|l| circle_of(&l)).collect::<Vec<_>>()
+                })
+                .collect()
+        };
+        let back = circles(&resolve(&wall.back));
+        if back.is_empty() {
+            continue;
+        }
+        let tol = 1e-6;
+        for (c, rf) in circles(&wall_faces[w]) {
+            let Some(&(_, rb)) = back.iter().find(|(cb, rb)| cb.distance(c) < tol && (rf - rb).abs() > 10.0 * tol) else { continue };
+            let on_front = rf > rb;
+            if on_front {
+                let disk = |r: f64| k::make_circle(frame.to_world(c), frame.unit_normal(), r).and_then(|e| k::make_wire(&[e])).and_then(|w| k::make_face_from_wire(&w, true));
+                match (disk(rf), disk(rb)) {
+                    (Ok(head), Ok(hole)) => {
+                        pieces.push(head);
+                        cuts.push(hole);
+                    }
+                    _ => warnings.push("A counterbore could not be drawn in the flat".into()),
+                }
+            }
+            heads.push(FlatHead { center: c, radius: rf.max(rb), up: on_front != data.view_back });
+        }
+    }
     warnings.dedup();
     if pieces.is_empty() {
         return Err("Nothing to flatten".into());
@@ -389,7 +447,7 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
         }
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
-    Ok(FlatPattern { frame, loops, bend_lines: lines, forms, shape, thickness: t, warnings })
+    Ok(FlatPattern { frame, loops, bend_lines: lines, forms, heads, shape, thickness: t, warnings })
 }
 
 /// A flat pattern from planar pieces already laid flat in `frame` (walls and
@@ -422,7 +480,7 @@ pub fn flat_from_pieces(frame: k::Plane, pieces: &[Shape], bend_lines: Vec<FlatB
         }
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
-    Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), shape, thickness, warnings })
+    Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings })
 }
 
 fn extent(l: &[DVec2]) -> f64 {
@@ -472,6 +530,17 @@ fn union_planar(pieces: &[Shape]) -> Result<Shape, String> {
 }
 
 /// Sample the edges of a wire into one closed polyline (plane coordinates).
+/// Center and radius of a sampled loop that is a circle.
+fn circle_of(l: &[DVec2]) -> Option<(DVec2, f64)> {
+    if l.len() < 8 {
+        return None;
+    }
+    let (lo, hi) = l.iter().fold((DVec2::splat(f64::MAX), DVec2::splat(f64::MIN)), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
+    let c = (lo + hi) * 0.5;
+    let r = l.iter().map(|p| p.distance(c)).sum::<f64>() / l.len() as f64;
+    (r > 1e-9 && l.iter().all(|p| (p.distance(c) - r).abs() < 1e-4 * r + 1e-8)).then_some((c, r))
+}
+
 fn wire_loop(w: &Shape, frame: &k::Plane) -> Vec<DVec2> {
     wire_points(w).into_iter().map(|p| frame.to_local(p)).collect()
 }

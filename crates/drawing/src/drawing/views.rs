@@ -931,6 +931,9 @@ pub struct ViewGeometry {
     /// Flat pattern views: form outlines (closed, view coordinates) and
     /// whether the form points up (toward the viewer).
     pub flat_forms: Vec<(Vec<[f64; 2]>, bool)>,
+    /// Flat pattern views: counterbore / countersink head circles and
+    /// whether the head is on the viewer's side.
+    pub flat_heads: Vec<(Vec<[f64; 2]>, bool)>,
     /// Free points of the sketches drawn in the view.
     pub sketch_points: Vec<[f64; 2]>,
     /// Crop boundary of a cropped view (view coordinates).
@@ -2818,6 +2821,10 @@ fn flat_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewF
         }
         g.form_marks.push(pt(f.center));
         g.snaps.push(Snap { p: pt(f.center), kind: SnapKind::Center, point: None });
+    }
+    for h in &flat.heads {
+        let pts: Vec<[f64; 2]> = (0..=64).map(|i| i as f64 * std::f64::consts::TAU / 64.0).map(|a| pt(h.center + DVec2::new(a.cos(), a.sin()) * h.radius)).collect();
+        g.flat_heads.push((pts, h.up));
     }
     for b in &flat.bend_lines {
         g.bends.push(FlatBend { a: pt(b.a), b: pt(b.b), up: b.up, angle: b.angle, radius: b.radius, width: b.allowance });

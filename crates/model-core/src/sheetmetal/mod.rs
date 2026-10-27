@@ -18,7 +18,7 @@ use glam::{DMat4, DVec3};
 
 pub mod flat;
 pub mod flat_dxf;
-pub use flat::{FlatBendLine, FlatForm, FlatPattern, flat_pattern, flat_pattern_for};
+pub use flat::{FlatBendLine, FlatForm, FlatHead, FlatPattern, flat_pattern, flat_pattern_for};
 
 /// Bend relief shape (model default or Bend relief override).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
