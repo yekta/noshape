@@ -76,7 +76,7 @@ selection and hover per step, rows in brackets).
 
 | # | Behaviour | Live / source | Status |
 |---|---|---|---|
-| 5.1 | Panel 440 px, Part / Face tabs, values = `query_mass_properties` | L403 | 🔧 (P 11.2) |
+| 5.1 | Panel 440 px, Part / Face tabs, values = `query_mass_properties` | L403 | 🔧 (P 11.2; 10-27: the panel opens ~440 px wide with Part / Face tabs and Esc closes it; values not compared with live) |
 | 5.2 | No material: red chip, blank mass / CoM / inertia; a one-time toast "One or more parts do not have a material defined." 3.6 s after opening, hidden 4.6 s later | L6287–6318 | ✅ (psui 10-27: the red "Part 1" chip, mass / CoM / inertia blank, CoM and inertia Override greyed, the toast at the top centre, as live "qa4 F18/F19") |
 | 5.2b | On the Part tab a face / edge / vertex click takes the whole part (shaded part amber, its Parts row selected); on the Face tab the face ("Face of Extrude 1", face amber) | behaviours "psui (10-27, interaction 5.x)" | ✅ Part tab (psui 10-27; a selected part's shading refit: top (239,182,72) / front (192,146,57) / right (227,172,68) vs live (243,183,72) / (192,144,57) / (224,169,66)) |
 | 5.3 | Face tab: Surface area, Perimeter, Lxx/Lxy/Lyx/Lyy, Lzz; non-coplanar faces blank and a red title | L2723–2735 | 🔧 (P 11.5) |

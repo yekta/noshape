@@ -170,7 +170,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.5 | Click toggles a feature in the selection (additive) | features_and_parts_lists ("just click to select additional items") | ✅ (app 10-24) |
 | 6.6 | Shift+click selects a range, hidden sketches included (live 10-27) | Home__selection | ✅ |
 | 6.7 | Drag a feature to reorder | features_and_parts_lists | ✅ |
-| 6.8 | Dragging a selected feature moves every selected feature (non-contiguous allowed) | features_and_parts_lists | 🔧 |
+| 6.8 | Dragging a selected feature moves every selected feature (non-contiguous allowed) | features_and_parts_lists | ✅ (10-27: Sketch 3 + Extrude 3 dragged above Sketch 2: a "2 items" chip, the drop line, both move) |
 | 6.9 | A reorder above a feature's dependencies is done (no refusal, no toast); the feature then fails on its missing selection | live qa4 round 5 v3 s8 (REORDER-INVALID) | ✅ (the app no longer checks the order; test `extrude_above_its_sketch_misses_its_region`) |
 | 6.10 | Search box filters by name or type: Default geometry rows and parts by name too, each run of dropped rows one "..." (Parts too), "Features (M of N)" counting the kept default rows, no error icon while filtering (live 10-27) | features_and_parts_lists | ✅ |
 | 6.11 | Filter commands :errors :warnings :suppressed :hidden :shown :type :name :folder :variable :part | features_and_parts_lists | ✅ (:partnumber / :revision match the parts' Part number / Revision properties; live 10-27: ":" alone matches nothing, ":type" / ":part" alone don't filter, ":hidden" / ":shown" take default rows and parts) |
