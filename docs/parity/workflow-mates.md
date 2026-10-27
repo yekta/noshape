@@ -54,7 +54,7 @@ Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 
 ## skb P1 mates audit (2026-10-24, agent/skb on main fde24dac; /root/skb-scratch/mates, plate with Ø10 hole + Ø10×30 pin)
 | Row | Live | Ours | Status | Verified |
 |---|---|---|---|---|
-| MT10 HUD position | centred on the 2nd pick, bottom edge on it, kept inside the graphics area (assembly/35, 93; mate-hud.txt) | was +14/+14 below-right, unclamped (✓/✕ cut off at the right edge, mates/s06) | ✅ **fixed** |  |
+| MT10 HUD position | centred on the 2nd pick, bottom edge on it, kept inside the graphics area (assembly/35, 93; mate-hud.txt) | was +14/+14 below-right, unclamped (✓/✕ cut off at the right edge, mates/s06) | ✅ **fixed** | 0.4.10+ / daf1f50c 10-27 (2nd pick (1185,432): HUD 1031–1339 × 381–429) |
 | MT11 DOF and drag per type | Fastened 0, Revolute ⟳z, Slider ↹z, Cylindrical ⟳z ↹z, Planar ⟳z ↹x ↹y, Ball 3 rotations (behaviours DOF table) | same (solver test + drags in the app, mates/t-*.png) | ✅ |  |
 | MT12 retype via Edit… | the row is renamed, the solve follows the new type | same (Revolute → Slider → Cylindrical → Planar → Ball) | ✅ | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) (Fastened → Revolute) |
 | MT13 cylinder-face inference | connector on the axis at mid-length, dots at the end centres (assembly/31) | same (mates/s10) | ✅ |  |
