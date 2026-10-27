@@ -655,6 +655,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P0 SKETCH-SOLVE-SPLINE-SLOW one constraint or dimension in a sketch with fit splines takes **3–5 minutes**: repro
+  /root/qa-scratch/tickets/sk211-step89.noshape (Sketch 1: 273 entities — 209 points, 45 lines, 7 circles, 7 arcs, 3
+  ellipses, **2 splines** — 97 constraints, dof 280; made by bin/skfuzz.py 211 89), bin/sk211time.py: Coincident
+  point `:257` on spline `:215` → **175.6 s**, ends "over defined (conflicting constraints)"; then a dimension −10
+  between points `:137` / `:48` → **295.1 s**, fails "Sketch could not be solved." (watcher CLI 12:08 ≥ green
+  0d75aa8e, load ~45; the fuzz runs on CLI 09:50 hit 123–290 s on the same steps, 59 of 198 steps over 5 s). A
+  backtrace taken mid-solve (tickets/sk211-solver-bt.txt): solver.rs solve_comp → eval → equations.rs:402
+  `numeric_grad` → :327 eval → :317 `fit_curve` → nurbs.rs:374 `interpolate` (an LU solve): the numeric gradient
+  re-interpolates the fit spline for every perturbed variable, so each Jacobian costs O(vars × spline solve). Live
+  solves such edits at once; in the app this would freeze the sketch for minutes (P0 "responsiveness while editing").
+  Analytic derivatives for the fit-spline equations (or re-fit once per Newton step, not per variable), and a solve
+  time budget that reports failure fast (qa 12:30, CLI 12:08; v0.4.10 timing running)
 - [x] 12740dfc P2 REPLICATE-EDGE-DEFAULT Replicate on a mate whose connectors sit on circular edges: ours lists the right options
   (Match edges on plane / on face / individual edges) but starts on **Match edges on plane** and keeps the last field as
   "Parts to find match in"; live starts on **Match edges on face** (the select's tooltip "Edge match scope") and renames
