@@ -2264,7 +2264,9 @@ using BlendBuild = std::function<bool(double scale, TopoDS_Shape& out, HHist& h)
 
 bool valid_shape(const TopoDS_Shape& s)
 {
-  return !s.IsNull() && BRepCheck_Analyzer(s).IsValid();
+  // In parallel: the check of a whole part after each blend cost more than
+  // the blend (live's 30-feature part, REGEN-SPEED).
+  return !s.IsNull() && BRepCheck_Analyzer(s, true, true).IsValid();
 }
 
 // Remove faces narrower than `width` (slivers left by a blend that almost
@@ -2470,14 +2472,24 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     bool         ok = false;
     try
     {
+      const KernelTimer timer("blend.as_is");
       ok = make(as_is)(1.0, r, h);
     }
     catch (const Standard_Failure&)
     {
     }
-    if (ok && valid_shape(r))
+    bool valid = false;
+    {
+      const KernelTimer timer("blend.as_is_check");
+      valid = ok && valid_shape(r);
+    }
+    if (valid)
+    {
+      const KernelTimer timer("blend.finish");
       return as_is.finish(r, h);
+    }
   }
+  const KernelTimer timer("blend.scaled");
   const Scaled sc(input, checked ? working_scale() : 1.0);
   auto [r, h] = checked_blend(sc.shape, make(sc), checked, size * sc.factor, what);
   return sc.finish(r, h);

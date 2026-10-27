@@ -55,6 +55,23 @@ void                            install_crash_guard();
 namespace noshape {
 bool kernel_profile_on();
 void kernel_profile_add(const char* what, std::chrono::steady_clock::duration took);
+void kernel_profile_add_named(const char* name, std::chrono::steady_clock::duration took);
+// A step inside an op in the NOSHAPE_KERNEL_PROFILE table ("op.step").
+struct KernelTimer
+{
+  const char*                           what;
+  std::chrono::steady_clock::time_point t0;
+  explicit KernelTimer(const char* w)
+      : what(w),
+        t0(std::chrono::steady_clock::now())
+  {
+  }
+  ~KernelTimer()
+  {
+    if (kernel_profile_on())
+      kernel_profile_add_named(what, std::chrono::steady_clock::now() - t0);
+  }
+};
 
 // Runs `f` under the crash guard: false when it throws or crashes (a
 // fallback inside an op that may crash OCCT, so the op can go on).

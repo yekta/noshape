@@ -1275,6 +1275,15 @@ bool kernel_profile_on()
   return on;
 }
 
+void kernel_profile_add_named(const char* name, std::chrono::steady_clock::duration took)
+{
+  KernelProfile&              p = kernel_profile();
+  std::lock_guard<std::mutex> g(p.lock);
+  auto&                       v = p.calls[std::string("  ") + name];
+  v.first += 1;
+  v.second += std::chrono::duration<double, std::milli>(took).count();
+}
+
 void kernel_profile_add(const char* what, std::chrono::steady_clock::duration took)
 {
   KernelProfile&              p = kernel_profile();

@@ -1707,6 +1707,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   // keeps none of the tools'.
   const bool by_faces = op == 1 && n_tools >= 8 && t.size() >= 2 && t.size() < n_tools;
   {
+    const KernelTimer timer("boolean.build");
     const CutByFaces scope(by_faces);
     build_cancellable(*b);
   }
@@ -1751,12 +1752,16 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   fail_if_cancelled();
   if (b->HasErrors() || !b->IsDone())
     fail_op("boolean failed: " + algo_errors(*b));
-  hist = new BRepTools_History(to_list(concat(a, t)), *b);
-  res  = b->Shape();
+  {
+    const KernelTimer timer("boolean.history");
+    hist = new BRepTools_History(to_list(concat(a, t)), *b);
+  }
+  res = b->Shape();
   fail_if_cancelled();
   if (opts.unify)
     res = unify(res, hist);
   res = remesh_facets(res, facets, hist);
+  const KernelTimer timer("boolean.result");
   return make_result(concat(args.items, tools.items), res, hist.get());
 }
 
