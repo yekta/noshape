@@ -936,6 +936,10 @@ impl PartStudioView {
         if self.with_sketch(cx, |ed, data| ed.constraint_command(data, c)) == Some(true) {
             self.regen_sync(window, cx);
         }
+        // "Sketch could not be solved." (live).
+        if let Some(text) = self.sketch.as_mut().and_then(|s| s.toast.take()) {
+            self.message = Some((noshape_model::display::FeatureStatus::Warning, text));
+        }
         self.refresh_scene(false, cx);
         cx.notify();
     }
@@ -2447,14 +2451,12 @@ impl PartStudioView {
     }
 
     /// A dimension's own context-menu items (label, `dim_menu_action`):
-    /// driving / driven, tolerance, configuration ("Delete dimension" ends
-    /// the menu).
+    /// driving / driven and configuration ("Delete dimension" ends the
+    /// menu). Live has no tolerance item there (behaviours "qa4 round 5 s5
+    /// driven dims" (2)): tolerances are set from the value box's ±.
     fn dimension_menu_items(&self, cid: noshape_sketch::ConstraintId, cx: &App) -> Vec<(String, String)> {
-        let Some((driving, allowed)) = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| (c.driving, crate::sketch_mode::tolerance_allowed(&c.kind)))) else { return Vec::new() };
+        let Some(driving) = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| c.driving)) else { return Vec::new() };
         let mut out = vec![((if driving { "Change to driven dimension" } else { "Change to driving dimension" }).to_string(), "driving".to_string())];
-        if allowed {
-            out.push(("Tolerance and precision…".into(), "tolerance".into()));
-        }
         if self.dimension_configuration(cid, cx).is_some() {
             out.push(("Unconfigure dimension".into(), "unconfigure".into()));
         } else {
@@ -2489,10 +2491,6 @@ impl PartStudioView {
             menu = menu.child(item("sk-dim-driving", if driving { "Change to driven dimension" } else { "Change to driving dimension" }, "driven-dimension", "driving", cx));
         }
         if is_dim {
-            let allowed = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| crate::sketch_mode::tolerance_allowed(&c.kind))).unwrap_or(false);
-            if allowed {
-                menu = menu.child(item("sk-dim-tol", "Tolerance and precision…", "dimension", "tolerance", cx));
-            }
             // Configure dimension with a list / checkbox configuration input.
             if self.dimension_configuration(cid, cx).is_some() {
                 menu = menu.child(item("sk-dim-unconf", "Unconfigure dimension", "configuration", "unconfigure", cx));
