@@ -147,6 +147,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   our crates opt-level 1, deps 3). v0.4.8 release CLI on the same doc: query_mass_properties 0.70 s with Shell 1 vs
   0.09 s with it suppressed, i.e. the shell alone ≈ 0.6 s at load ~25; live
   shells such parts in well under a second; ours freezes the preview for seconds (qa 2026-10-26, build 4d2f6b0c)
+  qa 2026-10-27 04:45 (load ~22, bin/shelltime.py: 80×50 plate, Ø20 hole, top face R, bottom removed; time of the
+  shell's feature_add): watcher CLI 04:06 h10 R2 t1.5 1.77 s, h30 R2 t1.5 1.98 s, h10 R4 t2.5 1.67 s, no hole 0.16 s;
+  v0.4.8 release 1.62 / 1.94 / 1.17 / 0.15 s (same volumes). Better than the 8–17 s above, still 10× the no-hole case.
 - [ ] P0 REGEN-SPEED (core 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
