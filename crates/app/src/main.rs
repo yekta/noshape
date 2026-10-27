@@ -16,18 +16,12 @@ use noshape_part_studio_ui::{part_studio, select_item};
 // The Variable Studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_variable_hooks`.
 use noshape_variable_studio_ui::{variable_insert, variable_studio};
 // Preferences (docs/CRATES.md), under their old paths; what they need of the app: `register_preferences_hooks`.
-use noshape_preferences_ui::{material_libraries, preferences_window, prefs_general, units_prefs};
+use noshape_preferences_ui::{material_libraries, preferences_window, units_prefs};
+// Release management (docs/CRATES.md), under its old paths; what it needs of the app: `register_release_hooks`.
+use noshape_release_ui::{company_settings, release_dialog, release_settings};
 mod fs_profile;
 mod live_server;
 mod std_source;
-mod numbering_prefs;
-mod release_conditions;
-mod release_prefs;
-mod release_settings;
-mod revision_template;
-mod revision_tools;
-mod company_settings;
-mod release_thumbs;
 mod doc_dialogs;
 mod shortcuts_page;
 mod feature_studio;
@@ -44,7 +38,6 @@ mod repair_mode;
 mod merge_dialog;
 mod version_properties;
 mod doc_panels;
-mod release_dialog;
 mod start_search;
 mod shortcuts;
 mod smoke;
@@ -334,6 +327,17 @@ fn register_preferences_hooks() {
     });
 }
 
+/// What release management (noshape-release-ui) needs of the app: other documents' and versions' windows, Create
+/// version, the workspace's Export.
+fn register_release_hooks() {
+    noshape_release_ui::release_hooks::register(noshape_release_ui::release_hooks::Hooks {
+        open_document_window: |path, gpu, cx| files::open_document_window(path, None, gpu, cx),
+        open_version_window: |path, version, gpu, cx| files::open_version_window(path, version, gpu, cx).map(|(handle, ws)| (handle, ws.read(cx).doc.clone())),
+        create_version: history_panel::open_create_version,
+        request_export: workspace::request_export,
+    });
+}
+
 fn main() {
     noshape_render::perf::process_start();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
@@ -349,6 +353,7 @@ fn main() {
     register_part_studio_hooks();
     register_variable_hooks();
     register_preferences_hooks();
+    register_release_hooks();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);

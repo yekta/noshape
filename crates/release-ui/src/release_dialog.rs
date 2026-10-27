@@ -28,7 +28,7 @@ pub fn note_viewed_config(tab: TabId, values: &noshape_model::configuration::Con
     LAST_VIEWED.lock().get_or_insert_with(Default::default).insert(tab, values.clone());
 }
 
-pub(crate) fn last_viewed_config(tab: TabId) -> Option<noshape_model::configuration::ConfigValues> {
+pub fn last_viewed_config(tab: TabId) -> Option<noshape_model::configuration::ConfigValues> {
     LAST_VIEWED.lock().as_ref().and_then(|m| m.get(&tab).cloned())
 }
 
@@ -1609,7 +1609,7 @@ impl Render for ReleaseDialog {
                                     let t = row.item.tab;
                                     div().id(SharedString::from(format!("rel-name-{i}"))).truncate().cursor_pointer().hover(|d| d.underline()).child(row.item.name.clone()).on_click(move |_, window, cx| {
                                         window.close_dialog(cx);
-                                        crate::workspace::request_activate_tab(t, window, cx);
+                                        crate::actions::request_activate_tab(t, window, cx);
                                     })
                                 })
                                 // Help (add-item-version2): an item linked from another
@@ -1705,7 +1705,7 @@ impl Render for ReleaseDialog {
                                 if item.document.is_some() {
                                     add_source::run_linked(&item, &doc_path, add_source::LinkedAction::Export, cx);
                                 } else {
-                                    crate::workspace::request_export(item.tab, item.part.iter().cloned().collect(), window, cx)
+                                    crate::release_hooks::request_export(item.tab, item.part.iter().cloned().collect(), window, cx)
                                 }
                             })
                         }),
@@ -2150,7 +2150,7 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
                                 });
                             }
                             if let Some(it) = &it {
-                                crate::workspace::request_export(it.tab, it.part.iter().cloned().collect(), window, cx);
+                                crate::release_hooks::request_export(it.tab, it.part.iter().cloned().collect(), window, cx);
                             }
                         })
                     })

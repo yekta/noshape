@@ -69,18 +69,15 @@ pub(super) fn run_linked(item: &ReleaseItem, this_doc: &std::path::Path, action:
     let Ok(mv) = l.version.parse::<noshape_store::MicroversionId>() else { return false };
     let path = if l.path.is_empty() { this_doc.to_path_buf() } else { PathBuf::from(&l.path) };
     let Some(gpu) = cx.try_global::<crate::gpu::GpuGlobal>().map(|g| g.0.clone()) else { return false };
-    let Ok((handle, ws)) = crate::files::open_version_window(path, mv, gpu, cx) else { return false };
+    let Ok((handle, d)) = crate::release_hooks::open_version_window(path, mv, gpu, cx) else { return false };
     let mut local = item.clone();
     local.document = None;
     // Once the new window has built its tab views and regenerated.
     cx.spawn(async move |cx| {
         cx.background_executor().timer(std::time::Duration::from_millis(800)).await;
-        let _ = handle.update(cx, move |_, window, cx| {
-            let d = ws.read(cx).doc.clone();
-            match action {
-                LinkedAction::Export => ws.update(cx, |w, cx| w.export_item(local.tab, local.part.iter().cloned().collect(), window, cx)),
-                LinkedAction::Properties => super::open_item_properties(d, local, |_, _, _| {}, window, cx),
-            }
+        let _ = handle.update(cx, move |_, window, cx| match action {
+            LinkedAction::Export => crate::release_hooks::request_export(local.tab, local.part.iter().cloned().collect(), window, cx),
+            LinkedAction::Properties => super::open_item_properties(d, local, |_, _, _| {}, window, cx),
         });
     })
     .detach();
@@ -394,7 +391,7 @@ impl AddItemsDialog {
                         .child(format!("Create a version in {name}."))
                         .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                             if let Some(gpu) = cx.try_global::<crate::gpu::GpuGlobal>().map(|g| g.0.clone()) {
-                                let _ = crate::files::open_document_window(path.clone(), None, gpu, cx);
+                                let _ = crate::release_hooks::open_document_window(path.clone(), gpu, cx);
                             }
                         })),
                 )
@@ -408,12 +405,12 @@ impl AddItemsDialog {
         match self.source.as_ref().filter(|s| !s.this_doc).map(|s| s.path.clone()) {
             Some(path) => {
                 if let Some(gpu) = cx.try_global::<crate::gpu::GpuGlobal>().map(|g| g.0.clone()) {
-                    let _ = crate::files::open_document_window(path, None, gpu, cx);
+                    let _ = crate::release_hooks::open_document_window(path, gpu, cx);
                 }
             }
             // Called directly: an action dispatched from the dialog layer
             // doesn't reach the Workspace.
-            None => crate::history_panel::open_create_version(self.doc.clone(), window, cx),
+            None => crate::release_hooks::create_version(self.doc.clone(), window, cx),
         }
     }
 

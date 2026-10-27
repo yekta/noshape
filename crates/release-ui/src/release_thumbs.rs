@@ -28,14 +28,14 @@ pub async fn render(doc: Document, versions: std::collections::HashMap<String, D
         let Some(tab) = doc.tab(item.tab) else { continue };
         let scene = match (&tab.content, item.kind, &item.part) {
             (TabContent::Drawing(d), ItemKind::Drawing, _) => {
-                if let Some(img) = crate::tab_manager::drawing_thumbnail(&doc, &versions, d, tab.name.clone()) {
+                if let Some(img) = crate::tab_thumbnail::drawing_thumbnail(&doc, &versions, d, tab.name.clone()) {
                     out.push((key(item), img));
                 }
                 continue;
             }
             (TabContent::Assembly(a), ItemKind::Assembly, _) => {
                 let result = evaluator.evaluate(&doc, a, &Default::default(), None);
-                crate::assembly_scene::build(&result, &Default::default(), &mut Default::default(), gpu.uploader()).scene
+                noshape_scene::asm_scene::build(&result, &Default::default(), &mut Default::default(), gpu.uploader()).scene
             }
             // A part, or with no part the whole Part Studio (Add Items tree).
             (TabContent::PartStudio(_), ItemKind::Part, part) => {
@@ -55,7 +55,7 @@ pub async fn render(doc: Document, versions: std::collections::HashMap<String, D
         let (w, h) = crate::gpu::THUMBNAIL_SIZE;
         let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64);
         let Ok(png) = gpu.render_thumbnail(Arc::new(scene), camera, crate::start_thumbnail::thumbnail_style()).await else { continue };
-        if let Some(img) = crate::tab_manager::decode(&png) {
+        if let Some(img) = crate::tab_thumbnail::decode(&png) {
             out.push((key(item), img));
         }
     }

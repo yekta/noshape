@@ -118,7 +118,7 @@ impl ReleasePrefsView {
 
     fn select_revision_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity().downgrade();
-        crate::files::request_open_path("Select revision list", "Text files", &["txt"], window, cx, move |path, cx| {
+        crate::file_dialogs::request_open_path("Select revision list", "Text files", &["txt"], window, cx, move |path, cx| {
             let text = std::fs::read_to_string(&path).unwrap_or_default();
             let labels: Vec<String> = text.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect();
             let _ = view.update(cx, |this, cx| {
@@ -131,7 +131,7 @@ impl ReleasePrefsView {
     }
 
     fn download_sample(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        crate::files::request_save_path("Download sample revision list", "sample-revision-list.txt".into(), "txt", window, cx, |path, _| {
+        crate::file_dialogs::request_save_path("Download sample revision list", "sample-revision-list.txt".into(), "txt", window, cx, |path, _| {
             let sample: Vec<String> = (1..=rs::CUSTOM_SCHEME_MIN).map(|i| format!("R{i:02}")).collect();
             if let Err(e) = std::fs::write(&path, sample.join("\n") + "\n") {
                 log::warn!("could not write {}: {e}", path.display());

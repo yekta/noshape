@@ -259,7 +259,7 @@ impl Lightbox {
 /// The app's UI font for the diagram's text (Onshape's Flama → Roboto).
 static FONTS: std::sync::LazyLock<Arc<resvg::usvg::fontdb::Database>> = std::sync::LazyLock::new(|| {
     let mut db = resvg::usvg::fontdb::Database::new();
-    for data in [&include_bytes!("../assets/fonts/Roboto-Regular.ttf")[..], include_bytes!("../assets/fonts/Roboto-Medium.ttf"), include_bytes!("../assets/fonts/Roboto-Bold.ttf")] {
+    for data in [&include_bytes!("../../app/assets/fonts/Roboto-Regular.ttf")[..], include_bytes!("../../app/assets/fonts/Roboto-Medium.ttf"), include_bytes!("../../app/assets/fonts/Roboto-Bold.ttf")] {
         db.load_font_data(data.to_vec());
     }
     db.set_sans_serif_family("Roboto");

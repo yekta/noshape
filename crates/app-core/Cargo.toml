@@ -26,6 +26,8 @@ serde_json.workspace = true
 serde.workspace = true
 # The documents library reads documents' metadata and thumbnails (start_library.rs).
 rusqlite.workspace = true
+# Drawing thumbnails (tab_thumbnail.rs).
+tiny-skia = "0.11"
 # The file dialogs (file_dialogs.rs): the native dialog, the documents folder.
 rfd = "0.15"
 dirs = "6"

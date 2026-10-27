@@ -19,6 +19,7 @@ noshape-assembly-ui.workspace = true
 noshape-part-studio-ui.workspace = true
 noshape-variable-studio-ui.workspace = true
 noshape-preferences-ui.workspace = true
+noshape-release-ui.workspace = true
 noshape-render.workspace = true
 noshape-model.workspace = true
 noshape-store.workspace = true
@@ -40,10 +41,6 @@ dirs = "6"
 # Local times in the documents page and the versions panel ("1:15 PM Today").
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 regex = "1"
-tiny-skia = "0.11"
-# Release ⋯ › View workflow: the diagram SVG with the app's Roboto (gpui's
-# SVG renderer only knows system fonts). Same version gpui uses.
-resvg = { version = "0.46", default-features = false, features = ["text"] }
 serde_json.workspace = true
 serde.workspace = true
 rusqlite.workspace = true

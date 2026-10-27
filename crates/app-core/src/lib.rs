@@ -41,6 +41,7 @@ pub mod shortcuts;
 pub mod start_library;
 pub mod start_thumbnail;
 pub mod start_trash;
+pub mod tab_thumbnail;
 pub mod theme;
 pub mod tool_synonyms;
 pub mod tool_text;
