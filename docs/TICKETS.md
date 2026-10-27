@@ -357,6 +357,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 OK-DISABLED-HOVER a disabled ✓ lights up on hover: new Extrude with nothing picked, ✓ is the disabled pale green
+  #CCE9CC, but with the pointer on it it turns the enabled #74CE3A (and stays inert), so it looks clickable
+  (tickets/empty-commit-disabled{,-hover}-0a25.png). Live's ✓ is `button-ok disabled` and a disabled button has no hover
+  look (qa 11:43, watcher build 0a25dd1a (11:32; not a green))
+- [ ] P3 CONFIG-CELL-EDIT-LOOK the configured value cell in the Configuration panel shows no edit state: after a click
+  (framed) and typing, or after a double-click, the cell loses its blue frame and shows the typed text plainly, with no
+  input box, caret or selection highlight (tickets/config-cell-edit-0a25.png, config-cell-dblclick-0a25.png). Live edits
+  in an `input.os-param-number` with the value selected on a double-click (behaviours "qa (2026-10-27, P2 batch 2)" (6)) (qa 11:43, watcher build 0a25dd1a (11:32; not a green))
 - [ ] P1 EDGE-HIGHLIGHT-LOOK (user-reported, v0.4.10 macOS) a hovered model edge is a light band with a dark border on
   both sides; hovered and selected edges must match live exactly (width at 1× and 2×, colours, outline or not). User
   shot: /root/qa-scratch/tickets/ehl/user-report.png (zoom user-edge-zoom.png). Reproduced on the v0.4.10 Linux
@@ -406,7 +414,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - psui (this commit): Ctrl+Space no longer switches tabs from the code editor (binding context
     `actions::RECENT_TAB_CONTEXT`, "Workspace && !(FeatureStudio > Input)"; checked on cfs2.noshape). The completion
     list waits for live's answer (REQUESTS "qa (2026-10-27, FS-EDITOR-COMPLETE)").
-- [x] 1e3c419c P1 LP-DIRECTION-PICK (user-reported) hover / pick read nothing in feature dialogs. Repro doc /root/qa-scratch/lpd.noshape
+- [x] verified watcher build 0a25dd1a (11:32; not a green) (qa 11:43: cfs2.noshape A `EDGE && ALLOWS_AXIS`, B `EDGE && LINE`, C `EDGE && SOLID`, D `ALLOWS_AXIS` all pre-highlight and take the part's edge; A, B, D also the sketch line; tickets/lp-compound*-0a25.png. Not in v0.4.10) 1e3c419c P1 LP-DIRECTION-PICK (user-reported) hover / pick read nothing in feature dialogs. Repro doc /root/qa-scratch/lpd.noshape
   (Sketch 1 rectangle 60×40, Extrude 1 10; Sketch 2 on the top face 10×10, Extrude 2 Add 8). Linear pattern › Feature
   pattern › Features to pattern = Extrude 2 › click Direction › hover / click the front top edge.
   - **v0.4.9 release** (Linux tarball, 7ee597e0 + fixes): the edge at its middle shows no pre-highlight and the click picks
@@ -462,7 +470,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Performance errors detected, AI Advisor (behaviours 1559 / 1563). Comments and AI Advisor are cloud; "Where used" (which
   tabs use this element) isn't there; "Release drafts" isn't on live's rail (a Free account has no release management)
   (qa 2026-10-27, green dacce5e7)
-- [x] 1cc65def P1 MEASURE-MAX-DIST Max dist between curved faces comes from sampled points, not the exact maximum: two tubes
+- [x] verified watcher build 0a25dd1a (11:32; not a green) CLI 11:30 (qa 11:43: rev.noshape outer cylinders Max dist 94.86833 from (−20, 0, 30) = √(90² + 30²); top circles 90.0, tube 1 vs 3 140.0; Min / axes / centres exact) 1cc65def P1 MEASURE-MAX-DIST Max dist between curved faces comes from sampled points, not the exact maximum: two tubes
   (Ø40 / Ø20 × 30, axes 50 mm apart; /root/qa-scratch/rev.noshape, Part 1 / Part 2 outer cylinders) → ours "Max dist
   94.850 mm" (app status bar) / 94.849984 (query_measure, from (−19.975, −0.997, 30), a mesh vertex, to (70, 0, 0)); exact
   √(90² + 30²) = 94.868 (from (−20, 0, 30)). Parallel axes 50.000 and Min 10.000 are exact. Live measures on the exact
@@ -473,7 +481,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   its faces' / edges' locally farthest point from the other, a (u, v) or parameter search kept on the bounded face);
   rev.noshape's tubes read 94.86833 from (−20, 0, 30); test measure::max_dist_is_exact_on_curved_faces_and_circles
   (faces √(90² + 30²), top circles 90).
-- [x] 4cc84ae1 P2 EMPTY-COMMIT a feature with an empty required selection can be committed: new Extrude, nothing picked, Enter,
+- [x] verified watcher build 0a25dd1a (11:32; not a green) (qa 11:43: new Extrude, nothing picked: Enter and a click on ✓ keep the dialog open, ✓ drawn disabled #CCE9CC; but see OK-DISABLED-HOVER) 4cc84ae1 P2 EMPTY-COMMIT a feature with an empty required selection can be committed: new Extrude, nothing picked, Enter,
   Enter → ours commits a red "Extrude 1" (green 525c619b). Live keeps the dialog open: the ✓ is disabled (`button-ok
   disabled`), and Enter, ✓ or Ctrl+Enter do nothing until a region is picked (behaviours "qa (2026-10-27, P2 batch 2)"
   (5)) (qa 2026-10-27, green 4854cad4)
@@ -481,7 +489,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   error; `FeatureDialog::can_submit`, checked in `accept_edit`); verified on :102: a new Extrude with nothing picked
   stays open through Enter, Enter, Ctrl+Enter; a picked face then commits; an existing Extrude opened for edit
   commits on Enter.
-- [x] e013107b P2 CONFIG-CELL-EDIT a configured value can't be edited in the Configuration panel's table: Configure Part Studio,
+- [x] verified watcher build 0a25dd1a (11:32; not a green) (qa 11:43: cfg.noshape Size › Large › Extrude 1 Depth: a click frames the cell (blue 2 px), typing 35 + Enter → "35 mm", Large regenerates 84800 exact; Esc cancels a typed 99; a double-click edits with the value selected (typing replaces it); the edit state has no visible input, see CONFIG-CELL-EDIT-LOOK) e013107b P2 CONFIG-CELL-EDIT a configured value can't be edited in the Configuration panel's table: Configure Part Studio,
   add row "Big", Linear pattern 1 › Instance count › right-click › Configure (column "Linear pattern 1 / Instance count",
   3 / 3, toast as live); a click, double-click or typing on Big's "3" cell does nothing (no blue frame, no edit), while
   the Name cell takes typing. Setting it through the feature dialog with Big active works (Big 5, Parts (5)). Live's
