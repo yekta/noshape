@@ -97,7 +97,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 4.25 | Spline tangent handles (white points) to drag | H:spline | ✅ (T:ux; GUI :103 open spline shows white tangent handles; handles are not deletable) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.26 | Bezier: click control points, double-click to end; control polygon shown | H:bezier | ✅ (control polygon shown while drawing and when selected) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.27 | Bezier: context menu **Escape bezier** removes the curve in progress | H:bezier | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.28 | Bezier degree label (double-click to edit, max 15) | H:bezier | ✅ (T:ux; GUI :103 double-click opens degree input; 4→6 succeeds, 16 rejected; bezier-degree-six-verified.png) |  |
+| 4.28 | Bezier degree label (double-click to edit, max 15) | H:bezier | ✅ (T:ux; GUI :103 double-click opens degree input; 4→6 succeeds, 16 rejected; bezier-degree-six-verified.png) | 0.4.10+ / 965d3f56 10-27 (double-click Deg 3 → 6; curve kept) |
 | 4.29 | Spline control point: click a spline / bezier control polygon to add a point | H:spline_control_point | ✅ (T:ux) |  |
 | 4.30 | Point: click to place | H:point | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 4.31 | Text: drag a box, lower-left corner and height set the first line; horizontal constraint on the bottom edge | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
@@ -251,9 +251,9 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) | 0.4.10+ / 965d3f56 10-27 (3x / 1x manipulators, count label edit, Enter accepts) |
 | 11.16 | Pattern preview limited to 10 instances | H:sketch_linear_pattern | ✅ | 0.4.10+ / 965d3f56 10-27 (count 15: preview 10) |
 | 11.17 | Edit pattern from the pattern glyph | H:sketch_linear_pattern | ✅ (T:sm; linear and circular instances are linked to the seed, see 14.1) | 0.4.10+ / 965d3f56 10-27 (right-click glyph › Edit pattern; count 15 → 3) |
-| 11.18 | Transform: triad manipulator (move, rotate, scale, free-drag center), Enter commits, Esc cancels | H:sketch_transform | ✅ (click in space / Enter commit, Esc cancel) |  |
-| 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ✅ (planar curves project exactly; non-planar edges project to a fitted spline like Onshape; other sketches; linked); a used circle / arc has a construction centre point, its line ends are not (live "skb (10-25) sketch Use on a face sketch", 4b5ac4fe) |  |
-| 11.20 | Use: hover preview of the projection | H:use | ✅ (GUI :103 m8.png: hovering the cylinder top edge highlights it and previews the projected circle on the sketch plane; click creates it) |  |
+| 11.18 | Transform: triad manipulator (move, rotate, scale, free-drag center), Enter commits, Esc cancels | H:sketch_transform | ✅ (click in space / Enter commit, Esc cancel) | 0.4.10+ / 965d3f56 10-27 (paste shows the triad: ring, scale arrow, move square; Enter commits, Esc leaves) |
+| 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ✅ (planar curves project exactly; non-planar edges project to a fitted spline like Onshape; other sketches; linked); a used circle / arc has a construction centre point, its line ends are not (live "skb (10-25) sketch Use on a face sketch", 4b5ac4fe) | 0.4.10+ / 965d3f56 10-27 (U, block edge → black line + use glyphs) |
+| 11.20 | Use: hover preview of the projection | H:use | ✅ (GUI :103 m8.png: hovering the cylinder top edge highlights it and previews the projected circle on the sketch plane; click creates it) | 0.4.10+ / 965d3f56 10-27 (hover preview orange) |
 | 11.21 | Use silhouette edges | H:use | ✅ (cylinders, cones, spheres, tori; verified on the demo plate) |  |
 | 11.22 | Intersection: face crossing the sketch plane | H:intersection | ✅ |  |
 | 11.23 | Text cannot be patterned / mirrored in a sketch | H:text | ✅ | 0.4.10+ / 203c4d6f 10-27 |
@@ -264,9 +264,9 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 |---|---|---|---|---|
 | 12.1 | Sketch entities: Delete sketch entity / Delete N sketch entities | i18n, B§9 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 12.2 | Construction, Transform sketch entities, Copy sketch entities | B§9 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 12.3 | Paste sketch entities (clipboard holds sketch entities) | B§9 | ✅ |  |
+| 12.3 | Paste sketch entities (clipboard holds sketch entities) | B§9 | ✅ | 0.4.10+ / 965d3f56 10-27 (Ctrl+C / Ctrl+V of a line lands centred on the pointer) |
 | 12.4 | View normal to sketch plane; Exit tool; Clear selection | B§9 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 12.5 | Use (model edge under the cursor) | B§9 | ✅ (GUI :103 right-click unused model edge offers Use; model-context-use.png) |  |
+| 12.5 | Use (model edge under the cursor) | B§9 | ✅ (GUI :103 right-click unused model edge offers Use; model-context-use.png) | 0.4.10+ / 965d3f56 10-27 (right-click an unused model edge: Use) |
 | 12.6 | Spline in progress: Confirm spline; Bezier: Escape bezier | H:spline, H:bezier | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 12.7 | Dimension: Change to driving / driven dimension, Delete | H:dimension | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 12.8 | Constraint glyph: Delete | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
@@ -278,7 +278,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 |---|---|---|---|---|
 | 13.1 | Tool prompts at the bottom of the view ("Select a mirror line.", …) | i18n | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 13.2 | "Cannot fillet selected point." | i18n | ❌ (FILLET-POINT-MSG) | 0.4.10+ / 203c4d6f 10-27 |
-| 13.3 | "The maximum bezier degree (15) has been reached." | i18n | ✅ (GUI :103 entering degree 16 reports exact message; bezier-max-degree-error.png; T:sm creation limit also added) |  |
+| 13.3 | "The maximum bezier degree (15) has been reached." | i18n | ✅ (GUI :103 entering degree 16 reports exact message; bezier-max-degree-error.png; T:sm creation limit also added) | 0.4.10+ / 965d3f56 10-27 (degree 16 → exact message) |
 | 13.4 | Conflicting constraints reported as a sketch warning | B§7.2 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 
 ## 14. Continuation regressions (2026-10-18)
