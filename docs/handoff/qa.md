@@ -3,6 +3,11 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+## Release blockers seen by qa (P0, green 4d2f6b0c = last-green)
+- DOC-POISON + SHELL-SLAB-GPF + FILLET-SEGV: ordinary Shell / Fillet / Delete operations can segfault the green app and
+  leave a document that crashes on every open; v0.4.8 opens the same documents. DRAFT-SEGV-DOC also hits v0.4.8.
+- SHELL-WALLS: wrong solid with status OK (also in v0.4.8).
+
 ## Daily release smoke
 (none yet: the first daily release under the new plan is due 2026-10-27 ~05:00 UTC)
 
