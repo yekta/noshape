@@ -3491,8 +3491,10 @@ impl PartStudioView {
             }
             // connectorEditLogic (live L37): the owner is the origin entity's
             // part, else the only part; attached to a picked face, else to
-            // the owner.
-            "mateConnector" if !user_set.contains("ownerPart") && params.query("ownerPart").is_empty() => {
+            // the owner. Only once an origin is picked: a new connector opens
+            // with the owner empty and Attachment None (live 10-27, also with
+            // one part).
+            "mateConnector" if !user_set.contains("ownerPart") && params.query("ownerPart").is_empty() && !params.query("originQuery").is_empty() => {
                 let origin = params.query("originQuery").first().cloned();
                 let parts: Vec<BodyId> = ctx.map(|c| c.bodies.iter().map(|b| b.id.clone()).collect()).unwrap_or_default();
                 let owner = origin.as_ref().and_then(|r| self.body_of(r)).or_else(|| (parts.len() == 1).then(|| parts[0].clone()));
