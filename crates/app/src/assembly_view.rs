@@ -2110,7 +2110,10 @@ impl AssemblyView {
     }
 
     fn update_capture(&mut self, cx: &mut Context<Self>) {
-        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none() && self.replace_panel.is_none() && self.step_edit.is_none();
+        // An open Section view dialog takes clicks for its fields (a press on
+        // an instance armed a drag, so its faces never reached the dialog).
+        let section_dialog = self.ui.section.as_ref().is_some_and(|s| s.dialog.is_some());
+        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none() && self.replace_panel.is_none() && self.step_edit.is_none() && !section_dialog;
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
         // Live ("nav2 selection" (7)): with something selected a left-drag
