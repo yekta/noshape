@@ -1360,6 +1360,7 @@ impl Workspace {
         let history_open = self.history.is_some();
         let notes_open = matches!(self.doc_panel, Some((DocPanel::Notes(_), _)));
         let perf_open = matches!(self.doc_panel, Some((DocPanel::Performance(_), _)));
+        let paused = self.active_part_studio().is_some_and(|v| v.read(cx).regen_paused());
         let perf_error = crate::doc_panels::PerfSnapshot { adapter: self.gpu.adapter_name(), ..Default::default() }.software_renderer();
         // Live (part-studio/181): the icons' ink starts at x 10, y 49 (20 px
         // icons): 2 px under the rail's top border, and centred in the 40 px
@@ -1380,11 +1381,13 @@ impl Workspace {
                     .tip("Versions and history", TipSide::Right)
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_history(window, cx))),
             )
-            .child(
+            // Live 10-27: paused regeneration drops Create version… (and
+            // Comments).
+            .when(!paused, |d| d.child(
                 crate::ui::rail_button("rail-version", "version", false, true, cx).pl(px(1.))
                     .tip("Create version…", TipSide::Right)
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| crate::history_panel::open_create_version(this.doc.clone(), window, cx))),
-            )
+            ))
             // Live order: Versions and history, Create version…, (Comments),
             // Document notes, (Where used), Performance, (AI Advisor).
             .child(

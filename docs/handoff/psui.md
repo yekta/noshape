@@ -29,6 +29,23 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
+## In progress (10-27 04:45, unlanded on agent/psui)
+
+Shift+wheel on number fields (5.22); feature list filter as live (6.10 / 6.11: kept Default geometry rows and parts,
+"..." runs in Parts, bare ":" matches nothing, ":type" / ":part" alone don't filter, the error icon hides while
+filtering; model-core `filter_row`); paused regeneration as live (6.25: amber banner over an emptied toolbar, bold
+italic pending rows, New folder gone, Create version… off the rail); 4.4 the open tool's button again keeps its
+dialog. Needs: app check on :102, clippy (model-core, ops, app-core, app), model-core interaction tests, T0.
+
+Drafted in /root/psui-scratch (apply after the running check, then build, look, land): patch-box.py (box selection
+takes no part vertices), patch-iso.py (Shift+I clears the selection; quiet over a faded part), patch-recent.py (empty
+tool search lists "Recently used"), patch-related.py (parts-list related highlight, 3.14 / 3.16).
+
+Residuals found today: live outlines the Delete part ghost (255,192,76) (ours none); a paused dialog's Depth field
+shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
+valuator on XI2 DeviceChanged from XTest's slave switches; real wheels fine); the banner's text is 5 px narrower
+than live's Flama.
+
 ## TAB-NO-PREVIEW: closed (test-display artifact)
 
 On Xvfb without a window manager the app window never gets X input focus, so GPUI treats it as inactive and sends no
@@ -43,10 +60,11 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-1. part-studio.md rows with live specs waiting (SPECS.md "psui: part-studio.md …"): 5.22 wheel on a focused number
-   field, 6.25 paused regeneration, 3.6 box selection, 6.10 / 6.11 filter box, 1.12 Delete key, 6.6 Shift+click range,
+1. part-studio.md rows with live specs waiting (SPECS.md "psui: part-studio.md …"): 6.25 paused regeneration, 3.6 box selection, 6.10 / 6.11 filter box, 1.12 Delete key, 6.6 Shift+click range,
    7.4 eye, 4.4 tool clicked again, 2.18 Shift+I with parts selected (isolates them, clears the selection; not yet
-   re-checked), 9.6 cube hover. Done today: 1.18, 1.19, 1.22, 1.27, 2.11, 2.13, 2.16, 2.17, 3.11, 9.7.
+   re-checked), 9.6 cube hover. Done today: 1.18, 1.19, 1.22, 1.27, 2.11, 2.13, 2.16, 2.17, 3.11, 9.7, 5.22 (Shift+wheel arrives as a
+   horizontal scroll on X11 / macOS: `quantity_field::wheel_delta`). 3.6: live asked whether the crossing box is
+   really blue (spec) or our yellow dashed #FFC20E (bundle).
 2. Preview blend residuals (behaviours "psui (10-26, P1) Feature preview look"; SPECS CORRECTION 10-27: live's Remove
    cuts the part and draws the grey tool over it, as ours, so Remove / Intersect are right unblended); live draws the active field's picked region outline
    full orange over the preview (ours: 30 % behind the tool); at slider 1 live's top face is lighter than ours.

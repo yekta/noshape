@@ -199,13 +199,11 @@ pub fn list_click<T: Clone + PartialEq>(order: &[T], selected: &[T], anchor: Opt
 
 // ------------------------------------------------------------------ feature filter
 
-/// Feature list search (Onshape "Filter by feature name or type name"):
-/// plain text matches names and type names; `:errors`, `:warnings`,
-/// `:suppressed`, `:hidden`, `:shown`, `:type x`, `:name x`, `:folder x`,
-/// `:variable x`, `:part x`, `:partnumber x` and `:revision x` narrow
-/// further (the last two by the parts' properties). Returns the matching
-/// features, or `None` for an empty query (no filtering).
-pub fn filter_features(studio: &PartStudio, display: &StudioDisplay, query: &str) -> Option<HashSet<FeatureId>> {
+/// A feature list query split into its command (lowercase, `""` for plain
+/// text) and argument, quotes taken off (`exact`). `None`: the query doesn't
+/// filter, being empty or a command still waiting for its argument (live
+/// 10-27: `:type` and `:part` alone list everything).
+fn parse_filter(query: &str) -> Option<(String, String, bool)> {
     let q = query.trim();
     if q.is_empty() {
         return None;
@@ -213,14 +211,46 @@ pub fn filter_features(studio: &PartStudio, display: &StudioDisplay, query: &str
     let (cmd, arg) = match q.strip_prefix(':') {
         Some(rest) => {
             let mut it = rest.splitn(2, char::is_whitespace);
-            (it.next().unwrap_or("").to_lowercase(), it.next().unwrap_or("").trim().to_string())
+            // A bare ":" is an unknown command: it matches nothing (live).
+            (it.next().filter(|c| !c.is_empty()).unwrap_or(":").to_lowercase(), it.next().unwrap_or("").trim().to_string())
         }
         None => (String::new(), q.to_string()),
     };
+    if arg.is_empty() && matches!(cmd.as_str(), "type" | "name" | "folder" | "variable" | "part" | "partnumber" | "revision") {
+        return None;
+    }
     // A quoted argument matches exactly (Help: `:part "Part 1"`; live
     // Variable table › Filter feature list puts `:variable "height"`).
     let exact = arg.len() >= 2 && arg.starts_with('"') && arg.ends_with('"');
     let arg = if exact { arg[1..arg.len() - 1].to_string() } else { arg };
+    Some((cmd, arg, exact))
+}
+
+/// Whether a list row that isn't a feature (a Default geometry row, a part)
+/// stays under the query, `None` for no filtering: plain text and `:name`
+/// match its name, `:hidden` / `:shown` its visibility (live 10-27:
+/// `:hidden` lists the hidden default planes, `:shown` the Origin and the
+/// parts); the other commands keep only features.
+pub fn filter_row(query: &str, name: &str, hidden: bool) -> Option<bool> {
+    let (cmd, arg, exact) = parse_filter(query)?;
+    let (name, arg) = (name.to_lowercase(), arg.to_lowercase());
+    let name_match = arg.is_empty() || if exact { name == arg } else { name.contains(&arg) };
+    Some(match cmd.as_str() {
+        "" | "name" => name_match,
+        "hidden" => hidden && name_match,
+        "shown" => !hidden && name_match,
+        _ => false,
+    })
+}
+
+/// Feature list search (Onshape "Filter by feature name or type name"):
+/// plain text matches names and type names; `:errors`, `:warnings`,
+/// `:suppressed`, `:hidden`, `:shown`, `:type x`, `:name x`, `:folder x`,
+/// `:variable x`, `:part x`, `:partnumber x` and `:revision x` narrow
+/// further (the last two by the parts' properties). Returns the matching
+/// features, or `None` when the query doesn't filter ([`parse_filter`]).
+pub fn filter_features(studio: &PartStudio, display: &StudioDisplay, query: &str) -> Option<HashSet<FeatureId>> {
+    let (cmd, arg, exact) = parse_filter(query)?;
     let arg_l = arg.to_lowercase();
     let status = |id: FeatureId| display.feature_state(id).map(|s| s.status);
     let type_name = |f: &Feature| f.feature_type().map(|t| t.name.to_lowercase()).unwrap_or_else(|| f.type_id.to_lowercase());
@@ -947,6 +977,23 @@ mod tests {
         assert!(filter_features(&ps, &d, ":variable \"dd\"").unwrap().is_empty());
         assert_eq!(filter_features(&ps, &d, "\"Variable 1\"").unwrap(), [FeatureId(1002)].into_iter().collect());
         assert!(filter_features(&ps, &d, ":errors").unwrap().is_empty());
+        // Live 10-27: ":" alone matches nothing, ":type" / ":part" without
+        // an argument don't filter.
+        assert!(filter_features(&ps, &d, ":").unwrap().is_empty());
+        assert!(filter_features(&ps, &d, ":type").is_none() && filter_features(&ps, &d, ":part ").is_none());
+    }
+
+    #[test]
+    fn filter_rows_by_name_and_visibility() {
+        assert_eq!(filter_row("", "Top", true), None);
+        assert_eq!(filter_row("to", "Top", false), Some(true));
+        assert_eq!(filter_row("extru", "Part 1", false), Some(false));
+        assert_eq!(filter_row(":hidden", "Top", true), Some(true));
+        assert_eq!(filter_row(":hidden", "Origin", false), Some(false));
+        assert_eq!(filter_row(":shown", "Part 1", false), Some(true));
+        assert_eq!(filter_row(":errors", "Part 1", false), Some(false));
+        assert_eq!(filter_row(":", "Origin", false), Some(false));
+        assert_eq!(filter_row(":type", "Origin", false), None);
     }
 
     #[test]

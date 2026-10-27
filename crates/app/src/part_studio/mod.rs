@@ -282,9 +282,9 @@ pub struct PartStudioView {
     focus: FocusHandle,
     /// Cached parts of the window (toolbar, viewport overlay, lists): see `cached_slice`.
     slices: Option<PsSlices>,
-    /// The features the list's rows last showed for the filter (None: no
-    /// filter), so a keystroke that keeps them re-renders only the head.
-    filter_rows: FilterMatches,
+    /// What the list's rows last showed for the filter ([`Self::filter_key`]),
+    /// so a keystroke that keeps it re-renders only the head.
+    filter_rows: (FilterMatches, Vec<bool>),
     /// What the list reads from the model every frame, kept between frames
     /// (see `ListCache`).
     list_cache: std::cell::RefCell<ListCache>,
@@ -429,7 +429,7 @@ impl PartStudioView {
             pending_spinner: None,
             focus: cx.focus_handle(),
             slices: None,
-            filter_rows: None,
+            filter_rows: (None, Vec::new()),
             list_cache: Default::default(),
             row_ctx: RowCtx::default(),
             fitted_once: false,
@@ -524,13 +524,22 @@ impl PartStudioView {
         Some((ps, upto))
     }
 
+    /// Whether regeneration is paused (the workspace's rail drops Create
+    /// version… meanwhile).
+    pub fn regen_paused(&self) -> bool {
+        self.ui.regen_paused.is_some()
+    }
+
     #[track_caller]
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let caller = std::panic::Location::caller();
         // Paused regeneration (Onshape): edits wait until "Regenerate".
         if self.ui.regen_paused.is_some() && !std::mem::take(&mut self.ui.force_regen) {
-            // Nothing starts: an "Opening…" waiting for this run goes.
+            // Nothing starts: an "Opening…" waiting for this run goes. The
+            // scene drops a closed dialog's look (and preview base) over the
+            // last model.
             self.pending.take_if(|p| p.seq == 0);
+            self.rebuild_scene(cx);
             cx.notify();
             return;
         }
@@ -1729,6 +1738,11 @@ impl PartStudioView {
     }
 
     pub fn start_feature(&mut self, type_id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        // Live 10-27: the open tool's button or shortcut again leaves its
+        // dialog as it is.
+        if self.sketch.is_none() && self.edit.as_ref().is_some_and(|e| e.is_new && e.dialog.read(cx).feature.type_id == type_id) {
+            return;
+        }
         // Starting Extrude/Revolve from an open sketch finishes the sketch and
         // preselects all of its regions (Onshape behavior).
         if self.sketch.is_some() && type_id != "sketch" {
@@ -1980,7 +1994,8 @@ impl PartStudioView {
         let history = DraftHistory::new(&dialog.read(cx).feature);
         self.ui.orient_pending = self.ui.orient_on_edit && dialog.read(cx).feature.type_id == "sketch";
         self.ui.preview_opacity = crate::feature_dialog::PREVIEW_REST;
-        self.ui.preview_tone = matches!(dialog.read(cx).feature.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft");
+        // Paused regeneration previews nothing (live 10-27).
+        self.ui.preview_tone = self.ui.regen_paused.is_none() && matches!(dialog.read(cx).feature.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft");
         self.ui.preview_before = None;
         self.ui.before_context = None;
         // A new feature's first change runs std's editing logic with an
@@ -2304,6 +2319,17 @@ impl PartStudioView {
         if let Some(version) = self.doc.read(cx).session.viewing_version() {
             return self.render_version_bar(&version, cx);
         }
+        // Live 10-27: paused regeneration leaves only Undo / Redo, with the
+        // banner centred over the bar.
+        if self.ui.regen_paused.is_some() {
+            return crate::ui::toolbar()
+                .id("part-studio-toolbar")
+                .w_full()
+                .relative()
+                .child(h_flex().flex_none().gap(px(2.)).child(crate::ui::undo_redo(&self.doc, cx)))
+                .child(div().absolute().top_0().left_0().right_0().flex().justify_center().child(self.render_paused_banner(cx)))
+                .into_any_element();
+        }
         // Onshape toolbar (§3.2): undo/redo first, 2 px group separators,
         // "Search tools…" at the right end.
         // Live: "Search tools…" follows the last tool (it is not pinned to
@@ -2536,15 +2562,8 @@ impl PartStudioView {
         // button (or its group) turns yellow (live: `#fcda7f`, border `#fab601`).
         let found = self.palette_found_tool(cx).is_some_and(|f| f == id || group.contains(&f));
         let main = main.when(found, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_1().border_color(gpui_kit::rgb(0xfab601)));
-        let main = main.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                // Clicking the active tool again closes it (Onshape).
-                let active_new = this.edit.as_ref().is_some_and(|e| e.is_new && e.dialog.read(cx).feature.type_id == id);
-                if active_new && this.sketch.is_none() {
-                    this.cancel_edit(window, cx);
-                } else {
-                    this.start_feature(id, window, cx);
-                }
-            }));
+        // The active tool clicked again keeps its dialog (`start_feature`).
+        let main = main.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_feature(id, window, cx)));
         let main = crate::ui::with_rich_tooltip(SharedString::from(format!("tt-{id}")), tooltip, crate::tool_text::description(id).unwrap_or(ty.description), main);
         if group.len() <= 1 {
             return main;
@@ -2729,7 +2748,8 @@ impl PartStudioView {
         // Editing a feature rolls the model to just after it: the rows
         // below show rolled back (Onshape), unless "Final" is on.
         let rollback = match &self.edit {
-            Some(e) if !e.is_new && !e.dialog.read(cx).show_final => rollback.min(e.index + 1),
+            // (Paused regeneration: the list stays as it is, live 10-27.)
+            Some(e) if !e.is_new && !e.dialog.read(cx).show_final && self.ui.regen_paused.is_none() => rollback.min(e.index + 1),
             _ => rollback,
         };
         let filtered = self.filtered(cx);
@@ -2841,22 +2861,26 @@ impl PartStudioView {
             }).collect(),
             appearances,
             first_config_input,
+            pending: self.pending_regen(cx),
         };
-        self.filter_rows.clone_from(&filtered);
+        self.filter_rows = self.filter_key(cx);
         let mut rows: Vec<AnyElement> = Vec::new();
         let mut dg_rows: Vec<AnyElement> = Vec::new();
-        // Default geometry.
-        for (label, r) in [
-            ("Origin", Reference::Origin),
-            ("Top", Reference::Plane(DatumPlane::Top)),
-            ("Front", Reference::Plane(DatumPlane::Front)),
-            ("Right", Reference::Plane(DatumPlane::Right)),
-        ] {
-            if filtered.is_some() {
-                break;
-            }
-            let selected = self.selection.contains(&r);
+        // Default geometry. Filtered, the rows the query keeps stay and each
+        // run of the others is one "..." row (live 10-27: ":hidden" lists
+        // Top, Front and Right).
+        let dg_ellipsis = || div().h(px(26.)).flex_none().pl(px(23.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element();
+        let mut dg_gap = false;
+        for (label, r) in DEFAULT_GEOMETRY {
             let hidden = hidden_defaults.contains(&r);
+            if filtered.is_some() && !self.default_row_kept(&r, hidden, cx) {
+                if !std::mem::replace(&mut dg_gap, true) {
+                    dg_rows.push(dg_ellipsis());
+                }
+                continue;
+            }
+            dg_gap = false;
+            let selected = self.selection.contains(&r);
             let dimmed = default_row_dimmed(hidden, self.ui.isolate.as_ref());
             let r2 = r.clone();
             let r3 = r.clone();
@@ -2982,10 +3006,6 @@ impl PartStudioView {
                     })
                     .into_any_element(),
             );
-        }
-        // Filtered: the folder stays with one "..." child (live 564).
-        if filtered.is_some() {
-            dg_rows.push(div().h(px(26.)).flex_none().pl(px(23.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element());
         }
         let dg_count = dg_rows.len();
         if !dg_rows.is_empty() {
@@ -3139,7 +3159,20 @@ impl PartStudioView {
                     _ => matches!(b.kind, BodyKind::Wire | BodyKind::Point),
                 };
                 let bodies: Vec<&noshape_model::display::BodyDisplay> = self.display.bodies.iter().filter(|b| of_kind(b)).collect();
-                let rows: Vec<AnyElement> = bodies.iter().map(|b| self.render_part_row(b, cx)).collect();
+                // Filtered (live 10-27): the parts the query drops are one
+                // "..." row per run; the title keeps counting them all.
+                let mut rows: Vec<AnyElement> = Vec::new();
+                let mut gap = false;
+                for b in &bodies {
+                    if noshape_model::interaction::filter_row(&self.ui.filter_query, &b.name, b.hidden) == Some(false) {
+                        if !std::mem::replace(&mut gap, true) {
+                            rows.push(div().h(px(26.)).flex_none().pl(px(23.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element());
+                        }
+                        continue;
+                    }
+                    gap = false;
+                    rows.push(self.render_part_row(b, cx));
+                }
                 (title, key, rows, bodies.iter().map(|b| b.id.clone()).collect())
             })
             .filter(|(key, _, rows, _)| *key == "Parts" || !rows.is_empty())
@@ -3148,7 +3181,7 @@ impl PartStudioView {
         let show_props = self.ui.show_part_props;
         for (title, key, rows, ids) in sections {
             let collapsed = self.ui.collapsed_sections.contains(key);
-            let n = rows.len();
+            let n = ids.len();
             let all_hidden = !ids.is_empty() && ids.iter().all(|b| self.display.body(b).is_some_and(|d| d.hidden));
             let view = cx.entity();
             let ids2 = ids.clone();
@@ -3219,9 +3252,13 @@ impl PartStudioView {
         let errors = studio.features.iter().filter(|f| failed(f.id)).count()
             + usize::from(self.edit_invalid(cx) && !editing_id.is_some_and(|id| studio.features.iter().any(|f| f.id == id && failed(f.id))));
         let dialog_open = self.edit.is_some();
+        let paused = self.ui.regen_paused.is_some();
         let viewing_version = self.doc.read(cx).session.viewing_version().is_some();
         let filter_input = self.ui.filter.as_ref().map(|(st, _)| st.clone());
-        let filtered_count = filtered.as_ref().map(|f| f.len());
+        // Filtered, the kept Default geometry rows count too.
+        let filtered_count = filtered.as_ref().map(|f| f.len() + DEFAULT_GEOMETRY.iter().filter(|(_, r)| self.default_row_kept(r, studio.hidden_defaults.contains(r), cx)).count());
+        // Live 10-27: the error icon goes while a filter is on.
+        let errors = if filtered.is_some() { 0 } else { errors };
         let config_box = self.render_config_box(cx);
         let contexts_section = self.render_contexts_section(cx);
 
@@ -3336,7 +3373,8 @@ impl PartStudioView {
                 }))
                 .child(div().flex_1())
                 // Live (navigation/301): a version keeps only the timer.
-                .when(!viewing_version, |d| d.child(
+                // Live 10-27: paused regeneration removes New folder.
+                .when(!viewing_version && !paused, |d| d.child(
                     // Live (570): new folder and pause are disabled while a
                     // feature dialog is open.
                     header_btn("new-folder-btn", "new-folder", false, cx)
@@ -3351,13 +3389,15 @@ impl PartStudioView {
                             let ids = this.selected_features.clone();
                             this.open_folder_prompt(ids, window, cx)
                         })),
-                )
-                .child(
-                    header_btn("pause-regen-btn", "pause-regen", self.ui.regen_paused.is_some(), cx)
-                        .when(dialog_open, |d| d.opacity(0.4).cursor_default())
-                        .tooltip(crate::ui::tooltip("Pause regeneration"))
+                ))
+                // Paused, the banner's buttons leave the mode; the button
+                // stays at 0.5 (live 10-27).
+                .when(!viewing_version, |d| d.child(
+                    header_btn("pause-regen-btn", "pause-regen", false, cx)
+                        .when(dialog_open || paused, |d| d.opacity(if paused { 0.5 } else { 0.4 }).cursor_default())
+                        .when(!paused, |d| d.tooltip(crate::ui::tooltip("Enter paused regeneration mode")))
                         .on_click(cx.listener(|this, _: &ClickEvent, w, cx| {
-                            if this.edit.is_none() {
+                            if this.edit.is_none() && this.ui.regen_paused.is_none() {
                                 this.toggle_pause_regen(w, cx)
                             }
                         })),
@@ -4119,6 +4159,8 @@ impl PartStudioView {
             .when(rolled_back || suppressed, |d| d.italic())
             .when(related && !selected && !editing, |d| d.bg(pal.row_related))
             .when(editing, |d| d.font_weight(FontWeight::SEMIBOLD))
+            // Live 10-27 (`pending-regen`): edited while regeneration is paused.
+            .when(self.row_ctx.pending.contains(&f.id), |d| d.font_weight(FontWeight::BOLD).italic())
             // Live (qa5 derived, 1580–1582): a Derived feature that brought
             // sketches has a ▸ before its icon; it lists them.
             .when(self.display.derived_sketches.iter().any(|(d, _)| *d == f.id), |d| {
@@ -4947,6 +4989,8 @@ struct RowCtx {
     planes: std::collections::HashSet<FeatureId>,
     appearances: std::collections::HashSet<FeatureId>,
     first_config_input: Option<String>,
+    /// Edited while regeneration is paused (`pending_regen`).
+    pending: std::collections::HashSet<FeatureId>,
 }
 
 /// Model results the features list and its head read every frame, kept
@@ -5025,6 +5069,11 @@ impl PartStudioView {
         set
     }
 
+    /// Whether the list's filter keeps a Default geometry row.
+    fn default_row_kept(&self, r: &Reference, hidden: bool, cx: &App) -> bool {
+        noshape_model::interaction::filter_row(&self.ui.filter_query, &self.default_name(r, cx), hidden) != Some(false)
+    }
+
     /// The assembly contexts the features reference (a walk over every
     /// feature's parameters), once per document state.
     pub(super) fn referenced_contexts(&self, cx: &App) -> std::rc::Rc<Vec<u32>> {
@@ -5033,15 +5082,24 @@ impl PartStudioView {
     }
 
     /// The filter query changed: of the cached slices only the features
-    /// list's rows show it, and only which features match (the head
+    /// and parts lists' rows show it, and only which rows it keeps (the head
     /// re-renders with the filter box anyway).
     fn filter_rows_changed(&mut self, cx: &mut Context<Self>) {
-        let shown = self.filtered(cx);
-        if shown != self.filter_rows
+        if self.filter_key(cx) != self.filter_rows
             && let Some(s) = &self.slices
         {
             s.features.update(cx, |_, cx| cx.notify());
+            s.parts.update(cx, |_, cx| cx.notify());
         }
+    }
+
+    /// What the filter shows: the matching features, then whether it keeps
+    /// each Default geometry row and each part.
+    fn filter_key(&self, cx: &App) -> (FilterMatches, Vec<bool>) {
+        let q = &self.ui.filter_query;
+        let defaults = DEFAULT_GEOMETRY.iter().map(|(_, r)| self.default_row_kept(r, self.studio(cx).is_some_and(|s| s.hidden_defaults.contains(r)), cx));
+        let parts = self.display.bodies.iter().map(|b| noshape_model::interaction::filter_row(q, &b.name, b.hidden) != Some(false));
+        (self.filtered(cx), defaults.chain(parts).collect())
     }
 
     /// What is drawn over the graphics area under the feature dialog (live:
@@ -5686,6 +5744,14 @@ mod warning_badge_tests {
         assert!(!warning_badge(FeatureStatus::Error, 1, true));
     }
 }
+
+/// The Default geometry rows, in list order.
+const DEFAULT_GEOMETRY: [(&str, Reference); 4] = [
+    ("Origin", Reference::Origin),
+    ("Top", Reference::Plane(DatumPlane::Top)),
+    ("Front", Reference::Plane(DatumPlane::Front)),
+    ("Right", Reference::Plane(DatumPlane::Right)),
+];
 
 /// The "Features (N)" count: the four default geometry rows, the features,
 /// and a new feature whose dialog is open (live sketch/501, qa5 P1-1).

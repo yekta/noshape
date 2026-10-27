@@ -30,7 +30,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 1.9 | Ctrl/⌘+C copies selected features | keyboard_shortcuts | ✅ |
 | 1.10 | Ctrl/⌘+V pastes copied features (repeatable, at the rollback bar) | keyboard_shortcuts | ✅ |
 | 1.11 | Delete/Backspace removes selected features | keyboard_shortcuts | ✅ |
-| 1.12 | Delete with parts selected deletes them (Delete part feature) | A §3.9; Home__selection | 🔧 |
+| 1.12 | Delete with parts selected opens the pre-filled "Delete part N" dialog (Delete composite parts, the parts' chips), the parts go from the list and show as a pale ghost (live 10-27) | A §3.9; Home__selection | ✅ (live outlines the ghost (255,192,76); ours has no outline) |
 | 1.13 | Ctrl/⌘+Z / Ctrl+Y / ⇧⌘Z undo/redo; inside a dialog they step the dialog's own edits | keyboard_shortcuts; A §2.1 | ✅ |
 | 1.14 | Shift+N renames the selected feature in place | keyboard_shortcuts | ✅ |
 | 1.15 | Alt/⌥+C opens Search tools | keyboard_shortcuts; Home__search_tools | ✅ |
@@ -109,7 +109,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 4.1 | Entities selected before starting a feature fill its first compatible field | A §2.3 | ✅ |
 | 4.2 | A sketch selected in the feature list preselects all its regions (Extrude, Revolve…) | features_and_parts_lists | ✅ (app 10-24: "Face of Sketch 2" preselected) |
 | 4.3 | Planes / features selected in the list preselect plane / feature fields | A §2.3 | 🔧 |
-| 4.4 | Clicking the active toolbar tool again closes it | Home__selection | 🔧 |
+| 4.4 | Clicking the active toolbar tool again (or its shortcut) leaves its dialog open as it is (live 10-27; only ✓ / ✕ / Esc close it) | Home__selection | ✅ |
 | 4.5 | Picking a tool from a toolbar dropdown makes it the group's face for the session | A §2.3 | 🔧 |
 | 4.6 | Toolbar tooltips show the shortcut | A §2.2 | ✅ |
 | 4.7 | Customize toolbar (drag tool sets, Reset) | part_studios | ✅ (built by an earlier pass: move tool sets, remove/restore tools, reset) |
@@ -145,7 +145,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.19 | Numeric fields accept expressions, units and #variables | Home__numeric_fields | ✅ |
 | 5.20 | Invalid expression: red outline and message | Home__numeric_fields | ✅ |
 | 5.21 | Expressions show their evaluated value | Home__numeric_fields | 🔧 |
-| 5.22 | Mouse wheel over a focused numeric field: ±0.1, Ctrl ±0.01, Shift ±1 (integers ±1), clamped to the field range | Home__numeric_fields | 🔧 |
+| 5.22 | Mouse wheel over a focused numeric field (mm document, live 10-27): ±1, Shift ±10, Ctrl ±0.1 (integers ±1); only while focused with no uncommitted typed text; a step out of the field's range is ignored (Depth goes below 0) | Home__numeric_fields | ✅ |
 | 5.23 | Field shows the converted value after accepting, the original text when focused | Home__numeric_fields | ✅ (fixed: focusing showed the converted text) |
 | 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | ✅ (app 10-24) |
 | 5.25 | Preview opacity slider (blends the model before and after the feature) | Home__dialogs | 🔧 |
@@ -168,12 +168,12 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.3 | Each feature with its tool icon | features_and_parts_lists | ✅ |
 | 6.4 | Double-click a feature to edit it | A §3.3 | ✅ |
 | 6.5 | Click toggles a feature in the selection (additive) | features_and_parts_lists ("just click to select additional items") | ✅ (app 10-24) |
-| 6.6 | Shift+click selects a range | Home__selection | 🔧 (Shift toggled) |
+| 6.6 | Shift+click selects a range, hidden sketches included (live 10-27) | Home__selection | ✅ |
 | 6.7 | Drag a feature to reorder | features_and_parts_lists | ✅ |
 | 6.8 | Dragging a selected feature moves every selected feature (non-contiguous allowed) | features_and_parts_lists | 🔧 |
 | 6.9 | A reorder above a feature's dependencies is done (no refusal, no toast); the feature then fails on its missing selection | live qa4 round 5 v3 s8 (REORDER-INVALID) | ✅ (the app no longer checks the order; test `extrude_above_its_sketch_misses_its_region`) |
-| 6.10 | Search box filters by name or type | features_and_parts_lists | 🔧 |
-| 6.11 | Filter commands :errors :warnings :suppressed :hidden :shown :type :name :folder :variable :part | features_and_parts_lists | 🔧 (:partnumber / :revision match the parts' Part number / Revision properties) |
+| 6.10 | Search box filters by name or type: Default geometry rows and parts by name too, each run of dropped rows one "..." (Parts too), "Features (M of N)" counting the kept default rows, no error icon while filtering (live 10-27) | features_and_parts_lists | ✅ |
+| 6.11 | Filter commands :errors :warnings :suppressed :hidden :shown :type :name :folder :variable :part | features_and_parts_lists | ✅ (:partnumber / :revision match the parts' Part number / Revision properties; live 10-27: ":" alone matches nothing, ":type" / ":part" alone don't filter, ":hidden" / ":shown" take default rows and parts) |
 | 6.12 | Error icon with count in the header; click filters to errors | features_and_parts_lists | 🔧 |
 | 6.13 | Failed features red with the error as tooltip | Home__error_indicators | ✅ |
 | 6.14 | Suppressed features struck through | features_and_parts_lists | ✅ |
@@ -187,7 +187,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.22 | Dynamic suppression ▸ Add expression… (expression editor, ƒx icon, live true/false preview) | live | ✅ |
 | 6.23 | Copy sketch / Paste sketch onto a plane or planar face | Home__context_menus | ✅ (verified: Copy sketch, Front plane > Paste sketch) |
 | 6.24 | Show dimensions (feature/face/sketch menus): the sketch's dimensions in 3D, parts see-through, hover gold on tan, double-click edits the sketch, click elsewhere or Esc hides; Export as DXF/DWG | Home__context_menus; live part-studio/40–42 | ✅ (Create Drawing of Sketch N… via asb's sketch views) |
-| 6.25 | Pause regeneration (banner: Regenerate / Regenerate and exit / Discard) ; regeneration times panel (hover highlights) | features_and_parts_lists | 🔧 |
+| 6.25 | Pause regeneration (banner: Regenerate / Regenerate and exit / Discard) ; regeneration times panel (hover highlights) | features_and_parts_lists | ✅ paused mode as live 10-27: the 343 × 28 amber banner over an emptied toolbar (Undo / Redo stay), ▶\| at 0.4 until something waits, New folder gone, pause at 0.5, Create version… off the rail, edited rows bold italic, dialogs preview nothing (no manipulator, no rollback), ✕ discards without asking. Live's Depth corner mark in a paused dialog not done |
 | 6.26 | Collapse the whole list; drag the feature/parts separator | features_and_parts_lists | 🔧 |
 | 6.27 | Default plane row menu (live): Rename | New sketch…, Offset plane…, Size to Part Studio (Paste sketch when a sketch was copied) | Hide, Hide other planes, Hide all planes | Zoom to selection, View normal to | Show dependencies…; origin: Rename | Hide | Show dependencies… | Hide, Hide other planes, Hide all planes | ✅ |
 | 6.28 | Default planes/origin can be hidden (never deleted) | part_studios | 🔧 |
@@ -221,7 +221,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 7.1 | Parts with colour swatch and count | features_and_parts_lists | ✅ |
 | 7.2 | Click selects (or fills a part field in a dialog, filtered) | features_and_parts_lists | 🔧 (unfiltered before) |
 | 7.3 | Hover highlights the part in the graphics area | features_and_parts_lists | 🔧 |
-| 7.4 | Eye on hover hides/shows the part; hidden parts greyed | features_and_parts_lists | 🔧 |
+| 7.4 | Eye on hover ("Hide Part N", 20 × 20 at x 210) hides/shows the part; hidden parts greyed | features_and_parts_lists | ✅ |
 | 7.5 | Parts list menu (live order): Rename, Properties…, Assign material…, Edit appearance… | Create Drawing of Part…, Export… | Hide, Isolate…, Make transparent… | Zoom to selection | Delete… | live | ✅ (Copy Part N after Copy here… as live; Release… and Revision history: see 13.14) |
 | 7.6 | Separate Parts / Surfaces / Curves sections (collapsible, eye hides a section); "Composite parts (N)" after Parts (collapsed at first, eye "Hide all composite parts", row tooltip "Composite part 1 (open\|closed) (N parts)"; closed: members leave Parts, stay drawn and selectable) | features_and_parts_lists, live part-studio/470–474 | ✅ |
 | 7.7 | Show parts list properties (part number, revision) from the section header menu | features_and_parts_lists | 🔧 |
@@ -251,7 +251,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 9.3 | View cube in the upper right turns with the camera | view_navigation | 🔧 |
 | 9.4 | Click a cube face for that standard view | view_navigation | 🔧 |
 | 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | 🔧 |
-| 9.6 | Cube faces/edges/corners highlight on hover (name shown) | A §6.2 | 🔧 |
+| 9.6 | Cube faces/edges/corners highlight on hover, (188,226,247) = #90cef1 at 0.6; no name or tooltip (live 10-27) | A §6.2 | ✅ |
 | 9.7 | Cube arrows rotate 15° (Shift 90°, Ctrl 5°); arc arrows roll | A §6.2 | ✅ (psui 10-27, as live "spec: psui part-studio.md 9.7": ▶ brings the left side in view, ▲ the front face, the right arc rolls clockwise; 15° / Ctrl 5° / Shift 90°) |
 | 9.8 | Camera menu (live order): Isometric/Dimetric/Trimetric | Named views…, Previous view | Zoom to fit/window | Perspective, Orient normal to sketch on edit | ✓ display ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… | live dom/menu-camera-render.txt | ✅ (Graphics preferences… and Highlight boundary edges by ui) |
 | 9.9 | Previous view returns to the camera before the last view change | View__previous_view | 🔧 |

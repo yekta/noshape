@@ -173,8 +173,9 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         out["filter"] = json!(st.filter);
         if !st.filter.trim().is_empty() {
             let r = od.regenerate(tab, None)?;
-            let shown = noshape_model::interaction::filter_features(&ps, &r.display, &st.filter).unwrap_or_default();
-            out["shown_features"] = ps.features.iter().filter(|f| shown.contains(&f.id)).map(|f| json!(f.name)).collect::<Vec<Value>>().into();
+            // A command still waiting for its argument (":type") doesn't filter.
+            let shown = noshape_model::interaction::filter_features(&ps, &r.display, &st.filter);
+            out["shown_features"] = ps.features.iter().filter(|f| shown.as_ref().is_none_or(|s| s.contains(&f.id))).map(|f| json!(f.name)).collect::<Vec<Value>>().into();
         }
     }
     od.window.lists.insert(tab, st);

@@ -68,6 +68,10 @@ impl PartStudioView {
     /// The manipulator of the feature being edited, if it has one.
     pub(super) fn current_manip(&self, cx: &App) -> Option<Manip> {
         let Some(e) = self.edit.as_ref() else { return self.section_manip().map(Manip::Section) };
+        // Live 10-27: a dialog over paused regeneration has no manipulator.
+        if self.ui.regen_paused.is_some() {
+            return None;
+        }
         match e.dialog.read(cx).feature.type_id.as_str() {
             "extrude" => self.current_arrow(cx).map(Manip::Arrow),
             "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.current_arc(cx).map(Manip::Arc),

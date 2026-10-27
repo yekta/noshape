@@ -93,6 +93,17 @@ pub fn step_text(text: &str, up: bool, mods: StepMods, f: &Stepping) -> Option<S
     })
 }
 
+/// A wheel event's step amount over a number field: its vertical delta, or
+/// the horizontal one when Shift turned the scroll sideways (X11, macOS;
+/// live steps ±10 on Shift + wheel, "spec: psui part-studio.md 5.22").
+pub fn wheel_delta(e: &gpui_kit::ScrollWheelEvent) -> f64 {
+    let (dx, dy) = match e.delta {
+        gpui_kit::ScrollDelta::Lines(l) => (f64::from(l.x), f64::from(l.y)),
+        gpui_kit::ScrollDelta::Pixels(p) => (f64::from(f32::from(p.x)), f64::from(f32::from(p.y))),
+    };
+    if dy.abs() < 1e-6 && e.modifiers.shift { dx } else { dy }
+}
+
 /// The hover text of an invalid number field (live).
 pub const INVALID_TIP: &str = "Enter a valid expression.";
 
@@ -536,10 +547,7 @@ impl gpui_kit::Render for QuantityInput {
                 if !this.state.read(cx).focus_handle(cx).is_focused(window) {
                     return;
                 }
-                let dy = match e.delta {
-                    ScrollDelta::Lines(l) => f64::from(l.y),
-                    ScrollDelta::Pixels(p) => f64::from(f32::from(p.y)),
-                };
+                let dy = wheel_delta(e);
                 if dy.abs() < 1e-6 {
                     return;
                 }
@@ -574,6 +582,18 @@ mod tests {
         assert_eq!(commit_text("5", Dim::UNITLESS, &p, &EmptyScope), "5");
         assert_eq!(commit_text("abc", Dim::LENGTH, &p, &EmptyScope), "abc");
         assert_eq!(commit_text("  ", Dim::LENGTH, &p, &EmptyScope), "");
+    }
+
+    #[test]
+    fn shift_wheel_steps_by_its_sideways_delta() {
+        use gpui_kit::{Modifiers, ScrollDelta, ScrollWheelEvent, point, px};
+        let ev = |delta, shift| ScrollWheelEvent { delta, modifiers: Modifiers { shift, ..Modifiers::default() }, ..ScrollWheelEvent::default() };
+        // X11 / macOS turn Shift + wheel into a horizontal scroll.
+        assert_eq!(wheel_delta(&ev(ScrollDelta::Lines(point(1., 0.)), true)), 1.);
+        assert_eq!(wheel_delta(&ev(ScrollDelta::Pixels(point(px(-20.), px(0.))), true)), -20.);
+        assert_eq!(wheel_delta(&ev(ScrollDelta::Lines(point(0., -1.)), false)), -1.);
+        // A trackpad's sideways swipe without Shift doesn't step.
+        assert_eq!(wheel_delta(&ev(ScrollDelta::Lines(point(1., 0.)), false)), 0.);
     }
 
     #[test]

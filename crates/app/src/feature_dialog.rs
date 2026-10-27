@@ -3381,10 +3381,7 @@ impl FeatureDialog {
                         if !st2.read(cx).focus_handle(cx).is_focused(window) {
                             return;
                         }
-                        let dy = match e.delta {
-                            ScrollDelta::Lines(l) => f64::from(l.y),
-                            ScrollDelta::Pixels(p) => f64::from(f32::from(p.y)),
-                        };
+                        let dy = crate::quantity_field::wheel_delta(e);
                         if dy.abs() < 1e-6 {
                             return;
                         }

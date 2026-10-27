@@ -1444,44 +1444,68 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// The features edited since regeneration was paused (or last
+    /// regenerated): new or changed. Live 10-27: their rows are bold italic.
+    pub(super) fn pending_regen(&self, cx: &App) -> std::collections::HashSet<FeatureId> {
+        let (Some(saved), Some(now)) = (&self.ui.regen_paused, self.studio(cx)) else { return Default::default() };
+        now.features.iter().filter(|f| saved.features.iter().find(|g| g.id == f.id) != Some(*f)).map(|f| f.id).collect()
+    }
+
+    /// Paused regeneration's banner (live 10-27, `delayed-regen-banner`):
+    /// 343 × 28, amber, centred over the emptied toolbar; "Paused
+    /// regeneration", then ▶| (Regenerate Part Studio: 0.4 and no tooltip
+    /// while nothing waits), a green ✓ and a white ✕, 40 × 22 each. A feature
+    /// dialog greys ✓ and ✕.
+    pub(super) fn render_paused_banner(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pending = self.ui.regen_paused.as_ref().is_some_and(|saved| self.studio(cx) != Some(saved));
+        let dialog_open = self.edit.is_some();
+        let btn = |id: &'static str, bg: u32, (icon, size): (&'static str, f32), tip: &'static str, action: u8, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .w(px(40.))
+                .h(px(22.))
+                .flex_none()
+                .rounded(px(4.))
+                .bg(gpui_kit::rgb(bg))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(crate::assets::icon(icon, size, cx))
+                .when(dialog_open, |d| d.opacity(0.5))
+                .when(!dialog_open, |d| {
+                    d.cursor_pointer().tooltip(crate::ui::tooltip(tip)).on_click(cx.listener(move |this, _: &ClickEvent, w, cx| this.paused_action(action, w, cx)))
+                })
+        };
+        let play = div()
+            .id("pr-regen")
+            .size(px(18.))
+            .flex_none()
+            .mr(px(19.))
+            .child(crate::assets::icon("regen-play", 18., cx))
+            .when(!pending, |d| d.opacity(0.4))
+            .when(pending, |d| {
+                d.cursor_pointer().tooltip(crate::ui::tooltip("Regenerate Part Studio")).on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.paused_action(0, w, cx)))
+            });
+        h_flex()
+            .id("paused-banner")
+            .occlude()
+            .w(px(343.))
+            .h(px(28.))
+            .flex_none()
+            .pl(px(10.))
+            .pr(px(11.))
+            .bg(gpui_kit::rgb(0xfab601))
+            .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::SEMIBOLD).text_color(gpui_kit::rgb(0x333333)).child("Paused regeneration"))
+            .child(play)
+            // Live's glyphs: a 12 × 8 tick, a 10 × 10 cross.
+            .child(btn("pr-exit", 0x009400, ("dialog-ok", 18.), "Regenerate features and exit", 1, cx))
+            .child(div().w(px(8.)).flex_none())
+            .child(btn("pr-discard", 0xffffff, ("dialog-cancel", 22.), "Discard unregenerated changes and exit", 2, cx))
+            .into_any_element()
+    }
+
     pub(super) fn render_regen_panels(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let pal = p();
         let mut out = Vec::new();
-        if self.ui.regen_paused.is_some() {
-            let btn = |id: &'static str, label: &'static str, action: u8, cx: &mut Context<Self>| {
-                div()
-                    .id(id)
-                    .px_2()
-                    .py_0p5()
-                    .rounded_sm()
-                    .text_xs()
-                    .text_color(pal.accent)
-                    .cursor_pointer()
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(label)
-                    .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| this.paused_action(action, w, cx)))
-            };
-            out.push(
-                h_flex()
-                    .id("paused-banner")
-                    .occlude()
-                    .absolute()
-                    .bottom(px(46.))
-                    .left(px(260.))
-                    .gap_2()
-                    .px_2()
-                    .py_1()
-                    .rounded_md()
-                    .bg(pal.panel_raised)
-                    .border_1()
-                    .border_color(pal.warning)
-                    .child(div().text_xs().text_color(pal.text).child("Paused regeneration"))
-                    .child(btn("pr-regen", "Regenerate Part Studio", 0, cx))
-                    .child(btn("pr-exit", "Regenerate features and exit", 1, cx))
-                    .child(btn("pr-discard", "Discard unregenerated changes and exit", 2, cx))
-                    .into_any_element(),
-            );
-        }
         if self.ui.show_regen_times {
             out.push(self.render_regen_times(cx));
         }

@@ -104,6 +104,8 @@ fn load_fonts(cx: &mut App) {
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-SemiBold.ttf")),
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-Bold.ttf")),
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-Italic.ttf")),
+        // Rows edited while regeneration is paused (live: bold italic).
+        std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-BoldItalic.ttf")),
         // Placeholders (Onshape: `input::placeholder { font-style: italic; font-weight: 300 }`).
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-LightItalic.ttf")),
         // Measure values (Onshape's `.measurement-value`: Inconsolata 14 px / 600).
