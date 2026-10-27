@@ -24,6 +24,8 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   15 mm swallows the bosses so their chamfers/fillets fail, as the geometry says), undo, rollback drag up and back,
   Suppress from the row menu (dependants red), the Diameter readout, Section view, Mass properties: no regressions
   in my area. Live asked about the feature list header with errors ("Features ..." truncates next to the red icon).
+- 10-27 03:30–04:15: PERF-SECTION-PANIC + MENU-SKETCH-TAG; CHIP-HOVER (regions); DEPTH-RANGE; tickets closed as not
+  bugs or already working: FOLDER-NAME-INLINE, EXT-DIRECTION, P1-10. psui's open tickets now: P1-8 caveat (Hole chips).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 

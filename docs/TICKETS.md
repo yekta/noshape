@@ -230,7 +230,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P2 P1-8 caveat (qa5, carried over) a reopened Hole whose points were clicked one by one shows one grouped chip
   "Vertices of Sketch N"; live keeps one "Vertex of Sketch N" chip per click (the grouping isn't stored; details in
   docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop") (qa5 2026-10-26)
-- [ ] P2 P1-10 (qa5, carried over) Extrude › Remove tool preview pointing away from the part is grey; live translucent dark
+- [x] P2 P1-10 works on main (psui 10-27: Extrude 2 as Remove flipped away from the block: the tool translucent dark
+  red, the part uncut) (qa5, carried over) Extrude › Remove tool preview pointing away from the part is grey; live translucent dark
   red (live part-studio/234–235) (qa5 2026-10-26)
 - [x] verified 19555ca3 (qa) 6db9bb8d P2 DELETE-TAB-DIALOG fixed (psui 10-27): live's 598 px "Delete tabs" with the outlined warning triangle, "Deleting
   this tab will result in failed or missing features in N tab(s)", one row per tab with its icon; within 1 px of
@@ -272,7 +273,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (qa4 round 5, still open on green) feature rows › Add selection to folder… opens a separate
   "Folder name" box (tickets/folder-name-box-ours.png); live names the new folder inline in its row (input prefilled
   "New folder"); the separate box belongs to the header's New folder button (behaviours "qa4 round 5 s8") (qa 2026-10-26)
-- [x] (psui, this commit) P2 DEPTH-RANGE fixed: a value outside the parameter's range (Depth above 500 m) makes the
+- [x] 338b18f5 P2 DEPTH-RANGE fixed: a value outside the parameter's range (Depth above 500 m) makes the
   field pink and stays as typed ("1e6 mm"), in and out of the field; valid values in other units still go to document
   units on blur ("500 m" → "500000 mm"). (live answered, behaviours "qa (2026-10-26, P2) Extrude Depth out of range") a length above 500 m
   (e.g. "1e6 mm", "600 m"): live turns the field pink (bg rgb(249,235,236)), keeps the text as typed and the title tooltip
