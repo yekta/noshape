@@ -650,7 +650,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
-- [ ] P2 REPLICATE-EDGE-DEFAULT Replicate on a mate whose connectors sit on circular edges: ours lists the right options
+- [x] 12740dfc P2 REPLICATE-EDGE-DEFAULT Replicate on a mate whose connectors sit on circular edges: ours lists the right options
   (Match edges on plane / on face / individual edges) but starts on **Match edges on plane** and keeps the last field as
   "Parts to find match in"; live starts on **Match edges on face** (the select's tooltip "Edge match scope") and renames
   the last field **"Faces to find match in"** (behaviours "qa (2026-10-27, P2 batch 2)" (4)); repro asm5.noshape-like
