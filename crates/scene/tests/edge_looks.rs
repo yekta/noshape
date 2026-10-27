@@ -66,9 +66,12 @@ fn top_front(display: &StudioDisplay) -> (Reference, Reference) {
 
 const THICK: f32 = 0.003;
 
+/// A state's name and its sRGB column across the edge.
+type Profile = (&'static str, Vec<[u8; 3]>);
+
 /// The sRGB column across the edge (`before` rows above the edge's own row and `after` below, at the viewport's
 /// middle), per state, at a device pixel ratio.
-fn profiles(dpr: f32, before: u32, after: u32) -> Option<Vec<(&'static str, Vec<[u8; 3]>)>> {
+fn profiles(dpr: f32, before: u32, after: u32) -> Option<Vec<Profile>> {
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -176,7 +179,7 @@ fn edge_and_face_highlights_look_as_live() {
             assert!((4.5..=6.5).contains(&width), "{dpr}x {name}: {width} CSS px: {}", show(&col));
             // Opaque rim at the ends, the core at 78 % over the scene: over a face, or darker where the plain edge
             // shows through (between 78 % over the face and 78 % over what the plain render has there).
-            assert!(col[a..=b].iter().any(|&c| c == colour), "{dpr}x {name}: no opaque rim: {}", show(&col));
+            assert!(col[a..=b].contains(&colour), "{dpr}x {name}: no opaque rim: {}", show(&col));
             let core = &col[a + k..=b - k];
             for (i, &c) in core.iter().enumerate() {
                 let under = rest[a + k + i];
@@ -197,10 +200,10 @@ fn edge_and_face_highlights_look_as_live() {
         let fh = get("face hovered");
         assert_eq!(fh[0], top, "{dpr}x: a hovered face isn't tinted");
         let lit: Vec<usize> = (0..fh.len()).filter(|&i| !close(fh[i], rest[i], 3)).collect();
-        assert!(fh.iter().any(|&c| c == HOVER) && lit.len() <= 3, "{dpr}x face hovered boundary: {}", show(&fh));
+        assert!(fh.contains(&HOVER) && lit.len() <= 3, "{dpr}x face hovered boundary: {}", show(&fh));
         let fs = get("face selected");
         assert!(close(fs[0], [0xE5, 0xA2, 0x22], 4), "{dpr}x selected face {} (live E5A222)", hex(fs[0]));
-        assert!(fs.iter().any(|&c| c == SELECT), "{dpr}x face selected boundary: {}", show(&fs));
+        assert!(fs.contains(&SELECT), "{dpr}x face selected boundary: {}", show(&fs));
         assert_eq!(get("face selected + hovered"), fs, "{dpr}x: hovering a selected face changes nothing");
     }
 }
