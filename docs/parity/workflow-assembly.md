@@ -35,7 +35,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 2.4 | Cylindrical: pin bottom edge, hole 2 top edge; drag up | slides + rotates | aligned (2nd connector landed at the hole's bottom edge); drag slides along the axis | ✅ / ? |
 | 2.5 | Slider: block top face → plate top face; HUD flip primary axis | flip turns the block over | block stays inside the plate; CLI: **rotation identity after the flip** (flip had no effect) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 |
 | 2.6 | Fastened: bracket → plate; flip, flip back | flips | flips correctly | ✅ |
-| 2.7 | Mate connector tool hover on a face | **orange outline on the hovered face, white dots only at that face's inference points, small triad + ring** (assembly/31-*) | no face outline, **dark dots on many edges of other faces**, large triad without ring | ✗ A5 |
+| 2.7 | Mate connector tool hover on a face | **orange outline on the hovered face, white dots only at that face's inference points, small triad + ring** (assembly/31-*) | no face outline, **dark dots on many edges of other faces**, large triad without ring | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 |
 | 2.8 | Place, ✓ | "Mate connector 1" under Mate features | same | ✅ |
 
 ## 3. Replicate, patterns
@@ -101,7 +101,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 2.1 | Revolute 2nd pick | moved part previews **amber** | ✅ A2 fixed |
 | 2.2 | New mate row | tooltip "Revolute 1 (Hidden)" + eye-off icon ✅, but the row text is still #333333 (live light grey) | ✅ (GUI green 8165fca6, skasm 10-27: the row light grey); was ✗ A3 (partly fixed) |
 | 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 |
-| 2.7 | Mate connector hover on the plate top | orange outline + white inference dots on that face ✅; **extra white dots on other parts** (bracket edges, shaft bottom) | ✗ A5 (partly fixed) |
+| 2.7 | Mate connector hover on the plate top | orange outline + white inference dots on that face ✅; **extra white dots on other parts** (bracket edges, shaft bottom) | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 (partly fixed) |
 | 3.1 / 3.4 / 3.6 | Replicate / Linear / Circular pattern dialogs | standard feature dialogs with live's fields (dom/ui2-asm-*) ✅; Replicate adds red hints "Select the instances to pattern (seed)" / "Select the geometry to find match in" that live doesn't show | ✅ A6 fixed / ✗ **A14** (hint text) |
 | 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ (T: assembly `replicate_on_matching_holes`, qa5 A12 assert); was ✅ A7 fixed / ✗ **A12** |
 | 3.4 | Linear pattern preview | grey preview copy | ✅ A8 fixed |
