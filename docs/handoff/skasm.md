@@ -12,6 +12,9 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (569dabca19a397e932f2db54) in noshape mm test.
 
 ## Landed on main
+- e5e45de1 + 3f354c8c center point circle's value box opposite the rim click (4 live samples in my tab); the
+  committed dimension keeps its usual place (where live puts it after Enter is not recorded). 4b5ac4fe used circle /
+  arc centre is construction (live).
 - 44180351 sketch edit fuzz (T2) `fuzz::random_sketch_edits_never_panic` (`SKETCH_FUZZ_SEEDS=1..100 SKETCH_FUZZ_STEPS=150
   cargo test -p noshape-sketch --test all fuzz::random_sketch_edits -- --ignored`: clean, 744 s).
 - be0dd33e new mate between two free parts: the part live keeps stays (`eval::new_mate_stays`: exact flip → sign rule,
@@ -57,8 +60,7 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (none: the branch equals main)
 
 ## Next, in order
-Sketch P1: value boxes right after drawing: where live puts them differs from ours (center circle: live opposite the
-rim click, ours upper right; 3 point circle: live below; rectangle height box after Enter: two live samples, no rule
+Sketch P1: value boxes right after drawing: where live puts them differs from ours (center circle: done e5e45de1; 3 point circle: live below; rectangle height box after Enter: two live samples, no rule
 yet). Samples in behaviours "skasm (2026-10-27) sketch value boxes right after drawing"; asked live for a
 systematic set (REQUESTS 10-27); implement the rule once it lands (scene sketch_mode.rs `diameter_field` /
 `length_field` labels). Otherwise parity/sketch.md all ✅. Assembly P2:
