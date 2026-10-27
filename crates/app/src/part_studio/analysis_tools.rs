@@ -82,8 +82,8 @@ pub struct ToolOptions {
     pub min_radius: bool,
     pub extend: bool,
     pub control_points: bool,
-    /// Dihedral: show the maximum (else minimum) angle.
-    pub show_max: bool,
+    /// Dihedral: angles in radians (else degrees).
+    pub radians: bool,
     pub threshold: bool,
     pub high_deg: f64,
     pub low_deg: f64,
@@ -100,7 +100,7 @@ pub struct ToolOptions {
 
 impl Default for ToolOptions {
     fn default() -> Self {
-        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: true, min_radius: false, extend: false, control_points: false, show_max: true, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3, surface: false, show_class: [false, true, true, true, true], tolerances: Default::default(), zebra: Default::default(), reflection: Default::default() }
+        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: true, min_radius: false, extend: false, control_points: false, radians: false, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3, surface: false, show_class: [false, true, true, true, true], tolerances: Default::default(), zebra: Default::default(), reflection: Default::default() }
     }
 }
 
@@ -141,6 +141,8 @@ pub struct AnalysisTool {
     /// Connection: the G1, G2 and G3 tolerance fields; Zebra: stripe count.
     tolerance_inputs: Vec<Entity<QuantityInput>>,
     _input_subs: Vec<Subscription>,
+    /// Dihedral: the Units select (Radians, Degrees).
+    units: Option<(Entity<crate::os_select::OsSelect>, Subscription)>,
     /// Interference detection: its top in the viewport, fixed when it opens
     /// (live: a resize keeps the top and the right offset).
     pub anchor_top: Option<f32>,
@@ -157,6 +159,11 @@ pub struct ToolMemory {
 }
 
 const COMB: [u8; 4] = [40, 170, 60, 255];
+/// Dihedral teeth (live 10-27, the threshold icons' colours): in range
+/// teal, above the high threshold yellow, below the low one purple.
+const DIHEDRAL_IN: [u8; 4] = [0x4d, 0xa7, 0xa3, 255];
+const DIHEDRAL_HIGH: [u8; 4] = [0xfd, 0xec, 0x51, 255];
+const DIHEDRAL_LOW: [u8; 4] = [0x69, 0x34, 0x76, 255];
 const ENVELOPE: [u8; 4] = [210, 40, 200, 255];
 const U_CURVES: [u8; 4] = [220, 50, 40, 255];
 const V_CURVES: [u8; 4] = [40, 90, 220, 255];
@@ -303,6 +310,33 @@ impl PartStudioView {
                 tolerance_inputs.push(st);
             }
         }
+        // Dihedral (live 10-27): High / Low threshold fields, 180 deg and 0 deg.
+        if kind == ToolKind::Dihedral {
+            for (i, v) in [options.high_deg, options.low_deg].into_iter().enumerate() {
+                let st = qty(format!("{v} deg"), QuantitySpec::quantity(noshape_units::Dim::ANGLE).range(Some(0.), Some(std::f64::consts::PI)), window, cx);
+                input_subs.push(cx.subscribe(&st, move |this: &mut Self, st, ev: &QuantityEvent, cx| {
+                    if !matches!(ev, QuantityEvent::Committed(_)) {
+                        return;
+                    }
+                    let Some(v) = st.read(cx).value() else { return };
+                    let Some(t) = &mut this.ui.analysis_tool else { return };
+                    *[&mut t.options.high_deg, &mut t.options.low_deg][i] = v.to_degrees();
+                    this.recompute_analysis_tool(cx);
+                }));
+                tolerance_inputs.push(st);
+            }
+        }
+        let units = (kind == ToolKind::Dihedral).then(|| {
+            let s = cx.new(|_| crate::os_select::OsSelect::new("at-units"));
+            let sub = cx.subscribe(&s, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
+                let crate::os_select::OsSelectEvent::Picked(id) = ev;
+                if let Some(t) = &mut this.ui.analysis_tool {
+                    t.options.radians = id.as_ref() == "RADIAN";
+                }
+                cx.notify();
+            });
+            (s, sub)
+        });
         if kind == ToolKind::Flatten {
             self.open_flatten(window, cx);
         }
@@ -314,7 +348,7 @@ impl PartStudioView {
         }
         // Interference detection keeps the top it opened at (live psb 10-19 i).
         let anchor_top = (kind == ToolKind::Interference).then(|| ((self.viewport.read(cx).size().y as f32) - 401.).max(0.));
-        self.ui.analysis_tool = Some(AnalysisTool { kind, selection, selection2, second_active, options, result: None, slider, _slider_sub: sub, tolerance_inputs, _input_subs: input_subs, anchor_top, stale: false });
+        self.ui.analysis_tool = Some(AnalysisTool { kind, selection, selection2, second_active, options, result: None, slider, _slider_sub: sub, tolerance_inputs, _input_subs: input_subs, units, anchor_top, stale: false });
         self.recompute_analysis_tool(cx);
         if kind.is_view_mode() {
             self.rebuild_scene(cx);
@@ -549,7 +583,7 @@ impl PartStudioView {
                         if let Some((comb, a, b)) = noshape_model::analysis::edge_dihedral(&ctx, r, samples) {
                             lo = lo.min(a);
                             hi = hi.max(b);
-                            res.combs.push((comb, COMB));
+                            res.combs.push((comb, DIHEDRAL_IN));
                         }
                     }
                     res.dihedral = (lo <= hi).then_some((lo, hi));
@@ -586,21 +620,25 @@ impl PartStudioView {
         for (comb, color) in &res.combs {
             let mut tips = Vec::with_capacity(comb.base.len());
             for (b, tooth) in comb.base.iter().zip(&comb.teeth) {
-                // Dihedral thresholds: teeth outside the limits turn red / blue.
+                // Dihedral thresholds: teeth above the high limit turn yellow,
+                // below the low one purple (live's threshold icons).
                 let mut c = *color;
                 if t.kind == ToolKind::Dihedral && t.options.threshold {
                     let deg = tooth.length().to_degrees();
                     if deg > t.options.high_deg {
-                        c = U_CURVES;
+                        c = DIHEDRAL_HIGH;
                     } else if deg < t.options.low_deg {
-                        c = V_CURVES;
+                        c = DIHEDRAL_LOW;
                     }
                 }
                 let tip = *b + *tooth * k;
                 lines.push_polyline(&[f(*b), f(tip)], c, 0, 1.0, LineSegment::ON_TOP);
                 tips.push(f(tip));
             }
-            lines.push_polyline(&tips, ENVELOPE, 0, 1.25, LineSegment::ON_TOP);
+            // Live: a dihedral comb is its teeth only.
+            if t.kind != ToolKind::Dihedral {
+                lines.push_polyline(&tips, ENVELOPE, 0, 1.25, LineSegment::ON_TOP);
+            }
         }
         for pl in &res.polylines {
             let pts: Vec<[f32; 3]> = pl.iter().map(|p| f(*p)).collect();
@@ -1028,26 +1066,48 @@ impl PartStudioView {
                     .child(gpui_kit::component::checkbox::Checkbox::new("at-rlock").label("Lock environment").checked(r.lock).on_click(cx.listener(set(|r, v| r.lock = v))));
             }
             ToolKind::Dihedral => {
-                let (lo, hi) = t.result.as_ref().and_then(|r| r.dihedral).unwrap_or((0.0, 0.0));
-                body = body
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .text_size(px(12.))
-                            .child(check("at-max", "Max", o.show_max, |o, v| o.show_max = v, cx))
-                            .child(check("at-min", "Min", !o.show_max, |o, v| o.show_max = !v, cx)),
-                    )
-                    .child(div().text_size(px(12.)).text_color(pal.text).child(if t.selection.is_empty() { String::new() } else if o.show_max { format!("Max: {} deg", noshape_units::to_fixed(hi, 2)) } else { format!("Min: {} deg", noshape_units::to_fixed(lo, 2)) }))
-                    .child(check("at-thr", "Enable threshold display", o.threshold, |o, v| o.threshold = v, cx));
+                // Live 10-27 (behaviours "psui (10-27, P2) Dihedral analysis
+                // panel"): Units, read-only Max / Min (blank with no edge),
+                // Enable threshold display and its High / Low rows.
+                let angle = |deg: f64| if o.radians { format!("{} rad", noshape_units::format_number(deg.to_radians(), 3)) } else { format!("{} deg", noshape_units::format_number(deg, 2)) };
+                let (lo, hi) = match t.result.as_ref().and_then(|r| r.dihedral).filter(|_| !t.selection.is_empty()) {
+                    Some((lo, hi)) => (angle(lo), angle(hi)),
+                    None => (String::new(), String::new()),
+                };
+                let muted = gpui_kit::rgb(0x666666);
+                let readout = |label: &'static str, value: String| {
+                    h_flex()
+                        .h(px(26.))
+                        .text_size(px(12.))
+                        .child(div().w(px(29.)).flex_none().text_color(muted).child(label))
+                        .child(div().flex_1().h(px(24.)).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).flex().items_center().justify_end().pr(px(3.)).text_size(px(13.33)).text_color(muted).child(value))
+                };
+                if let Some((sel, _)) = &t.units {
+                    sel.update(cx, |s, _| s.set_items(vec![("RADIAN".into(), "Radians".into()), ("DEGREE".into(), "Degrees".into())], if o.radians { "RADIAN" } else { "DEGREE" }));
+                    body = body.child(h_flex().h(px(28.)).text_size(px(12.)).child(div().w(px(29.)).flex_none().text_color(muted).child("Units")).child(div().w(px(156.)).child(sel.clone())));
+                }
+                body = body.child(readout("Max", hi)).child(readout("Min", lo)).child(check("at-thr", "Enable threshold display", o.threshold, |o, v| o.threshold = v, cx));
                 if o.threshold {
-                    body = body
-                        .child(stepper("at-hi", "High threshold", format!("{} deg", noshape_units::to_fixed(o.high_deg, 0)), |o, d| o.high_deg = (o.high_deg + d as f64).clamp(0.0, 180.0), cx))
-                        .child(stepper("at-lo", "Low threshold", format!("{} deg", noshape_units::to_fixed(o.low_deg, 0)), |o, d| o.low_deg = (o.low_deg + d as f64).clamp(0.0, 180.0), cx));
+                    for (i, (icon, label)) in [("dihedral-high", "High threshold"), ("dihedral-low", "Low threshold")].into_iter().enumerate() {
+                        let Some(st) = t.tolerance_inputs.get(i) else { continue };
+                        body = body.child(
+                            h_flex()
+                                .h(px(36.))
+                                .gap(px(5.))
+                                .text_size(px(12.))
+                                .child(crate::assets::icon(icon, 26., cx))
+                                .child(div().flex_1().text_color(muted).child(label))
+                                .child(div().w(px(79.)).flex_none().child(st.clone())),
+                        );
+                    }
                 }
             }
         }
         // Live: Interference detection has no Scale slider (dom/dialog-interference-*.txt).
-        if !matches!(kind, ToolKind::Connection | ToolKind::Flatten | ToolKind::Interference) && !kind.is_view_mode() {
+        // Live (Dihedral, 10-27): "Scale" on its own row over the slider.
+        if kind == ToolKind::Dihedral {
+            body = body.child(div().pt(px(6.)).text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child("Scale")).child(div().w_full().child(Slider::new(&t.slider)));
+        } else if !matches!(kind, ToolKind::Connection | ToolKind::Flatten | ToolKind::Interference) && !kind.is_view_mode() {
             body = body.child(h_flex().gap_2().text_size(px(12.)).text_color(pal.text_muted).child("Scale").child(div().flex_1().child(Slider::new(&t.slider))));
         }
         // Live (psb 10-19 i): Interference detection's panel is a 600 × 80
@@ -1105,7 +1165,9 @@ impl PartStudioView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("dialog-cancel", 24., cx))
+                            // Live (Dihedral, 10-27): the dialog's grey ✕, #333 at 0.5.
+                            .when(kind == ToolKind::Dihedral, |d| d.opacity(0.5).child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333))))
+                            .when(kind != ToolKind::Dihedral, |d| d.child(crate::assets::icon("dialog-cancel", 24., cx)))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.close_analysis_tool(cx);
                             })),

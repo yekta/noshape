@@ -70,8 +70,9 @@ that touches the model: ~12 min.
    entity (builder `hover.filter(|h| !selection.contains(h))`).
 4. (In the second batch: the highlight from Onshape's orthographic eye, offscreen test
    `the_highlight_moves_across_an_orthographic_view`.) Check perspective views against live too.
-5. Dihedral panel layout (P2; live asked for the full spec): Units ▾ row, Max / Min read-outs, Scale row, grey ✕;
-   Curve/surface's "☑ Previewed edges and faces" row over a dialog.
+5. Dihedral panel: layout as live (Units select, read-only Max / Min, threshold rows with our dihedral-high / -low
+   icons, Scale row, grey ✕), teal teeth (yellow above / purple below the thresholds), no envelope. Left: comb length
+   vs the Scale slider (live asked: lengths at min / 25 % / mid / 75 % / max) and the "Min: 90 deg" label on the comb.
 6. Cold start (viewport-performance.md 10-27): per-(source, options) MTLLibrary cache in the vendored wgpu-hal.
 7. interaction.md 🔧 rows left: 4.1–4.4, 4.7–4.9, 5.1, 5.3, 6.2–6.8, 2.3, 2.6. Ctrl+M Mate connector defaults
    (live asked: owner entity / attachment with one part).
