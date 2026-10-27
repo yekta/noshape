@@ -132,7 +132,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.7 | Picks go to the active field; clicking a picked entity again removes it | Home__selection; A §5.4 | ✅ |
 | 5.8 | Picks that don't pass the field filter do nothing: no highlight on hover, no pick, no toast, no flash | live "qa4 round 5 s1 follow-up 2" (1) | 🔧 (`field_takes`: the hover and the click; the invented rejection toast and red flash removed) |
 | 5.8b | Clicking a sketch curve while a region field is active takes the region it bounds (the smaller one for a curve between two regions); hovering the curve pre-highlights that region | live (Extrude dialog) | ✅ (was "all regions"; changed per live) |
-| 5.9 | List clicks (default planes, parts) obey the field filter | A §5.4 | 🔧 (were added unfiltered) |
+| 5.9 | List clicks (default planes, parts) obey the field filter | A §5.4 | ✅ (10-27: a part row does nothing in Extrude's regions field) |
 | 5.10 | Clicking a sketch in the feature list fills a region field with all its regions, shown as one "Faces of Sketch 1" row; clicking again removes them; feature fields take the feature | features_and_parts_lists; live | ✅ |
 | 5.11 | Single-pick fields replace their pick and move focus to the next empty selection field | A §5.4 | ✅ |
 | 5.12 | × on a chip removes that pick | feature_basics | ✅ |
@@ -219,7 +219,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 7.1 | Parts with colour swatch and count | features_and_parts_lists | ✅ |
-| 7.2 | Click selects (or fills a part field in a dialog, filtered) | features_and_parts_lists | 🔧 (unfiltered before) |
+| 7.2 | Click selects (or fills a part field in a dialog, filtered) | features_and_parts_lists | ✅ (10-27: Delete part takes the clicked row's part) |
 | 7.3 | Hover highlights the part in the graphics area | features_and_parts_lists | ✅ |
 | 7.4 | Eye on hover ("Hide Part N", 20 × 20 at x 210) hides/shows the part; hidden parts greyed | features_and_parts_lists | ✅ |
 | 7.5 | Parts list menu (live order): Rename, Properties…, Assign material…, Edit appearance… | Create Drawing of Part…, Export… | Hide, Isolate…, Make transparent… | Zoom to selection | Delete… | live | ✅ (Copy Part N after Copy here… as live; Release… and Revision history: see 13.14) |
