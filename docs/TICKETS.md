@@ -276,6 +276,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 CONFIG-CELL-EDIT a configured value can't be edited in the Configuration panel's table: Configure Part Studio,
+  add row "Big", Linear pattern 1 › Instance count › right-click › Configure (column "Linear pattern 1 / Instance count",
+  3 / 3, toast as live); a click, double-click or typing on Big's "3" cell does nothing (no blue frame, no edit), while
+  the Name cell takes typing. Setting it through the feature dialog with Big active works (Big 5, Parts (5)). Live's
+  table cells are editable like its other panels' (single click frames the cell, typing edits; live asked, qa batch 2
+  (6)) (qa 2026-10-27, green 4854cad4)
 - [x] c0bbde51 P0 REGEN-NO-CANCEL fixed (psui 10-27): a newer run that evaluates fewer features (the rollback bar above the running feature, a dialog on an earlier feature) aborts the running one; its finished features stay cached, so the rollback shows at once (app on cli-fillet-hang.noshape: 0 ms, 7 cached, while Fillet 2 ran). Was: a newer regeneration waits for a stale one instead of cancelling it: open a copy of
   /root/qa-scratch/tickets/cli-fillet-hang.noshape in green 502416cc (NOSHAPE_PERF=1); while the opening regen is still
   in Fillet 2 (it fails after the 30 s blend budget), drag the rollback bar above Fillet 2: schedule_regen #2 at 05:16:57,
