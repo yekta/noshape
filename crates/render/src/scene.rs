@@ -719,7 +719,15 @@ pub const LINE_LOD_MAX_ERROR_PX: f32 = 0.25;
 /// The coarsest line level (1-based, [`LINE_LOD_TOLERANCES`]) for a body
 /// whose bounding-box diagonal is `diagonal_px` CSS px on screen.
 pub fn line_lod_level(diagonal_px: f32) -> u8 {
-    LINE_LOD_TOLERANCES.iter().rposition(|&t| t * diagonal_px <= LINE_LOD_MAX_ERROR_PX).map_or(1, |i| i as u8 + 1)
+    let max = line_lod_max_error_px();
+    LINE_LOD_TOLERANCES.iter().rposition(|&t| t * diagonal_px <= max).map_or(1, |i| i as u8 + 1)
+}
+
+/// [`LINE_LOD_MAX_ERROR_PX`], or `NOSHAPE_PERF_LINE_ERROR_PX` (a benchmark knob: Onshape draws edges from the faces'
+/// own tessellation, whose screen error is up to [`MESH_ERROR_PX`]).
+fn line_lod_max_error_px() -> f32 {
+    static MAX: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *MAX.get_or_init(|| std::env::var("NOSHAPE_PERF_LINE_ERROR_PX").ok().and_then(|v| v.parse().ok()).unwrap_or(LINE_LOD_MAX_ERROR_PX))
 }
 
 /// Douglas–Peucker: the points of `pts` that keep every dropped point
