@@ -257,7 +257,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 9.9 | Previous view returns to the camera before the last view change | View__previous_view | ✅ (10-27: Shift+5 then Previous view gives the same frame pixel for pixel) |
 | 9.10 | Zoom to selection (parts, faces, edges, sketches, planes, features) | View__zoom_to_fit | 🔧 |
 | 9.11 | Display: Shaded with edges / Shaded without edges / Unshaded / Translucent; Hidden edges visible/removed; Tangent edges visible / phantom (dash-dot) / removed | live | ✅ (tangency found from the mesh: `MeshBuffers::smooth_edges`) |
-| 9.12 | Orient normal to sketch on edit (camera menu toggle); the previous view returns when the sketch closes | View__orient_normal_to_sketch_on_edit | 🔧 (not persisted across sessions) |
+| 9.12 | Orient normal to sketch on edit (camera menu toggle); the previous view returns when the sketch closes | View__orient_normal_to_sketch_on_edit | ✅ (10-27: Sketch 1 opens normal to Top, ✓ brings back the frame pixel for pixel; the toggle isn't persisted across sessions) |
 | 9.13 | Named views store orientation/zoom/projection; save, restore, delete | View__named_views | ✅ |
 | 9.14 | Named views store the section state | View__named_views | 🔧 |
 | 9.15 | Rotation inertia; rotate about the point under the cursor | A §6.1 | 🔧 |
