@@ -282,6 +282,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   "shell took too long"); plates whose only concave faces are through holes (and hole-rim fillets) take the regions
   path: the hole plates of the kernel matrix test 0.7–1.1 s → 81–93 ms, same volumes. Parts with concave edges still
   take slabs (1–5 s).
+  core 10-27 later: the regions path builds the planes' cavity as one polytope (no booleans), fillet / rim regions from
+  sections with an arc, cuts the rim torus first (cut last it took 270–360 ms against the hole's tube), and checks only
+  the faces the cut made: qa's shelltime plates (h10/h30 R2 t1.5, h10 R4 t2.5) 420–870 → 177–229 ms a Shell feature at
+  load ~35 (dev build), same volumes; probe `kernel_robustness::shell_feature_time_probe` (ignored).
 - [ ] P0 REGEN-SPEED (core 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left

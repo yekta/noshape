@@ -573,6 +573,69 @@ double offsets_touch_gap(const TopoDS_Shape& solid, const std::vector<TopoDS_Sha
 
 // ------------------------------------------------------------------ regions
 
+// The convex polytope {x : (x - o_i).n_i <= 0 for all i} as a solid, built
+// without booleans (SHELL-SLOW: a cut per plane cost ~18 ms each): each
+// plane's square of half-size `big` clipped by the other half-spaces, the
+// faces sewn. `faces[i]` gets plane i's face (null when it bounds nothing).
+TopoDS_Shape polytope(const std::vector<std::pair<gp_Pnt, gp_Dir>>& hs, double big, std::vector<TopoDS_Shape>& faces)
+{
+  const double            eps = 1e-12 * big;
+  BRepBuilderAPI_Sewing   sew(1e-9 * big);
+  std::vector<TopoDS_Face> made(hs.size());
+  for (size_t i = 0; i < hs.size(); ++i)
+  {
+    const gp_Ax3        ax(hs[i].first, hs[i].second);
+    const gp_Vec        x(ax.XDirection()), y(ax.YDirection());
+    std::vector<gp_Pnt> poly{hs[i].first.Translated(x * -big + y * -big), hs[i].first.Translated(x * big + y * -big),
+                             hs[i].first.Translated(x * big + y * big), hs[i].first.Translated(x * -big + y * big)};
+    for (size_t j = 0; j < hs.size() && poly.size() >= 3; ++j)
+    {
+      if (j == i)
+        continue;
+      const gp_Vec        n(hs[j].second);
+      auto                side = [&](const gp_Pnt& p) { return gp_Vec(hs[j].first, p).Dot(n); };
+      std::vector<gp_Pnt> next;
+      for (size_t k = 0; k < poly.size(); ++k)
+      {
+        const gp_Pnt& a = poly[k];
+        const gp_Pnt& b = poly[(k + 1) % poly.size()];
+        const double  sa = side(a), sb = side(b);
+        if (sa <= eps)
+          next.push_back(a);
+        if ((sa < -eps && sb > eps) || (sa > eps && sb < -eps))
+          next.push_back(a.Translated(gp_Vec(a, b) * (sa / (sa - sb))));
+      }
+      poly.swap(next);
+    }
+    std::vector<gp_Pnt> clean;
+    for (const gp_Pnt& p : poly)
+      if (clean.empty() || clean.back().Distance(p) > 1e-9 * big)
+        clean.push_back(p);
+    while (clean.size() > 1 && clean.front().Distance(clean.back()) <= 1e-9 * big)
+      clean.pop_back();
+    if (clean.size() < 3)
+      continue;
+    BRepBuilderAPI_MakePolygon w;
+    for (const gp_Pnt& p : clean)
+      w.Add(p);
+    w.Close();
+    if (!w.IsDone())
+      continue;
+    BRepBuilderAPI_MakeFace f(gp_Pln(ax), w.Wire(), true);
+    if (!f.IsDone())
+      continue;
+    made[i] = f.Face();
+    sew.Add(made[i]);
+  }
+  sew.Perform();
+  TopoDS_Shape so = solid_of(sew.SewedShape());
+  faces.assign(hs.size(), TopoDS_Shape());
+  for (size_t i = 0; i < hs.size(); ++i)
+    if (!made[i].IsNull())
+      faces[i] = sew.IsModified(made[i]) ? sew.Modified(made[i]) : TopoDS_Shape(made[i]);
+  return so;
+}
+
 // Path 0, inward walls of convex solids bounded by planes and convex
 // cylinders (fillets) with planar faces removed: the cavity is where every
 // kept face's offset leaves it, Parasolid's rule of offset faces extended
@@ -640,7 +703,18 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   TopoDS_Shape cavity = BRepPrimAPI_MakeBox(gp_Pnt(x0, y0, z0), gp_Pnt(x1, y1, z1)).Shape();
   // Cuts `tool` from the cavity; `src` gives the tool faces their source.
   auto cut_by = [&](const TopoDS_Shape& tool, const SourceMap& src) {
+    const KernelTimer timer("regions.cut_cavity");
+    const auto        t0 = std::chrono::steady_clock::now();
     BRepAlgoAPI_Cut c(cavity, tool);
+    if (dbg)
+    {
+      int nt = 0, nc = 0;
+      for (TopExp_Explorer x(tool, TopAbs_FACE); x.More(); x.Next())
+        ++nt;
+      for (TopExp_Explorer x(cavity, TopAbs_FACE); x.More(); x.Next())
+        ++nc;
+      std::fprintf(stderr, "regions: cut %d-face tool from %d-face cavity in %.1f ms\n", nt, nc, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+    }
     if (c.HasErrors() || !c.IsDone())
       return no("a boolean failed");
     const HHist h = c.History();
@@ -661,6 +735,8 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   };
   std::vector<std::pair<TopoDS_Face, gp_Cylinder>> cylinders;
   std::vector<std::pair<TopoDS_Face, gp_Torus>>    tori;
+  std::vector<std::pair<gp_Pnt, gp_Dir>>           halfspaces;
+  std::vector<TopoDS_Shape>                        halfspace_faces;
   for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
   {
     const TopoDS_Face& f = TopoDS::Face(e.Current());
@@ -702,19 +778,80 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
     // half-space was centred there, 2220 vs live 2653.5 mm3).
     const gp_Pnt mid(0.5 * (x0 + x1), 0.5 * (y0 + y1), 0.5 * (z0 + z1));
     const gp_Pnt on = a.Plane().Location().Translated(gp_Vec(n) * -t);
-    const gp_Pnt o  = mid.Translated(gp_Vec(n) * gp_Vec(mid, on).Dot(gp_Vec(n)));
-    gp_Ax3       ax(o, n);
-    gp_Pnt       c0 = o.Translated(gp_Vec(ax.XDirection()) * -big + gp_Vec(ax.YDirection()) * -big);
-    TopoDS_Shape hs = BRepPrimAPI_MakeBox(gp_Ax2(c0, n, ax.XDirection()), 2 * big, 2 * big, big).Shape();
-    SourceMap    src;
-    for (TopExp_Explorer x(hs, TopAbs_FACE); x.More(); x.Next())
+    halfspaces.emplace_back(mid.Translated(gp_Vec(n) * gp_Vec(mid, on).Dot(gp_Vec(n))), n);
+    halfspace_faces.push_back(f);
+  }
+  // The planes' cavity: their offsets with the (enlarged) box, one polytope.
+  {
+    const KernelTimer timer("regions.polytope");
+    for (const gp_Dir& d : {gp_Dir(1, 0, 0), gp_Dir(-1, 0, 0), gp_Dir(0, 1, 0), gp_Dir(0, -1, 0), gp_Dir(0, 0, 1), gp_Dir(0, 0, -1)})
     {
-      BRepAdaptor_Surface s(TopoDS::Face(x.Current()), false);
-      if (s.Plane().Axis().Direction().IsParallel(n, 1e-9) && std::abs(gp_Vec(o, s.Plane().Location()).Dot(gp_Vec(n))) < 1e-9 * big)
-        src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
+      halfspaces.emplace_back(gp_Pnt(d.X() > 0 ? x1 : x0, d.Y() > 0 ? y1 : y0, d.Z() > 0 ? z1 : z0), d);
+      halfspace_faces.push_back(TopoDS_Shape());
     }
-    if (!cut_by(hs, src))
-      return no("a plane's cut failed");
+    std::vector<TopoDS_Shape> pf;
+    cavity = polytope(halfspaces, big, pf);
+    if (cavity.IsNull() || solid_count(cavity) != 1)
+      return no("the planes' polytope failed");
+    sources.Clear();
+    for (size_t k = 0; k < pf.size(); ++k)
+      if (!pf[k].IsNull() && !halfspace_faces[k].IsNull())
+        sources.Bind(pf[k], Source{halfspace_faces[k], (uint8_t)REL_GENERATED});
+  }
+  for (const auto& [f, tor] : tori)
+  {
+    // A convex fillet all round an axis (a hole's or a boss's rim): the part
+    // of its tube farther than R - t from the tube circle is wall.
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    const double R = tor.MinorRadius(), M = tor.MajorRadius();
+    if (u1 - u0 < 2 * M_PI - 1e-6 || v1 - v0 >= M_PI - 1e-6 || !(M > R))
+      return no("a torus isn't a full rim fillet");
+    BRepAdaptor_Surface a(f, true);
+    gp_Pnt              p;
+    gp_Vec              du, dv;
+    a.D1(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, du, dv);
+    gp_Vec n = du.Crossed(dv);
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    const gp_Ax3& ax = tor.Position();
+    // The tube circle's point at p's angle.
+    const gp_Vec radial(gp_Lin(ax.Axis()).Normal(p).Direction());
+    const gp_Pnt tc = ax.Location().Translated(radial * M);
+    if (n.Dot(gp_Vec(tc, p)) <= 0)
+      return no("a concave torus");
+    // The meridian section at u0: the face's arc between v0 and v1, rays past
+    // it (short of the axis), back along the arc at R - t (to the tube
+    // centre when the wall is at least as thick as the fillet's radius).
+    const gp_Pnt c = ax.Location().Translated((gp_Vec(ax.XDirection()) * std::cos(u0) + gp_Vec(ax.YDirection()) * std::sin(u0)) * M);
+    const double L = R + 0.5 * std::min(R, M - R), vm = 0.5 * (v0 + v1), wide = L / std::cos(0.5 * (v1 - v0));
+    auto         on = [&](double v, double rad) { return ElSLib::Value(u0, v, gp_Torus(ax, M, rad)); };
+    BRepBuilderAPI_MakeWire wire;
+    const double            ri = R - t;
+    if (ri > 1e-9 * R)
+    {
+      wire.Add(BRepBuilderAPI_MakeEdge(on(v0, ri), on(v0, L)).Edge());
+      wire.Add(BRepBuilderAPI_MakeEdge(on(v0, L), on(vm, wide)).Edge());
+      wire.Add(BRepBuilderAPI_MakeEdge(on(vm, wide), on(v1, L)).Edge());
+      wire.Add(BRepBuilderAPI_MakeEdge(on(v1, L), on(v1, ri)).Edge());
+      wire.Add(BRepBuilderAPI_MakeEdge(GC_MakeArcOfCircle(on(v1, ri), on(vm, ri), on(v0, ri)).Value()).Edge());
+    }
+    else
+    {
+      BRepBuilderAPI_MakePolygon poly;
+      for (const gp_Pnt& q : {c, on(v0, L), on(vm, wide), on(v1, L)})
+        poly.Add(q);
+      poly.Close();
+      wire.Add(poly.Wire());
+    }
+    if (!wire.IsDone())
+      return no("a rim fillet's section failed");
+    TopoDS_Shape region = BRepPrimAPI_MakeRevol(BRepBuilderAPI_MakeFace(wire.Wire(), true).Face(), ax.Axis(), 2 * M_PI).Shape();
+    SourceMap src;
+    for (TopExp_Explorer x(region, TopAbs_FACE); x.More(); x.Next())
+      src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
+    if (!cut_by(region, src))
+      return no("a boolean failed");
   }
   for (const auto& [f, cyl] : cylinders)
   {
@@ -753,84 +890,46 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
     if (u1 - u0 >= M_PI - 1e-6)
       return no("a fillet spans a half turn");
     // The sector [u0, u1] beyond radius r - t, over the face's axial extent
-    // and 2t more each way: a prism of the sector polygon minus the cylinder.
-    const double L  = big;
+    // and 2t more each way: a prism of the sector's section (an arc at
+    // r - t; the centre when the wall is at least as thick as the fillet's
+    // radius: its offset vanishes and the whole sector goes). Out to just past
+    // the face: beyond it the sector is outside the part (a reach of `big`
+    // cut across the whole cavity, ~30 ms a fillet).
+    const double L  = r + t;
     auto         at = [&](double u, double rad, double v) { return ElSLib::Value(u, v, gp_Cylinder(ax, rad)); };
     const double va = v0 - margin, vb = v1 + margin, um = 0.5 * (u0 + u1), wide = L / std::cos(0.5 * (u1 - u0));
-    std::vector<gp_Pnt> base{at(u0, 0, va), at(u0, L, va), at(um, wide, va), at(u1, L, va)};
-    BRepBuilderAPI_MakePolygon poly;
-    for (const gp_Pnt& q : base)
-      poly.Add(q);
-    poly.Close();
-    TopoDS_Shape sector = BRepPrimAPI_MakePrism(BRepBuilderAPI_MakeFace(poly.Wire(), true).Face(), gp_Vec(ax.Direction()) * (vb - va)).Shape();
-    // A wall at least as thick as the fillet's radius: its offset vanishes
-    // and the whole sector goes.
-    TopoDS_Shape region = sector;
-    if (r - t > 1e-9 * r)
+    BRepBuilderAPI_MakeWire wire;
+    const double            ri = r - t;
+    if (ri > 1e-9 * r)
     {
-      gp_Ax2          cax(ElSLib::Value(0, va - 1, gp_Cylinder(ax, 0)), ax.Direction(), ax.XDirection());
-      TopoDS_Shape    inner = BRepPrimAPI_MakeCylinder(cax, r - t, vb - va + 2).Shape();
-      BRepAlgoAPI_Cut k(sector, inner);
-      if (k.HasErrors() || !k.IsDone())
-        return no("a boolean failed");
-      region = k.Shape();
+      wire.Add(BRepBuilderAPI_MakeEdge(at(u0, ri, va), at(u0, L, va)).Edge());
+      wire.Add(BRepBuilderAPI_MakeEdge(at(u0, L, va), at(um, wide, va)).Edge());
+      wire.Add(BRepBuilderAPI_MakeEdge(at(um, wide, va), at(u1, L, va)).Edge());
+      wire.Add(BRepBuilderAPI_MakeEdge(at(u1, L, va), at(u1, ri, va)).Edge());
+      wire.Add(BRepBuilderAPI_MakeEdge(GC_MakeArcOfCircle(at(u1, ri, va), at(um, ri, va), at(u0, ri, va)).Value()).Edge());
     }
+    else
+    {
+      BRepBuilderAPI_MakePolygon poly;
+      for (const gp_Pnt& q : {at(u0, 0, va), at(u0, L, va), at(um, wide, va), at(u1, L, va)})
+        poly.Add(q);
+      poly.Close();
+      wire.Add(poly.Wire());
+    }
+    if (!wire.IsDone())
+      return no("a fillet's section failed");
+    TopoDS_Shape region = BRepPrimAPI_MakePrism(BRepBuilderAPI_MakeFace(wire.Wire(), true).Face(), gp_Vec(ax.Direction()) * (vb - va)).Shape();
     SourceMap src;
     for (TopExp_Explorer x(region, TopAbs_FACE); x.More(); x.Next())
       src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
     if (!cut_by(region, src))
       return no("a boolean failed");
   }
-  for (const auto& [f, tor] : tori)
-  {
-    // A convex fillet all round an axis (a hole's or a boss's rim): the part
-    // of its tube farther than R - t from the tube circle is wall.
-    double u0, u1, v0, v1;
-    BRepTools::UVBounds(f, u0, u1, v0, v1);
-    const double R = tor.MinorRadius(), M = tor.MajorRadius();
-    if (u1 - u0 < 2 * M_PI - 1e-6 || v1 - v0 >= M_PI - 1e-6 || !(M > R))
-      return no("a torus isn't a full rim fillet");
-    BRepAdaptor_Surface a(f, true);
-    gp_Pnt              p;
-    gp_Vec              du, dv;
-    a.D1(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, du, dv);
-    gp_Vec n = du.Crossed(dv);
-    if (f.Orientation() == TopAbs_REVERSED)
-      n.Reverse();
-    const gp_Ax3& ax = tor.Position();
-    // The tube circle's point at p's angle.
-    const gp_Vec radial(gp_Lin(ax.Axis()).Normal(p).Direction());
-    const gp_Pnt tc = ax.Location().Translated(radial * M);
-    if (n.Dot(gp_Vec(tc, p)) <= 0)
-      return no("a concave torus");
-    // The meridian section at u0: the tube centre c, the face's arc between
-    // v0 and v1, rays past it (short of the axis), less the disc R - t (none
-    // when the wall is at least as thick as the fillet's radius).
-    const gp_Pnt c = ax.Location().Translated((gp_Vec(ax.XDirection()) * std::cos(u0) + gp_Vec(ax.YDirection()) * std::sin(u0)) * M);
-    const double L = R + 0.5 * std::min(R, M - R), vm = 0.5 * (v0 + v1), wide = L / std::cos(0.5 * (v1 - v0));
-    auto         on = [&](double v, double rad) { return ElSLib::Value(u0, v, gp_Torus(ax, M, rad)); };
-    BRepBuilderAPI_MakePolygon poly;
-    for (const gp_Pnt& q : {c, on(v0, L), on(vm, wide), on(v1, L)})
-      poly.Add(q);
-    poly.Close();
-    TopoDS_Shape region = BRepPrimAPI_MakeRevol(BRepBuilderAPI_MakeFace(poly.Wire(), true).Face(), ax.Axis(), 2 * M_PI).Shape();
-    if (R - t > 1e-9 * R)
-    {
-      TopoDS_Shape    inner = BRepPrimAPI_MakeTorus(gp_Ax2(ax.Location(), ax.Direction(), ax.XDirection()), M, R - t).Shape();
-      BRepAlgoAPI_Cut k(region, inner);
-      if (k.HasErrors() || !k.IsDone())
-        return no("a boolean failed");
-      region = k.Shape();
-    }
-    SourceMap src;
-    for (TopExp_Explorer x(region, TopAbs_FACE); x.More(); x.Next())
-      src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
-    if (!cut_by(region, src))
-      return no("a boolean failed");
-  }
+  std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("regions.final_cut");
   BRepAlgoAPI_Cut c(solid, cavity);
   if (c.HasErrors() || !c.IsDone())
     return no("a boolean failed");
+  lap = std::make_unique<KernelTimer>("regions.unify");
   // Faces the cut split (a hole's wall tube at its seam, kern's bracket:
   // 21 faces, live 20) merged, as the slabs' are.
   ShapeUpgrade_UnifySameDomain usd(c.Shape(), true, true, false);
@@ -838,16 +937,21 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   usd.Build();
   TopoDS_Shape r = single_solid(usd.Shape());
   HHist        hs = usd.History();
-  if (!valid_solid(r))
+  lap            = std::make_unique<KernelTimer>("regions.check");
+  // Checked where the cut changed the part (its untouched faces are the
+  // input's): the whole-part check cost 20 ms here.
+  auto ok = [&](const TopoDS_Shape& x) { return !x.IsNull() && solid_count(x) == 1 && valid_changed(solid, x); };
+  if (!ok(r))
   {
     r  = single_solid(c.Shape());
     hs = nullptr;
   }
-  if (!valid_solid(r) || solid_count(r) != 1)
+  if (!ok(r))
     return no("invalid result");
   const double vo = volume_of(solid), vr = volume_of(r);
   if (!(vr > 0 && vr < vo))
     return no("volume out of range");
+  lap = std::make_unique<KernelTimer>("regions.history");
   const HHist hc = c.History();
   out.result     = r;
   out.history    = hs.IsNull() ? shell_history(solid, r, {hc}, {hc}, sources, {}) : shell_history(solid, r, {hc, hs}, {hc, hs}, sources, {});

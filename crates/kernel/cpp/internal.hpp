@@ -80,6 +80,9 @@ void dump_op(const char* name, const TopoDS_Shape& s, const std::vector<TopoDS_S
 // Whether OCCT's booleans may run in parallel: only with NOSHAPE_BOP_PARALLEL=1
 // (qa BOOL-THREAD-CRASH, common.cpp).
 bool bop_parallel();
+// `r` valid where it differs from `input`: its faces not the input's in full,
+// the whole shape for closure and orientation (features.cpp).
+bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r);
 
 class HistoryBuilder
 {

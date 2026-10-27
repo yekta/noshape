@@ -2689,3 +2689,26 @@ fn feature_pattern_of_an_added_boss_off_the_plate_as_live() {
         }
     }
 }
+
+/// SHELL-SLOW probe (qa bin/shelltime.py): 80 × 50 × h plate, Ø20 hole, the
+/// top face filleted R, the bottom removed; the Shell feature's time.
+/// `NOSHAPE_KERNEL_PROFILE=cpu cargo test -p noshape-model --test all kernel_robustness::shell_feature_time_probe -- --ignored --nocapture`
+#[test]
+#[ignore = "T2: a timing probe"]
+fn shell_feature_time_probe() {
+    for (h, r, th) in [(10.0, 2.0, 1.5), (30.0, 2.0, 1.5), (10.0, 4.0, 2.5)] {
+        let mut t = T::new();
+        let (sk, _) = t.sketch(&[&[(-40.0, -25.0), (40.0, -25.0), (40.0, 25.0), (-40.0, 25.0)]], &[((0.0, 0.0), 10.0)]);
+        let r0 = t.regen();
+        let plate = r0.display.sketches.iter().find(|x| x.feature == sk).unwrap().regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).map(|g| Reference::SketchRegion { sketch: sk, key: g.key.clone() }).unwrap();
+        t.add("extrude", &[("entities", q(vec![plate])), ("depth", e(&format!("{h} mm"))), ("operationType", en("NEW"))]);
+        let top = t.faces_where(|c| c.z > h - 1e-6);
+        t.add("fillet", &[("entities", q(top)), ("radius", e(&format!("{r} mm")))]);
+        let bottom = t.faces_where(|c| c.z.abs() < 1e-6);
+        t.regen();
+        let t0 = std::time::Instant::now();
+        let s = t.shell(bottom, &format!("{th} mm"));
+        let (st, msg, v) = status(&mut t, s);
+        eprintln!("h{h} R{r} t{th}: {st:?} {msg:?} {v:.3} mm³ in {:.0} ms", t0.elapsed().as_secs_f64() * 1e3);
+    }
+}

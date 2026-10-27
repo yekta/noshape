@@ -2397,6 +2397,50 @@ OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness,
 // hair smaller (1e-7..1e-5 relative) succeeds, and the sliver faces it leaves
 // are then removed. An input that is invalid already keeps OCCT's result.
 
+// An op's result checked where the op changed it (a blend's, a shell's) (REGEN-SPEED: the
+// whole-part check cost more than the blend, 7.6 vs 5.9 ms a fillet on live's
+// 30-feature part): its faces that aren't the input's in full (geometry,
+// wires, edges, vertices: 3-5 of ~30 there), the whole shape only for
+// closure and orientation. An input face kept as it is was the input's.
+bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r)
+{
+  if (r.IsNull())
+    return false;
+  ShapeIMap old;
+  TopExp::MapShapes(input, TopAbs_FACE, old);
+  TopoDS_Compound changed;
+  BRep_Builder    B;
+  B.MakeCompound(changed);
+  int n = 0;
+  for (TopExp_Explorer e(r, TopAbs_FACE); e.More(); e.Next())
+    if (!old.Contains(e.Current()))
+    {
+      B.Add(changed, e.Current());
+      ++n;
+    }
+  // Closed and oriented: every edge bounds faces twice, once each way (a
+  // seam twice in its face). BRepCheck's topology-only pass cost 6 ms here.
+  NCollection_DataMap<TopoDS_Shape, std::pair<int, int>, TopTools_ShapeMapHasher> uses;
+  for (TopExp_Explorer f(r, TopAbs_FACE); f.More(); f.Next())
+    for (TopExp_Explorer e(f.Current(), TopAbs_EDGE); e.More(); e.Next())
+    {
+      if (BRep_Tool::Degenerated(TopoDS::Edge(e.Current())))
+        continue;
+      if (!uses.IsBound(e.Current()))
+        uses.Bind(e.Current(), {0, 0});
+      std::pair<int, int>& u = uses.ChangeFind(e.Current());
+      ++u.first;
+      u.second += e.Current().Orientation() == TopAbs_FORWARD ? 1 : e.Current().Orientation() == TopAbs_REVERSED ? -1 : 2;
+    }
+  for (decltype(uses)::Iterator it(uses); it.More(); it.Next())
+    if (it.Value().first != 2 || it.Value().second != 0)
+      return false;
+  // In parallel for many faces (the pool's workers use this frame).
+  BudgetHold hold;
+  return n == 0 || BRepCheck_Analyzer(changed, true, n > 16).IsValid();
+}
+
+
 namespace {
 
 // Builds one blend at `scale` x the requested sizes into (out, h); false if
@@ -2604,48 +2648,6 @@ struct Scaled
 // `make(sc)` returns the BlendBuild for the input scaled by `sc`.
 using MakeBuild = std::function<BlendBuild(const Scaled& sc)>;
 
-// A blend's result checked where the blend changed it (REGEN-SPEED: the
-// whole-part check cost more than the blend, 7.6 vs 5.9 ms a fillet on live's
-// 30-feature part): its faces that aren't the input's in full (geometry,
-// wires, edges, vertices: 3-5 of ~30 there), the whole shape only for
-// closure and orientation. An input face kept as it is was the input's.
-bool valid_blend(const TopoDS_Shape& input, const TopoDS_Shape& r)
-{
-  if (r.IsNull())
-    return false;
-  ShapeIMap old;
-  TopExp::MapShapes(input, TopAbs_FACE, old);
-  TopoDS_Compound changed;
-  BRep_Builder    B;
-  B.MakeCompound(changed);
-  int n = 0;
-  for (TopExp_Explorer e(r, TopAbs_FACE); e.More(); e.Next())
-    if (!old.Contains(e.Current()))
-    {
-      B.Add(changed, e.Current());
-      ++n;
-    }
-  // Closed and oriented: every edge bounds faces twice, once each way (a
-  // seam twice in its face). BRepCheck's topology-only pass cost 6 ms here.
-  NCollection_DataMap<TopoDS_Shape, std::pair<int, int>, TopTools_ShapeMapHasher> uses;
-  for (TopExp_Explorer f(r, TopAbs_FACE); f.More(); f.Next())
-    for (TopExp_Explorer e(f.Current(), TopAbs_EDGE); e.More(); e.Next())
-    {
-      if (BRep_Tool::Degenerated(TopoDS::Edge(e.Current())))
-        continue;
-      if (!uses.IsBound(e.Current()))
-        uses.Bind(e.Current(), {0, 0});
-      std::pair<int, int>& u = uses.ChangeFind(e.Current());
-      ++u.first;
-      u.second += e.Current().Orientation() == TopAbs_FORWARD ? 1 : e.Current().Orientation() == TopAbs_REVERSED ? -1 : 2;
-    }
-  for (decltype(uses)::Iterator it(uses); it.More(); it.Next())
-    if (it.Value().first != 2 || it.Value().second != 0)
-      return false;
-  // In parallel for many faces (the pool's workers use this frame).
-  BudgetHold hold;
-  return n == 0 || BRepCheck_Analyzer(changed, true, n > 16).IsValid();
-}
 
 OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const char* what,
                    const MakeBuild& make)
@@ -2667,7 +2669,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     bool valid = false;
     {
       const KernelTimer timer("blend.as_is_check");
-      valid = ok && valid_blend(input, r);
+      valid = ok && valid_changed(input, r);
     }
     if (valid)
     {
