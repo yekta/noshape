@@ -326,6 +326,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 API-REMOVE-DIR feature_add extrude operationType REMOVE without oppositeDirection stores oppositeDirection: true
+  (feature_get), although feature_schema gives its default as false: a 40×30×10 block on Top, a Ø10 circle sketched on Top,
+  REMOVE Through all / Blind 5 / no depth → all "Info: Selected tools and targets do not intersect.", volume 12000 (the cut
+  goes −Z, away from the block); with oppositeDirection: false passed explicitly it cuts (11214.602). The app's dialog flips
+  Remove away from the part as live's dialog does (behaviours 309, same red tool + toast), but live's REST API keeps the
+  parameter default, along the normal (behaviours 6494): the API should store what the caller gave, else the schema
+  default (qa 2026-10-27, watcher CLI 04:06 ≥ bcf401ca)
 - [x] (dx 10-27: a body's vertices are welded by position: 3MF one closed mesh by index, test export::tests::three_mf_bodies_are_manifold_by_index; OBJ one `v` per position, each face keeping its `vn` normals; OBJ stays in metres) P2 EXPORT-MESH-SHARED 3MF and OBJ exports don't share vertices between faces: tests/perf/live-30-features.noshape
   › Part 1 › Export… › 3MF (Medium) gives 3700 vertices for 2495 distinct positions and 4994 triangles, and 2332 of 14982
   directed edges have no opposite by vertex index (every face is its own island), although by position the mesh is
@@ -352,7 +359,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   exact for Simple / Counterbore / Countersink × Through / Blind (/root/qa-scratch/bin/holematrix.py) (qa 2026-10-26).
   On main (watcher CLI ~20:18) the schema no longer lists `style`, but feature_add still accepts `style: C_BORE` silently
   and makes a simple hole: an unknown parameter should be an invalid_argument error
-- [x] fixed on main (watcher CLI ~20:18, verify on green): P2 API-REMOVE-SCOPE (v0.4.8 CLI; please re-check on main) feature_add extrude with operationType REMOVE and no
+- [x] verified watcher CLI 04:06 (qa: booleanScope auto-fills the part; see API-REMOVE-DIR for the direction) fixed on main (watcher CLI ~20:18, verify on green): P2 API-REMOVE-SCOPE (v0.4.8 CLI; please re-check on main) feature_add extrude with operationType REMOVE and no
   booleanScope → "Error: No merge scope selected." (faulty booleanScope); the dialog auto-fills Merge scope = Part 1
   when Remove is picked (live behaviours "Remove … Merge scope = Part 1 (auto-filled)"). AGENT_API.md on main describes
   the auto choices for Add and the Remove direction but not the Remove scope (qa 2026-10-26, v0.4.8 release CLI)
