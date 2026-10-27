@@ -116,6 +116,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- I1 (P2) is core's now: the kernel's face integrator under-reports our STEP blend faces (Gauss 13.18188 vs a fine mesh
+  13.19411 on the same face); dx ruled out the reader and the geometry (TICKETS I1 has the numbers).
 - assembly-ui (after your move settles): assembly_mate_dialog.rs set_type renames a default name inline; it can call
   `noshape_model::default_names::retyped(&self.name, old, new)` (the same rule the API now uses), one copy.
 - App (after the app split): crates/app/src/part_studio/sheet_metal_panel.rs has the same logic as the new
