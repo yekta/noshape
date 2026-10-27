@@ -40,6 +40,8 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   second Shift+X keeps the Section view dialog); d97fe394 Esc on the menu also ends an isolate; 793ad99d Make
   transparent at live's 29 %; 57b344ac part-row hover no longer drops going row to row. Verified on :102 too: 2.19,
   3.17, 7.3, 9.3–9.5, interaction 5.5.
+- 10e24f53 the feature list's error icon as live (6.12). perf.yml dispatched 10-27 07:02 on main: run 40464678503
+  (read its summaries into viewport-performance.md).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -58,6 +60,12 @@ On Xvfb without a window manager the app window never gets X input focus, so GPU
 focus / blur events; nothing blurs, so nothing commits. **Always `xdotool windowfocus <window>` after starting the app
 on :102** (W=$(xdotool search --name noshape | head -1)). With focus, Tab commits and previews as live. Fixed alongside:
 a Tab commit scheduled two regenerations.
+
+## Landing checklist addition (10-27)
+
+A new or renamed menu label needs its crates/ops/src/coverage.rs MENUS line: run
+`cargo test -p noshape-ops --test all coverage::` with clippy / T0 (79460041's "Cancel" turned main red; skasm fixed
+it in 25dc002f). /root/psui-scratch/check22.sh runs it now.
 
 ## Build times (10-27, load ~30)
 

@@ -68,7 +68,7 @@ selection and hover per step, rows in brackets).
 | 4.4 | A vertex or edge with a plane (AN1): Top + vertical edge reads Perp line and plane angle · Curvature deviation · Min dist · Length (the edge's); vertex / edge midpoint / circle read their Min dist | L8949 (c); U `edge_vertex_midpoint_and_circle_with_the_top_plane` | ✅ U (edge rows exact, Curvature deviation also for a perpendicular line; vertex / circle rows beyond Min dist not captured live) |
 | 4.5 | Units follow the document (mm document: Millimeter) | L14555 (L401 was an inch document) | ✅ (psui 10-27: mm document → "40.000 mm") |
 | 4.6 | Status-bar Point readout with red / green / blue axis arrows ("Point:  X↘ 40.000 mm  Y↗ 0.000 mm  Z↑ 10.000 mm") | L14555–14574; live part-studio/qa4-r5-s9-4, ui-mass/07 | ✅ (psui 10-27, app vs live part-studio/qa4-r5-s9-4: "Point: X↘ … mm Y↗ … Z↑ …", the same arrows, colours, underlined values) |
-| 4.7 | Hovering a distance row draws a black dashed line | L8957 | 🔧 |
+| 4.7 | Hovering a distance row draws a black dashed line | L8957 | ✅ (10-27 on :102: Min dist row → the dashed line between the closest points) |
 | 4.8 | Live update when the selection changes; value display restored after 3 s (`MEASUREMENT_VALUE_DISPLAY_RESTORE_TIME_MS`) | B | 🔧 (readout and panel follow the selection: menus.rs `measure_cache` keyed on it). The 3 s constant (3e3) is only defined in the loaded bundles; nothing reads it there, so no behaviour to copy yet |
 | 4.9 | Mesh parts: an asterisk marks approximate values | L947, L953 | 🔧 |
 
