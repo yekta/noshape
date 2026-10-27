@@ -299,6 +299,12 @@ impl PartStudioView {
                             this.ui.analysis_tool = None;
                             this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
                         })));
+                        // Live (behaviours "More Part Studio menus": … Curve/surface analysis… | Create Drawing of
+                        // Sketch 1… | Select ▸; SKETCH-RMB-ITEMS): no DXF export from a curve.
+                        if let Some(id) = creator {
+                            let sk_name = creator_name.clone().unwrap_or_else(|| "Sketch".into());
+                            m = m.separator().item(icon_item(&format!("Create Drawing of {sk_name}…"), "menu-create-drawing", Box::new(move |this, w, cx| crate::drawing_create::request_create_drawing_of_sketch(this.tab, id, &sk_name, w, cx))));
+                        }
                     }
                     if k == PickKind::SketchRegion {
                         let rs = r.clone();

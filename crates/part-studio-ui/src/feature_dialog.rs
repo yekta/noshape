@@ -1610,6 +1610,13 @@ impl FeatureDialog {
         {
             self.variables.insert(name.clone(), q);
         }
+        // Live (behaviours 4279 "Bare number: the unit is appended"; VAR-BARE-UNIT): "12" in a Length becomes
+        // "12 mm", as any committed field.
+        let value = match kind {
+            "LENGTH" => crate::quantity_field::commit_text(&value, noshape_units::Dim::LENGTH, &self.units, &self.variables),
+            "ANGLE" => crate::quantity_field::commit_text(&value, noshape_units::Dim::ANGLE, &self.units, &self.variables),
+            _ => value,
+        };
         let range = (c.configuration && kind != "TEXT").then(|| (c.min.read(cx).value().to_string(), c.max.read(cx).value().to_string()));
         // The field keeps `#name` (renamed when the popup's name changed) and
         // gets the focus back (bundle `insertVariableName`).
