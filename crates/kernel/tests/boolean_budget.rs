@@ -8,7 +8,12 @@ use noshape_kernel as k;
 #[test]
 fn boolean_over_its_memory_budget_stops_with_an_error() {
     // SAFETY: the only test of this binary, set before any boolean runs.
-    unsafe { std::env::set_var("NOSHAPE_BOOLEAN_MEMORY_MB", "64") };
+    // Parallel booleans (as written: serial, the default since
+    // BOOL-THREAD-CRASH, stays under 64 MB on this knurl).
+    unsafe {
+        std::env::set_var("NOSHAPE_BOOLEAN_MEMORY_MB", "64");
+        std::env::set_var("NOSHAPE_BOP_PARALLEL", "1");
+    }
     let _ = k::set_working_scale(1000.0);
     let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
     // A small cut stays well inside the budget.
