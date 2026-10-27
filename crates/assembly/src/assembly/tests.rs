@@ -4185,7 +4185,7 @@ fn iso_7380_button_head_matches_live() {
 
 
 
-/// Live's texts (docs/parity/workflow-assembly-sweep.md rows 1–5, 7, 10, 12, 13):
+/// Live's texts (docs/parity/workflow-assembly-sweep.md rows 1–5, 7, 8, 10, 12, 13):
 /// relations on mates of the wrong kind, a relation whose mate is gone or
 /// failed, and a mate with both connectors on one instance.
 #[test]
@@ -4246,4 +4246,10 @@ fn relation_and_mate_errors_use_live_texts() {
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     let m14 = res.mates.iter().find(|m| m.id == MateId(14)).unwrap();
     assert_eq!(m14.message.as_deref(), Some("Geometry is not supported for tangent mate."));
+    // A Width mate with one width connector (row 8).
+    asm.mates.pop();
+    asm.mates.push(mate(15, MateType::Width, conn(2, pf.clone(), Inference::Centroid), conn(1, cylinder_face(&rp), Inference::Centroid)));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let m15 = res.mates.iter().find(|m| m.id == MateId(15)).unwrap();
+    assert_eq!(m15.message.as_deref(), Some("Two width mate connectors are required."));
 }

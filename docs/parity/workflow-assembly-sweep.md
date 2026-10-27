@@ -22,7 +22,7 @@ the error-string table's.
 | 5 | Relation's mate deleted | "One or more mates in this relation do not exist." | "Relation mate does not exist" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
 | 6 | Relation's mate suppressed | (error string exists, but live shows Inactive: row 17) | "Relation mate is suppressed" | 🔧 |
 | 7 | Relation's mate failed | "One or more mates in this relation are invalid." | "Relation mate could not be resolved" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
-| 8 | Width with one connector | "Two width mate connectors are required." | "Width mate needs two width mate connectors" | 🔧 |
+| 8 | Width with one connector | "Two width mate connectors are required." | "Width mate needs two width mate connectors" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
 | 9 | Secondary axis ∥ primary | "Failed to resolve mate connector. Secondary axis conflicts with primary axis." | "Secondary axis can't be parallel to the primary axis" | 🔧 |
 | 10 | Tangent on unsupported geometry / on a connector | "Geometry is not supported for tangent mate." | two long texts of ours | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) (E9: cylinder–cylinder is supported; connectors are not pickable) |
 | 11 | Replicate, nothing matches | "Selected target did not contain identical geometry." | "No matching geometry found (on the target instance)" | 🔧 |
