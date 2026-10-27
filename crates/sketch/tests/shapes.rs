@@ -147,3 +147,17 @@ fn corner_rectangle_constraints_follow_the_click_order() {
     assert!(sk.constraints().any(|c| c.kind == ConstraintKind::Perpendicular { a: top, b: left }));
     assert_eq!(sk.solve().dof, Some(4));
 }
+
+/// A center point rectangle's point-to-point midpoints survive a save and
+/// load (the document stores the sketch as JSON).
+#[test]
+fn center_rectangle_round_trips() {
+    let mut sk = Sketch::new();
+    sk.center_rectangle(v(1.0, 1.0), v(3.0, 2.0));
+    let back: Sketch = serde_json::from_str(&serde_json::to_string(&sk).unwrap()).unwrap();
+    let mids = |s: &Sketch| s.constraints().filter(|c| matches!(c.kind, ConstraintKind::MidpointOf { .. })).count();
+    assert_eq!(mids(&back), 2);
+    let mut back = back;
+    let rep = back.solve();
+    assert!(rep.is_solved() && rep.dof == Some(4), "{rep:?}");
+}
