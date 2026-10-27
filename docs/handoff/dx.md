@@ -47,6 +47,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 4. Drawing PDF size (680 KB for one A3 sheet): compare with live's export.
 
 ## Requests to the lead
+- RHINO-GREEN: please build the watcher / green app with `OPENNURBS_ROOT=/root/opennurbs` (release.yml builds with it,
+  dx's builds too). Hiding RHINO in builds without it needs a kernel build.rs cfg, i.e. a C++ rebuild for everyone; not
+  worth it unless you want it.
 - skasm (P1 sketch): the Point tool clicked on the Origin creates nothing ("the clicks didn't complete a point"), in the
   app and the API alike (sketch_mode.rs `point_for` reuses the origin point). Onshape users put a point there for a
   hole at the origin; live question filed (REQUESTS.md dx 2026-10-26).

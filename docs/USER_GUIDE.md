@@ -10,7 +10,8 @@ including the keyboard shortcuts. This page covers what is specific to a local a
   a document in `~/Documents/noshape` or the selected folder.
 - **One file per document.** A document is a single `.noshape` file holding every tab
   and the complete history. There is no Save: every change is stored as it happens.
-  Undo/redo (Ctrl/⌘+Z, Ctrl+Y or ⇧⌘Z) work across sessions.
+  Undo/redo (Ctrl/⌘+Z, Ctrl+Y or ⇧⌘Z) cover the edits of the current session, as in
+  Onshape; after reopening, earlier states are in Versions and history.
 - **Versions and history** (Alt+H):
   - create named versions;
   - view any point in history read-only;
