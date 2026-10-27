@@ -26,7 +26,7 @@ B = Onshape client code (bundle-raw), P = an existing parity row.
 | 1.9 | **No pre-highlight while a box is dragged** (only the plane under the press point keeps its ordinary hover); the selection fills in after release | live "nav2 selection" 5 | ✅ (ours draws only the box) |
 | 1.10 | Box look (BoxSelector.updateGraphics): a 1 px loop from the press point, each side stippled from its first corner, over an infill of the line colour at 0.2. Window `--os-box-select-color` (light #1651b0, dark #769fcc) solid; crossing #FFC20E 9 on / 8 off; zoom window rgba(144,206,241,0.7) 10 / 10. Live over white: fill #d0dcef / #fff3cf (= 0.2 exactly), line #7296cf / #ffda6e (= 0.6 of the colour) | L346–347; B | ✅ (viewport.rs `box_overlay`: the line at 0.5 over the 0.2 infill composites to live's 0.6) |
 | 1.11 | Ctrl+drag box deselects what it encloses / touches; with nothing selected it does nothing; looks as a plain box | P 3.6; live "nav2 selection" 6 | ✅ R ctrl-box-deselects, ctrl-box-nothing (run 40306609140); the box's look: P 3.6 |
-| 1.12 | Selection colours: face #e5aa38 + orange boundary, selected+hovered #f0bb58, edge #ffa90a ~3 px, part #c09039..#f0b850, plane fill #fdd385 / border #ffa90a | L256–263 | 🔧 (P) |
+| 1.12 | Selection colours: face #e5aa38 + orange boundary, selected+hovered #f0bb58, edge #ffa90a ~3 px, part #c09039..#f0b850, plane fill #fdd385 / border #ffa90a | L256–263 | ✅ (psui 10-27, app vs live "psui (10-27, interaction 1.12)" light set: top at rest (140,185,212) vs live (142,187,214), selected (229,163,34) exact, selected + hovered the same as selected; a selected face's boundary a 3 px (255,169,10) band; a selected edge 5 px (255,169,10) → (203,138,15) at the centre) |
 | 1.13 | Selection-count cursor macSelectionCursor-N, -5plus from 6 | L1100–1111 | ✅ P cursors 35/36 |
 | 1.14 | Left drag threshold 2 px / 50 ms (`LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE`, `_TIME_TOLERANCE`) | B | ✅ R (nav.yml run 40339384558 on main: jitter-click-clears, small-drag-keeps; 18/18 on Wayland and X11) |
 
@@ -49,7 +49,7 @@ selection and hover per step, rows in brackets).
 
 | # | Behaviour | Live / source | Status |
 |---|---|---|---|
-| 3.1 | Hovered face: boundary only, #FFC685 ~2 px, no fill (light and dark) | L257, L11317 | ✅ R hover target (hover-top); look 🔧 |
+| 3.1 | Hovered face: boundary only, #FFC685 ~2 px, no fill (light and dark) | L257, L11317 | ✅ (psui 10-27: the face fill unchanged, its boundary a flat 3 px #FFC685 band, as live psui-light-02; shaders.wgsl `face_band`) |
 | 3.2 | Hovered edge: thickened #FFC685; a 9 px dark hollow ring at its midpoint; near the midpoint (a few px) the midpoint becomes the target (11 px orange ring) | L258, L14599–14612; behaviours "icons2 midpoint radius" | ✅ (psui 10-27, app vs live selection/06, 06b: the edge lit #FFC685 with the dark midpoint ring; with no dialog the edge stays the target at the midpoint, as live; the midpoint target only with a field that takes points) |
 | 3.3 | Hovered vertex: a light-orange dot | L259 | ✅ (psui 10-27: the 11 px disc #F8C488, centre #FFD8AC, as palette POINT_HOVER from live part-studio/qa4-r5-s9-6d) |
 | 3.4 | Hovered plane / mate connector colours | B only (`SECTION_PLANE…`, `MATE_CONNECTOR_PRE_SELECTED_COLOR`) | ❓ (a colour capture for icons2, who owns hover visuals) |

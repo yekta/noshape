@@ -128,8 +128,6 @@ const FACE_SELECTED: vec3<f32> = vec3<f32>(0.887, 0.414, 0.018);
 // plane lies over it (selection/09).
 const BODY_SELECTED: vec3<f32> = vec3<f32>(1.0, 0.536, 0.074);
 const BODY_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.527, 0.073);
-// A highlighted part edge's dark core, sRGB (see fs_line).
-const EDGE_CORE: vec3<f32> = vec3<f32>(0.137, 0.188, 0.208);
 
 // ---------------------------------------------------------------- background
 
@@ -753,13 +751,19 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     let pick = global_pick(l.pick);
     let st = state_of(pick) & state_mask;
     var width = l.width * inst.extra.x + g.viewport.w;
-    let base_half = width * g.viewport.z * 0.5;
     // Live (selection/03, 06b, 07b): highlighted edges and face outlines
     // put ~3.5–4.5 px of colour down (4 px here at the default width).
     let lit = (st & (HOVER | SELECTED | ERROR)) != 0u;
     // From at most a part edge's width: a 2 px sketch line highlights like
     // an edge (live sketch/21, 22: the same 5 rows as selection/06b).
     if (lit) { width = (min(l.width, 1.25) * inst.extra.x + g.viewport.w) * 1.8 + 2.2; }
+    // Live (behaviours "psui (10-27, interaction 1.12)", light theme): a
+    // highlighted face's boundary is a flat 3 px band; a part edge hovered
+    // itself an 8 px band (dark outlines round a pale core), selected 5 px.
+    let face_band = lit && (st & OUTLINE) != 0u;
+    let own_edge = (l.style & 64u) != 0u && (st & (HOVER | SELECTED)) != 0u && !face_band;
+    if (face_band) { width = 3.0; }
+    if (own_edge) { width = select(5.0, 8.0, (st & HOVER) != 0u); }
     let half = max(width * g.viewport.z * 0.5, 0.5);
 
     var wa = (inst.model * vec4(l.a, 1.0)).xyz;
@@ -823,8 +827,8 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     o.world = mix(wa, wb, t);
     o.style = l.style;
     o.across = side * half;
-    let core = (l.style & 64u) != 0u && (st & (HOVER | SELECTED)) != 0u && (st & OUTLINE) == 0u;
-    o.core = select(0.0, max(base_half, 0.5), core);
+    // 1: a hovered part edge, 2: a selected one (fs_line draws the band).
+    o.core = select(0.0, select(2.0, 1.0, (st & HOVER) != 0u), own_edge);
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
 }
@@ -846,11 +850,20 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let t = fract(i.along / (period * g.viewport.z)) * period;
         if ((t > g.dash.x && t < g.dash.x + g.dash.y) || t > g.dash.x + g.dash.y + g.dash.z) { discard; }
     }
-    // A hovered / selected part edge: the edge shows through the highlight
-    // (live selection/06b, 07b: 0.2 of (35,48,53) in sRGB at the centre).
+    // A hovered / selected part edge (live psui-light-05..07, sRGB, from
+    // the centre out in logical px): hovered, a pale core (255,211,160),
+    // the hover colour, then a dark outline (26,35,40) on both sides;
+    // selected, a darker core (203,138,15) shading out to the selection
+    // colour, no outline.
     if (i.core > 0.0) {
-        let k = 0.2 * clamp(i.core + 0.5 - abs(i.across), 0.0, 1.0);
-        return vec4(mix(linear_to_srgb(i.color.rgb), EDGE_CORE, k), i.color.a);
+        let a = abs(i.across) / max(g.viewport.z, 1.0);
+        var c: vec3<f32>;
+        if (i.core < 1.5) {
+            if (a > 2.75) { c = vec3(26.0, 35.0, 40.0) / 255.0; } else if (a > 1.25) { c = linear_to_srgb(i.color.rgb); } else { c = vec3(255.0, 211.0, 160.0) / 255.0; }
+        } else {
+            if (a > 1.5) { c = linear_to_srgb(i.color.rgb); } else if (a > 0.5) { c = vec3(217.0, 156.0, 35.0) / 255.0; } else { c = vec3(203.0, 138.0, 15.0) / 255.0; }
+        }
+        return vec4(c, i.color.a);
     }
     return enc(i.color);
 }
