@@ -330,6 +330,8 @@ fn shell_solid() {
 #[test]
 fn a_crash_inside_the_kernel_fails_only_that_call() {
     for kind in [0, 1, 2, 0] {
+        // Uncaptured: the last line names the kind if the guard misses one and the process dies.
+        let _ = std::io::Write::write_all(&mut std::io::stderr(), format!("crash kind {kind}\n").as_bytes());
         let e = crash_inside_kernel(kind).unwrap_err();
         assert!(e.to_string().contains("the kernel crashed"), "{e}");
     }

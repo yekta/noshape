@@ -517,6 +517,7 @@ pub(crate) mod ffi {
 
         // ---- booleans etc.
         fn set_memory_budget_mb(mb: u64);
+        fn set_bop_parallel(on: bool);
         fn op_boolean(
             op: u8,
             args: &OcShapeList,

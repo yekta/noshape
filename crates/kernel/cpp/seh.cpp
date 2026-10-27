@@ -8,6 +8,7 @@
   #define WIN32_LEAN_AND_MEAN
   #define NOMINMAX
   #include <windows.h>
+  #include <csetjmp>
   #include <cstdlib>
   #include <exception>
 
@@ -16,8 +17,12 @@ namespace {
 // Guarded calls running on this thread.
 thread_local int seh_depth = 0;
 // std::terminate inside a guarded call (OCCT 8 throws from noexcept code:
-// gp_Dir of a zero vector), raised as this structured exception.
-constexpr DWORD terminate_code = 0xE0A50001;
+// gp_Dir of a zero vector) jumps back to the call, which reports this code.
+// (A structured exception raised from the handler can't get out: the C
+// runtime's terminate() runs the handler under its own __try / __except
+// and then aborts, 0xc0000409 on Windows CI.)
+constexpr DWORD          terminate_code = 0xE0A50001;
+thread_local std::jmp_buf* terminate_jmp = nullptr;
 // The terminate handler is per thread in MSVC's runtime.
 thread_local bool                   terminate_installed = false;
 thread_local std::terminate_handler previous_terminate  = nullptr;
@@ -39,7 +44,6 @@ int crash_filter(DWORD code)
     case EXCEPTION_FLT_OVERFLOW:
     case EXCEPTION_FLT_UNDERFLOW:
     case EXCEPTION_FLT_STACK_CHECK:
-    case terminate_code:
       return EXCEPTION_EXECUTE_HANDLER;
     default:
       // C++ exceptions (caught inside the call) and the rest go on.
@@ -49,8 +53,8 @@ int crash_filter(DWORD code)
 
 void on_terminate()
 {
-  if (seh_depth > 0)
-    RaiseException(terminate_code, EXCEPTION_NONCONTINUABLE, 0, nullptr);
+  if (seh_depth > 0 && terminate_jmp != nullptr)
+    std::longjmp(*terminate_jmp, 1);
   if (previous_terminate != nullptr)
     previous_terminate();
   std::abort();
@@ -71,6 +75,7 @@ unsigned long seh_frame(void (*fn)(void*), void* ctx)
 }
 } // namespace
 
+// No C++ objects in here either (longjmp lands in this frame).
 unsigned long seh_call(void (*fn)(void*), void* ctx) noexcept
 {
   if (!terminate_installed)
@@ -78,9 +83,19 @@ unsigned long seh_call(void (*fn)(void*), void* ctx) noexcept
     previous_terminate  = std::set_terminate(on_terminate);
     terminate_installed = true;
   }
+  std::jmp_buf               env;
+  std::jmp_buf* const        outer = terminate_jmp;
+  if (setjmp(env) != 0)
+  {
+    terminate_jmp = outer;
+    --seh_depth;
+    return terminate_code;
+  }
+  terminate_jmp = &env;
   ++seh_depth;
   const unsigned long code = seh_frame(fn, ctx);
   --seh_depth;
+  terminate_jmp = outer;
   return code;
 }
 } // namespace noshape

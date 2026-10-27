@@ -80,6 +80,8 @@ fn crashing_kernel_inputs_return() {
     names.sort();
     assert!(!names.is_empty());
     for n in &names {
+        // Uncaptured: the last line names the input if one kills the process.
+        let _ = std::io::Write::write_all(&mut std::io::stderr(), format!("crash input {n}\n").as_bytes());
         eprintln!("{n}: {}", replay(n));
     }
     // The kernel still works.

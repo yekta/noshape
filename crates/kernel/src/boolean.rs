@@ -93,6 +93,9 @@ pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolean
     // default 4096 otherwise): read here, where the process environment is
     // current on every platform.
     ffi::set_memory_budget_mb(std::env::var("NOSHAPE_BOOLEAN_MEMORY_MB").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0));
+    // OCCT's booleans in parallel (NOSHAPE_BOP_PARALLEL; serial by default):
+    // likewise.
+    ffi::set_bop_parallel(std::env::var_os("NOSHAPE_BOP_PARALLEL").is_some());
     Ok(OpResult::from_ffi(ck(ffi::op_boolean(code, &a, &t, &opts.ffi()))?))
 }
 

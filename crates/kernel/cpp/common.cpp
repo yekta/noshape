@@ -1426,12 +1426,22 @@ void budget_timer_stop(void* timer)
 #endif
 
 namespace noshape {
+namespace {
+std::atomic<bool> g_bop_parallel{std::getenv("NOSHAPE_BOP_PARALLEL") != nullptr};
+}
+
+void set_bop_parallel(bool on)
+{
+  g_bop_parallel.store(on);
+}
+
 bool bop_parallel()
 {
   // Serial unless NOSHAPE_BOP_PARALLEL=1 (qa BOOL-THREAD-CRASH: the seed-72
   // replay died in BOPAlgo_PaveFiller::ForceInterfEF on a pool thread in 1
-  // of 3 runs in parallel, 0 of 3 serial; ~35% slower on that replay).
-  static const bool parallel = std::getenv("NOSHAPE_BOP_PARALLEL") != nullptr;
-  return parallel;
+  // of 3 runs in parallel, 0 of 3 serial; ~35% slower on that replay). Also
+  // passed from Rust (`boolean`): on Windows the C runtime's getenv doesn't
+  // see a variable set in the process later (boolean_budget's set_var).
+  return g_bop_parallel.load();
 }
 } // namespace noshape
