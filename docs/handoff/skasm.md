@@ -21,6 +21,10 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
   onto the smaller block, Part 1); other studios keep the size rule. Test of live's mate edits (Flip primary axis
   brings the pin back upright, Offset Z 5 mm): mate_flip::editing_a_mate_between_free_parts_moves_the_pin_back_upright.
   00956cb2 DIN 6908 (the previous session's). 2d9a275c speed-target tests; fbfe810c ISO 10511 / 7040 = live;
+  0537ac91 OTF-FIRST-KEY; c8d26735 UI keystroke tests on GPUI's test platform (noshape-ui-test-support,
+  Gpu::headless, docs/TESTS.md "UI keystroke tests"; first tests: OTF-FIRST-KEY's keystrokes). ee23767c drags beside
+  conflicting constraints (sketch crate; the GUI drag of a point in qa's broken fuzz sketch still didn't move in my
+  walk although the editor-level drag does: open, see "Next").
   0b0f1abd sketch regions with long splines 36× faster (qa's fuzz sketch 1.46 s → 40 ms; fixture
   tests/fixtures/solve/fz211-final.json). qa's skfuzz 211 on the dev CLI: slowest step 0.74 s (qa: 290 s).
 - 10-27 afternoon (after the app split): 3d99e40d sketch value boxes as live's rule capture (corner rectangle, 3 point
@@ -154,11 +158,6 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
 ## Requests to the lead
-- OTF-FIRST-KEY (0537ac91) has no T1 keystroke test: no crate in the workspace has a GPUI test harness. Adding
-  `gpui-kit = { workspace = true, features = ["test-support"] }` (gpui test-support) as a dev-dependency of
-  part-studio-ui would let a `#[gpui::test]` type keys into the sketch view, but with `cargo test --workspace` the
-  feature unifies into every crate's test build (new crates: proptest, postage, futures-concurrency, web-time; one
-  rebuild of the gpui stack in every target dir). Your call; I'll write the test once it's there.
 - "Show calculation variance" in Mass properties (live: behaviours "skasm (2026-10-27) calculation variance": every
   value gets " ± 4.000e-1 mm³"-style text, 3-decimal scientific, not persisted). The assembly panel
   (assembly-ui/assembly_mass.rs) is mine, the Part Studio one psui's (part-studio-ui menus.rs ~1329), and the numbers

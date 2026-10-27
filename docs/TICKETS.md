@@ -784,9 +784,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   skasm 10-27 (0537ac91): open_otf_input focused the box, then set_cursor_position focused it again (focus not
   landed yet), which reset the input's "caller placed the caret" flag, so select-on-focus selected the typed key and
   the next key replaced it. Now focus, then set_selected_range(caret). Checked on :103: Line 5 0 Enter → 50 mm;
-  Circle 25 Enter → Ø25; corner rectangle 30 Enter 20 Enter → 30 × 20. No T1 keystroke test yet: the workspace has
-  no GPUI test harness (gpui test-support in a dev-dependency changes every crate's test build: asked the lead,
-  docs/handoff/skasm.md "Requests to the lead").
+  Circle 25 Enter → Ø25; corner rectangle 30 Enter 20 Enter → 30 × 20. T1 keystroke tests (c8d26735, GPUI test
+  platform, docs/TESTS.md "UI keystroke tests"): part-studio-ui part_studio::sketch::ui_tests::
+  line_value_box_takes_the_first_key and rectangle_value_boxes_take_width_then_height (both fail on the old code with
+  qa's symptoms).
 - [x] f34c32be P0 SKETCH-SOLVE-SPLINE-SLOW one constraint or dimension in a sketch with fit splines takes **3–5 minutes** — **verified** (qa 15:31, lead's CLI 15:14 at main ≥ f34c32be, debug build, load ~40: bin/sk211time.py → Coincident 0.28 s (was 175.6 s), dimension −10 0.48 s (was 295.1 s); same outcomes: "over defined (conflicting constraints)" / "Sketch could not be solved."; log cli/sk211-verify-1530.log): repro
   /root/qa-scratch/tickets/sk211-step89.noshape (Sketch 1: 273 entities — 209 points, 45 lines, 7 circles, 7 arcs, 3
   ellipses, **2 splines** — 97 constraints, dof 280; made by bin/skfuzz.py 211 89), bin/sk211time.py: Coincident
