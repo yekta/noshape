@@ -31,10 +31,61 @@
 // catches std::exception). OCCT 8's Standard_Failure derives from
 // std::exception, but we handle it first to include the exception type name.
 // ---------------------------------------------------------------------------
+#ifndef _WIN32
+  #include <csetjmp>
+  #include <csignal>
+namespace noshape {
+// Crash guard (qa DRAFT-SEGV-DOC / DOC-POISON): a SIGSEGV, SIGBUS, SIGFPE,
+// SIGILL or SIGABRT (std::terminate: OCCT 8 throws from noexcept code, e.g.
+// gp_Dir of a zero vector) raised on a thread while it runs a bridge call
+// jumps back to that
+// call, which fails with an error, so one bad feature fails instead of
+// killing the process (and the document stays openable). Signals anywhere
+// else go to the handler that was there before (Rust's). OCCT's own
+// OSD::SetSignal isn't used: it also takes SIGINT and friends.
+extern thread_local sigjmp_buf* crash_guard;
+extern thread_local int         crash_signal;
+void                            install_crash_guard();
+} // namespace noshape
+#endif
+
+namespace noshape {
+// Runs `f` under the crash guard: false when it throws or crashes (a
+// fallback inside an op that may crash OCCT, so the op can go on).
+template <class F>
+bool run_guarded(F&& f) noexcept
+{
+#ifndef _WIN32
+  install_crash_guard();
+  sigjmp_buf        env;
+  sigjmp_buf* const outer = crash_guard;
+  if (sigsetjmp(env, 1) != 0)
+  {
+    crash_guard = outer;
+    return false;
+  }
+  crash_guard = &env;
+#endif
+  bool ok = true;
+  try
+  {
+    f();
+  }
+  catch (...)
+  {
+    ok = false;
+  }
+#ifndef _WIN32
+  crash_guard = outer;
+#endif
+  return ok;
+}
+} // namespace noshape
+
 namespace rust {
 namespace behavior {
 template <typename Try, typename Fail>
-static void trycatch(Try&& func, Fail&& fail) noexcept
+static void trycatch_guarded(Try&& func, Fail&& fail) noexcept
 try
 {
   func();
@@ -59,6 +110,30 @@ catch (const std::exception& e)
 catch (...)
 {
   fail("occt: unknown C++ exception");
+}
+
+template <typename Try, typename Fail>
+static void trycatch(Try&& func, Fail&& fail) noexcept
+{
+#ifdef _WIN32
+  trycatch_guarded(func, fail);
+#else
+  noshape::install_crash_guard();
+  sigjmp_buf        env;
+  sigjmp_buf* const outer = noshape::crash_guard;
+  if (sigsetjmp(env, 1) != 0)
+  {
+    noshape::crash_guard = outer;
+    std::string msg = "occt: the kernel crashed (signal ";
+    msg += std::to_string(noshape::crash_signal);
+    msg += ")";
+    fail(msg);
+    return;
+  }
+  noshape::crash_guard = &env;
+  trycatch_guarded(func, fail);
+  noshape::crash_guard = outer;
+#endif
 }
 } // namespace behavior
 } // namespace rust
@@ -264,6 +339,9 @@ OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
               rust::Slice<const double> start_points, rust::Slice<const double> conditions, const OcShape& path,
               int32_t path_count);
 void  set_working_scale(double k);
+// Raises a signal inside a bridge call (tests of the crash guard): 0 SIGSEGV, 1 SIGFPE,
+// 2 std::terminate.
+void  crash_inside_kernel(uint8_t kind);
 OpOut op_thicken(const OcShape& s, double t1, double t2);
 OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness, uint8_t join);
 OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thickness, bool outward,

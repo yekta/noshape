@@ -1,0 +1,2 @@
+face 23
+shell thickness 0.002 outward 0 method 0

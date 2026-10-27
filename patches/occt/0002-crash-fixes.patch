@@ -1,0 +1,75 @@
+--- a/src/ModelingAlgorithms/TKOffset/Draft/Draft_Modification_1.cxx
++++ b/src/ModelingAlgorithms/TKOffset/Draft/Draft_Modification_1.cxx
+@@ -1560,7 +1560,9 @@
+       {
+         Extrema_ExtCS extr(AC, AS, Precision::PConfusion(), Precision::PConfusion());
+ 
+-        if (!extr.IsDone() || extr.NbExt() == 0)
++        // noshape: a curve parallel to the surface has distances but no
++        // points (Points() read past the point lists: SIGSEGV).
++        if (!extr.IsDone() || extr.NbExt() == 0 || extr.IsParallel())
+         {
+           errStat  = Draft_VertexRecomputation;
+           badShape = TVV;
+@@ -1581,6 +1583,12 @@
+             iref   = i;
+           }
+         }
++        if (iref == 0)
++        {
++          errStat  = Draft_VertexRecomputation;
++          badShape = TVV;
++          return;
++        }
+         extr.Points(iref, Pc, Ps);
+         pvt = Pc.Value();
+       }
+--- a/src/ModelingAlgorithms/TKShHealing/ShapeUpgrade/ShapeUpgrade_UnifySameDomain.cxx
++++ b/src/ModelingAlgorithms/TKShHealing/ShapeUpgrade/ShapeUpgrade_UnifySameDomain.cxx
+@@ -80,6 +80,7 @@
+ #include <BRepAdaptor_Curve.hxx>
+ #include <BRepAdaptor_Curve2d.hxx>
+ #include <BRepAdaptor_Surface.hxx>
++#include <gp.hxx>
+ #include <gp_Vec2d.hxx>
+ #include <BRepTools.hxx>
+ #include <BRepTopAdaptor_FClass2d.hxx>
+@@ -132,7 +133,12 @@
+   {
+     gp_Pnt aFirstPnt = theBAcurve.Value(theBAcurve.FirstParameter());
+     gp_Pnt aLastPnt  = theBAcurve.Value(theBAcurve.LastParameter());
+-    theDir           = gp_Vec(aFirstPnt, aLastPnt);
++    // noshape: a closed two-pole curve has no direction (gp_Dir of a zero
++    // vector aborts the process: its constructor is noexcept).
++    const gp_Vec aVec(aFirstPnt, aLastPnt);
++    if (aVec.Magnitude() <= gp::Resolution())
++      return false;
++    theDir = aVec;
+     return true;
+   }
+ 
+@@ -2323,6 +2329,12 @@
+     V[1]       = sae.LastVertex(TopoDS::Edge(theChain.Last()));
+     gp_Pnt PV2 = BRep_Tool::Pnt(V[1]);
+     gp_Vec Vec(PV1, PV2);
++    // noshape: a chain whose ends meet has no line (gp_Ax1 of a zero vector
++    // aborts the process).
++    if (Vec.Magnitude() <= gp::Resolution())
++    {
++      return false;
++    }
+     if (mySafeInputMode)
+     {
+       for (int k = 0; k < 2; k++)
+--- a/src/ModelingData/TKGeomBase/Extrema/Extrema_ExtCS.cxx
++++ b/src/ModelingData/TKGeomBase/Extrema/Extrema_ExtCS.cxx
+@@ -564,7 +564,8 @@
+ 
+ void Extrema_ExtCS::Points(const int N, Extrema_POnCurv& P1, Extrema_POnSurf& P2) const
+ {
+-  if (N < 1 || N > NbExt())
++  // noshape: parallel results have distances but no points.
++  if (N < 1 || N > NbExt() || N > myPOnC.Length() || N > myPOnS.Length())
+   {
+     throw Standard_OutOfRange();
+   }

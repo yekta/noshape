@@ -385,6 +385,13 @@ pub fn set_working_scale(k: f64) -> Result<()> {
     Ok(ffi::set_working_scale(k)?)
 }
 
+/// Raises SIGSEGV (`kind` 0), SIGFPE (1) or std::terminate (2) inside a kernel call: the crash
+/// guard turns it into an error of that call (tests; not on Windows).
+#[doc(hidden)]
+pub fn crash_inside_kernel(kind: u8) -> Result<()> {
+    Ok(ffi::crash_inside_kernel(kind)?)
+}
+
 // ---------------------------------------------------------------- fillet / chamfer
 
 /// Constant-radius fillet of `edges`. History: each filleted edge `Generated`

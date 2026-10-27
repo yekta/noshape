@@ -2556,6 +2556,8 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
     if (!df.IsDone() || df.HasErrors())
       return std::nullopt;
     const TopoDS_Shape full = df.Shape();
+    if (!BRepCheck_Analyzer(full).IsValid())
+      return std::nullopt;
     HHist              h1   = history_of({input}, df);
     BRepFilletAPI_MakeFillet mk(full);
     for (size_t i = 0; i < es.size(); ++i)
@@ -2565,8 +2567,9 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
         return std::nullopt;
       mk.Add(rs[i], TopoDS::Edge(im.First()));
     }
-    mk.Build();
-    if (!mk.IsDone())
+    // OCCT's fillet can crash on the extended part (qa FILLET-SEGV:
+    // ChFi3d_Builder::PerformIntersectionAtEnd): then this doesn't apply.
+    if (!run_guarded([&] { mk.Build(); }) || !mk.IsDone())
       return std::nullopt;
     HHist        h2      = history_of({full}, mk);
     TopoDS_Shape rounded = mk.Shape();
@@ -2992,6 +2995,15 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
                 bool checked)
 {
   require_non_null(s.shape, "shape");
+  if (std::getenv("NOSHAPE_DUMP_OPS"))
+  {
+    std::ostringstream p;
+    p.precision(17);
+    p << "fillet checked " << checked << " radii";
+    for (double r : radii)
+      p << " " << r;
+    dump_op("fillet", s.shape, edges.items, p.str());
+  }
   if (edges.items.empty())
     fail_invalid("fillet needs at least one edge");
   if (radii.size() != 1 && radii.size() != edges.items.size())
@@ -3916,6 +3928,15 @@ OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF&
                double angle)
 {
   require_non_null(s.shape, "shape");
+  if (std::getenv("NOSHAPE_DUMP_OPS"))
+  {
+    std::ostringstream p;
+    p.precision(17);
+    p << "draft pull " << dir.x << " " << dir.y << " " << dir.z << " origin " << neutral.origin.x << " " << neutral.origin.y << " "
+      << neutral.origin.z << " xdir " << neutral.xdir.x << " " << neutral.xdir.y << " " << neutral.xdir.z << " normal "
+      << neutral.normal.x << " " << neutral.normal.y << " " << neutral.normal.z << " angle " << angle;
+    dump_op("draft", s.shape, faces.items, p.str());
+  }
   if (faces.items.empty())
     fail_invalid("draft needs at least one face");
   if (!(std::abs(angle) < M_PI / 2.0))

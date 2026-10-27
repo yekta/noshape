@@ -6,6 +6,7 @@ mod blend;
 mod boolean_groups;
 #[path = "core.rs"]
 mod kernel_core;
+mod crash_inputs;
 mod display_mesh_guard;
 mod draft_curve;
 mod export;

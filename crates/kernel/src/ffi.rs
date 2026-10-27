@@ -460,6 +460,7 @@ pub(crate) mod ffi {
             path_count: i32,
         ) -> Result<OpOut>;
         fn set_working_scale(k: f64) -> Result<()>;
+        fn crash_inside_kernel(kind: u8) -> Result<()>;
         fn op_thicken(s: &OcShape, t1: f64, t2: f64) -> Result<OpOut>;
         fn op_shell(solid: &OcShape, faces: &OcShapeList, thickness: f64, join: u8)
         -> Result<OpOut>;

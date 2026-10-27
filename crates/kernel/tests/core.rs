@@ -322,3 +322,17 @@ fn shell_solid() {
     let o = shell(&b, &[], 1.0, ShellSide::Outside, JoinType::Intersection).unwrap();
     assert!(close(o.shape.volume().unwrap(), 1728.0 - 1000.0, 1e-6));
 }
+
+/// A crash inside a kernel call fails that call with an error (qa
+/// DRAFT-SEGV-DOC: a Draft's null dereference in OCCT killed the app on
+/// every open of the document); the process and later calls go on.
+#[cfg(unix)]
+#[test]
+fn a_crash_inside_the_kernel_fails_only_that_call() {
+    for kind in [0, 1, 2, 0] {
+        let e = crash_inside_kernel(kind).unwrap_err();
+        assert!(e.to_string().contains("the kernel crashed"), "{e}");
+    }
+    let b = make_box_corners(DVec3::ZERO, DVec3::ONE).unwrap();
+    assert!((b.volume().unwrap() - 1.0).abs() < 1e-12);
+}

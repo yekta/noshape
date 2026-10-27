@@ -1,5 +1,9 @@
 // Shapes, lists, topology exploration, validation and history building.
 #include "internal.hpp"
+#include <fstream>
+#include <cstdlib>
+#include <csignal>
+#include <cstring>
 
 #include <atomic>
 #include <cmath>
@@ -1122,4 +1126,108 @@ rust::String dump_shape(const OcShape& s)
   return rust::String(os.str());
 }
 
+} // namespace noshape
+
+#ifndef _WIN32
+namespace noshape {
+
+thread_local sigjmp_buf* crash_guard  = nullptr;
+thread_local int         crash_signal = 0;
+
+namespace {
+struct sigaction g_previous[32];
+
+void on_crash(int sig, siginfo_t* info, void* ctx)
+{
+  if (sigjmp_buf* env = crash_guard)
+  {
+    crash_guard  = nullptr;
+    crash_signal = sig;
+    siglongjmp(*env, 1);
+  }
+  // Not in a kernel call: the previous handler, or the default action
+  // (returning re-raises the fault).
+  const struct sigaction& prev = g_previous[sig];
+  if (prev.sa_flags & SA_SIGINFO)
+  {
+    if (prev.sa_sigaction != nullptr)
+    {
+      prev.sa_sigaction(sig, info, ctx);
+      return;
+    }
+  }
+  else if (prev.sa_handler == SIG_IGN)
+    return;
+  else if (prev.sa_handler != SIG_DFL && prev.sa_handler != nullptr)
+  {
+    prev.sa_handler(sig);
+    return;
+  }
+  signal(sig, SIG_DFL);
+}
+} // namespace
+
+void install_crash_guard()
+{
+  static std::once_flag once;
+  std::call_once(once, [] {
+    if (std::getenv("NOSHAPE_NO_CRASH_GUARD") != nullptr)
+      return;
+    for (int sig : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT})
+    {
+      struct sigaction sa;
+      std::memset(&sa, 0, sizeof sa);
+      sa.sa_sigaction = on_crash;
+      sa.sa_flags     = SA_SIGINFO | SA_ONSTACK | SA_NODEFER;
+      sigemptyset(&sa.sa_mask);
+      sigaction(sig, &sa, &g_previous[sig]);
+    }
+  });
+}
+
+} // namespace noshape
+#endif
+
+namespace noshape {
+void crash_inside_kernel(uint8_t kind)
+{
+  if (kind == 1)
+    std::raise(SIGFPE);
+  else if (kind == 2)
+    // An OCCT exception through a noexcept frame (OCCT 8's gp_Dir of a zero
+    // vector): std::terminate, abort.
+    [](double x) noexcept { (void)gp_Dir(x, 0, 0); }(0.0);
+  else
+    std::raise(SIGSEGV);
+}
+} // namespace noshape
+
+namespace noshape {
+// NOSHAPE_DUMP_OPS=<dir>: each dumped op writes <dir>/<name>-<n>.brep (its
+// input shape) and .txt (the indices of its sub-shape arguments in the
+// shape's face / edge maps, then its parameters), so a crash found in a
+// document becomes a kernel test (crates/kernel/tests/crash_inputs).
+void dump_op(const char* name, const TopoDS_Shape& s, const std::vector<TopoDS_Shape>& subs, const std::string& params)
+{
+  const char* dir = std::getenv("NOSHAPE_DUMP_OPS");
+  if (dir == nullptr || s.IsNull())
+    return;
+  static std::atomic<int> seq{0};
+  const std::string       base = std::string(dir) + "/" + name + "-" + std::to_string(seq++);
+  BRepTools::Write(s, (base + ".brep").c_str());
+  ShapeIMap faces, edges;
+  TopExp::MapShapes(s, TopAbs_FACE, faces);
+  TopExp::MapShapes(s, TopAbs_EDGE, edges);
+  std::ostringstream out;
+  out.precision(17);
+  for (const TopoDS_Shape& x : subs)
+  {
+    if (x.ShapeType() == TopAbs_FACE)
+      out << "face " << faces.FindIndex(x) - 1 << "\n";
+    else if (x.ShapeType() == TopAbs_EDGE)
+      out << "edge " << edges.FindIndex(x) - 1 << "\n";
+  }
+  out << params << "\n";
+  std::ofstream((base + ".txt").c_str()) << out.str();
+}
 } // namespace noshape

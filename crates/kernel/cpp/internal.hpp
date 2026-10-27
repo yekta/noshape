@@ -74,6 +74,9 @@ enum Relation : uint8_t
 // Collects history records mapping sub-shapes of the input arguments to
 // sub-shapes of the final output, using TopExp::MapShapes indices on both
 // sides.
+// Writes an op's input for a kernel test when NOSHAPE_DUMP_OPS is set (common.cpp).
+void dump_op(const char* name, const TopoDS_Shape& s, const std::vector<TopoDS_Shape>& subs, const std::string& params);
+
 class HistoryBuilder
 {
 public:

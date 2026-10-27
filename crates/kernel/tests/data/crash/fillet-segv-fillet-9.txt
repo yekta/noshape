@@ -1,0 +1,4 @@
+edge 35
+edge 38
+edge 40
+fillet checked 1 radii 0.02
