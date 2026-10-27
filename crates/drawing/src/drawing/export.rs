@@ -530,10 +530,30 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
     s
 }
 
-/// PDF content stream of one sheet.
-fn pdf_content(g: &SheetGeometry) -> String {
+/// PDF content stream of one sheet. Each element is drawn inside its
+/// export layer's optional content group (live's PDFs list the DXF layers
+/// in a viewer's Layers panel: Visible, BORDER_FRAME, TITLE_BLOCK…);
+/// `ocgs` collects the layers in first-use order (`/OC<k>` = `ocgs[k]`).
+fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>) -> String {
     let pt = 72.0 / 25.4;
     let mut content = String::new();
+    let mut cur: Option<super::cad_layers::CadLayer> = None;
+    let mut layer = |content: &mut String, l: Option<super::cad_layers::CadLayer>| {
+        if cur == l {
+            return;
+        }
+        if cur.is_some() {
+            content.push_str("EMC\n");
+        }
+        if let Some(l) = l {
+            let k = ocgs.iter().position(|x| *x == l).unwrap_or_else(|| {
+                ocgs.push(l);
+                ocgs.len() - 1
+            });
+            let _ = writeln!(content, "/OC /OC{k} BDC");
+        }
+        cur = l;
+    };
     content.push_str("1 J 1 j 0 0 0 RG 0 0 0 rg\n");
     let rgb = |c: Option<[u8; 3]>| {
         let c = c.unwrap_or([0, 0, 0]);
@@ -550,6 +570,7 @@ fn pdf_content(g: &SheetGeometry) -> String {
         if l.points.len() < 2 {
             continue;
         }
+        layer(&mut content, Some(g.cad_line_layer(li)));
         let _ = writeln!(content, "{} RG", rgb(g.line_color(li)));
         let (width_mm, dash) = g.line_pen(li);
         if dash.is_empty() {
@@ -566,6 +587,7 @@ fn pdf_content(g: &SheetGeometry) -> String {
     }
     content.push_str("[] 0 d\n");
     for (fi, f) in g.fills.iter().enumerate() {
+        layer(&mut content, Some(g.cad_fill_layer(fi)));
         let _ = writeln!(content, "{} rg", rgb(g.fill_color(fi)));
         for (i, p) in f.points.iter().enumerate() {
             let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
@@ -573,6 +595,7 @@ fn pdf_content(g: &SheetGeometry) -> String {
         content.push_str("f\n");
     }
     for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| stroked(g, *ti, t)) {
+        layer(&mut content, Some(g.cad_text_layer(ti)));
         let _ = writeln!(content, "{:.3} w {} RG", stroke_width(t) * pt, rgb(g.text_color(ti)));
         for st in font::text_strokes_font(t, g.text_font(ti)) {
             for (i, p) in st.iter().enumerate() {
@@ -582,6 +605,7 @@ fn pdf_content(g: &SheetGeometry) -> String {
         }
     }
     for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| !stroked(g, *ti, t)) {
+        layer(&mut content, Some(g.cad_text_layer(ti)));
         let size = t.height * 1.4 * pt;
         let _ = writeln!(content, "{} rg", rgb(g.text_color(ti)));
         // Approximate Helvetica advance: 0.5 em per char.
@@ -611,6 +635,7 @@ fn pdf_content(g: &SheetGeometry) -> String {
             .collect();
         let _ = writeln!(content, "BT /F{} {size:.3} Tf {c:.5} {s:.5} {:.5} {c:.5} {x:.3} {y:.3} Tm ({text}) Tj ET", pdf_font(g.text_font(ti)), -s);
     }
+    layer(&mut content, None);
     // Translucent overlays over everything, each with its opacity's
     // graphics state (`/Ov<k>`, see [`pdf_overlay_states`]).
     for (k, (pts, c, _)) in g.overlays.iter().enumerate() {
@@ -679,8 +704,25 @@ pub fn to_pdf_pages(pages: &[SheetGeometry]) -> Vec<u8> {
 /// [`to_pdf_pages`] with the header version (Export Drawing › Version).
 pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
     let pt = 72.0 / 25.4;
+    // The content first: it decides the layers (optional content groups),
+    // shared by every page; their objects follow the images.
+    let mut ocgs = Vec::new();
+    let contents: Vec<String> = pages.iter().map(|g| pdf_content(g, &mut ocgs)).collect();
+    let n_images: usize = pages.iter().map(|g| g.images.iter().filter(|im| im.rgb.is_some()).count()).sum();
+    let ocg0 = 4 + 2 * pages.len() + 11 + n_images;
+    let ocg_ref = |k: usize| format!("{} 0 R", ocg0 + k);
+    let oc_properties = if ocgs.is_empty() {
+        String::new()
+    } else {
+        let all: Vec<String> = (0..ocgs.len()).map(ocg_ref).collect();
+        // Live lists the layers by name in the viewer (ANNOTATION_TEXT, BORDER_FRAME, … Visible).
+        let mut order: Vec<usize> = (0..ocgs.len()).collect();
+        order.sort_by_key(|k| ocgs[*k].name(false));
+        format!(" /OCProperties << /OCGs [{}] /D << /Order [{}] /ON [{}] >> >>", all.join(" "), order.iter().map(|k| ocg_ref(*k)).collect::<Vec<_>>().join(" "), all.join(" "))
+    };
+    let oc_resources = if ocgs.is_empty() { String::new() } else { format!(" /Properties <<{} >>", (0..ocgs.len()).map(|k| format!(" /OC{k} {}", ocg_ref(k))).collect::<String>()) };
     let mut objects: Vec<Vec<u8>> = vec![
-        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        format!("<< /Type /Catalog /Pages 2 0 R /PageLayout /SinglePage{oc_properties} >>").into_bytes(),
         format!("<< /Type /Pages /Kids [{}] /Count {} >>", (0..pages.len()).map(|i| format!("{} 0 R", 4 + 2 * i)).collect::<Vec<_>>().join(" "), pages.len()).into_bytes(),
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>".to_vec(),
     ];
@@ -701,17 +743,20 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
             let _ = writeln!(draw, "q {:.3} 0 0 {:.3} {:.3} {:.3} cm /Im{n} Do Q", im.size[0] * pt, im.size[1] * pt, im.pos[0] * pt, im.pos[1] * pt);
             images.push(flate_stream(&format!("/Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 "), rgb));
         }
-        let content = draw + pdf_content(g).as_str();
+        let content = draw + contents[i].as_str();
         let (w, h) = (g.width * pt, g.height * pt);
         let xo = if xobjects.is_empty() { String::new() } else { format!(" /XObject <<{xobjects} >>") };
         let gs = pdf_overlay_states(g);
-        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 3 0 R{fonts} >>{xo}{gs} >> /Contents {} 0 R >>", 5 + 2 * i).into_bytes());
+        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 3 0 R{fonts} >>{xo}{gs}{oc_resources} >> /Contents {} 0 R >>", 5 + 2 * i).into_bytes());
         objects.push(flate_stream("", content.as_bytes()));
     }
     for name in &PDF_FONTS[1..] {
         objects.push(format!("<< /Type /Font /Subtype /Type1 /BaseFont /{name} /Encoding /WinAnsiEncoding >>").into_bytes());
     }
     objects.extend(images);
+    for l in &ocgs {
+        objects.push(format!("<< /Type /OCG /Name ({}) >>", l.name(false)).into_bytes());
+    }
     let mut out: Vec<u8> = format!("%PDF-{version}\n").into_bytes();
     out.extend_from_slice(b"%\xE2\xE3\xCF\xD3\n");
     let mut offsets = Vec::new();
@@ -900,6 +945,10 @@ mod tests {
     fn pdf_has_valid_structure() {
         let p = to_pdf(&sample());
         let s = String::from_utf8_lossy(&p);
+        // Layers as live: the export layers as optional content, by name.
+        let d = pdf_decoded(&p);
+        assert!(s.contains("/PageLayout /SinglePage /OCProperties << /OCGs [") && s.contains("/Type /OCG /Name (Visible)"), "{s}");
+        assert!(d.contains("/OC /OC0 BDC") && d.matches(" BDC").count() == d.matches("EMC").count(), "{d}");
         assert!(s.starts_with("%PDF-1.4"));
         assert!(s.contains("startxref") && s.trim_end().ends_with("%%EOF"));
         // xref offset points at "xref".

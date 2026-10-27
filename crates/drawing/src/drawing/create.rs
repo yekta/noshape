@@ -23,8 +23,13 @@ pub struct DrawingSource {
     pub sketch: Option<crate::FeatureId>,
 }
 
-/// Standard drawing scales, largest first (view scale = paper / model).
-const SCALES: [f64; 19] = [10.0, 5.0, 4.0, 2.5, 2.0, 1.5, 1.0, 0.75, 0.5, 0.4, 0.25, 0.2, 0.1, 0.05, 0.04, 0.025, 0.02, 0.01, 0.005];
+/// The scales Suggested views picks from, largest first (view scale =
+/// paper / model): live's list, 100:1 … 2:1, 1:1, 1:2 … 1:100 (no 3:4,
+/// 1.5, 2.5 or 0.4; qa DRAWING-SCALE).
+const SCALES: [f64; 30] = [
+    100.0, 50.0, 32.0, 20.0, 16.0, 12.0, 10.0, 8.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0,
+    1.0 / 2.0, 1.0 / 3.0, 1.0 / 4.0, 1.0 / 5.0, 1.0 / 6.0, 1.0 / 8.0, 1.0 / 10.0, 1.0 / 12.0, 1.0 / 16.0, 1.0 / 20.0, 1.0 / 25.0, 1.0 / 32.0, 1.0 / 40.0, 1.0 / 50.0, 1.0 / 80.0, 1.0 / 100.0,
+];
 
 /// Model bounds (meters) of a drawing source, regenerated from the document.
 pub fn source_bounds(doc: &Document, src: &DrawingSource) -> Option<(DVec3, DVec3)> {
