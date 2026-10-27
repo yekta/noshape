@@ -97,6 +97,15 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - SHELL-SLOW: live shells qa's plates in 4–7 ms of server time; our slabs take 1–3 s (serial booleans). Needs a
   different construction for prismatic parts (by_regions extended to holes / collapsing fillets), not tuning.
 
+## Paused 10-27 ~09:50 (lead's order; app split)
+- Everything landed (last 2b0ad117); no WIP, no builds running.
+- Open: WIN-CRASH-GUARD's CI check, run 40481396224 (dispatched on main at 9f7459f9; Linux / Windows / macOS were
+  still building at the pause). On resume: `gh run view 40481396224`; if Windows fails to compile, the code is in
+  cpp/seh.cpp and the `_MSC_VER` branches of noshape_occt.hpp (trycatch_timed, run_guarded).
+- REGEN-SPEED state: probe edit commit ~205 ms median in a dev build at load ~35 (510 ms this morning). Tried and
+  dropped: OBB filtering for all booleans (no gain). Next idea: display meshing `mesh_prepare` ~46 ms a commit
+  (mesh.cpp; BRepMesh over the whole part each time).
+
 ## Next, in order
 1. P0 REGEN-SPEED (open): per regeneration ~15 ms per boolean (OCCT build), fillet/chamfer ~10 ms + ~6 ms check, the
    display meshing ~45 ms. Ideas: check only the blend's new/modified faces instead of the whole part; fewer
