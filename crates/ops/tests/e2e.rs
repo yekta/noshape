@@ -4707,3 +4707,30 @@ fn drawing_line_to_line_on_two_edges() {
     let scale = num(&view["scale"]);
     assert!((text.parse::<f64>().unwrap() - width / scale).abs() < 0.01, "{text} vs {} (sheet {width}, scale {scale})", width / scale);
 }
+
+/// qa API-ASM-CONFIG-NAMES: an assembly instance's configuration given by
+/// input and option names ({"Size": "Large"}) is resolved to their ids,
+/// as config_activate does, so the instance is that configuration.
+#[test]
+fn assembly_configuration_by_names() {
+    let mut ctx = Ctx::new();
+    let path = scratch("asm_config_names.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    let ext = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }))["feature"].as_str().unwrap().to_string();
+    let size = call(&mut ctx, "config_add_input", json!({ "kind": "list", "name": "Size" }))["input"].as_str().unwrap().to_string();
+    assert_ne!(size, "Size", "the input's id differs from its name");
+    call(&mut ctx, "config_add_option", json!({ "input": "Size", "name": "Large" }));
+    call(&mut ctx, "config_configure", json!({ "feature": ext, "param": "depth", "input": size }));
+    call(&mut ctx, "config_set_value", json!({ "feature": ext, "param": "depth", "configuration": "Large", "value": "30 mm" }));
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let i = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": part, "configuration": { "Size": "Large" } }))["instance"].as_str().unwrap().to_string();
+    let top = |ctx: &mut Ctx, inst: &str| call(ctx, "assembly_entities", json!({ "instance": inst, "kind": "faces", "normal": [0, 0, 1] }))["faces"].as_array().unwrap().iter().map(|f| num(&f["centroid"][2])).fold(f64::MIN, f64::max);
+    assert!((top(&mut ctx, &i) - 30.0).abs() < 1e-6, "inserted in Large");
+    call(&mut ctx, "assembly_set_configuration", json!({ "instance": i, "configuration": { "Size": "Default" } }));
+    assert!((top(&mut ctx, &i) - 10.0).abs() < 1e-6, "set back to Default");
+    let e = try_call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": part, "configuration": { "Size": "Huge" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("configuration.Size"), "{e:?}");
+}

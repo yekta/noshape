@@ -237,7 +237,7 @@ fn replace(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let asm = assembly(od, tab)?.clone();
     let id = find_instance(&asm, a.str("instance")?, "instance")?;
     let src = doc::find_tab(od.doc(), a.str("source")?).map_err(|e| e.with_param("source"))?;
-    let config = crate::ops::config_arg(a)?;
+    let config = crate::ops::source_config_arg(od, src, a)?;
     let src_name = od.doc().tab(src).map(|t| t.name.clone()).unwrap_or_default();
     let before = solve(od, tab, &SolveOptions::default())?;
     let (source, base, studio) = match od.doc().tab(src).map(|t| &t.content) {

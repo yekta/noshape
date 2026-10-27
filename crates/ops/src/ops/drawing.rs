@@ -677,7 +677,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             if sketch.is_some() && a.get("part").is_some() {
                 return Err(OpError::param("sketch", "give `part` or `sketch`, not both"));
             }
-            Some(DrawingSource { tab, part: part_arg(od, tab, a)?, config: super::config_arg(a)?, sketch })
+            Some(DrawingSource { tab, part: part_arg(od, tab, a)?, config: super::source_config_arg(od, tab, a)?, sketch })
         }
         None => {
             if let Some(k) = ["part", "sketch", "configuration"].into_iter().find(|k| a.get(k).is_some()) {

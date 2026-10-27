@@ -332,7 +332,15 @@ fn set_configuration(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let asm = assembly(od, tab)?;
     let id = find_instance(asm, a.str("instance")?, "instance")?;
     let name = asm.instance(id).map(|i| i.name.clone()).unwrap_or_default();
-    let values = config_arg(a)?;
+    let src = match asm.instance(id).map(|i| &i.source) {
+        Some(InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. }) => Some(*studio),
+        Some(InstanceSource::Assembly { assembly, .. }) => Some(*assembly),
+        _ => None,
+    };
+    let values = match src {
+        Some(src) => crate::ops::source_config_arg(od, src, a)?,
+        None => config_arg(a)?,
+    };
     let r = solve(od, tab, &SolveOptions::default())?;
     let ok = commit(od, tab, &sa::change_configuration_description(&name), &r, |x| x.set_instance_config(id, values))?;
     if !ok {

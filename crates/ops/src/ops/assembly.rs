@@ -361,7 +361,7 @@ fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(Value::String(s)) if s == "default" => Default::default(),
         Some(Value::String(s)) if s == "last_viewed" => od.active_config.get(&src).cloned().unwrap_or_default(),
         Some(Value::String(_)) => return Err(OpError::param("configuration", "{input id: value}, \"default\" or \"last_viewed\"")),
-        _ => super::config_arg(a)?,
+        _ => super::source_config_arg(od, src, a)?,
     };
     let src_name = od.doc().tab(src).map(|t| t.name.clone()).unwrap_or_default();
     let result = solve(od, tab, &SolveOptions::default())?;

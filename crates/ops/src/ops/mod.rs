@@ -250,6 +250,18 @@ pub(crate) fn config_arg(a: &Args) -> Result<noshape_model::configuration::Confi
     Ok(noshape_model::configuration::ConfigValues(a.object("configuration")?.map(|m| m.iter().map(|(k, v)| (k.clone(), v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))).collect()).unwrap_or_default()))
 }
 
+/// `configuration` by input and option ids or names ({"Size": "Large"}),
+/// resolved against source tab `src`'s inputs as config_activate does (a
+/// Part Studio's); other sources take it as given (qa API-ASM-CONFIG-NAMES:
+/// names were stored as keys and the default configuration used).
+pub(crate) fn source_config_arg(od: &OpenDoc, src: TabId, a: &Args) -> Result<noshape_model::configuration::ConfigValues, OpError> {
+    let Some(map) = a.object("configuration")? else { return Ok(Default::default()) };
+    match od.doc().tab(src).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) => configuration::studio_values(ps, &od.doc().settings.units, map, "configuration"),
+        _ => config_arg(a),
+    }
+}
+
 pub(crate) fn feature_arg(ps: &PartStudio, a: &Args, name: &str) -> Result<noshape_model::reference::FeatureId, OpError> {
     doc::find_feature(ps, a.str(name)?).map_err(|e| e.with_param(name))
 }
