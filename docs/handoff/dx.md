@@ -55,7 +55,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   session::tests::two_writers_of_one_file_keep_both_edits. Left: (a) two writers changing different fields of the
   *same* feature: merge_part_studio keeps ours for a feature changed on both sides (core's merge.rs could merge the
   feature's params field by field); (b) live shows B's edit in A's open tab within seconds: `Session::sync_external()`
-  loads a head another process moved; DocModel::watch_external polls it every 1.5 s (app-core, cleared by the lead).
+  loads a head another process moved; DocModel::watch_external polls it every 1.5 s (c7928bb4, app-core, cleared by
+  the lead; checked in the app: a CLI rename showed in the open window within 4 s).
+- Also 10-27: bd14ff0e material_library_update / _export; 5b4b2831 part_annotation move; da75c032 3MF / OBJ welded
+  vertices (EXPORT-MESH-SHARED); 71e8357e PDF Text: Selectable embeds the drawing fonts (TrueType subsets, ToUnicode);
+  c7928bb4 API-REMOVE-DIR closed per the lead (the dialog's flip, documented); c30baf56 CRASH-MARKER-COPIES (a marker
+  applies only to files its dead process had open, `<pid>.docs`).
+- (this commit) Derived carries a source part's explicit appearance (live: red stays red; a default colour is the
+  target's next one, as ours already was); query_parts reports each part's `color`; RHINO-GREEN: RHINO is listed (app
+  dialog and export_parts) only in builds with openNURBS (kernel::RHINO_EXPORT from the build script's cfg).
+- Agent benchmark 10-27: part → ISO A3 drawing with suggested views → 80 and Ø16 dimensions → note → Selectable PDF in
+  1.2 s through the API (/root/dx-scratch/w/py/bench_dwg.py); pdftotext reads every label.
 
 ## Daily walk 10-27 03:40 (green 8165fca6, :131, /root/dx-scratch/w/o*.png)
 - No regressions in my area. Open of a truncated file: the error bubble stays (OPEN-ERROR-SILENT verified). Drawing
@@ -63,10 +73,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   92,359 B (live 92,767). Variable Studio: typed "12" → "12 mm". Part › Export… Parasolid 38.1 then + › Import…: the
   dialog offers material density for x_t, Import 1 rebuilds the same part, "CAD Imports" folder. Derived of Part
   Studio 1 into it: dialog, configuration row and the part as DER1/DER10.
-- Open question (REQUESTS dx 10-27): a derived part takes the target studio's next default colour (gray as a second
-  part); live may keep the source part's colour.
+- Live answered the derived colour question: the target's next default colour unless the source part's appearance is
+  explicit (then carried); ours now does both.
 
 ## Next (in order, after landing)
+0. Import numbers: the remaining ✗ rows of docs/parity/workflow-import-matrix.md (g50 F8 / F19, McMaster helix) and
+   I1 (x_t blend trims). (Configurations C1–C8, Derived DER1–14, Variable Studio VS1–4: all closed in the docs.)
 1. Audit done ("Move annotation" = part_annotation move, landed). Covered elsewhere:
    Move configuration input (config_reorder_inputs), Hide all instances (assembly_set_state on every instance), Save
    custom color (any colour is settable), Update material library (material_library_update, this landing).

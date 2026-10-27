@@ -45,7 +45,10 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let label = a.str("format")?;
     let format = PartFormat::ALL.into_iter().find(|f| f.label().eq_ignore_ascii_case(label) || f.ext().eq_ignore_ascii_case(label)).ok_or_else(|| OpError::param("format", "unknown format"))?;
     let mut s = ExportSettings::default();
-    crate::export::set_part_format(&mut s, PartFormat::ALL.iter().position(|f| *f == format).expect("listed"));
+    let Some(row) = PartFormat::list(false).iter().position(|f| *f == format) else {
+        return Err(OpError::param("format", "RHINO export is not in this build (it needs openNURBS; releases have it)"));
+    };
+    crate::export::set_part_format(&mut s, row);
     s.y_up = a.bool_or("y_up", false)?;
     s.stl_text = a.bool_or("stl_text", false)?;
     s.individual = a.bool_or("individual", false)?;

@@ -130,6 +130,12 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
             // Live (ui 10-22 b): every instance keeps the source name ("Part 1"
             // twice, no suffix).
             ev.ctx.own_names.insert(id.clone());
+            // An explicit source appearance comes along; a default colour
+            // is replaced by this studio's next one (live: a derived block
+            // in a studio with one part is grey, a red source part red).
+            if let Some(c) = provider.part_appearance(&tab, &b.id).or_else(|| src.part_appearance.get(&b.id).copied()) {
+                ev.ctx.part_appearance.insert(id.clone(), c);
+            }
             let body = crate::regen::context::Body::new(id, base_name, b.kind, shape, faces, color, ev.feature);
             ev.ctx.bodies.push(std::sync::Arc::new(body));
         }

@@ -285,6 +285,10 @@ impl DerivedProvider for DocStudios {
         self.studio(tab)?.part_properties.get(part)?.name.clone()
     }
 
+    fn part_appearance(&self, tab: &str, part: &noshape_model::reference::BodyId) -> Option<[f32; 4]> {
+        self.studio(tab)?.part_properties.get(part)?.appearance.map(|a| a.color)
+    }
+
     fn configuration(&self, tab: &str) -> Option<noshape_model::configuration::Configuration> {
         if let Some(r) = import_ref(tab) {
             let doc = external_snapshot(&r.path, r.microversion).ok()?;

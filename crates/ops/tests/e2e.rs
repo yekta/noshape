@@ -4577,3 +4577,28 @@ fn material_library_update_and_export() {
     let err = try_call(&mut ctx, "material_library_update", json!({ "tab": "Part Studio 1", "csv": "x" })).unwrap_err();
     assert_eq!(err.param.as_deref(), Some("tab"), "{err:?}");
 }
+
+/// Live "dx (2026-10-27, P2 Derived appearance)": a derived part takes the
+/// target studio's next default colour (grey beside its own blue-grey part),
+/// unless the source part has an explicit appearance (red stays red).
+#[test]
+fn derived_parts_carry_explicit_appearances_only() {
+    let mut ctx = Ctx::new();
+    let path = scratch("derived_colour.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let block = |ctx: &mut Ctx, tab: &str, x: f64| {
+        let sk = call(ctx, "sketch_create", json!({ "tab": tab, "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+        call(ctx, "sketch_draw", json!({ "tab": tab, "sketch": sk, "tool": "corner_rectangle", "points": [[x, 0], [x + 30.0, 20]] }));
+        let r = call(ctx, "sketch_get", json!({ "tab": tab, "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+        call(ctx, "feature_add", json!({ "tab": tab, "type": "extrude", "params": { "entities": [r], "depth": "10 mm", "operationType": "NEW" } }));
+    };
+    block(&mut ctx, "Part Studio 1", 0.0);
+    let b = call(&mut ctx, "tab_create", json!({ "kind": "partstudio" }))["tab"]["name"].as_str().unwrap().to_string();
+    block(&mut ctx, &b, 50.0);
+    call(&mut ctx, "feature_add", json!({ "tab": b, "type": "importDerived", "params": { "partStudio": "Part Studio 1" } }));
+    let colours = |ctx: &mut Ctx| call(ctx, "query_parts", json!({ "tab": b }))["parts"].as_array().unwrap().iter().map(|p| p["color"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert_eq!(colours(&mut ctx), ["#9dcfed", "#a5a5a5"], "its own part, then the derived one in the next default colour");
+    let a = call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_appearance", json!({ "tab": "Part Studio 1", "parts": [a], "color": "#ff0000" }));
+    assert_eq!(colours(&mut ctx), ["#9dcfed", "#ff0000"], "an explicit appearance comes along");
+}

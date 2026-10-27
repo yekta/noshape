@@ -163,6 +163,12 @@ fn main() {
             .flag_if_supported("-Wno-deprecated-copy")
             .flag_if_supported("-Wno-cpp");
     }
+    // Rust side: whether Rhino export is built in (qa RHINO-GREEN: a build
+    // without it doesn't offer RHINO).
+    println!("cargo::rustc-check-cfg=cfg(noshape_opennurbs)");
+    if opennurbs.is_some() {
+        println!("cargo::rustc-cfg=noshape_opennurbs");
+    }
     if let Some(on) = &opennurbs {
         let inc = on.join("include");
         build.define("NOSHAPE_OPENNURBS", None);

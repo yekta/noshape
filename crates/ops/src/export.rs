@@ -28,11 +28,12 @@ impl PartFormat {
 
     /// The Format list: Part Studios as `ALL`; assemblies without RHINO and
     /// with URDF before STL (live dom/dialog-export-partstudio-assembly.txt).
+    /// RHINO only in builds that have it ([`k::RHINO_EXPORT`]; releases do).
     pub fn list(assembly: bool) -> Vec<PartFormat> {
         if assembly {
             vec![Self::Parasolid, Self::Acis, Self::Step, Self::Iges, Self::Pvz, Self::Jt, Self::Gltf, Self::Glb, Self::Obj, Self::ThreeMf, Self::Urdf, Self::Stl]
         } else {
-            Self::ALL.to_vec()
+            Self::ALL.into_iter().filter(|f| *f != Self::Rhino || k::RHINO_EXPORT).collect()
         }
     }
 
@@ -290,8 +291,9 @@ fn step_options(s: &ExportSettings) -> k::StepOptions {
     k::StepOptions { schema, file_unit }
 }
 
+/// The Part Studio Format list's row `i` ([`PartFormat::list`]).
 pub fn set_part_format(s: &mut ExportSettings, i: usize) {
-    s.format = PartFormat::ALL[i];
+    s.format = PartFormat::list(false)[i];
     s.version = 0;
     s.latest = true;
 }
@@ -616,6 +618,20 @@ mod tests {
         }
         let bad: Vec<_> = directed.iter().filter(|((a, b), n)| **n != 1 || directed.get(&(*b, *a)) != Some(&1)).collect();
         assert!(bad.is_empty(), "{} of {} directed edges unmatched", bad.len(), directed.len());
+    }
+
+    /// qa RHINO-GREEN: RHINO is offered only by a build that can write it;
+    /// the dialog's rows and the formats stay aligned either way.
+    #[test]
+    fn rhino_is_listed_only_when_built_in() {
+        use super::PartFormat;
+        let list = PartFormat::list(false);
+        assert_eq!(list.contains(&PartFormat::Rhino), noshape_kernel::RHINO_EXPORT);
+        for (i, f) in list.iter().enumerate() {
+            let mut s = super::ExportSettings::default();
+            super::set_part_format(&mut s, i);
+            assert_eq!(s.format, *f);
+        }
     }
 
     #[test]

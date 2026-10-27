@@ -462,7 +462,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   booleanScope → "Error: No merge scope selected." (faulty booleanScope); the dialog auto-fills Merge scope = Part 1
   when Remove is picked (live behaviours "Remove … Merge scope = Part 1 (auto-filled)"). AGENT_API.md on main describes
   the auto choices for Add and the Remove direction but not the Remove scope (qa 2026-10-26, v0.4.8 release CLI)
-- [ ] P2 RHINO-GREEN the green build (/root/green/noshape, the lead's watcher build) has no openNURBS: Part › Export… ›
+- [x] (dx 10-27: a build without openNURBS no longer lists RHINO, in the Export dialog or export_parts (kernel::RHINO_EXPORT from the build script; test export::tests::rhino_is_listed_only_when_built_in); building the watcher with OPENNURBS_ROOT so QA tests what ships stays the lead's) P2 RHINO-GREEN the green build (/root/green/noshape, the lead's watcher build) has no openNURBS: Part › Export… ›
   RHINO → toast "Export failed: unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT
   (scripts/build-opennurbs.sh)", while RHINO stays offered in the format list. Releases build it (release.yml); the
   watcher's build should match the release configuration so QA tests what ships (lead: watcher build env); and a build

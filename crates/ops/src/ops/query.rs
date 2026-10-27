@@ -151,6 +151,11 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 "vertices": shown.vertices.iter().filter(|&&v| v).count(),
                 "hidden": d.is_some_and(|d| d.hidden),
             });
+            // As shown: its appearance, else its default part colour.
+            if let Some(d) = d {
+                let s = |c: f32| crate::appearance::lin_to_srgb(c);
+                v["color"] = json!(format!("#{:02x}{:02x}{:02x}", s(d.color[0]), s(d.color[1]), s(d.color[2])));
+            }
             if let Ok(vol) = b.shape.volume()
                 && matches!(b.kind, noshape_model::display::BodyKind::Solid)
             {

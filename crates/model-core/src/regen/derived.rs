@@ -35,4 +35,10 @@ pub trait DerivedProvider: Send + Sync + std::fmt::Debug {
     fn part_name(&self, _tab: &str, _part: &crate::reference::BodyId) -> Option<String> {
         None
     }
+    /// A source part's explicit appearance (linear RGBA), which Derived
+    /// carries over (live "dx (2026-10-27, P2 Derived appearance)"); a
+    /// default colour is not carried.
+    fn part_appearance(&self, _tab: &str, _part: &crate::reference::BodyId) -> Option<[f32; 4]> {
+        None
+    }
 }
