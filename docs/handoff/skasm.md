@@ -154,6 +154,11 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
 ## Requests to the lead
+- OTF-FIRST-KEY (0537ac91) has no T1 keystroke test: no crate in the workspace has a GPUI test harness. Adding
+  `gpui-kit = { workspace = true, features = ["test-support"] }` (gpui test-support) as a dev-dependency of
+  part-studio-ui would let a `#[gpui::test]` type keys into the sketch view, but with `cargo test --workspace` the
+  feature unifies into every crate's test build (new crates: proptest, postage, futures-concurrency, web-time; one
+  rebuild of the gpui stack in every target dir). Your call; I'll write the test once it's there.
 - "Show calculation variance" in Mass properties (live: behaviours "skasm (2026-10-27) calculation variance": every
   value gets " ± 4.000e-1 mm³"-style text, 3-decimal scientific, not persisted). The assembly panel
   (assembly-ui/assembly_mass.rs) is mine, the Part Studio one psui's (part-studio-ui menus.rs ~1329), and the numbers
