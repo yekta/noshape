@@ -15,6 +15,9 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 - cdde1c06 F19 Width mate in any pick order + DOF cache across evaluations, per-group DOF length scale.
 - c76cdcf4 assembly least change measured at the bodies' mate connectors (oracle_asm R1 matches live; R1 out of KNOWN;
   R3/C1 now keep rz 0, still KNOWN for live's −157.5°).
+- 7dc7aee4 assembly Section view: a clicked face fills Section planes (an instance press had armed a part drag, so the
+  click became a selection; `update_capture` now treats the open dialog as busy).
+- eb076e34, d1cf1ff7: tests for the secondary-axis and Replicate-nothing-matches texts.
 - 8016ded6 committed polygon's grey-boxed Ø readout (live colours) until the next polygon.
 - e5567eca SKETCH-DRAG-BIG in the app: the DOF analysis once before a drag (Sketch::refresh_analysis): 42–125 → 13–18 ms
   per step on qa's 1000-entity sketch (dev build, load ~40).
@@ -37,9 +40,8 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 
 ## Next, in order
 Sketch P1: no open items (parity/sketch.md all ✅; workflow-sketch-tools.md rechecked 10-27). Assembly P2:
-1. docs/parity/workflow-assembly-sweep.md still 🔧: 9 / 29 (secondary axis ∥ primary, MC dialog), 11 (Replicate,
-   nothing matches), 19 second half ("Missing mate to be matched."), 28 badges' tooltips, 34 (assembly section view
-   manipulator, big). GUI on /root/green/noshape with /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins, made by
+1. docs/parity/workflow-assembly-sweep.md still 🔧: 19 second half ("Missing mate to be matched."), 28 badges'
+   tooltips, 34 (assembly section view: rings, chips by direction, menu; face picks fixed 7dc7aee4). GUI on /root/green/noshape with /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins, made by
    /root/skasm-scratch/qa/asm1.py over MCP).
 2. docs/parity/assembly.md G5 exploded views (⏳): verify against live 800–826 (workflow-exploded-named-positions.md
    rows 2–15 are from an old pass; recheck them).
