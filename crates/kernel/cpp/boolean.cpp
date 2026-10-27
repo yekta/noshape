@@ -2100,9 +2100,21 @@ void set_memory_budget_mb(uint64_t mb)
   g_memory_budget_mb.store(mb > 0 ? mb : 4096);
 }
 
+namespace
+{
+// The way this thread's last op_boolean went (the Boolean corpus records it).
+thread_local const char* t_bool_path = "";
+} // namespace
+
+rust::String last_boolean_path()
+{
+  return rust::String(t_bool_path);
+}
+
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts)
 {
+  t_bool_path = "occt";
   if (args.items.empty())
     fail_invalid("boolean needs at least one argument");
   if (tools.items.empty())
@@ -2127,10 +2139,13 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   // Mesh bodies take part as planar facets (see facet_mesh).
   MeshFacets                facets;
   std::vector<TopoDS_Shape> a, t;
-  for (const TopoDS_Shape& x : args.items)
-    a.push_back(facet_mesh(x, facets));
-  for (const TopoDS_Shape& x : tools.items)
-    t.push_back(facet_mesh(x, facets));
+  {
+    const KernelTimer timer("boolean.inputs");
+    for (const TopoDS_Shape& x : args.items)
+      a.push_back(facet_mesh(x, facets));
+    for (const TopoDS_Shape& x : tools.items)
+      t.push_back(facet_mesh(x, facets));
+  }
   // Many touching tools into one solid (patterns): in slabs.
   if (op == 0 && opts.glue == 3 && a.size() == 1 && facets.source.empty())
   {
@@ -2138,6 +2153,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     HHist        h;
     const bool   done = fuse_slabs(a[0], t, opts, out, h);
     fail_if_cancelled();
+    if (done)
+      t_bool_path = "fuse_slabs";
     if (done)
       return make_result(concat(args.items, tools.items), out, h.get());
   }
@@ -2152,6 +2169,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       done = fuse_on_face(a[0], t[0], out, h);
     }
     if (done)
+      t_bool_path = "on_face";
+    if (done)
       return make_result(concat(args.items, tools.items), out, h.get());
   }
   // Holes straight through a plate: built directly.
@@ -2165,6 +2184,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       done = cut_through_holes(a[0], t, out, h);
     }
     if (done)
+      t_bool_path = "through_holes";
+    if (done)
       return make_result(concat(args.items, tools.items), out, h.get());
   }
   // Many tools apart from each other cut out of one solid (holes): in slabs.
@@ -2174,6 +2195,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     HHist        h;
     const bool   done = cut_slabs(a[0], t, opts, out, h);
     fail_if_cancelled();
+    if (done)
+      t_bool_path = "cut_slabs";
     if (done)
       return make_result(concat(args.items, tools.items), out, h.get());
   }
@@ -2225,6 +2248,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     fail_if_cancelled();
     if (trimmed)
     {
+      t_bool_path = "trimmed";
       res  = remesh_facets(opts.unify ? unify(res, hist) : res, facets, hist);
       return make_result(concat(args.items, tools.items), res, hist.get());
     }
@@ -2250,7 +2274,10 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   res = b->Shape();
   fail_if_cancelled();
   if (opts.unify)
+  {
+    const KernelTimer timer("boolean.unify");
     res = unify(res, hist);
+  }
   res = remesh_facets(res, facets, hist);
   const KernelTimer timer("boolean.result");
   return make_result(concat(args.items, tools.items), res, hist.get());

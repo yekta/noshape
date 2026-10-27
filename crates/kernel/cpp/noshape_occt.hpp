@@ -576,6 +576,8 @@ OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane,
 // ---- booleans, split, transform, section (boolean.cpp)
 void                     set_memory_budget_mb(uint64_t mb);
 void                     set_bop_parallel(bool on);
+rust::String             last_boolean_path();
+void                     set_occt_threads(int32_t n);
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts);
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts);

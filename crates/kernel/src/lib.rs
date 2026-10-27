@@ -32,6 +32,7 @@ pub const VERSION: &str = match option_env!("NOSHAPE_VERSION") {
     None => env!("CARGO_PKG_VERSION"),
 };
 
+pub mod bool_corpus;
 pub mod boolean;
 pub mod construct;
 pub mod error;
@@ -49,7 +50,7 @@ pub mod transform;
 
 pub use boolean::{
     BooleanOp, BooleanOptions, Glue, boolean, common, cut, fuse, fuse_all, imprint, project_curves, section,
-    section_caps, section_plane, section_wires, split, split_by_plane, unify_same_domain, with_cancel,
+    last_boolean_path, section_caps, set_parallel_booleans, section_plane, section_wires, split, split_by_plane, unify_same_domain, with_cancel,
 };
 pub use construct::*;
 pub use error::{KernelError, Result};

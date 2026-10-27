@@ -518,6 +518,10 @@ pub(crate) mod ffi {
         // ---- booleans etc.
         fn set_memory_budget_mb(mb: u64);
         fn set_bop_parallel(on: bool);
+        /// Which way this thread's last op_boolean went (BOOLEAN-SPEEDUP corpus).
+        fn last_boolean_path() -> String;
+        /// OCCT's thread pool size (once, before any parallel work).
+        fn set_occt_threads(n: i32);
         fn op_boolean(
             op: u8,
             args: &OcShapeList,

@@ -109,16 +109,42 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - SHELL-SLOW: live shells qa's plates in 4–7 ms of server time; our slabs take 1–3 s (serial booleans). Needs a
   different construction for prismatic parts (by_regions extended to holes / collapsing fillets), not tuning.
 
-## Speed targets (PLAN 2.7), current numbers (10-27 ~16:30, this machine, load ~30)
-- live-30-features full regen: **247 ms** release (target ≤ 80; live 171). Probe: `cargo test --release -p noshape-ops
-  --test all regen_profile::regen_profile -- --ignored --nocapture` (NOSHAPE_PROFILE_ONLY=live-30 for one fixture).
-- edit commit on it: **249 ms** release / ~205 ms dev quiet (target ≤ 100). Probe `regen_profile::edit_commit_profile`.
-- Shell on qa's filleted plates with a hole: **177–229 ms** a feature, dev (target ≤ 200). Probe
-  `kernel_robustness::shell_feature_time_probe` (model, ignored).
-- big-plate regen: **835–1254 ms** dev (was ~2.1 s; target ≤ 250, live 617): Extrude 2 ~310 ms (400 prisms 75, sketch
-  faces 62, cut by `cut_through_holes` ~90, naming), display mesh 400–750 ms (BRepMesh; OCCT patch 0003 halved it).
-- Measuring: NOSHAPE_KERNEL_PROFILE=1 (wall), =cpu (this thread), =proc (process CPU, pool threads too). Timed
-  perf.yml / T2 tests for each target: not yet written.
+## Speed targets (PLAN 2.7), current numbers
+perf.yml model job (release) on main 10-27 ~18:05 (run 40556712238; before ab192d94's square-corner fillets):
+| target | macOS (Apple silicon) | Linux x86_64 | goal |
+|---|---|---|---|
+| live-30-features full regen (`regen_profile::regen_profile`) | **50 ms** | 65 ms | ≤ 80 (live 171) |
+| edit commit on it (`regen_profile::edit_commit_profile`, total) | **72 ms** | 90 ms | ≤ 100 |
+| big-plate regen | 276 ms | 314 ms | ≤ 250 (live 617) |
+| Shell on qa's filleted plate with a hole | (not on perf.yml yet; dev here 177–229 ms a feature) | | ≤ 200 |
+This machine (load 20–40) runs ~3× slower than the macOS runner; compare there. Landed for these today: patch 0003,
+`cut_through_holes`, `fuse_on_face`, on-demand hole tables (the first hole parsed 2.1 MB of FS: 154 → 17 ms),
+`fillet_square_corner`, the blend check on changed faces, shells by regions. Measuring: NOSHAPE_KERNEL_PROFILE=1
+(wall), =cpu (this thread), =proc (process CPU, pool threads too); regen_profile NOSHAPE_PROFILE_ONLY=<fixture>.
+
+## Boolean speed-up (docs/BOOLEAN-SPEEDUP.md)
+Phase 0 (in progress, 10-27 evening):
+- Recorder: NOSHAPE_RECORD_BOOLEANS=<dir> (kernel `bool_corpus`, around `boolean()`): `<hash>.brep` + `<hash>.txt`
+  (op, options, valid / volume / counts / history hash, ms, path). Corpus /root/core-scratch/bool-corpus: 974 cases
+  from the model oracles / features / kernel_robustness / pattern_second / big_plate / qa_regressions / custom
+  features, every perf fixture (regen_profile) and the kernel tests: 933 OCCT, 28 on_face, 8 through_holes, 3
+  trimmed, 2 fuse_slabs; 948 with < 50 input faces, 17 with 50–1000, 9 over 1000.
+- Replay: `NOSHAPE_BOOL_CORPUS=<dir> cargo test -p noshape-kernel --test all bool_replay::bool_corpus_replay -- --ignored
+  --nocapture` (NOSHAPE_BOOL_MAX_FACES=n for small ones, NOSHAPE_BOOL_REBASE=1 to take a run as the expected one).
+  Replays compare with replays: 3 cases came out otherwise in a regeneration than replayed alone (rebased), and one
+  (24e39113, a fuse) changes its history between full replay runs: OCCT itself isn't deterministic there (listed in
+  `<corpus>/unstable`, reported, not failed). T1: `bool_replay::bool_corpus_small_cases` (26 cases in
+  crates/kernel/tests/data/bool, 0.6 s) and `bool_replay::parallel_booleans_give_the_same_result` (serial vs parallel).
+- Answer 1, small parts: of op_boolean's CPU on the 948 cases under 50 faces, OCCT's build is 98.8 % (51.7 of 52.3 s);
+  make_result 0.2 %, history 0.1 %, inputs and unify < 0.1 %. Median 10.4 ms a Boolean (dev build, load ~30),
+  p90 49 ms; 9 cases over 1 s (helix / B-spline tools) are 51 of the 74 s. So it's the OCCT Boolean itself (Phase 3
+  has its go), not overhead around it.
+- The 1600-face case (a fin fused to the 400-fin plate, the Extrude 3 of phase 2): op_boolean 1.93 s, OCCT's build
+  1.79 s; gdb samples land in whole-part passes (BOPAlgo_Builder::FillInternalShapes' MapShapesAndAncestors,
+  BuilderSolid::PerformAreas boxing every face, PostTreat's CorrectWires, the pave filler's teardown): O(faces) at
+  ~1 ms a face, however small the tool. The fin is flush with the plate's front and back faces, so `fuse_on_face`
+  (which wants the footprint clear of the face's edges) declines it: phase 2 has to merge coplanar faces.
+- Answer 2 (knurl thread scaling, NOSHAPE_OCCT_THREADS=1/2/4/8/16 with /root/occt-kern's [bop] stats): running.
 
 ## Next, in order
 0. **P0 Boolean speed-up, docs/BOOLEAN-SPEEDUP.md (lead, 10-27 19:40; the user's plan, binding).** Phase 0 first

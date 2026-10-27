@@ -95,8 +95,41 @@ pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolean
     ffi::set_memory_budget_mb(std::env::var("NOSHAPE_BOOLEAN_MEMORY_MB").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0));
     // OCCT's booleans in parallel (NOSHAPE_BOP_PARALLEL; serial by default):
     // likewise.
-    ffi::set_bop_parallel(std::env::var_os("NOSHAPE_BOP_PARALLEL").is_some());
-    Ok(OpResult::from_ffi(ck(ffi::op_boolean(code, &a, &t, &opts.ffi()))?))
+    ffi::set_bop_parallel(match PARALLEL_OVERRIDE.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => false,
+        2 => true,
+        _ => std::env::var_os("NOSHAPE_BOP_PARALLEL").is_some(),
+    });
+    // NOSHAPE_OCCT_THREADS=n: OCCT's thread pool size (scaling and
+    // determinism runs, BOOLEAN-SPEEDUP phase 0).
+    static THREADS: std::sync::Once = std::sync::Once::new();
+    THREADS.call_once(|| {
+        if let Some(n) = std::env::var("NOSHAPE_OCCT_THREADS").ok().and_then(|v| v.trim().parse::<i32>().ok()) {
+            ffi::set_occt_threads(n);
+        }
+    });
+    let run = || Ok(OpResult::from_ffi(ck(ffi::op_boolean(code, &a, &t, &opts.ffi()))?));
+    match crate::bool_corpus::recording() {
+        Some(dir) => crate::bool_corpus::record(&dir, op, objects, tools, opts, run),
+        None => run(),
+    }
+}
+
+/// 0: NOSHAPE_BOP_PARALLEL decides; 1: serial; 2: parallel.
+static PARALLEL_OVERRIDE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// OCCT's Booleans in parallel (`Some(true)`), serial (`Some(false)`) or as
+/// NOSHAPE_BOP_PARALLEL says (`None`), for the whole process (tests comparing
+/// both).
+pub fn set_parallel_booleans(on: Option<bool>) {
+    PARALLEL_OVERRIDE.store(on.map_or(0, |v| if v { 2 } else { 1 }), std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The way this thread's last [`boolean`] went: "occt", or the fast path that
+/// built it ("on_face", "through_holes", "fuse_slabs", "cut_slabs",
+/// "trimmed", "by_faces").
+pub fn last_boolean_path() -> String {
+    ffi::last_boolean_path()
 }
 
 /// Run `f` with `flag` as this thread's boolean cancel flag: once it is set,

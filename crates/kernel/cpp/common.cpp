@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <csignal>
 #include <cstring>
+#include <OSD_ThreadPool.hxx>
 #ifdef __linux__
   #include <ucontext.h>
 // The program's own code (GNU linkers define these).
@@ -1498,6 +1499,16 @@ std::atomic<bool> g_bop_parallel{std::getenv("NOSHAPE_BOP_PARALLEL") != nullptr}
 void set_bop_parallel(bool on)
 {
   g_bop_parallel.store(on);
+}
+
+void set_occt_threads(int32_t n)
+{
+  // Once, before any parallel work (the pool can't be resized under load).
+  static std::once_flag once;
+  std::call_once(once, [n] {
+    if (n > 0)
+      OSD_ThreadPool::DefaultPool()->Init(n);
+  });
 }
 
 bool bop_parallel()

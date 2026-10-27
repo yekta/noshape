@@ -3,6 +3,7 @@
 
 mod bbox;
 mod blend;
+mod bool_replay;
 mod boolean_groups;
 #[path = "core.rs"]
 mod kernel_core;
