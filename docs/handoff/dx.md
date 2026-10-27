@@ -34,8 +34,6 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 1. Apply the two pending patches; test (model drawing:: export tests, ops e2e drawing tests).
 2. qa tickets: OPEN-ERROR-SILENT (start window: show why a file didn't open), DRAWING-SCALE second half (auto centre
    marks on full circles only, not partial arcs).
-3. In-context: context_update of a Part Studio created in context (no primary) can't refresh, app and API alike
-   (ops::in_context::refreshed); live question filed (REQUESTS dx "P2 Modeling in context").
 4. API: F19 width mate e2e (skasm landed the fix in cdde1c06); re-time F4; benchmarks sheet metal (in-context done:
    /root/dx-scratch/bench/incontext.py; Variable Studio done: led to the Variable Studio ops).
 5. Drawings (P2): PDF text as filled outlines (Normal) and a subset NotoSans (Selectable), 1/600 in units; ui2's
@@ -44,6 +42,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D8/D14/D16.
 
 ## Requests to the lead
+- App (after the app split; 1 line each): crates/app/src/part_studio/in_context.rs:788 Update context should call
+  `noshape_ops::in_context::refreshed_in(&old, &result, asm, None, Some(<this Part Studio's tab>))` (a Part Studio
+  created in context then updates like live; today the app keeps refusing it), and the app's out-of-date dot should use
+  `out_of_date_in(.., Some(tab))`. The API already does (dx, e2e part_studio_created_in_context_updates).
 - RHINO-GREEN: please build the watcher / green app with `OPENNURBS_ROOT=/root/opennurbs` (release.yml builds with it,
   dx's builds too). Hiding RHINO in builds without it needs a kernel build.rs cfg, i.e. a C++ rebuild for everyone; not
   worth it unless you want it.

@@ -33,7 +33,11 @@ pub fn context_for(ps: &PartStudio, result: &AssemblyResult, assembly: TabId, pr
     let (id, name) = ic::next_context(&kept);
     let c = match primary {
         Some(p) => ic::snapshot(result, assembly, id, &name, p, name_of)?,
-        None => ic::snapshot_with(result, assembly, id, &name, to_studio, None, name_of),
+        None => {
+            let mut c = ic::snapshot_with(result, assembly, id, &name, to_studio, None, name_of);
+            c.state = origin_state(result, to_studio);
+            c
+        }
     };
     Some((id, Some(c)))
 }
@@ -67,12 +71,30 @@ pub fn update_description(name: &str) -> String {
 /// context's primary instance (or `fallback` when that is gone), keeping
 /// its name and hidden instances; features referencing it regenerate.
 pub fn refreshed(old: &AssemblyContext, result: &AssemblyResult, assembly: &Assembly, fallback: Option<InstanceId>) -> Option<AssemblyContext> {
+    refreshed_in(old, result, assembly, fallback, None)
+}
+
+/// [`refreshed`] for a context of Part Studio `studio`. A context created
+/// in context has no primary instance: the assembly is snapshotted through
+/// the Part Studio's origin, without the Part Studio's own instances (live
+/// "dx (2026-10-26, P2) Modeling in context": the inserted cover follows the
+/// plate and isn't in its own context).
+pub fn refreshed_in(old: &AssemblyContext, result: &AssemblyResult, assembly: &Assembly, fallback: Option<InstanceId>, studio: Option<TabId>) -> Option<AssemblyContext> {
     let name_of = |p: &InstancePath| assembly.instance(p[0]).map(|i| i.name.clone()).unwrap_or_default();
-    let primary: Vec<InstanceId> = match old.primary.first() {
-        Some(p) if assembly.instance(InstanceId(*p)).is_some() => old.primary.iter().map(|i| InstanceId(*i)).collect(),
-        _ => vec![fallback?],
+    let primary: Option<Vec<InstanceId>> = match old.primary.first() {
+        Some(p) if assembly.instance(InstanceId(*p)).is_some() => Some(old.primary.iter().map(|i| InstanceId(*i)).collect()),
+        _ => fallback.map(|f| vec![f]),
     };
-    let mut fresh = ic::snapshot(result, old.assembly, old.id, &old.name, &primary, &name_of)?;
+    let mut fresh = match primary {
+        Some(primary) => ic::snapshot(result, old.assembly, old.id, &old.name, &primary, &name_of)?,
+        None => {
+            let to_studio = old.origin?.to_dmat4().inverse();
+            let others = without_studio(result, studio);
+            let mut c = ic::snapshot_with(&others, old.assembly, old.id, &old.name, to_studio, None, &name_of);
+            c.state = origin_state(&others, to_studio);
+            c
+        }
+    };
     fresh.revision = old.revision + 1;
     fresh.hidden = old.hidden.clone();
     fresh.origin = old.origin;
@@ -82,8 +104,50 @@ pub fn refreshed(old: &AssemblyContext, result: &AssemblyResult, assembly: &Asse
 /// The context is out of date: the assembly around its primary instance
 /// changed since the snapshot (the blue dot).
 pub fn out_of_date(c: &AssemblyContext, result: &AssemblyResult) -> bool {
-    let path: Vec<InstanceId> = c.primary.iter().map(|i| InstanceId(*i)).collect();
-    c.state != 0 && ic::state_hash(result, &path).is_some_and(|h| h != c.state)
+    out_of_date_in(c, result, None)
+}
+
+/// [`out_of_date`] for a context of Part Studio `studio`; a context created
+/// in context compares the assembly seen through its origin, without the
+/// Part Studio's own instances (live: the dot shows after the plate changed).
+pub fn out_of_date_in(c: &AssemblyContext, result: &AssemblyResult, studio: Option<TabId>) -> bool {
+    if c.state == 0 {
+        return false;
+    }
+    match (c.primary.is_empty(), c.origin) {
+        (true, Some(o)) => origin_state(&without_studio(result, studio), o.to_dmat4().inverse()) != c.state,
+        _ => {
+            let path: Vec<InstanceId> = c.primary.iter().map(|i| InstanceId(*i)).collect();
+            ic::state_hash(result, &path).is_some_and(|h| h != c.state)
+        }
+    }
+}
+
+/// `result` without the occurrences of Part Studio `studio`'s parts.
+fn without_studio(result: &AssemblyResult, studio: Option<TabId>) -> AssemblyResult {
+    let mut r = result.clone();
+    if let Some(s) = studio {
+        r.occurrences.retain(|o| o.studio != s);
+    }
+    r
+}
+
+/// What a context without a primary instance captures (the parts' places
+/// through the Part Studio's origin and their geometry), as
+/// [`ic::state_hash`] does around a primary instance.
+fn origin_state(result: &AssemblyResult, to_studio: glam::DMat4) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    let q = |v: f64| (v * 1e7).round() as i64;
+    for o in result.occurrences.iter().filter(|o| !o.hidden && matches!(o.kind, noshape_model::display::BodyKind::Solid | noshape_model::display::BodyKind::Surface)) {
+        o.path.iter().for_each(|i| i.0.hash(&mut h));
+        (to_studio * o.transform).to_cols_array().iter().for_each(|v| q(*v).hash(&mut h));
+        o.mesh.positions.len().hash(&mut h);
+        if let Some((a, b)) = o.local_bounds {
+            [a.x, a.y, a.z, b.x, b.y, b.z].iter().for_each(|v| q(*v).hash(&mut h));
+        }
+    }
+    h.finish().max(1)
 }
 
 /// Insert and go to assembly: the Part Studio's parts and sketches as new

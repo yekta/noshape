@@ -681,6 +681,41 @@ fn hole_standard_sets_the_table_sizes() {
     call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": g["params"].clone() }));
 }
 
+/// A Part Studio created in context follows its assembly (live "dx
+/// (2026-10-26, P2) Modeling in context"): the plate made thicker shows the
+/// update dot, Update context moves the cover up, and the cover's own
+/// instance is never part of its context.
+#[test]
+fn part_studio_created_in_context_updates() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "in-context-update.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-40, -25], [40, 25]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let plate = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let b = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": plate }))["instance"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_set_state", json!({ "instances": [b], "fixed": true }));
+    let ps = call(&mut ctx, "assembly_create_part_studio_in_context", json!({}))["part_studio"].as_str().unwrap().to_string();
+    let top = call(&mut ctx, "query_entities", json!({ "tab": ps, "kind": "faces", "context": true, "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+    let s2 = call(&mut ctx, "sketch_create", json!({ "tab": ps, "plane": top.clone() }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_use", json!({ "tab": ps, "sketch": s2, "references": [top] }));
+    let regions = call(&mut ctx, "sketch_get", json!({ "tab": ps, "sketch": s2 }))["regions"].clone();
+    call(&mut ctx, "feature_add", json!({ "tab": ps, "type": "extrude", "params": { "entities": regions.as_array().unwrap().iter().map(|r| r["id"].clone()).collect::<Vec<_>>(), "depth": "3 mm" } }));
+    call(&mut ctx, "context_insert_in_assembly", json!({ "tab": ps, "parts": ["Part 1"] }));
+    let z = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({ "tab": ps }))["parts"][0]["bounding_box"]["min"][2]);
+    assert!((z(&mut ctx) - 10.0).abs() < 1e-6);
+    let up_to_date = |ctx: &mut Ctx| !call(ctx, "context_list", json!({ "tab": ps }))["contexts"][0]["out_of_date"].as_bool().unwrap();
+    assert!(up_to_date(&mut ctx), "the cover's own instance doesn't put its context out of date");
+    // The plate 15 mm: the dot, then Update context.
+    call(&mut ctx, "feature_edit", json!({ "tab": "Part Studio 1", "feature": "Extrude 1", "params": { "depth": "15 mm" } }));
+    assert!(!up_to_date(&mut ctx), "update available");
+    let u = call(&mut ctx, "context_update", json!({ "tab": ps, "context": "Context 1" }));
+    let names: Vec<&str> = u["contexts"][0]["instances"].as_array().unwrap().iter().map(|i| i["instance"].as_str().unwrap()).collect();
+    assert_eq!(names, ["Part 1 <1>"], "{u}");
+    assert!(up_to_date(&mut ctx));
+    assert!((z(&mut ctx) - 15.0).abs() < 1e-6, "the cover follows the plate");
+}
+
 /// A Width mate through the API (api F19, fixed by skasm cdde1c06): the
 /// block's two X faces centred between the base's.
 #[test]

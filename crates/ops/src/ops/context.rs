@@ -152,10 +152,10 @@ fn assembly_of(doc: &noshape_model::Document, tab: TabId) -> Option<&Assembly> {
 }
 
 /// A context as context_list shows it.
-fn context_json(od: &mut OpenDoc, ps: &PartStudio, c: &AssemblyContext) -> Value {
+fn context_json(od: &mut OpenDoc, studio: TabId, ps: &PartStudio, c: &AssemblyContext) -> Value {
     let referenced = noshape_model::in_context::referenced_contexts(&ps.features).contains(&c.id);
     let asm = assembly_of(od.doc(), c.assembly).cloned();
-    let out_of_date = asm.as_ref().is_some_and(|a| ic::out_of_date(c, &solve_assembly(od, c.assembly, a, &SolveOptions::default())));
+    let out_of_date = asm.as_ref().is_some_and(|a| ic::out_of_date_in(c, &solve_assembly(od, c.assembly, a, &SolveOptions::default()), Some(studio)));
     let primary = c.primary.first().and_then(|p| asm.as_ref()?.instance(InstanceId(*p))).map(|i| i.name.clone());
     json!({
         "id": c.id,
@@ -184,7 +184,7 @@ fn edit_studio_not_undoable(od: &mut OpenDoc, studio: TabId, description: &str, 
 fn studio_reply(od: &mut OpenDoc, studio: TabId, id: u32) -> Result<OpOutput, OpError> {
     let ps = doc::studio(od.doc(), studio)?.clone();
     let c = ps.contexts.iter().find(|c| c.id == id).cloned().ok_or_else(|| OpError::invalid("the context is gone"))?;
-    let v = context_json(od, &ps, &c);
+    let v = context_json(od, studio, &ps, &c);
     Ok(json!({ "part_studio": od.doc().tab(studio).map(|t| t.name.clone()), "context": v }).into())
 }
 
@@ -272,7 +272,7 @@ fn asm_update_context(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("context", "a context of another assembly"));
     }
     let result = solve_assembly(od, tab, &asm, &SolveOptions::default());
-    let fresh = ic::refreshed(&old, &result, &asm, Some(top)).ok_or_else(|| OpError::param("instance", "the instance has no geometry"))?;
+    let fresh = ic::refreshed_in(&old, &result, &asm, Some(top), Some(studio)).ok_or_else(|| OpError::param("instance", "the instance has no geometry"))?;
     commit_update(od, studio, fresh, &old.name)?;
     studio_reply(od, studio, old.id)
 }
@@ -309,7 +309,7 @@ fn set_primary(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?.clone();
-    let list: Vec<Value> = ps.contexts.iter().map(|c| context_json(od, &ps, c)).collect();
+    let list: Vec<Value> = ps.contexts.iter().map(|c| context_json(od, tab, &ps, c)).collect();
     Ok(json!({ "contexts": list }).into())
 }
 
@@ -330,10 +330,7 @@ fn update(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let old = find_context(&ps, a.str("context")?)?.clone();
     let asm = assembly_of(od.doc(), old.assembly).cloned().ok_or_else(|| OpError::param("context", "its assembly is gone"))?;
     let result = solve_assembly(od, old.assembly, &asm, &SolveOptions::default());
-    let fresh = ic::refreshed(&old, &result, &asm, None).ok_or_else(|| {
-        let why = if old.primary.is_empty() { "it has no primary instance (a Part Studio created in context): update it from the assembly (assembly_update_context on an instance of this Part Studio)" } else { "its primary instance is gone; update it from the assembly (assembly_update_context)" };
-        OpError::param("context", why)
-    })?;
+    let fresh = ic::refreshed_in(&old, &result, &asm, None, Some(tab)).ok_or_else(|| OpError::param("context", "its primary instance is gone; update it from the assembly (assembly_update_context)"))?;
     commit_update(od, tab, fresh, &old.name)?;
     list(ctx, a)
 }
