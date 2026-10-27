@@ -30,6 +30,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli-shell-gpf, cli-fillet-segv, cli-fillet2-segv and cli-draft-segv.noshape** (/root/qa-scratch/tickets/; green 19555ca3
   opens all five).
 ## Core modelling (core)
+- [ ] P0 BUDGET-LONGJMP the CPU budgets (97081557 blends, a117663d drafts / face deletion) jump out of OCCT with
+  `siglongjmp` from a timer-signal handler (crates/kernel/cpp/common.cpp `on_budget_tick`, SIGRTMIN+3 on a
+  CLOCK_THREAD_CPUTIME_ID timer, SA_RESTART); the jump can land inside malloc/free or any non-reentrant OCCT state.
+  Seen: fuzz seed 120 on the watcher CLI 08:30 **deadlocked** at step 28 (feature_suppress → ops regen_report →
+  model-core regen/mod.rs:420 `regenerate` → free → `__lll_lock_wait_private(main_arena)`), 0 % CPU for > 10 min, no
+  crash marker (no feature evaluating), no other thread holding the arena lock: a lock left held by a jump.
+  Backtrace tickets/cli-hang120-bt.txt, core tickets/core-hang120.1599386 (2.6 GB, gcore). This likely explains
+  BOOL-THREAD-CRASH too: those segfaults inside BOPAlgo (and the later "silent" deaths, i.e. glibc heap aborts) only
+  began on CLIs that have the budget (04:06 on; v0.4.8 and 19555ca3 run seed 72 through), and serial booleans didn't stop
+  them. Make the budget cooperative (OCCT's Message_ProgressIndicator::UserBreak / progress ranges, checked between
+  steps) or run budgeted kernel calls in a child process; never longjmp from a signal across arbitrary code (the
+  crash guard's `on_crash` siglongjmp has the same hazard, but it only runs once something has already crashed)
+  (qa 2026-10-27 09:35)
 - [ ] P1 WIN-CRASH-GUARD the kernel crash guard (common.cpp, sigsetjmp/sigaction) is POSIX-only: on Windows a crash inside
   OCCT (e.g. kernel/tests/data/crash/fillet-blend-segv, FILLET-SEGV-BLEND) still kills the process (the release/v0.4.9
   CI run 40469839948 died with STATUS_ACCESS_VIOLATION in crash_inputs; that test is now cfg(unix)). Add the Windows
@@ -66,6 +79,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   step, again without a kernel line. So serial booleans turned the segfaults into silent deaths or hangs, not fixed.
   Seed 93 on the watcher CLI 08:30 then ran all 120 steps (stderr saved, nothing): still nondeterministic. Fuzz batch 9
   runs with stderr saved to catch the next one (qa 09:21).
+  See BUDGET-LONGJMP (qa 09:35): a likely root cause.
   core 10-27: b0e757f3 stops one data race (in-place pcurves written into the caller's profile edges by the cylinder
   re-framing); the seed-72 replay with it: 2 of 3 runs complete all 106 steps, the 3rd still died at step 81 in
   `BOPAlgo_PaveFiller::ForceInterfEF` on a pool thread (BOPAlgo_PaveFiller_5.cxx, also changed by OCCT patch 0001, after

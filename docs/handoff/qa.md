@@ -11,6 +11,8 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   (fuzz seed 72 crashed 3 times on the 04:06 / 04:48 watcher CLIs; v0.4.8 survives it). Decide whether it blocks v0.4.9.
 - v0.4.9 as cut ships DRAFT-HANG (verified on the CI artifact: the draft-hang document's regen never ends); a117663d
   is after the release base. Cherry-pick or recut once the Windows include is fixed.
+- BUDGET-LONGJMP (P0 core, new 09:35): the blend/draft budgets siglongjmp out of OCCT from a timer signal; a fuzz CLI
+  deadlocked in malloc after it, and it likely explains BOOL-THREAD-CRASH. It ships in v0.4.9 (97081557 is in the base).
 - REGEN-NO-CANCEL (P0 psui) has no owner commit yet: a rollback waits up to 30 s+ behind a blend that's burning its budget.
 
 ## Release blockers seen by qa (updated 2026-10-27 06:10, green 4756f9be; see the newest "Green" section)
