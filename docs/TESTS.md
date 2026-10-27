@@ -65,3 +65,4 @@ delete the line to bring it back to T1. Record the move below.
 | model/tests/features_c `face_blend_on_curved_faces_as_live` (core, 10-26) | 30 s of face blends (cylinder, cone, chamfer gap: all match live) |
 | model/tests/features_c `face_blend_on_an_elliptic_boss_as_live` (core, 10-26/27) | 5 s of face blends (rolling ball, conic, asymmetric on the elliptic boss: as live since 10-27) |
 | model/tests/features_c `face_blend_curvature_on_an_elliptic_boss_as_live` (core, 10-27) | open difference from live: the curvature section fails (OCCT's fuse with the lofted tool comes back empty) |
+| kernel/tests/crash_inputs `replay_one` (core, 10-27) | a tool: replays and times one NOSHAPE_DUMP_OPS capture named by NOSHAPE_REPLAY |

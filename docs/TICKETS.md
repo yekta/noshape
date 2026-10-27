@@ -11,6 +11,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   `#include <cxxabi.h>`, GCC/Clang only, unguarded; blame d85c3029, REGEN-SPEED). Still on main, so main's Windows build
   is broken too (the watcher builds Linux only). Guard it (`#if !defined(_MSC_VER)`) or demangle another way. Linux and
   macOS jobs succeeded (06:29) (qa 07:50)
+  core 10-27: the lead's 2d6719c2 guards it on main (the release branch needs it too).
 - [ ] P0 the recut ships DRAFT-HANG: on the release's Linux artifact (run 40452492018, 0.4.9.7ee597e05af9) a copy of
   tickets/cli-draft-hang.noshape never finishes its opening regen (> 150 s, spinner); the draft budget a117663d came after
   the release's base 502416cc. Cherry-pick a117663d (and c30baf56 for markers) or recut. Same artifact: the five crash
@@ -199,6 +200,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Release v0.4.9 Linux artifact (7ee597e0, a release build): tickets/cli-delete-crash.noshape opens in 148 s, of which
   Shell 3 119.9 s and Shell 2 21.6 s (NOSHAPE_PERF); the seed-66 shell still 58.7 s on the watcher CLI 06:09. Shells have
   no budget yet (qa 08:00).
+  core 10-27 (in progress): shells run on the blends' 30 s CPU budget (qa's delete-crash shell input fails after 31 s,
+  "shell took too long"); plates whose only concave faces are through holes (and hole-rim fillets) take the regions
+  path: the hole plates of the kernel matrix test 0.7–1.1 s → 81–93 ms, same volumes. Parts with concave edges still
+  take slabs (1–5 s).
 - [ ] P0 REGEN-SPEED (core 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left

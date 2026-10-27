@@ -1346,6 +1346,7 @@ thread_local sigjmp_buf*              budget_jmp    = nullptr;
 thread_local double                   budget_limit  = 0;
 thread_local int                      budget_reason = 0;
 thread_local const std::atomic<bool>* budget_cancel = nullptr;
+thread_local int                      budget_hold   = 0;
 
 double thread_cpu_seconds()
 {
@@ -1360,7 +1361,7 @@ const int budget_signal = SIGRTMIN + 3;
 void on_budget_tick(int, siginfo_t*, void*)
 {
   sigjmp_buf* env = budget_jmp;
-  if (env == nullptr)
+  if (env == nullptr || budget_hold > 0)
     return;
   const bool over   = thread_cpu_seconds() > budget_limit;
   const bool cancel = budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed);

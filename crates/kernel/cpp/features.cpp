@@ -2406,7 +2406,9 @@ using BlendBuild = std::function<bool(double scale, TopoDS_Shape& out, HHist& h)
 bool valid_shape(const TopoDS_Shape& s)
 {
   // In parallel: the check of a whole part after each blend cost more than
-  // the blend (live's 30-feature part, REGEN-SPEED).
+  // the blend (live's 30-feature part, REGEN-SPEED). Not left by a budget
+  // mid-check (the pool's workers use this frame).
+  BudgetHold hold;
   return !s.IsNull() && BRepCheck_Analyzer(s, true, true).IsValid();
 }
 
@@ -3147,7 +3149,7 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_split_closed(
 // CPU seconds a fillet, chamfer, draft or face deletion may take (qa
 // FILLET-HANG: > 1 h in OCCT's blend approximation; DRAFT-HANG: > 20 min in
 // its defeaturing); NOSHAPE_BLEND_BUDGET overrides (tests).
-static double blend_budget_seconds()
+double blend_budget_seconds()
 {
   const char* v = std::getenv("NOSHAPE_BLEND_BUDGET");
   return v != nullptr ? std::atof(v) : 30.0;

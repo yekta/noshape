@@ -10,7 +10,11 @@ use std::path::Path;
 
 /// (input shape, its face / edge arguments, the op's parameter line).
 fn load(name: &str) -> (Shape, Vec<Shape>, Vec<String>) {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/crash");
+    let crash = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/crash");
+    let (dir, name) = match Path::new(name).parent() {
+        Some(d) if !d.as_os_str().is_empty() => (d.to_path_buf(), Path::new(name).file_name().unwrap().to_str().unwrap()),
+        _ => (crash, name),
+    };
     let s = read_brep(&dir.join(format!("{name}.brep"))).unwrap();
     let (faces, edges) = (s.faces(), s.edges());
     let text = std::fs::read_to_string(dir.join(format!("{name}.txt"))).unwrap();
@@ -73,4 +77,16 @@ fn crashing_kernel_inputs_return() {
     // The kernel still works.
     let b = make_box_corners(DVec3::ZERO, DVec3::ONE).unwrap();
     assert!((b.volume().unwrap() - 1.0).abs() < 1e-12);
+}
+
+/// Replays one NOSHAPE_DUMP_OPS capture and times it:
+/// `NOSHAPE_REPLAY=<dir>/<name> cargo test -p noshape-kernel --test all crash_inputs::replay_one -- --ignored --nocapture`.
+#[test]
+#[ignore = "T2: a tool; needs NOSHAPE_REPLAY"]
+fn replay_one() {
+    let _ = set_working_scale(1000.0);
+    let Ok(name) = std::env::var("NOSHAPE_REPLAY") else { return };
+    let t = std::time::Instant::now();
+    let r = replay(&name);
+    eprintln!("{name}: {r} in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
 }

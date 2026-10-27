@@ -69,6 +69,19 @@ extern thread_local sigjmp_buf*             budget_jmp;
 extern thread_local double                  budget_limit;
 extern thread_local int                     budget_reason;
 extern thread_local const std::atomic<bool>* budget_cancel;
+extern thread_local int                     budget_hold;
+// CPU seconds a blend, draft or shell may take (30; NOSHAPE_BLEND_BUDGET).
+double                                      blend_budget_seconds();
+// While one lives on a budgeted thread the budget doesn't jump (it does at
+// the next tick after): around work shared with OCCT's thread pool, whose
+// workers would go on using the abandoned stack frames.
+struct BudgetHold
+{
+  BudgetHold() { ++budget_hold; std::atomic_signal_fence(std::memory_order_seq_cst); }
+  ~BudgetHold() { std::atomic_signal_fence(std::memory_order_seq_cst); --budget_hold; }
+  BudgetHold(const BudgetHold&)            = delete;
+  BudgetHold& operator=(const BudgetHold&) = delete;
+};
 bool                                        budget_timer_start(void*& timer);
 void                                        budget_timer_stop(void* timer);
 double                                      thread_cpu_seconds();
