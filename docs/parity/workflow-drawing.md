@@ -110,7 +110,7 @@ Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 
 ## Re-run pass 14 (2026-10-22, main aa75fdf, app /tmp/qa5/noshape-0503; doc rebuilt: /tmp/qa5/d14/asm.noshape via /root/qa5-scratch/pass14/mkasm2.py = mkasm + plate fixed, block, shaft)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| D8 Callout on an assembly part in the iso view with a BOM table (Create Drawing › ANSI_A_MM, Suggested views; BOM table top right) | balloon shows the BOM item number "2" (p08, p09) | ✅ **fixed** |  |
+| D8 Callout on an assembly part in the iso view with a BOM table (Create Drawing › ANSI_A_MM, Suggested views; BOM table top right) | balloon shows the BOM item number "2" (p08, p09) | ❌ (BALLOON-WRONG-ITEM) **fixed** | 0.4.10+ / daf1f50c 10-27 |
 
 ## Re-check (qa4, 2026-10-23 20:40–21:10, main a0e360a3; code and the latest qa5 passes)
 - Fixed in qa5's later passes (rows marked ✅ above): D2, D3, D5, D7, D8, D9, D11, D14, D15, D16; D1, D4 fixes cited in code.
