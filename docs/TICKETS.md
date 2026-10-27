@@ -208,6 +208,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Release v0.4.9 Linux artifact (7ee597e0, a release build): tickets/cli-delete-crash.noshape opens in 148 s, of which
   Shell 3 119.9 s and Shell 2 21.6 s (NOSHAPE_PERF); the seed-66 shell still 58.7 s on the watcher CLI 06:09. Shells have
   no budget yet (qa 08:00).
+  qa 08:50, watcher CLI 08:30 (has cb84d673, shells by regions): bin/shelltime.py h10 R2 t1.5 1.26 s, h30 R2 t1.5 0.99 s,
+  h10 R4 t2.5 0.84 s (was 1.6–2.0 s), no hole 0.38 s, same volumes; cb84d673 says ~90 ms for such plates, so the feature as
+  a whole is still ~1 s here (load 26). The seed-66 failing shell: 35–40 s (was 52–59); opening that document 74–87 s on
+  this box (load 25–39, the 06:09 parallel-boolean CLI the same at equal load).
   core 10-27 (in progress): shells run on the blends' 30 s CPU budget (qa's delete-crash shell input fails after 31 s,
   "shell took too long"); plates whose only concave faces are through holes (and hole-rim fillets) take the regions
   path: the hole plates of the kernel matrix test 0.7–1.1 s → 81–93 ms, same volumes. Parts with concave edges still
