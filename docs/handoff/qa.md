@@ -3,10 +3,11 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Release blockers seen by qa (updated 2026-10-27 02:50, green 19555ca3)
+## Release blockers seen by qa (updated 2026-10-27 03:55, green 16cdcf6d)
 - Fixed and verified on 19555ca3: the crash documents (DRAFT/SHELL-SLAB/FILLET/FILLET-BLEND), SHELL-WALLS,
-  SHELL-FILLETED-BOX. Still open P0: FILLET-HANG (a fillet can spin for hours in OCCT's blend approximation, the document
-  then hangs on open), SHELL-SLOW (shells 5–9 s), REGEN-SPEED, TWO-PROCESS-LOST-EDIT.
+  SHELL-FILLETED-BOX. Still open P0: FILLET-HANG and the new DRAFT-HANG (OCCT blend approximation / defeaturing spin with
+  no budget; in the app a stuck regen blocks every later one, the Part Studio never updates again), SHELL-SLOW (shells
+  5–9 s), REGEN-SPEED (commit 1.0–1.7 s at load ~35 on 16cdcf6d; undo 3 back 886 ms), TWO-PROCESS-LOST-EDIT.
 
 ### Earlier (P0, green 4d2f6b0c)
 - DOC-POISON + SHELL-SLAB-GPF + FILLET-SEGV: ordinary Shell / Fillet / Delete operations can segfault the green app and
@@ -124,6 +125,13 @@ edge's midpoint), READOUT-AXES, EXT-2ND-DEPTH, EXPORT-DXF-OPTIONS (DXF R14, mm, 
 FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress | Dynamic suppression ▸ | Expand ▸ | Collapse ▸ |
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
+
+## Green 16cdcf6d (2026-10-27 03:25–03:55)
+- Verified: LOFT-PROFILE-LIST (› entries, ↑↓, nothing under the field), DRAWING-SCALE (1:2, centre mark on the hole only).
+- Reopened: OPEN-ERROR-SILENT (one-line message right, but the bubble goes away by itself ~6–9 s after launch).
+- New: DRAFT-HANG (P0 core, fuzz seed 60 step 76; the app opens the doc rolled back above Draft 8, rolling forward hangs),
+  LOFT-SKETCH-HIDE (P2 psui: only the first profile's sketch is hidden).
+- REGEN-SPEED re-timed (above). Not yet in green: SKETCH-PASTE fix ac0645bc, P1-16 shell fix 239fa250.
 
 ## Verified on green dc3a03f6 (2026-10-27 01:55)
 qa5's P1-17 (mass properties blank with nothing measured, no toast), P1-18 (⚠ badge on a missing-selection row), P2-D3
