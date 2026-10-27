@@ -2921,7 +2921,9 @@ impl PartStudioView {
                     })
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         let new = if *h { Some(r2.clone()) } else { None };
-                        if this.hover != new {
+                        // Leaving clears only this row's hover: going row to row the
+                        // next row's enter may come first.
+                        if this.hover != new && (*h || this.hover.as_ref() == Some(&r2)) {
                             this.hover = new;
                             this.refresh_scene(false, cx);
                         }
@@ -3527,7 +3529,9 @@ impl PartStudioView {
             )
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 let new = if *h { Some(r_hover.clone()) } else { None };
-                if this.hover != new {
+                // Leaving clears only this row's hover: going row to row the
+                // next row's enter may come first.
+                if this.hover != new && (*h || this.hover.as_ref() == Some(&r_hover)) {
                     this.hover = new;
                     this.refresh_scene(false, cx);
                 }

@@ -98,7 +98,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.14 | Selecting a face or part highlights the features that created/modified it in the feature list, and its part in the Parts list (related-highlight (236,240,244), live 10-27) | features_and_parts_lists | ✅ |
 | 3.15 | Hovering a feature in the list highlights its geometry | features_and_parts_lists ("Hover over a feature…") | ✅ (app 10-24) |
 | 3.16 | Selecting a feature in the list highlights its geometry (its part amber) and relates its part row (live 10-27) | A §5.3 (FEATURE_HIGHLIGHT) | ✅ |
-| 3.17 | Selecting / hovering a part in the parts list highlights the whole part | A §5.3 (PART_HIGHLIGHT) | 🔧 |
+| 3.17 | Selecting / hovering a part in the parts list highlights the whole part | A §5.3 (PART_HIGHLIGHT) | ✅ (10-27; row to row the hover no longer drops) |
 | 3.18 | Double-click a sketch in the graphics area edits it | (Onshape behaviour) | 🔧 |
 | 3.19 | Create selection dialog and Select ▸ submenu | Home__create_selection; live part-studio/380–398, dom/dialog-create-selection.txt, context-menus-ps-part-select-submenus.txt | 🔧 (Select ▸: face/region = Protrusion, Pocket, Hole, Fillet, Tangent connected, Bounded faces, Loop/chain connected edges, Create selection…; part edge and sketch curve = Tangent connected, Equal length/radius, Parallel, Create selection…; no separator; each item replaces the selection. Create selection (`part_studio/create_selection.rs`): 220 px, floats at the right-click point, header ✕ only, draggable; Faces / Edges tabs (opens on Faces), native-style select (Protrusion…Bounded faces / Tangent connected, Loop/chain connected, Equal length/radius, Parallel), Selection field (empty at open, picks toggle), ☐ Select patterns (pattern copies via `select::with_pattern_instances`), "N faces selected", [Add selection] (disabled at 0) adds to the selection and resets, staying open; preview seeds orange / results query yellow-green. Feature fields with SHOW_CREATE_SELECTION (Delete/Move/Replace face, Offset surface, Draft parting edges, face patterns / mirror) and Flatten's two fields have the 26 px button (tooltip "Create selection"); it opens the dialog beside the feature dialog, the field turns white with a blue border, Add selection fills the field. Convexity follows qConvexConnectedFaces (exterior fillet edges convex). Verified in the app.) |
 
@@ -220,7 +220,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 |---|---|---|---|
 | 7.1 | Parts with colour swatch and count | features_and_parts_lists | ✅ |
 | 7.2 | Click selects (or fills a part field in a dialog, filtered) | features_and_parts_lists | 🔧 (unfiltered before) |
-| 7.3 | Hover highlights the part in the graphics area | features_and_parts_lists | 🔧 |
+| 7.3 | Hover highlights the part in the graphics area | features_and_parts_lists | ✅ |
 | 7.4 | Eye on hover ("Hide Part N", 20 × 20 at x 210) hides/shows the part; hidden parts greyed | features_and_parts_lists | ✅ |
 | 7.5 | Parts list menu (live order): Rename, Properties…, Assign material…, Edit appearance… | Create Drawing of Part…, Export… | Hide, Isolate…, Make transparent… | Zoom to selection | Delete… | live | ✅ (Copy Part N after Copy here… as live; Release… and Revision history: see 13.14) |
 | 7.6 | Separate Parts / Surfaces / Curves sections (collapsible, eye hides a section); "Composite parts (N)" after Parts (collapsed at first, eye "Hide all composite parts", row tooltip "Composite part 1 (open\|closed) (N parts)"; closed: members leave Parts, stay drawn and selectable) | features_and_parts_lists, live part-studio/470–474 | ✅ |
@@ -248,9 +248,9 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 |---|---|---|---|
 | 9.1 | Right-drag rotates, middle-drag or Ctrl+right-drag pans, wheel zooms at the cursor | view_navigation | ✅ |
 | 9.2 | Double-click the middle button zooms to fit (live 10-27) | View__zoom_to_fit | ✅ |
-| 9.3 | View cube in the upper right turns with the camera | view_navigation | 🔧 |
-| 9.4 | Click a cube face for that standard view | view_navigation | 🔧 |
-| 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | 🔧 |
+| 9.3 | View cube in the upper right turns with the camera | view_navigation | ✅ (iso: the Top face fill 1803–1854 × 127–156 = live's pixels) |
+| 9.4 | Click a cube face for that standard view | view_navigation | ✅ |
+| 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | ✅ (live's corner takes the pointer ~8 px from its centre, ours on the drawn 13 px disc only) |
 | 9.6 | Cube faces/edges/corners highlight on hover, (188,226,247) = #90cef1 at 0.6; no name or tooltip (live 10-27) | A §6.2 | ✅ |
 | 9.7 | Cube arrows rotate 15° (Shift 90°, Ctrl 5°); arc arrows roll | A §6.2 | ✅ (psui 10-27, as live "spec: psui part-studio.md 9.7": ▶ brings the left side in view, ▲ the front face, the right arc rolls clockwise; 15° / Ctrl 5° / Shift 90°) |
 | 9.8 | Camera menu (live order): Isometric/Dimetric/Trimetric | Named views…, Previous view | Zoom to fit/window | Perspective, Orient normal to sketch on edit | ✓ display ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… | live dom/menu-camera-render.txt | ✅ (Graphics preferences… and Highlight boundary edges by ui) |
