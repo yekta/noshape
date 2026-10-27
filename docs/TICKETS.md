@@ -469,7 +469,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   retyped to fastened / slider / cylindrical / planar / ball / pin slot stays "Revolute 1" (DOF right in each case: 0 1 1 2 3
   3 2). In the app, retyping in the mate dialog renames the mate (Cylindrical 1 → Revolute: title and row "Revolute 1",
   green 16cdcf6d), so the API gives a different result for the same edit (qa 2026-10-27, watcher CLI 08:30)
-- [ ] P1 UNDO-NOOP-SHIFT a no-op operation pushes an undo step without a history entry, so undo/redo shift by one and
+- [x] (dx 10-27: the store's UndoStack::commit overwrote the previous step's changed names with the empty diff of a no-op commit; it now leaves them, test a_noop_commit_keeps_the_previous_edit_undoable; the repro now undoes Boss 4 to 5 mm at the first undo. The app's unchanged ✓ recording an edit is psui's dialog, pending live's answer) P1 UNDO-NOOP-SHIFT a no-op operation pushes an undo step without a history entry, so undo/redo shift by one and
   say the wrong thing: copy of tests/perf/live-30-features.noshape, feature_edit Boss 4 depth 5 → 2 mm, then
   feature_suppress Boss 2 suppressed:false (already unsuppressed: no history entry); history_undo → "Edit : Boss 4" but
   Boss 4 stays 2 mm; history_undo again → "Insert feature : Chamfer 5" but it is the Boss 4 edit that comes back (5 mm);

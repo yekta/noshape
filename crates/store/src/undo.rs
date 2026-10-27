@@ -281,6 +281,13 @@ impl UndoStack {
     ) -> Result<MicroversionId> {
         let before = doc.head(self.branch)?;
         let after = doc.commit(self.branch, changes, description)?;
+        // A commit that changed nothing makes no microversion and no undo
+        // step; the previous step (whose `after` is that same head) keeps
+        // its names (qa UNDO-NOOP-SHIFT: they were overwritten with the
+        // empty diff, and undo then skipped the edit).
+        if before == after {
+            return Ok(after);
+        }
         self.record(before, after, description);
         if let Some(e) = self.undo.last_mut().filter(|e| e.after == after) {
             e.changed = Some(doc.diff(before, after)?.into_iter().map(|c| c.name).collect());

@@ -556,6 +556,23 @@ fn restore_creates_new_microversion() {
     assert_eq!(doc.microversion(r3).unwrap().branch, main);
 }
 
+/// qa UNDO-NOOP-SHIFT: a no-op commit after an edit leaves that edit
+/// undoable (its changed names were overwritten with the empty diff, so an
+/// undo scoped to the tab did nothing and the next one undid two edits).
+#[test]
+fn a_noop_commit_keeps_the_previous_edit_undoable() {
+    let dir = TempDir::new();
+    let (mut doc, main) = new_doc(&dir);
+    let mut undo = UndoStack::new(main);
+    let s1 = undo.commit(&mut doc, &[set("tab/a", b"1")], "Insert").unwrap();
+    undo.commit(&mut doc, &[set("tab/a", b"2")], "Edit").unwrap();
+    undo.commit(&mut doc, &[set("tab/a", b"2")], "noop").unwrap();
+    let in_tab = |names: &[String]| names.iter().any(|n| n == "tab/a");
+    let u = undo.undo_in_keeping(&mut doc, &in_tab, &|_, v| v).unwrap().unwrap();
+    assert_eq!(doc.microversion(u).unwrap().description, "Undo Edit");
+    assert_eq!(*doc.manifest(u).unwrap(), *doc.manifest(s1).unwrap(), "the edit is undone, not skipped");
+}
+
 #[test]
 fn undo_redo() {
     let dir = TempDir::new();
