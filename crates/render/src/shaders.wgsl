@@ -857,8 +857,12 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
 
 @fragment
 fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
-    load_inst(i.slot);
-    if (clipped(i.world)) { discard; }
+    // The instance (176 bytes) only matters to the section clip: not read for every line fragment otherwise (the
+    // edge lines are the Retina orbit's GPU cost, docs/handoff/psui.md).
+    if (g.flags.x != 0u) {
+        load_inst(i.slot);
+        if (clipped(i.world)) { discard; }
+    }
     if ((i.style & 1u) != 0u && fract(i.along / (7.0 * g.viewport.z)) > 0.55) { discard; }
     if ((i.style & 4u) != 0u) {
         let t = fract(i.along / (16.0 * g.viewport.z));
