@@ -827,7 +827,9 @@ fn feature_pattern_of_hole_copies_the_holes() {
         let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).collect();
         assert_eq!(solids.len(), 1, "depth {depth}");
         let removed = 0.05 * 0.04 * depth * 1e-3 - total_volume(&r.context);
-        assert!(near(removed, 4.0 * hole, 1e-6), "depth {depth}: removed {removed}, 4 holes {}", 4.0 * hole);
+        // Within 1e-4: a part's volume is integrated to 1e-7 of the whole
+        // (~0.006 mm³ here), so the difference of two of them is no closer.
+        assert!(near(removed, 4.0 * hole, 1e-4), "depth {depth}: removed {removed}, 4 holes {}", 4.0 * hole);
     }
 }
 

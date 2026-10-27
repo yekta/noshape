@@ -732,7 +732,9 @@ pub fn revolve_profile_tool(profile: &[DVec2], frame: &Plane) -> Result<Shape> {
     let pplane = Plane::new(frame.origin, x.cross(n), x);
     let face = make_face(&pplane, &wire, &[])?;
     let r = revolve(&face, frame.origin, n, std::f64::consts::TAU)?;
-    Ok(r.shape)
+    // Live's Hole frame ("fs (10-26 b)" (g)): origin at the hole's start, z
+    // along the drill.
+    Shape::from_res(ffi::op_frame_cylinders_at(r.shape.raw(), crate::geom::p3(frame.origin), crate::geom::p3(-n)))
 }
 
 /// Cut a revolved hole tool (see [`revolve_profile_tool`]) at every frame

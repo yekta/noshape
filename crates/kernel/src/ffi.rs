@@ -314,6 +314,7 @@ pub(crate) mod ffi {
         fn shape_partner_hash(s: &OcShape) -> Result<u64>;
         fn shape_location(s: &OcShape) -> Result<Vec<f64>>;
         fn shape_unlocated(s: &OcShape) -> Result<UniquePtr<OcShape>>;
+        fn op_frame_cylinders_at(s: &OcShape, origin: P3, axis: P3) -> Result<UniquePtr<OcShape>>;
         fn sub_count(s: &OcShape, kind: u8) -> Result<u32>;
         fn sub_shape(s: &OcShape, kind: u8, index: u32) -> Result<UniquePtr<OcShape>>;
         fn sub_shapes(s: &OcShape, kind: u8) -> Result<UniquePtr<OcShapeList>>;

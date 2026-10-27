@@ -83,3 +83,56 @@ fn an_extruded_cylinder_is_framed_toward_its_sketch() {
         assert!((c / v - 1.0).abs() < 1e-9, "mirror {n:?}: {c} of {v}");
     }
 }
+
+/// Revolved and up-to cylinders as live (behaviours "core (2026-10-26)" (3),
+/// (5) and "fs (10-26 b)" (f)): a revolve's origin at mid-height, z against
+/// the axis as drawn; an Up to face extrude's origin 0.002 mm past the face's
+/// far end, z back toward the sketch; x gp_Ax2's default throughout.
+#[test]
+fn revolved_and_up_to_cylinders_are_framed_as_live() {
+    let mm = 1e-3;
+    let near = |a: DVec3, b: DVec3| (a - b).length() < 1e-6;
+    let frame = |s: &Shape| {
+        s.faces().into_iter().find_map(|f| match f.face_surface().ok()? {
+            Surface::Cylinder { origin, axis, x_dir, .. } => Some((origin / mm, axis, x_dir)),
+            _ => None,
+        }).expect("a cylinder")
+    };
+    // The rectangle (0,0)–(10,20) on Front (x, z), revolved about the z axis.
+    let front = Plane::new(DVec3::ZERO, -DVec3::Y, DVec3::X);
+    let seg = |a: (f64, f64), b: (f64, f64)| Segment2d::Line { a: DVec2::new(a.0, a.1) * mm, b: DVec2::new(b.0, b.1) * mm };
+    let rect = make_face_2d(&front, &[seg((0.0, 0.0), (10.0, 0.0)), seg((10.0, 0.0), (10.0, 20.0)), seg((10.0, 20.0), (0.0, 20.0)), seg((0.0, 20.0), (0.0, 0.0))], &[]).unwrap();
+    for (origin, axis, z, x) in [(DVec3::ZERO, DVec3::Z, -DVec3::Z, -DVec3::X), (DVec3::new(0.0, 0.0, 20.0) * mm, -DVec3::Z, DVec3::Z, DVec3::X)] {
+        let s = revolve(&rect, origin, axis, std::f64::consts::TAU).unwrap().shape;
+        let (o, a, xd) = frame(&s);
+        assert!(near(o, DVec3::new(0.0, 0.0, 10.0)) && near(a, z) && near(xd, x), "axis {axis:?}: origin {o:?} z {a:?} x {xd:?}");
+        assert!(s.is_valid());
+        let v = s.volume().unwrap();
+        let m = s.transformed(&Transform::Mirror(Plane::from_normal(DVec3::ZERO, DVec3::Y))).unwrap();
+        assert!((common(&s, &m).unwrap().shape.volume().unwrap() / v - 1.0).abs() < 1e-9, "axis {axis:?}: mirrored common");
+    }
+    // A Ø20 disc on Top up to a plane tilted 10° through (0, 0, 30).
+    let n = DVec3::new(-(10f64.to_radians().sin()), 0.0, 10f64.to_radians().cos());
+    let target = make_plane_face(&Plane::from_normal(DVec3::new(0.0, 0.0, 30.0) * mm, n), -0.1, 0.1, -0.1, 0.1).unwrap();
+    let disc = make_face_from_wire(&make_wire(&[make_circle(DVec3::ZERO, DVec3::Z, 10.0 * mm).unwrap()]).unwrap(), true).unwrap();
+    let s = extrude_up_to(&disc, DVec3::Z, &target, 0.0).unwrap().shape;
+    let (o, a, xd) = frame(&s);
+    assert!(near(o, DVec3::new(0.0, 0.0, 31.76527)) && near(a, -DVec3::Z) && near(xd, -DVec3::X), "up to: origin {o:?} z {a:?} x {xd:?}");
+    assert!(s.is_valid());
+}
+
+/// A Hole's cylinder as live ("fs (10-26 b)" (g): Ø6 through a block's top
+/// at (20, 20, 20)): origin at the hole's start, z along the drill.
+#[test]
+fn a_hole_cylinder_is_framed_at_its_start() {
+    let mm = 1e-3;
+    let frame = Plane::new(DVec3::new(20.0, 20.0, 20.0) * mm, DVec3::Z, DVec3::X);
+    let tool = revolve_profile_tool(&[DVec2::ZERO, DVec2::new(3.0, 0.0) * mm, DVec2::new(3.0, 20.0) * mm, DVec2::new(0.0, 20.0) * mm], &frame).unwrap();
+    let (o, a, x) = tool.faces().into_iter().find_map(|f| match f.face_surface().ok()? {
+        Surface::Cylinder { origin, axis, x_dir, .. } => Some((origin / mm, axis, x_dir)),
+        _ => None,
+    }).expect("a cylinder");
+    assert!((o - DVec3::new(20.0, 20.0, 20.0)).length() < 1e-6 && (a + DVec3::Z).length() < 1e-9 && (x + DVec3::X).length() < 1e-9, "origin {o:?} z {a:?} x {x:?}");
+    assert!(tool.is_valid());
+    assert!((tool.volume().unwrap() / mm.powi(3) - std::f64::consts::PI * 9.0 * 20.0).abs() < 1e-6);
+}

@@ -319,68 +319,118 @@ TopoDS_Shape seat_circles(const TopoDS_Shape& base, const gp_Dir& z_new, occ::ha
 // angle u becomes a - u (a = the old x's angle in the new frame) and v
 // becomes -v, a half turn of the (u, v) plane, so each pcurve turns by pi
 // and the face keeps its orientation.
+// Re-frames cylinder face `f` in place to Parasolid's frame: z = `z_world`
+// (the old axis or its reverse), x gp_Ax2's default for that z, origin
+// `origin_world` (on the axis), the old frame's handedness kept (so the
+// normal is). A point's (u, v) maps to (u + a, v + h) when z stays, to
+// (a - u, h - v) when it flips (a half turn of the (u, v) plane): the pcurves
+// are moved accordingly, the u range made to start in [0, 2 pi). False when
+// `f` isn't such a cylinder.
+bool reframe_cylinder(const TopoDS_Face& f, const gp_Dir& z_world, const gp_Pnt& origin_world)
+{
+  BRep_Builder                          B;
+  TopLoc_Location                       loc;
+  occ::handle<Geom_CylindricalSurface> cyl = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(f, loc));
+  if (cyl.IsNull())
+    return false;
+  const gp_Ax3  old      = cyl->Position();
+  const gp_Trsf to_world = loc.Transformation();
+  const gp_Trsf to_local = to_world.Inverted();
+  const double  s        = old.Direction().Transformed(to_world).Dot(z_world);
+  if (std::abs(std::abs(s) - 1) > 1e-9)
+    return false;
+  const bool    flip  = s < 0;
+  const gp_Dir  x_new = gp_Ax2(gp_Pnt(0, 0, 0), z_world).XDirection();
+  const gp_Pnt  o_new = origin_world.Transformed(to_local);
+  gp_Ax3        nw(o_new, z_world.Transformed(to_local), x_new.Transformed(to_local));
+  if (!old.Direct())
+    nw.YReverse();
+  const gp_Dir xo = old.XDirection();
+  const double a  = std::atan2(xo.Dot(nw.YDirection()), xo.Dot(nw.XDirection()));
+  // The old origin's height on the new axis.
+  const double h = gp_Vec(o_new, old.Location()).Dot(gp_Vec(nw.Direction()));
+  double       u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  const double two_pi = 2 * M_PI;
+  gp_Trsf2d    t;
+  if (flip)
+  {
+    // u' = a - u: the new range [a - u1, a - u0] starts in [0, 2 pi).
+    const double ap = u1 + std::fmod(std::fmod(a - u1, two_pi) + two_pi, two_pi);
+    t.SetRotation(gp_Pnt2d(ap / 2, h / 2), M_PI);
+  }
+  else
+  {
+    // u' = u + a: the new range [u0 + a, u1 + a] starts in [0, 2 pi).
+    const double ap = std::fmod(std::fmod(u0 + a, two_pi) + two_pi, two_pi) - u0;
+    t.SetTranslation(gp_Vec2d(ap, h));
+  }
+  occ::handle<Geom_CylindricalSurface> ns = new Geom_CylindricalSurface(nw, cyl->Radius());
+  ShapeIMap                            done;
+  // Pcurves as stored (a reversed face swaps a seam's two).
+  const TopoDS_Face                    ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+  for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+  {
+    if (done.Contains(e.Current()))
+      continue;
+    done.Add(e.Current());
+    const TopoDS_Edge          fwd = TopoDS::Edge(e.Current().Oriented(TopAbs_FORWARD));
+    double                     a1, b1;
+    occ::handle<Geom2d_Curve> c1 = BRep_Tool::CurveOnSurface(fwd, ff, a1, b1);
+    if (c1.IsNull())
+      fail_op("cylinder face without a pcurve");
+    occ::handle<Geom2d_Curve> n1  = occ::down_cast<Geom2d_Curve>(c1->Transformed(t));
+    const double               tol = BRep_Tool::Tolerance(fwd);
+    if (BRep_Tool::IsClosed(fwd, f))
+    {
+      double                     a2, b2;
+      occ::handle<Geom2d_Curve> c2 = BRep_Tool::CurveOnSurface(TopoDS::Edge(fwd.Reversed()), ff, a2, b2);
+      occ::handle<Geom2d_Curve> n2 = occ::down_cast<Geom2d_Curve>(c2->Transformed(t));
+      B.UpdateEdge(fwd, n1, n2, ns, loc, tol);
+    }
+    else
+      B.UpdateEdge(fwd, n1, ns, loc, tol);
+    B.Range(fwd, ns, loc, a1, b1);
+  }
+  B.UpdateFace(f, ns, loc, BRep_Tool::Tolerance(f));
+  return true;
+}
+
 void frame_cylinders_toward_sketch(const TopoDS_Shape& shape, const gp_Dir& away)
 {
-  BRep_Builder B;
-  ShapeIMap    faces;
+  ShapeIMap faces;
   TopExp::MapShapes(shape, TopAbs_FACE, faces);
   for (int i = 1; i <= faces.Extent(); ++i)
   {
     const TopoDS_Face&                    f = TopoDS::Face(faces(i));
     TopLoc_Location                       loc;
     occ::handle<Geom_CylindricalSurface> cyl = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(f, loc));
-    if (cyl.IsNull())
-      continue;
-    const gp_Ax3  old = cyl->Position();
-    const gp_Trsf to_world = loc.Transformation();
     // OCCT's frame points along the sweep: z = -sweep, indirect when the
-    // circle's axis opposes it.
-    if (!(old.Direction().Transformed(to_world).Dot(away) > 1 - 1e-9))
+    // circle's axis opposes it. Its origin (the profile circle's centre at
+    // the far end) stays.
+    if (cyl.IsNull() || !(cyl->Position().Direction().Transformed(loc.Transformation()).Dot(away) > 1 - 1e-9))
       continue;
-    const gp_Dir  z_new = away.Reversed();
-    const gp_Dir  x_new = gp_Ax2(gp_Pnt(0, 0, 0), z_new).XDirection();
-    const gp_Trsf to_local = to_world.Inverted();
-    gp_Ax3        nw(old.Location(), z_new.Transformed(to_local), x_new.Transformed(to_local));
-    // The same handedness keeps the normal: u' = a - u, v' = -v either way.
-    if (!old.Direct())
-      nw.YReverse();
-    const gp_Dir  xo = old.XDirection();
-    const double  a = std::atan2(xo.Dot(nw.YDirection()), xo.Dot(nw.XDirection()));
-    double        u0, u1, v0, v1;
-    BRepTools::UVBounds(f, u0, u1, v0, v1);
-    // The new u range [a' - u1, a' - u0] starts in [0, 2 pi).
-    const double ap = u1 + std::fmod(std::fmod(a - u1, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
-    gp_Trsf2d    t;
-    t.SetRotation(gp_Pnt2d(ap / 2, 0), M_PI);
-    occ::handle<Geom_CylindricalSurface> ns = new Geom_CylindricalSurface(nw, cyl->Radius());
-    ShapeIMap                            done;
-    // Pcurves as stored (a reversed face swaps a seam's two).
-    const TopoDS_Face                    ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
-    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
-    {
-      if (done.Contains(e.Current()))
-        continue;
-      done.Add(e.Current());
-      const TopoDS_Edge          fwd = TopoDS::Edge(e.Current().Oriented(TopAbs_FORWARD));
-      double                     a1, b1;
-      occ::handle<Geom2d_Curve> c1 = BRep_Tool::CurveOnSurface(fwd, ff, a1, b1);
-      if (c1.IsNull())
-        fail_op("cylinder face without a pcurve");
-      occ::handle<Geom2d_Curve> n1 = occ::down_cast<Geom2d_Curve>(c1->Transformed(t));
-      const double               tol = BRep_Tool::Tolerance(fwd);
-      if (BRep_Tool::IsClosed(fwd, f))
-      {
-        double                     a2, b2;
-        occ::handle<Geom2d_Curve> c2 = BRep_Tool::CurveOnSurface(TopoDS::Edge(fwd.Reversed()), ff, a2, b2);
-        occ::handle<Geom2d_Curve> n2 = occ::down_cast<Geom2d_Curve>(c2->Transformed(t));
-        B.UpdateEdge(fwd, n1, n2, ns, loc, tol);
-      }
-      else
-        B.UpdateEdge(fwd, n1, ns, loc, tol);
-      B.Range(fwd, ns, loc, a1, b1);
-    }
-    B.UpdateFace(f, ns, loc, BRep_Tool::Tolerance(f));
+    reframe_cylinder(f, away.Reversed(), cyl->Position().Location().Transformed(loc.Transformation()));
   }
+}
+
+// The axial extent [lo, hi] of face `f` along `ax` (from its edges).
+std::pair<double, double> axial_extent(const TopoDS_Face& f, const gp_Ax1& ax)
+{
+  double lo = 1e300, hi = -1e300;
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    if (BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
+      continue;
+    BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+    for (int k = 0; k <= 8; ++k)
+    {
+      const double h = gp_Vec(ax.Location(), c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 8)).Dot(gp_Vec(ax.Direction()));
+      lo = std::min(lo, h);
+      hi = std::max(hi, h);
+    }
+  }
+  return {lo, hi};
 }
 
 } // namespace
@@ -496,6 +546,10 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
     base = tr->Shape();
     merge_into(hist, history_of({profile.shape}, *tr));
   }
+  // The profile's full circles restarted at the frame's x (see op_prism).
+  occ::handle<BRepTools_ReShape> seat = new BRepTools_ReShape;
+  base = seat_circles(base, dir.Reversed(), seat);
+  merge_into(hist, seat->History());
   // Through-all length: generous multiple of the combined bounding box.
   const double          len = 2.0 * bbox_diag({base, until.shape}) + 1.0;
   BRepPrimAPI_MakePrism prism(base, gp_Vec(dir) * len, false, true);
@@ -550,11 +604,29 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   if (reachesEnd)
     fail_op("up-to target does not fully bound the extruded profile");
   TopoDS_Shape result = keep.size() == 1 ? keep[0] : compound_of(keep);
+  // Parasolid's frame of the extruded cylinders (live "core (2026-10-26)"
+  // (3)): z back toward the sketch, x gp_Ax2's default, origin on the axis
+  // 0.002 mm past the face's far end (Onshape extrudes blind to the target's
+  // extent over the profile plus 2 um, then trims).
+  {
+    ShapeIMap faces;
+    TopExp::MapShapes(result, TopAbs_FACE, faces);
+    for (int i = 1; i <= faces.Extent(); ++i)
+    {
+      const TopoDS_Face&  f = TopoDS::Face(faces(i));
+      BRepAdaptor_Surface fs(f, false);
+      if (fs.GetType() != GeomAbs_Cylinder || !fs.Cylinder().Axis().Direction().IsParallel(dir, 1e-9))
+        continue;
+      const gp_Ax1 cax(fs.Cylinder().Location(), dir);
+      const auto [lo, hi] = axial_extent(f, cax);
+      reframe_cylinder(f, dir.Reversed(), cax.Location().Translated(gp_Vec(dir) * (hi + 2e-6)));
+    }
+  }
 
   HistoryBuilder hb(args, result);
   hb.add_history(hist.get());
   auto moved = [&](const TopoDS_Shape& s) -> TopoDS_Shape {
-    return tr ? tr->ModifiedShape(s) : s;
+    return seat->Value(tr ? tr->ModifiedShape(s) : s);
   };
   hb.add_mapped(0, REL_FIRST, [&](const TopoDS_Shape& s) {
     return images_of(spH, prism.FirstShape(moved(s)));
@@ -582,10 +654,17 @@ OpOut op_revol(const OcShape& profile, P3 origin, P3 axis, double a0, double a1)
   HHist                     hist;
   TopoDS_Shape              base = profile.shape;
   std::unique_ptr<BRepBuilderAPI_Transform> tr;
-  if (std::abs(a0) > 1e-12 && !full)
+  // Parasolid's revolved cylinders (live "core (2026-10-26)" (5), "fs (10-26
+  // b)" (f)): z against the axis as drawn, x gp_Ax2's default, origin at
+  // mid-height (re-framed below). A full turn keeps the profile where it is:
+  // turning it to that x moved the seams other features are aligned with
+  // (the tapping screws' crown sphere against its recess).
+  const gp_Dir z_new = ax.Direction().Reversed();
+  const double start = full ? 0.0 : a0;
+  if (std::abs(start) > 1e-12)
   {
     gp_Trsf t;
-    t.SetRotation(ax, a0);
+    t.SetRotation(ax, start);
     tr   = std::make_unique<BRepBuilderAPI_Transform>(base, t, false);
     base = tr->Shape();
     merge_into(hist, history_of(args, *tr));
@@ -599,6 +678,21 @@ OpOut op_revol(const OcShape& profile, P3 origin, P3 axis, double a0, double a1)
     fail_op("revolve failed (does the profile cross the axis?)");
   TopoDS_Shape result = rv->Shape();
   merge_into(hist, history_of({base}, *rv));
+  {
+    ShapeIMap faces;
+    TopExp::MapShapes(result, TopAbs_FACE, faces);
+    const gp_Lin axis_line(ax);
+    for (int i = 1; i <= faces.Extent(); ++i)
+    {
+      const TopoDS_Face&  f = TopoDS::Face(faces(i));
+      BRepAdaptor_Surface fs(f, false);
+      if (fs.GetType() != GeomAbs_Cylinder || !fs.Cylinder().Axis().IsParallel(ax, 1e-9)
+          || axis_line.Distance(fs.Cylinder().Location()) > 1e-9 * (1 + fs.Cylinder().Radius()))
+        continue;
+      const auto [lo, hi] = axial_extent(f, ax);
+      reframe_cylinder(f, z_new, ax.Location().Translated(gp_Vec(ax.Direction()) * ((lo + hi) / 2)));
+    }
+  }
   HistoryBuilder hb(args, result);
   hb.add_history(hist.get());
   if (!full)
@@ -612,6 +706,31 @@ OpOut op_revol(const OcShape& profile, P3 origin, P3 axis, double a0, double a1)
                   [&](const TopoDS_Shape& s) { return single(rv->LastShape(moved(s))); });
   }
   return hb.finish();
+}
+
+// A copy of `s` whose cylinders coaxial with (`origin`, `axis`) take
+// Parasolid's frame with z = `axis` and their origin at `origin` (a Hole's
+// cylinders: at its start, z along the drill, live "fs (10-26 b)" (g)).
+std::unique_ptr<OcShape> op_frame_cylinders_at(const OcShape& s, P3 origin, P3 axis)
+{
+  require_non_null(s.shape, "shape");
+  const gp_Pnt o = to_pnt(origin);
+  const gp_Dir z = to_dir(axis, "axis");
+  BRepBuilderAPI_Copy cp(s.shape);
+  const TopoDS_Shape  r = cp.Shape();
+  const gp_Lin        line(o, z);
+  ShapeIMap           faces;
+  TopExp::MapShapes(r, TopAbs_FACE, faces);
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    const TopoDS_Face&  f = TopoDS::Face(faces(i));
+    BRepAdaptor_Surface fs(f, false);
+    if (fs.GetType() != GeomAbs_Cylinder || !fs.Cylinder().Axis().IsParallel(gp_Ax1(o, z), 1e-9)
+        || line.Distance(fs.Cylinder().Location()) > 1e-9 * (1 + fs.Cylinder().Radius()))
+      continue;
+    reframe_cylinder(f, z, o);
+  }
+  return wrap(r);
 }
 
 // ---------------------------------------------------------------- sweep
