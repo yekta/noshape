@@ -120,7 +120,7 @@ Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 
 ## Re-run pass 23 (qa5, 2026-10-24, app from agent/qa5 on main c703b0d0, which has api's drawing export b4b803af; d10 doc)
 | Row | Ours now | Status | Verified |
 |---|---|---|---|
-| D10 PDF | tab › Export… › PDF 1.5 Color: the isometric view is **lines** (not shaded); Detail A keeps its circle and the clipped content, "DETAIL A / SCALE 2:1" (pass23/d10pdf-1.png) | ✅ fixed (api) |  |
+| D10 PDF | tab › Export… › PDF 1.5 Color: the isometric view is **lines** (not shaded); Detail A keeps its circle and the clipped content, "DETAIL A / SCALE 2:1" (pass23/d10pdf-1.png) | ✅ fixed (api) | 0.4.10+ / daf1f50c 10-27 (PDF 1.5, 1 page 792×612, lines, Detail A clipped + SCALE 2:1) |
 | D12 DXF | Release 14: CIRCLE ×5, ELLIPSE ×2, MTEXT ×43, LINE, POLYLINE; layers VISIBLE, TITLE_BLOCK, BORDER_ZONES / BORDER_FRAME, DETAIL_VIEW_BORDER / DETAIL_VIEW_PARENT_BORDER, ANNOTATION_TEXT (R14 writes upper-case layer names, behaviours ~6165) | ✅ fixed (api) for this drawing; hatches, dimensions and tables not in it (not checked) | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (R14 AC1014, INSUNITS 4: DIMENSION 2, LINE 95, CIRCLE 7, ELLIPSE 4, MTEXT 46, POLYLINE 9, SOLID 4) |
 | D13 DRAWN name after reopening (pass 24, 2026-10-24) | d10 drawing: "ROOT" in DRAWN before and after closing and reopening the document | ✅ fixed |  |
 | D6 / 2.2 Dimension near an edge's midpoint (pass 24) | d, hover 7 px off the left view edge's midpoint: the whole edge highlights; click, move, click: length dimension "20" of the edge (live "asb (b)": the edge is picked, never its midpoint) | ✅ |  |
