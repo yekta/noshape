@@ -83,6 +83,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   sources). I1: live's face data says our x_t = live's x_t exactly; only our STEP reader's blends are off (13.1819 vs
   live's STEP 13.2001): next on I1.
 - Landing now only through tools/tiers/land.sh (lead 10-27).
+- Afternoon 10-27: 0d75aa8e API-ASM-CONFIG-NAMES; a74853db EXPORT-OBJ-MTL (OBJ zip with .mtl, 3MF in metres as live);
+  4a905b47 DWG-DIM-TWO-EDGES verified in the green app; 9c187bd1 drawing_annotation_edit orientation / flip_arrows /
+  arc_condition and drawing_view_edit cutting_line_angle (shared, the drawing UI calls them); 7bca8284 assembly_snap
+  (Snap mode, shared with the assembly view). I1: STEP surface-curve modes ruled out. FLAT-FORM-STYLES filed (needs
+  core's flat-pattern data). CONFIG-INPUT-ID waits on live (REQUESTS dx 10-27 P3).
+- Audit of edit texts (10-27 afternoon): left uncovered on purpose: "Use view geometry" (a step of the drawing sketch's
+  constrain tool), "Edit configured dimension" (= config_set_value), "Copy view label" (Alt+drag copy of a label).
 - Live answered I1 (behaviours "dx (2026-10-27, P2 I1 …)") and the flat-pattern line styles (REQUESTS dx 10-27 P3): read the latter next.
 
 ## Daily walk 10-27 03:40 (green 8165fca6, :131, /root/dx-scratch/w/o*.png)
