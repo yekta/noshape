@@ -496,6 +496,9 @@ impl FeatureDialog {
 
     pub fn set_value(&mut self, path: &str, v: ParamValue, cx: &mut Context<Self>) {
         self.user_set.insert(path.to_string());
+        // Live (behaviours "psui (2026-10-27, P1) DIALOG-OK-STATE" rule 2): any edit makes the dialog dirty, a tab
+        // click or a ticked box too (LOFT-PROFILES-PINK: ✓ stayed pale).
+        self.dirty = true;
         let shown = self.visible_selection_fields();
         self.set_value_auto(path, v, cx);
         self.focus_new_empty_field(&shown);
@@ -2795,6 +2798,8 @@ impl FeatureDialog {
                     // An opened entry's own field active: the array's border
                     // stays blue around the white field (live psui-loft-01).
                     let inner_active = self.active_query.as_deref().is_some_and(|a| a.starts_with(&format!("{path}.")));
+                    // Live (LOFT-PROFILES-PINK): the array the error points at is pink like a query field, unless active.
+                    let error = !(active || inner_active) && self.field_error(arr_id).is_some();
                     let mut field = v_flex()
                         .id(SharedString::from(format!("q-{path}")))
                         .flex_1()
@@ -2804,8 +2809,8 @@ impl FeatureDialog {
                         }))
                         .rounded(px(2.))
                         .border_1()
-                        .border_color(if active || inner_active { pal.accent } else { pal.border })
-                        .bg(if active { pal.query_active } else { pal.panel })
+                        .border_color(if error { pal.error } else if active || inner_active { pal.accent } else { pal.border })
+                        .bg(if active { pal.query_active } else if error { gpui_kit::rgb(0xf9ebec) } else { pal.panel })
                         .cursor_pointer()
                         .child(div().px(px(6.)).when(items == 0, |d| d.pt(px(6.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33))).when(items > 0, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.))).text_color(pal.text_muted).child(crate::ui::spec_text(s.label)));
                     let mut details: Vec<AnyElement> = Vec::new();
