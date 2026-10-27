@@ -729,7 +729,23 @@ impl PartStudioView {
     /// curve bounds or the part a face is on (None: no field is active).
     pub(super) fn field_takes(&self, t: &PickTarget, cx: &App) -> Option<bool> {
         let (_, filter, _) = self.edit.as_ref()?.dialog.read(cx).active_filter()?;
-        Some(kind_matches(t.kind, &t.reference, filter) || self.curve_region(&t.reference, filter).is_some() || self.part_for_field(&t.reference, filter).is_some())
+        Some((kind_matches(t.kind, &t.reference, filter) && self.face_fits(&t.reference, filter)) || self.curve_region(&t.reference, filter).is_some() || self.part_for_field(&t.reference, filter).is_some())
+    }
+
+    /// Whether a face's surface passes a field's filter: a field of planar faces only (Extrude's "Faces and sketch
+    /// regions") takes no cylinder (live BOX-FILLET-FACES: the box's two cylinders left out). Other references,
+    /// fields that take any face, and faces the context can't find pass.
+    pub(super) fn face_fits(&self, r: &Reference, filter: QueryFilter) -> bool {
+        let Reference::Face(n) = r else { return true };
+        if filter.intersects(QueryFilter::FACE) {
+            return true;
+        }
+        let Some(ctx) = self.context.as_ref() else { return true };
+        let surface = ctx.bodies.iter().find_map(|b| {
+            let fi = *b.find_faces(n).first()?;
+            b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?.face_surface().ok()
+        });
+        surface.is_none_or(|s| surface_fits(&s, filter))
     }
 
     /// Hover target in the graphics area, expanded like the selection.
@@ -1023,7 +1039,8 @@ impl PartStudioView {
             if let Some((_, filter, _)) = dialog.read(cx).active_filter() {
                 let current = dialog.read(cx).selected_refs();
                 dialog.update(cx, |d, cx| {
-                    for r in box_field_picks(&targets, filter) {
+                    let fitting: Vec<PickTarget> = targets.iter().filter(|t| self.face_fits(&t.reference, filter)).cloned().collect();
+                    for r in box_field_picks(&fitting, filter) {
                         if current.contains(r) == deselect {
                             d.add_pick(r.clone(), cx);
                         }
@@ -3634,6 +3651,15 @@ impl PartStudioView {
     }
 }
 
+/// Whether a face of this surface passes a field filter that takes no face of any kind ([`PartStudioView::face_fits`]).
+pub(super) fn surface_fits(s: &noshape_kernel::Surface, filter: QueryFilter) -> bool {
+    match s {
+        noshape_kernel::Surface::Plane(_) => filter.intersects(QueryFilter::PLANAR_FACE),
+        noshape_kernel::Surface::Cylinder { .. } => filter.intersects(QueryFilter::CYLINDRICAL_FACE),
+        _ => false,
+    }
+}
+
 /// Whether a box selection takes an entity of this kind (live behaviours
 /// "nav2 selection" 5): never default planes, the Origin or mate connectors,
 /// enclosed or crossed. Vertices and sketch regions only for a dialog field
@@ -3849,6 +3875,19 @@ mod box_take_tests {
         assert!(fillet.intersects(QueryFilter::ANY_FACE), "Fillet takes faces too");
         assert_eq!(box_field_picks(&targets, fillet), vec![&targets[1].reference, &targets[3].reference]);
         assert_eq!(box_field_picks(&targets, QueryFilter::ANY_FACE), vec![&targets[0].reference, &targets[2].reference]);
+    }
+
+    /// Live BOX-FILLET-FACES: Extrude's "Faces and sketch regions" takes the planar faces of a preselected tube,
+    /// not its cylinders; Wrap's face field takes both.
+    #[test]
+    fn a_planar_face_field_takes_no_cylinder() {
+        use noshape_kernel::{Plane, Surface};
+        let extrude = QueryFilter::SKETCH_REGION | QueryFilter::PLANAR_FACE;
+        let plane = Surface::Plane(Plane::xy());
+        let cylinder = Surface::Cylinder { origin: glam::DVec3::ZERO, axis: glam::DVec3::Z, x_dir: glam::DVec3::X, radius: 0.01 };
+        assert!(super::surface_fits(&plane, extrude));
+        assert!(!super::surface_fits(&cylinder, extrude));
+        assert!(super::surface_fits(&cylinder, QueryFilter::PLANAR_FACE | QueryFilter::CYLINDRICAL_FACE));
     }
 
     #[test]

@@ -1807,7 +1807,7 @@ impl PartStudioView {
                 {
                     feature.params.set("axisType", ParamValue::Enum(t.into()));
                 }
-                preselect(ty, &mut feature, &sel, self.built.as_ref());
+                preselect(ty, &mut feature, &sel, self.built.as_ref(), &|r, f| self.face_fits(r, f));
                 // Plane: the type follows the preselection (Onshape's cPlaneLogic).
                 if type_id == "cPlane"
                     && let Some(ctx) = self.context.as_ref()
@@ -4921,7 +4921,7 @@ impl PartStudioView {
 }
 
 /// Fill the first compatible query parameter(s) with preselected references.
-fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], built: Option<&BuiltScene>) {
+fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], built: Option<&BuiltScene>, fits: &dyn Fn(&Reference, QueryFilter) -> bool) {
     for s in &ty.params {
         if !s.is_visible(&feature.params) {
             continue;
@@ -4932,7 +4932,9 @@ fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], b
                 .filter(|r| {
                     let kind = built.and_then(|b| b.picks.ids_for(r).first().and_then(|id| b.picks.get(*id)).map(|t| t.kind));
                     match kind {
-                        Some(k) => kind_matches(k, r, filter),
+                        // Live (behaviours "psui (2026-10-27, P1) BOX-FILLET-FACES"): a field keeps the preselected
+                        // entities its filter accepts, faces by their surface too (Extrude: the planar ones only).
+                        Some(k) => kind_matches(k, r, filter) && fits(r, filter),
                         None => match r {
                             Reference::Body(_) => filter.intersects(QueryFilter::BODY),
                             Reference::Sketch(_) => filter.intersects(QueryFilter::SKETCH),

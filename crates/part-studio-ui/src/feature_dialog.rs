@@ -1662,8 +1662,25 @@ impl FeatureDialog {
             if text.trim().is_empty() {
                 return None;
             }
-            noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).err().map(|err| (s.id, crate::quantity_field::eval_message(&err)))
+            match noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables) {
+                Err(err) => Some((s.id, crate::quantity_field::eval_message(&err))),
+                // Live (behaviours "psui (2026-10-27, P1) DIALOG-OK-STATE"): out of range is a parameter error too.
+                Ok(_) if self.out_of_range(s.id, &text) => Some((s.id, self.range_message(s.id, &text))),
+                Ok(_) => None,
+            }
         })
+    }
+
+    /// The hover text of a value out of its field's range. Live: a count reads "Enter an integer value between 1 and
+    /// 2500. Current value is 0."; other quantities the generic text.
+    fn range_message(&self, path: &str, text: &str) -> String {
+        let Some(ParamKind::Num(n)) = self.spec_for_path(path).map(|s| &s.kind) else { return crate::quantity_field::INVALID_TIP.to_string() };
+        if n.kind != noshape_model::params::NumKind::Integer {
+            return crate::quantity_field::INVALID_TIP.to_string();
+        }
+        let v = noshape_units::evaluate_as(text, noshape_units::Dim::UNITLESS, &self.units, &self.variables).map(|q| q.value).unwrap_or(0.0);
+        let shown = if v.fract() == 0.0 { format!("{}", v as i64) } else { noshape_units::format_number(v, 3) };
+        format!("Enter an integer value between {} and {}. Current value is {shown}.", n.min as i64, n.max as i64)
     }
 
     /// A number field's applied text: what Enter or leaving the field last
@@ -3248,7 +3265,11 @@ impl FeatureDialog {
         let eval_err = num.filter(|_| !applied.trim().is_empty()).and_then(|n| noshape_units::evaluate_as(&applied, n.kind.dim(), &self.units, &self.variables).err());
         let invalid = err.is_some() || eval_err.is_some() || (num.is_some() && self.out_of_range(path, &applied));
         // Live (ui (10-26 c)): the hover says why ("Cannot use angle as length.").
-        let invalid_tip = eval_err.as_ref().map(crate::quantity_field::eval_message).unwrap_or_else(|| crate::quantity_field::INVALID_TIP.to_string());
+        let invalid_tip = match &eval_err {
+            Some(e) => crate::quantity_field::eval_message(e),
+            None if num.is_some() && self.out_of_range(path, &applied) => self.range_message(path, &applied),
+            None => crate::quantity_field::INVALID_TIP.to_string(),
+        };
         let field = v_flex().id(SharedString::from(format!("num-{path}")));
         let field = self.completion_keys(field, path, cx);
         // Enter in a changed field applies it; the next Enter commits.

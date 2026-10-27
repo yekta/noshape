@@ -106,6 +106,8 @@ pub fn wheel_delta(e: &gpui_kit::ScrollWheelEvent) -> f64 {
 
 /// The hover text of an invalid number field (live).
 pub const INVALID_TIP: &str = "Enter a valid expression.";
+/// The hover text of an expression that doesn't parse ("1+").
+pub const SYNTAX_TIP: &str = "Syntax error in expression.";
 
 /// Onshape's invalid number field (dialog fields, the sketch dimension box):
 /// a pink `#f9ebec` fill, a 2 px `#bd3039` underline and the hover
@@ -152,6 +154,9 @@ pub fn eval_message(err: &noshape_units::ExprError) -> String {
         ExprError::Eval(EvalError::WrongDimension { expected, found }) => format!("Cannot use {} as {}.", n(*found), n(*expected)),
         ExprError::Eval(EvalError::DimensionMismatch { op, left, right }) if matches!(*op, "add" | "subtract") => format!("Cannot {op} {} and {}.", n(*left), n(*right)),
         ExprError::Eval(EvalError::BadArgument { func, found, .. }) => format!("Cannot apply {func} to {}.", n(*found)),
+        // Live (behaviours "psui (2026-10-27, P1) DIALOG-OK-STATE" (b)): "1+" reads "Syntax error in expression.",
+        // "abc" (an unknown name) "Enter a valid expression.".
+        ExprError::Parse(noshape_units::ParseError { kind: noshape_units::ParseErrorKind::UnexpectedEnd { .. } | noshape_units::ParseErrorKind::UnexpectedToken { .. }, .. }) => SYNTAX_TIP.to_string(),
         _ => INVALID_TIP.to_string(),
     }
 }
@@ -629,5 +634,6 @@ mod eval_message_tests {
         assert_eq!(msg("10 deg + 5 mm"), "Cannot add angle and length.");
         assert_eq!(msg("5 mm * cos(10 mm)"), "Cannot apply cos to length.");
         assert_eq!(msg("abc"), "Enter a valid expression.");
+        assert_eq!(msg("1+"), "Syntax error in expression.");
     }
 }

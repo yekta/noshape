@@ -88,7 +88,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.4 | Box select left→right = window (fully inside), right→left = crossing | Home__selection | ✅ | 0.4.10+ / 83577e88 10-27 |
 | 3.5 | Window box is solid, crossing box dashed | Home__selection; A §5.2 | ✅ | 0.4.10+ / 83577e88 10-27 |
 | 3.6 | Box select: left→right takes what is wholly inside (faces and edges, no parts or part vertices), right→left what it touches; Ctrl+drag box deselects (live 10-27) | Home__selection | ✅ (live 10-27: window box #1651B0 20 % fill / 60 % solid border, crossing #FFC20E 20 % / 60 % dashed 9 on 8 off, both ~1.5 px; ours within 1 level) | 0.4.10+ / 83577e88 10-27 |
-| 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | ❌ (BOX-FILLET-FACES) live 10-27: only what the field accepts, edges only when it takes edges (Fillet: 12 edges, no face) | 0.4.10+ / 83577e88 10-27 |
+| 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | 🔧 (BOX-FILLET-FACES: the in-dialog box was already live's; a planar-face field now takes no cylinder) | 0.4.10+ / 83577e88 10-27 |
 | 3.8 | Selected entities show quick values in the Measure readout | A §5.1 | ✅ | 0.4.10+ / 83577e88 10-27 |
 | 3.9 | Selection count next to the cursor, 1–5 ("5" for five or more) | Home__selection; live cursors/ | ✅ (Onshape bakes the digit into the cursor image; GPUI has no image cursors, so a black digit with a white outline is drawn at the arrow's lower right) | 0.4.10+ / 83577e88 10-27 (now a real 32 px cursor image: arrow + digit, read via XFixes) |
 | 3.10 | Midpoints of edges show on hover and can be picked (measure, planes) | Home__selection | ✅ (part edges and open sketch curves; with a dialog open when its field takes points. Look as live qa4-r5-s9-6: hovering the edge shows a 9 px dark see-through ring at its midpoint (render point style RING); a selected midpoint is an 11 px #fac012 disc with a #c4960b ring and #ffd65b centre; a hovered midpoint target draws the same marker in orange #f8c488/#c49a6a/#ffd8ac. Within 9 px of the marker the midpoint is the hover target and the edge highlight goes, as live (checked 10-27).) | 0.4.10+ / 83577e88 10-27 |
@@ -123,7 +123,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 5.1 | Green check accepts, red X cancels | feature_basics | ✅ | 0.4.10+ / 6011065d 10-27 |
-| 5.2 | Title red while the feature errors; the ✓ is disabled but Enter still commits (the model falls back to the state before the feature) | live | ❌ (DIALOG-OK-STATE) (was: commit refused) | 0.4.10+ / 6011065d 10-27 |
+| 5.2 | Title red while the feature errors; the ✓ is disabled but Enter still commits (the model falls back to the state before the feature) | live | 🔧 (DIALOG-OK-STATE: live = canSubmit (dirty, no parameter error): a new dialog's ✓ disabled, any edit enables it and a failing feature commits red; invalid or out-of-range values disable it) | 0.4.10+ / 6011065d 10-27 |
 | 5.3 | Error/warning message shown in the dialog | Home__error_indicators | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.4 | Fields appear/disappear live from their visibility conditions | A §7.1 | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.4b | Clicks and right-clicks on the dialog (and other panels over the graphics area) never reach the model beneath | (Onshape behaviour) | 🔧 (clicking a field also picked/deselected geometry under it) |  |
