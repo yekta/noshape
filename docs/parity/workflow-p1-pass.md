@@ -12,7 +12,7 @@ then edits, undo/redo, rollback and suppress.
 | Enter in Depth | applies, dialog stays; 2nd Enter commits | same (behaviours 252) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Fillet (Shift+F), 3 vertical edges, R2 | chips "Edge of Extrude 1" ×3, preview, 15270.061 mm³ | radius arrow on the **last** pick | ✗ P1-3 (psb): ours on the first pick |  |
 | Chamfer (tool search), 1 mm, tangent propagation | 7-edge chain chamfered (faces 9 → 16) | — | ✅ |  |
-| Sketch on a preselected face | "Face of Extrude 1" in Sketch plane | same | ✅ |  |
+| Sketch on a preselected face | "Face of Extrude 1" in Sketch plane | same | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Points aligned with the origin | a 3rd point entity at (0,0) + Horizontal constraints | no entity; a Horizontal constraint from each point to the **external** Origin | ✅ P1-4 (5c94bb51: an external reference-only Origin entity, never drawn or listed; sketch_get names "origin"; e2e `sketch_get_names_the_origin_not_a_hidden_point`) |  |
 | Hole on 2 picked points | "Vertices of Sketch 2" (one chip); 2 holes, −633.385 mm³; title "Ø 6.35 mm ↧ 12 mm" ✅ | **two chips "Vertex of Sketch 1"** (one per click; "Vertices of …" only when the sketch row is picked) | ✗ **P1-8** (ui) |  |
 | Linear pattern › Feature pattern | order Part / Feature / Face ✅; chip **"Hole 1"**; Direction pink until picked ✅ | chip **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name) | ✗ **P1-9** (ui) |  |
@@ -71,7 +71,7 @@ then edits, undo/redo, rollback and suppress.
 | SEL1 on green 62524c30 | Fillet: a sketch line adds nothing, a plate edge adds "Edge of Extrude 1" | ✅ |  |
 | Instance right-click (Part 1 <1>, mated) | Properties…, Instance properties… / Hide … Fix, Use best available tessellation, Show mates, Hide mates / Edit in context … Switch to Part Studio 1 / Copy Part 1 <1> / Move to new subassembly, Change to version…, Export…, Release… / Zoom to selection … | same order (behaviours 1259, 1357; Add comment out of scope) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Fix, then drag the fixed plate | ground glyph on Part 1 <1> and on the root row; dragging draws the fix glyph at the cursor and nothing moves | same (behaviours 1210, 1268) | ✅ (cursor shape not checked) | 0.4.10+ / 1c853f78 10-27 |
-| Sketch dimension (view normal, rectangle, d on the top edge, place) | value box "78.15024 mm" selected, ± icon, ✓ ✕; 50 + Enter → label "50", width 50 | box at full precision (behaviours 4788 "12.53718 mm") | ✅ |  |
+| Sketch dimension (view normal, rectangle, d on the top edge, place) | value box "78.15024 mm" selected, ± icon, ✓ ✕; 50 + Enter → label "50", width 50 | box at full precision (behaviours 4788 "12.53718 mm") | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Plane (tool search; "Did you mean: Mate connector") | Entities "Top plane", type Offset, Offset distance 25 mm + flip, ☐ Flip normal; type list Offset, Plane point, Line angle, Point normal, Three point, Mid plane, Curve point, Tangent | same (behaviours 332) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Split (Part tab) of the plate by Plane 1 at 2.5 mm | dialog Part / Face, Parts, surfaces, or curves to split, Entity to split with, ☐ Keep tools, ☐ Trim to face boundaries, ☑ Keep both sides; result Parts 6 → 7 | same (behaviours 329) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Transform dialog | Entities to transform or copy, ▾ Translate by line (+ flip), Line or points, ☐ Copy part | same first type (behaviours 226) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
@@ -82,7 +82,7 @@ then edits, undo/redo, rollback and suppress.
 | Loft dialog | Profiles; ⌄ End conditions (Start / End profile condition ▾ None); ☐ Guides and continuity; ☐ Path; › ☐ Connections; ☐ Show isocurves | same (behaviours 340) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Sketch Trim (m) on a crossing line | the clicked segment past the crossing is removed; the new end is coincident with the other line | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ |  |
+| Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? |  |
 | View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |  |
 | Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
@@ -140,7 +140,7 @@ then edits, undo/redo, rollback and suppress.
 |---|---|---|---|
 | P2-A1 (skb 9bf8475b) | Circular pattern Angle 300 + Enter: applied, dialog stays; 2nd Enter accepts. Count + Enter accepts at once (live 4299) | ✅ fixed | 0.4.10+ / 6cbb24e0 10-27 |
 | P1-15 (ui 76da6649) | view-cube face hover #bce2f7 | ✅ fixed | 0.4.10+ / 1c853f78 10-27 |
-| P1-12 (ui 9bc26682) | Revolve axis chip "Edge of Sketch 2" | ✅ fixed |  |
+| P1-12 (ui 9bc26682) | Revolve axis chip "Edge of Sketch 2" | ✅ fixed | 0.4.10+ / 2a6d0167 10-27 (axis-line.noshape: "Edge of Sketch 1") |
 | P1-7 (ui 9bc26682) | failing hidden sketch row red | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | P1-14 (ui 2a85db38) | new document: inertia header "(lb mm²)" | ✅ fixed |  |
 | P1-3 (psb 44927ecb) | Fillet arrow on the last picked edge | ✅ fixed |  |
