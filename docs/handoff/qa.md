@@ -47,7 +47,9 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
   extrude / draft / pattern / mirror / suppress / delete / undo; log cli/clifuzz-<seed>.log; NSCLI_ERR=<file> keeps
   stderr); clifuzz_bisect.py replays a seed with a cold open in a fresh process after every step. Seed 1, 5 → DRAFT-SEGV-DOC; seed 7 → SHELL-SLAB-GPF; seed 9 → FILLET-SEGV; seed 11 (no drafts) → SHELL-SLAB abort; seeds 2, 3, 4, 6, 8 clean. The v0.4.8 release CLI
   (seeds 21–24, FZTAG=r): only the Draft crash (seed 22), so the Shell / Fillet crashes are new since v0.4.8.
-  clifuzz_nodraft.py skips drafts.
+  clifuzz_nodraft.py skips drafts; main seeds 30–35: 32 → FILLET-SEGV-BLEND (also v0.4.8), 33 timed out, rest clean.
+  Sketch fuzzer skfuzz.py (draw / constrain / dimension / trim / offset / delete / undo): seeds 1–3 × 200 ops on main, no
+  crash. Crash rate of the modelling fuzz on main: ~1 per 100–150 random operations.
 - UI fuzzer: /root/qa-scratch/bin/fuzz.py <seed> <n> (random keys / clicks / drags on :110 against the pid in
   /tmp/qa_fzpid; actions logged to /root/qa-scratch/fuzz-actions.log). Seeds 1–3 (800 actions): no crash.
 - Don't run the app with NOSHAPE_PERF=1 when testing section views (PERF-SECTION-PANIC freezes the viewport).
