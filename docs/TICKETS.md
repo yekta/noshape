@@ -340,6 +340,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   do not intersect or are totally contained." Result and wording both differ now.
 - [ ] P2 ADV2 (qa5 kern row, re-checked) Loft of a 20×20 square on Top to a Ø16 circle 20 mm up (Plane 1): 5927.755 mm³
   in the green app; live 5927.728022 (docs/handoff/qa5-routing.md "kern" table) (qa 2026-10-26, build 4d2f6b0c)
+  qa 20:30 (main CLI 12:08): live's other loft (behaviours pvz-shapes "Loft": 20×20 square (110..130, −10..10) to a circle r8 at
+  (120, 0, 25)) gives 7409.693222 / 6 faces, live 7409.706328752699 (−0.013 mm³, −1.8e-6): same direction as ADV2.
 - [ ] P2 HOLE-MISS-MSG a Hole whose points are on the part's Top-plane face but drilled away from the part (sketch on
   Top at z 0 under a 40×30×20 block, default direction): ours "No target parts selected for hole."; live "None of the holes
   intersected a part." with Merge scope flagged (behaviours L56/L57 and "H1 flipped"); live keeps "No target parts…" for
