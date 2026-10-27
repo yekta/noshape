@@ -12,6 +12,13 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   v0.4.9 and v0.4.10, and is the likeliest cause of BOOL-THREAD-CRASH (segfaults in BOPAlgo only on CLIs with the budget).
 - REGEN-NO-CANCEL (P0 psui) has no owner commit yet: a rollback waits up to 30 s+ behind a blend that's burning its budget.
 - New today (owners): API-ASM-CONFIG-NAMES (P2 dx), CONFIG-INPUT-ID (P3 psui), FS-EDITOR-COMPLETE (P2 psui).
+- EDGE-HIGHLIGHT-LOOK filed (P1 psui) with 1× / 2× profiles of v0.4.10 vs live. Note: live's own 1× capture
+  (behaviours 18762, psui 1456) has a dark outline around the hovered edge too, so "unlike live" may be a 2× / Retina
+  difference; the pending live capture decides. **BLACK-REGION not reproduced** on v0.4.10 Linux 1× / 2× (corner zoom
+  to the vertex, tilts above / below the top face, bottom view), so not filed: please get the user's document (or note
+  it's macOS / Metal). While building the repro: FEATURE-PATTERN-ADD-Y (P1 core): a Feature pattern of an Add extrude
+  drops its Y-direction / second-direction instances (7 × 5 → 7 bosses, status OK) — likely what the user's plate
+  with two linear patterns ran into.
 
 ## Release blockers seen by qa (updated 2026-10-27 06:10, green 4756f9be; see the newest "Green" section)
 - Verified in the green app bcf401ca: the five crash documents open (DOC-POISON guard), TWO-PROCESS-LOST-EDIT (both edits
@@ -39,7 +46,11 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   ("Face of Extrude 1"); Fillet edge, Shell face (tickets/lp-pick-v0410-*.png); kill -9 0.3 s after Suppress keeps
   it; drawing (ANSI A suggested views) → PDF 1 page letter, DXF, DWG; STEP / Parasolid export → import 24800 exact;
   mate DOF matrix 8 / 8.
-- Running: crash / hang documents through the CLI (cli/crashdocs-v0410.out), geometry matrices (cli/mat-v0410.out).
+- All 14 crash / hang documents open through the v0.4.10 CLI (13.8–151.7 s; cli-draft-hang now finishes, 152 s;
+  their failing features fail with messages). Geometry matrices on the v0.4.10 CLI: fillet 32 / 32, featmatrix 14 / 14,
+  hole 12 / 12, shell 96 / 96 (walls everywhere), boolean 8 / 9 (the 9th is the empty touching intersection the script
+  can't measure), transform 5 / 5. 2× (GPUI_X11_SCALE_FACTOR=2) UI renders right.
+- Found on it: EDGE-HIGHLIGHT-LOOK (user report, reproduced), FEATURE-PATTERN-ADD-Y (also on main).
 
 ### v0.4.9 recut (release/v0.4.9 7ee597e0 = main 502416cc + "Release v0.4.9"), 2026-10-27 05:00, smoke on green 502416cc
 - **The earlier blocker is gone**: the recut contains bf8aaee2 / 87e8275f (crash guard, OCCT patch, DOC-POISON rollback),
