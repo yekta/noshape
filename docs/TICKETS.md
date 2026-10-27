@@ -134,6 +134,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   change** (with Reapply off ours = live: OK, copies moved, the off-part copy silently does nothing). Check against psb's
   f202f693 / FSW-pattern (qa 2026-10-26, main CLI ~20:18)
 - [ ] P1 Extrude add 308 ms (std logic 55 ms, ~250 ms in ops' add path regens): target ≤ 150 ms (PLAN 2.6).
+  dx 10-27 re-timed through the CLI (load ~25): the first Extrude add of a process 230–330 ms (one-time std warm-up),
+  later ones 8–23 ms; Hole add 250–290 ms (was ~330: the API's add path stopped running holeEditLogic a third time),
+  i.e. two passes of std's holeEditLogic at ~100–150 ms of FeatureScript each; Hole edit 3–60 ms.
 
 ## Part Studio UI (psui)
 - [x] 3b089573 P1 DCLICK-HEAVY fixed (psui 10-27): the X11 and Wayland backends counted clicks by when each press was handled

@@ -296,22 +296,25 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
     }
     // Features whose dialog runs std's "Editing Logic Function" (Extrude,
     // Fillet, Loft: the app's `std_edit_logic`) get the same here, on the
-    // model before the feature, until it settles.
+    // model before the feature, until what the dialog shows settles: a pass
+    // that only syncs hidden legacy values (Hole `holeDiameter` after
+    // `holeDiameterV3`) needs no other (each Hole pass is ~100 ms of
+    // FeatureScript).
     if noshape_model::custom::std_feature::has_editing_logic(&feature.type_id) {
         let ctx = od.regenerate_with(tab, None, |o| o.upto = Some(index))?.context;
         let specified: Vec<String> = given.keys().cloned().collect();
+        let ty = feature.feature_type();
+        let shown = |k: &str| ty.and_then(|t| t.param(k)).is_some_and(|s| !s.hints.has(noshape_model::params::Hints::ALWAYS_HIDDEN));
         let mut old = noshape_model::params::ParamValues::default();
         for _ in 0..3 {
             let Some(changed) = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &feature.type_id, feature.id, &feature.name, &units, &old, &feature.params, &specified, true) else { break };
             old = feature.params.clone();
-            let mut any = false;
-            for (k, v) in changed.0 {
-                if !set(&k) && feature.params.get(&k) != Some(&v) {
-                    feature.params.set(&k, v);
-                    any = true;
-                }
+            let changes: Vec<(String, noshape_model::params::ParamValue)> = changed.0.into_iter().filter(|(k, v)| !set(k) && feature.params.get(k) != Some(v)).collect();
+            let visible = changes.iter().any(|(k, _)| shown(k));
+            for (k, v) in changes {
+                feature.params.set(&k, v);
             }
-            if !any {
+            if !visible {
                 break;
             }
         }
