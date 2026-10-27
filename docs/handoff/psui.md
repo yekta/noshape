@@ -42,6 +42,10 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   3.17, 7.3, 9.3–9.5, interaction 5.5.
 - 10e24f53 the feature list's error icon as live (6.12). perf.yml dispatched 10-27 07:02 on main: run 40464678503
   (read its summaries into viewport-performance.md).
+- 10-27 07:10–07:50: 39757d3b preview highlights whole over the mix (compare::POST pass); 028f1f2d face menu Hide
+  other / all parts; 46aaad69 view cube corner hit; 4e55b01f PREVIEW-NO-PICK (P1 regression of 8bf820e0, the
+  preview's pick pass). Verified on :102: 1.7, 3.10, 4.3, 4.5, 5.9, 5.16, 5.21, 5.31, 7.2, 9.9, 9.10, 9.12, 10.2–10.5,
+  11.2, 11.3, interaction 4.7 / 6.7.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -92,4 +96,6 @@ that touches the model: ~12 min.
 
 ## Requests to the lead
 
-(none)
+- 10-27 07:50: P1 PREVIEW-NO-PICK (TICKETS): every build from 8bf820e0 (10-27 ~01:30) to 4e55b01f, so v0.4.8 and
+  any v0.4.9 cut before 4e55b01f, can't hover or pick anything in the graphics while a feature dialog previews
+  (new Extrude: the top face can't be picked). Fixed in 4e55b01f; please take it into the v0.4.9 recut.
