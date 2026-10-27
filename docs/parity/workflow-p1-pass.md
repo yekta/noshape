@@ -120,16 +120,16 @@ then edits, undo/redo, rollback and suppress.
 | Ctrl+Z / Ctrl+Y on the suppress | unsuppressed / suppressed again | — | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Circular pattern 1 count 4 (edit), Enter twice | stays open (P2-A1, fix 9bf8475b not in this green) | 2nd Enter accepts | ✅ P2-A1 (qa re-check on a08e3eda) |  |
 | Instance list header after count 4 | "Instances (5)" | top-level rows: "Instances (3)" | ✅ P2-A6 (9703d9b9, qa verified 21d6a89e) |  |
-| Replicate dialog, Instances = Part 2 <1> | Mate to be matched auto-filled "Revolute 1"; Match faces in parts ▾; Parts to find match in (red) | same (behaviours 5969–5970) | ✅ |  |
-| … pending list row while open | none | "Replicate 1" row with an error badge at once | ✅ P2-A7 (9703d9b9, qa verified 21d6a89e; skasm 10-27: the Replicate row with its badge) |  |
-| Parts to find match in = plate, ✓ | pins in both free Ø10 holes; "Replicate 1" ▸ Part 2 <5>, <6>, Mate features (2) | same structure (behaviours 5973) | ✅ |  |
+| Replicate dialog, Instances = Part 2 <1> | Mate to be matched auto-filled "Revolute 1"; Match faces in parts ▾; Parts to find match in (red) | same (behaviours 5969–5970) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
+| … pending list row while open | none | "Replicate 1" row with an error badge at once | ✅ P2-A7 (9703d9b9, qa verified 21d6a89e; skasm 10-27: the Replicate row with its badge) | 0.4.10+ / 6cbb24e0 10-27 |
+| Parts to find match in = plate, ✓ | pins in both free Ø10 holes; "Replicate 1" ▸ Part 2 <5>, <6>, Mate features (2) | same structure (behaviours 5973) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Linear pattern opened from tool search | red "Linear pattern 1" row with a red dot at once, kept after picking Instances | same (behaviours 5985) | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Mate connector (Ctrl+M) | "Mate connector 1": On entity ▾, Origin entity, ☐ Realign, ☐ Move, flip / reorient; Realign adds Primary / Secondary axis entity; Move adds X / Y / Z 0 mm, Rotate about Z ▾, Rotation angle 0 deg | same (behaviours 5960–5965) | ✅ |  |
+| Mate connector (Ctrl+M) | "Mate connector 1": On entity ▾, Origin entity, ☐ Realign, ☐ Move, flip / reorient; Realign adds Primary / Secondary axis entity; Move adds X / Y / Z 0 mm, Rotate about Z ▾, Rotation angle 0 deg | same (behaviours 5960–5965) | ✅ | 0.4.10+ / 6cbb24e0 10-27 (Part Studio dialog: + Owner entity / Attachment, as live behaviours 333, 8445) |
 | Feature row drag (Extrude 3 up) | pill #1651B0 with white text at the pointer; 2 px #1651B0 drop line across the list with a hollow ring at its left end; hovered row (224,240,251) | same (live (222,241,251); "qa5 (10-25 p2)" (7)) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Drop above the feature's own sketch | accepted, no message; row red (170,37,45), "Features …" + red badge, tooltip "… did not regenerate properly: …" / "1 missing selection" | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | … row icon | plain extrude icon | ⚠ warning triangle on the row | ✗ **P1-18** (ui) |  |
 | Ctrl+Z | one step restores the order | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Assembly mirror dialog | Instances to mirror, Mirror plane (+ connector button), [Mirror strategy…] | same (behaviours 8704) | ✅ |  |
+| Assembly mirror dialog | Instances to mirror, Mirror plane (+ connector button), [Mirror strategy…] | same (behaviours 8704) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Drawing Note tool (n), hover | prompt only, no preview | "NOTE" preview at the pointer | ✗ **P2-D3** (ui2) |  |
 | Click, type "QA NOTE" | Note panel next to the note: Noto Sans ( Note ), 0.1200, B I U S colour, spacing, align, list, … ☐ Flag notes (greyed Flag (Drawing), 2 Characters); ruler bar over the text | same (drawing/225, behaviours 3277) | ✅ |  |
 | Drawing Detail view tool | panel: 4 shapes (circle pressed), "Create circle", View scale ▾, View label A, Profile style In line, ☑ Show detail view profile, ☐ Clip border to geometry | same (behaviours 1404, 1795) | ✅ |  |
