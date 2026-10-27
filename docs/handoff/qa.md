@@ -31,8 +31,9 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
 - CLI (v0.4.8 release, /root/qa-scratch/rel/…/noshape-cli) through a small MCP client: /root/qa-scratch/bin/nscli.py
   (`Cli()('feature_add', {...})`). Matrices with analytic volumes: shellmatrix.py, hollowmatrix.py, filletmatrix.py,
   featmatrix.py, holematrix.py (same dir). Hole style needs `styleV2`; a Remove extrude needs `booleanScope`.
-- tools/lead/disk-loop.sh deletes files named noshape* > 100 MB older than 2 h under /root/*-scratch (maxdepth 4): touch
-  the green copy or keep binaries deeper (the v0.4.8 release is in /root/qa-scratch/rel/k/v048/…, depth 5).
+- tools/lead/disk-loop.sh deletes files named noshape* > 100 MB older than 2 h under /root/*-scratch (maxdepth 4): keep
+  binaries at depth ≥ 5: green copy /root/qa-scratch/rel/k/green/x/noshape-<sha8> (symlinked from /root/qa-scratch),
+  v0.4.8 in /root/qa-scratch/rel/k/v048/…, the watcher's main CLI in /root/qa-scratch/rel/k/main/x/.
 - The watcher's own CLI build (target-lead, ~20:18, main d62f25e2/c9540ae6, not green) is copied to
   /root/qa-scratch/rel/k/main/x/noshape-cli (`NSCLI=… python3 …` with nscli.Cli(os.environ['NSCLI'])).
 - "View in high quality" on this llvmpipe box makes viewport frames take > 10 s ("GPU frame still running after 10s;
@@ -82,7 +83,7 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
 
 ## Open findings (mine) by area
 - core: **DOC-POISON, DRAFT-SEGV-DOC, SHELL-SLAB-GPF** (P0 crashes that leave unopenable documents; SHELL-SLAB-GPF is a
-  regression on main after green), SHELL-WALLS, SHELL-FILLETED-BOX, SHELL-SLOW,
+  regressions since v0.4.8, all three crash the green app on open), SHELL-WALLS, SHELL-FILLETED-BOX, SHELL-SLOW,
   REGEN-SPEED, TWO-PROCESS-LOST-EDIT (all P0); I1 (P2); carried over qa5's P1-16 / P1-6.
 - psui: TAB-NO-PREVIEW, DCLICK-HEAVY (P1); DELETE-TAB-DIALOG, LOFT-PROFILE-LIST, PERF-SECTION-PANIC (P2); carried over
   qa5's P1-8 caveat, P1-10.
