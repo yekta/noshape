@@ -4412,3 +4412,34 @@ fn replicate_with_nothing_to_match_says_so_as_live() {
     let err = analysis::matched_targets(&res, &asm, &asm.patterns[0], &UnitPrefs::default()).unwrap_err();
     assert_eq!(err, "Selected target did not contain identical geometry.");
 }
+
+/// ISO 10512 fine-pitch prevailing torque nuts (missing from the catalogue,
+/// skasm 10-27): live's table (dom/skb-sc-comp) through DIN 985's
+/// prevailing-torque nut with live's bore (0.74 s), 90 degree countersinks and
+/// 30 degree corner chamfers. Live's B-rep of M8 x 1 (behaviours "skasm
+/// (2026-10-27) standard content gaps"): 27 faces, volume 935.290 –
+/// 935.619 mm³ (/massproperties LOW bounds).
+#[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
+fn iso_10512_nut_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Prevailing torque nut fine pitch ISO 10512").expect("ISO 10512 in the catalogue");
+    let names: Vec<&str> = c.sizes.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(names, ["M8 x 1", "M10 x 1", "M10 x 1.25", "M12 x 1.25", "M12 x 1.5", "M16 x 1.5", "M20 x 1.5", "M24 x 2", "M30 x 2", "M36 x 2"]);
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("M8 x 1");
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let v = b.shape.volume().unwrap() * 1e9;
+    eprintln!("ISO 10512 M8 x 1: {} faces, {v} mm³", b.faces.len());
+    assert_eq!(b.faces.len(), 27);
+    assert!((935.290..=935.619).contains(&v), "{v} mm³, live 935.290 – 935.619");
+    let area: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap() * 1e6).sum();
+    assert!((area - 804.0370).abs() < 1e-2, "{area} mm², live 804.0370");
+    for size in &names {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        let r = standard::regenerate(&spec).unwrap();
+        assert!(r.display.features.iter().all(|f| f.message.is_none()), "{size}");
+    }
+}

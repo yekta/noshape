@@ -16408,6 +16408,181 @@
    },
    {
     "category": "Nuts",
+    "class": "Prevailing torque nuts fine pitch",
+    "name": "Prevailing torque nut fine pitch ISO 10512",
+    "shape": "nut",
+    "form": {
+     "form": 5,
+     "both": 1,
+     "cska": 45,
+     "ca": 30
+    },
+    "sizes": [
+     {
+      "name": "M8 x 1",
+      "label": "Prevailing torque nut fine pitch M8x1",
+      "d": 8.0,
+      "dims": {
+       "cb": 9.62,
+       "cd": 1.055172,
+       "cr": 0.95625,
+       "d": 8.0,
+       "dh": 6.917,
+       "s": 13.0,
+       "w": 6.44,
+       "m": 9.5,
+       "de": 13.0
+      }
+     },
+     {
+      "name": "M10 x 1",
+      "label": "Prevailing torque nut fine pitch M10x1",
+      "d": 10.0,
+      "dims": {
+       "cb": 11.84,
+       "cd": 1.331034,
+       "cr": 1.20625,
+       "d": 10.0,
+       "dh": 8.917,
+       "s": 16.0,
+       "w": 8.04,
+       "m": 11.9,
+       "de": 16.0
+      }
+     },
+     {
+      "name": "M10 x 1.25",
+      "label": "Prevailing torque nut fine pitch M10x1.25",
+      "d": 10.0,
+      "dims": {
+       "cb": 11.84,
+       "cd": 1.331034,
+       "cr": 1.20625,
+       "d": 10.0,
+       "dh": 8.647,
+       "s": 16.0,
+       "w": 8.04,
+       "m": 11.9,
+       "de": 16.0
+      }
+     },
+     {
+      "name": "M12 x 1.25",
+      "label": "Prevailing torque nut fine pitch M12x1.25",
+      "d": 12.0,
+      "dims": {
+       "cb": 13.32,
+       "cd": 1.562069,
+       "cr": 1.415625,
+       "d": 12.0,
+       "dh": 10.647,
+       "s": 18.0,
+       "w": 10.37,
+       "m": 14.9,
+       "de": 18.0
+      }
+     },
+     {
+      "name": "M12 x 1.5",
+      "label": "Prevailing torque nut fine pitch M12x1.5",
+      "d": 12.0,
+      "dims": {
+       "cb": 13.32,
+       "cd": 1.562069,
+       "cr": 1.415625,
+       "d": 12.0,
+       "dh": 10.376,
+       "s": 18.0,
+       "w": 10.37,
+       "m": 14.9,
+       "de": 18.0
+      }
+     },
+     {
+      "name": "M16 x 1.5",
+      "label": "Prevailing torque nut fine pitch M16x1.5",
+      "d": 16.0,
+      "dims": {
+       "cb": 17.76,
+       "cd": 1.724138,
+       "cr": 1.5625,
+       "d": 16.0,
+       "dh": 14.376,
+       "s": 24.0,
+       "w": 14.1,
+       "m": 19.1,
+       "de": 24.0
+      }
+     },
+     {
+      "name": "M20 x 1.5",
+      "label": "Prevailing torque nut fine pitch M20x1.5",
+      "d": 20.0,
+      "dims": {
+       "cb": 22.2,
+       "cd": 2.034483,
+       "cr": 1.84375,
+       "d": 20.0,
+       "dh": 18.376,
+       "s": 30.0,
+       "w": 16.9,
+       "m": 22.8,
+       "de": 30.0
+      }
+     },
+     {
+      "name": "M24 x 2",
+      "label": "Prevailing torque nut fine pitch M24x2",
+      "d": 24.0,
+      "dims": {
+       "cb": 26.64,
+       "cd": 2.37931,
+       "cr": 2.15625,
+       "d": 24.0,
+       "dh": 21.835,
+       "s": 36.0,
+       "w": 20.2,
+       "m": 27.1,
+       "de": 36.0
+      }
+     },
+     {
+      "name": "M30 x 2",
+      "label": "Prevailing torque nut fine pitch M30x2",
+      "d": 30.0,
+      "dims": {
+       "cb": 34.04,
+       "cd": 2.862069,
+       "cr": 2.59375,
+       "d": 30.0,
+       "dh": 27.835,
+       "s": 46.0,
+       "w": 24.3,
+       "m": 32.6,
+       "de": 46.0
+      }
+     },
+     {
+      "name": "M36 x 2",
+      "label": "Prevailing torque nut fine pitch M36x2",
+      "d": 36.0,
+      "dims": {
+       "cb": 40.7,
+       "cd": 3.275862,
+       "cr": 2.96875,
+       "d": 36.0,
+       "dh": 33.835,
+       "s": 55.0,
+       "w": 29.4,
+       "m": 38.9,
+       "de": 55.0
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_ISO_10512_PREVAILING_TORQUE_HEX_REGULAR_NUT_MAIN (live dom/skb-sc-comp, dom/skb-sc-fsrules); geometry as live's M8 x 1 B-rep (collar s, bored 0.74 s, 90 degree countersinks to d, hex corners chamfered 30 degrees both sides, (TOTAL_THICKNESS - THICKNESS)/2.9 deep, rounded 0.3125 (TOTAL_THICKNESS - THICKNESS)), checked against live's M8x1 volume / faces (behaviours \"skasm (2026-10-27) standard content gaps\")"
+   },
+   {
+    "category": "Nuts",
     "class": "Prevailing torque hex nuts",
     "name": "Prevailing torque regular nut ISO 7719",
     "shape": "nut",
