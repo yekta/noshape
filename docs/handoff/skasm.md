@@ -57,7 +57,9 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
   the shape; API polygon descriptions.
 
 ## WIP on agent/skasm
-(none: the branch equals main)
+(none: the branch equals main. PAUSED 10-27 ~09:50 UTC on the lead's order (app split first); no builds or tests
+running. On resume: rebase, then the next items below; live requests pending: PEM crawl, 11 standard content
+components, mate edits between free parts (UI), calculation variance, sketch value box placement.)
 
 ## Next, in order
 Sketch P1: value boxes right after drawing: where live puts them differs from ours (center circle: done e5e45de1; 3 point circle: live below; rectangle height box after Enter: two live samples, no rule
