@@ -74,23 +74,23 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-1. Delete part ghost outline (255,192,76). Dihedral panel
-   (item 5). part-studio.md rows done 10-27: 1.12, 1.18, 1.19, 1.22, 1.27, 2.11, 2.13, 2.16, 2.17, 2.18, 3.6, 3.11,
-   3.14, 3.16, 4.4, 4.9, 5.22, 6.6, 6.10, 6.11, 6.25, 6.28, 7.4, 9.2, 9.6, 9.7. 3.6: live asked whether the crossing
-   box is really blue (spec) or our yellow dashed #FFC20E (bundle CROSS_SELECT_COLOR; kept).
-2. Preview blend residuals (behaviours "psui (10-26, P1) Feature preview look"; SPECS CORRECTION 10-27: live's Remove
-   cuts the part and draws the grey tool over it, as ours, so Remove / Intersect are right unblended); live draws the active field's picked region outline
-   full orange over the preview (ours: 30 % behind the tool); at slider 1 live's top face is lighter than ours.
-3. (Done 10-27: a hovered selected edge draws the hover's dark outline round the selection colour and a
-   (255,188,64) core, as live.)
-4. (In the second batch: the highlight from Onshape's orthographic eye, offscreen test
-   `the_highlight_moves_across_an_orthographic_view`.) Check perspective views against live too.
-5. Dihedral panel: layout as live (Units select, read-only Max / Min, threshold rows with our dihedral-high / -low
-   icons, Scale row, grey ✕), teal teeth (yellow above / purple below the thresholds), no envelope. Left: comb length
-   vs the Scale slider (live asked: lengths at min / 25 % / mid / 75 % / max) and the "Min: 90 deg" label on the comb.
-6. Cold start (viewport-performance.md 10-27): per-(source, options) MTLLibrary cache in the vendored wgpu-hal.
-7. interaction.md 🔧 rows left: 4.1–4.4, 4.7–4.9, 5.1, 5.3, 6.2–6.8, 2.3, 2.6. Ctrl+M Mate connector defaults
-   (live asked: owner entity / attachment with one part).
+1. Highlights over the preview blend (P1 residual, behaviours "psui (10-26, P1) Feature preview look"; also the
+   Delete part ghost's (255,192,76) outline, 1.12): live draws the active field's picks after the mix, depth-tested
+   against the model before the feature, so a picked region under the boss and a deleted part's outline stay full
+   orange; ours draws them in the "with" model only (30 % under the boss, nothing for a deleted part). Design: a
+   post-mix pass (new `compare` tag) drawing the base scene's highlighted lines into the frame with the main pass's
+   depth (store it when preview_mix; MSAA: render into the MSAA buffer + resolve into a texture, then composite over
+   the frame, or single-sample line pipelines against `depth_sample`). At slider 1 live's top face is lighter.
+2. part-studio.md 🔧 rows waiting for live (asked 10-27): 3.7 box into a dialog field (ours: Fillet takes the 6 faces),
+   3.12 / 3.13 Select other into a field, 6.26 / 6.37 / 6.38 list separator and folder menus. Dihedral comb length vs
+   Scale and its "Min: 90 deg" label (asked). Ctrl+M Mate connector defaults (asked). Crossing box colour (asked).
+3. View cube corner hit: live takes the corner ~8 px from its centre (pointer at (1829,156) in iso), ours only on the
+   drawn 13 px disc (`overlay::cube_hit`).
+4. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache
+   needs vendoring wgpu-hal 29, or smaller per-pipeline shader modules (naga's MSL writer emits the whole module per
+   stage). Measure with perf.yml (run 40464678503 dispatched 07:02).
+5. interaction.md 🔧 rows left: 4.1–4.4, 4.8, 4.9, 5.1, 5.3, 6.2–6.8 (6.7's camera menu), 2.3, 2.6.
+6. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
 ## Requests to the lead
 
