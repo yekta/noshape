@@ -3,7 +3,12 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Release blockers seen by qa (P0, green 4d2f6b0c = last-green)
+## Release blockers seen by qa (updated 2026-10-27 02:50, green 19555ca3)
+- Fixed and verified on 19555ca3: the crash documents (DRAFT/SHELL-SLAB/FILLET/FILLET-BLEND), SHELL-WALLS,
+  SHELL-FILLETED-BOX. Still open P0: FILLET-HANG (a fillet can spin for hours in OCCT's blend approximation, the document
+  then hangs on open), SHELL-SLOW (shells 5–9 s), REGEN-SPEED, TWO-PROCESS-LOST-EDIT.
+
+### Earlier (P0, green 4d2f6b0c)
 - DOC-POISON + SHELL-SLAB-GPF + FILLET-SEGV: ordinary Shell / Fillet / Delete operations can segfault the green app and
   leave a document that crashes on every open; v0.4.8 opens the same documents. DRAFT-SEGV-DOC also hits v0.4.8.
 - SHELL-WALLS: wrong solid with status OK (also in v0.4.8).
@@ -45,6 +50,8 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
   /root/qa-scratch/rel/k/main/x/noshape-cli (`NSCLI=… python3 …` with nscli.Cli(os.environ['NSCLI'])).
 - "View in high quality" on this llvmpipe box makes viewport frames take > 10 s ("GPU frame still running after 10s;
   waiting"); the UI then stops taking input for a minute and replays the queued clicks. Click Disable on the blue bar.
+- nscli.py starts the CLI with PDEATHSIG, so a `timeout`-killed fuzz run no longer leaves an orphan CLI; an orphan
+  still burning CPU is a hang (seed 33 → FILLET-HANG).
 - CLI modelling fuzzer: /root/qa-scratch/bin/clifuzz_dbg.py <seed> <n> (NSCLI=<cli>; random fillet / chamfer / shell /
   extrude / draft / pattern / mirror / suppress / delete / undo; log cli/clifuzz-<seed>.log; NSCLI_ERR=<file> keeps
   stderr); clifuzz_bisect.py replays a seed with a cold open in a fresh process after every step. Seed 1, 5 → DRAFT-SEGV-DOC; seed 7 → SHELL-SLAB-GPF; seed 9 → FILLET-SEGV; seed 11 (no drafts) → SHELL-SLAB abort; seeds 2, 3, 4, 6, 8 clean. The v0.4.8 release CLI
