@@ -25,7 +25,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 1.4 | Shift+Enter commits and reopens the same tool, empty | keyboard_shortcuts; Home__dialogs | ✅ |
 | 1.5 | Esc exits the command / cancels the dialog | keyboard_shortcuts | ✅ |
 | 1.6 | Esc in a changed dialog field reverts the typed value; the next Esc cancels the dialog | live (behaviours.md: Feature dialog basics) | ✅ |
-| 1.7 | Esc closes transient UI first (S toolbar, Select other, zoom-window mode), then exits isolate/transparent, then clears the selection | View__isolate; select_other | 🔧 |
+| 1.7 | Esc closes transient UI first (S toolbar, Select other, zoom-window mode, the context menu), then exits isolate/transparent; it never clears the selection (live 10-27: Space does) | View__isolate; select_other | ✅ |
 | 1.8 | Space deselects everything (features and entities) | keyboard_shortcuts | ✅ (app 10-24) |
 | 1.9 | Ctrl/⌘+C copies selected features | keyboard_shortcuts | ✅ |
 | 1.10 | Ctrl/⌘+V pastes copied features (repeatable, at the rollback bar) | keyboard_shortcuts | ✅ |
@@ -91,7 +91,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | 🔧 |
 | 3.8 | Selected entities show quick values in the Measure readout | A §5.1 | ✅ |
 | 3.9 | Selection count next to the cursor, 1–5 ("5" for five or more) | Home__selection; live cursors/ | ✅ (Onshape bakes the digit into the cursor image; GPUI has no image cursors, so a black digit with a white outline is drawn at the arrow's lower right) |
-| 3.10 | Midpoints of edges show on hover and can be picked (measure, planes) | Home__selection | 🔧 (part edges and open sketch curves; with a dialog open when its field takes points. Look as live qa4-r5-s9-6: hovering the edge shows a 9 px dark see-through ring at its midpoint (render point style RING); a selected midpoint is an 11 px #fac012 disc with a #c4960b ring and #ffd65b centre; a hovered midpoint target draws the same marker in orange #f8c488/#c49a6a/#ffd8ac. Open (behaviour): live makes the midpoint the hover target within a few px, dropping the edge highlight; ours switches only on click (midpoint_pick).) |
+| 3.10 | Midpoints of edges show on hover and can be picked (measure, planes) | Home__selection | ✅ (part edges and open sketch curves; with a dialog open when its field takes points. Look as live qa4-r5-s9-6: hovering the edge shows a 9 px dark see-through ring at its midpoint (render point style RING); a selected midpoint is an 11 px #fac012 disc with a #c4960b ring and #ffd65b centre; a hovered midpoint target draws the same marker in orange #f8c488/#c49a6a/#ffd8ac. Within 9 px of the marker the midpoint is the hover target and the edge highlight goes, as live (checked 10-27).) |
 | 3.11 | Select other lists faces and edges under the cursor nearest first; hovering a row highlights it; click/Enter picks; list closes | Home__select_other | ✅ (psui 10-27, see 1.18; a row click picks it, Esc closes) |
 | 3.12 | Select other picks go to the active dialog field | Home__select_other | 🔧 |
 | 3.13 | Select other from the face/edge context menu | Home__select_other | 🔧 |
