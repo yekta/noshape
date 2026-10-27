@@ -493,6 +493,8 @@ struct TargetState {
     caps: Option<crate::section_caps::CapTextures>,
     /// Compare mode textures (while comparing).
     compare: Option<CompareTextures>,
+    /// A hovered whole part's mask (while one is hovered).
+    hover_mask: Option<crate::hover_outline::HoverMask>,
     /// Camera-dependent geometry, and its instances for the last view built.
     camera_geometry: Vec<Arc<dyn crate::camera_geometry::CameraGeometry>>,
     camera_geometry_built: Option<(crate::camera_geometry::View, Vec<Instance>)>,
@@ -1055,6 +1057,8 @@ struct DrawMode<'a> {
     /// Section caps: their bind group and the planes to cap.
     caps: Option<(&'a wgpu::BindGroup, &'a [u32])>,
     outline: bool,
+    /// The mask of a hovered whole part's visible faces (hover_outline.rs).
+    hover_mask: bool,
     /// The visible-depth sample pass (Onshape's `DepthSamplingPass`): faces
     /// and points with true depth (no pick depth bias), no lines.
     depth_samples: bool,
@@ -1092,7 +1096,7 @@ fn indexed_lines() -> bool {
 }
 
 fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, mode: DrawMode) {
-    let DrawMode { pick, mask, caps, outline, depth_samples, planes_write_depth } = mode;
+    let DrawMode { pick, mask, caps, outline, hover_mask, depth_samples, planes_write_depth } = mode;
     pass.set_bind_group(1, bind_inst, &[]);
     /// Records the color pass's draw calls (`r.draw_calls`) when done.
     struct Calls(std::cell::Cell<u32>, bool);
@@ -1157,6 +1161,10 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
     };
     if mask {
         draw(pass, &lists.opaque, &pipelines.section_mask);
+        return;
+    }
+    if hover_mask {
+        draw(pass, &lists.opaque, &pipelines.mesh_hover_mask);
         return;
     }
     if pick {
@@ -1677,6 +1685,8 @@ struct Pipelines {
     /// section_caps.rs).
     section_mask: Lazy,
     section_cap: Lazy,
+    /// A hovered whole part's mask (hover_outline.rs).
+    mesh_hover_mask: Lazy,
     mesh_transparent: wgpu::RenderPipeline,
     /// Feature previews (see-through): their back faces before the other
     /// transparent meshes, their front faces after (`draw_lists`).
@@ -1733,6 +1743,7 @@ impl Pipelines {
             &self.mesh_outline_depth,
             &self.section_mask,
             &self.section_cap,
+            &self.mesh_hover_mask,
             &self.mesh_reflect,
             &self.mesh_transparent_back,
             &self.mesh_transparent_front,
@@ -1801,6 +1812,8 @@ pub struct Renderer {
     pipelines: Option<Pipelines>,
     /// Ambient occlusion pass (built for the current MSAA count when used).
     ao: Option<crate::ao::AoPass>,
+    /// A hovered whole part's outline band (built when first used).
+    hover_outline: Option<crate::hover_outline::HoverOutline>,
     globals_color: wgpu::Buffer,
     globals_pick: wgpu::Buffer,
     /// Globals of the visible-depth sampling pass (its own, so it can share a
@@ -2215,6 +2228,7 @@ impl Renderer {
             cap_pipeline_layout,
             pipelines: None,
             ao: None,
+            hover_outline: None,
             globals_color,
             globals_pick,
             globals_sample,
@@ -2357,6 +2371,8 @@ impl Renderer {
         let image_soft = lazy(LayoutKind::Image, P { label: "image-soft", vs: "vs_image", fs: "fs_image_soft", buffers: IMAGE_BUFFERS, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }, PLAIN);
         let image_blend = lazy(LayoutKind::Image, P { label: "image-blend", vs: "vs_image", fs: "fs_image_blend", buffers: IMAGE_BUFFERS, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }, PLAIN);
         let compare_dn = lazy(LayoutKind::Main, P { label: "compare-dn", vs: "vs_mesh", fs: "fs_compare_dn", buffers: MESH_BUFFERS, format: COMPARE_DN_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }, PLAIN);
+        // Against the color pass's depth, with its faces' bias (the same depths: GreaterEqual passes).
+        let mesh_hover_mask = lazy(LayoutKind::Main, P { label: "hover-mask", vs: "vs_mesh", fs: "fs_hover_mask", buffers: MESH_BUFFERS, format: crate::hover_outline::MASK_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }, PLAIN);
         let compare_mix = lazy(LayoutKind::Main, P { label: "compare-mix", vs: "vs_background", fs: "fs_compare_mix", buffers: &[], format: PRESENT_FORMAT, blend: alpha, depth: None, bias: none, samples: 1 }, PLAIN);
         self.pipelines = Some(Pipelines {
             background,
@@ -2366,6 +2382,7 @@ impl Renderer {
             mesh_outline_depth,
             section_mask,
             section_cap,
+            mesh_hover_mask,
             mesh_reflect,
             mesh_transparent,
             mesh_transparent_back,
@@ -2730,10 +2747,15 @@ impl Renderer {
         if ao_strength > 0.001 && self.ao.as_ref().is_none_or(|a| a.msaa != msaa) {
             self.ao = Some(crate::ao::AoPass::new(&self.device, msaa, COLOR_FORMAT));
         }
+        // A hovered whole part: its outline band after the color pass (hover_outline.rs).
+        let hover_band = req.scene.states.iter().any(|&s| s & (crate::scene::state::HOVER | crate::scene::state::OUTLINE) == crate::scene::state::HOVER | crate::scene::state::OUTLINE && s & crate::scene::state::SELECTED == 0);
+        if hover_band && self.hover_outline.is_none() {
+            self.hover_outline = Some(crate::hover_outline::HoverOutline::new(&self.device, COLOR_FORMAT));
+        }
         drop(t_prep);
 
         let t_encode = perf::scope("r.encode_submit");
-        let Self { device, queue, pipelines, targets, bind_color, pending, ao, timer, overlay_gpu, text_shading, section_caps, compare_none, .. } = self;
+        let Self { device, queue, pipelines, targets, bind_color, pending, ao, hover_outline, timer, overlay_gpu, text_shading, section_caps, compare_none, .. } = self;
         let ao_on = ao_strength > 0.001 && ao.is_some() && !perf_overrides().skip_ao;
         let timer_slot = timer.as_ref().and_then(|t| t.free_slot());
         let pipelines = pipelines.as_ref().expect("pipelines");
@@ -2845,7 +2867,7 @@ impl Renderer {
                     view: &tex.depth,
                     // Kept for the ambient occlusion pass and a preview's
                     // highlights over the "with" layer.
-                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: if ao_strength > 0.001 || post_frame.is_some() { wgpu::StoreOp::Store } else { wgpu::StoreOp::Discard } }),
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: if ao_strength > 0.001 || post_frame.is_some() || hover_band { wgpu::StoreOp::Store } else { wgpu::StoreOp::Discard } }),
                     stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store: wgpu::StoreOp::Discard }),
                 }),
                 timestamp_writes: timer.as_ref().zip(timer_slot).and_then(|(t, i)| t.writes(i, cap_planes.is_none(), !ao_on)),
@@ -2866,6 +2888,42 @@ impl Renderer {
             let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength, timestamp_writes };
             ao.encode(device, queue, &mut encoder, &tex.depth_sample, color_view, frame);
         }
+        ts.hover_mask = match hover_outline.as_ref().filter(|_| hover_band) {
+            Some(band) => {
+                let mask = crate::hover_outline::HoverOutline::mask(device, ts.hover_mask.take(), width, height, msaa);
+                {
+                    let (view, resolve) = match &mask.msaa {
+                        Some(v) => (v, Some(&mask.resolved)),
+                        None => (&mask.resolved, None),
+                    };
+                    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("hover-mask"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view,
+                            depth_slice: None,
+                            resolve_target: resolve,
+                            ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: if resolve.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store } },
+                        })],
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: &tex.depth,
+                            // Kept for a preview's highlights over the "with" layer.
+                            depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store }),
+                            stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Discard }),
+                        }),
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                        multiview_mask: None,
+                    });
+                    pass.set_bind_group(0, bind_color, &[]);
+                    pass.set_bind_group(3, &*compare_none, &[]);
+                    draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, &bind_inst, DrawMode { hover_mask: true, ..Default::default() });
+                }
+                // Live: the silhouette line's two pixels at 1× (psui/parthover crops), 2–3 on a slant.
+                band.encode(device, queue, &mut encoder, &mask, color_view, globals.hover.map(|c| linear_to_srgb(c) as f32 / 255.0)[..3].try_into().expect("rgb"), dpr);
+                Some(mask)
+            }
+            None => None,
+        };
         // Compare mode: both versions together, mixed over the frame.
         if let (Some(c), Some((over, bind_over, _, _))) = (ts.compare.as_ref(), compare_frame.as_ref()) {
             {

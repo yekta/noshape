@@ -104,6 +104,11 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 - 10-27 20:00–22:00: 921bb066 P1-8 caveat (Hole `groupedSketches`); 5840897a a click into a field checks the face's
   surface like hover (Revolve's axis took a planar face); part-studio.md 1.24 / 3.18 / 5.6 verified. Main went red
   20:34 (lead's -Dfar= vs core's `far`): fixed by the lead (bd0948b5) while mine was landing.
+- 10-27 21:40–23:30 (new psui session on a fresh account): ecc38c5a BOX-DIALOG-PANIC (P0 release blocker,
+  regression of df28c320: `box_select` read the dialog inside its own update; T1 GPUI test
+  box_select_with_a_dialog_open, which panics without the fix), SECTION-DIALOG-STACK (starting a feature ends the
+  Section view dialog as with ✓, T1 test), TABS-PANEL-FOCUS (the Tab manager doesn't take the focus). Then the
+  part hover look (0d below) as live: render hover_outline.rs.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -149,9 +154,8 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-0. Live answers pending (REQUESTS psui 10-27): the part hover look in a part field (PART-HOVER-RED look), the
-   section cap colour where two parts overlap (reopened PS-SECTION item: ours sums the colours to white), the mate
-   connector disc over a face (interaction 3.4), MENU-TRUNCATE. Apply each as answered.
+0. Live answer pending (REQUESTS psui 10-27, P2 interaction 4.9): when the Measure readout puts an asterisk after
+   a value (live saw "Min dist: 0.000* in" with two picks on a mesh, none for mesh + Origin). Apply when answered.
 0a. P2 P1-8 caveat (Hole chips): a sketch's vertices picked from its row and clicked one by one are stored the same,
    so a reopened Hole can't tell them apart; needs the row pick stored as such (a model change).
 0b. Cold start (COLD=1 run 40547478509 compared it: base 1.55–1.93 s, early 1.42–1.59 s, the window drawn later with
@@ -169,14 +173,21 @@ that touches the model: ~12 min.
    isn't the cost. A coarser line LOD (`NOSHAPE_PERF_LINE_ERROR_PX` 1 / 3 against 0.25, perf.yml 40583226566) changes
    nothing either (66.8–72.5 fps, noise), so segment count isn't it: next look at the per-segment fragment work (the
    line shader's AA band over 4× MSAA, blending) and the per-instance draw overhead (one instance per segment).
-0d. Part hover look: live's #FFC685 replaces the dark outer edge line (2–3 px on the part side, nothing outside);
-   ours draws the hover outline just outside it (outline pass). Needs knowing which edges lie on the part's image
-   boundary.
+0d. Part hover look: done (render hover_outline.rs: mask of the hovered part's visible faces against the color
+   pass's depth, then a band over the resolved frame within `dpr` px of the mask's boundary on either side; the hull
+   outline no longer draws hover-only parts). Costs one mask pass + one full-screen pass only while a whole part is
+   hovered. Verified on :102 (blk.noshape, Part 1 row hovered): right silhouette rest face | (101,126,141) (10,11,12)
+   | bg → hover face | FFC685 FFC685 | bg, the bottom the same, as live's crops. Residual: on shallow slants a few
+   pixels of the line's antialiasing lie diagonally past the band's 1 px reach and stay dark (a 1.5 px reach
+   overshoots onto the background on steep edges instead).
+0f. Retina orbit, next experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
+   which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
+   the slot as the instance (one instance per copy) and measure with perf.yml.
 0e. P3 LEFT-RAIL-WHERE-USED: live's Free account only shows an upgrade notice for "Where used"; a panel listing
    the tabs that use this element would be ours to design.
 
-1. Our base part shading differs a few units from live's (block top (140,185,212) vs (145,181,203)), which is what
-   the preview samples still differ by.
+1. Base part shading: the offscreen test part_faces_are_lit_like_onshape holds the block top at live's
+   (140,185,212) within 4; the preview samples' few units are the preview mix, not the base shading.
 3. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache
    needs vendoring wgpu-hal 29, or smaller per-pipeline shader modules (naga's MSL writer emits the whole module per
    stage). perf.yml without `-f ref=` measures the latest release: run 40464678503 (v0.4.8) failed its gates on

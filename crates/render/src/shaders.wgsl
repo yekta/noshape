@@ -469,11 +469,25 @@ fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
         v = -g.camera_fwd.xyz;
     }
     if (dot(normalize(i.normal), v) > 0.0) { discard; }
-    // Hovered, not selected: the light-orange hover color (live G35, a
-    // hovered mesh part).
-    if ((st & HOVER) != 0u && (st & SELECTED) == 0u) { return enc(vec4(g.hover.rgb, 1.0)); }
+    // Hovered, not selected: drawn inside the part's image instead (`fs_hover_mask`, hover_outline.wgsl).
+    if (hover_outlined(st)) { discard; }
     if ((st & BODY) != 0u) { return enc(vec4(BODY_OUTLINE, 1.0)); }
     return enc(vec4(g.select.rgb, 1.0));
+}
+
+/// A hovered, not selected, outlined part (a whole part hovered; live G35 a hovered mesh part): its outline in the
+/// hover colour on the part side of its image (hover_outline.wgsl).
+fn hover_outlined(st: u32) -> bool {
+    return (st & (HOVER | OUTLINE)) == (HOVER | OUTLINE) && (st & SELECTED) == 0u;
+}
+
+/// The mask of a hovered outlined part's visible faces, against the color pass's depth.
+@fragment
+fn fs_hover_mask(i: MeshOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
+    let st = state_of(i.pick);
+    if (!hover_outlined(st) || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    return vec4(1.0);
 }
 
 // Depth of outlined parts only (no color): see mesh_outline_depth.

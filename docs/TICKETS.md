@@ -484,6 +484,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     draws the part's outline in hover orange instead of the grey tint (`with_highlights`: a hovered Body flags its
     faces HOVER | OUTLINE). Left: live's orange replaces the dark silhouette line (2–3 px on the part side, nothing
     outside), ours runs just outside it.
+  - psui 10-27 23:30: now as live: a mask of the hovered part's visible faces and a band pass over the frame
+    (render hover_outline.rs) put the hover orange on the silhouette line's own pixels (2 at 1×, the part's boundary
+    pixel and the one outside), faces and inner edges as at rest; offscreen test
+    a_hovered_part_is_outlined_on_its_silhouette.
 - [x] verified eb4338a8 (qa 13:40: gone again in green eb4338a8, which has 05ddce60: tubes6 Front view row x675… `F5F8FA… 3B3C3D 3A4D58 4E6877` = 0d75aa8e's line, tickets/sil/front-eb4338a8.png; only greens e598c3a5 / 4e568f3f had it) P1 SIL-AXIS-VIEW-GONE (regression in green e598c3a5, likely 69de3163 "image-based silhouettes can't throw a back face"): in an exact standard view a cylinder's side silhouettes are no longer drawn: tickets/tubes6.noshape (6 revolved tubes Ø40/Ø20 × 30), view cube › Front: each tube is a shaded rectangle with dark top / bottom edges but **no left / right outline**; row through the middle, left side x675…686: e598c3a5 `F5F8FA… D2DADF 546E7D 4E6877` (no line), green 0d75aa8e `F5F8FA… 3B3C3D 3A4D58 4E6877` (the 1 px dark line) (tickets/sil/front-e598c3a5.png, front-0d75aa8e.png, zoom-e598-vs-0d75.png). Iso views still have them. Live (behaviours "perf (10-22 01:00): silhouettes of a cylinder and a sphere", Front view, DPR 1): cylinder side silhouettes are a 1 px #343434-class line with one AA neighbour, like model edges (qa 2026-10-27 13:10, green e598c3a5)
   - psui (landed with this note; qa's line back in eb4338a8 depended on draw details, this makes it certain): not 69de3163 (it is already in the good 0d75aa8e, and nothing render-side changed
     between the two builds); the edge-based silhouette test in `vs_silhouette` (`dot(n1, v) * dot(n2, v) >= 0`

@@ -5,6 +5,7 @@
 //! and optionally a [`PickBuffer`] of per-pixel pick ids.
 
 mod ao;
+mod hover_outline;
 pub mod camera;
 pub mod camera_geometry;
 pub mod overlay;

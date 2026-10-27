@@ -1980,3 +1980,84 @@ fn on_top_meshes_show_through_the_model() {
     assert!((hidden_r - hidden_g).abs() < 30, "hidden: ({hidden_r}, {hidden_g})");
     assert!(shown_r > shown_g + 60, "on top: ({shown_r}, {shown_g})");
 }
+
+/// PART-HOVER-RED look (live behaviours "psui (2026-10-27, P2) PART-HOVER-RED look", psui/parthover crops): a hovered
+/// whole part's outline is its silhouette line redrawn in solid hover orange, the part's boundary pixel and the one
+/// outside it (2 px at 1×); the faces keep their colours and nothing is drawn farther out.
+#[test]
+fn a_hovered_part_is_outlined_on_its_silhouette() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (lo, hi) = ([-0.02f32, -0.01, -0.005], [0.02f32, 0.01, 0.005]);
+    let mesh = r.upload_mesh(&primitives::box_mesh(lo, hi, 1));
+    let edges = r.upload_lines(&primitives::box_edges(lo, hi, 10, 1.0));
+    for dpr in [1.0f32, 2.0] {
+        let (w, h) = ((400.0 * dpr) as u32, (300.0 * dpr) as u32);
+        let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(-1.0, 1.0, -1.0), glam::DVec3::Z), ..Default::default() };
+        cam.fit_box(glam::Vec3::from(lo).as_dvec3(), glam::Vec3::from(hi).as_dvec3(), w as f64 / h as f64);
+        let mut frame = |hover: bool| {
+            let mut scene = Scene::default();
+            scene.instances.push(Instance::new(Drawable::Mesh(mesh.clone())).with_color(srgb(0x9a, 0xb4, 0xcc)));
+            scene.instances.push(Instance::new(Drawable::Lines(edges.clone())).with_color([0.02, 0.02, 0.03, 1.0]).layer(1));
+            if hover {
+                for id in 1..=6 {
+                    scene.set_state(id, state::HOVER | state::OUTLINE);
+                }
+            }
+            r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: dpr, style: &Style::default(), pick: false }).unwrap().bgra
+        };
+        let (rest, hovered) = (frame(false), frame(true));
+        let px = |b: &[u8], x: i32, y: i32| -> [u8; 3] {
+            let i = ((y as u32 * w + x as u32) * 4) as usize;
+            [b[i + 2], b[i + 1], b[i]]
+        };
+        let background = px(&rest, 2, 2);
+        let orange = |c: [u8; 3]| (c[0] as i32 - 255).abs() <= 3 && (c[1] as i32 - 198).abs() <= 3 && (c[2] as i32 - 133).abs() <= 3;
+        // Pixels within `d` device px of the part's image at rest.
+        let near_part = |x: i32, y: i32, d: i32| (-d..=d).any(|dy| (-d..=d).any(|dx| (0..w as i32).contains(&(x + dx)) && (0..h as i32).contains(&(y + dy)) && px(&rest, x + dx, y + dy) != background));
+        let (mut far, mut band, mut other) = (0, 0, 0);
+        for y in 0..h as i32 {
+            for x in 0..w as i32 {
+                let (a, b) = (px(&rest, x, y), px(&hovered, x, y));
+                if a == b {
+                    continue;
+                }
+                if orange(b) {
+                    band += 1;
+                } else {
+                    other += 1;
+                }
+                if !near_part(x, y, dpr.ceil() as i32) {
+                    far += 1;
+                }
+            }
+        }
+        if let Ok(dir) = std::env::var("NOSHAPE_TEST_OUT") {
+            for (name, b) in [("rest", &rest), ("hover", &hovered)] {
+                let mut rgba = b.clone();
+                for p in rgba.as_chunks_mut::<4>().0 {
+                    p.swap(0, 2);
+                }
+                image::save_buffer(format!("{dir}/part_hover_{name}_{dpr}x.png"), &rgba, w, h, image::ExtendedColorType::Rgba8).unwrap();
+            }
+        }
+        assert_eq!(far, 0, "{dpr}x: {far} pixels drawn away from the part");
+        assert_eq!(other, 0, "{dpr}x: {other} pixels changed besides the orange band");
+        assert!(band > (300.0 * dpr) as usize, "{dpr}x: only {band} band pixels");
+        // Along the middle row: the band at the left silhouette, about 2 px (1×) wide, and the face's colour unchanged
+        // just inside it.
+        let y = h as i32 / 2;
+        let start = (0..w as i32).find(|&x| orange(px(&hovered, x, y))).expect("the band on the middle row");
+        let run = (start..w as i32).take_while(|&x| orange(px(&hovered, x, y))).count() as i32;
+        let d = dpr as i32;
+        assert!((2 * d - 1..=3 * d).contains(&run), "{dpr}x: band {run} px wide at the left silhouette");
+        let inner = start + run + 1;
+        assert_eq!(px(&hovered, inner, y), px(&rest, inner, y), "{dpr}x: the face inside the band changed");
+    }
+}
