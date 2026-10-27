@@ -867,9 +867,10 @@ pub struct Scene {
     /// [`compare::TARGET`] ones (the model with it) drawn on their own, by
     /// this alpha (the dialog's preview slider; 0.7 at rest).
     pub preview_mix: Option<f32>,
-    /// Section caps where two parts' material meets are red (Onshape's
-    /// interference colour): assemblies only; a Part Studio hatches each
-    /// part's cap as usual (live, qa PS-SECTION-RED).
+    /// Section caps where two parts' material meets are flat red, unhatched
+    /// (Onshape's SECTION_PLANE_INTERSECTING_COLOR): assemblies and Part
+    /// Studios alike (live behaviours "psui (2026-10-27, P2) PS-SECTION
+    /// overlap"); off, each part's cap is hatched as usual.
     pub section_interference: bool,
 }
 

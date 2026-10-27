@@ -702,11 +702,11 @@ fn section_caps_cover_the_cut() {
     assert!(dark * 4 < light * 3, "no hatch lines on the cap (darkest {dark}, median {light})");
 }
 
-/// qa PS-SECTION-RED: where two parts' material meets on the cut, an
-/// assembly's cap is red (Onshape's interference colour); a Part Studio's
-/// stays hatched in the part colours (live).
+/// Where two parts' material meets on the cut the cap is red (Onshape's
+/// interference colour) while `section_interference` is on (assemblies and
+/// Part Studios); off, it stays hatched in the part colours.
 #[test]
-fn overlapping_caps_are_red_only_in_assemblies() {
+fn overlapping_caps_are_red_only_with_interference_on() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,

@@ -775,8 +775,10 @@ impl PartStudioView {
                 _ => Vec::new(),
             };
         }
+        // A whole part hovered (its Parts list row, or a face under a parts field) is the part itself: drawn as its
+        // outline in hover orange (`with_highlights`; live "psui (2026-10-27, P2) PART-HOVER-RED look").
         match &self.hover {
-            Some(Reference::Body(b)) => self.body_geometry(b),
+            Some(r @ Reference::Body(_)) => vec![r.clone()],
             // A sketch curve under a region field pre-highlights its region.
             Some(r @ Reference::SketchEntity { .. }) => {
                 let filter = self.edit.as_ref().and_then(|e| e.dialog.read(cx).active_filter()).map(|(_, f, _)| f);
@@ -792,7 +794,7 @@ impl PartStudioView {
                 };
                 let wants_kind = filter.is_some_and(|f| kind_matches(kind, r, f));
                 match filter.filter(|_| !wants_kind).and_then(|f| self.part_for_field(r, f)) {
-                    Some(Reference::Body(b)) => self.body_geometry(&b),
+                    Some(b @ Reference::Body(_)) => vec![b],
                     _ => vec![r.clone()],
                 }
             }

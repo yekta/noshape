@@ -447,6 +447,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     feature's inputs now (test edge_looks::a_failing_feature_leaves_the_hovered_part_unred). lpd.noshape on :102:
     Split, hovering the block gives our usual part hover (a light grey tint), no red. Whether live outlines the part in
     orange instead is asked in REQUESTS (psui 10-27 PART-HOVER-RED look).
+  - psui (landed with this note): live's look (behaviours "psui (2026-10-27, P2) PART-HOVER-RED look"): a hovered
+    whole part (parts field, Parts list row) shows its outline in #FFC685, no tint, inner edges at rest. Ours now
+    draws the part's outline in hover orange instead of the grey tint (`with_highlights`: a hovered Body flags its
+    faces HOVER | OUTLINE). Left: live's orange replaces the dark silhouette line (2–3 px on the part side, nothing
+    outside), ours runs just outside it.
 - [x] verified eb4338a8 (qa 13:40: gone again in green eb4338a8, which has 05ddce60: tubes6 Front view row x675… `F5F8FA… 3B3C3D 3A4D58 4E6877` = 0d75aa8e's line, tickets/sil/front-eb4338a8.png; only greens e598c3a5 / 4e568f3f had it) P1 SIL-AXIS-VIEW-GONE (regression in green e598c3a5, likely 69de3163 "image-based silhouettes can't throw a back face"): in an exact standard view a cylinder's side silhouettes are no longer drawn: tickets/tubes6.noshape (6 revolved tubes Ø40/Ø20 × 30), view cube › Front: each tube is a shaded rectangle with dark top / bottom edges but **no left / right outline**; row through the middle, left side x675…686: e598c3a5 `F5F8FA… D2DADF 546E7D 4E6877` (no line), green 0d75aa8e `F5F8FA… 3B3C3D 3A4D58 4E6877` (the 1 px dark line) (tickets/sil/front-e598c3a5.png, front-0d75aa8e.png, zoom-e598-vs-0d75.png). Iso views still have them. Live (behaviours "perf (10-22 01:00): silhouettes of a cylinder and a sphere", Front view, DPR 1): cylinder side silhouettes are a 1 px #343434-class line with one AA neighbour, like model edges (qa 2026-10-27 13:10, green e598c3a5)
   - psui (landed with this note; qa's line back in eb4338a8 depended on draw details, this makes it certain): not 69de3163 (it is already in the good 0d75aa8e, and nothing render-side changed
     between the two builds); the edge-based silhouette test in `vs_silhouette` (`dot(n1, v) * dot(n2, v) >= 0`
@@ -764,10 +769,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (tickets/curve-analysis-over-extrude.png). Either the panel must be opaque or the analysis tool must replace the feature dialog as live
   does for tool switches (live: Shift+E with a dialog open replaces it, behaviours 7371) (qa 2026-10-26, build 4d2f6b0c)
 
-- [ ] reopened (qa 11:58, green e8858e61 and watcher build 0a25dd1a): the red is gone, but the overlap now renders as a
+- [x] reopened (qa 11:58, green e8858e61 and watcher build 0a25dd1a): the red is gone, but the overlap now renders as a
   **hole**: ps2.noshape › Section view › Front › ✓: where the pin passes through the block, the cap is blank white with
   the Top plane's line showing through it (parity of 2 parts reads as "outside"); live hatches the overlap grey
   (behaviours "skb (10-24) assembly section" (5)). tickets/ps-section-overlap-white-green.png, ps-section-green.png
+  - psui (landed with this note): live re-captured (behaviours "psui (2026-10-27, P2) PS-SECTION overlap"): a Part
+    Studio's overlap IS flat interference red (198,0,0), unhatched, whatever the parts' colours (the earlier note
+    saw no overlap). Part Studio scenes turn `section_interference` on: ps2.noshape on :102, Front section → the
+    overlap reads (198,0,0) on every pixel, the rest hatched in each part's colour.
 - [x] c93f34b4 P2 PS-SECTION-RED fixed (psui 10-27): `Scene::section_interference` (assemblies only) gates the red overlap in the cap shader; offscreen test overlapping_caps_are_red_only_in_assemblies. Was: Part Studio section caps fill overlapping parts' material solid red; live's Part Studio doesn't
   (behaviours "skb (10-24) assembly section" (5): "overlapping parts' caps are grey-hatched with no red overlap fill";
   only the assembly shows the red interference, part-studio/2406–2414). Repro: /root/skasm-scratch/qa/ps2.noshape (block

@@ -301,6 +301,9 @@ const DISPLAY_ONLY_PICK_BASE: u32 = 1 << 30;
 pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache, up: &Uploader) -> BuiltScene {
     let _t = noshape_render::perf::scope("s.build");
     let mut scene = Scene::default();
+    // Live (behaviours "psui (2026-10-27, P2) PS-SECTION overlap"): a Part Studio's section caps are flat
+    // interference red where two parts overlap, as an assembly's (the earlier capture saw no overlap).
+    scene.section_interference = true;
     let mut picks = PickMap::default();
 
     // ---------------------------------------------------------------- bodies
@@ -1131,7 +1134,18 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     // 04, sketch/23 = 22, "plane and mate connector hover" (c); a part edge
     // too, behaviours "psui (2026-10-27, P1) EDGE-HIGHLIGHT-LOOK" (c)).
     if let Some(h) = hover.filter(|h| !selection.contains(h)) {
-        mark(h, state::HOVER, &mut scene);
+        match h {
+            // A hovered part (live "psui (2026-10-27, P2) PART-HOVER-RED look"): its outline in hover orange, no
+            // tint, its own edges as at rest.
+            Reference::Body(b) => {
+                for f in display.body(b).filter(|b| !b.hidden).map(|b| b.face_refs.as_slice()).unwrap_or_default() {
+                    for &id in built.picks.ids_for(f) {
+                        scene.add_flag(id, state::HOVER | state::OUTLINE);
+                    }
+                }
+            }
+            h => mark(h, state::HOVER, &mut scene),
+        }
     }
     // A face's boundary edges: a solid 2 device px line, not the band of an
     // edge highlighted itself (live EDGE-HIGHLIGHT-LOOK (d)).
