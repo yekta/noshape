@@ -73,7 +73,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   document then crashes on every open (DRAFT-SEGV-DOC, SHELL-SLAB-GPF, FILLET-SEGV, FILLET-SEGV-BLEND). Whatever the kernel bug, one bad feature must not
   make a document unopenable: commit after a successful regen, and/or run kernel ops so a crash only fails that feature
   (subprocess / signal guard), and/or open with the last feature rolled back after a crash on open (qa 2026-10-26)
-- [x] (core 10-27: a 30 s CPU budget on fillets/chamfers, cancellable; the hang document: Fillet 2 fails after the budget, the regeneration finishes; making that fillet succeed (OCCT's approximation) is open) P0 FILLET-HANG a Fillet runs for > 15 min (stopped by hand) in OCCT's blend approximation (`BRepBlend_AppFuncRoot::
+- [x] checked on watcher CLI 04:06 (qa 04:40; app pending green): cli-fillet-hang.noshape opens in 42 s, Fillet 2 "Failed to fillet selections."; the chamfer repro (bin/chrepro.py) fails after 30.8 s "Failed to chamfer selections." (core 10-27: a 30 s CPU budget on fillets/chamfers, cancellable; the hang document: Fillet 2 fails after the budget, the regeneration finishes; making that fillet succeed (OCCT's approximation) is open) P0 FILLET-HANG a Fillet runs for > 15 min (stopped by hand) in OCCT's blend approximation (`BRepBlend_AppFuncRoot::
   SearchLocation` / `NCollection_BaseSequence::Find` ← Approx_SweepApproximation ← BRepBlend_AppSurface ←
   ChFi3d_Builder::CompleteData … ← noshape checked_blend / scaled_blend ← op_fillet features.cpp:3049, `checked`, size 5)
   with no timeout or abort; the app would freeze on it. Opening the saved document in a fresh process hangs too (> 30 min,
@@ -98,7 +98,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (green 16cdcf6d) the doc opens rolled back above Draft 8 (crash marker: good), but dragging the bar below Draft 8 starts a
   regen that never ends (2 workers in Defeaturing, spinner for > 6 min); dragging the bar back above Draft 8 schedules
   regen #3, which queues behind the stuck one: the spinner stays, the Part Studio never updates again until the app is
-  killed. Live: a draft either builds or fails at once. Needs a budget on delete_faces / defeaturing (fail the feature,
+  killed. Still hangs on the watcher CLI 04:06, which has the fillet/chamfer budget (feature_list > 200 s): the budget
+  doesn't cover the draft's defeaturing. Live: a draft either builds or fails at once. Needs a budget on delete_faces / defeaturing (fail the feature,
   "Selected faces could not be drafted.") and a regen that a newer one can supersede (qa 2026-10-27, CLI 19555ca3, app
   16cdcf6d)
 - [x] verified green app bcf401ca (qa 04:30: two app processes on one copy of the 30-feature part, A suppresses Boss 1, B renames Boss 2 → "RenamedInB": B shows both at once, the file keeps both (feature_list: Boss 1 Suppressed, RenamedInB); A still shows "Boss 2", the known leftover) (dx 10-27: a session merges its edit onto a head another process moved, three-way, then reloads; both edits kept in arrival order as live; session::tests::two_writers_of_one_file_keep_both_edits. Left: same-feature two-field edits keep ours (core merge.rs), and the other window shows the change only at its next edit) P0 TWO-PROCESS-LOST-EDIT the same .noshape opened by two app processes (e.g. `noshape doc.noshape` twice, or a
