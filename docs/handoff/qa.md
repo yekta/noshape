@@ -23,7 +23,10 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   still over 200 ms); undo 1 / 1 ms, then 618 / 390 ms past two states; Create Drawing (suggested views, 1:2) + PDF (1 page
   letter, 1.5); STEP and Parasolid export → import 60779.484 = live (48 faces); STL / 3MF / OBJ meshes closed, 3MF manifold;
   assembly opens, a revolute pin drags without moving off its hole; kill -9 right after a Suppress keeps it; geometry
-  matrices on the watcher CLI 04:48: fillet 32/32, boolean 11/11 exact.
+  matrices on the watcher CLI 04:48: fillet 32/32, boolean 11/11, shell 96/96 (walls everywhere; hole cases 3.5–7.4 s),
+  hollow 60/60, rim 36/36, transform 5/5, split / mid plane exact; UI Part mirror about Right = 121558.969 (2×).
+  featmatrix's hole patterns fail only through API-REMOVE-DIR; patmatrix's ×50/×100 overlapping holes now fail "Could not
+  create all instances as entered" on purpose (live's rule, pattern.rs copies_fail); holematrix needs styleV2.
 - Known open in the release: DRAFT-HANG (P0: a draft can spin forever; the app's regen then never ends), SHELL-SLOW (a
   failing shell 52 s), REGEN-SPEED, API-REMOVE-DIR (P1: scripted REMOVE extrudes miss; featmatrix's hole patterns fail).
 - Pending: the CI artifact (run 40452492018) for the version string and the crash documents.
@@ -49,6 +52,9 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
 8. Re-run /root/qa-scratch/bin/{shellmatrix,hollowmatrix,holematrix,rimmatrix,boolmatrix}.py if a CLI is shipped.
 
 ## Setup that works
+- **Crash markers** (`/tmp/noshape-regen/*.marker`, CRASH-MARKER-COPIES): a process killed mid-regen (kill -9, `timeout`)
+  leaves one, and the next document opened with that feature id (any copy of the same fixture) opens rolled back. After
+  a kill test, expect the next copy of that fixture to open rolled back, or remove your own dead pids' markers first.
 - **Give the app window X focus first** (`xdotool windowfocus --sync <id>`, q.sh `focusw`): :110 has no window manager, so
   without it GPUI sends no focus/blur events (Tab / click-away commits never fire; TAB-NO-PREVIEW was this artifact).
 - App: `cp /root/green/noshape /root/qa-scratch/noshape-<sha8>`, run with `NOSHAPE_PERF=1 NOSHAPE_PERF_PERIOD=1
