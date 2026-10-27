@@ -3,24 +3,15 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Requests to the lead (qa, updated 2026-10-27 10:35)
-- LP-DIRECTION-PICK (P1 psui): 4e55b01f verified on green e8858e61 for Linear pattern Direction (Feature / Part / Face,
-  Direction first too), Fillet edges, Shell faces and a custom feature with `"Filter" : EntityType.EDGE`. **Not fixed**: a
-  custom feature whose filter is `EntityType.EDGE && QueryFilterCompound.ALLOWS_AXIS` (MaxNumberOfPicks 2) still gets no
-  hover and no pick in the dialog (the API takes the edges), so the user's custom-feature example stays broken in v0.4.10.
-  Cause (confirmed in the app 10:20): studio.rs `filter_of` intersects `EDGE` (EDGE | SKETCH_EDGE) with LINE / ALLOWS_AXIS
-  bits, leaving SKETCH_EDGE only, so `EDGE && GeometryType.LINE` takes sketch lines but no part edges either. Needs an
-  owner (custom crate): `EntityType.EDGE` should carry LINEAR_EDGE / CIRCULAR_EDGE / SOLID_EDGE for the intersection.
-- release/v0.4.9 (7ee597e0) still lacks 2d6719c2 (Windows include), a117663d (DRAFT-HANG budget) and 011aaf43 (serial
-  booleans, BOOL-THREAD-CRASH; replays running). Recut / cherry-pick. Earlier: the Windows build fails on `#include <cxxabi.h>` in crates/kernel/cpp/common.cpp:1273
-  (MSVC C1083; also on main). Needs a guard before the release can publish (TICKETS "Release v0.4.9").
-- BOOL-THREAD-CRASH (P0 core) is very likely in the release: nondeterministic segfaults in OCCT booleans on pool threads
-  (fuzz seed 72 crashed 3 times on the 04:06 / 04:48 watcher CLIs; v0.4.8 survives it). Decide whether it blocks v0.4.9.
-- v0.4.9 as cut (fcd301e2, re-checked on its CI artifact 09:50) ships DRAFT-HANG (the draft-hang document's regen never ends); a117663d
-  is after the release base. Cherry-pick or recut once the Windows include is fixed.
-- BUDGET-LONGJMP (P0 core, new 09:35): the blend/draft budgets siglongjmp out of OCCT from a timer signal; a fuzz CLI
-  deadlocked in malloc after it, and it likely explains BOOL-THREAD-CRASH. It ships in v0.4.9 (97081557 is in the base).
+## Requests to the lead (qa, updated 2026-10-27 10:55)
+- v0.4.10 (e8e0f62d = e8858e61) fixes the built-in dialogs' picks (LP-DIRECTION-PICK, checked on its artifact) but not
+  custom features' compound edge filters (`EDGE && GeometryType.LINE`, `EDGE && ALLOWS_AXIS` take sketch edges only):
+  psui's 1e3c419c came after. The user's custom-feature example stays broken until the next release.
+- BUDGET-LONGJMP (P0 core) has no owner commit: the blend / draft budgets siglongjmp out of OCCT from a timer signal; a
+  fuzz CLI deadlocked in malloc after one (seed 120, twice), seed 131 hangs at a delete with the budget on. It ships in
+  v0.4.9 and v0.4.10, and is the likeliest cause of BOOL-THREAD-CRASH (segfaults in BOPAlgo only on CLIs with the budget).
 - REGEN-NO-CANCEL (P0 psui) has no owner commit yet: a rollback waits up to 30 s+ behind a blend that's burning its budget.
+- New today (owners): API-ASM-CONFIG-NAMES (P2 dx), CONFIG-INPUT-ID (P3 psui), FS-EDITOR-COMPLETE (P2 psui).
 
 ## Release blockers seen by qa (updated 2026-10-27 06:10, green 4756f9be; see the newest "Green" section)
 - Verified in the green app bcf401ca: the five crash documents open (DOC-POISON guard), TWO-PROCESS-LOST-EDIT (both edits
