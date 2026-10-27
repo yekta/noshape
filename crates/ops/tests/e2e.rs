@@ -213,6 +213,12 @@ fn assembly_with_mates() {
     // Limits the mate type doesn't have are refused.
     let err = try_call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "limits": { "x": { "min": "0 mm" } } })).unwrap_err();
     assert_eq!(err.param.as_deref(), Some("limits"), "{err:?}");
+    // Another type: a default name follows it, as in the mate dialog (qa API-MATE-RETYPE-NAME).
+    let r = call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "type": "slider" }));
+    assert_eq!(r["name"], "Slider 1", "{r}");
+    call(&mut ctx, "assembly_mate", json!({ "mate": "Slider 1", "name": "Pin guide" }));
+    let r = call(&mut ctx, "assembly_mate", json!({ "mate": "Pin guide", "type": "cylindrical" }));
+    assert_eq!(r["name"], "Pin guide", "a custom name stays: {r}");
 }
 
 /// A configured block: a List input sets the extrude depth, a Checkbox

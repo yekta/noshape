@@ -486,7 +486,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [ ] P2 API-MATE-RETYPE-NAME assembly_mate editing an existing mate's `type` keeps its old name: asm5.noshape's "Revolute 1"
+- [x] (dx 10-27: a default name follows the new type keeping its number, a custom name stays (noshape_model::default_names::retyped, the dialog's rule); e2e assembly_with_mates retypes Revolute 1 → Slider 1) P2 API-MATE-RETYPE-NAME assembly_mate editing an existing mate's `type` keeps its old name: asm5.noshape's "Revolute 1"
   retyped to fastened / slider / cylindrical / planar / ball / pin slot stays "Revolute 1" (DOF right in each case: 0 1 1 2 3
   3 2). In the app, retyping in the mate dialog renames the mate (Cylindrical 1 → Revolute: title and row "Revolute 1",
   green 16cdcf6d), so the API gives a different result for the same edit (qa 2026-10-27, watcher CLI 08:30)

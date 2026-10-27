@@ -715,7 +715,8 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = editing.unwrap_or_else(|| MateId(asm.next_id()));
     let name = match (a.opt_str("name")?, &old) {
         (Some(n), _) => n.trim().to_string(),
-        (None, Some(m)) => m.name.clone(),
+        // A default name follows the new type ("Revolute 1" → "Slider 1"), as in the dialog.
+        (None, Some(m)) => noshape_model::default_names::retyped(&m.name, m.mate_type.name(), mate_type.name()),
         (None, None) => asm.next_feature_name(mate_type.name()),
     };
     let mut m = match &old {

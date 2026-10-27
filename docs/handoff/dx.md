@@ -97,6 +97,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- assembly-ui (after your move settles): assembly_mate_dialog.rs set_type renames a default name inline; it can call
+  `noshape_model::default_names::retyped(&self.name, old, new)` (the same rule the API now uses), one copy.
 - App (after the app split): crates/app/src/part_studio/sheet_metal_panel.rs has the same logic as the new
   `noshape_ops::sheetmetal` (joint_rows, joint_edit_index, insert_joint_edit, bend_faces, bend_row_order, plain, the
   Radius / K factor edit, Convert to rip, Move up / down); its handlers should call that module (dx can do it once the

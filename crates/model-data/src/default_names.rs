@@ -21,6 +21,16 @@ pub fn base(english: &str) -> String {
     base_with(*LOCALIZER.read().unwrap_or_else(|e| e.into_inner()), english)
 }
 
+/// A default name kept across a type change ("Revolute 1" → "Slider 1" when
+/// a Revolute mate becomes a Slider; live's mate dialog): the new type's
+/// base with the same suffix. A custom name stays as it is.
+pub fn retyped(name: &str, old_english: &str, new_english: &str) -> String {
+    match name.strip_prefix(base(old_english).as_str()) {
+        Some(rest) => format!("{}{rest}", base(new_english)),
+        None => name.to_string(),
+    }
+}
+
 fn base_with(f: Option<Localizer>, english: &str) -> String {
     f.and_then(|f| f(english)).unwrap_or(english).to_string()
 }
