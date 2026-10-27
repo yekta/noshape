@@ -555,6 +555,20 @@ impl AssemblyView {
         self.refresh_scene(false, cx);
     }
 
+    /// j: shows every mate when any is hidden (a new mate is), else hides
+    /// them all, as Show all mates / Hide all mates (live; J-KEY-NO-EFFECT:
+    /// it flipped a view flag that each mate's own Hidden overrode).
+    pub(super) fn toggle_mates(&mut self, cx: &mut Context<Self>) {
+        let Some(asm) = self.assembly(cx) else { return };
+        if asm.mates.is_empty() {
+            return;
+        }
+        let shown = self.show_mates && asm.mates.iter().all(|m| !m.hidden);
+        let ids: Vec<MateId> = asm.mates.iter().map(|m| m.id).collect();
+        self.set_mates_hidden(ids, shown, cx);
+        cx.notify();
+    }
+
     pub(super) fn show_all_mates(&mut self, cx: &mut Context<Self>) {
         let ids: Vec<MateId> = self.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).collect()).unwrap_or_default();
         self.set_mates_hidden(ids, false, cx);
@@ -870,10 +884,25 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// The inline rename input when `row` is being renamed.
-    pub(super) fn rename_field(&self, row: RenameRow) -> Option<AnyElement> {
+    /// The inline rename input when `row` is being renamed. Esc cancels it:
+    /// the old name stays (live; ASM-RENAME-ESC).
+    pub(super) fn rename_field(&self, row: RenameRow, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (r, st, _) = self.ui.rename.as_ref()?;
-        (*r == row).then(|| div().flex_1().child(Input::new(st).xsmall()).into_any_element())
+        (*r == row).then(|| {
+            div()
+                .flex_1()
+                .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                    if ev.keystroke.key == "escape" {
+                        // Dropping the subscription first: the blur commits nothing.
+                        this.ui.rename = None;
+                        window.focus(&this.focus, cx);
+                        cx.stop_propagation();
+                        cx.notify();
+                    }
+                }))
+                .child(Input::new(st).xsmall())
+                .into_any_element()
+        })
     }
 
     /// Shift+N: rename the selected instance or mate feature.
@@ -1446,7 +1475,7 @@ impl AssemblyView {
             .hover(|d| d.bg(pal.panel_hover))
             .child(div().w(px(12.)).child(svg().path(icon_path(if expanded { "chevron-down" } else { "chevron-right" })).size_3().text_color(pal.text_faint)))
             .child(svg().path(icon_path("folder")).size_3p5().text_color(pal.text_muted))
-            .child(match self.rename_field(RenameRow::Feature(id)) {
+            .child(match self.rename_field(RenameRow::Feature(id), cx) {
                 Some(field) => field,
                 None => div().flex_1().truncate().child(format!("{} ({count})", folder.name)).into_any_element(),
             })

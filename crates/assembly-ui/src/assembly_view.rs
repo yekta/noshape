@@ -3329,7 +3329,7 @@ impl AssemblyView {
                     }),
             )
             .child(crate::ui::tree_icon(icon, suppressed || hidden, cx))
-            .child(match self.rename_field(behaviors::RenameRow::Instance(top)).filter(|_| is_top) {
+            .child(match self.rename_field(behaviors::RenameRow::Instance(top), cx).filter(|_| is_top) {
                 Some(field) => field,
                 // The state glyphs follow the name (Onshape), not the row's right edge.
                 None => suppressed_text(div().min_w_0().truncate().mr(px(2.)), suppressed || dyn_suppressed).child(crate::ui::user_text(name.clone())).into_any_element(),
@@ -3537,7 +3537,7 @@ impl AssemblyView {
                 }))
             }))
             .child(div().flex_none().when(dim, |d| d.opacity(0.5)).child(crate::assets::icon(&icon, 14., cx)))
-            .child(match self.rename_field(behaviors::RenameRow::Feature(id)) {
+            .child(match self.rename_field(behaviors::RenameRow::Feature(id), cx) {
                 Some(field) => field,
                 None => suppressed_text(div().flex_1().truncate(), inactive).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
@@ -3667,7 +3667,7 @@ impl AssemblyView {
             .when(all_selected, |d| d.bg(pal.accent_soft))
             .hover(|d| d.bg(pal.panel_hover))
             .child(div().w(px(16.)).flex_none().flex().justify_center().child(crate::assets::icon(&icon_path("assembly"), 16., cx)))
-            .child(match self.rename_field(behaviors::RenameRow::Instance(InstanceId::ORIGIN)) {
+            .child(match self.rename_field(behaviors::RenameRow::Instance(InstanceId::ORIGIN), cx) {
                 Some(field) => field,
                 None => div().min_w_0().truncate().child(crate::ui::user_text(name)).into_any_element(),
             })
@@ -5762,11 +5762,7 @@ impl AssemblyView {
         root
             .on_action(cx.listener(|this, _: &InsertInstance, window, cx| this.toggle_insert(window, cx)))
             .on_action(cx.listener(|this, _: &FastenMate, window, cx| this.start_mate(MateType::Fastened, window, cx)))
-            .on_action(cx.listener(|this, _: &ToggleMates, _, cx| {
-                this.show_mates = !this.show_mates;
-                this.refresh_scene(false, cx);
-                cx.notify();
-            }))
+            .on_action(cx.listener(|this, _: &ToggleMates, _, cx| this.toggle_mates(cx)))
             .on_action(cx.listener(|this, _: &ToggleShowMatesMode, _, cx| this.toggle_show_mates_mode(cx)))
             .on_action(cx.listener(|this, _: &ToggleSnapMode, window, cx| this.toggle_snap(window, cx)))
             .on_action(cx.listener(|this, _: &ToggleMateConnectors, _, cx| {
