@@ -60,6 +60,15 @@ impl<'a> SheetPick<'a> {
     pub fn hover_at(&self) -> Option<u32> {
         let tol = self.tol_mm(5.0);
         let hover = self.built.and_then(|b| b.hit(self.cursor, tol));
+        // Tools that take only view edges (or sketch geometry) look for those
+        // under whatever else is on top (an annotation, a centerline).
+        let edges_only = |also_sketch: bool| self.built.and_then(|b| b.hit_where(self.cursor, tol, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }) || (also_sketch && matches!(t, PickTarget::SketchEntity(_)))));
+        let hover = match self.tool {
+            Tool::Dimension { kind: DimTool::Point2, .. } => hover,
+            Tool::Dimension { kind: DimTool::Linear, .. } | Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
+            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } => edges_only(false).or(hover),
+            _ => hover,
+        };
         let hover = match (self.tool, hover) {
             // 2 point linear takes points only: no edge highlight.
             (Tool::Dimension { kind: DimTool::Point2, .. }, _) => None,

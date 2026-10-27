@@ -230,6 +230,22 @@ impl BuiltSheet {
         self.tables.iter().find(|(t, _)| *t == id).map(|(_, l)| l)
     }
 
+    /// The closest line pick target to a sheet point within `tol` mm among
+    /// those `accept` takes (a tool that takes only view edges sees the
+    /// edge under an annotation or a centerline; qa DWG-DIM-TWO-EDGES).
+    pub fn hit_where(&self, p: [f64; 2], tol: f64, accept: &dyn Fn(&PickTarget) -> bool) -> Option<u32> {
+        let mut best: Option<(u32, f64)> = None;
+        for l in self.geometry.lines.iter().filter(|l| l.pick != 0 && self.picks.get(l.pick as usize).is_some_and(accept)) {
+            let n = l.points.len();
+            let segs = if l.closed { n } else { n.saturating_sub(1) };
+            let d = (0..segs).map(|i| dist_to_segment(p, l.points[i], l.points[(i + 1) % n])).fold(f64::INFINITY, f64::min);
+            if d <= tol && best.is_none_or(|(_, bd)| d < bd) {
+                best = Some((l.pick, d));
+            }
+        }
+        best.map(|(k, _)| k)
+    }
+
     /// Closest pick target to a sheet point within `tol` mm. Annotations win
     /// ties against view geometry.
     pub fn hit(&self, p: [f64; 2], tol: f64) -> Option<u32> {

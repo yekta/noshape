@@ -523,7 +523,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   not the original 60779.48). Related, app (green 4854cad4): opening Extrude 1 and ✓ without a change records "Edit :
   Extrude 1", so the next Ctrl+Z seems to do nothing (live asked whether an unchanged ✓ makes a history entry, qa batch 2
   (7)) (qa 2026-10-27, watcher CLI 08:12)
-- [ ] P2 DWG-DIM-TWO-EDGES drawing Dimension (d): click a view's left vertical edge, then its right vertical edge: ours
+- [ ] (dx 10-27: the shared tools' hover took the topmost target and dropped it when not an edge, so an edge under an annotation, a snap point or the pending dimension's preview was never picked; edge-only tools now hit-test edges first (BuiltSheet::hit_where). API: line_to_line on dwg82's two edges now gives 82, e2e drawing_line_to_line_on_two_edges. App half (the second click placing the first edge's length) to re-check on the next green, then close) P2 DWG-DIM-TWO-EDGES drawing Dimension (d): click a view's left vertical edge, then its right vertical edge: ours
   places the left edge's length (82) at the second click; live switches to the horizontal line-to-line distance between
   the two edges after the second click and places it on the third (behaviours "qa (2026-10-27, P2 batch 2)" (2)); repro
   /root/qa-scratch/dwg82.noshape Top view (qa 2026-10-27, green bcf401ca)

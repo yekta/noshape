@@ -4685,3 +4685,25 @@ fn release_parts_and_revision_history() {
     let all = call(&mut ctx, "release_revision_history", json!({}));
     assert_eq!(all["packages"].as_array().unwrap().len(), 2, "{all}");
 }
+
+/// qa DWG-DIM-TWO-EDGES: Line to line on two parallel view edges clicked at
+/// their middles (where snap points and other targets sit on top) dimensions
+/// the distance between them.
+#[test]
+fn drawing_line_to_line_on_two_edges() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "dim_two_edges.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let dw = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": dw, "edges": true }));
+    let view = g["views"].as_array().unwrap().iter().find(|v| v["orientation"] == "front").unwrap().clone();
+    let mut vertical: Vec<Value> = view["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][0]) - num(&e["b"][0])).abs() < 1e-6).cloned().collect();
+    vertical.sort_by(|a, b| num(&a["a"][0]).total_cmp(&num(&b["a"][0])));
+    let (l, r) = (vertical.first().unwrap(), vertical.last().unwrap());
+    let mid = |e: &Value| json!([num(&e["a"][0]), (num(&e["a"][1]) + num(&e["b"][1])) / 2.0]);
+    let width = num(&r["a"][0]) - num(&l["a"][0]);
+    let out = call(&mut ctx, "drawing_dimension", json!({ "drawing": dw, "kind": "line_to_line", "picks": [mid(l), mid(r)], "place": [num(&l["a"][0]) + width / 2.0, num(&l["b"][1]).max(num(&l["a"][1])) + 15.0] }));
+    let text = out["annotations"].as_array().unwrap().last().unwrap()["text"].as_str().unwrap().to_string();
+    let scale = num(&view["scale"]);
+    assert!((text.parse::<f64>().unwrap() - width / scale).abs() < 0.01, "{text} vs {} (sheet {width}, scale {scale})", width / scale);
+}
