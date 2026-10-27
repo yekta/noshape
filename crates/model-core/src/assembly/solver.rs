@@ -1317,25 +1317,48 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
     let cost = |r: &[f64]| r.iter().map(|v| v * v).sum::<f64>().sqrt();
     let before = cost(&r).max(1e-10);
     let mut trial = poses.to_vec();
-    for _ in 0..6 {
-        let jac = jacobian(problem, &trial, free, &r, scale, 1e-7);
+    // About 10× closer each step (oracle R1: 0.1 rad → 2e-8 after 6); the
+    // fine difference step keeps the null space exact enough to go on.
+    for _ in 0..12 {
+        let jac = jacobian(problem, &trial, free, &r, scale, 1e-9);
         let eig = (jac.transpose() * &jac).symmetric_eigen();
         let maxv = eig.eigenvalues.iter().fold(0.0f64, |a, v| a.max(v.abs()));
         let null: Vec<usize> = (0..n).filter(|&i| eig.eigenvalues[i].abs() <= 1e-8 * maxv.max(1.0)).collect();
-        let basis = DMatrix::<f64>::from_fn(n, null.len(), |row, c| eig.eigenvectors[(row, null[c])]);
-        let mut back = DVector::<f64>::zeros(n);
+        let mut basis = DMatrix::<f64>::from_fn(n, null.len(), |row, c| eig.eigenvectors[(row, null[c])]);
+        // The change is measured at each body's mate connectors (their mean),
+        // not at its part origin (oracle_asm R1: a pin on a Revolute keeps
+        // its turn, where pulling its far part origin back turned it −6°):
+        // in coordinates (anchor move, turn), anchor move = t + w × lever.
+        let levers: Vec<DVec3> = free.iter().map(|&bi| trial[bi].rotation * anchor(problem, bi) / scale).collect();
+        let to_anchor = |v: &mut DMatrix<f64>, sign: f64| {
+            for (k, l) in levers.iter().enumerate() {
+                for c in 0..v.ncols() {
+                    let w = DVec3::new(v[(k * 6 + 3, c)], v[(k * 6 + 4, c)], v[(k * 6 + 5, c)]);
+                    let m = w.cross(*l) * sign;
+                    for j in 0..3 {
+                        v[(k * 6 + j, c)] += m[j];
+                    }
+                }
+            }
+        };
+        to_anchor(&mut basis, 1.0);
+        let basis = if null.is_empty() { basis } else { basis.qr().q().columns(0, null.len()).into_owned() };
+        let mut back = DMatrix::<f64>::zeros(n, 1);
         for (k, &bi) in free.iter().enumerate() {
             if (0..6).all(|j| (0..null.len()).all(|c| basis[(k * 6 + j, c)].abs() < 1e-6)) {
                 continue;
             }
             let (s, c) = (problem.bodies[bi].pose, trial[bi]);
-            let t = (s.origin - c.origin) / scale;
+            let a = anchor(problem, bi);
+            let t = (s.transform_point(a) - c.transform_point(a)) / scale;
             let w = log_rot(s.rotation * c.rotation.inverse());
             for (j, v) in [t.x, t.y, t.z, w.x, w.y, w.z].into_iter().enumerate() {
-                back[k * 6 + j] = v;
+                back[(k * 6 + j, 0)] = v;
             }
         }
-        let along = &basis * (basis.transpose() * &back);
+        let mut along = &basis * (basis.transpose() * &back);
+        to_anchor(&mut along, -1.0);
+        let along = DVector::from_column_slice(along.as_slice());
         let svd = jac.svd(true, true);
         let tol = 1e-10 * svd.singular_values.iter().fold(0.0f64, |a, v| a.max(*v));
         let Ok(fix) = svd.solve(&(-DVector::from_column_slice(&r)), tol) else { return };
@@ -1352,6 +1375,32 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
     if cost(&r) <= before {
         poses.copy_from_slice(&trial);
     }
+}
+
+/// Body-local point where [`least_change`] measures `body`'s move: the mean
+/// origin of its connectors in the problem's mates (the part origin when it
+/// has none).
+fn anchor(p: &Problem, body: usize) -> DVec3 {
+    let (mut sum, mut n) = (DVec3::ZERO, 0.0);
+    let mut add = |m: &SolverMate| {
+        for (b, f) in [(m.a, &m.a_local), (m.b, &m.b_local)].into_iter().chain(m.extra.iter().map(|(b, f)| (*b, f))) {
+            if b == body {
+                sum += f.origin;
+                n += 1.0;
+            }
+        }
+    };
+    for &t in &p.terms {
+        match t {
+            Term::Mate(i) => add(&p.mates[i]),
+            Term::Relation(i) => {
+                add(&p.mates[p.relations[i].mate_a]);
+                add(&p.mates[p.relations[i].mate_b]);
+            }
+            Term::Drag(_) | Term::Stay(_) => {}
+        }
+    }
+    if n > 0.0 { sum / n } else { DVec3::ZERO }
 }
 
 fn fill_mate_status(p: &Problem, poses: &[Frame], result: &mut SolveResult) {
@@ -1759,7 +1808,9 @@ mod tests {
             let p = bodies[1].pose;
             let o = p.origin / mm;
             assert!((o - DVec3::new(30.0, 5.0, 12.0)).abs().max_element() < 1e-9, "turn {turn}: at {o:?} mm");
-            assert!(p.rotation.angle_between(rotation) < 1e-12, "turn {turn}: turned {}", p.rotation.angle_between(rotation));
+            // The turn from the vector part (angle_between's acos reads one ulp as 3e-8).
+            let turned = 2.0 * (p.rotation * rotation.inverse()).xyz().length();
+            assert!(turned < 1e-12, "turn {turn}: turned {turned}");
         }
     }
 
