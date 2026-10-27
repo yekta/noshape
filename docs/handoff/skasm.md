@@ -62,8 +62,9 @@ Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs do
    ✅; CA3 closed by ui, CA4 and A15 rechecked on green).
 4. Exact flip with nothing fixed: which part turns now follows a rule fitted to live's 14 R3 runs (the first
    connector's part when the common Z's first non-zero coordinate is negative, else the second's; solver test
-   `exact_flip_turns_the_part_live_turns`). It fits all 14 but is a fit; a live run with Z = (+ε, −1, 0) or similar
-   would confirm it.
+   `exact_flip_turns_the_part_live_turns`), and only that part moves (d249b08a: the other is held for a first solve,
+   as live keeps its transform). It fits all 14 but is a fit; asked live (REQUESTS 10-27) for 4 confirming runs and a
+   no-flip run (with both free ours still splits the move between the two parts; live probably moves one).
 5. Slot: live shows all 3 offset glyphs at the end cap; after the commit live's centre line is plain dark blue (ours
    stayed highlighted once, not reproduced).
 6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
