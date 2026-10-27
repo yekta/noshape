@@ -84,7 +84,9 @@ that touches the model: ~12 min.
    asked which edges). The picked region's tint and the extrude's end cap (grey at 50 %, `extrude_end_cap`) are
    drawn over the mix too, as live at slider 0 / 1 (psui-prv-05a/b). Left: under the cap, live's boss top is the
    part's own lit top (143,185,211), ours the preview tone at ambient: live's "with" model may draw an Add's body
-   in the part colour; check its left / right faces against that before changing `shade_preview`.
+   in the part colour. But the rest shot (top over white (121,135,144), the cap over a 0.7 mix) implies a top of
+   (109,149,175): the two don't agree under one model (cap post-mix at 50 %), so ask live for the boss top at
+   slider 1 with the cap's region excluded (e.g. Depth 25 mm, sample the top's far corner) before changing it.
 2. part-studio.md 🔧 rows waiting for live (asked 10-27): 3.7 box into a dialog field (ours: Fillet takes the 6 faces),
    3.12 / 3.13 Select other into a field, 6.26 / 6.37 / 6.38 list separator and folder menus. Dihedral comb length vs
    Scale and its "Min: 90 deg" label (asked).
