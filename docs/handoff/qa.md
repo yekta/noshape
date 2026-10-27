@@ -212,6 +212,9 @@ in Extrude's regions field picks the face), ORD-BASE.
 - bin/hangwatch.sh runs (pid in /root/qa-scratch/hangwatch.pid): gdb backtrace of any fuzz CLI that stalls (no CPU
   180 s) or spins (its fuzz log idle 600 s) into cli/hang-<pid>-<time>.txt. Seed 131 rerun with the budget on is at
   step 66 (delete) at 97 % CPU.
+- Assembly export round trip (bin/asmrt.py, asm5): STEP → import = Assembly (3 instances, same placements; the two pin
+  instances swap <1>/<2>) + a Part Studio with each part once (39430.089 / 2356.194 exact); IGES and Parasolid → 3 placed
+  parts, exact; GLB writes. No findings.
 - Fuzz: batch 9 (seeds 120–127, watcher CLI 08:30): seed 120 hit the 1500 s timeout again (the BUDGET-LONGJMP malloc
   deadlock seed), 121–127 clean. Budget A/B (seeds 130–137, CLI 09:50, on vs NOSHAPE_BLEND_BUDGET=100000): 130 clean on
   both; still running (~23 min a seed). Cold-open fuzz 140–141 consistent.
