@@ -80,6 +80,14 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 - 10-27 16:10: GPU-TEST-SEGV (P1, lead): GPU tests crashed in a driver's exit handler after it was unloaded (each
   Renderer::new loaded and dropped its own Vulkan instance + device); one process-wide device now (renderer
   `shared_device`), 90 / 90 clean runs where the old binary died once in 27.
+- 10-27 14:10–15:10 (new psui session, taking over from the one moved off its account): ab488e30 perf.yml speed
+  targets (the previous session's); 9d216d54 EDGE-ON-PLANE-PICK (P1: a datum plane's border picks as its fill, first
+  and without depth writes, `Instance::pick_behind`; offscreen test); d6e49c94 SPACE-CHECKBOX (P1: GPUI's keyboard
+  click already presses a focused element with a click handler, the tab stops' own key handler toggled twice);
+  9dd786cc PART-HOVER-RED (`accent` never takes the error red; scene test) + PARTS-SHIFT-RANGE; d96076f9
+  EXPR-ENTER-COMMITS. BOX-FILLET-FACES is a preselection (box drawn before the dialog opened), DIALOG-OK-STATE has
+  bundle notes: both wait for live (REQUESTS psui 10-27). perf.yml on main dispatched 15:01: 40526871683 (bench),
+  40526882894 (bench, COLD=1): read their "Speed targets" lines into the table below.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -124,6 +132,9 @@ App edit → `cargo build -p noshape`: 60–78 s. A vendor gpui-base / gpui-pre-
 that touches the model: ~12 min.
 
 ## Next, in order
+
+0. Live answers pending (REQUESTS psui 10-27): BOX-FILLET-FACES preselection, DIALOG-OK-STATE (a) / (b), the part hover
+   look in a part field (PART-HOVER-RED look). Apply each as answered.
 
 1. Our base part shading differs a few units from live's (block top (140,185,212) vs (145,181,203)), which is what
    the preview samples still differ by.
