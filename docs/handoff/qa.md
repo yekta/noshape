@@ -4,7 +4,7 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 ## Parity re-verification (lead 10-27 13:50; standing, high priority)
-**P1 verified: 622 of 804 rows** (❌ open: SKETCH-LINE-MENU, FILLET-POINT-MSG (sketch.md); DIALOG-OK-STATE resolved f16b31c6; HOLE-SIZE-NO-DIAMETER, DIM-AC-ENTER, TAB-EXPORT-MISSING fixed and verified f16b31c6; OTF-FIRST-KEY, BOX-FILLET-FACES, SURF-EXTRUDE-SKETCH-EDGES fixed and verified (6cbb24e0 / 203c4d6f); SPACE-CHECKBOX and SHORTCUT-MAP-FOCUS fixed and verified). Column "Verified" = `0.4.10+ / <green> <date>`
+**P1 verified: 631 of 804 rows** (❌ open: SKETCH-LINE-MENU, FILLET-POINT-MSG (sketch.md); DIALOG-OK-STATE resolved f16b31c6; HOLE-SIZE-NO-DIAMETER, DIM-AC-ENTER, TAB-EXPORT-MISSING fixed and verified f16b31c6; OTF-FIRST-KEY, BOX-FILLET-FACES, SURF-EXTRUDE-SKETCH-EDGES fixed and verified (6cbb24e0 / 203c4d6f); SPACE-CHECKBOX and SHORTCUT-MAP-FOCUS fixed and verified). Column "Verified" = `0.4.10+ / <green> <date>`
 (green after v0.4.10). Helper: /root/qa-scratch/bin/pv.py (`count`, `list FILE`, `set FILE ROW TEXT [--fail TICKET]`);
 sessions /root/qa-scratch/bin/pvs.sh, shots /root/qa-scratch/pv/. Live reference = behaviours.md; rows with no live record
 go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (left: 5.8b, 5.16, 5.34, 6.24 (need a dimensioned sketch), 7.6 (needs surfaces / composite), 10.7a / 10.8 (section manipulator, 3 planes), 11.4 (no-material mass props asked live), 13.13 (configurations); sketch.md §1–8 in progress (rows exercised in the app marked; T:-only rows left for later); workflow-sketch-tools.md done (left: SK5 CLI, SEL1); workflow-booleans.md 28/28 (bool-base / merge-base copies in qa-scratch, volumes via bin/qparts.sh); 5.2 Enter on an empty feature asked live). Session moved to the Stablecog account 14:10; §4–5 on green 6011065d.
@@ -14,10 +14,12 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   workflow-sketch-tools (32/34), sketch.md §1–12 rows exercised in the app (T:-only rows not yet). Done: p1-dialogs state replay (bin/p1states.py = ui-scratch's ours-states.py on :110, crops in p1a/ours, compare with
   live/p1audit via ui-scratch/audit/pair.sh). Done: core-workflow (fresh profile HOME=/tmp/qa-home2) except 2.17/2.18, 3.5/3.6, 3.8–3.12, 3.14, 3.16, 4.2–4.8, 5.6–5.11, 6.3, 7.2. workflow-p1-pass: Part Studio rows on qa-scratch/wf-block.noshape (40×20×10, Fillet R2, Chamfer, 2-point Hole + feature pattern; bin/mkblock.py); assembly rows on qa-scratch/pin.noshape (plate 60×20×5 with 3 Ø10 holes + Ø10×30 pin, built by bin/mkpin.py); left: drawing / BOM / explode / pattern / replicate rows. Next: the rest of interaction / navigation (touch / macOS / Windows rows need those platforms),
   workflow-p1-pass, workflow-undo, sketch.md rest.
+- Filed (evening, greens 203c4d6f): P2 PREVIEW-SELF-PICK (psui: clicks on a feature preview's own faces give a self-reference), P2 DUP-COINCIDENT, P2 SKETCH-LINE-MENU (regression), P3 FILLET-POINT-MSG (skasm).
 - Filed (later, greens 2a6d0167 / 1c853f78): P1 HOLE-SIZE-NO-DIAMETER (drill size doesn't set the diameter), P1 TAB-EXPORT-MISSING, P2 DIM-AC-ENTER (value boxes need an extra Enter when the autocomplete is open), P2 EXPR-PARSE-JUNK ("1 in26" → 126 in), P3 VERSION-FOOTER-STALE.
 - Filed: P1 DIALOG-OK-STATE, P1 SHORTCUT-MAP-FOCUS, P1 SURF-EXTRUDE-SKETCH-EDGES (core), P1 OTF-FIRST-KEY (skasm, also
   in v0.4.10), P2 EXPR-ENTER-COMMITS (fixed by psui), P2 SKETCH-S-EXTRUDE, P2 PLANE-MENU-SELECTED, P2 SKETCH-RMB-ITEMS,
   P2 VAR-BARE-UNIT, P3 MENU-TRUNCATE; P1 SPACE-CHECKBOX filed and verified fixed.
+- Verified fixed on f16b31c6 (18:40–18:46): HOLE-SIZE-NO-DIAMETER, TAB-EXPORT-MISSING, DIM-AC-ENTER, EXPR-PARSE-JUNK, VAR-BARE-UNIT, PLANE-MENU-SELECTED, SKETCH-RMB-ITEMS, LOFT-PROFILES-PINK, SKETCH-S-EXTRUDE, ASM-DIR-NO-HOVER; DIALOG-OK-STATE resolved (live = ours). On 203c4d6f: SURF-EXTRUDE-SKETCH-EDGES, BOX-FILLET-FACES. On 6cbb24e0: OTF-FIRST-KEY.
 - Verified fixed on 1c853f78: SHORTCUT-MAP-FOCUS, EXPR-ENTER-COMMITS.
 - Verified fixed on 2a6d0167: SPACE-CHECKBOX, EDGE-ON-PLANE-PICK, PARTS-SHIFT-RANGE, PART-HOVER-RED, REGEN-NO-CANCEL;
   SKETCH-SOLVE-SPLINE-SLOW on the lead's CLI (0.28 / 0.48 s, were 175 / 295 s).

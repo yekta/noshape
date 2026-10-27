@@ -46,7 +46,7 @@ then edits, undo/redo, rollback and suppress.
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
 | Create Drawing of Assembly 1… (suggested views) | 4 views, pin seen through hole 1, edges correct | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Part Studio tab menu | Delete, Rename, Properties…, Show code, Duplicate, Copy to clipboard, Select as document thumbnail, Move to document…, Export… | same (+ Open in new browser tab, browser only) | ✅ |  |
+| Part Studio tab menu | Delete, Rename, Properties…, Show code, Duplicate, Copy to clipboard, Select as document thumbnail, Move to document…, Export… | same (+ Open in new browser tab, browser only) | ✅ | 0.4.10+ / f16b31c6 10-27 |
 | Part row › Create Drawing of Part 1… | "Part 1 Drawing 1" tab right after Part Studio 1, 4 views | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Dimension on a straight edge (assembly drawing) | "2.362" placed | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Dimension on a hole circle | part drawing "Ø.394" ✅; **assembly drawing: click not taken** | — | ✗ **P2-D1** |  |
@@ -57,7 +57,7 @@ then edits, undo/redo, rollback and suppress.
 |---|---|---|---|---|
 | Linear pattern (assembly): dialog | Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction | A6 (pass 21) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Pattern the pin 20 mm along the plate edge (flipped) | preview in hole 2; ✓ → "Linear pattern 1 ▸ Part 2 <2>", Instances (3) | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Enter twice in the pattern dialog | stays open | Part Studio dialogs commit on the 2nd Enter; assembly? (request p3) | ✅ P2-A1 (skb 9bf8475b, qa re-check on a08e3eda) |  |
+| Enter twice in the pattern dialog | stays open | Part Studio dialogs commit on the 2nd Enter; assembly? (request p3) | ✅ P2-A1 (skb 9bf8475b, qa re-check on a08e3eda) | 0.4.10+ / f16b31c6 10-27 |
 | Exploded views panel → Add exploded view | "Editing Explode 1 [Done]" banner, Explode 1 row, "Build steps by dragging components" | EXV rows | ✅ | 0.4.10+ / 1c853f78 10-27 |
 
 ## P1 extras, green 461aefb0
@@ -87,12 +87,12 @@ then edits, undo/redo, rollback and suppress.
 | View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |  |
 | Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
-| Group dialog (assembly) | one "Instances" field | same (behaviours 1333) | ✅ |  |
+| Group dialog (assembly) | one "Instances" field | same (behaviours 1333) | ✅ | 0.4.10+ / f16b31c6 10-27 |
 | Split of an inserted part in the Part Studio | the halves are new parts (ids from Split, renamed Part 6 / 7, others renumbered); the assembly instance of the old part fails "Failed to resolve instance." and its mate / pattern error | live Split re-identifies the same way (old id gone, halves new, renumbered; behaviours "qa5 (10-25 p3)" Split) | ✅ (consistent) |  |
 | P2-D1 on green af9f1e4c (fix 817d9cb1) | assembly drawing, tilted plate: d on the middle hole rim → "Ø.394" preview, prompt "Click to place the dimension, or select a second entity" | — | ✅ **fixed** |  |
 | STEP import ("+" › Import…, bracket.step) | "Import to Onshape" options; Import → tab "bracket" + folder "CAD Imports" | same dialog (behaviours 1051) | ✅ |  |
 | Assembly drawing after the unrelated import | Update ⟳ turns saturated (out of date) | unrelated changes? (request 10-26 p5) | ? |  |
-| Part Studio tab menu (green af9f1e4c) | Delete / Open in new browser tab, Rename, Properties…, Show code / Duplicate, Copy to clipboard / Select as document thumbnail / Move to document… (no Export…) | the newer live captures (behaviours 6561, 7153) list exactly these; the older one (280) also had Export… | ✅ |  |
+| Part Studio tab menu (green af9f1e4c) | Delete / Open in new browser tab, Rename, Properties…, Show code / Duplicate, Copy to clipboard / Select as document thumbnail / Move to document… (no Export…) | the newer live captures (behaviours 6561, 7153) list exactly these; the older one (280) also had Export… | ✅ | superseded: live has Export… (TAB-EXPORT-MISSING, fixed dea57d5c, verified f16b31c6); row 49 is the current one |
 
 ## Pass 28, green af9f1e4c (assembly limits, live answers p2/p4/p5)
 | Step | Ours | Live | Status | Verified |
