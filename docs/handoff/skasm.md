@@ -81,7 +81,8 @@ Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs do
    skb's generator (/root/skb-scratch/gen) maps other column names; asked live for each default size's volume / faces
    to check the geometry against.
 8. Sketch solve time in broken sketches: the fuzz (random constraints, 200–600 entities) shows failing solves
-   taking ~95 ms (conflicts) and ~940 ms when not converging: `solve` retries up to 8 times with conflicts
+   taking ~95 ms (conflicts) and 230–940 ms (machine load) when not converging (profiled: 9 attempts of 3–40 ms,
+   the DOF analysis 1–4 ms): `solve` retries up to 8 times with conflicts
    excluded (sketch/src/solver.rs ~922), each a whole-sketch solve. Real edits revert a conflicting constraint, so
    only a sketch opened already broken pays it; candidate fix: retry only the failing component.
 8b. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
