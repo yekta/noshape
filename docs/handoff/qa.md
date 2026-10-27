@@ -10,6 +10,8 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 - BUDGET-LONGJMP (P0 core) has no owner commit: the blend / draft budgets siglongjmp out of OCCT from a timer signal; a
   fuzz CLI deadlocked in malloc after one (seed 120, twice), seed 131 hangs at a delete with the budget on. It ships in
   v0.4.9 and v0.4.10, and is the likeliest cause of BOOL-THREAD-CRASH (segfaults in BOPAlgo only on CLIs with the budget).
+- SKETCH-SOLVE-SPLINE-SLOW (P0 skasm, new 12:25): in a 273-entity sketch with 2 fit splines one coincident takes 176 s and
+  the next dimension 295 s (CLI 12:08); the solver's numeric gradient re-fits the spline per variable. Needs an owner.
 - REGEN-NO-CANCEL (P0 psui) has no owner commit yet: a rollback waits up to 30 s+ behind a blend that's burning its budget.
 - New today (owners): API-ASM-CONFIG-NAMES (P2 dx), CONFIG-INPUT-ID (P3 psui), FS-EDITOR-COMPLETE (P2 psui).
 - EDGE-HIGHLIGHT-LOOK filed (P1 psui) with 1× / 2× profiles of v0.4.10 vs live. Note: live's own 1× capture
