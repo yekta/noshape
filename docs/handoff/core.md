@@ -23,7 +23,12 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   5 edit commits on live's 30-feature part): 510 → ~350 ms (dev build, load ~30–40; min 312).
 - 3733ef7a SHELL-SLOW: the slab construction's common in parallel (a quarter faster).
 - 97081557 P0 FILLET-HANG: fillets/chamfers on a 30 s CPU budget (thread CPU timer, also stops on cancel); kernel test
-  `kernel_core::a_kernel_call_over_its_budget_fails`.
+  `kernel_core::a_kernel_call_over_its_budget_fails`. a117663d P0 DRAFT-HANG: drafts (30 s) and face deletions (10 s) too;
+  defeaturing runs on the calling thread (a thread CPU budget doesn't count OCCT's parallel workers: keep any op that
+  can hang single-threaded, or its budget never runs out).
+- 502416cc REGEN-SPEED: ancestor maps and surface properties cached on the C++ shape (a Mutex inside the Rust Shape
+  trips clippy's mutable_key_type wherever Shape is a hash key: keep such caches in OcShape).
+- Tickets checked on main 10-27: std_oracle hole scope and draft_curve level parting line pass (Linux).
 
 ## OCCT patches (patches/occt)
 - 0001 kern's congruent-pair reuse (TKBO). 0002 core's crash fixes (TKOffset Draft_Modification_1, TKGeomBase
