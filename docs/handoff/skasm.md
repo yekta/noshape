@@ -46,8 +46,8 @@ Sketch P1: no open items (parity/sketch.md all ✅; workflow-sketch-tools.md rec
 1. docs/parity/workflow-assembly-sweep.md: all rows ✅ 10-27 (34 left UNCONFIRMED: the 2° snap window). Filed
    PS-SECTION-RED for psui (Part Studio caps red where parts overlap; live only in the assembly). GUI docs:
    /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins), asm2 (a pin through the plate), ps2 (Part Studio overlap).
-2. docs/parity/assembly.md G5 exploded views (⏳): workflow-exploded-named-positions 2–4, 7, 11, 14–16 ✅ 10-27 (EXV6
-   rollback pill checked); left: 5 minor, NP2.
+2. docs/parity/assembly.md G5 exploded views: workflow-exploded-named-positions rechecked 10-27 (EXV6 rollback pill,
+   NP2 header measured against live 155); qa/asm3.noshape = asm1 + Revolute + a named position driving it.
 3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; left:
    A10 a toolbar tooltip staying after a click (app-core tooltips, psui's area)), workflow-configured-assembly (1–5, 8
    ✅; CA3 closed by ui, CA4 and A15 rechecked on green).

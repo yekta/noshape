@@ -28,7 +28,7 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/x01�
 | 16 | Revolute row menu (normal mode) | … Isolate…, Make transparent… \| Edit named position driver mate… \| Suppress, Dynamic suppression ▸ \| Animate… … (separators around the driver item) | same items; **no separators** around "Edit named position driver mate…" (y08) | ✅ (GUI green 19555ca3, skasm 10-27: separators around "Edit named position driver mate…") |
 | 17 | Edit named position driver mate… | banner "Editing Named position 1 [Done]", 220 px "Driving mate selector": "Mates to drive positions" › Revolute 1 › ☐ ↻ - Z (152) | same; checkbox label "⟳ - z" (lower-case) (y09) | ✅ (case ?) |
 | 18 | Tick + ✓ | two-level header "Revolute 1" over "⟳ - z"; each row "0 deg" (154) | same (y10) | ✅ |
-| 19 | Type 90 + Enter in the value cell | stores "90 deg"; cell has a 2 px blue frame while focused (155) | "90 deg" stored, the part turns 90° ✅; header styling differs: live "Name" header text bottom-aligned in a lighter cell, mate header cells darker; ours centred, same grey (cmp-y11) | ✗ **NP2** (ui, minor) |
+| 19 | Type 90 + Enter in the value cell | stores "90 deg"; cell has a 2 px blue frame while focused (155) | "90 deg" stored, the part turns 90° ✅; header styling differs: live "Name" header text bottom-aligned in a lighter cell, mate header cells darker; ours centred, same grey (cmp-y11) | ✅ NP2 (skasm 10-27 against live 155, qa/asm3.noshape: header 70 px, rows 34 px, Name cell #eaeaea with its text 45 px under the top (was 42), mate cells #d7d7d7) |
 
 
 ## Re-run pass 21 (2026-10-23, app = target-lead 10-23 17:10, main 88fbf8f)
@@ -37,7 +37,7 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/x01�
 | EXV1 empty panel | grey band behind "Add exploded view", triad-over-cube illustration (x01) | ✅ **fixed** |
 | EXV2 editing tree | indent guide line, rollback bar indented, info text on one line (x02) | ✅ **fixed** |
 | EXV3 triad | grey-outlined arrows with rings, no planar handles (x03z) | ✅ **fixed** |
-| EXV4 / EXV5 / NP1 / NP2 / MNU2 | fixed on main (code cites the qa5 IDs; NP1 Delete gated by np_editing, MNU2 separators around the driver item) | ✅ (code-verified; UI spot-check pending) |
+| EXV4 / EXV5 / NP1 / NP2 / MNU2 | fixed on main (code cites the qa5 IDs; NP1 Delete gated by np_editing, MNU2 separators around the driver item) | ✅ (code-verified; NP2 measured against live 155 by skasm 10-27) |
 | EXV6 rollback pill | not re-checked (my drag made no step this run) | – |
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871)

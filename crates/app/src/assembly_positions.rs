@@ -336,7 +336,7 @@ impl AssemblyView {
                 .relative()
                 .h(px(if two_level { 68. } else { 34. }))
                 .justify_center()
-                .when(two_level, |d| d.items_end().pb(px(9.)))
+                .when(two_level, |d| d.items_end().pb(px(6.)))
                 .bg(head_bg)
                 .child("Name")
                 .child(crate::ui::col_grip(T, "name", 140.)),
