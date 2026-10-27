@@ -143,7 +143,8 @@ impl TabManager {
             }),
             cx.subscribe_in(&doc, window, |_: &mut Self, _, _: &DocEvent, _, cx| cx.notify()),
         ];
-        search.update(cx, |s, cx| s.focus(window, cx));
+        // Live 10-27 (TABS-PANEL-FOCUS): opening the panel leaves the focus
+        // on the page; typing goes into Search tabs only once it is clicked.
         Self { doc, thumbs: Thumbs::default(), evaluator: Default::default(), search, query: String::new(), kinds: HashSet::new(), selected: active, multi: Vec::new(), collapsed: HashSet::new(), renaming: None, sort: TabSort::TabOrder, sort_open: false, sort_anchor: Default::default(), show_search: true, show_filters: true, compact: false, show_preview: true, _subs: subs }
     }
 

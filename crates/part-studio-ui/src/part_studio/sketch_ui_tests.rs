@@ -21,8 +21,8 @@ impl Render for Workspace {
     }
 }
 
-/// A fresh document's Part Studio in a test window, sketching on Top with `tool`.
-fn sketch_with(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>) {
+/// A fresh document's Part Studio in a test window, drawn once.
+fn part_studio(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
     cx.update(gpui_kit::init);
     // The app's default key bindings (Esc → Cancel, tool keys), without the
     // user's customizations.
@@ -48,6 +48,12 @@ fn sketch_with(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHan
         (w, view.unwrap())
     });
     draw(cx, window);
+    (window, view)
+}
+
+/// A fresh document's Part Studio in a test window, sketching on Top with `tool`.
+fn sketch_with(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    let (window, view) = part_studio(cx, name);
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             v.selection = vec![Reference::Plane(DatumPlane::Top)];
@@ -307,4 +313,42 @@ fn enter_in_a_line_chain_dimensions_the_last_segment(cx: &mut TestAppContext) {
     });
     keys(cx, window, &["enter"]);
     assert!(near(&dimensions(cx, &view), &[last]), "{:?} vs {last}", dimensions(cx, &view));
+}
+
+/// BOX-DIALOG-PANIC: a box selection with a feature dialog open went into the
+/// dialog's field while reading the dialog inside its own update (a panic).
+#[gpui::test]
+fn box_select_with_a_dialog_open(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "box-dialog");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    draw(cx, window);
+    // Every pick id the drawn scene can have (the default planes, the origin).
+    let ids: Vec<u32> = (1..64).collect();
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            assert!(v.edit.is_some(), "the Fillet dialog is open");
+            v.box_select(&ids, false, cx);
+            v.box_select(&ids, true, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+}
+
+/// SECTION-DIALOG-STACK: starting a feature with the Section view dialog open
+/// closes that dialog as with ✓ and keeps the section (live 10-27).
+#[gpui::test]
+fn a_feature_started_over_the_section_dialog_accepts_it(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "section-stack");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.section_through(Reference::Plane(DatumPlane::Front), w, cx);
+            assert!(v.ui.section_dialog.is_some());
+            v.start_feature("extrude", w, cx);
+            assert!(v.ui.section_dialog.is_none(), "the Section view dialog closed");
+            assert!(!v.ui.section.is_empty(), "the section stays on");
+            assert!(v.edit.is_some(), "the Extrude dialog is open");
+        })
+    })
+    .unwrap();
 }

@@ -1048,9 +1048,11 @@ impl PartStudioView {
             let dialog = e.dialog.clone();
             if let Some((_, filter, _)) = dialog.read(cx).active_filter() {
                 let current = dialog.read(cx).selected_refs();
+                // Read before the update: reading the dialog inside its own
+                // update panics (BOX-DIALOG-PANIC).
+                let own = dialog.read(cx).feature.id;
+                let fitting: Vec<PickTarget> = targets.iter().filter(|t| self.face_fits(&t.reference, filter) && !made_by(&t.reference, own)).cloned().collect();
                 dialog.update(cx, |d, cx| {
-                    let own = dialog.read(cx).feature.id;
-                    let fitting: Vec<PickTarget> = targets.iter().filter(|t| self.face_fits(&t.reference, filter) && !made_by(&t.reference, own)).cloned().collect();
                     for r in box_field_picks(&fitting, filter) {
                         if current.contains(r) == deselect {
                             d.add_pick(r.clone(), cx);

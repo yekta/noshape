@@ -1790,6 +1790,9 @@ impl PartStudioView {
         } else if self.edit.is_some() {
             self.cancel_edit(window, cx);
         }
+        // Live 10-27 (SECTION-DIALOG-STACK): an open Section view dialog
+        // closes as with ✓, the section staying on.
+        self.end_section_dialog(true, window, cx);
         let units = self.doc.read(cx).session.doc.settings.units;
         let Some(studio) = self.studio(cx) else { return };
         let Some(mut feature) = studio.new_feature(type_id, &units) else { return };
