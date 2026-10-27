@@ -6,7 +6,7 @@ crates/ops/src/coverage.rs MENUS, and MENUS lists no item the UI no longer has.
     tools/menu-coverage.py [commit]      (default: the working tree)
 
 Exit 1 with the lines to add / remove. Run by the shared pre-push hook when a push to main changes
-crates/app/src, crates/app-core/src, crates/drawing-ui/src, crates/assembly-ui/src, crates/part-studio-ui/src or the coverage map. Keep the parsing in step with `menu_labels` in the Rust test.
+crates/app/src, crates/app-core/src, crates/drawing-ui/src, crates/assembly-ui/src, crates/part-studio-ui/src, crates/variable-studio-ui/src or the coverage map. Keep the parsing in step with `menu_labels` in the Rust test.
 """
 import os, re, subprocess, sys
 
@@ -17,10 +17,10 @@ ROOT = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=Tr
 
 
 def files_at(commit):
-    """{path: text} of crates/app/src, crates/app-core/src, crates/drawing-ui/src, crates/assembly-ui/src, crates/part-studio-ui/src (top level and part_studio/) and the coverage map."""
+    """{path: text} of crates/app/src, crates/app-core/src, crates/drawing-ui/src, crates/assembly-ui/src, crates/part-studio-ui/src, crates/variable-studio-ui/src (top level and part_studio/) and the coverage map."""
     wanted = []
     if commit:
-        names = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", commit, "crates/app/src", "crates/app-core/src", "crates/drawing-ui/src", "crates/assembly-ui/src", "crates/part-studio-ui/src"], capture_output=True, text=True).stdout.split()
+        names = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", commit, "crates/app/src", "crates/app-core/src", "crates/drawing-ui/src", "crates/assembly-ui/src", "crates/part-studio-ui/src", "crates/variable-studio-ui/src"], capture_output=True, text=True).stdout.split()
         wanted = [n for n in names if n.count("/") == 3 or n.startswith(PART_STUDIO_DIRS)]
         wanted.append("crates/ops/src/coverage.rs")
         p = subprocess.Popen(["git", "-C", ROOT, "cat-file", "--batch"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -33,7 +33,7 @@ def files_at(commit):
             i = head_end + 1 + size + 1
         return texts
     texts = {}
-    for crate in ("app", "app-core", "drawing-ui", "assembly-ui", "part-studio-ui"):
+    for crate in ("app", "app-core", "drawing-ui", "assembly-ui", "part-studio-ui", "variable-studio-ui"):
         top = os.path.join(ROOT, "crates", crate, "src")
         for name in os.listdir(top):
             if name.endswith(".rs"):

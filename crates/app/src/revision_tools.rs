@@ -96,7 +96,7 @@ impl RevisionToolsView {
 /// newest first.
 fn search(number: &str, kind: ItemKind) -> Vec<Found> {
     let mut out: Vec<Found> = Vec::new();
-    for path in crate::variable_insert::other_documents(std::path::Path::new("")) {
+    for path in crate::doc_files::other_documents(std::path::Path::new("")) {
         let Ok(store) = noshape_store::Document::open_read_only(&path) else { continue };
         let log = store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
         let revisions = log.typed_revisions(number, kind);

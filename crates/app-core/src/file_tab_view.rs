@@ -102,7 +102,7 @@ pub fn download(doc: &Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mu
     let Some(TabContent::File(f)) = doc.read(cx).session.doc.tab(tab).map(|t| t.content.clone()) else { return };
     let ext = static_ext(&f.ext());
     let doc = doc.clone();
-    crate::files::request_save_path("Download", f.file_name.clone(), ext, window, cx, move |path, cx| {
+    crate::file_dialogs::request_save_path("Download", f.file_name.clone(), ext, window, cx, move |path, cx| {
         let r = f.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| std::fs::write(&path, b).map_err(|e| e.to_string()));
         let msg = match r {
             Ok(()) => format!("Downloaded {}", path.display()),
@@ -115,7 +115,7 @@ pub fn download(doc: &Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mu
 /// Update…: replace the file with another one (the tab keeps its name).
 pub fn update(doc: &Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut App) {
     let doc = doc.clone();
-    crate::files::request_open_path("Update file", "All files", &["*"], window, cx, move |path, cx| {
+    crate::file_dialogs::request_open_path("Update file", "All files", &["*"], window, cx, move |path, cx| {
         let Ok(bytes) = std::fs::read(&path) else { return };
         let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
         doc.update(cx, |d, cx| {
@@ -232,7 +232,7 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
                         Button::new("pick-import").label("Import").outline().on_click(move |_, window, cx| {
                             window.close_dialog(cx);
                             let (doc, pick) = (doc2.clone(), pick2.clone());
-                            crate::files::request_open_path(title, "Files", exts, window, cx, move |path, cx| {
+                            crate::file_dialogs::request_open_path(title, "Files", exts, window, cx, move |path, cx| {
                                 let Ok(bytes) = std::fs::read(&path) else { return };
                                 let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
                                 let file = FileTab::new(&name, &bytes, noshape_model::file_tab::now());

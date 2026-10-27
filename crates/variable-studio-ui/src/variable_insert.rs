@@ -57,31 +57,6 @@ struct DialogState {
     own_version: Option<(String, String)>,
 }
 
-/// .noshape documents besides `current`: recently opened, the documents
-/// folder and the watched folders.
-pub(crate) fn other_documents(current: &std::path::Path) -> Vec<std::path::PathBuf> {
-    let canon = |p: &std::path::Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
-    let me = canon(current);
-    let mut out: Vec<std::path::PathBuf> = Vec::new();
-    let mut push = |p: std::path::PathBuf| {
-        let c = canon(&p);
-        if c != me && c.extension().is_some_and(|e| e == "noshape") && c.exists() && !out.contains(&c) {
-            out.push(c);
-        }
-    };
-    for p in crate::files::recent() {
-        push(p);
-    }
-    for dir in std::iter::once(crate::files::documents_dir()).chain(crate::files::watched_folders()) {
-        if let Ok(rd) = std::fs::read_dir(dir) {
-            for e in rd.flatten() {
-                push(e.path());
-            }
-        }
-    }
-    out
-}
-
 /// Whether `r` points at `studio` (of `external`'s document, or this one).
 fn same_source(r: &StudioRef, studio: TabId, external: &Option<vars::ExternalStudio>) -> bool {
     r.studio == studio && r.external.as_ref().map(|e| &e.path) == external.as_ref().map(|e| &e.path)
@@ -476,7 +451,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
             let chosen = state.borrow().document.clone();
             match chosen {
                 None => {
-                    let docs = other_documents(&path);
+                    let docs = crate::doc_files::other_documents(&path);
                     if docs.is_empty() {
                         rows.push(os::info_box("No other documents.").m(px(10.)).into_any_element());
                     }
@@ -616,7 +591,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(doc_name))
                     .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(15.6)).text_color(pal.text).child(crate::ui::glyph("branch", 10., pal.text)).child(own_label)),
             )
-            .child(square("ivs-create-version", "version", "Create version…", false).on_click(move |_, window, cx| crate::history_panel::open_create_version_in(doc_v.clone(), window, cx)))
+            .child(square("ivs-create-version", "version", "Create version…", false).on_click(move |_, window, cx| crate::variable_hooks::create_version(doc_v.clone(), window, cx)))
             .child(square("ivs-version-graph", "version-graph", "Version graph", graph).on_click(move |_, window, _| {
                 let mut s = st_g.borrow_mut();
                 s.graph = !s.graph;
@@ -923,11 +898,11 @@ pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRe
                     let (p1, e2) = (e.path.clone(), e.clone());
                     m.item(crate::os_menu::OsMenuItem::new("Open linked document").on_click(move |_, _, cx| {
                         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-                        let _ = crate::files::open_document_window(p1.clone(), None, gpu, cx);
+                        let _ = crate::variable_hooks::open_document_window(p1.clone(), gpu, cx);
                     }))
                         .item(crate::os_menu::OsMenuItem::new("Update linked document").on_click(move |_, window, cx| open_at_document(d4.clone(), target, e2.path.clone(), window, cx)))
                 }
-                None => m.item(crate::os_menu::OsMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::workspace::request_activate_tab(studio_id, window, cx))),
+                None => m.item(crate::os_menu::OsMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::actions::request_activate_tab(studio_id, window, cx))),
             };
             let m = if k > 0 { m.item(crate::os_menu::OsMenuItem::new("Move up").on_click(move |_, _, cx| move_ref(&d1, target, studio_id, false, cx))) } else { m };
             let m = if k + 1 < n { m.item(crate::os_menu::OsMenuItem::new("Move down").on_click(move |_, _, cx| move_ref(&d2, target, studio_id, true, cx))) } else { m };

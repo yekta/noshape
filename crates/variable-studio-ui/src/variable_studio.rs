@@ -304,7 +304,7 @@ fn cell_div() -> Div {
 /// A variable table's "Variable type" cell: the type 7 px in, a black ▾ at
 /// the right and Onshape's select list under the cell. Every variable table
 /// draws it alike, a Variable Studio's or a Part Studio's own (live psb/t-807).
-pub(crate) fn type_cell(id: impl Into<ElementId>, options: Vec<String>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Div {
+pub fn type_cell(id: impl Into<ElementId>, options: Vec<String>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Div {
     let pal = p();
     let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
     let probe = bounds.clone();
@@ -850,7 +850,7 @@ impl Render for VariableStudioView {
                                     // An inserted table: the reference's items.
                                     Some((doc, target, me, name, k, n)) => {
                                         let (d1, d2, d3, d4) = (doc.clone(), doc.clone(), doc.clone(), doc.clone());
-                                        let m = m.item(crate::os_menu::OsMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::workspace::request_activate_tab(me, window, cx)));
+                                        let m = m.item(crate::os_menu::OsMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::actions::request_activate_tab(me, window, cx)));
                                         let m = if k > 0 { m.item(item("Move up").on_click(move |_, _, cx| crate::variable_insert::move_ref(&d1, target, me, false, cx))) } else { m };
                                         let m = if k + 1 < n { m.item(item("Move down").on_click(move |_, _, cx| crate::variable_insert::move_ref(&d2, target, me, true, cx))) } else { m };
                                         m.item(collapse)

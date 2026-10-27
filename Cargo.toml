@@ -31,6 +31,7 @@ noshape-app-core = { path = "crates/app-core" }
 noshape-drawing-ui = { path = "crates/drawing-ui" }
 noshape-assembly-ui = { path = "crates/assembly-ui" }
 noshape-part-studio-ui = { path = "crates/part-studio-ui" }
+noshape-variable-studio-ui = { path = "crates/variable-studio-ui" }
 
 gpui-kit = "0.7.3"
 wgpu = "29"
@@ -76,6 +77,9 @@ opt-level = 0
 opt-level = 0
 # The Part Studio UI, likewise.
 [profile.dev.package.noshape-part-studio-ui]
+opt-level = 0
+# The Variable Studio UI, likewise.
+[profile.dev.package.noshape-variable-studio-ui]
 opt-level = 0
 
 [profile.release]

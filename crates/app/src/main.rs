@@ -6,13 +6,15 @@
 #![recursion_limit = "256"]
 
 // The app's base layer (docs/CRATES.md), under its old paths.
-use noshape_app_core::{actions, assets, cached_slice, camera_menu, config_visibility, cursor, custom_tables, derived, doc_model, export_naming, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, properties_dialog, scene_builder, session, start_thumbnail, theme, ui, viewport};
+use noshape_app_core::{actions, assets, cached_slice, camera_menu, cursor, custom_tables, derived, doc_files, doc_model, export_naming, file_tab_view, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, properties_dialog, scene_builder, session, start_thumbnail, theme, ui, viewport};
 // The Drawing studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_drawing_hooks`.
 use noshape_drawing_ui::{drawing_create, drawing_keys, drawing_view};
 // The Assembly studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_assembly_hooks`.
 use noshape_assembly_ui::{assembly_scene, assembly_view};
 // The Part Studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_part_studio_hooks`.
 use noshape_part_studio_ui::{part_studio, select_item};
+// The Variable Studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_variable_hooks`.
+use noshape_variable_studio_ui::{variable_insert, variable_studio};
 mod fs_profile;
 mod live_server;
 mod std_source;
@@ -28,7 +30,6 @@ mod material_prefs;
 mod release_thumbs;
 mod doc_dialogs;
 mod shortcuts_page;
-mod file_tab_view;
 mod feature_studio;
 mod fs_notices;
 mod fs_import;
@@ -58,9 +59,6 @@ mod smoke;
 mod start_window;
 mod tab_manager;
 mod tab_thumbs;
-mod variable_import;
-mod variable_insert;
-mod variable_studio;
 mod workspace;
 
 use gpui_kit::component::{Theme, ThemeMode};
@@ -283,7 +281,7 @@ fn register_part_studio_hooks() {
     noshape_part_studio_ui::part_studio_hooks::register(noshape_part_studio_ui::part_studio_hooks::Hooks {
         open_document_window: |path, gpu, cx| files::open_document_window(path, None, gpu, cx),
         library_docs: || start_library::Library::default().scan(&start_library::ScanInput::current()).docs,
-        other_documents: variable_insert::other_documents,
+        other_documents: doc_files::other_documents,
         release_log: release_dialog::release_log,
         release_part_items: release_dialog::part_items,
         open_release_candidate: release_dialog::open_release_candidate,
@@ -319,6 +317,14 @@ fn register_part_studio_hooks() {
     });
 }
 
+/// What the Variable Studio (noshape-variable-studio-ui) needs of the app: other documents' windows, Create version.
+fn register_variable_hooks() {
+    noshape_variable_studio_ui::variable_hooks::register(noshape_variable_studio_ui::variable_hooks::Hooks {
+        open_document_window: |path, gpu, cx| files::open_document_window(path, None, gpu, cx),
+        create_version: history_panel::open_create_version_in,
+    });
+}
+
 fn main() {
     noshape_render::perf::process_start();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
@@ -332,6 +338,7 @@ fn main() {
     register_drawing_hooks();
     register_assembly_hooks();
     register_part_studio_hooks();
+    register_variable_hooks();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);

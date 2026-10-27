@@ -596,7 +596,7 @@ fn element_code(name: &str, content: &TabContent) -> String {
 /// tab) and it is deleted here.
 pub fn move_to_document(doc: Entity<DocModel>, tabs: Vec<noshape_model::document::TabId>, window: &mut Window, cx: &mut App) {
     let path = doc.read(cx).session.path.clone();
-    let docs = crate::variable_insert::other_documents(&path);
+    let docs = crate::doc_files::other_documents(&path);
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let rows: Vec<AnyElement> = if docs.is_empty() {

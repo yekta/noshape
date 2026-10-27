@@ -97,7 +97,7 @@ pub(super) fn cell_menu(m: crate::os_menu::OsMenu, view: Entity<VariableStudioVi
 impl VariableStudioView {
     /// ui_list on a Variable Studio: the Configurations panel's ⋯ › Expand
     /// all / Collapse all (its inputs), as the menu does it.
-    pub(crate) fn agent_list(&mut self, act: noshape_ops::window::ListAct, cx: &mut Context<Self>) {
+    pub fn agent_list(&mut self, act: noshape_ops::window::ListAct, cx: &mut Context<Self>) {
         if let noshape_ops::window::ListAct::All(open) = act {
             if open {
                 self.cfg_folded.clear();

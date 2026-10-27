@@ -1,0 +1,20 @@
+[package]
+name = "noshape-variable-studio-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's Variable Studio UI: the Variable Studio table, its configurations, CSV import, and inserting Variable Studios into elements. Built on noshape-app-core; the noshape binary registers what it needs of the app (variable_hooks)."
+
+[dependencies]
+noshape-app-core.workspace = true
+noshape-model.workspace = true
+noshape-store.workspace = true
+noshape-units.workspace = true
+noshape-ops.workspace = true
+gpui-kit.workspace = true
+anyhow.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

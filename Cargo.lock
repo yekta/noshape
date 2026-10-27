@@ -4325,6 +4325,7 @@ dependencies = [
  "noshape-sketch",
  "noshape-store",
  "noshape-units",
+ "noshape-variable-studio-ui",
  "noshape-workspace-hack",
  "open",
  "parking_lot",
@@ -4345,6 +4346,7 @@ dependencies = [
  "ahash",
  "anyhow",
  "async-channel",
+ "chrono",
  "dirs 6.0.0",
  "glam 0.34.1",
  "gpui-kit",
@@ -4732,6 +4734,24 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "noshape-variable-studio-ui"
+version = "0.4.6"
+dependencies = [
+ "anyhow",
+ "gpui-kit",
+ "log",
+ "noshape-app-core",
+ "noshape-model",
+ "noshape-ops",
+ "noshape-store",
+ "noshape-units",
+ "noshape-workspace-hack",
+ "parking_lot",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
