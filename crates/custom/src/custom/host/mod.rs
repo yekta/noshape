@@ -566,6 +566,7 @@ static REGISTER: Once = Once::new();
 /// Register every modeling native with the FeatureScript runtime (once,
 /// before any Feature Studio is compiled).
 pub fn register() {
+    crate::register();
     REGISTER.call_once(|| {
         let mut all: Vec<(&'static str, NativeFn)> = Vec::new();
         all.extend_from_slice(status::NATIVES);
@@ -810,46 +811,4 @@ pub fn enum_name(v: &Value) -> Option<Arc<str>> {
     v.as_str()
 }
 
-/// `ErrorStringEnum` members' texts (the comments above them in
-/// errorstringenum.gen.fs) and, back, each text's first member.
-#[allow(clippy::type_complexity)]
-fn error_texts() -> &'static (HashMap<String, String>, HashMap<String, String>) {
-    static TEXTS: std::sync::LazyLock<(HashMap<String, String>, HashMap<String, String>)> = std::sync::LazyLock::new(|| {
-        let (mut m, mut back) = (HashMap::new(), HashMap::new());
-        let src = noshape_featurescript::std_source("errorstringenum.gen.fs").unwrap_or("");
-        let mut last: Option<String> = None;
-        for line in src.lines() {
-            let t = line.trim();
-            if let Some(c) = t.strip_prefix("/*").and_then(|c| c.strip_suffix("*/")) {
-                last = Some(c.trim().to_string());
-                continue;
-            }
-            let name = t.trim_end_matches(',');
-            if !name.is_empty() && name.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_') {
-                if let Some(text) = last.take() {
-                    back.entry(text.clone()).or_insert_with(|| name.to_string());
-                    m.insert(name.to_string(), text);
-                }
-            } else if !t.starts_with('*') && !t.starts_with("/**") {
-                last = None;
-            }
-        }
-        (m, back)
-    });
-    &TEXTS
-}
-
-/// The `ErrorStringEnum` member whose text is `text` (a built-in
-/// evaluator's Onshape message, reported by an operation as its member).
-pub fn error_code(text: &str) -> Option<&'static str> {
-    error_texts().1.get(text).map(String::as_str)
-}
-
-/// The user-facing text of an `ErrorStringEnum` member: the comment above
-/// it in errorstringenum.gen.fs (what Onshape shows in the feature list).
-pub fn error_text(member: &str) -> String {
-    error_texts().0.get(member).cloned().unwrap_or_else(|| match member {
-        "REGEN_ERROR" => "Error regenerating.".to_string(),
-        other => other.to_string(),
-    })
-}
+pub use crate::regen::custom_features::{error_code, error_text};

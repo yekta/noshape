@@ -3,7 +3,7 @@ name = "noshape-model-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "noshape's model core: regeneration, features, the FeatureScript host and std, in-context, analysis. Above noshape-model-data; noshape-assembly, noshape-drawing and the noshape-model facade build on it."
+description = "noshape's model core: regeneration, features, sheet metal, in-context, analysis. Above noshape-model-data; noshape-custom (the FeatureScript host), noshape-assembly, noshape-drawing and the noshape-model facade build on it."
 
 [dependencies]
 noshape-units.workspace = true
@@ -26,8 +26,6 @@ smallvec.workspace = true
 nalgebra.workspace = true
 # DWG / DWT and DXF 2000+ drawing export (MPL-2.0).
 acadrust = "0.6.5"
-# zlib of packed queries (qCompressed, @unpackQuery).
-miniz_oxide = "0.8"
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [dev-dependencies]

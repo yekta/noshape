@@ -419,10 +419,10 @@ pub fn decal(ev: &mut EvalCtx) -> FResult<()> {
     } else if tab.starts_with("ext:") || tab.contains('/') {
         ev.derived.as_ref().and_then(|d| d.file(&tab))
     } else {
-        ev.custom.clone().unwrap_or_else(crate::custom::fallback_provider).file(&tab)
+        ev.custom.clone().unwrap_or_else(crate::regen::custom_features::fallback_provider).file(&tab)
     };
     let bytes = file.and_then(|f| f.bytes()).map(std::sync::Arc::new);
-    let size = bytes.as_ref().map(|b| crate::custom::reference::image_size(b));
+    let size = bytes.as_ref().map(|b| crate::regen::custom_features::image_size(b));
     let Some((Some(iw), Some(ih), _)) = size else { return err_at(&["image"], "Select image for decal") };
     if iw > 4096 || ih > 4096 {
         return err_at(&["image"], "Inserted image exceeds 4k x 4k size limit");
@@ -576,7 +576,7 @@ pub fn decal(ev: &mut EvalCtx) -> FResult<()> {
 /// cylinder) with the image's aspect. `image`: the image file's bytes;
 /// `href`: Realign's horizontal reference direction, if any.
 pub fn decal_default_size(ctx: &crate::regen::context::Context, params: &crate::params::ParamValues, href: Option<DVec3>, image: &[u8]) -> Option<(f64, f64)> {
-    let (Some(iw), Some(ih), _) = crate::custom::reference::image_size(image) else { return None };
+    let (Some(iw), Some(ih), _) = crate::regen::custom_features::image_size(image) else { return None };
     let aspect = iw as f64 / ih.max(1) as f64;
     let face = crate::regen::measure::resolve_shapes(ctx, params.query("face").first()?).into_iter().next()?;
     let (w, h) = match face.face_surface().ok()? {

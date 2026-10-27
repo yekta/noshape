@@ -9,10 +9,12 @@
 //! cached per shape, so unchanged bodies are never re-meshed.
 
 pub mod context;
+pub mod custom_features;
 pub mod crash_guard;
 pub mod derived;
 mod display;
 pub mod runs;
+pub mod std_route;
 pub use display::flat_view_display;
 pub use display::{PART_COLORS, angle_display_mesh, keep_shown, set_angle_display_mesh, shown_vertices, tessellate_shape};
 pub mod eval;
@@ -51,7 +53,7 @@ pub struct RegenOptions {
     /// Access to other Part Studios of the document (Derived features).
     pub derived: Option<std::sync::Arc<dyn derived::DerivedProvider>>,
     /// Compiled Feature Studios of the document (custom features).
-    pub custom_features: Option<std::sync::Arc<dyn crate::custom::CustomFeatureProvider>>,
+    pub custom_features: Option<std::sync::Arc<dyn custom_features::CustomFeatureProvider>>,
     /// Lets the caller stop this run when a newer edit makes it stale.
     pub cancel: Option<RegenCancel>,
 }
@@ -268,7 +270,7 @@ impl Regenerator {
             }
             // Custom features depend on their Feature Studio's source.
             if let Some((tab, _)) = crate::custom::parse_type_id(&f.type_id) {
-                let v = opts.custom_features.clone().unwrap_or_else(crate::custom::fallback_provider).version(tab);
+                let v = opts.custom_features.clone().unwrap_or_else(custom_features::fallback_provider).version(tab);
                 key = hash_bytes(key, &v.to_le_bytes());
             }
             live.push(f.id);

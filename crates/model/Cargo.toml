@@ -13,6 +13,7 @@ noshape-kernel.workspace = true
 noshape-featurescript.workspace = true
 noshape-model-data.workspace = true
 noshape-model-core.workspace = true
+noshape-custom.workspace = true
 noshape-assembly.workspace = true
 noshape-drawing.workspace = true
 earcutr = "0.5"

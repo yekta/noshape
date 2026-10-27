@@ -4352,6 +4352,7 @@ version = "0.4.6"
 dependencies = [
  "glam 0.34.1",
  "nalgebra",
+ "noshape-custom",
  "noshape-kernel",
  "noshape-model-core",
  "noshape-model-data",
@@ -4375,6 +4376,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "noshape-custom"
+version = "0.4.6"
+dependencies = [
+ "glam 0.34.1",
+ "log",
+ "miniz_oxide 0.8.9",
+ "noshape-featurescript",
+ "noshape-kernel",
+ "noshape-model-core",
+ "noshape-model-data",
+ "noshape-sketch",
+ "noshape-units",
+ "noshape-workspace-hack",
+ "parking_lot",
+ "serde_json",
+]
+
+[[package]]
 name = "noshape-drawing"
 version = "0.4.6"
 dependencies = [
@@ -4388,6 +4407,7 @@ dependencies = [
  "miniz_oxide 0.8.9",
  "nalgebra",
  "noshape-assembly",
+ "noshape-custom",
  "noshape-featurescript",
  "noshape-kernel",
  "noshape-model-core",
@@ -4442,6 +4462,7 @@ dependencies = [
  "miniz_oxide 0.8.9",
  "nalgebra",
  "noshape-assembly",
+ "noshape-custom",
  "noshape-drawing",
  "noshape-featurescript",
  "noshape-kernel",
@@ -4470,7 +4491,6 @@ dependencies = [
  "glam 0.34.1",
  "indexmap",
  "log",
- "miniz_oxide 0.8.9",
  "nalgebra",
  "noshape-featurescript",
  "noshape-kernel",

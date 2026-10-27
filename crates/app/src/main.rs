@@ -339,6 +339,8 @@ fn main() {
     // Initializes the GPU on a background thread; the first use waits for it.
     let gpu = gpu::Gpu::new().expect("could not start the GPU thread");
     noshape_render::perf::milestone("GPU thread started");
+    // Regeneration evaluates custom features and the features std runs through the FeatureScript host.
+    noshape_model::custom::register();
     // Feature Studio imports of other documents / versions read their snapshots.
     noshape_model::custom::set_external_tab_loader(derived::external_tab);
     let args: Vec<String> = std::env::args().skip(1).collect();

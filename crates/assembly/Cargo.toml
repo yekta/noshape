@@ -10,6 +10,7 @@ noshape-units.workspace = true
 noshape-kernel.workspace = true
 noshape-model-data.workspace = true
 noshape-model-core.workspace = true
+noshape-custom.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 glam.workspace = true

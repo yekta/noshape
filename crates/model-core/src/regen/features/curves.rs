@@ -1217,7 +1217,7 @@ fn point_at_fraction(samples: &[DVec3], t: f64) -> DVec3 {
 
 /// A bent polyline's edges as Onshape lists them: the lines, then the arcs,
 /// each in path order (live "fs (10-25 d)": opPolyline, the Routing curve).
-pub(crate) fn lines_before_arcs(wire: &Shape) -> FResult<Shape> {
+pub fn lines_before_arcs(wire: &Shape) -> FResult<Shape> {
     let is_line: Vec<bool> = wire.edges().iter().map(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, k::Curve::Line { .. }))).collect();
     let n = is_line.len() as u32;
     let order: Vec<u32> = (0..n).filter(|i| is_line[*i as usize]).chain((0..n).filter(|i| !is_line[*i as usize])).collect();
@@ -1225,7 +1225,7 @@ pub(crate) fn lines_before_arcs(wire: &Shape) -> FResult<Shape> {
 }
 
 /// Polyline with tangent fillet arcs of radius `r[i]` at corner i (0 = sharp).
-pub(crate) fn filleted_polyline(pts: &[DVec3], r: &[f64], closed: bool) -> FResult<Shape> {
+pub fn filleted_polyline(pts: &[DVec3], r: &[f64], closed: bool) -> FResult<Shape> {
     let n = pts.len();
     // Corner geometry: (tangent-in point, arc mid, tangent-out point).
     let mut corners: Vec<Option<(DVec3, DVec3, DVec3)>> = vec![None; n];

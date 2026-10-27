@@ -211,20 +211,20 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
             // one end is enough, neither fails, no field marked); points
             // can't be mixed in.
             if !verts.is_empty() {
-                ev.warnings.push(crate::custom::host::error_text("FILL_CURVE_OR_POINT_CONSTRAINTS"));
+                ev.warnings.push(crate::regen::custom_features::error_text("FILL_CURVE_OR_POINT_CONSTRAINTS"));
             }
             let loop_ = Shape::compound(&edges);
             for w in chain_wires(&guides)? {
                 let touches = w.vertices().iter().any(|v| k::distance(v, &loop_).is_ok_and(|d| d.distance < 1e-6));
                 if !touches {
-                    return err(crate::custom::host::error_text("FILL_SURFACE_BAD_SUPPORT"));
+                    return err(crate::regen::custom_features::error_text("FILL_SURFACE_BAD_SUPPORT"));
                 }
             }
             curves = guides;
         }
     }
     // Onshape's FILL_SURFACE_FAIL text, not the kernel's (qa5 SF5).
-    let res = k::fill_surface_guided(&boundary, &points, &curves).map_err(|_| FeatureError::new(crate::custom::host::error_text("FILL_SURFACE_FAIL")))?;
+    let res = k::fill_surface_guided(&boundary, &points, &curves).map_err(|_| FeatureError::new(crate::regen::custom_features::error_text("FILL_SURFACE_FAIL")))?;
     let names = new_face_names(ev, &res.shape);
     surface_result(ev, NamedShape::new(res.shape, names))
 }
@@ -276,7 +276,7 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
         let outer = face.wires().into_iter().next().ok_or_else(|| FeatureError::new("Surface has no boundary"))?;
         // A kernel failure reads as Onshape's EXTEND_FAILED ("Unable to move
         // selected entities."), not the kernel's own text (qa5 SF5).
-        let failed = |_| FeatureError::new(crate::custom::host::error_text("EXTEND_FAILED"));
+        let failed = |_| FeatureError::new(crate::regen::custom_features::error_text("EXTEND_FAILED"));
         // Only some edges picked (qa5 SF5: one edge of a 40 × 20 fill, 10 mm:
         // only that edge moves, 1000 mm²): the picked straight edges move out
         // in the plane, their neighbours run on to meet them.

@@ -18,52 +18,8 @@ pub const TABLE_ERRORS: &str = "FeatureScript execution produced table errors. S
 const TIME_LIMIT: Duration = Duration::from_secs(60);
 const STACK_SIZE: usize = 256 << 20;
 
-/// One table of a custom table's result.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct CustomTable {
-    pub title: String,
-    /// Shown after the title, which truncates first.
-    pub title_suffix: Option<String>,
-    pub columns: Vec<TableColumn>,
-    pub rows: Vec<TableRow>,
-    /// Entities the whole table is about (cross-highlighting).
-    pub entities: Vec<Reference>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct TableColumn {
-    pub id: String,
-    pub name: String,
-    /// `TableTextAlignment` member (`LEFT`, `CENTER`, `RIGHT`), if given.
-    pub alignment: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct TableRow {
-    /// Cells by column id (missing ids are empty cells).
-    pub cells: Vec<(String, TableCell)>,
-    pub entities: Vec<Reference>,
-}
-
-impl TableRow {
-    pub fn cell(&self, column: &str) -> Option<&TableCell> {
-        self.cells.iter().find(|(c, _)| c == column).map(|(_, v)| v)
-    }
-
-    /// The cell's text, or [`NOT_SET`] for a column the row has no value for.
-    pub fn text(&self, column: &str) -> &str {
-        self.cell(column).map_or(NOT_SET, |c| c.text.as_str())
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct TableCell {
-    pub text: String,
-    /// `TableCellError`: shown in error state with this tooltip.
-    pub error: Option<String>,
-    /// `TableCellWithInfo`: an info icon with this tooltip.
-    pub info: Option<String>,
-}
+/// The table data (a hole table is one too, made by the model core).
+pub use crate::custom::{CustomTable, NOT_SET, TableCell, TableColumn, TableRow};
 
 /// What a table run produced: the tables, or the error, plus `println`
 /// output and notices. Live: a table that runs normally shows no output;
@@ -197,9 +153,6 @@ pub fn cell_text(v: &Value, units: &UnitPrefs) -> String {
         None => to_display(v),
     }
 }
-
-/// The text a table panel shows for a column the row has no value for.
-pub const NOT_SET: &str = "Not set";
 
 fn format_cell(q: Quantity, units: &UnitPrefs, precision: Option<usize>) -> String {
     let v = q.value / units.si_factor(q.dim);

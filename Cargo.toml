@@ -19,6 +19,7 @@ noshape-kernel = { path = "crates/kernel" }
 noshape-model = { path = "crates/model" }
 noshape-model-data = { path = "crates/model-data" }
 noshape-model-core = { path = "crates/model-core" }
+noshape-custom = { path = "crates/custom" }
 noshape-assembly = { path = "crates/assembly" }
 noshape-drawing = { path = "crates/drawing" }
 noshape-store = { path = "crates/store" }

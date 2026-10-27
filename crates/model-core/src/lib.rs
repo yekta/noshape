@@ -1,5 +1,5 @@
-//! noshape-model-core: regeneration and the rest of the model logic (assemblies are noshape-assembly, drawings
-//! noshape-drawing; the noshape-model facade puts everything under one path).
+//! noshape-model-core: regeneration and the rest of the model logic (the FeatureScript host is noshape-custom,
+//! assemblies noshape-assembly, drawings noshape-drawing; the noshape-model facade puts everything under one path).
 //!
 //! * [`document`]: documents and tabs.
 //! * [`partstudio`]: feature lists; [`features`]: feature schemas;
@@ -18,7 +18,7 @@ pub mod release;
 pub use noshape_model_data::assembly;
 pub mod compare;
 pub use noshape_model_data::configuration;
-pub mod custom;
+pub use noshape_model_data::custom;
 pub mod demo;
 pub use noshape_model_data::default_names;
 pub mod demo_fab;

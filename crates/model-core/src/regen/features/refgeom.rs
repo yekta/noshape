@@ -343,7 +343,7 @@ pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
 /// The composite part of bodies `idx` (also made by imports: an open mesh
 /// becomes a closed composite of its pieces, Onshape G27), body `index` of
 /// the feature.
-pub(crate) fn make_composite(ev: &mut EvalCtx, idx: &[usize], closed: bool, index: u32) -> FResult<()> {
+pub fn make_composite(ev: &mut EvalCtx, idx: &[usize], closed: bool, index: u32) -> FResult<()> {
     let members: Vec<Arc<Body>> = idx.iter().map(|&i| ev.ctx.bodies[i].clone()).collect();
     let compound = Shape::compound(&members.iter().map(|b| b.shape.clone()).collect::<Vec<_>>());
     let nf = compound.count(ShapeType::Face);

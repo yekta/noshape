@@ -149,36 +149,7 @@ fn csv_rows(text: &str) -> Vec<Value> {
     rows
 }
 
-/// (width, height, media type) from PNG / GIF / JPEG headers.
-pub(crate) fn image_size(b: &[u8]) -> (Option<u32>, Option<u32>, &'static str) {
-    let be32 = |i: usize| b.get(i..i + 4).map(|s| u32::from_be_bytes([s[0], s[1], s[2], s[3]]));
-    let be16 = |i: usize| b.get(i..i + 2).map(|s| u16::from_be_bytes([s[0], s[1]]) as u32);
-    let le16 = |i: usize| b.get(i..i + 2).map(|s| u16::from_le_bytes([s[0], s[1]]) as u32);
-    if b.starts_with(b"\x89PNG") {
-        return (be32(16), be32(20), "image/png");
-    }
-    if b.starts_with(b"GIF8") {
-        return (le16(6), le16(8), "image/gif");
-    }
-    if b.starts_with(&[0xFF, 0xD8]) {
-        // Walk the segments to a start-of-frame marker.
-        let mut i = 2;
-        while i + 9 < b.len() {
-            if b[i] != 0xFF {
-                i += 1;
-                continue;
-            }
-            let marker = b[i + 1];
-            let len = be16(i + 2).unwrap_or(0) as usize;
-            if matches!(marker, 0xC0..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF) {
-                return (be16(i + 7), be16(i + 5), "image/jpeg");
-            }
-            i += 2 + len.max(1);
-        }
-        return (None, None, "image/jpeg");
-    }
-    (None, None, "application/octet-stream")
-}
+pub(crate) use crate::regen::custom_features::image_size;
 
 /// A JSON value as FeatureScript (null is undefined).
 fn json_value(j: &serde_json::Value) -> Value {

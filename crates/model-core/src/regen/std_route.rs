@@ -1,0 +1,120 @@
+//! Which built-in features the standard library's own FeatureScript runs instead of their native evaluators (Flex
+//! PCB always; sheet metal when switched on; core features on the std route, the oracle the native ones are tested
+//! against). The FeatureScript host (noshape-custom, `custom::std_feature`) runs them, through
+//! [`super::custom_features::evaluate_std`].
+
+use crate::regen::custom_features::evaluate_std;
+use crate::regen::eval::{EvalCtx, FResult};
+use crate::regen::features::EvalFn;
+use std::sync::LazyLock;
+
+/// Built-in sheet metal features run by std (switched on by
+/// [`set_std_sheet_metal`] or `NOSHAPE_STD_SHEET_METAL=1` until the std
+/// route passes every native sheet metal test; Flex PCB always runs by std).
+static STD_SHEET_METAL: LazyLock<std::sync::atomic::AtomicBool> = LazyLock::new(|| std::sync::atomic::AtomicBool::new(std::env::var("NOSHAPE_STD_SHEET_METAL").is_ok_and(|v| v == "1")));
+
+pub fn set_std_sheet_metal(on: bool) {
+    STD_SHEET_METAL.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
+/// makes std run them instead, the oracle the native ones are tested
+/// against (tests/std_oracle.rs).
+static STD_ROUTE: LazyLock<parking_lot::RwLock<Vec<String>>> = LazyLock::new(Default::default);
+
+/// Run these core feature types by std (empty: all native again).
+pub fn set_std_route(types: &[&str]) {
+    *STD_ROUTE.write() = types.iter().map(|t| t.to_string()).collect();
+}
+
+macro_rules! core_features {
+    ($($f:ident => $ty:literal, $module:literal, $name:literal;)*) => {
+        $(fn $f(ev: &mut EvalCtx) -> FResult<()> {
+            evaluate_std(ev, $module, $name)
+        })*
+
+        /// Core features std can run: feature type, std module and feature, evaluator.
+        const CORE: &[(&str, &str, &str, EvalFn)] = &[$(($ty, $module, $name, $f),)*];
+    };
+}
+
+core_features! {
+    core_extrude => "extrude", "extrude.fs", "extrude";
+    core_fillet => "fillet", "fillet.fs", "fillet";
+    core_hole => "hole", "hole.fs", "hole";
+    core_loft => "loft", "loft.fs", "loft";
+    core_transform => "transform", "transformCopy.fs", "fTransform";
+    core_revolve => "revolve", "revolve.fs", "revolve";
+    core_chamfer => "chamfer", "chamfer.fs", "chamfer";
+    core_shell => "shell", "shell.fs", "shell";
+    core_sweep => "sweep", "sweep.fs", "sweep";
+    core_linear_pattern => "linearPattern", "linearPattern.fs", "linearPattern";
+    core_circular_pattern => "circularPattern", "circularPattern.fs", "circularPattern";
+    core_mirror => "mirror", "mirror.fs", "mirror";
+    core_boolean => "booleanBodies", "boolean.fs", "booleanBodies";
+    core_plane => "cPlane", "cplane.fs", "cPlane";
+    core_draft => "draft", "draft.fs", "draft";
+    core_split => "splitPart", "splitpart.fs", "splitPart";
+}
+
+/// The built-in feature type std's feature `name` stands for (Transform: fTransform), else `name`.
+pub fn core_type(name: &str) -> &str {
+    CORE.iter().find(|c| c.2 == name).map_or(name, |c| c.0)
+}
+
+macro_rules! std_features {
+    ($($f:ident => $module:literal, $name:literal;)*) => {
+        $(fn $f(ev: &mut EvalCtx) -> FResult<()> {
+            evaluate_std(ev, $module, $name)
+        })*
+
+        /// The std module and feature of a built-in feature type.
+        pub fn std_name(type_id: &str) -> Option<(&'static str, &'static str)> {
+            if let Some(&(_, module, name, _)) = CORE.iter().find(|(t, ..)| *t == type_id) {
+                return Some((module, name));
+            }
+            Some(match type_id {
+                $($name => ($module, $name),)*
+                _ => return None,
+            })
+        }
+
+        /// The std evaluator of a built-in feature type, if std runs it.
+        pub fn evaluator(type_id: &str) -> Option<EvalFn> {
+            if let Some(&(.., f)) = CORE.iter().find(|(t, ..)| *t == type_id)
+                && STD_ROUTE.read().iter().any(|t| t == type_id)
+            {
+                return Some(f);
+            }
+            if !STD_SHEET_METAL.load(std::sync::atomic::Ordering::Relaxed) && !matches!(type_id, "pcbStart" | "pcbEnd") {
+                return None;
+            }
+            Some(match type_id {
+                $($name => $f,)*
+                _ => return None,
+            })
+        }
+    };
+}
+
+std_features! {
+    sheet_metal_start => "sheetMetalStart.fs", "sheetMetalStart";
+    sheet_metal_end => "sheetMetalEnd.fs", "sheetMetalEnd";
+    flange => "sheetMetalFlange.fs", "sheetMetalFlange";
+    hem => "sheetMetalHem.fs", "sheetMetalHem";
+    tab => "sheetMetalTab.fs", "sheetMetalTab";
+    bend => "sheetMetalBend.fs", "sheetMetalBend";
+    jog => "sheetMetalJog.fs", "sheetMetalJog";
+    formed => "sheetMetalFormed.fs", "sheetMetalFormed";
+    loft => "sheetMetalLoft.fs", "sheetMetalLoft";
+    make_joint => "sheetMetalMakeJoint.fs", "sheetMetalMakeJoint";
+    joint => "sheetMetalJoint.fs", "sheetMetalJoint";
+    corner => "sheetMetalCorner.fs", "sheetMetalCorner";
+    bend_relief => "sheetMetalBendRelief.fs", "sheetMetalBendRelief";
+    corner_break => "sheetMetalCornerBreak.fs", "sheetMetalCornerBreak";
+    rip => "sheetMetalRip.fs", "sheetMetalRip";
+    // Tag (std tag.fs): its form / frame attributes are what std Form and Frame import.
+    tag => "tag.fs", "tag";
+    pcb_start => "pcbStart.fs", "pcbStart";
+    pcb_end => "pcbEnd.fs", "pcbEnd";
+}

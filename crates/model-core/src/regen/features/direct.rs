@@ -214,7 +214,7 @@ fn limit_point(ev: &EvalCtx, id: &str) -> FResult<(DVec3, Option<DVec3>)> {
 
 /// Move faces by a rigid transform: remove them (healing the gap with the
 /// neighbours), then re-apply the region they bounded at the new place.
-pub(crate) fn move_rigid(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> FResult<()> {
+pub fn move_rigid(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> FResult<()> {
     let body = ev.ctx.bodies[bi].clone();
     let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
     let healed = k::delete_faces(&body.shape, &shapes).map_err(kerr("Move face failed (the faces could not be removed from the part)"))?;

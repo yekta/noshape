@@ -11,155 +11,14 @@ use noshape_featurescript::annot::{self, Ann};
 use noshape_featurescript::ast::{self, ExprKind, Name, StmtKind, TopKind, UnOp};
 use noshape_featurescript::compile::{CompiledModule, DeclKind, Resolver};
 use noshape_featurescript::interp::Interp;
-use noshape_featurescript::ir::{CompiledFn, GlobalCell, TypeRef};
-use noshape_featurescript::value::{Map, Tag, Value, type_info};
+use noshape_featurescript::ir::{CompiledFn, TypeRef};
+use noshape_featurescript::value::{Map, Value, type_info};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, LazyLock};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Severity {
-    Error,
-    Warning,
-    Info,
-}
-
-/// A compile notice. `line`/`column` are 1-based (0 = unknown).
-#[derive(Clone, Debug, PartialEq)]
-pub struct Diagnostic {
-    pub severity: Severity,
-    pub line: usize,
-    pub column: usize,
-    pub message: String,
-    /// "Parse error" notices (syntax) vs other compile errors.
-    pub parse: bool,
-}
-
-impl std::fmt::Display for Diagnostic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.line > 0 { write!(f, "Line {}: {}", self.line, self.message) } else { f.write_str(&self.message) }
-    }
-}
-
-/// Kind of a feature parameter (from its precondition statement).
-#[derive(Clone, Debug)]
-pub enum ParamKindFs {
-    Query { filter: QueryFilter, max_picks: Option<usize> },
-    /// `definition.x is FeatureList`: picked features, passed as a map from
-    /// feature Id to feature function.
-    FeatureList { max_picks: Option<usize> },
-    Num { kind: NumKind, spec: NumSpec },
-    Bool { default: bool },
-    Enum { tag: Tag, options: Vec<(String, String)>, default: String },
-    Text { default: String },
-    /// `template`: the "Item label template" (`#param` placeholders).
-    Array { item_label: String, template: Option<String>, items: Vec<ParamDecl> },
-    /// `definition.x is LookupTablePath` with a "Lookup Table" annotation:
-    /// the table registered under `table` (see `hole_tables::DynLevel`).
-    Lookup { table: &'static str },
-    /// `definition.x is TableData` (and the other reference types).
-    Reference { kind: crate::params::ReferenceKind },
-    /// `isAnything(definition.x)` and other parameters without a UI.
-    Anything,
-    /// A parameter group (`annotation { "Group Name" : "Position" } { ... }`):
-    /// its title, unfolded unless "Collapsed By Default". Not in the
-    /// definition; the group's parameters show only while it is unfolded.
-    Group { open: bool },
-}
-
-/// A feature parameter.
-#[derive(Clone)]
-pub struct ParamDecl {
-    pub id: String,
-    pub label: String,
-    pub kind: ParamKindFs,
-    pub hints: Hints,
-    pub description: String,
-    /// Visibility conditions (`if (definition.x) { ... }`): all must hold.
-    pub conditions: Vec<Arc<CompiledFn>>,
-}
-
-impl std::fmt::Debug for ParamDecl {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{:?}", self.id, self.kind)
-    }
-}
-
-/// A custom feature declared by a Feature Studio.
-#[derive(Clone)]
-pub struct CustomFeatureDef {
-    /// The exported constant (`myFeature`).
-    pub name: String,
-    /// "Feature Type Name" (`My Feature`).
-    pub display_name: String,
-    /// `custom:<tab>:<name>`.
-    pub type_id: String,
-    pub description: String,
-    pub icon: String,
-    pub params: Vec<ParamDecl>,
-    pub feature_type: &'static FeatureType,
-    pub cell: Arc<GlobalCell>,
-    pub editing_logic: Option<String>,
-}
-
-/// A custom table declared by a Feature Studio.
-#[derive(Clone)]
-pub struct CustomTableDef {
-    /// The exported constant (`myTable`).
-    pub name: String,
-    /// "Table Type Name" (`My table`).
-    pub display_name: String,
-    /// "Table Type Description", if any.
-    pub description: String,
-    /// Parameters of its precondition (Onshape shows them above the table).
-    pub params: Vec<ParamDecl>,
-    pub cell: Arc<GlobalCell>,
-}
-
-impl std::fmt::Debug for CustomTableDef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CustomTableDef").field("name", &self.name).field("display_name", &self.display_name).finish()
-    }
-}
-
-impl std::fmt::Debug for CustomFeatureDef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CustomFeatureDef").field("name", &self.name).field("params", &self.params).finish()
-    }
-}
-
-/// Result of compiling one Feature Studio's source.
-pub struct CompiledStudio {
-    pub tab: TabId,
-    pub hash: u64,
-    pub features: Vec<CustomFeatureDef>,
-    /// Custom tables (`"Table Type Name"` + `defineTable`).
-    pub tables: Vec<CustomTableDef>,
-    pub diagnostics: Vec<Diagnostic>,
-    pub module: Option<Arc<CompiledModule>>,
-}
-
-impl std::fmt::Debug for CompiledStudio {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CompiledStudio").field("tab", &self.tab).field("features", &self.features).field("diagnostics", &self.diagnostics).finish()
-    }
-}
-
-impl CompiledStudio {
-    pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == Severity::Error)
-    }
-    pub fn feature(&self, name: &str) -> Option<&CustomFeatureDef> {
-        self.features.iter().find(|f| f.name == name)
-    }
-    pub fn table(&self, name: &str) -> Option<&CustomTableDef> {
-        self.tables.iter().find(|t| t.name == name)
-    }
-    pub fn first_error(&self) -> Option<&Diagnostic> {
-        self.diagnostics.iter().find(|d| d.severity == Severity::Error)
-    }
-}
+pub use crate::regen::custom_features::{CompiledStudio, CustomFeatureDef, CustomTableDef, Diagnostic, ParamDecl, ParamKindFs, Severity};
 
 // ---------------------------------------------------------------- compile
 
@@ -185,8 +44,9 @@ pub fn compile(tab: TabId, source: &str) -> Arc<CompiledStudio> {
 /// Compile a Feature Studio (cached by tab, source and `deps`, a hash of
 /// the sources of the tabs it may import).
 pub fn compile_with(tab: TabId, source: &str, resolver: &dyn Resolver, deps: u64) -> Arc<CompiledStudio> {
-    // Custom schemas come from compiled studios: make `features::get` find them (noshape-model-data).
-    crate::features::set_custom_lookup(lookup);
+    // Custom schemas come from compiled studios: make `features::get` find them (noshape-model-data), and
+    // regeneration evaluate them.
+    crate::register();
     host::register();
     let hash = source_hash(source) ^ deps.rotate_left(17);
     if let Some(c) = CACHE.lock().get(&(tab.0, hash)) {

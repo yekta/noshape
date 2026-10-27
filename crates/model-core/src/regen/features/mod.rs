@@ -45,8 +45,8 @@ pub mod surfacing_c;
 pub type EvalFn = fn(&mut EvalCtx) -> FResult<()>;
 
 pub fn evaluator(type_id: &str) -> Option<EvalFn> {
-    // Sheet metal by the standard library (custom/std_feature.rs), when on.
-    if let Some(f) = crate::custom::std_feature::evaluator(type_id) {
+    // Features the standard library runs (regen::std_route; the host runs them).
+    if let Some(f) = crate::regen::std_route::evaluator(type_id) {
         return Some(f);
     }
     Some(match type_id {
@@ -142,7 +142,7 @@ pub fn evaluator(type_id: &str) -> Option<EvalFn> {
         "cutlist" => frames::cutlist,
         "tag" => frames::tag,
         // --- end batch SM dispatch ---
-        t if crate::custom::is_custom(t) => crate::custom::evaluate,
+        t if crate::custom::is_custom(t) => crate::regen::custom_features::evaluate_custom,
         _ => return None,
     })
 }

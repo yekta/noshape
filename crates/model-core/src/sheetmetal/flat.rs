@@ -473,7 +473,7 @@ fn wire_loop(w: &Shape, frame: &k::Plane) -> Vec<DVec2> {
 }
 
 /// Sample the edges of a wire into one chained polyline (model space).
-pub(crate) fn wire_points(w: &Shape) -> Vec<DVec3> {
+pub fn wire_points(w: &Shape) -> Vec<DVec3> {
     let mut segs: Vec<Vec<DVec3>> = Vec::new();
     for e in w.edges() {
         let Ok(info) = e.edge_info() else { continue };

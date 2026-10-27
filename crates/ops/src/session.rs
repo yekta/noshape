@@ -113,6 +113,8 @@ impl Session {
         let name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Untitled".into());
         store.set_name(&name)?;
         let branch = store.default_branch()?;
+        // The document's features may need the FeatureScript host (custom features, std-run features).
+        noshape_model::custom::register();
         noshape_model::regen::crash_guard::enable(noshape_model::regen::crash_guard::default_dir());
         Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false })
     }
@@ -123,6 +125,9 @@ impl Session {
         let branch = store.default_branch()?;
         let head = store.head(branch)?;
         let doc = Document::from_blobs(&store.read_all(head)?)?;
+        // The document's features may need the FeatureScript host (custom features, std-run features); recovery
+        // below regenerates.
+        noshape_model::custom::register();
         // Undo works across sessions: rebuild the stack from the history.
         let undo = UndoStack::from_history(&store, branch, 500).unwrap_or_else(|_| UndoStack::new(branch).with_limit(500));
         let mut s = Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false };

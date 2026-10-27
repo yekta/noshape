@@ -11,13 +11,14 @@ target structure and the rules that keep it.
 |---|---|---|
 | 0 | `noshape-units`, `noshape-sketch`, `noshape-kernel`, `noshape-featurescript` | quantities, the sketch solver, the OCCT kernel bridge, the FeatureScript language |
 | 1 | **`noshape-model-data`** | the document data model: documents, tabs, Part Studio feature lists, feature schemas, params, references, configurations, variables, and the data types of Assemblies, Drawings (sheets, views, annotations, templates, fonts) and Feature Studios. Serde types and plain methods on them; **no evaluation** |
-| 2 | **`noshape-model-core`** | regeneration, features, FeatureScript host/std, in-context (context bodies in regeneration), analysis |
-| 3 | **`noshape-assembly`** | assembly evaluation, the mate solver, assembly analysis (interference, exploded views), BOM, standard content, native assembly import, in-context snapshots, the demo documents with assemblies |
-| 4 | **`noshape-drawing`** | drawing views, HLR projection, sheet building, tables, export (PDF/DXF/DWG/DWT), the demo documents with drawings |
-| 4 | **`noshape-model`** (facade) | re-exports model-data, model-core, assembly and drawing under the old paths; holds the model integration tests (`crates/model/tests`) |
-| 2–4 | `noshape-store`, `noshape-scene`, `noshape-render` | persistence, scene building, the wgpu renderer |
-| 5 | `noshape-ops`, `noshape-cli` | the agent API |
-| 6 | app crates (planned split of `noshape`): workspace/chrome, Part Studio UI, sketch UI, assembly UI, drawing UI, other studios, the binary | GPUI application |
+| 2 | **`noshape-model-core`** | regeneration, features, sheet metal, in-context (context bodies in regeneration), analysis; what regeneration needs of the FeatureScript host (`regen::custom_features`: compiled studio types, `CustomFeatureProvider`, the `CustomHost` hook; `regen::std_route`: which built-in features std runs) |
+| 3 | **`noshape-custom`** | the FeatureScript host: compiling Feature Studios, custom features and custom tables, the modeling natives, the built-in features std runs, the demo Feature Studio |
+| 4 | **`noshape-assembly`** | assembly evaluation, the mate solver, assembly analysis (interference, exploded views), BOM, standard content, native assembly import, in-context snapshots, the demo documents with assemblies |
+| 5 | **`noshape-drawing`** | drawing views, HLR projection, sheet building, tables, export (PDF/DXF/DWG/DWT), the demo documents with drawings |
+| 5 | **`noshape-model`** (facade) | re-exports model-data, model-core, custom, assembly and drawing under the old paths; holds the model integration tests (`crates/model/tests`) |
+| 2–5 | `noshape-store`, `noshape-scene`, `noshape-render` | persistence, scene building, the wgpu renderer |
+| 6 | `noshape-ops`, `noshape-cli` | the agent API |
+| 7 | app crates (planned split of `noshape`): workspace/chrome, Part Studio UI, sketch UI, assembly UI, drawing UI, other studios, the binary | GPUI application |
 
 `noshape-model` re-exports every `noshape-model-data` module under the same path (`noshape_model::document`,
 `noshape_model::drawing::Sheet`, …), so code above it doesn't change when types move down.
@@ -32,6 +33,10 @@ target structure and the rules that keep it.
 3. **Upward calls are hooks, not dependencies.** When a lower crate must reach logic above it (feature schemas of
    compiled Feature Studios), it exposes a registration function (`features::set_custom_lookup`) that the upper crate
    calls; never add a dependency from a lower layer to a higher one.
+   A hook a regeneration may need must be installed before it runs: the FeatureScript host (`noshape_custom::register`,
+   idempotent) is installed by every compile, `DocumentScripts::from_document`, std's prewarm and the std switches,
+   and at startup by the app, the agent API (`Ctx::new`, `Session::open`/`create`); without it a feature that needs
+   it fails with `regen::custom_features::NO_HOST` (never silently).
 4. **Tests live with the logic they exercise.** A unit test in `noshape-model-data` may only use data; tests that
    regenerate or move views go in `noshape-model` (e.g. `drawing/links_tests.rs`, `configuration_tests.rs`).
 5. **Keep crates under ~25k lines.** When one grows past that, split it along these lines before it becomes a tangle.
@@ -63,6 +68,20 @@ target structure and the rules that keep it.
   |---|---|---|
   | assembly logic (eval) | assembly unit tests | 6.5 s |
   | assembly logic (eval) | the app | 54–66 s (loaded; the drawing row above was 35 s quiet) |
+
+- 2026-10-27: `noshape-custom` (14k lines, the FeatureScript host: compile, provider, run, the natives, custom tables,
+  the features std runs, the demo Feature Studio) split out above the core; `noshape-model-core` is now 33k lines.
+  Regeneration reaches the host through `regen::custom_features` (the compiled studio types and
+  `CustomFeatureProvider` moved down; the `CustomHost` hook: fallback provider, custom and std evaluation; `error_text`,
+  `image_size`) and `regen::std_route` (which built-in features std runs, the std switches); the custom table data
+  types moved to model-data. noshape-assembly and noshape-drawing depend on noshape-custom. Measured warm,
+  incremental, machine load ~20–27, edit → rebuild:
+
+  | edit in | rebuild | time |
+  |---|---|---|
+  | FeatureScript host (run.rs) | custom unit tests | 5.5 s |
+  | FeatureScript host (run.rs) | the app | 51 s |
+  | model core (regen) | core unit tests | 7 s (was 11 s) |
 
 - Next: the app (138k lines), one studio at a time, each at a moment agreed with its owner: variables (3.5k) first,
   then drawing UI (27k), assembly UI (23k), Part Studio (34k), with `app-core` (widgets, viewport, shared panels) under

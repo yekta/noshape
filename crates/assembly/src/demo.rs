@@ -1,6 +1,7 @@
-//! Demo documents with an assembly (they solve it); the rest are noshape-model-core's (re-exported here).
+//! Demo documents with an assembly (they solve it); the rest are noshape-model-core's and noshape-custom's (re-exported here).
 
 pub use noshape_model_core::demo::*;
+pub use noshape_custom::demo::add_demo_feature_studio;
 use noshape_model_core::configuration::ConfigValues;
 use noshape_model_core::document::{Document, TabContent};
 use noshape_model_core::reference::Reference;

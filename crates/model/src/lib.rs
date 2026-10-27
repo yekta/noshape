@@ -1,11 +1,14 @@
 //! noshape-model: the headless CAD document model, as one path.
 //!
 //! A facade over the layered crates (docs/CRATES.md): `noshape-model-data` (the document data), `noshape-model-core`
-//! (regeneration, features, FeatureScript), `noshape-assembly` (assembly evaluation, solving, analysis) and
+//! (regeneration, features), `noshape-custom` (the FeatureScript host), `noshape-assembly` (assembly evaluation, solving, analysis) and
 //! `noshape-drawing` (drawing views and export). Every module keeps its old path: `noshape_model::document`,
 //! `noshape_model::regen`, `noshape_model::assembly::eval`, `noshape_model::drawing::views`, …
 
 pub use noshape_model_core::*;
+
+/// Feature Studios: data and the FeatureScript host.
+pub use noshape_custom::custom;
 
 /// Assembly data and logic.
 pub use noshape_assembly::assembly;

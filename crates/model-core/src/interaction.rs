@@ -636,8 +636,8 @@ pub fn region_for_curve(regions: &[crate::display::SketchRegionDisplay], entity:
 /// Size is the callout, one line per part of it ("⌀5 mm ↧ 2 mm",
 /// "⌵⌀20 mm X 90 deg", "M6x1.00 ↧ 1 mm"); Drill angle only when the tip
 /// stays in the part.
-pub fn hole_table(ctx: &crate::regen::context::Context, units: &noshape_units::UnitPrefs) -> Vec<crate::custom::table::CustomTable> {
-    use crate::custom::table::{CustomTable, TableCell, TableColumn, TableRow};
+pub fn hole_table(ctx: &crate::regen::context::Context, units: &noshape_units::UnitPrefs) -> Vec<crate::custom::CustomTable> {
+    use crate::custom::{CustomTable, TableCell, TableColumn, TableRow};
     let factor = units.si_factor(noshape_units::Dim::LENGTH);
     let unit = if units.length == noshape_units::LengthUnit::Inch { "in" } else { "mm" };
     let len = |m: f64| format!("{} {unit}", noshape_units::format_number(m / factor, units.length_precision));

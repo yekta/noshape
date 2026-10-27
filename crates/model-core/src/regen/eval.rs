@@ -143,7 +143,7 @@ pub struct EvalCtx<'a> {
     /// `resolve_edges`, `resolve_bodies`) are unaffected.
     pub xform: Option<DMat4>,
     /// Feature Studio scripts of the document (custom features).
-    pub custom: Option<Arc<dyn crate::custom::CustomFeatureProvider>>,
+    pub custom: Option<Arc<dyn crate::regen::custom_features::CustomFeatureProvider>>,
     /// Type id of the custom feature being evaluated (`custom:<tab>:<name>`).
     pub custom_type: Option<String>,
     /// The run's [`super::RegenCancel`]: long loops (pattern instances)

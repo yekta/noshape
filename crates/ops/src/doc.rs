@@ -296,6 +296,8 @@ impl Ctx {
 fn init_once() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
+        // Regeneration evaluates custom features and the features std runs through the FeatureScript host.
+        noshape_model::custom::register();
         // Variable Studios inserted from other documents read those
         // documents' versions (the app sets the same loader).
         noshape_model::variables::set_external_loader(|path, mv| mv.parse().ok().and_then(|mv| crate::derived::external_snapshot(path, mv).ok()));

@@ -1,6 +1,7 @@
 //! Access to a document's compiled Feature Studios during regeneration.
 
 use super::studio::{CompiledStudio, compile_with, module_path};
+pub use crate::regen::custom_features::CustomFeatureProvider;
 use crate::document::{Document, TabContent, TabId};
 use crate::features::FeatureType;
 use noshape_featurescript::compile::{CompiledModule, Resolver};
@@ -33,20 +34,6 @@ impl CustomFeatureProvider for Latest {
     }
 }
 
-/// Supplies compiled Feature Studios by tab id string (the `<tab>` part of
-/// `custom:<tab>:<name>`). Passed to regeneration in
-/// `RegenOptions::custom_features`, like the Derived provider.
-pub trait CustomFeatureProvider: Send + Sync + std::fmt::Debug {
-    fn studio(&self, tab: &str) -> Option<Arc<CompiledStudio>>;
-    /// A file tab of the document, by tab id string (reference parameters).
-    fn file(&self, _tab: &str) -> Option<crate::file_tab::FileTab> {
-        None
-    }
-    /// Changes whenever the studio's compiled result may change.
-    fn version(&self, tab: &str) -> u64 {
-        self.studio(tab).map(|s| s.hash).unwrap_or(0)
-    }
-}
 
 /// Imports between the Feature Studios of one document: an import path is
 /// a tab id (`import(path : "<tab id>", version : "...")`).
@@ -62,6 +49,7 @@ struct DocResolver<'a> {
 static EXTERNAL_TABS: std::sync::OnceLock<fn(&str) -> Option<crate::document::Tab>> = std::sync::OnceLock::new();
 
 pub fn set_external_tab_loader(f: fn(&str) -> Option<crate::document::Tab>) {
+    crate::register();
     let _ = EXTERNAL_TABS.set(f);
 }
 
@@ -132,6 +120,8 @@ pub struct DocumentScripts {
 
 impl DocumentScripts {
     pub fn from_document(doc: &Document) -> Arc<Self> {
+        // Regenerations with these scripts evaluate custom features through the host.
+        crate::register();
         let sources: Vec<(TabId, String, String)> = doc
             .ordered_tabs()
             .into_iter()
