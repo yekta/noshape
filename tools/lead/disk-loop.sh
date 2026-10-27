@@ -5,6 +5,10 @@ free_gb() { df -BG --output=avail / | tail -1 | tr -dc 0-9; }
 busy() { local p; for p in $(pgrep -x cargo); do tr '\0' '\n' < /proc/$p/environ 2>/dev/null | grep -qx "CARGO_TARGET_DIR=$1" && return 0; done; return 1; }
 floor() {
   [ "$(free_gb)" -ge 30 ] && return
+  # First the incremental sessions nobody touched for 30 min (safe in busy dirs too: a compile uses its current one).
+  find /root/target-*/debug/incremental -mindepth 1 -maxdepth 1 -type d -mmin +30 -exec rm -rf {} + 2>/dev/null
+  echo "$(date -u +%H:%M) floor: pruned stale incremental sessions, $(free_gb) GB free" >> /tmp/lead/disk-loop.log
+  [ "$(free_gb)" -ge 30 ] && return
   for d in $(du -s /root/target-*/debug/incremental 2>/dev/null | sort -rn | awk '{print $2}'); do
     t=${d%/debug/incremental}; busy "$t" && continue
     rm -rf "$d"/* && echo "$(date -u +%H:%M) floor: cleared $d, $(free_gb) GB free" >> /tmp/lead/disk-loop.log
