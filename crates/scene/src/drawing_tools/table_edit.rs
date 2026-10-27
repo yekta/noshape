@@ -157,8 +157,17 @@ pub fn split_label(k: &TableKind) -> &'static str {
     match k {
         TableKind::Custom { .. } => "Split custom table below",
         TableKind::Bom { .. } => "Split BOM table below",
-        TableKind::CutList { .. } => "Split cut list",
+        // Help (cut_list_table): "Split cut list table below".
+        TableKind::CutList { .. } => "Split cut list table below",
         _ => "Split table below",
+    }
+}
+
+/// The second part's "Unsplit …" (help cut_list_table: "Unsplit cut list table").
+pub fn unsplit_label(k: &TableKind) -> &'static str {
+    match k {
+        TableKind::CutList { .. } => "Unsplit cut list table",
+        _ => "Unsplit table",
     }
 }
 

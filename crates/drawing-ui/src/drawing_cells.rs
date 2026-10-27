@@ -112,7 +112,7 @@ impl DrawingEditor {
             }));
         }
         if t.rows.is_some_and(|r| r[0] > 0) {
-            out.push(MenuEntry::item("Unsplit table", move |t, _, cx| {
+            out.push(MenuEntry::item(te::unsplit_label(&t.kind), move |t, _, cx| {
                 t.edit_sheet("Unsplit table", cx, |s| {
                     te::unsplit_table(s, id, &l);
                 });

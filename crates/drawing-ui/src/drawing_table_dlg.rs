@@ -382,6 +382,26 @@ impl DrawingEditor {
                     )
                 })
                 .when(bom, |v| v.child(row("Template", div().w(px(120.)).text_size(px(11.)).child("Follow assembly").into_any_element())).child(row("BOM type", select("table-dlg-type", if d.structured { "Structured".into() } else { "Flattened".into() }, 120., types).into_any_element())))
+                .when_some(d.table.filter(|_| editing && !bom), |v, id| {
+                    let names: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
+                    let cur = self.sheet;
+                    let ed = ed.clone();
+                    let sheet = Button::new("table-dlg-sheet").label(names.get(cur).cloned().unwrap_or_default()).ghost().xsmall().w(px(120.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu("table-dlg-sheet-dd", true, move |mut m, _, _| {
+                        for (i, n) in names.iter().enumerate() {
+                            let e = ed.clone();
+                            m = m.item(crate::os_menu::OsMenuItem::new(n.clone()).checked(i == cur).on_click(move |_, _, cx| {
+                                e.update(cx, |t, cx| {
+                                    if i != cur {
+                                        t.close_table_dlg(true, cx);
+                                        t.move_table_to_sheet(id, Some(i), cx);
+                                    }
+                                })
+                            }));
+                        }
+                        m
+                    });
+                    v.child(row("Sheet", sheet.into_any_element()))
+                })
                 .child(row("Order", select("table-dlg-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 120., orders).into_any_element()))
                 .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
                 .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners))
