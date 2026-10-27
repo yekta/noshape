@@ -156,8 +156,14 @@ def main():
     gate("GPU p95", "gpup95", args.gate_gpu_p95)
     gate("frame-interval p95", "p95", args.gate_p95)
     base_path = os.path.join(args.baseline, "summary.json") if args.baseline else None
-    if base_path and os.path.exists(base_path):
-        base = json.load(open(base_path, encoding="utf-8"))
+    # The benchmark document (perf.yml FIXTURE): a baseline of another one
+    # (a run dispatched with `fixture`, e.g. live-30's 24 instances against
+    # the NIST assembly's 406) compares nothing.
+    fixture = os.environ.get("FIXTURE", "")
+    base = json.load(open(base_path, encoding="utf-8")) if base_path and os.path.exists(base_path) else None
+    if base is not None and base.get("fixture") != fixture:
+        lines += ["", f"Baseline ({base.get('label', '?')}) measured {base.get('fixture') or 'an unrecorded document'}, not {fixture or '?'}: not compared."]
+    elif base is not None:
         lines += ["", f"Against the baseline ({base.get('label', '?')}), max {args.max_regression * 100:.0f}% worse:"]
         for r in measured:
             b = next((x for x in base.get("runs", []) if x.get("mode") == r["mode"] and x.get("kind") == r.get("kind") and not x.get("missing")), None)
@@ -182,7 +188,7 @@ def main():
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
             f.write(text)
     with open(os.path.join(args.out, "summary.json"), "w", encoding="utf-8") as f:
-        json.dump({"label": args.label, "runs": rows, "failures": failures}, f, indent=1)
+        json.dump({"label": args.label, "fixture": fixture, "runs": rows, "failures": failures}, f, indent=1)
     for f in failures:
         print(f"::error::{args.label}: {f}")
     sys.exit(1 if failures else 0)

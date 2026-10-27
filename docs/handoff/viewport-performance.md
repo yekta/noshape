@@ -809,3 +809,11 @@ changes. I write the renderer part first (my files) and show crops before touchi
   - Levers: wgpu-hal Metal compiles MSL per pipeline stage (`newLibraryWithSource`), the same entry point again for
     each pipeline using it (vs_mesh in 4 core pipelines, fs_mesh in 2): a per-(source, options) MTLLibrary cache in
     the vendored wgpu-hal would cut 16 compiles to ~12; then measure what of the first launch's window time is ours.
+
+- **2026-10-27 (psui): main measured, and the baseline fix.** Run 40467324821 (`-f ref=main`, main@6715ba5, NIST
+  assembly, 406 instances): macOS 14 texture orbit 32.7 fps (p95 42.7 ms), zoom 32.2, pan 18.0; readback 18–19 fps
+  (UI CPU p95 11.6 / 11.3 / 11.8 ms); macOS 15 texture orbit 32.6, zoom 30.5, pan 19.6, readback ~19 (UI CPU p95
+  ~9.5 ms); Linux lavapipe ~2.6 fps. Its gates failed on "regressions" that weren't: the baseline (the last successful
+  run, 40421880164) had measured live-30 (one part, 24 instances). analyze.py now records the document in
+  summary.json (`fixture`) and compares only against a baseline of the same one. Without `-f ref=` perf.yml measures
+  the latest release (run 40464678503 measured v0.4.8).
