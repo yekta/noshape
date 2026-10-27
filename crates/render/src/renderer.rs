@@ -1301,9 +1301,19 @@ fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f3
         // A feature preview mixes with its slider's alpha, untinted.
         _ => ([0.0; 4], [1.0, 0.0, scene.preview_mix.unwrap_or(0.0).clamp(0.0, 1.0), 0.0]),
     };
+    // Onshape lights from the eye-space position in an orthographic view
+    // too (lightFragment: `normalize(-vPosition)`), its eye 0.6 × the
+    // model's diameter back from the centre (`onshape_near_far`), so the
+    // highlight moves across the screen (live 10-27: of three blocks in a
+    // row only the far one's top carries it). The other shaders read the
+    // eye only in perspective.
+    let light_eye = match onshape_near_far(camera, bounds) {
+        Some((e, _, _)) if camera.projection == Projection::Orthographic => e.as_vec3(),
+        _ => eye,
+    };
     Globals {
         view_proj: vp.to_cols_array_2d(),
-        camera_pos: [eye.x, eye.y, eye.z, (camera.projection == Projection::Perspective) as u32 as f32],
+        camera_pos: [light_eye.x, light_eye.y, light_eye.z, (camera.projection == Projection::Perspective) as u32 as f32],
         camera_fwd: [fwd.x, fwd.y, fwd.z, 0.0],
         camera_up: [up.x, up.y, up.z, 0.0],
         viewport: [width as f32, height as f32, dpr, 0.0],

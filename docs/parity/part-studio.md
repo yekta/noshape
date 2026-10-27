@@ -70,7 +70,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.15 | Shift+P hides all construction geometry (planes, sketches); again shows it | keyboard_shortcuts | ✅ (app 10-24, = sketch 1.17) |
 | 2.16 | Y hides the hovered entity's part/sketch/plane (or the selection) | keyboard_shortcuts; View__hide_show | ✅ (psui 10-27: Y hides the part under the pointer, as live) |
 | 2.17 | Shift+Y shows hidden entities (selected ones, else all parts) | keyboard_shortcuts; View__hide_show | ✅ (psui 10-27: with nothing selected, Shift+Y shows only the hidden part under the pointer; over empty graphics nothing, as live) |
-| 2.18 | Shift+I isolates the hovered/selected parts (others transparent); cumulative | keyboard_shortcuts; View__isolate | 🔧 |
+| 2.18 | Shift+I isolates the hovered/selected parts (others at ~20 %) and clears the selection; over a faded part it does nothing (live 10-27: not cumulative by hover) | keyboard_shortcuts; View__isolate | ✅ |
 | 2.19 | Shift+T makes the hovered/selected parts transparent; cumulative | keyboard_shortcuts; View__make_transparent | 🔧 |
 | 2.20 | Shift+X opens the Section view dialog (again with a section on: turns it off) | keyboard_shortcuts | ✅ |
 | 2.21 | Shift+V named views | keyboard_shortcuts | ✅ |
@@ -87,7 +87,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.3 | Hover pre-highlights the entity under the cursor | A §5.3 | ✅ |
 | 3.4 | Box select left→right = window (fully inside), right→left = crossing | Home__selection | ✅ |
 | 3.5 | Window box is solid, crossing box dashed | Home__selection; A §5.2 | ✅ |
-| 3.6 | Ctrl+drag box deselects | Home__selection | 🔧 |
+| 3.6 | Box select: left→right takes what is wholly inside (faces and edges, no parts or part vertices), right→left what it touches; Ctrl+drag box deselects (live 10-27) | Home__selection | ✅ (crossing box colour asked of live; ours is the bundle's #FFC20E 9-on-8-off) |
 | 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | 🔧 |
 | 3.8 | Selected entities show quick values in the Measure readout | A §5.1 | ✅ |
 | 3.9 | Selection count next to the cursor, 1–5 ("5" for five or more) | Home__selection; live cursors/ | ✅ (Onshape bakes the digit into the cursor image; GPUI has no image cursors, so a black digit with a white outline is drawn at the arrow's lower right) |
@@ -95,9 +95,9 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.11 | Select other lists faces and edges under the cursor nearest first; hovering a row highlights it; click/Enter picks; list closes | Home__select_other | ✅ (psui 10-27, see 1.18; a row click picks it, Esc closes) |
 | 3.12 | Select other picks go to the active dialog field | Home__select_other | 🔧 |
 | 3.13 | Select other from the face/edge context menu | Home__select_other | 🔧 |
-| 3.14 | Selecting a face or part highlights the features that created/modified it in the feature list | features_and_parts_lists | 🔧 |
+| 3.14 | Selecting a face or part highlights the features that created/modified it in the feature list, and its part in the Parts list (related-highlight (236,240,244), live 10-27) | features_and_parts_lists | ✅ |
 | 3.15 | Hovering a feature in the list highlights its geometry | features_and_parts_lists ("Hover over a feature…") | ✅ (app 10-24) |
-| 3.16 | Selecting a feature in the list highlights its geometry | A §5.3 (FEATURE_HIGHLIGHT) | 🔧 |
+| 3.16 | Selecting a feature in the list highlights its geometry (its part amber) and relates its part row (live 10-27) | A §5.3 (FEATURE_HIGHLIGHT) | ✅ |
 | 3.17 | Selecting / hovering a part in the parts list highlights the whole part | A §5.3 (PART_HIGHLIGHT) | 🔧 |
 | 3.18 | Double-click a sketch in the graphics area edits it | (Onshape behaviour) | 🔧 |
 | 3.19 | Create selection dialog and Select ▸ submenu | Home__create_selection; live part-studio/380–398, dom/dialog-create-selection.txt, context-menus-ps-part-select-submenus.txt | 🔧 (Select ▸: face/region = Protrusion, Pocket, Hole, Fillet, Tangent connected, Bounded faces, Loop/chain connected edges, Create selection…; part edge and sketch curve = Tangent connected, Equal length/radius, Parallel, Create selection…; no separator; each item replaces the selection. Create selection (`part_studio/create_selection.rs`): 220 px, floats at the right-click point, header ✕ only, draggable; Faces / Edges tabs (opens on Faces), native-style select (Protrusion…Bounded faces / Tangent connected, Loop/chain connected, Equal length/radius, Parallel), Selection field (empty at open, picks toggle), ☐ Select patterns (pattern copies via `select::with_pattern_instances`), "N faces selected", [Add selection] (disabled at 0) adds to the selection and resets, staying open; preview seeds orange / results query yellow-green. Feature fields with SHOW_CREATE_SELECTION (Delete/Move/Replace face, Offset surface, Draft parting edges, face patterns / mirror) and Flatten's two fields have the 26 px button (tooltip "Create selection"); it opens the dialog beside the feature dialog, the field turns white with a blue border, Add selection fills the field. Convexity follows qConvexConnectedFaces (exterior fillet edges convex). Verified in the app.) |
@@ -114,7 +114,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 4.6 | Toolbar tooltips show the shortcut | A §2.2 | ✅ |
 | 4.7 | Customize toolbar (drag tool sets, Reset) | part_studios | ✅ (built by an earlier pass: move tool sets, remove/restore tools, reset) |
 | 4.8 | Search tools: typing filters tools, Enter runs the first, Esc closes | Home__search_tools | ✅ |
-| 4.9 | Search tools with no query lists recently used tools first; description on hover | Home__search_tools | 🔧 |
+| 4.9 | Search tools with no query lists recently used tools first (bold "Recently used", newest first, first row selected, description pane); description on hover | Home__search_tools | ✅ |
 | 4.10 | REMEMBER_PREVIOUS_VALUE parameters default to the last accepted value of that tool | A §7.2 | ✅ (app 10-24: Fillet 3 opened at the 3 mm just accepted) |
 | 4.11 | Search tools box: 162 px #eee box, "alt/⌥" (35 px) and "c" (17 px) keys joined, 19 px, 1 px #aaa with a 2 px bottom edge, 3 px after the label | live part-studio/00-new-doc-initial | ✅ (box, key edges and key text rows at live's pixels) |
 
@@ -190,7 +190,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.25 | Pause regeneration (banner: Regenerate / Regenerate and exit / Discard) ; regeneration times panel (hover highlights) | features_and_parts_lists | ✅ paused mode as live 10-27: the 343 × 28 amber banner over an emptied toolbar (Undo / Redo stay), ▶\| at 0.4 until something waits, New folder gone, pause at 0.5, Create version… off the rail, edited rows bold italic, dialogs preview nothing (no manipulator, no rollback), ✕ discards without asking. Live's Depth corner mark in a paused dialog not done |
 | 6.26 | Collapse the whole list; drag the feature/parts separator | features_and_parts_lists | 🔧 |
 | 6.27 | Default plane row menu (live): Rename | New sketch…, Offset plane…, Size to Part Studio (Paste sketch when a sketch was copied) | Hide, Hide other planes, Hide all planes | Zoom to selection, View normal to | Show dependencies…; origin: Rename | Hide | Show dependencies… | Hide, Hide other planes, Hide all planes | ✅ |
-| 6.28 | Default planes/origin can be hidden (never deleted) | part_studios | 🔧 |
+| 6.28 | Default planes/origin can be hidden (never deleted: Delete does nothing, no Delete in their menu, live 10-27) | part_studios | ✅ |
 | 6.29 | Clicking empty list space clears the feature selection | (Onshape behaviour) | ✅ (app 10-24) |
 
 ### Rollback bar
@@ -247,7 +247,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 9.1 | Right-drag rotates, middle-drag or Ctrl+right-drag pans, wheel zooms at the cursor | view_navigation | ✅ |
-| 9.2 | Double-click the middle button zooms to fit | View__zoom_to_fit | 🔧 |
+| 9.2 | Double-click the middle button zooms to fit (live 10-27) | View__zoom_to_fit | ✅ |
 | 9.3 | View cube in the upper right turns with the camera | view_navigation | 🔧 |
 | 9.4 | Click a cube face for that standard view | view_navigation | 🔧 |
 | 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | 🔧 |

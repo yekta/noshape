@@ -2,7 +2,7 @@
 
 struct Globals {
     view_proj: mat4x4<f32>,
-    camera_pos: vec4<f32>,   // xyz eye, w = 1 perspective / 0 orthographic
+    camera_pos: vec4<f32>,   // xyz eye (orthographic: Onshape's, for lighting), w = 1 perspective / 0 orthographic
     camera_fwd: vec4<f32>,   // xyz forward
     camera_up: vec4<f32>,
     viewport: vec4<f32>,     // width px, height px, device pixel ratio, pick widening px

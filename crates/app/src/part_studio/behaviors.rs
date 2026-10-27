@@ -1905,8 +1905,12 @@ impl PartStudioView {
     /// Shift+I / Shift+T (cumulative while active, like Onshape).
     pub(super) fn isolate(&mut self, mode: IsolateMode, window: &mut Window, cx: &mut Context<Self>) {
         let targets = self.isolate_targets();
+        // Live 10-27: Shift+I over a faded part (it takes no hover) does
+        // nothing.
         if targets.is_empty() {
-            self.flash_info("Select or hover over a part first.".into(), cx);
+            if self.ui.isolate.is_none() {
+                self.flash_info("Select or hover over a part first.".into(), cx);
+            }
             return;
         }
         match &mut self.ui.isolate {
@@ -1918,6 +1922,10 @@ impl PartStudioView {
                 }
             }
             _ => self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity: 0.0, select_transparent: false, expand: 0 }),
+        }
+        // Live 10-27: isolating the selected parts clears the selection.
+        if mode == IsolateMode::Isolate {
+            self.selection.clear();
         }
         let d = self.display.clone();
         self.apply_display(d, window, cx);

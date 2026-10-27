@@ -3439,6 +3439,11 @@ impl PartStudioView {
             Some(e) => e.dialog.read(cx).active_refs().contains(&r),
             None => self.selection.contains(&r),
         };
+        // Live 10-27 (`related-highlight`): the part of a selected face,
+        // edge or vertex, or one a selected feature made.
+        let related = !selected
+            && self.edit.is_none()
+            && (self.selection.iter().any(|s| !matches!(s, Reference::Body(_)) && self.body_of(s).as_ref() == Some(&b.id)) || self.selected_features.contains(&b.id.feature));
         let hidden = b.hidden;
         let (id1, id2, id3) = (b.id.clone(), b.id.clone(), b.id.clone());
         let r_hover = r.clone();
@@ -3466,6 +3471,7 @@ impl PartStudioView {
             .pl(px(23.))
             .mr(px(5.))
             .group("part-row")
+            .when(related, |d| d.bg(pal.row_related))
             .when(renaming, |d| d.bg(gpui_kit::rgb(0xffffff)))
             .when(hidden, |d| d.text_color(pal.text_faint))
             .child(crate::ui::tree_icon(part_icon, hidden, cx))

@@ -26,20 +26,18 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   in my area. Live asked about the feature list header with errors ("Features ..." truncates next to the red icon).
 - 10-27 03:30–04:15: PERF-SECTION-PANIC + MENU-SKETCH-TAG; CHIP-HOVER (regions); DEPTH-RANGE; tickets closed as not
   bugs or already working: FOLDER-NAME-INLINE, EXT-DIRECTION, P1-10. psui's open tickets now: P1-8 caveat (Hole chips).
+- 10-27 05:30 54ffeab7: paused regeneration as live (6.25), feature list filter with default rows / parts / "..."
+  runs (6.10 / 6.11, model-core `filter_row`), Shift+wheel ±10 (5.22), the active tool clicked again keeps its
+  dialog (4.4); Roboto Bold Italic. Checked: clippy (4 crates), interaction / quantity_field / ops list tests, T0.
+  Verified against live on :102 also: 1.12, 6.6, 7.4, 9.2, 9.6, 6.28.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
-## In progress (10-27 04:45, unlanded on agent/psui)
+## In progress (10-27 05:35)
 
-Shift+wheel on number fields (5.22); feature list filter as live (6.10 / 6.11: kept Default geometry rows and parts,
-"..." runs in Parts, bare ":" matches nothing, ":type" / ":part" alone don't filter, the error icon hides while
-filtering; model-core `filter_row`); paused regeneration as live (6.25: amber banner over an emptied toolbar, bold
-italic pending rows, New folder gone, Create version… off the rail); 4.4 the open tool's button again keeps its
-dialog. Needs: app check on :102, clippy (model-core, ops, app-core, app), model-core interaction tests, T0.
-
-Drafted in /root/psui-scratch (apply after the running check, then build, look, land): patch-box.py (box selection
-takes no part vertices), patch-iso.py (Shift+I clears the selection; quiet over a faded part), patch-recent.py (empty
-tool search lists "Recently used"), patch-related.py (parts-list related highlight, 3.14 / 3.16).
+check14 (clippy render + app, offscreen + box_select tests, T0) on the second batch (commit after 54ffeab7):
+Onshape's orthographic eye for the highlight, box select without part vertices, "Recently used" tool search,
+parts-list related rows, Shift+I clears the selection. Land it when check14 is green.
 
 Residuals found today: live outlines the Delete part ghost (255,192,76) (ours none); a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
@@ -60,21 +58,18 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-1. part-studio.md rows with live specs waiting (SPECS.md "psui: part-studio.md …"): 6.25 paused regeneration, 3.6 box selection, 6.10 / 6.11 filter box, 1.12 Delete key, 6.6 Shift+click range,
-   7.4 eye, 4.4 tool clicked again, 2.18 Shift+I with parts selected (isolates them, clears the selection; not yet
-   re-checked), 9.6 cube hover. Done today: 1.18, 1.19, 1.22, 1.27, 2.11, 2.13, 2.16, 2.17, 3.11, 9.7, 5.22 (Shift+wheel arrives as a
-   horizontal scroll on X11 / macOS: `quantity_field::wheel_delta`). 3.6: live asked whether the crossing box is
-   really blue (spec) or our yellow dashed #FFC20E (bundle).
+1. A black ring shows at a selected edge's midpoint after a box selection (green build too; live none): find what
+   draws it (implicit point / hover sprite?) and drop it. Delete part ghost outline (255,192,76). Dihedral panel
+   (item 5). part-studio.md rows done 10-27: 1.12, 1.18, 1.19, 1.22, 1.27, 2.11, 2.13, 2.16, 2.17, 2.18, 3.6, 3.11,
+   3.14, 3.16, 4.4, 4.9, 5.22, 6.6, 6.10, 6.11, 6.25, 6.28, 7.4, 9.2, 9.6, 9.7. 3.6: live asked whether the crossing
+   box is really blue (spec) or our yellow dashed #FFC20E (bundle CROSS_SELECT_COLOR; kept).
 2. Preview blend residuals (behaviours "psui (10-26, P1) Feature preview look"; SPECS CORRECTION 10-27: live's Remove
    cuts the part and draws the grey tool over it, as ours, so Remove / Intersect are right unblended); live draws the active field's picked region outline
    full orange over the preview (ours: 30 % behind the tool); at slider 1 live's top face is lighter than ours.
 3. Edge selected + hovered (live: the hover's dark outline round a (255,188,64) core): ours never hovers a selected
    entity (builder `hover.filter(|h| !selection.contains(h))`).
-4. Part lighting's specular varies across the screen in live, ours is flat: three blocks (behaviours "spec: psui
-   part-studio.md 2.18 / 2.19": Part 3 blue at the right reads top (62,96,171), ours (53,87,161); Part 1 / 2 match
-   within 2). Live's Part 3 = 0.905 × colour + ~8 (a specular term), Part 1 none; live notes a highlight near the
-   front-right corner of one block. Look at the bundle's lightFragment view vector (eye-space position?) before
-   changing shaders.wgsl `shade()`; test `part_faces_are_lit_like_onshape`.
+4. (In the second batch: the highlight from Onshape's orthographic eye, offscreen test
+   `the_highlight_moves_across_an_orthographic_view`.) Check perspective views against live too.
 5. Dihedral panel layout (P2; live asked for the full spec): Units ▾ row, Max / Min read-outs, Scale row, grey ✕;
    Curve/surface's "☑ Previewed edges and faces" row over a dialog.
 6. Cold start (viewport-performance.md 10-27): per-(source, options) MTLLibrary cache in the vendored wgpu-hal.

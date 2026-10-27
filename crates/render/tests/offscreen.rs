@@ -947,15 +947,17 @@ fn part_faces_are_lit_like_onshape() {
         let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
         let (fwd, up) = (cam.forward(), cam.up());
         let light = (fwd.cross(up) + up - fwd).normalize();
+        // Onshape's orthographic eye: 0.6 × the diameter back from the centre.
+        let eye = if cam.projection == Projection::Perspective { cam.eye() } else { -fwd * 0.6 * 0.1 * 3f64.sqrt() };
         for n in [glam::DVec3::X, -glam::DVec3::X, glam::DVec3::Y, -glam::DVec3::Y, glam::DVec3::Z, -glam::DVec3::Z] {
             let p = n * 0.05;
-            if n.dot(cam.eye() - p) <= 0.0 {
+            if n.dot(eye - p) <= 0.0 {
                 continue;
             }
             let q = cam.project(p, glam::DVec2::new(w as f64, h as f64), 0.2).expect("on screen");
             let px = &f.bgra[((q.y as u32 * w + q.x as u32) * 4) as usize..][..3];
             let got = [px[2] as f64, px[1] as f64, px[0] as f64];
-            let half = (light + (cam.eye() - p).normalize()).normalize();
+            let half = (light + (eye - p).normalize()).normalize();
             let spec = n.dot(half).max(0.0).powf(30.0) * 0.6;
             let want: Vec<f64> = base.iter().map(|&c| ((c as f64 / 255.0) * (0.5 + 0.5 * n.dot(light).max(0.0)) + spec).min(1.0) * 255.0).collect();
             eprintln!("normal {n:?}: got {got:?}, Onshape's model {want:?}");
@@ -970,6 +972,43 @@ fn part_faces_are_lit_like_onshape() {
     };
     live(glam::DVec3::Z, [140.0, 185.0, 212.0]);
     live(-glam::DVec3::Y, [78.0, 104.0, 118.0]);
+}
+
+/// Live 10-27 (behaviours "spec: psui part-studio.md 2.18 / 2.19"): three
+/// 30 × 20 × 10 mm blocks in a row at x 0 / 40 / 80, iso view. The
+/// highlight comes from Onshape's eye-space position, so only the far
+/// block's top carries it: Part 1's top (142,187,214), Part 3's
+/// (62,96,171) = 0.905 × its colour + about 9.
+#[test]
+fn the_highlight_moves_across_an_orthographic_view() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (600u32, 400u32);
+    let lin = |c: [u8; 3]| [srgb_lin(c[0]), srgb_lin(c[1]), srgb_lin(c[2]), 1.0];
+    let mut scene = Scene::default();
+    for (x, color) in [(0.0f32, [157, 207, 237]), (0.04, [165, 165, 165]), (0.08, [59, 97, 180])] {
+        let mesh = r.upload_mesh(&primitives::box_mesh([x, 0.0, 0.0], [x + 0.03, 0.02, 0.01], 1));
+        scene.instances.push(Instance::new(Drawable::Mesh(mesh)).with_color(lin(color)));
+    }
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Isometric);
+    cam.fit_box(glam::DVec3::ZERO, glam::DVec3::new(0.11, 0.02, 0.01), w as f64 / h as f64);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+    let top = |x: f64| {
+        let q = cam.project(glam::DVec3::new(x, 0.01, 0.01), glam::DVec2::new(w as f64, h as f64), 0.2).expect("on screen");
+        let px = &f.bgra[((q.y as u32 * w + q.x as u32) * 4) as usize..][..3];
+        [px[2] as f64, px[1] as f64, px[0] as f64]
+    };
+    for (x, want) in [(0.015, [142.0, 187.0, 214.0]), (0.095, [62.0, 96.0, 171.0])] {
+        let got = top(x);
+        assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() <= 4.0), "top at x {x}: {got:?} vs live {want:?}");
+    }
 }
 
 fn srgb_lin(c: u8) -> f32 {

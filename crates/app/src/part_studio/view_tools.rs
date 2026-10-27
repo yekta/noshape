@@ -88,6 +88,10 @@ impl PartStudioView {
             let names: Vec<&str> = tools.iter().map(|t| sketch_search_name(*t)).collect();
             return studio_rank(&names, &self.palette_query).into_iter().map(|i| PaletteItem::SketchTool(tools[i])).collect();
         }
+        // Live 10-27: an empty search lists the tools used last, newest first.
+        if self.palette_query.trim().is_empty() {
+            return self.ui.recent_tools.iter().map(|id| PaletteItem::Feature(id)).collect();
+        }
         let custom: Vec<&'static features::FeatureType> = self.doc.read(cx).custom_features().feature_types().into_iter().collect();
         // Only tools: hidden feature types (Rip, Recognize, …) are not in
         // live's tool search either.
@@ -211,6 +215,7 @@ impl PartStudioView {
                 }))
         });
         let nothing = items.is_empty();
+        let recents = self.palette_query.trim().is_empty();
         let highlight = !self.ui.palette_no_highlight;
         // Live (menus/tool-search-*): 10 px under the toolbar at the window's
         // right edge, drawn over the panels.
@@ -249,19 +254,27 @@ impl PartStudioView {
                                 .child(crate::ui::input_with_placeholder(&st, "Search tools", cx).appearance(false).cleanable(true).text_size(px(14.)).pl(px(5.))),
                         ),
                 )
-                .when(self.palette_query.trim().is_empty(), |d| {
+                .when(recents && nothing, |d| {
                     d.child(div().h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Start typing to search tools"))
                 })
                 .children(suggestions.filter(|_| !self.palette_query.trim().is_empty()))
                 .when(!self.palette_query.trim().is_empty() && nothing, |d| {
                     d.child(div().h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).text_color(pal.text).child("No items match your search"))
                 })
-                .when(!self.palette_query.trim().is_empty() && !nothing, |d| d.child(
+                .when(!nothing, |d| d.child(
                     h_flex()
                         .items_start()
                         .px(px(10.))
                         .py(px(14.))
-                        .child(v_flex().w(px(198.)).flex_none().gap(px(2.)).children(rows))
+                        .child(
+                            v_flex()
+                                .w(px(198.))
+                                .flex_none()
+                                .gap(px(2.))
+                                // Live 10-27: a bold "Recently used" centred over the rows.
+                                .when(recents, |d| d.child(div().h(px(22.)).flex_none().flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Recently used")))
+                                .children(rows),
+                        )
                         .child(div().w(px(1.)).ml(px(12.)).h(px(142.)).bg(gpui_kit::rgb(0xcccccc)))
                         .children(detail),
                 ))

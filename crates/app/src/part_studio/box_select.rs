@@ -5,8 +5,10 @@
 //! crosses its border, so it takes only what lies wholly inside; a crossing
 //! box everything drawn in it. Here the same from the display geometry
 //! projected to the screen: faces by their triangles, edges and sketch
-//! curves by their polylines, vertices and points, sketch regions by
-//! their triangles. Default planes are never taken (live "nav2 selection").
+//! curves by their polylines, sketch points, sketch regions by their
+//! triangles. Default planes are never taken (live "nav2 selection"), nor
+//! part vertices (live 10-27: a window round a block takes its 6 faces and
+//! 12 edges).
 
 use super::PartStudioView;
 use glam::{DVec2, DVec3};
@@ -119,10 +121,6 @@ impl PartStudioView {
             }
             for (ei, r) in body.edge_refs.iter().enumerate() {
                 let pts: Vec<DVec3> = m.edges.get(ei).map(|e| e.iter().map(p3).collect()).unwrap_or_default();
-                keep(r, shape(&pts, &[]), &mut out);
-            }
-            for (vi, r) in body.vertex_refs.iter().enumerate() {
-                let pts: Vec<DVec3> = m.vertices.get(vi).map(p3).into_iter().collect();
                 keep(r, shape(&pts, &[]), &mut out);
             }
         }
