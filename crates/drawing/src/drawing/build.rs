@@ -1481,7 +1481,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let (ux, uy) = (pl.dir_to_sheet([1.0, 0.0]), pl.dir_to_sheet([0.0, 1.0]));
                 let in_band = |p: [f64; 2]| pl.breaks().iter().any(|b| p[b.axis as usize] > b.a && p[b.axis as usize] < b.b);
                 let mark = g.mark();
-                for (c, r, _) in geo.circles().into_iter().filter(|_| v.show_centerlines) {
+                for (c, r, _) in geo.full_circles().into_iter().filter(|_| v.show_centerlines) {
                     // Deleted one by one (select + Delete).
                     let key = centermark_key(c);
                     if in_band(c) || v.deleted_centermarks.contains(&key) {

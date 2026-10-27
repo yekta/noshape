@@ -1085,6 +1085,33 @@ impl ViewGeometry {
         out
     }
 
+    /// [`Self::circles`] that are whole circles: one closed edge, or arcs at
+    /// that center and radius covering 360° together. Live puts automatic
+    /// centermarks on these only, not on a partial arc such as a rounded
+    /// corner's quarter (behaviours "qa (2026-10-26, P2 batch)", qa
+    /// DRAWING-SCALE).
+    pub fn full_circles(&self) -> Vec<([f64; 2], f64, Option<PointRef>)> {
+        let drawn = self.drawn_model_edges();
+        let arcs: Vec<([f64; 2], f64, f64)> = self
+            .model_edges
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| drawn[*i])
+            .filter_map(|(_, m)| match m.geom {
+                EdgeGeom::Circle { center, radius, face_on: true, mid, .. } => {
+                    let span = match (&m.ends[0], &m.ends[1]) {
+                        (Some((_, a)), Some((_, b))) if (a[0] - b[0]).hypot(a[1] - b[1]) >= 1e-9 => arc_span(center, *a, mid, *b),
+                        _ => std::f64::consts::TAU,
+                    };
+                    Some((center, radius, span))
+                }
+                _ => None,
+            })
+            .collect();
+        let same = |c: [f64; 2], r: f64, x: &([f64; 2], f64, f64)| (c[0] - x.0[0]).abs() < 1e-9 && (c[1] - x.0[1]).abs() < 1e-9 && (r - x.1).abs() < 1e-9;
+        self.circles().into_iter().filter(|(c, r, _)| arcs.iter().filter(|x| same(*c, *r, x)).map(|x| x.2).sum::<f64>() >= std::f64::consts::TAU - 1e-6).collect()
+    }
+
     /// Face-on circular bores (holes and bosses): (center, radius, reference),
     /// one per center and radius.
     pub fn bores(&self) -> Vec<([f64; 2], f64, Option<PointRef>)> {
@@ -2594,6 +2621,33 @@ pub fn body_under(src: &SourceModel, frame: &ViewFrame, p: [f64; 2], tol: f64) -
         })
         .min_by(|a, b| a.0.total_cmp(&b.0))
         .map(|(_, id)| id)
+}
+
+/// The angle (radians, 0..2π) an arc of `center` sweeps from `a` through
+/// `mid` to `b`.
+fn arc_span(center: [f64; 2], a: [f64; 2], mid: [f64; 2], b: [f64; 2]) -> f64 {
+    use std::f64::consts::TAU;
+    let ang = |p: [f64; 2]| (p[1] - center[1]).atan2(p[0] - center[0]);
+    let ccw = |from: f64, to: f64| (to - from).rem_euclid(TAU);
+    let (to_b, to_mid) = (ccw(ang(a), ang(b)), ccw(ang(a), ang(mid)));
+    // Counterclockwise from a, the arc passes mid before b; else it runs clockwise.
+    if to_mid <= to_b { to_b } else { TAU - to_b }
+}
+
+#[cfg(test)]
+mod arc_span_tests {
+    #[test]
+    fn spans_of_quarters_halves_and_three_quarters() {
+        use std::f64::consts::{FRAC_PI_2, PI};
+        let c = [0.0, 0.0];
+        let q = super::arc_span(c, [1.0, 0.0], [0.6, 0.8], [0.0, 1.0]);
+        assert!((q - FRAC_PI_2).abs() < 1e-9, "{q}");
+        // The same ends the other way round: three quarters.
+        let t = super::arc_span(c, [1.0, 0.0], [-0.6, -0.8], [0.0, 1.0]);
+        assert!((t - 3.0 * FRAC_PI_2).abs() < 1e-9, "{t}");
+        let h = super::arc_span(c, [1.0, 0.0], [0.0, -1.0], [-1.0, 0.0]);
+        assert!((h - PI).abs() < 1e-9, "{h}");
+    }
 }
 
 /// Crop a parent view's geometry to a circle.
