@@ -74,13 +74,13 @@ it, so re-take positions after every selection.
 | # | Step | Live | Status | Verified |
 |---|---|---|---|---|
 | 4.1 | Double-click Extrude 1, depth 25, Enter Enter | Rolled back while editing; model regenerates | ✅ re-checked 10-23: rolled back while editing; Part 1 kept (was ✗ F12 (Part 1 disappears silently)) | 0.4.10+ / 1c853f78 10-27 |
-| 4.2 | Feature row right-click › Suppress | Struck-through italic; model updates | ✅ |  |
-| 4.3 | Drag Fillet 1 below Chamfer 1 | Drop line + pill; reordered | ✅ (Fillet then fails: F8) |  |
+| 4.2 | Feature row right-click › Suppress | Struck-through italic; model updates | ✅ | 0.4.10+ / fa61ba6f 10-27 |
+| 4.3 | Drag Fillet 1 below Chamfer 1 | Drop line + pill; reordered | ✅ (Fillet then fails: F8) | 0.4.10+ / fa61ba6f 10-27 |
 | 4.4 | Ctrl+Z / Ctrl+Y / Ctrl+Z | Undo / redo the reorder | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| 4.5 | Click a row, ↑ ↑ / ↓ ↓ | Rollback bar moves; light blue while focused | ✅ |  |
-| 4.6 | Select a feature row, Delete key | Deletes it | ✅ re-checked 10-23: Delete removes the feature, Ctrl+Z restores (was ✗ F15) |  |
-| 4.7 | Right-click › Delete; Ctrl+Z | Deleted; restored | ✅ |  |
-| 4.8 | Error header | At the default panel width live truncates to "Features ..." beside the error icon (part-studio/94, 570); a wider panel shows "Features (N)" | ✅ (F16 withdrawn) |  |
+| 4.5 | Click a row, ↑ ↑ / ↓ ↓ | Rollback bar moves; light blue while focused | ✅ | 0.4.10+ / fa61ba6f 10-27 |
+| 4.6 | Select a feature row, Delete key | Deletes it | ✅ re-checked 10-23: Delete removes the feature, Ctrl+Z restores (was ✗ F15) | 0.4.10+ / fa61ba6f 10-27 |
+| 4.7 | Right-click › Delete; Ctrl+Z | Deleted; restored | ✅ | 0.4.10+ / fa61ba6f 10-27 |
+| 4.8 | Error header | At the default panel width live truncates to "Features ..." beside the error icon (part-studio/94, 570); a wider panel shows "Features (N)" | ✅ (F16 withdrawn) | 0.4.10+ / fa61ba6f 10-27 |
 
 ## 5. Variables, configuration, measure, mass properties
 
