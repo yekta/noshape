@@ -400,7 +400,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     (`vs_backsil` divided by a finite step's on-screen length, which can come out as nothing); its push is now
     analytic, test a_thin_plate_draws_nothing_past_its_outline (1× and 2×). The edge looks wait for live's 2×
     capture.
-- [x] 8d9246ab P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
+- [x] verified watcher CLI 12:08 (≥ green 0d75aa8e; qa 12:10: config_add_input List "Size" → List_mRB7Pn8k5H0Vmv, a 2nd List → List_c5l6FBA6sJtcRi; a Checkbox still gets "Checkbox_3", live's form for checkboxes not captured) 8d9246ab P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
   List → id "Configuration" (renamed "Size", the id stays "Configuration"), Checkbox → "Checkbox_2" (ops/config.rs
   add_input → fs_identifier(name)). Live gives a List a random internal id `List_8iFesnytxapQpg` (behaviours 5915, 6098:
   config string `List_YC7FakBBQ6r7FX=Default;…`), which our Variable Studio already copies (ops/vs_config.rs:35). The id
@@ -411,7 +411,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (bin/cfgmatrix.py, CLI 09:50) (qa 2026-10-27 10:44, CLI 09:50)
   psui: a new List input's id is live's random List_… form (`vs_config::list_id`, as the Variable Studio's);
   Checkbox and Variable keep FeatureScript ids from their names until a capture shows live's Checkbox form.
-- [ ] P2 FS-EDITOR-COMPLETE the Feature Studio editor has no code completion, and Ctrl+Space in it leaves the tab. Steps:
+- [ ] (qa 12:10, green 0d75aa8e: Ctrl+Space in the editor now stays in the Feature Studio (11e7e6aa verified); no completion list yet, waits for live) P2 FS-EDITOR-COMPLETE the Feature Studio editor has no code completion, and Ctrl+Space in it leaves the tab. Steps:
   /root/qa-scratch/tickets/cfs2.noshape › Feature Studio 1 › end of the source, type `opExt` (wait), then Ctrl+Space.
   Ours (green e8858e61): nothing drops down while typing; Ctrl+Space runs the document-wide "back to the previous tab"
   (app-core actions.rs:185 SwitchRecentTab) and jumps to Part Studio 1 mid-edit (tickets/fs-ctrl-space-before.png /
@@ -467,7 +467,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     covering the linear and circular ones, so `EDGE && ALLOWS_AXIS` takes linear, circular and sketch edges, `EDGE &&
     GeometryType.LINE` linear and sketch edges, `EDGE && CIRCLE` circular ones (model test
     custom_features::compound_edge_filters_take_model_edges).
-- [x] 8cdd189f P3 PERF-TOTAL-MISMATCH the Performance panel and its Regeneration times dialog give two totals for the same studio:
+- [x] verified green 0d75aa8e (qa 12:10: live-30-features.noshape just opened: panel "Total regeneration time: 1.13s", Regeneration times dialog "Total regen time: 1.13s"; tickets/perf-total-green-0d75.png) 8cdd189f P3 PERF-TOTAL-MISMATCH the Performance panel and its Regeneration times dialog give two totals for the same studio:
   live-30-features.noshape just opened (regen from cache) → panel "Total regeneration time: 46ms", stopwatch › dialog footer
   "Total regen time: 314ms" (the per-feature column sums to ~314). Live reads one number in both places (behaviours 17899);
   show the same (tickets/perf-total-mismatch.png) (qa 2026-10-27, green dacce5e7)
@@ -679,7 +679,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [ ] P2 API-ASM-CONFIG-NAMES assembly_insert / assembly_set_configuration take a configuration by input **name**
+- [x] verified watcher CLI 12:08 (0d75aa8e; qa 12:10, bin/cfgasm2.py: `{"Size": "Large"}` is stored as `{"Configuration": "Large"}` and the instance is Large (top z 28); the BOM groups the two Large instances; drawing_create by name draws 60 × 28; `{"Size": "Huge"}` is refused "no configuration `Huge`; configurations: Default (Default), Large (Large)") P2 API-ASM-CONFIG-NAMES assembly_insert / assembly_set_configuration take a configuration by input **name**
   (their own examples: `{"configuration": {"Size": "Large"}}`) and store it, but the instance regenerates in the default
   configuration. Steps (bin/cfgasm2.py, CLI 09:50): Part Studio with a List input named "Size" (id "Configuration",
   options Default / Large: Extrude 1 depth 10 / 20) and a Checkbox "NoBoss" (id "Checkbox_2", suppresses Extrude 2);
