@@ -8,12 +8,25 @@ use crate::gpu::Gpu;
 use crate::sketch_mode::Tool;
 use crate::viewport::ViewportEvent;
 use glam::DVec2;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, Keystroke, Modifiers, Point, TestAppContext, WindowBounds, WindowOptions, px, size};
+use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, IntoElement, Keystroke, Modifiers, InteractiveElement as _, ParentElement as _, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
 use noshape_model::reference::{DatumPlane, Reference};
+
+/// The app's workspace as far as keys go: the "Workspace" key context the
+/// default bindings (Esc → Cancel, …) need above the view.
+struct Workspace(Entity<PartStudioView>);
+
+impl Render for Workspace {
+    fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+        div().key_context("Workspace").size_full().child(self.0.clone())
+    }
+}
 
 /// A fresh document's Part Studio in a test window, sketching on Top with `tool`.
 fn sketch_with(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>) {
     cx.update(gpui_kit::init);
+    // The app's default key bindings (Esc → Cancel, tool keys), without the
+    // user's customizations.
+    cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
     crate::part_studio_hooks::register_for_tests();
     let dir = std::env::temp_dir().join(format!("noshape-ui-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -25,7 +38,14 @@ fn sketch_with(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHan
     let (window, view) = cx.update(|cx| {
         let doc = cx.new(|_| DocModel::new(session));
         let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
-        gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx))).unwrap()
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
     });
     draw(cx, window);
     cx.update_window(window, |_, w, cx| {
@@ -207,4 +227,54 @@ fn dimension_box_enter_commits_with_the_unit_list_open(cx: &mut TestAppContext) 
     assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "one Enter closes the box");
     keys(cx, window, &["2", "6"]);
     assert!(near(&dimensions(cx, &view), &[0.0254]), "{:?}", dimensions(cx, &view));
+}
+
+/// A line drawn and its value box dismissed (Esc), then the Dimension tool.
+fn line_then_dimension_tool(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    let (window, view) = sketch_with(cx, name, Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["escape", "escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    draw(cx, window);
+    (window, view)
+}
+
+/// Parity sketch.md 7.3: the Dimension tool's pick and placement clicks open
+/// the value box, which takes the typed value from the first key; Enter
+/// applies it.
+#[gpui::test]
+fn dimension_tool_click_click_type_enter(cx: &mut TestAppContext) {
+    let (window, view) = line_then_dimension_tool(cx, "dim-tool");
+    assert!(dimensions(cx, &view).is_empty());
+    click(cx, window, &view, (570., 380.));
+    click(cx, window, &view, (570., 330.));
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_some()), "placement opens the value box");
+    keys(cx, window, &["2", "5", "enter"]);
+    assert!(near(&dimensions(cx, &view), &[0.025]), "{:?}", dimensions(cx, &view));
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_none()));
+}
+
+/// Parity sketch.md 7.16a: Esc on an untouched new box closes it at once
+/// and the dimension keeps its measured value; reopened and changed, the
+/// first Esc reverts the text and keeps the box, the second closes it.
+#[gpui::test]
+fn dimension_box_escape_as_live(cx: &mut TestAppContext) {
+    let (window, view) = line_then_dimension_tool(cx, "dim-esc");
+    click(cx, window, &view, (570., 380.));
+    click(cx, window, &view, (570., 330.));
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "an untouched box closes at once");
+    let measured = dimensions(cx, &view);
+    assert_eq!(measured.len(), 1, "the dimension stays");
+    let cid = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.value().is_some()).unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_dim_edit(cid, w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["9"]);
+    keys(cx, window, &["escape"]);
+    let text = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|d| d.1.read(cx).value().to_string()));
+    assert!(text.as_deref().is_some_and(|t| !t.starts_with('9')), "the first Esc reverts and keeps the box: {text:?}");
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "the second Esc closes it");
+    assert!(near(&dimensions(cx, &view), &measured), "{:?}", dimensions(cx, &view));
 }

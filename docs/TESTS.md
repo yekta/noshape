@@ -50,10 +50,12 @@ worker on wgpu's no-op backend), keys through GPUI's dispatch. Example: part-stu
 - Write the test inside the module whose private state it reads (`#[cfg(test)] #[path = "…_ui_tests.rs"] mod
   ui_tests;`), with `#[gpui::test] fn …(cx: &mut TestAppContext)`, and import gpui_kit names one by one (a glob brings
   GPUI's `test` macro in, and `#[gpui::test]`'s own `#[test]` then recurses). Set up: `cx.update(gpui_kit::init)`,
-  `part_studio_hooks::register_for_tests()` (inert app hooks), a document from `Session::create` in a temp dir,
-  `gpui_kit::open_window(…, |w, cx| cx.new(|cx| View::new(doc, tab, Gpu::headless().unwrap(), w, cx)))`, then
-  `window.activate_window()`: focus events (an input's select-on-focus) only run in an active window, and without it
-  a test passes where the app fails.
+  `cx.bind_keys(actions::default_key_bindings())` (the app's keys without the user's customizations),
+  `part_studio_hooks::register_for_tests()` (inert app hooks), a document from `Session::create` in a temp dir, the
+  view inside a wrapper with `key_context("Workspace")` (the default bindings' context, e.g. Esc → Cancel) via
+  `gpui_kit::open_window`, the view built with `Gpu::headless().unwrap()`, then `window.activate_window()`: focus
+  events (an input's select-on-focus) only run in an active window, and without it a test passes where the app
+  fails. `sketch_ui_tests.rs`'s `sketch_with` does all of it.
 - Drive it as the user does, and draw a frame between steps (`window.draw(cx).clear(cx)`, then
   `cx.run_until_parked()`: a newly focused input registers its text handler when painted). Keys:
   `window.dispatch_keystroke(Keystroke::parse("5"), cx)` with `key_char` set for a character key; clicks in the 3D view
