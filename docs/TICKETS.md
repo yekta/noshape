@@ -379,7 +379,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     | B `EDGE && GeometryType.LINE` | nothing | (not tried) |
     | C `EDGE && BodyType.SOLID` | "Edge of Extrude 1" | — |
     | D `ALLOWS_AXIS` alone | "Edge of Extrude 1" | — |
-    B (`EDGE && GeometryType.LINE`) is probably the most common edge filter in custom features. Screenshots:
+    B (`EDGE && GeometryType.LINE`) is probably the most common edge filter in custom features; `EDGE && CIRCLE`
+    reduces the same way. Face filters are fine (`FACE && PLANE` keeps PLANAR_FACE, `FACE && CYLINDER` keeps
+    CYLINDRICAL_FACE) since EntityType.FACE carries those bits. Screenshots:
     tickets/pick-green-custom-{A-axisedge-model-none,A-axisedge-sketch-only,B-edge-line-none,C-edge-solid-ok,D-allows-axis-ok}.png
   - psui: the v0.4.9 part is PREVIEW-NO-PICK (fixed 4e55b01f; render test a_preview_picks_the_edges_of_the_model_with_the_feature
     now covers edges too). The compound filters: custom/studio.rs `filter_of`'s `&&` takes any model edge (EDGE) as
