@@ -823,7 +823,12 @@ impl AssemblyView {
     /// it yet (live qa5 A19: an empty Replicate, "Replicate 1"; qa5 P2-A7).
     pub(super) fn pending_pattern_row(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let s = self.pattern.as_ref().filter(|s| s.editing.is_none())?;
-        let err = self.pattern_from_session(s, cx).err();
+        // Live: the row tooltip is the dialog title's, "<name> did not
+        // regenerate properly: <message>".
+        let err = self.pattern_from_session(s, cx).err().map(|e| match self.pattern_regen_error(s, cx) {
+            Some(m) => format!("{} did not regenerate properly: {m}", s.name),
+            None => e.to_string(),
+        });
         let pal = p();
         let icon = match s.kind {
             PatternDialogKind::Linear | PatternDialogKind::PartPattern => "linear-pattern",
