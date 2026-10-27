@@ -98,7 +98,7 @@ then edits, undo/redo, rollback and suppress.
 | Step | Ours | Live | Status |
 |---|---|---|---|
 | Cylindrical mate dialog | Limits only (no Offset), 4 limit rows Z ≑ / Z ⌶ / rotation min / max, "No minimum" / "No maximum" | same (behaviours 5942, 5959); Simulation connection excluded (simulation) | ✅ |
-| Limits Z max `5` + Enter | applies and closes the dialog | 1st Enter applies, 2nd accepts | ✗ **P2-A2** (skb) |
+| Limits Z max `5` + Enter | applies and closes the dialog | 1st Enter applies, 2nd accepts | ✅ P2-A2 (skasm 10-27 GUI: "30" + Enter → "30 deg" selected, dialog open; 2nd Enter accepts) |
 | Drag the pin past the limit | stops at 5.0 mm along the hole connector's Z (it points down); the unfixed plate is pulled along | — | ✅ |
 | Shell 1 mm, live's p2 model (depth 10, R1, 4 through holes) | "Could not shell part with selections." | OK 3998.627 mm³, 33 faces | ✗ **P1-16** (kern) |
 | Shell 2.5 mm, same | OK 8487.861 mm³, 53 faces | OK 8503.961 mm³, 47 faces | ✗ **P1-16** |
@@ -109,9 +109,9 @@ then edits, undo/redo, rollback and suppress.
 | Distance `25` + Enter, Enter | 1st applies (pin moves), 2nd accepts | Onshape number fields | ✅ |
 | Done, then double-click Explode 1 | plain row, unexploded; re-enters editing fully exploded | same | ✅ |
 | Step row right-click | Edit… / Rename / — / Delete | same (behaviours 815) | ✅ |
-| Esc with no dialog in explode editing | toolbar back but still exploded, row stays active with the rollback bar; the next double-click leaves instead of re-entering | Esc = Done | ✗ **P2-A3** (skb) |
+| Esc with no dialog in explode editing | toolbar back but still exploded, row stays active with the rollback bar; the next double-click leaves instead of re-entering | Esc = Done | ✅ P2-A3 (skasm 10-27 GUI: Esc → no banner, plain "Explode 1", no rollback bar, assembled) |
 | Assembly circular pattern dialog | Instances, Axis of pattern (+ clock), Angle 360 deg, Instance count 2 (+ ↻), ☑ Equal spacing, ☐ Centered; ✓ pale until Instances is set | same (behaviours 6186, 8704) | ✅ |
-| Pin about the middle hole's rim, ✓ | copy in hole 3; "Circular pattern 1 ▸ Part 2 <2>", Instances (3); info bubble "1 instance(s) created." | bubble? (request 10-26 p6) | ? |
+| Pin about the middle hole's rim, ✓ | copy in hole 3; "Circular pattern 1 ▸ Part 2 <2>", Instances (3); info bubble "1 instance(s) created." | live: no bubble or toast (behaviours "qa5 (10-26 p6)" (1)) | ✅ (ours shows none either; `accept_pattern`) |
 | Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✗ **P2-A4** (skb) |
 | Mate type → Revolute | Offset, Limits (rotation min / max kept); row "Revolute 1"; Z offset 0 (the pin rises to mid-height) | same (behaviours 5942) | ✅ |
 | Fix the plate, drag the revolute pin | rotates only: axis stays on hole 1 (0.002 mm), plate unchanged; the copy follows | behaviours 5948 (1) | ✅ |
