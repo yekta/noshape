@@ -1371,14 +1371,16 @@ pub struct ConnectorGlyphs {
     items: Vec<(DVec3, DVec3, DVec3, DVec3, ConnectorLook)>,
 }
 
-const MC_R_IN_PX: f64 = 12.5;
+// Onshape's MATE_CONNECTOR_DIAMETER_PX 36 and RING_WIDTH_PX 4 (behaviours "psui (2026-10-27, P2) interaction 3.4").
+const MC_R_IN_PX: f64 = 14.0;
 const MC_R_OUT_PX: f64 = 18.0;
 const MC_RIM_PX: f32 = 1.3;
-/// Fill (sRGB) and opacity: live's wedge reads (250,251,252) at rest over
-/// (245,248,250), (241,220,151) hovered, (243,215,128) selected.
-const MC_FILL_REST: ([u8; 3], f32) = ([255, 255, 255], 0.5);
-const MC_FILL_HOVER: ([u8; 3], f32) = ([235, 178, 13], 0.4);
-const MC_FILL_SELECTED: ([u8; 3], f32) = ([235, 178, 13], 0.5);
+/// Fill (sRGB) and opacity, each over what is behind the disc (live over a face (142,187,214): rest (232,241,247),
+/// hover (187,190,134), selected (220,204,90)): MATE_CONNECTOR_COLOR rgba(255,255,255,0.8), PRE_SELECTED
+/// rgba(255,194,14,0.4) and SELECTED rgba(255,194,14,0.5) instead of the white.
+const MC_FILL_REST: ([u8; 3], f32) = ([255, 255, 255], 0.8);
+const MC_FILL_HOVER: ([u8; 3], f32) = ([255, 194, 14], 0.4);
+const MC_FILL_SELECTED: ([u8; 3], f32) = ([255, 194, 14], 0.5);
 const MC_RIM_REST: [u8; 4] = [40, 44, 46, 255];
 const MC_RIM_LIT: [u8; 4] = [0, 40, 71, 255];
 
