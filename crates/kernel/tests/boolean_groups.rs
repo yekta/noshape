@@ -66,3 +66,31 @@ fn holes_through_a_plate_built_directly() {
         assert_eq!(walls.len(), 1, "tool {k}: {:?}", res.history.of_input(k as u32 + 1, ShapeType::Face, side).collect::<Vec<_>>());
     }
 }
+
+/// A boss standing on a face is fused directly (boolean.cpp fuse_on_face):
+/// the face gets the boss's outline as an inner loop; the same solid as the
+/// boolean's. Off the face's edge it is fused as usual.
+#[test]
+fn a_boss_on_a_face_fused_directly() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(100.0, 60.0, 10.0) * mm).unwrap();
+    let boss = make_cylinder(&Plane::new(DVec3::new(30.0, 30.0, 10.0) * mm, DVec3::Z, DVec3::X), 5.0 * mm, 8.0 * mm, 2.0 * PI).unwrap();
+    let t = std::time::Instant::now();
+    let r = boolean(BooleanOp::Fuse, std::slice::from_ref(&plate), std::slice::from_ref(&boss), &BooleanOptions::default()).unwrap();
+    eprintln!("boss in {:.2} ms", t.elapsed().as_secs_f64() * 1e3);
+    assert!(r.shape.is_valid());
+    let want = (100.0 * 60.0 * 10.0 + PI * 25.0 * 8.0) * 1e-9;
+    assert!((r.shape.volume().unwrap() - want).abs() < 1e-13, "{}", r.shape.volume().unwrap());
+    assert_eq!(r.shape.faces().len(), 6 + 2);
+    let top = plate.faces().iter().position(|f| f.centroid().unwrap().z > 9.9 * mm).unwrap() as u32;
+    assert_eq!(r.history.modified(0, ShapeType::Face, top).len(), 1);
+    let bottom_cap = boss.faces().iter().position(|f| f.centroid().unwrap().z < 10.1 * mm && matches!(f.face_surface(), Ok(Surface::Plane(_)))).unwrap() as u32;
+    assert!(r.history.is_deleted(1, ShapeType::Face, bottom_cap));
+    // Over the plate's edge: the boolean's (the boss's foot is split).
+    let edge = make_cylinder(&Plane::new(DVec3::new(98.0, 30.0, 10.0) * mm, DVec3::Z, DVec3::X), 5.0 * mm, 8.0 * mm, 2.0 * PI).unwrap();
+    let r = boolean(BooleanOp::Fuse, &[plate], &[edge], &BooleanOptions::default()).unwrap();
+    assert!(r.shape.is_valid());
+    let v = r.shape.volume().unwrap();
+    assert!((v - (100.0 * 60.0 * 10.0 + PI * 25.0 * 8.0) * 1e-9).abs() < 1e-12, "{v}");
+}

@@ -1826,6 +1826,171 @@ static bool cut_through_holes(const TopoDS_Shape& target, const std::vector<Topo
   return true;
 }
 
+
+// A tool standing on a planar face of the target (a boss extruded from a
+// sketch on the face): one of its planar faces lies in the face's plane,
+// facing it, inside it and clear of its edges, and the rest of the tool is
+// on the face's outer side touching nothing else. The fuse is the target
+// with the cap's outline as a new inner loop of the face and the tool's
+// other faces added (no boolean: live's 30-feature part spent ~6 ms of CPU
+// in each boss's). False when it doesn't apply; the caller fuses as usual.
+static bool fuse_on_face(const TopoDS_Shape& target, const TopoDS_Shape& tool, TopoDS_Shape& out, HHist& hist)
+{
+  auto no = [](int why) {
+    if (std::getenv("NOSHAPE_BOOL_DEBUG"))
+      std::fprintf(stderr, "fuse on face: no (%d)\n", why);
+    return false;
+  };
+  auto only = [](const TopoDS_Shape& s, TopAbs_ShapeEnum k, TopoDS_Shape& one) {
+    int n = 0;
+    for (TopExp_Explorer e(s, k); e.More(); e.Next(), ++n)
+      one = e.Current();
+    return n == 1;
+  };
+  TopoDS_Shape solid, shell, tsolid, tshell;
+  if (!only(target, TopAbs_SOLID, solid) || !only(solid, TopAbs_SHELL, shell) || !only(tool, TopAbs_SOLID, tsolid) || !only(tsolid, TopAbs_SHELL, tshell))
+    return no(1);
+  Bnd_Box all;
+  BRepBndLib::Add(solid, all, false);
+  BRepBndLib::Add(tsolid, all, false);
+  if (all.IsVoid())
+    return no(2);
+  const double tol = 1e-7 * std::max(1.0, std::sqrt(all.SquareExtent()));
+  auto outward = [](const TopoDS_Face& f, gp_Pln& pl) {
+    BRepAdaptor_Surface s(f, false);
+    if (s.GetType() != GeomAbs_Plane)
+      return false;
+    pl       = s.Plane();
+    gp_Dir n = pl.Position().Direct() ? pl.Axis().Direction() : pl.Axis().Direction().Reversed();
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    pl = gp_Pln(pl.Location(), n);
+    return true;
+  };
+  // The tool's cap on a face of the target.
+  ShapeIMap faces;
+  TopExp::MapShapes(solid, TopAbs_FACE, faces);
+  TopoDS_Face cap, face;
+  gp_Pln      fpl;
+  for (TopExp_Explorer e(tsolid, TopAbs_FACE); e.More() && face.IsNull(); e.Next())
+  {
+    const TopoDS_Face& c = TopoDS::Face(e.Current());
+    gp_Pln             cpl;
+    if (!outward(c, cpl))
+      continue;
+    int nw = 0;
+    for (TopoDS_Iterator w(c); w.More(); w.Next())
+      ++nw;
+    if (nw != 1)
+      continue;
+    for (int i = 1; i <= faces.Extent(); ++i)
+    {
+      const TopoDS_Face& f = TopoDS::Face(faces(i));
+      gp_Pln             pl;
+      if (outward(f, pl) && pl.Axis().Direction().Dot(cpl.Axis().Direction()) < -1 + 1e-12 && pl.Distance(cpl.Location()) <= tol)
+      {
+        Bnd_Box fb, cb;
+        BRepBndLib::Add(f, fb, false);
+        BRepBndLib::Add(c, cb, false);
+        if (fb.IsOut(cb))
+          continue;
+        cap  = c;
+        face = f;
+        fpl  = pl;
+        break;
+      }
+    }
+  }
+  if (face.IsNull())
+    return no(3);
+  const gp_Dir n(fpl.Axis().Direction());
+  // The rest of the tool on the face's outer side.
+  for (TopExp_Explorer v(tsolid, TopAbs_VERTEX); v.More(); v.Next())
+    if (gp_Vec(fpl.Location(), BRep_Tool::Pnt(TopoDS::Vertex(v.Current()))).Dot(gp_Vec(n)) < -tol)
+      return no(4);
+  // Nothing of the target but the face near the tool (boxes), the cap inside
+  // the face and clear of its edges.
+  Bnd_Box tb;
+  BRepBndLib::Add(tsolid, tb, false);
+  tb.Enlarge(tol);
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    if (faces(i).IsSame(face))
+      continue;
+    Bnd_Box fb;
+    BRepBndLib::Add(faces(i), fb, false);
+    if (!fb.IsOut(tb))
+      return no(5);
+  }
+  {
+    TopExp_Explorer v(cap, TopAbs_VERTEX);
+    gp_Pnt          p;
+    if (v.More())
+      p = BRep_Tool::Pnt(TopoDS::Vertex(v.Current()));
+    else
+    {
+      TopExp_Explorer ed(cap, TopAbs_EDGE);
+      if (!ed.More())
+        return no(6);
+      BRepAdaptor_Curve c(TopoDS::Edge(ed.Current()));
+      p = c.Value(c.FirstParameter());
+    }
+    BRepClass_FaceClassifier fc(face, p, tol);
+    if (fc.State() != TopAbs_IN)
+      return no(7);
+    for (TopExp_Explorer e(face, TopAbs_EDGE); e.More(); e.Next())
+    {
+      Bnd_Box eb;
+      BRepBndLib::Add(e.Current(), eb, false);
+      if (eb.IsOut(tb))
+        continue;
+      BRepExtrema_DistShapeShape dist(cap, e.Current());
+      if (!dist.IsDone() || dist.Value() <= 10 * tol)
+        return no(8);
+    }
+  }
+  // The face with the cap's outline as an inner loop, run against the
+  // tool's own use of its edges (the shell stays closed and oriented).
+  BRep_Builder      B;
+  const TopoDS_Face fwd = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
+  TopoDS_Face       nf  = TopoDS::Face(fwd.EmptyCopied());
+  for (TopoDS_Iterator w(fwd); w.More(); w.Next())
+    B.Add(nf, w.Value());
+  TopoDS_Wire hole;
+  B.MakeWire(hole);
+  for (TopExp_Explorer e(cap, TopAbs_EDGE); e.More(); e.Next())
+  {
+    // e as the cap uses it; the face uses it as the cap does (the cap and
+    // the face face each other), in the face's forward terms.
+    const TopoDS_Edge ed = TopoDS::Edge(e.Current());
+    BRepLib::BuildPCurveForEdgeOnPlane(ed, nf);
+    B.Add(hole, face.Orientation() == TopAbs_REVERSED ? ed.Reversed() : TopoDS_Shape(ed));
+  }
+  hole.Closed(true);
+  B.Add(nf, hole);
+  nf.Orientation(face.Orientation());
+  TopoDS_Shell ns;
+  B.MakeShell(ns);
+  for (TopoDS_Iterator it(shell); it.More(); it.Next())
+    B.Add(ns, it.Value().IsSame(face) ? nf.Oriented(it.Value().Orientation()) : it.Value());
+  for (TopoDS_Iterator it(tshell); it.More(); it.Next())
+    if (!it.Value().IsSame(cap))
+      B.Add(ns, it.Value());
+  ns.Closed(true);
+  TopoDS_Solid so;
+  B.MakeSolid(so);
+  B.Add(so, ns.Oriented(shell.Orientation()));
+  so.Orientation(solid.Orientation());
+  if (!closed_and_oriented(so))
+    return no(9);
+  HHist h = new BRepTools_History();
+  h->AddModified(face, nf);
+  h->Remove(cap);
+  out  = so;
+  hist = h;
+  return true;
+}
+
 // The result's facets back as mesh faces; `hist` becomes the history from
 // the original (unfaceted) inputs.
 static TopoDS_Shape remesh_facets(const TopoDS_Shape& res, MeshFacets& facets, HHist& hist)
@@ -1973,6 +2138,19 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     HHist        h;
     const bool   done = fuse_slabs(a[0], t, opts, out, h);
     fail_if_cancelled();
+    if (done)
+      return make_result(concat(args.items, tools.items), out, h.get());
+  }
+  // A tool standing on a face of the target (a boss): built directly.
+  if (op == 0 && a.size() == 1 && t.size() == 1 && facets.source.empty())
+  {
+    TopoDS_Shape out;
+    HHist        h;
+    bool         done = false;
+    {
+      const KernelTimer timer("boolean.on_face");
+      done = fuse_on_face(a[0], t[0], out, h);
+    }
     if (done)
       return make_result(concat(args.items, tools.items), out, h.get());
   }
