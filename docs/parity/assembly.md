@@ -121,40 +121,40 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | # | Entry | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
 | C1 | Exit isolate (top, while isolating) | H:mates | ✅ | |  |
-| C2 | Hide / Show | UI:context-part | ✅ | |  |
-| C3 | Hide other instances | UI:context-part | ✅ | |  |
-| C4 | Hide all instances | UI:context-part | ✅ | |  |
-| C5 | Isolate… | UI:context-part | ✅ | |  |
-| C6 | Make transparent… | UI:context-part | ✅ | |  |
-| C7 | Suppress / Unsuppress | UI:context-part | ✅ | |  |
-| C8 | Fix / Unfix | UI:context-part | ✅ | |  |
+| C2 | Hide / Show | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C3 | Hide other instances | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C4 | Hide all instances | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C5 | Isolate… | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C6 | Make transparent… | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C7 | Suppress / Unsuppress | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C8 | Fix / Unfix | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C9 | Check interference… (subassemblies, multi-selection) | UI:context-subassembly | ✅ | |  |
-| C10 | Add mate connector to instance origin… | UI:context-part | ✅ | single selection |  |
-| C11 | Replace instances… / Replace n instances… | UI:context-part, B | ✅ | |  |
-| C12 | Switch to Part Studio / Switch to Assembly | UI:context-part | ✅ | opens the tab |  |
+| C10 | Add mate connector to instance origin… | UI:context-part | ✅ | single selection | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C11 | Replace instances… / Replace n instances… | UI:context-part, B | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C12 | Switch to Part Studio / Switch to Assembly | UI:context-part | ✅ | opens the tab | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C13 | Change configuration… | UI:context-part | ✅ | |  |
 | C14 | Select instances with same part and same configuration | UI:context-part | ✅ | |  |
-| C15 | Copy <name> / Copy n items | UI:context-part, B | ✅ | |  |
-| C16 | Move to new subassembly | UI:context-part | ✅ | model test `move_to_new_subassembly_and_dissolve_keep_positions` |  |
+| C15 | Copy <name> / Copy n items | UI:context-part, B | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C16 | Move to new subassembly | UI:context-part | ✅ | model test `move_to_new_subassembly_and_dissolve_keep_positions` | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C17 | Dissolve subassembly | UI:context-subassembly | ✅ | tab left empty when unused elsewhere |  |
-| C18 | Zoom to selection | UI:context-part | ✅ | |  |
-| C19 | Add selection to folder… | UI:context-part | ✅ | |  |
+| C18 | Zoom to selection | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
+| C19 | Add selection to folder… | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C20 | Expand ▸ Expand selected / Expand all; Collapse ▸ … | UI:context-part | ✅ | subassemblies; GUI g2–g4 |  |
 | C21 | Create empty subassembly | UI:context-part | ✅ | new "Assembly N" tab + instance |  |
 | C22 | Delete (mates, MCs, relations go; groups keep other members) | UI:context-part, E§1 | ✅ | model test `rename_hide_others_and_unfix_all` |  |
 | C23 | Show mates, Go to item in list (graphics menu) | E§5.4 | ✅ | |  |
 | C24 | Graphics menu on empty space: Show all, Zoom to fit, Isometric, Clear selection | E§5.4 | ✅ | |  |
-| C25 | Properties…, Instance properties…, Show center of mass, Use best available tessellation, Edit in context, Update context, Change to version, Export, Where used, Revision history, Create task, Add comment, Create Drawing, Add to named positions, Lock/follow position to, Select instances with same configuration | UI:context-part | ✅ | all of the live list implemented (see LA13 and G13: Edit in context ▸, Update context ▸, Set as primary instance ▸); Where used / Revision history / Create task / Add comment are cloud-only or not in the live menu GUI skasm 10-27: the instance menu equals live 501 item for item (Add comment cloud-only). |  |
+| C25 | Properties…, Instance properties…, Show center of mass, Use best available tessellation, Edit in context, Update context, Change to version, Export, Where used, Revision history, Create task, Add comment, Create Drawing, Add to named positions, Lock/follow position to, Select instances with same configuration | UI:context-part | ✅ | all of the live list implemented (see LA13 and G13: Edit in context ▸, Update context ▸, Set as primary instance ▸); Where used / Revision history / Create task / Add comment are cloud-only or not in the live menu GUI skasm 10-27: the instance menu equals live 501 item for item (Add comment cloud-only). | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 
 ### 4.2 Top-level assembly menu (UI:context-assembly)
 
 | # | Entry | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| A1 | Rename (the tab) | UI:context-assembly | ✅ | |  |
-| A2 | Check interference… | UI:context-assembly | ✅ | |  |
-| A3 | Add exploded view… | UI:context-assembly | ✅ | |  |
-| A4 | Unfix all (when something is fixed) | E§5.4, AS-06 | ✅ | top row: Unfix all right after Show center of mass once an instance at this level is fixed (not for fixed parts inside a subassembly; live 530–538); folder rows too (L17); multi-select of fixed instances: Unfix GUI :103 a1 = live 532 |  |
-| A5 | Expand all / Collapse all | UI:context-assembly | ✅ | |  |
+| A1 | Rename (the tab) | UI:context-assembly | ✅ | | 0.4.10+ / acd6acce 10-27 (tickets/asm-root-menu-acd6.png) |
+| A2 | Check interference… | UI:context-assembly | ✅ | | 0.4.10+ / acd6acce 10-27 (tickets/asm-root-menu-acd6.png) |
+| A3 | Add exploded view… | UI:context-assembly | ✅ | | 0.4.10+ / acd6acce 10-27 (tickets/asm-root-menu-acd6.png) |
+| A4 | Unfix all (when something is fixed) | E§5.4, AS-06 | ✅ | top row: Unfix all right after Show center of mass once an instance at this level is fixed (not for fixed parts inside a subassembly; live 530–538); folder rows too (L17); multi-select of fixed instances: Unfix GUI :103 a1 = live 532 | 0.4.10+ / acd6acce 10-27 (tickets/asm-root-menu-acd6.png) |
+| A5 | Expand all / Collapse all | UI:context-assembly | ✅ | | 0.4.10+ / acd6acce 10-27 (tickets/asm-root-menu-acd6.png) |
 | A6 | Properties…, Hide instance list properties, Show center of mass, Create Drawing, Export, Where used, Release, Revision history, Create task, Add comment | UI:context-assembly | ✅ | Properties…, Show / Hide instance list properties, Show center of mass, Create Drawing…, Export…, Check interference…, Add exploded view… implemented; Release… is a paid-plan upsell (excluded), Add comment cloud-only GUI skasm 10-27: top-level row menu as LA14. |  |
 
 ## 5. Mate features list (H:mates, E§5.1, E§6.5, UI:assembly__mate-hover.png)
