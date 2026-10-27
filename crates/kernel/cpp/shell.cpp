@@ -831,7 +831,18 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   BRepAlgoAPI_Cut c(solid, cavity);
   if (c.HasErrors() || !c.IsDone())
     return no("a boolean failed");
-  TopoDS_Shape r = single_solid(c.Shape());
+  // Faces the cut split (a hole's wall tube at its seam, kern's bracket:
+  // 21 faces, live 20) merged, as the slabs' are.
+  ShapeUpgrade_UnifySameDomain usd(c.Shape(), true, true, false);
+  usd.SetLinearTolerance(1e-7);
+  usd.Build();
+  TopoDS_Shape r = single_solid(usd.Shape());
+  HHist        hs = usd.History();
+  if (!valid_solid(r))
+  {
+    r  = single_solid(c.Shape());
+    hs = nullptr;
+  }
   if (!valid_solid(r) || solid_count(r) != 1)
     return no("invalid result");
   const double vo = volume_of(solid), vr = volume_of(r);
@@ -839,7 +850,7 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
     return no("volume out of range");
   const HHist hc = c.History();
   out.result     = r;
-  out.history    = shell_history(solid, r, {hc}, {hc}, sources, {});
+  out.history    = hs.IsNull() ? shell_history(solid, r, {hc}, {hc}, sources, {}) : shell_history(solid, r, {hc, hs}, {hc, hs}, sources, {});
   return true;
 }
 
