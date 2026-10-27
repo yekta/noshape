@@ -4125,6 +4125,8 @@ impl SketchEditor {
             self.set_tool(Tool::Transform);
         }
         self.selection = pasted;
+        // The Transform triad on the copy (qa: it stayed on the original).
+        self.follow_transform_selection(&data.sketch);
         self.message = None;
         true
     }
@@ -7931,6 +7933,7 @@ mod tests {
         assert!(((c.start_point() + c.end_point()) * 0.5 - v(0.05, 0.03)).length() < 1e-9);
         assert_eq!(ed.tool, Tool::Transform);
         assert_eq!(ed.message, None);
+        assert!((ed.pattern_center - v(0.05, 0.03)).length() < 1e-9, "the triad sits on the copy: {}", ed.pattern_center);
         assert!(!ed.paste_clipboard(&mut d, "hello"));
     }
 
