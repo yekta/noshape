@@ -368,7 +368,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (scripts/build-opennurbs.sh)", while RHINO stays offered in the format list. Releases build it (release.yml); the
   watcher's build should match the release configuration so QA tests what ships (lead: watcher build env); and a build
   without openNURBS shouldn't list RHINO (qa 2026-10-26, build 4d2f6b0c)
-- [x] (dx 10-26) P3 docs/USER_GUIDE.md says "Undo/redo … work across sessions"; they don't (the undo history starts empty after a
+- [x] verified (qa 10-27: USER_GUIDE.md:13 "Undo/redo … cover the edits of the current session") (dx 10-26) P3 docs/USER_GUIDE.md says "Undo/redo … work across sessions"; they don't (the undo history starts empty after a
   reopen, which is also live's behaviour): fix the sentence (qa 2026-10-26, build 4d2f6b0c)
 - [x] (dx 10-27: exports and the MCP server report `noshape_kernel::VERSION`, the release tag release.yml stamps (NOSHAPE_VERSION), else the crate's, as the app already did; releases built before cut-release.sh bumped Cargo.toml reported 0.4.6 in files) P2 VERSION-0.4.6 exported files and the app report version 0.4.6 (STEP header `originating_system 'NOSHAPE 0.4.6'`)
   while the releases are v0.4.7 / v0.4.8: the workspace `version` in Cargo.toml was never bumped; the daily release cut
