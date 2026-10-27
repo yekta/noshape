@@ -354,9 +354,8 @@ const LIVE_MATES: &[(&str, &str, bool, &str)] = &[
 /// one that matches again.
 const KNOWN: &[(&str, &str)] = &[
     ("R1", "skb: circular edge CENTER connectors now as live (the pin upright on the hole at (−70, 20, 10)); the solver then turns the pin −6° about the axis (keeping the part origin near its start), live keeps rz 0"),
-    ("R3", "kern + skb: Revolute on cylinder MID_AXIS_POINTs: the connector Z is the cylinder's axis, which live points back toward the sketch (−z for these extrudes; kern 339de774: ours still points away); live then turns the flipped pin rz −157.5° (B at (314.75, 96.61, 20)), ours +6°"),
-    ("C1", "kern + skb: Cylindrical on cylinder axes: as R3 (live rz −157.5°, translationZ +50 mm)"),
-    ("CP1", "kern: circular pattern about the pin's MID_AXIS_POINT: live's axis points back toward the sketch (−z) and its copies turn −90° about world z; since kern 339de774 our cylinder axis points +z (away from the sketch) and they turn +90°"),
+    ("R3", "skasm: Revolute on cylinder MID_AXIS_POINTs: the connector Z is the cylinder's axis, back toward the sketch as live (core: the pin flips as live); live then turns the flipped pin rz −157.5° (B at (314.75, 96.61, 20)), ours −6° (B at (−68.91, 40.86, 20))"),
+    ("C1", "skasm: Cylindrical on cylinder axes: as R3 (live rz −157.5°, translationZ +50 mm; ours −6°, translationZ as live)"),
     ("M1", "skb: Revolute (bottom on top) + Slider (front faces): live keeps B upright, turned 30° at (7.68, −8.66, 10); ours turns it upside down"),
 ];
 
