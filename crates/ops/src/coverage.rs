@@ -479,6 +479,9 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Add selection to folder…", Op("feature_add_folder")),
     ("partStudio:Align view with vertical axis", Op("view_camera")),
     ("partStudio:Assign material…", Op("part_set_material")),
+    // The graphics menu's way out of a feature dialog (psui 79460041): an agent's
+    // feature_add / feature_edit is undone instead.
+    ("partStudio:Cancel", Op("history_undo")),
     ("partStudio:Clear all", Op("feature_edit")),
     ("partStudio:Clear missing references", Op("feature_clear_missing")),
     ("partStudio:Clear selection", Op("ui_select")),
