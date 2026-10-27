@@ -980,6 +980,7 @@ impl PartStudioView {
             selection.extend(seeds.iter().cloned());
         }
         let mut extra = self.sketch_overlay(&mut selection, &mut accent, cx);
+        extra.extend(self.extrude_end_cap(cx));
         // The manipulator's glyph follows the camera: the renderer builds it
         // for every frame (camera_geometry.rs).
         let mut manip: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = self.manipulator_geometry(cx).into_iter().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>).collect();
@@ -1048,7 +1049,10 @@ impl PartStudioView {
         self.ui.planes_picked_in_graphics.retain(|r| sel.contains(r));
         // A plane being resized: its highlight follows the drag.
         let shown = self.with_plane_drag(self.display.clone());
+        let extra_len = extra.len();
         let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
+        // with_highlights' overlays, then the extra ones (see the preview's POST tags).
+        let (highlights_end, extra_end) = (scene.instances.len() - extra_len, scene.instances.len());
         // A selected Decal row tints its image like a selected face (live).
         for (i, _, f) in &built.decals {
             if self.selected_features.contains(f)
@@ -1180,10 +1184,16 @@ impl PartStudioView {
         // A feature preview (live previewBlend): the model before the feature
         // under the one with it, mixed at the preview slider's value.
         if let Some(base) = &self.built_base {
-            // Live: the highlight lines (a picked region's outline) show
-            // whole over the mix, also where the new body covers them.
-            for inst in scene.instances[built.static_instances..].iter_mut().filter(|i| matches!(i.drawable, noshape_render::Drawable::Lines(_))) {
-                inst.compare = noshape_render::scene::compare::POST;
+            // Live: the highlights (a picked region's outline and tint) show
+            // whole over the mix, also where the new body covers them
+            // (psui-prv-05a/b: the region's tint reads the same at 0 and 1).
+            // with_highlights' own overlays come before the extra ones; of
+            // those only the end cap (extrude_end_cap) is a highlight.
+            for (k, inst) in scene.instances.iter_mut().enumerate().take(extra_end).skip(built.static_instances) {
+                let fill = matches!(inst.drawable, noshape_render::Drawable::Mesh(_)) && inst.layer == scene_builder::HIGHLIGHT_FILL_LAYER;
+                if (k < highlights_end && (fill || (matches!(inst.drawable, noshape_render::Drawable::Lines(_)) && inst.layer == scene_builder::HIGHLIGHT_LINES_LAYER))) || (k >= highlights_end && fill) {
+                    inst.compare = noshape_render::scene::compare::POST;
+                }
             }
             scene.instances.extend(base.scene.instances[..base.static_instances].iter().cloned().map(|mut i| {
                 i.pickable = false;

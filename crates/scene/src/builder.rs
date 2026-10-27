@@ -242,6 +242,13 @@ const SELECTION_OVER_PLANES: f32 = 0.44;
 /// top face unchanged as live's).
 const DIMS_SHOWN_AMBIENT: f32 = 0.035;
 
+/// The layer of the highlight fills [`with_highlights`] adds (a picked
+/// sketch region's tint, a lit plane's fill).
+pub const HIGHLIGHT_FILL_LAYER: i32 = 8;
+/// The layer of the highlight lines [`with_highlights`] adds (a picked
+/// region's outline, a lit plane's border).
+pub const HIGHLIGHT_LINES_LAYER: i32 = 12;
+
 /// See [`SceneOptions::faint_planes`].
 pub const FAINT_PLANE_ALPHA: f32 = 0.04;
 
@@ -1160,13 +1167,13 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&overlay_pts))).per_primitive_color().unpickable().ignore_clip().layer(20));
     }
     for (m, c, picked) in overlay_regions {
-        let inst = Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(c).unpickable().ignore_clip().layer(8);
+        let inst = Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(c).unpickable().ignore_clip().layer(HIGHLIGHT_FILL_LAYER);
         // A picked region tints the preview built on it from above (live
         // part-studio/230): flat, after the see-through meshes.
         scene.instances.push(if picked { inst.unlit().over_transparent() } else { inst });
     }
     if !overlay_lines.segments.is_empty() {
-        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&overlay_lines))).per_primitive_color().unpickable().ignore_clip().layer(12));
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&overlay_lines))).per_primitive_color().unpickable().ignore_clip().layer(HIGHLIGHT_LINES_LAYER));
     }
     scene.instances.extend(extra);
     scene

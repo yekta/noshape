@@ -178,6 +178,55 @@ impl PartStudioView {
         Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: if blind { "depth" } else { "" }, flip: Some("oppositeDirection") })
     }
 
+    /// A blended Extrude preview's end cap (live 10-27, psui-prv-05a/b): the
+    /// picked regions and faces moved to where the extrude ends, a flat
+    /// grey (89,89,89) at 50 % in live's sRGB blend ((172,172,172) over
+    /// white, (117,135,146) over the part's top; 0.46 here gives
+    /// (172,172,172) and (116,137,150)), drawn over the mix like the other
+    /// highlights, at either end of the slider.
+    pub(super) fn extrude_end_cap(&self, cx: &App) -> Option<noshape_render::Instance> {
+        self.built_base.as_ref()?;
+        let arrow = self.current_arrow(cx).filter(|a| a.param == "depth" && a.length > 0.0)?;
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        let shift = (arrow.dir * arrow.length).as_vec3();
+        let mut mesh = noshape_render::MeshData::default();
+        let mut push = |positions: &[[f32; 3]], indices: &[u32], normal: glam::Vec3| {
+            let first = mesh.positions.len() as u32;
+            mesh.positions.extend(positions.iter().map(|p| (glam::Vec3::from(*p) + shift).to_array()));
+            mesh.normals.extend(std::iter::repeat_n(normal.to_array(), positions.len()));
+            mesh.pick_ids.extend(std::iter::repeat_n(0, positions.len()));
+            mesh.indices.extend(indices.iter().map(|i| first + i));
+        };
+        let before = self.ui.preview_before.as_ref().unwrap_or(&self.display);
+        for r in d.feature.params.query("entities") {
+            match r {
+                Reference::SketchRegion { sketch, key } => {
+                    let Some(sk) = self.display.sketches.iter().find(|s| s.feature == *sketch) else { continue };
+                    let Some(reg) = sk.regions.iter().find(|g| &g.key == key) else { continue };
+                    push(&reg.positions, &reg.indices, sk.frame.normal.as_vec3());
+                }
+                r => {
+                    let Some((b, fi)) = before.bodies.iter().find_map(|b| b.face_refs.iter().position(|f| f == r).map(|fi| (b, fi))) else { continue };
+                    let Some(&(first, count)) = b.mesh.face_ranges.get(fi) else { continue };
+                    let Some(idx) = b.mesh.indices.get(first as usize..(first + count) as usize) else { continue };
+                    // Local indices over the face's own vertices.
+                    let mut map = std::collections::HashMap::new();
+                    let mut pos: Vec<[f32; 3]> = Vec::new();
+                    let local: Vec<u32> = idx.iter().map(|&i| *map.entry(i).or_insert_with(|| {
+                        pos.push(b.mesh.positions[i as usize]);
+                        pos.len() as u32 - 1
+                    })).collect();
+                    push(&pos, &local, arrow.dir.as_vec3());
+                }
+            }
+        }
+        if mesh.indices.is_empty() {
+            return None;
+        }
+        let grey = crate::theme::lin(0x595959);
+        Some(noshape_render::Instance::new(noshape_render::Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([grey[0], grey[1], grey[2], 0.46]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER))
+    }
+
     /// Drag handles of other features (Onshape): plane offset, shell
     /// thickness, fillet radius, chamfer distance.
     fn param_arrow(&self, cx: &App) -> Option<Arrow> {

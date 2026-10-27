@@ -81,11 +81,10 @@ that touches the model: ~12 min.
 1. Highlights over the preview blend: the active field's highlight lines (a picked region's outline) now show whole
    over the mix (compare::POST, the renderer's preview-post pass against the frame's depth). Left: the Delete part
    ghost's (255,192,76) outline (the deleted part exists only in the base model, which carries no highlights; live
-   asked which edges), and the new body's top face: at slider 1 live's boss reads left (86,110,124), top
-   (116,137,150), right (122,157,178) (psui-prv-05b); ours left (82,106,120), right (125,156,175) but top
-   (87,109,122): `shade_preview` leaves a face turned up at ambient. In sRGB live's faces fit left 0.833 × colour,
-   right 1.19 ×, top 0.739 × + 0.156 (an additive term from above); the bundle's mix itself is a plain
-   `mix(base, preview, uPreviewAlpha)`. Refit `shade_preview` (keep part-studio/230) before changing it.
+   asked which edges). The picked region's tint and the extrude's end cap (grey at 50 %, `extrude_end_cap`) are
+   drawn over the mix too, as live at slider 0 / 1 (psui-prv-05a/b). Left: under the cap, live's boss top is the
+   part's own lit top (143,185,211), ours the preview tone at ambient: live's "with" model may draw an Add's body
+   in the part colour; check its left / right faces against that before changing `shade_preview`.
 2. part-studio.md 🔧 rows waiting for live (asked 10-27): 3.7 box into a dialog field (ours: Fillet takes the 6 faces),
    3.12 / 3.13 Select other into a field, 6.26 / 6.37 / 6.38 list separator and folder menus. Dihedral comb length vs
    Scale and its "Min: 90 deg" label (asked).
