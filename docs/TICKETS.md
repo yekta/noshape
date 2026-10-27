@@ -343,7 +343,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [x] 884577bd P1 LP-DIRECTION-PICK (user-reported) hover / pick read nothing in feature dialogs. Repro doc /root/qa-scratch/lpd.noshape
+- [x] 1e3c419c P1 LP-DIRECTION-PICK (user-reported) hover / pick read nothing in feature dialogs. Repro doc /root/qa-scratch/lpd.noshape
   (Sketch 1 rectangle 60×40, Extrude 1 10; Sketch 2 on the top face 10×10, Extrude 2 Add 8). Linear pattern › Feature
   pattern › Features to pattern = Extrude 2 › click Direction › hover / click the front top edge.
   - **v0.4.9 release** (Linux tarball, 7ee597e0 + fixes): the edge at its middle shows no pre-highlight and the click picks
