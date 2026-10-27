@@ -184,7 +184,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.1 | Select-first: constraint applies immediately to the selection | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 8.2 | Multi-selection: Parallel / Equal / Coincident / Tangent chain all entities, Horizontal / Vertical / Fix apply to each | H:parallel, H:equal, H:horizontal | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 8.3 | Tool-first: each pair picked is constrained; tool stays on until clicked again or another tool | H:coincident | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 8.4 | Coincident: point-point, point-curve, collinear lines, same circle | H:coincident | ✅ |  |
+| 8.4 | Coincident: point-point, point-curve, collinear lines, same circle | H:coincident | ✅ | 0.4.10+ / 965d3f56 10-27 (two line ends + i: both move halfway, coincident glyph) |
 | 8.5 | Concentric, Parallel, Tangent, Horizontal, Vertical, Perpendicular, Equal, Fix | constraint pages | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.6 | Midpoint: point + line/arc, or 3 points (start, end, middle) | H:midpoint | ✅ |  |
 | 8.7 | Normal: line + curve, in either pick order | H:normal; live qa4 round 5 v3 s6 (3) | ✅ (test `constraint_picks_and_application_as_live`) |  |
@@ -200,7 +200,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.13 | Hover a glyph highlights its entities (yellow); click selects it; Delete removes it | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.14 | Drag glyphs to move them | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.15 | Conflicting constraints: white glyph on red | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 8.16 | External (Use) constraints have a blue glyph background | H:working_with_constraints | ✅ (GUI :103 Equal to projected model circle gives blue glyph backgrounds; external-equal.png) |  |
+| 8.16 | External (Use) constraints have a blue glyph background | H:working_with_constraints | ✅ (GUI :103 Equal to projected model circle gives blue glyph backgrounds; external-equal.png) | 0.4.10+ / 965d3f56 10-27 (Use glyphs on #def1fb) |
 | 8.17 | Equal: if one curve is dimensioned, its size wins | H:equal | ✅ (solver) | 0.4.10+ / 203c4d6f 10-27 |
 | 8.18 | Constraint manager / Profile inspector | H:working_with_constraints | ✅ (both panels from the Sketch diagnostics tools) |  |
 
