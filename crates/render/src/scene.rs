@@ -851,6 +851,10 @@ pub struct Scene {
     /// [`compare::TARGET`] ones (the model with it) drawn on their own, by
     /// this alpha (the dialog's preview slider; 0.7 at rest).
     pub preview_mix: Option<f32>,
+    /// Section caps where two parts' material meets are red (Onshape's
+    /// interference colour): assemblies only; a Part Studio hatches each
+    /// part's cap as usual (live, qa PS-SECTION-RED).
+    pub section_interference: bool,
 }
 
 impl Scene {
@@ -882,6 +886,7 @@ impl Scene {
             && self.clip_extra == other.clip_extra
             && self.compare == other.compare
             && self.preview_mix == other.preview_mix
+            && self.section_interference == other.section_interference
             && self.states == other.states
             && self.instances.len() == other.instances.len()
             && self.instances.iter().zip(&other.instances).all(|(a, b)| {

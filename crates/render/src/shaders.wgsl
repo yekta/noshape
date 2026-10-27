@@ -524,7 +524,7 @@ struct CapPlane {
     u: vec4<f32>,         // xyz tangent, w = hatch pattern scale (world)
     v: vec4<f32>,         // xyz normal x tangent
     selector: vec4<f32>,  // this plane's selector color
-    index: vec4<u32>,     // x = plane index, y = 1 when the plane is selected
+    index: vec4<u32>,     // x = plane index, y = 1 when the plane is selected, z = 1 overlaps red
 };
 
 @group(2) @binding(0) var<uniform> cap: CapPlane;
@@ -618,8 +618,10 @@ fn fs_section_cap(i: CapOut) -> @location(0) vec4<f32> {
     } else {
         col = s.rgb * mix(1.0, fade, shade);
     }
-    // Two parts' material at one point: red (Onshape's intersecting color).
-    if (parts > 1.0) { col = vec3(220.0 / 255.0, 0.0, 0.0); }
+    // Two parts' material at one point: red (Onshape's intersecting color),
+    // in assemblies (a Part Studio's caps stay hatched, live).
+    let overlap = parts > 1.0 && cap.index.z != 0u;
+    if (overlap) { col = vec3(220.0 / 255.0, 0.0, 0.0); }
     col = mix(col, cap.selector.rgb, 0.1);
     // Onshape's endcap shader: a selected plane (the Section view dialog's)
     // mixes toward SECTION_PLANE_PRE_HIGHLIGHT_COLOR rgb(255, 198, 133) by
@@ -627,7 +629,7 @@ fn fs_section_cap(i: CapOut) -> @location(0) vec4<f32> {
     if (cap.index.y != 0u) { col = mix(col, vec3(255.0, 198.0, 133.0) / 255.0, 0.8); }
     col = mix(col, vec3(0.0), edge);
     var a = alpha;
-    if (parts > 1.0) { a = clamp(alpha + 0.1, 0.0, 1.0); }
+    if (overlap) { a = clamp(alpha + 0.1, 0.0, 1.0); }
     return vec4(col, a);
 }
 

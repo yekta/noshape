@@ -1413,7 +1413,7 @@ fn section_cap_planes(scene: &Scene, camera: &Camera, view_proj: &Mat4, height: 
             u: [p.tangent.x, p.tangent.y, p.tangent.z, scale],
             v: n.cross(p.tangent).extend(0.0).to_array(),
             selector: crate::section_caps::SELECTOR_COLORS[k],
-            index: [k as u32, u32::from(scene.clip_selected.get(k).copied().unwrap_or(false)), 0, 0],
+            index: [k as u32, u32::from(scene.clip_selected.get(k).copied().unwrap_or(false)), u32::from(scene.section_interference), 0],
         });
         if forward.dot(n) <= 0.0 {
             visible.push(k as u32);

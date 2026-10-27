@@ -525,6 +525,46 @@ fn section_caps_cover_the_cut() {
     assert!(dark * 4 < light * 3, "no hatch lines on the cap (darkest {dark}, median {light})");
 }
 
+/// qa PS-SECTION-RED: where two parts' material meets on the cut, an
+/// assembly's cap is red (Onshape's interference colour); a Part Studio's
+/// stays hatched in the part colours (live).
+#[test]
+fn overlapping_caps_are_red_only_in_assemblies() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.03, -0.03], [0.05, 0.03, 0.03], 1)))).with_color([0.45, 0.6, 0.75, 1.0]));
+    // A pin through the block and the cut plane x = 0.
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.02, -0.01, -0.01], [0.02, 0.01, 0.01], 100)))).with_color([0.3, 0.3, 0.3, 1.0]));
+    scene.clip = Some(ClipPlane::new(glam::Vec3::X, 0.0));
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(-1.0, 0.0, 0.0), glam::DVec3::Z), ..Default::default() };
+    let (w, h) = (400u32, 300u32);
+    cam.fit_box(glam::DVec3::new(-0.05, -0.03, -0.03), glam::DVec3::new(0.05, 0.03, 0.03), w as f64 / h as f64);
+    let mut reds = Vec::new();
+    for interference in [false, true] {
+        scene.section_interference = interference;
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        let mut red = 0;
+        for y in (h / 2 - 5)..(h / 2 + 5) {
+            for x in (w / 2 - 5)..(w / 2 + 5) {
+                let p = &f.bgra[((y * w + x) * 4) as usize..][..3];
+                if p[2] as i32 > p[1] as i32 + 60 && p[2] as i32 > p[0] as i32 + 60 {
+                    red += 1;
+                }
+            }
+        }
+        reds.push(red);
+    }
+    assert_eq!(reds[0], 0, "a Part Studio's overlap is red");
+    assert!(reds[1] > 80, "an assembly's overlap isn't red ({} px)", reds[1]);
+}
+
 /// Regression: a box cut at mid-height seen from above-front. The front face
 /// below the plane is not cut and must keep its plain shading (the cap only
 /// covers the cut, not faces the view ray reaches before the material).

@@ -371,6 +371,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     let clip = |(n, d): &(DVec3, f64)| noshape_render::ClipPlane::new(n.as_vec3(), *d as f32);
     scene.clip = opts.section.first().map(clip);
     scene.clip_extra = opts.section.iter().skip(1).map(clip).collect();
+    scene.section_interference = true;
     if let Some(slot) = opts.section_selected.and_then(|i| scene.clip_selected.get_mut(i)) {
         *slot = true;
     }
@@ -624,7 +625,7 @@ fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32,
 }
 
 pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights, up: &Uploader) -> Scene {
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare, preview_mix: built.scene.preview_mix };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference };
     for top in &h.accent_tops {
         for &id in built.picks.faces_of(*top) {
             scene.add_flag(id, state::ACCENT);
