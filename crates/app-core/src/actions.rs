@@ -189,8 +189,8 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("a", FlipPrimaryAxis, dlg),
         KeyBinding::new("q", ReorientSecondaryAxis, dlg),
         KeyBinding::new("`", SelectOther, doc),
-        KeyBinding::new("shift-`", SelectOtherPrevious, doc),
-        KeyBinding::new("~", SelectOtherPrevious, doc),
+        // Live (behaviours "spec: psui part-studio.md 2.16 / 2.17 … Select other"):
+        // Shift+` ("~") does nothing; ↑ / ↓ move in the open list.
         KeyBinding::new("secondary-n", NewDocument, None),
         KeyBinding::new("secondary-o", OpenDocument, None),
         KeyBinding::new("secondary-shift-s", SaveCopyAs, doc_mod),

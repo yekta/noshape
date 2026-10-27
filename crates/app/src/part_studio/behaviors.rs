@@ -69,7 +69,10 @@ pub struct SelectOther {
 /// Onshape's Select other constants (woolsthorpe: SELECTION_DIALOG_OFFSET_X /
 /// _Y, SELECT_OTHER_CLICK_ZONE_RADIUS_PX, _PICK_RADIUS_PX, _MAXIMUM_ELEMENTS)
 /// and the dialog's size (dom/select-other-popup.txt: 220 × 149).
-const SELECT_OTHER_OFFSET: (f32, f32) = (100., -25.);
+/// The offset as live places it (behaviours "spec: psui part-studio.md 2.16 /
+/// 2.17 … Select other": the pointer + (100, 51); the bundle's −25 is from
+/// another origin).
+const SELECT_OTHER_OFFSET: (f32, f32) = (100., 51.);
 const SELECT_OTHER_ZONE_PX: f64 = 8.;
 const SELECT_OTHER_PICK_PX: f64 = 8.;
 const SELECT_OTHER_MAX: usize = 20;
@@ -1804,10 +1807,31 @@ impl PartStudioView {
         let mut targets: Vec<Reference> = self.selection.clone();
         targets.extend(self.selected_features.iter().map(|f| Reference::Feature(*f)));
         if targets.is_empty() {
-            self.show_all_parts(cx);
+            // Live ("spec: psui part-studio.md 2.16 / 2.17"): with nothing
+            // selected only the hidden parts under the pointer come back;
+            // over empty graphics or the lists Shift+Y does nothing.
+            let under: Vec<Reference> = self.hidden_bodies_under_pointer(cx).into_iter().map(Reference::Body).collect();
+            if !under.is_empty() {
+                self.set_visibility(&under, false, cx);
+            }
         } else {
             self.set_visibility(&targets, false, cx);
         }
+    }
+
+    /// Hidden parts whose meshes the pointer's ray meets.
+    fn hidden_bodies_under_pointer(&self, cx: &App) -> Vec<BodyId> {
+        let vp = self.viewport.read(cx);
+        let Some(p) = self.ui.pointer.filter(|_| vp.pointer_inside()) else { return Vec::new() };
+        let (o, d) = vp.ray(p);
+        let v = |m: &noshape_model::display::MeshBuffers, i: u32| glam::DVec3::from(glam::Vec3::from(m.positions[i as usize]));
+        self.display
+            .bodies
+            .iter()
+            .filter(|b| b.hidden)
+            .filter(|b| b.mesh.indices.chunks_exact(3).any(|t| noshape_scene::camera_ops::ray_triangle(o, d, v(&b.mesh, t[0]), v(&b.mesh, t[1]), v(&b.mesh, t[2])).is_some()))
+            .map(|b| b.id.clone())
+            .collect()
     }
 
     /// Context menu "Show all": parts, sketches, planes and default geometry.
@@ -2394,7 +2418,16 @@ impl PartStudioView {
         };
         let found = interaction::entities_along_ray(&self.display, origin, dir, tol, &skip, SELECT_OTHER_MAX);
         let point = found.first().map(|h| origin + dir.normalize_or_zero() * h.depth);
-        let hits: Vec<Reference> = found.into_iter().map(|h| h.reference).collect();
+        // Live: each part follows its nearest face ("Face of Extrude 1",
+        // "Part 1", "Face of Extrude 1" behind it).
+        let mut hits: Vec<Reference> = Vec::new();
+        for h in found {
+            let body = self.owning_body(&h.reference).filter(|_| matches!(h.reference, Reference::Face(_)));
+            hits.push(h.reference);
+            if let Some(b) = body.map(Reference::Body).filter(|b| !hits.contains(b)) {
+                hits.push(b);
+            }
+        }
         let n = hits.len();
         let index = (!from_menu && n > 0).then(|| if backwards { n - 1 } else { 1 % n });
         self.hover = if from_menu { None } else { index.and_then(|i| hits.get(i).cloned()) };
@@ -2445,8 +2478,12 @@ impl PartStudioView {
         let Some(i) = index.or(self.ui.select_other.as_ref().and_then(|so| so.index)) else { return };
         let Some(so) = self.ui.select_other.take() else { return };
         let Some(r) = so.hits.get(i).cloned() else { return };
-        let kind = if matches!(r, Reference::Edge(_)) { PickKind::Edge } else { PickKind::Face };
         self.hover = None;
+        if let Reference::Body(b) = r {
+            self.pick_body(b, cx);
+            return;
+        }
+        let kind = if matches!(r, Reference::Edge(_)) { PickKind::Edge } else { PickKind::Face };
         self.pick(PickTarget { reference: r, kind, anchor: None }, cx);
     }
 

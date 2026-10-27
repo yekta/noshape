@@ -36,8 +36,8 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 1.15 | Alt/⌥+C opens Search tools | keyboard_shortcuts; Home__search_tools | ✅ |
 | 1.16 | Shift+/ toggles the keyboard shortcut map | keyboard_shortcuts | ✅ |
 | 1.17 | Shift+/ opens Onshape's shortcut sheet: tabs General, Part Studio, Assembly, 3D view, Sketch, Feature Studio, Drawing; key chips + action, 🔒 locked; search across tabs; legend | live (shortcuts/, dom/keyboard-shortcuts.txt) | ✅ (the live 114-row list) |
-| 1.18 | ` (grave) opens Select other at the cursor | keyboard_shortcuts; Home__select_other | 🔧 |
-| 1.19 | ` again moves down the Select other list, Shift+` up, Enter picks | Home__select_other | 🔧 |
+| 1.18 | ` (grave) opens Select other at the cursor | keyboard_shortcuts; Home__select_other | ✅ (psui 10-27, as live "spec: psui part-studio.md … Select other": the list at the pointer + (100, 51), each part after its nearest face, row 2 bold and pre-highlighted) |
+| 1.19 | ` again moves down the Select other list, Shift+` up, Enter picks | Home__select_other | ✅ (psui 10-27: ` and ↓ step down and wrap, Enter picks; live's Shift+` does nothing, so ours no longer steps back on it) |
 | 1.20 | S opens the shortcut toolbar at the cursor: 5x2 tools (Part Studio: Sketch, Extrude, Revolve, Sweep, Loft / Fillet, Chamfer, Hole, Boolean, Transform) | live (shortcuts/16) | ✅ |
 | 1.21 | S toolbar contents customizable in preferences | part_studios | ✅ (Customize toolbar > Shortcut toolbar (S) checklist; saved in the config dir) |
 | 1.22 | [ opens the Measure tool | keyboard_shortcuts | 🔧 |
@@ -65,11 +65,11 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.10 | Z zoom out, Shift+Z zoom in (about the view center) | keyboard_shortcuts | ✅ |
 | 2.11 | W zoom to window: drag a box to magnify; W again cancels | keyboard_shortcuts; View__zoom_to_fit | 🔧 |
 | 2.12 | ←→↑↓ rotate 15°, Ctrl 5°, Shift 90° | keyboard_shortcuts | ✅ |
-| 2.13 | Ctrl+Shift+←→↑↓ pan (150 px per step) | keyboard_shortcuts; A §6.1 | 🔧 (bound but unhandled) |
+| 2.13 | Ctrl+Shift+←→↑↓ pan (150 px per step) | keyboard_shortcuts; A §6.1 | ✅ (psui 10-27: 150 px per press, as live) |
 | 2.14 | P shows/hides planes | keyboard_shortcuts | ✅ |
 | 2.15 | Shift+P hides all construction geometry (planes, sketches); again shows it | keyboard_shortcuts | ✅ (app 10-24, = sketch 1.17) |
-| 2.16 | Y hides the hovered entity's part/sketch/plane (or the selection) | keyboard_shortcuts; View__hide_show | 🔧 (bound but unhandled) |
-| 2.17 | Shift+Y shows hidden entities (selected ones, else all parts) | keyboard_shortcuts; View__hide_show | 🔧 |
+| 2.16 | Y hides the hovered entity's part/sketch/plane (or the selection) | keyboard_shortcuts; View__hide_show | ✅ (psui 10-27: Y hides the part under the pointer, as live) |
+| 2.17 | Shift+Y shows hidden entities (selected ones, else all parts) | keyboard_shortcuts; View__hide_show | ✅ (psui 10-27: with nothing selected, Shift+Y shows only the hidden part under the pointer; over empty graphics nothing, as live) |
 | 2.18 | Shift+I isolates the hovered/selected parts (others transparent); cumulative | keyboard_shortcuts; View__isolate | 🔧 |
 | 2.19 | Shift+T makes the hovered/selected parts transparent; cumulative | keyboard_shortcuts; View__make_transparent | 🔧 |
 | 2.20 | Shift+X opens the Section view dialog (again with a section on: turns it off) | keyboard_shortcuts | ✅ |
@@ -92,7 +92,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.8 | Selected entities show quick values in the Measure readout | A §5.1 | ✅ |
 | 3.9 | Selection count next to the cursor, 1–5 ("5" for five or more) | Home__selection; live cursors/ | ✅ (Onshape bakes the digit into the cursor image; GPUI has no image cursors, so a black digit with a white outline is drawn at the arrow's lower right) |
 | 3.10 | Midpoints of edges show on hover and can be picked (measure, planes) | Home__selection | 🔧 (part edges and open sketch curves; with a dialog open when its field takes points. Look as live qa4-r5-s9-6: hovering the edge shows a 9 px dark see-through ring at its midpoint (render point style RING); a selected midpoint is an 11 px #fac012 disc with a #c4960b ring and #ffd65b centre; a hovered midpoint target draws the same marker in orange #f8c488/#c49a6a/#ffd8ac. Open (behaviour): live makes the midpoint the hover target within a few px, dropping the edge highlight; ours switches only on click (midpoint_pick).) |
-| 3.11 | Select other lists faces and edges under the cursor nearest first; hovering a row highlights it; click/Enter picks; list closes | Home__select_other | 🔧 |
+| 3.11 | Select other lists faces and edges under the cursor nearest first; hovering a row highlights it; click/Enter picks; list closes | Home__select_other | ✅ (psui 10-27, see 1.18; a row click picks it, Esc closes) |
 | 3.12 | Select other picks go to the active dialog field | Home__select_other | 🔧 |
 | 3.13 | Select other from the face/edge context menu | Home__select_other | 🔧 |
 | 3.14 | Selecting a face or part highlights the features that created/modified it in the feature list | features_and_parts_lists | 🔧 |
@@ -252,7 +252,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 9.4 | Click a cube face for that standard view | view_navigation | 🔧 |
 | 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | 🔧 |
 | 9.6 | Cube faces/edges/corners highlight on hover (name shown) | A §6.2 | 🔧 |
-| 9.7 | Cube arrows rotate 15° (Shift 90°, Ctrl 5°); arc arrows roll | A §6.2 | 🔧 |
+| 9.7 | Cube arrows rotate 15° (Shift 90°, Ctrl 5°); arc arrows roll | A §6.2 | ✅ (psui 10-27, as live "spec: psui part-studio.md 9.7": ▶ brings the left side in view, ▲ the front face, the right arc rolls clockwise; 15° / Ctrl 5° / Shift 90°) |
 | 9.8 | Camera menu (live order): Isometric/Dimetric/Trimetric | Named views…, Previous view | Zoom to fit/window | Perspective, Orient normal to sketch on edit | ✓ display ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… | live dom/menu-camera-render.txt | ✅ (Graphics preferences… and Highlight boundary edges by ui) |
 | 9.9 | Previous view returns to the camera before the last view change | View__previous_view | 🔧 |
 | 9.10 | Zoom to selection (parts, faces, edges, sketches, planes, features) | View__zoom_to_fit | 🔧 |

@@ -536,16 +536,6 @@ impl PartStudioView {
         self.edit_part_props(body, if hidden { "Hide part" } else { "Show part" }, cx, |p| p.hidden = hidden);
     }
 
-    pub(super) fn show_all_parts(&mut self, cx: &mut Context<Self>) {
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Show all parts", cx, |ps| {
-                for p in ps.part_properties.values_mut() {
-                    p.hidden = false;
-                }
-            });
-        });
-    }
-
     /// Parts list › Properties…: Onshape's metadata Properties modal
     /// (live dom/dialog-assembly-part-properties.txt, "Onshape Part").
     pub(super) fn open_part_meta(&mut self, body: BodyId, window: &mut Window, cx: &mut Context<Self>) {

@@ -632,6 +632,11 @@ impl Viewport {
         }
     }
 
+    /// The pointer is over the viewport.
+    pub fn pointer_inside(&self) -> bool {
+        self.pointer_inside
+    }
+
     /// World-space ray through a viewport-local position.
     pub fn ray(&self, local: DVec2) -> (DVec3, DVec3) {
         self.camera.ray(local, self.size())

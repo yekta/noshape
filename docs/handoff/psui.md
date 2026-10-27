@@ -44,8 +44,8 @@ that touches the model: ~12 min.
 ## Next, in order
 
 1. End of day (~04:00): walk the Part Studio workflows in /root/green/noshape against live; regressions to TICKETS.
-2. Preview blend residuals (behaviours "psui (10-26, P1) Feature preview look"): Remove / Intersect tools not
-   blended yet (live: the part uncut, the tool grey through it); live draws the active field's picked region outline
+2. Preview blend residuals (behaviours "psui (10-26, P1) Feature preview look"; SPECS CORRECTION 10-27: live's Remove
+   cuts the part and draws the grey tool over it, as ours, so Remove / Intersect are right unblended); live draws the active field's picked region outline
    full orange over the preview (ours: 30 % behind the tool); at slider 1 live's top face is lighter than ours.
 3. Edge selected + hovered (live: the hover's dark outline round a (255,188,64) core): ours never hovers a selected
    entity (builder `hover.filter(|h| !selection.contains(h))`).
