@@ -1082,6 +1082,15 @@ fn same_buffers(a: &Instance, b: &Instance, pick: bool) -> bool {
     }
 }
 
+/// Draw slots the line quad index buffer covers ([`Pipelines::quad_index`]).
+const QUAD_INDEX_SLOTS: u32 = 1 << 16;
+
+/// `NOSHAPE_PERF_LINES=plain`: line quads drawn with six vertices each, not indexed (for the benchmarks).
+fn plain_lines() -> bool {
+    static PLAIN: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *PLAIN.get_or_init(|| std::env::var("NOSHAPE_PERF_LINES").is_ok_and(|v| v == "plain"))
+}
+
 fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, mode: DrawMode) {
     let DrawMode { pick, mask, caps, outline, depth_samples, planes_write_depth } = mode;
     pass.set_bind_group(1, bind_inst, &[]);
@@ -1124,7 +1133,13 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
                 // vertex index (the instance index steps through segments).
                 Drawable::Lines(l) => {
                     pass.set_vertex_buffer(0, l.0.buffer.slice(..));
-                    pass.draw(slots.start * 6..slots.end * 6, 0..l.0.count);
+                    match &pipelines.quad_index {
+                        Some(qi) if slots.end <= QUAD_INDEX_SLOTS => {
+                            pass.set_index_buffer(qi.slice(..), wgpu::IndexFormat::Uint32);
+                            pass.draw_indexed(slots.start * 6..slots.end * 6, 0, 0..l.0.count);
+                        }
+                        _ => pass.draw(slots.start * 6..slots.end * 6, 0..l.0.count),
+                    }
                 }
                 Drawable::Points(pt) => {
                     pass.set_vertex_buffer(0, pt.0.buffer.slice(..));
@@ -1700,6 +1715,8 @@ struct Pipelines {
     /// over the "under" one.
     compare_dn: Lazy,
     compare_mix: Lazy,
+    /// Line quads drawn indexed ([`QUAD_INDEX_SLOTS`] slots; `None` with `NOSHAPE_PERF_LINES=plain`).
+    quad_index: Option<wgpu::Buffer>,
     msaa: u32,
     /// The [`Lazy`] pipelines are compiling (see [`Pipelines::start_deferred`]).
     deferred_started: bool,
@@ -2372,6 +2389,13 @@ impl Renderer {
             image_blend,
             compare_dn,
             compare_mix,
+            quad_index: (!plain_lines()).then(|| {
+                // Slot k's six vertices are k·6 + [0, 1, 2, 0, 2, 5]: `line_vertex`'s corners 3 and 4 repeat 0 and 2,
+                // so each segment runs four vertex shaders instead of six (the line pass was the GPU cost of a
+                // Retina orbit: perf.yml 40537102560, 82 fps without lines against 71).
+                let idx: Vec<u32> = (0..QUAD_INDEX_SLOTS).flat_map(|k| [0u32, 1, 2, 0, 2, 5].map(|i| k * 6 + i)).collect();
+                self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some("line quad indices"), contents: bytemuck::cast_slice(&idx), usage: wgpu::BufferUsages::INDEX })
+            }),
             msaa,
             deferred_started: false,
         });
