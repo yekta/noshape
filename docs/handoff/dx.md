@@ -29,17 +29,24 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   and document_open / document_info `recovered`. Checked on qa's cli-fillet-segv.noshape: open 1 aborts in the kernel
   (Shell 4), opens 2 and 3 work. The app needs nothing new (it opens through Session::open); a toast with the note
   would be nicer (app side, after the app split).
+- ece4df3e PDF layers (OCGs as live's export) + live's scale list; 9932ff31 auto centermarks on whole circles only (qa
+  DRAWING-SCALE closed); our A3 PDF is now 92.8 KB (live 92.8 KB).
+- 02f60fee F19 Width mate e2e (3 DOF left, the live-correct count; api's notes guessed 5).
+- b0dc0898 Part Studio created in context updates as live (refreshed_in / out_of_date_in; app switch requested).
+- 556bdcb5 Hole add: std holeEditLogic two passes not three (~330 → ~270 ms; the rest is FeatureScript speed, core).
+- 8bc476b0 sheet metal table through the API (sheetmetal_* ops, ops::sheetmetal); SM-MODIFY-JOINT ticket for core.
+- 16cdcf6d one-line open errors; 6a21a5d0 assembly_set_state `state`; D8 and D12 rows verified in workflow-drawing.md.
+- In progress: OPEN-ERROR-SILENT part 2 (app, start_window.rs + files.rs: the error bubble stays until ×, and the Open
+  dialog's failures show it): /root/dx-scratch/openerr/patch.py, to apply when the lead's app freeze ends.
 
 ## Next (in order, after landing)
-1. Apply the two pending patches; test (model drawing:: export tests, ops e2e drawing tests).
-2. qa tickets: OPEN-ERROR-SILENT (start window: show why a file didn't open), DRAWING-SCALE second half (auto centre
-   marks on full circles only, not partial arcs).
-4. API: F19 width mate e2e (skasm landed the fix in cdde1c06); re-time F4; benchmarks sheet metal (in-context done:
-   /root/dx-scratch/bench/incontext.py; Variable Studio done: led to the Variable Studio ops).
-5. Drawings (P2): PDF text as filled outlines (Normal) and a subset NotoSans (Selectable), 1/600 in units; ui2's
-   Tables-end and thread tiles re-screenshot vs live; flat pattern Counterbore / Countersink / Form styles.
-6. Re-verify old rows on the green build: workflow-configurations.md C1–C8, workflow-derived.md DER2–DER14 (DER8 works
-   through the API; check the app's Insert panel), workflow-drawing.md D8/D14/D16.
+1. OPEN-ERROR-SILENT part 2 (see In progress).
+2. API: benchmarks done for Variable Studio, in-context, sheet metal (/root/dx-scratch/bench/*.py); next: drive a model
+   through the MCP server with a real client; render_image of the window camera (image size).
+3. Drawings (P2): PDF Selectable text with a subset NotoSans (Normal text is already filled outlines); ui2's
+   Tables-end and thread tiles checked vs live 10-27 (match); flat pattern Counterbore / Countersink / Form styles.
+4. Re-verify old rows on the green build: workflow-configurations.md C1–C8, workflow-derived.md DER2–DER14 (DER8 works
+   through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
 - App (after the app split): crates/app/src/part_studio/sheet_metal_panel.rs has the same logic as the new
