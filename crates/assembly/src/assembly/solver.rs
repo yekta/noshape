@@ -968,7 +968,14 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
         if z_rel >= 0.0 {
             continue;
         }
-        let (moving, local) = if !bodies[m.a].fixed {
+        let exact = z_rel < -1.0 + 1e-9;
+        // Live (behaviours "skasm (2026-10-27): oracle_asm R3 rule", 14 runs,
+        // nothing fixed): in an exact flip the first connector's part turns
+        // when the connectors' common Z points to the negative side (its
+        // first non-zero coordinate, x then y then z, is negative), else the
+        // second's.
+        let first_turns = !exact || first_nonzero(bodies[m.a].pose.mul(&m.a_local).rotation * DVec3::Z) < 0.0;
+        let (moving, local) = if !bodies[m.a].fixed && (first_turns || bodies[m.b].fixed) {
             (m.a, m.a_local)
         } else if !bodies[m.b].fixed {
             (m.b, m.b_local)
@@ -976,11 +983,16 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
             continue;
         };
         let c = bodies[moving].pose.mul(&local);
-        let axis = (z_rel < -1.0 + 1e-9).then(|| (c.rotation * DVec3::Z).cross(HALF_TURN_W).try_normalize()).flatten().unwrap_or(c.rotation * DVec3::X);
+        let axis = exact.then(|| (c.rotation * DVec3::Z).cross(HALF_TURN_W).try_normalize()).flatten().unwrap_or(c.rotation * DVec3::X);
         let turn = DQuat::from_axis_angle(axis, std::f64::consts::PI);
         let p = bodies[moving].pose;
         bodies[moving].pose = Frame { origin: c.origin + turn * (p.origin - c.origin), rotation: (turn * p.rotation).normalize() };
     }
+}
+
+/// The first coordinate of `v` (x, then y, then z) that isn't zero.
+fn first_nonzero(v: DVec3) -> f64 {
+    v.to_array().into_iter().find(|c| c.abs() > 1e-9).unwrap_or(0.0)
 }
 
 /// Live's world vector for exact half-turns (fitted over 14 runs to 3e-16;
@@ -1584,6 +1596,23 @@ mod tests {
                 assert!(((p.rotation * DVec3::Z).z - z).abs() < 1e-6, "{kind:?} aligned={aligned}: Z {:?}", p.rotation * DVec3::Z);
                 assert!((p.origin.z - tz * mm).abs() < 1e-6, "{kind:?} aligned={aligned}: t {:?}", p.origin);
             }
+        }
+    }
+
+    /// Live's exact flips with nothing fixed (behaviours "skasm (2026-10-27):
+    /// oracle_asm R3 rule", runs rz0 and e4–e10): the first connector's part
+    /// turns over when the common Z's first non-zero coordinate is negative,
+    /// else the second's.
+    #[test]
+    fn exact_flip_turns_the_part_live_turns() {
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        for (z, first) in [(DVec3::NEG_Z, true), (DVec3::NEG_X, true), (DVec3::X, false), (DVec3::Y, false), (DVec3::NEG_Y, true), (DVec3::Z, false), (DVec3::new(-s, 0.0, -s), true), (DVec3::new(0.0, 0.5, -0.75f64.sqrt()), false)] {
+            let mut bodies = vec![body(DVec3::new(0.05, 0.02, 0.0), false), body(DVec3::new(-0.03, 0.01, 0.04), false)];
+            let local = Frame::from_axes(DVec3::ZERO, z, z.any_orthonormal_vector());
+            let m = mate(MateType::Revolute, 0, local, 1, local);
+            assert!(solve(&mut bodies, &[m], &[], &[]).converged, "{z:?}");
+            let turned = |b: &SolverBody| b.pose.rotation.angle_between(DQuat::IDENTITY) > 3.0;
+            assert_eq!((turned(&bodies[0]), turned(&bodies[1])), (first, !first), "{z:?}");
         }
     }
 
