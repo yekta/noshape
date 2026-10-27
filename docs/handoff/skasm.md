@@ -57,8 +57,10 @@ Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs do
 3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; left:
    A10 a toolbar tooltip staying after a click (app-core tooltips, psui's area)), workflow-configured-assembly (1–5, 8
    ✅; CA3 closed by ui, CA4 and A15 rechecked on green).
-4. Which part moves when neither is fixed in an exact flip (live's rule open, behaviours R3 note); ours moves the first
-   connector's part (as live in 10 of 14 runs).
+4. Exact flip with nothing fixed: which part turns now follows a rule fitted to live's 14 R3 runs (the first
+   connector's part when the common Z's first non-zero coordinate is negative, else the second's; solver test
+   `exact_flip_turns_the_part_live_turns`). It fits all 14 but is a fit; a live run with Z = (+ε, −1, 0) or similar
+   would confirm it.
 5. Slot: live shows all 3 offset glyphs at the end cap; after the commit live's centre line is plain dark blue (ours
    stayed highlighted once, not reproduced).
 6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
