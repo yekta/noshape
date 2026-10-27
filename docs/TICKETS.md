@@ -741,6 +741,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P1 OTF-FIRST-KEY (parity sketch.md 5.2, was ✅) the first key typed into a sketch value box right after creating geometry is lost: Line, click, click, type `5` → the box still reads 28.025; `0` → the box opens with "0"; Enter keeps the invalid 0 (no dimension). Circle: click, click, type `25` Enter → Ø5 dimension. Corner rectangle: `30` Enter is lost entirely, the next `20` Enter dimensions the width. Live (behaviours 148, 179): the value box takes the typed digits from the first key, Enter applies ("50" → 50 mm). Shots tickets/otf-first-key-line-2d9a.png (after 5 / 0 / Enter), otf-first-key-circle-2d9a.png (qa 2026-10-27 16:55, green 2d9a275c)
 - [x] f34c32be P0 SKETCH-SOLVE-SPLINE-SLOW one constraint or dimension in a sketch with fit splines takes **3–5 minutes**: repro
   /root/qa-scratch/tickets/sk211-step89.noshape (Sketch 1: 273 entities — 209 points, 45 lines, 7 circles, 7 arcs, 3
   ellipses, **2 splines** — 97 constraints, dof 280; made by bin/skfuzz.py 211 89), bin/sk211time.py: Coincident
