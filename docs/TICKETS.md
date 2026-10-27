@@ -610,6 +610,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   configuration map. Side note: the op says a repeat insert "offsets the new instance along X so they don't overlap";
   it offsets by (7.5, 5, 2.25) mm per copy (diagonal; a 60 × 40 part still overlaps), and an insert of the same part
   in another configuration isn't offset. Fix the text or the offset.
+  drawing_create has the same fault: `{"configuration": {"Size": "Large"}}` draws the default part (front view 60 × 18),
+  `{"Configuration": "Large"}` the Large one (60 × 28). query_mass_properties / query_parts resolve names (48800 both
+  ways). Ops taking `configuration`: assembly_insert, assembly_replace, assembly_set_configuration, drawing_create,
+  part_configured_properties, query_parts, query_mass_properties, variable_insert_studio, config_set_value.
 - [x] verified green 3197362b / watcher CLI 09:50 (qa: Revolute 1 → slider "Slider 1", → fastened "Fastened 1") (dx 10-27: a default name follows the new type keeping its number, a custom name stays (noshape_model::default_names::retyped, the dialog's rule); e2e assembly_with_mates retypes Revolute 1 → Slider 1) P2 API-MATE-RETYPE-NAME assembly_mate editing an existing mate's `type` keeps its old name: asm5.noshape's "Revolute 1"
   retyped to fastened / slider / cylindrical / planar / ball / pin slot stays "Revolute 1" (DOF right in each case: 0 1 1 2 3
   3 2). In the app, retyping in the mate dialog renames the mate (Cylindrical 1 → Revolute: title and row "Revolute 1",
