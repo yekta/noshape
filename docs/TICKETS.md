@@ -6,6 +6,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## Release v0.4.9 (qa, 2026-10-27 02:55)
+- qa 09:35: release/v0.4.9 is now fcd301e2 (7ee597e0 + 819c2b47 Windows include fix + fcd301e2 crash_inputs unix-only);
+  CI run 40480068401 running. Still not in it: a117663d (DRAFT-HANG budget: the draft-hang document never finishes on the
+  CI artifact), c30baf56 (CRASH-MARKER-COPIES), cb84d673 (SHELL-SLOW). It contains 97081557, whose signal-longjmp budget
+  is BUDGET-LONGJMP (P0, malloc deadlock seen; likely BOOL-THREAD-CRASH's cause).
 - [ ] P0 release/v0.4.9 recut 7ee597e0: CI run 40452492018 **Windows x86_64 (MSVC) failed in "Build (release)"**:
   `crates/kernel/cpp/common.cpp(1273): fatal error C1083: Cannot open include file: 'cxxabi.h'` (the kernel profile's
   `#include <cxxabi.h>`, GCC/Clang only, unguarded; blame d85c3029, REGEN-SPEED). Still on main, so main's Windows build
