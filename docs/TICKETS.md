@@ -9,6 +9,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P0 release/v0.4.9 recut 7ee597e0: CI run 40452492018 **Windows x86_64 (MSVC) failed in "Build (release)"** (05:45;
   the 2650df69 run built on Windows). Logs come when the run ends (the blend budget's timer is `#ifdef __linux__`, so
   not that). Linux and macOS still building (qa 05:47)
+- [ ] P0 the recut likely ships BOOL-THREAD-CRASH (core): the watcher CLIs 04:06 and 04:48 (≥ 502416cc, the release's
+  base) segfault in OCCT booleans on pool threads three times in one fuzz sequence; v0.4.8 runs it through. To confirm
+  on the release's Linux artifact when CI finishes (qa 05:55)
 - [x] resolved by the recut (qa 05:05: release/v0.4.9 is now 7ee597e0 = main 502416cc + "Release v0.4.9", which has all of them; CI artifact check pending) P0 release/v0.4.9 (2650df69 = 34ab98f7 + CI fix) predates bf8aaee2 (kernel crash guard + OCCT patch 0002), dx's
   crash markers / open rollback (DOC-POISON) and 7a04ba4d (SHELL-WALLS / SHELL-FILLETED-BOX). As cut it ships the Shell
   and Fillet segfaults that leave documents unopenable (SHELL-SLAB-GPF, FILLET-SEGV: regressions since v0.4.8; the green
