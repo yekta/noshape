@@ -1293,7 +1293,11 @@ impl PartStudioView {
         state.update(cx, |s, cx| {
             s.focus(window, cx);
             match &first {
-                Some(f) => s.set_cursor_position(gpui_kit::component::input::Position { line: 0, character: f.chars().count() as u32 }, window, cx),
+                // The caret after the typed key, set after `focus` so it wins
+                // over the field's select-on-focus (OTF-FIRST-KEY:
+                // `set_cursor_position` focuses again, which dropped that, so
+                // the key came up selected and the next one replaced it).
+                Some(f) => s.set_selected_range(f.len()..f.len(), cx),
                 None => s.select_all(window, cx),
             }
         });
