@@ -14,6 +14,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli-shell-gpf, cli-fillet-segv, cli-fillet2-segv and cli-draft-segv.noshape** (/root/qa-scratch/tickets/; green 19555ca3
   opens all five).
 ## Core modelling (core)
+- [ ] P0 BOOL-THREAD-CRASH the process dies inside OCCT booleans on a worker thread, nondeterministically: CLI fuzz seed 72 on
+  the watcher CLI 04:06 (≥ bcf401ca, crash guard and blend budget in): run 1 died at step 105 (delete Extrude 8; marker:
+  Extrude 10 evaluating), kernel log "general protection fault … in noshape-cli[b13430a]" =
+  `BOPAlgo_PaveFiller::ForceInterfEF` on thread 768668 (main pid 768652); the replay of the same seed died earlier, at
+  step 81 (suppress; marker: Chamfer 5 evaluating), "segfault at 0 … [b0d43a5]" = `BOPAlgo_Builder::FillInternalShapes`.
+  Neither document crashes when reopened (tickets/cli-delete-gpf.noshape: 6 opens on two CLIs, all OK), so it looks like
+  a race in OCCT's parallel boolean (thread pool) or earlier memory corruption in the session; the crash guard only
+  covers the evaluating thread, so a signal on a pool thread takes the whole process down (the app would vanish, the
+  CLI's session is lost). Logs cli/clifuzz-72z.log, clifuzz-72zr.log ("START" lines name each op); markers kept in
+  tickets/markers/. Try: run booleans with RunParallel off (or a guarded pool), ASan / TSan on the seed-72 replay
+  (`NSCLI=<cli> FZTAG=r python3 bin/clifuzz_trace.py 72 106`) (qa 2026-10-27)
 - [ ] P0 COMMIT-LATENCY edit commit on tests/perf/live-30-features.noshape is over budget on main (perf.yml run
   40421862773, abac9266, 10-27): "commit shown in" 315–378 ms (macOS 14) and 241–635 ms (macOS 15), budget ≤ 200 ms
   (PLAN 2.6; perf measured 174 / 149 ms on 10-26 before the later landings). The time is the model: regen[preview]
