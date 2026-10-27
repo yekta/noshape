@@ -1,14 +1,14 @@
 #!/bin/bash
-# Floor (every 5 min): below 40 GB free, clear the incremental caches of target dirs that no running cargo uses, biggest
+# Floor (every 5 min): below 30 GB free, clear the incremental caches of target dirs that no running cargo uses, biggest
 # first (safe: cargo rebuilds them; never touches a dir mid-build). 10-27 01:40 the disk filled to 0 after the crate splits.
 free_gb() { df -BG --output=avail / | tail -1 | tr -dc 0-9; }
 busy() { local p; for p in $(pgrep -x cargo); do tr '\0' '\n' < /proc/$p/environ 2>/dev/null | grep -qx "CARGO_TARGET_DIR=$1" && return 0; done; return 1; }
 floor() {
-  [ "$(free_gb)" -ge 40 ] && return
+  [ "$(free_gb)" -ge 30 ] && return
   for d in $(du -s /root/target-*/debug/incremental 2>/dev/null | sort -rn | awk '{print $2}'); do
     t=${d%/debug/incremental}; busy "$t" && continue
     rm -rf "$d"/* && echo "$(date -u +%H:%M) floor: cleared $d, $(free_gb) GB free" >> /tmp/lead/disk-loop.log
-    [ "$(free_gb)" -ge 40 ] && return
+    [ "$(free_gb)" -ge 30 ] && return
   done
 }
 # Every 30 min: delete stale test executables, and prune old artifact variants (keep the newest 6 per crate).
