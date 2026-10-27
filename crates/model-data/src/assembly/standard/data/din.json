@@ -22924,6 +22924,117 @@
    {
     "category": "Washers",
     "class": "Lock washers",
+    "name": "Conical spring lock washer DIN 6908",
+    "shape": "washer",
+    "form": {
+     "form": 0
+    },
+    "sizes": [
+     {
+      "name": "M2.25",
+      "label": "Conical spring lock washer M2.25",
+      "d": 2.5,
+      "dims": {
+       "d1": 2.25,
+       "d2": 6.0,
+       "h": 0.5,
+       "d": 2.5
+      }
+     },
+     {
+      "name": "M2.75",
+      "label": "Conical spring lock washer M2.75",
+      "d": 3.0,
+      "dims": {
+       "d1": 2.75,
+       "d2": 7.0,
+       "h": 0.6,
+       "d": 3.0
+      }
+     },
+     {
+      "name": "M3.2",
+      "label": "Conical spring lock washer M3.2",
+      "d": 3.5,
+      "dims": {
+       "d1": 3.2,
+       "d2": 8.0,
+       "h": 0.8,
+       "d": 3.5
+      }
+     },
+     {
+      "name": "M3.6",
+      "label": "Conical spring lock washer M3.6",
+      "d": 4.0,
+      "dims": {
+       "d1": 3.6,
+       "d2": 9.0,
+       "h": 1.0,
+       "d": 4.0
+      }
+     },
+     {
+      "name": "M4.55",
+      "label": "Conical spring lock washer M4.55",
+      "d": 5.0,
+      "dims": {
+       "d1": 4.55,
+       "d2": 11.0,
+       "h": 1.2,
+       "d": 5.0
+      }
+     },
+     {
+      "name": "M5.5",
+      "label": "Conical spring lock washer M5.5",
+      "d": 6.0,
+      "dims": {
+       "d1": 5.5,
+       "d2": 14.0,
+       "h": 1.5,
+       "d": 6.0
+      }
+     },
+     {
+      "name": "M7.4",
+      "label": "Conical spring lock washer M7.4",
+      "d": 8.0,
+      "dims": {
+       "d1": 7.4,
+       "d2": 18.0,
+       "h": 2.0,
+       "d": 8.0
+      }
+     },
+     {
+      "name": "M9.3",
+      "label": "Conical spring lock washer M9.3",
+      "d": 10.0,
+      "dims": {
+       "d1": 9.3,
+       "d2": 23.0,
+       "h": 2.5,
+       "d": 10.0
+      }
+     },
+     {
+      "name": "M11",
+      "label": "Conical spring lock washer M11",
+      "d": 12.0,
+      "dims": {
+       "d1": 11.0,
+       "d2": 29.0,
+       "h": 3.0,
+       "d": 12.0
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_6908_CONICAL_SPRING_LOCK_WASHER_MAIN (live dom/skb-sc-comp); live builds it as a flat ring INSIDE_DIAMETER / OUTSIDE_DIAMETER / THICKNESS (M2.25: 4 faces, 12.149 mm³; behaviours \"skasm (2026-10-27) standard content gaps\")"
+   },
+   {
+    "category": "Washers",
+    "class": "Lock washers",
     "name": "Spring lock washer DIN 127 Type A",
     "shape": "washer",
     "form": {

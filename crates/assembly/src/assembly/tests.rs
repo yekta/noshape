@@ -4443,3 +4443,23 @@ fn iso_10512_nut_matches_live() {
         assert!(r.display.features.iter().all(|f| f.message.is_none()), "{size}");
     }
 }
+
+/// DIN 6908 conical spring lock washers (missing from the catalogue, skasm
+/// 10-27): live's table; live builds a flat ring (M2.25: 2 planes, 2
+/// cylinders, 12.149 mm³, behaviours "skasm (2026-10-27) standard content
+/// gaps").
+#[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
+fn din_6908_washer_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Conical spring lock washer DIN 6908").expect("DIN 6908 in the catalogue");
+    let names: Vec<&str> = c.sizes.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(names, ["M2.25", "M2.75", "M3.2", "M3.6", "M4.55", "M5.5", "M7.4", "M9.3", "M11"]);
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("M2.25");
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let v = b.shape.volume().unwrap() * 1e9;
+    assert_eq!(b.faces.len(), 4);
+    assert!((12.144..=12.154).contains(&v), "{v} mm³, live 12.144 – 12.154");
+}
