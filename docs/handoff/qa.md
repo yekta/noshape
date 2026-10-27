@@ -162,6 +162,17 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
+## Green dacce5e7 / watcher CLIs 08:12–08:30 (2026-10-27 08:30–09:10)
+- New: MEASURE-MAX-DIST (P1: max distance between curved faces / circles is sampled, 94.850 vs 94.868, 89.981 vs 90),
+  MASS-INERTIA-APPROX (P2: curved parts' inertia / CoM approximate; boxes exact), UNDO-NOOP-SHIFT (P1: a no-op op pushes an
+  undo step without a history entry, undo labels shift; app: an unchanged ✓ records an "Edit" entry, live asked),
+  CONFIG-CELL-EDIT (P2), and from live's batch 2: EMPTY-COMMIT, REPLICATE-EDGE-DEFAULT, DWG-DIM-TWO-EDGES (P2),
+  EXPORT-OBJ-MTL (P3); LOFT-SKETCH-HIDE confirmed by live.
+- BOOL-THREAD-CRASH: still dies with serial booleans (replay B of seed 72 at step 60, no segfault line); replays with
+  stderr running. SHELL-SLOW: with cb84d673 holes plates ~1 s (was 1.6–2), the failing shell 35–40 s.
+- OK: UI counterbore hole (11448.955 exact), undo/redo paths without no-ops (3 seeds), Line-angle plane, measure min /
+  centre distances, surface areas, Steel mass, box inertia.
+
 ## Green 4854cad4 (2026-10-27 08:17–08:30)
 - REGEN-SPEED: commit median ~250 ms at load ~27 (serial booleans didn't slow it). Replays of seeds 72 / 93 on the
   serial-boolean CLI (08:12) running to check BOOL-THREAD-CRASH.
