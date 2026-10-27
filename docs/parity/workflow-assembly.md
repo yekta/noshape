@@ -18,7 +18,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 1.1 | + › Import… → STEP | file prompt, then the Import dialog | path prompt (no-native-dialog mode), "Import to Onshape" dialog: Import to this document / Combine to a single Part Studio, ☑ Import appearances, ☐ Y axis up, ☐ composite, ☐ join surfaces | ✅ (see kern G38h for live's dialog) |
 | 1.2 | Import | Part Studio tab named after the file | tab "bracket" (Import 1 → Part 1) + folder tab "CAD Imports"; the new tab is placed after Part Studio 1, not at the end | ? |
 | 1.3 | Assembly, i | "Insert parts and assemblies", Current document › Part Studios, filters, tree with thumbnails, "Inserted: 0", "Undo to remove instances" | same | ✅ |
-| 1.4 | Click Part 1 (empty assembly) | instance at identity, **amber (selected)**, row selected, view zooms to fit it | at identity, but **not amber, row not selected**; the zoom-to-fit crops the plate at the right edge | ✗ A1 |
+| 1.4 | Click Part 1 (empty assembly) | instance at identity, **amber (selected)**, row selected, view zooms to fit it | at identity, but **not amber, row not selected**; the zoom-to-fit crops the plate at the right edge | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 |
 | 1.5 | Click Part 2, move to graphics, click | follows the cursor amber; drops at the click | same | ✅ |
 | 1.6 | Bracket (Part 1 of "bracket") | ? | instance named "Part 1 <2>" | ? |
 | 1.7 | ✓, F | – | 5 instances | ✅ |
@@ -97,7 +97,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 
 | # | Row | Ours | Status |
 |---|---|---|---|
-| 1.4 | First insert into an empty assembly | **amber + row selected now** (the "Assembly 2" root row is highlighted too); zoom-to-fit still crops the plate (right and bottom off-screen, dialog over it) | ✗ A1 (partly fixed) |
+| 1.4 | First insert into an empty assembly | **amber + row selected now** (the "Assembly 2" root row is highlighted too); zoom-to-fit still crops the plate (right and bottom off-screen, dialog over it) | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 (partly fixed) |
 | 2.1 | Revolute 2nd pick | moved part previews **amber** | ✅ A2 fixed |
 | 2.2 | New mate row | tooltip "Revolute 1 (Hidden)" + eye-off icon ✅, but the row text is still #333333 (live light grey) | ✅ (GUI green 8165fca6, skasm 10-27: the row light grey); was ✗ A3 (partly fixed) |
 | 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 |
