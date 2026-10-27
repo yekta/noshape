@@ -127,13 +127,26 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 Extrude add 308 ms (std logic 55 ms, ~250 ms in ops' add path regens): target ≤ 150 ms (PLAN 2.6).
 
 ## Part Studio UI (psui)
-- [ ] P1 DCLICK-HEAVY on a heavy part a double-click on a feature row doesn't open the feature: tests/perf/fins-400.noshape,
+- [x] P1 DCLICK-HEAVY fixed (psui 10-27): the X11 and Wayland backends counted clicks by when each press was handled
+  (`Instant::now()`), so a second press waiting behind the first click's work (fins-400 here: ~0.9 s) started a new
+  click, and the row was selected and deselected. Now the presses' own event times (X server / compositor ms) decide
+  (vendor/gpui-pre-linux, NOSHAPE PATCH). fins-400: Extrude 1 double-clicked 150 ms apart opens at once (the old build:
+  no dialog, the row deselected). macOS and Windows take the OS's click count already. The Wayland change compiles but wasn't run here (no Wayland
+  session on this machine).
+  Original report: on a heavy part a double-click on a feature row doesn't open the feature: tests/perf/fins-400.noshape,
   double-click Extrude 1 (or Linear pattern 1) in the feature list, clicks 1 ms or 150 ms apart → only the row gets
   selected, no dialog (5 tries); right-click › Edit… opens it. The same double-click on a light part opens the dialog at
   once. On fins-400 the first click's selection highlight shows ~0.9 s later (software GL, load ~25), so the click count
   is probably measured when the event is handled instead of from the event's own timestamp; live opens the dialog on any
   double-click (qa 2026-10-26, build 4d2f6b0c)
-- [ ] P1 TAB-NO-PREVIEW a number typed into a feature dialog field and committed with **Tab** never reaches the preview:
+- [x] P1 TAB-NO-PREVIEW: not an app bug, a test-display artifact (psui 10-27). On Xvfb without a window manager the
+  noshape window never gets X input focus, so it is never "active" and GPUI dispatches no focus / blur events at all
+  (`Window::draw` sends empty focus paths for an inactive window): no input ever blurs, so nothing commits on Tab or a
+  click away, while keys still arrive (xdotool sends them to the window under the pointer). With the window focused
+  (`xdotool windowfocus <window id>` after the app starts) Tab commits and the preview regenerates at once, as live.
+  **qa: give the app window X focus before testing anything focus-related** (blur, Tab, click-away commits, focus rings).
+  Fixed alongside: a Tab commit scheduled the preview twice (psui, this commit).
+  Original report: a number typed into a feature dialog field and committed with **Tab** never reaches the preview:
   edit Extrude 1 of tests/perf/live-30-features.noshape, Depth 10 → 14, Tab → the field reads "14 mm" but no
   schedule_regen in the perf log and the preview stays at 10 mm (tickets/tab-no-preview-extrude.png); the same in Linear
   pattern 1 (Instance count, Distance + Tab: nothing until Enter or a checkbox change, which then shows all the pending
@@ -147,7 +160,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop") (qa5 2026-10-26)
 - [ ] P2 P1-10 (qa5, carried over) Extrude › Remove tool preview pointing away from the part is grey; live translucent dark
   red (live part-studio/234–235) (qa5 2026-10-26)
-- [ ] P2 DELETE-TAB-DIALOG deleting a Part Studio used by an assembly: ours shows plain text "Deleting "Part Studio 1" may
+- [x] P2 DELETE-TAB-DIALOG fixed (psui 10-27): live's 598 px "Delete tabs" with the outlined warning triangle, "Deleting
+  this tab will result in failed or missing features in N tab(s)", one row per tab with its icon; within 1 px of
+  part-studio/1584. Original report: deleting a Part Studio used by an assembly: ours shows plain text "Deleting "Part Studio 1" may
   cause errors in the tab that use it: Assembly 1." (tickets/delete-tab-dialog-ours.png); live: a yellow warning box "⚠
   Deleting this tab will result in failed or missing features in 1 tab" and below it one row per affected tab (tab icon +
   name), [Delete] [Cancel] (live part-studio/1584-p9-tab-delete-confirm.png, behaviours "(7) Delete the "qa5 src" tab")

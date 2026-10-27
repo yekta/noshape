@@ -1134,6 +1134,9 @@ impl FeatureDialog {
     /// `canSubmit`: the dialog is dirty and no value fails validation).
     fn changed(&mut self, cx: &mut Context<Self>) {
         self.dirty = true;
+        // The preview runs with every value, typed ones included: a commit
+        // (Tab) that rewrote the text doesn't schedule a second run.
+        self.typed_pending = false;
         cx.emit(DialogEvent::Changed);
     }
 
