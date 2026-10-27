@@ -37,6 +37,7 @@
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRepLib.hxx>
+#include <TopAbs.hxx>
 #include <BRepLib_FindSurface.hxx>
 #include <BRepOffsetAPI_DraftAngle.hxx>
 #include <BRepOffsetAPI_MakeFilling.hxx>
@@ -3208,6 +3209,294 @@ double blend_budget_seconds()
   return v != nullptr ? std::atof(v) : 30.0;
 }
 
+// A fillet of one straight edge between two planar faces whose ends meet
+// planar caps through straight edges square to it (a box's or a plate's
+// corner edge), built directly: the two faces trimmed back to the tangent
+// lines, each cap's corner rounded, the cylinder between (REGEN-SPEED:
+// OCCT's fillet and its check took ~10 ms each on live's 30-feature part).
+// False when it doesn't apply; the caller fillets as usual.
+static bool fillet_square_corner(const TopoDS_Shape& s, const TopoDS_Edge& e, double R, TopoDS_Shape& out, HHist& hist)
+{
+  auto no = [](int why) {
+    if (std::getenv("NOSHAPE_BLEND_DEBUG"))
+      std::fprintf(stderr, "square corner: no (%d)\n", why);
+    return false;
+  };
+  auto only = [](const TopoDS_Shape& x, TopAbs_ShapeEnum k, TopoDS_Shape& one) {
+    int n = 0;
+    for (TopExp_Explorer it(x, k); it.More(); it.Next(), ++n)
+      one = it.Current();
+    return n == 1;
+  };
+  TopoDS_Shape solid, shell;
+  if (!only(s, TopAbs_SOLID, solid) || !only(solid, TopAbs_SHELL, shell))
+    return no(1);
+  if (BRepAdaptor_Curve(e).GetType() != GeomAbs_Line)
+    return no(2);
+  Bnd_Box all;
+  BRepBndLib::Add(solid, all, false);
+  const double tol = 1e-7 * std::max(1.0, std::sqrt(all.SquareExtent()));
+  ShapeAncMap ef, ve;
+  TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  const ShapeList* fl = ef.Seek(e);
+  if (fl == nullptr || fl->Extent() != 2)
+    return no(3);
+  const TopoDS_Face F1 = TopoDS::Face(fl->First()), F2 = TopoDS::Face(fl->Last());
+  auto normal = [](const TopoDS_Face& f, gp_Dir& n) {
+    BRepAdaptor_Surface a(f, false);
+    if (a.GetType() != GeomAbs_Plane)
+      return false;
+    const gp_Pln pl = a.Plane();
+    n               = pl.Position().Direct() ? pl.Axis().Direction() : pl.Axis().Direction().Reversed();
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    return true;
+  };
+  gp_Dir n1, n2;
+  if (!normal(F1, n1) || !normal(F2, n2))
+    return no(4);
+  TopoDS_Vertex V[2];
+  TopExp::Vertices(TopoDS::Edge(e.Oriented(TopAbs_FORWARD)), V[0], V[1]);
+  if (V[0].IsNull() || V[1].IsNull() || V[0].IsSame(V[1]))
+    return no(5);
+  const gp_Pnt P[2] = {BRep_Tool::Pnt(V[0]), BRep_Tool::Pnt(V[1])};
+  const double L    = P[0].Distance(P[1]);
+  if (L <= 100 * tol)
+    return no(6);
+  const gp_Dir D(gp_Vec(P[0], P[1]));
+  // Per end: the edge on F1 (a), on F2 (b), the cap (C), their far vertices.
+  TopoDS_Edge   a[2], b[2];
+  TopoDS_Face   C[2];
+  TopoDS_Vertex fa[2], fb[2];
+  gp_Dir        u1, u2;
+  auto          on = [&](const TopoDS_Shape& x, const TopoDS_Face& f) {
+    const ShapeList* l = ef.Seek(x);
+    if (l == nullptr)
+      return false;
+    for (ShapeList::Iterator it(*l); it.More(); it.Next())
+      if (it.Value().IsSame(f))
+        return true;
+    return false;
+  };
+  for (int i = 0; i < 2; ++i)
+  {
+    const ShapeList* el = ve.Seek(V[i]);
+    if (el == nullptr || el->Extent() != 3)
+      return no(7);
+    for (ShapeList::Iterator it(*el); it.More(); it.Next())
+    {
+      const TopoDS_Edge x = TopoDS::Edge(it.Value());
+      if (x.IsSame(e))
+        continue;
+      if (BRepAdaptor_Curve(x).GetType() != GeomAbs_Line)
+        return no(8);
+      TopoDS_Vertex x0, x1;
+      TopExp::Vertices(TopoDS::Edge(x.Oriented(TopAbs_FORWARD)), x0, x1);
+      const TopoDS_Vertex far = x0.IsSame(V[i]) ? x1 : x0;
+      if (on(x, F1))
+      {
+        a[i]  = x;
+        fa[i] = far;
+      }
+      else if (on(x, F2))
+      {
+        b[i]  = x;
+        fb[i] = far;
+      }
+    }
+    if (a[i].IsNull() || b[i].IsNull())
+      return no(9);
+    // The cap: the other face of a, the same as b's.
+    const ShapeList* al = ef.Seek(a[i]);
+    const ShapeList* bl = ef.Seek(b[i]);
+    if (al == nullptr || bl == nullptr || al->Extent() != 2 || bl->Extent() != 2)
+      return no(10);
+    const TopoDS_Face ca = TopoDS::Face(al->First().IsSame(F1) ? al->Last() : al->First());
+    const TopoDS_Face cb = TopoDS::Face(bl->First().IsSame(F2) ? bl->Last() : bl->First());
+    gp_Dir            nc;
+    if (!ca.IsSame(cb) || ca.IsSame(F1) || ca.IsSame(F2) || !normal(ca, nc) || !nc.IsParallel(D, 1e-12))
+      return no(11);
+    C[i]               = ca;
+    const gp_Dir da(gp_Vec(P[i], BRep_Tool::Pnt(fa[i]))), db(gp_Vec(P[i], BRep_Tool::Pnt(fb[i])));
+    if (i == 0)
+    {
+      u1 = da;
+      u2 = db;
+    }
+    else if (!da.IsEqual(u1, 1e-12) || !db.IsEqual(u2, 1e-12))
+      return no(12);
+  }
+  if (C[0].IsSame(C[1]) || std::abs(u1.Dot(D)) > 1e-12 || std::abs(u2.Dot(D)) > 1e-12 || std::abs(u1.Dot(n1)) > 1e-12 || std::abs(u2.Dot(n2)) > 1e-12)
+    return no(13);
+  // Convex: each face lies behind the other's plane.
+  if (!(gp_Vec(u1).Dot(gp_Vec(n2)) < -1e-9 && gp_Vec(u2).Dot(gp_Vec(n1)) < -1e-9))
+    return no(14);
+  const double alpha = u1.Angle(u2);
+  const double d     = R / std::tan(alpha / 2);
+  for (int i = 0; i < 2; ++i)
+    if (P[i].Distance(BRep_Tool::Pnt(fa[i])) <= d + 100 * tol || P[i].Distance(BRep_Tool::Pnt(fb[i])) <= d + 100 * tol)
+      return no(15);
+  // Nothing else of F1, F2 or the caps in the region the fillet takes.
+  {
+    const TopoDS_Shape keep[] = {e, a[0], a[1], b[0], b[1]};
+    for (const TopoDS_Face& f : {F1, F2, C[0], C[1]})
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+      {
+        bool known = false;
+        for (const TopoDS_Shape& k : keep)
+          known = known || x.Current().IsSame(k);
+        if (known)
+          continue;
+        BRepExtrema_DistShapeShape dist(e, x.Current());
+        if (!dist.IsDone() || dist.Value() <= d * M_SQRT2 + 100 * tol)
+          return no(16);
+      }
+  }
+  // The fillet's cylinder: axis on the bisector, R from both faces.
+  const gp_Dir bis(gp_Vec(u1) + gp_Vec(u2));
+  const double off = R / std::sin(alpha / 2);
+  const gp_Pnt A0  = P[0].Translated(gp_Vec(bis) * off);
+  const gp_Pnt W1 = P[0].Translated(gp_Vec(u1) * d), W2 = P[0].Translated(gp_Vec(u2) * d);
+  // As OCCT frames its fillet cylinders: x towards the first face's tangent
+  // line, u from 0 to the blend's angle (y turned when that is clockwise).
+  const gp_Dir X(gp_Vec(A0, W1));
+  gp_Ax3       ax(A0, D, X);
+  const gp_Vec r2(A0, W2);
+  if (r2.Dot(gp_Vec(ax.YDirection())) < 0)
+    ax.YReverse();
+  const double beta = std::atan2(r2.Dot(gp_Vec(ax.YDirection())), r2.Dot(gp_Vec(X)));
+  occ::handle<Geom_CylindricalSurface> cyl = new Geom_CylindricalSurface(ax, R);
+  BRepBuilderAPI_MakeFace              mf(cyl, 0, beta, 0, L, tol);
+  if (!mf.IsDone())
+    return no(17);
+  TopoDS_Face blend = mf.Face();
+  {
+    BRepAdaptor_Surface bs(blend);
+    gp_Pnt              p;
+    gp_Vec              du, dv;
+    bs.D1(0.5 * beta, 0.5 * L, p, du, dv);
+    gp_Vec nn = du.Crossed(dv);
+    if (blend.Orientation() == TopAbs_REVERSED)
+      nn.Reverse();
+    const gp_Lin axis(A0, D);
+    if (nn.Dot(gp_Vec(ElCLib::Value(ElCLib::Parameter(axis, p), axis), p)) < 0)
+      blend.Reverse();
+  }
+  // Its edges: the tangent lines on F1 / F2, the arcs on the caps.
+  TopoDS_Edge t1, t2, arc[2];
+  for (TopExp_Explorer x(blend, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge ed = TopoDS::Edge(x.Current());
+    BRepAdaptor_Curve c(ed);
+    const gp_Pnt      m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
+    if (c.GetType() == GeomAbs_Line)
+      (gp_Lin(W1, D).Distance(m) < gp_Lin(W2, D).Distance(m) ? t1 : t2) = ed;
+    else
+      arc[gp_Vec(P[0], m).Dot(gp_Vec(D)) < 0.5 * L ? 0 : 1] = ed;
+  }
+  if (t1.IsNull() || t2.IsNull() || arc[0].IsNull() || arc[1].IsNull())
+    return no(18);
+  // The fillet face's vertices, by position.
+  auto vertex_at = [&](const gp_Pnt& p) {
+    for (TopExp_Explorer x(blend, TopAbs_VERTEX); x.More(); x.Next())
+      if (BRep_Tool::Pnt(TopoDS::Vertex(x.Current())).Distance(p) < 1000 * tol)
+        return TopoDS::Vertex(x.Current());
+    return TopoDS_Vertex();
+  };
+  TopoDS_Edge na[2], nb[2];
+  for (int i = 0; i < 2; ++i)
+  {
+    const gp_Pnt  Pi = P[i];
+    TopoDS_Vertex w1 = vertex_at(Pi.Translated(gp_Vec(u1) * d)), w2 = vertex_at(Pi.Translated(gp_Vec(u2) * d));
+    if (w1.IsNull() || w2.IsNull())
+      return no(19);
+    // a, b shortened to the tangent points, in their own direction.
+    auto shortened = [&](const TopoDS_Edge& x, const TopoDS_Vertex& w, const TopoDS_Vertex& far) {
+      TopoDS_Vertex x0, x1;
+      TopExp::Vertices(TopoDS::Edge(x.Oriented(TopAbs_FORWARD)), x0, x1);
+      return x0.IsSame(V[i]) ? BRepBuilderAPI_MakeEdge(w, far).Edge() : BRepBuilderAPI_MakeEdge(far, w).Edge();
+    };
+    na[i] = shortened(a[i], w1, fa[i]);
+    nb[i] = shortened(b[i], w2, fb[i]);
+  }
+  // Orientation of a new edge in a face: against the fillet face's use.
+  auto against = [&](const TopoDS_Edge& x, const TopoDS_Face& f) {
+    TopAbs_Orientation in_blend = TopAbs_FORWARD;
+    for (TopExp_Explorer it(blend, TopAbs_EDGE); it.More(); it.Next())
+      if (it.Current().IsSame(x))
+        in_blend = it.Current().Orientation();
+    const TopAbs_Orientation r = TopAbs::Reverse(in_blend);
+    return f.Orientation() == TopAbs_REVERSED ? TopAbs::Reverse(r) : r;
+  };
+  BRep_Builder B;
+  // `f` with edges replaced (`subst`: old -> new, same direction) and
+  // `extra` added after the edge it follows.
+  auto rebuilt = [&](const TopoDS_Face& f, const std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>>& subst, const TopoDS_Shape& after, const TopoDS_Shape& extra) {
+    const TopoDS_Face fwd = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+    TopoDS_Face       nf  = TopoDS::Face(fwd.EmptyCopied());
+    for (TopoDS_Iterator w(fwd); w.More(); w.Next())
+    {
+      TopoDS_Wire nw;
+      B.MakeWire(nw);
+      for (TopoDS_Iterator x(w.Value()); x.More(); x.Next())
+      {
+        TopoDS_Shape put = x.Value();
+        for (const auto& [o, n] : subst)
+          if (x.Value().IsSame(o))
+            put = n.ShapeType() == TopAbs_EDGE && !o.IsSame(e) ? n.Oriented(x.Value().Orientation()) : n;
+        B.Add(nw, put);
+        if (!after.IsNull() && x.Value().IsSame(after))
+          B.Add(nw, extra);
+      }
+      nw.Closed(true);
+      B.Add(nf, nw);
+    }
+    for (TopExp_Explorer x(nf, TopAbs_EDGE); x.More(); x.Next())
+      for (const auto& [o, n] : subst)
+        if (x.Current().IsSame(n))
+          BRepLib::BuildPCurveForEdgeOnPlane(TopoDS::Edge(x.Current()), nf);
+    if (!extra.IsNull())
+      BRepLib::BuildPCurveForEdgeOnPlane(TopoDS::Edge(extra), nf);
+    nf.Orientation(f.Orientation());
+    return nf;
+  };
+  const TopoDS_Face nF1 = rebuilt(F1, {{e, t1.Oriented(against(t1, F1))}, {a[0], na[0]}, {a[1], na[1]}}, TopoDS_Shape(), TopoDS_Shape());
+  const TopoDS_Face nF2 = rebuilt(F2, {{e, t2.Oriented(against(t2, F2))}, {b[0], nb[0]}, {b[1], nb[1]}}, TopoDS_Shape(), TopoDS_Shape());
+  TopoDS_Face       nC[2];
+  for (int i = 0; i < 2; ++i)
+    nC[i] = rebuilt(C[i], {{a[i], na[i]}, {b[i], nb[i]}}, a[i], arc[i].Oriented(against(arc[i], C[i])));
+  TopoDS_Shell ns;
+  B.MakeShell(ns);
+  for (TopoDS_Iterator it(shell); it.More(); it.Next())
+  {
+    const TopoDS_Shape& f = it.Value();
+    const TopoDS_Shape* r = f.IsSame(F1) ? &nF1 : f.IsSame(F2) ? &nF2 : f.IsSame(C[0]) ? &nC[0] : f.IsSame(C[1]) ? &nC[1] : nullptr;
+    B.Add(ns, r != nullptr ? r->Oriented(f.Orientation()) : f);
+  }
+  B.Add(ns, blend);
+  ns.Closed(true);
+  TopoDS_Solid so;
+  B.MakeSolid(so);
+  B.Add(so, ns.Oriented(shell.Orientation()));
+  so.Orientation(solid.Orientation());
+  if (!closed_and_oriented(so))
+    return no(20);
+  HHist h = new BRepTools_History();
+  h->AddModified(F1, nF1);
+  h->AddModified(F2, nF2);
+  for (int i = 0; i < 2; ++i)
+  {
+    h->AddModified(C[i], nC[i]);
+    h->AddModified(a[i], na[i]);
+    h->AddModified(b[i], nb[i]);
+  }
+  h->AddGenerated(e, blend);
+  out  = so;
+  hist = h;
+  return true;
+}
+
 static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
                 bool checked)
 {
@@ -3236,6 +3525,19 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     es.push_back(first_adjacent_face_edge_check(s.shape, edges.items[i], "fillet edge"));
     rs.push_back(r);
     rmax = std::max(rmax, r);
+  }
+  // One square corner edge: built directly.
+  if (checked && es.size() == 1)
+  {
+    TopoDS_Shape r;
+    HHist        h;
+    bool         done = false;
+    {
+      const KernelTimer timer("blend.square_corner");
+      done = fillet_square_corner(s.shape, es[0], rs[0], r, h);
+    }
+    if (done)
+      return make_result({s.shape}, r, h.get());
   }
   if (checked)
   {

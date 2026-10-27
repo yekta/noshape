@@ -275,3 +275,21 @@ fn top_edge_fillets_mitre_at_sharp_corners_as_live() {
         assert_eq!(f.faces().len(), 10, "R{r}");
     }
 }
+
+/// A box's corner edge filleted directly (features.cpp fillet_square_corner):
+/// the exact solid, one cylinder face generated from the edge.
+#[test]
+fn a_square_corner_fillet_built_directly() {
+    setup();
+    let s = bx([0.0; 3], [40.0, 30.0, 20.0]);
+    let edge = edges_where(&s, |i| (i.start.x - 40.0 * MM).abs() < 1e-9 && (i.end.x - 40.0 * MM).abs() < 1e-9 && (i.start.y - 30.0 * MM).abs() < 1e-9 && (i.end.y - 30.0 * MM).abs() < 1e-9);
+    assert_eq!(edge.len(), 1);
+    let edge_index = s.edges().iter().position(|e| e.is_same(&edge[0])).unwrap() as u32;
+    let r = fillet_checked(&s, &edge, &[3.0 * MM]).unwrap();
+    assert!(r.shape.is_valid());
+    let want = 40.0 * 30.0 * 20.0 - (1.0 - std::f64::consts::FRAC_PI_4) * 9.0 * 20.0;
+    assert!((vol_mm3(&r.shape) - want).abs() < 1e-6, "{} vs {want}", vol_mm3(&r.shape));
+    assert_eq!(r.shape.faces().len(), 7);
+    let generated = r.history.generated(0, ShapeType::Edge, edge_index);
+    assert!(generated.iter().any(|(k, _)| *k == ShapeType::Face), "{generated:?}");
+}

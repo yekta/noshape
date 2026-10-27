@@ -42,6 +42,11 @@ fn v3(v: &[f64]) -> DVec3 {
 
 /// Runs the captured op; returns its outcome as text (the op must return).
 fn replay(name: &str) -> String {
+    replay_as(name, true)
+}
+
+/// [`replay`]; `describe` false: the op only (profiling).
+fn replay_as(name: &str, describe: bool) -> String {
     let (s, subs, p) = load(name);
     let r = match p[0].as_str() {
         "fillet" => {
@@ -65,6 +70,7 @@ fn replay(name: &str) -> String {
         other => panic!("unknown op {other}"),
     };
     match r {
+        Ok(_) if !describe => "ok".into(),
         Ok(r) => format!("ok valid {} volume {:.9e} faces {}", r.shape.is_valid(), r.shape.volume().unwrap_or(0.0), r.shape.faces().len()),
         Err(e) => format!("error {e}"),
     }
@@ -96,7 +102,12 @@ fn crashing_kernel_inputs_return() {
 fn replay_one() {
     let _ = set_working_scale(1000.0);
     let Ok(name) = std::env::var("NOSHAPE_REPLAY") else { return };
+    // NOSHAPE_REPLAY_REPEAT=n: n times (profiling); the last one's time.
+    let n: usize = std::env::var("NOSHAPE_REPLAY_REPEAT").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
+    for _ in 1..n {
+        replay_as(&name, false);
+    }
     let t = std::time::Instant::now();
     let r = replay(&name);
-    eprintln!("{name}: {r} in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
+    eprintln!("{name}: {r} in {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
 }
