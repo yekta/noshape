@@ -65,7 +65,7 @@ then edits, undo/redo, rollback and suppress.
 |---|---|---|---|---|
 | Revolve dialog | Solid / Surface / Thin, New … Intersect, Faces and sketch regions to revolve, Revolve axis (pink until set), ☑ Full revolve | same (behaviours 338, 13863) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Revolve about a profile line | full cylinder; axis chip "Sketch 4 line" | chip text? ("Edge of Sketch N" in live lists; request p3 (a)) | ? |  |
-| Circular pattern dialog | Axis of pattern, Angle 360 deg, Instance count 4 + ↻, ☑ Equal spacing, ☐ Centered, › ☐ Skip instances | same (behaviours 331) | ✅ |  |
+| Circular pattern dialog | Axis of pattern, Angle 360 deg, Instance count 4 + ↻, ☑ Equal spacing, ☐ Centered, › ☐ Skip instances | same (behaviours 331) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Circular pattern of Part 3 about a hole rim | 3 copies around the hole axis; each copy gets a new palette colour | copies' colour? (request p3 (b)) | ? |  |
 | P1-4 re-check on green 62524c30 (skb 7b972911) | points snapped to the origin's horizontal: no visible point at the origin; Hole on "Vertices of Sketch 6" previews only the 2 real points. Data still holds a hidden construction "Origin stand-in" point at (0,0) with the Horizontal constraints on it (sketch_get lists it) | ✅ UI / minor data note for skb (live: no entity, constraint to the external Origin) |  |
 | SEL1 on green 62524c30 | Fillet: a sketch line adds nothing, a plate edge adds "Edge of Extrude 1" | ✅ |  |
@@ -74,12 +74,12 @@ then edits, undo/redo, rollback and suppress.
 | Sketch dimension (view normal, rectangle, d on the top edge, place) | value box "78.15024 mm" selected, ± icon, ✓ ✕; 50 + Enter → label "50", width 50 | box at full precision (behaviours 4788 "12.53718 mm") | ✅ |  |
 | Plane (tool search; "Did you mean: Mate connector") | Entities "Top plane", type Offset, Offset distance 25 mm + flip, ☐ Flip normal; type list Offset, Plane point, Line angle, Point normal, Three point, Mid plane, Curve point, Tangent | same (behaviours 332) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Split (Part tab) of the plate by Plane 1 at 2.5 mm | dialog Part / Face, Parts, surfaces, or curves to split, Entity to split with, ☐ Keep tools, ☐ Trim to face boundaries, ☑ Keep both sides; result Parts 6 → 7 | same (behaviours 329) | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Transform dialog | Entities to transform or copy, ▾ Translate by line (+ flip), Line or points, ☐ Copy part | same first type (behaviours 226) | ✅ |  |
+| Transform dialog | Entities to transform or copy, ▾ Translate by line (+ flip), Line or points, ☐ Copy part | same first type (behaviours 226) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Mass and section properties (bottom-right icon), part without material | dialog Part / Face, red "Part 2" chip, blank mass / CoM / inertia, volume 21005.949 mm³, area 4401.292 mm²; inertia header "(mm² kg)"; yellow no-material toast | header "(lb mm²)"; toast: notes disagree | ✗ **P1-14** (ui) / ? |  |
 | Section view (Shift+X), Front plane | dialog Exclude / Include, Section planes (+ plane button), Items to exclude, info "Select a plane, planar face, cylinder, cone, or mate connector."; chip "Section plane 1 (Front)", manipulator arrow + rotate glyph + ring, tan preview cut faces | same (behaviours 359) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Draft dialog | Neutral plane / Parting line; Neutral plane (+MC); Entities to draft; Draft angle 3 deg + ↻; ☑ Tangent propagation; ☐ Reapply fillet | same (behaviours 327) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sweep dialog | Solid / Surface / Thin, New … Intersect; Faces and sketch regions to sweep; Sweep path (pink) + flip; ☐ Extend to full path; Profile control ▾ None; › ☐ Twist; ☐ Scale | same (behaviours 339) | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Loft dialog | Profiles; ⌄ End conditions (Start / End profile condition ▾ None); ☐ Guides and continuity; ☐ Path; › ☐ Connections; ☐ Show isocurves | same (behaviours 340) | ✅ |  |
+| Loft dialog | Profiles; ⌄ End conditions (Start / End profile condition ▾ None); ☐ Guides and continuity; ☐ Path; › ☐ Connections; ☐ Show isocurves | same (behaviours 340) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Sketch Trim (m) on a crossing line | the clicked segment past the crossing is removed; the new end is coincident with the other line | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ |  |
@@ -138,7 +138,7 @@ then edits, undo/redo, rollback and suppress.
 ## Owner fixes re-checked on green a08e3eda
 | Item | Check | Status | Verified |
 |---|---|---|---|
-| P2-A1 (skb 9bf8475b) | Circular pattern Angle 300 + Enter: applied, dialog stays; 2nd Enter accepts. Count + Enter accepts at once (live 4299) | ✅ fixed |  |
+| P2-A1 (skb 9bf8475b) | Circular pattern Angle 300 + Enter: applied, dialog stays; 2nd Enter accepts. Count + Enter accepts at once (live 4299) | ✅ fixed | 0.4.10+ / 6cbb24e0 10-27 |
 | P1-15 (ui 76da6649) | view-cube face hover #bce2f7 | ✅ fixed | 0.4.10+ / 1c853f78 10-27 |
 | P1-12 (ui 9bc26682) | Revolve axis chip "Edge of Sketch 2" | ✅ fixed |  |
 | P1-7 (ui 9bc26682) | failing hidden sketch row red | ✅ fixed |  |
