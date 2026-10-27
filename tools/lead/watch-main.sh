@@ -17,8 +17,12 @@ check() {
   log "  T0 $((SECONDS-t0)) s"; t0=$SECONDS
   o=$(nice -n -5 tools/tiers/t1.sh --no-fail-fast 2>&1); local rc=$?
   # A test executable deleted under cargo (disk cleanup) fails as "could not execute process": run once more.
-  if [ $rc -ne 0 ] && echo "$o" | grep -qE "could not execute process|No such file or directory \(os error 2\)"; then
-    log "  T1 retry (missing test executable)"; o=$(nice -n -5 tools/tiers/t1.sh --no-fail-fast 2>&1); rc=$?
+  # Missing build outputs (a test executable or an rlib deleted or half-written under cargo: a killed build, disk
+  # cleanup) aren't a test failure: clean our crates' artifacts and run once more.
+  if [ $rc -ne 0 ] && echo "$o" | grep -qE "could not execute process|No such file or directory \(os error 2\)|can't find crate for \`noshape|extern location for noshape[a-z_]* does not exist"; then
+    log "  T1 retry after cleaning our crates (missing build outputs)"
+    cargo metadata --format-version 1 --no-deps 2>/dev/null | python3 -c 'import json,sys; print("\n".join(p["name"] for p in json.load(sys.stdin)["packages"]))' | while read -r p; do cargo clean -q -p "$p" 2>/dev/null; done
+    o=$(nice -n -5 tools/tiers/t1.sh --no-fail-fast 2>&1); rc=$?
   fi
   log "  T1 $((SECONDS-t0)) s"; t0=$SECONDS
   [ $rc -ne 0 ] && { echo "T1:"; echo "$o" | fails; [ -z "$(echo "$o" | fails)" ] && echo "$o" | tail -5; }
