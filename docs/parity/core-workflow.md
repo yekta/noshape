@@ -91,12 +91,12 @@ it, so re-take positions after every selection.
 | 5.3 | Drag the variable to the top; Extrude 1 depth "#w" | Parts 20 mm | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 5.4 | Select a face / two faces | "Area: 856.366 mm²" / a distance | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 5.5 | Mass properties, no material | ? centre of mass shown | ? F18 (centre of mass and inertia blank) |  |
-| 5.6 | Material warning | Goes with the Mass properties dialog | ✅ (v0.4.6 gate): page toast ≈3.4 s, gone ≈8 s (= live) (was ✗ F19 (stays; later covers the sketch dialog's ✓)) |  |
-| 5.7 | Configurations panel › Configure Part Studio; add row "Long" | List input, Default / Long, info box | ✅ |  |
-| 5.8 | Right-click a feature parameter (Variable Value) | "Configure …" | ✅ re-checked 10-23: Depth › right-click › "Configure" (was ✗ F20 (only Cut/Copy/Paste/Select All)) |  |
-| 5.9 | + Configure features | Yellow banner "Select … to configure [Done]" | ✅ (v0.4.6 gate): yellow "Select sketches or features to configure [Done]" (was ✗ F21 (no banner seen)) |  |
-| 5.10 | Strip tooltip after the panel opens | Hides | ✅ re-checked 10-23: no tooltip left over the panel (was ✗ F22 (stays over the panel)) |  |
-| 5.11 | ☰ › Workspace units… while a sketch is open; Length → Inch, ✓ | Units change; the sketch stays open; geometry unchanged | ✅ re-checked 10-23: the Workspace units dialog accepts the open sketch first (Sketch 3 kept), geometry unchanged; live order not captured (was ✗ F23, F24) |  |
+| 5.6 | Material warning | Goes with the Mass properties dialog | ✅ (v0.4.6 gate): page toast ≈3.4 s, gone ≈8 s (= live) (was ✗ F19 (stays; later covers the sketch dialog's ✓)) | 0.4.10+ / f16b31c6 10-27 (toast on Mass properties with no material) |
+| 5.7 | Configurations panel › Configure Part Studio; add row "Long" | List input, Default / Long, info box | ✅ | 0.4.10+ / fa61ba6f 10-27 |
+| 5.8 | Right-click a feature parameter (Variable Value) | "Configure …" | ✅ re-checked 10-23: Depth › right-click › "Configure" (was ✗ F20 (only Cut/Copy/Paste/Select All)) | 0.4.10+ / fa61ba6f 10-27 |
+| 5.9 | + Configure features | Yellow banner "Select … to configure [Done]" | ✅ (v0.4.6 gate): yellow "Select sketches or features to configure [Done]" (was ✗ F21 (no banner seen)) | 0.4.10+ / fa61ba6f 10-27 |
+| 5.10 | Strip tooltip after the panel opens | Hides | ✅ re-checked 10-23: no tooltip left over the panel (was ✗ F22 (stays over the panel)) | 0.4.10+ / fa61ba6f 10-27 |
+| 5.11 | ☰ › Workspace units… while a sketch is open; Length → Inch, ✓ | Units change; the sketch stays open; geometry unchanged | ✅ re-checked 10-23: the Workspace units dialog accepts the open sketch first (Sketch 3 kept), geometry unchanged; live order not captured (was ✗ F23, F24) | 0.4.10+ / fa61ba6f 10-27 (dialog + sketch accepted first; unit change itself not re-run) |
 
 ## 6. Assembly and drawing (live: "Assembly", "Drawing")
 
