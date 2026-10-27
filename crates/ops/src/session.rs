@@ -833,4 +833,33 @@ mod tests {
         assert!(h[0] == "Insert tab" && h[1].ends_with(":: Rename : Renamed in B") && h[2].ends_with(":: Suppress : Extrude 1"), "{h:?}");
         let _ = std::fs::remove_dir_all(&dir);
     }
+
+    /// Session::sync_external (the app polls it): another writer's head is
+    /// loaded once; nothing while viewing history; nothing when no one wrote.
+    #[test]
+    fn sync_external_loads_another_writers_head() {
+        let dir = std::env::temp_dir().join(format!("noshape-session-sync-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("s.noshape");
+        let _ = std::fs::remove_file(&path);
+        drop(Session::create(&path, Document::new()).unwrap());
+        let mut a = Session::open(&path).unwrap();
+        let mut b = Session::open(&path).unwrap();
+        assert!(!a.sync_external().unwrap(), "no one wrote");
+        b.doc.settings.description = "Written by B".into();
+        b.commit(&[], true, "Edit description").unwrap();
+        assert!(!b.sync_external().unwrap(), "its own edit");
+        // Viewing history: left alone until it returns to the head.
+        let first = a.store.history(a.branch).unwrap().last().unwrap().id;
+        a.view_microversion(Some(first)).unwrap();
+        assert!(!a.sync_external().unwrap());
+        a.view_microversion(None).unwrap();
+        assert_eq!(a.doc.settings.description, "Written by B");
+        let mut c = Session::open(&path).unwrap();
+        b.doc.settings.description = "Again".into();
+        b.commit(&[], true, "Edit description").unwrap();
+        assert!(c.sync_external().unwrap() && c.doc.settings.description == "Again");
+        assert!(!c.sync_external().unwrap(), "once");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

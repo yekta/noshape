@@ -219,6 +219,33 @@ impl DocModel {
         cx.notify();
     }
 
+    /// Another process writing this file (the document open in a second
+    /// window, an agent): its edits show here within ~1.5 s, as live shows
+    /// another writer's edit in an open tab (qa TWO-PROCESS-LOST-EDIT). The
+    /// poll is one query while nothing changed; it stops with the document.
+    pub fn watch_external(&mut self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(std::time::Duration::from_millis(1500)).await;
+                let alive = this.update(cx, |d: &mut DocModel, cx| {
+                    // An edit waiting to be committed merges on its commit instead.
+                    if d.has_pending() {
+                        return;
+                    }
+                    match d.session.sync_external() {
+                        Ok(true) => d.reloaded(cx),
+                        Ok(false) => {}
+                        Err(e) => log::warn!("checking for other writers: {e:#}"),
+                    }
+                });
+                if alive.is_err() {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
     pub fn reloaded(&mut self, cx: &mut Context<Self>) {
         self.pending = PendingEdit::default();
         cx.emit(DocEvent::Reloaded);

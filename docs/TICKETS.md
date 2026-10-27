@@ -364,7 +364,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and every agent's process on the box consume each other's markers; /tmp/noshape-regen here holds markers of fuzz CLIs
   killed by `timeout` (Chamfer 3 / 4, Draft 5, Shell 1). Key the marker by the document file (path or store id + head)
   too. Also: a kill -9 or power cut mid-regen reads as "it stopped noshape" (qa 2026-10-27, green 502416cc)
-- [ ] P1 API-REMOVE-DIR (regression: on v0.4.8 the same calls cut; qa's featmatrix "linear pattern of hole" cases now fail "Selected features do not create any geometry that may be patterned." because the seed hole cuts nothing) feature_add extrude operationType REMOVE without oppositeDirection stores oppositeDirection: true
+- [x] (dx 10-27, lead's decision (a): won't change. The agent API gives the app's results for the same inputs, so feature_add keeps the open dialog's flip as live's dialog makes it; feature_add's description now says so and that `oppositeDirection` given explicitly is kept, which is how an agent picks the side. qa's P1 note (regression: on v0.4.8 the same calls cut; qa's featmatrix "linear pattern of hole" cases now fail "Selected features do not create any geometry that may be patterned." because the seed hole cuts nothing) is the same choice: v0.4.8's feature_add didn't run the dialog's logic yet, the app's dialog with these inputs doesn't cut either; scripts that relied on the old default pass oppositeDirection: false) P2 API-REMOVE-DIR feature_add extrude operationType REMOVE without oppositeDirection stores oppositeDirection: true
   (feature_get), although feature_schema gives its default as false: a 40×30×10 block on Top, a Ø10 circle sketched on Top,
   REMOVE Through all / Blind 5 / no depth → all "Info: Selected tools and targets do not intersect.", volume 12000 (the cut
   goes −Z, away from the block); with oppositeDirection: false passed explicitly it cuts (11214.602). The app's dialog flips
@@ -376,7 +376,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and cuts; live's REST default `false` there points away and cuts nothing). Storing the schema default would fix this
   case (sketch on the Top plane under the part) and break that one. Decision for the lead: (a) keep the dialog's choice
   (live UI), (b) the REST default (live API), or (c) dx's proposal: keep the dialog's flip only when the preview then
-  touches the merge scope, else the default (an agent can't see the red tool). Waiting on it (dx handoff).
+  touches the merge scope, else the default (an agent can't see the red tool). Lead 10-27: (a).
 - [x] verified green 502416cc (qa 04:55: 3MF 2495 vertices = distinct positions, 0 unmatched edges, 60774.111; OBJ welded, normals through vn; OBJ still in metres, asked live) (dx 10-27: a body's vertices are welded by position: 3MF one closed mesh by index, test export::tests::three_mf_bodies_are_manifold_by_index; OBJ one `v` per position, each face keeping its `vn` normals; OBJ stays in metres) P2 EXPORT-MESH-SHARED 3MF and OBJ exports don't share vertices between faces: tests/perf/live-30-features.noshape
   › Part 1 › Export… › 3MF (Medium) gives 3700 vertices for 2495 distinct positions and 4994 triangles, and 2332 of 14982
   directed edges have no opposite by vertex index (every face is its own island), although by position the mesh is
