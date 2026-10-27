@@ -344,6 +344,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 CRASH-MARKER-COPIES a crash marker rolls back whichever document next opens with that feature id, not the file whose
+  process died: copy tests/perf/live-30-features.noshape to kd2.noshape and bur.noshape; open kd2 in the app, Boss 1 ›
+  Suppress and kill -9 the app during that regeneration; open bur.noshape (never touched): it opens with the rollback bar
+  above Boss 2 and a new history entry "Roll back above Boss 2: it stopped noshape while regenerating", and the marker is
+  gone, so kd2 (the file that was regenerating) opens unprotected. Markers live in the shared `<temp>/noshape-regen`
+  (crash_guard.rs) and match by feature id only (session.rs recover_crashed_features), so copies of a document, the CLI
+  and every agent's process on the box consume each other's markers; /tmp/noshape-regen here holds markers of fuzz CLIs
+  killed by `timeout` (Chamfer 3 / 4, Draft 5, Shell 1). Key the marker by the document file (path or store id + head)
+  too. Also: a kill -9 or power cut mid-regen reads as "it stopped noshape" (qa 2026-10-27, green 502416cc)
 - [ ] P1 API-REMOVE-DIR (regression: on v0.4.8 the same calls cut; qa's featmatrix "linear pattern of hole" cases now fail "Selected features do not create any geometry that may be patterned." because the seed hole cuts nothing) feature_add extrude operationType REMOVE without oppositeDirection stores oppositeDirection: true
   (feature_get), although feature_schema gives its default as false: a 40×30×10 block on Top, a Ø10 circle sketched on Top,
   REMOVE Through all / Blind 5 / no depth → all "Info: Selected tools and targets do not intersect.", volume 12000 (the cut
