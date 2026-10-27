@@ -4301,7 +4301,7 @@ dependencies = [
 
 [[package]]
 name = "noshape"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -4339,7 +4339,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-app-core"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4379,7 +4379,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-assembly"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "glam 0.34.1",
  "nalgebra",
@@ -4396,7 +4396,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-assembly-ui"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "glam 0.34.1",
@@ -4420,7 +4420,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-cli"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4432,7 +4432,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-custom"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "glam 0.34.1",
  "log",
@@ -4450,7 +4450,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-drawing"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "acadrust",
  "ahash",
@@ -4481,7 +4481,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-drawing-ui"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "glam 0.34.1",
@@ -4503,7 +4503,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-feature-studio-ui"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "gpui-kit",
@@ -4520,7 +4520,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-featurescript"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "log",
  "noshape-workspace-hack",
@@ -4531,7 +4531,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-history-ui"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4553,7 +4553,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-kernel"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -4566,7 +4566,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-model"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "acadrust",
  "ahash",
@@ -4598,7 +4598,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-model-core"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "acadrust",
  "ahash",
@@ -4625,7 +4625,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-model-data"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "ahash",
  "earcutr",
@@ -4647,7 +4647,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-ops"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "glam 0.34.1",
@@ -4672,7 +4672,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-part-studio-ui"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "glam 0.34.1",
@@ -4697,7 +4697,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-preferences-ui"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "gpui-kit",
@@ -4718,7 +4718,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-release-ui"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4741,7 +4741,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-render"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "bytemuck",
  "glam 0.34.1",
@@ -4758,7 +4758,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-scene"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "dirs 6.0.0",
  "glam 0.34.1",
@@ -4775,7 +4775,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-sketch"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "cadkit-core",
  "cadkit-dwg",
@@ -4795,7 +4795,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-start-ui"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "dirs 6.0.0",
@@ -4815,7 +4815,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-store"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "blake3",
  "log",
@@ -4830,7 +4830,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-units"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "indexmap",
  "noshape-workspace-hack",
@@ -4841,7 +4841,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-variable-studio-ui"
-version = "0.4.6"
+version = "0.4.11"
 dependencies = [
  "anyhow",
  "gpui-kit",
