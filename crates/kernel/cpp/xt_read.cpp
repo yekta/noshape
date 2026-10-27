@@ -1145,14 +1145,14 @@ struct Builder
     double spacing = 0;
     for (size_t i = 0; i + 1 < cp.size(); ++i)
       spacing = std::max(spacing, cp[i].Distance(cp[i + 1]));
-    const double near = std::max(100 * r.at_index(n.ptr("chart")).real("chordal_error"), 1e-2 * spacing);
+    const double near_tol = std::max(100 * r.at_index(n.ptr("chart")).real("chordal_error"), 1e-2 * spacing);
     std::vector<gp_Pnt> exact;
     for (size_t i = 0; i < cp.size(); ++i)
     {
       const gp_Vec t = gp_Vec(cp[i == 0 ? 0 : i - 1], cp[i + 1 < cp.size() ? i + 1 : i]);
       gp_Pnt       q;
       const bool   fixed = (i == 0 && fixed_first) || (i + 1 == cp.size() && fixed_last);
-      exact.push_back(!fixed && refine(cp[i], t, q) && q.Distance(cp[i]) < near ? q : cp[i]);
+      exact.push_back(!fixed && refine(cp[i], t, q) && q.Distance(cp[i]) < near_tol ? q : cp[i]);
     }
     if (extend > 0 && exact.size() >= 2 && exact.front().Distance(exact.back()) > 1e-7)
     {

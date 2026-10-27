@@ -2625,20 +2625,20 @@ OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, con
       // misses points on periodic B-spline faces); a closed curve's ends meet
       // with the same tangent.
       const int N = 128;
-      occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, N + 1), near = new NCollection_HArray1<gp_Pnt>(1, N + 1);
+      occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, N + 1), near_pts = new NCollection_HArray1<gp_Pnt>(1, N + 1);
       occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, N + 1);
       for (int k = 0; k <= N; ++k)
       {
         const double t = k == N ? b : a + (b - a) * k / N;
         const double tt = closed && k == N ? a : t; // the same point
-        near->SetValue(k + 1, c->Value(tt));
+        near_pts->SetValue(k + 1, c->Value(tt));
         pts->SetValue(k + 1, far_at(tt));
         prm->SetValue(k + 1, t);
       }
       // Both ends interpolated on the same parameters (the same knots), so
       // the rulings join C(t) to its far end: a degree 3 × 1 B-spline (live:
       // SPLINE, degrees 1 and 3).
-      GeomAPI_Interpolate ip(pts, prm, false, 1e-9), in(near, prm, false, 1e-9);
+      GeomAPI_Interpolate ip(pts, prm, false, 1e-9), in(near_pts, prm, false, 1e-9);
       if (closed)
       {
         const gp_Vec tn = c->DN(a, 1);
@@ -2651,9 +2651,9 @@ OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, con
       in.Perform();
       if (!ip.IsDone() || !in.IsDone())
         fail_op("draft: ruling end curve failed");
-      occ::handle<Geom_Curve> far(ip.Curve()), start(in.Curve());  // direct-init: older GCC (CI) rejects the converting copy-init
+      occ::handle<Geom_Curve> far_curve(ip.Curve()), start(in.Curve());  // direct-init: older GCC (CI) rejects the converting copy-init
       TopoDS_Edge e0 = BRepBuilderAPI_MakeEdge(start, a, b).Edge();
-      TopoDS_Edge e1 = BRepBuilderAPI_MakeEdge(far, a, b).Edge();
+      TopoDS_Edge e1 = BRepBuilderAPI_MakeEdge(far_curve, a, b).Edge();
       TopoDS_Face rf = BRepFill::Face(e0, e1);
       if (rf.IsNull())
         fail_op("draft: ruled face failed");

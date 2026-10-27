@@ -337,14 +337,14 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     bool   corner;
   };
   std::vector<Pt> pts;
-  auto near = [&](double a, double b, double len) { return std::min(forward(a, b, len), forward(b, a, len)) < tol; };
+  auto close_to = [&](double a, double b, double len) { return std::min(forward(a, b, len), forward(b, a, len)) < tol; };
   for (double s : corners_a)
     pts.push_back({s, 0, -1, true});
   for (size_t i = 0; i < gs.size(); ++i)
   {
     bool merged = false;
     for (Pt& p : pts)
-      if (near(p.sa, gs[i].sa, A.len))
+      if (close_to(p.sa, gs[i].sa, A.len))
       {
         p.guide = (int)i;
         merged  = true;
@@ -363,7 +363,7 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     {
       bool on = false;
       for (double s : pb)
-        on |= near(s, g.sb, B.len);
+        on |= close_to(s, g.sb, B.len);
       if (!on)
         pb.push_back(g.sb);
     }
@@ -378,17 +378,17 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
         break;
       }
     for (size_t j = 0; j < n; ++j)
-      if (near(pb[j], gs[pts[ia].guide].sb, B.len))
+      if (close_to(pb[j], gs[pts[ia].guide].sb, B.len))
         ib = j;
     for (size_t i = 0; i < n; ++i)
     {
       pts[(ia + i) % n].sb = pb[(ib + i) % n];
-      if (pts[(ia + i) % n].guide >= 0 && !near(pts[(ia + i) % n].sb, gs[pts[(ia + i) % n].guide].sb, B.len))
+      if (pts[(ia + i) % n].guide >= 0 && !close_to(pts[(ia + i) % n].sb, gs[pts[(ia + i) % n].guide].sb, B.len))
         fail_op("All guides should intersect each profile boundary.");
     }
     for (size_t i = 0; i < n; ++i)
       for (double s : corners_b)
-        if (near(pts[i].sb, s, B.len))
+        if (close_to(pts[i].sb, s, B.len))
           pts[i].corner = true;
   }
   else

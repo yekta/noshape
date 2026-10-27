@@ -3,6 +3,7 @@
 
     analyze.py <output dir> <label> [--stills] [--gate-ui-cpu-p95 MS] [--gate-gpu-p95 MS]
                [--gate-p95 MS] [--gate-mode MODE] [--baseline DIR --max-regression FRACTION]
+               [--report-regressions]
 
 Writes a Markdown table to $GITHUB_STEP_SUMMARY (and stdout) and
 <output dir>/summary.json (the next runs' baseline). Gates, on the orbit run of
@@ -12,7 +13,11 @@ Writes a Markdown table to $GITHUB_STEP_SUMMARY (and stdout) and
   --gate-gpu-p95     our GPU time p95 per frame (skipped for builds that don't report it);
   --gate-p95         frame-interval p95;
   --baseline         every run: fps, frame-interval p95, UI CPU p95 and GPU p95 at most
-                     --max-regression worse than in DIR/summary.json.
+                     --max-regression worse than in DIR/summary.json, and worse by more
+                     than the metric's noise floor (MIN_CHANGE);
+  --report-regressions  compare with the baseline but don't fail on it (software renderers:
+                     WARP / lavapipe draw on the runner's shared CPU at 1-2 fps and swing
+                     10-50% between runs of the same build).
 Exits 1 if a gate fails.
 """
 import argparse, glob, json, os, re, sys
@@ -27,6 +32,9 @@ SUMMARY = re.compile(
 
 # (metric, label, higher is better) compared against the baseline.
 COMPARED = [("fps", "fps", True), ("p95", "frame-interval p95", False), ("cpup95", "UI CPU p95", False), ("gpup95", "GPU p95", False)]
+# Smallest change that counts as a regression, whatever the percentage: below it a runner's jitter decides
+# (v0.4.11 macOS 15: UI CPU p95 0.79 -> 0.87 ms failed as +10%).
+MIN_CHANGE = {"fps": 2.0, "p95": 2.0, "cpup95": 0.5, "gpup95": 0.5}
 
 
 # Startup milestones (NOSHAPE_PERF=1 logs), ms from process start; the
@@ -144,6 +152,7 @@ def main():
     ap.add_argument("--gate-mode", default="texture")
     ap.add_argument("--baseline")
     ap.add_argument("--max-regression", type=float, default=0.10)
+    ap.add_argument("--report-regressions", action="store_true")
     args = ap.parse_args()
     rows = runs(args.out)
     lines = [f"### Viewport benchmark: {args.label}", "",
@@ -225,7 +234,11 @@ def main():
                 change = (now - was) / was
                 worse = -change if higher_better else change
                 notes.append(f"{label} {was:.2f} → {now:.2f} ({change * 100:+.0f}%)")
-                if worse > args.max_regression:
+                if worse <= args.max_regression or abs(now - was) <= MIN_CHANGE[metric]:
+                    continue
+                if args.report_regressions:
+                    notes[-1] += " over, not gated"
+                else:
                     failures.append(f"regression: {r['mode']} {r['kind']} {label} {was:.2f} → {now:.2f}")
             lines.append(f"- {r['mode']} {r['kind']}: " + "; ".join(notes))
     elif args.baseline:

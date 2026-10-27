@@ -228,12 +228,12 @@ jobs:
             os: windows-latest
             asset: windows-x86_64.zip
             modes: readback
-            gates: ''
+            gates: --report-regressions
           - name: Linux (Xvfb, lavapipe)
             os: ubuntu-24.04
             asset: linux-x86_64.tar.gz
             modes: texture readback
-            gates: --stills
+            gates: --stills --report-regressions
     env:
       GH_TOKEN: ${{ github.token }}
       FRAMES: ${{ inputs.frames || '300' }}

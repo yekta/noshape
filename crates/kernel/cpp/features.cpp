@@ -4082,10 +4082,10 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> chamfer_as_cut(const TopoDS
       // Distance d1 on face 1, the chamfer at angle d2 to it: the triangle's
       // third side by the law of sines (d1 tan d2 on a square edge).
       const double theta = std::acos(std::max(-1.0, std::min(1.0, w1.Dot(w2))));
-      const double far   = M_PI - theta - d2;
-      if (far <= 1e-9)
+      const double far_angle   = M_PI - theta - d2;
+      if (far_angle <= 1e-9)
         return std::nullopt;
-      s2 = d1 * std::sin(d2) / std::sin(far);
+      s2 = d1 * std::sin(d2) / std::sin(far_angle);
     }
     const gp_Pnt p1 = a.Translated(w1 * s1), p2 = a.Translated(w2 * s2);
     BRepBuilderAPI_MakePolygon sec(a, p1, p2, true);
@@ -4402,8 +4402,8 @@ static TopoDS_Shape end_cone_at_apex(const TopoDS_Shape& input, const TopoDS_Fac
   if (std::abs(an) < 1e-9)
     return r0;
   const double tn   = gp_Vec(apex, neutral.Location()).Dot(gp_Vec(neutral.Axis().Direction())) / an;
-  const double near = tn > 0 ? hi : lo;
-  const double rn   = std::abs(near) * std::tan(std::abs(cone.SemiAngle()));
+  const double near_z = tn > 0 ? hi : lo;
+  const double rn   = std::abs(near_z) * std::tan(std::abs(cone.SemiAngle()));
   // Material side of the original face: a hole's face looks at its axis.
   double u0, u1, v0, v1;
   BRepTools::UVBounds(drafted, u0, u1, v0, v1);
@@ -4427,8 +4427,8 @@ static TopoDS_Shape end_cone_at_apex(const TopoDS_Shape& input, const TopoDS_Fac
     return r0;
   const TopoDS_Shape body = BRepPrimAPI_MakeCylinder(gp_Ax2(cax.Location().Translated(gp_Vec(cax.Direction()) * c0), cax.Direction()),
                                                      cyl.Cylinder().Radius(), c1 - c0).Shape();
-  const gp_Pnt       base = apex.Translated(gp_Vec(ax) * near);
-  const TopoDS_Shape tip  = BRepPrimAPI_MakeCone(gp_Ax2(base, near > 0 ? ax.Reversed() : ax), rn, 0, std::abs(near)).Shape();
+  const gp_Pnt       base = apex.Translated(gp_Vec(ax) * near_z);
+  const TopoDS_Shape tip  = BRepPrimAPI_MakeCone(gp_Ax2(base, near_z > 0 ? ax.Reversed() : ax), rn, 0, std::abs(near_z)).Shape();
   try
   {
     std::unique_ptr<BRepAlgoAPI_BooleanOperation> first, second;

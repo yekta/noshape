@@ -163,6 +163,9 @@ fn main() {
             .flag_if_supported("-Wno-missing-field-initializers")
             .flag_if_supported("-Wno-deprecated-copy")
             .flag_if_supported("-Wno-cpp");
+        // windows.h (pulled in by OCCT headers such as OSD_Parallel.hxx) defines `near` and `far` as empty macros,
+        // so a variable named either breaks only the Windows build. Define them the same way here so it breaks here.
+        build.define("near", Some("")).define("far", Some(""));
     }
     // Rust side: whether Rhino export is built in (qa RHINO-GREEN: a build
     // without it doesn't offer RHINO).
