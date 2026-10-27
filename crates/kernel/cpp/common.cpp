@@ -1270,7 +1270,9 @@ void dump_op(const char* name, const TopoDS_Shape& s, const std::vector<TopoDS_S
 }
 } // namespace noshape
 
-#include <cxxabi.h>
+#if defined(__GNUC__) || defined(__clang__)
+  #include <cxxabi.h>
+#endif
 namespace noshape {
 namespace {
 struct KernelProfile
@@ -1294,10 +1296,15 @@ KernelProfile& kernel_profile()
 // The bridge function's name from its lambda's type ("...$op_fillet(...)::<lambda()>").
 std::string bridge_name(const char* mangled)
 {
+#if defined(__GNUC__) || defined(__clang__)
   int   st  = 0;
   char* dem = abi::__cxa_demangle(mangled, nullptr, nullptr, &st);
   std::string n = dem != nullptr ? dem : mangled;
   std::free(dem);
+#else
+  // MSVC's type names are already readable (no <cxxabi.h> there).
+  std::string n = mangled;
+#endif
   const size_t paren = n.find('(');
   size_t       end   = paren == std::string::npos ? n.size() : paren;
   size_t       start = n.rfind('$', end);
