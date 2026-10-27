@@ -189,7 +189,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop") (qa5 2026-10-26)
 - [ ] P2 P1-10 (qa5, carried over) Extrude › Remove tool preview pointing away from the part is grey; live translucent dark
   red (live part-studio/234–235) (qa5 2026-10-26)
-- [x] 6db9bb8d P2 DELETE-TAB-DIALOG fixed (psui 10-27): live's 598 px "Delete tabs" with the outlined warning triangle, "Deleting
+- [x] verified 19555ca3 (qa) 6db9bb8d P2 DELETE-TAB-DIALOG fixed (psui 10-27): live's 598 px "Delete tabs" with the outlined warning triangle, "Deleting
   this tab will result in failed or missing features in N tab(s)", one row per tab with its icon; within 1 px of
   part-studio/1584. Original report: deleting a Part Studio used by an assembly: ours shows plain text "Deleting "Part Studio 1" may
   cause errors in the tab that use it: Assembly 1." (tickets/delete-tab-dialog-ours.png); live: a yellow warning box "⚠
@@ -247,7 +247,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   2026-10-26, build 4d2f6b0c)
   skasm 10-27: the step was the sketch regions' hole search (~40 ms); now regions 3.5 ms, the sketch regen ~12 ms (dev
   build under load); perf test scene sketch_perf::big_shape_sketch_drag_step_parts. Re-time on a release build.
-- [x] 6329b168 P2 SKETCH-PASTE Ctrl+C / Ctrl+V of a dimensioned circle in a sketch: ours pastes the copy exactly on top of the
+- [ ] reopened (qa 19555ca3: the copy lands at the pointer, selected, Ø dimension copied, no prompt = live; but the
+  Transform manipulator sits on the original circle / sketch origin, not on the copy's centre as live;
+  tickets/sketch-paste-manipulator-on-original.png) 6329b168 P2 SKETCH-PASTE Ctrl+C / Ctrl+V of a dimensioned circle in a sketch: ours pastes the copy exactly on top of the
   original (prompt "Pasted; drag or transform the selection into place"); live (behaviours "qa (2026-10-26, P2 sketch)")
   pastes it centred on the pointer, selected, with the sketch Transform tool active and its manipulator on the copy, no
   prompt; the Ø dimension is pasted too (as ours) (qa 2026-10-26, build 4d2f6b0c)
