@@ -1118,7 +1118,31 @@ impl Sketch {
         rep
     }
 
+    /// The driving dimensions: (id, the value measured now, the target).
+    fn walk_dims(&self) -> Vec<(ConstraintId, f64, f64)> {
+        self.constraints()
+            .filter(|c| c.driving && c.kind.is_dimension())
+            .filter_map(|c| {
+                let target = c.value()?;
+                let mut start = self.measure_kind(&c.kind, &c.hints)?;
+                if matches!(c.kind, ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. }) {
+                    let d = (target - start + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
+                    start = target - d;
+                }
+                Some((c.id, start, target))
+            })
+            .collect()
+    }
+
     fn solve_inner(&mut self, opts: &SolveOptions) -> SolveReport {
+        let dims = self.walk_dims();
+        // Nothing to walk (every dimension already measures its value): a
+        // failed solve would only be repeated, so solve with conflict
+        // exclusion at once (a broken sketch paid a full solve and a DOF
+        // analysis more on every edit).
+        if dims.iter().all(|(_, a, b)| (b - a).abs() <= 1e-9 * (1.0 + b.abs())) {
+            return run(self, opts, &[]);
+        }
         let snapshot = self.clone();
         let rep = run_ext(self, opts, &[], false);
         if !matches!(rep.status, SolveStatus::Failed { .. }) {
@@ -1130,22 +1154,6 @@ impl Sketch {
         let quick = SolveOptions { analyze: false, ..opts.clone() };
         for steps in [4usize, 16, 64] {
             *self = snapshot.clone();
-            let dims: Vec<(ConstraintId, f64, f64)> = self
-                .constraints()
-                .filter(|c| c.driving && c.kind.is_dimension())
-                .filter_map(|c| {
-                    let target = c.value()?;
-                    let mut start = self.measure_kind(&c.kind, &c.hints)?;
-                    if matches!(c.kind, ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. }) {
-                        let d = (target - start + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
-                        start = target - d;
-                    }
-                    Some((c.id, start, target))
-                })
-                .collect();
-            if dims.is_empty() {
-                break;
-            }
             let mut ok = true;
             for k in 1..=steps {
                 let f = k as f64 / steps as f64;
