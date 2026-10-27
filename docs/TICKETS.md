@@ -10,6 +10,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   CI run 40480068401 running. Still not in it: a117663d (DRAFT-HANG budget: the draft-hang document never finishes on the
   CI artifact), c30baf56 (CRASH-MARKER-COPIES), cb84d673 (SHELL-SLOW). It contains 97081557, whose signal-longjmp budget
   is BUDGET-LONGJMP (P0, malloc deadlock seen; likely BOOL-THREAD-CRASH's cause).
+  qa 09:50, CI artifact of fcd301e2 (run 40480068401, Linux): the five crash documents open; cli-fillet-hang opens in
+  43 s; **cli-draft-hang still never finishes (> 200 s)**: DRAFT-HANG ships unless a117663d is taken. Note for testers:
+  this build lacks c30baf56, so markers left by any killed process roll back copies of the same document.
 - [ ] P0 release/v0.4.9 recut 7ee597e0: CI run 40452492018 **Windows x86_64 (MSVC) failed in "Build (release)"**:
   `crates/kernel/cpp/common.cpp(1273): fatal error C1083: Cannot open include file: 'cxxabi.h'` (the kernel profile's
   `#include <cxxabi.h>`, GCC/Clang only, unguarded; blame d85c3029, REGEN-SPEED). Still on main, so main's Windows build

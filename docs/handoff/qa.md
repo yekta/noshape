@@ -9,7 +9,7 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   (MSVC C1083; also on main). Needs a guard before the release can publish (TICKETS "Release v0.4.9").
 - BOOL-THREAD-CRASH (P0 core) is very likely in the release: nondeterministic segfaults in OCCT booleans on pool threads
   (fuzz seed 72 crashed 3 times on the 04:06 / 04:48 watcher CLIs; v0.4.8 survives it). Decide whether it blocks v0.4.9.
-- v0.4.9 as cut ships DRAFT-HANG (verified on the CI artifact: the draft-hang document's regen never ends); a117663d
+- v0.4.9 as cut (fcd301e2, re-checked on its CI artifact 09:50) ships DRAFT-HANG (the draft-hang document's regen never ends); a117663d
   is after the release base. Cherry-pick or recut once the Windows include is fixed.
 - BUDGET-LONGJMP (P0 core, new 09:35): the blend/draft budgets siglongjmp out of OCCT from a timer signal; a fuzz CLI
   deadlocked in malloc after it, and it likely explains BOOL-THREAD-CRASH. It ships in v0.4.9 (97081557 is in the base).
