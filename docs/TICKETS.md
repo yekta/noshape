@@ -605,6 +605,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   reports `{"Size": "Large"}` for <2>, and the BOM puts <1> and <2> in one row (qty 2). Names work where name == id
   (config Variable "h") and in config_activate. Resolve names to ids (as config_activate does) or refuse an unknown
   input; don't store and report a configuration that isn't applied (qa 2026-10-27 10:45, CLI 09:50)
+  The app's Change configuration… is right: on the same instance the dialog shows "Size Default" (the applied value);
+  choosing Large + ✓ stores `Configuration: Large` (z 28), but the stale `Size: Large` key stays in the instance's
+  configuration map. Side note: the op says a repeat insert "offsets the new instance along X so they don't overlap";
+  it offsets by (7.5, 5, 2.25) mm per copy (diagonal; a 60 × 40 part still overlaps), and an insert of the same part
+  in another configuration isn't offset. Fix the text or the offset.
 - [x] verified green 3197362b / watcher CLI 09:50 (qa: Revolute 1 → slider "Slider 1", → fastened "Fastened 1") (dx 10-27: a default name follows the new type keeping its number, a custom name stays (noshape_model::default_names::retyped, the dialog's rule); e2e assembly_with_mates retypes Revolute 1 → Slider 1) P2 API-MATE-RETYPE-NAME assembly_mate editing an existing mate's `type` keeps its old name: asm5.noshape's "Revolute 1"
   retyped to fastened / slider / cylindrical / planar / ball / pin slot stays "Revolute 1" (DOF right in each case: 0 1 1 2 3
   3 2). In the app, retyping in the mate dialog renames the mate (Cylindrical 1 → Revolute: title and row "Revolute 1",
