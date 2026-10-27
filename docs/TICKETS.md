@@ -37,6 +37,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli-shell-gpf, cli-fillet-segv, cli-fillet2-segv and cli-draft-segv.noshape** (/root/qa-scratch/tickets/; green 19555ca3
   opens all five).
 ## Core modelling (core)
+- [ ] P3 SM-FACES Sheet metal model › Extrude of an open L ((0,0)–(50,0)–(50,30), Blind 20, thickness 2, R3; live "fs (10-23
+  05:00)"): volumes exact (3211.3274 / flipped 3051.3274) and the folded boxes = live, but ours has **10 faces**, live **14**
+  (12 PLANE + 2 CYLINDER): live keeps each end face (z 0 and z 20) split into wall / bend / wall pieces, ours merges each end
+  into one face, so picking "the end of the 30 mm wall" selects the whole end (watcher CLI 09:50) (qa 2026-10-27)
 - [ ] P3 PLDRAFT-VOLUME curved parting-line drafts build as live (4 faces, all OK) but a little large: live's "psb (10-25 m)
   curved parting line draft" cases (cylinder Ø20×20, Plane 1 Line angle 120° on a Front line at z 10, Split face, Draft ›
   Parting line from Top, bin/pldraft.py, watcher CLI 08:30): A1 one sided 5° 5974.3559 (live 5974.3441, +2.0e-6), A2 other
