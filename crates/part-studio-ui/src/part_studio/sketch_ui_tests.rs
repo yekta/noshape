@@ -130,3 +130,58 @@ fn rectangle_value_boxes_take_width_then_height(cx: &mut TestAppContext) {
     keys(cx, window, &["3", "0", "enter", "2", "0", "enter"]);
     assert!(near(&dimensions(cx, &view), &[0.02, 0.03]), "{:?}", dimensions(cx, &view));
 }
+
+/// A press, a drag in `steps` and a release of the tool, viewport pixels.
+fn drag(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, from: (f64, f64), to: (f64, f64), steps: usize) {
+    let p = |t: f64| DVec2::new(from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
+    let mut evs = vec![ViewportEvent::PointerMove { position: p(0.0), modifiers: Modifiers::default() }, ViewportEvent::ToolDown { position: p(0.0), modifiers: Modifiers::default(), click_count: 1 }];
+    evs.extend((1..=steps).map(|k| ViewportEvent::ToolDrag { position: p(k as f64 / steps as f64) }));
+    evs.push(ViewportEvent::ToolUp { position: p(1.0), modifiers: Modifiers::default() });
+    for ev in evs {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ev, w, cx);
+            });
+        })
+        .unwrap();
+        draw(cx, window);
+    }
+}
+
+/// Conflicting dimensions in one part of a sketch don't stop a drag in
+/// another: a point placed beside a line with two different lengths drags
+/// with the pointer.
+#[gpui::test]
+fn a_point_drags_beside_conflicting_dimensions(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "conflict-drag", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Point, w, cx))).unwrap();
+    draw(cx, window);
+    click(cx, window, &view, (800., 300.));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.with_sketch(cx, |_, data| {
+                let line = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+                data.sketch.add_constraint(noshape_sketch::ConstraintKind::Length { curve: line, value: 0.01 }).unwrap();
+                data.sketch.add_constraint_ext(noshape_sketch::ConstraintKind::Length { curve: line, value: 0.02 }, true).unwrap();
+                data.sketch.solve();
+            });
+            v.activate_tool(Tool::Select, w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    let point = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let data = view.read(cx).sketch_data(cx).unwrap();
+            let p = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| e.id).max().unwrap();
+            data.sketch.point(p).unwrap()
+        })
+    };
+    let before = point(cx);
+    drag(cx, window, &view, (800., 300.), (860., 330.), 6);
+    let moved = point(cx) - before;
+    assert!(moved.length() > 1e-4, "the point stayed: {moved:?}");
+}
