@@ -1406,3 +1406,14 @@ void budget_timer_stop(void* timer)
 }
 } // namespace noshape
 #endif
+
+namespace noshape {
+bool bop_parallel()
+{
+  // Serial unless NOSHAPE_BOP_PARALLEL=1 (qa BOOL-THREAD-CRASH: the seed-72
+  // replay died in BOPAlgo_PaveFiller::ForceInterfEF on a pool thread in 1
+  // of 3 runs in parallel, 0 of 3 serial; ~35% slower on that replay).
+  static const bool parallel = std::getenv("NOSHAPE_BOP_PARALLEL") != nullptr;
+  return parallel;
+}
+} // namespace noshape

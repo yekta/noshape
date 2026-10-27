@@ -198,7 +198,7 @@ void fail_if_cancelled()
 
 void apply_opts(BRepAlgoAPI_BuilderAlgo& a, const BoolOpts& o)
 {
-  a.SetRunParallel(o.parallel);
+  a.SetRunParallel(o.parallel && bop_parallel());
   a.SetUseOBB(o.obb);
   if (o.fuzzy > 0)
     a.SetFuzzyValue(o.fuzzy);
@@ -1070,7 +1070,7 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
   one.Append(target);
   sp.SetArguments(one);
   sp.SetTools(planes);
-  sp.SetRunParallel(true);
+  sp.SetRunParallel(bop_parallel());
   sp.SetNonDestructive(true);
   build_with(sp, flag);
   if (sp.HasErrors() || !sp.IsDone() || cancelled(flag))
@@ -1182,7 +1182,7 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
   g.SetArguments(to_list({parts[0]}));
   g.SetTools(to_list(std::vector<TopoDS_Shape>(parts.begin() + 1, parts.end())));
   g.SetGlue(BOPAlgo_GlueShift);
-  g.SetRunParallel(true);
+  g.SetRunParallel(bop_parallel());
   g.SetNonDestructive(true);
   g.SetToFillHistory(true);
   build_cancellable(g);
@@ -1307,7 +1307,7 @@ bool blend_in_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Edge>& 
   one.Append(target);
   sp.SetArguments(one);
   sp.SetTools(planes);
-  sp.SetRunParallel(true);
+  sp.SetRunParallel(bop_parallel());
   sp.SetNonDestructive(true);
   build_with(sp, flag);
   if (sp.HasErrors() || !sp.IsDone() || cancelled(flag))
@@ -1434,7 +1434,7 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
   one.Append(target);
   sp.SetArguments(one);
   sp.SetTools(planes);
-  sp.SetRunParallel(true);
+  sp.SetRunParallel(bop_parallel());
   sp.SetNonDestructive(true);
   build_with(sp, flag);
   if (sp.HasErrors() || !sp.IsDone() || cancelled(flag))
@@ -1810,7 +1810,7 @@ OpOut op_enclose(const OcShapeList& shapes)
   BOPAlgo_MakerVolume mv;
   mv.SetArguments(to_list(shapes.items));
   mv.SetIntersect(true);
-  mv.SetRunParallel(true);
+  mv.SetRunParallel(bop_parallel());
   mv.Perform();
   if (mv.HasErrors())
     fail_op("enclose failed: " + algo_errors(mv));
@@ -1981,7 +1981,7 @@ OpOut op_section(const OcShape& a, const OcShape& b)
   sec.Approximation(true);
   sec.ComputePCurveOn1(true);
   sec.ComputePCurveOn2(true);
-  sec.SetRunParallel(true);
+  sec.SetRunParallel(bop_parallel());
   sec.Build();
   if (sec.HasErrors() || !sec.IsDone())
     fail_op("section failed: " + algo_errors(sec));
@@ -1995,7 +1995,7 @@ std::unique_ptr<OcShape> section_plane(const OcShape& s, const PlaneF& plane)
   require_non_null(s.shape, "shape");
   BRepAlgoAPI_Section sec(s.shape, to_pln(plane), false);
   sec.Approximation(true);
-  sec.SetRunParallel(true);
+  sec.SetRunParallel(bop_parallel());
   sec.Build();
   if (sec.HasErrors() || !sec.IsDone())
     fail_op("plane section failed: " + algo_errors(sec));

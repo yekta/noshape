@@ -567,7 +567,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   BRepAlgoAPI_Splitter sp;
   sp.SetArguments(single(longPrism));
   sp.SetTools(single(until.shape));
-  sp.SetRunParallel(true);
+  sp.SetRunParallel(bop_parallel());
   sp.SetNonDestructive(true);
   sp.Build();
   if (sp.HasErrors())

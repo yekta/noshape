@@ -1772,7 +1772,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     BRepAlgoAPI_Fuse fu;
     fu.SetArguments(first);
     fu.SetTools(rest);
-    fu.SetRunParallel(true);
+    fu.SetRunParallel(bop_parallel());
     fu.Build();
     if (fu.HasErrors() || !fu.IsDone())
       return false;
@@ -1794,7 +1794,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       co.SetArguments(a1);
       co.SetTools(a2);
       // In parallel: a quarter faster on qa's shell matrix (SHELL-SLOW).
-      co.SetRunParallel(true);
+      co.SetRunParallel(bop_parallel());
       co.Build();
     }
     if (co.HasErrors() || !co.IsDone())
@@ -2128,7 +2128,7 @@ OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, c
     BRepAlgoAPI_Cut cu;
     cu.SetArguments(args);
     cu.SetTools(removal);
-    cu.SetRunParallel(true);
+    cu.SetRunParallel(bop_parallel());
     cu.Build();
     if (cu.HasErrors() || !cu.IsDone())
       fail_op("draft fallback: cut failed");
@@ -2142,7 +2142,7 @@ OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, c
     BRepAlgoAPI_Fuse fu;
     fu.SetArguments(args);
     fu.SetTools(addition);
-    fu.SetRunParallel(true);
+    fu.SetRunParallel(bop_parallel());
     fu.Build();
     if (fu.HasErrors() || !fu.IsDone())
       fail_op("draft fallback: fuse failed");
@@ -2370,7 +2370,7 @@ OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, con
     sp_tools.Append(sheet);
     sp.SetArguments(sp_args);
     sp.SetTools(sp_tools);
-    sp.SetRunParallel(true);
+    sp.SetRunParallel(bop_parallel());
     sp.Build();
     if (sp.HasErrors())
       fail_op("draft: split failed");
@@ -2419,7 +2419,7 @@ OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, con
     BRepAlgoAPI_Cut cu;
     cu.SetArguments(args);
     cu.SetTools(removal);
-    cu.SetRunParallel(true);
+    cu.SetRunParallel(bop_parallel());
     cu.Build();
     if (cu.HasErrors() || !cu.IsDone())
       fail_op("draft: cut failed");
@@ -2433,7 +2433,7 @@ OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, con
     BRepAlgoAPI_Fuse fu;
     fu.SetArguments(args);
     fu.SetTools(addition);
-    fu.SetRunParallel(true);
+    fu.SetRunParallel(bop_parallel());
     fu.Build();
     if (fu.HasErrors() || !fu.IsDone())
       fail_op("draft: fuse failed");

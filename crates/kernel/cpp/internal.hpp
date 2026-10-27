@@ -77,6 +77,10 @@ enum Relation : uint8_t
 // Writes an op's input for a kernel test when NOSHAPE_DUMP_OPS is set (common.cpp).
 void dump_op(const char* name, const TopoDS_Shape& s, const std::vector<TopoDS_Shape>& subs, const std::string& params);
 
+// Whether OCCT's booleans may run in parallel: only with NOSHAPE_BOP_PARALLEL=1
+// (qa BOOL-THREAD-CRASH, common.cpp).
+bool bop_parallel();
+
 class HistoryBuilder
 {
 public:

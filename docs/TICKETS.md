@@ -36,6 +36,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Three runs of one sequence, three different crash points: frequent enough to hit in a session.
   The v0.4.8 release CLI runs the same seed to the end (106 steps, no crash; some op results differ there, so this only
   hints at a regression since v0.4.8).
+  core 10-27: b0e757f3 stops one data race (in-place pcurves written into the caller's profile edges by the cylinder
+  re-framing); the seed-72 replay with it: 2 of 3 runs complete all 106 steps, the 3rd still died at step 81 in
+  `BOPAlgo_PaveFiller::ForceInterfEF` on a pool thread (BOPAlgo_PaveFiller_5.cxx, also changed by OCCT patch 0001, after
+  v0.4.8). Serial (every OCCT boolean's RunParallel off): 3 of 3 runs complete. So OCCT booleans now run serial
+  by default (NOSHAPE_BOP_PARALLEL=1 for the parallel mode; the seed-72 replay is ~35% slower). Left: the race itself
+  (patch 0001's EF/VF changes or OCCT), and OSD_Parallel::For loops that run several booleans at once (cut_slabs,
+  fuse_slabs, fuse_trimmed) still do.
 - [ ] P0 COMMIT-LATENCY edit commit on tests/perf/live-30-features.noshape is over budget on main (perf.yml run
   40421862773, abac9266, 10-27): "commit shown in" 315–378 ms (macOS 14) and 241–635 ms (macOS 15), budget ≤ 200 ms
   (PLAN 2.6; perf measured 174 / 149 ms on 10-26 before the later landings). The time is the model: regen[preview]
