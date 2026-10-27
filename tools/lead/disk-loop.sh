@@ -28,7 +28,7 @@ while true; do
   find /root/.debug -mindepth 1 -maxdepth 3 -mmin +120 -exec rm -rf {} + 2>/dev/null
   # Incremental caches (on again since 10-26 20:00): drop per-crate caches untouched for 90 min, and keep each target
   # dir's under 10 GB (oldest first).
-  find /root/target-*/debug/incremental -mindepth 1 -maxdepth 1 -type d -mmin +90 -exec rm -rf {} + 2>/dev/null
+  find /root/target-*/debug/incremental -mindepth 1 -maxdepth 1 -type d -mmin +30 -exec rm -rf {} + 2>/dev/null
   for d in /root/target-*/debug/incremental; do
     while [ "$(du -s $d 2>/dev/null | cut -f1)" -gt 10000000 ]; do o=$(ls -tr $d | head -1); [ -z "$o" ] && break; rm -rf "$d/$o"; done
   done

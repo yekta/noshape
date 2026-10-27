@@ -24,6 +24,12 @@ check() {
     cargo metadata --format-version 1 --no-deps 2>/dev/null | python3 -c 'import json,sys; print("\n".join(p["name"] for p in json.load(sys.stdin)["packages"]))' | while read -r p; do cargo clean -q -p "$p" 2>/dev/null; done
     o=$(nice -n -5 tools/tiers/t1.sh --no-fail-fast 2>&1); rc=$?
   fi
+  # A segfault inside a GPU test binary (lavapipe/libvulkan, intermittent: ticket GPU-TEST-SEGV) is retried once;
+  # a real failure fails twice.
+  if [ $rc -ne 0 ] && echo "$o" | grep -qE "noshape-(render|ops|scene) --test all|SIGSEGV" && ! echo "$o" | grep -qE "^test .* FAILED|panicked at"; then
+    log "  T1 retry (GPU test segfault)"; echo "$(date -u '+%F %T') GPU-TEST-SEGV $(git rev-parse --short HEAD)" >> /tmp/lead/flaky.log
+    o=$(nice -n -5 tools/tiers/t1.sh --no-fail-fast 2>&1); rc=$?
+  fi
   log "  T1 $((SECONDS-t0)) s"; t0=$SECONDS
   [ $rc -ne 0 ] && { echo "T1:"; echo "$o" | fails; [ -z "$(echo "$o" | fails)" ] && echo "$o" | tail -5; }
   # Build-script output ("warning: <crate>@<ver>: ..." from OCCT headers) isn't a lint; clippy's own errors are.

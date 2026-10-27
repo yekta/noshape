@@ -357,6 +357,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P1 GPU-TEST-SEGV (lead 2026-10-27) GPU test binaries crash now and then with SIGSEGV inside libvulkan (lavapipe) on
+  this machine: ops `--test all` (hidden_edges, per core) at 09:31 and render `--test all` (offscreen) at 12:13; the next
+  run passes. The watcher retries T1 once on it (/tmp/lead/flaky.log counts them). Find the cause (Renderer/Instance
+  creation per test vs one shared device, lavapipe thread-safety, a missing device wait before drop) and fix it so a
+  GPU test never crashes the process.
 - [x] P3 OK-DISABLED-HOVER a disabled ✓ lights up on hover: new Extrude with nothing picked, ✓ is the disabled pale green
   #CCE9CC, but with the pointer on it it turns the enabled #74CE3A (and stays inert), so it looks clickable
   (tickets/empty-commit-disabled{,-hover}-0a25.png). Live's ✓ is `button-ok disabled` and a disabled button has no hover
