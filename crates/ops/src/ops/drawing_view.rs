@@ -64,7 +64,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "view_edit",
             summary: "Rotate, order, align, move to sheet or copy a view; remove its crop, breaks or broken-out sections",
-            description: "The view menu's actions, one edit each:\n- `rotate`: `by` degrees counter-clockwise (Rotate ▸ 90° counter-clockwise = 90, clockwise = -90, 180°) or `to` an absolute angle (Custom angle…; 0 = Reset rotation). \"Rotate view\".\n- `rotate_to_edge`: Rotate view ▸ Vertical to… / Horizontal to… (`direction`): turn by the smallest angle so the straight edge of the view at `edge` (sheet mm) is vertical / horizontal; views without a parent or children.\n- `order`: Order ▸ Bring to front / Send to back (`to`: front | back).\n- `align`: Align views ▸ Vertically / Horizontally (`direction`): the view's center lines up with view `with`'s.\n- `suppress_alignment`: (Un)suppress alignment with parent (`on`, default true); projected, auxiliary and section views; a rotated view can't be re-aligned.\n- `flip_direction`: section views: Flip direction (the view looks the other way across the cutting line).\n- `cutting_line_angle`: section views with a two-point cutting line: Cutting line angle… `to` degrees (the line turned about its middle, its length kept). \"Cutting line angle\".\n- `remove_crop`, `remove_breaks` (Remove all breaks), `remove_broken_out` (Remove section, broken-out section `index`); a removed crop or broken-out section leaves its boundary on the sheet as a sketch circle, polygon or spline (live).\n- `move_to_sheet`: Move to sheet… `to_sheet` (number or name; omitted: a new sheet); the view moves alone, linked to its parent.\n- `unpin_reference`: Unpin view reference (every view of the same source and part shows the workspace again).\n- `copy`: Copy then Paste: the view with its derived views, annotations and tables, pasted centered `at` (sheet mm) on sheet `to_sheet` (default this one); \"Paste views\"; the reply's `pasted` lists the new view ids.",
+            description: "The view menu's actions, one edit each:\n- `rotate`: `by` degrees counter-clockwise (Rotate ▸ 90° counter-clockwise = 90, clockwise = -90, 180°) or `to` an absolute angle (Custom angle…; 0 = Reset rotation). \"Rotate view\". Views without children and not aligned with a parent (none, a detail view's, or its alignment suppressed), as the rotation angle.\n- `rotate_to_edge`: Rotate view ▸ Vertical to… / Horizontal to… (`direction`): turn by the smallest angle so the straight edge of the view at `edge` (sheet mm) is vertical / horizontal; the same views.\n- `order`: Order ▸ Bring to front / Send to back (`to`: front | back).\n- `align`: Align views ▸ Vertically / Horizontally (`direction`): the view's center lines up with view `with`'s.\n- `suppress_alignment`: (Un)suppress alignment with parent (`on`, default true); projected, auxiliary and section views; a rotated view can't be re-aligned.\n- `flip_direction`: section views: Flip direction (the view looks the other way across the cutting line).\n- `cutting_line_angle`: section views with a two-point cutting line: Cutting line angle… `to` degrees (the line turned about its middle, its length kept). \"Cutting line angle\".\n- `remove_crop`, `remove_breaks` (Remove all breaks), `remove_broken_out` (Remove section, broken-out section `index`); a removed crop or broken-out section leaves its boundary on the sheet as a sketch circle, polygon or spline (live).\n- `move_to_sheet`: Move to sheet… `to_sheet` (number or name; omitted: a new sheet); the view moves alone, linked to its parent.\n- `unpin_reference`: Unpin view reference (every view of the same source and part shows the workspace again).\n- `copy`: Copy then Paste: the view with its derived views, annotations and tables, pasted centered `at` (sheet mm) on sheet `to_sheet` (default this one); \"Paste views\"; the reply's `pasted` lists the new view ids.",
             fields: with(
                 common(),
                 vec![
@@ -159,8 +159,7 @@ fn od<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<&'a mut OpenDoc, OpError> {
 
 /// A view without a parent (on this sheet) or children: it can turn.
 fn free(t: &Target, id: ViewId) -> bool {
-    let sheet = &t.d.sheets[t.sheet];
-    sheet.parent_of(id).is_none_or(|p| p.is_ghost()) && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id))
+    t.d.sheets[t.sheet].turns_freely(id)
 }
 
 /// A sheet given as in `sheet`: a number (1 = first) or a name.
@@ -265,6 +264,9 @@ fn view_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let v = view_of(&t, id);
     let desc: &str = match action {
         "rotate" => {
+            if !free(&t, id) {
+                return Err(OpError::param("view", "views aligned with a parent, or with children, can't turn"));
+            }
             let deg = std::f64::consts::PI / 180.0;
             match (a.opt_f64("by")?, a.get("to")) {
                 (Some(by), None) => edit_view(&mut t, id, |v| v.rotation += by * deg),
@@ -279,7 +281,7 @@ fn view_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         "rotate_to_edge" => {
             let vertical = direction(a)?;
             if !free(&t, id) {
-                return Err(OpError::param("view", "views with a parent or children can't turn"));
+                return Err(OpError::param("view", "views aligned with a parent, or with children, can't turn"));
             }
             let p = pt_arg(a, "edge")?;
             let (pa, pb, _) = edge_at(&t, &Tool::Select, p, 0).map_err(|_| OpError::param("edge", "Select a straight edge of the view"))?;

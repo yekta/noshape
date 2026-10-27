@@ -3096,6 +3096,13 @@ fn drawing_view_menu_edits() {
     call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": child, "action": "suppress_alignment" }));
     assert_eq!(last(&mut ctx, 1), ["Suppress alignment with parent"]);
     assert_eq!(view(&mut ctx, &child)["unaligned"], true);
+    // Not aligned with its parent any more, it turns on its own (live: Rotate
+    // view on views not aligned to a parent); a view with children doesn't.
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": child, "action": "rotate", "by": 15 }));
+    assert!((num(&view(&mut ctx, &child)["rotation"]) - 15.0).abs() < 1e-9);
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": child, "action": "rotate", "to": 0 }));
+    let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": base, "action": "rotate", "by": 15 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": base, "action": "suppress_alignment" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": base, "action": "remove_crop" })).unwrap_err();
@@ -3114,7 +3121,7 @@ fn drawing_view_menu_edits() {
     assert_eq!(fv["tangent_edges"], "hidden", "{fv}");
     let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": free, "set": { "bogus": 1 } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set.bogus"), "{e:?}");
-    let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": child, "set": { "rotation": 45 } })).unwrap_err();
+    let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": base, "set": { "rotation": 45 } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set.rotation"), "{e:?}");
 
     // Show/hide parts and edges (an edge hidden, then shown again).

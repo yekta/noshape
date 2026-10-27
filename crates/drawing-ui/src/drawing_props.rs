@@ -318,14 +318,11 @@ impl DrawingEditor {
             ],
         ));
         // Rotate view vertically / horizontally: pick a straight edge (views
-        // without a parent or children, like the rotation angle).
-        // A view linked to a parent on another sheet doesn't align with it (live x (4)).
-        // Detail views aren't aligned with their parent: live asb 10-23
-        // views (1) lists Rotate view on them.
-        let free = (matches!(v.kind, ViewKind::Detail { .. }) || sheet.parent_of(id).is_none_or(|p| p.is_ghost())) && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id));
-        // Live (behaviours "Replicate annotations with real annotations" (5)):
-        // a "Rotate view" submenu "Vertical to… | Horizontal to…".
-        if free {
+        // that turn on their own; live: also a child whose alignment is
+        // suppressed). Live (behaviours "Replicate annotations with real
+        // annotations" (5)): a "Rotate view" submenu "Vertical to… |
+        // Horizontal to…".
+        if sheet.turns_freely(id) {
             out.push(MenuEntry::Submenu(
                 "Rotate view".into(),
                 vec![
@@ -458,8 +455,26 @@ impl DrawingEditor {
 
     fn start_rotate_to_edge(&mut self, id: ViewId, vertical: bool, cx: &mut Context<Self>) {
         self.rotate_to_edge = Some((id, vertical));
-        self.status = Some("Select a straight edge to rotate the view to".into());
         cx.notify();
+    }
+
+    /// Rotate view › Vertical to… / Horizontal to… while picking (live
+    /// drawing/670): a faint magenta guide through the pointer across the
+    /// canvas (vertical or horizontal) and a red ✕ at the pointer.
+    pub fn render_rotate_guide(&self) -> Option<AnyElement> {
+        let (_, vertical) = self.rotate_to_edge?;
+        let p = self.sheet_to_local(self.cursor);
+        let (x, y) = (p[0] as f32, p[1] as f32);
+        let guide = gpui_kit::rgba(0xff00ff1f);
+        let line = if vertical { div().absolute().top_0().bottom_0().left(px(x)).w(px(1.)) } else { div().absolute().left_0().right_0().top(px(y)).h(px(1.)) };
+        Some(
+            div()
+                .absolute()
+                .size_full()
+                .child(line.bg(guide))
+                .child(div().absolute().left(px(x - 6.)).top(px(y - 8.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xff3f3f)).child("✕"))
+                .into_any_element(),
+        )
     }
 
     /// Click while rotating a view to an edge: the view turns (by the

@@ -4514,8 +4514,8 @@ Examples:
 Rotate, order, align, move to sheet or copy a view; remove its crop, breaks or broken-out sections (edits the document (one undoable history entry)).
 
 The view menu's actions, one edit each:
-- `rotate`: `by` degrees counter-clockwise (Rotate ▸ 90° counter-clockwise = 90, clockwise = -90, 180°) or `to` an absolute angle (Custom angle…; 0 = Reset rotation). "Rotate view".
-- `rotate_to_edge`: Rotate view ▸ Vertical to… / Horizontal to… (`direction`): turn by the smallest angle so the straight edge of the view at `edge` (sheet mm) is vertical / horizontal; views without a parent or children.
+- `rotate`: `by` degrees counter-clockwise (Rotate ▸ 90° counter-clockwise = 90, clockwise = -90, 180°) or `to` an absolute angle (Custom angle…; 0 = Reset rotation). "Rotate view". Views without children and not aligned with a parent (none, a detail view's, or its alignment suppressed), as the rotation angle.
+- `rotate_to_edge`: Rotate view ▸ Vertical to… / Horizontal to… (`direction`): turn by the smallest angle so the straight edge of the view at `edge` (sheet mm) is vertical / horizontal; the same views.
 - `order`: Order ▸ Bring to front / Send to back (`to`: front | back).
 - `align`: Align views ▸ Vertically / Horizontally (`direction`): the view's center lines up with view `with`'s.
 - `suppress_alignment`: (Un)suppress alignment with parent (`on`, default true); projected, auxiliary and section views; a rotated view can't be re-aligned.

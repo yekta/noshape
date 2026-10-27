@@ -2335,6 +2335,17 @@ impl Sheet {
         }
     }
 
+    /// A view that turns on its own (Rotate view ▸, the API's rotations): no
+    /// children, and no parent it is aligned with (none, one on another
+    /// sheet, a detail view's, or the alignment suppressed). Live: Rotate
+    /// view on views not aligned to a parent (pasted copies, the Iso view),
+    /// not on the Top / Front / Right views.
+    pub fn turns_freely(&self, id: ViewId) -> bool {
+        let Some(v) = self.view(id) else { return false };
+        let aligned = self.parent_of(id).is_some_and(|p| !p.is_ghost()) && !v.unaligned && !matches!(v.kind, ViewKind::Detail { .. });
+        !aligned && !self.views.iter().any(|x| self.parent_of(x.id) == Some(id))
+    }
+
     /// `id` and all views derived from it (children, grandchildren...).
     pub fn descendants(&self, id: ViewId) -> Vec<ViewId> {
         let mut out = vec![id];
