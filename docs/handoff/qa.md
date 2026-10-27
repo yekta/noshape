@@ -145,6 +145,15 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
+## Green 502416cc (2026-10-27 04:53–05:22)
+- Verified: FILLET-HANG (the hang doc opens in 47 s; residual 30 s stall per failing blend), EXPORT-MESH-SHARED,
+  DEPTH-RANGE (pink only after blur, live also while focused), CHIP-HOVER.
+- New: REGEN-NO-CANCEL (P0 psui: a newer regen waits for the stale one), CRASH-MARKER-COPIES (P2 dx), API-REMOVE-DIR
+  raised to P1 (breaks scripted cuts; featmatrix fallout), DRAFT-HANG second occurrence.
+- Checked = live: Line-angle plane normals (30° / 120° exactly live's), transform ×5, split, mid plane, UI mirror,
+  mass properties panel (no material: CoM blank + toast), delete a used sketch (dependent red, undo restores), inline
+  rename, new document from the Documents window → sketch (R) → extrude → fillet (volume exact), UI fuzz 2×700 clean.
+
 ## Green bcf401ca (2026-10-27 04:10–04:40)
 - Verified: OPEN-ERROR-SILENT (my 16cdcf6d reopen was wrong: that build lacked 3dfa5710), SKETCH-PASTE, PERF-SECTION-PANIC,
   MENU-SKETCH-TAG, crash documents in the app, TWO-PROCESS-LOST-EDIT, API-REMOVE-SCOPE, USER_GUIDE; P1-16 / P1-6 shell on the
