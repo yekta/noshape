@@ -12,6 +12,12 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (569dabca19a397e932f2db54) in noshape mm test.
 
 ## Landed on main
+- 10-27 07:xx: sketch tools as live's REST spec (behaviours "spec: skasm sketch tools"): center point rectangle =
+  construction centre point, `ConstraintKind::MidpointOf` of both diagonals (no diagonal line); 3 point circle's 3
+  construction points; ellipse Horizontal / Vertical from the major-axis click; corner rectangle Horizontal /
+  Perpendicular by click order; midpoint line from the clicked end. Slot, Dimension-tool and BOM specs already matched.
+- 10-27 06:xx: assembly sweep, configured-assembly, exploded / named positions and parity/assembly G5, LA43, C25, A6,
+  LA14 all rechecked in the GUI; NP2 header 3 px; empty relation dialog's title error; Select default plane popup.
 - 10-27 06:00: assembly Section view "Select default plane" popup (Top / Front / Right, Flip plane, ✓ ✕), as
   the Part Studio's; f08016a2 a pending pattern row's badge repeats the dialog title's error.
 - cdde1c06 F19 Width mate in any pick order + DOF cache across evaluations, per-group DOF length scale.
@@ -42,7 +48,7 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (none: the branch equals main)
 
 ## Next, in order
-Sketch P1: no open items (parity/sketch.md all ✅; workflow-sketch-tools.md rechecked 10-27). Assembly P2:
+Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs done). Assembly P2:
 1. docs/parity/workflow-assembly-sweep.md: all rows ✅ 10-27 (34 left UNCONFIRMED: the 2° snap window). Filed
    PS-SECTION-RED for psui (Part Studio caps red where parts overlap; live only in the assembly). GUI docs:
    /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins), asm2 (a pin through the plate), ps2 (Part Studio overlap).

@@ -74,17 +74,17 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 4.2 | Line: press-drag-release makes a single segment | H:line | ✅ |
 | 4.3 | Line: clicking an existing point closes / ends the chain | B§2.4.1 | ✅ |
 | 4.4 | Line: moving back onto the chain end switches to a tangent arc; after the arc the tool reverts to Line | H:line | ✅ (T:sm) |
-| 4.5 | Midpoint line: click the midpoint, then an end; midpoint constraint | H:midpoint_line | ✅ |
-| 4.6 | Corner rectangle: click corner, click diagonal corner, or drag | H:corner_rectangle | ✅ |
-| 4.7 | Center point rectangle: click center, click corner, or drag; construction diagonal with midpoint at the center | H:center_point_rectangle | ✅ |
+| 4.5 | Midpoint line: click the midpoint, then an end; midpoint constraint | H:midpoint_line | ✅ (live spec 10-27: a normal point at the midpoint, the line from the clicked end; skasm 10-27) |
+| 4.6 | Corner rectangle: click corner, click diagonal corner, or drag | H:corner_rectangle | ✅ (live spec 10-27: Horizontal on the edge at the 2nd click's y, Perpendicular with the edge at the 1st click's x, 2 Parallel; sketch test `corner_rectangle_constraints_follow_the_click_order`) |
+| 4.7 | Center point rectangle: click center, click corner, or drag; a construction point at the center, Midpoint of both diagonals (live spec 10-27: no diagonal lines, the Help's "construction diagonal" isn't stored) | H:center_point_rectangle, live spec-tools | ✅ (skasm 10-27: `MidpointOf` point-to-point midpoints; scene test `center_rectangle_and_three_point_circle_as_live`) |
 | 4.8 | Aligned rectangle: two clicks for the first side, third click for the width | H:aligned_rectangle | ✅ (T:sm) |
 | 4.9 | Center point circle: click center, click rim, or drag | H:center_point_circle | ✅ |
-| 4.10 | 3 point circle: three clicks, or drag 1→2 then click 3 | H:3_point_circle | ✅ (T:sm) |
+| 4.10 | 3 point circle: three clicks, or drag 1→2 then click 3; a construction point Coincident with the circle at each click (live spec 10-27) | H:3_point_circle | ✅ (T:sm; points skasm 10-27) |
 | 4.11 | 3 point arc: start, end, then the bulge point; drag start→end then click | H:3_point_arc | ✅ |
 | 4.12 | 3 point arc: snaps to an exact semicircle when the center reaches the chord | H:3_point_arc | ✅ |
 | 4.13 | Tangent arc tool: start at a curve end, click the end; tangent constraint | H:arc_tangent | ✅ (T:sm) |
 | 4.14 | Center point arc: center, start (radius), end; the sweep follows the cursor's direction | H:center_point_arc | ✅ (T:sm) |
-| 4.15 | Ellipse: center, primary axis, secondary radius | H:ellipse | ✅ (T:sm) |
+| 4.15 | Ellipse: center, primary axis, secondary radius; a horizontal / vertical major-axis click makes it Horizontal / Vertical (live spec 10-27 "majorAxisSnap0") | H:ellipse | ✅ (T:sm; snap skasm 10-27) |
 | 4.16 | Elliptical arc: center, primary axis, secondary radius + start, end on the construction ellipse | H:elliptical_arc | ✅ (T:sm) |
 | 4.17 | Elliptical arc start/end snap to the axis / quadrant points | H:elliptical_arc | ✅ (axis / quadrant snaps on the construction ellipse) |
 | 4.18 | Conic: start, end, control point; rho value | H:conic | ✅ (T:ux, T:sm; GUI :103 rho field auto-focus and 0.7 Enter verified; /tmp/skb/2026-10-18/conic-rho*.png) |
