@@ -712,8 +712,11 @@ impl<'a, L: Lookup> Builder<'a, L> {
             (EntityKind::Line, EntityKind::Line) => self.collinear(p, q),
             (x, y) if x.is_circular() && y.is_circular() => {
                 let (c1, c2) = (self.center(p)?, self.center(q)?);
-                self.lin(Lin::new().p(1.0, c1[0]).p(-1.0, c2[0]));
-                self.lin(Lin::new().p(1.0, c1[1]).p(-1.0, c2[1]));
+                // Pieces of one trimmed circle share their centre already.
+                if c1 != c2 {
+                    self.lin(Lin::new().p(1.0, c1[0]).p(-1.0, c2[0]));
+                    self.lin(Lin::new().p(1.0, c1[1]).p(-1.0, c2[1]));
+                }
                 let (r1, r2) = (self.radius(p)?, self.radius(q)?);
                 self.lin(Lin::new().rad(1.0, &r1).rad(-1.0, &r2));
                 Ok(())

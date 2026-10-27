@@ -32,6 +32,21 @@ fn trim_line_end_and_middle() {
     assert!((a.end_point() - v(3.0, 0.0)).length() < 1e-9);
     let rep = sk2.solve();
     assert!(rep.is_solved(), "{rep:?}");
+    // Live: the pieces are Coincident curve to curve.
+    let piece = r.created.iter().copied().find(|e| sk2.kind(*e) == Some(EntityKind::Line)).unwrap();
+    assert!(sk2.constraints().any(|c| c.kind == ConstraintKind::Coincident { a: h2, b: piece }));
+    // an arc trimmed in its middle: Coincident pieces on one centre, nothing redundant
+    let mut sk4 = Sketch::new();
+    let arc = sk4.add_arc(v(0.0, 0.0), v(5.0, 0.0), v(-5.0, 0.0));
+    sk4.add_line(v(2.0, 0.0), v(2.0, 6.0));
+    sk4.add_line(v(-2.0, 0.0), v(-2.0, 6.0));
+    let before = sk4.solve().dof;
+    let r = sk4.trim(arc, v(0.0, 5.0)).unwrap();
+    let piece = r.created.iter().copied().find(|e| sk4.kind(*e) == Some(EntityKind::Arc)).unwrap();
+    assert!(sk4.constraints().any(|c| c.kind == ConstraintKind::Coincident { a: arc, b: piece }));
+    let rep = sk4.solve();
+    assert!(rep.is_solved(), "{rep:?}");
+    assert_eq!(rep.dof, before, "the pieces keep the arc's freedom");
     // the endpoints stay on the cutting lines when those move
     let mut sk3 = sk.clone();
     let (s, _) = sk3.endpoints(v1).unwrap();

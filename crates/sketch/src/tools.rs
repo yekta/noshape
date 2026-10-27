@@ -239,10 +239,12 @@ impl Sketch {
         Ok(nid)
     }
 
+    /// Live (behaviours "skb (10-25) sketch trim constraints"): the two
+    /// pieces of a curve trimmed in its middle are Coincident curve to curve.
     fn relate_pieces(&mut self, a: EntityId, b: EntityId, res: &mut EditResult) {
         match self.kind(a) {
-            Some(EntityKind::Line) => self.add_c(res, ConstraintKind::Collinear { a, b }),
-            Some(EntityKind::Arc) | Some(EntityKind::EllipticalArc) => self.add_c(res, ConstraintKind::Equal { a, b }),
+            Some(EntityKind::Line) | Some(EntityKind::Arc) => self.add_c(res, ConstraintKind::Coincident { a, b }),
+            Some(EntityKind::EllipticalArc) => self.add_c(res, ConstraintKind::Equal { a, b }),
             _ => {}
         }
     }
