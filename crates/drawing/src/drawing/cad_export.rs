@@ -59,12 +59,27 @@ pub const DEFAULT_DWG: usize = 3;
 
 /// Onshape's line types (live AC1032 LTYPE table; inches, scaled to the
 /// file's units).
-const LINE_TYPES: [(&str, &str, &[f64]); 4] = [
+const LINE_TYPES: [(&str, &str, &[f64]); 5] = [
     ("DASHED", "Dashed line __ __ __ __ __", &[0.5, -0.25]),
     ("ONS_PHANTOM", "Onshape Phantom line ______ __ __ ______", &[0.25, -0.05, 0.05, -0.05, 0.05, -0.05]),
     ("CENTER", "Center line ____ _ ____ _ ____ _", &[0.45, -0.09, 0.09, -0.09]),
     ("HIDDEN", "Hidden line ____ ____ ____ ____", &[0.1, -0.05]),
+    // Live dx-linestyles.dxf (Adjust linestyle › Dotted).
+    ("DOTTED", "Dotted . . . . . . . . . .", &[0.0, -0.25]),
 ];
+
+/// An Adjust linestyle edge's line type (live dx-linestyles.dxf: the LINE
+/// keeps its LTYPE name, Dashes as its linetype scale, group 48, and the
+/// thickness as its lineweight): name, scale and thickness (mm).
+fn adjusted_line_type(g: &SheetGeometry, li: usize) -> Option<(&'static str, f64, f64)> {
+    use super::LinePattern as P;
+    let pen = g.pens.iter().rev().find(|s| s.lines.contains(&li)).filter(|p| p.centered && !p.dashes.is_empty())?;
+    [(P::Dashed, "DASHED"), (P::Phantom, "ONS_PHANTOM"), (P::Center, "CENTER"), (P::Dotted, "DOTTED")].into_iter().find_map(|(pat, name)| {
+        let base = pat.dashes(1.0);
+        let k = pen.dashes.iter().sum::<f64>() / base.iter().sum::<f64>();
+        (base.len() == pen.dashes.len() && base.iter().zip(&pen.dashes).all(|(b, d)| (b * k - d).abs() < 1e-6)).then_some((name, k, pen.width_mm))
+    })
+}
 
 /// The layer table's order (live drw2-k-dxf2018, asbu-aux: 0, Defpoints,
 /// then these as used; the sheet-metal and virtual sharp layers, absent
@@ -412,12 +427,16 @@ fn document_tables(pages: &[&SheetGeometry], insunits: u8, version: DxfVersion) 
     let k = units_per_mm(insunits);
     let mut doc = CadDocument::with_version(version);
     doc.header.insertion_units = insunits as i16;
+    // Live (dx-linestyles.dxf): $LTSCALE 0.5 (its inch patterns at half size:
+    // DASHED 0.5 in draws 6.35 mm dashes, as its PDF).
+    doc.header.linetype_scale = 0.5;
     for (name, description, pattern) in LINE_TYPES {
         let mut lt = LineType::new(name);
         lt.description = description.to_string();
         let to_units = |inch: f64| inch * 25.4 * k;
         for &p in pattern {
-            lt.add_element(if p > 0.0 { LineTypeElement::dash(to_units(p)) } else { LineTypeElement::space(to_units(-p)) });
+            // 0 is a dot (DOTTED).
+            lt.add_element(if p >= 0.0 { LineTypeElement::dash(to_units(p)) } else { LineTypeElement::space(to_units(-p)) });
         }
         lt.pattern_length = pattern.iter().map(|p| to_units(p.abs())).sum();
         let _ = doc.line_types.add(lt);
@@ -676,6 +695,11 @@ impl Sheet<'_> {
         (common.layer, common.color) = (layer, c);
         if dim {
             common.line_weight = LineWeight::Value(13);
+        }
+        if let Some((name, scale, width)) = adjusted_line_type(self.g, li) {
+            common.linetype = name.to_string();
+            common.linetype_scale = scale;
+            common.line_weight = LineWeight::Value((width * 100.0).round() as i16);
         }
         put(doc, e, owner).map(|_| ())
     }
@@ -1305,6 +1329,23 @@ mod tests {
     use super::*;
     use crate::drawing::sheet::LineStyle;
     use crate::drawing::{DimOrientation, Sheet};
+
+    /// Adjust linestyle edges as live writes them (dx-linestyles.dxf): the
+    /// LINE with its LTYPE, Dashes as the entity's linetype scale, the
+    /// thickness as lineweight; $LTSCALE 0.5.
+    #[test]
+    fn adjusted_linestyle_edges_keep_their_line_type() {
+        let mut g = sample();
+        let i = g.lines.len();
+        g.line([10.0, 10.0], [50.0, 10.0], LineStyle::Visible);
+        g.pens.push(crate::drawing::sheet::PenSpan { centered: true, lines: i..i + 1, width_mm: 0.35, dashes: crate::drawing::LinePattern::Dashed.dashes(2.0) });
+        let doc = cad_document(&g, 4, DxfVersion::AC1032).unwrap();
+        assert!((doc.header.linetype_scale - 0.5).abs() < 1e-12);
+        let dashed: Vec<_> = doc.entities().filter(|e| e.common().linetype == "DASHED").collect();
+        assert_eq!(dashed.len(), 1);
+        assert!((dashed[0].common().linetype_scale - 2.0).abs() < 1e-9);
+        assert!(matches!(dashed[0].common().line_weight, LineWeight::Value(35)));
+    }
 
     fn sample() -> SheetGeometry {
         let sheet = Sheet::default();
