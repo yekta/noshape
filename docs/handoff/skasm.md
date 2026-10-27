@@ -33,27 +33,32 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
   the shape; API polygon descriptions.
 
 ## WIP on agent/skasm
-- `WIP skasm (app, after the app split)`: crates/app/src/part_studio/sketch.rs: the constraint shortcut shows the
-  unsolvable toast at once (now it shows with the next editor action), dimension menu without "Tolerance and
-  precision…" (parity 8.7d 🔧 until then). Land after the lead's app split (rebase, re-find the file).
+(none: the branch equals main)
 
 ## Next, in order
-1. (Landed 10-27: the app part, toast at once, no Tolerance item.) Polygon commit: live also shows a pattern count label with its glyph (behaviours 160); ours has none. (LIMIT-PLACEHOLDER
-   of 10-27 was a false alarm: the limit fields select all on focus; my test's Tab had focused the field and the
-   click then placed the caret, as a browser does.) The drag bench is on main (psui c7f26470).
-2. (done 8016ded6) Polygon commit's boxed Ø readout.
-3. Sketch regen per drag step ~11 ms on 1000 entities (dev): eval 6.3 ms (solve 2.1, regions 3.2, wires 0.6), the rest
-   regen/display overhead. Inside the frame; a release build has more headroom.
-4. GUI-verify the rest of docs/parity/workflow-assembly-sweep.md's 🔧 rows (1–5, 7, 8, 10, 12–18, 25 ✅ 10-27).
-5. Which part moves when neither is fixed in an exact flip: live's rule is open (behaviours R3 note); ours moves the
-   first connector's part (as live in 10 of 14 runs).
-6. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
+Sketch P1: no open items (parity/sketch.md all ✅; workflow-sketch-tools.md rechecked 10-27). Assembly P2:
+1. docs/parity/workflow-assembly-sweep.md still 🔧: 9 / 29 (secondary axis ∥ primary, MC dialog), 11 (Replicate,
+   nothing matches), 19 second half ("Missing mate to be matched."), 28 badges' tooltips, 34 (assembly section view
+   manipulator, big). GUI on /root/green/noshape with /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins, made by
+   /root/skasm-scratch/qa/asm1.py over MCP).
+2. docs/parity/assembly.md G5 exploded views (⏳): verify against live 800–826 (workflow-exploded-named-positions.md
+   rows 2–15 are from an old pass; recheck them).
+3. workflow-mates.md / workflow-assembly.md / workflow-configured-assembly.md: old passes; recheck their ✗ rows on green
+   (several are fixed in code, e.g. MT3–MT6).
+4. Which part moves when neither is fixed in an exact flip (live's rule open, behaviours R3 note); ours moves the first
+   connector's part (as live in 10 of 14 runs).
+5. Slot: live shows all 3 offset glyphs at the end cap; after the commit live's centre line is plain dark blue (ours
+   stayed highlighted once, not reproduced).
+6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
+   isn't back within 300 ticks); fine on CI runners presumably.
+7. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
    noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture` (clean 10-27).
-7. End-of-day walk, daily (~04:00 UTC). 10-27 02:40 on green 19555ca3: line chain + dimension, polygon, V on H toast,
-   mate dialog (types, limits, errors), Revolute + drag (only the dragged instance moves): no regressions.
-   10-27 04:00 on green 8165fca6: paste (copy at the pointer, selected, Transform triad on it): as live. Note: the sketch
-   options (Show constraints / expressions / errors) persist in ~/.config/noshape/sketch-options.json, so "Show
-   expressions" can start ticked on this box (another session saved it); not a bug.
+8. End-of-day walk, daily (~04:00 UTC): see below.
+
+Walks: 10-27 02:40 on green 19555ca3: line chain + dimension, polygon, V on H toast, mate dialog (types, limits,
+errors), Revolute + drag (only the dragged instance moves): no regressions. 04:00 on green 8165fca6: paste (copy at the
+pointer, selected, Transform triad on it). Sketch options (Show constraints / expressions / errors) persist in
+~/.config/noshape/sketch-options.json, so "Show expressions" can start ticked on this box; not a bug.
 
 Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_perf:: -- --ignored --nocapture`):
 200 pins / 300 mates: evaluation again 6.5 ms, adding a mate 16.5 ms, inserting a pin 7.8 ms (was ~50), drag steps
