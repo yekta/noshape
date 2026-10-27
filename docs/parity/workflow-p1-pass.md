@@ -16,19 +16,19 @@ then edits, undo/redo, rollback and suppress.
 | Points aligned with the origin | a 3rd point entity at (0,0) + Horizontal constraints | no entity; a Horizontal constraint from each point to the **external** Origin | ✅ P1-4 (5c94bb51: an external reference-only Origin entity, never drawn or listed; sketch_get names "origin"; e2e `sketch_get_names_the_origin_not_a_hidden_point`) |  |
 | Hole on 2 picked points | "Vertices of Sketch 2" (one chip); 2 holes, −633.385 mm³; title "Ø 6.35 mm ↧ 12 mm" ✅ | **two chips "Vertex of Sketch 1"** (one per click; "Vertices of …" only when the sketch row is picked) | ✗ **P1-8** (ui) |  |
 | Linear pattern › Feature pattern | order Part / Feature / Face ✅; chip **"Hole 1"**; Direction pink until picked ✅ | chip **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name) | ✗ **P1-9** (ui) |  |
-| Shell 2.5 mm (top face) | 8960 mm³, 59 faces | — | ✅ |  |
+| Shell 2.5 mm (top face) | 8960 mm³, 59 faces | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Edit Extrude 1 10 → 15 mm | everything regenerates Ok but Shell returns 4 slivers, status Ok | **Shell 1 ERROR "Could not shell part with selections."**, part stays unshelled (behaviours "qa5 (10-25 p1)" (5)) | ✗ **P1-5** (psb + kern) |  |
-| Undo / Redo / Undo | 8960 ↔ slivers ↔ 8960 | — | ✅ |  |
+| Undo / Redo / Undo | 8960 ↔ slivers ↔ 8960 | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Rollback bar above Shell 1 | Shell greyed italic, part unshelled (14220.74) | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Suppress Fillet 1 (row menu) | italic strike-through, sharp corners, rest Ok (8446.23) | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Row menus | Extrude: Rename, Edit…, Edit Sketch 1…, Show dimensions, … ✅; Fillet: no "Show dimensions" | Fillet: no "Show dimensions" either (+ Add comment, out of scope) | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Mirror › Feature mirror of the Hole about the Right plane | dropdown Part / Feature / Face mirror; chips "Hole 1", "Right plane"; −158.35 mm³ (two holes through the 2.5 mm floor) | — | ✅ |  |
+| Mirror › Feature mirror of the Hole about the Right plane | dropdown Part / Feature / Face mirror; chips "Hole 1", "Right plane"; −158.35 mm³ (two holes through the 2.5 mm floor) | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Edit Fillet 1 R2 → R1 (dialog: later features greyed, "Final" ☐) | R1 applied; **Shell 1 Error "Could not shell part with selections."** at any thickness 1–2.5 mm | live? (request (6)) | ✗? **P1-6** (kern, needs live) |  |
-| Undo the R1 edit | back to 8801.649 mm³ | — | ✅ |  |
-| Rename (row menu) "Edge break" | stored "Edge break" | — | ✅ |  |
-| Row menus of Fillet / Chamfer | no "Show dimensions" (Extrude has it) | same | ✅ |  |
+| Undo the R1 edit | back to 8801.649 mm³ | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
+| Rename (row menu) "Edge break" | stored "Edge break" | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
+| Row menus of Fillet / Chamfer | no "Show dimensions" (Extrude has it) | same | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Delete Extrude 1 (dependents) | Fillet, Chamfer, Sketch 2, Hole, Pattern, Shell, Mirror error, Parts (0); errored rows red, **but hidden Sketch 2 stays grey** | failing sketch row red (behaviours 6432, 6491) | ✗ **P1-7** (ui) |  |
-| Undo the delete | back to 8801.649 mm³ | — | ✅ |  |
+| Undo the delete | back to 8801.649 mm³ | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Extrude › Remove from a sketch under the part (default flips away, as live) | tool grey, no message | red translucent tool + toast "Selected tools and targets do not intersect." (part-studio/234) | ✗ **P1-10** (psb + icons2) |  |
 
 ## P2 assembly core (same session, /root/green/noshape ee654502; plate 60×20×5 with 3 Ø10 holes + Ø10×30 pin from Part Studio 1)
@@ -141,9 +141,9 @@ then edits, undo/redo, rollback and suppress.
 | P2-A1 (skb 9bf8475b) | Circular pattern Angle 300 + Enter: applied, dialog stays; 2nd Enter accepts. Count + Enter accepts at once (live 4299) | ✅ fixed | 0.4.10+ / 6cbb24e0 10-27 |
 | P1-15 (ui 76da6649) | view-cube face hover #bce2f7 | ✅ fixed | 0.4.10+ / 1c853f78 10-27 |
 | P1-12 (ui 9bc26682) | Revolve axis chip "Edge of Sketch 2" | ✅ fixed |  |
-| P1-7 (ui 9bc26682) | failing hidden sketch row red | ✅ fixed |  |
+| P1-7 (ui 9bc26682) | failing hidden sketch row red | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | P1-14 (ui 2a85db38) | new document: inertia header "(lb mm²)" | ✅ fixed |  |
 | P1-3 (psb 44927ecb) | Fillet arrow on the last picked edge | ✅ fixed |  |
 | P1-13 (psb 44927ecb) | part-pattern copies keep the seed colour | ✅ fixed |  |
-| P1-5 (psb a52d1e44) | Shell 2.5 on the depth-15 model: "Could not shell part with selections." | ✅ fixed |  |
+| P1-5 (psb a52d1e44) | Shell 2.5 on the depth-15 model: "Could not shell part with selections." | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | P1-16 (kern) | Shell 1 mm on live's p2 model still fails; 2.5 mm 8487.861 mm³ | ✗ open |  |
