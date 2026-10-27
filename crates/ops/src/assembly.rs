@@ -268,7 +268,8 @@ pub fn default_replicate_scope(a: &Assembly, seed: InstanceId, mate: MateId) -> 
         Reference::Implicit { on, .. } => &**on,
         r => r,
     };
-    if matches!(entity, Reference::Edge(_)) { ReplicateScope::EdgesOnPlane } else { ReplicateScope::FacesInParts }
+    // Live (behaviours "qa (2026-10-27, P2 batch 2)" (4)): an edge-based mate starts on "Match edges on face".
+    if matches!(entity, Reference::Edge(_)) { ReplicateScope::EdgesOnFace } else { ReplicateScope::FacesInParts }
 }
 
 /// Accept the pattern dialog: the pattern replaces its old version (or is

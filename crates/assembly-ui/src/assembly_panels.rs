@@ -1007,13 +1007,13 @@ impl AssemblyView {
     /// or edge options by the seed mate's entity (help: Replicate 6).
     pub(super) fn replicate_scope(&self, s: &PatternSession, cx: &App) -> noshape_model::assembly::ReplicateScope {
         use noshape_model::assembly::ReplicateScope;
-        s.scope.unwrap_or_else(|| if self.replicate_on_edge(s, cx) { ReplicateScope::EdgesOnPlane } else { ReplicateScope::FacesInParts })
+        s.scope.unwrap_or_else(|| if self.replicate_on_edge(s, cx) { ReplicateScope::EdgesOnFace } else { ReplicateScope::FacesInParts })
     }
 
     /// Whether the seed mate's target entity is an edge (edge scopes).
     fn replicate_on_edge(&self, s: &PatternSession, cx: &App) -> bool {
         match (self.assembly(cx), s.seeds.first(), s.mate) {
-            (Some(a), Some(seed), Some(m)) => noshape_ops::assembly::default_replicate_scope(a, *seed, m) == noshape_model::assembly::ReplicateScope::EdgesOnPlane,
+            (Some(a), Some(seed), Some(m)) => noshape_ops::assembly::default_replicate_scope(a, *seed, m) == noshape_model::assembly::ReplicateScope::EdgesOnFace,
             _ => false,
         }
     }
@@ -1509,7 +1509,9 @@ impl AssemblyView {
                     let options: &[ReplicateScope] = if self.replicate_on_edge(s, cx) { &ReplicateScope::EDGE } else { &ReplicateScope::FACE };
                     let items = options.iter().map(|o| (SharedString::from(o.label()), SharedString::from(o.label()))).collect();
                     self.replicate_select.update(cx, |sel, _| sel.set_items(items, scope.label()));
-                    body = body.child(div().id("rep-scope-field").pt(px(6.)).tooltip(crate::ui::tooltip("Face match scope")).child(div().w(px(194.)).h(px(28.)).child(self.replicate_select.clone())));
+                    // Live: "Edge match scope" for an edge-based mate.
+                    let scope_tip = if self.replicate_on_edge(s, cx) { "Edge match scope" } else { "Face match scope" };
+                    body = body.child(div().id("rep-scope-field").pt(px(6.)).tooltip(crate::ui::tooltip(scope_tip)).child(div().w(px(194.)).h(px(28.)).child(self.replicate_select.clone())));
                     let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
                     let rows: Vec<AnyElement> = s
                         .scope_refs
@@ -1529,7 +1531,7 @@ impl AssemblyView {
                     let active = s.active == Some(2);
                     // Live (qa5 A19): empty, the field is red (label and border).
                     let scope_tip = s.scope_refs.is_empty().then(|| SharedString::from("A target scope must be selected."));
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", "Parts to find match in", scope_tip, active, rows).when(s.scope_refs.is_empty(), os::query_box_error).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", if scope == ReplicateScope::EdgesOnFace { "Faces to find match in" } else { "Parts to find match in" }, scope_tip, active, rows).when(s.scope_refs.is_empty(), os::query_box_error).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.active = Some(2);
                         }

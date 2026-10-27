@@ -1152,6 +1152,10 @@ fn replicate_from_a_hole_edge_matches_holes_once() {
     let t = analysis::matched_targets(&r0, &a0, &scoped(ReplicateScope::EdgesOnPlane, Some(plate_top.clone())), &UnitPrefs::default()).unwrap();
     assert_eq!(t.len(), 1, "edges on plane: {:?}", t.iter().map(|t| &t.1.reference).collect::<Vec<_>>());
     assert_eq!(t[0].1.reference, Reference::Implicit { on: Box::new(circles.iter().find(|(_, c)| c.x > 0.0 && (c.z - top).abs() < 1e-9).unwrap().0.clone()), inference: Inference::Center });
+    // "Match edges on face" (live's default for an edge seed, behaviours "qa
+    // (2026-10-27, P2 batch 2)" (4)) with the same face finds the same edge.
+    let t = analysis::matched_targets(&r0, &a0, &scoped(ReplicateScope::EdgesOnFace, Some(plate_top.clone())), &UnitPrefs::default()).unwrap();
+    assert_eq!(t.len(), 1, "edges on face: {:?}", t.iter().map(|t| &t.1.reference).collect::<Vec<_>>());
     // No selection yet: the dialog's "Parts to find match in" is required.
     let mut none = scoped(ReplicateScope::EdgesOnPlane, None);
     if let PatternKind::Replicate { scope_refs, .. } = &mut none.kind {

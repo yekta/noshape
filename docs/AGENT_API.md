@@ -2438,7 +2438,7 @@ Examples:
 | `handed` | boolean |  | Mirror: every seed's Mirror action Derived (shorthand for `strategy`). |
 | `strategy` | array of object |  | Mirror: the Mirror strategy table, per seed {"instance", "action", "placement"}. `transform` (default) places a rigid copy of the part; `derived` uses its opposite-handed version from the Part Studio's "<Part Studio>-Mirrored" Part Studio (made when missing: one more edit, "Create mirrored Part Studio", in the folder "Mirrored parts and assemblies"). `placement` (Derived): auto (default) or the bounding box / origin plane the copy is placed by. Seeds left out keep their row (a new pattern: transform, auto). |
 | `mate` | string |  | Part pattern / replicate: the seed's mate to follow (default: the seed's only mate). |
-| `scope` | one of `faces_in_parts`, `faces_in_features`, `individual_faces`, `edges_on_plane`, `edges_on_face`, `individual_edges` |  | Replicate: where to match (default: faces_in_parts, or edges_on_plane when the seed mate is on an edge). |
+| `scope` | one of `faces_in_parts`, `faces_in_features`, `individual_faces`, `edges_on_plane`, `edges_on_face`, `individual_edges` |  | Replicate: where to match (default: faces_in_parts, or edges_on_face when the seed mate is on an edge). |
 | `scope_refs` | array of object |  | Replicate: "Parts to find match in": [{"instance": id or name, "entity": a face / edge id (none: the whole part)}]. |
 | `name` | string |  | Pattern name (default "Linear pattern 1"...). |
 | `edit` | string |  | An existing pattern to edit (id or name). |

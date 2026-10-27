@@ -51,7 +51,7 @@ pub fn ops() -> Vec<Op> {
                     "Mirror: the Mirror strategy table, per seed {\"instance\", \"action\", \"placement\"}. `transform` (default) places a rigid copy of the part; `derived` uses its opposite-handed version from the Part Studio's \"<Part Studio>-Mirrored\" Part Studio (made when missing: one more edit, \"Create mirrored Part Studio\", in the folder \"Mirrored parts and assemblies\"). `placement` (Derived): auto (default) or the bounding box / origin plane the copy is placed by. Seeds left out keep their row (a new pattern: transform, auto).",
                 ),
                 opt("mate", s(), "Part pattern / replicate: the seed's mate to follow (default: the seed's only mate)."),
-                opt("scope", json!({ "type": "string", "enum": SCOPES.iter().map(|x| x.0).collect::<Vec<_>>() }), "Replicate: where to match (default: faces_in_parts, or edges_on_plane when the seed mate is on an edge)."),
+                opt("scope", json!({ "type": "string", "enum": SCOPES.iter().map(|x| x.0).collect::<Vec<_>>() }), "Replicate: where to match (default: faces_in_parts, or edges_on_face when the seed mate is on an edge)."),
                 opt("scope_refs", json!({ "type": "array", "items": { "type": "object" } }), "Replicate: \"Parts to find match in\": [{\"instance\": id or name, \"entity\": a face / edge id (none: the whole part)}]."),
                 opt("name", s(), "Pattern name (default \"Linear pattern 1\"...)."),
                 opt("edit", s(), "An existing pattern to edit (id or name)."),
