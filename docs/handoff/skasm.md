@@ -12,6 +12,15 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (569dabca19a397e932f2db54) in noshape mm test.
 
 ## Landed on main
+- 10-27 13:xx (new session, Yekta account): f34c32be SKETCH-SOLVE-SPLINE-SLOW (P0): fit spline equations
+  (FitPoint, FitEndDir, FitFitDir, CurvatureNum) have their own gradients from the fit's factored system
+  (sketch/src/equations.rs FitDiff; nurbs.rs FitSystem, the fit's banded system; linalg.rs BandLu) instead of
+  re-fitting per input. qa's sk211 (94-point spline): Coincident 68 s → 0.3–0.7 s in the sketch crate, CLI 175 s →
+  2–4 s (dev build, load 35–50); T1 test solve_time::sk211_… (fixture tests/fixtures/solve/sk211-step89.json).
+  26c7a498: a new mate between free parts of one Part Studio moves the later part's instance (live: the plate, Part 2,
+  onto the smaller block, Part 1); other studios keep the size rule. Test of live's mate edits (Flip primary axis
+  brings the pin back upright, Offset Z 5 mm): mate_flip::editing_a_mate_between_free_parts_moves_the_pin_back_upright.
+  00956cb2 DIN 6908 (the previous session's).
 - 10-27 afternoon (after the app split): 3d99e40d sketch value boxes as live's rule capture (corner rectangle, 3 point
   circle, center point arc, 3 point arc); 12740dfc REPLICATE-EDGE-DEFAULT; 71bc6f56 ISO 10512 nut (= live's B-rep);
   DIN 6908 washer (= live).
@@ -59,6 +68,18 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
   dimension), Point tool on the Origin, paste at the pointer + Transform (SKETCH-PASTE), unsolvable constraint keeps
   the shape; API polygon descriptions.
 
+## Speed targets (PLAN 2.7), current numbers
+Measured 10-27 14:00 in the dev test profile (opt-level 1; no release build: disk under the 30 GB floor), load ~40;
+release is faster. Each is a timed T2/perf test with the target as its gate.
+- Sketch drag step, ~200 entities (219 entities, 178 constraints; pointer move + solve + the sketch's regeneration):
+  **median 5.19 ms** (solve 1.48 ms), worst 17 ms. Target < 8 ms. Full solve with the DOF analysis: **1.15 ms**
+  (target < 8 ms). `cargo test -p noshape-scene --test all sketch_perf::speed_target -- --ignored --nocapture`.
+- Assembly drag, 200 instances / 300 mates: frame with the scene **median 5.40 ms** in plane, **6.18 ms** off plane
+  (worst 23–26 ms); target 120 fps = 8.33 ms. Insert into the 300-mate assembly **11.9 ms** (target ≤ 20 ms). Adding
+  a mate 40 ms. 1000 free pins: drag frame 1.49 ms, insert 3.9 ms. `cargo test -p noshape-ops --test all
+  assembly_perf:: -- --ignored --nocapture --test-threads=1`.
+- Next: the drag worst cases (18–26 ms spikes in both), the sketch step's regeneration (3.7 of 5.2 ms).
+
 ## WIP on agent/skasm
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
@@ -74,10 +95,10 @@ place). parity/sketch.md all ✅. Assembly P2:
 3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; A10 fixed
    earlier, rows 109 / 170), workflow-configured-assembly (1–5, 8
    ✅; CA3 closed by ui, CA4 and A15 rechecked on green).
-4. Which part moves when a new mate joins two free parts: done (be0dd33e) from 27 live runs; open: two different
-   parts of similar size (untested in live), and edits of an existing mate between free parts (still the second
-   connector's part stays; REST updates of a mate feature came back ERROR in my tab, so it needs a UI run in live:
-   /root/skasm-scratch/live/flip7.mjs).
+4. Which part moves when a new mate joins two free parts: done (be0dd33e, 26c7a498: the later part of one studio
+   moves). Mate edits match live's two UI runs. Open (asked live, REQUESTS "a NEW Revolute made in the UI mate
+   dialog"): a dialog-made flipped mate turns the pin about its connector X with rz 0 in ours (new_mate_holds), live's
+   REST-made one turned it about Z × w (rz −157.48°); which does live's dialog do?
 5. Slot: rechecked 10-27 against live spec-slot-06 (Ø20 leader, glyph groups, colours as live); the once-seen
    highlighted centre line was not reproduced.
 6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick

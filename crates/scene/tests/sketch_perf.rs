@@ -198,6 +198,61 @@ fn sketch_drag_and_constraint_latency() {
     assert!(s.median < FRAME, "pattern seed drag: median {:?}", s.median);
 }
 
+/// PLAN 2.7 speed target (beat Onshape): on a ~200-entity sketch a drag step
+/// (pointer move, solve, the sketch's regeneration, as the app runs it) and
+/// a full solve with the DOF analysis each under 8 ms (medians, release).
+const SPEED_TARGET: Duration = Duration::from_millis(8);
+
+#[test]
+#[ignore]
+fn speed_target_200_entity_sketch() {
+    let (sk, corner) = big_sketch(20);
+    println!("200-entity sketch: {} entities, {} constraints", sk.entity_count(), sk.constraint_count());
+    assert!(sk.entity_count() >= 200);
+    let mut data = SketchData { sketch: sk, ..Default::default() };
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    let fid = f.id;
+    ps.features.push(f);
+    let mut regen = Regenerator::new();
+    let opts = RegenOptions { editing_sketch: Some(fid), ..Default::default() };
+    regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    let mut ed = editor();
+    ed.set_tool(Tool::Select);
+    let from = data.sketch.point(corner).unwrap();
+    ed.hover = Some(corner);
+    ed.pointer_move(&mut data, from, false, false);
+    ed.tool_down(&mut data, from, Some(corner), false, false);
+    let (mut steps, mut solves) = (Vec::new(), Vec::new());
+    for i in 1..=100 {
+        let a = i as f64 * 0.05;
+        let p = from + v(0.004 * a.cos() + 0.00004 * i as f64, 0.004 * a.sin());
+        let t = Instant::now();
+        ed.pointer_move(&mut data, p, false, false);
+        ed.tool_drag(&mut data, p);
+        solves.push(t.elapsed());
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        steps.push(t.elapsed());
+    }
+    ed.tool_up(&mut data, from);
+    let (step, edit) = (stats(steps), stats(solves));
+    let full = stats((0..21).map(|_| {
+        let mut sk = data.sketch.clone();
+        let t = Instant::now();
+        sk.solve();
+        t.elapsed()
+    }).collect());
+    let ms = |d: Duration| d.as_secs_f64() * 1e3;
+    println!("  drag step: median {:.2} ms (solve {:.2}), worst {:.2} ms", ms(step.median), ms(edit.median), ms(step.worst));
+    println!("  full solve with the DOF analysis: median {:.2} ms, worst {:.2} ms", ms(full.median), ms(full.worst));
+    assert!(step.median < SPEED_TARGET, "drag step median {:?}", step.median);
+    assert!(full.median < SPEED_TARGET, "full solve median {:?}", full.median);
+}
+
 /// The regeneration after each drag step alone (to profile it).
 #[test]
 #[ignore]

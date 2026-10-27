@@ -9,8 +9,9 @@
 //! Timed as the app runs them: the evaluation after an edit (a mate added, a
 //! pin inserted: solve, DOF, mate status), the scene built from scratch, and
 //! drag steps (one solve per pointer move, no DOF, then the scene's
-//! instances moved). Targets: a drag step within a 60 Hz frame, adding a mate without
-//! a stall (under 100 ms).
+//! instances moved). Targets (PLAN 2.7): a drag step within a 120 Hz frame,
+//! inserting into the 300-mate assembly within 20 ms, adding a mate without a
+//! stall (under 100 ms).
 
 use glam::DVec3;
 use noshape_model::assembly::eval::{AssemblyResult, SolveOptions};
@@ -23,10 +24,12 @@ use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-/// One display frame at 60 Hz.
-const FRAME: Duration = Duration::from_micros(16_667);
+/// One display frame at 120 Hz (PLAN 2.7: assembly drag at 120 fps with 200 instances).
+const FRAME: Duration = Duration::from_micros(8_333);
 /// Adding a mate shows within this.
 const EDIT: Duration = Duration::from_millis(100);
+/// PLAN 2.7: inserting into the 300-mate assembly.
+const INSERT: Duration = Duration::from_millis(20);
 
 fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
     let op = registry::by_tool_name(tool).unwrap_or_else(|| panic!("no tool {tool}"));
@@ -271,7 +274,7 @@ fn assembly_drag_and_mate_latency() {
     println!("  inserting a pin: {:.1} ms (median of 5); the whole scene from scratch {}", ms(insert2), scene_1000.map(|d| format!("{:.1} ms", ms(d.0))).unwrap_or("(no GPU)".into()));
 
     assert!(add < EDIT, "adding a mate took {add:?}");
-    assert!(insert < EDIT && insert2 < EDIT, "inserting a pin took {insert:?} / {insert2:?}");
+    assert!(insert < INSERT && insert2 < EDIT, "inserting a pin took {insert:?} / {insert2:?}");
     for (what, solve, frame) in [("in-plane drag", &s, &s_frame), ("off-plane drag", &f, &f_frame), ("1000-pin drag", &g, &g_frame)] {
         assert!(solve.median < FRAME, "{what}: solve median {:?}", solve.median);
         if let Some(fr) = frame {

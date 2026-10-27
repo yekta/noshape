@@ -242,15 +242,17 @@ impl Nurbs {
     pub fn eval_ders(&self, u: f64) -> [DVec2; 3] {
         let p = self.degree;
         let span = self.find_span(u);
-        let d = self.basis_ders(span, u, 2);
         let mut a = [DVec2::ZERO; 3];
         let mut w = [0.0; 3];
+        // Up to cubics (every sketch curve but imported ones) without allocating.
+        let (d3, dn) = if p <= 3 { (self.basis_ders3(span, u, 2), Vec::new()) } else { ([[0.0; 4]; 3], self.basis_ders(span, u, 2)) };
         for k in 0..3 {
             for j in 0..=p {
                 let i = span - p + j;
                 let wi = self.weight(i);
-                a[k] += self.ctrl[i] * (d[k][j] * wi);
-                w[k] += d[k][j] * wi;
+                let dk = if p <= 3 { d3[k][j] } else { dn[k][j] };
+                a[k] += self.ctrl[i] * (dk * wi);
+                w[k] += dk * wi;
             }
         }
         if self.weights.is_none() {
