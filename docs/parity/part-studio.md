@@ -106,57 +106,57 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 4.1 | Entities selected before starting a feature fill its first compatible field | A §2.3 | ✅ |  |
-| 4.2 | A sketch selected in the feature list preselects all its regions (Extrude, Revolve…) | features_and_parts_lists | ✅ (app 10-24: "Face of Sketch 2" preselected) |  |
-| 4.3 | Planes / features selected in the list preselect plane / feature fields | A §2.3 | ✅ (10-27: Top in the list → Plane 1's "Top plane"; Sketch 1's row → Extrude's "Face of Sketch 1") |  |
-| 4.4 | Clicking the active toolbar tool again (or its shortcut) leaves its dialog open as it is (live 10-27; only ✓ / ✕ / Esc close it) | Home__selection | ✅ |  |
-| 4.5 | Picking a tool from a toolbar dropdown makes it the group's face for the session | A §2.3 | ✅ (10-27: Face blend from the Fillet ▾ takes the group's button) |  |
-| 4.6 | Toolbar tooltips show the shortcut | A §2.2 | ✅ |  |
-| 4.7 | Customize toolbar (drag tool sets, Reset) | part_studios | ✅ (built by an earlier pass: move tool sets, remove/restore tools, reset) |  |
-| 4.8 | Search tools: typing filters tools, Enter runs the first, Esc closes | Home__search_tools | ✅ |  |
-| 4.9 | Search tools with no query lists recently used tools first (bold "Recently used", newest first, first row selected, description pane); description on hover | Home__search_tools | ✅ |  |
-| 4.10 | REMEMBER_PREVIOUS_VALUE parameters default to the last accepted value of that tool | A §7.2 | ✅ (app 10-24: Fillet 3 opened at the 3 mm just accepted) |  |
-| 4.11 | Search tools box: 162 px #eee box, "alt/⌥" (35 px) and "c" (17 px) keys joined, 19 px, 1 px #aaa with a 2 px bottom edge, 3 px after the label | live part-studio/00-new-doc-initial | ✅ (box, key edges and key text rows at live's pixels) |  |
+| 4.1 | Entities selected before starting a feature fill its first compatible field | A §2.3 | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 4.2 | A sketch selected in the feature list preselects all its regions (Extrude, Revolve…) | features_and_parts_lists | ✅ (app 10-24: "Face of Sketch 2" preselected) | 0.4.10+ / 6011065d 10-27 |
+| 4.3 | Planes / features selected in the list preselect plane / feature fields | A §2.3 | ✅ (10-27: Top in the list → Plane 1's "Top plane"; Sketch 1's row → Extrude's "Face of Sketch 1") | 0.4.10+ / 6011065d 10-27 |
+| 4.4 | Clicking the active toolbar tool again (or its shortcut) leaves its dialog open as it is (live 10-27; only ✓ / ✕ / Esc close it) | Home__selection | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 4.5 | Picking a tool from a toolbar dropdown makes it the group's face for the session | A §2.3 | ✅ (10-27: Face blend from the Fillet ▾ takes the group's button) | 0.4.10+ / 6011065d 10-27 |
+| 4.6 | Toolbar tooltips show the shortcut | A §2.2 | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 4.7 | Customize toolbar (drag tool sets, Reset) | part_studios | ✅ (built by an earlier pass: move tool sets, remove/restore tools, reset) | 0.4.10+ / 6011065d 10-27 |
+| 4.8 | Search tools: typing filters tools, Enter runs the first, Esc closes | Home__search_tools | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 4.9 | Search tools with no query lists recently used tools first (bold "Recently used", newest first, first row selected, description pane); description on hover | Home__search_tools | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 4.10 | REMEMBER_PREVIOUS_VALUE parameters default to the last accepted value of that tool | A §7.2 | ✅ (app 10-24: Fillet 3 opened at the 3 mm just accepted) | 0.4.10+ / 6011065d 10-27 |
+| 4.11 | Search tools box: 162 px #eee box, "alt/⌥" (35 px) and "c" (17 px) keys joined, 19 px, 1 px #aaa with a 2 px bottom edge, 3 px after the label | live part-studio/00-new-doc-initial | ✅ (box, key edges and key text rows at live's pixels) | 0.4.10+ / 6011065d 10-27 |
 
 ## 5. Feature dialogs and selection fields (Home__dialogs, feature_basics, Home__numeric_fields, A §7)
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 5.1 | Green check accepts, red X cancels | feature_basics | ✅ |  |
-| 5.2 | Title red while the feature errors; the ✓ is disabled but Enter still commits (the model falls back to the state before the feature) | live | ✅ (was: commit refused) |  |
-| 5.3 | Error/warning message shown in the dialog | Home__error_indicators | ✅ |  |
-| 5.4 | Fields appear/disappear live from their visibility conditions | A §7.1 | ✅ |  |
+| 5.1 | Green check accepts, red X cancels | feature_basics | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.2 | Title red while the feature errors; the ✓ is disabled but Enter still commits (the model falls back to the state before the feature) | live | ❌ (DIALOG-OK-STATE) (was: commit refused) | 0.4.10+ / 6011065d 10-27 |
+| 5.3 | Error/warning message shown in the dialog | Home__error_indicators | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.4 | Fields appear/disappear live from their visibility conditions | A §7.1 | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.4b | Clicks and right-clicks on the dialog (and other panels over the graphics area) never reach the model beneath | (Onshape behaviour) | 🔧 (clicking a field also picked/deselected geometry under it) |  |
-| 5.5 | First selection field active when the dialog opens | feature_basics | ✅ |  |
+| 5.5 | First selection field active when the dialog opens | feature_basics | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.6 | Click a selection field to make it active; it stays active while a number field has keyboard focus ("two fields are active") | Home__dialogs; feature_basics | 🔧 (typing deactivated it) |  |
-| 5.7 | Picks go to the active field; clicking a picked entity again removes it | Home__selection; A §5.4 | ✅ |  |
+| 5.7 | Picks go to the active field; clicking a picked entity again removes it | Home__selection; A §5.4 | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.8 | Picks that don't pass the field filter do nothing: no highlight on hover, no pick, no toast, no flash | live "qa4 round 5 s1 follow-up 2" (1) | 🔧 (`field_takes`: the hover and the click; the invented rejection toast and red flash removed) |  |
 | 5.8b | Clicking a sketch curve while a region field is active takes the region it bounds (the smaller one for a curve between two regions); hovering the curve pre-highlights that region | live (Extrude dialog) | ✅ (was "all regions"; changed per live) |  |
-| 5.9 | List clicks (default planes, parts) obey the field filter | A §5.4 | ✅ (10-27: a part row does nothing in Extrude's regions field) |  |
-| 5.10 | Clicking a sketch in the feature list fills a region field with all its regions, shown as one "Faces of Sketch 1" row; clicking again removes them; feature fields take the feature | features_and_parts_lists; live | ✅ |  |
-| 5.11 | Single-pick fields replace their pick and move focus to the next empty selection field | A §5.4 | ✅ |  |
-| 5.12 | × on a chip removes that pick | feature_basics | ✅ |  |
-| 5.13 | Right-click a pick > Clear all (plus Clear missing references when some are missing); × on hover removes one row | live (Fillet dialog) | ✅ |  |
-| 5.14 | Hovering a pick row highlights its entity in the graphics area, tints the row and shows its name as a tooltip | Home__dialogs; live | ✅ (yellow-green #f2ff80 state QUERY in the shader) |  |
-| 5.15 | Missing references shown red; Clear missing references | feature_basics | ✅ (verified: red rows, accept disabled, Clear missing references) |  |
+| 5.9 | List clicks (default planes, parts) obey the field filter | A §5.4 | ✅ (10-27: a part row does nothing in Extrude's regions field) | 0.4.10+ / 6011065d 10-27 |
+| 5.10 | Clicking a sketch in the feature list fills a region field with all its regions, shown as one "Faces of Sketch 1" row; clicking again removes them; feature fields take the feature | features_and_parts_lists; live | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.11 | Single-pick fields replace their pick and move focus to the next empty selection field | A §5.4 | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.12 | × on a chip removes that pick | feature_basics | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.13 | Right-click a pick > Clear all (plus Clear missing references when some are missing); × on hover removes one row | live (Fillet dialog) | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.14 | Hovering a pick row highlights its entity in the graphics area, tints the row and shows its name as a tooltip | Home__dialogs; live | ✅ (yellow-green #f2ff80 state QUERY in the shader) | 0.4.10+ / 6011065d 10-27 |
+| 5.15 | Missing references shown red; Clear missing references | feature_basics | ✅ (verified: red rows, accept disabled, Clear missing references) | 0.4.10+ / 6011065d 10-27 |
 | 5.16 | Reorder picks in order-sensitive fields by dragging a row | feature_basics | ✅ (10-27, Loft profiles: ⇅ turns the rows' × into ≡ grips and shows DONE; dragging a grip draws the drop line and moves the pick. The Move up/down menu items were removed: live menus only have Clear all) |  |
-| 5.17 | Tab moves between fields (inputs and checkboxes) | feature_basics | ✅ |  |
-| 5.18 | Space toggles a focused checkbox; arrows/Enter in dropdowns | feature_basics | ✅ (Space toggles a checkbox; Enter/Space opens a dropdown, arrows move, Enter picks — the list opens without the current value highlighted) |  |
-| 5.19 | Numeric fields accept expressions, units and #variables | Home__numeric_fields | ✅ |  |
-| 5.20 | Invalid expression: red outline and message | Home__numeric_fields | ✅ |  |
-| 5.21 | Expressions show their evaluated value | Home__numeric_fields | ✅ (10-27: "10+5" → "15 mm" once unfocused) |  |
-| 5.22 | Mouse wheel over a focused numeric field (mm document, live 10-27): ±1, Shift ±10, Ctrl ±0.1 (integers ±1); only while focused with no uncommitted typed text; a step out of the field's range is ignored (Depth goes below 0) | Home__numeric_fields | ✅ |  |
-| 5.23 | Field shows the converted value after accepting, the original text when focused | Home__numeric_fields | ✅ (fixed: focusing showed the converted text) |  |
-| 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | ✅ (app 10-24) |  |
-| 5.25 | Preview opacity slider (blends the model before and after the feature) | Home__dialogs | ✅ (live previewBlend: both models mixed at the slider, 0.7 at rest; the active field's highlight lines drawn whole over the mix, also at 1, as live part-studio/psui-prv-01 / -05b) |  |
-| 5.26 | Rename the feature from the dialog title | Home__dialogs | ✅ (double-click the title) |  |
-| 5.27 | Dialog movable and resizable; help (?) icon | Home__dialogs | ✅ (move by the title, resize by the bottom-right grip; size kept for the session) |  |
-| 5.28 | Boolean "Convert to expression" / "Convert to checkbox" (evaluated at regeneration with upstream variables) | feature_basics | ✅ (starts as true/false text, focused) |  |
-| 5.29 | Tolerance options on tolerant quantities (± icon "Tolerance options": precision ▾ then tolerance type ▾; Hole diameter adds Fit / Fit with tolerance / Fit (tolerance only) with Standard, Fit type, Hole class, Shaft class) | Home__tolerance_options; live dialogs/hole-30–37 | ✅ (`model::fits`; the hole callout in the graphics area shows "Ø6.350 H7 +0.015/−0.000 THRU") |  |
-| 5.30 | Extrude/Revolve from a part face (or a sketch on one) defaults to Add with that part as the merge scope | (Onshape behaviour, A §7) | ✅ (app 10-24) |  |
-| 5.31 | Choosing Remove/Intersect on such a feature points it into the part | (Onshape behaviour) | ✅ (10-27: Extrude on the block's top face, Remove → the arrow turns down, the block cut through, the tool grey) |  |
-| 5.32 | Drag handles for depth/angle/distance (extrude arrow, revolve arc, plane offset, shell thickness, fillet radius, chamfer distance) | A §7.7 | ✅ (hover outlines the arrow blue) |  |
-| 5.33 | Editing a feature rolls the model back to it | Home__dialogs | ✅ |  |
+| 5.17 | Tab moves between fields (inputs and checkboxes) | feature_basics | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.18 | Space toggles a focused checkbox; arrows/Enter in dropdowns | feature_basics | ❌ (SPACE-CHECKBOX) (Space toggles a checkbox; Enter/Space opens a dropdown, arrows move, Enter picks — the list opens without the current value highlighted) | 0.4.10+ / 6011065d 10-27 |
+| 5.19 | Numeric fields accept expressions, units and #variables | Home__numeric_fields | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.20 | Invalid expression: red outline and message | Home__numeric_fields | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.21 | Expressions show their evaluated value | Home__numeric_fields | ✅ (10-27: "10+5" → "15 mm" once unfocused) | 0.4.10+ / 6011065d 10-27 |
+| 5.22 | Mouse wheel over a focused numeric field (mm document, live 10-27): ±1, Shift ±10, Ctrl ±0.1 (integers ±1); only while focused with no uncommitted typed text; a step out of the field's range is ignored (Depth goes below 0) | Home__numeric_fields | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 5.23 | Field shows the converted value after accepting, the original text when focused | Home__numeric_fields | ✅ (fixed: focusing showed the converted text) | 0.4.10+ / 6011065d 10-27 |
+| 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | ✅ (app 10-24) | 0.4.10+ / 6011065d 10-27 |
+| 5.25 | Preview opacity slider (blends the model before and after the feature) | Home__dialogs | ✅ (live previewBlend: both models mixed at the slider, 0.7 at rest; the active field's highlight lines drawn whole over the mix, also at 1, as live part-studio/psui-prv-01 / -05b) | 0.4.10+ / 6011065d 10-27 |
+| 5.26 | Rename the feature from the dialog title | Home__dialogs | ✅ (double-click the title) | 0.4.10+ / 6011065d 10-27 |
+| 5.27 | Dialog movable and resizable; help (?) icon | Home__dialogs | ✅ (move by the title, resize by the bottom-right grip; size kept for the session) | 0.4.10+ / 6011065d 10-27 |
+| 5.28 | Boolean "Convert to expression" / "Convert to checkbox" (evaluated at regeneration with upstream variables) | feature_basics | ✅ (starts as true/false text, focused) | 0.4.10+ / 6011065d 10-27 |
+| 5.29 | Tolerance options on tolerant quantities (± icon "Tolerance options": precision ▾ then tolerance type ▾; Hole diameter adds Fit / Fit with tolerance / Fit (tolerance only) with Standard, Fit type, Hole class, Shaft class) | Home__tolerance_options; live dialogs/hole-30–37 | ✅ (`model::fits`; the hole callout in the graphics area shows "Ø6.350 H7 +0.015/−0.000 THRU") | 0.4.10+ / 6011065d 10-27 |
+| 5.30 | Extrude/Revolve from a part face (or a sketch on one) defaults to Add with that part as the merge scope | (Onshape behaviour, A §7) | ✅ (app 10-24) | 0.4.10+ / 6011065d 10-27 |
+| 5.31 | Choosing Remove/Intersect on such a feature points it into the part | (Onshape behaviour) | ✅ (10-27: Extrude on the block's top face, Remove → the arrow turns down, the block cut through, the tool grey) | 0.4.10+ / 6011065d 10-27 |
+| 5.32 | Drag handles for depth/angle/distance (extrude arrow, revolve arc, plane offset, shell thickness, fillet radius, chamfer distance) | A §7.7 | ✅ (hover outlines the arrow blue) | 0.4.10+ / 6011065d 10-27 |
+| 5.33 | Editing a feature rolls the model back to it | Home__dialogs | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.34 | Feature dialog rows on live's pixels: Chrome's fractional rows (26.33 px empty selection fields, 27.33 px checkbox rows) snapped like Chrome (27/28 px steps), 5 px under a field, 28 px select rows (select on the top line), 26 px quantity rows (29 px with a hole icon), 31 px icon selects, 48 px stacked label + select, Hole size block without top padding, inactive field label #666, frame ending 24.5 px under the list | live dialogs/*-01-open, dom/dialog-extrude-new, dialog-fillet, dialog-chamfer, dialog-hole | ✅ (Extrude, Revolve, Fillet, Chamfer, Shell, Hole, Sweep, Linear pattern, Plane: every row's checkbox/underline/label at live's pixel; Revolve and Fillet's frame bottom and ? are 1 px high from Chrome's sub-pixel rounding) |  |
 
 ## 6. Feature list (PartStudio__features_and_parts_lists, A §3)
