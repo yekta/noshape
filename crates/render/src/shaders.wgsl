@@ -715,6 +715,25 @@ fn vs_line(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
     return line_vertex(index, l, 0xffffffffu);
 }
 
+/// `NOSHAPE_PERF_LINES=pulled` (renderer.rs `pulled_lines`): the segment by vertex index from a storage buffer, the
+/// slot as the instance.
+@group(2) @binding(0) var<storage, read> line_segs: array<u32>;
+
+@vertex
+fn vs_line_pulled(@builtin(vertex_index) index: u32, @builtin(instance_index) slot: u32) -> LineOut {
+    // `LineSegment`: a, b (3 × f32 each), RGBA8 color, pick id, width, style: 10 words.
+    let o = (index / 6u) * 10u;
+    var l: LineIn;
+    l.a = vec3(bitcast<f32>(line_segs[o]), bitcast<f32>(line_segs[o + 1u]), bitcast<f32>(line_segs[o + 2u]));
+    l.b = vec3(bitcast<f32>(line_segs[o + 3u]), bitcast<f32>(line_segs[o + 4u]), bitcast<f32>(line_segs[o + 5u]));
+    l.color = unpack4x8unorm(line_segs[o + 6u]);
+    l.pick = line_segs[o + 7u];
+    l.width = bitcast<f32>(line_segs[o + 8u]);
+    l.style = line_segs[o + 9u];
+    load_inst(slot);
+    return line_vertex(slot * 6u + index % 6u, l, 0xffffffffu);
+}
+
 // A tessellation edge inside a curved face with the normals of its two
 // facets (Onshape's edge-based silhouettes, `vs-draw-silhouettes`): drawn
 // like an edge where one facet faces the viewer and the other doesn't.

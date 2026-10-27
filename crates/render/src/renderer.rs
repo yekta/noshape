@@ -114,6 +114,8 @@ pub(crate) struct GpuMesh {
 }
 pub(crate) struct GpuLines {
     buffer: wgpu::Buffer,
+    /// `NOSHAPE_PERF_LINES=pulled`: the segments as a storage buffer (bind group 2 of `vs_line_pulled`).
+    pulled: Option<wgpu::BindGroup>,
     count: u32,
     pub(crate) bounds: Option<(Vec3, Vec3)>,
     /// [`SilhouetteSegment`]s (drawn where they are silhouettes, never
@@ -1095,6 +1097,30 @@ fn indexed_lines() -> bool {
     *INDEXED.get_or_init(|| std::env::var("NOSHAPE_PERF_LINES").is_ok_and(|v| v == "indexed"))
 }
 
+/// `NOSHAPE_PERF_LINES=pulled`: the color pass's edge lines read their segments from a storage buffer by vertex index,
+/// one instance per copy (not one per segment: six-vertex instances fill few lanes of a vertex SIMD group), for the
+/// benchmarks.
+fn pulled_lines() -> bool {
+    static PULLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *PULLED.get_or_init(|| std::env::var("NOSHAPE_PERF_LINES").is_ok_and(|v| v == "pulled"))
+}
+
+/// Bind group 2 of `vs_line_pulled`: the segments (one layout for the process-wide device).
+fn lines_layout(device: &wgpu::Device) -> &'static wgpu::BindGroupLayout {
+    static LAYOUT: std::sync::OnceLock<wgpu::BindGroupLayout> = std::sync::OnceLock::new();
+    LAYOUT.get_or_init(|| {
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("lines"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None },
+                count: None,
+            }],
+        })
+    })
+}
+
 fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, mode: DrawMode) {
     let DrawMode { pick, mask, caps, outline, hover_mask, depth_samples, planes_write_depth } = mode;
     pass.set_bind_group(1, bind_inst, &[]);
@@ -1135,6 +1161,10 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
                 }
                 // Six vertices per slot: the shaders take the slot from the
                 // vertex index (the instance index steps through segments).
+                Drawable::Lines(l) if l.0.pulled.is_some() && std::ptr::eq(pipeline.get(), &pipelines.line) => {
+                    pass.set_bind_group(2, l.0.pulled.as_ref(), &[]);
+                    pass.draw(0..l.0.count * 6, slots);
+                }
                 Drawable::Lines(l) => {
                     pass.set_vertex_buffer(0, l.0.buffer.slice(..));
                     match &pipelines.quad_index {
@@ -1542,6 +1572,8 @@ const PLAIN: Extra = Extra { writes: wgpu::ColorWrites::ALL, cull: None };
 #[derive(Clone, Copy)]
 enum LayoutKind {
     Main,
+    /// Lines pulled from a storage buffer (bind group 2, `NOSHAPE_PERF_LINES=pulled`).
+    Lines,
     /// With an image (bind group 2).
     Image,
     /// Section caps.
@@ -1554,6 +1586,7 @@ struct PipelineMaker {
     device: wgpu::Device,
     shader: wgpu::ShaderModule,
     main: wgpu::PipelineLayout,
+    lines: wgpu::PipelineLayout,
     image: wgpu::PipelineLayout,
     cap: wgpu::PipelineLayout,
     /// Compile at utility priority (the first-frame pipelines under `NOSHAPE_PREWARM=early`; each runs on a
@@ -1571,6 +1604,7 @@ impl PipelineMaker {
             label: Some(p.label),
             layout: Some(match layout {
                 LayoutKind::Main => &self.main,
+                LayoutKind::Lines => &self.lines,
                 LayoutKind::Image => &self.image,
                 LayoutKind::Cap => &self.cap,
             }),
@@ -2304,6 +2338,11 @@ impl Renderer {
             device: self.device.clone(),
             shader: self.shader.clone(),
             main: self.pipeline_layout.clone(),
+            lines: self.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("lines-layout"),
+                bind_group_layouts: &[Some(&self.globals_layout), Some(&self.inst_layout), Some(lines_layout(&self.device)), Some(&self.compare_layout)],
+                immediate_size: 0,
+            }),
             image: self.image_pipeline_layout.clone(),
             cap: self.cap_pipeline_layout.clone(),
             early: false,
@@ -2320,6 +2359,7 @@ impl Renderer {
         // each): a fresh install compiles every shader (1.6 s on the macOS 14
         // runners one by one, 4.3 s on 15).
         let first = PipelineMaker { early: crate::worker::prewarm_early(), ..m.clone() };
+        let (line_layout, line_vs, line_buffers) = if pulled_lines() { (LayoutKind::Lines, "vs_line_pulled", &[][..]) } else { (LayoutKind::Main, "vs_line", LINE_BUFFERS) };
         let (background, mesh_opaque, mesh_solid, mesh_transparent, line, mesh_backsil, silhouette, point) = std::thread::scope(|s| {
             let background = s.spawn(|| first.make(LayoutKind::Main, P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }, PLAIN));
             let mesh_opaque = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN));
@@ -2331,7 +2371,7 @@ impl Renderer {
             // Lines test depth but don't write it: the ambient occlusion pass reads the depth buffer, and a highlight
             // band brought toward the eye left a step there that it shaded as a crease, a noisy shadow along a
             // hovered edge (EDGE-HIGHLIGHT-LOOK; live has none).
-            let line = s.spawn(|| first.make(LayoutKind::Main, P { label: "line", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
+            let line = s.spawn(|| first.make(line_layout, P { label: "line", vs: line_vs, fs: "fs_line", buffers: line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
             // Front faces culled, like Onshape's pass (`setOverrideFaceCullingMode(FRONT)`).
             let mesh_backsil = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) }));
             let silhouette = s.spawn(|| first.make(LayoutKind::Main, P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: SILHOUETTE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
@@ -3785,9 +3825,10 @@ impl Uploader {
             } else {
                 bytemuck::cast_slice(&lines.segments)
             },
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: if pulled_lines() { wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::STORAGE } else { wgpu::BufferUsages::VERTEX },
         });
-        LinesHandle(Arc::new(GpuLines { buffer, count: lines.segments.len() as u32, bounds: lines.bounds(), silhouette: false }))
+        let pulled = pulled_lines().then(|| self.device.create_bind_group(&wgpu::BindGroupDescriptor { label: Some("lines"), layout: lines_layout(&self.device), entries: &[wgpu::BindGroupEntry { binding: 0, resource: buffer.as_entire_binding() }] }));
+        LinesHandle(Arc::new(GpuLines { buffer, pulled, count: lines.segments.len() as u32, bounds: lines.bounds(), silhouette: false }))
     }
 
     pub fn upload_silhouettes(&self, data: &SilhouetteData) -> LinesHandle {
@@ -3796,7 +3837,7 @@ impl Uploader {
             contents: if data.segments.is_empty() { &[0u8; std::mem::size_of::<SilhouetteSegment>()] } else { bytemuck::cast_slice(&data.segments) },
             usage: wgpu::BufferUsages::VERTEX,
         });
-        LinesHandle(Arc::new(GpuLines { buffer, count: data.segments.len() as u32, bounds: data.bounds(), silhouette: true }))
+        LinesHandle(Arc::new(GpuLines { buffer, pulled: None, count: data.segments.len() as u32, bounds: data.bounds(), silhouette: true }))
     }
 
     pub fn upload_points(&self, points: &PointData) -> PointsHandle {
