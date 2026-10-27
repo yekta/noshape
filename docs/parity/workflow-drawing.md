@@ -80,8 +80,8 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 1.7 | DWG NO. of an assembly drawing | "----" (both drawings) | ✅ D4 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("----") |
 | 2.6 | GTol: type right after opening | "0.1" lands in Tolerance, ✓ enabled | ✅ D7 fixed |  |
 | 3.2 | Callout balloons in the existing drawing | still "----" with a BOM table present | ✗ D8 |  |
-| 4.1 | Export dialog | "View export rules" link present | ✅ D9 fixed |  |
-| 4.3 | DXF options | Release 14 + "Model space only", Sheets ▾ "All sheets" ✅; **Units "Drawing units"** (live "Use drawing units"), **☐ Set z-height to zero…** (live ☑ by default, behaviours.md D12 answer) | ✅ D11 fixed / ✗ **D15** |  |
+| 4.1 | Export dialog | "View export rules" link present | ✅ D9 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) |
+| 4.3 | DXF options | Release 14 + "Model space only", Sheets ▾ "All sheets" ✅; **Units "Drawing units"** (live "Use drawing units"), **☐ Set z-height to zero…** (live ☑ by default, behaviours.md D12 answer) | ✅ D11 fixed / ✗ **D15** | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (Release 14, Model space only, All sheets, Use drawing units) |
 | – | Tab menus (assembly / drawing tab) | no "Open in new browser tab" (browser-only, ok), no "Show code" | ? |  |
 | 2.1, 4.2, 4.4 | D5, D10, D13 | not re-run this pass | – |  |
 
@@ -95,7 +95,7 @@ Pass 6 (17:11) had found D5 fixed (d starts Dimension after Esc).
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | D8 balloons | the old front-view balloon now shows **3**; a new balloon on a cylinder in the isometric view still shows "----" | ✗ still (partly) |  |
-| D15 DXF defaults | ☑ Set z-height to zero…, Units "Use drawing units" | ✅ **fixed** |  |
+| D15 DXF defaults | ☑ Set z-height to zero…, Units "Use drawing units" | ✅ **fixed** | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (☑ z-height to zero) |
 | D14 SCALE after undo | "----" on the empty sheet, "1:1" with a view, "----" after Ctrl+Z (consistent) | ✅ **fixed** (live value on an empty sheet ?) |  |
 | D16 (new) | the "Sheet1" chip draws over the Insert view dialog's title ("Sheet1 ew") | ✗ **D16** (asb / ui) |  |
 
@@ -121,7 +121,7 @@ Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 
 | Row | Ours now | Status | Verified |
 |---|---|---|---|
 | D10 PDF | tab › Export… › PDF 1.5 Color: the isometric view is **lines** (not shaded); Detail A keeps its circle and the clipped content, "DETAIL A / SCALE 2:1" (pass23/d10pdf-1.png) | ✅ fixed (api) |  |
-| D12 DXF | Release 14: CIRCLE ×5, ELLIPSE ×2, MTEXT ×43, LINE, POLYLINE; layers VISIBLE, TITLE_BLOCK, BORDER_ZONES / BORDER_FRAME, DETAIL_VIEW_BORDER / DETAIL_VIEW_PARENT_BORDER, ANNOTATION_TEXT (R14 writes upper-case layer names, behaviours ~6165) | ✅ fixed (api) for this drawing; hatches, dimensions and tables not in it (not checked) |  |
+| D12 DXF | Release 14: CIRCLE ×5, ELLIPSE ×2, MTEXT ×43, LINE, POLYLINE; layers VISIBLE, TITLE_BLOCK, BORDER_ZONES / BORDER_FRAME, DETAIL_VIEW_BORDER / DETAIL_VIEW_PARENT_BORDER, ANNOTATION_TEXT (R14 writes upper-case layer names, behaviours ~6165) | ✅ fixed (api) for this drawing; hatches, dimensions and tables not in it (not checked) | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (R14 AC1014, INSUNITS 4: DIMENSION 2, LINE 95, CIRCLE 7, ELLIPSE 4, MTEXT 46, POLYLINE 9, SOLID 4) |
 | D13 DRAWN name after reopening (pass 24, 2026-10-24) | d10 drawing: "ROOT" in DRAWN before and after closing and reopening the document | ✅ fixed |  |
 | D6 / 2.2 Dimension near an edge's midpoint (pass 24) | d, hover 7 px off the left view edge's midpoint: the whole edge highlights; click, move, click: length dimension "20" of the edge (live "asb (b)": the edge is picked, never its midpoint) | ✅ |  |
 | D8 (dx 10-27, main 9932ff31, CLI) | Callout on the pin's silhouette in an assembly drawing's isometric view (plate + Ø10 pin) | the pin's BOM item number "2" (drawing_get now lists silhouettes; /root/dx-scratch/d8/d8.py) | ✅ D8 |  |
