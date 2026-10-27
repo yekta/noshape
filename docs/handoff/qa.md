@@ -27,6 +27,11 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   hollow 60/60, rim 36/36, transform 5/5, split / mid plane exact; UI Part mirror about Right = 121558.969 (2×).
   featmatrix's hole patterns fail only through API-REMOVE-DIR; patmatrix's ×50/×100 overlapping holes now fail "Could not
   create all instances as entered" on purpose (live's rule, pattern.rs copies_fail); holematrix (now styleV2) 12/12 exact.
+- Also OK (green 525c619b, 05:20–05:50): drawing Update after a depth change (views follow, the dimension stays, the
+  button goes dim), STL import (+ › Import…: "l30" Part Studio, mesh 60774.111 = the file), UI sketch on a face → circle
+  → Ø dimension 10 → Remove extrude (34044.055 exact), dimension editor, undo empty after reopen (= live).
+- **New P0 seen while smoking: BOOL-THREAD-CRASH** (OCCT boolean segfaults on pool threads, nondeterministic; fuzz seed
+  72 twice on the watcher CLI 04:06); REGEN-NO-CANCEL (P0). **The release CI's Windows build failed** (TICKETS).
 - Known open in the release: DRAFT-HANG (P0: a draft can spin forever; the app's regen then never ends), SHELL-SLOW (a
   failing shell 52 s), REGEN-SPEED, API-REMOVE-DIR (P1: scripted REMOVE extrudes miss; featmatrix's hole patterns fail).
 - Pending: the CI artifact (run 40452492018) for the version string and the crash documents.
