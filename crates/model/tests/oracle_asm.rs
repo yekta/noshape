@@ -353,8 +353,6 @@ const LIVE_MATES: &[(&str, &str, bool, &str)] = &[
 /// connectors and solver. The test fails on a new difference and on a known
 /// one that matches again.
 const KNOWN: &[(&str, &str)] = &[
-    ("R3", "skasm: Revolute on cylinder MID_AXIS_POINTs: the connector Z is the cylinder's axis, back toward the sketch as live (core: the pin flips as live); live then turns the flipped pin rz −157.5° (B at (314.75, 96.61, 20)), ours keeps the turn (rz 0, skasm least change at the connectors)"),
-    ("C1", "skasm: Cylindrical on cylinder axes: as R3 (live rz −157.5°, translationZ +50 mm; ours rz 0, translationZ as live)"),
     ("M1", "skb: Revolute (bottom on top) + Slider (front faces): live keeps B upright, turned 30° at (7.68, −8.66, 10); ours turns it upside down"),
 ];
 

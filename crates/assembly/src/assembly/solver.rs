@@ -953,14 +953,19 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
 /// meets too) start on the requested side: a moving body whose connector Z
 /// points the wrong way is turned 180° about its connector's X axis (live
 /// behaviours "qa4 round 5 s3 mate flip": Flip primary axis turns the pin
-/// over for Revolute, Cylindrical and Planar).
+/// over for Revolute, Cylindrical and Planar). Exactly opposed axes (any
+/// half-turn would do) turn as live does: about the world axis Z × w, Z the
+/// moving connector's axis, w the constant [`HALF_TURN_W`] (behaviours
+/// "skasm (2026-10-27): oracle_asm R3 rule for a flipped part": the part's
+/// own turn about the axis carries through).
 fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
     for m in mates {
         if m.follow.is_some() || !matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel) {
             continue;
         }
         let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
-        if (relative(&poses, m).rotation * DVec3::Z).z >= 0.0 {
+        let z_rel = (relative(&poses, m).rotation * DVec3::Z).z;
+        if z_rel >= 0.0 {
             continue;
         }
         let (moving, local) = if !bodies[m.a].fixed {
@@ -971,11 +976,16 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) {
             continue;
         };
         let c = bodies[moving].pose.mul(&local);
-        let turn = DQuat::from_axis_angle(c.rotation * DVec3::X, std::f64::consts::PI);
+        let axis = (z_rel < -1.0 + 1e-9).then(|| (c.rotation * DVec3::Z).cross(HALF_TURN_W).try_normalize()).flatten().unwrap_or(c.rotation * DVec3::X);
+        let turn = DQuat::from_axis_angle(axis, std::f64::consts::PI);
         let p = bodies[moving].pose;
         bodies[moving].pose = Frame { origin: c.origin + turn * (p.origin - c.origin), rotation: (turn * p.rotation).normalize() };
     }
 }
+
+/// Live's world vector for exact half-turns (fitted over 14 runs to 3e-16;
+/// y / x from the R3 transform's full digits).
+const HALF_TURN_W: DVec3 = DVec3::new(0.94143788, 0.187_457_292_343_560_82, 0.28027574);
 
 /// A Ball mate's cone limit broken at the start is met by the least turn
 /// (live oracle_asm B2: a block started upright on a 30° cone about the
