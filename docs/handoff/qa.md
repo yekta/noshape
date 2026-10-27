@@ -3,7 +3,12 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Requests to the lead (qa, updated 2026-10-27 07:55)
+## Requests to the lead (qa, updated 2026-10-27 10:35)
+- LP-DIRECTION-PICK (P1 psui): 4e55b01f verified on green e8858e61 for Linear pattern Direction (Feature / Part / Face,
+  Direction first too), Fillet edges, Shell faces and a custom feature with `"Filter" : EntityType.EDGE`. **Not fixed**: a
+  custom feature whose filter is `EntityType.EDGE && QueryFilterCompound.ALLOWS_AXIS` (MaxNumberOfPicks 2) still gets no
+  hover and no pick in the dialog (the API takes the edges), so the user's custom-feature example stays broken in v0.4.10.
+  Needs a psui owner for compound query filters in the pick filter.
 - release/v0.4.9 (7ee597e0) still lacks 2d6719c2 (Windows include), a117663d (DRAFT-HANG budget) and 011aaf43 (serial
   booleans, BOOL-THREAD-CRASH; replays running). Recut / cherry-pick. Earlier: the Windows build fails on `#include <cxxabi.h>` in crates/kernel/cpp/common.cpp:1273
   (MSVC C1083; also on main). Needs a guard before the release can publish (TICKETS "Release v0.4.9").
@@ -27,6 +32,11 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 - SHELL-WALLS: wrong solid with status OK (also in v0.4.8).
 
 ## Daily release smoke
+### Checklist rows run on every release (in addition to the open / regen / export / drawing / assembly / kill -9 rows below)
+- **hover + pick in a feature dialog** (LP-DIRECTION-PICK regression, from 2026-10-27): lpd.noshape (bin/lpdoc.py) →
+  Linear pattern in Feature, Part and Face mode: Direction pre-highlights and picks an edge at its middle and a face (not
+  the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
+  (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
 ### v0.4.9 recut (release/v0.4.9 7ee597e0 = main 502416cc + "Release v0.4.9"), 2026-10-27 05:00, smoke on green 502416cc
 - **The earlier blocker is gone**: the recut contains bf8aaee2 / 87e8275f (crash guard, OCCT patch, DOC-POISON rollback),
   7a04ba4d (SHELL-WALLS) and 97081557 (blend budget). The five crash documents open in the green app (bcf401ca and later);
