@@ -20,7 +20,7 @@ it, so re-take positions after every selection.
 | 1.1 | Start window › Create › Document… | Dialog with the name "Untitled document" selected | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 1.2 | Type a name, Enter | Creates and opens it | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 1.3 | New document contents | Part Studio 1 (active) + Assembly 1; "Features (4)", Default geometry, rollback bar under Right, "Parts (0)"; isometric | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| 1.4 | Start window footer version | (ours) should read the release version | ✅ re-checked 10-23 on main 88fbf8f5: footer "(0.4.6.88fbf8f5fa11)" = release version + commit (was ✗ F27) |  |
+| 1.4 | Start window footer version | (ours) should read the release version | ❌ (VERSION-FOOTER-STALE) re-checked 10-23 on main 88fbf8f5: footer "(0.4.6.88fbf8f5fa11)" = release version + commit (was ✗ F27) | 0.4.10+ / daf1f50c 10-27 (footer "(0.4.6.daf1f50c6bcf)") |
 
 ## 2. Sketch on Top (live: "Sketch mode", "Input behaviour" › G)
 
