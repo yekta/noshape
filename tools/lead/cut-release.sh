@@ -25,7 +25,9 @@ open(p,'w').write(s)
 P
   git add Cargo.toml Cargo.lock; $G commit -q -m "Release v$V"
   git push -q -f origin release/v$V
-  echo "pushed release/v$V at $(git rev-parse --short HEAD) (from $S, version $old -> $V); tag it once CI on the branch is green"
+  # CI runs on the branch only when fixes were cherry-picked (the base already passed on all three platforms).
+  [ $# -gt 0 ] && gh workflow run ci.yml -R yekta/noshape --ref release/v$V && echo "CI started on release/v$V (cherry-picked fixes)"
+  echo "pushed release/v$V at $(git rev-parse --short HEAD) (from $S, version $old -> $V)"
   git checkout -q --detach origin/main;;
 tag)
   V=$2; git checkout -q --detach origin/release/v$V

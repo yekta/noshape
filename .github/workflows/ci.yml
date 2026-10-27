@@ -3,10 +3,11 @@ name: CI
 on:
   # Test tiers (docs/TESTS.md). The lead's watcher tests every main commit with T0+T1 on Linux and moves the tag
   # `last-green`. CI runs T1 on Linux, macOS and Windows: every 3 hours on the current last-green (scheduled, so runs
-  # don't cancel each other; a tag push per green commit did, 10-27), and on each release branch (release/v*). T2
+  # don't cancel each other; a tag push per green commit did, 10-27); a release branch with cherry-picked fixes gets a
+  # run from cut-release.sh (workflow_dispatch). T2
   # (deep) runs Sundays on all three and never blocks anything.
   push:
-    branches: [ci, 'release/v*']
+    branches: [ci]
   pull_request:
   schedule:
     - cron: '17 */3 * * *' # T1 on the current last-green
