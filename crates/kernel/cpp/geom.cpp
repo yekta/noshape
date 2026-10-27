@@ -772,7 +772,7 @@ PropsF props_volume(const OcShape& s)
 PropsF props_surface(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
-  return to_props(surface_props(s.shape));
+  return to_props(s.surface_props([&] { return surface_props(s.shape); }));
 }
 
 PropsF props_linear(const OcShape& s)

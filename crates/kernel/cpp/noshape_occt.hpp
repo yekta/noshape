@@ -21,6 +21,7 @@
 #include <chrono>
 #include <typeinfo>
 #include <array>
+#include <map>
 #include <atomic>
 #include <cstdint>
 #include <exception>
@@ -283,6 +284,19 @@ public:
     return myVolume;
   }
 
+  // Surface (area) properties, computed once like the volume.
+  template <class F>
+  const GProp_GProps& surface_props(F&& compute) const
+  {
+    std::call_once(mySurfaceFlag, [&] { mySurface = compute(); });
+    return mySurface;
+  }
+
+  // Ancestor maps (CSR offsets, values) by kind * 16 + ancestor kind,
+  // computed once: regeneration asks for the same ones of a body many times.
+  mutable std::mutex                                                                 myAncestorsLock;
+  mutable std::map<int, std::pair<std::vector<uint32_t>, std::vector<uint32_t>>> myAncestors;
+
   TopoDS_Shape shape;
 
 private:
@@ -290,6 +304,8 @@ private:
   mutable ShapeIMap      myMaps[TopAbs_SHAPE + 1];
   mutable std::once_flag myVolumeFlag;
   mutable GProp_GProps   myVolume;
+  mutable std::once_flag mySurfaceFlag;
+  mutable GProp_GProps   mySurface;
 };
 
 // Growable list of shapes used to pass shape arrays across the bridge.

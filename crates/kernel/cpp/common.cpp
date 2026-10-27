@@ -479,7 +479,33 @@ int64_t index_of(const OcShape& s, const OcShape& sub, uint8_t kind)
   return i > 0 ? i - 1 : -1;
 }
 
+static Csr ancestor_map_uncached(const OcShape& s, uint8_t kind, uint8_t ancestor_kind);
+
 Csr ancestor_map(const OcShape& s, uint8_t kind, uint8_t ancestor_kind)
+{
+  const int key = kind * 16 + ancestor_kind;
+  {
+    std::lock_guard<std::mutex> g(s.myAncestorsLock);
+    auto                        it = s.myAncestors.find(key);
+    if (it != s.myAncestors.end())
+    {
+      Csr out;
+      out.offsets.reserve(it->second.first.size());
+      for (uint32_t v : it->second.first)
+        out.offsets.push_back(v);
+      out.values.reserve(it->second.second.size());
+      for (uint32_t v : it->second.second)
+        out.values.push_back(v);
+      return out;
+    }
+  }
+  Csr out = ancestor_map_uncached(s, kind, ancestor_kind);
+  std::lock_guard<std::mutex> g(s.myAncestorsLock);
+  s.myAncestors[key] = {std::vector<uint32_t>(out.offsets.begin(), out.offsets.end()), std::vector<uint32_t>(out.values.begin(), out.values.end())};
+  return out;
+}
+
+static Csr ancestor_map_uncached(const OcShape& s, uint8_t kind, uint8_t ancestor_kind)
 {
   const TopAbs_ShapeEnum k  = to_kind(kind);
   const TopAbs_ShapeEnum ak = to_kind(ancestor_kind);
