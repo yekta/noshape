@@ -153,6 +153,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   live 617 ms (491 / 116). v0.4.8 release CLI: a full regen of the 30-feature part (query_mass_properties, process
   0.62–0.76 s, ~0.2 s of it start-up) ≈ 0.45–0.55 s at load ~25, still 2.5–3× the budget
   (qa 2026-10-26, build 4d2f6b0c)
+  qa 2026-10-27 green 16cdcf6d (load 30–42): edit Extrude 1 depth to a new value each time (alternating 10/12 is served
+  from a result cache in 2–3 ms, so it can't be timed): 11 → 1046 ms, 13 → 1681 ms (29 features evaluated; Boss 1/2
+  52–65 ms, Hole 1 30, Linear pattern 1 27, fillets ~11 each); at 14–17 the block swallows the bosses so later times
+  (597 / 861 / 360 ms) are on a degenerate model. Undo: the last two states come back cached (2–3 ms), the third undo
+  re-evaluates all 29 features (886 ms), far over the 50 ms undo budget; keep more states (or every undo target) cached
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
 - [x] (core 10-27: live's numbers exactly, 1 mm 3998.632 / 33 faces, 2.5 mm 8503.961 / 47; kernel test shell.rs shell_block_with_close_holes_like_onshape back in T1) P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
