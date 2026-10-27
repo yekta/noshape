@@ -20,7 +20,7 @@ the error-string table's.
 | 3 | Screw on wrong types | "Screw relations require one cylindrical mate." | no period | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
 | 4 | Linear on wrong types | "Linear relations require two translational degrees of freedom." | no period | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
 | 5 | Relation's mate deleted | "One or more mates in this relation do not exist." | "Relation mate does not exist" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
-| 6 | Relation's mate suppressed | (error string exists, but live shows Inactive: row 17) | "Relation mate is suppressed" | 🔧 |
+| 6 | Relation's mate suppressed | (error string exists, but live shows Inactive: row 17) | "Relation mate is suppressed" | ✅ (T: assembly `relation_measured_from_stored_reference` E5: inactive, skasm 10-27) |
 | 7 | Relation's mate failed | "One or more mates in this relation are invalid." | "Relation mate could not be resolved" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
 | 8 | Width with one connector | "Two width mate connectors are required." | "Width mate needs two width mate connectors" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
 | 9 | Secondary axis ∥ primary | "Failed to resolve mate connector. Secondary axis conflicts with primary axis." | "Secondary axis can't be parallel to the primary axis" | 🔧 |
@@ -39,8 +39,8 @@ the error-string table's.
 | 22 | Insert the assembly into itself (E14) | not offered; search "No assemblies match current search." | not offered; "No results." | 🔧 |
 | 24 | Second pick on the same instance (E1) | not accepted; title "Fastened 1 did not regenerate properly: Mate needs two mate connectors." | a yellow alert "Select a mate connector on a different instance" | 🔧 |
 | 25 | Dialog errors (all assembly feature dialogs) | red title with tooltip "<name> did not regenerate properly: <text>" (mate, relation, pattern) | red title, no tooltip; mate errors in a yellow alert box | ✅ (GUI green dc3a03f6, skasm 10-27) |
-| 26 | Tangent dialog fields | two "Face, edge or vertex" fields; incomplete: "Tangent mate needs two entities." | one "Mate connectors" field | 🔧 |
-| 27 | Width tab field | "Tab mate connector(s)" | "Tab mate connectors" | 🔧 |
+| 26 | Tangent dialog fields | two "Face, edge or vertex" fields; incomplete: "Tangent mate needs two entities." | one "Mate connectors" field | ✅ (GUI green 19555ca3, skasm 10-27: two "Face, edge or vertex" fields, empty → "Nothing selected.") |
+| 27 | Width tab field | "Tab mate connector(s)" | "Tab mate connectors" | ✅ (GUI green 19555ca3, skasm 10-27) |
 | 28 | Part deleted (E15) | instance rows red "Failed to resolve instance."; connector mate "Failed to resolve the instance for mate." (its chip red); face mate "Selection is invalid." with "Missing entity of …" chips; mate connector "Failed to resolve mate connector origin."; badges "Assembly contains error" / "Mate error" | "Part no longer exists in its Part Studio …", "Instance no longer exists"; no badge tooltips | 🔧 |
 | 29 | Secondary axis conflict (E16) | the title red with the error tooltip, only the secondary chip red | no title error | 🔧 |
 | 30 | Animate | absent for Ball / Fastened; 0→360 deg / 0→25 mm, Steps 300, Reciprocate; one DOF auto-filled, several: empty until picked in "Select degree of freedom" (⟳ z first, then ↹ x, y, z) | Animate on Ball; 0→half the assembly size; first DOF pre-filled, translations first, chips "↔" | 🔧 |
