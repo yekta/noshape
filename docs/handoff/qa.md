@@ -3,31 +3,33 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Session 3 (qa on a fresh account, from 19:05; greens fa61ba6f → 965d3f56 → 8602df0d → dd1b5037)
+## Session 3 (qa on a fresh account, from 19:05; greens fa61ba6f → 965d3f56 → 8602df0d → dd1b5037 → daf1f50c)
 - Verified: EXPORT-OBJ-ZIP-NAME (fa61ba6f); re-verified SURF-EXTRUDE-SKETCH-EDGES, BOX-FILLET-FACES (fa61ba6f);
   PREVIEW-SELF-PICK, DUP-COINCIDENT, FILLET-POINT-MSG (dd1b5037).
-- Checklists done: **workflow-p1-pass** (all ✅ rows), **workflow-bracket 12/12** (re-run in the app, = live once the pattern
-  follows live's edge direction), **workflow-analysis 12/12** (interference tooltip exact now). sketch.md: ~45 more rows
-  (1.8's "Enter accepts" is outdated: live doesn't, = ours); ~45 left, mostly T:-only or needing variables / text / circular.
+- Checklists done: **workflow-p1-pass** (all ✅ rows), **workflow-bracket 12/12**, **workflow-analysis 12/12**,
+  **workflow-units 8/8**; workflow-keyboard-mouse 33/40 (KB1, KB3 hold now), cursors 20/34 (read back with
+  **bin/xcur.py**: XFixes cursor image / hotspot; wait ~2 s after a move on this box, frames are slow), workflow-surfaces
+  6/13, workflow-advanced-part-studio 9/46 (sweep / fillet / draft exact on the CLI: bin/advmatrix.py), interaction 36/44,
+  sketch.md ~55 more rows (1.8's "Enter accepts" is outdated: live doesn't; ~40 left, mostly T:-only).
 - New tickets: **P0 FILLET-OVERSIZE-OK** (core: fillets / chamfers of two edges whose rounds overlap on the face between them
   report Ok with impossible solids, R50 can empty a part; single oversize edges = live; still on dd1b5037; live asked),
   **P1 SKETCH-GLYPH-LAYOUT-LOST** (skasm regression: psb's 10-25 merges a7913bbe / 8439c48c dropped 45690459, 74dc1f8c and
   7fa4f33d's UI halves), P2 ASM-PATTERN-EDIT-TAKES-SELECTION (live confirmed), P2 SKETCH-FILLET-STUCK-RADIUS,
-  P3 SKETCH-PATTERN-GLYPH-HOVER, P3 ORIGIN-COINCIDENT-GLYPH. PATTERN-EDGE-DIR-FLIPPED closed: live = ours.
-- Live requests open: FILLET-OVERSIZE-OK cases, section view + a feature started (stacked dialogs; ours: Section view on
-  top, 1st Esc closes it).
-- Merge-loss audit (tickets/merge-audit-1027.txt): checked in the app and **not** lost: e4799ab4 Thicken flip, 703545e4 Move
-  face Direction, 38a14f20 midpoint marker (replaced by a newer live capture), 8284b6b4 (O key does nothing), 5b048262 (box
-  takes no planes / Origin), 259270b6 (box line colours), Not checked: 11e83152 (failing feature inputs red; my try hit FILLET-OVERSIZE), 98ae008e edge LOD,
-  6c040449 assembly section arrow, 4a0e07c2 Hole merge scope, 4083c486 watermarks.
-- bin/oversize.py (CLI oversize / overlap matrix on a 40×20×10 block). No CLI for green builds after 12:08; geometry checks
-  on newer greens are in the app.
+  P3 SKETCH-PATTERN-GLYPH-HOVER, P3 ORIGIN-COINCIDENT-GLYPH. Closed: PATTERN-EDGE-DIR-FLIPPED (live = ours).
+  CLI-only: feature-sweep L45b now fixed; ADV2 (loft volume −1.8e-6) has a 2nd data point.
+- Live requests open: FILLET-OVERSIZE-OK cases, Section view + a feature started (stacked dialogs), tab manager + Esc,
+  assembly instance filter vs pattern instances.
+- Merge-loss audit (tickets/merge-audit-1027.txt): checked in the app, **not** lost: e4799ab4, 703545e4, 38a14f20 (replaced),
+  8284b6b4, 5b048262, 259270b6. Not checked: 11e83152 (failing feature inputs red), 98ae008e, 6c040449, 4a0e07c2, 4083c486.
+- To re-test: SKETCH-LINE-MENU on the line itself (skasm: my shot had the pointer on the endpoint).
+- No CLI for greens after the 12:08 main build; geometry checks on newer greens are in the app. Main's kernel didn't build on
+  Linux at ~20:30 (skasm's request: features.cpp `far` after fea4d943), so green may stall at daf1f50c.
 - v0.4.11 was published 15:13 (not smoked by qa); the v0.4.10 binary in rel/k/v0410 is gone (disk loop).
-- Next: untouched P1 checklists (workflow-surfaces, workflow-units, workflow-keyboard-mouse, cursors,
-  workflow-advanced-part-studio, workflow-feature-sweep's ✅ rows); sketch.md rest. 04:30: P0 blockers at the top of TICKETS.
+- Next: UI fuzz on daf1f50c (seed 41 running); P2 assembly / drawing checklists; sketch.md rest. 04:30: P0 blockers at the
+  top of TICKETS for the 05:00 release.
 
 ## Parity re-verification (lead 10-27 13:50; standing, high priority)
-**P1 verified: see session 3 (pv.py count: 715 of 2025 rows overall)** (❌ open: SKETCH-LINE-MENU, FILLET-POINT-MSG (sketch.md); DIALOG-OK-STATE resolved f16b31c6; HOLE-SIZE-NO-DIAMETER, DIM-AC-ENTER, TAB-EXPORT-MISSING fixed and verified f16b31c6; OTF-FIRST-KEY, BOX-FILLET-FACES, SURF-EXTRUDE-SKETCH-EDGES fixed and verified (6cbb24e0 / 203c4d6f); SPACE-CHECKBOX and SHORTCUT-MAP-FOCUS fixed and verified). Column "Verified" = `0.4.10+ / <green> <date>`
+**Verified rows: see session 3 (pv.py count docs/parity/*.md)** (❌ open: SKETCH-LINE-MENU, FILLET-POINT-MSG (sketch.md); DIALOG-OK-STATE resolved f16b31c6; HOLE-SIZE-NO-DIAMETER, DIM-AC-ENTER, TAB-EXPORT-MISSING fixed and verified f16b31c6; OTF-FIRST-KEY, BOX-FILLET-FACES, SURF-EXTRUDE-SKETCH-EDGES fixed and verified (6cbb24e0 / 203c4d6f); SPACE-CHECKBOX and SHORTCUT-MAP-FOCUS fixed and verified). Column "Verified" = `0.4.10+ / <green> <date>`
 (green after v0.4.10). Helper: /root/qa-scratch/bin/pv.py (`count`, `list FILE`, `set FILE ROW TEXT [--fail TICKET]`);
 sessions /root/qa-scratch/bin/pvs.sh, shots /root/qa-scratch/pv/. Live reference = behaviours.md; rows with no live record
 go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (left: 5.8b, 5.16, 5.34, 6.24 (need a dimensioned sketch), 7.6 (needs surfaces / composite), 10.7a / 10.8 (section manipulator, 3 planes), 11.4 (no-material mass props asked live), 13.13 (configurations); sketch.md §1–8 in progress (rows exercised in the app marked; T:-only rows left for later); workflow-sketch-tools.md done (left: SK5 CLI, SEL1); workflow-booleans.md 28/28 (bool-base / merge-base copies in qa-scratch, volumes via bin/qparts.sh); 5.2 Enter on an empty feature asked live). Session moved to the Stablecog account 14:10; §4–5 on green 6011065d.
