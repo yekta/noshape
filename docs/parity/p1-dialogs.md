@@ -77,7 +77,7 @@ live and replayed in ours from the same points; side-by-side crops in
 | Fillet (Full round, Measurement, Control, Asymmetric, Partial, Variable, Smooth corners) | ✅ | Vertices / Points on edges: no reorder (`PREVENT_ARRAY_REORDER`) |  |
 | Chamfer (types, Tangent) | ✅ | |  |
 | Draft (Parting line), Shell (Hollow) | ✅ | |  |
-| Hole (Inch / Metric, Simple / Counterbore / Countersink) | ✅ | live's 11.25 mm counterbore was its remembered Metric M6 value |  |
+| Hole (Inch / Metric, Simple / Counterbore / Countersink) | ❌ (HOLE-SIZE-NO-DIAMETER) | live's 11.25 mm counterbore was its remembered Metric M6 value | 0.4.10+ / 2a6d0167 10-27 |
 | Linear / Circular / Curve pattern (Feature, Face, Second direction, Skip instances) | 🔧 | Skip instances: "Instances to skip" is one field taking clicks on the instance points (`ALLOW_ARRAY_FOCUS`, `TOGGLE_POINTS`): 11 px white discs ringed #606a72, hovered #134e96, skipped #a2b9df and the instance gone, the seed a 4 px white dot; items "(1, 0) ×", a CLEAR button ("Clear all items"); no "Add instance" button |  |
 | Mirror, Boolean, Split, Transform, Plane | ✅ | |  |
 
