@@ -349,6 +349,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Remove away from the part as live's dialog does (behaviours 309, same red tool + toast), but live's REST API keeps the
   parameter default, along the normal (behaviours 6494): the API should store what the caller gave, else the schema
   default (qa 2026-10-27, watcher CLI 04:06 ≥ bcf401ca)
+  dx 10-27: the flip is std's extrudeEditLogic (canSetBooleanFlip) run by feature_add as the open dialog runs it, on
+  purpose (T0 e2e::feature_add_makes_the_dialogs_choices: a Remove sketched on the part's top face flips *into* the part
+  and cuts; live's REST default `false` there points away and cuts nothing). Storing the schema default would fix this
+  case (sketch on the Top plane under the part) and break that one. Decision for the lead: (a) keep the dialog's choice
+  (live UI), (b) the REST default (live API), or (c) dx's proposal: keep the dialog's flip only when the preview then
+  touches the merge scope, else the default (an agent can't see the red tool). Waiting on it (dx handoff).
 - [x] (dx 10-27: a body's vertices are welded by position: 3MF one closed mesh by index, test export::tests::three_mf_bodies_are_manifold_by_index; OBJ one `v` per position, each face keeping its `vn` normals; OBJ stays in metres) P2 EXPORT-MESH-SHARED 3MF and OBJ exports don't share vertices between faces: tests/perf/live-30-features.noshape
   › Part 1 › Export… › 3MF (Medium) gives 3700 vertices for 2495 distinct positions and 4994 triangles, and 2332 of 14982
   directed edges have no opposite by vertex index (every face is its own island), although by position the mesh is

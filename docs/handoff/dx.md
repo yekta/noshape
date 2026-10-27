@@ -79,6 +79,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- API-REMOVE-DIR (TICKETS): pick (a) the dialog's flip as now, (b) live REST's default, or (c) dx's proposal (the
+  dialog's flip only when the flipped tool then reaches the merge scope). The ticket has the trade-off.
 - App-core (doc_model.rs is in your move): TWO-PROCESS-LOST-EDIT's live half. A ~1.5 s timer per open document:
   `if !self.has_pending() && self.session.sync_external()? { self.reloaded(cx) }` (one SQLite query when nothing
   changed). Then the other window of the same file shows each edit within seconds, as live; edits were already
