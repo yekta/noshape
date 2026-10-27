@@ -3293,16 +3293,16 @@ static bool fillet_square_corner(const TopoDS_Shape& s, const TopoDS_Edge& e, do
         return no(8);
       TopoDS_Vertex x0, x1;
       TopExp::Vertices(TopoDS::Edge(x.Oriented(TopAbs_FORWARD)), x0, x1);
-      const TopoDS_Vertex far = x0.IsSame(V[i]) ? x1 : x0;
+      const TopoDS_Vertex far_v = x0.IsSame(V[i]) ? x1 : x0;
       if (on(x, F1))
       {
         a[i]  = x;
-        fa[i] = far;
+        fa[i] = far_v;
       }
       else if (on(x, F2))
       {
         b[i]  = x;
-        fb[i] = far;
+        fb[i] = far_v;
       }
     }
     if (a[i].IsNull() || b[i].IsNull())
@@ -3412,10 +3412,10 @@ static bool fillet_square_corner(const TopoDS_Shape& s, const TopoDS_Edge& e, do
     if (w1.IsNull() || w2.IsNull())
       return no(19);
     // a, b shortened to the tangent points, in their own direction.
-    auto shortened = [&](const TopoDS_Edge& x, const TopoDS_Vertex& w, const TopoDS_Vertex& far) {
+    auto shortened = [&](const TopoDS_Edge& x, const TopoDS_Vertex& w, const TopoDS_Vertex& far_v) {
       TopoDS_Vertex x0, x1;
       TopExp::Vertices(TopoDS::Edge(x.Oriented(TopAbs_FORWARD)), x0, x1);
-      return x0.IsSame(V[i]) ? BRepBuilderAPI_MakeEdge(w, far).Edge() : BRepBuilderAPI_MakeEdge(far, w).Edge();
+      return x0.IsSame(V[i]) ? BRepBuilderAPI_MakeEdge(w, far_v).Edge() : BRepBuilderAPI_MakeEdge(far_v, w).Edge();
     };
     na[i] = shortened(a[i], w1, fa[i]);
     nb[i] = shortened(b[i], w2, fb[i]);
