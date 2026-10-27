@@ -523,7 +523,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Likely cause (docs/handoff/kernel-robustness.md, gate (a)): `schedule_regen` aborts each running run "it doesn't
   extend"; a rollback above the running feature is a prefix of the running run, so it is treated as extended and waits
   for the whole run instead of taking the cached prefix at once.
-- [x] a9f68288 P2 LOFT-SKETCH-HIDE fixed (psui 10-27): every sketch a feature uses is hidden (a loft both profiles), also one picked in a later edit (model-core `used_sketches`, ops::studio). Was: a Loft hides only its first profile's sketch: Sketch 1 = 40×40 square on Top, Plane 1 = Top
+- [x] verified green e8858e61 (qa 11:56: loft2.noshape, old Loft deleted, Sketch 1 shown again; new Loft picking the circle first then the square, ✓: both Sketch 1 and Sketch 2 get the eye-slash and their outlines go; tickets/loft-sketch-hide-green.png) a9f68288 P2 LOFT-SKETCH-HIDE fixed (psui 10-27): every sketch a feature uses is hidden (a loft both profiles), also one picked in a later edit (model-core `used_sketches`, ops::studio). Was: a Loft hides only its first profile's sketch: Sketch 1 = 40×40 square on Top, Plane 1 = Top
   offset 40, Sketch 2 = Ø24 circle on it (/root/qa-scratch/loft2.noshape); Loft, pick the circle then the square, ✓: Sketch 2
   goes grey with the eye-slash, Sketch 1 stays shown (its menu says Hide) and its outline stays drawn; pick the square first
   and it's the other way round (only Sketch 1 hidden, the circle stays drawn). Live hides every sketch a feature uses
@@ -645,7 +645,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   "Parts to find match in"; live starts on **Match edges on face** (the select's tooltip "Edge match scope") and renames
   the last field **"Faces to find match in"** (behaviours "qa (2026-10-27, P2 batch 2)" (4)); repro asm5.noshape-like
   plate + pin, Cylindrical on edge centres, Replicate › Instances = the pin (qa 2026-10-27, green 16cdcf6d)
-- [x] 3bcb5145 P1 SKETCH-DRAG-BIG dragging a corner in a 1000-entity sketch (10 × 10 rectangles + 100 circles, made with
+- [x] verified release v0.4.10 (qa 11:56, NOSHAPE_PERF=1, load 47: bigsketch.noshape, drag a corner vertex 20 steps: the sketch regen per step 7–16 ms, median 9, every step under a 60 Hz frame; 204 ms for the commit on release; tickets/sketch-drag-big-v0410-perf.txt) 3bcb5145 P1 SKETCH-DRAG-BIG dragging a corner in a 1000-entity sketch (10 × 10 rectangles + 100 circles, made with
   sketch_draw shapes; /root/qa-scratch/cli/bigsketch.noshape) re-evaluates the sketch feature per drag step in 72–113 ms
   (green dev build, load ~25; NOSHAPE_PERF "regen: 1 features evaluated"); budget: under one 60 Hz frame. Re-time on a
   release build; the step looks like a full sketch regen (regions included) rather than a solver-only update (qa
