@@ -195,6 +195,10 @@ Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER
 in Extrude's regions field picks the face), ORD-BASE.
 
 ## 11:35–12:03 (green e8858e61 still; watcher build 0a25dd1a = all six app crates split, 11:32)
+- **Green 0d75aa8e (12:04, all six app crates split)**: tool-open smoke 87 names: every crop pixel-identical to green
+  e8858e61's (79 dialogs, 8 hidden types absent); pick sweep 27 / 28 as before (Hole refuses an edge); verified
+  API-ASM-CONFIG-NAMES, CONFIG-INPUT-ID (lists), PERF-TOTAL-MISMATCH (1.13 s both), Ctrl+Space in the FS editor. New
+  P0 SKETCH-SOLVE-SPLINE-SLOW from the timed sketch fuzz (also v0.4.10: 61 s for one coincident). (12:31)
 - The split's hooks (main.rs-registered calls from the split UI crates) all open on 0a25dd1a: Part context menu ›
   Assign material (Material panel, Onshape Material Library), Export (Parasolid 38.1), Release (Create Release
   candidate), Create Drawing (templates, creates "Part 1 Drawing 1" with Insert view); right strip Variable table;
