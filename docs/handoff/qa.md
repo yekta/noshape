@@ -187,6 +187,17 @@ in Extrude's regions field picks the face), ORD-BASE.
   and cancel cleanly (Esc leaves the 8 base features), no panic in the log; the other 8 (Derived mirror, Import, Point,
   Recognize, Rip, Cube, Sphere, Copy part) aren't in Search tools because they're `.hidden()` types (internal /
   deprecated / FS primitives), as expected. Contact sheets: /root/qa-scratch/ts/sheet0–3.png.
+- Pick sweep (bin/picksweep.sh, lpd.noshape, green e8858e61): 28 dialogs, one click on the part's top edge or top face
+  into the first field: 27 take it ("Edge of Extrude 1" / "Face of Extrude 1" / "Part 1" in part fields: Chamfer, Fillet,
+  Offset curve, Composite curve, Extrude, Shell, Draft, Plane, Mate connector, Move / Delete / Replace face, Offset
+  surface, Thicken, Isocline, Face blend, Split, Boolean, Transform, Mirror, Linear / Circular pattern, Body draft,
+  Intersection curve, Delete part, Enclose, Composite part); Hole (sketch points) refuses an edge, as it should. Crops
+  /root/qa-scratch/pk/d0.png, d1.png. Good release-smoke companion to the "hover + pick" row.
+- Custom features geometry (bin/cfgeom.py / cfgeom2.py, CLI 09:50): fCuboid (+ opFillet all edges), fCylinder +
+  opBoolean in a loop, sketch + opRevolve torus: volumes exact (rounded box 3839.032 = Minkowski formula); param edit,
+  undo / redo, suppress, re-commit of changed source all right; a syntax error committed puts every instance in Error
+  "Feature Studio has errors: Line 45: …". Not ticketed: an opBoolean SUBTRACT that consumes the whole target leaves no
+  part and status OK (live unknown).
 - Fuzz: batch 9 (seeds 120–127, watcher CLI 08:30): seed 120 hit the 1500 s timeout again (the BUDGET-LONGJMP malloc
   deadlock seed), 121–127 clean. Budget A/B (seeds 130–137, CLI 09:50, on vs NOSHAPE_BLEND_BUDGET=100000): 130 clean on
   both; still running (~23 min a seed). Cold-open fuzz 140–141 consistent.
