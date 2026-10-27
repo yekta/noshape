@@ -24,14 +24,14 @@ the error-string table's.
 | 7 | Relation's mate failed | "One or more mates in this relation are invalid." | "Relation mate could not be resolved" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |
 | 8 | Width with one connector | "Two width mate connectors are required." | "Width mate needs two width mate connectors" | 🔧 |
 | 9 | Secondary axis ∥ primary | "Failed to resolve mate connector. Secondary axis conflicts with primary axis." | "Secondary axis can't be parallel to the primary axis" | 🔧 |
-| 10 | Tangent on unsupported geometry / on a connector | "Geometry is not supported for tangent mate." | two long texts of ours | 🔧 (E9: cylinder–cylinder is supported; connectors are not pickable) |
+| 10 | Tangent on unsupported geometry / on a connector | "Geometry is not supported for tangent mate." | two long texts of ours | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) (E9: cylinder–cylinder is supported; connectors are not pickable) |
 | 11 | Replicate, nothing matches | "Selected target did not contain identical geometry." | "No matching geometry found (on the target instance)" | 🔧 |
 | 12 | Both connectors on one instance | "Mate connectors are on same instance." | "Both mate connectors are on the same rigid set" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) (E1: the dialog refuses the pick, row 24) |
-| 13 | Both in one group | "Mate cannot be added between member of same group." | same as 12 | 🔧 (E2 confirmed) |
+| 13 | Both in one group | "Mate cannot be added between member of same group." | same as 12 | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) (E2 confirmed) |
 | 14 | Both instances fixed (E3) | "Mate is between fixed instances."; the fix icons get a yellow ⚠, the root an error badge | no check (solves as fixed) | ✅ (GUI green dc3a03f6, skasm 10-27) |
-| 15 | Mated instance suppressed (E4) | not an error: "Revolute 2 (Inactive: One or more instances is suppressed)" | inactive, no reason | 🔧 |
-| 16 | Relations fighting (E8: two gears, ratios 1 and 2, one pair) | no error | "Relation could not be solved (conflicts with other mates or relations)" | 🔧 |
-| 17 | Relation on a suppressed / inactive mate (E4, E5) | Inactive: "Gear 1 (Inactive: One or more mates is inactive or suppressed)" | error "One or more mates in this relation are suppressed." (row 6) | 🔧 |
+| 15 | Mated instance suppressed (E4) | not an error: "Revolute 2 (Inactive: One or more instances is suppressed)" | inactive, no reason | ✅ (T: assembly `relation_measured_from_stored_reference` (E4), skasm 10-27) |
+| 16 | Relations fighting (E8: two gears, ratios 1 and 2, one pair) | no error | "Relation could not be solved (conflicts with other mates or relations)" | ✅ (T: assembly `relation_measured_from_stored_reference` (E8), skasm 10-27) |
+| 17 | Relation on a suppressed / inactive mate (E4, E5) | Inactive: "Gear 1 (Inactive: One or more mates is inactive or suppressed)" | error "One or more mates in this relation are suppressed." (row 6) | ✅ (T: assembly `relation_measured_from_stored_reference` (E4, E5), skasm 10-27) |
 | 18 | Mate limits min > max (E11) | "Minimum mate limit should be smaller than maximum limit. A parameter value is not valid.", both limit inputs pink | no check (both limits kept) | ✅ (GUI green dc3a03f6, skasm 10-27) |
 | 19 | Replicate without target scope / mate (E12) | "A target scope must be selected." / "Missing mate to be matched." (dialog title) | "Select parts to find match in" / our own | 🔧 |
 | 20 | Pattern count 0 or 2501 (E13) | count pink, title black, tooltip "… did not regenerate properly:  A parameter value is not valid." (two spaces) | pink, no tooltip | 🔧 |

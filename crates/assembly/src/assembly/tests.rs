@@ -4185,7 +4185,7 @@ fn iso_7380_button_head_matches_live() {
 
 
 
-/// Live's texts (docs/parity/workflow-assembly-sweep.md rows 1–5, 7, 12):
+/// Live's texts (docs/parity/workflow-assembly-sweep.md rows 1–5, 7, 10, 12, 13):
 /// relations on mates of the wrong kind, a relation whose mate is gone or
 /// failed, and a mate with both connectors on one instance.
 #[test]
@@ -4228,8 +4228,22 @@ fn relation_and_mate_errors_use_live_texts() {
     // Both connectors on one instance.
     asm.instance_mut(InstanceId(3)).unwrap().fixed = false;
     asm.relations.clear();
-    asm.mates.push(mate(12, MateType::Fastened, conn(2, pf.clone(), Inference::MidAxis), conn(2, pf, Inference::Centroid)));
+    asm.mates.push(mate(12, MateType::Fastened, conn(2, pf.clone(), Inference::MidAxis), conn(2, pf.clone(), Inference::Centroid)));
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     let m12 = res.mates.iter().find(|m| m.id == MateId(12)).unwrap();
     assert_eq!(m12.message.as_deref(), Some("Mate connectors are on same instance."));
+    // Two members of one group (row 13).
+    asm.mates.pop();
+    asm.groups.push(Group { id: MateId(50), name: "Group 1".into(), instances: vec![InstanceId(2), InstanceId(3)], suppressed: false });
+    asm.mates.push(mate(13, MateType::Fastened, conn(2, pf.clone(), Inference::Centroid), conn(3, pf.clone(), Inference::Centroid)));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let m13 = res.mates.iter().find(|m| m.id == MateId(13)).unwrap();
+    assert_eq!(m13.message.as_deref(), Some("Mate cannot be added between member of same group."));
+    // Tangent on the assembly Origin (row 10).
+    asm.mates.pop();
+    asm.groups.clear();
+    asm.mates.push(mate(14, MateType::Tangent, conn(2, pf.clone(), Inference::Centroid), MateConnectorRef::on(InstanceId::ORIGIN, vec![], Reference::Origin)));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let m14 = res.mates.iter().find(|m| m.id == MateId(14)).unwrap();
+    assert_eq!(m14.message.as_deref(), Some("Geometry is not supported for tangent mate."));
 }
