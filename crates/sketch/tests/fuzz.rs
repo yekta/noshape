@@ -95,3 +95,132 @@ fn random_perturbations_resolve() {
         assert!(rep.is_solved(), "case {case}: {rep:?}");
     }
 }
+
+/// Random edit sessions: shapes of every builder (rectangles, the center
+/// point rectangle's point-to-point midpoints, 3 point circles, polygons,
+/// slots, arcs), constraints and dimensions between random entities, trims,
+/// splits, fillets, offsets, deletes and drags, each followed by a solve
+/// and the regions. Nothing may panic, a solve that reports Solved leaves
+/// no residual, and every point stays finite. `SKETCH_FUZZ_SEEDS=a..b` /
+/// `SKETCH_FUZZ_STEPS=n` widen it.
+#[test]
+#[ignore = "T2: fuzz"]
+fn random_sketch_edits_never_panic() {
+    let range = std::env::var("SKETCH_FUZZ_SEEDS").ok().and_then(|s| s.split_once("..").and_then(|(a, b)| Some((a.parse::<u64>().ok()?, b.parse::<u64>().ok()?)))).unwrap_or((1, 6));
+    let steps: usize = std::env::var("SKETCH_FUZZ_STEPS").ok().and_then(|s| s.parse().ok()).unwrap_or(80);
+    for seed in range.0..range.1 {
+        eprintln!("seed {seed}");
+        let mut rng = Rng(seed * 2 + 1);
+        let mut sk = Sketch::new();
+        for step in 0..steps {
+            let p = |rng: &mut Rng| DVec2::new(rng.range(-10.0, 10.0), rng.range(-10.0, 10.0));
+            let ents: Vec<EntityId> = sk.entities().map(|e| e.id).collect();
+            let pick = |rng: &mut Rng, v: &[EntityId]| -> Option<EntityId> { if v.is_empty() { None } else { Some(v[((rng.next() * v.len() as f64) as usize).min(v.len() - 1)]) } };
+            let curves: Vec<EntityId> = sk.entities().filter(|e| e.kind() != EntityKind::Point).map(|e| e.id).collect();
+            let points: Vec<EntityId> = sk.entities().filter(|e| e.kind() == EntityKind::Point).map(|e| e.id).collect();
+            match (rng.next() * 16.0) as usize {
+                0 => {
+                    let (a, b) = (p(&mut rng), p(&mut rng));
+                    sk.corner_rectangle(a, b);
+                }
+                1 => {
+                    let (a, b) = (p(&mut rng), p(&mut rng));
+                    sk.center_rectangle(a, b);
+                }
+                2 => {
+                    let _ = sk.three_point_circle_points(p(&mut rng), p(&mut rng), p(&mut rng));
+                }
+                3 => {
+                    let n = 3 + (rng.next() * 6.0) as usize;
+                    let _ = sk.polygon(p(&mut rng), p(&mut rng), n, rng.next() < 0.5);
+                }
+                4 => {
+                    let l = sk.add_line(p(&mut rng), p(&mut rng));
+                    let _ = sk.slot_around(l, rng.range(0.1, 3.0));
+                }
+                5 => {
+                    let c = p(&mut rng);
+                    let r = rng.range(0.2, 5.0);
+                    let (a0, a1) = (rng.range(0.0, 6.28), rng.range(0.0, 6.28));
+                    sk.add_arc(c, c + DVec2::from_angle(a0) * r, c + DVec2::from_angle(a1) * r);
+                }
+                6 => {
+                    sk.add_line(p(&mut rng), p(&mut rng));
+                }
+                7 => {
+                    if let (Some(a), Some(b)) = (pick(&mut rng, &ents), pick(&mut rng, &ents)) {
+                        let kinds = [
+                            ConstraintKind::Coincident { a, b },
+                            ConstraintKind::Parallel { a, b },
+                            ConstraintKind::Perpendicular { a, b },
+                            ConstraintKind::Tangent { a, b },
+                            ConstraintKind::Equal { a, b },
+                            ConstraintKind::Horizontal { a, b: None },
+                            ConstraintKind::Vertical { a, b: Some(b) },
+                            ConstraintKind::Midpoint { point: a, curve: b },
+                            ConstraintKind::Concentric { a, b },
+                            ConstraintKind::Collinear { a, b },
+                        ];
+                        let k = kinds[((rng.next() * kinds.len() as f64) as usize).min(kinds.len() - 1)].clone();
+                        let _ = sk.add_constraint(k);
+                    }
+                }
+                8 => {
+                    if let (Some(a), Some(b), Some(c)) = (pick(&mut rng, &points), pick(&mut rng, &points), pick(&mut rng, &points)) {
+                        let _ = sk.add_constraint(ConstraintKind::MidpointOf { point: a, a: b, b: c });
+                    }
+                }
+                9 => {
+                    if let Some(c) = pick(&mut rng, &curves) {
+                        let v = rng.range(0.1, 8.0);
+                        let k = match sk.kind(c) {
+                            Some(EntityKind::Line) => ConstraintKind::Length { curve: c, value: v },
+                            Some(EntityKind::Circle) => ConstraintKind::Diameter { curve: c, value: v },
+                            _ => ConstraintKind::Radius { curve: c, value: v },
+                        };
+                        let _ = sk.add_constraint(k);
+                    }
+                }
+                10 => {
+                    if let Some(c) = pick(&mut rng, &curves) {
+                        let _ = sk.trim(c, p(&mut rng));
+                    }
+                }
+                11 => {
+                    if let Some(c) = pick(&mut rng, &curves) {
+                        let _ = sk.split(c, p(&mut rng));
+                    }
+                }
+                12 => {
+                    if let (Some(a), Some(b)) = (pick(&mut rng, &curves), pick(&mut rng, &curves)) {
+                        let _ = sk.fillet(a, b, rng.range(0.1, 2.0));
+                    }
+                }
+                13 => {
+                    if let Some(c) = pick(&mut rng, &curves) {
+                        let _ = sk.offset(&[c], rng.range(-2.0, 2.0));
+                    }
+                }
+                14 => {
+                    if let Some(e) = pick(&mut rng, &ents) {
+                        sk.remove_entity(e);
+                    }
+                }
+                _ => {
+                    if let Some(pt) = pick(&mut rng, &points) {
+                        let rep = sk.drag(&[(DragHandle::Point(pt), p(&mut rng))]);
+                        assert!(!rep.is_solved() || rep.max_residual < 1e-6, "seed {seed} step {step}: drag {rep:?}");
+                    }
+                }
+            }
+            let rep = sk.solve();
+            assert!(!rep.is_solved() || rep.max_residual < 1e-6, "seed {seed} step {step}: {rep:?}");
+            for e in sk.entities() {
+                if let Some(q) = sk.point(e.id) {
+                    assert!(q.is_finite(), "seed {seed} step {step}: point {:?} at {q:?}", e.id);
+                }
+            }
+            let _ = sk.regions();
+        }
+    }
+}
