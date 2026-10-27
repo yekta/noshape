@@ -505,6 +505,29 @@ pub struct PenSpan {
     pub lines: std::ops::Range<usize>,
     pub width_mm: f64,
     pub dashes: Vec<f64>,
+    /// The dash pattern centred on each line (Adjust linestyle, live: equal
+    /// end dashes) instead of starting at its first point.
+    pub centered: bool,
+}
+
+/// Where a dash pattern starts (its offset, mm) so that it lies centred on a
+/// line `len` long, as live draws Adjust linestyle edges ("dx linestyle
+/// dash lengths": a 40 mm Dashed edge is 4.125, gap, 3 × (6.35, gap),
+/// 4.125): whole periods after the first dash, and the first dash's
+/// remainder split between both ends.
+pub fn centered_phase(len: f64, pattern: &[f64]) -> f64 {
+    let period: f64 = pattern.iter().sum();
+    let Some(&first) = pattern.first() else { return 0.0 };
+    if !(period > 0.0) || !(len > 0.0) {
+        return 0.0;
+    }
+    let tail = period - first;
+    if len < tail {
+        return 0.0;
+    }
+    let k = ((len - tail) / period).floor();
+    let end = (len - tail - k * period) / 2.0;
+    first - end
 }
 
 /// Lines, texts and fills drawn in a color (index ranges into the
@@ -645,6 +668,18 @@ impl SheetGeometry {
     }
 
     /// Line `i`'s pen: width (mm) and dash pattern.
+    /// Line `i`'s dash offset: centred for Adjust linestyle pens, else 0.
+    pub fn line_dash_phase(&self, i: usize) -> f64 {
+        match self.pens.iter().rev().find(|s| s.lines.contains(&i)) {
+            Some(p) if p.centered && !p.dashes.is_empty() => {
+                let pts = &self.lines[i].points;
+                let len: f64 = pts.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum();
+                centered_phase(len, &p.dashes)
+            }
+            _ => 0.0,
+        }
+    }
+
     pub fn line_pen(&self, i: usize) -> (f64, Vec<f64>) {
         match self.pens.iter().rev().find(|s| s.lines.contains(&i)) {
             Some(p) => (p.width_mm, p.dashes.clone()),
@@ -1418,7 +1453,7 @@ impl SheetGeometry {
                             self.lines.push(Polyline2 { points: vec![[c[0] - s, c[1] - s], [c[0] + s, c[1] + s]], style: LineStyle::Thin, closed: false, pick });
                             self.lines.push(Polyline2 { points: vec![[c[0] - s, c[1] + s], [c[0] + s, c[1] - s]], style: LineStyle::Thin, closed: false, pick });
                         }
-                        self.pens.push(PenSpan { lines: l0..self.lines.len(), width_mm: self.style.virtual_sharp_pen, dashes: Vec::new() });
+                        self.pens.push(PenSpan { centered: false, lines: l0..self.lines.len(), width_mm: self.style.virtual_sharp_pen, dashes: Vec::new() });
                         if let Some(rgb) = self.style.virtual_sharp_color {
                             self.colors.push(ColorSpan { lines: l0..self.lines.len(), texts: 0..0, fills: 0..0, rgb });
                         }

@@ -93,7 +93,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     let mut ll: Vec<Option<SheetLayer>> = (0..g.lines.len()).map(|i| g.line_sheet_layer(i)).collect();
     let mut fl: Vec<Option<SheetLayer>> = (0..g.fills.len()).map(|i| g.fill_sheet_layer(i)).collect();
     // Line pens (Adjust linestyle); added lines use their style's pen.
-    let mut lp: Vec<Option<(f64, Vec<f64>)>> = (0..g.lines.len()).map(|i| g.pens.iter().rev().find(|s| s.lines.contains(&i)).map(|p| (p.width_mm, p.dashes.clone()))).collect();
+    let mut lp: Vec<Option<(f64, Vec<f64>, bool)>> = (0..g.lines.len()).map(|i| g.pens.iter().rev().find(|s| s.lines.contains(&i)).map(|p| (p.width_mm, p.dashes.clone(), p.centered))).collect();
     let mut tl: Vec<Option<SheetLayer>> = Vec::new();
     // Export layers (`cad_layers`) per element, kept the same way.
     // k: 0 lines, 1 texts, 2 fills.
@@ -201,7 +201,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         out.texts.retain(|_| *k.next().unwrap_or(&true));
     }
     out.colors = spans_of(&lc, &tc, &fc);
-    out.pens = lp.into_iter().enumerate().filter_map(|(i, p)| p.map(|(width_mm, dashes)| super::sheet::PenSpan { lines: i..i + 1, width_mm, dashes })).collect();
+    out.pens = lp.into_iter().enumerate().filter_map(|(i, p)| p.map(|(width_mm, dashes, centered)| super::sheet::PenSpan { centered, lines: i..i + 1, width_mm, dashes })).collect();
     let one = |i: usize, l: &Option<SheetLayer>, k: u8| l.map(|layer| LayerSpan { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, layer });
     out.layers = ll.iter().enumerate().filter_map(|(i, l)| one(i, l, 0)).chain(tl.iter().enumerate().filter_map(|(i, l)| one(i, l, 1))).chain(fl.iter().enumerate().filter_map(|(i, l)| one(i, l, 2))).collect();
     let span = |i: usize, l: &Option<CadLayer>, k: u8| l.map(|layer| super::cad_layers::CadSpan { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, layer });
@@ -294,7 +294,9 @@ pub fn to_svg(g: &SheetGeometry) -> String {
         let dash_attr = if dash.is_empty() {
             String::new()
         } else {
-            format!(r#" stroke-dasharray="{}""#, dash.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(" "))
+            let phase = g.line_dash_phase(li);
+            let offset = if phase != 0.0 { format!(r#" stroke-dashoffset="{phase}""#) } else { String::new() };
+            format!(r#" stroke-dasharray="{}"{offset}"#, dash.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(" "))
         };
         let _ = writeln!(s, r#"<{tag} points="{}" stroke-width="{}"{dash_attr}{stroke}/>"#, pts.join(" "), width_mm);
     }
@@ -599,7 +601,7 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
             content.push_str("[] 0 d\n");
         } else {
             let d: Vec<String> = dash.iter().map(|x| format!("{:.3}", x * pt)).collect();
-            let _ = writeln!(content, "[{}] 0 d", d.join(" "));
+            let _ = writeln!(content, "[{}] {:.3} d", d.join(" "), g.line_dash_phase(li) * pt);
         }
         let _ = writeln!(content, "{:.3} w", width_mm * pt);
         for (i, p) in l.points.iter().enumerate() {

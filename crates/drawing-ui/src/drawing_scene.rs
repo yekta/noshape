@@ -36,8 +36,9 @@ pub fn pen_px(style: LineStyle, width_mm: f64, zoom: f64) -> f32 {
     (width_mm * zoom * k).clamp(1.0, 7.0) as f32
 }
 
-/// Split a polyline into dashes following `pattern` (on, off, on, off...).
-pub fn dash(points: &[[f64; 2]], closed: bool, pattern: &[f64]) -> Vec<Vec<[f64; 2]>> {
+/// Split a polyline into dashes following `pattern` (on, off, on, off...),
+/// starting `phase` mm into it.
+pub fn dash(points: &[[f64; 2]], closed: bool, pattern: &[f64], phase: f64) -> Vec<Vec<[f64; 2]>> {
     let mut pts: Vec<[f64; 2]> = points.to_vec();
     if closed && pts.len() > 2 {
         pts.push(pts[0]);
@@ -54,6 +55,17 @@ pub fn dash(points: &[[f64; 2]], closed: bool, pattern: &[f64]) -> Vec<Vec<[f64;
     let mut k = 0usize;
     let mut left = pattern[0];
     let mut on = true;
+    let mut skip = phase.rem_euclid(total);
+    while skip > 1e-12 {
+        let step = left.min(skip);
+        skip -= step;
+        left -= step;
+        if left <= 1e-12 {
+            k = (k + 1) % pattern.len();
+            left = pattern[k];
+            on = k.is_multiple_of(2);
+        }
+    }
     for w in pts.windows(2) {
         let (mut a, b) = (w[0], w[1]);
         let mut seg = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
@@ -166,7 +178,7 @@ fn push_sheet_line(lines: &mut LineData, built: &BuiltSheet, li: usize, zoom: f6
     // Adjust linestyle pens override the style's width and dashes.
     let (width_mm, dashes) = g.line_pen(li);
     let width = pen_px(l.style, width_mm, zoom);
-    for piece in dash(&l.points, l.closed, &dashes) {
+    for piece in dash(&l.points, l.closed, &dashes, g.line_dash_phase(li)) {
         push(lines, &piece, color, if picked { l.pick } else { 0 }, width);
     }
 }
@@ -318,11 +330,17 @@ mod tests {
 
     #[test]
     fn dashes_follow_pattern() {
-        let d = dash(&[[0.0, 0.0], [10.0, 0.0]], false, &[3.0, 1.5]);
+        let d = dash(&[[0.0, 0.0], [10.0, 0.0]], false, &[3.0, 1.5], 0.0);
         assert_eq!(d.len(), 3);
         assert!((d[0][1][0] - 3.0).abs() < 1e-9);
         assert!((d[1][0][0] - 4.5).abs() < 1e-9);
-        assert_eq!(dash(&[[0.0, 0.0], [1.0, 0.0]], false, &[]).len(), 1);
+        assert_eq!(dash(&[[0.0, 0.0], [1.0, 0.0]], false, &[], 0.0).len(), 1);
+        // Live's 40 mm Dashed edge: 4.125, gap, 3 × (6.35, gap), 4.125.
+        let ph = noshape_model::drawing::sheet::centered_phase(40.0, &[6.35, 3.175]);
+        let d = dash(&[[0.0, 0.0], [40.0, 0.0]], false, &[6.35, 3.175], ph);
+        let lens: Vec<f64> = d.iter().map(|p| p[p.len() - 1][0] - p[0][0]).collect();
+        assert_eq!(lens.len(), 5, "{lens:?}");
+        assert!((lens[0] - 4.125).abs() < 1e-9 && (lens[4] - 4.125).abs() < 1e-9 && (lens[2] - 6.35).abs() < 1e-9, "{lens:?}");
     }
 }
 

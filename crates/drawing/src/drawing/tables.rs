@@ -821,7 +821,7 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
     }
     // Drawing properties › Tables › Line thickness: every line of the table.
     if let Some(s) = &data.style {
-        g.pens.push(super::sheet::PenSpan { lines: line0..g.lines.len(), width_mm: s.line, dashes: Vec::new() });
+        g.pens.push(super::sheet::PenSpan { centered: false, lines: line0..g.lines.len(), width_mm: s.line, dashes: Vec::new() });
     }
 }
 

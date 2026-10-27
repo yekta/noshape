@@ -320,7 +320,7 @@ fn picture_pens(g: &mut noshape_model::drawing::sheet::SheetGeometry) {
     for (i, l) in g.lines.iter().enumerate() {
         match spans.last_mut() {
             Some(sp) if sp.lines.end == i && g.lines[sp.lines.start].style == l.style => sp.lines.end = i + 1,
-            _ => spans.push(PenSpan { lines: i..i + 1, width_mm: width(l.style), dashes: l.style.dashes().to_vec() }),
+            _ => spans.push(PenSpan { centered: false, lines: i..i + 1, width_mm: width(l.style), dashes: l.style.dashes().to_vec() }),
         }
     }
     g.pens.splice(0..0, spans);

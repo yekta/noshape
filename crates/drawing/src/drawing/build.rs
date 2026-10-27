@@ -667,7 +667,7 @@ fn pen_lines(g: &mut SheetGeometry, lines: std::ops::Range<usize>, pen: &super::
     while start < lines.end {
         let st = g.lines[start].style;
         let end = (start..lines.end).find(|&k| g.lines[k].style != st).unwrap_or(lines.end);
-        g.pens.push(super::sheet::PenSpan { lines: start..end, width_mm: pen.thickness, dashes: st.dashes().to_vec() });
+        g.pens.push(super::sheet::PenSpan { centered: false, lines: start..end, width_mm: pen.thickness, dashes: st.dashes().to_vec() });
         start = end;
     }
 }
@@ -1164,7 +1164,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         }
         if let Some(width_mm) = layer.thickness(fp) {
             let dashes = g.lines[i].style.dashes().to_vec();
-            g.pens.push(super::sheet::PenSpan { lines: i..i + 1, width_mm, dashes });
+            g.pens.push(super::sheet::PenSpan { centered: false, lines: i..i + 1, width_mm, dashes });
         }
     }
     for i in mark_t..end_t {
@@ -1261,7 +1261,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     if v.editing_edges && (marked || !e.visible) {
                         let lines = l0..g.lines.len();
                         if marked {
-                            g.pens.push(super::sheet::PenSpan { lines: lines.clone(), width_mm: 0.7, dashes: Vec::new() });
+                            g.pens.push(super::sheet::PenSpan { centered: false, lines: lines.clone(), width_mm: 0.7, dashes: Vec::new() });
                         }
                         g.colors.push(super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb: [170, 170, 170] });
                         continue;
@@ -1269,7 +1269,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     // Adjust linestyle: this edge's own pen and color.
                     if let Some(es) = e.model.and_then(|m| geo.model_edges.get(m as usize)).and_then(|me| v.edge_styles.iter().find(|s| s.body == me.body && s.name == *me.name)) {
                         let lines = l0..g.lines.len();
-                        g.pens.push(super::sheet::PenSpan { lines: lines.clone(), width_mm: es.thickness, dashes: es.pattern.dashes(es.dashes) });
+                        g.pens.push(super::sheet::PenSpan { centered: false, lines: lines.clone(), width_mm: es.thickness, dashes: es.pattern.dashes(es.dashes) });
+                        if let Some(p) = g.pens.last_mut() {
+                            p.centered = true;
+                        }
                         if let Some(rgb) = es.color {
                             g.colors.push(super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb });
                         }
@@ -1296,7 +1299,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             let st = g.lines[start].style;
                             let end = (start..lines.end).find(|&k| g.lines[k].style != st).unwrap_or(lines.end);
                             let dashes = st.dashes().iter().map(|d| d * dash_scale.max(0.01)).collect();
-                            g.pens.insert(pens0, super::sheet::PenSpan { lines: start..end, width_mm: thickness, dashes });
+                            g.pens.insert(pens0, super::sheet::PenSpan { centered: false, lines: start..end, width_mm: thickness, dashes });
                             start = end;
                         }
                     }
@@ -1326,7 +1329,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     }
                 }
                 if mark.0 < g.lines.len() {
-                    g.pens.push(super::sheet::PenSpan { lines: mark.0..g.lines.len(), width_mm: pen.thickness, dashes });
+                    g.pens.push(super::sheet::PenSpan { centered: false, lines: mark.0..g.lines.len(), width_mm: pen.thickness, dashes });
                     color_lines_since(&mut g, mark, pen.color);
                 }
                 for (lines, rgb) in own {
@@ -1358,7 +1361,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     }
                 }
                 if mark.0 < g.lines.len() {
-                    g.pens.push(super::sheet::PenSpan { lines: mark.0..g.lines.len(), width_mm: vt.sketch_solid.thickness, dashes: Vec::new() });
+                    g.pens.push(super::sheet::PenSpan { centered: false, lines: mark.0..g.lines.len(), width_mm: vt.sketch_solid.thickness, dashes: Vec::new() });
                     color_lines_since(&mut g, mark, vt.sketch_point_color);
                 }
             }
@@ -1451,7 +1454,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     g.colors.insert(hatch_colors0, super::sheet::ColorSpan { lines: hatch_lines.clone(), texts: 0..0, fills: 0..0, rgb });
                 }
                 if (vt.hatch_line.thickness - LineStyle::Thin.width_mm()).abs() > 1e-9 {
-                    g.pens.insert(hatch_pens0, super::sheet::PenSpan { lines: hatch_lines, width_mm: vt.hatch_line.thickness, dashes: Vec::new() });
+                    g.pens.insert(hatch_pens0, super::sheet::PenSpan { centered: false, lines: hatch_lines, width_mm: vt.hatch_line.thickness, dashes: Vec::new() });
                 }
             }
             g.cad_since(cad_mark, CadLayer::ViewHatches);
@@ -1554,7 +1557,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
                 if g.lines.len() > mark.0 {
                     let dashes = LineStyle::Centerline.dashes().iter().map(|d| d * vt.centerline_dashes.max(0.01)).collect();
-                    g.pens.push(super::sheet::PenSpan { lines: mark.0..g.lines.len(), width_mm: vt.centerline_thickness, dashes });
+                    g.pens.push(super::sheet::PenSpan { centered: false, lines: mark.0..g.lines.len(), width_mm: vt.centerline_thickness, dashes });
                 }
             }
             // Center of mass indicator: a circle with two opposite quarters filled.
@@ -1694,7 +1697,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             if g.lines.len() > thread_mark.0 {
                 let lines = thread_mark.0..g.lines.len();
                 let st = g.lines[lines.start].style;
-                g.pens.push(super::sheet::PenSpan { lines, width_mm: vt.thread_line.thickness, dashes: st.dashes().iter().map(|d| d * vt.thread_dashes.max(0.01)).collect() });
+                g.pens.push(super::sheet::PenSpan { centered: false, lines, width_mm: vt.thread_line.thickness, dashes: st.dashes().iter().map(|d| d * vt.thread_dashes.max(0.01)).collect() });
             }
             color_lines_since(&mut g, thread_mark, vt.thread_line.color);
             // Flat pattern views › Form centermarks: style and colour.
@@ -2093,7 +2096,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let sk = &drawing.props.view_tab.sketch_line;
         let lines = sketch_mark.0..g.lines.len();
         if !lines.is_empty() {
-            g.pens.insert(pens0, super::sheet::PenSpan { lines: lines.clone(), width_mm: sk.thickness, dashes: Vec::new() });
+            g.pens.insert(pens0, super::sheet::PenSpan { centered: false, lines: lines.clone(), width_mm: sk.thickness, dashes: Vec::new() });
             if let Some(rgb) = sk.color {
                 g.colors.insert(colors0, super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb });
             }
@@ -2147,7 +2150,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             let l0 = g.lines.len();
             g.lines.push(Polyline2 { points: vec![os, xt], style: LineStyle::Thin, closed: false, pick });
             g.lines.push(Polyline2 { points: vec![os, yt], style: LineStyle::Thin, closed: false, pick });
-            g.pens.push(super::sheet::PenSpan { lines: l0..l0 + 2, width_mm: ts.hole_indicator_line, dashes: Vec::new() });
+            g.pens.push(super::sheet::PenSpan { centered: false, lines: l0..l0 + 2, width_mm: ts.hole_indicator_line, dashes: Vec::new() });
             match ts.hole_indicator_arrow {
                 Some(a) => {
                     g.arrow_as(xt, [sx, 0.0], a, super::sheet::ArrowType::Filled);

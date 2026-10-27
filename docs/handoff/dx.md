@@ -145,9 +145,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   …/.fingerprint/…/invoked.timestamp", "could not parse/generate dep info …noshape_app_core-….d", "unable to copy
   …/incremental/…-working/….o"): its 30-min pass runs prune-build.py / prune-deps.py / fix-fingerprints.py and the
   incremental `find … -mmin +30 -exec rm -rf` on every target dir, without the `busy` check the floor step has.
-  Please skip a dir while a cargo uses it (`busy "$t" && continue`), as the floor does. Until then dx builds in
-  /root/build-dx (a hard-linked copy of target-dx, outside the loop's /root/target-* patterns; 28 GB apparent,
-  shared blocks); dx deletes it once the loop skips busy dirs.
+  Please skip a dir while a cargo uses it (`busy "$t" && continue`), as the floor does.
 - **Display meshing runs one part at a time** (kernel mesh.cpp, core's area; PLAN 2.7 import target, also regen):
   mesh_prepare holds the global `mesh_mutex` around BRepMesh and mesh_fill takes it again for BRepTools::Clean, so
   `regen::display::mesh_in_parallel`'s 36 jobs of the NIST import queue on it: NOSHAPE_KERNEL_PROFILE summed
