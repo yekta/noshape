@@ -1294,11 +1294,25 @@ impl FeatureDialog {
         let Some(ParamKind::Num(n)) = self.spec_for_path(path).map(|s| &s.kind) else { return };
         let dim = if n.kind == noshape_model::params::NumKind::Integer { noshape_units::Dim::UNITLESS } else { n.kind.dim() };
         let text = state.read(cx).value().to_string();
+        // Live (DEPTH-RANGE): a value out of the field's range stays as typed.
+        if self.out_of_range(path, &text) {
+            return;
+        }
         let next = if text.trim().is_empty() { self.baselines.get(path).cloned().unwrap_or_default() } else { crate::quantity_field::commit_text(&text, dim, &self.units, &self.variables) };
         if next != text {
             state.update(cx, |s, cx| s.set_value(next.clone(), window, cx));
             self.on_text_changed(path, next, cx);
         }
+    }
+
+    /// A number field's text evaluating outside its parameter's range (live
+    /// "qa (2026-10-26, P2) Extrude Depth out of range": above 500 m the
+    /// field is pink and keeps the text as typed; 500 m itself is fine).
+    fn out_of_range(&self, path: &str, text: &str) -> bool {
+        let Some(ParamKind::Num(n)) = self.spec_for_path(path).map(|s| &s.kind) else { return false };
+        let dim = if n.kind == noshape_model::params::NumKind::Integer { noshape_units::Dim::UNITLESS } else { n.kind.dim() };
+        let slack = |v: f64| v.abs() * 1e-12 + 1e-15;
+        noshape_units::evaluate_as(text, dim, &self.units, &self.variables).is_ok_and(|q| q.value < n.min - slack(n.min) || q.value > n.max + slack(n.max))
     }
 
     /// Insert autofill entry `index` (the selected one when `None`) into the
@@ -3220,7 +3234,8 @@ impl FeatureDialog {
             self.baselines.insert(path.to_string(), text.clone());
         }
         let converted = num
-            .filter(|_| !focused && err.is_none() && self.completion.is_none())
+            // An out-of-range value shows as typed (live DEPTH-RANGE: "1e6 mm").
+            .filter(|_| !focused && err.is_none() && self.completion.is_none() && !self.out_of_range(path, &text))
             .and_then(|n| noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).ok())
             .map(|q| noshape_units::format_quantity(q, &self.units))
             // Dialog fields write angles "3 deg" (live dialogs/draft-01, hole).
@@ -3236,7 +3251,7 @@ impl FeatureDialog {
         // shows it in the still focused field; typing hides it again.
         let applied = self.baselines.get(path).cloned().unwrap_or_else(|| text.clone());
         let eval_err = num.filter(|_| !applied.trim().is_empty()).and_then(|n| noshape_units::evaluate_as(&applied, n.kind.dim(), &self.units, &self.variables).err());
-        let invalid = err.is_some() || eval_err.is_some();
+        let invalid = err.is_some() || eval_err.is_some() || (num.is_some() && self.out_of_range(path, &applied));
         // Live (ui (10-26 c)): the hover says why ("Cannot use angle as length.").
         let invalid_tip = eval_err.as_ref().map(crate::quantity_field::eval_message).unwrap_or_else(|| crate::quantity_field::INVALID_TIP.to_string());
         let field = v_flex().id(SharedString::from(format!("num-{path}")));

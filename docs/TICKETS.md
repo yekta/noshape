@@ -260,7 +260,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   with a red chevron but never gets focus. live (behaviours "qa4 round 5 s7 dialogs"): on ticking, Extrude direction is
   the active field (border rgb(22,81,176), fill rgb(222,241,251)), title red rgb(170,37,45), chevron rgb(189,48,57);
   after a pick focus moves on (qa 2026-10-26)
-- [x] (psui, this commit) P2 CHIP-HOVER fixed for sketch regions (a picked region is drawn from the sketch, so its
+- [x] be87bda5 P2 CHIP-HOVER fixed for sketch regions (a picked region is drawn from the sketch, so its
   QUERY state lit nothing; now its fill turns #f2ff80 while the chip is hovered; faces / edges already did) (qa4 round 5,
   still open on green) hovering a selection chip in a feature dialog (e.g. "Face of
   Sketch 1" in Extrude 1) shows the chip's tooltip but the viewport doesn't change at all (pixel-identical); live turns the
@@ -270,7 +270,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (qa4 round 5, still open on green) feature rows › Add selection to folder… opens a separate
   "Folder name" box (tickets/folder-name-box-ours.png); live names the new folder inline in its row (input prefilled
   "New folder"); the separate box belongs to the header's New folder button (behaviours "qa4 round 5 s8") (qa 2026-10-26)
-- [ ] P2 DEPTH-RANGE (live answered, behaviours "qa (2026-10-26, P2) Extrude Depth out of range") a length above 500 m
+- [x] (psui, this commit) P2 DEPTH-RANGE fixed: a value outside the parameter's range (Depth above 500 m) makes the
+  field pink and stays as typed ("1e6 mm"), in and out of the field; valid values in other units still go to document
+  units on blur ("500 m" → "500000 mm"). (live answered, behaviours "qa (2026-10-26, P2) Extrude Depth out of range") a length above 500 m
   (e.g. "1e6 mm", "600 m"): live turns the field pink (bg rgb(249,235,236)), keeps the text as typed and the title tooltip
   says "… A parameter value is not valid."; ours shows the message but never makes the field pink and rewrites "1e6 mm" to
   "1000000 mm". A valid value in other units is rewritten into document units on blur ("500 m" → "500000 mm") in both.
