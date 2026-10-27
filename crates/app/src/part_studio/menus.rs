@@ -70,6 +70,7 @@ impl PartStudioView {
         // The open dialog's feature ("Confirm Extrude 1").
         let editing_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone());
         let section_dialog = self.ui.section_dialog.is_some();
+        let several_parts = self.display.bodies.len() > 1;
         let planar = target_ref.as_ref().is_some_and(|r| self.frame_of_ref(r).is_some());
         let linear_edge = target_ref.as_ref().is_some_and(|r| self.linear_edge_direction(r).is_some());
         let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
@@ -346,6 +347,23 @@ impl PartStudioView {
                                 this.set_part_hidden(&b1, true, cx);
                                 this.hover = None;
                             })));
+                        // Live 10-27 (behaviours "spec: psui part-studio.md 8.8
+                        // / 8.10", a face of one of three parts): Hide other
+                        // parts and Hide all parts follow, as in the parts list.
+                        if k == PickKind::Face && several_parts {
+                            let keep = b.clone();
+                            m = m
+                                .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {
+                                    let others: Vec<Reference> = this.display.bodies.iter().filter(|d| d.id != keep).map(|d| Reference::Body(d.id.clone())).collect();
+                                    this.set_visibility(&others, true, cx);
+                                    this.hover = None;
+                                })))
+                                .item(item(&crate::i18n::template("Hide all __label__", &[("label", "parts")]), Box::new(|this, _, cx| {
+                                    let all: Vec<Reference> = this.display.bodies.iter().map(|d| Reference::Body(d.id.clone())).collect();
+                                    this.set_visibility(&all, true, cx);
+                                    this.hover = None;
+                                })));
+                        }
                         // Live (ui-com/01, 03): a part with a material offers
                         // its center of mass (then "Hide center of mass").
                         if has_material {

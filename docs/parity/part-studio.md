@@ -144,7 +144,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.18 | Space toggles a focused checkbox; arrows/Enter in dropdowns | feature_basics | ✅ (Space toggles a checkbox; Enter/Space opens a dropdown, arrows move, Enter picks — the list opens without the current value highlighted) |
 | 5.19 | Numeric fields accept expressions, units and #variables | Home__numeric_fields | ✅ |
 | 5.20 | Invalid expression: red outline and message | Home__numeric_fields | ✅ |
-| 5.21 | Expressions show their evaluated value | Home__numeric_fields | 🔧 |
+| 5.21 | Expressions show their evaluated value | Home__numeric_fields | ✅ (10-27: "10+5" → "15 mm" once unfocused) |
 | 5.22 | Mouse wheel over a focused numeric field (mm document, live 10-27): ±1, Shift ±10, Ctrl ±0.1 (integers ±1); only while focused with no uncommitted typed text; a step out of the field's range is ignored (Depth goes below 0) | Home__numeric_fields | ✅ |
 | 5.23 | Field shows the converted value after accepting, the original text when focused | Home__numeric_fields | ✅ (fixed: focusing showed the converted text) |
 | 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | ✅ (app 10-24) |
