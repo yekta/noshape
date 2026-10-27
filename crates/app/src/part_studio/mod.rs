@@ -1889,7 +1889,14 @@ impl PartStudioView {
                 this.refresh_scene(false, cx);
             }
             DialogEvent::Accept { repeat } => this.accept_edit(*repeat, window, cx),
-            DialogEvent::Cancel => this.cancel_edit(window, cx),
+            // Live (behaviours "psui (10-27, PANEL-BLEED)"): an analysis panel
+            // opened over the dialog closes on the first Esc, the dialog on
+            // the second.
+            DialogEvent::Cancel => {
+                if !this.close_analysis_tool(cx) {
+                    this.cancel_edit(window, cx);
+                }
+            }
             DialogEvent::QueryFocused => this.refresh_scene(false, cx),
             // Live (psb 10-19 h): Tab past the dialog's last control goes to
             // the navbar; Shift+Tab before its first one to <body> (here the

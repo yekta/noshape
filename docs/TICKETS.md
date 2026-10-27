@@ -226,7 +226,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   0 mm matches ("Failed to extrude selections, check input.", no pink) (qa 2026-10-26, build 4d2f6b0c)
 - [ ] P2 MENU-SKETCH-TAG feature row menu: ours "Edit Boss sketch 1 [Sketch]…" for a custom-named sketch; live "Edit Boss
   sketch 1…" (no type tag; behaviours "qa (2026-10-26, P2 batch)" (2)) (qa 2026-10-26, build 4d2f6b0c)
-- [ ] P2 PANEL-BLEED with a feature dialog open (Revolve, Shift+W), Shift+D opens the Dihedral analysis panel on top of it,
+- [x] (psui, this commit) P2 PANEL-BLEED: live bleeds through the same way (behaviours "psui (10-27, PANEL-BLEED
+  follow-up)": both panels at x 246, y 79, the analysis panel on top at rgba(255,255,255,0.95), the dialog's rows
+  faint under it). Fixed what differed: the analysis field starts empty over a feature dialog, and with the focus in
+  the dialog the 1st Esc closes the analysis panel, the 2nd cancels the dialog; Dihedral's field "Edges to show
+  dihedral". Open (P2): the Dihedral panel's layout (live: Units [Degrees ▾], Max / Min read-out rows, Scale above a
+  full-width slider, a grey ✕; part-studio/psui-pb-default-newD-1-after.png) and Curve/surface's extra
+  "☑ Previewed edges and faces" row over a dialog. Original report: with a feature dialog open (Revolve, Shift+W), Shift+D opens the Dihedral analysis panel on top of it,
   and the Revolve dialog's rows ("Faces and sketch regions to revolve", the clock button, "Full revolve") show through
   the analysis panel's body (tickets/dihedral-over-revolve.png); the panel also comes back with the previous run's pick
   ("Edge of Chamfer 4"). Same for Curve/surface analysis (Shift+C) over an open Extrude dialog

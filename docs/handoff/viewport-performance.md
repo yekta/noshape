@@ -799,4 +799,13 @@ changes. I write the renderer part first (my files) and show crops before touchi
   plus refine 35 ms: ticket COMMIT-LATENCY (core). Undo 31–40 ms, redo 26–71 ms (budget 50: redo 71 ms once on 14).
 - **fins-400 at 2x Retina, frame-driven** (run 40421870988): frames on the GPU orbit 129.3 / 147.3 fps, pan
   107.9 / 93.7, zoom 151.2 / 102.3 (macOS 14 / 15); read back orbit 71.0 / 86.1. Budget 60 fps: met.
-- Cold start: run 40421880164 (live-30, cold=1) still running at 01:40.
+- **Cold start** (runs 40421880164 cold=1, 40421862773 warm; summary.json `window_ms` / `frame_ms` / `pipelines_ms`):
+  - second launches, Metal cache warm: first frame **477–825 ms** (window 287–543 ms, pipelines 6–20 ms): within 1 s.
+  - shader cache cleared before each launch: first frame 1337–2091 ms, pipelines 504–978 ms (the 8 core pipelines'
+    Metal compiles); within 2 s except the job's very first launch.
+  - the job's first launch (texture orbit) in either run: first frame 2.5–3.4 s, window 1.4–2.1 s alone (vs ~0.3–0.8 s
+    for later launches): OS first-run costs (fonts, dyld, translocation) on top of the pipelines: over the 2 s
+    first-launch budget.
+  - Levers: wgpu-hal Metal compiles MSL per pipeline stage (`newLibraryWithSource`), the same entry point again for
+    each pipeline using it (vs_mesh in 4 core pipelines, fs_mesh in 2): a per-(source, options) MTLLibrary cache in
+    the vendored wgpu-hal would cut 16 compiles to ~12; then measure what of the first launch's window time is ours.

@@ -193,7 +193,10 @@ impl PartStudioView {
         let pre: Vec<Reference> = self.selection.iter().filter(|r| self.analysis_accepts(kind, r)).filter_map(|r| self.tool_entity(kind, r)).collect();
         // The tool takes the preselection (it doesn't stay selected).
         let had_pre = !pre.is_empty();
-        let mut selection = if pre.is_empty() { self.ui.tool_memory.selection.get(key).cloned().unwrap_or_default() } else { pre };
+        // Over a feature dialog the field starts empty (live "psui (10-27,
+        // PANEL-BLEED)": the earlier run's pick is not brought back).
+        let remembered = if self.edit.is_some() { Vec::new() } else { self.ui.tool_memory.selection.get(key).cloned().unwrap_or_default() };
+        let mut selection = if pre.is_empty() { remembered } else { pre };
         if kind == ToolKind::Thickness {
             // Edit thickness analysis: the analyzed parts.
             let t = self.ui.thickness.get_or_insert_with(Default::default);
@@ -843,7 +846,7 @@ impl PartStudioView {
             }
         } else if !matches!(kind, ToolKind::Zebra | ToolKind::Reflection) {
             let caption = match kind {
-                ToolKind::Dihedral => "Edges to analyze",
+                ToolKind::Dihedral => "Edges to show dihedral",
                 ToolKind::Connection => "Entities",
                 ToolKind::Thickness => "Parts to analyze",
                 ToolKind::Interference => "Parts to analyze",
