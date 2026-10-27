@@ -234,20 +234,20 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 11.1 | Fillet: click a vertex, radius box; later vertices make equal fillets | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 11.2 | Fillet: click two curves | H:sketch_fillet | ✅ (T:sm) |  |
+| 11.2 | Fillet: click two curves | H:sketch_fillet | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.3 | Fillet keeps a virtual sharp with the coincident constraints | H:sketch_fillet | ✅ |  |
 | 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ✅ (T:sm; red preview, radius manipulator) |  |
-| 11.5 | Chamfer: vertex or two lines, two distance dimensions (45° default) | H:sketch_chamfer | ✅ (T:ux) |  |
+| 11.5 | Chamfer: vertex or two lines, two distance dimensions (45° default) | H:sketch_chamfer | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.6 | Trim: click removes up to the nearest intersections, whole curve when unbounded | H:trim | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 11.7 | Trim: drag across curves trims everything crossed | H:trim | ✅ (T:sm) |  |
-| 11.8 | Trim: click a standalone point deletes it | H:trim | ✅ (T:sm) |  |
-| 11.9 | Extend: click a line or arc to extend to the next boundary | H:extend | ✅ |  |
-| 11.10 | Extend: "Unable to extend the selected geometry." | i18n | ✅ (GUI :103 extending an unbounded circle reports exact message; extend-error.png; T:sm added) |  |
-| 11.11 | Split: click a curve where to split | H:sketch_split | ✅ |  |
+| 11.7 | Trim: drag across curves trims everything crossed | H:trim | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
+| 11.8 | Trim: click a standalone point deletes it | H:trim | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
+| 11.9 | Extend: click a line or arc to extend to the next boundary | H:extend | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 11.10 | Extend: "Unable to extend the selected geometry." | i18n | ✅ (GUI :103 extending an unbounded circle reports exact message; extend-error.png; T:sm added) | 0.4.10+ / 203c4d6f 10-27 |
+| 11.11 | Split: click a curve where to split | H:sketch_split | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves. Live "psb (10-24 j)": the copies get their own points joined by Coincidents, sharp outer corners, own centres; one OFFSET per further pair (all on the first picked pair) and one DISTANCE on that pair (a lone curve: one OFFSET), no Parallel / Concentric; free ends unconstrained; editing the distance moves every copy; a new offset starts away from the region (a circle outward), the flip isn't remembered | H:offset; live psb (10-24 j), qa4 round 5 s1 follow-up | ✅ (GUI :103 skasm 10-26: one edge offsets away from the region with the arrow, Enter creates it and opens the "5 mm" box with ± ✓ ✕; `Sketch::offset_tool`, `ConstraintKind::OffsetCurve`; tests `offset_tool_makes_live_constraints_on_a_chain`, `offset_tool_on_the_closed_loop_and_a_circle`) | 0.4.10+ / 2d9a275c 10-27 |
 | 11.12a | Offset takes one chain: a curve not connected to the pending one is only selected (again: deselected) with "Can only offset a single chain at once."; the preview stays | live qa4 round 5 s1 follow-up (5) (OFF-TOAST) | ✅ (test `offset_takes_one_chain`) |  |
 | 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) |  |
-| 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) |  |
+| 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) |  |
 | 11.16 | Pattern preview limited to 10 instances | H:sketch_linear_pattern | ✅ |  |
 | 11.17 | Edit pattern from the pattern glyph | H:sketch_linear_pattern | ✅ (T:sm; linear and circular instances are linked to the seed, see 14.1) |  |
@@ -276,8 +276,8 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 13.1 | Tool prompts at the bottom of the view ("Select a mirror line.", …) | i18n | ✅ |  |
-| 13.2 | "Cannot fillet selected point." | i18n | ✅ |  |
+| 13.1 | Tool prompts at the bottom of the view ("Select a mirror line.", …) | i18n | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 13.2 | "Cannot fillet selected point." | i18n | ❌ (FILLET-POINT-MSG) | 0.4.10+ / 203c4d6f 10-27 |
 | 13.3 | "The maximum bezier degree (15) has been reached." | i18n | ✅ (GUI :103 entering degree 16 reports exact message; bezier-max-degree-error.png; T:sm creation limit also added) |  |
 | 13.4 | Conflicting constraints reported as a sketch warning | B§7.2 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 
