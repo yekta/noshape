@@ -2773,6 +2773,9 @@ impl AssemblyView {
 
     pub(super) fn close_animation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.anim = None;
+        // The keyboard goes back to the view (its fields are gone; Alt+C's
+        // tool search then got no typing).
+        window.focus(&self.focus, cx);
         // Back to the document's positions (animation is not saved).
         self.schedule_eval(window, cx);
     }
