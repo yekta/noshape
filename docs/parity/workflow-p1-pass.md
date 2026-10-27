@@ -58,7 +58,7 @@ then edits, undo/redo, rollback and suppress.
 | Linear pattern (assembly): dialog | Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction | A6 (pass 21) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Pattern the pin 20 mm along the plate edge (flipped) | preview in hole 2; ✓ → "Linear pattern 1 ▸ Part 2 <2>", Instances (3) | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Enter twice in the pattern dialog | stays open | Part Studio dialogs commit on the 2nd Enter; assembly? (request p3) | ✅ P2-A1 (skb 9bf8475b, qa re-check on a08e3eda) |  |
-| Exploded views panel → Add exploded view | "Editing Explode 1 [Done]" banner, Explode 1 row, "Build steps by dragging components" | EXV rows | ✅ |  |
+| Exploded views panel → Add exploded view | "Editing Explode 1 [Done]" banner, Explode 1 row, "Build steps by dragging components" | EXV rows | ✅ | 0.4.10+ / 1c853f78 10-27 |
 
 ## P1 extras, green 461aefb0
 | Step | Ours | Live | Status | Verified |
@@ -104,12 +104,12 @@ then edits, undo/redo, rollback and suppress.
 | Shell 2.5 mm, same | OK 8487.861 mm³, 53 faces | OK 8503.961 mm³, 47 faces | ✗ **P1-16** |  |
 | Mass properties, nothing selected | all parts measured (7178.097 mm³), toast after 3.6 s, hides by itself | field empty, values blank, no toast | ✗ **P1-17** (ui) |  |
 | Assembly drawing after an unrelated STEP import | Update ⟳ bright | stays dim (only referenced elements count) | ✗ **P2-D2** (ui2) |  |
-| Exploded views panel, Add exploded view | 712 px panel; "Editing Explode 1 [Done]", toolbar reduced to undo/redo, active row + rollback bar, "Build steps by dragging components" box, footer Add exploded view | same (behaviours 1834) | ✅ |  |
-| Drag the triad's Z arrow (pin) | "Explode step" dialog: Translation ▾, Instances, ☐ Specify direction, Distance 18.3 mm, ☑ Explode lines, edges field; row "↗ Explode step 1"; info box gone | same | ✅ |  |
-| Distance `25` + Enter, Enter | 1st applies (pin moves), 2nd accepts | Onshape number fields | ✅ |  |
-| Done, then double-click Explode 1 | plain row, unexploded; re-enters editing fully exploded | same | ✅ |  |
-| Step row right-click | Edit… / Rename / — / Delete | same (behaviours 815) | ✅ |  |
-| Esc with no dialog in explode editing | toolbar back but still exploded, row stays active with the rollback bar; the next double-click leaves instead of re-entering | Esc = Done | ✅ P2-A3 (skasm 10-27 GUI: Esc → no banner, plain "Explode 1", no rollback bar, assembled) |  |
+| Exploded views panel, Add exploded view | 712 px panel; "Editing Explode 1 [Done]", toolbar reduced to undo/redo, active row + rollback bar, "Build steps by dragging components" box, footer Add exploded view | same (behaviours 1834) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Drag the triad's Z arrow (pin) | "Explode step" dialog: Translation ▾, Instances, ☐ Specify direction, Distance 18.3 mm, ☑ Explode lines, edges field; row "↗ Explode step 1"; info box gone | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Distance `25` + Enter, Enter | 1st applies (pin moves), 2nd accepts | Onshape number fields | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Done, then double-click Explode 1 | plain row, unexploded; re-enters editing fully exploded | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Step row right-click | Edit… / Rename / — / Delete | same (behaviours 815) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Esc with no dialog in explode editing | toolbar back but still exploded, row stays active with the rollback bar; the next double-click leaves instead of re-entering | Esc = Done | ✅ P2-A3 (skasm 10-27 GUI: Esc → no banner, plain "Explode 1", no rollback bar, assembled) | 0.4.10+ / 1c853f78 10-27 |
 | Assembly circular pattern dialog | Instances, Axis of pattern (+ clock), Angle 360 deg, Instance count 2 (+ ↻), ☑ Equal spacing, ☐ Centered; ✓ pale until Instances is set | same (behaviours 6186, 8704) | ✅ |  |
 | Pin about the middle hole's rim, ✓ | copy in hole 3; "Circular pattern 1 ▸ Part 2 <2>", Instances (3); info bubble "1 instance(s) created." | live: no bubble or toast (behaviours "qa5 (10-26 p6)" (1)) | ✅ (ours shows none either; `accept_pattern`) |  |
 | Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✅ P2-A4 (f4f7d14a, qa verified 21d6a89e on green 16cdcf6d) |  |
