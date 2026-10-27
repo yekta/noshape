@@ -140,10 +140,14 @@ qa5's P1-17 (mass properties blank with nothing measured, no toast), P1-18 (⚠ 
 TAB-NO-PREVIEW (with X focus); API-DERIVED-BY-NAME; crash documents open with the watcher CLI 19555ca3 (app pending
 the next green, bf8aaee2). EXT-DIRECTION still open with focus.
 
-## To verify on the next green (fixed on main by qa5 after green 4d2f6b0c; P1-8, P1-9, P1-17, P1-18, P2-A5, P2-D3 done)
-P1-1, P1-8, P1-9, P1-17, P1-18, P2-A2…A8, P2-D2, P2-D3 (docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26
-stop"; P2-A3 / A7 / A8 have no unit test: Esc in explode editing, the pending Replicate row, no "instance(s) created"
-bubble).
+## qa5 items (fixed on main by qa5 after green 4d2f6b0c): all verified
+P1-8, P1-9, P1-17, P1-18, P2-A5, P2-D3 on dc3a03f6 / 19555ca3 (above). On green 16cdcf6d (2026-10-27 04:05, asm5.noshape:
+plate with 4 holes, pin, Cylindrical → Revolute, linear pattern): P1-1 ("Features (9)" with a new sketch on Top open),
+P2-A2 (1st Enter in a mate limit applies "30 deg" and keeps the dialog, 2nd accepts), P2-A3 (Esc in explode editing = Done:
+toolbar back, unexploded, plain row; double-click re-enters exploded), P2-A4 (pattern copy stays drawn, no z-fighting, while
+the seed's mate is edited and retyped), P2-A6 ("Instances (3)" = Part 1, Part 2, Linear pattern 1), P2-A7 (pending
+"Replicate 1" row with red dot at open, mate auto-filled), P2-A8 (no "instance(s) created" bubble), P2-D2 (assembly drawing
+Update stays dim after a sketch in an unused Part Studio 2; lights up after the plate's depth changes).
 
 ## Next
 Revolve / patterns / mirror / boolean on the new plate; feature-list reorder/delete/rollback on the 30-feature part;
