@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## Release blockers for the 2026-10-28 05:00 release (qa, 2026-10-27 20:43)
-- [ ] P0 BOX-DIALOG-PANIC (psui, regression of df28c320, in greens dd1b5037 and daf1f50c): any box selection with a feature dialog open crashes the app. See the psui ticket below. Not in v0.4.11.
+- [ ] P0 BOX-DIALOG-PANIC (psui, regression of df28c320, in greens dd1b5037, daf1f50c and c9c66d1c (re-checked 21:05)): any box selection with a feature dialog open crashes the app. See the psui ticket below. Not in v0.4.11.
 
 ## Release v0.4.9 (qa, 2026-10-27 02:55)
 - qa 09:35: release/v0.4.9 is now fcd301e2 (7ee597e0 + 819c2b47 Windows include fix + fcd301e2 crash_inputs unix-only);
