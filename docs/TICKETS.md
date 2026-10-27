@@ -244,7 +244,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cylinders, spine an ellipse (type 32) exactly 2.000000 mm from both supports at 17 samples; 4× denser tube stations
   change nothing; a fine mesh of each face gives the same area (13.2012) as the integral (13.2016). So tube, spine
   and contact curves are exact; the +0.072 mm³ per patch (≈ the surface 5 µm outside) must come from the patch's
-  other edges (where the blend ends on the neighbouring faces) or its pcurves: check those next.
+  other edges (where the blend ends on the neighbouring faces) or its pcurves. Its edges, read: two exact ellipses
+  (the contact curves, 6.65917 mm each) and a quarter circle R2 (3.14159 mm), a triangle tapering to a point where
+  the cylinders turn tangent; all exact too. Live's per-face areas are asked (REQUESTS dx 10-27 I1) to tell whether
+  the excess is ours or the STEP approximation's.
 - [ ] P2 BOOL-TOUCH-INFO Boolean Intersect of two blocks that only touch face to face: both parts deleted (= live), but
   live reports INFO "The parts either do not intersect or are totally contained." (dialog bubble); ours OK with no message.
   A disjoint pair: live OK, no message (= ours) (behaviours "qa (2026-10-26, P1 boolean edge cases)") (qa 2026-10-26)
