@@ -1929,6 +1929,10 @@ impl SketchEditor {
         if self.tool == Tool::Chamfer {
             self.after_chamfer(data, &result);
         } else {
+            // The committed radius is the tab's default from now on.
+            if let Some(Curve2::Arc { radius, .. }) = result.created.iter().find_map(|e| data.sketch.curve(*e).filter(|c| matches!(c, Curve2::Arc { .. }))) {
+                self.fillet_radius = radius;
+            }
             self.after_fillet(data, &result);
         }
         self.message = None;
@@ -3273,10 +3277,34 @@ impl SketchEditor {
                 let r = (d / k.max(1e-9)).max(self.world_per_px);
                 let dim = data.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id);
                 if let Some(dim) = dim {
+                    // A radius the corner can't take keeps the last one that
+                    // solved, so the preview stays and drags back; the radius
+                    // only becomes the tab's default once committed
+                    // (SKETCH-FILLET-STUCK-RADIUS: an over-drag made every
+                    // later fillet "radius too large").
+                    let before = data.sketch.clone();
+                    // The legs the arc trims: a radius the corner can't take
+                    // flips them (it still "solves").
+                    let legs: Vec<(EntityId, DVec2)> = data
+                        .sketch
+                        .endpoints(arc)
+                        .map(|(a, b)| [a, b])
+                        .into_iter()
+                        .flatten()
+                        .flat_map(|pt| data.sketch.users_of_point(pt))
+                        .filter(|e| *e != arc)
+                        .filter_map(|e| match data.sketch.curve(e) {
+                            Some(Curve2::Line { a, b }) => Some((e, b - a)),
+                            _ => None,
+                        })
+                        .collect();
                     let _ = data.sketch.set_dimension_value(dim, r);
                     data.dimension_exprs.remove(&dim.0);
-                    data.sketch.solve();
-                    self.fillet_radius = r;
+                    let solved = data.sketch.solve().is_solved();
+                    let kept = legs.iter().all(|(e, d0)| matches!(data.sketch.curve(*e), Some(Curve2::Line { a, b }) if (b - a).dot(*d0) > 1e-12 * d0.length_squared().max(1e-30)));
+                    if !solved || !kept {
+                        data.sketch = before;
+                    }
                 }
                 if pending { EditOutcome::redraw() } else { EditOutcome::changed() }
             }
@@ -3500,7 +3528,17 @@ impl SketchEditor {
                 }
             }
             Some(DragState::Handle(_)) | Some(DragState::TrimPath { .. }) => EditOutcome::redraw(),
-            Some(DragState::FilletRadius { .. }) => if self.pending_corner.is_some() { EditOutcome::redraw() } else { EditOutcome::changed() },
+            Some(DragState::FilletRadius { arc }) => {
+                if self.pending_corner.is_some() {
+                    EditOutcome::redraw()
+                } else {
+                    // A committed fillet dragged: its radius is the default now.
+                    if let Some(Curve2::Arc { radius, .. }) = data.sketch.curve(arc) {
+                        self.fillet_radius = radius;
+                    }
+                    EditOutcome::changed()
+                }
+            }
             Some(DragState::ChamferDistance) => EditOutcome::redraw(),
             Some(DragState::OffsetArrow { moved, .. }) => {
                 if !moved {
@@ -8205,6 +8243,31 @@ mod tests {
         }
         assert_eq!(count(&d, EntityKind::EllipticalArc), 1);
         assert_eq!(ed.otf.as_ref().map(|o| o.fields.len()), Some(2));
+    }
+
+    /// SKETCH-FILLET-STUCK-RADIUS: dragging the preview's arrow far past
+    /// what the corner allows keeps the last radius that solved (the preview
+    /// stays) and leaves the default alone until the fillet is committed;
+    /// the next corner still fillets.
+    #[test]
+    fn fillet_overdrag_keeps_the_preview_and_the_default() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.023, 0.015));
+        let (p0, p1) = (d.sketch.point(r.points[0]).unwrap(), d.sketch.point(r.points[1]).unwrap());
+        let default = ed.fillet_radius;
+        click(&mut ed, &mut d, p0);
+        let arc = ed.pending_corner.as_ref().and_then(|(pv, res)| res.created.iter().copied().find(|e| pv.sketch.kind(*e) == Some(EntityKind::Arc))).expect("a preview");
+        ed.drag = Some(DragState::FilletRadius { arc });
+        for k in 1..=10 {
+            ed.tool_drag(&mut d, v(0.01 * k as f64, 0.01 * k as f64));
+        }
+        ed.tool_up(&mut d, v(0.1, 0.1));
+        assert_eq!(ed.fillet_radius, default, "the drag doesn't set the default");
+        let preview_arc = ed.pending_corner.as_ref().and_then(|(pv, _)| pv.sketch.curve(arc));
+        assert!(matches!(preview_arc, Some(Curve2::Arc { radius, .. }) if radius < 0.015), "the preview stays: {preview_arc:?}");
+        assert!(ed.commit_corner(&mut d).changed);
+        click(&mut ed, &mut d, p1);
+        assert!(ed.pending_corner.is_some(), "the next corner still fillets: {:?}", ed.message);
     }
 
     #[test]
