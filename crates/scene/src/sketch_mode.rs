@@ -1314,11 +1314,13 @@ impl SketchEditor {
     }
 
     pub fn pointer_move(&mut self, data: &mut SketchData, p: DVec2, shift: bool, alt: bool) -> EditOutcome {
-        // Polygon side count: distance from the locked circumference, one side per 15 px.
+        // Polygon side count from the pointer's distance to the centre (live,
+        // behaviours "skasm (2026-10-27) sketch polygon side count"): one
+        // side more per 10 px beyond the 2nd click, one less per 10 px in.
         if matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) && self.clicks.len() == 2 && self.polygon_typed.is_empty() {
             let (ctr, rim) = (self.clicks[0].pos, self.clicks[1].pos);
-            let delta = ((p - ctr).length() - (rim - ctr).length()) / (self.world_per_px * 15.0);
-            let n = (self.polygon_base_sides as f64 + delta.round()).clamp(3.0, 50.0) as usize;
+            let delta = ((p - ctr).length() - (rim - ctr).length()) / (self.world_per_px * 10.0);
+            let n = (self.polygon_base_sides as f64 + delta.floor()).clamp(3.0, 50.0) as usize;
             if n != self.polygon_sides {
                 self.polygon_sides = n;
                 self.message = Some(format!("Sides: {n}"));
@@ -2663,9 +2665,9 @@ impl SketchEditor {
                     self.message = Some(format!("Sides: {} (drag toward / away from the polygon, type a number, click or press Enter to set)", self.polygon_sides));
                     return EditOutcome::redraw();
                 }
+                // Any click commits (live: it doesn't start the next polygon).
                 let c = self.clicks.remove(0);
                 let rim = self.clicks.remove(0);
-                let next_center = ((click.pos - rim.pos).length() > self.world_per_px * 9.0).then_some(click);
                 let sides = self.polygon_sides.clamp(3, 50);
                 self.polygon_typed.clear();
                 match sk.polygon(c.pos, rim.pos, sides, self.polygon_on_vertex()) {
@@ -2677,9 +2679,6 @@ impl SketchEditor {
                         attach(sk, ids.points[0], None, &rim);
                         // Live makes no dimension (its boxed Ø is a readout).
                         self.finish_create(data, &ids.curves);
-                        if let Some(center) = next_center {
-                            self.clicks.push(center);
-                        }
                         EditOutcome::changed()
                     }
                     Err(_) => EditOutcome::redraw(),
@@ -4335,11 +4334,24 @@ impl SketchEditor {
             },
             Tool::Circle | Tool::Polygon | Tool::CircumPolygon => {
                 if let Some(a) = anchors.first() {
-                    let r = (anchors.get(1).copied().unwrap_or(c) - *a).length();
+                    let d = anchors.get(1).copied().unwrap_or(c) - *a;
+                    let r = d.length();
                     if valid(r) {
-                        // Outside the circle, opposite the cursor (live sketch/09).
-                        let label_w = label_width_px(&dia(r * 2.0)) * 0.5 + 6.0;
-                        out.push((*a - (c - *a).normalize_or_zero() * (r + px * label_w), dia(r * 2.0)));
+                        // Live (behaviours "skasm (2026-10-27) where the live
+                        // Ø readout sits"): halfway to the cursor when the
+                        // label fits there, otherwise outside: across the
+                        // centre for a mostly horizontal cursor, else
+                        // straight below (above) the shape.
+                        let text = dia(r * 2.0);
+                        let w = label_width_px(&text);
+                        let at = if r >= px * (w + 40.0) {
+                            *a + d * 0.5
+                        } else if d.x.abs() > d.y.abs() {
+                            *a + DVec2::new(-d.x.signum() * (r + px * (w * 0.5 + 4.0)), 0.0)
+                        } else {
+                            *a + DVec2::new(0.0, -d.y.signum() * (r + px * 22.0))
+                        };
+                        out.push((at, text));
                     }
                 }
             }
@@ -6456,6 +6468,30 @@ mod tests {
         assert!(!ed.selection.is_empty(), "and keeps it");
     }
 
+    /// Live (behaviours "skasm (2026-10-27) where the live Ø readout
+    /// sits"): circles and both polygons put it halfway to the cursor when
+    /// it fits, otherwise outside: across the centre for a horizontal
+    /// cursor, straight below the shape for a diagonal one.
+    #[test]
+    fn circle_and_polygon_readout_sits_halfway_or_outside_as_live() {
+        let u = UnitPrefs::default();
+        for tool in [Tool::Circle, Tool::Polygon, Tool::CircumPolygon] {
+            let (mut ed, mut d) = editor(tool);
+            let o = v(0.05, 0.05);
+            click(&mut ed, &mut d, o);
+            let at = |ed: &mut SketchEditor, d: &mut SketchData, p: DVec2| {
+                ed.pointer_move(d, p, false, false);
+                (ed.preview_values(d, &u)[0].0 - o) / PX
+            };
+            let mid = at(&mut ed, &mut d, o + v(150.0 * PX, 0.0));
+            assert!((mid - v(75.0, 0.0)).length() < 1e-6, "{tool:?} {mid}");
+            let left = at(&mut ed, &mut d, o + v(40.0 * PX, 0.0));
+            assert!(left.x < -44.0 && left.y.abs() < 1e-6, "{tool:?} {left}");
+            let below = at(&mut ed, &mut d, o + v(-28.0 * PX, 28.0 * PX));
+            assert!(below.x.abs() < 1e-6 && (below.y + 39.6 + 22.0).abs() < 0.5, "{tool:?} {below}");
+        }
+    }
+
     /// Live (behaviours "dx (2026-10-26, for skasm) Point tool on the
     /// Origin"): the Point tool clicked on the Origin makes a sketch point
     /// there, Coincident with the Origin (a Hole can then use it).
@@ -6795,11 +6831,10 @@ mod tests {
         assert_eq!(ed.polygon_sides, 7, "spinner's explicit value stays locked");
         click(&mut ed, &mut data, v(0.08, 0.06));
         assert_eq!(count(&data, EntityKind::Line), 7);
-        assert_eq!(ed.clicks.len(), 1, "the click also starts the next polygon");
-        assert_eq!(ed.clicks[0].pos, v(0.08, 0.06));
-        ed.cancel();
-        assert_eq!(ed.tool, Tool::Select);
-        assert_eq!(count(&data, EntityKind::Line), 7, "only the new preview is discarded");
+        // Live (behaviours "skasm (2026-10-27) sketch polygon side count" (d)):
+        // the click commits and doesn't start the next polygon.
+        assert!(ed.clicks.is_empty(), "no next polygon at the click");
+        assert_eq!(ed.tool, Tool::Polygon);
     }
 
     /// Live (skasm 10-26, PS "skasm poly"): the Inscribed polygon's second
@@ -7814,9 +7849,11 @@ mod tests {
         ed.polygon_sides = 5;
         click(&mut ed, &mut d, v(0.031, 0.013));
         assert!(ed.polygon_sides_pending(), "the circumference is locked first");
-        // moving away from the polygon adds sides, back restores them
-        ed.pointer_move(&mut d, v(0.031 + PX * 31.0, 0.013), false, false);
+        // moving away from the polygon adds a side per 10 px, back restores them
+        ed.pointer_move(&mut d, v(0.031 + PX * 21.0, 0.013), false, false);
         assert_eq!(ed.polygon_sides, 7);
+        ed.pointer_move(&mut d, v(0.031 - PX * 19.0, 0.013), false, false);
+        assert_eq!(ed.polygon_sides, 3);
         ed.pointer_move(&mut d, v(0.031, 0.013), false, false);
         assert_eq!(ed.polygon_sides, 5);
         click(&mut ed, &mut d, v(0.031, 0.013));
