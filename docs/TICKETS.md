@@ -29,8 +29,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   invalid (NOSHAPE_SHELL_DEBUG: 45 tools, fuse 5.4 s, common 3 s, "result valid 0"): an accident, so arm64 can land
   elsewhere. Needs Parasolid's rule (likely: the blind holes' tip cones reach into the floor's wall; the same part
   10 mm high with through holes shells in live, P1-16) — open.
-- [ ] P1 `model/tests/std_oracle::hole_scope_follows_depth_as_live`: "Merge scope at depth 15 mm: []" (Linux, Windows).
-- [ ] P1 `kernel/tests/draft_curve::level_parting_line_matches_occt` red on all platforms 10-26 (exact match vs OCCT).
+- [x] (core 10-27: passes on main, Linux, 1.4 s; the whole std_oracle file stays T2) P1 `model/tests/std_oracle::hole_scope_follows_depth_as_live`: "Merge scope at depth 15 mm: []" (Linux, Windows).
+- [x] (core 10-27: passes on main, Linux, 6 s; T2 for the other platforms' last digits) P1 `kernel/tests/draft_curve::level_parting_line_matches_occt` red on all platforms 10-26 (exact match vs OCCT).
 - [x] verified 19555ca3 (qa): all five crash documents open in the green app 19555ca3 and the CLI (the failing features
   report errors); cli-delete-crash.noshape still regenerating after 120 s in the app, slow but no crash (qa 2026-10-27)
 - [x] bf8aaee2 (core: OCCT patch 0002 fixes the Draft's parallel-extrema read; crash guard: a kernel crash fails its feature; the document opens, Draft 7 "Selected faces could not be drafted.") P0 DRAFT-SEGV-DOC a document whose features include a certain Draft crashes the app and the CLI on every open
