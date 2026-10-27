@@ -2064,8 +2064,11 @@ impl AssemblyView {
                 return Some(if d.picks_entities() { PickMode::Entity } else { PickMode::Inference });
             }
         }
-        // Replicate's "Parts to find match in": parts, faces or edges.
-        if self.pattern.as_ref().is_some_and(|p| p.active == Some(2)) {
+        // Replicate's "Parts to find match in": parts, faces or edges. A
+        // linear pattern's Direction takes the edge (or face) itself, which
+        // pre-highlights on hover (live; ASM-DIR-NO-HOVER: as mate connector
+        // inference nothing highlighted and a click could take a vertex).
+        if self.pattern.as_ref().is_some_and(|p| p.active == Some(2) || (p.kind == PatternDialogKind::Linear && p.active.is_some())) {
             return Some(PickMode::Entity);
         }
         if self.mc.as_ref().is_some_and(|m| m.active) || self.pattern.as_ref().is_some_and(|p| p.active.is_some()) || self.snap.is_some() || self.mass_connector_picking() {
