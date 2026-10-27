@@ -95,13 +95,78 @@ enum Entry {
     Values(Vec<(String, String)>),
     /// A plain string leaf (thread classes) or an empty map ("Custom").
     Leaf,
+    /// Another table constant, converted when a walk reaches it.
+    Ref(String),
 }
 
-/// Every table constant of `holetables.gen.fs` by name, plus the
-/// [`TABLE_EXTERNAL_THREAD`] / [`TABLE_HOLE`] standard levels.
-static TABLES: LazyLock<HashMap<String, Arc<Entry>>> = LazyLock::new(load_tables);
+/// `holetables.gen.fs` (2.1 MB): each table constant's initializer, found by
+/// a scan, parsed when a lookup first reaches it (parsing the whole file cost
+/// ~130 ms on the first hole of a regeneration, REGEN-SPEED).
+struct Source {
+    src: &'static str,
+    /// Constant name -> byte range of its initializer.
+    spans: HashMap<&'static str, (usize, usize)>,
+}
 
-fn load_tables() -> HashMap<String, Arc<Entry>> {
+static SOURCE: LazyLock<Source> = LazyLock::new(|| {
+    let src = noshape_featurescript::std_source("holetables.gen.fs").unwrap_or_default();
+    Source { src, spans: const_spans(src) }
+});
+
+/// Tables converted so far, by constant name (and [`TABLE_EXTERNAL_THREAD`] /
+/// [`TABLE_HOLE`]); leaked once each so lookups can hand out `'static` refs.
+static TABLES: LazyLock<parking_lot::Mutex<HashMap<String, &'static Arc<Entry>>>> = LazyLock::new(Default::default);
+
+/// Top-level `const NAME = <init>;` items: NAME -> the range of <init>
+/// (braces matched outside string literals).
+fn const_spans(src: &str) -> HashMap<&str, (usize, usize)> {
+    let b = src.as_bytes();
+    let mut out = HashMap::new();
+    let mut at = 0;
+    while at < b.len() {
+        let line_end = src[at..].find('\n').map_or(b.len(), |n| at + n);
+        let line = &src[at..line_end];
+        let rest = line.strip_prefix("export const ").or_else(|| line.strip_prefix("const "));
+        let Some(rest) = rest else {
+            at = line_end + 1;
+            continue;
+        };
+        let name_len = rest.find(|c: char| !(c.is_alphanumeric() || c == '_')).unwrap_or(rest.len());
+        let name = &rest[..name_len];
+        let Some(eq) = src[at..].find('=').map(|n| at + n + 1) else { break };
+        let mut i = eq;
+        while i < b.len() && b[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        let start = i;
+        let (mut depth, mut in_str) = (0i32, false);
+        while i < b.len() {
+            let c = b[i];
+            if in_str {
+                if c == b'\\' {
+                    i += 1;
+                } else if c == b'"' {
+                    in_str = false;
+                }
+            } else if c == b'"' {
+                in_str = true;
+            } else if c == b'{' || c == b'[' || c == b'(' {
+                depth += 1;
+            } else if c == b'}' || c == b']' || c == b')' {
+                depth -= 1;
+            } else if c == b';' && depth == 0 {
+                break;
+            }
+            i += 1;
+        }
+        out.insert(name, (start, i));
+        at = src[i..].find('\n').map_or(b.len(), |n| i + n + 1);
+    }
+    out
+}
+
+/// The converted table constant `name`, parsed on first use.
+fn table_const(name: &str) -> Option<&'static Arc<Entry>> {
     use noshape_featurescript::ast::{Expr, ExprKind, MapKey, TopKind};
     fn text(e: &Expr) -> Option<&str> {
         if let ExprKind::Str(s) = &*e.kind { Some(s) } else { None }
@@ -112,17 +177,31 @@ fn load_tables() -> HashMap<String, Arc<Entry>> {
             MapKey::Expr(e) => text(e),
         }
     }
-    fn resolve(name: &str, consts: &HashMap<&str, &Expr>, memo: &mut HashMap<String, Arc<Entry>>) -> Option<Arc<Entry>> {
+    fn resolve(name: &str, memo: &mut HashMap<String, &'static Arc<Entry>>) -> Option<Arc<Entry>> {
         if let Some(e) = memo.get(name) {
-            return Some(e.clone());
+            return Some((*e).clone());
         }
-        let e = convert(consts.get(name)?, consts, memo)?;
-        memo.insert(name.to_string(), e.clone());
+        let source = &*SOURCE;
+        let &(a, b) = source.spans.get(name)?;
+        let snippet = format!("FeatureScript 3008;\nconst {name} = {};\n", &source.src[a..b]);
+        let module = match noshape_featurescript::parser::parse(&snippet) {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("holetables.gen.fs {name}: {e:?}");
+                return None;
+            }
+        };
+        let init = module.items.iter().find_map(|it| match &it.kind {
+            TopKind::Const { init, .. } => Some(init),
+            _ => None,
+        })?;
+        let e = convert(init)?;
+        memo.insert(name.to_string(), Box::leak(Box::new(e.clone())));
         Some(e)
     }
-    fn convert(e: &Expr, consts: &HashMap<&str, &Expr>, memo: &mut HashMap<String, Arc<Entry>>) -> Option<Arc<Entry>> {
+    fn convert(e: &Expr) -> Option<Arc<Entry>> {
         match &*e.kind {
-            ExprKind::Ident(q) => resolve(&q.name, consts, memo),
+            ExprKind::Ident(q) => Some(Arc::new(Entry::Ref(q.name.to_string()))),
             ExprKind::Str(_) => Some(Arc::new(Entry::Leaf)),
             ExprKind::Map(items) => {
                 let field = |f: &str| items.iter().find(|(k, _)| key(k) == Some(f)).map(|(_, v)| v);
@@ -136,46 +215,29 @@ fn load_tables() -> HashMap<String, Arc<Entry>> {
                     key: s("name").unwrap_or_default(),
                     name: s("displayName").unwrap_or_default(),
                     default: s("default"),
-                    entries: list.iter().filter_map(|(k, v)| Some((key(k)?.to_string(), convert(v, consts, memo)?))).collect(),
+                    entries: list.iter().filter_map(|(k, v)| Some((key(k)?.to_string(), convert(v)?))).collect(),
                 })))
             }
             _ => None,
         }
     }
-    let src = noshape_featurescript::std_source("holetables.gen.fs").unwrap_or_default();
-    let module = match noshape_featurescript::parser::parse(src) {
-        Ok(m) => m,
-        Err(e) => {
-            log::error!("holetables.gen.fs: {e:?}");
-            return HashMap::new();
-        }
-    };
-    let consts: HashMap<&str, &Expr> = module
-        .items
-        .iter()
-        .filter_map(|it| match &it.kind {
-            TopKind::Const { name, init, .. } => Some((&**name, init)),
-            _ => None,
-        })
-        .collect();
-    let mut memo = HashMap::new();
-    for name in consts.keys() {
-        resolve(name, &consts, &mut memo);
+    let mut memo = TABLES.lock();
+    if let Some(e) = memo.get(name) {
+        return Some(*e);
     }
     // externalThread.fs's localExternalThreadTable; the generic hole table.
-    let standards = |memo: &HashMap<String, Arc<Entry>>, ansi: &str, iso: &str| {
-        Arc::new(Entry::Level(Level {
-            key: "standard".into(),
-            name: "Standard".into(),
-            default: None,
-            entries: [("ANSI", ansi), ("ISO", iso)].iter().filter_map(|(k, t)| Some((k.to_string(), memo.get(*t)?.clone()))).collect(),
-        }))
+    let mut standards = |ansi: &str, iso: &str| -> Arc<Entry> {
+        let entries = [("ANSI", ansi), ("ISO", iso)].iter().filter_map(|(k, t)| Some((k.to_string(), resolve(t, &mut memo)?))).collect();
+        Arc::new(Entry::Level(Level { key: "standard".into(), name: "Standard".into(), default: None, entries }))
     };
-    let ext = standards(&memo, "ANSI_ExternalThreadTable", "ISO_ExternalThreadTable");
-    let hole = standards(&memo, "ANSI_HoleTable", "ISO_HoleTable");
-    memo.insert(TABLE_EXTERNAL_THREAD.into(), ext);
-    memo.insert(TABLE_HOLE.into(), hole);
-    memo
+    let e = match name {
+        TABLE_EXTERNAL_THREAD => standards("ANSI_ExternalThreadTable", "ISO_ExternalThreadTable"),
+        TABLE_HOLE => standards("ANSI_HoleTable", "ISO_HoleTable"),
+        _ => resolve(name, &mut memo)?,
+    };
+    let leaked: &'static Arc<Entry> = Box::leak(Box::new(e));
+    memo.insert(name.to_string(), leaked);
+    Some(leaked)
 }
 
 fn root(table: &str) -> Option<&'static Entry> {
@@ -189,7 +251,7 @@ fn root(table: &str) -> Option<&'static Entry> {
         TABLE_EXTERNAL_THREAD | TABLE_HOLE => table,
         _ => return None,
     };
-    TABLES.get(name).map(|e| &**e)
+    table_const(name).map(|e| &**e)
 }
 
 /// The option of `level` a path element names. Paths saved before the full
@@ -201,13 +263,20 @@ fn find<'a>(level: &'a Level, key: &str) -> Option<&'a (String, Arc<Entry>)> {
 /// Follow `path` from a table's root: the entry reached and, per step, the
 /// level and the option taken.
 fn walk(table: &str, path: &[String]) -> Option<(&'static Entry, Vec<(&'static Level, &'static str)>)> {
-    let mut e = root(table)?;
+    // A reference to another table: that table.
+    fn deref(e: &'static Entry) -> Option<&'static Entry> {
+        match e {
+            Entry::Ref(name) => table_const(name).map(|t| &**t),
+            _ => Some(e),
+        }
+    }
+    let mut e = deref(root(table)?)?;
     let mut steps = Vec::new();
     for p in path {
         let Entry::Level(l) = e else { return None };
         let (k, next) = find(l, p)?;
         steps.push((l, k.as_str()));
-        e = next;
+        e = deref(next)?;
     }
     Some((e, steps))
 }
