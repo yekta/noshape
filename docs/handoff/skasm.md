@@ -12,6 +12,10 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (569dabca19a397e932f2db54) in noshape mm test.
 
 ## Landed on main
+- be0dd33e new mate between two free parts: the part live keeps stays (`eval::new_mate_stays`: exact flip → sign rule,
+  else the smaller part moves; ties → the negative-Z one), in the mate dialog and assembly_mate (was: the second
+  connector's part always stayed). Live runs in my own tab, behaviours "skasm (2026-10-27) follow-up: which part
+  moves" (14 + 13 runs). d249b08a the solver holds the unturned part in an exact flip.
 - 25dc002f fixed main (RED from psui's 79460041 graphics-menu "Cancel"): coverage entry → history_undo (Ui entries
   are rejected by coverage::no_ui_only_entries). 103ee7cd MidpointOf round-trip test.
 - 10-27 07:00: sketch trim pieces Coincident curve to curve (live); exact-flip moving part by the common Z's sign.
@@ -60,11 +64,9 @@ Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs do
 3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; A10 fixed
    earlier, rows 109 / 170), workflow-configured-assembly (1–5, 8
    ✅; CA3 closed by ui, CA4 and A15 rechecked on green).
-4. Exact flip with nothing fixed: which part turns now follows a rule fitted to live's 14 R3 runs (the first
-   connector's part when the common Z's first non-zero coordinate is negative, else the second's; solver test
-   `exact_flip_turns_the_part_live_turns`), and only that part moves (d249b08a: the other is held for a first solve,
-   as live keeps its transform). It fits all 14 but is a fit; asked live (REQUESTS 10-27) for 4 confirming runs and a
-   no-flip run (with both free ours still splits the move between the two parts; live probably moves one).
+4. Which part moves when a new mate joins two free parts: done (be0dd33e) from 27 live runs; open: two different
+   parts of similar size (untested in live), and edits of an existing mate between free parts (still the second
+   connector's part stays).
 5. Slot: live shows all 3 offset glyphs at the end cap; after the commit live's centre line is plain dark blue (ours
    stayed highlighted once, not reproduced).
 6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
