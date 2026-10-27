@@ -24,6 +24,18 @@ pub struct Props {
     pub active: usize,
     /// Excluded / included items' names.
     pub items: Vec<String>,
+    /// The "Select default plane" popup, when open.
+    pub popup: Option<PlanePopup>,
+}
+
+/// The "Select default plane" popup (live behaviours "Select default
+/// plane", ui-snapv/25): a 308 px HUD right of the plane button with a
+/// drag handle, [Select a plane ▾] (Top | Front | Right), Flip plane, a
+/// green ✓ ("Commit current plane") and ✕ ("Cancel").
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PlanePopup {
+    /// Its plane list is open.
+    pub list_open: bool,
 }
 
 /// What the user did.
@@ -39,6 +51,13 @@ pub enum Action {
     RemoveItem(usize),
     /// The plane button beside "Section planes".
     PlaneButton,
+    /// The popup's [Select a plane ▾] (opens or closes its list).
+    PopupList,
+    /// A default plane from the popup's list: 0 Top, 1 Front, 2 Right.
+    PopupPick(usize),
+    PopupFlip,
+    PopupCommit,
+    PopupCancel,
 }
 
 /// The dialog for `view`; `on` runs each action on it. `key` names the
@@ -116,9 +135,74 @@ pub fn render<V: 'static>(props: Props, key: &'static str, view: &Entity<V>, on:
     let item_rows = props.items.iter().enumerate().map(|(i, n)| chip(SharedString::from(format!("sec-item-{i}")), n.clone(), false, Action::RemoveItem(i))).collect();
     let planes_field = field("sec-planes", "Section planes".into(), !props.items_active, plane_rows, false);
     let items_field = field("sec-items", if props.include { "Items to include".into() } else { "Items to exclude".into() }, props.items_active, item_rows, true);
+    let white = gpui_kit::rgb(0xffffff);
+    let frame = gpui_kit::rgb(0xcccccc);
+    let popup = props.popup.map(|pp| {
+        let opt = |i: usize, label: &'static str| {
+            div()
+                .id(SharedString::from(format!("sec-pop-{label}")))
+                .h(px(26.))
+                .px(px(8.))
+                .flex()
+                .items_center()
+                .text_size(px(14.))
+                .text_color(pal.text)
+                .cursor_pointer()
+                .hover(|d| d.bg(pal.row_hover))
+                .child(label)
+                .on_click(act(Action::PopupPick(i)))
+        };
+        let square = || div().size(px(6.)).border_1().border_color(gpui_kit::rgb(0x999999));
+        let button = |id: &'static str, tip: &'static str, a: Action| div().id(id).size(px(26.)).flex_none().flex().items_center().justify_center().rounded(px(3.)).cursor_pointer().tooltip(crate::ui::tooltip(tip)).on_click(act(a));
+        v_flex()
+            .id("sec-plane-popup")
+            .occlude()
+            .absolute()
+            // Live ui-snapv/25: 14 px right of the plane button, 69 px below the dialog's top.
+            .left(px(231.))
+            .top(px(71.))
+            .w(px(308.))
+            .bg(white)
+            .border_1()
+            .border_color(frame)
+            .rounded(px(3.))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .child(h_flex().h(px(16.)).justify_center().gap(px(1.)).border_b_1().border_color(frame).child(square()).child(square()).child(square()))
+            .child(
+                h_flex()
+                    .px(px(5.))
+                    .py(px(4.))
+                    .gap(px(5.))
+                    .child(
+                        v_flex()
+                            .relative()
+                            .w(px(203.))
+                            .child(
+                                h_flex()
+                                    .id("sec-pop-select")
+                                    .h(px(26.))
+                                    .px(px(6.))
+                                    .border_b_1()
+                                    .border_color(gpui_kit::rgb(0x999999))
+                                    .cursor_pointer()
+                                    .child(div().flex_1().text_size(px(14.)).text_color(gpui_kit::rgb(0x666666)).child("Select a plane"))
+                                    .child(crate::ui::glyph("ui-caret-down", 12., pal.text))
+                                    .on_click(act(Action::PopupList)),
+                            )
+                            .when(pp.list_open, |d| {
+                                d.child(v_flex().absolute().top(px(27.)).left_0().w(px(203.)).bg(white).border_1().border_color(frame).child(opt(0, "Top")).child(opt(1, "Front")).child(opt(2, "Right")))
+                            }),
+                    )
+                    .child(button("sec-pop-flip", "Flip plane", Action::PopupFlip).border_1().border_color(frame).hover(|d| d.bg(pal.panel_hover)).child(crate::assets::icon("flip-direction", 20., cx)))
+                    .child(button("sec-pop-ok", "Commit current plane", Action::PopupCommit).bg(gpui_kit::rgb(0x009400)).child(crate::assets::icon("dialog-ok", 20., cx)))
+                    .child(button("sec-pop-cancel", "Cancel", Action::PopupCancel).border_1().border_color(frame).hover(|d| d.bg(pal.panel_hover)).child(crate::assets::icon("dialog-cancel", 20., cx))),
+            )
+    });
     v_flex()
         .id("section-dialog")
         .occlude()
+        .relative()
+        .children(popup)
         .child(crate::ui::panel_probe(key))
         .w(px(220.))
         .bg(pal.dialog_bg)
@@ -153,6 +237,7 @@ pub fn render<V: 'static>(props: Props, key: &'static str, view: &Entity<V>, on:
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
+                            .tooltip(crate::ui::tooltip("Select default plane"))
                             .child(crate::assets::icon("plane", 20., cx))
                             .on_click(act(Action::PlaneButton)),
                     ),

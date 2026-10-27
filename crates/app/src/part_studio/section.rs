@@ -62,6 +62,9 @@ pub struct SectionDialog {
     pub active: usize,
     /// State before the dialog opened (restored by Cancel).
     saved: (Vec<SectionPlane>, Option<(bool, Vec<BodyId>)>),
+    /// The "Select default plane" popup and the plane it added.
+    pub popup: Option<crate::section_dialog::PlanePopup>,
+    pub popup_plane: Option<usize>,
 }
 
 /// The section view dialog's prompt (live part-studio/70).
@@ -120,7 +123,7 @@ impl PartStudioView {
         }
         let (include, items) = self.ui.section_parts.clone().unwrap_or((false, Vec::new()));
         let active = self.ui.section.len().saturating_sub(1);
-        self.ui.section_dialog = Some(SectionDialog { include, items, items_active: false, active, saved });
+        self.ui.section_dialog = Some(SectionDialog { include, items, items_active: false, active, saved, popup: None, popup_plane: None });
         self.apply_section(window, cx);
     }
 
@@ -374,9 +377,10 @@ impl PartStudioView {
         // its plane's nearest standard direction, whatever was picked (a
         // face, a connector: "Section plane 1 (Top)"); a turned plane has no
         // name.
-        let planes = self.ui.section.iter().map(|pl| if pl.label.starts_with("Section plane") { String::new() } else { direction_name(pl.normal).to_string() }).collect();
+        // Flip plane names the other side (live: "Section plane 2 (Back)").
+        let planes = self.ui.section.iter().map(|pl| if pl.label.starts_with("Section plane") { String::new() } else if pl.flipped { opposite_name(direction_name(pl.normal)).to_string() } else { direction_name(pl.normal).to_string() }).collect();
         let items = d.items.iter().map(|b| self.display.body(b).map(|x| x.name.clone()).unwrap_or_else(|| "Part".into())).collect();
-        let props = crate::section_dialog::Props { include: d.include, items_active: d.items_active, planes, active: d.active, items };
+        let props = crate::section_dialog::Props { include: d.include, items_active: d.items_active, planes, active: d.active, items, popup: d.popup };
         Some(crate::section_dialog::render(props, "ps-section", &cx.entity(), Self::on_section_action, cx))
     }
 
@@ -420,7 +424,74 @@ impl PartStudioView {
                 }
                 self.apply_section(w, cx);
             }
-            Action::PlaneButton => self.add_view_section_plane(w, cx),
+            // Live ("Select default plane"): the button opens the popup; a
+            // plane chosen there is added (and replaced by the next choice)
+            // until ✓ commits it or ✕ takes it away again.
+            Action::PlaneButton => {
+                if let Some(d) = &mut self.ui.section_dialog {
+                    d.popup = if d.popup.is_some() { None } else { Some(Default::default()) };
+                    d.popup_plane = None;
+                }
+                cx.notify();
+            }
+            Action::PopupList => {
+                if let Some(p) = self.ui.section_dialog.as_mut().and_then(|d| d.popup.as_mut()) {
+                    p.list_open = !p.list_open;
+                }
+                cx.notify();
+            }
+            Action::PopupPick(k) => {
+                let Some(d) = &mut self.ui.section_dialog else { return };
+                let normal = [DVec3::Z, DVec3::NEG_Y, DVec3::X][k.min(2)];
+                let pl = plane(["Top", "Front", "Right"][k.min(2)], DVec3::ZERO, normal);
+                let i = match d.popup_plane.filter(|i| *i < self.ui.section.len()) {
+                    Some(i) => {
+                        self.ui.section[i] = pl;
+                        i
+                    }
+                    None if self.ui.section.len() >= MAX_PLANES => {
+                        self.flash_info("Maximum number of section planes reached".into(), cx);
+                        return;
+                    }
+                    None => {
+                        self.ui.section.push(pl);
+                        self.ui.section.len() - 1
+                    }
+                };
+                d.popup_plane = Some(i);
+                d.active = i;
+                d.items_active = false;
+                if let Some(p) = &mut d.popup {
+                    p.list_open = false;
+                }
+                self.reset_section_manip();
+                self.apply_section(w, cx);
+            }
+            Action::PopupFlip => {
+                let Some(d) = &self.ui.section_dialog else { return };
+                let i = d.popup_plane.unwrap_or(d.active);
+                if let Some(pl) = self.ui.section.get_mut(i) {
+                    pl.flipped = !pl.flipped;
+                }
+                self.apply_section(w, cx);
+            }
+            Action::PopupCommit => {
+                if let Some(d) = &mut self.ui.section_dialog {
+                    d.popup = None;
+                    d.popup_plane = None;
+                }
+                cx.notify();
+            }
+            Action::PopupCancel => {
+                let Some(d) = &mut self.ui.section_dialog else { return };
+                d.popup = None;
+                if let Some(i) = d.popup_plane.take().filter(|i| *i < self.ui.section.len()) {
+                    self.ui.section.remove(i);
+                    d.active = self.ui.section.len().saturating_sub(1);
+                    self.reset_section_manip();
+                }
+                self.apply_section(w, cx);
+            }
         }
     }
 
@@ -525,21 +596,6 @@ impl PartStudioView {
         }
         cx.notify();
     }
-
-    fn add_view_section_plane(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.ui.section.len() >= MAX_PLANES {
-            self.flash_info("Maximum number of section planes reached".into(), cx);
-            return;
-        }
-        let center = self.fit_bounds().map(|(lo, hi)| (lo + hi) * 0.5).unwrap_or_default();
-        let n = -self.viewport.read(cx).camera.forward();
-        self.ui.section.push(plane("View", center, n));
-        if let Some(d) = &mut self.ui.section_dialog {
-            d.active = self.ui.section.len() - 1;
-            d.items_active = false;
-        }
-        self.apply_section(window, cx);
-    }
 }
 
 /// The value box (live asm/2370–2371: an `os-canvas-text-edit` 75×26 with a
@@ -564,6 +620,15 @@ fn direction_name(n: DVec3) -> &'static str {
         "Front"
     } else {
         "Right"
+    }
+}
+
+/// The standard direction opposite `name` (a flipped plane's chip).
+fn opposite_name(name: &str) -> &'static str {
+    match name {
+        "Top" => "Bottom",
+        "Front" => "Back",
+        _ => "Left",
     }
 }
 

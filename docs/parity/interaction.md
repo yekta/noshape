@@ -94,6 +94,7 @@ selection and hover per step, rows in brackets).
 | 6.6 | Caps: 0.9 × (part colour + id offset), hatch lines 0.5× the fill, direction and spacing from a hash of that colour (Onshape's endcap shader); while the dialog is open 0.2·cap + 0.8·#FFC685; geometry lying on the plane is kept (plane on a top face: no cap; through the bottom face: capped) | live ui (10-26) (ui-cap/04–10), icons2 caps 3, kern G40/G44 | ✅ shader port (shaders.wgsl, icons2/perf); per-part id 230 + 4·index as live's (reproduces icons2's three caps: 131.0° / 125.9° / 19.4°, 15.9 / 8.7 / 17.6 px); on-plane geometry kept (`clipped`) |
 | 6.7 | With a feature dialog open, Shift+X does nothing and the camera menu has no Section view… | L4955–4961 | 🔧 |
 | 6.8 | A plane feature row accepted as a section plane (ADV1) | workflow-analysis ADV1 | 🔧 (feature row click → `section_pick`) |
+| 6.9 | "Select default plane" (the button beside Section planes): a 308 px popup (drag handle, [Select a plane ▾] Top / Front / Right, Flip plane, green ✓ "Commit current plane", ✕ "Cancel"); a choice adds a section plane at the origin (the next choice replaces it), Flip renames it "(Back)" / "(Bottom)" / "(Left)", ✓ keeps it, ✕ takes it away | behaviours "Select default plane", ui-snapv/25 | ✅ Part Studio (psui 10-27, section_dialog.rs `PlanePopup`; the button used to add a view-direction plane at once); assembly: still adds Front at once |
 
 ## Handover (nav2 → psb, 10-25 15:45)
 

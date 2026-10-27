@@ -4384,7 +4384,7 @@ impl AssemblyView {
         let d = s.dialog.as_ref()?;
         let asm = self.assembly(cx);
         let items = s.items.iter().map(|id| asm.and_then(|a| a.instance(*id).map(|i| i.name.clone())).unwrap_or_default()).collect();
-        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.direction_name().to_string()).collect(), active: if d.chosen { d.active } else { usize::MAX }, items };
+        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.direction_name().to_string()).collect(), active: if d.chosen { d.active } else { usize::MAX }, items, popup: None };
         Some(crate::section_dialog::render(props, "asm-section", &cx.entity(), Self::on_section_action, cx))
     }
 
@@ -4425,7 +4425,8 @@ impl AssemblyView {
                     }
                 }
             }
-            Action::Accept | Action::Cancel => {}
+            // The assembly opens no "Select default plane" popup yet.
+            Action::Accept | Action::Cancel | Action::PopupList | Action::PopupPick(_) | Action::PopupFlip | Action::PopupCommit | Action::PopupCancel => {}
         }
         self.rebuild_scene(false, cx);
         cx.notify();
