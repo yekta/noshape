@@ -52,11 +52,17 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   -p noshape-kernel --test all crash_inputs::replay_one -- --ignored --nocapture` replays a NOSHAPE_DUMP_OPS capture.
   NOSHAPE_SHELL_DEBUG=1 prints why regions/offset decline ("regions: a concave edge" + where).
 
-- (next commit) oracle_p1 LP2 / CP2 as live again (T2, red in the 10-27 nightly; T1 test
+- 2f1fde83 oracle_p1 LP2 / CP2 as live again (T2, red in the 10-27 nightly; T1 test
   `oracle_p1::overhanging_pattern_copies_merge_with_the_part_as_live`): pattern.rs `overhang_growth` takes the part's
   exact box (the tolerance-padded one left the column's bottom 0.05 µm under the part's, no merge). kernel_robustness
   `patterns_match_onshape` M3 (T2): Up to extrudes no longer seat their circles (seated, the boss's seam fell on the
   target cylinder's seam line and the fuse lost 0.035 mm³); their cylinders are still framed as live.
+
+- cc6c4b54 shell_that_breaks as live: `blind_hole_floor_too_thin` (shell.cpp) fails an inward shell when a blind
+  hole's shoulder / flat bottom is less than 2t above the kept face under it (live's 26-case grid; its second clause,
+  t <= ~1 tip-cone apex under the cavity floor, rests on 2 points: not ruled). qa_regressions test back in T1 (0.6 s).
+  std_oracle's `set_std_route` is per thread now (process-wide it turned oracle_p1's extrudes into std's when both
+  ran in one binary: "Select face or sketch region to extrude." under T2). SHELL-WALLS-CORNER void (exact mitre).
 
 - a01dca62 Hole add speed: line_crossings keeps OCCT's loaded line intersector on the shape. Left in std's hole probe:
   min_distance (~140 calls, ~0.8 ms each, BRepExtrema rebuilt per call).
@@ -87,14 +93,13 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
    display meshing ~45 ms. Ideas: check only the blend's new/modified faces instead of the whole part; fewer
    unify passes; profile with NOSHAPE_KERNEL_PROFILE=1 on the probe. Live: 2–9 ms per feature.
 2. P0 SHELL-SLOW (open): parts with concave edges still go to slabs (fuse of 20–45 overlapping tools 0.4–5 s; qa's
-   shell_that_breaks part 9 s); NOSHAPE_SHELL_DEBUG=1 times each stage. The delete-crash shell input (now fails on the
+   shell_that_breaks part now fails at once by live's rule); NOSHAPE_SHELL_DEBUG=1 times each stage. The delete-crash shell input (now fails on the
    budget) is in /root/core-scratch/slow-shells. Next: regions for concave edges between planes (pockets, steps).
-3. P0 `qa_regressions::shell_that_breaks_the_part_fails` (T2): live fails too; ours fails only by an invalid OCCT
-   result (platform-dependent). Needs Parasolid's rule (TICKETS note).
-4. P1 SHELL-WALLS-CORNER (fillets meeting at a sharp corner keep ~0.47·R mm³ more in live), std_oracle hole scope,
+3. P1 std_oracle hole scope,
    Extrude add (Hole add: std holeEditLogic is OCCT-bound in its probe), the elliptic boss curvature blend,
-   FILLET-HANG's fillet itself. Live asked (REQUESTS core 10-27, 10-27 b): fillet corner geometry, shell_that_breaks rule.
-5. kern's open items: forward-oriented edges (proposal: hand out edges FORWARD so start/end, parameters and tangents
+   FILLET-HANG's fillet itself. T2 reds of the 10-27 nightly in my area to check: kernel_robustness
+   shell_draft_sweep_matches_onshape, sheetmetal_frames (3).
+4. kern's open items: forward-oriented edges (proposal: hand out edges FORWARD so start/end, parameters and tangents
    agree; touches every caller of edge_info). Cylinder frames: done (64f6f79a).
 
 ## End-of-day walk (10-27 03:45, green 8165fca6)

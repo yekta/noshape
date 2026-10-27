@@ -70,7 +70,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   2026-10-27)
 - [x] 3f5f69ed (core: extruded cylinders framed as live, z toward the sketch; CP1 matches, out of KNOWN; R3/C1 now flip the pin as live, the solver's −157.5° turn is skasm's) P0 `model/tests/oracle_asm::assemblies_match_live` CP1 regressed by 339de774 (cylinder frame); fs suspects the
   cylinder axis should point toward the sketch (also CP1, R3, C1). Red at the halt.
-- [ ] P0 `model/tests/qa_regressions::shell_that_breaks_the_part_fails` red on macOS arm64 in every CI run of 10-26 (T2
+- [x] cc6c4b54 (core: live's rule, a blind hole's bottom within 2t of the floor fails the shell before OCCT runs; back in T1) P0 `model/tests/qa_regressions::shell_that_breaks_the_part_fails` red on macOS arm64 in every CI run of 10-26 (T2
   since then): the shell result differs on arm64.
   core 10-27: live fails too (spec "core qa_regressions::shell_that_breaks_the_part_fails": "Could not shell part with
   selections.", part unchanged 21211.1623 mm³ / 24 faces). Ours on Linux fails only because OCCT's slab union comes out
@@ -186,7 +186,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   hollowmatrix.py + hollowmatrix-v048.txt (qa 2026-10-26, v0.4.8 release CLI + build 4d2f6b0c). On main (watcher CLI
   ~20:18, tickets/hollowmatrix-main.txt): the hollow cases are still wrong (same volumes) and every open-top case with
   t > R now fails "Could not shell part with selections." (live OK)
-- [ ] P1 SHELL-WALLS-CORNER (core, from live's shell oracle "spec: core SHELL-WALLS / SHELL-FILLETED-BOX" and "core (2026-10-26 b)")
+- [x] cc6c4b54 void (live 'core (2026-10-27)': live's corner is the exact mitre OCCT builds, to 0.002 mm³; the 1 mm³ was live's LOW-precision mass properties; kernel test blend::top_edge_fillets_mitre_at_sharp_corners_as_live) P1 SHELL-WALLS-CORNER (core, from live's shell oracle "spec: core SHELL-WALLS / SHELL-FILLETED-BOX" and "core (2026-10-26 b)")
   top-edge fillets meeting at a sharp vertical corner: live keeps ~1.008 mm³ more per R2 corner than OCCT's mitre (4
   corners 4.031 mm³; no corner patch face), so every filleted shell of qa's matrix is 0.47·R mm³ under live
 - [ ] P0 SHELL-SLOW Shell takes seconds, also in the v0.4.8 release: same matrix, plates with a hole + top fillet R ≥ 2 and
