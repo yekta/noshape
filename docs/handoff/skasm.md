@@ -105,48 +105,28 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 "tools/tiers/land.sh".)
 
 ## Next, in order
-Lead 10-27 order: P1 tickets (none open) → PLAN 2.7 speed targets (met, above) → assembly.md's 7 🔧 rows (T11 is the
-theme owner's; I15 / LA50–LA55 are standard content) → mates/assembly workflow gaps (all ✅; UNCONFIRMED details asked
-live, REQUESTS "assembly sweep leftovers") → standard content. 10-27 15:00: ISO 10511 / 7040 on live's template and
-tables (fbfe810c). The other missing components (DIN 7050 / 7051 / 967 / 923, ISO 7379, NASM 45938 + /4, NAS 1129 ×2,
-PEM ×52) need live's /features (the recipe; one size's surfaces don't give the formulas), 429 until ~10-28 03:00.
-Sketch P1: value boxes as live for every tool live measured (center rectangle and tangent arc added 10-27
-from request 1503). parity/sketch.md all ✅. Assembly P2:
-1. docs/parity/workflow-assembly-sweep.md: all rows ✅ 10-27 (34 left UNCONFIRMED: the 2° snap window). Filed
-   PS-SECTION-RED for psui (Part Studio caps red where parts overlap; live only in the assembly). GUI docs:
-   /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins), asm2 (a pin through the plate), ps2 (Part Studio overlap).
-2. docs/parity/assembly.md G5 exploded views: workflow-exploded-named-positions rechecked 10-27 (EXV6 rollback pill,
-   NP2 header measured against live 155); qa/asm3.noshape = asm1 + Revolute + a named position driving it.
-3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; A10 fixed
-   earlier, rows 109 / 170), workflow-configured-assembly (1–5, 8
-   ✅; CA3 closed by ui, CA4 and A15 rechecked on green).
-4. Which part moves when a new mate joins two free parts: done (be0dd33e, 26c7a498: the later part of one studio
-   moves). Mate edits match live's two UI runs. Live's dialog-made mates (request 1490): the dialog starts on the
-   alignment needing no turn, Flip turns the moving part 180° about its connector X with rz 0 = ours; only REST-made
-   mates turn about Z × w (our oracle R3 path). Closed.
-5. Slot: rechecked 10-27 against live spec-slot-06 (Ø20 leader, glyph groups, colours as live); the once-seen
-   highlighted centre line was not reproduced.
-6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
-   isn't back within 300 ticks); fine on CI runners presumably.
-7. Standard content (tests say P3 long tail): PEM® data crawled by live (52 components: FSRules, configuration,
-   bodydetails at each Part Studio's default; /features still 429 until ~10-28 03:00) in dom/skb-sc-fsrules/PEM_*.
-   Of the 11 others: ISO 10512 and DIN 6908 done; left DIN 7050/7051/967 (tapping, cross recess), DIN 923 (needs a
-   head-shoulder-neck form: live's configuration lists the inputs), ISO 7379 (shoulder screw with neck widths /
-   fillets), NASM 45938 + /4, NAS 1129 ×2. Live's volumes for each studio default are in behaviours "skasm
-   (2026-10-27) standard content gaps"; asked for ISO 10511 / 7040 B-reps (ours come from the published tables). 11 non-PEM
-   components are missing too (/root/skasm-scratch/sc/compare.py lists them: DIN 7050/7051/967 tapping, DIN 923, 6908,
-   ISO 7379, 10512, NASM 45938 + /4, NAS 1129 ×2); their tables exist for some (dom/skb-sc-fsrules, skb-sc-comp) but
-   skb's generator (/root/skb-scratch/gen) maps other column names; asked live for each default size's volume / faces
-   to check the geometry against.
-8. Sketch solve time in broken sketches: the fuzz (random constraints, 200–600 entities) shows failing solves
-   taking ~95 ms (conflicts) and 230–940 ms (machine load) when not converging (profiled: 9 attempts of 3–40 ms,
-   the DOF analysis 1–4 ms): `solve` retries up to 8 times with conflicts
-   excluded (sketch/src/solver.rs ~922), each a whole-sketch solve. Real edits revert a conflicting constraint, so
-   only a sketch opened already broken pays it; candidate fix: retry only the failing component.
-8b. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
-   noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture` (clean 10-27, also
-   after the exact-flip rule: 200 seeds, 418 s).
-9. End-of-day walk, daily (~04:00 UTC): see below.
+Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
+(standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.
+1. Open tickets (10-27 21:00): SKETCH-LINE-MENU (P2): qa's shot was a point's menu; the line's is live's. Waiting on
+   live (REQUESTS "sketch point menus") for a point's exact menu, then match it.
+2. Circular pattern › Axis of pattern pre-highlight (qa's note on ASM-DIR-NO-HOVER): parked patch
+   /root/skasm-scratch/circ-axis.patch (entity picking for Circular too; a bare circle edge / cylinder resolves to its
+   axis). Apply, check on :103 with qa/asm1.noshape (a pin's circular edge as the axis), land. Waited on main's kernel
+   build (features.cpp `far`, Requests above).
+3. UI keystroke tests (docs/TESTS.md, part-studio-ui sketch_ui_tests.rs, 7 tests): extend to other P1 sketch key
+   flows (`=#var` in a value box, polygon sides typed, Tab between rectangle boxes, Enter in a Line chain). The harness
+   is part-studio-ui only; assembly-ui could opt in the same way (dev-dependency on noshape-ui-test-support + gpui).
+4. Standard content (P3): ANSI taper pin crowned ends (live's /features ~22:45 UTC, see Landed); DIN 7050 / 7051 /
+   967 / 923, ISO 7379, NASM 45938 + /4, NAS 1129 ×2, PEM ×52 need live's /features (~10-28 03:00); live's studio
+   default geometry for each is in behaviours "skasm (2026-10-27) standard content gaps" (faces, volumes) to test
+   against.
+5. Broken-sketch solve time: a constraint on qa's 438-entity fuzz sketch ~85–125 ms in the sketch crate (9
+   exclusion attempts of ~15 ms, the failing component's LM each time). Candidate: retry only the failing component.
+6. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
+   noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture`.
+7. End-of-day walk (~04:00 UTC) on the newest /root/green/noshape against live: line chain + dimension, value boxes
+   (line, rectangle, circle, center rectangle, tangent arc), polygon, mate dialog, Revolute + drag, linear pattern
+   direction pick.
 
 Walks: 10-27 02:40 on green 19555ca3: line chain + dimension, polygon, V on H toast, mate dialog (types, limits,
 errors), Revolute + drag (only the dragged instance moves): no regressions. 04:00 on green 8165fca6: paste (copy at the
