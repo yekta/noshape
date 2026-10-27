@@ -115,16 +115,31 @@ jobs:
           path: target/release/${{ matrix.exe }}
           if-no-files-found: error
 
+      # Windows runs the tiers in PowerShell: in Git Bash, /usr/bin/link shadows MSVC's link.exe and every build script
+      # fails to link (10-27).
       - name: Test (T1 core)
-        if: github.event_name != 'schedule' && inputs.tier != 't2'
+        if: github.event_name != 'schedule' && inputs.tier != 't2' && runner.os != 'Windows'
         shell: bash
         run: tools/tiers/t1.sh --locked --no-fail-fast
 
+      - name: Test (T1 core, Windows)
+        if: github.event_name != 'schedule' && inputs.tier != 't2' && runner.os == 'Windows'
+        shell: pwsh
+        run: cargo test --locked --workspace --no-fail-fast
+
       - name: Test (T2 deep; never blocks)
-        if: github.event_name == 'schedule' || inputs.tier == 't2'
+        if: (github.event_name == 'schedule' || inputs.tier == 't2') && runner.os != 'Windows'
         continue-on-error: true
         shell: bash
         run: tools/tiers/t2.sh --locked
+
+      - name: Test (T2 deep, Windows; never blocks)
+        if: (github.event_name == 'schedule' || inputs.tier == 't2') && runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $names = python tools/tiers/t2-names.py .
+          cargo test --locked --workspace --no-fail-fast -- --ignored --exact @names
 
       # The whole workspace (app included, tests included) must be warning-free.
       - name: Clippy (-D warnings)
