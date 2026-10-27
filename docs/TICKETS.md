@@ -83,6 +83,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   /root/qa-scratch/tickets/cli-fillet-hang.noshape (history ends "Insert feature : Fillet 2"); stack
   tickets/cli-fillet-hang-bt-tail.txt. Needs a time / iteration budget on blends (fail the feature) and the regen must stay
   abortable (qa 2026-10-27, main CLI 19555ca3)
+- [ ] P0 DRAFT-HANG a Draft spins for > 20 min in OCCT's defeaturing (`BOPAlgo_PaveFiller::MakeBlocks` /
+  PutPavesOnCurve → `IntTools_Context::IsVertexOnLine` and PerformEF ← BOPAlgo_Builder ← FillGap::TrimExtendedFaces ←
+  BOPAlgo_RemoveFeatures ← BRepAlgoAPI_Defeaturing::Build ← noshape op_defeature features.cpp:3984 ← ops.rs delete_faces ←
+  model-core detail_a.rs `draft_reblend` / reblend:247). Different root cause from FILLET-HANG (draft, defeaturing), same
+  missing budget. clifuzz_dbg.py seed 60 step 76 on the watcher CLI 19555ca3 (log /root/qa-scratch/cli/clifuzz-60n.log
+  "76 draft-args"); doc /root/qa-scratch/tickets/cli-draft-hang.noshape (history ends "Insert feature : Draft 8"), stack
+  tickets/cli-draft-hang-bt.txt. The CLI hangs on opening the doc too (feature_list > 3 min, same stack). In the app
+  (green 16cdcf6d) the doc opens rolled back above Draft 8 (crash marker: good), but dragging the bar below Draft 8 starts a
+  regen that never ends (2 workers in Defeaturing, spinner for > 6 min); dragging the bar back above Draft 8 schedules
+  regen #3, which queues behind the stuck one: the spinner stays, the Part Studio never updates again until the app is
+  killed. Live: a draft either builds or fails at once. Needs a budget on delete_faces / defeaturing (fail the feature,
+  "Selected faces could not be drafted.") and a regen that a newer one can supersede (qa 2026-10-27, CLI 19555ca3, app
+  16cdcf6d)
 - [x] (dx 10-27: a session merges its edit onto a head another process moved, three-way, then reloads; both edits kept in arrival order as live; session::tests::two_writers_of_one_file_keep_both_edits. Left: same-feature two-field edits keep ours (core merge.rs), and the other window shows the change only at its next edit) P0 TWO-PROCESS-LOST-EDIT the same .noshape opened by two app processes (e.g. `noshape doc.noshape` twice, or a
   file-manager double-click while it's open) gives two independent windows; edits from both are written, but the later
   writer's microversion takes the earlier one as parent while carrying its own stale state, so the earlier edit silently
