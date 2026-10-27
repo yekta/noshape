@@ -12,7 +12,8 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (569dabca19a397e932f2db54) in noshape mm test.
 
 ## Landed on main
-- 10-27 07:xx: sketch tools as live's REST spec (behaviours "spec: skasm sketch tools"): center point rectangle =
+- 10-27 07:00: sketch trim pieces Coincident curve to curve (live); exact-flip moving part by the common Z's sign.
+- 10-27 06:45: sketch tools as live's REST spec (behaviours "spec: skasm sketch tools"): center point rectangle =
   construction centre point, `ConstraintKind::MidpointOf` of both diagonals (no diagonal line); 3 point circle's 3
   construction points; ellipse Horizontal / Vertical from the major-axis click; corner rectangle Horizontal /
   Perpendicular by click order; midpoint line from the clicked end. Slot, Dimension-tool and BOM specs already matched.
@@ -65,9 +66,12 @@ Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs do
    stayed highlighted once, not reproduced).
 6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
    isn't back within 300 ticks); fine on CI runners presumably.
-7. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
-   noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture` (clean 10-27).
-8. End-of-day walk, daily (~04:00 UTC): see below.
+7. Standard content PEM®: our catalogue has no PEM component (live lists 40 under 6 standards); asked live for the
+   component FeatureScript / features crawl (REQUESTS 10-27). Implement from that data once it lands.
+8. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
+   noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture` (clean 10-27, also
+   after the exact-flip rule: 200 seeds, 418 s).
+9. End-of-day walk, daily (~04:00 UTC): see below.
 
 Walks: 10-27 02:40 on green 19555ca3: line chain + dimension, polygon, V on H toast, mate dialog (types, limits,
 errors), Revolute + drag (only the dragged instance moves): no regressions. 04:00 on green 8165fca6: paste (copy at the
