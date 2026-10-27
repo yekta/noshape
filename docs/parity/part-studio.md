@@ -267,10 +267,10 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 10.1 | Hide/Show parts, sketches, planes, mate connectors, default geometry | View__hide_show | 🔧 (parts only before) |
-| 10.2 | Hide other parts / Hide all parts / Show all / Show all parts | View__hide_show | 🔧 |
-| 10.3 | Isolate keeps chosen parts opaque, others transparent | View__isolate | 🔧 |
-| 10.4 | Make transparent makes chosen parts transparent | View__make_transparent | 🔧 |
-| 10.5 | Isolate/transparent panel with transparency control and × to exit; Esc exits | View__isolate | 🔧 |
+| 10.2 | Hide other parts / Hide all parts / Show all / Show all parts | View__hide_show | ✅ (10-27: the face menu and the parts list row menu as live; Show all in the empty-space menu) |
+| 10.3 | Isolate keeps chosen parts opaque, others transparent | View__isolate | ✅ (see 2.18) |
+| 10.4 | Make transparent makes chosen parts transparent | View__make_transparent | ✅ (see 2.19) |
+| 10.5 | Isolate/transparent panel with transparency control and × to exit; Esc exits | View__isolate | ✅ (10-27: the 220-px panel at the dialog's place, Esc exits, also from the graphics menu) |
 | 10.6 | Select transparent geometry checkbox; Expand by distance | View__isolate | 🔧 |
 | 10.7 | Section view dialog (live): Exclude | Include tabs, "Section planes" field (planes, planar faces, mate connectors; × removes) + a view-facing plane button, "Items to exclude/include"; ✓/Enter keeps, ✕/Esc restores; empty-space menu Edit section view… / Turn off section view | live part-studio/70–74 | ✅ |
 | 10.7a | Section view manipulator: base circle (slides the manipulator over the plane), offset arrow, and at its tip two rotate rings about the plane's in-plane axes (Top: Y, then X); a ring drag turns the plane about the arrow's base, snapping to 5° within 2° (else 3 decimals) with a "deg" value box that takes a typed angle; a turned plane's chip loses "(Top)"; the hovered handle turns blue | live "skb (10-24) assembly section" (1)–(3) | ✅ (app: ring hover blue, drag → "27.345 deg", tilted cut; `section_manip.rs`, test `rotation_snaps_and_reads_as_live`; look to icons2) |
@@ -281,8 +281,8 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 11.1 | Measure readout for the selection (length, area, radius, distance, angle, ΔX/ΔY/ΔZ); the first row follows the client's order (bundle `setMeasurements`: Diameter / Radius / Parallel (axis) distance or an angle first): two perpendicular faces read "Perp planes angle: 90.000 deg" (live part-studio/81, assembly/707), parallel faces "Parallel dist", pairs "Min dist", face totals "Area"; values with fixed decimals and "deg" ("90.000 deg", "400.000 mm²") | View__measure_tool, live 81/707 | ✅ (verified in the app; Part Studio and assembly share `measure::measure_shapes`; labels for line/axis pairs inferred from the bundle's measurement types — live request psb 10-20 m) |
-| 11.2 | Measure/Mass properties buttons at the bottom right; [ opens Measure with a prompt when nothing is selected | A §1, §6.10 | 🔧 |
-| 11.3 | Measure graphics (dotted min distance with X/Y/Z components) and measure type selector | View__measure_tool | 🔧 |
+| 11.2 | Measure/Mass properties buttons at the bottom right; [ opens Measure with a prompt when nothing is selected | A §1, §6.10 | ✅ (10-27: [ opens Measure with "Select entities to measure"; the bottom-right Mass button opens Mass properties) |
+| 11.3 | Measure graphics (dotted min distance with X/Y/Z components) and measure type selector | View__measure_tool | ✅ (10-27: two faces → Parallel dist / Area / Min dist / Max dist with X/Y/Z rows, the dashed line on row hover; Measure type "Show all") |
 | 11.4 | Mass properties: volume, surface area, mass (with material), center of mass | View__mass_properties_tool | ✅ |
 | 11.5 | Moments of inertia about the center of mass; Face tab; reference mate connector; override mass | View__mass_properties_tool | 🔧 (several parts: each part's inertia moved to the joint centre of mass by the parallel-axis term, test `mass_properties_move_each_part_to_the_joint_centre`; Face tab / reference mate connector / override mass still open) |
 | 11.6 | Part appearance colour, transparency, tessellation quality (Appearance editor) | customizing_appearances | 🔧 (material still in Part properties) |
