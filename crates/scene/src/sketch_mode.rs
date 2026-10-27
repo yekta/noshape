@@ -331,11 +331,24 @@ pub struct OtfField {
     pub scale: f64,
     /// Label position of the resulting dimension (sketch coordinates).
     pub label: DVec2,
-    /// A circle's box goes on this side of the rim instead (unit vector):
-    /// live puts a center point circle's Ø box opposite the rim click, its
-    /// near side ~14 px off the rim (behaviours "skasm (2026-10-27) sketch
-    /// value boxes right after drawing").
-    pub away: Option<DVec2>,
+    /// Where live puts the value while it is an idle value (blue text),
+    /// and while it is the active box (behaviours "skasm (2026-10-27) sketch
+    /// value boxes right after drawing — rule capture"); `None`: `label`.
+    pub place: Option<BoxPlace>,
+    pub place_active: Option<BoxPlace>,
+}
+
+/// A value box's place relative to its geometry, in screen pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BoxPlace {
+    /// Beside the circle (or arc's circle) on side `u` (unit vector), the
+    /// box's near edge 14 px off the rim.
+    Rim(DVec2),
+    /// Beside a line's midpoint on side `u`, the near edge `gap` px off the
+    /// line (inside a shape when `u` points into it).
+    Edge { line: EntityId, u: DVec2, gap: f64 },
+    /// Centred on a point.
+    At(DVec2),
 }
 
 /// On-the-fly dimension boxes of the last created geometry (Onshape:
@@ -2360,7 +2373,7 @@ impl SketchEditor {
                         self.chain_end = Some(end);
                         self.clicks = vec![Click { pos: sk.point(end).unwrap_or(click.pos), inference: None }];
                         self.finish_create(data, &ids.curves);
-                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px)]);
+                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px, None)]);
                         EditOutcome::changed()
                     }
                     Err(e) => {
@@ -2467,6 +2480,28 @@ impl SketchEditor {
                 if !self.alt_held {
                     fields.push(length_field(&data.sketch, vertical, w));
                 }
+                // Live (behaviours "… value boxes … rule capture" (3)): the width
+                // box outside the first click's horizontal edge, 14 px off; the
+                // height as blue text outside the first click's vertical edge,
+                // 16 px off; once it is the box, inside 14 px from the other
+                // vertical edge.
+                if self.tool == Tool::CornerRect {
+                    let mid = |id: EntityId| match data.sketch.curve(id) {
+                        Some(Curve2::Line { a, b }) => (a + b) * 0.5,
+                        _ => DVec2::ZERO,
+                    };
+                    let centre = (first.pos + click.pos) * 0.5;
+                    let out_h = DVec2::new(0.0, (mid(horizontal).y - centre.y).signum());
+                    let out_v = DVec2::new((mid(vertical).x - centre.x).signum(), 0.0);
+                    let other = ids.curves.iter().copied().find(|c| *c != vertical && *c != horizontal && (mid(*c).x - centre.x).abs() > 1e-12 && (mid(*c).y - centre.y).abs() < 1e-12);
+                    let width = BoxPlace::Edge { line: horizontal, u: out_h, gap: 14.0 };
+                    fields[0].place = Some(width);
+                    fields[0].place_active = Some(width);
+                    if let Some(f) = fields.get_mut(1) {
+                        f.place = Some(BoxPlace::Edge { line: vertical, u: out_v, gap: 16.0 });
+                        f.place_active = other.map(|o| BoxPlace::Edge { line: o, u: out_v, gap: 14.0 });
+                    }
+                }
                 self.set_otf(data, fields);
                 EditOutcome::changed()
             }
@@ -2537,7 +2572,7 @@ impl SketchEditor {
                             attach(sk, *q, None, cl);
                         }
                         self.finish_create(data, &[id]);
-                        self.set_otf(data, vec![diameter_field(&data.sketch, id, self.world_per_px, None)]);
+                        self.set_otf(data, vec![diameter_field(&data.sketch, id, self.world_per_px, data.sketch.entity(id).and_then(|e| e.center()).and_then(|cp| data.sketch.point(cp)).and_then(|ctr| (ctr - c[0].pos).try_normalize()))]);
                         EditOutcome::changed()
                     }
                     Err(_) => EditOutcome::redraw(),
@@ -2561,7 +2596,9 @@ impl SketchEditor {
                         }
                         rim_autos(sk, arc, &c[2]);
                         self.finish_create(data, &[arc]);
-                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px)]);
+                        // Live: the box centred on the start-end chord.
+                        let chord = data.sketch.endpoints(arc).and_then(|(a, b)| Some((data.sketch.point(a)? + data.sketch.point(b)?) * 0.5));
+                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px, chord.map(BoxPlace::At))]);
                         EditOutcome::changed()
                     }
                     Err(_) => EditOutcome::redraw(),
@@ -2583,7 +2620,9 @@ impl SketchEditor {
                     attach(sk, end, Some(id), e_click);
                 }
                 self.finish_create(data, &[id]);
-                self.set_otf(data, vec![radius_field(&data.sketch, id, self.world_per_px)]);
+                // Live: the box opposite the start click, as a circle's.
+                let away = (c[0].pos - c[1].pos).try_normalize().map(BoxPlace::Rim);
+                self.set_otf(data, vec![radius_field(&data.sketch, id, self.world_per_px, away)]);
                 EditOutcome::changed()
             }
             Tool::TangentArc => {
@@ -2613,7 +2652,7 @@ impl SketchEditor {
                         self.chain_end = end;
                         self.clicks = vec![click];
                         self.finish_create(data, &ids.curves);
-                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px)]);
+                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px, None)]);
                         EditOutcome::changed()
                     }
                     Err(e) => {
@@ -2660,7 +2699,7 @@ impl SketchEditor {
                         // the initial box keeps the default driving value.
                         let rho = self.conic_rho.clamp(0.01, 0.99);
                         add_dimension(data, ConstraintKind::Rho { conic: id, value: rho }, Some(label), None);
-                        self.set_otf(data, vec![OtfField { kind: ConstraintKind::Rho { conic: id, value: 0.0 }, scale: 1.0, label, away: None }]);
+                        self.set_otf(data, vec![OtfField { kind: ConstraintKind::Rho { conic: id, value: 0.0 }, scale: 1.0, label, place: None, place_active: None }]);
                         EditOutcome::changed()
                     }
                     Err(e) => {
@@ -3017,27 +3056,35 @@ impl SketchEditor {
             .filter_map(|(i, f)| {
                 let v = data.sketch.measure_new(&f.kind)? * f.scale;
                 let dim = dim_unit(&f.kind);
-                Some((self.otf_label(data, f, units), noshape_units::format_quantity(Quantity::new(v, dim), units), i == o.active))
+                Some((self.otf_label(data, f, units, i == o.active), noshape_units::format_quantity(Quantity::new(v, dim), units), i == o.active))
             })
             .collect()
     }
 
-    /// Where a box sits: its label, or for a
-    /// circle with `away`, beside the rim on that side, the box's near edge
-    /// 14 px off it (the box is centred on the point; 24 px high, its width
-    /// from the value text as the app draws it).
-    fn otf_label(&self, data: &SketchData, f: &OtfField, units: &UnitPrefs) -> DVec2 {
-        let Some(u) = f.away else { return f.label };
-        let Some(Curve2::Circle { center, radius }) = (match f.kind {
-            ConstraintKind::Diameter { curve, .. } => data.sketch.curve(curve),
-            _ => None,
-        }) else {
-            return f.label;
-        };
+    /// Where a value sits (sketch coordinates of its centre): its label, or
+    /// its [`BoxPlace`]. The app draws the active box 24 px high and its
+    /// width from the text, an idle value as ~18 px high text.
+    fn otf_label(&self, data: &SketchData, f: &OtfField, units: &UnitPrefs, active: bool) -> DVec2 {
+        let Some(place) = (if active { f.place_active } else { f.place }) else { return f.label };
         let text = data.sketch.measure_new(&f.kind).map(|v| dim_value_text(&f.kind, v, units)).unwrap_or_default();
-        let (hw, hh) = ((label_width_px(&text) * 14.0 / 16.0 + 12.0) * 0.5, 12.0);
-        let extent = u.x.abs() * hw + u.y.abs() * hh;
-        center + u * (radius + (14.0 + extent) * self.world_per_px)
+        let (hw, hh) = if active { ((label_width_px(&text) * 14.0 / 16.0 + 12.0) * 0.5, 12.0) } else { (label_width_px(&text) * 13.0 / 28.0, 9.0) };
+        let extent = |u: DVec2| u.x.abs() * hw + u.y.abs() * hh;
+        let wpp = self.world_per_px;
+        let curve = match f.kind {
+            ConstraintKind::Diameter { curve, .. } | ConstraintKind::Radius { curve, .. } | ConstraintKind::Length { curve, .. } => data.sketch.curve(curve),
+            _ => None,
+        };
+        match place {
+            BoxPlace::Rim(u) => match curve {
+                Some(Curve2::Circle { center, radius } | Curve2::Arc { center, radius, .. }) => center + u * (radius + (14.0 + extent(u)) * wpp),
+                _ => f.label,
+            },
+            BoxPlace::Edge { line, u, gap } => match data.sketch.curve(line) {
+                Some(Curve2::Line { a, b }) => (a + b) * 0.5 + u * (gap + extent(u)) * wpp,
+                _ => f.label,
+            },
+            BoxPlace::At(p) => p,
+        }
     }
 
     /// Text of the idle boxes, like a dimension label (live Onshape shows a
@@ -5287,17 +5334,18 @@ fn length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
         Some(Curve2::Line { a, b }) => (a + b) * 0.5 - (b - a).try_normalize().unwrap_or(DVec2::X).perp() * wpp * 26.0,
         _ => DVec2::ZERO,
     };
-    OtfField { kind: ConstraintKind::Length { curve: line, value: 0.0 }, scale: 1.0, label, away: None }
+    OtfField { kind: ConstraintKind::Length { curve: line, value: 0.0 }, scale: 1.0, label, place: None, place_active: None }
 }
 
-fn radius_field(sk: &Sketch, arc: EntityId, wpp: f64) -> OtfField {
+fn radius_field(sk: &Sketch, arc: EntityId, wpp: f64, place: Option<BoxPlace>) -> OtfField {
     let label = default_label_pos(sk, &ConstraintKind::Radius { curve: arc, value: 0.0 }, wpp).unwrap_or_default();
-    OtfField { kind: ConstraintKind::Radius { curve: arc, value: 0.0 }, scale: 1.0, label, away: None }
+    OtfField { kind: ConstraintKind::Radius { curve: arc, value: 0.0 }, scale: 1.0, label, place, place_active: place }
 }
 
 fn diameter_field(sk: &Sketch, circle: EntityId, wpp: f64, away: Option<DVec2>) -> OtfField {
+    let place = away.map(BoxPlace::Rim);
     let label = default_label_pos(sk, &ConstraintKind::Diameter { curve: circle, value: 0.0 }, wpp).unwrap_or_default();
-    OtfField { kind: ConstraintKind::Diameter { curve: circle, value: 0.0 }, scale: 1.0, label, away }
+    OtfField { kind: ConstraintKind::Diameter { curve: circle, value: 0.0 }, scale: 1.0, label, place, place_active: place }
 }
 
 /// Primary then secondary axis diameter boxes of an ellipse / elliptical arc.
@@ -5306,8 +5354,8 @@ fn ellipse_fields(sk: &Sketch, id: EntityId, wpp: f64) -> Vec<OtfField> {
     let u = major.try_normalize().unwrap_or(DVec2::X);
     let off = wpp * 26.0;
     vec![
-        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: true, value: 0.0 }, scale: 2.0, label: center + major + u * off, away: None },
-        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: false, value: 0.0 }, scale: 2.0, label: center + u.perp() * (minor + off), away: None },
+        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: true, value: 0.0 }, scale: 2.0, label: center + major + u * off, place: None, place_active: None },
+        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: false, value: 0.0 }, scale: 2.0, label: center + u.perp() * (minor + off), place: None, place_active: None },
     ]
 }
 
@@ -7971,6 +8019,52 @@ mod tests {
             assert!(along > 0.010 + 14.0 * PX, "{rim:?}: box at {at:?}");
             assert!((at - side * along).length() < 1e-9, "{rim:?}: box off the axis {at:?}");
         }
+    }
+
+    /// Live (behaviours "skasm (2026-10-27) sketch value boxes … rule
+    /// capture"): a corner rectangle's width box outside the first click's
+    /// horizontal edge, its height text outside the first click's vertical
+    /// edge and, as the box, inside by the other vertical edge; a 3 point
+    /// circle's box opposite the first click, a center point arc's opposite
+    /// the start, a 3 point arc's on the chord's midpoint.
+    #[test]
+    fn value_boxes_where_live_puts_them() {
+        let units = UnitPrefs::default();
+        // top-left (first) → bottom-right
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        let (p0, p1) = (v(0.010, 0.030), v(0.040, 0.010));
+        click(&mut ed, &mut d, p0);
+        click(&mut ed, &mut d, p1);
+        let b = ed.otf_boxes(&d, &units);
+        assert!(b[0].0.y > 0.030 + 14.0 * PX && (b[0].0.x - 0.025).abs() < 1e-9, "width box above the top edge: {:?}", b[0].0);
+        assert!(b[1].0.x < 0.010 - 16.0 * PX && (b[1].0.y - 0.020).abs() < 1e-9, "height text left of the left edge: {:?}", b[1].0);
+        ed.otf_step(1);
+        let b = ed.otf_boxes(&d, &units);
+        assert!(b[1].0.x < 0.040 - 14.0 * PX && b[1].0.x > 0.025 && (b[1].0.y - 0.020).abs() < 1e-9, "height box inside by the right edge: {:?}", b[1].0);
+        // 3 point circle, first click on top: the box below
+        let (mut ed, mut d) = editor(Tool::ThreePointCircle);
+        for p in [v(0.030, 0.040), v(0.040, 0.030), v(0.020, 0.030)] {
+            click(&mut ed, &mut d, p);
+        }
+        let b = ed.otf_boxes(&d, &units);
+        assert!(b[0].0.y < 0.020 - 14.0 * PX && (b[0].0.x - 0.030).abs() < 1e-9, "box below: {:?}", b[0].0);
+        // center point arc, start to the right: the box left
+        let (mut ed, mut d) = editor(Tool::CenterArc);
+        click(&mut ed, &mut d, v(0.030, 0.030));
+        click(&mut ed, &mut d, v(0.040, 0.030));
+        for a in [0.3f64, 0.8, 1.3, 1.5] {
+            ed.pointer_move(&mut d, v(0.030, 0.030) + DVec2::from_angle(a) * 0.01, false, false);
+        }
+        click(&mut ed, &mut d, v(0.030, 0.040));
+        let b = ed.otf_boxes(&d, &units);
+        assert!(b[0].0.x < 0.020 - 14.0 * PX && (b[0].0.y - 0.030).abs() < 1e-9, "box left: {:?}", b[0].0);
+        // 3 point arc: on the chord's midpoint
+        let (mut ed, mut d) = editor(Tool::Arc3);
+        for p in [v(0.020, 0.030), v(0.040, 0.030), v(0.030, 0.036)] {
+            click(&mut ed, &mut d, p);
+        }
+        let b = ed.otf_boxes(&d, &units);
+        assert!((b[0].0 - v(0.030, 0.030)).length() < 1e-6, "box on the chord: {:?}", b[0].0);
     }
 
     /// Live (behaviours "spec: skasm sketch tools"): a center point
