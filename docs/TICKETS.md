@@ -172,6 +172,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   52–65 ms, Hole 1 30, Linear pattern 1 27, fillets ~11 each); at 14–17 the block swallows the bosses so later times
   (597 / 861 / 360 ms) are on a degenerate model. Undo: the last two states come back cached (2–3 ms), the third undo
   re-evaluates all 29 features (886 ms), far over the 50 ms undo budget; keep more states (or every undo target) cached
+  qa 04:49 green bcf401ca at load ~20: commits (fresh depths 11 / 9 / 13 / 8 / 12.5 / 9.5) 223 / 393 / 856 / 325 / 398 /
+  305 ms (28 features re-evaluated, median ~360); undo: 1st and 2nd 1 ms (cached), 3rd and 4th 266 / 282 ms.
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
 - [x] verified watcher CLI 04:06 (≥ green bcf401ca, has 239fa250; qa5 pass28/build.py: 2.5 mm 8503.961 mm³ / 47 faces, 1 mm 3998.630 / 33, live 8503.961 / 47 and 3998.627 / 33) (core 10-27: live's numbers exactly, 1 mm 3998.632 / 33 faces, 2.5 mm 8503.961 / 47; kernel test shell.rs shell_block_with_close_holes_like_onshape back in T1) P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
