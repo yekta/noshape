@@ -3,7 +3,12 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Requests to the lead (qa, updated 2026-10-27 10:55)
+## Requests to the lead (qa, updated 2026-10-27 13:20)
+- **SIL-AXIS-VIEW-GONE (P1 psui, regression in green e598c3a5 / 4e568f3f)**: cylinder side silhouettes are gone in exact
+  standard views (Front of revolved tubes); 0d75aa8e draws them. Likely 69de3163 (EDGE-HIGHLIGHT-LOOK (2), silhouette
+  push now analytic). Ships if a release is cut from these greens.
+- BUDGET-LONGJMP (add45a95, in green 4e568f3f): re-running seeds 120 / 131 / 72 on the watcher CLI 12:59 (logs
+  cli/clifuzz-{120,131,72}L.log); results go into the ticket.
 - v0.4.10 (e8e0f62d = e8858e61) fixes the built-in dialogs' picks (LP-DIRECTION-PICK, checked on its artifact) but not
   custom features' compound edge filters (`EDGE && GeometryType.LINE`, `EDGE && ALLOWS_AXIS` take sketch edges only):
   psui's 1e3c419c came after. The user's custom-feature example stays broken until the next release.
@@ -193,6 +198,16 @@ edge's midpoint), READOUT-AXES, EXT-2ND-DEPTH, EXPORT-DXF-OPTIONS (DXF R14, mm, 
 FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress | Dynamic suppression ▸ | Expand ▸ | Collapse ▸ |
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
+
+## 12:40–13:20 (greens e598c3a5 → 4e568f3f; qa moved to the Motile account at 12:40)
+- Verified: OK-DISABLED-HOVER, CONFIG-CELL-EDIT-LOOK, EXPORT-OBJ-MTL (e598c3a5), REPLICATE-EDGE-DEFAULT (4e568f3f).
+- 30-feature part on e598c3a5 (load 45–68): open 1.18 s; Extrude 1 edits 460 / 1056 / 1327 ms; 3rd undo back 883 ms
+  (REGEN-SPEED unchanged); section view (Plane 1, tan preview caps, "Section plane 1 (Top)" = live).
+- New doc walk: Front sketch, rectangle + dims, Revolve about a sketch line → 28274.334 mm³ / 7539.822 mm² exact; Part
+  mirror about Top, Part linear pattern 3 × 50 (Tab updates the preview, = live), mass properties of 2 = 56548.668.
+- New: SIL-AXIS-VIEW-GONE (P1 psui), PARTS-SHIFT-RANGE (P2 psui), EXPORT-OBJ-ZIP-NAME (P3 dx). Doc tickets/tubes6.noshape.
+- Not filed (unsure of live): a sketch line lying on the Right plane's edge-on line in the Front view can't be hovered /
+  picked as Revolve axis (picks fine once orbited).
 
 ## 11:35–12:03 (green e8858e61 still; watcher build 0a25dd1a = all six app crates split, 11:32)
 - **Green 0d75aa8e (12:04, all six app crates split)**: tool-open smoke 87 names: every crop pixel-identical to green
