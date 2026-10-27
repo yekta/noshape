@@ -500,7 +500,8 @@ impl Render for TabManager {
             .size_full()
             .bg(pal.panel)
             .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _, cx| match ev.keystroke.key.as_str() {
-                "escape" => cx.emit(TabManagerEvent::Close),
+                // Live ("spec: psui part-studio.md … 1.27 Alt+T"): Esc does not
+                // close it; Alt+T again or its ✕ does.
                 "down" => this.step(1, cx),
                 "up" => this.step(-1, cx),
                 "tab" => this.step(if ev.keystroke.modifiers.shift { -1 } else { 1 }, cx),

@@ -1510,6 +1510,9 @@ impl PartStudioView {
             ViewportEvent::ToolUp { .. } if self.plane_drag_end(window, cx) => return,
             _ => {}
         }
+        if matches!(ev, ViewportEvent::CameraChanged) && !vp.read(cx).zoom_window {
+            self.end_zoom_window_prompt(cx);
+        }
         // Screen-sized geometry built here follows the zoom: resize it when
         // the scale changes, without re-rendering (perf; the manipulators'
         // glyphs are built by the renderer per frame).
@@ -5234,6 +5237,7 @@ impl Render for PartStudioView {
                         vp.zoom_window = false;
                         cx.notify();
                     });
+                    this.end_zoom_window_prompt(cx);
                     return;
                 }
                 if this.sketch.is_some() {

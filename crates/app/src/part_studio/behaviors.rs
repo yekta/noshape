@@ -74,6 +74,8 @@ pub struct SelectOther {
 /// another origin).
 const SELECT_OTHER_OFFSET: (f32, f32) = (100., 51.);
 const SELECT_OTHER_ZONE_PX: f64 = 8.;
+/// The zoom-window mode's prompt (live part-studio/psui-kb-w-armed).
+const ZOOM_WINDOW_PROMPT: &str = "Drag to create zoom bounding box.";
 const SELECT_OTHER_PICK_PX: f64 = 8.;
 const SELECT_OTHER_MAX: usize = 20;
 const SELECT_OTHER_SIZE: (f32, f32) = (220., 149.);
@@ -1829,7 +1831,7 @@ impl PartStudioView {
             .bodies
             .iter()
             .filter(|b| b.hidden)
-            .filter(|b| b.mesh.indices.chunks_exact(3).any(|t| noshape_scene::camera_ops::ray_triangle(o, d, v(&b.mesh, t[0]), v(&b.mesh, t[1]), v(&b.mesh, t[2])).is_some()))
+            .filter(|b| b.mesh.indices.as_chunks::<3>().0.iter().any(|t| noshape_scene::camera_ops::ray_triangle(o, d, v(&b.mesh, t[0]), v(&b.mesh, t[1]), v(&b.mesh, t[2])).is_some()))
             .map(|b| b.id.clone())
             .collect()
     }
@@ -2332,11 +2334,27 @@ impl PartStudioView {
     /// W: the next box drag zooms to the box (press W again to cancel).
     pub(super) fn toggle_zoom_window(&mut self, cx: &mut Context<Self>) {
         self.push_camera_history(cx);
-        self.viewport.update(cx, |vp, cx| {
+        let on = self.viewport.update(cx, |vp, cx| {
             vp.zoom_window = !vp.zoom_window;
             cx.notify();
+            vp.zoom_window
         });
+        // Live ("spec: psui part-studio.md 2.11"): a blue bar at the top
+        // centre while the mode is armed.
+        if on {
+            self.message = Some((noshape_model::display::FeatureStatus::Info, ZOOM_WINDOW_PROMPT.into()));
+        } else {
+            self.end_zoom_window_prompt(cx);
+        }
         cx.notify();
+    }
+
+    /// The zoom-window bar goes with its mode (W again, Esc, a box zoomed).
+    pub(super) fn end_zoom_window_prompt(&mut self, cx: &mut Context<Self>) {
+        if self.message.as_ref().is_some_and(|(_, m)| m == ZOOM_WINDOW_PROMPT) {
+            self.message = None;
+            cx.notify();
+        }
     }
 
     /// Ctrl+Shift+arrows (Onshape pans 150 px per step).
