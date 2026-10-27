@@ -18,6 +18,7 @@ pub mod dwt;
 pub mod mbd;
 pub mod export;
 pub mod painter;
+pub mod pdf_font;
 pub mod showcase;
 pub mod tables;
 pub mod views;

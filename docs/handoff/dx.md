@@ -72,7 +72,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    custom color (any colour is settable), Update material library (material_library_update, this landing).
 2. API: benchmarks done for Variable Studio, in-context, sheet metal (/root/dx-scratch/bench/*.py); next: drive a model
    through the MCP server with a real client; render_image of the window camera (image size).
-3. Drawings (P2): PDF Selectable text with a subset NotoSans (Normal text is already filled outlines); ui2's
+3. Drawings (P2): PDF Selectable text landed 10-27 (embedded TrueType subsets, CID fonts with ToUnicode; same
+   placement as the outlines); open: compare its file size / font object layout with a live Selectable export; ui2's
    Tables-end and thread tiles checked vs live 10-27 (match); flat pattern Counterbore / Countersink / Form styles.
 4. Re-verify old rows on the green build: workflow-configurations.md C1–C8, workflow-derived.md DER2–DER14 (DER8 works
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).

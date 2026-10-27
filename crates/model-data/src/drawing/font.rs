@@ -422,6 +422,45 @@ pub fn text_fill_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> (Vec<
     (pts, idx)
 }
 
+/// Where [`text_fill_font`] draws a text, for writing it as text in the
+/// font itself (PDF Text: Selectable): its glyphs land on the outlines.
+pub struct TextRun {
+    pub face: noshape_sketch::text::EmbedFace,
+    /// Sheet mm per layout unit (the font's ascender is 1).
+    pub scale: f64,
+    /// Horizontal squeeze (a text wider than its frame).
+    pub sx: f64,
+    /// Each line's baseline start (sheet mm); the text turns by its angle.
+    pub origins: Vec<[f64; 2]>,
+}
+
+/// [`TextRun`] of a text (None: not in a drawing font family, or nothing
+/// to draw).
+pub fn text_run(t: &Text2, font: Option<&super::sheet::TextFont>) -> Option<TextRun> {
+    let (family, bold, italic) = match font {
+        Some(f) => (f.family.as_str(), f.bold, f.italic),
+        None => (DEFAULT_FAMILY, false, false),
+    };
+    let face = noshape_sketch::text::drawing_embed_face(family, bold, italic)?;
+    let layout = noshape_sketch::text::layout_drawing_text(&t.text, family, bold, italic);
+    if layout.contours.is_empty() || layout.width <= 0.0 {
+        return None;
+    }
+    let s = t.height / fill_cap(family, bold, italic);
+    let natural = layout.width * s;
+    let target = text_width(&t.text, t.height);
+    let sx = if natural > target && target > 0.0 { target / natural } else { 1.0 };
+    let off = anchor_offset(t.anchor, natural * sx, t.height);
+    let (c, sn) = (t.angle.cos(), t.angle.sin());
+    let origins = (0..layout.lines.max(1))
+        .map(|li| {
+            let (lx, ly) = (off[0], off[1] - face.line_h * li as f64 * s);
+            [t.pos[0] + lx * c - ly * sn, t.pos[1] + lx * sn + ly * c]
+        })
+        .collect();
+    Some(TextRun { face, scale: s, sx, origins })
+}
+
 /// The four corners of the text's bounding box (sheet coordinates,
 /// counter-clockwise from the lower-left of the text frame), including a
 /// small margin and room for descenders.

@@ -603,7 +603,7 @@ fn bom_hole_table_and_linked_balloons() {
     // Exports include the table.
     assert!(export::to_svg(&built.geometry).contains("HOLE TABLE"));
     assert!(export::to_dxf(&built.geometry).contains("HOLE TABLE"));
-    assert!(export::pdf_decoded(&export::to_pdf(&built.geometry)).contains("HOLE TABLE"));
+    assert!(export::pdf_texts(&export::to_pdf(&built.geometry)).iter().any(|t| t == "HOLE TABLE"));
 }
 
 #[test]

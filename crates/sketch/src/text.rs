@@ -541,11 +541,77 @@ pub fn layout_drawing_text(text: &str, font: &str, bold: bool, italic: bool) -> 
     }
 }
 
+/// A drawing font face as a PDF embeds it (Text: Selectable): the file,
+/// the synthesized styles, and the metrics [`layout_drawing_text`] lays out
+/// with (`em` and `line_h` in its units, where the ascender is 1).
+pub struct EmbedFace {
+    pub data: &'static [u8],
+    pub synth_bold: bool,
+    pub synth_italic: bool,
+    pub units_per_em: u16,
+    pub em: f64,
+    pub line_h: f64,
+    /// In font units: ascender, descender, cap height, bbox.
+    pub ascender: i16,
+    pub descender: i16,
+    pub cap_height: i16,
+    pub bbox: [i16; 4],
+    pub postscript_name: String,
+    pub italic_angle: f32,
+}
+
+/// [`EmbedFace`] of a drawing Font list family (None for the sketch fonts
+/// and files that don't parse).
+pub fn drawing_embed_face(font: &str, bold: bool, italic: bool) -> Option<EmbedFace> {
+    let f = drawing_face(font, bold, italic)?;
+    let face = ttf_parser::Face::parse(f.data, 0).ok()?;
+    let asc = (face.ascender() as f64).max(1.0);
+    let r = face.global_bounding_box();
+    let mut postscript_name = face.names().into_iter().find(|n| n.name_id == ttf_parser::name_id::POST_SCRIPT_NAME).and_then(|n| n.to_string()).unwrap_or_else(|| font.replace(' ', ""));
+    // A variable font names its family only; live's PDFs say "NotoSans-Regular".
+    if !postscript_name.contains('-') {
+        postscript_name += ["-Regular", "-Bold", "-Italic", "-BoldItalic"][usize::from(bold) + 2 * usize::from(italic)];
+    }
+    Some(EmbedFace {
+        data: f.data,
+        synth_bold: f.synth_bold,
+        synth_italic: f.synth_italic,
+        units_per_em: face.units_per_em(),
+        em: face.units_per_em() as f64 / asc,
+        line_h: (face.ascender() as f64 - face.descender() as f64 + face.line_gap() as f64) / asc,
+        ascender: face.ascender(),
+        descender: face.descender(),
+        cap_height: face.capital_height().unwrap_or(face.ascender()),
+        bbox: [r.x_min, r.y_min, r.x_max, r.y_max],
+        postscript_name,
+        italic_angle: face.italic_angle(),
+    })
+}
+
+/// The glyphs [`layout_drawing_text`] draws, per line: (glyph id, the
+/// character, advance in font units). Missing characters are '?' as there.
+pub fn drawing_glyphs(text: &str, data: &[u8]) -> Vec<Vec<(u16, char, u16)>> {
+    let Ok(face) = ttf_parser::Face::parse(data, 0) else { return Vec::new() };
+    text.chars()
+        .take(MAX_CHARS)
+        .collect::<String>()
+        .lines()
+        .map(|line| {
+            line.chars()
+                .filter_map(|ch| {
+                    let gid = face.glyph_index(ch).or_else(|| face.glyph_index('?'))?;
+                    Some((gid.0, ch, face.glyph_hor_advance(gid).unwrap_or(0)))
+                })
+                .collect()
+        })
+        .collect()
+}
+
 /// Synthesized italic: the slant (x per y, live asb 10-24: 0.27–0.30).
-const SYNTH_SLANT: f64 = 0.28;
+pub const SYNTH_SLANT: f64 = 0.28;
 /// Synthesized bold: the extra advance per glyph (live: about +30/1000 em)
 /// and the outline drawn again that far right.
-const SYNTH_BOLD: f64 = 0.03;
+pub const SYNTH_BOLD: f64 = 0.03;
 
 /// [`layout_text`] of one face (`wght`: a variable font's weight).
 fn layout_face(text: &str, data: &[u8], wght: Option<f32>, synth_bold: bool, synth_italic: bool) -> TextLayout {
