@@ -841,9 +841,16 @@ impl<'a> EvalCtx<'a> {
             .enumerate()
             .filter(|(_, b)| b.kind == BodyKind::Solid)
             .filter(|(_, b)| {
-                // The exact distance only for tools whose boxes reach the body.
+                // The exact distance only for tools whose boxes reach the body,
+                // and only when none of the tool's vertices is in or on it (a
+                // boss standing on the part: the classification is cheaper
+                // than the distance, REGEN-SPEED).
                 let Ok(bb) = b.shape.bounding_box(false) else { return false };
-                tools.iter().zip(&tb).any(|(t, tbox)| tbox.as_ref().is_none_or(|x| overlaps(&bb, x)) && k::distance(&b.shape, &t.shape).map(|d| d.distance < 1e-9).unwrap_or(false))
+                let touches = |t: &NamedShape| {
+                    t.shape.vertices().iter().take(8).filter_map(|v| v.vertex_point().ok()).any(|p| matches!(b.shape.classify_point(p, 1e-9), Ok(k::PointClass::Inside | k::PointClass::OnBoundary)))
+                        || k::distance(&b.shape, &t.shape).map(|d| d.distance < 1e-9).unwrap_or(false)
+                };
+                tools.iter().zip(&tb).any(|(t, tbox)| tbox.as_ref().is_none_or(|x| overlaps(&bb, x)) && touches(t))
             })
             .map(|(i, _)| i)
             .collect()
