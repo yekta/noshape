@@ -1,7 +1,9 @@
 //! Kernel inputs that crashed the process in qa's fuzzed documents (tickets
-//! FILLET-SEGV, DRAFT-SEGV-DOC, SHELL-SLAB-GPF), captured with
-//! NOSHAPE_DUMP_OPS (common.cpp `dump_op`): each op must return, Ok or an
-//! error, and leave the kernel usable.
+//! FILLET-SEGV, FILLET-SEGV-BLEND, DRAFT-SEGV-DOC, SHELL-SLAB-GPF), captured
+//! with NOSHAPE_DUMP_OPS (common.cpp `dump_op`): each op must return, Ok or
+//! an error, and leave the kernel usable. fillet-blend-segv still crashes
+//! inside OCCT's surface/restriction blend and returns through the crash
+//! guard; the others return without it (OCCT patch 0002).
 
 use noshape_kernel::*;
 use std::path::Path;

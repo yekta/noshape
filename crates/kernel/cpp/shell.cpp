@@ -1455,6 +1455,15 @@ TopoDS_Shape collapsed_corner_filler(const TopoDS_Face& f, const TopoDS_Shape& s
 bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t,
               double sign, Built& out)
 {
+  const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
+  auto       t_last = std::chrono::steady_clock::now();
+  auto       lap = [&](const char* what) {
+    if (!dbg)
+      return;
+    const auto now = std::chrono::steady_clock::now();
+    std::fprintf(stderr, "slabs: %s %.0f ms\n", what, std::chrono::duration<double, std::milli>(now - t_last).count());
+    t_last = now;
+  };
   ShapeIMap rm;
   for (const TopoDS_Shape& f : removed)
     rm.Add(f);
@@ -1711,6 +1720,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     }
     tools.Append(poly);
   }
+  lap("tools");
   if (tools.IsEmpty())
     return false;
   TopoDS_Shape union_;
@@ -1732,9 +1742,9 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     union_ = fu.Shape();
     hu = fu.History();
   }
+  lap("fuse");
   TopoDS_Shape r;
   HHist        hb;
-  const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
   if (dbg)
     std::fprintf(stderr, "slabs: %d tools, union volume %.6g\n", tools.Extent(), volume_of(union_));
   if (sign < 0)
@@ -1779,11 +1789,13 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     r = cu.Shape();
     hb = cu.History();
   }
+  lap("common");
   // Merge the faces split up by the slab construction.
   ShapeUpgrade_UnifySameDomain usd(r, true, true, false);
   usd.SetLinearTolerance(1e-7);
   usd.Build();
   HHist hs = usd.History();
+  lap("unify");
   const TopoDS_Shape split = single_solid(r);
   r = single_solid(usd.Shape());
   // Unify can break a valid result (qa5 P1-16 at 1 mm): keep the split one.
