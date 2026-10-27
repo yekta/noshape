@@ -383,7 +383,7 @@ fn insert_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 .enumerate()
                 .map(|(i, v)| {
                     let n = v.as_str().ok_or_else(|| OpError::param(&format!("variables[{i}]"), "a variable name"))?.trim().trim_start_matches('#');
-                    def.variables.iter().any(|x| x.name == n).then(|| n.to_string()).ok_or_else(|| OpError::not_found(format!("no variable `{n}` in the studio; variables: {}", def.variables.iter().map(|x| format!("#{}", x.name)).collect::<Vec<_>>().join(", "))).with_param(&format!("variables[{i}]")))
+                    def.variables.iter().any(|x| x.name == n).then(|| n.to_string()).ok_or_else(|| OpError::not_found(format!("no variable `{n}` in the studio; variables: {}", def.variables.iter().map(|x| format!("#{}", x.name)).collect::<Vec<_>>().join(", "))).with_param(format!("variables[{i}]")))
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         ),

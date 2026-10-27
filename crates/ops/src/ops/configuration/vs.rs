@@ -378,7 +378,7 @@ pub(super) fn copy_inputs(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::Op
             .enumerate()
             .map(|(k, v)| {
                 let key = v.as_str().unwrap_or_default();
-                src.iter().find(|i| i.id == key).or_else(|| src.iter().find(|i| i.name.eq_ignore_ascii_case(key))).cloned().ok_or_else(|| OpError::not_found(format!("no configuration input `{key}` in `from`")).with_param(&format!("inputs[{k}]")))
+                src.iter().find(|i| i.id == key).or_else(|| src.iter().find(|i| i.name.eq_ignore_ascii_case(key))).cloned().ok_or_else(|| OpError::not_found(format!("no configuration input `{key}` in `from`")).with_param(format!("inputs[{k}]")))
             })
             .collect::<Result<_, _>>()?,
         None => src,
