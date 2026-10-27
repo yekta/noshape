@@ -6,7 +6,7 @@
 #![recursion_limit = "256"]
 
 // The app's base layer (docs/CRATES.md), under its old paths.
-use noshape_app_core::{actions, assets, cached_slice, camera_menu, cursor, derived, doc_files, doc_model, file_tab_view, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, repair_mode, scene_builder, session, start_library, start_thumbnail, start_trash, theme, ui, viewport};
+use noshape_app_core::{actions, assets, cached_slice, camera_menu, cursor, derived, doc_files, doc_model, file_tab_view, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, repair_mode, scene_builder, session, start_library, start_thumbnail, theme, ui, viewport};
 // The Drawing studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_drawing_hooks`.
 use noshape_drawing_ui::{drawing_create, drawing_view};
 // The Assembly studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_assembly_hooks`.
@@ -23,6 +23,8 @@ use noshape_release_ui::{company_settings, release_dialog, release_settings};
 use noshape_feature_studio_ui::{feature_studio, fs_notices, fs_search, std_source};
 // Versions and history (docs/CRATES.md), under their old paths; what they need of the app: `register_history_hooks`.
 use noshape_history_ui::{compare_mode, history_panel};
+// The documents page (docs/CRATES.md), under its old path; what it needs of the app: `register_start_hooks`.
+use noshape_start_ui::start_window;
 mod live_server;
 mod doc_dialogs;
 mod shortcuts_page;
@@ -31,10 +33,8 @@ mod material_library_view;
 mod files;
 mod workspace_protection;
 mod doc_panels;
-mod start_search;
 mod shortcuts;
 mod smoke;
-mod start_window;
 mod tab_manager;
 mod tab_thumbs;
 mod workspace;
@@ -353,6 +353,11 @@ fn register_history_hooks() {
     noshape_history_ui::history_hooks::register(noshape_history_ui::history_hooks::Hooks { feature_icon: part_studio::feature_icon, workspace_protection: workspace_protection::open_dialog });
 }
 
+/// What the documents page (noshape-start-ui) needs of the app: a document's window, the build label.
+fn register_start_hooks() {
+    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, build_label });
+}
+
 fn main() {
     noshape_render::perf::process_start();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
@@ -371,6 +376,7 @@ fn main() {
     register_release_hooks();
     register_feature_studio_hooks();
     register_history_hooks();
+    register_start_hooks();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);

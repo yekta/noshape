@@ -1,0 +1,22 @@
+[package]
+name = "noshape-start-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's documents page (the start window): the documents list, folders, labels, search, the Trash, import and create. Built on noshape-app-core, noshape-preferences-ui and noshape-release-ui (its Preferences and Company settings menu items); the noshape binary registers what it needs of the app (start_hooks)."
+
+[dependencies]
+noshape-app-core.workspace = true
+noshape-preferences-ui.workspace = true
+noshape-release-ui.workspace = true
+noshape-render.workspace = true
+noshape-model.workspace = true
+noshape-store.workspace = true
+noshape-ops.workspace = true
+gpui-kit.workspace = true
+anyhow.workspace = true
+log.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+dirs = "6"
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

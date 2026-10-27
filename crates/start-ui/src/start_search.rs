@@ -120,7 +120,7 @@ pub fn facts(path: &Path) -> Option<DocFacts> {
     let read = |mv| store.read_all(mv).ok().and_then(|b| noshape_model::document::Document::from_blobs(&b).ok()).map(|d| state_facts(&d));
     let workspaces = store.list_branches().ok()?.iter().filter(|b| !b.deleted).filter_map(|b| read(b.head)).collect();
     let list = store.list_versions().ok()?;
-    let published = list.iter().any(|v| store.get_meta(&format!("{}{}", crate::history_panel::PUBLISHED_FS_KEY, v.id)).ok().flatten().is_some());
+    let published = list.iter().any(|v| store.get_meta(&format!("{}{}", noshape_ops::versions::PUBLISHED_FS_KEY, v.id)).ok().flatten().is_some());
     let versions = list.iter().filter_map(|v| read(v.microversion)).collect();
     Some(DocFacts { workspaces, versions, published })
 }

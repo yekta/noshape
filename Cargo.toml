@@ -36,6 +36,7 @@ noshape-preferences-ui = { path = "crates/preferences-ui" }
 noshape-release-ui = { path = "crates/release-ui" }
 noshape-feature-studio-ui = { path = "crates/feature-studio-ui" }
 noshape-history-ui = { path = "crates/history-ui" }
+noshape-start-ui = { path = "crates/start-ui" }
 
 gpui-kit = "0.7.3"
 wgpu = "29"
@@ -92,6 +93,8 @@ opt-level = 0
 [profile.dev.package.noshape-feature-studio-ui]
 opt-level = 0
 [profile.dev.package.noshape-history-ui]
+opt-level = 0
+[profile.dev.package.noshape-start-ui]
 opt-level = 0
 
 [profile.release]

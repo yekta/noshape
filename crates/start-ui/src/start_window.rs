@@ -233,7 +233,7 @@ impl Default for Prefs {
 }
 
 fn prefs_path() -> PathBuf {
-    crate::files::config_dir().join("start.json")
+    crate::paths::config_dir().join("start.json")
 }
 
 fn load_prefs() -> Prefs {
@@ -378,7 +378,7 @@ impl StartView {
         let mut subs = subs;
         subs.push(adv_sub);
         let prefs = load_prefs();
-        let source = prefs.source.clone().unwrap_or(if crate::files::recent().is_empty() { Source::All } else { Source::Recent });
+        let source = prefs.source.clone().unwrap_or(if crate::doc_files::recent().is_empty() { Source::All } else { Source::Recent });
         let mut this = Self {
             focus: cx.focus_handle(),
             body: None,
@@ -609,7 +609,7 @@ impl StartView {
 
     fn open_path(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-        match crate::files::open_document_window(path.clone(), None, gpu, cx) {
+        match crate::start_hooks::open_document_window(path.clone(), None, gpu, cx) {
             Ok(()) => self.force_rescan(cx),
             Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not open document: {e:#}")),
         }
@@ -618,7 +618,7 @@ impl StartView {
     fn new_document(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let start = match &self.source {
             Source::Folder(f) => f.clone(),
-            _ => crate::files::documents_dir(),
+            _ => crate::file_dialogs::documents_dir(),
         };
         let default = lib::next_untitled(&start);
         let location = Location::new(start);
@@ -656,7 +656,7 @@ impl StartView {
     fn current_place(&self) -> PathBuf {
         match &self.source {
             Source::Folder(f) => f.clone(),
-            _ => crate::files::documents_dir(),
+            _ => crate::file_dialogs::documents_dir(),
         }
     }
 
@@ -670,25 +670,25 @@ impl StartView {
         // Onshape's picker takes any file: CAD files become a Part Studio (and
         // the file in "CAD Imports"), DXF / DWG a drawing plus the file, others
         // a file tab.
-        crate::files::request_open_path("Import files", "All files", &["*"], window, cx, move |path, cx| {
+        crate::file_dialogs::request_open_path("Import files", "All files", &["*"], window, cx, move |path, cx| {
             let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
             let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
             let result = if ext == lib::EXT {
-                crate::files::open_document_window(path, None, gpu, cx)
+                crate::start_hooks::open_document_window(path, None, gpu, cx)
             } else {
                 (|| {
-                    let mut doc = crate::units_prefs::new_document();
+                    let mut doc = crate::user_units::new_document();
                     let units = doc.settings.units;
-                    let (name, file) = crate::workspace::import_names(&path);
+                    let (name, file) = noshape_ops::import::import_names(&path);
                     let bytes = std::fs::read(&path)?;
                     let stored = noshape_model::file_tab::FileTab::new(&file, &bytes, noshape_model::file_tab::now());
                     doc.tabs.clear();
                     doc.settings.tab_order.clear();
                     match stored.kind() {
                         noshape_model::file_tab::FileKind::Cad => {
-                            let foreign = crate::workspace::read_foreign(&path, &units)?;
+                            let foreign = noshape_ops::import::read_foreign(&path, &units)?;
                             let mut ps = noshape_model::PartStudio::new();
-                            crate::workspace::add_import_feature(&mut ps, &file, foreign, &units);
+                            noshape_ops::import::add_import_feature(&mut ps, &file, foreign, &units);
                             doc.add_tab(&name, noshape_model::TabContent::PartStudio(ps));
                             let folder = crate::file_tab_view::cad_imports_folder(&mut doc);
                             crate::file_tab_view::add_file_tab(&mut doc, stored, Some(folder), None);
@@ -697,7 +697,7 @@ impl StartView {
                             let f = crate::file_tab_view::add_file_tab(&mut doc, stored, None, None);
                             let dr = crate::file_tab_view::drawing_from_cad(&bytes).map_err(|e| anyhow::anyhow!(e))?;
                             let id = doc.add_tab(&name, noshape_model::TabContent::Drawing(dr));
-                            crate::workspace::place_after(&mut doc, id, Some(f));
+                            noshape_ops::docedit::place_after(&mut doc, id, Some(f));
                         }
                         _ => {
                             crate::file_tab_view::add_file_tab(&mut doc, stored, None, None);
@@ -710,7 +710,7 @@ impl StartView {
                         target = place.join(format!("{clean} ({n}).{}", lib::EXT));
                         n += 1;
                     }
-                    crate::files::open_document_window(target, Some(doc), gpu, cx)
+                    crate::start_hooks::open_document_window(target, Some(doc), gpu, cx)
                 })()
             };
             if let Err(e) = result {
@@ -760,7 +760,7 @@ impl StartView {
     }
 
     fn rename(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
-        if crate::files::is_document_open(&d.path, cx) {
+        if crate::doc_files::is_document_open(&d.path, cx) {
             Self::notify(window, cx, AlertKind::Warning, format!("{}: Close the document's window before renaming it", d.name));
             return;
         }
@@ -769,7 +769,7 @@ impl StartView {
         let prompt = NamePrompt { title: "Rename document", ok_label: "Rename", label: "Document name", default: d.name.clone(), hint: Some(hint), location: None, labels: None };
         prompt_name(prompt, window, cx, move |name, window, cx| match lib::rename_document(&d.path, &name) {
             Ok(dest) => {
-                crate::files::replace_recent(&d.path, &dest);
+                crate::doc_files::replace_recent(&d.path, &dest);
                 view.update(cx, |this, cx| {
                     this.labels.moved(&d.path, &dest);
                     this.labels.save();
@@ -808,7 +808,7 @@ impl StartView {
             }
             return;
         }
-        if crate::files::is_document_open(&d.path, cx) {
+        if crate::doc_files::is_document_open(&d.path, cx) {
             Self::notify(window, cx, AlertKind::Warning, format!("{}: Close the document's window before moving it to the trash", d.name));
             return;
         }
@@ -833,7 +833,7 @@ impl StartView {
     /// selection will be sent to the trash." (bold) + "Show details" (the
     /// item list), **Send to trash** / Cancel.
     fn confirm_trash(&mut self, path: PathBuf, name: String, folder: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if folder && self.docs.iter().any(|d| d.path.starts_with(&path) && crate::files::is_document_open(&d.path, cx)) {
+        if folder && self.docs.iter().any(|d| d.path.starts_with(&path) && crate::doc_files::is_document_open(&d.path, cx)) {
             Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the documents in this folder before moving it to the trash"));
             return;
         }
@@ -879,12 +879,12 @@ impl StartView {
         match self.trash.send(&path, &name, folder) {
             Ok(item) => {
                 for d in self.docs.iter().filter(|d| d.path == item.original || (folder && d.path.starts_with(&item.original))) {
-                    crate::files::remove_recent(&d.path);
+                    crate::doc_files::remove_recent(&d.path);
                 }
                 if folder {
-                    let mut list = crate::files::watched_folders();
+                    let mut list = crate::doc_files::watched_folders();
                     list.retain(|f| canon(f) != item.original);
-                    crate::files::set_watched_folders(&list);
+                    crate::doc_files::set_watched_folders(&list);
                     if matches!(&self.source, Source::Folder(f) if canon(f).starts_with(&item.original)) {
                         self.source = Source::All;
                         self.save_prefs();
@@ -916,12 +916,12 @@ impl StartView {
                     Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(item.name.clone()), text: " has been restored.".into(), restore: None, brief: true });
                 }
                 // A folder from outside the documents folder is listed again.
-                if let Some(item) = item.filter(|i| i.folder && !i.original.starts_with(canon(&crate::files::documents_dir())))
+                if let Some(item) = item.filter(|i| i.folder && !i.original.starts_with(canon(&crate::file_dialogs::documents_dir())))
                     && item.original.parent().is_some_and(|p| !self.dirs.iter().any(|d| d == p))
                 {
-                    let mut list = crate::files::watched_folders();
+                    let mut list = crate::doc_files::watched_folders();
                     list.push(dest.clone());
-                    crate::files::set_watched_folders(&list);
+                    crate::doc_files::set_watched_folders(&list);
                     self.folders = ScanInput::current().folders;
                 }
                 self.selected = None;
@@ -1048,18 +1048,18 @@ impl StartView {
         for d in self.docs.iter().filter(|d| d.path.starts_with(old)) {
             if let Ok(rest) = d.path.strip_prefix(old) {
                 let dest = new.join(rest);
-                crate::files::replace_recent(&d.path, &dest);
+                crate::doc_files::replace_recent(&d.path, &dest);
                 self.labels.moved(&d.path, &dest);
             }
         }
         self.labels.save();
-        let mut list = crate::files::watched_folders();
+        let mut list = crate::doc_files::watched_folders();
         for w in list.iter_mut() {
             if canon(w) == old {
                 *w = new.to_path_buf();
             }
         }
-        crate::files::set_watched_folders(&list);
+        crate::doc_files::set_watched_folders(&list);
         if let Source::Folder(f) = &self.source
             && let Ok(rest) = canon(f).strip_prefix(old)
         {
@@ -1103,7 +1103,7 @@ impl StartView {
 
     /// Folder menu › Move to…: the folder browser (not into itself).
     fn move_folder(&mut self, f: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
-        let mut location = Location::new(f.parent().map(Path::to_path_buf).unwrap_or_else(crate::files::documents_dir));
+        let mut location = Location::new(f.parent().map(Path::to_path_buf).unwrap_or_else(crate::file_dialogs::documents_dir));
         location.exclude = Some(f.clone());
         let location = Rc::new(location);
         let view = cx.entity();
@@ -1138,7 +1138,7 @@ impl StartView {
     }
 
     fn forget(&mut self, d: DocEntry, cx: &mut Context<Self>) {
-        crate::files::remove_recent(&d.path);
+        crate::doc_files::remove_recent(&d.path);
         self.force_rescan(cx);
     }
 
@@ -1635,7 +1635,7 @@ impl StartView {
         let Some(pe) = &self.props else { return };
         let path = pe.path.clone();
         let (name, desc, label) = (pe.name.read(cx).value().trim().to_string(), pe.description.read(cx).value().to_string(), pe.label.read(cx).value().trim().to_string());
-        if crate::files::is_document_open(&path, cx) {
+        if crate::doc_files::is_document_open(&path, cx) {
             Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the document's window before changing its properties"));
             return;
         }
@@ -1647,7 +1647,7 @@ impl StartView {
         if name != pe.saved.0 {
             match lib::rename_document(&path, &name) {
                 Ok(d) => {
-                    crate::files::replace_recent(&path, &d);
+                    crate::doc_files::replace_recent(&path, &d);
                     self.labels.moved(&path, &d);
                     self.labels.save();
                     dest = d.canonicalize().unwrap_or(d);
@@ -1666,7 +1666,7 @@ impl StartView {
 
     /// "Move to…": Onshape's folder picker; moves the (closed) document.
     fn move_to(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
-        if crate::files::is_document_open(&d.path, cx) {
+        if crate::doc_files::is_document_open(&d.path, cx) {
             Self::notify(window, cx, AlertKind::Warning, format!("{}: Close the document's window before moving it", d.name));
             return;
         }
@@ -1681,7 +1681,7 @@ impl StartView {
                     let dir = loc.chosen.borrow().clone();
                     match lib::move_document(&d.path, &dir) {
                         Ok(dest) => {
-                            crate::files::replace_recent(&d.path, &dest);
+                            crate::doc_files::replace_recent(&d.path, &dest);
                             view.update(cx, |this, cx| {
                                 this.labels.moved(&d.path, &dest);
                                 this.labels.save();
@@ -1947,7 +1947,7 @@ impl StartView {
         let crumbs: Vec<PathBuf> = match &self.source {
             Source::Folder(f) => {
                 let f = canon(f);
-                let docs = canon(&crate::files::documents_dir());
+                let docs = canon(&crate::file_dialogs::documents_dir());
                 let top = outside_folders().into_iter().find(|o| f.starts_with(o));
                 let mut v: Vec<PathBuf> = f.ancestors().take_while(|a| *a != docs && top.as_deref().is_none_or(|t| a.starts_with(t))).map(Path::to_path_buf).collect();
                 v.reverse();
@@ -2015,7 +2015,7 @@ impl StartView {
     fn folder_tiles(&self) -> Vec<(PathBuf, Option<String>)> {
         let mut tiles: Vec<(PathBuf, Option<String>)> = match &self.source {
             Source::All => {
-                let root = canon(&crate::files::documents_dir());
+                let root = canon(&crate::file_dialogs::documents_dir());
                 let mut v: Vec<(PathBuf, Option<String>)> = self.dirs.iter().filter(|d| d.parent() == Some(root.as_path())).map(|d| (d.clone(), None)).collect();
                 let extra: Vec<PathBuf> = outside_folders().into_iter().filter(|f| !v.iter().any(|(d, _)| d == f)).collect();
                 v.extend(extra.into_iter().map(|f| (f, None)));
@@ -2604,7 +2604,7 @@ impl StartView {
             .enumerate()
             .map(|(ix, d)| {
                 let selected = self.selected.as_ref() == Some(&d.path);
-                let open = crate::files::is_document_open(&d.path, cx);
+                let open = crate::doc_files::is_document_open(&d.path, cx);
                 let v2 = cx.entity();
                 let (d1, d2) = (d.clone(), d.clone());
                 let p1 = d.path.clone();
@@ -2769,9 +2769,9 @@ impl StartView {
             .border_color(pal.border)
             .text_size(px(11.))
             .text_color(pal.text_muted)
-            .child(div().flex_1().child(format!("Documents are stored on this computer in {}", display_path(&crate::files::documents_dir()))))
+            .child(div().flex_1().child(format!("Documents are stored on this computer in {}", display_path(&crate::file_dialogs::documents_dir()))))
             // Live documents/90: the build, in parentheses, at the right end.
-            .child(format!("({})", crate::build_label()))
+            .child(format!("({})", crate::start_hooks::build_label()))
             .into_any_element()
     }
 }
@@ -3007,7 +3007,7 @@ fn view_toggle(id: &'static str, glyph: &'static [u8], tip: &'static str, select
 
 /// A folder's display name ("noshape documents" for the default folder).
 fn folder_label(f: &Path) -> String {
-    if f == crate::files::documents_dir() {
+    if f == crate::file_dialogs::documents_dir() {
         "noshape documents".to_string()
     } else {
         f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| f.display().to_string())
@@ -3026,14 +3026,14 @@ fn display_path(p: &Path) -> String {
 
 /// Where a new document goes: the documents folder ("Owned by me") or one
 /// of the other folders shown in the start window.
-pub(crate) struct Location {
-    pub(crate) root: PathBuf,
+pub struct Location {
+    pub root: PathBuf,
     /// Folders added from outside the documents folder (top level).
-    pub(crate) others: Vec<PathBuf>,
+    pub others: Vec<PathBuf>,
     /// The place shown; the destination.
-    pub(crate) chosen: Rc<RefCell<PathBuf>>,
+    pub chosen: Rc<RefCell<PathBuf>>,
     /// A folder that can't be a destination (the folder being moved).
-    pub(crate) exclude: Option<PathBuf>,
+    pub exclude: Option<PathBuf>,
 }
 
 /// The names the user's history is written under (see `StartView::me`).
@@ -3044,7 +3044,7 @@ fn my_names() -> Vec<String> {
 }
 
 /// Subfolders of `dir` (not hidden), by name.
-pub(crate) fn subfolders(dir: &Path) -> Vec<PathBuf> {
+pub fn subfolders(dir: &Path) -> Vec<PathBuf> {
     let mut out: Vec<PathBuf> = std::fs::read_dir(dir)
         .map(|rd| rd.flatten().filter(|e| e.file_type().is_ok_and(|t| t.is_dir()) && !e.file_name().to_string_lossy().starts_with('.')).map(|e| canon(&e.path())).collect())
         .unwrap_or_default();
@@ -3058,14 +3058,14 @@ fn canon(p: &Path) -> PathBuf {
 
 /// Folders added from outside the documents folder (shown at the top level).
 fn outside_folders() -> Vec<PathBuf> {
-    let root = canon(&crate::files::documents_dir());
-    crate::files::watched_folders().into_iter().map(|f| canon(&f)).filter(|f| !f.starts_with(&root) && f.is_dir()).collect()
+    let root = canon(&crate::file_dialogs::documents_dir());
+    crate::doc_files::watched_folders().into_iter().map(|f| canon(&f)).filter(|f| !f.starts_with(&root) && f.is_dir()).collect()
 }
 
 impl Location {
     /// A browser starting at `chosen`.
-    pub(crate) fn new(chosen: PathBuf) -> Self {
-        Self { root: canon(&crate::files::documents_dir()), others: outside_folders(), chosen: Rc::new(RefCell::new(canon(&chosen))), exclude: None }
+    pub fn new(chosen: PathBuf) -> Self {
+        Self { root: canon(&crate::file_dialogs::documents_dir()), others: outside_folders(), chosen: Rc::new(RefCell::new(canon(&chosen))), exclude: None }
     }
 
     /// The folders listed in `dir`.
@@ -3082,7 +3082,7 @@ impl Location {
     /// Onshape's "Document location" browser: a header with home, back and
     /// the current place, above the list of its folders (click a folder to
     /// go into it; the place shown is the destination).
-    pub(crate) fn render(&self) -> AnyElement {
+    pub fn render(&self) -> AnyElement {
         let pal = p();
         let chosen = self.chosen.borrow().clone();
         let at_root = chosen == self.root;

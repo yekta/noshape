@@ -2261,7 +2261,7 @@ fn folder_glyph(size: f32, color: impl Into<Hsla>) -> gpui_kit::component::Icon 
 }
 
 // Importing is shared with the agent API (crates/ops/src/import.rs).
-pub(crate) use noshape_ops::import::{IMPORT_EXTS, add_import_feature, import_names, read_foreign};
+pub(crate) use noshape_ops::import::{IMPORT_EXTS, import_names};
 
 /// Tab right-click menus (live menus/rmb-tab-*): they open upward, the
 /// bottom on the tab bar's top edge and the left edge at the tab's.
