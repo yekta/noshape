@@ -343,6 +343,26 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P1 LP-DIRECTION-PICK (user-reported) hover / pick read nothing in feature dialogs. Repro doc /root/qa-scratch/lpd.noshape
+  (Sketch 1 rectangle 60×40, Extrude 1 10; Sketch 2 on the top face 10×10, Extrude 2 Add 8). Linear pattern › Feature
+  pattern › Features to pattern = Extrude 2 › click Direction › hover / click the front top edge.
+  - **v0.4.9 release** (Linux tarball, 7ee597e0 + fixes): the edge at its middle shows no pre-highlight and the click picks
+    nothing (Direction stays empty; tickets/lp-pick-v049-feature-midpoint.png); the same in Part pattern (Entities = Part 1;
+    lp-pick-v049-part.png); a click inside the top face picks the **Front plane** behind it instead of the face
+    (lp-pick-v049-face-falls-to-plane.png); a plane from the feature list (Top) is taken. (One edge pick away from the edge's
+    middle did go in, so it isn't every hover, but the user's steps fail.) Cause per the lead: 8bf820e0 (preview mix);
+    fixed by 4e55b01f, which is in green but not in v0.4.9; v0.4.10 (from e8858e61) carries it.
+  - **Green e8858e61** (has 4e55b01f), same steps, same pixels: Feature / Part / Face pattern: the edge pre-highlights and
+    goes in as "Edge of Extrude 1"; the top face goes in as "Face of Extrude 1"; Direction filled first, then Features, also
+    works (lp-pick-green-feature / -part / -face / -direction-first.png); Fillet edges and Shell faces hover + pick
+    (pick-green-fillet.png, pick-green-shell.png).
+  - **Still broken on green: a custom feature whose query uses a compound filter.** Feature Studio (cfs.noshape) with
+    `annotation { "Name" : "Edges", "Filter" : EntityType.EDGE && QueryFilterCompound.ALLOWS_AXIS, "MaxNumberOfPicks" : 2 }`:
+    the Edges field is active but straight edges neither pre-highlight nor pick (two different edges tried); the same
+    feature with `"Filter" : EntityType.EDGE` alone hovers and picks (pick-green-custom-allows-axis.png, left plain, right
+    compound). The API takes the same two edges for the compound feature (feature_add OK), so it is the dialog's pick
+    filter that rejects ALLOWS_AXIS. Live: the exact entity types per mode and for the custom query are asked in
+    REQUESTS "qa (2026-10-27, P1 LP-DIRECTION-PICK)" (A)–(F) (qa 2026-10-27 10:30)
 - [ ] P3 PERF-TOTAL-MISMATCH the Performance panel and its Regeneration times dialog give two totals for the same studio:
   live-30-features.noshape just opened (regen from cache) → panel "Total regeneration time: 46ms", stopwatch › dialog footer
   "Total regen time: 314ms" (the per-feature column sums to ~314). Live reads one number in both places (behaviours 17899);
