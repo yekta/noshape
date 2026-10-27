@@ -180,3 +180,27 @@ fn new_mate_between_free_parts_moves_the_smaller_one() {
         let _ = std::fs::remove_file(&path);
     }
 }
+
+/// A new mate from the assembly Origin (picked first) to a free part moves
+/// the part: the origin never moves.
+#[test]
+fn new_mate_from_the_origin_moves_the_part() {
+    let dir = std::env::temp_dir().join(format!("noshape-origin-mate-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("origin.noshape");
+    let _ = std::fs::remove_file(&path);
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "pin" }));
+    studio(&mut ctx, "pin", json!({ "tool": "circle", "points": [[0, 0], [5, 0]] }), "40 mm");
+    call(&mut ctx, "assembly_insert", json!({ "source": "pin", "part": "Part 1" }));
+    call(&mut ctx, "assembly_transform", json!({ "instance": "Part 1 <1>", "translation": [30, 20, 10] }));
+    let pin = json!({ "instance": "Part 1 <1>", "entity": face(&mut ctx, "Part 1 <1>", [0.0, 0.0, -1.0]), "inference": "centroid" });
+    let r = call(&mut ctx, "assembly_mate", json!({ "type": "fastened", "a": { "origin": true }, "b": pin }));
+    assert_eq!(r["mate_ok"], json!(true), "{r}");
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let i = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == "Part 1 <1>").unwrap();
+    let t: Vec<f64> = i["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+    assert!(t.iter().all(|v| v.abs() < 1e-6), "the pin's bottom centre on the origin: {t:?}");
+    let _ = std::fs::remove_file(&path);
+}

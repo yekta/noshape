@@ -1249,6 +1249,10 @@ pub fn limit_keys(t: MateType) -> &'static [&'static str] {
 /// size the one whose connector Z points to the negative side.
 pub fn new_mate_stays(result: &AssemblyResult, m: &super::Mate, units: &UnitPrefs) -> InstanceId {
     let (a, b) = (m.a.instance, m.b.instance);
+    // The assembly origin never moves.
+    if a == InstanceId::ORIGIN || b == InstanceId::ORIGIN {
+        return InstanceId::ORIGIN;
+    }
     let (Some(fa), Some(fb)) = (result.connector_world(&m.a, units), result.connector_world(&m.b, units)) else { return b };
     let (za, zb) = (fa.z(), fb.z());
     let negative = |v: DVec3| v.to_array().into_iter().find(|c| c.abs() > 1e-9).unwrap_or(0.0) < 0.0;
