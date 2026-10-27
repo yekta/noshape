@@ -3,30 +3,29 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Session 3 (qa on a fresh account, from 19:05; greens fa61ba6f → 965d3f56 → 8602df0d → dd1b5037 → daf1f50c)
-- Verified: EXPORT-OBJ-ZIP-NAME (fa61ba6f); re-verified SURF-EXTRUDE-SKETCH-EDGES, BOX-FILLET-FACES (fa61ba6f);
-  PREVIEW-SELF-PICK, DUP-COINCIDENT, FILLET-POINT-MSG (dd1b5037).
-- Checklists done: **workflow-p1-pass** (all ✅ rows), **workflow-bracket 12/12**, **workflow-analysis 12/12**,
-  **workflow-units 8/8**; workflow-keyboard-mouse 33/40 (KB1, KB3 hold now), cursors 20/34 (read back with
-  **bin/xcur.py**: XFixes cursor image / hotspot; wait ~2 s after a move on this box, frames are slow), workflow-surfaces
-  6/13, workflow-advanced-part-studio 9/46 (sweep / fillet / draft exact on the CLI: bin/advmatrix.py), interaction 36/44,
-  sketch.md ~55 more rows (1.8's "Enter accepts" is outdated: live doesn't; ~40 left, mostly T:-only).
-- New tickets: **P0 FILLET-OVERSIZE-OK** (core: fillets / chamfers of two edges whose rounds overlap on the face between them
-  report Ok with impossible solids, R50 can empty a part; single oversize edges = live; still on dd1b5037; live asked),
-  **P1 SKETCH-GLYPH-LAYOUT-LOST** (skasm regression: psb's 10-25 merges a7913bbe / 8439c48c dropped 45690459, 74dc1f8c and
-  7fa4f33d's UI halves), P2 ASM-PATTERN-EDIT-TAKES-SELECTION (live confirmed), P2 SKETCH-FILLET-STUCK-RADIUS,
-  P3 SKETCH-PATTERN-GLYPH-HOVER, P3 ORIGIN-COINCIDENT-GLYPH. Closed: PATTERN-EDGE-DIR-FLIPPED (live = ours).
-  CLI-only: feature-sweep L45b now fixed; ADV2 (loft volume −1.8e-6) has a 2nd data point.
-- Live requests open: FILLET-OVERSIZE-OK cases, Section view + a feature started (stacked dialogs), tab manager + Esc,
-  assembly instance filter vs pattern instances.
-- Merge-loss audit (tickets/merge-audit-1027.txt): checked in the app, **not** lost: e4799ab4, 703545e4, 38a14f20 (replaced),
-  8284b6b4, 5b048262, 259270b6. Not checked: 11e83152 (failing feature inputs red), 98ae008e, 6c040449, 4a0e07c2, 4083c486.
-- To re-test: SKETCH-LINE-MENU on the line itself (skasm: my shot had the pointer on the endpoint).
-- No CLI for greens after the 12:08 main build; geometry checks on newer greens are in the app. Main's kernel didn't build on
-  Linux at ~20:30 (skasm's request: features.cpp `far` after fea4d943), so green may stall at daf1f50c.
+## Session 3 (qa on a fresh account, from 19:05; greens fa61ba6f → 965d3f56 → 8602df0d → dd1b5037 → daf1f50c → c9c66d1c)
+- **P0 BOX-DIALOG-PANIC (psui, release blocker, at the top of TICKETS)**: any box selection with a feature dialog open panics the
+  app since df28c320 (greens dd1b5037 → c9c66d1c). Found by bin/fuzz.py (seeds 41, 43 both die on it); UI fuzzing is pointless
+  until it's fixed. Re-test: wf-block, Shift+F, drag a box over the part.
+- Verified: EXPORT-OBJ-ZIP-NAME, SURF-EXTRUDE-SKETCH-EDGES, BOX-FILLET-FACES (fa61ba6f); PREVIEW-SELF-PICK, DUP-COINCIDENT,
+  FILLET-POINT-MSG (dd1b5037). Closed as = live: PATTERN-EDGE-DIR-FLIPPED, SKETCH-LINE-MENU (on a line).
+- Checklists done: workflow-p1-pass, workflow-bracket 12/12, workflow-analysis 12/12, workflow-units 8/8; partial:
+  workflow-keyboard-mouse 33/40, cursors 20/34 (bin/xcur.py reads the X cursor: wait ~2 s after a move), workflow-mates 16/33,
+  workflow-drawing 17/28, workflow-assembly 17/75, workflow-surfaces 6/13, workflow-advanced-part-studio 9/46
+  (bin/advmatrix.py), interaction 36/44, sketch.md 210/261.
+- New tickets this session: P0 BOX-DIALOG-PANIC, P0 FILLET-OVERSIZE-OK (live answered: R50 two-edge and R25 three-edge must
+  fail "End boundary intersects unfilleted edge."; smaller overlapping rounds = live exactly), P1 SKETCH-GLYPH-LAYOUT-LOST,
+  P1 CONFLICT-COLLAPSE-ON-DRAG, P2 ASM-PATTERN-EDIT-TAKES-SELECTION, P2 SKETCH-FILLET-STUCK-RADIUS, P2 SECTION-DIALOG-STACK,
+  P2 DATUM-SCALE-DETACHED, P2 BALLOON-WRONG-ITEM, P3 SKETCH-PATTERN-GLYPH-HOVER, P3 ORIGIN-COINCIDENT-GLYPH,
+  P3 TABS-PANEL-FOCUS, P3 MATE-ANGLE-360.
+- REGEN-SPEED on c9c66d1c (load ~33): commits median 313 ms, 3rd undo 137 ms (numbers in the ticket).
+- CLI fuzz seed 150 (main CLI 12:08): 150 steps clean.
+- Live requests open: FILLET-OVERSIZE chamfer cases, assembly instance filter vs pattern instances, datums vs sheet scale.
+- Merge-loss audit (tickets/merge-audit-1027.txt): checked, not lost: e4799ab4, 703545e4, 38a14f20, 8284b6b4, 5b048262,
+  259270b6. Not checked: 11e83152, 98ae008e, 6c040449, 4a0e07c2, 4083c486.
 - v0.4.11 was published 15:13 (not smoked by qa); the v0.4.10 binary in rel/k/v0410 is gone (disk loop).
-- Next: UI fuzz on daf1f50c (seed 41 running); P2 assembly / drawing checklists; sketch.md rest. 04:30: P0 blockers at the
-  top of TICKETS for the 05:00 release.
+- Next: re-test BOX-DIALOG-PANIC on each green; rest of workflow-assembly / workflow-drawing / workflow-mates; drawing.md and
+  assembly.md (P2, 0 verified so far). 04:30: P0 blockers at the top of TICKETS for the 05:00 release.
 
 ## Parity re-verification (lead 10-27 13:50; standing, high priority)
 **Verified rows: see session 3 (pv.py count docs/parity/*.md)** (❌ open: SKETCH-LINE-MENU, FILLET-POINT-MSG (sketch.md); DIALOG-OK-STATE resolved f16b31c6; HOLE-SIZE-NO-DIAMETER, DIM-AC-ENTER, TAB-EXPORT-MISSING fixed and verified f16b31c6; OTF-FIRST-KEY, BOX-FILLET-FACES, SURF-EXTRUDE-SKETCH-EDGES fixed and verified (6cbb24e0 / 203c4d6f); SPACE-CHECKBOX and SHORTCUT-MAP-FOCUS fixed and verified). Column "Verified" = `0.4.10+ / <green> <date>`
