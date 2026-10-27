@@ -41,7 +41,8 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
    needs live's rule); M1 is live's own failing case.
 6. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
    noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture` (clean 10-27).
-7. End-of-day walk of sketch + assembly workflows in /root/green/noshape against live (~04:00 UTC).
+7. End-of-day walk, daily (~04:00 UTC). 10-27 02:40 on green 19555ca3: line chain + dimension, polygon, V on H toast,
+   mate dialog (types, limits, errors), Revolute + drag (only the dragged instance moves): no regressions.
 
 Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_perf:: -- --ignored --nocapture`):
 200 pins / 300 mates: evaluation again 6.5 ms, adding a mate 16.5 ms, inserting a pin 7.8 ms (was ~50), drag steps
