@@ -27,6 +27,10 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
   189663bf DIM-AC-ENTER + EXPR-PARSE-JUNK (Enter commits the dimension box with the unit list open; UI test);
   05dab13c ASM-DIR-NO-HOVER (linear pattern Direction picks the edge, highlighted on hover); dad69aa3 UI test of
   the drag beside conflicting constraints.
+  dbc15478 value boxes of center rectangle / tangent arc (live 1503); 4d29be6a Derived mirror in XY (live's exact
+  transform); 03915b0f ring snap as live's (5° / 1° / 0.1° by distance). Open (P3): ANSI taper pin crowned ends (behaviours
+  "… ANSI Commercial class taper pin B-rep (request 1504)": spheres R = d + 0.010 in through the d/2 circle; the
+  cone's end offset needs live's /features, 429 until ~22:45 UTC: dom/skasm-sc-gaps/ANSI_taper_pin__features.json).
   0b0f1abd sketch regions with long splines 36× faster (qa's fuzz sketch 1.46 s → 40 ms; fixture
   tests/fixtures/solve/fz211-final.json). qa's skfuzz 211 on the dev CLI: slowest step 0.74 s (qa: 290 s).
 - 10-27 afternoon (after the app split): 3d99e40d sketch value boxes as live's rule capture (corner rectangle, 3 point
@@ -89,7 +93,12 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 - Re-run 14:40 (load ~30): assembly drag frame median 1.48–2.93 ms, worst ≤ 3.05 ms; insert 5.7–7.7 ms; 1000 pins
   drag 1.4–1.5 ms. Sketch step per-step times (3 runs): worst 5–9 ms, sporadic (no step pattern): the earlier
   18–26 ms worst cases were machine load, not a code path.
-- Next for speed: the sketch step's regeneration (3.7 of 5.2 ms in the dev build).
+- Live (behaviours "speed: skasm sketch and assembly", request 1501; server-solved, one request in flight): sketch
+  drag ≈ 400 ms a step at 188 entities (≈ 310 ms at 20) → ours ≈ 4–5 ms (dev build), ~80× faster; adding a
+  dimension ≈ 2.2 s and a Coincident ≈ 1.7 s of server solve → ours ≈ 1 ms; assembly drag ≈ 1.2 s a step at 200
+  instances → ours 1.5–6 ms; insert 1.3–2.2 s to the assembly data → ours 6–12 ms.
+- Next for speed: the sketch step's regeneration (3.7 of 5.2 ms in the dev build; JSON serialization in the regen
+  path is the largest single item: core's code).
 
 ## WIP on agent/skasm
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
