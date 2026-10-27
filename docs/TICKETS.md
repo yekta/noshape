@@ -354,6 +354,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the Name cell takes typing. Setting it through the feature dialog with Big active works (Big 5, Parts (5)). Live's
   table cells are editable like its other panels' (single click frames the cell, typing edits; live asked, qa batch 2
   (6)) (qa 2026-10-27, green 4854cad4)
+  Live confirmed (behaviours "qa (2026-10-27, P2 batch 2)" (6)): a single click frames the value cell (blue 2 px,
+  `os-table-cell-selected`), typing replaces the value in place (`input.os-param-number`), Esc cancels, a double-click opens
+  the input with the value selected; each cell shows "›" and a ± tolerance icon.
 - [x] c0bbde51 P0 REGEN-NO-CANCEL fixed (psui 10-27): a newer run that evaluates fewer features (the rollback bar above the running feature, a dialog on an earlier feature) aborts the running one; its finished features stay cached, so the rollback shows at once (app on cli-fillet-hang.noshape: 0 ms, 7 cached, while Fillet 2 ran). Was: a newer regeneration waits for a stale one instead of cancelling it: open a copy of
   /root/qa-scratch/tickets/cli-fillet-hang.noshape in green 502416cc (NOSHAPE_PERF=1); while the opening regen is still
   in Fillet 2 (it fails after the 30 s blend budget), drag the rollback bar above Fillet 2: schedule_regen #2 at 05:16:57,
@@ -523,6 +526,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   not the original 60779.48). Related, app (green 4854cad4): opening Extrude 1 and ✓ without a change records "Edit :
   Extrude 1", so the next Ctrl+Z seems to do nothing (live asked whether an unchanged ✓ makes a history entry, qa batch 2
   (7)) (qa 2026-10-27, watcher CLI 08:12)
+  Live answered (7): an unchanged ✓ is recorded as an edit there too and costs one Ctrl+Z, so the app's part is as live;
+  the bug is the API's: a no-op call that records no history entry must not push an undo step either.
 - [ ] (dx 10-27: the shared tools' hover took the topmost target and dropped it when not an edge, so an edge under an annotation, a snap point or the pending dimension's preview was never picked; edge-only tools now hit-test edges first (BuiltSheet::hit_where). API: line_to_line on dwg82's two edges now gives 82, e2e drawing_line_to_line_on_two_edges. App half (the second click placing the first edge's length) to re-check on the next green, then close) P2 DWG-DIM-TWO-EDGES drawing Dimension (d): click a view's left vertical edge, then its right vertical edge: ours
   places the left edge's length (82) at the second click; live switches to the horizontal line-to-line distance between
   the two edges after the second click and places it on the third (behaviours "qa (2026-10-27, P2 batch 2)" (2)); repro
