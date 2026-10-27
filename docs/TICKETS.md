@@ -376,7 +376,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   psui (landed with this note): editing keeps the cell's blue 2 px frame round the in-place input. qa's shots show no
   caret or selection because the window had no X focus (GPUI draws neither in an inactive window; `xdotool
   windowfocus` after starting the app); with focus, a double-click shows the value selected (checked on :102).
-- [ ] P1 EDGE-HIGHLIGHT-LOOK (user-reported, v0.4.10 macOS) a hovered model edge is a light band with a dark border on
+- [x] P1 EDGE-HIGHLIGHT-LOOK (user-reported, v0.4.10 macOS) a hovered model edge is a light band with a dark border on
   both sides; hovered and selected edges must match live exactly (width at 1× and 2×, colours, outline or not). User
   shot: /root/qa-scratch/tickets/ehl/user-report.png (zoom user-edge-zoom.png). Reproduced on the v0.4.10 Linux
   artifact (tickets/ehl/plate.noshape = bin/platedoc.py: 300 × 200 × 3 plate, patterned Ø10 bosses; iso, hover the
@@ -405,6 +405,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     (`vs_backsil` divided by a finite step's on-screen length, which can come out as nothing); its push is now
     analytic, test a_thin_plate_draws_nothing_past_its_outline (1× and 2×). The edge looks wait for live's 2×
     capture.
+  - psui (landed with this note): the looks follow live's capture (behaviours "psui (2026-10-27, P1)
+    EDGE-HIGHLIGHT-LOOK"): a hovered / selected part edge is a 5 CSS px band in one colour (#FFC685 / #FFA90A), its
+    rim opaque and its core at 78 % over the scene, no dark outline; hovered + selected = selected; a face's boundary
+    is a 2 device px line; plain edges 1 CSS px. Also gone: a faint shadow beside a hovered edge (the ambient
+    occlusion pass read the band's lifted depth; lines no longer write depth). Measured against live's rows at 1× and
+    2× (within ±4), test scene edge_looks::edge_and_face_highlights_look_as_live (fails on the v0.4.10 look).
+    Not followed: live renders at the real pixel ratio only on Macs without an Intel GPU (we do everywhere).
 - [x] verified watcher CLI 12:08 (≥ green 0d75aa8e; qa 12:10: config_add_input List "Size" → List_mRB7Pn8k5H0Vmv, a 2nd List → List_c5l6FBA6sJtcRi; a Checkbox still gets "Checkbox_3", live's form for checkboxes not captured) 8d9246ab P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
   List → id "Configuration" (renamed "Size", the id stays "Configuration"), Checkbox → "Checkbox_2" (ops/config.rs
   add_input → fs_identifier(name)). Live gives a List a random internal id `List_8iFesnytxapQpg` (behaviours 5915, 6098:

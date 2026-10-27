@@ -2237,7 +2237,10 @@ impl Renderer {
             // image (drawn just before, without bias) doesn't veil it. Opaque
             // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
             let mesh_transparent = s.spawn(|| m.make(LayoutKind::Main, P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, PLAIN));
-            let line = s.spawn(|| m.make(LayoutKind::Main, P { label: "line", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
+            // Lines test depth but don't write it: the ambient occlusion pass reads the depth buffer, and a highlight
+            // band brought toward the eye left a step there that it shaded as a crease, a noisy shadow along a
+            // hovered edge (EDGE-HIGHLIGHT-LOOK; live has none).
+            let line = s.spawn(|| m.make(LayoutKind::Main, P { label: "line", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
             // Front faces culled, like Onshape's pass (`setOverrideFaceCullingMode(FRONT)`).
             let mesh_backsil = s.spawn(|| m.make(LayoutKind::Main, P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) }));
             let silhouette = s.spawn(|| m.make(LayoutKind::Main, P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: SILHOUETTE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));

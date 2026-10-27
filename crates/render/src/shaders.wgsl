@@ -767,13 +767,12 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     // From at most a part edge's width: a 2 px sketch line highlights like
     // an edge (live sketch/21, 22: the same 5 rows as selection/06b).
     if (lit) { width = (min(l.width, 1.25) * inst.extra.x + g.viewport.w) * 1.8 + 2.2; }
-    // Live (behaviours "psui (10-27, interaction 1.12)", light theme): a
-    // highlighted face's boundary is a flat 3 px band; a part edge hovered
-    // itself an 8 px band (dark outlines round a pale core), selected 5 px.
+    // Live (EDGE-HIGHLIGHT-LOOK): a hovered or selected face's boundary is an opaque line 2 device px wide at any
+    // pixel ratio; a part edge hovered or selected itself a 5 CSS px band (fs_line).
     let face_band = lit && (st & OUTLINE) != 0u;
     let own_edge = (l.style & 64u) != 0u && (st & (HOVER | SELECTED)) != 0u && !face_band;
-    if (face_band) { width = 3.0; }
-    if (own_edge) { width = select(5.0, 8.0, (st & HOVER) != 0u); }
+    if (face_band) { width = 2.0 / max(g.viewport.z, 1.0); }
+    if (own_edge) { width = 5.0; }
     let half = max(width * g.viewport.z * 0.5, 0.5);
 
     var wa = (inst.model * vec4(l.a, 1.0)).xyz;
@@ -782,12 +781,17 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     // on screen), so its own faces' depth slope doesn't eat the face side of
     // the band (live selection/06b: centred on the edge).
     // Lifted lines too (a hovered part's silhouette over its own faces).
-    if (lit || (l.style & 32u) != 0u) {
-        wa = toward_eye(wa, 1.5 * half);
-        wb = toward_eye(wb, 1.5 * half);
-    }
+    var lift = 0.0;
+    if (lit || (l.style & 32u) != 0u) { lift = 1.5 * half; }
     var ca = g.view_proj * vec4(wa, 1.0);
     var cb = g.view_proj * vec4(wb, 1.0);
+    if (lift > 0.0) {
+        // Only the depth comes forward (the same pixels on screen).
+        let la = g.view_proj * vec4(toward_eye(wa, lift), 1.0);
+        let lb = g.view_proj * vec4(toward_eye(wb, lift), 1.0);
+        ca = vec4(ca.xy, la.z / la.w * ca.w, ca.w);
+        cb = vec4(cb.xy, lb.z / lb.w * cb.w, cb.w);
+    }
     ca = clip_near(ca, cb);
     cb = clip_near(cb, ca);
 
@@ -831,15 +835,16 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     // A selected part's edges let its amber through (live ins-902: the
     // top/front edge peaks at 0.73 of the faces, ours at 0.53 when opaque).
     if ((st & (BODY | HOVER | SELECTED)) == BODY) { alpha = alpha * 0.68; }
-    o.color = vec4(highlight_stroke(base, st), alpha);
+    // Hovering a selected part edge or face keeps the selection's look (live).
+    let keep_selected = (own_edge || face_band) && (st & SELECTED) != 0u;
+    o.color = vec4(select(highlight_stroke(base, st), g.select.rgb, keep_selected), alpha);
     o.pick = pick;
     o.along = t * len;
     o.world = mix(wa, wb, t);
     o.style = l.style;
     o.across = side * half;
-    // 1: a hovered part edge, 2: a selected one, 3: both (fs_line draws
-    // the band).
-    o.core = select(0.0, select(2.0, select(1.0, 3.0, (st & SELECTED) != 0u), (st & HOVER) != 0u), own_edge);
+    // A part edge's own highlight band (fs_line).
+    o.core = select(0.0, 1.0, own_edge);
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
 }
@@ -861,23 +866,21 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let t = fract(i.along / (period * g.viewport.z)) * period;
         if ((t > g.dash.x && t < g.dash.x + g.dash.y) || t > g.dash.x + g.dash.y + g.dash.z) { discard; }
     }
-    // A hovered / selected part edge (live psui-light-05..07, sRGB, from
-    // the centre out in logical px): hovered, a pale core (255,211,160),
-    // the hover colour, then a dark outline (26,35,40) on both sides;
-    // selected, a darker core (203,138,15) shading out to the selection
-    // colour, no outline; selected and hovered, the hover's outline round
-    // the selection colour and a (255,188,64) core.
+    // A hovered or selected part edge (live behaviours "psui (2026-10-27, P1) EDGE-HIGHLIGHT-LOOK", Onshape's
+    // HIGHLIGHT_LINE_WIDTH_MIN_PX 5, HIGHLIGHT_EDGE_OPACITY 0.78, HIGHLIGHT_EDGE_BORDER_OPACITY 1): one colour, the
+    // outer device pixel on each side opaque, the core at 78 % over the scene, so the plain near-black edge under
+    // its middle shows through at 22 %. No dark outline.
     if (i.core > 0.0) {
-        let a = abs(i.across) / max(g.viewport.z, 1.0);
-        var c: vec3<f32>;
-        if (i.core > 2.5) {
-            if (a > 2.75) { c = vec3(26.0, 35.0, 40.0) / 255.0; } else if (a > 1.25) { c = linear_to_srgb(g.select.rgb); } else { c = vec3(255.0, 188.0, 64.0) / 255.0; }
-        } else if (i.core < 1.5) {
-            if (a > 2.75) { c = vec3(26.0, 35.0, 40.0) / 255.0; } else if (a > 1.25) { c = linear_to_srgb(i.color.rgb); } else { c = vec3(255.0, 211.0, 160.0) / 255.0; }
-        } else {
-            if (a > 1.5) { c = linear_to_srgb(i.color.rgb); } else if (a > 0.5) { c = vec3(217.0, 156.0, 35.0) / 255.0; } else { c = vec3(203.0, 138.0, 15.0) / 255.0; }
-        }
-        return vec4(c, i.color.a);
+        let dpr = max(g.viewport.z, 1.0);
+        let a = abs(i.across);
+        let half = 2.5 * dpr;
+        let col = linear_to_srgb(i.color.rgb);
+        let rim = max(1.0, 0.6 * dpr);
+        if (a > half - rim) { return vec4(col, i.color.a); }
+        // The plain edge (1 CSS px, antialiased) under the core: its black adds to the cover, nothing to the colour.
+        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * 0.22;
+        let alpha = 0.78 + edge;
+        return vec4(col * (0.78 / alpha), alpha * i.color.a);
     }
     return enc(i.color);
 }

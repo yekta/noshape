@@ -899,7 +899,8 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
     let mut lines = LineData::default();
     lines.segments.reserve(m.edges.iter().map(|e| e.len().saturating_sub(1)).sum());
     for (ei, pl) in m.edges.iter().enumerate() {
-        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, LineSegment::CORE);
+        // Onshape DEFAULT_LINE_WIDTH 1 (live EDGE-HIGHLIGHT-LOOK: a plain edge is 1 CSS px, antialiased).
+        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.0, LineSegment::CORE);
     }
     let points = PointData {
         points: m.vertices.iter().enumerate().map(|(i, p)| PointSprite { position: *p, color: [255; 4], pick_id: i as u32 + 1, size: 6.0, style: 0, _pad: 0 }).collect(),
@@ -1123,14 +1124,13 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         }
     }
     // What is selected isn't pre-highlighted again (live selection/05 =
-    // 04, sketch/23 = 22, "plane and mate connector hover" (c)), except a
-    // part edge: hovered it gets the hover's dark outline back round a
-    // lighter core (live 10-27, behaviours "psui light samples block").
-    if let Some(h) = hover.filter(|h| !selection.contains(h) || matches!(h, Reference::Edge(_))) {
+    // 04, sketch/23 = 22, "plane and mate connector hover" (c); a part edge
+    // too, behaviours "psui (2026-10-27, P1) EDGE-HIGHLIGHT-LOOK" (c)).
+    if let Some(h) = hover.filter(|h| !selection.contains(h)) {
         mark(h, state::HOVER, &mut scene);
     }
-    // A face's boundary edges: solid, without the dark core of an edge
-    // highlighted itself (live selection/03, 04 vs 06b, 07b).
+    // A face's boundary edges: a solid 2 device px line, not the band of an
+    // edge highlighted itself (live EDGE-HIGHLIGHT-LOOK (d)).
     for (e, flag) in boundary {
         for &id in built.picks.ids_for(&e) {
             let own = scene.states.get(id as usize).is_some_and(|s| s & (state::HOVER | state::SELECTED | state::ERROR) != 0);
