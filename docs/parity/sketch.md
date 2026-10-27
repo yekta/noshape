@@ -13,22 +13,22 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 1.1 | Sketch button / Shift+S opens the Sketch dialog prompting "Select a sketch plane" | B§1.1, i18n | ✅ |  |
-| 1.2 | A preselected plane or planar face fills the Sketch plane field | B§1.1 | ✅ |  |
-| 1.3 | Context menu on a plane/face: **New sketch** | H:sketch_basics, LE | ✅ |  |
-| 1.4 | Double-click a sketch in the Feature list (or Edit) re-opens it | B§1.1 | ✅ |  |
-| 1.5 | View is **not** reoriented on entry by default; `n` views normal to the sketch plane, `n` again flips | View__orient_normal_to_sketch_on_edit, B§1.4 | ✅ |  |
-| 1.6 | "Orient normal to sketch on edit" option in the camera menu | View__orient_normal_to_sketch_on_edit | ✅ (Part Studio camera menu; the sketch view orients on entry) |  |
-| 1.7 | A new sketch starts with no tool active once the plane is picked; a click in empty space does nothing; the view doesn't rotate | Live sketch/00, 01, 44, 500–503 (confirmed by live capture) | ✅ (checked in the app 10-24: Top picked from the list, no tool active, empty click does nothing, view stays) |  |
+| 1.1 | Sketch button / Shift+S opens the Sketch dialog prompting "Select a sketch plane" | B§1.1, i18n | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 1.2 | A preselected plane or planar face fills the Sketch plane field | B§1.1 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 1.3 | Context menu on a plane/face: **New sketch** | H:sketch_basics, LE | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 1.4 | Double-click a sketch in the Feature list (or Edit) re-opens it | B§1.1 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 1.5 | View is **not** reoriented on entry by default; `n` views normal to the sketch plane, `n` again flips | View__orient_normal_to_sketch_on_edit, B§1.4 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 1.6 | "Orient normal to sketch on edit" option in the camera menu | View__orient_normal_to_sketch_on_edit | ✅ (Part Studio camera menu; the sketch view orients on entry) | 0.4.10+ / 2d9a275c 10-27 |
+| 1.7 | A new sketch starts with no tool active once the plane is picked; a click in empty space does nothing; the view doesn't rotate | Live sketch/00, 01, 44, 500–503 (confirmed by live capture) | ✅ (checked in the app 10-24: Top picked from the list, no tool active, empty click does nothing, view stays) | 0.4.10+ / 2d9a275c 10-27 |
 | 1.7a | The sketch frame (Onshape `SketchPlaneDisplay.updateBounds`): placed once when first drawn, centred on the plane entity's bounds centre (the ray through the graphics centre if off screen), 0.7 × the graphics height tall (`VIEWPORT_HEIGHT_TO_PLANE_HEIGHT_RATIO`) × 1.77777 wide; fixed in the plane afterwards (zoom / geometry don't change it; a new plane re-places it); `#90cef1` 1 px; name 20 px (`PLANE_TEXT_HEIGHT_PX`) in the plane 5 px inside the top-left corner, shrunk to fit | Bundle webgl `oM`, live sketch/500–503 (2.02 × 1.14 plane at the default zoom) | ✅ (app 10-24: frame corners at (388,557) (727,265) (1776,567) (1437,860) vs live (388,557) (728,263) (1776,567) (1435,861)) |  |
 | 1.8 | ✓ / Enter accepts the sketch; "Finish sketch" button | H:sketch_basics, B§1.5 | ✅ |  |
-| 1.9 | ✗ cancels the whole sketch session; a Restore link undoes the cancel | H:sketch_basics | ✅ (✕ shows "Sketch N has been canceled. **Restore** ×" (GUI :103 m3-toast.png); Restore reopens the draft with its geometry (m3-restored.png); × dismisses) |  |
-| 1.10 | Esc cancels the active tool / chain, never the sketch | H:sketch_tools ("The Escape key exits a tool selection") | ✅ (also when the focus is in the Sketch dialog) |  |
+| 1.9 | ✗ cancels the whole sketch session; a Restore link undoes the cancel | H:sketch_basics | ✅ (✕ shows "Sketch N has been canceled. **Restore** ×" (GUI :103 m3-toast.png); Restore reopens the draft with its geometry (m3-restored.png); × dismisses) | 0.4.10+ / 2d9a275c 10-27 |
+| 1.10 | Esc cancels the active tool / chain, never the sketch | H:sketch_tools ("The Escape key exits a tool selection") | ✅ (also when the focus is in the Sketch dialog) | 0.4.10+ / 2d9a275c 10-27 |
 | 1.11 | Extrude (Shift+E) / Revolve (Shift+W) from the sketch toolbar accept the sketch and preselect all regions | H:sketch_tools | ✅ |  |
 | 1.12 | Ctrl+Z / Ctrl+Y inside the sketch step through sketch edits | LE, B§8.2 | ✅ |  |
-| 1.13 | Sketch dialog options are remembered between sessions (except Show expressions) | H:sketch_basics | ✅ (Show constraints remembered; Show expressions resets) |  |
+| 1.13 | Sketch dialog options are remembered between sessions (except Show expressions) | H:sketch_basics | ✅ (Show constraints remembered; Show expressions resets) | 0.4.10+ / 2d9a275c 10-27 |
 | 1.14 | Disable imprinting checkbox when sketching on a part face | H:sketch_basics | ✅ (feature param) |  |
-| 1.15 | Feature list shows a blue indicator on a sketch that is not fully defined | PartStudio__features_and_parts_lists, LE | ✅ |  |
+| 1.15 | Feature list shows a blue indicator on a sketch that is not fully defined | PartStudio__features_and_parts_lists, LE | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 1.16 | Shift+H hides / shows all sketches | H:sketch_basics | ✅ |  |
 | 1.17 | Shift+P hides construction geometry | B§1.7 | ✅ (Part Studio: hides planes and sketches construction) |  |
 
@@ -36,17 +36,17 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 2.1 | Sketch toolbar replaces the feature toolbar while a sketch is open | H:sketch_tools | ✅ |  |
+| 2.1 | Sketch toolbar replaces the feature toolbar while a sketch is open | H:sketch_tools | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 2.2 | Order: Undo, Redo, Extrude, Revolve, Line▾, Rectangle▾, Circle▾, Arc▾, Polygon▾, Spline▾, Point, Text, Use▾, Construction, Fillet▾, Trim▾, Offset▾, Mirror, Pattern▾, Dimension, 14 constraints | LE (docs toolbar images) | ✅ (groups and dropdown contents match live dom/toolbar-sketch.txt + dropdowns-sketch.json, incl. the Insert DXF or DWG ▾ / Insert image group after Linear pattern) |  |
 | 2.3 | Groups: Line/Midpoint line; Corner/Center point/Aligned rectangle; Center point/3 point circle/Ellipse; 3 point/Tangent/Center point/Elliptical arc/Conic; Inscribed/Circumscribed polygon; Spline/Bezier/Spline control point; Use/Intersection; Fillet/Chamfer; Trim/Extend/Split; Offset/Slot; Linear/Circular pattern/Transform | LE | ✅ |  |
-| 2.4 | A group button shows the last tool used from that group | H:sketch_tools | ✅ |  |
-| 2.5 | The active tool's button is highlighted | UI | ✅ |  |
+| 2.4 | A group button shows the last tool used from that group | H:sketch_tools | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 2.5 | The active tool's button is highlighted | UI | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 2.6 | Tools stay active until Esc or another tool is chosen | H:sketch_tools | ✅ |  |
 | 2.7 | Pressing a tool's shortcut (or button) again exits it | B§2.1 | ✅ |  |
 | 2.8 | Constraint buttons not applicable to the current selection are disabled | B§3.1 | ✅ (T:sm) |  |
 | 2.9 | Tooltips name the tool and its shortcut | UI | ✅ |  |
-| 2.10 | Search tools (Alt+C) finds sketch tools | H:sketch_tools | ✅ (sketch tools listed first in a sketch) |  |
-| 2.11 | S opens the sketch shortcut toolbar at the cursor | H:sketch_basics | ✅ (sketch tools in the S toolbar) |  |
+| 2.10 | Search tools (Alt+C) finds sketch tools | H:sketch_tools | ✅ (sketch tools listed first in a sketch) | 0.4.10+ / 2d9a275c 10-27 |
+| 2.11 | S opens the sketch shortcut toolbar at the cursor | H:sketch_basics | ✅ (sketch tools in the S toolbar) | 0.4.10+ / 2d9a275c 10-27 |
 
 ## 3. Keyboard shortcuts (sketch scope)
 
@@ -70,43 +70,43 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 4.1 | Line: click-click-click chains connected segments | H:line | ✅ |  |
-| 4.2 | Line: press-drag-release makes a single segment | H:line | ✅ |  |
-| 4.3 | Line: clicking an existing point closes / ends the chain | B§2.4.1 | ✅ |  |
-| 4.4 | Line: moving back onto the chain end switches to a tangent arc; after the arc the tool reverts to Line | H:line | ✅ (T:sm) |  |
-| 4.5 | Midpoint line: click the midpoint, then an end; midpoint constraint | H:midpoint_line | ✅ (live spec 10-27: a normal point at the midpoint, the line from the clicked end; skasm 10-27) |  |
-| 4.6 | Corner rectangle: click corner, click diagonal corner, or drag | H:corner_rectangle | ✅ (live spec 10-27: Horizontal on the edge at the 2nd click's y, Perpendicular with the edge at the 1st click's x, 2 Parallel; sketch test `corner_rectangle_constraints_follow_the_click_order`) |  |
-| 4.7 | Center point rectangle: click center, click corner, or drag; a construction point at the center, Midpoint of both diagonals (live spec 10-27: no diagonal lines, the Help's "construction diagonal" isn't stored) | H:center_point_rectangle, live spec-tools | ✅ (skasm 10-27: `MidpointOf` point-to-point midpoints; scene test `center_rectangle_and_three_point_circle_as_live`) |  |
-| 4.8 | Aligned rectangle: two clicks for the first side, third click for the width | H:aligned_rectangle | ✅ (T:sm) |  |
-| 4.9 | Center point circle: click center, click rim, or drag | H:center_point_circle | ✅ |  |
-| 4.10 | 3 point circle: three clicks, or drag 1→2 then click 3; a construction point Coincident with the circle at each click (live spec 10-27) | H:3_point_circle | ✅ (T:sm; points skasm 10-27) |  |
-| 4.11 | 3 point arc: start, end, then the bulge point; drag start→end then click | H:3_point_arc | ✅ |  |
-| 4.12 | 3 point arc: snaps to an exact semicircle when the center reaches the chord | H:3_point_arc | ✅ |  |
-| 4.13 | Tangent arc tool: start at a curve end, click the end; tangent constraint | H:arc_tangent | ✅ (T:sm) |  |
-| 4.14 | Center point arc: center, start (radius), end; the sweep follows the cursor's direction | H:center_point_arc | ✅ (T:sm) |  |
-| 4.15 | Ellipse: center, primary axis, secondary radius; a horizontal / vertical major-axis click makes it Horizontal / Vertical (live spec 10-27 "majorAxisSnap0") | H:ellipse | ✅ (T:sm; snap skasm 10-27) |  |
+| 4.1 | Line: click-click-click chains connected segments | H:line | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.2 | Line: press-drag-release makes a single segment | H:line | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.3 | Line: clicking an existing point closes / ends the chain | B§2.4.1 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.4 | Line: moving back onto the chain end switches to a tangent arc; after the arc the tool reverts to Line | H:line | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.5 | Midpoint line: click the midpoint, then an end; midpoint constraint | H:midpoint_line | ✅ (live spec 10-27: a normal point at the midpoint, the line from the clicked end; skasm 10-27) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.6 | Corner rectangle: click corner, click diagonal corner, or drag | H:corner_rectangle | ✅ (live spec 10-27: Horizontal on the edge at the 2nd click's y, Perpendicular with the edge at the 1st click's x, 2 Parallel; sketch test `corner_rectangle_constraints_follow_the_click_order`) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.7 | Center point rectangle: click center, click corner, or drag; a construction point at the center, Midpoint of both diagonals (live spec 10-27: no diagonal lines, the Help's "construction diagonal" isn't stored) | H:center_point_rectangle, live spec-tools | ✅ (skasm 10-27: `MidpointOf` point-to-point midpoints; scene test `center_rectangle_and_three_point_circle_as_live`) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.8 | Aligned rectangle: two clicks for the first side, third click for the width | H:aligned_rectangle | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.9 | Center point circle: click center, click rim, or drag | H:center_point_circle | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.10 | 3 point circle: three clicks, or drag 1→2 then click 3; a construction point Coincident with the circle at each click (live spec 10-27) | H:3_point_circle | ✅ (T:sm; points skasm 10-27) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.11 | 3 point arc: start, end, then the bulge point; drag start→end then click | H:3_point_arc | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.12 | 3 point arc: snaps to an exact semicircle when the center reaches the chord | H:3_point_arc | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.13 | Tangent arc tool: start at a curve end, click the end; tangent constraint | H:arc_tangent | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.14 | Center point arc: center, start (radius), end; the sweep follows the cursor's direction | H:center_point_arc | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.15 | Ellipse: center, primary axis, secondary radius; a horizontal / vertical major-axis click makes it Horizontal / Vertical (live spec 10-27 "majorAxisSnap0") | H:ellipse | ✅ (T:sm; snap skasm 10-27) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.16 | Elliptical arc: center, primary axis, secondary radius + start, end on the construction ellipse | H:elliptical_arc | ✅ (T:sm) |  |
-| 4.17 | Elliptical arc start/end snap to the axis / quadrant points | H:elliptical_arc | ✅ (axis / quadrant snaps on the construction ellipse) |  |
-| 4.18 | Conic: start, end, control point; rho value | H:conic | ✅ (T:ux, T:sm; GUI :103 rho field auto-focus and 0.7 Enter verified; /tmp/skb/2026-10-18/conic-rho*.png) |  |
-| 4.19 | Inscribed / circumscribed polygon: center, circumference; construction circle. Inscribed: the 2nd click is an edge's middle (circle tangent to the edges); circumscribed: a vertex (circle through the vertices) | H:inscribed_polygon; live skasm 10-26 (behaviours "skasm sketch polygons") | ✅ (geometry and constraints as live 10-26 (seed + circular pattern; inscribed Midpoint + Tangent, circumscribed Coincident on the circle; no Ø dimension), test `polygon_second_click_is_an_edge_middle_inscribed_and_a_vertex_circumscribed`; GUI :103 10-27) |  |
-| 4.20 | Polygon: type the side count before the circumference click (3–50) | H:inscribed_polygon | ✅ |  |
-| 4.21 | Polygon: after the circumference click the pointer's distance from the centre sets the side count (+1 per 10 px beyond the click, −1 per 10 px in, min 3); Enter or any click commits (no new polygon at the click); Esc discards | Live skasm 10-27 (behaviours "skasm (2026-10-27) sketch polygon side count") | ✅ (T:sm `polygon_sides_typed_and_midpoint_line`, `polygon_spinner_and_next_center_commit_the_previous_polygon`) |  |
-| 4.22 | Spline: click points, double-click to end | H:spline | ✅ (T:sm) |  |
-| 4.23 | Spline: closes when the last point lands on the first | H:spline | ✅ (T:sm) |  |
-| 4.24 | Spline: context menu **Confirm spline** finishes one point behind | H:spline | ✅ (T:sm) |  |
-| 4.25 | Spline tangent handles (white points) to drag | H:spline | ✅ (T:ux; GUI :103 open spline shows white tangent handles; handles are not deletable) |  |
-| 4.26 | Bezier: click control points, double-click to end; control polygon shown | H:bezier | ✅ (control polygon shown while drawing and when selected) |  |
-| 4.27 | Bezier: context menu **Escape bezier** removes the curve in progress | H:bezier | ✅ (T:sm) |  |
+| 4.17 | Elliptical arc start/end snap to the axis / quadrant points | H:elliptical_arc | ✅ (axis / quadrant snaps on the construction ellipse) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.18 | Conic: start, end, control point; rho value | H:conic | ✅ (T:ux, T:sm; GUI :103 rho field auto-focus and 0.7 Enter verified; /tmp/skb/2026-10-18/conic-rho*.png) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.19 | Inscribed / circumscribed polygon: center, circumference; construction circle. Inscribed: the 2nd click is an edge's middle (circle tangent to the edges); circumscribed: a vertex (circle through the vertices) | H:inscribed_polygon; live skasm 10-26 (behaviours "skasm sketch polygons") | ✅ (geometry and constraints as live 10-26 (seed + circular pattern; inscribed Midpoint + Tangent, circumscribed Coincident on the circle; no Ø dimension), test `polygon_second_click_is_an_edge_middle_inscribed_and_a_vertex_circumscribed`; GUI :103 10-27) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.20 | Polygon: type the side count before the circumference click (3–50) | H:inscribed_polygon | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.21 | Polygon: after the circumference click the pointer's distance from the centre sets the side count (+1 per 10 px beyond the click, −1 per 10 px in, min 3); Enter or any click commits (no new polygon at the click); Esc discards | Live skasm 10-27 (behaviours "skasm (2026-10-27) sketch polygon side count") | ✅ (T:sm `polygon_sides_typed_and_midpoint_line`, `polygon_spinner_and_next_center_commit_the_previous_polygon`) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.22 | Spline: click points, double-click to end | H:spline | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.23 | Spline: closes when the last point lands on the first | H:spline | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.24 | Spline: context menu **Confirm spline** finishes one point behind | H:spline | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.25 | Spline tangent handles (white points) to drag | H:spline | ✅ (T:ux; GUI :103 open spline shows white tangent handles; handles are not deletable) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.26 | Bezier: click control points, double-click to end; control polygon shown | H:bezier | ✅ (control polygon shown while drawing and when selected) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.27 | Bezier: context menu **Escape bezier** removes the curve in progress | H:bezier | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.28 | Bezier degree label (double-click to edit, max 15) | H:bezier | ✅ (T:ux; GUI :103 double-click opens degree input; 4→6 succeeds, 16 rejected; bezier-degree-six-verified.png) |  |
 | 4.29 | Spline control point: click a spline / bezier control polygon to add a point | H:spline_control_point | ✅ (T:ux) |  |
-| 4.30 | Point: click to place | H:point | ✅ |  |
-| 4.31 | Text: drag a box, lower-left corner and height set the first line; horizontal constraint on the bottom edge | H:text | ✅ |  |
-| 4.32 | Text: font, bold, italic, flip; edit later; drag by its box | H:text | ✅ |  |
+| 4.30 | Point: click to place | H:point | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.31 | Text: drag a box, lower-left corner and height set the first line; horizontal constraint on the bottom edge | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.32 | Text: font, bold, italic, flip; edit later; drag by its box | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 4.33 | Text: Convert to expression | H:text | ✅ (GUI :103 Convert to expression evaluates `"A" ~ (2 + 3)` to A5; text-expression.png) |  |
-| 4.34 | Slot: select centerline curves (before or after the tool); one shared width dimension | H:slot | ✅ (T:ux) |  |
+| 4.34 | Slot: select centerline curves (before or after the tool); one shared width dimension | H:slot | ✅ (T:ux) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.35 | Slot: a connected chain gives one slot following the chain | H:slot | ✅ (T:ux; GUI :103 selected L-shaped line chain makes one continuous slot with shared width input; chained-slot.png) |  |
-| 4.36 | Construction toggle: q with a selection toggles it, without one draws construction geometry | H:construction | ✅ |  |
-| 4.37 | Construction lines are dashed (dash-dot) in the status color | B§5.2 | ✅ (dashed, status colors) |  |
+| 4.36 | Construction toggle: q with a selection toggles it, without one draws construction geometry | H:construction | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.37 | Construction lines are dashed (dash-dot) in the status color | B§5.2 | ✅ (dashed, status colors) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.38 | Insert image / Insert DXF or DWG | H:insert_image, H:insert_dwg_or_dxf | ✅ (DXF ASCII + binary and DWG R13–2018 through cadkit (crates/sketch/src/cad.rs, dwg.rs): block references expanded (placement, scale, rotation, arrays, nesting), mirrored/tilted planes and non-uniform block scales mapped exactly; T:ux dwg.rs fixtures R2000–R2018 + cad.rs tests; GUI :103 m4-dwg.png "Inserted 7 entities from fixture.dwg" incl. the BLOCK1 line. Images: 3D textured quads in any orientation, depth tested, exact colors, visible outside sketch mode (m2-placed / m2-iso / m2-accepted-c.png)) |  |
 | 4.39 | Preview geometry while placing is drawn in the sketch preview color | B§2.3 | ✅ |  |
 
