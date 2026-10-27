@@ -29,11 +29,11 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 
 | # | Step | Live | Ours | Status |
 |---|---|---|---|---|
-| 2.1 | Revolute: shaft bottom edge, hole 1 top edge | connector snaps to the circle centre; 2nd pick jumps the part, **amber preview**, HUD | snaps, jumps, HUD; the moved part is drawn normally (not amber) | ✗ A2 |
-| 2.2 | Dialog ✓ | "Revolute 1" row, **new mates hidden: light grey row, tooltip "… (Hidden)"** | row in normal dark text | ✗ A3 |
+| 2.1 | Revolute: shaft bottom edge, hole 1 top edge | connector snaps to the circle centre; 2nd pick jumps the part, **amber preview**, HUD | snaps, jumps, HUD; the moved part is drawn normally (not amber) | ✅ (GUI green 8165fca6, skasm 10-27: the moved part amber while the dialog is open); was ✗ A2 |
+| 2.2 | Dialog ✓ | "Revolute 1" row, **new mates hidden: light grey row, tooltip "… (Hidden)"** | row in normal dark text | ✅ (GUI green 8165fca6, skasm 10-27: the new mate row light grey, "(Hidden)"); was ✗ A3 |
 | 2.3 | Drag the shaft | rotates about the axis only | stays on the axis | ✅ |
 | 2.4 | Cylindrical: pin bottom edge, hole 2 top edge; drag up | slides + rotates | aligned (2nd connector landed at the hole's bottom edge); drag slides along the axis | ✅ / ? |
-| 2.5 | Slider: block top face → plate top face; HUD flip primary axis | flip turns the block over | block stays inside the plate; CLI: **rotation identity after the flip** (flip had no effect) | ✗ A4 |
+| 2.5 | Slider: block top face → plate top face; HUD flip primary axis | flip turns the block over | block stays inside the plate; CLI: **rotation identity after the flip** (flip had no effect) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 |
 | 2.6 | Fastened: bracket → plate; flip, flip back | flips | flips correctly | ✅ |
 | 2.7 | Mate connector tool hover on a face | **orange outline on the hovered face, white dots only at that face's inference points, small triad + ring** (assembly/31-*) | no face outline, **dark dots on many edges of other faces**, large triad without ring | ✗ A5 |
 | 2.8 | Place, ✓ | "Mate connector 1" under Mate features | same | ✅ |
@@ -42,11 +42,11 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 
 | # | Step | Live | Ours | Status |
 |---|---|---|---|---|
-| 3.1 | Replicate dialog | standard feature dialog (✓ ✕) (pending capture) | custom panel: ALL-CAPS headers "SEED INSTANCE", "MATE TO BE MATCHED", a "Use selection" button, yellow hint text, a blue **OK** button, no ✓ | ✗ A6 |
+| 3.1 | Replicate dialog | standard feature dialog (✓ ✕) (pending capture) | custom panel: ALL-CAPS headers "SEED INSTANCE", "MATE TO BE MATCHED", a "Use selection" button, yellow hint text, a blue **OK** button, no ✓ | ✅ (GUI green 8165fca6, skasm 10-27: Replicate is a standard feature dialog ✓ ✕); was ✗ A6 |
 | 3.2 | Seed Part 3 <1> (Cylindrical 1), OK | one copy per free matching hole | "3 match(es) found": **two pins stacked inside hole 1 (where the shaft is) and one on top of the seed in hole 2** (z-fighting stripes) | ✗ A7 |
 | 3.3 | Ctrl+Z | removes it | removed | ✅ |
-| 3.4 | Assembly linear pattern dialog | standard feature dialog with preview | same custom panel style (INSTANCES / DIRECTION, boxed inputs, OK); **no preview** | ✗ A6, A8 |
-| 3.5 | Direction = plate front edge, 25 mm × 3 | copies along the edge | the edge pick becomes "Mate connector of Part 1 <1>" and copies go **along its Z (the face normal, −Y)**, off the plate | ✗ A9 |
+| 3.4 | Assembly linear pattern dialog | standard feature dialog with preview | same custom panel style (INSTANCES / DIRECTION, boxed inputs, OK); **no preview** | ✅ (GUI green 8165fca6, skasm 10-27: Linear pattern a standard feature dialog); was ✗ A6, A8 |
+| 3.5 | Direction = plate front edge, 25 mm × 3 | copies along the edge | the edge pick becomes "Mate connector of Part 1 <1>" and copies go **along its Z (the face normal, −Y)**, off the plate | ✅ (T: assembly `linear_pattern_along_an_edge`); was ✗ A9 |
 | 3.6 | Assembly circular pattern, axis = shaft face, 4 × 360 | 3 copies around the axis | 3 copies around the shaft axis; tree "Circular pattern 1 (3)" | ✅ / ? |
 | 3.7 | Button tooltip after clicking it | hides | "Assembly circular pattern" tooltip stays over the graphics | ✗ A10 |
 
@@ -60,7 +60,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 4.4 | ✓, Done | unexploded graphics, banner gone | same | ✅ |
 | 4.5 | BOM panel | BOM type Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description | same; Part 3 quantity 6 | ✅ |
 | 4.6 | Double-click Part number, "PN-001", Enter | commits, selection moves one row down | same | ✅ |
-| 4.7 | Type into the selected cell | typing starts editing | **nothing happens** (typed text lost) | ✗ A11 |
+| 4.7 | Type into the selected cell | typing starts editing | **nothing happens** (typed text lost) | ✅ (GUI :103 skasm 10-27: "PN-002" typed into a selected cell lands whole, Enter commits); was ✗ A11 |
 
 ## Findings (2026-10-21 run)
 
@@ -99,15 +99,15 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 |---|---|---|---|
 | 1.4 | First insert into an empty assembly | **amber + row selected now** (the "Assembly 2" root row is highlighted too); zoom-to-fit still crops the plate (right and bottom off-screen, dialog over it) | ✗ A1 (partly fixed) |
 | 2.1 | Revolute 2nd pick | moved part previews **amber** | ✅ A2 fixed |
-| 2.2 | New mate row | tooltip "Revolute 1 (Hidden)" + eye-off icon ✅, but the row text is still #333333 (live light grey) | ✗ A3 (partly fixed) |
-| 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✗ A4 |
+| 2.2 | New mate row | tooltip "Revolute 1 (Hidden)" + eye-off icon ✅, but the row text is still #333333 (live light grey) | ✅ (GUI green 8165fca6, skasm 10-27: the row light grey); was ✗ A3 (partly fixed) |
+| 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 |
 | 2.7 | Mate connector hover on the plate top | orange outline + white inference dots on that face ✅; **extra white dots on other parts** (bracket edges, shaft bottom) | ✗ A5 (partly fixed) |
 | 3.1 / 3.4 / 3.6 | Replicate / Linear / Circular pattern dialogs | standard feature dialogs with live's fields (dom/ui2-asm-*) ✅; Replicate adds red hints "Select the instances to pattern (seed)" / "Select the geometry to find match in" that live doesn't show | ✅ A6 fixed / ✗ **A14** (hint text) |
-| 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ A7 fixed / ✗ **A12** |
+| 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ (T: assembly `replicate_on_matching_holes`, qa5 A12 assert); was ✅ A7 fixed / ✗ **A12** |
 | 3.4 | Linear pattern preview | grey preview copy | ✅ A8 fixed |
 | 3.5 | Direction = plate front edge | copy along the edge, 25 mm | ✅ A9 fixed |
 | 3.7 | Toolbar button tooltip after click | hides | ✅ A10 fixed |
-| 4.7 | Type into a selected BOM cell | editing starts but the **first character is lost** ("PN-002" → "N-002") and is committed on its own: Esc leaves "P" in the cell; Delete doesn't clear a cell | ✗ A11 (changed) |
+| 4.7 | Type into a selected BOM cell | editing starts but the **first character is lost** ("PN-002" → "N-002") and is committed on its own: Esc leaves "P" in the cell; Delete doesn't clear a cell | ✅ (GUI :103 skasm 10-27: "PN-002" whole; Enter commits and moves down); was ✗ A11 (changed) |
 | – | Relation toolbar button | live: Gear / Rack and pinion / Screw / Linear relation tools (feature dialogs) | **custom "Relation" panel**: tabs Gear / Rack & pinion / Screw / Linear, "Select mate" dropdowns, Lead per radian, blue **OK** | ✗ **A13** |
 | – | Tab position of a new Assembly made with + while Part Studio 1 was active | after Part Studio 1 (stays there) | was placed after Part Studio 1, **later shown at the end of the tab bar** (after a BOM edit / undo / tab switches) | ✗ **DOC5** |
 
