@@ -536,7 +536,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   replaces the value in place, Enter opens it, Esc unframes, a double-click edits with the value selected; a plain
   number in a length / angle cell commits with the workspace unit ("40" → "40 mm"). Verified on :102 (Extrude 1 /
   Depth, Big).
-- [ ] reopened in part (qa 11:53, green e8858e61, NOSHAPE_PERF=1, fresh copy of cli-fillet-hang.noshape): the visible part
+- [x] verified eb4338a8 (qa 13:36: fresh copies of cli-fillet-hang.noshape, NOSHAPE_PERF=1; with the opening regen in Fillet 2, dragging the bar above it gives "0 evaluated, 7 cached, 4 ms" at once; Suppress Fillet 1 right after regenerates in 1 ms and the view run's Fillet 2 marker is gone within seconds, so the stale run is aborted. Left over, by design (a913de0e): once idle, the document thumbnail re-regenerates the head in the background ("7 features evaluated, 0 cached, 47455 ms", Fillet 2 burning its budget) and stops when the view regenerates again) reopened in part (qa 11:53, green e8858e61, NOSHAPE_PERF=1, fresh copy of cli-fillet-hang.noshape): the visible part
   is fixed: with the opening regen in Fillet 2 (crash marker "Fillet 2", +55 s), dragging the bar above Fillet 2 gives
   schedule_regen #2 → "0 evaluated, 7 cached, 1 ms" at once and the rolled-back model stays (tickets/regen-no-cancel-
   green-rolled.png). But the running run is **not aborted**: its marker stays and it finishes "8 features evaluated,
