@@ -25,6 +25,7 @@ mod camera;
 mod display;
 mod render;
 mod select;
+mod release;
 mod sheetmetal;
 mod sketch;
 mod sketch_edit;
@@ -61,6 +62,7 @@ pub fn all() -> Vec<Op> {
     v.extend(query::ops());
     v.extend(analysis::ops());
     v.extend(sheetmetal::ops());
+    v.extend(release::ops());
     v.extend(render::ops());
     v.extend(camera::ops());
     v.extend(display::ops());

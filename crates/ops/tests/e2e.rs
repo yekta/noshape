@@ -4648,3 +4648,34 @@ fn ui_list_variable_studio_display() {
     let e = try_call(&mut ctx, "ui_list", json!({ "tab": vs, "action": "filter", "text": "x" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("action"));
 }
+
+/// Release… through the API as the Release candidate dialog: part numbers,
+/// revisions A then B, a version per release, the dialog's checks, and the
+/// Revision history.
+#[test]
+fn release_parts_and_revision_history() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "release.noshape");
+    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1" })).unwrap_err();
+    assert!(e.message.contains("needs attention"), "no part number: {e:?}");
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "notes": "first", "part_numbers": { "Part 1": "PRT-0001" } }));
+    assert_eq!(r["items"][0]["revision"], "A", "{r}");
+    assert_eq!(r["items"][0]["part_number"], "PRT-0001", "{r}");
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    assert_eq!(parts["parts"][0]["part_number"], "PRT-0001", "{parts}");
+    let h = call(&mut ctx, "history_list", json!({ "limit": 3 }));
+    assert!(h["versions"].as_array().unwrap().iter().any(|v| v["name"] == "R1"), "{h}");
+    // The part number stays; the next release is revision B.
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R2" }));
+    assert_eq!(r["items"][0]["revision"], "B", "{r}");
+    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R3", "revisions": { "Part 1": "A" } })).unwrap_err();
+    assert!(e.message.contains("Part 1"), "a revision lower than the released B: {e:?}");
+    let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0001" }));
+    let revs = rh["revisions"].as_array().unwrap();
+    assert_eq!(revs.len(), 2, "{rh}");
+    assert!(revs[0]["revision"] == "B" && revs[0]["obsolete"] == false && revs[0]["version"] == "R2", "{rh}");
+    // A stays released unless Company settings obsolete it automatically.
+    assert!(revs[1]["revision"] == "A" && revs[1]["version"] == "R1", "{rh}");
+    let all = call(&mut ctx, "release_revision_history", json!({}));
+    assert_eq!(all["packages"].as_array().unwrap().len(), 2, "{all}");
+}

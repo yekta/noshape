@@ -146,6 +146,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("part_set_appearance", &[r##"{"parts": ["Part 1"], "color": "#3b61b4"}"##, r##"{"faces": ["face:…"], "color": [200, 40, 40], "transparency": 0.3}"##]),
     ("part_remove_appearance", &[r##"{"parts": ["Part 1"]}"##]),
     ("part_appearances", &[r##"{}"##]),
+    ("release_create", &[r##"{"tab": "Part Studio 1", "name": "Release 1", "part_numbers": {"Part 1": "PRT-0001"}}"##, r##"{"tab": "Assembly 1", "name": "R2", "notes": "first build", "include_drawings": true}"##]),
+    ("release_revision_history", &[r##"{"part_number": "PRT-0001"}"##, r##"{}"##]),
     ("material_list", &[r##"{"search": "steel"}"##]),
     ("material_library_update", &[r##"{"tab": "Material Library 1", "path": "/tmp/materials.csv"}"##, r##"{"tab": "Material Library 1", "csv": "Category,Name,Density [kg/m^3]\nMetals,Brass C360,8500\n"}"##]),
     ("material_library_export", &[r##"{"tab": "Material Library 1", "path": "/tmp/materials.csv"}"##]),

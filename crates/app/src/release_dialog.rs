@@ -16,9 +16,9 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabId;
 use noshape_model::reference::BodyId;
-use noshape_model::release::{Issue, ItemKind, NumberingSchemes, Package, PackageKind, ReleaseItem, ReleaseLog};
+use noshape_model::release::{Issue, ItemKind, Package, PackageKind, ReleaseItem, ReleaseLog};
 
-pub(crate) const META_KEY: &str = "releases";
+pub(crate) const META_KEY: &str = noshape_ops::release::META_KEY;
 
 /// The configuration each Part Studio was last shown in (Add Items ›
 /// "Set to last viewed configuration").
@@ -35,88 +35,31 @@ pub(crate) fn last_viewed_config(tab: TabId) -> Option<noshape_model::configurat
 /// Company settings › Release management (release_settings.rs).
 pub use crate::release_settings::release_settings;
 
-fn numbering_path() -> std::path::PathBuf {
-    crate::files::config_dir().join("numbering_schemes.json")
-}
-
-/// Company settings › Numbering schemes.
-pub fn numbering_schemes() -> NumberingSchemes {
-    std::fs::read(numbering_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
-}
-
-pub fn set_numbering_schemes(s: &NumberingSchemes) {
-    let _ = std::fs::write(numbering_path(), serde_json::to_vec_pretty(s).unwrap_or_default());
-}
-
-/// Generates the next number of a sequential scheme (`pick` chooses the
-/// scheme and object type) and saves the advanced counter.
-pub fn next_number(pick: impl FnOnce(&mut NumberingSchemes) -> Option<String>) -> Option<String> {
-    let mut n = numbering_schemes();
-    let out = pick(&mut n)?;
-    set_numbering_schemes(&n);
-    Some(out)
-}
+pub use noshape_ops::release::{next_number, numbering_schemes, set_numbering_schemes};
 
 /// The document's release log (with the settings' revision scheme and
 /// part number uniqueness).
 pub fn release_log(doc: &DocModel) -> ReleaseLog {
-    let mut log: ReleaseLog = doc.session.store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
-    log.scheme = release_settings().scheme;
-    log.drawing_reuse = numbering_schemes().drawing_reuse;
-    log.auto_obsolete = release_settings().auto_obsolete;
-    log
+    noshape_ops::release::release_log(&doc.session)
 }
 
 fn save_log(doc: &mut DocModel, log: &ReleaseLog) -> anyhow::Result<()> {
-    doc.session.store.set_meta(META_KEY, Some(&log.to_json()))?;
-    Ok(())
+    noshape_ops::release::save_log(&mut doc.session, log)
 }
 
-/// Release items for parts of a Part Studio (their names and part numbers).
-/// `config`: the configuration of configured parts (empty: none); the
-/// name then carries it ("Part 1 (Long)").
+/// Release items for parts of a Part Studio (`noshape_ops::release::part_items`).
 pub fn part_items(doc: &DocModel, tab: TabId, parts: &[BodyId], names: &[String], config: &noshape_model::configuration::ConfigValues) -> Vec<ReleaseItem> {
-    let log = release_log(doc);
-    let studio = doc.session.doc.tab(tab).and_then(|t| match &t.content {
-        noshape_model::document::TabContent::PartStudio(ps) => Some(ps),
-        _ => None,
-    });
-    let props = studio.map(|ps| ps.part_properties.clone());
-    // Inputs excluded from properties are released at their defaults.
-    let config = &studio.map(|ps| ps.configuration.for_properties(config)).unwrap_or_else(|| config.clone());
-    let desc = studio.map(|ps| ps.configuration.describe(config)).unwrap_or_default();
-    parts
-        .iter()
-        .zip(names)
-        .map(|(b, name)| {
-            let p = props.as_ref().and_then(|p| p.get(b));
-            let pn = p.and_then(|p| p.part_number.clone()).unwrap_or_default();
-            // Release__typical_release_workflow: a part imported with a
-            // revision keeps it in its first release.
-            let nrm = p.is_some_and(|p| p.meta.not_revision_managed);
-            let imported = p.and_then(|p| p.revision.clone()).filter(|r| !r.trim().is_empty() && log.revisions(&pn).is_empty());
-            let name = if desc.is_empty() { name.clone() } else { format!("{name} ({desc})") };
-            ReleaseItem { tab, part: Some(b.clone()), name, kind: ItemKind::Part, revision: if nrm { String::new() } else { imported.unwrap_or_else(|| log.next_revision(&pn)) }, part_number: pn, not_revision_managed: nrm, reverted: false, config: if desc.is_empty() { Default::default() } else { config.clone() }, document: None }
-        })
-        .collect()
+    noshape_ops::release::part_items(&doc.session, tab, parts, names, config)
 }
 
-/// Part number of a tab item: an Assembly's Properties, otherwise the
-/// tab's metadata (store meta "tab_part_number:<id>").
+/// Part number of a tab item (`noshape_ops::release::tab_part_number`).
 pub fn tab_part_number(doc: &DocModel, tab: TabId) -> String {
-    match doc.session.doc.tab(tab).map(|t| &t.content) {
-        Some(noshape_model::document::TabContent::Assembly(a)) => a.properties.part_number.clone().unwrap_or_default(),
-        _ => doc.session.store.get_meta(&format!("tab_part_number:{}", tab.0)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default(),
-    }
+    noshape_ops::release::tab_part_number(&doc.session, tab)
 }
 
 /// The parts of a Part Studio tab (regenerated): ids and names.
 fn studio_parts(doc: &DocModel, studio: TabId, config: &noshape_model::configuration::ConfigValues) -> (Vec<BodyId>, Vec<String>) {
-    use noshape_model::regen::derived::DerivedProvider as _;
-    let provider = doc.derived_provider();
-    let ctx = if config.is_empty() { provider.context(&studio.to_string()) } else { provider.context_in(&studio.to_string(), config) };
-    let Some(ctx) = ctx else { return (Vec::new(), Vec::new()) };
-    ctx.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| (b.id.clone(), b.name.clone())).unzip()
+    noshape_ops::release::studio_parts(&*doc.derived_provider(), studio, config)
 }
 
 /// A tab's Properties › "Not revision managed" (drawings, Variable
@@ -152,95 +95,14 @@ pub fn drawing_watermark_text(doc: &DocModel, tab: TabId) -> Option<String> {
     (!text.trim().is_empty()).then(|| text.clone())
 }
 
-/// Release items for a tab (tab menu Release…; Release__typical_release_workflow):
-/// a Part Studio's parts; an Assembly and everything in its Bill of
-/// Materials (parts and subassemblies); a Drawing and the parts or
-/// assemblies its views show; a Variable Studio or file itself.
+/// Release items for a tab (tab menu Release…; `noshape_ops::release::tab_items`).
 pub fn tab_items(doc: &DocModel, tab: TabId) -> Vec<ReleaseItem> {
-    use noshape_model::document::TabContent;
-    let log = release_log(doc);
-    let mut out: Vec<ReleaseItem> = Vec::new();
-    fn push(out: &mut Vec<ReleaseItem>, items: Vec<ReleaseItem>) {
-        for it in items {
-            if !out.iter().any(|o| o.same_object(&it)) {
-                out.push(it);
-            }
-        }
-    }
-    let tab_item = |t: TabId, kind: ItemKind| {
-        let name = doc.session.doc.tab(t).map(|x| x.name.clone()).unwrap_or_default();
-        let pn = tab_part_number(doc, t);
-        ReleaseItem { tab: t, part: None, name, kind, revision: log.next_revision(&pn), part_number: pn, not_revision_managed: false, reverted: false, config: Default::default(), document: None }
-    };
-    let all_parts = |studio: TabId, config: &noshape_model::configuration::ConfigValues| {
-        let (ids, names) = studio_parts(doc, studio, config);
-        part_items(doc, studio, &ids, &names, config)
-    };
-    let one_part = |studio: TabId, b: &BodyId, config: &noshape_model::configuration::ConfigValues| {
-        let (ids, names) = studio_parts(doc, studio, config);
-        let name = ids.iter().position(|x| x == b).map(|i| names[i].clone()).unwrap_or_else(|| "Part".into());
-        part_items(doc, studio, std::slice::from_ref(b), &[name], config)
-    };
-    // Assemblies recurse into their subassemblies (guarded against cycles).
-    fn assembly(doc: &DocModel, a: TabId, seen: &mut Vec<TabId>, out: &mut Vec<ReleaseItem>, tab_item: &dyn Fn(TabId, ItemKind) -> ReleaseItem, all_parts: &dyn Fn(TabId, &noshape_model::configuration::ConfigValues) -> Vec<ReleaseItem>, one_part: &dyn Fn(TabId, &BodyId, &noshape_model::configuration::ConfigValues) -> Vec<ReleaseItem>) {
-        use noshape_model::assembly::InstanceSource;
-        if seen.contains(&a) {
-            return;
-        }
-        seen.push(a);
-        push(out, vec![tab_item(a, ItemKind::Assembly)]);
-        let Some(noshape_model::document::TabContent::Assembly(asm)) = doc.session.doc.tab(a).map(|t| &t.content) else { return };
-        for inst in &asm.instances {
-            match &inst.source {
-                // Only the configurations the assembly uses (Help: Releasing a configuration).
-                InstanceSource::Part { studio, body, config } => push(out, one_part(*studio, body, config)),
-                InstanceSource::PartStudio { studio, config } => push(out, all_parts(*studio, config)),
-                InstanceSource::Assembly { assembly: sub, .. } => assembly(doc, *sub, seen, out, tab_item, all_parts, one_part),
-                _ => {}
-            }
-        }
-    }
-    match doc.session.doc.tab(tab).map(|t| &t.content) {
-        Some(TabContent::PartStudio(_)) => push(&mut out, all_parts(tab, &Default::default())),
-        Some(TabContent::Assembly(_)) => assembly(doc, tab, &mut Vec::new(), &mut out, &tab_item, &all_parts, &one_part),
-        Some(TabContent::Drawing(d)) => {
-            push(&mut out, vec![tab_item(tab, ItemKind::Drawing)]);
-            for sheet in &d.sheets {
-                for v in &sheet.views {
-                    let noshape_model::drawing::ViewKind::Base { source, part, config, .. } = &v.kind else { continue };
-                    match (doc.session.doc.tab(*source).map(|t| &t.content), part) {
-                        (Some(TabContent::Assembly(_)), _) => push(&mut out, vec![tab_item(*source, ItemKind::Assembly)]),
-                        (Some(TabContent::PartStudio(_)), Some(b)) => push(&mut out, one_part(*source, b, config)),
-                        (Some(TabContent::PartStudio(_)), None) => push(&mut out, all_parts(*source, config)),
-                        _ => {}
-                    }
-                }
-            }
-        }
-        Some(TabContent::VariableStudio(_)) => push(&mut out, vec![tab_item(tab, ItemKind::VariableStudio)]),
-        Some(TabContent::File(_)) => push(&mut out, vec![tab_item(tab, ItemKind::File)]),
-        _ => {}
-    }
-    out
+    noshape_ops::release::tab_items(&doc.session, &*doc.derived_provider(), tab)
 }
 
-/// Drawings of the document showing any of `items` (Include associated
-/// drawings): a drawing whose base views show the item's part, Part Studio
-/// or Assembly.
+/// Drawings of the document showing any of `items` (Include associated drawings).
 fn associated_drawings(doc: &DocModel, items: &[ReleaseItem]) -> Vec<ReleaseItem> {
-    use noshape_model::document::TabContent;
-    let mut out = Vec::new();
-    for t in doc.session.doc.ordered_tabs() {
-        let TabContent::Drawing(d) = &t.content else { continue };
-        let shows = d.sheets.iter().flat_map(|s| s.views.iter()).any(|v| match &v.kind {
-            noshape_model::drawing::ViewKind::Base { source, part, .. } => items.iter().any(|it| it.tab == *source && (part.is_none() || it.part.is_none() || it.part == *part)),
-            _ => false,
-        });
-        if shows {
-            out.extend(tab_items(doc, t.id).into_iter().filter(|i| i.kind == ItemKind::Drawing));
-        }
-    }
-    out
+    noshape_ops::release::associated_drawings(&doc.session, &*doc.derived_provider(), items)
 }
 
 /// "Add Items to Release" (help add-item-to-release-01.png): the current
@@ -1103,7 +965,7 @@ impl ReleaseDialog {
             }
         }));
         let numbering = numbering_schemes();
-        let conditions = if mode == Mode::Release { crate::release_conditions::condition_issues(doc.read(cx), &rows.iter().map(|r| r.item.clone()).collect::<Vec<_>>()) } else { Vec::new() };
+        let conditions = if mode == Mode::Release { crate::release_conditions::condition_issues(&doc.read(cx).session, &rows.iter().map(|r| r.item.clone()).collect::<Vec<_>>()) } else { Vec::new() };
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search"));
         subs.push(cx.subscribe_in(&search, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change) {
@@ -1350,7 +1212,7 @@ impl ReleaseDialog {
             row.item = it;
         }
         if self.mode == Mode::Release {
-            self.conditions = crate::release_conditions::condition_issues(self.doc.read(cx), &self.items(cx));
+            self.conditions = crate::release_conditions::condition_issues(&self.doc.read(cx).session, &self.items(cx));
         }
         // The pictures show the refreshed items.
         self.thumbs.clear();
@@ -1422,69 +1284,16 @@ impl ReleaseDialog {
     /// Release (or Obsolete): record the package at a new version.
     fn commit(&mut self, cx: &mut Context<Self>) -> bool {
         let kind = if self.mode == Mode::Obsolete { PackageKind::Obsoletion } else { PackageKind::Release };
-        let mut pkg = self.package(kind, cx);
+        let pkg = self.package(kind, cx);
         if pkg.name.is_empty() || (kind == PackageKind::Obsoletion && pkg.notes.trim().is_empty()) || self.issues(cx).iter().any(|v| !v.is_empty()) {
             cx.notify();
             return false;
         }
         let r = self.doc.update(cx, |doc, cx| -> anyhow::Result<()> {
-            // The part numbers go onto the parts (one change per Part Studio).
-            if kind == PackageKind::Release {
-                // Items linked from versions keep theirs (versions don't change).
-                let mut tabs: Vec<TabId> = pkg.items.iter().filter(|i| i.document.is_none()).map(|i| i.tab).collect();
-                tabs.dedup();
-                for tab in tabs {
-                    let items: Vec<ReleaseItem> = pkg.items.iter().filter(|i| i.tab == tab && i.part.is_some() && i.document.is_none()).cloned().collect();
-                    let changed = doc.session.doc.tab(tab).is_some_and(|t| match &t.content {
-                        noshape_model::document::TabContent::PartStudio(ps) => items.iter().any(|i| i.part.as_ref().and_then(|b| ps.part_properties.get(b)).and_then(|p| p.part_number.as_deref()) != Some(i.part_number.as_str())),
-                        _ => false,
-                    });
-                    if changed {
-                        doc.edit_studio(tab, &format!("Release {}", pkg.name), cx, |ps| {
-                            for i in &items {
-                                if let Some(b) = &i.part {
-                                    ps.part_properties.entry(b.clone()).or_default().part_number = Some(i.part_number.clone());
-                                }
-                            }
-                        });
-                    }
-                }
-            }
-            // Tab items keep their part numbers: an Assembly in its
-            // Properties, other tabs in their metadata.
-            if kind == PackageKind::Release {
-                for i in pkg.items.iter().filter(|i| i.part.is_none() && i.document.is_none()) {
-                    if tab_part_number(doc, i.tab) == i.part_number {
-                        continue;
-                    }
-                    let is_assembly = matches!(doc.session.doc.tab(i.tab).map(|t| &t.content), Some(noshape_model::document::TabContent::Assembly(_)));
-                    if is_assembly {
-                        let pn = i.part_number.clone();
-                        doc.edit_tab(i.tab, &format!("Release {}", pkg.name), cx, |c| {
-                            if let noshape_model::document::TabContent::Assembly(a) = c {
-                                a.properties.part_number = Some(pn);
-                            }
-                        });
-                    } else {
-                        doc.session.store.set_meta(&format!("tab_part_number:{}", i.tab.0), Some(i.part_number.as_bytes()))?;
-                    }
-                }
-            }
-            // An obsoletion marks the version of the release it obsoletes;
-            // a release creates a version named after it.
-            let released_at = (kind == PackageKind::Obsoletion).then(|| release_log(doc)).and_then(|log| pkg.items.iter().find_map(|i| log.release_version_of(&i.part_number, &i.revision)));
-            pkg.version = Some(match released_at {
-                Some(v) => v,
-                None => doc.session.create_version(&pkg.name, &pkg.notes)?.to_string(),
-            });
-            if kind == PackageKind::Release {
-                add_source::mark_linked_versions(&pkg)?;
-            }
-            let mut log = release_log(doc);
-            log.record(pkg);
-            save_log(doc, &log)?;
+            // As the agent API's release_create (noshape_ops::release::commit).
+            let r = noshape_ops::release::commit(&mut doc.session, pkg);
             doc.reloaded(cx);
-            Ok(())
+            r.map(|_| ())
         });
         if let Err(e) = r {
             self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));

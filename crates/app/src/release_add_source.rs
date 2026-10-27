@@ -193,24 +193,6 @@ pub(super) fn linked_snapshot(doc: &DocModel, item: &ReleaseItem) -> Option<Arc<
 /// Record a release in the linked documents' logs: "the version in the
 /// linked document will also be marked as Released and the Release
 /// attached to the version will be the one from the current document".
-pub(super) fn mark_linked_versions(pkg: &noshape_model::release::Package) -> anyhow::Result<()> {
-    let mut groups: Vec<(String, String)> = pkg.items.iter().filter(|i| !i.reverted).filter_map(|i| i.document.as_ref().filter(|l| !l.path.is_empty()).map(|l| (l.path.clone(), l.version.clone()))).collect();
-    groups.sort();
-    groups.dedup();
-    let mut paths: Vec<String> = groups.iter().map(|(p, _)| p.clone()).collect();
-    paths.dedup();
-    for path in paths {
-        let mut store = noshape_store::Document::open(&path)?;
-        let mut log = store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
-        for (_, v) in groups.iter().filter(|(p, _)| *p == path) {
-            let items: Vec<ReleaseItem> = pkg.items.iter().filter(|i| !i.reverted && i.document.as_ref().is_some_and(|l| l.path == path && l.version == *v)).map(|i| ReleaseItem { document: None, ..i.clone() }).collect();
-            log.record(noshape_model::release::Package { items, version: Some(v.clone()), ..pkg.clone() });
-        }
-        store.set_meta(META_KEY, Some(&log.to_json()))?;
-    }
-    Ok(())
-}
-
 impl AddItemsDialog {
     /// The rows of the chosen type at the source's version.
     pub(super) fn source_entries(&self, kind: usize, matches: &dyn Fn(&str) -> bool, cx: &App) -> Vec<Entry> {

@@ -327,6 +327,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
+- **release**: [`release_create`](#release_create), [`release_revision_history`](#release_revision_history)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
@@ -5961,6 +5962,50 @@ Examples:
 | `part` | string | required | The sheet metal part (`body:…` id or name). |
 | `file` | string | required | Where to write it. |
 | `format` | one of `DXF`, `SVG` |  | File format. |
+
+### release
+
+#### release_create
+
+Release a tab or parts: part numbers, revisions, a version named after the release (edits the document (one undoable history entry)).
+
+Release… (a tab's menu, or a part's): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). The dialog's checks refuse it with their messages (a part number missing, a revision too low, Company settings' release conditions). Releasing writes the part numbers onto the parts ("Release <name>"), records the release at a new version named `name`; with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.
+
+Examples:
+
+```json
+{"tab": "Part Studio 1", "name": "Release 1", "part_numbers": {"Part 1": "PRT-0001"}}
+{"tab": "Assembly 1", "name": "R2", "notes": "first build", "include_drawings": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | The tab to release (name or id). |
+| `parts` | array of string |  | Part Studio: only these parts (ids or names). |
+| `name` | string | required | Release name (the version's name). |
+| `notes` | string |  | Release notes (the version's description). |
+| `part_numbers` | object |  | {item name or part id: part number}. |
+| `revisions` | object |  | {item name or part id: revision}. |
+| `include_drawings` | boolean |  | Include associated drawings. |
+
+#### release_revision_history
+
+A part number's revisions: release, version, state.
+
+Revision history (a released part's or tab's menu): the part number's revisions, newest first, each with its release's name and time, the version it was released at, the item type, and whether it is obsolete (by an obsoletion, or by a later revision). Without `part_number`, the release log's packages.
+
+Examples:
+
+```json
+{"part_number": "PRT-0001"}
+{}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `part_number` | string |  | The part number. |
 
 ### render
 
