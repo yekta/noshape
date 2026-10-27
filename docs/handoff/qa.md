@@ -203,6 +203,10 @@ in Extrude's regions field picks the face), ORD-BASE.
   (+ Ctrl+Shift+F search panel), Performance and Document notes panels, help menu, start page (logo), user menu,
   Preferences window. Compare after the next green. New: FS-EDITOR-COMPLETE (P2). Main's Cargo version is still 0.4.6
   (start page footer "0.4.6.e8858e61fb4d"); only the release branch bumps it.
+- Configurations (CLI 09:50; bin/cfgmatrix.py, cfgasm*.py, cfgbom.py, vstest.py): Part Studio List × Checkbox ×
+  config Variable 8 / 8 exact; Variable Studio list-configured #boss inserted by name or id right; the "Insert into all"
+  refusal message matches live. New: API-ASM-CONFIG-NAMES (P2 dx: assembly_insert / set_configuration / drawing_create
+  ignore inputs given by name), CONFIG-INPUT-ID (P3 psui). The app's Change configuration… dialog is right.
 - Fuzz: batch 9 (seeds 120–127, watcher CLI 08:30): seed 120 hit the 1500 s timeout again (the BUDGET-LONGJMP malloc
   deadlock seed), 121–127 clean. Budget A/B (seeds 130–137, CLI 09:50, on vs NOSHAPE_BLEND_BUDGET=100000): 130 clean on
   both; still running (~23 min a seed). Cold-open fuzz 140–141 consistent.
