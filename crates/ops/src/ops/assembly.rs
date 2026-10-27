@@ -780,6 +780,12 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // land at t (0,0,−30), the connectors coincident).
     if editing.is_none() && opts.only_mate.is_some() {
         opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m));
+        // Two free parts: the one live keeps in place (the dialog's rule).
+        if opts.hold.len() == 1 && m.mate_type != MateType::Width {
+            let units = od.doc().settings.units;
+            let current = od.evaluate_assembly(tab, &sa::effective(&asm, &asm.configuration.defaults()), &SolveOptions::default());
+            opts.hold = vec![noshape_model::assembly::eval::new_mate_stays(&current, &m, &units)];
+        }
     }
     let solved = od.evaluate_assembly(tab, &preview, &opts);
     let ok = solved.mates.iter().find(|s| s.id == id).map(|s| (s.ok, s.message.clone()));

@@ -143,3 +143,40 @@ fn width_mate_solves_in_any_face_order() {
         let _ = std::fs::remove_file(&path);
     }
 }
+
+/// Live (behaviours "skasm (2026-10-27) follow-up: which part moves with
+/// nothing fixed"): a new mate between two free parts moves one of them,
+/// never both. Without a flip the smaller part (the pin) moves, whichever
+/// connector was picked first; the plate keeps its placement exactly.
+#[test]
+fn new_mate_between_free_parts_moves_the_smaller_one() {
+    for plate_first in [false, true] {
+        let dir = std::env::temp_dir().join(format!("noshape-free-mate-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(format!("free-{plate_first}.noshape"));
+        let _ = std::fs::remove_file(&path);
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        studio(&mut ctx, "Part Studio 1", json!({ "tool": "corner_rectangle", "points": [[-50, -30], [50, 30]] }), "10 mm");
+        call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "pin" }));
+        studio(&mut ctx, "pin", json!({ "tool": "circle", "points": [[0, 0], [5, 0]] }), "40 mm");
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "pin", "part": "Part 1" }));
+        call(&mut ctx, "assembly_transform", json!({ "instance": "Part 1 <1>", "translation": [5, -7, 3] }));
+        call(&mut ctx, "assembly_transform", json!({ "instance": "Part 1 <2>", "translation": [80, 0, 0] }));
+        // The pin's bottom face on the plate's top face: the Zs are opposed already.
+        let pin = json!({ "instance": "Part 1 <2>", "entity": face(&mut ctx, "Part 1 <2>", [0.0, 0.0, -1.0]), "inference": "centroid" });
+        let plate = json!({ "instance": "Part 1 <1>", "entity": face(&mut ctx, "Part 1 <1>", [0.0, 0.0, 1.0]), "inference": "centroid" });
+        let (a, b) = if plate_first { (plate, pin) } else { (pin, plate) };
+        call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": a, "b": b }));
+        let list = call(&mut ctx, "assembly_list", json!({}));
+        let t = |name: &str| -> [f64; 3] {
+            let i = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == name).unwrap();
+            let v: Vec<f64> = i["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+            [v[0], v[1], v[2]]
+        };
+        assert!(near(t("Part 1 <1>"), [5.0, -7.0, 3.0], 1e-9), "plate first {plate_first}: the plate moved to {:?}", t("Part 1 <1>"));
+        assert!(near(t("Part 1 <2>"), [5.0, -7.0, 13.0], 1e-6), "plate first {plate_first}: the pin at {:?}", t("Part 1 <2>"));
+        let _ = std::fs::remove_file(&path);
+    }
+}

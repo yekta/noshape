@@ -680,10 +680,12 @@ impl AssemblyView {
             && let Some(m) = s.dialog.read(cx).to_mate(cx)
         {
             let fixed = |id: InstanceId| asm.instance(id).is_some_and(|i| i.fixed);
-            // The second connector's instance stays put unless the first is fixed
-            // (until Solve solves every mate).
+            // One of two free parts stays put (until Solve solves every
+            // mate): for a new mate the one live keeps (`new_mate_stays`),
+            // else the second connector's.
             if !s.solve_all && !fixed(m.a.instance) && !fixed(m.b.instance) {
-                opts.hold.push(m.b.instance);
+                let stays = if s.editing.is_none() && m.mate_type != MateType::Width { noshape_model::assembly::eval::new_mate_stays(&self.result, &m, &self.units(cx)) } else { m.b.instance };
+                opts.hold.push(stays);
             }
             // Until Solve only this mate is solved (help: Mates), so instances
             // mated to the moving one stay where they are.

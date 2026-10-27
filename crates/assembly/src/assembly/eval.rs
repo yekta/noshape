@@ -1240,6 +1240,35 @@ pub fn limit_keys(t: MateType) -> &'static [&'static str] {
     }
 }
 
+/// The part that stays put when a new mate joins two free parts (live,
+/// behaviours "skasm (2026-10-27) follow-up: which part moves with nothing
+/// fixed"; one part moves, never both). Connector Zs exactly the wrong way
+/// round (an axial mate turns one part over): the first connector's part
+/// turns when the common Z's first non-zero coordinate is negative, else
+/// the second's. Otherwise the smaller part moves; between parts of one
+/// size the one whose connector Z points to the negative side.
+pub fn new_mate_stays(result: &AssemblyResult, m: &super::Mate, units: &UnitPrefs) -> InstanceId {
+    let (a, b) = (m.a.instance, m.b.instance);
+    let (Some(fa), Some(fb)) = (result.connector_world(&m.a, units), result.connector_world(&m.b, units)) else { return b };
+    let (za, zb) = (fa.z(), fb.z());
+    let negative = |v: DVec3| v.to_array().into_iter().find(|c| c.abs() > 1e-9).unwrap_or(0.0) < 0.0;
+    // Internal flip_primary true: the Z axes aligned (else opposed).
+    let wanted = if m.flip_primary { 1.0 } else { -1.0 };
+    let axial = matches!(m.mate_type, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel);
+    if axial && (za.dot(zb) + wanted).abs() < 1e-9 {
+        return if negative(za) { b } else { a };
+    }
+    let size = |id: InstanceId| result.instance_bounds(id).map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.0);
+    let (sa, sb) = (size(a), size(b));
+    if (sa - sb).abs() > 1e-9 * sa.max(sb) {
+        return if sa < sb { b } else { a };
+    }
+    if negative(za) != negative(zb) {
+        return if negative(za) { b } else { a };
+    }
+    b
+}
+
 /// A new mate's preview holds: every free value at zero, so the moving
 /// instance lands with its mate connector on the other one (Onshape brings
 /// the connectors together; qa5 A4: a flipped Slider turns the block over
