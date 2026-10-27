@@ -57,7 +57,11 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (none: the branch equals main)
 
 ## Next, in order
-Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs done). Assembly P2:
+Sketch P1: value boxes right after drawing: where live puts them differs from ours (center circle: live opposite the
+rim click, ours upper right; 3 point circle: live below; rectangle height box after Enter: two live samples, no rule
+yet). Samples in behaviours "skasm (2026-10-27) sketch value boxes right after drawing"; asked live for a
+systematic set (REQUESTS 10-27); implement the rule once it lands (scene sketch_mode.rs `diameter_field` /
+`length_field` labels). Otherwise parity/sketch.md all ✅. Assembly P2:
 1. docs/parity/workflow-assembly-sweep.md: all rows ✅ 10-27 (34 left UNCONFIRMED: the 2° snap window). Filed
    PS-SECTION-RED for psui (Part Studio caps red where parts overlap; live only in the assembly). GUI docs:
    /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins), asm2 (a pin through the plate), ps2 (Part Studio overlap).
