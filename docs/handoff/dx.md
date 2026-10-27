@@ -73,6 +73,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Agent benchmark 10-27: part → ISO A3 drawing with suggested views → 80 and Ø16 dimensions → note → Selectable PDF in
   1.2 s through the API (/root/dx-scratch/w/py/bench_dwg.py); pdftotext reads every label.
 
+## Paused 10-27 ~09:50 (lead: app split first)
+- Landed since the morning handoff: 7b947277 P1 UNDO-NOOP-SHIFT (store: a no-op commit kept the previous undo step);
+  b305c5ca API-MATE-RETYPE-NAME; 56c1ee31 Selectable PDF fonts named as live's (AAAAAA+NotoSans); ba3f2c5e
+  DWG-DIM-TWO-EDGES (edge-only drawing tools hit-test edges under annotations; API line_to_line fixed, app half to
+  re-check on the next green); b8f58d5b the crash-marker test isolated (Session::open_with_markers; main was red).
+- WIP, not on main: 451426ba on origin agent/dx (also /root/dx-scratch/cfgcell.patch): CONFIG-CELL-EDIT, the
+  configuration table's value cells as live (behaviours "qa (2026-10-27, P2 batch 2)" (6)): click frames, typing
+  replaces, double-click edits with the value selected, Esc unframes. In crates/app/src/part_studio/ (frozen for the
+  split): rebase it onto the moved files when the lead resumes, build the app, check it in the window, land.
+- Waiting on live: I1 per-face areas (REQUESTS dx 10-27 I1), flat-pattern line styles (REQUESTS dx 10-27 P3).
+
 ## Daily walk 10-27 03:40 (green 8165fca6, :131, /root/dx-scratch/w/o*.png)
 - No regressions in my area. Open of a truncated file: the error bubble stays (OPEN-ERROR-SILENT verified). Drawing
   from ISO A3 suggested views: first-angle layout, hole centre mark; Export › PDF: 1.5, A3 landscape, 5 layers, Flate,
