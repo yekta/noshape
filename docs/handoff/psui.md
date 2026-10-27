@@ -95,9 +95,9 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 
 | target | goal | current (where measured) |
 |---|---|---|
-| orbit / pan / zoom, NIST assembly at Retina | 120 fps | presented 30.5–31.3 fps on the paravirtual macOS runners (their timer caps it; perf.yml 40493040035, v0.4.10, 1194×794 device px, not Retina); UI CPU p95 0.4–0.9 ms; GPU time not reported on Metal (no timestamps) |
-| cold start to first frame | ≤ 1 s | Metal shader cache cleared: 1.34–2.09 s (pipelines 0.50–0.98 s); warm cache 0.48–0.83 s; a job's first launch 2.5–3.4 s (runs 40421880164 / 40421862773) |
-| open a document | ≤ 0.5 s | app to document window 0.34–0.55 s + window to first frame 0.55–0.95 s cold (viewport-performance.md 10-26) |
+| orbit / pan / zoom, NIST assembly at Retina | 120 fps | v0.4.11 (perf.yml 40528877198, macOS 14, 2388×1588 device px, frame-driven): presented 76.7 / 73.6 / 64.9 fps, UI CPU p95 0.35 / 0.33 / 0.37 ms; GPU time not reported on Metal (r.done_ms lands with ab488e30, after v0.4.11). At 1× the runner presents ~30 fps (its timer) |
+| cold start to first frame | ≤ 1 s | v0.4.11: the job's first launch 1356 ms (OS first run: gpui_kit::init 285 ms vs 20 warm; the held shader compile 421 ms starts at the first window draw, 784 ms); warm launches 276–385 ms ✓. COLD=1 run 40526882894 (Metal shader cache cleared each launch) pending |
+| open a document | ≤ 0.5 s | v0.4.11 warm: opening → first viewport frame 130–200 ms ✓; first launch 800 ms |
 
 ## In progress
 
