@@ -466,7 +466,6 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:This target", Op("drawing_annotation_edit")),
     ("drawing:Unmerge cells", Op("drawing_table_edit")),
     ("drawing:Unpin view reference", Op("drawing_view_edit")),
-    ("drawing:Unsplit table", Op("drawing_table_edit")),
     ("drawing:Vertical break lines", Op("drawing_break_view")),
     ("drawing:Vertical to...", Op("drawing_view_edit")),
     ("drawing:Vertically", Op("drawing_view_edit")),
