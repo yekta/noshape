@@ -637,6 +637,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (tickets/curve-analysis-over-extrude.png). Either the panel must be opaque or the analysis tool must replace the feature dialog as live
   does for tool switches (live: Shift+E with a dialog open replaces it, behaviours 7371) (qa 2026-10-26, build 4d2f6b0c)
 
+- [ ] reopened (qa 11:58, green e8858e61 and watcher build 0a25dd1a): the red is gone, but the overlap now renders as a
+  **hole**: ps2.noshape › Section view › Front › ✓: where the pin passes through the block, the cap is blank white with
+  the Top plane's line showing through it (parity of 2 parts reads as "outside"); live hatches the overlap grey
+  (behaviours "skb (10-24) assembly section" (5)). tickets/ps-section-overlap-white-green.png, ps-section-green.png
 - [x] c93f34b4 P2 PS-SECTION-RED fixed (psui 10-27): `Scene::section_interference` (assemblies only) gates the red overlap in the cap shader; offscreen test overlapping_caps_are_red_only_in_assemblies. Was: Part Studio section caps fill overlapping parts' material solid red; live's Part Studio doesn't
   (behaviours "skb (10-24) assembly section" (5): "overlapping parts' caps are grey-hatched with no red overlap fill";
   only the assembly shows the red interference, part-studio/2406–2414). Repro: /root/skasm-scratch/qa/ps2.noshape (block
@@ -668,7 +672,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   original (prompt "Pasted; drag or transform the selection into place"); live (behaviours "qa (2026-10-26, P2 sketch)")
   pastes it centred on the pointer, selected, with the sketch Transform tool active and its manipulator on the copy, no
   prompt; the Ø dimension is pasted too (as ours) (qa 2026-10-26, build 4d2f6b0c)
-- [x] 5c94bb51 P2 P1-4 data (qa5, carried over) sketches keep a hidden construction "Origin stand-in" point at (0,0) carrying the
+- [x] verified CLI 09:50 (qa 11:58: center rectangle on Top: sketch_get lists 4 points + 4 lines, no hidden point; its Midpoint constraints name "origin") 5c94bb51 P2 P1-4 data (qa5, carried over) sketches keep a hidden construction "Origin stand-in" point at (0,0) carrying the
   Horizontal/Vertical constraints (sketch_get lists it); live constrains to the external Origin (qa5 2026-10-26)
   skasm 10-26: fixed on main since 5c94bb51 (in green 4d2f6b0c): sketch_get leaves reference-only geometry out and a
   constraint names its reference ("origin"); e2e `sketch_get_names_the_origin_not_a_hidden_point`. The stored point is
