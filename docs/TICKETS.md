@@ -239,7 +239,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P0 REGEN-NO-CANCEL a newer regeneration waits for a stale one instead of cancelling it: open a copy of
+- [x] c0bbde51 P0 REGEN-NO-CANCEL fixed (psui 10-27): a newer run that evaluates fewer features (the rollback bar above the running feature, a dialog on an earlier feature) aborts the running one; its finished features stay cached, so the rollback shows at once (app on cli-fillet-hang.noshape: 0 ms, 7 cached, while Fillet 2 ran). Was: a newer regeneration waits for a stale one instead of cancelling it: open a copy of
   /root/qa-scratch/tickets/cli-fillet-hang.noshape in green 502416cc (NOSHAPE_PERF=1); while the opening regen is still
   in Fillet 2 (it fails after the 30 s blend budget), drag the rollback bar above Fillet 2: schedule_regen #2 at 05:16:57,
   but its result (7 features, all cached, 1 ms) only arrives at 05:17:30, when Fillet 2's budget ran out; the spinner

@@ -30,14 +30,17 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   runs (6.10 / 6.11, model-core `filter_row`), Shift+wheel ±10 (5.22), the active tool clicked again keeps its
   dialog (4.4); Roboto Bold Italic. Checked: clippy (4 crates), interaction / quantity_field / ops list tests, T0.
   Verified against live on :102 also: 1.12, 6.6, 7.4, 9.2, 9.6, 6.28.
+- 10-27 05:40–06:25: bac382a7 highlight from Onshape's orthographic eye (offscreen test against live), box select
+  without part vertices, "Recently used" tool search, parts-list related rows, Shift+I clears the selection;
+  bd5ce252 Dihedral panel as live; b6f189d2 no pre-highlight during a box drag (the stray midpoint ring); 5b54b73d a
+  hovered selected edge as live; c0bbde51 REGEN-NO-CANCEL (P0, model-core regen::runs: a newer run needing fewer
+  features aborts the running one).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
-## In progress (10-27 05:35)
+## In progress
 
-check14 (clippy render + app, offscreen + box_select tests, T0) on the second batch (commit after 54ffeab7):
-Onshape's orthographic eye for the highlight, box select without part vertices, "Recently used" tool search,
-parts-list related rows, Shift+I clears the selection. Land it when check14 is green.
+(nothing unlanded)
 
 Residuals found today: live outlines the Delete part ghost (255,192,76) (ours none); a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
