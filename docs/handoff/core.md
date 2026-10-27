@@ -73,6 +73,13 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   Also fixed there: BudgetHold / blend_budget_seconds were declared only on Linux but used everywhere since cb84d673:
   macOS and Windows don't build between cb84d673 and 9f7459f9.
 
+- add45a95 (land.sh) Windows CI green (run 40493410580 on core/win-ci): std::terminate inside a guarded call longjmps
+  back (seh.cpp; an SEH exception raised from the handler can't get out: ucrt's terminate() wraps it in __except, then
+  aborts, 0xc0000409); NOSHAPE_BOP_PARALLEL goes from Rust to C++ like the memory budget (Windows' CRT getenv doesn't see
+  set_var). BUDGET-LONGJMP: the budget's tick jumps only when the interrupted PC is in the executable's own text
+  (`in_own_code`, common.cpp), so never out of malloc/free. classify_point keeps its loaded classifier on the shape.
+  NOSHAPE_KERNEL_PROFILE=cpu: kernel profile in thread CPU time (use it on this loaded machine).
+
 - a01dca62 Hole add speed: line_crossings keeps OCCT's loaded line intersector on the shape. Left in std's hole probe:
   min_distance (~140 calls, ~0.8 ms each, BRepExtrema rebuilt per call).
 
@@ -96,15 +103,6 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - Side faces of an extrude: x = the direction of its bottom (sketch) edge; check ours.
 - SHELL-SLOW: live shells qa's plates in 4–7 ms of server time; our slabs take 1–3 s (serial booleans). Needs a
   different construction for prismatic parts (by_regions extended to holes / collapsing fillets), not tuning.
-
-## Paused 10-27 ~09:50 (lead's order; app split)
-- Everything landed (last 2b0ad117); no WIP, no builds running.
-- Open: WIN-CRASH-GUARD's CI check, run 40481396224 (dispatched on main at 9f7459f9; Linux / Windows / macOS were
-  still building at the pause). On resume: `gh run view 40481396224`; if Windows fails to compile, the code is in
-  cpp/seh.cpp and the `_MSC_VER` branches of noshape_occt.hpp (trycatch_timed, run_guarded).
-- REGEN-SPEED state: probe edit commit ~205 ms median in a dev build at load ~35 (510 ms this morning). Tried and
-  dropped: OBB filtering for all booleans (no gain). Next idea: display meshing `mesh_prepare` ~46 ms a commit
-  (mesh.cpp; BRepMesh over the whole part each time).
 
 ## Next, in order
 1. P0 REGEN-SPEED (open): per regeneration ~15 ms per boolean (OCCT build), fillet/chamfer ~10 ms + ~6 ms check, the
@@ -136,8 +134,8 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   "pipeline compil" thread faulting in libvulkan 10 min earlier: ops' GPU test `hidden_edges::edges_behind_fins_stay_hidden`
   (renderer, not mine) crashing in the Vulkan loader/driver, intermittently (1 in 3 runs under gdb here). The DOC-POISON
   session test failing in the same run looks like a consequence (a dead test process's crash markers); dx's.
-- macOS / Windows don't compile on main between cb84d673 and 9f7459f9 (my Linux-only declarations, fixed in
-  9f7459f9): don't take a last-green from that window into a release; CI run 40481396224 checks 9f7459f9.
+- macOS / Windows don't compile on main between cb84d673 and 9f7459f9 (fixed in 9f7459f9); Windows T1 green from
+  add45a95 on (crash guard + boolean_budget). Don't release from before add45a95.
 - Forward-oriented edges (kern's proposal, P0 class: EdgeInfo.start/end follow a reversed edge but its parameters,
   tangents and circle frame don't, and many callers pair them): handing every edge out FORWARD (common.cpp
   `sub_shape`/`sub_shapes`, patch in /root/core-scratch/forward-edges.patch) passes every kernel, model, model-core,

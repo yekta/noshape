@@ -56,7 +56,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   side 6616.0612 (6616.0459), A3 symmetric 6948.9371 (6948.9073, +4.3e-6), A4 5°/10° 7312.7271 (7312.6950, +4.4e-6).
   Shows at 3 decimals in Mass properties; live's drafted faces are exact ruled B-splines (deg 1 × 3, 2 × 66 poles)
   (qa 2026-10-27)
-- [ ] P0 BUDGET-LONGJMP the CPU budgets (97081557 blends, a117663d drafts / face deletion) jump out of OCCT with
+- [x] add45a95 (core: the budget only jumps when the interrupted instruction is the program's own code (OCCT and the bridge are static), never inside a shared library: malloc / free, libstdc++, libm, the loader; the next tick 100 ms later. Kernel test a_budget_never_stops_a_call_inside_the_allocator: the old jump deadlocked 2 of 5 runs. Still a jump: an OCCT-internal lock held by a frame above the interrupted one would stay held (none known in budgeted ops). qa: please re-run seeds 120 / 131 and the seed-72 replay) P0 BUDGET-LONGJMP the CPU budgets (97081557 blends, a117663d drafts / face deletion) jump out of OCCT with
   `siglongjmp` from a timer-signal handler (crates/kernel/cpp/common.cpp `on_budget_tick`, SIGRTMIN+3 on a
   CLOCK_THREAD_CPUTIME_ID timer, SA_RESTART); the jump can land inside malloc/free or any non-reentrant OCCT state.
   Seen: fuzz seed 120 on the watcher CLI 08:30 **deadlocked** at step 28 (feature_suppress → ops regen_report →
@@ -76,7 +76,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   1500 s timeout) after the budget had cut a Shell at step 50; budget off, the same Shell at step 50 ran unbounded
   for > 20 min (killed at 2400 s), so the "off" arm can't reach the later steps and the A/B can't separate the two
   causes. 130 and 132 clean both ways. Logs /root/qa-scratch/cli/clifuzz-13{0,1,2}{on,off}.log.
-- [ ] P1 WIN-CRASH-GUARD the kernel crash guard (common.cpp, sigsetjmp/sigaction) is POSIX-only: on Windows a crash inside
+- [x] add45a95 (core: verified on Windows CI run 40493410580: crash_inputs incl. fillet-blend-segv and all four crash kinds return; std::terminate comes back by longjmp, the C runtime runs terminate handlers under its own __except) P1 WIN-CRASH-GUARD the kernel crash guard (common.cpp, sigsetjmp/sigaction) is POSIX-only: on Windows a crash inside
   OCCT (e.g. kernel/tests/data/crash/fillet-blend-segv, FILLET-SEGV-BLEND) still kills the process (the release/v0.4.9
   CI run 40469839948 died with STATUS_ACCESS_VIOLATION in crash_inputs; that test is now cfg(unix)). Add the Windows
   equivalent (SEH: __try/__except around the bridge call, or a vectored exception handler + longjmp-safe unwinding)
