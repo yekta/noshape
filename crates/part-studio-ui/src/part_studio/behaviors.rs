@@ -2157,9 +2157,12 @@ impl PartStudioView {
             // in). A Remove / Intersect (not blended yet: its tool would hide
             // inside the uncut part) keeps the cut result with its tool see-
             // through over it, red nearly opaque.
+            // Live 10-27 (behaviours "psui (10-27) "psui preview look" Extrude
+            // Add"): a blended Add's model with the feature is the result
+            // itself, the new volume in the part's own colour.
             let blended = adds && !failed;
             if blended {
-                d.bodies = before.bodies.clone();
+                return self.display.clone();
             }
             for b in tool.bodies.iter().filter(|b| !old.contains(&b.id)) {
                 let mut b = b.clone();
