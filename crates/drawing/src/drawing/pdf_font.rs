@@ -150,15 +150,6 @@ pub fn subset(data: &[u8], used: &BTreeSet<u16>) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// A six-letter subset tag ("ABCDEF+") from the glyphs kept.
-pub fn subset_tag(used: &BTreeSet<u16>, k: usize) -> String {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ k as u64;
-    for g in used {
-        h = (h ^ *g as u64).wrapping_mul(0x100_0000_01b3);
-    }
-    (0..6).map(|i| (b'A' + ((h >> (5 * i)) % 26) as u8) as char).collect()
-}
-
 /// A ToUnicode CMap: glyph id → the character it draws.
 pub fn to_unicode(map: &std::collections::BTreeMap<u16, char>) -> String {
     let mut s = String::from("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n");

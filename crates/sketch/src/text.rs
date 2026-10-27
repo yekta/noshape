@@ -558,6 +558,10 @@ pub struct EmbedFace {
     pub bbox: [i16; 4],
     pub postscript_name: String,
     pub italic_angle: f32,
+    /// The Font list family ("Noto Sans") and whether bold (the PDF font
+    /// descriptor's FontFamily and FontWeight).
+    pub family: String,
+    pub bold: bool,
 }
 
 /// [`EmbedFace`] of a drawing Font list family (None for the sketch fonts
@@ -567,11 +571,8 @@ pub fn drawing_embed_face(font: &str, bold: bool, italic: bool) -> Option<EmbedF
     let face = ttf_parser::Face::parse(f.data, 0).ok()?;
     let asc = (face.ascender() as f64).max(1.0);
     let r = face.global_bounding_box();
-    let mut postscript_name = face.names().into_iter().find(|n| n.name_id == ttf_parser::name_id::POST_SCRIPT_NAME).and_then(|n| n.to_string()).unwrap_or_else(|| font.replace(' ', ""));
-    // A variable font names its family only; live's PDFs say "NotoSans-Regular".
-    if !postscript_name.contains('-') {
-        postscript_name += ["-Regular", "-Bold", "-Italic", "-BoldItalic"][usize::from(bold) + 2 * usize::from(italic)];
-    }
+    // As the file names it (live's PDFs: "AAAAAA+NotoSans", "…+DejaVuSans").
+    let postscript_name = face.names().into_iter().find(|n| n.name_id == ttf_parser::name_id::POST_SCRIPT_NAME).and_then(|n| n.to_string()).unwrap_or_else(|| font.replace(' ', ""));
     Some(EmbedFace {
         data: f.data,
         synth_bold: f.synth_bold,
@@ -585,6 +586,8 @@ pub fn drawing_embed_face(font: &str, bold: bool, italic: bool) -> Option<EmbedF
         bbox: [r.x_min, r.y_min, r.x_max, r.y_max],
         postscript_name,
         italic_angle: face.italic_angle(),
+        family: font.to_string(),
+        bold,
     })
 }
 

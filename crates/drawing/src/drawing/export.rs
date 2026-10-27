@@ -652,7 +652,7 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
                 // Synthesized bold: drawn again 0.03 em to the right.
                 for shift in if bold { &[0.0, SYNTH_BOLD][..] } else { &[0.0][..] } {
                     let (e, f) = (o[0] * pt + shift * m[0], o[1] * pt + shift * m[1]);
-                    let _ = writeln!(content, "BT /T{k} 1 Tf {tc} Tc {:.5} {:.5} {:.5} {:.5} {e:.3} {f:.3} Tm <{hex}> Tj ET", m[0], m[1], m[2], m[3]);
+                    let _ = writeln!(content, "BT /Type0TTF{k} 1 Tf {tc} Tc {:.5} {:.5} {:.5} {:.5} {e:.3} {f:.3} Tm <{hex}> Tj ET", m[0], m[1], m[2], m[3]);
                 }
             }
             continue;
@@ -808,7 +808,7 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
     let fonts: String = std::iter::once(" /F1 3 0 R".to_string())
         .chain((2..=12).map(|k| format!(" /F{k} {} 0 R", font0 + k - 2)))
         .filter(|_| base14)
-        .chain((0..embedded.faces.len()).map(|k| format!(" /T{k} {} 0 R", t0 + 5 * k)))
+        .chain((0..embedded.faces.len()).map(|k| format!(" /Type0TTF{k} {} 0 R", t0 + 5 * k)))
         .collect();
     let mut next = font0 + 11;
     let mut images: Vec<Vec<u8>> = Vec::new();
@@ -841,7 +841,8 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
         let n = t0 + 5 * k;
         let used: std::collections::BTreeSet<u16> = glyphs.keys().copied().collect();
         let file = super::pdf_font::subset(face.data, &used).unwrap_or_else(|| face.data.to_vec());
-        let name = format!("{}+{}", super::pdf_font::subset_tag(&used, k), face.postscript_name);
+        // Live's subsets are all tagged "AAAAAA".
+        let name = format!("AAAAAA+{}", face.postscript_name);
         let u = |v: f64| (v * 1000.0 / face.units_per_em as f64).round() as i64;
         let widths: String = glyphs.iter().map(|(g, (_, adv))| format!("{g} [{}] ", u(*adv as f64))).collect();
         let b = face.bbox;
@@ -849,15 +850,17 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
         objects.push(format!("<< /Type /Font /Subtype /CIDFontType2 /BaseFont /{name} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor {} 0 R /DW 1000 /W [{widths}] /CIDToGIDMap /Identity >>", n + 2).into_bytes());
         objects.push(
             format!(
-                "<< /Type /FontDescriptor /FontName /{name} /Flags 32 /FontBBox [{} {} {} {}] /ItalicAngle {} /Ascent {} /Descent {} /CapHeight {} /StemV 80 /FontFile2 {} 0 R >>",
+                // Live's descriptor: the box's top and bottom as Ascent and Descent, no cap / x height or stem.
+                "<< /Type /FontDescriptor /FontStretch /Normal /FontWeight {} /Flags 32 /FontBBox [{} {} {} {}] /ItalicAngle {:.6} /Ascent {}.000000 /Descent {}.000000 /CapHeight 0.000000 /XHeight 0.000000 /StemV 0.000000 /FontName /{name} /FontFamily ({}) /FontFile2 {} 0 R >>",
+                if face.bold { 700 } else { 400 },
                 u(b[0] as f64),
                 u(b[1] as f64),
                 u(b[2] as f64),
                 u(b[3] as f64),
                 face.italic_angle,
-                u(face.ascender as f64),
-                u(face.descender as f64),
-                u(face.cap_height as f64),
+                u(b[3] as f64),
+                u(b[1] as f64),
+                face.family,
                 n + 3
             )
             .into_bytes(),
@@ -1058,7 +1061,8 @@ mod tests {
         let p = to_pdf(&sample());
         let s = String::from_utf8_lossy(&p);
         let d = pdf_decoded(&p);
-        assert!(s.contains("/Subtype /CIDFontType2") && s.contains("+NotoSans-Regular /Encoding /Identity-H") && s.contains("/FontFile2"), "{s}");
+        // As live's (samples/tpl-ISO_A3.pdf): "AAAAAA+NotoSans", its descriptor's family and weight.
+        assert!(s.contains("/Subtype /CIDFontType2") && s.contains("/BaseFont /AAAAAA+NotoSans /Encoding /Identity-H") && s.contains("/FontWeight 400 /Flags 32 /FontBBox [-556 -273 1321 1048]") && s.contains("/FontFamily (Noto Sans) /FontFile2"), "{s}");
         let base14: Vec<&str> = d.lines().filter(|l| l.starts_with("BT /F")).collect();
         assert!(base14.is_empty(), "no text left in a base-14 font: {base14:?}");
         let texts = pdf_texts(&p);
