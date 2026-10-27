@@ -30,7 +30,7 @@ pub struct DrawingPrefsView {
 }
 
 impl DrawingPrefsView {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let saved = ListPrefs::load().drawing_light_model_space;
         Self { saved, edited: saved, open: None, field_bounds: Rc::default(), closed_at: None }
     }

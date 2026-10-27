@@ -12,12 +12,12 @@ use noshape_app_core::*;
 use noshape_assembly_ui::assembly_view;
 use noshape_drawing_ui::drawing_keys;
 
-pub mod drawing_prefs;
+mod drawing_prefs;
 pub mod material_libraries;
-pub mod material_prefs;
-pub mod mouse_prefs;
+mod material_prefs;
+mod mouse_prefs;
 pub mod preferences_hooks;
 pub mod preferences_window;
-pub mod prefs_export_rules;
+mod prefs_export_rules;
 pub mod prefs_general;
 pub mod units_prefs;
