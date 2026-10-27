@@ -19,6 +19,7 @@
 #include <TopoDS_Shape.hxx>
 
 class IntCurvesFace_ShapeIntersector; // geom.cpp line_crossings
+class BRepClass3d_SolidClassifier;    // geom.cpp classify_point
 
 #include <chrono>
 #include <typeinfo>
@@ -349,6 +350,11 @@ public:
   // one body. Its Perform keeps results inside: used under the lock.
   mutable std::mutex                                       myLineLock;
   mutable std::shared_ptr<IntCurvesFace_ShapeIntersector> myLineHits;
+
+  // The loaded point classifier of classify_point (geom.cpp), likewise:
+  // Extrude's auto scope classifies a tool's vertices against one part.
+  mutable std::mutex                                    myClassifyLock;
+  mutable std::shared_ptr<BRepClass3d_SolidClassifier> myClassifier;
 
   // Ancestor maps (CSR offsets, values) by kind * 16 + ancestor kind,
   // computed once: regeneration asks for the same ones of a body many times.

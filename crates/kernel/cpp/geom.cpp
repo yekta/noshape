@@ -906,7 +906,15 @@ rust::Vec<double> line_crossings(const OcShape& s, P3 p, P3 dir, double len)
 int8_t classify_point(const OcShape& solid, P3 p, double tol)
 {
   require_non_null(solid.shape, "solid");
-  BRepClass3d_SolidClassifier c(solid.shape, to_pnt(p), tol > 0 ? tol : 1e-7);
+  std::lock_guard<std::mutex> g(solid.myClassifyLock);
+  if (!solid.myClassifier)
+  {
+    auto loaded = std::make_shared<BRepClass3d_SolidClassifier>();
+    loaded->Load(solid.shape);
+    solid.myClassifier = loaded;
+  }
+  BRepClass3d_SolidClassifier& c = *solid.myClassifier;
+  c.Perform(to_pnt(p), tol > 0 ? tol : 1e-7);
   switch (c.State())
   {
     case TopAbs_IN:
