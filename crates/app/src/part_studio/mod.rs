@@ -1143,6 +1143,8 @@ impl PartStudioView {
             }
         }
         if let Some(q) = &self.ui.query_hover {
+            // A region is drawn from the sketch, not by its pick state.
+            scene.instances.extend(scene_builder::query_region(&self.display, q, self.gpu.uploader()));
             let refs = match q {
                 Reference::Body(b) => self.body_geometry(b),
                 Reference::Sketch(f) | Reference::Feature(f) => self.feature_geometry(*f),

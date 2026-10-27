@@ -1232,6 +1232,19 @@ pub fn debug_geometry(debug: &noshape_model::display::DebugGeometry, up: &Upload
     out
 }
 
+/// A sketch region whose chip is hovered in a dialog (live CHIP-HOVER: the
+/// entity in the query-hover yellow-green): the region filled flat in that
+/// colour over everything see-through, like a picked region's fill.
+pub fn query_region(display: &StudioDisplay, r: &Reference, up: &Uploader) -> Option<Instance> {
+    let Reference::SketchRegion { sketch, key } = r else { return None };
+    let sk = display.sketches.iter().find(|s| s.feature == *sketch)?;
+    let reg = sk.regions.iter().find(|g| &g.key == key)?;
+    let n: [f32; 3] = sk.frame.normal.as_vec3().into();
+    let k = theme::lin(theme::viewport::QUERY_HOVER);
+    let m = MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() };
+    Some(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([k[0], k[1], k[2], 0.7]).unpickable().ignore_clip().layer(8).unlit().over_transparent())
+}
+
 /// The boundary edges of `faces` where other geometry hides them, dashed in
 /// the selection color (live "lp wall over" 2258: the seed of a failed
 /// Feature pattern behind the block).

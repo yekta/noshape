@@ -245,7 +245,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   names in a second, grey, indented list under the field ("Face of Sketch 2 / Face of Sketch 1",
   tickets/loft-profiles-ours.png); live: one list, each entry "› Face of Sketch 1 ×" with its chevron, ↑↓ reorder button,
   nothing below the field (live ui/961-loft-two-profiles.png) (qa 2026-10-26, build 4d2f6b0c)
-- [x] (psui, this commit) P2 PERF-SECTION-PANIC fixed: a section view's colour pass with ambient occlusion on asked for
+- [x] 51689c87 P2 PERF-SECTION-PANIC fixed: a section view's colour pass with ambient occlusion on asked for
   timestamp writes with neither index (renderer.rs `GpuTimer::writes` now gives none). Reproduced on green 16cdcf6d, gone
   here. Original report: with `NOSHAPE_PERF=1` the viewport render thread panics as soon as a section view cuts a
   part (Shift+X, pick Front plane): "wgpu error: Validation Error … In a CommandEncoder, label = 'frame' / In a pass
@@ -253,12 +253,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   viewport is frozen for the rest of the session (the UI keeps working). Without NOSHAPE_PERF the section renders fine, so
   users don't hit it, but every perf run / perf.yml benchmark with a section does. Log tickets/perf-section-panic.log,
   doc tickets/qa-1026-main.noshape (tab Part Studio 6) (qa 2026-10-26, build 4d2f6b0c)
-- [ ] P2 EXT-DIRECTION (qa4 round 5, still open on green 4d2f6b0c) ticking Extrude › Direction leaves the new "Extrude
+- [ ] P2 EXT-DIRECTION (psui 10-27: on main the captured case works: a face picked, ticking Direction makes "Extrude
+  direction" the active field, title and chevron red, as live; with nothing picked yet ours keeps the empty regions field
+  active, live asked (REQUESTS "psui (10-27, EXT-DIRECTION)")) (qa4 round 5, still open on green 4d2f6b0c) ticking Extrude › Direction leaves the new "Extrude
   direction" field inactive (white) and the regions field active, chevron grey; after a region pick the field turns pink
   with a red chevron but never gets focus. live (behaviours "qa4 round 5 s7 dialogs"): on ticking, Extrude direction is
   the active field (border rgb(22,81,176), fill rgb(222,241,251)), title red rgb(170,37,45), chevron rgb(189,48,57);
   after a pick focus moves on (qa 2026-10-26)
-- [ ] P2 CHIP-HOVER (qa4 round 5, still open on green) hovering a selection chip in a feature dialog (e.g. "Face of
+- [x] (psui, this commit) P2 CHIP-HOVER fixed for sketch regions (a picked region is drawn from the sketch, so its
+  QUERY state lit nothing; now its fill turns #f2ff80 while the chip is hovered; faces / edges already did) (qa4 round 5,
+  still open on green) hovering a selection chip in a feature dialog (e.g. "Face of
   Sketch 1" in Extrude 1) shows the chip's tooltip but the viewport doesn't change at all (pixel-identical); live turns the
   hovered chip's entity yellow-green #f2ff80 (qa 2026-10-26)
 - [ ] P2 FOLDER-NAME-INLINE (qa4 round 5, still open on green) feature rows › Add selection to folder… opens a separate
@@ -269,7 +273,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   says "… A parameter value is not valid."; ours shows the message but never makes the field pink and rewrites "1e6 mm" to
   "1000000 mm". A valid value in other units is rewritten into document units on blur ("500 m" → "500000 mm") in both.
   0 mm matches ("Failed to extrude selections, check input.", no pink) (qa 2026-10-26, build 4d2f6b0c)
-- [x] (psui, this commit) P2 MENU-SKETCH-TAG fixed ("Edit Boss sketch…": the tag only when the name doesn't contain
+- [x] 51689c87 P2 MENU-SKETCH-TAG fixed ("Edit Boss sketch…": the tag only when the name doesn't contain
   the type, as the tooltips). Original report: feature row menu: ours "Edit Boss sketch 1 [Sketch]…" for a custom-named sketch; live "Edit Boss
   sketch 1…" (no type tag; behaviours "qa (2026-10-26, P2 batch)" (2)) (qa 2026-10-26, build 4d2f6b0c)
 - [x] 67bca14a P2 PANEL-BLEED: live bleeds through the same way (behaviours "psui (10-27, PANEL-BLEED

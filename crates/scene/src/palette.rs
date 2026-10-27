@@ -13,6 +13,9 @@ pub mod viewport {
     pub const INACTIVE: u32 = 0x999999;
     /// Pre-highlight (`PRE_HIGHLIGHT_COLOR_BORDER`).
     pub const PREHIGHLIGHT: u32 = 0xffc685;
+    /// A dialog chip's entity while the chip is hovered (live qa4 round 5
+    /// s7, CHIP-HOVER: the query-hover yellow-green).
+    pub const QUERY_HOVER: u32 = 0xf2ff80;
     /// Selection (`ENTITY_HIGHLIGHT_COLOR_BORDER`).
     pub const SELECTION: u32 = 0xffa90a;
     /// The fill of a picked sketch region, flat at `PICKED_REGION_ALPHA`
