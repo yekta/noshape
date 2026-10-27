@@ -83,6 +83,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   /root/qa-scratch/tickets/cli-fillet-hang.noshape (history ends "Insert feature : Fillet 2"); stack
   tickets/cli-fillet-hang-bt-tail.txt. Needs a time / iteration budget on blends (fail the feature) and the regen must stay
   abortable (qa 2026-10-27, main CLI 19555ca3)
+  Chamfer too (qa 2026-10-27, CLI 19555ca3): a 0.1 mm chamfer of 4 edges spins in `ChFi3d_ChBuilder::PerformSurf` →
+  ChFi3d_Builder::CompleteData → StoreData (Geom2d_BSplineCurve eval) ← BRepFilletAPI_MakeChamfer::Build ← checked_blend /
+  scaled_blend ← op_chamfer features.cpp:3643 (> 10 min in the fuzzer, > 80 s standalone). Repro: open a copy of
+  /root/qa-scratch/tickets/cli-chamfer-hang-pre.noshape, feature_add chamfer with entities / width from
+  tickets/cli-chamfer-hang-args.json (bin/chrepro.py); stack tickets/cli-chamfer-hang-bt.txt; fuzz seed 62 step 81.
 - [ ] P0 DRAFT-HANG a Draft spins for > 20 min in OCCT's defeaturing (`BOPAlgo_PaveFiller::MakeBlocks` /
   PutPavesOnCurve → `IntTools_Context::IsVertexOnLine` and PerformEF ← BOPAlgo_Builder ← FillGap::TrimExtendedFaces ←
   BOPAlgo_RemoveFeatures ← BRepAlgoAPI_Defeaturing::Build ← noshape op_defeature features.cpp:3984 ← ops.rs delete_faces ←
