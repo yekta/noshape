@@ -504,6 +504,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   replaces the value in place, Enter opens it, Esc unframes, a double-click edits with the value selected; a plain
   number in a length / angle cell commits with the workspace unit ("40" → "40 mm"). Verified on :102 (Extrude 1 /
   Depth, Big).
+- [ ] reopened in part (qa 11:53, green e8858e61, NOSHAPE_PERF=1, fresh copy of cli-fillet-hang.noshape): the visible part
+  is fixed: with the opening regen in Fillet 2 (crash marker "Fillet 2", +55 s), dragging the bar above Fillet 2 gives
+  schedule_regen #2 → "0 evaluated, 7 cached, 1 ms" at once and the rolled-back model stays (tickets/regen-no-cancel-
+  green-rolled.png). But the running run is **not aborted**: its marker stays and it finishes "8 features evaluated,
+  0 cached, 84919 ms" 84 s later (tickets/regen-no-cancel-green-perf.txt), burning a core on a result nobody wants, and
+  any edit that needs the kernel meanwhile shares it. The fix text says the newer run aborts the running one; the
+  blend budget's cancel jump (97081557) evidently doesn't fire. Side note: a SIGTERM'd app mid-regen leaves its marker
+  and the next open rolls the document back before that feature (DOC-POISON guard); Ctrl+Q clears it (reopens 8 / 8).
 - [x] c0bbde51 P0 REGEN-NO-CANCEL fixed (psui 10-27): a newer run that evaluates fewer features (the rollback bar above the running feature, a dialog on an earlier feature) aborts the running one; its finished features stay cached, so the rollback shows at once (app on cli-fillet-hang.noshape: 0 ms, 7 cached, while Fillet 2 ran). Was: a newer regeneration waits for a stale one instead of cancelling it: open a copy of
   /root/qa-scratch/tickets/cli-fillet-hang.noshape in green 502416cc (NOSHAPE_PERF=1); while the opening regen is still
   in Fillet 2 (it fails after the 30 s blend budget), drag the rollback bar above Fillet 2: schedule_regen #2 at 05:16:57,
