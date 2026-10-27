@@ -3771,7 +3771,6 @@ impl PartStudioView {
         let model_body = model_ref.as_ref().and_then(|r| self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r)).map(|b| (b.id.clone(), b.name.clone())));
         let linear_model_edge = model_ref.as_ref().filter(|r| self.linear_edge_direction(r).is_some()).cloned();
         let sketch_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_else(|| "sketch".into());
-        let own_plane = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned());
         // Other sketches shown (live: Hide other sketches / Hide all sketches).
         let this_sketch = self.sketch.as_ref().map(|e| e.feature);
         let other_sketches = self.display.sketches.iter().any(|s| !s.hidden && Some(s.feature) != this_sketch);
@@ -3794,6 +3793,11 @@ impl PartStudioView {
             _ => None,
         });
         let curves_selected = self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().any(|e| d.sketch.curve(*e).is_some())));
+        // Live (behaviours "skasm (2026-10-27) sketch point menus"): curves
+        // only get Construction / Extrude / Revolve; curve endpoints only get
+        // neither Copy nor Transform.
+        let all_curves = n > 0 && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().all(|e| d.sketch.curve(*e).is_some())));
+        let only_endpoints = n > 0 && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().all(|e| d.sketch.curve(*e).is_none() && !d.sketch.users_of_point(*e).is_empty())));
         let has_clip = cx.read_from_clipboard().and_then(|c| c.text()).is_some_and(|t| t.contains("noshape_sketch_entities"));
         let view = cx.entity();
         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
@@ -3908,13 +3912,20 @@ impl PartStudioView {
                 }
                 return m;
             }
-            if n > 0 {
+            if only_endpoints {
+                if has_clip {
+                    m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
+                }
+            } else if n > 0 {
                 m = m.item(item("Copy sketch entities", Box::new(|this, _, cx| {
                     let text = this.sketch_data(cx).and_then(|d| this.sketch.as_ref()?.copy_selection(&d));
                     if let Some(text) = text {
                         cx.write_to_clipboard(ClipboardItem::new_string(text));
                     }
                 })));
+                if has_clip {
+                    m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
+                }
                 if !tool_active {
                     m = m.item(item("Transform sketch entities", Box::new(|this, _, cx| this.set_tool(Tool::Transform, cx))));
                 }
@@ -3932,14 +3943,14 @@ impl PartStudioView {
                     }
                 })));
             }
-            if has_clip {
+            if has_clip && n == 0 {
                 m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
             }
             // Live (behaviours "qa4 round 5 s5 driven dims", a selected line,
             // SK-LINE-MENU): Construction | Extrude…, Revolve… | Hide other
             // sketches, Hide all sketches, Curve/surface analysis… (no
-            // Section view…).
-            if n > 0 && !tool_active {
+            // Section view…); only for curves.
+            if all_curves && !tool_active {
                 m = m.separator().item(item("Construction", Box::new(|this, w, cx| this.toggle_construction(w, cx))));
                 m = m.separator().item(item("Extrude…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Extrude), cx)))).item(item("Revolve…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Revolve), cx))));
             }
@@ -3950,13 +3961,10 @@ impl PartStudioView {
             if n > 0 && !tool_active && other_sketches {
                 m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(this_sketch, cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
             }
-            if !tool_active {
+            if !tool_active && (n == 0 || curves_selected) {
                 m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
             }
             if n > 0 {
-                if let Some(plane) = own_plane.clone().filter(|_| !tool_active && !curves_selected) {
-                    m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through(plane.clone(), w, cx))));
-                }
                 m = m.separator();
                 m = m.item(item("Clear selection", Box::new(|this, _, cx| {
                     if let Some(ed) = &mut this.sketch {
@@ -4004,7 +4012,7 @@ impl PartStudioView {
             m = m.item(item("Select other…", Box::new(|this, window, cx| this.open_select_other(window, cx))));
             m = m.separator();
             m = m.item(item("Zoom to fit", Box::new(|_, window, cx| window.dispatch_action(Box::new(ZoomToFit), cx))));
-            if n > 0 {
+            if curves_selected {
                 m = m.item(item("Zoom to selection", Box::new(|this, _, cx| {
                     let Some(ed) = &this.sketch else { return };
                     let refs = ed.selection.iter().map(|e| Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).collect();

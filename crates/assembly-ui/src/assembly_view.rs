@@ -2065,10 +2065,11 @@ impl AssemblyView {
             }
         }
         // Replicate's "Parts to find match in": parts, faces or edges. A
-        // linear pattern's Direction takes the edge (or face) itself, which
-        // pre-highlights on hover (live; ASM-DIR-NO-HOVER: as mate connector
-        // inference nothing highlighted and a click could take a vertex).
-        if self.pattern.as_ref().is_some_and(|p| p.active == Some(2) || (p.kind == PatternDialogKind::Linear && p.active.is_some())) {
+        // linear pattern's Direction and a circular one's Axis take the edge
+        // (or face) itself, which pre-highlights on hover (live; ASM-DIR-NO-HOVER:
+        // as mate connector inference nothing highlighted and a click could
+        // take a vertex). A bare circle edge or cylinder gives its axis.
+        if self.pattern.as_ref().is_some_and(|p| p.active == Some(2) || (matches!(p.kind, PatternDialogKind::Linear | PatternDialogKind::Circular) && p.active.is_some())) {
             return Some(PickMode::Entity);
         }
         if self.mc.as_ref().is_some_and(|m| m.active) || self.pattern.as_ref().is_some_and(|p| p.active.is_some()) || self.snap.is_some() || self.mass_connector_picking() {
