@@ -864,7 +864,7 @@ impl PartStudioView {
                 self.flash_info("Click a selection field in the dialog first.".into(), cx);
                 return;
             };
-            if !kind_matches(target.kind, &target.reference, filter) {
+            if !(kind_matches(target.kind, &target.reference, filter) && self.face_fits(&target.reference, filter)) {
                 // Clicking a sketch curve while a region field is active
                 // takes the region it bounds; a face, edge or vertex in a
                 // parts field takes its part (Onshape).
