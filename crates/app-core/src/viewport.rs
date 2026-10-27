@@ -2341,6 +2341,11 @@ fn box_overlay(a: DVec2, b: DVec2, style: BoxStyle) -> Div {
             // The line sits on the 0.2 infill: 0.5 on top makes live's 0.6
             // (1 − 0.8 × 0.5).
             out = out.child(div().absolute().left(px(rect.0)).top(px(rect.1)).w(px(rect.2)).h(px(rect.3)).bg(rgb(color).opacity(alpha * 0.5)));
+            // Live's canvas line is ~1.5 px: an antialiased pixel at half the
+            // colour beside it, outside the box (live 10-27: (114,150,207)
+            // then (137,167,215) for the window box).
+            let outer = if along_x { (rect.0, if from.y <= 0.0 { -1.0 } else { h }, rect.2, 1.0) } else { (if from.x <= 0.0 { -1.0 } else { w }, rect.1, 1.0, rect.3) };
+            out = out.child(div().absolute().left(px(outer.0)).top(px(outer.1)).w(px(outer.2)).h(px(outer.3)).bg(rgb(color).opacity(alpha * 0.5)));
         }
     }
     out
