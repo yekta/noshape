@@ -152,9 +152,11 @@ impl PartStudioView {
         if self.edit.is_some() && self.ui.section_dialog.is_none() {
             return;
         }
+        // Live 10-27: a second Shift+X leaves the dialog open (its ✕ closes it).
         if self.ui.section_dialog.is_some() {
-            self.end_section_dialog(false, window, cx);
-        } else if !self.ui.section.is_empty() {
+            return;
+        }
+        if !self.ui.section.is_empty() {
             self.ui.section.clear();
             self.ui.section_parts = None;
             self.apply_section(window, cx);

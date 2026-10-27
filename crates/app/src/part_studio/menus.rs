@@ -67,6 +67,9 @@ impl PartStudioView {
         let section = !self.ui.section.is_empty();
         let editing = self.edit.is_some();
         let editing_tool = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.feature_type()).map(|t| t.name);
+        // The open dialog's feature ("Confirm Extrude 1").
+        let editing_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone());
+        let section_dialog = self.ui.section_dialog.is_some();
         let planar = target_ref.as_ref().is_some_and(|r| self.frame_of_ref(r).is_some());
         let linear_edge = target_ref.as_ref().is_some_and(|r| self.linear_edge_direction(r).is_some());
         let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
@@ -82,6 +85,8 @@ impl PartStudioView {
         }
         let menu = OsMenu::build(window, cx, move |mut m, window, cx| {
             let v = view.clone();
+            // The empty-space menu lists the modes' exits itself, first.
+            let mut exits_first = false;
             let item = |label: &str, f: MenuAction| {
                 let v = v.clone();
                 OsMenuItem::new(label.to_string()).on_click(move |_, window, cx| v.update(cx, |this, cx| {
@@ -371,7 +376,7 @@ impl PartStudioView {
                             // edit and off items take Section view…'s place.
                             m = m
                                 .item(item("Edit section view…", Box::new(|this, w, cx| this.edit_section(w, cx))))
-                                .item(item("Turn off section view", Box::new(|this, w, cx| this.toggle_section(w, cx))));
+                                .item(item("Turn off section view", Box::new(|this, w, cx| this.turn_off_section(w, cx))));
                         } else if k == PickKind::Face {
                             let rs = r.clone();
                             m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| {
@@ -445,19 +450,50 @@ impl PartStudioView {
                         }
                     }
                 }
-                // Empty space.
+                // Empty space. Live 10-27 (behaviours "spec: psui
+                // part-studio.md 8.8 / 8.10"): the way out of a mode comes
+                // first (Confirm / Cancel for a feature dialog, Exit isolate,
+                // Exit make transparent); the Section view swaps Select for
+                // Turn off section view; a feature dialog adds Curve/surface
+                // analysis….
                 _ => {
+                    exits_first = true;
+                    if let (Some(name), false) = (editing_name.clone().filter(|_| editing_tool.is_some()), in_sketch) {
+                        m = m
+                            .item(item(&format!("Confirm {name}"), Box::new(|this, w, cx| this.accept_edit(false, w, cx))))
+                            .item(item("Cancel", Box::new(|this, w, cx| this.cancel_edit(w, cx))))
+                            .separator();
+                    }
+                    if let Some(mode) = isolate {
+                        let label = match mode {
+                            super::behaviors::IsolateMode::Isolate => "Exit isolate",
+                            super::behaviors::IsolateMode::Transparent => "Exit make transparent",
+                        };
+                        m = m.item(item(label, Box::new(|this, w, cx| {
+                            this.exit_isolate(w, cx);
+                        }))).separator();
+                    }
                     m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx)))).separator();
-                    // Select ▸ with nothing selected: only Create selection…
-                    // (live menus/rmb-sketch-empty-select-submenu.png).
-                    let vs = v.clone();
-                    m = m.submenu("Select", window, cx, move |sm, _, _| {
-                        let v = vs.clone();
-                        sm.item(OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
-                            this.close_context_menu(cx);
-                            this.open_create_selection_at(this.ui.menu_pos, cx);
-                        })))
-                    });
+                    if section || section_dialog {
+                        m = m.item(icon_item("Turn off section view", "menu-section-view", Box::new(|this, w, cx| this.turn_off_section(w, cx))));
+                    } else {
+                        if editing && !in_sketch {
+                            m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| {
+                                this.ui.analysis_tool = None;
+                                this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
+                            })));
+                        }
+                        // Select ▸ with nothing selected: only Create selection…
+                        // (live menus/rmb-sketch-empty-select-submenu.png).
+                        let vs = v.clone();
+                        m = m.submenu("Select", window, cx, move |sm, _, _| {
+                            let v = vs.clone();
+                            sm.item(OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                                this.close_context_menu(cx);
+                                this.open_create_selection_at(this.ui.menu_pos, cx);
+                            })))
+                        });
+                    }
                     if has_selection {
                         m = m.separator().item(item("Clear selection", Box::new(|this, _, cx| {
                             this.selection.clear();
@@ -469,7 +505,8 @@ impl PartStudioView {
                     m = m.separator().item(zoom_fit()).item(item("Isometric", Box::new(|this, _, cx| this.view(StandardView::Isometric, cx))));
                 }
             }
-            // Modes that are on: a way out of each.
+            // Modes that are on: a way out of each (the empty-space menu
+            // put them first).
             let mut exits: Vec<OsMenuItem> = Vec::new();
             if let Some(tool) = editing_tool {
                 exits.push(item(&format!("Exit {tool}"), Box::new(|this, w, cx| this.cancel_edit(w, cx))));
@@ -487,9 +524,9 @@ impl PartStudioView {
                 exits.push(item("Edit section view…", Box::new(|this, w, cx| this.edit_section(w, cx))));
             }
             if section && !(kind == Some(PickKind::Face) && body.is_some() && !editing && !in_sketch) {
-                exits.push(item("Turn off section view", Box::new(|this, w, cx| this.toggle_section(w, cx))));
+                exits.push(item("Turn off section view", Box::new(|this, w, cx| this.turn_off_section(w, cx))));
             }
-            if !exits.is_empty() {
+            if !exits.is_empty() && !exits_first {
                 m = m.separator();
                 for e in exits {
                     m = m.item(e);

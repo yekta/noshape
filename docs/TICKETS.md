@@ -356,7 +356,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (tickets/curve-analysis-over-extrude.png). Either the panel must be opaque or the analysis tool must replace the feature dialog as live
   does for tool switches (live: Shift+E with a dialog open replaces it, behaviours 7371) (qa 2026-10-26, build 4d2f6b0c)
 
-- [ ] P2 PS-SECTION-RED Part Studio section caps fill overlapping parts' material solid red; live's Part Studio doesn't
+- [x] c93f34b4 P2 PS-SECTION-RED fixed (psui 10-27): `Scene::section_interference` (assemblies only) gates the red overlap in the cap shader; offscreen test overlapping_caps_are_red_only_in_assemblies. Was: Part Studio section caps fill overlapping parts' material solid red; live's Part Studio doesn't
   (behaviours "skb (10-24) assembly section" (5): "overlapping parts' caps are grey-hatched with no red overlap fill";
   only the assembly shows the red interference, part-studio/2406–2414). Repro: /root/skasm-scratch/qa/ps2.noshape (block
   + a pin as a new part through it, made by qa/ps2.py), view menu › Section view…, pick Front, ✓: the pin's cap inside
