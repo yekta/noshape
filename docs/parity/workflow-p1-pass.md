@@ -47,7 +47,7 @@ then edits, undo/redo, rollback and suppress.
 |---|---|---|---|---|
 | Create Drawing of Assembly 1… (suggested views) | 4 views, pin seen through hole 1, edges correct | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Part Studio tab menu | Delete, Rename, Properties…, Show code, Duplicate, Copy to clipboard, Select as document thumbnail, Move to document…, Export… | same (+ Open in new browser tab, browser only) | ✅ |  |
-| Part row › Create Drawing of Part 1… | "Part 1 Drawing 1" tab right after Part Studio 1, 4 views | — | ✅ |  |
+| Part row › Create Drawing of Part 1… | "Part 1 Drawing 1" tab right after Part Studio 1, 4 views | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Dimension on a straight edge (assembly drawing) | "2.362" placed | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Dimension on a hole circle | part drawing "Ø.394" ✅; **assembly drawing: click not taken** | — | ✗ **P2-D1** |  |
 | BOM panel (right strip) | "Bill of materials", BOM type ▾ Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description; rows 1 | 1, 2 | 1 | same columns (behaviours 1270) | ✅ | 0.4.10+ / 1c853f78 10-27 |
@@ -85,8 +85,8 @@ then edits, undo/redo, rollback and suppress.
 | Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ |  |
 | n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? |  |
 | View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |  |
-| Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ |  |
-| Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ |  |
+| Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
+| Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Group dialog (assembly) | one "Instances" field | same (behaviours 1333) | ✅ |  |
 | Split of an inserted part in the Part Studio | the halves are new parts (ids from Split, renamed Part 6 / 7, others renumbered); the assembly instance of the old part fails "Failed to resolve instance." and its mate / pattern error | live Split re-identifies the same way (old id gone, halves new, renumbered; behaviours "qa5 (10-25 p3)" Split) | ✅ (consistent) |  |
 | P2-D1 on green af9f1e4c (fix 817d9cb1) | assembly drawing, tilted plate: d on the middle hole rim → "Ø.394" preview, prompt "Click to place the dimension, or select a second entity" | — | ✅ **fixed** |  |
@@ -131,9 +131,9 @@ then edits, undo/redo, rollback and suppress.
 | Ctrl+Z | one step restores the order | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Assembly mirror dialog | Instances to mirror, Mirror plane (+ connector button), [Mirror strategy…] | same (behaviours 8704) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Drawing Note tool (n), hover | prompt only, no preview | "NOTE" preview at the pointer | ✗ **P2-D3** (ui2) |  |
-| Click, type "QA NOTE" | Note panel next to the note: Noto Sans ( Note ), 0.1200, B I U S colour, spacing, align, list, … ☐ Flag notes (greyed Flag (Drawing), 2 Characters); ruler bar over the text | same (drawing/225, behaviours 3277) | ✅ |  |
-| Drawing Detail view tool | panel: 4 shapes (circle pressed), "Create circle", View scale ▾, View label A, Profile style In line, ☑ Show detail view profile, ☐ Clip border to geometry | same (behaviours 1404, 1795) | ✅ |  |
-| Circle drawn on the Top view | field "Profile created", shape buttons un-pressed, View scale **2:1**, label A; preview follows the pointer; click places "DETAIL A / SCALE 2:1" | live: "2:1" with the parent at 1:1 (qa5 live check, drawing/qa5-p6d-2.png) | ✅ |  |
+| Click, type "QA NOTE" | Note panel next to the note: Noto Sans ( Note ), 0.1200, B I U S colour, spacing, align, list, … ☐ Flag notes (greyed Flag (Drawing), 2 Characters); ruler bar over the text | same (drawing/225, behaviours 3277) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
+| Drawing Detail view tool | panel: 4 shapes (circle pressed), "Create circle", View scale ▾, View label A, Profile style In line, ☑ Show detail view profile, ☐ Clip border to geometry | same (behaviours 1404, 1795) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
+| Circle drawn on the Top view | field "Profile created", shape buttons un-pressed, View scale **2:1**, label A; preview follows the pointer; click places "DETAIL A / SCALE 2:1" | live: "2:1" with the parent at 1:1 (qa5 live check, drawing/qa5-p6d-2.png) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 
 ## Owner fixes re-checked on green a08e3eda
 | Item | Check | Status | Verified |
