@@ -381,6 +381,7 @@ uint64_t                 shape_partner_hash(const OcShape& s);
 rust::Vec<double>        shape_location(const OcShape& s);
 std::unique_ptr<OcShape> shape_unlocated(const OcShape& s);
 std::unique_ptr<OcShape> op_frame_cylinders_at(const OcShape& s, P3 origin, P3 axis);
+OpOut                    op_divide_closed(const OcShape& s);
 uint32_t                 sub_count(const OcShape& s, uint8_t kind);
 std::unique_ptr<OcShape> sub_shape(const OcShape& s, uint8_t kind, uint32_t index);
 std::unique_ptr<OcShapeList> sub_shapes(const OcShape& s, uint8_t kind);

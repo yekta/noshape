@@ -2506,16 +2506,32 @@ fn face_blend_on_curved_faces_as_live() {
     face_blend_on_curved_faces(false);
 }
 
-/// The elliptic boss of [`face_blend_on_curved_faces_as_live`] (live NE).
-/// Open (core): ours 10 faces (the boss side in two halves) vs live's 9, and
-/// the curvature section fails ("Failed to blend faces.").
+/// The elliptic boss of [`face_blend_on_curved_faces_as_live`] (live NE):
+/// rolling ball, conic and asymmetric as live (9 faces).
 #[test]
-#[ignore = "T2: open differences from live (elliptic boss face blend)"]
+#[ignore = "T2: 5 s of face blends"]
 fn face_blend_on_an_elliptic_boss_as_live() {
     face_blend_on_curved_faces(true);
 }
 
+/// The elliptic boss's curvature section (live NE, 11850.666 mm³). Open
+/// (core): OCCT's fuse with the lofted tool comes back empty ("Failed to
+/// blend faces.").
+#[test]
+#[ignore = "T2: open difference from live (elliptic boss, curvature section)"]
+fn face_blend_curvature_on_an_elliptic_boss_as_live() {
+    face_blend_on_curved_faces_curvature();
+}
+
+fn face_blend_on_curved_faces_curvature() {
+    face_blend_on_curved_faces_filtered(true, true);
+}
+
 fn face_blend_on_curved_faces(ellipse: bool) {
+    face_blend_on_curved_faces_filtered(ellipse, false);
+}
+
+fn face_blend_on_curved_faces_filtered(ellipse: bool, curvature_only: bool) {
     let build = |boss: &str, chamfer: bool| -> Studio {
         let mut s = Studio::new();
         let mut sk = noshape_sketch::Sketch::new();
@@ -2615,7 +2631,8 @@ fn face_blend_on_curved_faces(ellipse: bool) {
         ("cyl", true, &[("flipSide2", "true")], 12126.454190269484, 1e-3),
     ];
     let mut bad = Vec::new();
-    for &(boss, chamfer, ps, live, tol) in cases.iter().filter(|c| (c.0 == "ell") == ellipse) {
+    let is_curvature = |ps: &[(&str, &str)]| ps.iter().any(|p| p.1 == "CURVATURE");
+    for &(boss, chamfer, ps, live, tol) in cases.iter().filter(|c| (c.0 == "ell") == ellipse && (!ellipse || is_curvature(c.2) == curvature_only)) {
         let (res, st, msg) = run(boss, chamfer, ps);
         if st != FeatureStatus::Ok {
             bad.push(format!("{boss} chamfer={chamfer} {ps:?}: {st:?} {msg}"));

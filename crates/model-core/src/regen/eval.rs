@@ -1269,6 +1269,18 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
             let full = P::Arc { center: *center, radius: *radius, start_angle: *a0, end_angle: *a0 + (a1 - a0) + (b1 - b0), ccw: *ccw };
             out = vec![(full, e)];
         }
+        // Likewise a whole ellipse (two halves of one entity): one edge, so
+        // its extrusion is one face (live psb NE: an elliptic boss's side is
+        // one face; OCCT can't merge two extrusion halves afterwards).
+        if out.len() == 2
+            && out[0].1 == out[1].1
+            && let (P::EllipseArc { center, major_axis, major_radius, minor_radius, start_param: a0, end_param: a1, ccw }, P::EllipseArc { start_param: b0, end_param: b1, .. }) = (&out[0].0, &out[1].0)
+            && ((a1 - a0).abs() + (b1 - b0).abs()) >= std::f64::consts::TAU - 1e-9
+        {
+            let e = out[0].1;
+            let full = P::EllipseArc { center: *center, major_axis: *major_axis, major_radius: *major_radius, minor_radius: *minor_radius, start_param: *a0, end_param: *a0 + std::f64::consts::TAU, ccw: *ccw };
+            out = vec![(full, e)];
+        }
         // Likewise a closed spline (a periodic fit spline, split at its
         // seam): one edge, so its extrusion is one face (live's lobed recess).
         if out.len() == 2

@@ -11,6 +11,7 @@
 #include <Precision.hxx>
 #include <ShapeFix_Edge.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
+#include <ShapeUpgrade_ShapeDivideClosed.hxx>
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepGProp.hxx>
@@ -731,6 +732,23 @@ std::unique_ptr<OcShape> op_frame_cylinders_at(const OcShape& s, P3 origin, P3 a
     reframe_cylinder(f, z, o);
   }
   return wrap(r);
+}
+
+// The shape with its closed (periodic) faces split once across their seams,
+// with the history of the split. A boolean against a tool lying close
+// along one whole periodic face can fail where it works on the halves (an
+// elliptic boss's face blend); the halves share the face's surface, so a
+// unify merges them back.
+OpOut op_divide_closed(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  ShapeUpgrade_ShapeDivideClosed d(s.shape);
+  d.SetNbSplitPoints(1);
+  d.Perform();
+  HHist h;
+  if (!d.GetContext().IsNull())
+    h = d.GetContext()->History();
+  return make_result({s.shape}, d.Result(), h.get());
 }
 
 // ---------------------------------------------------------------- sweep

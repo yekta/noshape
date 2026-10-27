@@ -708,6 +708,13 @@ pub fn rib_linear_form(base: &Shape, profile: &Shape, plane: &Plane, thickness: 
     op(ffi::op_rib(base.raw(), profile.raw(), &plane.ffi(), p3(n), p3(-n), fuse))
 }
 
+/// `shape` with its closed (periodic) faces split once across their seams
+/// (history arg 0 = shape). The halves share their face's surface, so
+/// [`crate::unify_same_domain`] merges them back.
+pub fn divide_closed(shape: &Shape) -> Result<OpResult> {
+    op(ffi::op_divide_closed(shape.raw()))
+}
+
 /// Build a revolved cutting tool (e.g. for holes: counterbore, countersink,
 /// tapped drill with tip) from a closed polyline profile given in
 /// `(radius, depth)` coordinates, revolved 360° around the `frame` normal.

@@ -89,6 +89,9 @@ pub struct Partial {
 
 fn fail(why: impl std::fmt::Display) -> FeatureError {
     log::debug!("section blend: {why}");
+    if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+        eprintln!("section blend: {why}");
+    }
     FeatureError::new("Failed to fillet selections.")
 }
 
@@ -486,15 +489,26 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
             Err(fail("empty chain"))
         };
         let mut secs = Vec::new();
+        let mut starts = Vec::new();
         let mut convex = false;
         let count = if closed { N } else { N + 1 };
         for k in 0..count {
-            let (p, fr, side1_first) = station(lo + (hi - lo) * k as f64 / N as f64)?;
+            // A closed loft starts a quarter of the way round: its own seam
+            // on the edge's (the periodic faces' seam) made OCCT's boolean
+            // with an elliptic boss's whole side come back empty.
+            let f = if closed { (k as f64 / N as f64 + 0.25).fract() } else { k as f64 / N as f64 };
+            let (p, fr, side1_first) = station(lo + (hi - lo) * f)?;
             let (face, _, cv) = section_face(p, &fr, spec, side1_first)?;
             convex = cv;
             secs.push(face);
+            starts.push(p);
         }
-        let tool = k::loft(&secs, &k::LoftOptions { solid: true, closed, ..Default::default() })?;
+        // Every section starts at its edge point (its corner on the edge):
+        // a curvature section's B-spline wires twisted otherwise.
+        let tool = k::loft(&secs, &k::LoftOptions { solid: true, closed, start_points: Some(starts), ..Default::default() })?;
+        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+            eprintln!("section blend: loft of {} sections (closed {closed}, chain {} edges): valid {} volume {:?} faces {}", secs.len(), chain.len(), tool.shape.is_valid(), tool.shape.volume(), tool.shape.count(ShapeType::Face));
+        }
         // The face touching neither support is the blend face.
         let ename = body.edges[chain[0].index].clone();
         let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
@@ -633,6 +647,9 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         named = NamedShape::new(s, n);
     }
     let un = k::unify_same_domain(&named.shape)?;
+    if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+        eprintln!("section blend: boolean valid {} solids {}, unified valid {} solids {}", named.shape.is_valid(), named.shape.count(ShapeType::Solid), un.shape.is_valid(), un.shape.count(ShapeType::Solid));
+    }
     let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
     if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
         return Err(fail("the result is not one valid solid"));
