@@ -1513,8 +1513,10 @@ impl PartStudioView {
             let kk = kk.clone();
             this.edit_config(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |ps| noshape_ops::config::set_configured_text(ps, ci, &kk, v));
         });
+        // Editing keeps the cell's blue frame round the in-place input (live `os-table-cell-selected` +
+        // `input.os-param-number`; CONFIG-CELL-EDIT-LOOK).
         if self.ui.cfg_editing.as_deref() == Some(cell.as_str()) {
-            return editor;
+            return div().flex_1().min_w_0().h_full().flex().items_center().border_2().border_color(p().accent).child(editor).into_any_element();
         }
         // Live 10-27 (CONFIG-CELL-EDIT): a click frames the whole cell (blue 2 px), typing on it replaces the value
         // in place, Esc unframes, a double-click edits with the value selected.

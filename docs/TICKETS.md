@@ -357,14 +357,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P3 OK-DISABLED-HOVER a disabled ✓ lights up on hover: new Extrude with nothing picked, ✓ is the disabled pale green
+- [x] P3 OK-DISABLED-HOVER a disabled ✓ lights up on hover: new Extrude with nothing picked, ✓ is the disabled pale green
   #CCE9CC, but with the pointer on it it turns the enabled #74CE3A (and stays inert), so it looks clickable
   (tickets/empty-commit-disabled{,-hover}-0a25.png). Live's ✓ is `button-ok disabled` and a disabled button has no hover
   look (qa 11:43, watcher build 0a25dd1a (11:32; not a green))
-- [ ] P3 CONFIG-CELL-EDIT-LOOK the configured value cell in the Configuration panel shows no edit state: after a click
+  psui (landed with this note): the feature dialog's ✓ keeps its disabled colour under the pointer and pressed (the
+  other ✓ buttons already skipped their hover when disabled); checked on :102: #CCE9CC hovered while disabled,
+  #74CE3A hovered once a face is picked.
+- [x] P3 CONFIG-CELL-EDIT-LOOK the configured value cell in the Configuration panel shows no edit state: after a click
   (framed) and typing, or after a double-click, the cell loses its blue frame and shows the typed text plainly, with no
   input box, caret or selection highlight (tickets/config-cell-edit-0a25.png, config-cell-dblclick-0a25.png). Live edits
   in an `input.os-param-number` with the value selected on a double-click (behaviours "qa (2026-10-27, P2 batch 2)" (6)) (qa 11:43, watcher build 0a25dd1a (11:32; not a green))
+  psui (landed with this note): editing keeps the cell's blue 2 px frame round the in-place input. qa's shots show no
+  caret or selection because the window had no X focus (GPUI draws neither in an inactive window; `xdotool
+  windowfocus` after starting the app); with focus, a double-click shows the value selected (checked on :102).
 - [ ] P1 EDGE-HIGHLIGHT-LOOK (user-reported, v0.4.10 macOS) a hovered model edge is a light band with a dark border on
   both sides; hovered and selected edges must match live exactly (width at 1× and 2×, colours, outline or not). User
   shot: /root/qa-scratch/tickets/ehl/user-report.png (zoom user-edge-zoom.png). Reproduced on the v0.4.10 Linux
@@ -394,7 +400,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     (`vs_backsil` divided by a finite step's on-screen length, which can come out as nothing); its push is now
     analytic, test a_thin_plate_draws_nothing_past_its_outline (1× and 2×). The edge looks wait for live's 2×
     capture.
-- [x] COMMIT P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
+- [x] 8d9246ab P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
   List → id "Configuration" (renamed "Size", the id stays "Configuration"), Checkbox → "Checkbox_2" (ops/config.rs
   add_input → fs_identifier(name)). Live gives a List a random internal id `List_8iFesnytxapQpg` (behaviours 5915, 6098:
   config string `List_YC7FakBBQ6r7FX=Default;…`), which our Variable Studio already copies (ops/vs_config.rs:35). The id

@@ -3513,6 +3513,8 @@ impl Render for FeatureDialog {
         // selections don't disable it (a new Loft with no profiles isn't
         // dirty yet, icons2; an Add with no merge scope is, qa5 BOOL4b).
         let blocked = value_invalid || !self.dirty;
+        // What the ✓ shows disabled (`ui::disabled_accept`: the pale green, or the accent at 20 % in a hex theme).
+        let disabled_ok: Hsla = if gpui_kit::hex_theme_active() { pal.accept.into() } else { gpui_kit::rgb(0xcce9cc).into() };
         let title_color = if invalid { pal.text_invalid } else { pal.text };
         let shown = self.shown_feature();
         let name = noshape_model::interaction::display_name_computed(&shown, &|k| self.computed.get(k).cloned().or_else(|| shown_length(&shown, k, &self.units, &self.variables)));
@@ -3639,8 +3641,9 @@ impl Render for FeatureDialog {
                             .custom(
                                 gpui_kit::component::button::ButtonCustomVariant::new(cx)
                                     .color(pal.accept.into())
-                                    .hover(gpui_kit::rgb(0x74ce3a).into())
-                                    .active(pal.accept.into())
+                                    // A disabled ✓ has no hover look (live `button-ok disabled`; OK-DISABLED-HOVER).
+                                    .hover(if blocked { disabled_ok } else { gpui_kit::rgb(0x74ce3a).into() })
+                                    .active(if blocked { disabled_ok } else { pal.accept.into() })
                                     .shadow(false),
                             )
                             // Live (dom adv4-a-dialog): ✓ and ✗ are 24 px sprites centred in 28 x 24.
