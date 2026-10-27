@@ -1080,7 +1080,10 @@ fn hole_overridden_parameters_info() {
     };
     let path = |k: &str| (k.to_string(), ParamValue::Lookup(vec!["Drilled".into(), "1/4 (0.25)".into()]));
     let (k1, p1) = path("ansiHoleTableEx");
-    assert_eq!(info(&[(Box::leak(k1.into_boxed_str()), p1), ("holeDiameterV3", e("0.3 in"))]).as_deref(), Some("Parameters have been overridden. Check input."));
+    assert_eq!(info(&[(Box::leak(k1.clone().into_boxed_str()), p1.clone()), ("holeDiameterV3", e("0.3 in"))]).as_deref(), Some("Parameters have been overridden. Check input."));
+    // Never synced from the table (a REST-built hole, the 30-feature part's "Ø 6 mm THRU" with Drill size 1/4): the
+    // same info (live H1–H5, HOLE-SIZE-NO-DIAMETER).
+    assert_eq!(info(&[(Box::leak(k1.into_boxed_str()), p1), ("holeDiameterV3", e("6 mm")), ("tableSynced", b(false))]).as_deref(), Some("Parameters have been overridden. Check input."));
     let (k2, p2) = path("ansiHoleTable");
     assert_eq!(info(&[(Box::leak(k2.into_boxed_str()), p2), ("styleV2", en("C_BORE")), ("holeDiameterV3", e("0.25 in")), ("cBoreDiameterV3", e("0.5 in")), ("cBoreDepthV3", e("0.1 in"))]), None);
 }

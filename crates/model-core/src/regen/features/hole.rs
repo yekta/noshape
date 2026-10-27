@@ -127,10 +127,14 @@ fn locations(ev: &EvalCtx) -> FResult<Vec<Location>> {
 /// Whether a numeric parameter still holds its schema default.
 fn is_default(ev: &EvalCtx, feature: &str, id: &str) -> bool {
     let Some(spec) = crate::features::get(feature).and_then(|t| t.param(id)) else { return false };
-    match (spec.default_value(ev.units), ev.params.expr(id)) {
-        (crate::params::ParamValue::Expr(d), Some(e)) => d.text.trim() == e.text.trim(),
+    let Some(e) = ev.params.expr(id) else { return false };
+    // The schema default written in either system ("0.25 in" in a mm document is still the default).
+    let value = |text: &str| noshape_units::evaluate(text, &noshape_units::EmptyScope).ok().map(|q| q.value);
+    let Some(v) = value(&e.text) else { return false };
+    [noshape_units::UnitPrefs::default(), noshape_units::UnitPrefs::imperial()].iter().any(|u| match spec.default_value(u) {
+        crate::params::ParamValue::Expr(d) => d.text.trim() == e.text.trim() || value(&d.text).is_some_and(|dv| (dv - v).abs() <= 1e-12 + dv.abs() * 1e-9),
         _ => false,
-    }
+    })
 }
 
 struct HoleDims {
@@ -717,13 +721,18 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         ev.infos.push(FIT_INFO.into());
     }
     // Live L52/L61: a Diameter (or tap drill) other than the standard's.
-    // Counterbore / countersink values don't count.
-    if ev.params.bool(ht::TABLE_SYNCED_PARAM) {
+    // Counterbore / countersink values don't count. Also for holes whose
+    // values were never synced from the table (live's REST-built H1–H5 show
+    // it: HOLE-SIZE-NO-DIAMETER (2)).
+    let synced = ev.params.bool(ht::TABLE_SYNCED_PARAM);
+    if !ev.params.lookup(ht::hole_table_param(ev.params).0).is_empty() {
         let (pid, table) = ht::hole_table_param(ev.params);
         if let Some(spec) = ht::table_values(table, &ht::complete_path(table, ev.params.lookup(pid))) {
+            // Unsynced, only the values that were set count (the others take the table's, `hole_dims`).
+            let set = |id: &str| synced || !is_default(ev, "hole", id);
             let off = |a: f64, b: f64| (a - b).abs() > 1e-9;
-            let tap = matches!((dims.tap_drill, spec.tap_drill_diameter), (Some(a), Some(b)) if off(a, b));
-            if off(dims.diameter, spec.hole_diameter) || tap {
+            let tap = set("tapDrillDiameterV3") && matches!((dims.tap_drill, spec.tap_drill_diameter), (Some(a), Some(b)) if off(a, b));
+            if (set("holeDiameterV3") && off(dims.diameter, spec.hole_diameter)) || tap {
                 ev.infos.push("Parameters have been overridden. Check input.".into());
             }
         }
