@@ -564,7 +564,7 @@ fn bom_hole_table_and_linked_balloons() {
     drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new() }, [410.0, 287.0]));
     // Hole table of the plate's top view on sheet 1.
     let origin = [-0.05, -0.03];
-    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false }, [410.0, 120.0]));
+    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false }, [410.0, 120.0]));
     let sources = regenerate_sources(&doc, &drawing);
     let src = &sources[&SourceKey::studio(asm)];
     assert!(src.assembly);
@@ -597,9 +597,20 @@ fn bom_hole_table_and_linked_balloons() {
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
     // 1 large hole (A1) and 2 small ones (B1, B2), located from the corner.
-    for want in ["HOLE TABLE", "A1", "B1", "B2", "Ø24", "Ø9.6", "50", "30", "12", "88", "48"] {
+    for want in ["HOLE TABLE", "A1", "B1", "B2", "Ø24", "Ø9.6", "50", "30", "12", "88", "48", "QTY"] {
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
+    // Live 1983: a size's SIZE and QTY cells merged down its rows (B1, B2: one Ø9.6, QTY 2).
+    assert_eq!(t.iter().filter(|x| *x == "Ø9.6").count(), 1, "{t:?}");
+    assert!(t.iter().any(|x| x == "2"), "{t:?}");
+    // ☐ Show location data: no X / Y LOC; Order bottom to top keeps a size merged.
+    if let TableKind::Hole { show_location, bottom_to_top, .. } = &mut drawing.sheets[0].tables[0].kind {
+        (*show_location, *bottom_to_top) = (false, true);
+    }
+    let built2 = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let t2 = texts(&built2);
+    assert!(!t2.iter().any(|x| x == "X LOC") && t2.iter().any(|x| x == "QTY"), "{t2:?}");
+    assert_eq!(t2.iter().filter(|x| *x == "Ø9.6").count(), 1, "{t2:?}");
     // Exports include the table.
     assert!(export::to_svg(&built.geometry).contains("HOLE TABLE"));
     assert!(export::to_dxf(&built.geometry).contains("HOLE TABLE"));

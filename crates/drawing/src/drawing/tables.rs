@@ -38,6 +38,9 @@ pub struct TableData {
     pub col_align: Vec<CellAlign>,
     /// The header cells are bold (custom tables).
     pub header_bold: bool,
+    /// Cells merged by the data (hole tables' SIZE and QTY per size), in
+    /// [`TableData::all_rows`] rows.
+    pub merges: Vec<super::CellMerge>,
     /// Drawing properties › Tables for the table (None: tables drawn on
     /// their own, as in unit tests).
     pub style: Option<AppliedStyle>,
@@ -348,7 +351,7 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             let header = if *header && !rows.is_empty() { Some(rows.remove(0)) } else { None };
             // Live 744–750: header cells bold and centred, body cells left-aligned.
             let col_align = vec![CellAlign::Left; cells.iter().map(|r| r.len()).max().unwrap_or(0)];
-            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), col_align, header_bold: true, style: None }
+            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), col_align, header_bold: true, style: None, merges: Vec::new() }
         }
         TableKind::Bom { structured, bottom_to_top, overrides, .. } => {
             // Onshape's BOM table columns (live drawing/189): Item, Quantity,
@@ -389,19 +392,65 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             }
             TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden, ..Default::default() }
         }
-        TableKind::Hole { precision, origin: stored, flip_x, flip_y, .. } => {
+        TableKind::Hole { precision, origin: stored, flip_x, flip_y, show_location, bottom_to_top, .. } => {
+            // Live (behaviours 1983): TAG | X LOC | Y LOC | SIZE | QTY, a
+            // size's SIZE and QTY cells merged down its rows; ☐ Show
+            // location data drops X / Y LOC.
             let (sx, sy) = (if *flip_x { -1.0 } else { 1.0 }, if *flip_y { -1.0 } else { 1.0 });
-            let header = Some(vec!["TAG".into(), "X LOC".into(), "Y LOC".into(), "SIZE".into()]);
+            let mut header: Vec<String> = vec!["TAG".into()];
+            if *show_location {
+                header.extend(["X LOC".into(), "Y LOC".into()]);
+            }
+            header.extend(["SIZE".into(), "QTY".into()]);
             let f = DimFormat { precision: *precision, ..Default::default() };
             let u = length_units(drawing, &f);
             let num = |m: f64| format_number(m / u.meters(), f.precision, default_digits(u));
-            let rows = view_geo
-                .map(|g| hole_rows(g, origin.unwrap_or(*stored)))
-                .unwrap_or_default()
-                .into_iter()
-                .map(|h| vec![h.tag, num(h.x * sx), num(h.y * sy), format!("Ø{}", num(h.diameter))])
+            let holes = view_geo.map(|g| hole_rows(g, origin.unwrap_or(*stored))).unwrap_or_default();
+            // Groups of one size: consecutive rows (hole_rows keeps a size together).
+            let mut groups: Vec<(usize, usize)> = Vec::new();
+            for (i, h) in holes.iter().enumerate() {
+                match groups.last_mut() {
+                    Some((s, n)) if (holes[*s].diameter - h.diameter).abs() < 1e-12 => *n += 1,
+                    _ => groups.push((i, 1)),
+                }
+            }
+            let mut rows: Vec<Vec<String>> = Vec::new();
+            for &(s, n) in &groups {
+                for (k, h) in holes[s..s + n].iter().enumerate() {
+                    let mut r = vec![h.tag.clone()];
+                    if *show_location {
+                        r.extend([num(h.x * sx), num(h.y * sy)]);
+                    }
+                    // The merged cells carry the text in their first row.
+                    r.push(if k == 0 { format!("Ø{}", num(h.diameter)) } else { String::new() });
+                    r.push(if k == 0 { n.to_string() } else { String::new() });
+                    rows.push(r);
+                }
+            }
+            let (size_col, nrows) = (header.len() - 2, rows.len());
+            if *bottom_to_top {
+                rows.reverse();
+            }
+            // In all_rows' order: the header first (or last, bottom to top).
+            let merges = groups
+                .iter()
+                .filter(|(_, n)| *n > 1)
+                .flat_map(|&(s, n)| {
+                    let row = if *bottom_to_top { nrows - (s + n) } else { s + 1 };
+                    [super::CellMerge { row, col: size_col, rows: n, cols: 1 }, super::CellMerge { row, col: size_col + 1, rows: n, cols: 1 }]
+                })
                 .collect();
-            TableData { title: Some("HOLE TABLE".into()), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
+            if *bottom_to_top {
+                // The text sits in the first (now topmost) row of each group.
+                for &(s, n) in &groups {
+                    let (top, bottom) = (nrows - (s + n), nrows - 1 - s);
+                    for c in [size_col, size_col + 1] {
+                        let v = std::mem::take(&mut rows[bottom][c]);
+                        rows[top][c] = v;
+                    }
+                }
+            }
+            TableData { title: Some("HOLE TABLE".into()), header: Some(header), rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new(), merges, ..Default::default() }
         }
         TableKind::Revision { .. } => revision_data(&table.kind, revisions),
         // Resolved by [`table_data_with`] from the evaluated tables.

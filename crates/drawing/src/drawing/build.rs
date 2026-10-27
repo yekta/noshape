@@ -2132,6 +2132,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             _ => None,
         };
         let data = tables::table_data_with(drawing, t, geo, source, origin, info, &expand);
+        let merged;
+        let t = if data.merges.is_empty() {
+            t
+        } else {
+            merged = super::Table { merges: t.merges.iter().copied().chain(data.merges.iter().copied()).collect(), ..t.clone() };
+            &merged
+        };
         let layout = tables::layout(t, &data);
         let (l0, t0, f0) = (g.lines.len(), g.texts.len(), g.fills.len());
         tables::render(&mut g, t, &data, &layout, pick);

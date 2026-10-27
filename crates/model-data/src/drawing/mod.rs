@@ -1297,6 +1297,12 @@ pub enum TableKind {
         flip_x: bool,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         flip_y: bool,
+        /// Hole table › ☑ Show location data (the X LOC / Y LOC columns).
+        #[serde(default = "yes_hole", skip_serializing_if = "is_true")]
+        show_location: bool,
+        /// Order: Bottom to top.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        bottom_to_top: bool,
     },
     /// Cut list of the frame members of the Part Studio shown by `view`
     /// (the Cut list feature's rows); Order "Bottom to top" reverses it.
@@ -3077,6 +3083,14 @@ impl TableStyles {
             TableKind::Revision { .. } => &self.revision,
         }
     }
+}
+
+fn yes_hole() -> bool {
+    true
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
 }
 
 /// One kind's table look: line pen (mm), font, title row height (None:

@@ -3286,6 +3286,8 @@ fn drawing_table_menu_edits() {
     assert_eq!(last(&mut ctx), "Fit table");
     let e = edit(&mut ctx, json!({ "action": "flip_x" })).unwrap_err();
     assert!(e.message.contains("hole tables"), "{e:?}");
+    let e = edit(&mut ctx, json!({ "action": "show_location", "on": false })).unwrap_err();
+    assert!(e.message.contains("hole tables"), "{e:?}");
     let e = edit(&mut ctx, json!({ "action": "merge_right", "row": 1, "column": 2 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("action"), "{e:?}");
 

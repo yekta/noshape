@@ -14,7 +14,7 @@ use noshape_model::drawing::{CellAlign, Table, TableCorner, TableKind};
 use noshape_scene::drawing_tools::table_edit::{self as te, FormatFields, FormatScope};
 use serde_json::{Value, json};
 
-const ACTIONS: [&str; 20] = [
+const ACTIONS: [&str; 21] = [
     "format_cell",
     "merge_right",
     "merge_below",
@@ -31,6 +31,7 @@ const ACTIONS: [&str; 20] = [
     "flip_x",
     "flip_y",
     "precision",
+    "show_location",
     "order",
     "bom_type",
     "fixed_corner",
@@ -45,7 +46,7 @@ pub fn ops() -> Vec<Op> {
         group: "drawing",
         verb: "table_edit",
         summary: "Edit a table from its menus: cells, merge, rows / columns, size, split, order, corner, text height",
-        description: "The table context menus, one edit each. Cells are (`row`, `column`) counted from 0 below the title (the header is row 0); a block of cells runs to (`to_row`, `to_column`).\n- `format_cell`: Format cell… (`scope` cell | row | column | table; `align` left | center | right, `bold`, `height` mm or null for the table's) (\"Format cells\").\n- `merge_right` / `merge_below` (\"Merge cells\"), `unmerge` (\"Unmerge cells\").\n- General tables, a block selected: `merge` (`mode` all | horizontal | vertical), `insert` (`at` column_left | column_right | row_above | row_below), `remove` / `duplicate` (`what` columns | rows); edit texts the menu's (\"All\", \"Column Left\", \"Rows\"…).\n- `columns_equally` / `rows_equally`: Size ▸ — of the block's columns / rows when a block is given (two or more), else the whole table.\n- `resize`: Resize… column `column`'s `width` and the row `height` (mm) (\"Resize cell\").\n- BOM, cut list and custom tables: `split` below displayed row `row` (\"Split table\"; the reply's `table` is the new part), `unsplit` (\"Unsplit table\").\n- Hole tables: `flip_x`, `flip_y`, `precision` (`decimals` 0–4 or null for the drawing's).\n- `order` (`to` top_to_bottom | bottom_to_top; BOM and cut list), `bom_type` (`to` flattened | structured).\n- `fixed_corner` (`to` top_right | top_left | bottom_right | bottom_left; the table stays put), `text_height` (`to` 2.5 | 3 | 3.5 | 5 mm), `fit` (Fit to content).",
+        description: "The table context menus, one edit each. Cells are (`row`, `column`) counted from 0 below the title (the header is row 0); a block of cells runs to (`to_row`, `to_column`).\n- `format_cell`: Format cell… (`scope` cell | row | column | table; `align` left | center | right, `bold`, `height` mm or null for the table's) (\"Format cells\").\n- `merge_right` / `merge_below` (\"Merge cells\"), `unmerge` (\"Unmerge cells\").\n- General tables, a block selected: `merge` (`mode` all | horizontal | vertical), `insert` (`at` column_left | column_right | row_above | row_below), `remove` / `duplicate` (`what` columns | rows); edit texts the menu's (\"All\", \"Column Left\", \"Rows\"…).\n- `columns_equally` / `rows_equally`: Size ▸ — of the block's columns / rows when a block is given (two or more), else the whole table.\n- `resize`: Resize… column `column`'s `width` and the row `height` (mm) (\"Resize cell\").\n- BOM, cut list and custom tables: `split` below displayed row `row` (\"Split table\"; the reply's `table` is the new part), `unsplit` (\"Unsplit table\").\n- Hole tables: `flip_x`, `flip_y`, `precision` (`decimals` 0–4 or null for the drawing's).\n- `order` (`to` top_to_bottom | bottom_to_top; BOM, cut list and hole tables), `show_location` (`on`: a hole table's X LOC / Y LOC columns, Show location data), `bom_type` (`to` flattened | structured).\n- `fixed_corner` (`to` top_right | top_left | bottom_right | bottom_left; the table stays put), `text_height` (`to` 2.5 | 3 | 3.5 | 5 mm), `fit` (Fit to content).",
         fields: vec![
             doc_field(),
             drawing_field(),
@@ -65,6 +66,7 @@ pub fn ops() -> Vec<Op> {
             opt("at", json!({ "type": "string", "enum": ["column_left", "column_right", "row_above", "row_below"] }), "insert."),
             opt("what", json!({ "type": "string", "enum": ["columns", "rows"] }), "remove, duplicate."),
             opt("decimals", json!({ "type": ["integer", "null"], "minimum": 0, "maximum": 4 }), "precision."),
+            opt("on", json!({ "type": "boolean", "default": true }), "show_location."),
             opt("to", json!({ "type": ["string", "number"] }), "order, bom_type, fixed_corner, text_height: the choice."),
         ],
         mutates: true,
@@ -268,7 +270,16 @@ fn table_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             "Unsplit table"
         }
-        "flip_x" | "flip_y" | "precision" if !matches!(table.kind, TableKind::Hole { .. }) => return refuse("hole tables only"),
+        "flip_x" | "flip_y" | "precision" | "show_location" if !matches!(table.kind, TableKind::Hole { .. }) => return refuse("hole tables only"),
+        "show_location" => {
+            let on = a.bool_or("on", true)?;
+            edit(&mut t, &move |x| {
+                if let TableKind::Hole { show_location, .. } = &mut x.kind {
+                    *show_location = on;
+                }
+            });
+            "Show location data"
+        }
         "flip_x" | "flip_y" => {
             let fx = action == "flip_x";
             edit(&mut t, &move |x| {
@@ -296,10 +307,11 @@ fn table_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let desc = match table.kind {
                 TableKind::Bom { .. } => "BOM order",
                 TableKind::CutList { .. } => "Cut list order",
-                _ => return refuse("BOM and cut list tables only"),
+                TableKind::Hole { .. } => "Hole table order",
+                _ => return refuse("BOM, cut list and hole tables only"),
             };
             edit(&mut t, &move |x| match &mut x.kind {
-                TableKind::Bom { bottom_to_top, .. } | TableKind::CutList { bottom_to_top, .. } => *bottom_to_top = up,
+                TableKind::Bom { bottom_to_top, .. } | TableKind::CutList { bottom_to_top, .. } | TableKind::Hole { bottom_to_top, .. } => *bottom_to_top = up,
                 _ => {}
             });
             desc
