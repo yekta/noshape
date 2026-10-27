@@ -164,6 +164,19 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
+## 09:10–09:40 (green dacce5e7 → eab98680, watcher CLI 08:30)
+- **BUDGET-LONGJMP (P0 core, new)**: the budgets siglongjmp out of OCCT from a timer signal. Fuzz seed 120 deadlocked
+  on glibc's main_arena lock (backtrace + 2.6 GB core in tickets/). Seed 93 with NOSHAPE_BLEND_BUDGET=100000 ran
+  through its usual crash step (seed 72 no-budget replays running): supports it as BOOL-THREAD-CRASH's cause.
+- Re-checked old tickets: BOOL-TOUCH-INFO (now INFO but the parts are kept; live deletes them), HOLE-MISS-MSG (ours now
+  auto-flips the hole; live doesn't), PATTERN-REAPPLY-CUT-ONLY and ADV2 unchanged.
+- New P2/P3: API-MATE-RETYPE-NAME, LEFT-RAIL-WHERE-USED, PERF-TOTAL-MISMATCH; MASS-INERTIA-APPROX matrix (torus Ixx off at
+  3 decimals, tube Ixy); DWG-DIM-TWO-EDGES: the API's smart dimension is right.
+- OK: versions (create V1, view-only V1, back to Main), feature list filter, Show dependencies, mate DOF per type,
+  interference volume, drawing exports (DXF R14 / SVG / PNG / PDF), Extrude end-type dialogs = live captures, measure
+  diameters / centres / lengths exact, no memory growth over 30 commits (~1 GB plateau).
+- release/v0.4.9 is now fcd301e2 (Windows fix in; DRAFT-HANG budget not in; carries the longjmp budget); its CI is running.
+
 ## Green dacce5e7 / watcher CLIs 08:12–08:30 (2026-10-27 08:30–09:10)
 - New: MEASURE-MAX-DIST (P1: max distance between curved faces / circles is sampled, 94.850 vs 94.868, 89.981 vs 90),
   MASS-INERTIA-APPROX (P2: curved parts' inertia / CoM approximate; boxes exact), UNDO-NOOP-SHIFT (P1: a no-op op pushes an
