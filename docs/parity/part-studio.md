@@ -292,28 +292,28 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 12.1 | Variable table panel on the right | variable_table | ✅ |  |
-| 12.2 | Configuration panel and configuration selectors | configurations | ✅ |  |
-| 12.3 | `#variable` in any numeric field; :variable filter finds users | variable_table; features_and_parts_lists | ✅ (quoted = exact) |  |
-| 12.4 | Hover a variable highlights the features that use it; right-click > Filter feature list | variable_table | ✅ (`:variable "name"`, live 564) |  |
+| 12.1 | Variable table panel on the right | variable_table | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 12.2 | Configuration panel and configuration selectors | configurations | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 12.3 | `#variable` in any numeric field; :variable filter finds users | variable_table; features_and_parts_lists | ✅ (quoted = exact) | 0.4.10+ / 2d9a275c 10-27 |
+| 12.4 | Hover a variable highlights the features that use it; right-click > Filter feature list | variable_table | ✅ (`:variable "name"`, live 564) | 0.4.10+ / 2d9a275c 10-27 |
 
 ### Found in the live capture
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 13.1 | A new feature hides the sketch it consumes | live (selection/02) | ✅ |  |
-| 13.2 | Ctrl+A does nothing in the Part Studio | live (shortcuts/14) | ✅ (not bound) |  |
-| 13.3 | Delete/Backspace on a selected feature deletes it at once (no confirmation, no toast); Ctrl+Z restores it | live (shortcuts/15) | ✅ (Delete and Ctrl+Z verified) |  |
-| 13.4 | Tab skips the End type dropdown; Shift+Tab from Depth reaches the flip button | live | ✅ |  |
-| 13.5 | Depth arrow: hover outlines it blue; dragging updates the Depth field with the value selected; no viewport label | live (dialogs/extrude-05..07) | ✅ (app 10-24 vs dialogs/extrude-05..07: the field is focused with the value selected during the drag too, not only after; the dragged arrow is one solid blue stroke (≈ #2c61a3), the hovered one blue around a light-blue core; values move in 0.1 mm / 0.01 in steps like live's "13.9 mm", "2.06 in") |  |
-| 13.6 | Hovering a selected feature row shows "Extrude 1 <- Sketch 1" | live | ✅ |  |
-| 13.7 | Rollback bar: no right-click menu; after clicking a feature row ↑/↓ move the bar; focused bar `#a0c7dd`; dragging shows a "Rollback bar" pill and a 2 px blue drop line | live | ✅ |  |
-| 13.8 | Picking through planes: a part face behind a transparent plane always wins | live (selection/30–31) | ✅ (verified: the face behind the Right plane is picked) |  |
-| 13.9 | Copy here… opens Transform (Translate by XYZ, Copy part) for the part | live (part-studio/102) | ✅ |  |
-| 13.11 | Deleting a tab: no confirmation and no toast (a "Delete tabs" warning only when other tabs use it); Ctrl+Z doesn't bring it back; Versions and history > right-click an earlier change > Restore restores it. Undo is per tab: Ctrl+Z reverts the active tab's newest edit only | live; Document__document_tabs; Document__versions_and_history | ✅ (`UndoStack::undo_in`/`redo_in`, `commit_not_undoable`) |  |
-| 13.12 | A Variable shows as "#name = value" ("#? = …" until named) in the list and its dialog title; its dialog opens with Name focused | live (Variable dialog) | ✅ |  |
+| 13.1 | A new feature hides the sketch it consumes | live (selection/02) | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 13.2 | Ctrl+A does nothing in the Part Studio | live (shortcuts/14) | ✅ (not bound) | 0.4.10+ / 2d9a275c 10-27 |
+| 13.3 | Delete/Backspace on a selected feature deletes it at once (no confirmation, no toast); Ctrl+Z restores it | live (shortcuts/15) | ✅ (Delete and Ctrl+Z verified) | 0.4.10+ / 2d9a275c 10-27 |
+| 13.4 | Tab skips the End type dropdown; Shift+Tab from Depth reaches the flip button | live | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 13.5 | Depth arrow: hover outlines it blue; dragging updates the Depth field with the value selected; no viewport label | live (dialogs/extrude-05..07) | ✅ (app 10-24 vs dialogs/extrude-05..07: the field is focused with the value selected during the drag too, not only after; the dragged arrow is one solid blue stroke (≈ #2c61a3), the hovered one blue around a light-blue core; values move in 0.1 mm / 0.01 in steps like live's "13.9 mm", "2.06 in") | 0.4.10+ / 2d9a275c 10-27 |
+| 13.6 | Hovering a selected feature row shows "Extrude 1 <- Sketch 1" | live | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 13.7 | Rollback bar: no right-click menu; after clicking a feature row ↑/↓ move the bar; focused bar `#a0c7dd`; dragging shows a "Rollback bar" pill and a 2 px blue drop line | live | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 13.8 | Picking through planes: a part face behind a transparent plane always wins | live (selection/30–31) | ✅ (verified: the face behind the Right plane is picked) | 0.4.10+ / 2d9a275c 10-27 |
+| 13.9 | Copy here… opens Transform (Translate by XYZ, Copy part) for the part | live (part-studio/102) | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 13.11 | Deleting a tab: no confirmation and no toast (a "Delete tabs" warning only when other tabs use it); Ctrl+Z doesn't bring it back; Versions and history > right-click an earlier change > Restore restores it. Undo is per tab: Ctrl+Z reverts the active tab's newest edit only | live; Document__document_tabs; Document__versions_and_history | ✅ (`UndoStack::undo_in`/`redo_in`, `commit_not_undoable`) | 0.4.10+ / 2d9a275c 10-27 |
+| 13.12 | A Variable shows as "#name = value" ("#? = …" until named) in the list and its dialog title; its dialog opens with Name focused | live (Variable dialog) | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 13.13 | Configurations: "+ Configure features", click a feature, then a parameter (outlined in yellow in its dialog) to configure it; a dialog shows and edits the active configuration's values of configured parameters | PartStudio__part_studio_and_assembly_configurations | ✅ (was: the dialog showed and edited the base value, which the table then overrode) |  |
-| 13.10 | Clicking a face/edge/vertex while a parts field is active (Boolean Tools…) takes its part; hovering highlights the whole part | (Onshape behaviour) | ✅ |  |
+| 13.10 | Clicking a face/edge/vertex while a parts field is active (Boolean Tools…) takes its part; hovering highlights the whole part | (Onshape behaviour) | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 
 | 13.14 | Release management (local, no approvers): parts list Release… opens "Create Release candidate" (items with Revision / State / Part number, needs-attention count and messages, Release name * and notes, Save draft, Apply → "Review Release", Release, Close); Release writes the part numbers, creates a version named after the release and records it (store meta "releases"); revisions A, B, C… skipping I O Q S X Z, never lower than released, auto-obsolete of the previous revision; Revision history (View release, Obsolete revision → "Create Obsolete candidate" with re-releasable option); versions graph ▲ release / ◭ contains obsoletion, legend, Releases ▸ submenu → Review Release; Properties show the released revision | docs-raw Release__*.md (no live capture: free plan) | 🔧 (Add items (+), Release all configurations, the versions-panel release icon and tab-menu Release… still to do) 19 Oct: Release… on Part Studio / Assembly / Drawing / Variable Studio / file tabs (`tab_items`: BOM parts, drawing sources) and the versions panel, Revision history on Assembly / Drawing / Variable Studio tabs, obsoletion marks the released version, Release drafts panel (rail) with double-click → Review Release, Save draft ▴ Save / Delete draft, State "In progress" for workspace items, empty Release name, imported revision kept, Not revision managed, drawing revision tables fed from the log, Revision history User / Document / Version link / View obsoletion. Remaining gaps listed in the handoff. |
 | 13.15 | Hole: Up to next / Up to entity show the computed depth read-only ("Multiple" with several points), and the name template follows hole.fs (thread size, ↧ depth / computed depth / THRU, ⌴ / ⌵ parts) with values as the fields show them, also in the list row while editing | hole.fs getFeatureName, setFeatureComputedParameter; live part-studio/436 | ✅ (verified: Multiple, 10 mm, "Ø 6.35 mm ↧ 12 mm" in title and row) |
