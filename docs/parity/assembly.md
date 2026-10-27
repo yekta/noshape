@@ -257,9 +257,9 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | R4 | Click an instance shows the triad: axis arrows, plane squares, rotation arcs | H:triad | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | R5 | Drag the triad center to reposition it (snaps to MCs / inference points) | H:triad | ✅ | |  |
 | R6 | Typed value field after a triad drag | H:triad | ✅ | |  |
-| R7 | Right-click center: Move to origin | H:triad | ✅ | |  |
-| R8 | Right-click axis arrow: Align with Z, Anti-align with Z | H:triad | ✅ | |  |
-| R9 | Right-click arc: Rotate 90 degrees, Rotate 180 degrees | H:triad | ✅ | |  |
+| R7 | Right-click center: Move to origin | H:triad | ✅ | | 0.4.10+ / acd6acce 10-27 (handle clicked first, then right-click; tickets/asm-triad-menus-acd6.png) |
+| R8 | Right-click axis arrow: Align with Z, Anti-align with Z | H:triad | ✅ | | 0.4.10+ / acd6acce 10-27 (handle clicked first, then right-click; tickets/asm-triad-menus-acd6.png) |
+| R9 | Right-click arc: Rotate 90 degrees, Rotate 180 degrees | H:triad | ✅ | | 0.4.10+ / acd6acce 10-27 (handle clicked first, then right-click; tickets/asm-triad-menus-acd6.png) |
 | R10 | Box selection selects instances (Shift/Ctrl adds) | — | ✅ | |  |
 | R11 | Mate values on the selected mate; double-click a value to type one | H:mates | ✅ | live 300–318, 305z; bundle `calculateMateValues` / `calculateDimensionDisplayData`: the first connector measured in the second's frame (`onshape_mate_values`; typed values converted back to the solver's convention by `solver_values_for`, unit test `typed_mate_values_round_trip_through_the_solver_convention`). Rotation: angular dimension around the moving connector, radius 80 px fixed when first shown (`PREVIEW_ANGULAR_DIMENSION_RADIUS_PIXEL_SIZE`), arc from +X through the value, arrowheads out, text at half the sweep in the plane along X, arc broken around it. Translations: in-plane linear dimensions X: origin → x, Y: (x,0) → (x,y), Z: (x,y,0) → (x,y,z), arrowheads out, text centred, line broken (`value_dims`, `ValueLine`). GUI :103 r1–r5: Revolute 1 selected shows 0.000°, double-click (`xdotool click --repeat 2 --delay 1`; a longer delay splits the clicks under Xvfb) opens the box, 30 ↵ turns the pin, the arc reads 30.000° |  |
 | R12 | Mates solved simultaneously; red when unsolvable | E§24.2 | ✅ | |  |
