@@ -307,6 +307,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the same; feature_dialog.rs
   InputEvent::Blur → commit_number + flush_typed looks right, so the Changed event seems lost on the way (qa 2026-10-26,
   build 4d2f6b0c)
+- [x] 4e55b01f P1 PREVIEW-NO-PICK (psui found 10-27, regression of 8bf820e0 in v0.4.8 / green ≥ 136c6738): with a feature dialog previewing (new Extrude, any edit), nothing in the graphics hovered or picked: the pick pass drew only the unpickable copy of the model before the feature. Fixed: the preview's pick pass picks the model with the feature (offscreen::a_preview_picks_the_model_with_the_feature). Check: Shift+E on a block, hover its top face (orange boundary), click it (chip "Face of Extrude 1").
 - [ ] P2 P1-8 caveat (qa5, carried over) a reopened Hole whose points were clicked one by one shows one grouped chip
   "Vertices of Sketch N"; live keeps one "Vertex of Sketch N" chip per click (the grouping isn't stored; details in
   docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop") (qa5 2026-10-26)
