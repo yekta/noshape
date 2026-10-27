@@ -107,12 +107,9 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.
-1. Open tickets (10-27 21:00): SKETCH-LINE-MENU (P2): qa's shot was a point's menu; the line's is live's. Waiting on
-   live (REQUESTS "sketch point menus") for a point's exact menu, then match it.
-2. Circular pattern › Axis of pattern pre-highlight (qa's note on ASM-DIR-NO-HOVER): parked patch
-   /root/skasm-scratch/circ-axis.patch (entity picking for Circular too; a bare circle edge / cylinder resolves to its
-   axis). Apply, check on :103 with qa/asm1.noshape (a pin's circular edge as the axis), land. Waited on main's kernel
-   build (features.cpp `far`, Requests above).
+1. Open tickets: none in my section (10-27 21:30). e52e8015 point menus as live, circular pattern axis picks the
+   entity (pre-highlight); UI keystroke tests now 9 (polygon sides typed, Enter in a Line chain added).
+2. (Tried: writing back solved components between conflict-exclusion retries: no gain measured, dropped.)
 3. UI keystroke tests (docs/TESTS.md, part-studio-ui sketch_ui_tests.rs, 7 tests): extend to other P1 sketch key
    flows (`=#var` in a value box, polygon sides typed, Tab between rectangle boxes, Enter in a Line chain). The harness
    is part-studio-ui only; assembly-ui could opt in the same way (dev-dependency on noshape-ui-test-support + gpui).
@@ -149,9 +146,6 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
 ## Requests to the lead
-- **20:40 main doesn't build on Linux**: crates/kernel/cpp/features.cpp:3296/3300/3305/3418 (core's ab192d94
-  fillet_square_corner) use `far` as a variable; fea4d943 defines near/far empty on Linux, so `const TopoDS_Vertex
-  far = …` fails ("expected unqualified-id before '='"). Rename it there (core's file; I haven't touched it).
 - "Show calculation variance" in Mass properties (live: behaviours "skasm (2026-10-27) calculation variance": every
   value gets " ± 4.000e-1 mm³"-style text, 3-decimal scientific, not persisted). The assembly panel
   (assembly-ui/assembly_mass.rs) is mine, the Part Studio one psui's (part-studio-ui menus.rs ~1329), and the numbers
