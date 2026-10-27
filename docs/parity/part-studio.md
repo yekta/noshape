@@ -123,7 +123,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 5.1 | Green check accepts, red X cancels | feature_basics | ✅ | 0.4.10+ / 6011065d 10-27 |
-| 5.2 | Title red while the feature errors; the ✓ is disabled but Enter still commits (the model falls back to the state before the feature) | live | 🔧 (DIALOG-OK-STATE: live = canSubmit (dirty, no parameter error): a new dialog's ✓ disabled, any edit enables it and a failing feature commits red; invalid or out-of-range values disable it) | 0.4.10+ / f16b31c6 10-27 |
+| 5.2 | Title red while the feature errors; the ✓ is disabled but Enter still commits (the model falls back to the state before the feature) | live | ✅ (verified qa f16b31c6; DIALOG-OK-STATE: live = canSubmit (dirty, no parameter error): a new dialog's ✓ disabled, any edit enables it and a failing feature commits red; invalid or out-of-range values disable it) | 0.4.10+ / f16b31c6 10-27 |
 | 5.3 | Error/warning message shown in the dialog | Home__error_indicators | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.4 | Fields appear/disappear live from their visibility conditions | A §7.1 | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.4b | Clicks and right-clicks on the dialog (and other panels over the graphics area) never reach the model beneath | (Onshape behaviour) | 🔧 (clicking a field also picked/deselected geometry under it) |  |
