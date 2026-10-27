@@ -556,6 +556,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Section view…", Op("render_image")),
     ("partStudio:Select other…", Op("ui_select")),
     ("partStudio:Select", Op("ui_select")),
+    ("partStudio:Show all planes", Op("feature_set_visibility")),
     ("partStudio:Show all", Op("feature_set_visibility")),
     ("partStudio:Show dependencies…", Op("feature_dependencies")),
     ("partStudio:Show dimensions", Op("sketch_get")),

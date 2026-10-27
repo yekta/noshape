@@ -2986,12 +2986,20 @@ impl PartStudioView {
                         // Hide | Show dependencies….
                         let r = r.clone();
                         let is_plane = matches!(r, Reference::Plane(_));
+                        // Live (behaviours "6.28 Default planes can't be deleted", PLANE-MENU-SELECTED): a selected
+                        // plane's menu adds Section view… and Clear selection.
+                        let selected = view.read(cx).selection.contains(&r);
                         let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
                         let (r1, r2, r3, r4) = (r.clone(), r.clone(), r.clone(), r.clone());
                         let (vn, rn) = (view.clone(), r.clone());
                         let mut m = menu.item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, w, cx| vn.update(cx, |this, cx| this.start_default_rename(rn.clone(), w, cx)))).separator();
                         if is_plane {
                             let (vs, rs) = (view.clone(), r.clone());
+                            // Live: Paste sketch comes first in the group.
+                            if PartStudioView::clipboard_has_sketch(cx) {
+                                let (vp, rp) = (view.clone(), r.clone());
+                                m = m.item(crate::os_menu::OsMenuItem::new("Paste sketch").on_click(move |_, _, cx| vp.update(cx, |this, cx| this.paste_sketch_onto(rp.clone(), cx))));
+                            }
                             m = m
                                 .item(crate::os_menu::OsMenuItem::new("New sketch…").icon_name("sketch").on_click(move |_, w, cx| {
                                     v1.update(cx, |this, cx| {
@@ -3006,19 +3014,29 @@ impl PartStudioView {
                                     })
                                 }))
                                 .item(crate::os_menu::OsMenuItem::new("Size to Part Studio").on_click(move |_, _, cx| vs.update(cx, |this, cx| this.size_plane_to_studio(rs.clone(), cx))));
-                            if PartStudioView::clipboard_has_sketch(cx) {
-                                let (vp, rp) = (view.clone(), r.clone());
-                                m = m.item(crate::os_menu::OsMenuItem::new("Paste sketch").on_click(move |_, _, cx| vp.update(cx, |this, cx| this.paste_sketch_onto(rp.clone(), cx))));
-                            }
                             m = m.separator();
                         }
                         m = m.item(crate::os_menu::OsMenuItem::new(if hidden { "Show" } else { "Hide" }).icon_name(if hidden { "eye" } else { "eye-off" }).on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_visibility(std::slice::from_ref(&r2), !hidden, cx))));
                         if is_plane {
                             let (vo, ro, va) = (view.clone(), r.clone(), view.clone());
                             let (vz, rz) = (view.clone(), r.clone());
+                            // Live: a hidden plane offers Show all planes instead of Hide other / Hide all.
+                            m = if hidden {
+                                m.item(crate::os_menu::OsMenuItem::new("Show all planes").on_click(move |_, _, cx| {
+                                    va.update(cx, |this, cx| {
+                                        let planes: Vec<Reference> = this.display.planes.iter().map(|p| p.reference.clone()).collect();
+                                        this.set_visibility(&planes, false, cx);
+                                    })
+                                }))
+                            } else {
+                                m.item(crate::os_menu::OsMenuItem::new("Hide other planes").on_click(move |_, _, cx| vo.update(cx, |this, cx| this.hide_planes(Some(&ro), cx))))
+                                    .item(crate::os_menu::OsMenuItem::new("Hide all planes").on_click(move |_, _, cx| va.update(cx, |this, cx| this.hide_planes(None, cx))))
+                            };
+                            if selected {
+                                let (vx, rx) = (view.clone(), r.clone());
+                                m = m.item(crate::os_menu::OsMenuItem::new("Section view…").icon_name("menu-section-view").on_click(move |_, w, cx| vx.update(cx, |this, cx| this.section_through(rx.clone(), w, cx))));
+                            }
                             m = m
-                                .item(crate::os_menu::OsMenuItem::new("Hide other planes").on_click(move |_, _, cx| vo.update(cx, |this, cx| this.hide_planes(Some(&ro), cx))))
-                                .item(crate::os_menu::OsMenuItem::new("Hide all planes").on_click(move |_, _, cx| va.update(cx, |this, cx| this.hide_planes(None, cx))))
                                 .separator()
                                 .item(crate::os_menu::OsMenuItem::new("Zoom to selection").on_click(move |_, _, cx| {
                                     vz.update(cx, |this, cx| {
@@ -3032,6 +3050,17 @@ impl PartStudioView {
                                         this.view_normal(cx);
                                     })
                                 }));
+                            if selected {
+                                let vc = view.clone();
+                                m = m.item(crate::os_menu::OsMenuItem::new("Clear selection").on_click(move |_, _, cx| {
+                                    vc.update(cx, |this, cx| {
+                                        this.selection.clear();
+                                        this.selected_features.clear();
+                                        this.refresh_scene(false, cx);
+                                        cx.notify();
+                                    })
+                                }));
+                            }
                         }
                         let (vd, rd) = (view.clone(), r.clone());
                         m = m.separator().item(crate::os_menu::OsMenuItem::new("Show dependencies…").on_click(move |_, _, cx| {
