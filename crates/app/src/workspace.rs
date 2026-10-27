@@ -1230,9 +1230,9 @@ impl Workspace {
                                 let doc = v10.read(cx).doc.clone();
                                 dd::move_to_document(doc, vec![id], w, cx)
                             }));
-                        // Only Drawings export from the tab (live 10-24: parts export
-                        // from their own menu, assemblies from the instance list).
-                        let menu = if kind == "drawing" { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
+                        // Live (dom/context-menus-partstudio.txt rmb-tab-partstudio / -assembly, TAB-EXPORT-MISSING):
+                        // Part Studio, Assembly and Drawing tabs end with Export… (before an Assembly's Release…).
+                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         // Release management (help image Release_highlighted2, live
                         // rmb-tab-assembly / -drawing: the last entry, after Export…):
                         // Release… for Assemblies, Drawings, Variable Studios and files
