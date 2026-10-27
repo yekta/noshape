@@ -596,6 +596,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 API-ASM-CONFIG-NAMES assembly_insert / assembly_set_configuration take a configuration by input **name**
+  (their own examples: `{"configuration": {"Size": "Large"}}`) and store it, but the instance regenerates in the default
+  configuration. Steps (bin/cfgasm2.py, CLI 09:50): Part Studio with a List input named "Size" (id "Configuration",
+  options Default / Large: Extrude 1 depth 10 / 20) and a Checkbox "NoBoss" (id "Checkbox_2", suppresses Extrude 2);
+  insert Part 1 four times: no configuration, `{"Size": "Large"}`, `{"Configuration": "Large"}`, `{"Checkbox_2": true}`.
+  assembly_entities faces: 11 / top z 18; **11 / z 18** (should be z 28); 11 / z 28; 6 / z 10. assembly_list still
+  reports `{"Size": "Large"}` for <2>, and the BOM puts <1> and <2> in one row (qty 2). Names work where name == id
+  (config Variable "h") and in config_activate. Resolve names to ids (as config_activate does) or refuse an unknown
+  input; don't store and report a configuration that isn't applied (qa 2026-10-27 10:45, CLI 09:50)
 - [x] verified green 3197362b / watcher CLI 09:50 (qa: Revolute 1 → slider "Slider 1", → fastened "Fastened 1") (dx 10-27: a default name follows the new type keeping its number, a custom name stays (noshape_model::default_names::retyped, the dialog's rule); e2e assembly_with_mates retypes Revolute 1 → Slider 1) P2 API-MATE-RETYPE-NAME assembly_mate editing an existing mate's `type` keeps its old name: asm5.noshape's "Revolute 1"
   retyped to fastened / slider / cylindrical / planar / ball / pin slot stays "Revolute 1" (DOF right in each case: 0 1 1 2 3
   3 2). In the app, retyping in the mate dialog renames the mate (Cylindrical 1 → Revolute: title and row "Revolute 1",
