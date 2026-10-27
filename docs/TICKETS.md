@@ -363,6 +363,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     compound). The API takes the same two edges for the compound feature (feature_add OK), so it is the dialog's pick
     filter that rejects ALLOWS_AXIS. Live: the exact entity types per mode and for the custom query are asked in
     REQUESTS "qa (2026-10-27, P1 LP-DIRECTION-PICK)" (A)–(F) (qa 2026-10-27 10:30)
+  - Likely cause of the compound-filter part (code read, qa 10:45): crates/custom/src/custom/studio.rs `filter_of`
+    `Ann::And` intersects the two sides' bits. `EntityType.EDGE` = ANY_EDGE = EDGE | SKETCH_EDGE (params.rs:189), and
+    `ALLOWS_AXIS` = LINEAR_EDGE | CIRCULAR_EDGE | SKETCH_EDGE | CYLINDRICAL_FACE | MATE_CONNECTOR (studio.rs:738), so the
+    intersection is **SKETCH_EDGE only** and every model edge is rejected. The same holds for `EDGE && GeometryType.LINE`
+    / `.CIRCLE` and `EDGE && ALLOWS_DIRECTION`: the "EDGE && LINE -> linear edges" refinement in the comment never
+    yields model edges, because `EDGE` doesn't carry LINEAR_EDGE / CIRCULAR_EDGE (or SOLID_EDGE). The
+    `std_edge_filters_match_builtin` test only covers std features that have a built-in twin, so it misses custom code.
 - [ ] P3 PERF-TOTAL-MISMATCH the Performance panel and its Regeneration times dialog give two totals for the same studio:
   live-30-features.noshape just opened (regen from cache) → panel "Total regeneration time: 46ms", stopwatch › dialog footer
   "Total regen time: 314ms" (the per-feature column sums to ~314). Live reads one number in both places (behaviours 17899);
