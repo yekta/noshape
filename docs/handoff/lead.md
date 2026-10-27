@@ -9,7 +9,7 @@
 | skasm | sketch + assembly | 275c16ff-2d09-463e-8e27-043656a4a312 (10-27 12:30; was Unbind 24cb8a1d) | Yekta | noshape-wt/skasm, /root/target-skasm | :103 | /root/lead-scratch/prompt-skasm.md |
 | dx | agent API, drawings, data exchange | 0a28d6c8-180a-4c59-8cfe-6bff3f4dcf71 | Stablecog | noshape-wt/dx, /root/target-dx | :105 | /root/lead-scratch/prompt-dx.md |
 | live (no builds) | live Onshape research: answers REQUESTS.md, writes specs ahead (live/SPECS.md) | 911412ff-1f48-46de-8008-a4de9c809039 | Motile | Chrome :107 | - | /root/lead-scratch/prompt-live.md |
-| qa (no builds) | tests /root/green/noshape vs live, files docs/TICKETS.md | 23cc0f7b-b7e0-47c4-979d-310631c0d2cc | Unbind | noshape-wt/qa (docs only) | :110 | /root/lead-scratch/prompt-qa.md |
+| qa (no builds) | tests /root/green/noshape vs live, files docs/TICKETS.md | f51a032e-fc69-441c-8bf2-f501018b23c5 (10-27 12:50; was Unbind 23cc0f7b) | Motile | noshape-wt/qa (docs only) | :110 | /root/lead-scratch/prompt-qa.md |
 
 All on Opus 5.5. Worktrees are under /root/projects/noshape-wt/ (the repo is /root/projects/noshape). The lead's
 watcher tests main in noshape-wt/watch with /root/target-lead; releases are cut in noshape-wt/release. The rustc
