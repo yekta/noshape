@@ -141,7 +141,7 @@ fn random_sketch_edits_never_panic() {
                 5 => {
                     let c = p(&mut rng);
                     let r = rng.range(0.2, 5.0);
-                    let (a0, a1) = (rng.range(0.0, 6.28), rng.range(0.0, 6.28));
+                    let (a0, a1) = (rng.range(0.0, std::f64::consts::TAU), rng.range(0.0, std::f64::consts::TAU));
                     sk.add_arc(c, c + DVec2::from_angle(a0) * r, c + DVec2::from_angle(a1) * r);
                 }
                 6 => {
