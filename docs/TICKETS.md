@@ -244,6 +244,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   goes grey with the eye-slash, Sketch 1 stays shown (its menu says Hide) and its outline stays drawn; pick the square first
   and it's the other way round (only Sketch 1 hidden, the circle stays drawn). Live hides every sketch a feature uses
   (behaviours "The used sketch is hidden automatically"); a loft uses both (qa 2026-10-27, build 16cdcf6d)
+  Same root, green 525c619b: an Extrude committed with an empty region field (Enter twice, red), then edited to pick
+  Sketch 1's region and ✓: Sketch 1 stays shown (its menu says Hide). It looks like only the first region picked while a
+  feature is being created hides its sketch; hiding should follow every sketch a committed feature uses (live asked, qa
+  batch 2 (1)/(5)).
 - [x] verified 19555ca3 (qa: double-click on fins-400 opens Extrude 1) 3b089573 P1 DCLICK-HEAVY fixed (psui 10-27): the X11 and Wayland backends counted clicks by when each press was handled
   (`Instant::now()`), so a second press waiting behind the first click's work (fins-400 here: ~0.9 s) started a new
   click, and the row was selected and deselected. Now the presses' own event times (X server / compositor ms) decide
