@@ -21,7 +21,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 1.6 | "Orient normal to sketch on edit" option in the camera menu | View__orient_normal_to_sketch_on_edit | ✅ (Part Studio camera menu; the sketch view orients on entry) | 0.4.10+ / 2d9a275c 10-27 |
 | 1.7 | A new sketch starts with no tool active once the plane is picked; a click in empty space does nothing; the view doesn't rotate | Live sketch/00, 01, 44, 500–503 (confirmed by live capture) | ✅ (checked in the app 10-24: Top picked from the list, no tool active, empty click does nothing, view stays) | 0.4.10+ / 2d9a275c 10-27 |
 | 1.7a | The sketch frame (Onshape `SketchPlaneDisplay.updateBounds`): placed once when first drawn, centred on the plane entity's bounds centre (the ray through the graphics centre if off screen), 0.7 × the graphics height tall (`VIEWPORT_HEIGHT_TO_PLANE_HEIGHT_RATIO`) × 1.77777 wide; fixed in the plane afterwards (zoom / geometry don't change it; a new plane re-places it); `#90cef1` 1 px; name 20 px (`PLANE_TEXT_HEIGHT_PX`) in the plane 5 px inside the top-left corner, shrunk to fit | Bundle webgl `oM`, live sketch/500–503 (2.02 × 1.14 plane at the default zoom) | ✅ (app 10-24: frame corners at (388,557) (727,265) (1776,567) (1437,860) vs live (388,557) (728,263) (1776,567) (1435,861)) |  |
-| 1.8 | ✓ / Enter accepts the sketch; "Finish sketch" button | H:sketch_basics, B§1.5 | ✅ |  |
+| 1.8 | ✓ / Enter accepts the sketch; "Finish sketch" button | H:sketch_basics, B§1.5 | ✅ | 0.4.10+ / 965d3f56 10-27 (✓ accepts; Enter with no tool keeps the sketch open = live behaviours 214 / 4824) |
 | 1.9 | ✗ cancels the whole sketch session; a Restore link undoes the cancel | H:sketch_basics | ✅ (✕ shows "Sketch N has been canceled. **Restore** ×" (GUI :103 m3-toast.png); Restore reopens the draft with its geometry (m3-restored.png); × dismisses) | 0.4.10+ / 2d9a275c 10-27 |
 | 1.10 | Esc cancels the active tool / chain, never the sketch | H:sketch_tools ("The Escape key exits a tool selection") | ✅ (also when the focus is in the Sketch dialog) | 0.4.10+ / 2d9a275c 10-27 |
 | 1.11 | Extrude (Shift+E) / Revolve (Shift+W) from the sketch toolbar accept the sketch and preselect all regions | H:sketch_tools | ✅ | 0.4.10+ / 203c4d6f 10-27 |
@@ -104,7 +104,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 4.32 | Text: font, bold, italic, flip; edit later; drag by its box | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 4.33 | Text: Convert to expression | H:text | ✅ (GUI :103 Convert to expression evaluates `"A" ~ (2 + 3)` to A5; text-expression.png) |  |
 | 4.34 | Slot: select centerline curves (before or after the tool); one shared width dimension | H:slot | ✅ (T:ux) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.35 | Slot: a connected chain gives one slot following the chain | H:slot | ✅ (T:ux; GUI :103 selected L-shaped line chain makes one continuous slot with shared width input; chained-slot.png) |  |
+| 4.35 | Slot: a connected chain gives one slot following the chain | H:slot | ✅ (T:ux; GUI :103 selected L-shaped line chain makes one continuous slot with shared width input; chained-slot.png) | 0.4.10+ / 965d3f56 10-27 (L chain selected → one slot) |
 | 4.36 | Construction toggle: q with a selection toggles it, without one draws construction geometry | H:construction | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 4.37 | Construction lines are dashed (dash-dot) in the status color | B§5.2 | ✅ (dashed, status colors) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.38 | Insert image / Insert DXF or DWG | H:insert_image, H:insert_dwg_or_dxf | ✅ (DXF ASCII + binary and DWG R13–2018 through cadkit (crates/sketch/src/cad.rs, dwg.rs): block references expanded (placement, scale, rotation, arrays, nesting), mirrored/tilted planes and non-uniform block scales mapped exactly; T:ux dwg.rs fixtures R2000–R2018 + cad.rs tests; GUI :103 m4-dwg.png "Inserted 7 entities from fixture.dwg" incl. the BLOCK1 line. Images: 3D textured quads in any orientation, depth tested, exact colors, visible outside sketch mode (m2-placed / m2-iso / m2-accepted-c.png)) |  |
@@ -142,7 +142,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 6.11 | Inference glyph next to the cursor | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.12 | Inference line yellow dashed (`INFERENCE_SNAP_LINE_COLOR`) | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.13 | Shift suppresses inferences | H:automatic_inferencing | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 6.14 | Snap to model vertices and edges when sketching on a face; vertices stay linked | H:sketch_basics | ✅ (GUI :103 m10.png: sketch on a part face, the line start snaps to the model vertex with a coincident inference and stays linked (fixed point)) |  |
+| 6.14 | Snap to model vertices and edges when sketching on a face; vertices stay linked | H:sketch_basics | ✅ (GUI :103 m10.png: sketch on a part face, the line start snaps to the model vertex with a coincident inference and stays linked (fixed point)) | 0.4.10+ / 965d3f56 10-27 (sketch on wf-block's top face: line from the top face's corner vertex, start black + use glyph) |
 | 6.15 | Woken entity / parallel partner highlighted orange, new line drawn dotted when parallel | H:automatic_inferencing | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.16 | Ellipse quadrant (Quadrant constraint) inference | H:working_with_constraints | ✅ (T:ux, Quadrant constraint) |  |
 
@@ -162,12 +162,12 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 7.10 | Point / line / circle to a construction line, cursor across it: centerline dimension (twice the distance) | H:dimension | ✅ (T:sm, T:ux) |  |
 | 7.11 | Ellipse: major / minor diameter | B§4.2 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.12 | Dimension to the sketch origin | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
-| 7.13 | Dimension to planes / model edges | H:dimension | ✅ (planes as trace lines, model edges / vertices as linked reference geometry) |  |
+| 7.13 | Dimension to planes / model edges | H:dimension | ✅ (planes as trace lines, model edges / vertices as linked reference geometry) | 0.4.10+ / 965d3f56 10-27 (point to model edge 24.797 → 20) |
 | 7.14 | Over-defining dimensions are made driven: plain grey value ("Ø10", no parentheses) and the value box still opens, no toast | H:dimension; live "qa4 round 5 s5 driven dims" (1) | ✅ (test `driven_labels_and_offset_side_as_live`; GUI :103 skasm 10-26: second Ø on a dimensioned circle opens the box, grey plain "Ø10" after Esc) | 0.4.10+ / 203c4d6f 10-27 (duplicate Ø → driven grey plain; h + v + aligned length all stay driving: asked live 18:26) |
 | 7.15 | Driven ↔ driving from the context menu ("Change to driving/driven dimension") | H:dimension | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 7.16 | Double-click a dimension to edit its value | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 7.16a | Esc on an untouched value box (new or reopened) closes it at once (a new dimension keeps its measured value); a changed box reverts on the first Esc, closes on the second; a bare expression is stored with the document unit ("2*5" → "(2*5) mm") | live qa4 round 5 v3 s5 (DIM-ESC-UNTOUCHED, DIM-EXPR-UNIT) | ✅ (app; `quantity_text::simple` no longer reads "*5" as a unit; tests `dimension_expression_keeps_the_unit`, `expressions_get_the_unit_around_them`) | 0.4.10+ / 2d9a275c 10-27 |
-| 7.17 | Editing moves both dimensioned sides by half (except radius / diameter) | H:dimension | ✅ (T:ux) |  |
+| 7.17 | Editing moves both dimensioned sides by half (except radius / diameter) | H:dimension | ✅ (T:ux) | 0.4.10+ / 965d3f56 10-27 (free line 16.85 → 30 horizontal: both ends moved, centre kept) |
 | 7.18 | Negative values flip direction (distance, angle, line length); not allowed for arc, radius, diameter | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.19 | Drag the dimension label to move it | B§4 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 7.20 | Select + Delete removes a dimension; context menu Delete | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
