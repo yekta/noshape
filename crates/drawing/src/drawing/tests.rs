@@ -2310,8 +2310,9 @@ fn ansi_title_block_dates_read_month_day_year() {
     let ansi = templates::default_fields(TitleBlockStyle::Ansi, true);
     let iso = templates::default_fields(TitleBlockStyle::Iso, false);
     let date = |f: &[(String, String)]| f.iter().find(|(k, _)| k == "Drawn date").map(|(_, v)| v.clone()).unwrap();
-    assert_eq!(date(&ansi), "{date|m/d/yyyy}");
-    assert_eq!(date(&iso), "{date}");
+    // The date drawn, formatted per standard where it resolves.
+    assert_eq!(date(&ansi), "{drawing.date_drawn}");
+    assert_eq!(date(&iso), "{drawing.date_drawn}");
     assert_eq!(format::field_format("2026-10-20", "m/d/yyyy"), "10/20/2026");
 }
 

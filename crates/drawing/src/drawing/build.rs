@@ -788,19 +788,30 @@ pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sou
         // Release approver / date and the drawing's three title lines: empty
         // until set (the title block shows its "----" placeholders, live
         // drawing/156, 164).
-        "release.approver" | "release.date" | "drawing.title1" | "drawing.title2" | "drawing.title3" => String::new(),
+        "release.approver" | "release.date" => String::new(),
+        "drawing.title1" => drawing.meta.title1.clone(),
+        "drawing.title2" => drawing.meta.title2.clone(),
+        "drawing.title3" => drawing.meta.title3.clone(),
         "drawing.name" => info.drawing_name.clone(),
         // Who / when (the local user, today), as Onshape's drawn / changed by.
         "drawing.drawn_by" => drawing.drawn_by.as_deref().unwrap_or(&info.user_name).to_uppercase(),
         "drawing.changed_by" => info.user_name.to_uppercase(),
         // Live: M/D/YYYY in ANSI drawings ("10/19/2026"), ISO dates otherwise.
-        "drawing.date_drawn" | "drawing.changed_date" => if sheet.title_style == super::TitleBlockStyle::Ansi { format::field_format(&format::today(), "m/d/yyyy") } else { format::today() },
+        // Date drawn: when the drawing was made (older drawings: today).
+        "drawing.date_drawn" | "drawing.changed_date" => {
+            let day = if key == "drawing.date_drawn" { drawing.meta.created.clone().unwrap_or_else(format::today) } else { format::today() };
+            if sheet.title_style == super::TitleBlockStyle::Ansi { format::field_format(&day, "m/d/yyyy") } else { day }
+        }
         // Release / metadata properties with no value yet: "----".
         // An unreleased drawing is "In progress" (as parts, `ItemMeta::state`).
         "drawing.state" => crate::partstudio::RELEASE_STATES[0].to_string(),
         "drawing.category" => "Onshape Drawing".into(),
         "drawing.not_revision_managed" => "False".into(),
-        "drawing.description" | "drawing.number" | "drawing.revision" | "drawing.revision_description" => String::new(),
+        "drawing.description" => drawing.meta.description.clone(),
+        "drawing.number" => drawing.meta.number.clone(),
+        // Live: an unset revision reads "-".
+        "drawing.revision" => if drawing.meta.revision.is_empty() { "-".into() } else { drawing.meta.revision.clone() },
+        "drawing.revision_description" => String::new(),
         "drawing.inspection_count" => drawing.sheets.iter().flat_map(|s| s.annotations.iter()).filter(|a| a.inspection.is_some()).count().to_string(),
         // Sheet reference properties from the part's Properties.
         // Live (drw2 10-21 h): an unset revision reads "-".

@@ -4838,3 +4838,29 @@ fn surface_extrude_of_a_whole_sketch() {
     let area = num(&bodies[0]["surface_area"]);
     assert!((area - 2.0 * std::f64::consts::PI * 200.0).abs() < 1e-6, "{area}");
 }
+
+/// The title block's DWG NO. / REV / TITLE / DRAWN date as live maps them
+/// (behaviours "dx title block mappings"): the drawing's own Part number
+/// and Revision, the reference part's Title 1–3, the day it was made.
+#[test]
+fn title_block_maps_the_drawings_own_properties() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "title_map.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
+    let r = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "depth": "10 mm" } }));
+    call(&mut ctx, "part_set_properties", json!({ "part": "Part 1", "part_number": "P-100", "revision": "B" }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI_A_MM.dwt", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let field = |ctx: &mut Ctx, f: &str| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["title_fields"].as_array().unwrap().iter().find(|x| x["field"] == f).map(|x| x["shown"].as_array().map(|l| l.iter().filter_map(|t| t.as_str()).collect::<Vec<_>>().join("\n")).unwrap_or_default()).unwrap_or_default();
+    // Not the part's number / revision.
+    assert_ne!(field(&mut ctx, "Part number"), "P-100");
+    assert_eq!(field(&mut ctx, "Revision"), "-");
+    let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": tab }));
+    assert!(p["properties"]["created"].is_string(), "{p}");
+    call(&mut ctx, "drawing_element_properties", json!({ "drawing": tab, "set": { "part_number": "D-200", "revision": "C" } }));
+    assert_eq!(field(&mut ctx, "Part number"), "D-200");
+    assert_eq!(field(&mut ctx, "Revision"), "C");
+    let e = try_call(&mut ctx, "drawing_element_properties", json!({ "drawing": tab, "set": { "bogus": "x" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set.bogus"), "{e:?}");
+}

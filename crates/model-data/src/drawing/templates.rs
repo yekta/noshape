@@ -82,18 +82,21 @@ pub fn default_fields(style: TitleBlockStyle, inches: bool) -> Vec<(String, Stri
             // and the three TITLE lines are property fields shown as "----"
             // until set; MATERIAL starts blank.
             ("Drawn by", "{user.name}"),
-            // Live CR12 data: ANSI dates read 10/20/2026, ISO 2026-10-20.
-            ("Drawn date", if style == TitleBlockStyle::Ansi { "{date|m/d/yyyy}" } else { "{date}" }),
+            // The date the drawing was made (live "dx title block mappings":
+            // not the document's, not today); ANSI 10/20/2026, ISO 2026-10-20.
+            ("Drawn date", "{drawing.date_drawn}"),
             ("Checked by", ""),
             ("Checked date", ""),
             ("Approved by", "{release.approver}"),
             ("Approved date", "{release.date}"),
             ("Material", ""),
             ("Finish", ""),
-            ("Title", "{drawing.title1}\n{drawing.title2}\n{drawing.title3}"),
+            // Live: the sheet reference part's Title 1–3 (not the drawing's).
+            ("Title", "{part.title1}\n{part.title2}\n{part.title3}"),
             ("Size", ""),
-            ("Part number", "{part.number}"),
-            ("Revision", "-"),
+            // Live: the drawing's own Part number and Revision.
+            ("Part number", "{drawing.number}"),
+            ("Revision", "{drawing.revision}"),
             ("Scale", ""),
             ("Weight", ""),
             ("Sheet", "{sheet.number} of {sheet.count}"),

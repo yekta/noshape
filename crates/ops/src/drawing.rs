@@ -246,6 +246,8 @@ pub fn new_drawing(doc: &Document, template: &DrawingTemplate, source: Option<&D
     let mut d = noshape_model::drawing::create::create_drawing(template, source, bounds, suggested, frame);
     // DRAWN: who created it, saved with the drawing.
     d.drawn_by = Some(noshape_store::local_user_name()).filter(|n| !n.is_empty());
+    // DRAWN's date: the day it was made (UTC).
+    d.meta.created = Some(noshape_model::drawing::format::today());
     if suggested {
         noshape_model::drawing::mbd::place_model_datums(&mut d, doc);
     }

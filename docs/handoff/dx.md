@@ -141,6 +141,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- App (crates/app doc_dialogs.rs `tab_properties`): a Drawing tab's Properties should also edit the drawing's own
+  Part number, Revision, Description and Title 1–3 (`Drawing.meta`; the API's drawing_element_properties). Live: the
+  title block's DWG NO. / REV come from them (behaviours "dx title block mappings").
 - **disk-loop.sh breaks builds in busy target dirs** (3 of dx's land.sh runs on 10-27 failed: "failed to write
   …/.fingerprint/…/invoked.timestamp", "could not parse/generate dep info …noshape_app_core-….d", "unable to copy
   …/incremental/…-working/….o"): its 30-min pass runs prune-build.py / prune-deps.py / fix-fingerprints.py and the

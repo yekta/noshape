@@ -2543,6 +2543,30 @@ pub struct Drawing {
     /// is reopened (live "qa5 pass 7" (6); qa5 D17). None: the current one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sources_at: Option<String>,
+    /// The drawing element's own properties (Tab › Properties).
+    #[serde(default, skip_serializing_if = "meta_is_empty")]
+    pub meta: Box<DrawingMeta>,
+}
+
+/// A drawing element's own properties (Tab › Properties). Live ("dx title
+/// block mappings"): the title block's DWG NO. is its Part number and REV
+/// its Revision (never the part's); DRAWN's date is when it was created.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DrawingMeta {
+    pub number: String,
+    pub revision: String,
+    pub description: String,
+    pub title1: String,
+    pub title2: String,
+    pub title3: String,
+    /// Date drawn (YYYY-MM-DD, UTC), set when the drawing is made.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<String>,
+}
+
+fn meta_is_empty(m: &DrawingMeta) -> bool {
+    *m == DrawingMeta::default()
 }
 
 fn is_zero_usize(n: &usize) -> bool {
@@ -2551,7 +2575,7 @@ fn is_zero_usize(n: &usize) -> bool {
 
 impl Default for Drawing {
     fn default() -> Self {
-        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true, props: DrawingProps::default(), active_sheet: 0, continuation: None, drawn_by: None, sources_at: None }
+        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true, props: DrawingProps::default(), active_sheet: 0, continuation: None, drawn_by: None, sources_at: None, meta: Box::default() }
     }
 }
 

@@ -264,6 +264,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "element_properties",
+            summary: "Read or set the drawing's own properties (Tab › Properties: part number, revision, description, titles)",
+            description: "The drawing element's Properties (right-click its tab › Properties). Live (behaviours \"dx title block mappings\"): the title block's DWG NO. is the drawing's Part number and REV its Revision (\"-\" when unset), never the part's; TITLE shows the sheet reference part's Title 1–3; DRAWN's date is when the drawing was made (`created`). Without `set`, replies with them; `set` changes the ones it names (part_number, revision, description, title1, title2, title3; strings). One edit (\"Properties\").",
+            fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Properties to change: part_number, revision, description, title1, title2, title3.")]),
+            mutates: true,
+            destructive: false,
+            run: element_properties,
+        },
+        Op {
+            group: "drawing",
             verb: "title_field",
             summary: "Edit a title block field: its cell's note",
             description: "Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. \"Title\", \"Drawn by\"; a key the layout lacks is added). Lines split on \\n; property codes like {part.name} expand. One edit (\"Edit title block\").",
@@ -1414,6 +1424,32 @@ fn edit_hatch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("at", "not inside a hatch region of the view's cut"));
     }
     done(od, t, "Edit hatch", "view", view.0)
+}
+
+fn element_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let json_of = |m: &noshape_model::drawing::DrawingMeta| json!({ "part_number": m.number, "revision": m.revision, "description": m.description, "title1": m.title1, "title2": m.title2, "title3": m.title3, "created": m.created });
+    let Some(set) = a.get("set") else { return Ok(json!({ "properties": json_of(&t.d.meta) }).into()) };
+    let set = set.as_object().ok_or_else(|| OpError::param("set", "an object"))?;
+    for (k, v) in set {
+        let text = v.as_str().ok_or_else(|| OpError::param(&format!("set.{k}"), "a string"))?.to_string();
+        let m = &mut t.d.meta;
+        match k.as_str() {
+            "part_number" => m.number = text,
+            "revision" => m.revision = text,
+            "description" => m.description = text,
+            "title1" => m.title1 = text,
+            "title2" => m.title2 = text,
+            "title3" => m.title3 = text,
+            _ => return Err(OpError::param(&format!("set.{k}"), "part_number, revision, description, title1, title2 or title3")),
+        }
+    }
+    let (si, meta) = (t.sheet, t.d.meta.clone());
+    commit(od, t.tab, si, t.d, "Properties")?;
+    let mut v = reply(od, t.tab, si, false)?;
+    v["properties"] = json_of(&meta);
+    Ok(v.into())
 }
 
 fn title_field(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
