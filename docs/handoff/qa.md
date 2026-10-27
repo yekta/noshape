@@ -8,7 +8,7 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   Direction first too), Fillet edges, Shell faces and a custom feature with `"Filter" : EntityType.EDGE`. **Not fixed**: a
   custom feature whose filter is `EntityType.EDGE && QueryFilterCompound.ALLOWS_AXIS` (MaxNumberOfPicks 2) still gets no
   hover and no pick in the dialog (the API takes the edges), so the user's custom-feature example stays broken in v0.4.10.
-  Cause (confirmed in the app 11:00): studio.rs `filter_of` intersects `EDGE` (EDGE | SKETCH_EDGE) with LINE / ALLOWS_AXIS
+  Cause (confirmed in the app 10:20): studio.rs `filter_of` intersects `EDGE` (EDGE | SKETCH_EDGE) with LINE / ALLOWS_AXIS
   bits, leaving SKETCH_EDGE only, so `EDGE && GeometryType.LINE` takes sketch lines but no part edges either. Needs an
   owner (custom crate): `EntityType.EDGE` should carry LINEAR_EDGE / CIRCULAR_EDGE / SOLID_EDGE for the intersection.
 - release/v0.4.9 (7ee597e0) still lacks 2d6719c2 (Windows include), a117663d (DRAFT-HANG budget) and 011aaf43 (serial
@@ -179,7 +179,7 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
-## 10:10–11:10 (green e8858e61)
+## 10:10–10:35 (green e8858e61)
 - LP-DIRECTION-PICK: v0.4.9 reproduced, green verified (pattern Direction in all three modes, Fillet, Shell, plain custom
   edge query); compound custom filters (`EDGE && LINE`, `EDGE && ALLOWS_AXIS`) still take sketch edges only (ticket,
   cause in studio.rs). Release smoke row added.

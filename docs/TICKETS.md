@@ -13,7 +13,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 09:50, CI artifact of fcd301e2 (run 40480068401, Linux): the five crash documents open; cli-fillet-hang opens in
   43 s; **cli-draft-hang still never finishes (> 200 s)**: DRAFT-HANG ships unless a117663d is taken. Note for testers:
   this build lacks c30baf56, so markers left by any killed process roll back copies of the same document.
-- [x] resolved (qa 11:30: v0.4.9 was published 09:41 from tag 819c2b47 = 7ee597e0 + the lead's own `<cxxabi.h>` guard, with Linux, macOS and Windows assets; same code as the fcd301e2 artifact checked at 09:50 except crash_inputs.rs) P0 release/v0.4.9 recut 7ee597e0: CI run 40452492018 **Windows x86_64 (MSVC) failed in "Build (release)"**:
+- [x] resolved (qa 10:30: v0.4.9 was published 09:41 from tag 819c2b47 = 7ee597e0 + the lead's own `<cxxabi.h>` guard, with Linux, macOS and Windows assets; same code as the fcd301e2 artifact checked at 09:50 except crash_inputs.rs) P0 release/v0.4.9 recut 7ee597e0: CI run 40452492018 **Windows x86_64 (MSVC) failed in "Build (release)"**:
   `crates/kernel/cpp/common.cpp(1273): fatal error C1083: Cannot open include file: 'cxxabi.h'` (the kernel profile's
   `#include <cxxabi.h>`, GCC/Clang only, unguarded; blame d85c3029, REGEN-SPEED). Still on main, so main's Windows build
   is broken too (the watcher builds Linux only). Guard it (`#if !defined(_MSC_VER)`) or demangle another way. Linux and
@@ -21,7 +21,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Fixed on main by 2d6719c2 (qa 08:20: not yet on release/v0.4.9, still 7ee597e0); with a117663d (DRAFT-HANG) and 011aaf43
   (BOOL-THREAD-CRASH, serial booleans) it is what a recut needs
   core 10-27: the lead's 2d6719c2 guards it on main (the release branch needs it too).
-- [ ] P0 (qa 11:30: published v0.4.9 = 819c2b47 ships it, as do BUDGET-LONGJMP and BOOL-THREAD-CRASH; v0.4.10 from e8858e61 has a117663d / 011aaf43) the recut ships DRAFT-HANG: on the release's Linux artifact (run 40452492018, 0.4.9.7ee597e05af9) a copy of
+- [ ] P0 (qa 10:30: published v0.4.9 = 819c2b47 ships it, as do BUDGET-LONGJMP and BOOL-THREAD-CRASH; v0.4.10 from e8858e61 has a117663d / 011aaf43) the recut ships DRAFT-HANG: on the release's Linux artifact (run 40452492018, 0.4.9.7ee597e05af9) a copy of
   tickets/cli-draft-hang.noshape never finishes its opening regen (> 150 s, spinner); the draft budget a117663d came after
   the release's base 502416cc. Cherry-pick a117663d (and c30baf56 for markers) or recut. Same artifact: the five crash
   documents open (6.7–32 s regen; cli-delete-crash 148 s because of a 120 s Shell 3), cli-fillet-hang opens in 68 s,
@@ -362,15 +362,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     feature with `"Filter" : EntityType.EDGE` alone hovers and picks (pick-green-custom-allows-axis.png, left plain, right
     compound). The API takes the same two edges for the compound feature (feature_add OK), so it is the dialog's pick
     filter that rejects ALLOWS_AXIS. Live: the exact entity types per mode and for the custom query are asked in
-    REQUESTS "qa (2026-10-27, P1 LP-DIRECTION-PICK)" (A)–(F) (qa 2026-10-27 10:30)
-  - Likely cause of the compound-filter part (code read, qa 10:45): crates/custom/src/custom/studio.rs `filter_of`
+    REQUESTS "qa (2026-10-27, P1 LP-DIRECTION-PICK)" (A)–(F) (qa 2026-10-27 10:10)
+  - Likely cause of the compound-filter part (code read, qa 10:15): crates/custom/src/custom/studio.rs `filter_of`
     `Ann::And` intersects the two sides' bits. `EntityType.EDGE` = ANY_EDGE = EDGE | SKETCH_EDGE (params.rs:189), and
     `ALLOWS_AXIS` = LINEAR_EDGE | CIRCULAR_EDGE | SKETCH_EDGE | CYLINDRICAL_FACE | MATE_CONNECTOR (studio.rs:738), so the
     intersection is **SKETCH_EDGE only** and every model edge is rejected. The same holds for `EDGE && GeometryType.LINE`
     / `.CIRCLE` and `EDGE && ALLOWS_DIRECTION`: the "EDGE && LINE -> linear edges" refinement in the comment never
     yields model edges, because `EDGE` doesn't carry LINEAR_EDGE / CIRCULAR_EDGE (or SOLID_EDGE). The
     `std_edge_filters_match_builtin` test only covers std features that have a built-in twin, so it misses custom code.
-  - Confirmed in the app (green e8858e61, qa 11:00; doc /root/qa-scratch/tickets/cfs2.noshape: the lpd part plus a line
+  - Confirmed in the app (green e8858e61, qa 10:20; doc /root/qa-scratch/tickets/cfs2.noshape: the lpd part plus a line
     in Sketch 3 on Front, four custom features with 2-pick "Edges" fields). Clicking the part's top front edge and the
     sketch line:
     | Filter | part edge | sketch line |
