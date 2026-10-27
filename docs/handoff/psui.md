@@ -68,14 +68,21 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 - 10-27 12:20: MEASURE-MAX-DIST (P1): Max dist refined on the exact geometry (model-core measure `refine_max`).
 - 10-27 13:10: EMPTY-COMMIT (P2: ✓ / Enter / Ctrl+Enter only once the dialog can be submitted) and CONFIG-CELL-EDIT
   (P2: configured value cells frame on a click and take typing, as live).
+- 10-27 13:40: 69de3163 EDGE-HIGHLIGHT-LOOK (2), the user's black wedge: the image-based silhouette pass could throw
+  a back face across the screen (a push divided by a finite step's on-screen length); now analytic, offscreen test
+  a_thin_plate_draws_nothing_past_its_outline (1× / 2×). Not reproducible on Linux, so the most likely cause, not a
+  confirmed one. 11e7e6aa FS-EDITOR-COMPLETE (1): Ctrl+Space stays in the Feature Studio's code editor.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
 ## In progress
 
-(nothing unlanded)
+- EDGE-HIGHLIGHT-LOOK (1), the edge looks: waiting for live's 1× / 2× capture (REQUESTS line "psui (2026-10-27, P1,
+  from the user) EDGE-HIGHLIGHT-LOOK"). Live's 1× profile (behaviours 18762) has the dark layer half a pixel above
+  the light band (2 px dark above, 1 below, band 5 px): two primitives drawn separately; ours is one band in fs_line
+  (1 / 6 / 1). Match per state with an offscreen test each once the capture is in.
 
-Residuals found today: live outlines the Delete part ghost (255,192,76) (ours none); a paused dialog's Depth field
+Residuals found today: a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
 valuator on XI2 DeviceChanged from XTest's slave switches; real wheels fine); the banner's text is 5 px narrower
 than live's Flama.
@@ -86,6 +93,11 @@ On Xvfb without a window manager the app window never gets X input focus, so GPU
 focus / blur events; nothing blurs, so nothing commits. **Always `xdotool windowfocus <window>` after starting the app
 on :102** (W=$(xdotool search --name noshape | head -1)). With focus, Tab commits and previews as live. Fixed alongside:
 a Tab commit scheduled two regenerations.
+
+## Landing (10-27 13:45, lead): only with `tools/tiers/land.sh`
+
+It rebases, runs clippy + the full tests of every touched crate and its dependents (+ T0 for app / ops / cli) and
+pushes only if green.
 
 ## Landing checklist addition (10-27)
 
