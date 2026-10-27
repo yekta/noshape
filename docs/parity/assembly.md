@@ -167,7 +167,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | F4 | Mate limit indicator icon ("<name> has limits") | H:mates, B | ✅ | |  |
 | F5 | Eye icon on hover toggles the mate indicator | E§6.4 | ✅ | |  |
 | F6 | Mates expand to the implicit mate connectors they use | E§5.1, UI:mate-hover | ✅ | |  |
-| F7 | Double-click edits | H:mates | ✅ | |  |
+| F7 | Double-click edits | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | F8 | Error rows red with indicator | E§6.4 | ✅ | |  |
 | F9 | Suppressed / inactive rows grey, struck through | E§6.4 | ✅ | |  |
 | F10 | Mate folders (Add selection to folder, folder menu) | E§5.6 | ✅ | |  |
@@ -178,18 +178,18 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Entry | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| M1 | Rename | H:mates | ✅ | inline |  |
-| M2 | Edit… (works when suppressed) | H:mates | ✅ | |  |
+| M1 | Rename | H:mates | ✅ | inline | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| M2 | Edit… (works when suppressed) | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | M3 | Apply limit position ▸ Min/Max per DOF ("Moved mate to max Z limit") | H:mates, B | ✅ | model test `mate_reset_and_apply_limit_position`; other DOFs stay free |  |
-| M4 | Reset (home position) | H:mates | ✅ | model test |  |
-| M5 | Animate <mate>… | H:mates, B | ✅ | see §11 |  |
-| M6 | Hide / Show | H:mates | ✅ | |  |
-| M7 | Show all mates | H:mates | ✅ | |  |
+| M4 | Reset (home position) | H:mates | ✅ | model test | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| M5 | Animate <mate>… | H:mates, B | ✅ | see §11 | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| M6 | Hide / Show | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| M7 | Show all mates | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | M8 | Isolate…, Make transparent… (instances of the mate) | H:mates | ✅ | |  |
-| M9 | Suppress / Unsuppress | H:mates | ✅ | |  |
+| M9 | Suppress / Unsuppress | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | M10 | Add selection to folder… | E§6.5 | ✅ | |  |
 | M11 | Clear selection | H:mates | ✅ | |  |
-| M12 | Delete | H:mates | ✅ | |  |
+| M12 | Delete | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | M13 | Dynamic suppression, Edit named position driver mate, Configure | E§6.5 | ✅ | Dynamic suppression ▸ (mates and instances: "Unsuppressed if"; once set: Unsuppress + Edit dynamic suppression), Edit named position driver mate… (Driving mate selector, editing banner, value columns); Configure: mate parameters are configured from the Configuration panel's mode (G17) |  |
 | M14 | Mate connector menu: Rename, Edit, Hide, Hide other mate connectors, Show all mate connectors, Suppress, Delete | E§6.5 | ✅ | |  |
 
@@ -197,21 +197,21 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| D1 | Mate type selector changes the type of the mate in place | E§6.2 | ✅ | default names follow ("Fastened 1" → "Revolute 1") |  |
-| D2 | Two mate connector fields; picks fill the first, then auto-advance to the second | E§6.2 | ✅ | |  |
-| D3 | Clicking a field makes it active; × clears it | E§6.2 | ✅ | |  |
-| D4 | Second pick moves the first connector's instance onto the second (second stays) | E§6.3 | ✅ | |  |
+| D1 | Mate type selector changes the type of the mate in place | E§6.2 | ✅ | default names follow ("Fastened 1" → "Revolute 1") | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| D2 | Two mate connector fields; picks fill the first, then auto-advance to the second | E§6.2 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| D3 | Clicking a field makes it active; × clears it | E§6.2 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| D4 | Second pick moves the first connector's instance onto the second (second stays) | E§6.3 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | D5 | Connectors must be on different instances | E§6.1 | ✅ | |  |
 | D6 | Explicit mate connectors and the Origin pickable (graphics or list) | E§6.1 | ✅ | |  |
-| D7 | Flip primary axis (button, `a`); bottom connector flips when the top one is constrained | H:mates | ✅ | stationary side is the held one |  |
-| D8 | Reorient secondary axis (90° steps) | H:mates | ✅ | |  |
+| D7 | Flip primary axis (button, `a`); bottom connector flips when the top one is constrained | H:mates | ✅ | stationary side is the held one | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| D8 | Reorient secondary axis (90° steps) | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | D9 | Reorder items link → handles to swap → Done | H:mates | ✅ | |  |
-| D10 | Offset checkbox; offset axes per type (Fastened XYZ, Slider XY, Revolute/Planar/Pin slot Z) | E§6.2, E§7, live 740–748, dom/dialog-mate-fastened-offset.txt | ✅ | rows = 26 px `xyz-along-x/y/z` icon + 168 px field (no text label, live); direction: the first connector sits at +offset in the second's frame (bundle `getSecondMateConnectorOffsetTransform`; live: the plate picked first ends 10 mm above) — solver `residuals` (`t = rel.origin + R_rel·offset`), test in `two_blocks_fastened_face_to_face` (both pick orders). Default primary-axis alignment (live 760–780): when both connectors of a new mate are picked, the Z axes are made to agree if they point the same way now, opposed otherwise, so the moving part keeps its orientation (bottom face → top face stacks upright; two top hole rims coincide; an upside-down part stays so). The flip button reads pressed when Onshape's `primaryAxisAlignment` would be true (= our `!flip_primary`) |  |
-| D11 | Rotation offset with axis selector (Rotate about X / Y / Z) | H:mates, dom/dialog-mate-fastened-offset.txt | ✅ | the 194 px "Rotate about X ▾" select (tooltip "Rotation axis") and the "Rotation angle" row (12 px #666 label, 108 px field), as live; model test `mate_rotation_offset_about_any_axis` |  |
-| D12 | Limits checkbox; per-DOF min / max fields (blank = unbounded) | E§6.2 | ✅ | |  |
+| D10 | Offset checkbox; offset axes per type (Fastened XYZ, Slider XY, Revolute/Planar/Pin slot Z) | E§6.2, E§7, live 740–748, dom/dialog-mate-fastened-offset.txt | ✅ | rows = 26 px `xyz-along-x/y/z` icon + 168 px field (no text label, live); direction: the first connector sits at +offset in the second's frame (bundle `getSecondMateConnectorOffsetTransform`; live: the plate picked first ends 10 mm above) — solver `residuals` (`t = rel.origin + R_rel·offset`), test in `two_blocks_fastened_face_to_face` (both pick orders). Default primary-axis alignment (live 760–780): when both connectors of a new mate are picked, the Z axes are made to agree if they point the same way now, opposed otherwise, so the moving part keeps its orientation (bottom face → top face stacks upright; two top hole rims coincide; an upside-down part stays so). The flip button reads pressed when Onshape's `primaryAxisAlignment` would be true (= our `!flip_primary`) | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| D11 | Rotation offset with axis selector (Rotate about X / Y / Z) | H:mates, dom/dialog-mate-fastened-offset.txt | ✅ | the 194 px "Rotate about X ▾" select (tooltip "Rotation axis") and the "Rotation angle" row (12 px #666 label, 108 px field), as live; model test `mate_rotation_offset_about_any_axis` | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| D12 | Limits checkbox; per-DOF min / max fields (blank = unbounded) | E§6.2 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | D13 | Ball mate cone angle limit | E§7.8 | ✅ | model test `ball_mate_cone_limit`; dialog shows one Maximum cone angle field |  |
-| D14 | Solve button (solve all mates incl. this one) | H:mates | ✅ | |  |
-| D15 | Heads-up checkmark at the cursor after both picks: "Commit current mate and start a new mate" | H:mates, B | ✅ | |  |
+| D14 | Solve button (solve all mates incl. this one) | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| D15 | Heads-up checkmark at the cursor after both picks: "Commit current mate and start a new mate" | H:mates, B | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | D16 | Animate (preview) button in the dialog | H:mates | ✅ | ▶ (`play-dialog`, "Animate mate degree of freedom", live 575): the mate's first DOF runs once from its current value through 2 full turns (a span for sliders) with the value arc and whole-degree label ("208°"), then back to the start pose (~12 s: 720 steps at 60/s; live ≈45 s in a slow browser, "probably a fixed frame count"); ▶ never becomes a stop button. GUI :103 d4–d7, v6–v7 |  |
 | D17 | Edit implicit / assembly MCs from the dialog (MC icon) | H:mates | ✅ | the chip's `mate-connector-qlv-item` icon opens the Mate connector dialog docked right of the mate dialog (live 578, dom/assembly-mate-chip-connector-dialog.txt): close button only for an implicit connector, Origin type ▾ On entity, active "Origin entity" field naming the entity ("Face of Part 1 <1>"), ☐ Realign, ☐ Move (X/Y/Z translation, Rotate about X/Y/Z ▾, Rotation angle), flip / reorient icons, `?`; edits go into the mate's own reference, which stays implicit (`MateConnectorRef.moved`, `ConnectorMove.off`; model test `implicit_connector_move_offsets_the_mate`). GUI :103 m4–m5; standalone dialog: Onshape's preview slider (112 px, rests at 0.7, fades the connector glyph to the left) with `?` on its row |  |
 | D18 | Only the current mate's instances move until Solve | H:mates | ✅ | help (Mates): "Onshape does not continually calculate all mates and their positions until the Mate feature is accepted. Use Solve". `SolveOptions::only_mate`: before Solve only the mate being defined is solved (the second connector's instance held, live 33–35: the first-picked part moves); other mates and relations are not enforced and report ok; Solve / ✓ solve everything. T:`a_mate_being_defined_is_solved_alone_until_solve`; GUI :103 d1 (Part 1 <2> mated onto <1>: the revolute-mated Pin stays put), d2 (Solve: the Pin follows, and Fastened 1 conflicts as expected) |  |
@@ -223,18 +223,18 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| N1 | Hovering shows inference dots; the nearest shows a full triad | E§6.3 | ✅ | |  |
-| N2 | Planar face: centroid, every vertex, edge midpoints, arc/circle centers, inner loop (hole, slot) centers; Z normal to the face | E§8.2 | ✅ | model test `inference_points_match_onshape` |  |
+| N1 | Hovering shows inference dots; the nearest shows a full triad | E§6.3 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
+| N2 | Planar face: centroid, every vertex, edge midpoints, arc/circle centers, inner loop (hole, slot) centers; Z normal to the face | E§8.2 | ✅ | model test `inference_points_match_onshape` | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | N3 | Cylindrical face: axis points at both ends and the middle, Z along the axis | E§8.2 | ✅ | model test |  |
 | N4 | Conical face: top, middle, bottom and virtual sharp | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` |  |
 | N5 | Spherical face: center | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` |  |
-| N6 | Circular edge: center only | H:mates | ✅ | model test |  |
+| N6 | Circular edge: center only | H:mates | ✅ | model test | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | N7 | Linear edge: midpoint and both ends, Z along the edge | E§8.2 | ✅ | model test |  |
 | N8 | Arc / curve edge: center, midpoint and ends | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` (fixed: an arc edge's Midpoint resolved to the center, regen/implicit.rs) |  |
 | N9 | Vertex: the point, Z normal to a face | E§8.2 | ✅ | hovering a part vertex: Z normal to the first planar face around it T:`inference_points_on_cones_spheres_arcs_and_vertices` |  |
 | N10 | No seam vertices of circles offered | — | ✅ | model test |  |
 | N11 | Shift locks the entity; the connector snaps to its nearest point | E§6.3 | ✅ | |  |
-| N12 | Hovered entity highlighted | E§6.3 | ✅ | |  |
+| N12 | Hovered entity highlighted | E§6.3 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | N13 | Sketch entities / regions as targets | E§8.2 | ✅ | sketch instance curves: a line offers its midpoint (Z along the line) and its ends, a circle its center (GUI n2–n3). Regions are pickable faces (`face_refs` = SketchRegion); hovering inside a loop offers the region centroid plus the loop's corners and edge midpoints, Z along the sketch normal (live 601; `regen::implicit` SketchRegion branch, `inference_candidates`); model test `sketch_instances_are_wire_occurrences_with_edges` GUI :103: Insert › Sketches, hovering a region snaps to its centroid (Z on the sketch normal); Fastened onto a hole. |  |
 
 ## 8. Mate connector dialog (E§8)
@@ -253,8 +253,8 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 |---|---|---|---|---|---|
 | R1 | Free drag moves an instance within its remaining DOF; limits stop it | E§24.1 | ✅ | model test `slider_respects_limits` |  |
 | R2 | Unmated, unfixed instances move exactly | H:triad | ✅ | |  |
-| R3 | Fixed instances cannot be dragged (cue, no manipulator) | H:triad | ✅ | no manipulator for a selected fixed instance (live 565); press-dragging it: `no-drop` cursor + the fix glyph at the cursor, nothing moves, no message (live 562–563; `AsmUi.fixed_drag`); no pre-highlight while dragging (live 562: hover cleared when the fixed drag starts). GUI :103 r5 (glyph, nothing moves), r7 (selected, no triad) |  |
-| R4 | Click an instance shows the triad: axis arrows, plane squares, rotation arcs | H:triad | ✅ | |  |
+| R3 | Fixed instances cannot be dragged (cue, no manipulator) | H:triad | ✅ | no manipulator for a selected fixed instance (live 565); press-dragging it: `no-drop` cursor + the fix glyph at the cursor, nothing moves, no message (live 562–563; `AsmUi.fixed_drag`); no pre-highlight while dragging (live 562: hover cleared when the fixed drag starts). GUI :103 r5 (glyph, nothing moves), r7 (selected, no triad) | 0.4.10+ / dd1b5037 10-27 (asm5: dragging the fixed plate: no-drop cursor, plate doesn't move) |
+| R4 | Click an instance shows the triad: axis arrows, plane squares, rotation arcs | H:triad | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | R5 | Drag the triad center to reposition it (snaps to MCs / inference points) | H:triad | ✅ | |  |
 | R6 | Typed value field after a triad drag | H:triad | ✅ | |  |
 | R7 | Right-click center: Move to origin | H:triad | ✅ | |  |
