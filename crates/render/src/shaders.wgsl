@@ -406,17 +406,23 @@ fn vs_backsil(v: MeshIn, @builtin(instance_index) slot: u32) -> BackSilOut {
     let n = normalize((inst.normal_m * vec4(oct_decode(v.normal), 0.0)).xyz);
     let persp = g.camera_pos.w > 0.5;
     let ndv = dot(n, select(-g.camera_fwd.xyz, normalize(g.camera_pos.xyz - w), persp));
-    // A small step along the normal (any length in orthographic).
-    let step = select(1e-3, 1e-3 * length(g.camera_pos.xyz - w), persp);
     let p = g.view_proj * vec4(w, 1.0);
-    let q = g.view_proj * vec4(w + n * step, 1.0);
+    // The normal's direction on screen, from the projection's derivative (exact; a finite step along the normal
+    // could come out as no move at all, and dividing by it threw the face across the screen in black:
+    // EDGE-HIGHLIGHT-LOOK's black wedge, macOS).
+    let dn = g.view_proj * vec4(n, 0.0);
     let half_vp = g.viewport.xy * 0.5;
-    let screen = length((q.xy / q.w - p.xy / p.w) * half_vp);
-    // The part's edge width (EDGE_WIDTH × the line width preference).
+    let vel = (dn.xy - p.xy / p.w * dn.w) / p.w * half_vp;
+    let len = length(vel);
+    // The part's edge width (EDGE_WIDTH × the line width preference): half of it out, less where the face turns
+    // straight away.
     let width = EDGE_WIDTH * inst.extra.x;
-    let scale = 0.5 * g.viewport.z * width / (screen + 1e-6) * (1.0 - abs(ndv));
+    let push = 0.5 * g.viewport.z * width * (1.0 - abs(ndv));
     var o: BackSilOut;
-    o.pos = mix(p, q, scale);
+    o.pos = p;
+    if (len > 1e-6) {
+        o.pos = vec4(p.xy + vel / len * push / half_vp * p.w, p.zw);
+    }
     o.clamped_ndv = min(ndv, 0.0);
     o.world = w;
     o.pick = global_pick(v.pick);

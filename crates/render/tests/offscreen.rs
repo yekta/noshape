@@ -416,6 +416,77 @@ fn plate_edges_are_drawn_solid_over_faces() {
     assert!(light.len() * 50 <= total && !consecutive, "{} of {total} edge samples covered by faces: {light:?}", light.len());
 }
 
+/// EDGE-HIGHLIGHT-LOOK (user, macOS Retina): a large thin plate in iso showed a solid black wedge past its outline,
+/// a back face thrown across the screen by the image-based silhouette pass (its push divided by a finite step's
+/// on-screen length, which can come out as nothing). Nothing but the plate and its ~1 px silhouette may cover the
+/// background, at 1× and 2×.
+#[test]
+fn a_thin_plate_draws_nothing_past_its_outline() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (lo, hi) = ([0.0f32, 0.0, 0.0], [0.6f32, 0.4, 0.004]);
+    let mesh = r.upload_mesh(&primitives::box_mesh(lo, hi, 1));
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(mesh.clone())));
+    // As the scene builder draws a part: its faces, then the same mesh as image-based silhouettes in the edge colour.
+    scene.instances.push(Instance::new(Drawable::Mesh(mesh)).with_color([0.02, 0.02, 0.03, 1.0]).back_silhouette());
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Isometric);
+    for dpr in [1.0f32, 2.0] {
+        let (w, h) = ((800.0 * dpr) as u32, (600.0 * dpr) as u32);
+        // Zoomed in on the near corner, like the user's view.
+        cam.fit_box(glam::DVec3::new(0.3, 0.0, 0.0), glam::DVec3::new(0.6, 0.15, 0.004), w as f64 / h as f64);
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: dpr, style: &Style::default(), pick: false }).unwrap();
+        // The plate's outline on screen: the convex hull of its corners.
+        let vp = glam::DVec2::new(w as f64, h as f64);
+        let mut pts: Vec<glam::DVec2> = (0..8)
+            .filter_map(|k| cam.project(glam::DVec3::new(if k & 1 == 0 { lo[0] } else { hi[0] } as f64, if k & 2 == 0 { lo[1] } else { hi[1] } as f64, if k & 4 == 0 { lo[2] } else { hi[2] } as f64), vp, 1.0))
+            .collect();
+        pts.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
+        let cross = |o: glam::DVec2, a: glam::DVec2, b: glam::DVec2| (a - o).perp_dot(b - o);
+        let mut hull: Vec<glam::DVec2> = Vec::new();
+        for pass in 0..2 {
+            let start = hull.len();
+            let it: Box<dyn Iterator<Item = &glam::DVec2>> = if pass == 0 { Box::new(pts.iter()) } else { Box::new(pts.iter().rev()) };
+            for &p in it {
+                while hull.len() >= start + 2 && cross(hull[hull.len() - 2], hull[hull.len() - 1], p) <= 0.0 {
+                    hull.pop();
+                }
+                hull.push(p);
+            }
+            hull.pop();
+        }
+        let outside = |q: glam::DVec2| -> f64 {
+            // Distance outside the (counter-clockwise) hull, 0 inside.
+            let mut d: f64 = 0.0;
+            for i in 0..hull.len() {
+                let (a, b) = (hull[i], hull[(i + 1) % hull.len()]);
+                let e = b - a;
+                let side = e.perp_dot(q - a) / e.length();
+                d = d.min(side);
+            }
+            -d
+        };
+        let mut stray = 0;
+        for y in 0..h {
+            for x in 0..w {
+                let o = ((y * w + x) * 4) as usize;
+                let lum = f.bgra[o] as u32 + f.bgra[o + 1] as u32 + f.bgra[o + 2] as u32;
+                if lum < 600 && outside(glam::DVec2::new(x as f64 + 0.5, y as f64 + 0.5)) > 3.0 * dpr as f64 {
+                    stray += 1;
+                }
+            }
+        }
+        assert!(stray < 20, "{stray} pixels drawn past the plate's outline at {dpr}x");
+    }
+}
+
 /// Regression (stale frames): back-to-back scene changes for one target,
 /// including changes of only an instance color or only a pick state, must
 /// each render their own content (instance/state uploads are skipped only
