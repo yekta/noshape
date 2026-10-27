@@ -247,6 +247,8 @@ pub struct FeatureDialog {
     pub width: Option<Pixels>,
     /// Selection lists in reorder mode (their "DONE" showing), by path.
     reordering: std::collections::HashSet<String>,
+    /// `COLLAPSE_ARRAY_ITEMS` entries opened with their › ("array.index").
+    open_items: std::collections::HashSet<String>,
     /// While a pick is dragged in reorder mode: list path, the row it would
     /// land next to, after it.
     pick_drop: Option<(String, usize, bool)>,
@@ -331,6 +333,7 @@ impl FeatureDialog {
             valid_texts: HashMap::new(),
             width: None,
             reordering: std::collections::HashSet::new(),
+            open_items: std::collections::HashSet::new(),
             pick_drop: None,
             configure_mode: false,
             configured: Default::default(),
@@ -1748,8 +1751,10 @@ impl FeatureDialog {
                 v
             }
         };
-        // Items of a driven array show their query in the array's field.
-        let driven = prefix.is_some_and(|(arr, _)| self.ty.params.iter().any(|p| p.id == arr && p.hints.has(Hints::DRIVEN_QUERY)));
+        // Items of a driven array show their query in the array's field;
+        // an opened COLLAPSE_ARRAY_ITEMS entry shows it again inside (live
+        // psui-loft-01: Loft's profile, "Faces and sketch regions").
+        let driven = prefix.is_some_and(|(arr, _)| self.ty.params.iter().any(|p| p.id == arr && p.hints.has(Hints::DRIVEN_QUERY) && !p.hints.has(Hints::COLLAPSE_ARRAY_ITEMS)));
         // Rows with their group depth (indented once the next row is known).
         let mut rows: Vec<(AnyElement, usize)> = Vec::new();
         let mut i = 0;
@@ -2753,6 +2758,9 @@ impl FeatureDialog {
                     // and its item's values follow under it, indented.
                     let q = item_specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. }));
                     let active = self.active_query.as_deref() == Some(path);
+                    // An opened entry's own field active: the array's border
+                    // stays blue around the white field (live psui-loft-01).
+                    let inner_active = self.active_query.as_deref().is_some_and(|a| a.starts_with(&format!("{path}.")));
                     let mut field = v_flex()
                         .id(SharedString::from(format!("q-{path}")))
                         .flex_1()
@@ -2762,7 +2770,7 @@ impl FeatureDialog {
                         }))
                         .rounded(px(2.))
                         .border_1()
-                        .border_color(if active { pal.accent } else { pal.border })
+                        .border_color(if active || inner_active { pal.accent } else { pal.border })
                         .bg(if active { pal.query_active } else { pal.panel })
                         .cursor_pointer()
                         .child(div().px(px(6.)).when(items == 0, |d| d.pt(px(6.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33))).when(items > 0, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.))).text_color(pal.text_muted).child(crate::ui::spec_text(s.label)));
@@ -2774,12 +2782,49 @@ impl FeatureDialog {
                         self.reordering.remove(arr_id);
                     }
                     let reorder_on = can_reorder && self.reordering.contains(arr_id);
+                    // COLLAPSE_ARRAY_ITEMS (live psui-loft-00..03, Loft's Profiles
+                    // and Guides): each entry has a › expander and nothing follows
+                    // under the field; an opened entry shows its fields inside the
+                    // field under its row (its query field then the active one);
+                    // a 1 px rgba(0,0,0,0.2) divider between entries.
+                    let collapse = s.hints.has(Hints::COLLAPSE_ARRAY_ITEMS);
                     for k in 0..items {
                         let r = q.and_then(|q| values.array(arr_id).get(k).and_then(|it| it.query(q.id).first().cloned()));
                         let label = match (s.item_template, values.array(arr_id).get(k)) {
                             (Some(t), Some(it)) => self.item_label(t, it, item_specs, k),
                             _ => r.as_ref().map(|r| (self.labeler)(r)).unwrap_or_default(),
                         };
+                        let item_key = format!("{arr_id}.{k}");
+                        let open = collapse && self.open_items.contains(&item_key);
+                        let expander = collapse.then(|| {
+                            let q_id = q.map(|q| q.id);
+                            div()
+                                .id(SharedString::from(format!("dqe-{path}-{k}")))
+                                .size(px(20.))
+                                .flex_none()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .child(crate::ui::glyph(if open { "expander-down" } else { "expander-right" }, 14., gpui_kit::rgb(0x555555)))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    if !this.open_items.remove(&item_key) {
+                                        this.open_items.insert(item_key.clone());
+                                        if let Some(q) = q_id {
+                                            this.active_query = Some(item_path(arr_id, k, q));
+                                        }
+                                    }
+                                    cx.notify();
+                                }))
+                        });
+                        // Live (dom/psui-loft-entries.json): 24 px entries 30 px apart.
+                        if collapse {
+                            if k > 0 {
+                                field = field.child(div().h(px(1.)).bg(gpui_kit::rgba(0x00000033)));
+                            }
+                            field = field.child(div().h(px(5.)));
+                        }
                         let row = h_flex()
                             .id(SharedString::from(format!("dq-{path}-{k}")))
                             .h(px(24.))
@@ -2787,6 +2832,7 @@ impl FeatureDialog {
                             .pr(px(4.))
                             .text_size(px(13.33))
                             .text_color(if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
+                            .children(expander)
                             .child(div().flex_1().truncate().child(label.clone()))
                             .when(reorder_on, |d| d.child(self.reorder_grip(arr_id, k, &label, true)))
                             .when(!reorder_on, |d| {
@@ -2818,6 +2864,14 @@ impl FeatureDialog {
                             });
                         field = field.child(if reorder_on { self.reorder_target(row, arr_id, k, cx) } else { row });
                         if focus_only {
+                            continue;
+                        }
+                        if collapse {
+                            if open {
+                                let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
+                                // Clicks inside stay with the entry's own fields.
+                                field = field.child(v_flex().id(SharedString::from(format!("dqo-{path}-{k}"))).pl(px(20.)).pr(px(4.)).pb(px(4.)).children(inner).on_click(|_, _, cx| cx.stop_propagation()));
+                            }
                             continue;
                         }
                         let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);

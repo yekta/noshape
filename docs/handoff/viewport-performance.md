@@ -791,3 +791,12 @@ changes. I write the renderer part first (my files) and show crops before touchi
     5. Feature preview: Onshape mixes one opaque preview layer (uPreviewTexture / uPreviewAlpha); ours draws back
        + front faces (double-darkens); one-layer preview + FEATURE_PREVIEW refit for the preview's owner. AO in
        sRGB values not yet compared with live.
+
+## psui 2026-10-27: re-measured on main (abac9266) with perf.yml
+- **Edit commit, live-30-features** (run 40421862773, NOSHAPE_PERF_SCRIPT=edit-undo-redo, six launches each):
+  commit shown in 315–378 ms (macOS 14) / 241–635 ms (macOS 15): **over the 200 ms budget** (10-26: 174 / 149).
+  The time is regen[preview] (285 ms: Boss 1–6 8–25 ms each, Linear pattern 1 45 ms, Hole 1 18 ms, Fillet 3 19 ms)
+  plus refine 35 ms: ticket COMMIT-LATENCY (core). Undo 31–40 ms, redo 26–71 ms (budget 50: redo 71 ms once on 14).
+- **fins-400 at 2x Retina, frame-driven** (run 40421870988): frames on the GPU orbit 129.3 / 147.3 fps, pan
+  107.9 / 93.7, zoom 151.2 / 102.3 (macOS 14 / 15); read back orbit 71.0 / 86.1. Budget 60 fps: met.
+- Cold start: run 40421880164 (live-30, cold=1) still running at 01:40.
