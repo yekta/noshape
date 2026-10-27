@@ -15,6 +15,11 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 - cdde1c06 F19 Width mate in any pick order + DOF cache across evaluations, per-group DOF length scale.
 - c76cdcf4 assembly least change measured at the bodies' mate connectors (oracle_asm R1 matches live; R1 out of KNOWN;
   R3/C1 now keep rz 0, still KNOWN for live's −157.5°).
+- dcd3cd30 oracle_asm R3 / C1 as live: exactly opposed axial connectors turn over about world Z × w (live's constant);
+  KNOWN now holds only M1 (live's own over-constrained case).
+- c95ed870 closing Animate mate gives the keyboard back (Alt+C search got no typing).
+- a239abb0, 782944e5 sketch polygon side count per 10 px, click commits without a next polygon, a tool session starts
+  at 6 sides; circle / polygon Ø readout halfway or outside as live.
 - b154b333, 507ce0e5, 57cab72a: test of the assembly error texts against live's (assembly sweep rows checked).
 - 4ca39911 assembly fuzz test (T2).
 - 3bcb5145 SKETCH-DRAG-BIG: sketch regions' hole search by bounding box (regions 38 → 3.5 ms, regen 47 → 12 ms per
@@ -32,13 +37,12 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 1. (Landed 10-27: the app part, toast at once, no Tolerance item.) Polygon commit: live also shows a pattern count label with its glyph (behaviours 160); ours has none. (LIMIT-PLACEHOLDER
    of 10-27 was a false alarm: the limit fields select all on focus; my test's Tab had focused the field and the
    click then placed the caret, as a browser does.) The drag bench is on main (psui c7f26470).
-2. Live answers pending (REQUESTS.md, skasm 2026-10-27): polygon side count after the 2nd click (pointer distance?),
-   polygon Ø readout position while drawing.
+2. Polygon commit: live's grey-boxed Ø readout after Enter (not a dimension; ours shows nothing) — app overlay.
 3. Sketch regen per drag step ~11 ms on 1000 entities (dev): eval 6.3 ms (solve 2.1, regions 3.2, wires 0.6), the rest
    regen/display overhead. Inside the frame; a release build has more headroom.
 4. GUI-verify the rest of docs/parity/workflow-assembly-sweep.md's 🔧 rows (1–5, 7, 8, 10, 12–18, 25 ✅ 10-27).
-5. oracle_asm R3/C1 (live flips the pin about an axis at −78.75° (rz −157.5°), ours about x; equally short flips:
-   needs live's rule); M1 is live's own failing case.
+5. Which part moves when neither is fixed in an exact flip: live's rule is open (behaviours R3 note); ours moves the
+   first connector's part (as live in 10 of 14 runs).
 6. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
    noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture` (clean 10-27).
 7. End-of-day walk, daily (~04:00 UTC). 10-27 02:40 on green 19555ca3: line chain + dimension, polygon, V on H toast,
