@@ -38,20 +38,20 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | Shift+E / Shift+F / Shift+W / Shift+S | Extrude / Fillet / Revolve / Sketch | Shift+E, Shift+F ✅ (earlier); Shift+S ✅ | ✅ (Shift+W ?) | 0.4.10+ / dd1b5037 10-27 (E, F, W; S not re-run) |
 | Shift+H | hide/show sketches | no visible sketches to test | ? |  |
 | ↑ ↓ on the rollback bar | move it | ✅ (core 4.5) | ✅ |  |
-| Shift+1…7 | Front, Back, Left, Right, Top, Bottom, Isometric | all correct | ✅ |  |
-| ← → ↑ ↓ | rotate 15°: from Front, Left brings Right in, Up brings Bottom in | same direction and step | ✅ |  |
+| Shift+1…7 | Front, Back, Left, Right, Top, Bottom, Isometric | all correct | ✅ | 0.4.10+ / dd1b5037 10-27 |
+| ← → ↑ ↓ | rotate 15°: from Front, Left brings Right in, Up brings Bottom in | same direction and step | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Shift+arrows / Ctrl+arrows / Ctrl+Shift+arrows | coarse / precision rotate / pan | Shift+← from Front → Right (90°), Ctrl+← a small step | ✅ / ? (angles) |  |
-| Shift+P | hide all construction | planes hidden / back | ✅ |  |
+| Shift+P | hide all construction | planes hidden / back | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | y / Shift+Y | hide / show selected parts | ✅ | ✅ |  |
-| p | hide/show planes | ✅ | ✅ |  |
+| p | hide/show planes | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Shift+I | Make isolate | Isolate dialog (Transparency / Component controls) | ✅ dialog; **planes stay visible** (live: other parts and planes/origin go translucent) | ✗ KB3 |  |
 | Shift+T | Make transparent | "Make transparent" dialog | ✅ |  |
 | Shift+V | Named views | panel "Named views": New view name, +, "No views created" | ✅; **Esc does not close it** (stays through several Esc + clicks) | ? KB2 |  |
 | Shift+X | Section view | ✅ (see workflow-analysis AN3) | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Shift+R | view in high quality | not checked visually | ? |  |
 | n | view normal to; second n flips | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| z / Shift+Z | zoom out / in about the view centre | ✅ | ✅ |  |
-| f | zoom to fit | ✅ (a press during a view animation is ignored: workflow-surfaces) | ✅ / ? |  |
+| z / Shift+Z | zoom out / in about the view centre | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
+| f | zoom to fit | ✅ (a press during a view animation is ignored: workflow-surfaces) | ✅ / ? | 0.4.10+ / dd1b5037 10-27 |
 | w | zoom to window | not tested | ? |  |
 
 ## Sketch (all checked by the highlighted tool)
