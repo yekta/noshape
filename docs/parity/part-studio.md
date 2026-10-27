@@ -246,21 +246,21 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 9.1 | Right-drag rotates, middle-drag or Ctrl+right-drag pans, wheel zooms at the cursor | view_navigation | ✅ |  |
-| 9.2 | Double-click the middle button zooms to fit (live 10-27) | View__zoom_to_fit | ✅ |  |
-| 9.3 | View cube in the upper right turns with the camera | view_navigation | ✅ (iso: the Top face fill 1803–1854 × 127–156 = live's pixels) |  |
-| 9.4 | Click a cube face for that standard view | view_navigation | ✅ |  |
-| 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | ✅ (a corner takes the pointer up to 0.31 half edges (9 px) from its centre, live's ~8 px beyond its disc) |  |
-| 9.6 | Cube faces/edges/corners highlight on hover, (188,226,247) = #90cef1 at 0.6; no name or tooltip (live 10-27) | A §6.2 | ✅ |  |
-| 9.7 | Cube arrows rotate 15° (Shift 90°, Ctrl 5°); arc arrows roll | A §6.2 | ✅ (psui 10-27, as live "spec: psui part-studio.md 9.7": ▶ brings the left side in view, ▲ the front face, the right arc rolls clockwise; 15° / Ctrl 5° / Shift 90°) |  |
-| 9.8 | Camera menu (live order): Isometric/Dimetric/Trimetric | Named views…, Previous view | Zoom to fit/window | Perspective, Orient normal to sketch on edit | ✓ display ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… | live dom/menu-camera-render.txt | ✅ (Graphics preferences… and Highlight boundary edges by ui) |  |
-| 9.9 | Previous view returns to the camera before the last view change | View__previous_view | ✅ (10-27: Shift+5 then Previous view gives the same frame pixel for pixel) |  |
-| 9.10 | Zoom to selection (parts, faces, edges, sketches, planes, features) | View__zoom_to_fit | ✅ (10-27: a face's menu › Zoom to selection frames that face) |  |
-| 9.11 | Display: Shaded with edges / Shaded without edges / Unshaded / Translucent; Hidden edges visible/removed; Tangent edges visible / phantom (dash-dot) / removed | live | ✅ (tangency found from the mesh: `MeshBuffers::smooth_edges`) |  |
-| 9.12 | Orient normal to sketch on edit (camera menu toggle); the previous view returns when the sketch closes | View__orient_normal_to_sketch_on_edit | ✅ (10-27: Sketch 1 opens normal to Top, ✓ brings back the frame pixel for pixel; the toggle isn't persisted across sessions) |  |
-| 9.13 | Named views store orientation/zoom/projection; save, restore, delete | View__named_views | ✅ |  |
+| 9.1 | Right-drag rotates, middle-drag or Ctrl+right-drag pans, wheel zooms at the cursor | view_navigation | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 9.2 | Double-click the middle button zooms to fit (live 10-27) | View__zoom_to_fit | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 9.3 | View cube in the upper right turns with the camera | view_navigation | ✅ (iso: the Top face fill 1803–1854 × 127–156 = live's pixels) | 0.4.10+ / 2d9a275c 10-27 |
+| 9.4 | Click a cube face for that standard view | view_navigation | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | ✅ (a corner takes the pointer up to 0.31 half edges (9 px) from its centre, live's ~8 px beyond its disc) | 0.4.10+ / 2d9a275c 10-27 |
+| 9.6 | Cube faces/edges/corners highlight on hover, (188,226,247) = #90cef1 at 0.6; no name or tooltip (live 10-27) | A §6.2 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 9.7 | Cube arrows rotate 15° (Shift 90°, Ctrl 5°); arc arrows roll | A §6.2 | ✅ (psui 10-27, as live "spec: psui part-studio.md 9.7": ▶ brings the left side in view, ▲ the front face, the right arc rolls clockwise; 15° / Ctrl 5° / Shift 90°) | 0.4.10+ / 2d9a275c 10-27 |
+| 9.8 | Camera menu (live order): Isometric/Dimetric/Trimetric | Named views…, Previous view | Zoom to fit/window | Perspective, Orient normal to sketch on edit | ✓ display ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… | live dom/menu-camera-render.txt | ✅ (Graphics preferences… and Highlight boundary edges by ui) | 0.4.10+ / 2d9a275c 10-27 |
+| 9.9 | Previous view returns to the camera before the last view change | View__previous_view | ✅ (10-27: Shift+5 then Previous view gives the same frame pixel for pixel) | 0.4.10+ / 2d9a275c 10-27 |
+| 9.10 | Zoom to selection (parts, faces, edges, sketches, planes, features) | View__zoom_to_fit | ✅ (10-27: a face's menu › Zoom to selection frames that face) | 0.4.10+ / 2d9a275c 10-27 |
+| 9.11 | Display: Shaded with edges / Shaded without edges / Unshaded / Translucent; Hidden edges visible/removed; Tangent edges visible / phantom (dash-dot) / removed | live | ✅ (tangency found from the mesh: `MeshBuffers::smooth_edges`) | 0.4.10+ / 2d9a275c 10-27 |
+| 9.12 | Orient normal to sketch on edit (camera menu toggle); the previous view returns when the sketch closes | View__orient_normal_to_sketch_on_edit | ✅ (10-27: Sketch 1 opens normal to Top, ✓ brings back the frame pixel for pixel; the toggle isn't persisted across sessions) | 0.4.10+ / 2d9a275c 10-27 |
+| 9.13 | Named views store orientation/zoom/projection; save, restore, delete | View__named_views | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 9.14 | Named views store the section state | View__named_views | 🔧 |  |
-| 9.15 | Rotation inertia; rotate about the point under the cursor | A §6.1 | ✅ U (`inertia_decays_like_onshape`, `rotation_keeps_the_pivot_fixed_on_screen`, app-core navigation, from the bundle) |  |
+| 9.15 | Rotation inertia; rotate about the point under the cursor | A §6.1 | ✅ U (`inertia_decays_like_onshape`, `rotation_keeps_the_pivot_fixed_on_screen`, app-core navigation, from the bundle) | 0.4.10+ / 2d9a275c 10-27 |
 
 ## 10. Visibility, isolate, transparency, section (View__hide_show, View__isolate, View__make_transparent, View__section_view)
 
