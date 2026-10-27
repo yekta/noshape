@@ -55,7 +55,7 @@ selection and hover per step, rows in brackets).
 | 3.4 | Hovered plane / mate connector colours | B only (`SECTION_PLANE…`, `MATE_CONNECTOR_PRE_SELECTED_COLOR`) | ❓ (a colour capture for icons2, who owns hover visuals) |
 | 3.5 | Timing ("reduce mouse hover highlight" on): below 0.15 px/ms the pick runs on every move; faster, the old highlight clears (unless still under the pointer) and the pick waits min(5 × average pick ms, 250 ms) after the pointer pauses (average = EMA 0.8/0.2 of pick times) | live "nav2 pre-highlight" 1–2 | 🔧 (viewport.rs `prehighlight_delay`, GPU hover-pick time as the average; plain selection only; test `prehighlight_waits_for_a_pause_as_live`) |
 | 3.6 | Leaving the graphics area clears the pre-highlight at once (next frame) | live "nav2 pre-highlight" 4; B `onMouseLeave` | ✅ R (hover-leave) |
-| 3.7 | Hovering a feature row outlines its geometry | L260 | 🔧 P |
+| 3.7 | Hovering a feature row outlines its geometry | L260 | ✅ (psui 10-27, app vs live selection/10: the part outlined #FFC685, the row highlighted, tooltip "Extrude 1 <- Sketch 1" right of the row) |
 | 3.8 | Sketch hover #ffc685 / mirrored pair secondary #f2ff80 | L8776–8813 | ✅ P sketch |
 
 ## 4. Measure (status bar readout and panel)
