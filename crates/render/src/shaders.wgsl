@@ -732,7 +732,13 @@ fn vs_silhouette(@builtin(vertex_index) index: u32, s: SilhouetteIn) -> LineOut 
     l.style = 32u;
     // A face's hover and selection show on its boundary edges, not here.
     var o = line_vertex(index, l, ~(HOVER | SELECTED));
-    if (dot(n1, view) * dot(n2, view) >= 0.0) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
+    // A silhouette unless both facets clearly face the same way. A facet seen exactly edge-on (an exact standard
+    // view of a cylinder) faces neither: both edges round it are the outline (SIL-AXIS-VIEW-GONE: with `>= 0` both
+    // were dropped and the cylinder's sides lost their line in Front view).
+    let d1 = dot(normalize(n1), normalize(view));
+    let d2 = dot(normalize(n2), normalize(view));
+    let eps = 1e-4;
+    if ((d1 > eps && d2 > eps) || (d1 < -eps && d2 < -eps)) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
 }
 

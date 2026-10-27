@@ -487,6 +487,43 @@ fn a_thin_plate_draws_nothing_past_its_outline() {
     }
 }
 
+/// SIL-AXIS-VIEW-GONE: in an exact standard view a curved face's facet can be exactly edge-on at the outline; the
+/// tessellation edges round it pair that facet (facing neither way) with one facing away, and are the silhouette.
+/// `dot(n1, v) * dot(n2, v) >= 0` dropped them, so a cylinder lost its side lines in Front view.
+#[test]
+fn a_silhouette_beside_an_edge_on_facet_is_drawn() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (200u32, 150u32);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Front);
+    cam.fit_sphere(glam::DVec3::ZERO, 0.02, w as f64 / h as f64);
+    let mut dark = |n2: [f32; 3]| {
+        let seg = SilhouetteSegment { a: [0.0, 0.0, -0.01], b: [0.0, 0.0, 0.01], n1: [1.0, 0.0, 0.0], n2, pick_id: 0, width: 1.25 };
+        let lines = r.upload_silhouettes(&SilhouetteData { segments: vec![seg] });
+        let scene = Scene { instances: vec![Instance::new(Drawable::Lines(lines)).with_color([0.0, 0.0, 0.0, 1.0])], ..Default::default() };
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        (0..w).map(|x| f.bgra[((h / 2 * w + x) * 4) as usize]).min().unwrap()
+    };
+    // Front view looks along +Y: n1 = +X is edge-on; the other facet turned away (+Y) or toward the viewer (-Y).
+    let s = std::f32::consts::FRAC_1_SQRT_2;
+    assert!(dark([s, s, 0.0]) < 100, "beside a facet turned away");
+    assert!(dark([s, -s, 0.0]) < 100, "beside a facet turned toward the viewer");
+    // Both facets facing the viewer: no silhouette.
+    let mut r2 = r;
+    let seg = SilhouetteSegment { a: [0.0, 0.0, -0.01], b: [0.0, 0.0, 0.01], n1: [s, -s, 0.0], n2: [-s, -s, 0.0], pick_id: 0, width: 1.25 };
+    let lines = r2.upload_silhouettes(&SilhouetteData { segments: vec![seg] });
+    let scene = Scene { instances: vec![Instance::new(Drawable::Lines(lines)).with_color([0.0, 0.0, 0.0, 1.0])], ..Default::default() };
+    let f = r2.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+    assert!((0..w).all(|x| f.bgra[((h / 2 * w + x) * 4) as usize] > 200), "both facets toward the viewer: nothing");
+}
+
 /// GPU-TEST-SEGV: renderers made and dropped on many threads at once (tests in one binary run in parallel) share
 /// the process's one device; each renders its frame. With a Vulkan instance and device per renderer, lavapipe
 /// crashed the process now and then inside libvulkan.
