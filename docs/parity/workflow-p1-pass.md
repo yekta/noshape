@@ -45,18 +45,18 @@ then edits, undo/redo, rollback and suppress.
 ## P2 drawing (same session)
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
-| Create Drawing of Assembly 1… (suggested views) | 4 views, pin seen through hole 1, edges correct | — | ✅ |  |
+| Create Drawing of Assembly 1… (suggested views) | 4 views, pin seen through hole 1, edges correct | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Part Studio tab menu | Delete, Rename, Properties…, Show code, Duplicate, Copy to clipboard, Select as document thumbnail, Move to document…, Export… | same (+ Open in new browser tab, browser only) | ✅ |  |
 | Part row › Create Drawing of Part 1… | "Part 1 Drawing 1" tab right after Part Studio 1, 4 views | — | ✅ |  |
-| Dimension on a straight edge (assembly drawing) | "2.362" placed | — | ✅ |  |
+| Dimension on a straight edge (assembly drawing) | "2.362" placed | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Dimension on a hole circle | part drawing "Ø.394" ✅; **assembly drawing: click not taken** | — | ✗ **P2-D1** |  |
-| BOM panel (right strip) | "Bill of materials", BOM type ▾ Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description; rows 1 | 1, 2 | 1 | same columns (behaviours 1270) | ✅ |  |
+| BOM panel (right strip) | "Bill of materials", BOM type ▾ Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description; rows 1 | 1, 2 | 1 | same columns (behaviours 1270) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 
 ## P2 assembly, green 461aefb0
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
-| Linear pattern (assembly): dialog | Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction | A6 (pass 21) | ✅ |  |
-| Pattern the pin 20 mm along the plate edge (flipped) | preview in hole 2; ✓ → "Linear pattern 1 ▸ Part 2 <2>", Instances (3) | — | ✅ |  |
+| Linear pattern (assembly): dialog | Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction | A6 (pass 21) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Pattern the pin 20 mm along the plate edge (flipped) | preview in hole 2; ✓ → "Linear pattern 1 ▸ Part 2 <2>", Instances (3) | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Enter twice in the pattern dialog | stays open | Part Studio dialogs commit on the 2nd Enter; assembly? (request p3) | ✅ P2-A1 (skb 9bf8475b, qa re-check on a08e3eda) |  |
 | Exploded views panel → Add exploded view | "Editing Explode 1 [Done]" banner, Explode 1 row, "Build steps by dragging components" | EXV rows | ✅ |  |
 
@@ -123,7 +123,7 @@ then edits, undo/redo, rollback and suppress.
 | Replicate dialog, Instances = Part 2 <1> | Mate to be matched auto-filled "Revolute 1"; Match faces in parts ▾; Parts to find match in (red) | same (behaviours 5969–5970) | ✅ |  |
 | … pending list row while open | none | "Replicate 1" row with an error badge at once | ✅ P2-A7 (9703d9b9, qa verified 21d6a89e; skasm 10-27: the Replicate row with its badge) |  |
 | Parts to find match in = plate, ✓ | pins in both free Ø10 holes; "Replicate 1" ▸ Part 2 <5>, <6>, Mate features (2) | same structure (behaviours 5973) | ✅ |  |
-| Linear pattern opened from tool search | red "Linear pattern 1" row with a red dot at once, kept after picking Instances | same (behaviours 5985) | ✅ |  |
+| Linear pattern opened from tool search | red "Linear pattern 1" row with a red dot at once, kept after picking Instances | same (behaviours 5985) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Mate connector (Ctrl+M) | "Mate connector 1": On entity ▾, Origin entity, ☐ Realign, ☐ Move, flip / reorient; Realign adds Primary / Secondary axis entity; Move adds X / Y / Z 0 mm, Rotate about Z ▾, Rotation angle 0 deg | same (behaviours 5960–5965) | ✅ |  |
 | Feature row drag (Extrude 3 up) | pill #1651B0 with white text at the pointer; 2 px #1651B0 drop line across the list with a hollow ring at its left end; hovered row (224,240,251) | same (live (222,241,251); "qa5 (10-25 p2)" (7)) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Drop above the feature's own sketch | accepted, no message; row red (170,37,45), "Features …" + red badge, tooltip "… did not regenerate properly: …" / "1 missing selection" | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
