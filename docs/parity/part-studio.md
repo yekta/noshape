@@ -174,7 +174,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.9 | A reorder above a feature's dependencies is done (no refusal, no toast); the feature then fails on its missing selection | live qa4 round 5 v3 s8 (REORDER-INVALID) | ✅ (the app no longer checks the order; test `extrude_above_its_sketch_misses_its_region`) |
 | 6.10 | Search box filters by name or type: Default geometry rows and parts by name too, each run of dropped rows one "..." (Parts too), "Features (M of N)" counting the kept default rows, no error icon while filtering (live 10-27) | features_and_parts_lists | ✅ |
 | 6.11 | Filter commands :errors :warnings :suppressed :hidden :shown :type :name :folder :variable :part | features_and_parts_lists | ✅ (:partnumber / :revision match the parts' Part number / Revision properties; live 10-27: ":" alone matches nothing, ":type" / ":part" alone don't filter, ":hidden" / ":shown" take default rows and parts) |
-| 6.12 | Error icon with count in the header; click filters to errors | features_and_parts_lists | 🔧 |
+| 6.12 | Error icon in the header (17 px at x 45, "N feature(s) failed to regenerate"), title "Features …"; click filters ":errors " (live 10-27) | features_and_parts_lists | ✅ |
 | 6.13 | Failed features red with the error as tooltip | Home__error_indicators | ✅ |
 | 6.14 | Suppressed features struck through | features_and_parts_lists | ✅ |
 | 6.15 | Under-defined sketch indicator | features_and_parts_lists | ✅ (blue text) |
@@ -254,7 +254,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 9.6 | Cube faces/edges/corners highlight on hover, (188,226,247) = #90cef1 at 0.6; no name or tooltip (live 10-27) | A §6.2 | ✅ |
 | 9.7 | Cube arrows rotate 15° (Shift 90°, Ctrl 5°); arc arrows roll | A §6.2 | ✅ (psui 10-27, as live "spec: psui part-studio.md 9.7": ▶ brings the left side in view, ▲ the front face, the right arc rolls clockwise; 15° / Ctrl 5° / Shift 90°) |
 | 9.8 | Camera menu (live order): Isometric/Dimetric/Trimetric | Named views…, Previous view | Zoom to fit/window | Perspective, Orient normal to sketch on edit | ✓ display ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… | live dom/menu-camera-render.txt | ✅ (Graphics preferences… and Highlight boundary edges by ui) |
-| 9.9 | Previous view returns to the camera before the last view change | View__previous_view | 🔧 |
+| 9.9 | Previous view returns to the camera before the last view change | View__previous_view | ✅ (10-27: Shift+5 then Previous view gives the same frame pixel for pixel) |
 | 9.10 | Zoom to selection (parts, faces, edges, sketches, planes, features) | View__zoom_to_fit | 🔧 |
 | 9.11 | Display: Shaded with edges / Shaded without edges / Unshaded / Translucent; Hidden edges visible/removed; Tangent edges visible / phantom (dash-dot) / removed | live | ✅ (tangency found from the mesh: `MeshBuffers::smooth_edges`) |
 | 9.12 | Orient normal to sketch on edit (camera menu toggle); the previous view returns when the sketch closes | View__orient_normal_to_sketch_on_edit | 🔧 (not persisted across sessions) |

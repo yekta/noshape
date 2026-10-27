@@ -3347,16 +3347,20 @@ impl PartStudioView {
                 // truncates to "Features …".
                 .when(errors > 0, |d| {
                     d.child(
+                        // Live 10-27: a 27 × 30 button at the row's start, the
+                        // 17 px icon 5 px in, "N feature(s) failed to
+                        // regenerate"; a click filters ":errors ".
                         div()
                             .id("feature-errors")
-                            .size(px(20.))
-                            .mr(px(8.))
+                            .size(px(17.))
+                            .ml(px(1.))
+                            .mr(px(9.))
                             .flex_none()
                             .cursor_pointer()
-                            .child(crate::assets::icon("regen-error", 20., cx))
-                            .tip(format!("{errors} feature{} failed to regenerate", if errors == 1 { "" } else { "s" }), crate::ui::TipSide::Right)
+                            .child(crate::assets::icon("regen-error", 17., cx))
+                            .tip(crate::i18n::template("__errorCount__ feature(s) failed to regenerate", &[("errorCount", &errors.to_string())]), crate::ui::TipSide::Right)
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                                let next = if this.ui.filter_query.trim() == ":errors" { "" } else { ":errors" };
+                                let next = if this.ui.filter_query.trim() == ":errors" { "" } else { ":errors " };
                                 this.set_filter(next, window, cx);
                             })),
                     )
