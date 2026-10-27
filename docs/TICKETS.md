@@ -62,7 +62,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P0 FILLET-HANG a Fillet runs for > 15 min (stopped by hand) in OCCT's blend approximation (`BRepBlend_AppFuncRoot::
   SearchLocation` / `NCollection_BaseSequence::Find` ← Approx_SweepApproximation ← BRepBlend_AppSurface ←
   ChFi3d_Builder::CompleteData … ← noshape checked_blend / scaled_blend ← op_fillet features.cpp:3049, `checked`, size 5)
-  with no timeout or abort; the app would freeze on it. Opening the saved document in a fresh process hangs too (> 10 min).
+  with no timeout or abort; the app would freeze on it. Opening the saved document in a fresh process hangs too (> 30 min,
+  stopped). Second occurrence: fuzz seed 33 (main CLI ~20:18) sat in the same BRepBlend approximation for > 1 h
+  (stack tickets/cli-hang2-bt.txt, op_fillet features.cpp:2912).
   clifuzz_dbg.py seed 40 step 9 on the watcher CLI 19555ca3 (log /root/qa-scratch/cli/clifuzz-40n.log "9 fillet-args"); doc
   /root/qa-scratch/tickets/cli-fillet-hang.noshape (history ends "Insert feature : Fillet 2"); stack
   tickets/cli-fillet-hang-bt-tail.txt. Needs a time / iteration budget on blends (fail the feature) and the regen must stay
@@ -247,6 +249,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   2026-10-26, build 4d2f6b0c)
   skasm 10-27: the step was the sketch regions' hole search (~40 ms); now regions 3.5 ms, the sketch regen ~12 ms (dev
   build under load); perf test scene sketch_perf::big_shape_sketch_drag_step_parts. Re-time on a release build.
+  qa 19555ca3: in the green app the drag step's sketch regen is still 50–185 ms (load 41); re-time on a quiet box /
+  release build before closing (qa 2026-10-27)
 - [ ] reopened (qa 19555ca3: the copy lands at the pointer, selected, Ø dimension copied, no prompt = live; but the
   Transform manipulator sits on the original circle / sketch origin, not on the copy's centre as live;
   tickets/sketch-paste-manipulator-on-original.png) 6329b168 P2 SKETCH-PASTE Ctrl+C / Ctrl+V of a dimensioned circle in a sketch: ours pastes the copy exactly on top of the
