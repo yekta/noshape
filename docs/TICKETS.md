@@ -236,6 +236,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   nearest live's volume, so the x_t patches (our NURBS tube for a rolling-ball blend, xt_read.cpp blend_surface /
   blend_boundary, trimmed by the spine projected onto the supports) come out ~0.15% too big: check the trim curves
   first (the tube itself is O(h^4)). Files /root/dx-scratch/i1/{in.*,d_*.noshape}.
+  dx 10-27 later (debug build, not landed): the 4 faces are XT rolling-ball blends (type 56) of radius 2 mm between two
+  cylinders, spine an ellipse (type 32) exactly 2.000000 mm from both supports at 17 samples; 4× denser tube stations
+  change nothing; a fine mesh of each face gives the same area (13.2012) as the integral (13.2016). So tube, spine
+  and contact curves are exact; the +0.072 mm³ per patch (≈ the surface 5 µm outside) must come from the patch's
+  other edges (where the blend ends on the neighbouring faces) or its pcurves: check those next.
 - [ ] P2 BOOL-TOUCH-INFO Boolean Intersect of two blocks that only touch face to face: both parts deleted (= live), but
   live reports INFO "The parts either do not intersect or are totally contained." (dialog bubble); ours OK with no message.
   A disjoint pair: live OK, no message (= ours) (behaviours "qa (2026-10-26, P1 boolean edge cases)") (qa 2026-10-26)
