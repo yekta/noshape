@@ -15,108 +15,108 @@ it, so re-take positions after every selection.
 
 ## 1. New document (live: "New document")
 
-| # | Step | Live | Status |
-|---|---|---|---|
-| 1.1 | Start window › Create › Document… | Dialog with the name "Untitled document" selected | ✅ |
-| 1.2 | Type a name, Enter | Creates and opens it | ✅ |
-| 1.3 | New document contents | Part Studio 1 (active) + Assembly 1; "Features (4)", Default geometry, rollback bar under Right, "Parts (0)"; isometric | ✅ |
-| 1.4 | Start window footer version | (ours) should read the release version | ✅ re-checked 10-23 on main 88fbf8f5: footer "(0.4.6.88fbf8f5fa11)" = release version + commit (was ✗ F27) |
+| # | Step | Live | Status | Verified |
+|---|---|---|---|---|
+| 1.1 | Start window › Create › Document… | Dialog with the name "Untitled document" selected | ✅ |  |
+| 1.2 | Type a name, Enter | Creates and opens it | ✅ |  |
+| 1.3 | New document contents | Part Studio 1 (active) + Assembly 1; "Features (4)", Default geometry, rollback bar under Right, "Parts (0)"; isometric | ✅ |  |
+| 1.4 | Start window footer version | (ours) should read the release version | ✅ re-checked 10-23 on main 88fbf8f5: footer "(0.4.6.88fbf8f5fa11)" = release version + commit (was ✗ F27) |  |
 
 ## 2. Sketch on Top (live: "Sketch mode", "Input behaviour" › G)
 
-| # | Step | Live | Status |
-|---|---|---|---|
-| 2.1 | Sketch, then click Top in the list | Sketch 1 dialog, plane "Top plane", no tool active, view not rotated | ✅ |
-| 2.2 | Sketch dialog defaults | ☐ Disable imprinting, **☑ Show constraints**, ☐ Show expressions, ☑ Show errors | ✅ re-checked 10-23 (main 88fbf8f5): ☑ Show constraints, ☑ Show errors (was ✗ F1) |
-| 2.3 | N | Animated view normal to the plane | ✅ |
-| 2.4 | L, click, click, click (chain) | Previous segment's length boxed, live length in blue | ✅ |
-| 2.5 | Enter mid-chain | The boxed length becomes a driving dimension; the tool stays | ✅ |
-| 2.6 | Esc | One Esc ends the chain and exits the tool | ✅ |
-| 2.7 | G (corner rectangle), C (circle), A (3-point arc) | As live | ✅ |
-| 2.8 | Select two lines, E | Equal; glyphs shown | ✅ |
-| 2.9 | D, pick circle, place | Value box opens with the full value selected ("20.479094 mm") | ✅ |
-| 2.10 | Bare "25" + Enter | Ø25, box closes | ✅ (but see F3) |
-| 2.11 | Double-click the dimension, "1 in" + Enter | Ø25.4, tan background | ✅ |
-| 2.12 | "10+5" + Enter | Label "ƒ 15" (expression prefix) | ✅ re-checked 10-23: "ƒ 15" (was ✗ F4) |
-| 2.13 | Re-open it | Box shows "(10+5) mm" | ✅ re-checked 10-23: "(10+5) mm" (was ✗ F5) |
-| 2.14 | Type, Esc | Reverts and blurs; box stays | ✅ |
-| 2.15 | Unknown "#w" + Enter | "Create variable" popup next to the field (Name "w") | ✅ re-checked 10-23: Create variable popup, Name "w" (was ✗ F6) |
-| 2.16 | "abc" + Enter | Pink field, red underline, ✓ disabled, box stays open, hover "Enter a valid expression." | ✅ re-checked 10-23: pink, red underline, ✓ disabled (was ✗ F7) |
-| 2.17 | Arc radius, point-point, line-point dimensions | Created, typed values applied | ✅ |
-| 2.18 | Type the value immediately after the placing click | Applied (keys not lost) | ✅ (checked with 20 ms steps) |
-| 2.19 | Enter with no tool active | Does **not** accept the sketch (live sketch/311) | ✅ (see F2) |
-| 2.20 | ✓ | Sketch 1 in the list, under-defined badge | ✅ |
-| 2.21 | Dimension crash (user report, macOS) | – | not reproduced on Linux (all dimension kinds above) |
+| # | Step | Live | Status | Verified |
+|---|---|---|---|---|
+| 2.1 | Sketch, then click Top in the list | Sketch 1 dialog, plane "Top plane", no tool active, view not rotated | ✅ |  |
+| 2.2 | Sketch dialog defaults | ☐ Disable imprinting, **☑ Show constraints**, ☐ Show expressions, ☑ Show errors | ✅ re-checked 10-23 (main 88fbf8f5): ☑ Show constraints, ☑ Show errors (was ✗ F1) |  |
+| 2.3 | N | Animated view normal to the plane | ✅ |  |
+| 2.4 | L, click, click, click (chain) | Previous segment's length boxed, live length in blue | ✅ |  |
+| 2.5 | Enter mid-chain | The boxed length becomes a driving dimension; the tool stays | ✅ |  |
+| 2.6 | Esc | One Esc ends the chain and exits the tool | ✅ |  |
+| 2.7 | G (corner rectangle), C (circle), A (3-point arc) | As live | ✅ |  |
+| 2.8 | Select two lines, E | Equal; glyphs shown | ✅ |  |
+| 2.9 | D, pick circle, place | Value box opens with the full value selected ("20.479094 mm") | ✅ |  |
+| 2.10 | Bare "25" + Enter | Ø25, box closes | ✅ (but see F3) |  |
+| 2.11 | Double-click the dimension, "1 in" + Enter | Ø25.4, tan background | ✅ |  |
+| 2.12 | "10+5" + Enter | Label "ƒ 15" (expression prefix) | ✅ re-checked 10-23: "ƒ 15" (was ✗ F4) |  |
+| 2.13 | Re-open it | Box shows "(10+5) mm" | ✅ re-checked 10-23: "(10+5) mm" (was ✗ F5) |  |
+| 2.14 | Type, Esc | Reverts and blurs; box stays | ✅ |  |
+| 2.15 | Unknown "#w" + Enter | "Create variable" popup next to the field (Name "w") | ✅ re-checked 10-23: Create variable popup, Name "w" (was ✗ F6) |  |
+| 2.16 | "abc" + Enter | Pink field, red underline, ✓ disabled, box stays open, hover "Enter a valid expression." | ✅ re-checked 10-23: pink, red underline, ✓ disabled (was ✗ F7) |  |
+| 2.17 | Arc radius, point-point, line-point dimensions | Created, typed values applied | ✅ |  |
+| 2.18 | Type the value immediately after the placing click | Applied (keys not lost) | ✅ (checked with 20 ms steps) |  |
+| 2.19 | Enter with no tool active | Does **not** accept the sketch (live sketch/311) | ✅ (see F2) |  |
+| 2.20 | ✓ | Sketch 1 in the list, under-defined badge | ✅ |  |
+| 2.21 | Dimension crash (user report, macOS) | – | not reproduced on Linux (all dimension kinds above) |  |
 
 ## 3. Features (live: "Part Studio: features, selection, menus", "Feature dialog basics", "Input behaviour")
 
-| # | Step | Live | Status |
-|---|---|---|---|
-| 3.1 | Shift+E, click the rectangle region | "Face of Sketch 1", 25 mm default, Part 1 preview | ✅ |
-| 3.2 | Depth: 1st click / "30" Enter / Enter | Selects all / "30 mm" re-selected, dialog stays / commits; sketch hidden | ✅ |
-| 3.3 | Shift+7 | Isometric | ✅ |
-| 3.4 | Shift+F, two edges, "3" Enter Enter | Fillet 1 | ✅ |
-| 3.5 | Chamfer on the vertical edge meeting both 3 mm fillets: 5 mm, then 2 mm | 5 mm: **error "Distance of chamfer on face too large."** (live G46: Onshape refuses it too); 2 mm builds Onshape's 10-face shape | (F8 fixed per kern 10-22; re-run) |
-| 3.6 | Shell, remove top face, 2.5 / 1 mm | Shells (2.5 mm: 13946.59 mm³, 21 faces, kern 10-22) | (F9 fixed per kern 10-22; re-run) |
-| 3.7 | After Enter committed a value, Esc | Cancels the dialog (no pending edit) | ✅ |
-| 3.8 | Sketch points on the top face; Hole from the sketch | One chip "Vertices of Sketch 2"; one hole per point | ✅ re-checked 10-23: one chip "Vertices of Sketch 2", one hole per point (was ✗ F10) |
-| 3.9 | Hole defaults and callout | Drilled 1/4 (6.35 mm), 12 mm blind, 118 deg; "Ø6.35 ↧ 12" callout; row "Ø 6.35 mm ↧ 12 mm" | ✅ |
-| 3.10 | Linear pattern, Part type: Part 1, edge, 40 mm × 3 | Part 2/3, default colour rotation #a5a5a5, #3b61b4 | ✅ |
-| 3.11 | Direction field, click near the edge's midpoint | Filtered to the edge ("Edge of Part 1") | ✅ re-checked 10-23: an edge/line, not a midpoint (was ✗ F11) |
-| 3.12 | Linear pattern, Feature type: Hole, edge, 10 mm × 2 | Holes copied on Part 1 | ✅ re-checked 10-23: holes copied 10 mm along the edge, Part 1 intact (was ✗ F12 (Part 1 destroyed)) |
-| 3.13 | Esc while a select's search box is open | Closes the list only | ✅ re-checked 10-23: list closes, dialog stays (was ✗ F13) |
-| 3.14 | Mirror, Part type: Part 3 about Right | Part 4 | ✅ |
-| 3.15 | Shift+X while a feature dialog is open | ? | ✅ re-checked 10-23: Shift+X does nothing while the dialog is open (was ✗ F14 (Section view opens on top of the open Mirror dialog)) |
-| 3.16 | Boolean union Part 3 + Part 4 | Touching parts: one part. Parts that don't touch (live 10-22): **two unchanged parts, the row stays black with no error**, and while editing a blue info bubble **"Boolean resulted in no geometry change…"** (psb BOOL1) | ✅ touching; disjoint: re-run |
+| # | Step | Live | Status | Verified |
+|---|---|---|---|---|
+| 3.1 | Shift+E, click the rectangle region | "Face of Sketch 1", 25 mm default, Part 1 preview | ✅ |  |
+| 3.2 | Depth: 1st click / "30" Enter / Enter | Selects all / "30 mm" re-selected, dialog stays / commits; sketch hidden | ✅ |  |
+| 3.3 | Shift+7 | Isometric | ✅ |  |
+| 3.4 | Shift+F, two edges, "3" Enter Enter | Fillet 1 | ✅ |  |
+| 3.5 | Chamfer on the vertical edge meeting both 3 mm fillets: 5 mm, then 2 mm | 5 mm: **error "Distance of chamfer on face too large."** (live G46: Onshape refuses it too); 2 mm builds Onshape's 10-face shape | (F8 fixed per kern 10-22; re-run) |  |
+| 3.6 | Shell, remove top face, 2.5 / 1 mm | Shells (2.5 mm: 13946.59 mm³, 21 faces, kern 10-22) | (F9 fixed per kern 10-22; re-run) |  |
+| 3.7 | After Enter committed a value, Esc | Cancels the dialog (no pending edit) | ✅ |  |
+| 3.8 | Sketch points on the top face; Hole from the sketch | One chip "Vertices of Sketch 2"; one hole per point | ✅ re-checked 10-23: one chip "Vertices of Sketch 2", one hole per point (was ✗ F10) |  |
+| 3.9 | Hole defaults and callout | Drilled 1/4 (6.35 mm), 12 mm blind, 118 deg; "Ø6.35 ↧ 12" callout; row "Ø 6.35 mm ↧ 12 mm" | ✅ |  |
+| 3.10 | Linear pattern, Part type: Part 1, edge, 40 mm × 3 | Part 2/3, default colour rotation #a5a5a5, #3b61b4 | ✅ |  |
+| 3.11 | Direction field, click near the edge's midpoint | Filtered to the edge ("Edge of Part 1") | ✅ re-checked 10-23: an edge/line, not a midpoint (was ✗ F11) |  |
+| 3.12 | Linear pattern, Feature type: Hole, edge, 10 mm × 2 | Holes copied on Part 1 | ✅ re-checked 10-23: holes copied 10 mm along the edge, Part 1 intact (was ✗ F12 (Part 1 destroyed)) |  |
+| 3.13 | Esc while a select's search box is open | Closes the list only | ✅ re-checked 10-23: list closes, dialog stays (was ✗ F13) |  |
+| 3.14 | Mirror, Part type: Part 3 about Right | Part 4 | ✅ |  |
+| 3.15 | Shift+X while a feature dialog is open | ? | ✅ re-checked 10-23: Shift+X does nothing while the dialog is open (was ✗ F14 (Section view opens on top of the open Mirror dialog)) |  |
+| 3.16 | Boolean union Part 3 + Part 4 | Touching parts: one part. Parts that don't touch (live 10-22): **two unchanged parts, the row stays black with no error**, and while editing a blue info bubble **"Boolean resulted in no geometry change…"** (psb BOOL1) | ✅ touching; disjoint: re-run |  |
 
 ## 4. Edit, roll back, reorder, suppress, delete, undo (live: "Rollback bar", "Right-click menus")
 
-| # | Step | Live | Status |
-|---|---|---|---|
-| 4.1 | Double-click Extrude 1, depth 25, Enter Enter | Rolled back while editing; model regenerates | ✅ re-checked 10-23: rolled back while editing; Part 1 kept (was ✗ F12 (Part 1 disappears silently)) |
-| 4.2 | Feature row right-click › Suppress | Struck-through italic; model updates | ✅ |
-| 4.3 | Drag Fillet 1 below Chamfer 1 | Drop line + pill; reordered | ✅ (Fillet then fails: F8) |
-| 4.4 | Ctrl+Z / Ctrl+Y / Ctrl+Z | Undo / redo the reorder | ✅ |
-| 4.5 | Click a row, ↑ ↑ / ↓ ↓ | Rollback bar moves; light blue while focused | ✅ |
-| 4.6 | Select a feature row, Delete key | Deletes it | ✅ re-checked 10-23: Delete removes the feature, Ctrl+Z restores (was ✗ F15) |
-| 4.7 | Right-click › Delete; Ctrl+Z | Deleted; restored | ✅ |
-| 4.8 | Error header | At the default panel width live truncates to "Features ..." beside the error icon (part-studio/94, 570); a wider panel shows "Features (N)" | ✅ (F16 withdrawn) |
+| # | Step | Live | Status | Verified |
+|---|---|---|---|---|
+| 4.1 | Double-click Extrude 1, depth 25, Enter Enter | Rolled back while editing; model regenerates | ✅ re-checked 10-23: rolled back while editing; Part 1 kept (was ✗ F12 (Part 1 disappears silently)) |  |
+| 4.2 | Feature row right-click › Suppress | Struck-through italic; model updates | ✅ |  |
+| 4.3 | Drag Fillet 1 below Chamfer 1 | Drop line + pill; reordered | ✅ (Fillet then fails: F8) |  |
+| 4.4 | Ctrl+Z / Ctrl+Y / Ctrl+Z | Undo / redo the reorder | ✅ |  |
+| 4.5 | Click a row, ↑ ↑ / ↓ ↓ | Rollback bar moves; light blue while focused | ✅ |  |
+| 4.6 | Select a feature row, Delete key | Deletes it | ✅ re-checked 10-23: Delete removes the feature, Ctrl+Z restores (was ✗ F15) |  |
+| 4.7 | Right-click › Delete; Ctrl+Z | Deleted; restored | ✅ |  |
+| 4.8 | Error header | At the default panel width live truncates to "Features ..." beside the error icon (part-studio/94, 570); a wider panel shows "Features (N)" | ✅ (F16 withdrawn) |  |
 
 ## 5. Variables, configuration, measure, mass properties
 
-| # | Step | Live | Status |
-|---|---|---|---|
-| 5.1 | Variable (Plane ▾ dropdown): w, 20 | "#w = 20 mm" | ✅ |
-| 5.2 | Plane ▾ dropdown contents | … Variable, Query variable, **Composite part, Tag** | ✅ (v0.4.6 gate): list scrolls to Composite part / Tag (was ✗ F17 (last items cut off at the window bottom)) |
-| 5.3 | Drag the variable to the top; Extrude 1 depth "#w" | Parts 20 mm | ✅ |
-| 5.4 | Select a face / two faces | "Area: 856.366 mm²" / a distance | ✅ |
-| 5.5 | Mass properties, no material | ? centre of mass shown | ? F18 (centre of mass and inertia blank) |
-| 5.6 | Material warning | Goes with the Mass properties dialog | ✅ (v0.4.6 gate): page toast ≈3.4 s, gone ≈8 s (= live) (was ✗ F19 (stays; later covers the sketch dialog's ✓)) |
-| 5.7 | Configurations panel › Configure Part Studio; add row "Long" | List input, Default / Long, info box | ✅ |
-| 5.8 | Right-click a feature parameter (Variable Value) | "Configure …" | ✅ re-checked 10-23: Depth › right-click › "Configure" (was ✗ F20 (only Cut/Copy/Paste/Select All)) |
-| 5.9 | + Configure features | Yellow banner "Select … to configure [Done]" | ✅ (v0.4.6 gate): yellow "Select sketches or features to configure [Done]" (was ✗ F21 (no banner seen)) |
-| 5.10 | Strip tooltip after the panel opens | Hides | ✅ re-checked 10-23: no tooltip left over the panel (was ✗ F22 (stays over the panel)) |
-| 5.11 | ☰ › Workspace units… while a sketch is open; Length → Inch, ✓ | Units change; the sketch stays open; geometry unchanged | ✅ re-checked 10-23: the Workspace units dialog accepts the open sketch first (Sketch 3 kept), geometry unchanged; live order not captured (was ✗ F23, F24) |
+| # | Step | Live | Status | Verified |
+|---|---|---|---|---|
+| 5.1 | Variable (Plane ▾ dropdown): w, 20 | "#w = 20 mm" | ✅ |  |
+| 5.2 | Plane ▾ dropdown contents | … Variable, Query variable, **Composite part, Tag** | ✅ (v0.4.6 gate): list scrolls to Composite part / Tag (was ✗ F17 (last items cut off at the window bottom)) |  |
+| 5.3 | Drag the variable to the top; Extrude 1 depth "#w" | Parts 20 mm | ✅ |  |
+| 5.4 | Select a face / two faces | "Area: 856.366 mm²" / a distance | ✅ |  |
+| 5.5 | Mass properties, no material | ? centre of mass shown | ? F18 (centre of mass and inertia blank) |  |
+| 5.6 | Material warning | Goes with the Mass properties dialog | ✅ (v0.4.6 gate): page toast ≈3.4 s, gone ≈8 s (= live) (was ✗ F19 (stays; later covers the sketch dialog's ✓)) |  |
+| 5.7 | Configurations panel › Configure Part Studio; add row "Long" | List input, Default / Long, info box | ✅ |  |
+| 5.8 | Right-click a feature parameter (Variable Value) | "Configure …" | ✅ re-checked 10-23: Depth › right-click › "Configure" (was ✗ F20 (only Cut/Copy/Paste/Select All)) |  |
+| 5.9 | + Configure features | Yellow banner "Select … to configure [Done]" | ✅ (v0.4.6 gate): yellow "Select sketches or features to configure [Done]" (was ✗ F21 (no banner seen)) |  |
+| 5.10 | Strip tooltip after the panel opens | Hides | ✅ re-checked 10-23: no tooltip left over the panel (was ✗ F22 (stays over the panel)) |  |
+| 5.11 | ☰ › Workspace units… while a sketch is open; Length → Inch, ✓ | Units change; the sketch stays open; geometry unchanged | ✅ re-checked 10-23: the Workspace units dialog accepts the open sketch first (Sketch 3 kept), geometry unchanged; live order not captured (was ✗ F23, F24) |  |
 
 ## 6. Assembly and drawing (live: "Assembly", "Drawing")
 
-| # | Step | Live | Status |
-|---|---|---|---|
-| 6.1 | Assembly tab, I | Insert dialog | ✅ |
-| 6.2 | Click Part 2, click; click Part 3, click | Inserted; **the first instance lands at the origin** | ✅ re-checked 10-23: first instance at the assembly origin (was ✗ F25) |
-| 6.3 | Instance filter "3" | Filters the list | ✅ |
-| 6.4 | Fastened mate (M): two faces | Mate HUD, solves, "Fastened 1" | ✅ |
-| 6.5 | + › Create Drawing…, ANSI_A_MM, OK | Model picker, then Insert view following the cursor | ✅ |
-| 6.6 | Place front, right and top views; Esc | Projected views | ✅ |
-| 6.7 | Dimension tool, pick an edge, place | Dimension "17"; tool stays active | ✅ (two-edge distance not retried) |
+| # | Step | Live | Status | Verified |
+|---|---|---|---|---|
+| 6.1 | Assembly tab, I | Insert dialog | ✅ |  |
+| 6.2 | Click Part 2, click; click Part 3, click | Inserted; **the first instance lands at the origin** | ✅ re-checked 10-23: first instance at the assembly origin (was ✗ F25) |  |
+| 6.3 | Instance filter "3" | Filters the list | ✅ |  |
+| 6.4 | Fastened mate (M): two faces | Mate HUD, solves, "Fastened 1" | ✅ |  |
+| 6.5 | + › Create Drawing…, ANSI_A_MM, OK | Model picker, then Insert view following the cursor | ✅ |  |
+| 6.6 | Place front, right and top views; Esc | Projected views | ✅ |  |
+| 6.7 | Dimension tool, pick an edge, place | Dimension "17"; tool stays active | ✅ (two-edge distance not retried) |  |
 
 ## 7. Export, save, reopen
 
-| # | Step | Live | Status |
-|---|---|---|---|
-| 7.1 | Part Studio tab › Export…, STEP | Dialog (Parasolid default), STEP options, file written | ✅ (3 solids, mm) |
-| 7.2 | STEP contents | Products named as in live's export | ✅ (v0.4.6 gate): flat products Part 1…n, AP242 header (was ✗ F26) |
-| 7.3 | Quit, start, Recently opened, open | Thumbnail, all tabs and features back | ✅ (single click selects; double click opens: ? vs live) |
+| # | Step | Live | Status | Verified |
+|---|---|---|---|---|
+| 7.1 | Part Studio tab › Export…, STEP | Dialog (Parasolid default), STEP options, file written | ✅ (3 solids, mm) |  |
+| 7.2 | STEP contents | Products named as in live's export | ✅ (v0.4.6 gate): flat products Part 1…n, AP242 header (was ✗ F26) |  |
+| 7.3 | Quit, start, Recently opened, open | Thumbnail, all tabs and features back | ✅ (single click selects; double click opens: ? vs live) |  |
 
 ## 8. Context menus: every item clicked once (added 10-22 after qa5's Parts-list Rename crash on aa75fdf)
 
@@ -125,99 +125,99 @@ from the same state. **Any crash, hang or console panic fails the gate.** Items 
 and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.md "Right-click menus").
 
 **8.1 Feature row, sketch (Sketch 1)**
-| # | Item | Expected | Status |
-|---|---|---|---|
-| 8.1.1 | Rename | inline name field, all selected; Esc reverts | – |
-| 8.1.2 | Edit… | Sketch 1 opens for editing | – |
-| 8.1.3 | Copy sketch | copied (no visible change; Paste in another sketch pastes it) | – |
-| 8.1.4 | Show dimensions | the sketch's dimensions show in the graphics | – |
-| 8.1.5 | Add selection to folder… | Folder name popup beside the row | – |
-| 8.1.6 | Hide / Show | the sketch hides / shows; eye toggles | – |
-| 8.1.7 | Create Drawing of Sketch 1… | Create Drawing dialog | – |
-| 8.1.8 | Export as DXF/DWG… | export dialog | – |
-| 8.1.9 | Suppress / Unsuppress | struck-through italic / back | – |
-| 8.1.10 | Dynamic suppression ▸ Add expression… | expression popup | – |
-| 8.1.11 | Zoom to selection | view zooms to the sketch | – |
-| 8.1.12 | View normal to | view turns normal to its plane | – |
-| 8.1.13 | Show dependencies… | "Dependencies of Sketch 1" panel | – |
-| 8.1.14 | Roll to here | rollback bar moves under Sketch 1 | – |
-| 8.1.15 | Edit sketch appearance… | appearance editor | – |
-| 8.1.16 | Delete | deleted (Ctrl+Z restores) | – |
+| # | Item | Expected | Status | Verified |
+|---|---|---|---|---|
+| 8.1.1 | Rename | inline name field, all selected; Esc reverts | – |  |
+| 8.1.2 | Edit… | Sketch 1 opens for editing | – |  |
+| 8.1.3 | Copy sketch | copied (no visible change; Paste in another sketch pastes it) | – |  |
+| 8.1.4 | Show dimensions | the sketch's dimensions show in the graphics | – |  |
+| 8.1.5 | Add selection to folder… | Folder name popup beside the row | – |  |
+| 8.1.6 | Hide / Show | the sketch hides / shows; eye toggles | – |  |
+| 8.1.7 | Create Drawing of Sketch 1… | Create Drawing dialog | – |  |
+| 8.1.8 | Export as DXF/DWG… | export dialog | – |  |
+| 8.1.9 | Suppress / Unsuppress | struck-through italic / back | – |  |
+| 8.1.10 | Dynamic suppression ▸ Add expression… | expression popup | – |  |
+| 8.1.11 | Zoom to selection | view zooms to the sketch | – |  |
+| 8.1.12 | View normal to | view turns normal to its plane | – |  |
+| 8.1.13 | Show dependencies… | "Dependencies of Sketch 1" panel | – |  |
+| 8.1.14 | Roll to here | rollback bar moves under Sketch 1 | – |  |
+| 8.1.15 | Edit sketch appearance… | appearance editor | – |  |
+| 8.1.16 | Delete | deleted (Ctrl+Z restores) | – |  |
 
 **8.2 Feature row, other feature (Extrude 1)**
-| # | Item | Expected | Status |
-|---|---|---|---|
-| 8.2.1 | Rename | inline name field; Esc reverts | – |
-| 8.2.2 | Edit… | Extrude 1 dialog | – |
-| 8.2.3 | Edit Sketch 1… | Sketch 1 opens | – |
-| 8.2.4 | Show dimensions | dimensions show | – |
-| 8.2.5 | Add selection to folder… | Folder name popup | – |
-| 8.2.6 | Suppress / Unsuppress | struck-through / back | – |
-| 8.2.7 | Dynamic suppression ▸ Add expression… | expression popup | – |
-| 8.2.8 | Zoom to selection | zooms | – |
-| 8.2.9 | Show dependencies… | dependencies panel | – |
-| 8.2.10 | Roll to here | bar under Extrude 1 | – |
-| 8.2.11 | Add appearance to feature… | appearance editor | – |
-| 8.2.12 | Delete | deleted (Ctrl+Z restores) | – |
+| # | Item | Expected | Status | Verified |
+|---|---|---|---|---|
+| 8.2.1 | Rename | inline name field; Esc reverts | – |  |
+| 8.2.2 | Edit… | Extrude 1 dialog | – |  |
+| 8.2.3 | Edit Sketch 1… | Sketch 1 opens | – |  |
+| 8.2.4 | Show dimensions | dimensions show | – |  |
+| 8.2.5 | Add selection to folder… | Folder name popup | – |  |
+| 8.2.6 | Suppress / Unsuppress | struck-through / back | – |  |
+| 8.2.7 | Dynamic suppression ▸ Add expression… | expression popup | – |  |
+| 8.2.8 | Zoom to selection | zooms | – |  |
+| 8.2.9 | Show dependencies… | dependencies panel | – |  |
+| 8.2.10 | Roll to here | bar under Extrude 1 | – |  |
+| 8.2.11 | Add appearance to feature… | appearance editor | – |  |
+| 8.2.12 | Delete | deleted (Ctrl+Z restores) | – |  |
 
 **8.3 Several feature rows (Shift-click two)**
-| # | Item | Expected | Status |
-|---|---|---|---|
-| 8.3.1 | Add selection to folder… | Folder name popup | – |
-| 8.3.2 | Section view… | Section view dialog | – |
-| 8.3.3 | Suppress | both struck-through | – |
-| 8.3.4 | Dynamic suppression ▸ | submenu | – |
-| 8.3.5 | Clear selection | rows unselected | – |
-| 8.3.6 | Edit sketch appearance… / Add appearance to feature… | appearance editor | – |
-| 8.3.7 | Delete | both deleted (Ctrl+Z restores) | – |
+| # | Item | Expected | Status | Verified |
+|---|---|---|---|---|
+| 8.3.1 | Add selection to folder… | Folder name popup | – |  |
+| 8.3.2 | Section view… | Section view dialog | – |  |
+| 8.3.3 | Suppress | both struck-through | – |  |
+| 8.3.4 | Dynamic suppression ▸ | submenu | – |  |
+| 8.3.5 | Clear selection | rows unselected | – |  |
+| 8.3.6 | Edit sketch appearance… / Add appearance to feature… | appearance editor | – |  |
+| 8.3.7 | Delete | both deleted (Ctrl+Z restores) | – |  |
 
 **8.4 Default geometry: plane (Top) and Origin**
-| # | Item | Expected | Status |
-|---|---|---|---|
-| 8.4.1 | Top › Rename | inline field; Esc reverts | – |
-| 8.4.2 | Top › New sketch… | Sketch dialog on Top | – |
-| 8.4.3 | Top › Offset plane… | Plane dialog, Offset, Top picked | – |
-| 8.4.4 | Top › Size to Part Studio | plane resizes to the parts | – |
-| 8.4.5 | Top › Hide / Show | plane hides / shows | – |
-| 8.4.6 | Top › Hide other planes | Front, Right hide | – |
-| 8.4.7 | Top › Hide all planes | all planes hide | – |
-| 8.4.8 | Top › Zoom to selection | zooms | – |
-| 8.4.9 | Top › View normal to | view normal to Top | – |
-| 8.4.10 | Top › Show dependencies… | dependencies panel | – |
-| 8.4.11 | Origin › Rename / Hide / Show dependencies… | as above | – |
+| # | Item | Expected | Status | Verified |
+|---|---|---|---|---|
+| 8.4.1 | Top › Rename | inline field; Esc reverts | – |  |
+| 8.4.2 | Top › New sketch… | Sketch dialog on Top | – |  |
+| 8.4.3 | Top › Offset plane… | Plane dialog, Offset, Top picked | – |  |
+| 8.4.4 | Top › Size to Part Studio | plane resizes to the parts | – |  |
+| 8.4.5 | Top › Hide / Show | plane hides / shows | – |  |
+| 8.4.6 | Top › Hide other planes | Front, Right hide | – |  |
+| 8.4.7 | Top › Hide all planes | all planes hide | – |  |
+| 8.4.8 | Top › Zoom to selection | zooms | – |  |
+| 8.4.9 | Top › View normal to | view normal to Top | – |  |
+| 8.4.10 | Top › Show dependencies… | dependencies panel | – |  |
+| 8.4.11 | Origin › Rename / Hide / Show dependencies… | as above | – |  |
 
 **8.5 Folder row**
-| # | Item | Expected | Status |
-|---|---|---|---|
-| 8.5.1 | Expand / Collapse | folder opens / closes | – |
-| 8.5.2 | Rename | inline field; Esc reverts | – |
-| 8.5.3 | Suppress / Unsuppress | its features struck-through / back | – |
-| 8.5.4 | Expand all / Collapse all | all folders open / close | – |
-| 8.5.5 | Unpack folder | folder removed, features stay | – |
+| # | Item | Expected | Status | Verified |
+|---|---|---|---|---|
+| 8.5.1 | Expand / Collapse | folder opens / closes | – |  |
+| 8.5.2 | Rename | inline field; Esc reverts | – |  |
+| 8.5.3 | Suppress / Unsuppress | its features struck-through / back | – |  |
+| 8.5.4 | Expand all / Collapse all | all folders open / close | – |  |
+| 8.5.5 | Unpack folder | folder removed, features stay | – |  |
 
 **8.6 Parts list row (Part 1)**
-| # | Item | Expected | Status |
-|---|---|---|---|
-| 8.6.1 | Rename | inline white field; Esc reverts (**crashed on aa75fdf**, qa5) | – |
-| 8.6.2 | Properties… | Properties dialog (Name focused) | – |
-| 8.6.3 | Assign material… | material panel | – |
-| 8.6.4 | Edit appearance… | appearance editor | – |
-| 8.6.5 | Copy here… | Transform dialog, Translate by XYZ, ☑ Copy part | – |
-| 8.6.6 | Copy Part 1 | copied (no toast) | – |
-| 8.6.7 | Create Drawing of Part 1… | Create Drawing dialog | – |
-| 8.6.8 | Export… | Export dialog | – |
-| 8.6.9 | Release… | Release dialog | – |
-| 8.6.10 | Hide / Show | part hides / shows | – |
-| 8.6.11 | Isolate… | Isolate panel | – |
-| 8.6.12 | Make transparent… | part translucent | – |
-| 8.6.13 | Zoom to selection | zooms | – |
-| 8.6.14 | Delete… | Delete part feature (Ctrl+Z restores) | – |
+| # | Item | Expected | Status | Verified |
+|---|---|---|---|---|
+| 8.6.1 | Rename | inline white field; Esc reverts (**crashed on aa75fdf**, qa5) | – |  |
+| 8.6.2 | Properties… | Properties dialog (Name focused) | – |  |
+| 8.6.3 | Assign material… | material panel | – |  |
+| 8.6.4 | Edit appearance… | appearance editor | – |  |
+| 8.6.5 | Copy here… | Transform dialog, Translate by XYZ, ☑ Copy part | – |  |
+| 8.6.6 | Copy Part 1 | copied (no toast) | – |  |
+| 8.6.7 | Create Drawing of Part 1… | Create Drawing dialog | – |  |
+| 8.6.8 | Export… | Export dialog | – |  |
+| 8.6.9 | Release… | Release dialog | – |  |
+| 8.6.10 | Hide / Show | part hides / shows | – |  |
+| 8.6.11 | Isolate… | Isolate panel | – |  |
+| 8.6.12 | Make transparent… | part translucent | – |  |
+| 8.6.13 | Zoom to selection | zooms | – |  |
+| 8.6.14 | Delete… | Delete part feature (Ctrl+Z restores) | – |  |
 
 **8.7 Parts list section header ("Parts (N)")**
-| # | Item | Expected | Status |
-|---|---|---|---|
-| 8.7.1 | Show / Hide parts list properties | properties columns show / hide | – |
-| 8.7.2 | Hide all parts | all parts hide | – |
+| # | Item | Expected | Status | Verified |
+|---|---|---|---|---|
+| 8.7.1 | Show / Hide parts list properties | properties columns show / hide | – |  |
+| 8.7.2 | Hide all parts | all parts hide | – |  |
 
 ## Findings (2026-10-21 run; owner per item)
 

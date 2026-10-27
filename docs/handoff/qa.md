@@ -3,6 +3,12 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+## Parity re-verification (lead 10-27 13:50; standing, high priority)
+**P1 verified: 50 of 804 rows** (✅ rows of the ten P1 checklists; 0 turned ❌). Column "Verified" = `0.4.10+ / <green> <date>`
+(green after v0.4.10). Helper: /root/qa-scratch/bin/pv.py (`count`, `list FILE`, `set FILE ROW TEXT [--fail TICKET]`);
+sessions /root/qa-scratch/bin/pvs.sh, shots /root/qa-scratch/pv/. Live reference = behaviours.md; rows with no live record
+go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–2 (except 1.16, 1.21, 1.25, 2.18).
+
 ## Requests to the lead (qa, updated 2026-10-27 13:05)
 - BUDGET-LONGJMP (add45a95, in green 4e568f3f): re-running seeds 120 / 131 / 72 on the watcher CLI 12:59 (logs
   cli/clifuzz-{120,131,72}L.log); results go into the ticket.
