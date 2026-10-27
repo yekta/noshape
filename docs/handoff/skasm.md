@@ -108,8 +108,11 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.
-1. Open tickets: none in my section (10-27 21:30). e52e8015 point menus as live, circular pattern axis picks the
-   entity (pre-highlight); UI keystroke tests now 9 (polygon sides typed, Enter in a Line chain added).
+1. Open tickets: none in my section (10-27 late). Fixed this round: dc9db0a4 CONFLICT-COLLAPSE-ON-DRAG (a drag
+   solves only the dragged components; the others stay as they are, also faster), 1ca0cf14 ASM-RENAME-ESC +
+   J-KEY-NO-EFFECT, 07ead631 MATE-ANGLE-360, 5bc2e08e ORIGIN-COINCIDENT-GLYPH (a point on the Origin is coincident
+   with it, no longer merged into it: circles centred on the Origin now carry a Coincident too, as live),
+   bf1edd44 SKETCH-PATTERN-GLYPH-HOVER. e52e8015 point menus as live; UI keystroke tests 9.
 2. (Tried: writing back solved components between conflict-exclusion retries: no gain measured, dropped.)
 3. UI keystroke tests (docs/TESTS.md, part-studio-ui sketch_ui_tests.rs, 7 tests): extend to other P1 sketch key
    flows (`=#var` in a value box, polygon sides typed, Tab between rectangle boxes, Enter in a Line chain). The harness
