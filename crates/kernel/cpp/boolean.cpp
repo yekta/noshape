@@ -55,6 +55,17 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepLib.hxx>
+#include <TopAbs.hxx>
+#include <TopoDS_Iterator.hxx>
+#include <gp_Cylinder.hxx>
+#include <gp_Lin.hxx>
+#include <ElSLib.hxx>
+#include <BRepTools_History.hxx>
+#include <BRepTools.hxx>
+#include <BRepAdaptor_Surface.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
+#include <BRepClass_FaceClassifier.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRep_Builder.hxx>
@@ -1543,6 +1554,278 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
   return true;
 }
 
+// Holes straight through a plate (big-plate: 400 Extrude Remove circles):
+// each tool a circle prism (a cylinder and two caps square to it) passing
+// clean through two opposite planar faces of the target and touching nothing
+// else, so the result is the target with each hole's circles as new inner
+// loops of those two faces and the tool's cylinder between them as the
+// hole's wall. Built directly (no boolean: OCCT's cut of 400 tools in slabs
+// spent ~1.7 s of CPU). False when it doesn't apply; the caller cuts as usual.
+static bool cut_through_holes(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, TopoDS_Shape& out, HHist& hist)
+{
+  auto no = [](int why) {
+    if (std::getenv("NOSHAPE_BOOL_DEBUG"))
+      std::fprintf(stderr, "through holes: no (%d)\n", why);
+    return false;
+  };
+  if (t.size() < 2)
+    return no(1);
+  TopoDS_Shape solid;
+  int          nsolid = 0;
+  for (TopExp_Explorer e(target, TopAbs_SOLID); e.More(); e.Next(), ++nsolid)
+    solid = e.Current();
+  if (nsolid != 1)
+    return no(2);
+  TopoDS_Shape shell;
+  int          nshell = 0;
+  for (TopoDS_Iterator it(solid); it.More(); it.Next(), ++nshell)
+    shell = it.Value();
+  if (nshell != 1 || shell.ShapeType() != TopAbs_SHELL)
+    return no(3);
+  ShapeIMap faces;
+  TopExp::MapShapes(solid, TopAbs_FACE, faces);
+  Bnd_Box all;
+  BRepBndLib::Add(solid, all, false);
+  if (all.IsVoid())
+    return no(4);
+  const double tol = 1e-7 * std::max(1.0, std::sqrt(all.SquareExtent()));
+  std::vector<Bnd_Box> fbox((size_t)faces.Extent());
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    BRepBndLib::Add(faces(i), fbox[(size_t)i - 1], false);
+    fbox[(size_t)i - 1].Enlarge(tol);
+  }
+
+  struct Hole
+  {
+    TopoDS_Face                             side;
+    std::vector<TopoDS_Shape>               caps;
+    occ::handle<Geom_CylindricalSurface>    cyl; // in world coordinates
+    int                                     fa = 0, fb = 0; // target faces (indices) it passes through
+    double                                  va = 0, vb = 0; // their positions on the cylinder's v
+    TopoDS_Face                             wall;
+    TopoDS_Edge                             ea, eb; // the wall's circles on fa, fb
+  };
+  std::vector<Hole> holes(t.size());
+  gp_Dir            d;
+  for (size_t k = 0; k < t.size(); ++k)
+  {
+    Hole& h = holes[k];
+    int   nf = 0;
+    for (TopExp_Explorer e(t[k], TopAbs_FACE); e.More(); e.Next(), ++nf)
+    {
+      const TopoDS_Face&  f = TopoDS::Face(e.Current());
+      BRepAdaptor_Surface s(f, false);
+      if (s.GetType() == GeomAbs_Cylinder && h.side.IsNull())
+        h.side = f;
+      else if (s.GetType() == GeomAbs_Plane)
+        h.caps.push_back(f);
+      else
+        return no(5);
+    }
+    if (nf != 3 || h.side.IsNull() || h.caps.size() != 2)
+      return no(6);
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(h.side, u0, u1, v0, v1);
+    if (u1 - u0 < 2 * M_PI - 1e-9)
+      return no(7);
+    TopLoc_Location                      loc;
+    occ::handle<Geom_CylindricalSurface> c = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(h.side, loc));
+    if (c.IsNull())
+      return no(8);
+    h.cyl = loc.IsIdentity() ? c : occ::down_cast<Geom_CylindricalSurface>(c->Transformed(loc.Transformation()));
+    const gp_Dir z = h.cyl->Position().Direction();
+    if (k == 0)
+      d = z;
+    else if (!z.IsParallel(d, 1e-12))
+      return no(9);
+    for (const TopoDS_Shape& cap : h.caps)
+      if (!BRepAdaptor_Surface(TopoDS::Face(cap), false).Plane().Axis().Direction().IsParallel(z, 1e-12))
+        return no(10);
+  }
+
+  // The target's faces each hole meets: exactly two, planar, square to the
+  // holes, the hole's caps beyond both; nothing else near it.
+  NCollection_DataMap<int, std::vector<size_t>> on_face;
+  for (size_t k = 0; k < holes.size(); ++k)
+  {
+    Hole&        h = holes[k];
+    const gp_Ax3 ax = h.cyl->Position();
+    const double r  = h.cyl->Radius();
+    Bnd_Box      tb;
+    BRepBndLib::Add(h.side, tb, false);
+    tb.Enlarge(tol);
+    std::vector<int> met;
+    for (int i = 1; i <= faces.Extent(); ++i)
+      if (!fbox[(size_t)i - 1].IsOut(tb))
+        met.push_back(i);
+    if (met.size() != 2)
+      return no(11);
+    double vs[2];
+    for (int j = 0; j < 2; ++j)
+    {
+      BRepAdaptor_Surface s(TopoDS::Face(faces(met[(size_t)j])), false);
+      if (s.GetType() != GeomAbs_Plane || !s.Plane().Axis().Direction().IsParallel(d, 1e-12))
+        return no(12);
+      vs[j] = gp_Vec(ax.Location(), s.Plane().Location()).Dot(gp_Vec(ax.Direction()));
+    }
+    if (std::abs(vs[0] - vs[1]) <= 10 * tol)
+      return no(13);
+    double cv[2];
+    for (int j = 0; j < 2; ++j)
+      cv[j] = gp_Vec(ax.Location(), BRepAdaptor_Surface(TopoDS::Face(h.caps[(size_t)j]), false).Plane().Location()).Dot(gp_Vec(ax.Direction()));
+    const double lo = std::min(vs[0], vs[1]), hi = std::max(vs[0], vs[1]);
+    // Caps on or beyond both faces (a sketch on the top face cut through all
+    // starts on it).
+    if (!(std::min(cv[0], cv[1]) < lo + 10 * tol && std::max(cv[0], cv[1]) > hi - 10 * tol))
+      return no(14);
+    h.fa = vs[0] < vs[1] ? met[0] : met[1];
+    h.fb = vs[0] < vs[1] ? met[1] : met[0];
+    h.va = lo;
+    h.vb = hi;
+    // The circles lie inside their faces, clear of the faces' edges.
+    for (int j = 0; j < 2; ++j)
+    {
+      const int          fi = j == 0 ? h.fa : h.fb;
+      const TopoDS_Face& f  = TopoDS::Face(faces(fi));
+      const gp_Pnt       c  = ax.Location().Translated(gp_Vec(ax.Direction()) * (j == 0 ? lo : hi));
+      Bnd_Box            cb;
+      cb.Add(c);
+      BRepClass_FaceClassifier fc(f, c, tol);
+      if (fc.State() != TopAbs_IN)
+        return no(15);
+      for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+      {
+        Bnd_Box eb;
+        BRepBndLib::Add(e.Current(), eb, false);
+        if (eb.Distance(cb) > r + 10 * tol)
+          continue;
+        BRepExtrema_DistShapeShape dist(BRepBuilderAPI_MakeVertex(c).Vertex(), e.Current());
+        if (!dist.IsDone() || dist.Value() <= r + 10 * tol)
+          return no(16);
+      }
+    }
+    for (int fi : {h.fa, h.fb})
+    {
+      if (!on_face.IsBound(fi))
+        on_face.Bind(fi, {});
+      on_face.ChangeFind(fi).push_back(k);
+    }
+  }
+  // Holes apart from each other.
+  {
+    std::vector<std::pair<double, size_t>> order;
+    gp_Dir                                 x = gp_Ax2(gp_Pnt(0, 0, 0), d).XDirection();
+    for (size_t k = 0; k < holes.size(); ++k)
+      order.emplace_back(gp_Vec(holes[k].cyl->Location().XYZ()).Dot(gp_Vec(x)), k);
+    std::sort(order.begin(), order.end());
+    for (size_t i = 0; i < order.size(); ++i)
+      for (size_t j = i + 1; j < order.size(); ++j)
+      {
+        const Hole& a = holes[order[i].second];
+        const Hole& b = holes[order[j].second];
+        if (order[j].first - order[i].first > a.cyl->Radius() + b.cyl->Radius() + 10 * tol)
+          break;
+        const double dd = gp_Lin(a.cyl->Axis()).Distance(b.cyl->Location());
+        if (dd <= a.cyl->Radius() + b.cyl->Radius() + 10 * tol && (a.fa == b.fa || a.fb == b.fb || a.fa == b.fb || a.fb == b.fa))
+          return no(17);
+      }
+  }
+
+  // The walls: the tools' cylinders between the two faces, facing the axis.
+  BRep_Builder B;
+  for (Hole& h : holes)
+  {
+    BRepBuilderAPI_MakeFace mf(h.cyl, 0, 2 * M_PI, h.va, h.vb, tol);
+    if (!mf.IsDone())
+      return no(18);
+    TopoDS_Face wall = mf.Face();
+    for (TopExp_Explorer e(wall, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge& ed = TopoDS::Edge(e.Current());
+      if (BRep_Tool::IsClosed(ed, wall))
+        continue;
+      BRepAdaptor_Curve c(ed);
+      if (c.GetType() != GeomAbs_Circle)
+        return no(19);
+      const double v = gp_Vec(h.cyl->Location(), c.Circle().Location()).Dot(gp_Vec(h.cyl->Position().Direction()));
+      (std::abs(v - h.va) < std::abs(v - h.vb) ? h.ea : h.eb) = ed;
+    }
+    if (h.ea.IsNull() || h.eb.IsNull())
+      return no(20);
+    // Outward from the material: towards the axis.
+    BRepAdaptor_Surface s(wall);
+    gp_Pnt              p;
+    gp_Vec              du, dv;
+    s.D1(0.5, 0.5 * (h.va + h.vb), p, du, dv);
+    gp_Vec n = du.Crossed(dv);
+    if (wall.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    if (n.Dot(gp_Vec(gp_Lin(h.cyl->Axis()).Normal(p).Direction())) > 0)
+      wall.Reverse();
+    h.wall = wall;
+  }
+
+  // The two faces of each hole with its circles as inner loops.
+  HHist                                                                   h = new BRepTools_History();
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> replaced;
+  for (NCollection_DataMap<int, std::vector<size_t>>::Iterator it(on_face); it.More(); it.Next())
+  {
+    const TopoDS_Face& f   = TopoDS::Face(faces(it.Key()));
+    const TopoDS_Face  fwd = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+    TopoDS_Face        nfc = TopoDS::Face(fwd.EmptyCopied());
+    for (TopoDS_Iterator w(fwd); w.More(); w.Next())
+      B.Add(nfc, w.Value());
+    for (size_t k : it.Value())
+    {
+      Hole&              ho = holes[k];
+      const TopoDS_Edge& e  = it.Key() == ho.fa ? ho.ea : ho.eb;
+      BRepLib::BuildPCurveForEdgeOnPlane(e, nfc);
+      // The loop runs against the wall's use of the circle (one closed,
+      // oriented shell), in the face's own (forward) terms.
+      TopAbs_Orientation in_wall = TopAbs_FORWARD;
+      for (TopExp_Explorer x(ho.wall, TopAbs_EDGE); x.More(); x.Next())
+        if (x.Current().IsSame(e))
+          in_wall = x.Current().Orientation();
+      const TopAbs_Orientation against = TopAbs::Reverse(in_wall);
+      TopoDS_Wire              w;
+      B.MakeWire(w);
+      B.Add(w, e.Oriented(f.Orientation() == TopAbs_REVERSED ? TopAbs::Reverse(against) : against));
+      w.Closed(true);
+      B.Add(nfc, w);
+    }
+    nfc.Orientation(f.Orientation());
+    replaced.Bind(f, nfc);
+    h->AddModified(f, nfc);
+  }
+  TopoDS_Shell ns;
+  B.MakeShell(ns);
+  for (TopoDS_Iterator it(shell); it.More(); it.Next())
+  {
+    const TopoDS_Shape* r = replaced.Seek(it.Value());
+    B.Add(ns, r != nullptr ? r->Oriented(it.Value().Orientation()) : it.Value());
+  }
+  for (const Hole& ho : holes)
+  {
+    B.Add(ns, ho.wall);
+    h->AddModified(ho.side, ho.wall);
+    for (const TopoDS_Shape& cap : ho.caps)
+      h->Remove(cap);
+    h->AddGenerated(TopoDS::Face(faces(ho.fa)), ho.ea);
+    h->AddGenerated(TopoDS::Face(faces(ho.fb)), ho.eb);
+  }
+  ns.Closed(true);
+  TopoDS_Solid so;
+  B.MakeSolid(so);
+  B.Add(so, ns.Oriented(shell.Orientation()));
+  so.Orientation(solid.Orientation());
+  if (!closed_and_oriented(so))
+    return no(21);
+  out  = so;
+  hist = h;
+  return true;
+}
+
 // The result's facets back as mesh faces; `hist` becomes the history from
 // the original (unfaceted) inputs.
 static TopoDS_Shape remesh_facets(const TopoDS_Shape& res, MeshFacets& facets, HHist& hist)
@@ -1690,6 +1973,19 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     HHist        h;
     const bool   done = fuse_slabs(a[0], t, opts, out, h);
     fail_if_cancelled();
+    if (done)
+      return make_result(concat(args.items, tools.items), out, h.get());
+  }
+  // Holes straight through a plate: built directly.
+  if (op == 1 && a.size() == 1 && facets.source.empty())
+  {
+    TopoDS_Shape out;
+    HHist        h;
+    bool         done = false;
+    {
+      const KernelTimer timer("boolean.through_holes");
+      done = cut_through_holes(a[0], t, out, h);
+    }
     if (done)
       return make_result(concat(args.items, tools.items), out, h.get());
   }

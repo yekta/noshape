@@ -35,3 +35,34 @@ fn cut_with_many_tools_some_crossing() {
     assert_eq!(res.count(ShapeType::Solid), 1);
     assert!(res.is_valid());
 }
+
+/// Holes straight through a plate are built directly (boolean.cpp
+/// cut_through_holes; big-plate's 400 cost ~1.7 s of CPU in OCCT): the same
+/// solid as a cut, each tool's side the hole's wall, its caps gone.
+#[test]
+fn holes_through_a_plate_built_directly() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(160.0, 160.0, 10.0) * mm).unwrap();
+    let r = 4.0 * mm;
+    let mut tools: Vec<Shape> = Vec::new();
+    for i in 0..8 {
+        for j in 0..8 {
+            let c = DVec3::new(10.0 + 20.0 * i as f64, 10.0 + 20.0 * j as f64, -5.0) * mm;
+            tools.push(make_cylinder(&Plane::new(c, DVec3::Z, DVec3::X), r, 20.0 * mm, 2.0 * PI).unwrap());
+        }
+    }
+    let t = std::time::Instant::now();
+    let res = boolean(BooleanOp::Cut, &[plate], &tools, &BooleanOptions::default()).unwrap();
+    eprintln!("64 holes in {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
+    let s = &res.shape;
+    assert!(s.is_valid());
+    let want = (160.0 * 160.0 - 64.0 * PI * 16.0) * 10.0 * 1e-9;
+    assert!((s.volume().unwrap() - want).abs() < 1e-12, "{} vs {want}", s.volume().unwrap());
+    assert_eq!(s.faces().len(), 6 + 64);
+    for (k, tool) in tools.iter().enumerate() {
+        let side = tool.faces().iter().position(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).unwrap() as u32;
+        let walls = res.history.modified(k as u32 + 1, ShapeType::Face, side);
+        assert_eq!(walls.len(), 1, "tool {k}: {:?}", res.history.of_input(k as u32 + 1, ShapeType::Face, side).collect::<Vec<_>>());
+    }
+}
