@@ -105,6 +105,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Live answered the derived colour question: the target's next default colour unless the source part's appearance is
   explicit (then carried); ours now does both.
 
+## Evening 10-27 (landed through 24a0e15f)
+- Speed: Parasolid read 35 → 3 s; x_t assemblies import as live (Assembly + "<file> parts"); live's NIST exports in
+  tests/perf; dx_perf::timed_nist_import (STEP 41.8 s / x_t 48.0 s dev, loaded; live 38.7 / 24.5 s) is held back by
+  the display meshing lock (request below). Bracket drawing 178 ms vs live 30.1 s.
+- Drawings: Adjust linestyle in live's lengths, centred per edge (screen, PDF, SVG) and as LINE + LTYPE in DXF
+  ($LTSCALE 0.5); title block as live maps it (drawing's own Part number / Revision, part's Title 1–3, date drawn;
+  op drawing_element_properties); template sizes by standard; formats unlocked on new drawings; Detail profile
+  lines Phantom; palette select lists widen to their rows; walks of views / dimensions / Drawing properties
+  (drawing.md: V36 V37 V39 V51 V66 V67 V72 D28 D32 D35 D38 verified, S29–S33 notes refreshed).
+- Live asked (REQUESTS dx 10-27): none open.
+
 ## Drawing walk 10-27 afternoon (green 0537ac91, :131, /root/dx-scratch/w2/s*.png)
 - Verified ✅: V36, V37, V39, V51, V66, V67, V72 (drawing.md). Fixed from it: Rotate view ▸ on views whose alignment
   is suppressed (one rule `Sheet::turns_freely` for the menu and the API), live's rotate guide (no bubble); crop
@@ -148,7 +159,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   …/.fingerprint/…/invoked.timestamp", "could not parse/generate dep info …noshape_app_core-….d", "unable to copy
   …/incremental/…-working/….o"): its 30-min pass runs prune-build.py / prune-deps.py / fix-fingerprints.py and the
   incremental `find … -mmin +30 -exec rm -rf` on every target dir, without the `busy` check the floor step has.
-  Please skip a dir while a cargo uses it (`busy "$t" && continue`), as the floor does.
+  Please skip a dir while a cargo uses it (`busy "$t" && continue`), as the floor does. Also: fix-fingerprints.py
+  only checks that some artifact of a crate is left, so an `.rlib` whose `.rmeta` was pruned keeps its fingerprint
+  and cargo fails "extern location … .rmeta does not exist" (dx 22:56: 42 crates of target-dx; dx reset them by
+  hand). Checking `.rmeta` and `.rlib` separately would catch it.
 - **Display meshing runs one part at a time** (kernel mesh.cpp, core's area; PLAN 2.7 import target, also regen):
   mesh_prepare holds the global `mesh_mutex` around BRepMesh and mesh_fill takes it again for BRepTools::Clean, so
   `regen::display::mesh_in_parallel`'s 36 jobs of the NIST import queue on it: NOSHAPE_KERNEL_PROFILE summed
