@@ -122,6 +122,11 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
 ## Requests to the lead
+- Main RED 484a185c (09:31) and cb5e9cec (07:55), "ops --test all SIGSEGV": not the kernel. The kernel log has
+  `hidden_edges::e[1635930] general protection fault … in libvulkan.so.1.4.341` at the watcher's T1 (09:26), and a
+  "pipeline compil" thread faulting in libvulkan 10 min earlier: ops' GPU test `hidden_edges::edges_behind_fins_stay_hidden`
+  (renderer, not mine) crashing in the Vulkan loader/driver, intermittently (1 in 3 runs under gdb here). The DOC-POISON
+  session test failing in the same run looks like a consequence (a dead test process's crash markers); dx's.
 - macOS / Windows don't compile on main between cb84d673 and 9f7459f9 (my Linux-only declarations, fixed in
   9f7459f9): don't take a last-green from that window into a release; CI run 40481396224 checks 9f7459f9.
 - Forward-oriented edges (kern's proposal, P0 class: EdgeInfo.start/end follow a reversed edge but its parameters,
