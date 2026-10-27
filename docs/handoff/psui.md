@@ -16,6 +16,14 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   6db9bb8d DELETE-TAB-DIALOG as live; 606d2d0f Tab commit schedules one preview, TAB-NO-PREVIEW closed (Xvfb artifact).
 - 10-27 01:20–02:10: 8bf820e0 feature previews as live's preview blend; 72e41465 LOFT-PROFILE-LIST; 5e4c8ad5
   interaction 3.2/3.3 and p1-dialogs closures; PANEL-BLEED (analysis field empty over a dialog, Esc order) in check7.
+- 10-27 02:10–03:30: 67bca14a PANEL-BLEED (analysis field empty over a dialog, Esc order); ac78dfed Section view's
+  "Select default plane" popup; fef99ffe highlighted edges as live's light set (face boundary 3 px, edge hover 8 px
+  with dark outlines, selected 5 px); 5912b4c1 Mass Part tab takes the whole part; 8165fca6 selected-part shading
+  refit; then PERF-SECTION-PANIC + MENU-SKETCH-TAG (check12).
+- End-of-day walk 10-27 03:10 on /root/green/noshape (16cdcf6d): live-30 edit Extrude 1 (Enter previews, ✓ regens;
+  15 mm swallows the bosses so their chamfers/fillets fail, as the geometry says), undo, rollback drag up and back,
+  Suppress from the row menu (dependants red), the Diameter readout, Section view, Mass properties: no regressions
+  in my area. Live asked about the feature list header with errors ("Features ..." truncates next to the red icon).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -37,9 +45,8 @@ that touches the model: ~12 min.
 2. Preview blend residuals (behaviours "psui (10-26, P1) Feature preview look"): Remove / Intersect tools not
    blended yet (live: the part uncut, the tool grey through it); live draws the active field's picked region outline
    full orange over the preview (ours: 30 % behind the tool); at slider 1 live's top face is lighter than ours.
-3. interaction 1.12 / 3.1: live asked for a fresh light capture (REQUESTS "psui (10-27, interaction 1.12)"). Our
-   face-hover band is ~4.5 px against live's ~3 px (selection/03); the selected top (229,163,34) vs the old capture's
-   (229,170,56). Change nothing until the fresh set arrives.
+3. Edge selected + hovered (live: the hover's dark outline round a (255,188,64) core): ours never hovers a selected
+   entity (builder `hover.filter(|h| !selection.contains(h))`).
 4. Dihedral panel layout (P2; live asked for the full spec): Units ▾ row, Max / Min read-outs, Scale row, grey ✕;
    Curve/surface's "☑ Previewed edges and faces" row over a dialog.
 5. Cold start (viewport-performance.md 10-27): per-(source, options) MTLLibrary cache in the vendored wgpu-hal.
