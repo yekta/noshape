@@ -121,7 +121,9 @@ impl Session {
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        let store = Store::open(&path).with_context(|| format!("opening {}", path.display()))?;
+        // One line for the user (qa OPEN-ERROR-SILENT): the store error's own
+        // text, not its cause chain, which repeats SQLite's message.
+        let store = Store::open(&path).map_err(|e| anyhow::anyhow!("{e}")).with_context(|| format!("opening {}", path.display()))?;
         let branch = store.default_branch()?;
         let head = store.head(branch)?;
         let doc = Document::from_blobs(&store.read_all(head)?)?;
