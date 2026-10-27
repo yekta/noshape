@@ -99,7 +99,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   regen that never ends (2 workers in Defeaturing, spinner for > 6 min); dragging the bar back above Draft 8 schedules
   regen #3, which queues behind the stuck one: the spinner stays, the Part Studio never updates again until the app is
   killed. Still hangs on the watcher CLI 04:06, which has the fillet/chamfer budget (feature_list > 200 s): the budget
-  doesn't cover the draft's defeaturing. Live: a draft either builds or fails at once. Needs a budget on delete_faces / defeaturing (fail the feature,
+  doesn't cover the draft's defeaturing. Second occurrence (qa 05:05): fuzz seed 71 step 39 on the same CLI (log
+  cli/clifuzz-71z.log "39 draft-args", doc tickets/cli-draft-hang2.noshape), the same PerformEF stack under
+  `trycatch_timed` (it times but doesn't stop the call); 2 of the last 12 fuzz seeds hit it. Live: a draft either builds or fails at once. Needs a budget on delete_faces / defeaturing (fail the feature,
   "Selected faces could not be drafted.") and a regen that a newer one can supersede (qa 2026-10-27, CLI 19555ca3, app
   16cdcf6d)
 - [x] verified green app bcf401ca (qa 04:30: two app processes on one copy of the 30-feature part, A suppresses Boss 1, B renames Boss 2 → "RenamedInB": B shows both at once, the file keeps both (feature_list: Boss 1 Suppressed, RenamedInB); A still shows "Boss 2", the known leftover) (dx 10-27: a session merges its edit onto a head another process moved, three-way, then reloads; both edits kept in arrival order as live; session::tests::two_writers_of_one_file_keep_both_edits. Left: same-feature two-field edits keep ours (core merge.rs), and the other window shows the change only at its next edit) P0 TWO-PROCESS-LOST-EDIT the same .noshape opened by two app processes (e.g. `noshape doc.noshape` twice, or a
