@@ -37,8 +37,11 @@ P
 [ -n "$pkgs" ] || pkgs="noshape-ops"
 args=$(for p in $pkgs; do printf -- '-p %s ' "$p"; done)
 echo "== crates: $pkgs"
-echo "== clippy"; cargo clippy $args --all-targets -- -D warnings 2>&1 | grep -vE '^warning: [a-z0-9_-]+@' | grep -E '^(error|warning)' -A6 && fail "clippy"
-echo "== tests"; cargo test $args --no-fail-fast 2>&1 | grep -vE '^warning: [a-z0-9_-]+@' | grep -E 'FAILED|panicked|^error|SIGSEGV|signal:' && fail "tests"
+# Decide on cargo's exit code (with pipefail a grep can't decide it), then show the relevant lines.
+echo "== clippy"; out=$(cargo clippy $args --all-targets -- -D warnings 2>&1); rc=$?
+[ $rc -eq 0 ] || { echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E '^(error|warning)' -A6 | head -60; fail "clippy"; }
+echo "== tests"; out=$(cargo test $args --no-fail-fast 2>&1); rc=$?
+[ $rc -eq 0 ] || { echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E 'FAILED|panicked|^error|SIGSEGV|signal:|Caused by' -A2 | head -60; fail "tests"; }
 if echo "$pkgs" | grep -qwE 'noshape|noshape-ops|noshape-cli'; then echo "== T0"; tools/tiers/t0.sh > /tmp/land-t0-$$.log 2>&1 || { tail -20 /tmp/land-t0-$$.log; fail "T0"; }; fi
 # Main may have moved while we tested: rebase again; re-test only if the new commits touch our crates.
 git fetch -q origin
