@@ -98,6 +98,9 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 - 10-27 17:00–18:20: 08673b8b section overlap flat red in Part Studios (live re-capture) + part hover = its outline
   in hover orange; 1a5a255a PLANE-MENU-SELECTED; 15f1128b SKETCH-S-EXTRUDE; 595549a3 LOFT-PROFILES-PINK (array
   field error look; any set_value makes the dialog dirty); a80013c6 `NOSHAPE_PREWARM=early` switch (off).
+- 10-27 18:20–20:00: 8602df0d mate connector disc as Onshape's constants (interaction 3.4 ⏳); df28c320
+  PREVIEW-SELF-PICK (`made_by`) + a selected connector's owner tinted yellow-green; MENU-TRUNCATE not a bug (live:
+  250 px, "…"); 467c4f21 / dc395f46 indexed line quads measured and left opt-in (`NOSHAPE_PERF_LINES=indexed`).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -158,7 +161,15 @@ that touches the model: ~12 min.
 0c. Retina orbit 76 fps (target 120) is GPU-bound (submit→done ≈ 17 ms mean, 45 ms p95 at 2388×1588, 4× MSAA):
    diagnostic run 40537102560 at 2×: base 71 fps (done 18.8 / 46.0 ms), MSAA 1 70.7, no AO 69.3, no back
    silhouettes 65.8, **no lines 81.8 fps (13.2 / 24.9 ms)**, no silhouettes 73.4 (p95 26.4). The edge lines are the
-   GPU cost at Retina: next, a cheaper line pass (fewer vertices per segment, LOD while orbiting).
+   GPU cost at Retina. Indexed quads (4 vertex shaders per segment) were tried (perf.yml 40563115906, alternating
+   runs in one job): p95 25 ms against 46, but mean 19.4 against 17.3 ms and 69 fps against 75, so vertex count
+   isn't the cost; next try fewer, longer segments while the camera moves (a coarser line LOD during orbit) or the
+   fragment side of thin quads.
+0d. Part hover look: live's #FFC685 replaces the dark outer edge line (2–3 px on the part side, nothing outside);
+   ours draws the hover outline just outside it (outline pass). Needs knowing which edges lie on the part's image
+   boundary.
+0e. P3 LEFT-RAIL-WHERE-USED: live's Free account only shows an upgrade notice for "Where used"; a panel listing
+   the tabs that use this element would be ours to design.
 
 1. Our base part shading differs a few units from live's (block top (140,185,212) vs (145,181,203)), which is what
    the preview samples still differ by.
