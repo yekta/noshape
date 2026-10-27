@@ -66,6 +66,8 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   other lists only what the active field accepts; the entity menu with a dialog open in live's order), 6.26 (each
   list down to its 30 px header), 6.37 / 6.38 checked as live. Verified on :102.
 - 10-27 12:20: MEASURE-MAX-DIST (P1): Max dist refined on the exact geometry (model-core measure `refine_max`).
+- 10-27 13:10: EMPTY-COMMIT (P2: ✓ / Enter / Ctrl+Enter only once the dialog can be submitted) and CONFIG-CELL-EDIT
+  (P2: configured value cells frame on a click and take typing, as live).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -98,6 +100,9 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+0. EDGE-HIGHLIGHT-LOOK (P1, user v0.4.10 macOS Retina): a hovered edge has a dark border; a black region at
+   the plate's bottom right. Match live's hovered / selected / both looks at 1x / 2x (REQUESTS "psui (10-27)
+   EDGE-HIGHLIGHT-LOOK"), offscreen test per state.
 1. Our base part shading differs a few units from live's (block top (140,185,212) vs (145,181,203)), which is what
    the preview samples still differ by.
 3. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache

@@ -1393,7 +1393,15 @@ impl PartStudioView {
             // Focus once when the rename opens (a dialog opened later keeps
             // the keyboard).
             if std::mem::take(&mut self.ui.cfg_editing_focus) {
-                st.update(cx, |s, cx| s.focus(window, cx));
+                let initial = self.ui.cfg_edit_initial.take();
+                st.update(cx, |s, cx| {
+                    s.focus(window, cx);
+                    // Typing on a framed value replaces it; a double-click selects it (live).
+                    match initial {
+                        Some(t) => s.set_value(t, window, cx),
+                        None => s.select_all(window, cx),
+                    }
+                });
             }
             let (k2, st2, original) = (key.clone(), st.clone(), text.clone());
             return div()
@@ -1492,10 +1500,76 @@ impl PartStudioView {
             Some(ParamValue::Enum(s)) | Some(ParamValue::Text(s)) => s.clone(),
             _ => String::new(),
         };
-        self.config_name_cell(format!("cp-{ci}-{key}"), text, (px(13.33), FontWeight::NORMAL), window, cx, move |this, v, cx| {
+        let cell = format!("cp-{ci}-{key}");
+        // A plain number in a length or angle cell takes the workspace unit, as a quantity field writes it ("40" →
+        // "40 mm").
+        let dim = self.studio(cx).and_then(|s| s.feature(c.feature)).and_then(|f| noshape_model::features::get(&f.type_id)).and_then(|t| t.param(&c.param).and_then(|p| match &p.kind {
+            noshape_model::params::ParamKind::Num(n) if n.kind != noshape_model::params::NumKind::Integer => Some(n.kind.dim()),
+            _ => None,
+        }));
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let editor = self.config_name_cell(cell.clone(), text.clone(), (px(13.33), FontWeight::NORMAL), window, cx, move |this, v, cx| {
+            let v = dim.map_or(v.clone(), |d| with_default_unit(&v, d, &units));
             let kk = kk.clone();
             this.edit_config(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |ps| noshape_ops::config::set_configured_text(ps, ci, &kk, v));
-        })
+        });
+        if self.ui.cfg_editing.as_deref() == Some(cell.as_str()) {
+            return editor;
+        }
+        // Live 10-27 (CONFIG-CELL-EDIT): a click frames the whole cell (blue 2 px), typing on it replaces the value
+        // in place, Esc unframes, a double-click edits with the value selected.
+        // A click elsewhere (the frame lost the keyboard) unframes it.
+        if self.ui.cfg_framed.as_ref().is_some_and(|(k, f)| *k == cell && !f.is_focused(window)) {
+            self.ui.cfg_framed = None;
+        }
+        let framed = self.ui.cfg_framed.as_ref().filter(|(k, _)| *k == cell).map(|(_, f)| f.clone());
+        let pal = p();
+        let (c1, c2) = (cell.clone(), cell.clone());
+        div()
+            .id(SharedString::from(format!("cpv-{cell}")))
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .flex()
+            .items_center()
+            .border_2()
+            .border_color(if framed.is_some() { pal.accent } else { gpui_kit::rgba(0x00000000) })
+            .when_some(framed, |d, f| {
+                // An "Input" context: the Part Studio's single-key shortcuts stay quiet while typing here.
+                d.key_context("Input").track_focus(&f).on_key_down(cx.listener(move |this, e: &KeyDownEvent, _, cx| {
+                    let k = &e.keystroke;
+                    let plain = !(k.modifiers.control || k.modifiers.alt || k.modifiers.platform);
+                    if k.key == "escape" {
+                        this.ui.cfg_framed = None;
+                    } else if k.key == "enter" {
+                        this.ui.cfg_editing = Some(c1.clone());
+                        this.ui.cfg_editing_focus = true;
+                    } else if let Some(ch) = k.key_char.clone().filter(|_| plain) {
+                        this.ui.cfg_editing = Some(c1.clone());
+                        this.ui.cfg_editing_focus = true;
+                        this.ui.cfg_edit_initial = Some(ch);
+                    } else {
+                        return;
+                    }
+                    cx.stop_propagation();
+                    cx.notify();
+                }))
+            })
+            .child(div().min_w_0().truncate().text_size(px(13.33)).child(text))
+            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                cx.stop_propagation();
+                if e.click_count() >= 2 {
+                    this.ui.cfg_editing = Some(c2.clone());
+                    this.ui.cfg_editing_focus = true;
+                    this.ui.cfg_framed = None;
+                } else {
+                    let f = cx.focus_handle();
+                    window.focus(&f, cx);
+                    this.ui.cfg_framed = Some((c2.clone(), f));
+                }
+                cx.notify();
+            }))
+            .into_any_element()
     }
 
     /// "Configured properties" tab (Help PartStudio__configured_properties;
@@ -2803,4 +2877,31 @@ impl Render for VarTableDrag {
 /// reordering.
 fn var_table_drag_source<E: StatefulInteractiveElement>(el: E, studio: noshape_model::document::TabId, name: SharedString) -> E {
     el.on_drag(VarTableDrag { studio, name }, |d, _, _, cx| cx.new(|_| d.clone()))
+}
+
+/// `text` with the workspace unit when it is a plain number for a field of dimension `dim` ("40" → "40 mm"); any
+/// other text as it is.
+pub(super) fn with_default_unit(text: &str, dim: noshape_units::Dim, units: &noshape_units::UnitPrefs) -> String {
+    match text.trim().parse::<f64>() {
+        // Field text writes angles in "deg" (the display's "°" is for read-outs).
+        Ok(v) if dim == noshape_units::Dim::ANGLE && units.angle == noshape_units::AngleUnit::Degree => format!("{} deg", noshape_units::format_number(v, 12)),
+        Ok(v) if !dim.is_unitless() => noshape_units::format_quantity_exact(noshape_units::Quantity::new(v * units.si_factor(dim), dim), units),
+        _ => text.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod default_unit_tests {
+    use super::with_default_unit;
+    use noshape_units::{Dim, UnitPrefs};
+
+    #[test]
+    fn a_plain_number_takes_the_workspace_unit() {
+        let mm = UnitPrefs::default();
+        assert_eq!(with_default_unit("40", Dim::LENGTH, &mm), "40 mm");
+        assert_eq!(with_default_unit("12.5", Dim::ANGLE, &mm), "12.5 deg");
+        assert_eq!(with_default_unit("40 in", Dim::LENGTH, &mm), "40 in");
+        assert_eq!(with_default_unit("#w * 2", Dim::LENGTH, &mm), "#w * 2");
+        assert_eq!(with_default_unit("3", Dim::UNITLESS, &mm), "3");
+    }
 }

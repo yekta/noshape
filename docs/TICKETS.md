@@ -430,7 +430,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   its faces' / edges' locally farthest point from the other, a (u, v) or parameter search kept on the bounded face);
   rev.noshape's tubes read 94.86833 from (−20, 0, 30); test measure::max_dist_is_exact_on_curved_faces_and_circles
   (faces √(90² + 30²), top circles 90).
-- [x] COMMIT P2 EMPTY-COMMIT a feature with an empty required selection can be committed: new Extrude, nothing picked, Enter,
+- [x] 4cc84ae1 P2 EMPTY-COMMIT a feature with an empty required selection can be committed: new Extrude, nothing picked, Enter,
   Enter → ours commits a red "Extrude 1" (green 525c619b). Live keeps the dialog open: the ✓ is disabled (`button-ok
   disabled`), and Enter, ✓ or Ctrl+Enter do nothing until a region is picked (behaviours "qa (2026-10-27, P2 batch 2)"
   (5)) (qa 2026-10-27, green 4854cad4)
@@ -438,7 +438,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   error; `FeatureDialog::can_submit`, checked in `accept_edit`); verified on :102: a new Extrude with nothing picked
   stays open through Enter, Enter, Ctrl+Enter; a picked face then commits; an existing Extrude opened for edit
   commits on Enter.
-- [ ] P2 CONFIG-CELL-EDIT a configured value can't be edited in the Configuration panel's table: Configure Part Studio,
+- [x] f576b650 P2 CONFIG-CELL-EDIT a configured value can't be edited in the Configuration panel's table: Configure Part Studio,
   add row "Big", Linear pattern 1 › Instance count › right-click › Configure (column "Linear pattern 1 / Instance count",
   3 / 3, toast as live); a click, double-click or typing on Big's "3" cell does nothing (no blue frame, no edit), while
   the Name cell takes typing. Setting it through the feature dialog with Big active works (Big 5, Parts (5)). Live's
@@ -447,6 +447,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Live confirmed (behaviours "qa (2026-10-27, P2 batch 2)" (6)): a single click frames the value cell (blue 2 px,
   `os-table-cell-selected`), typing replaces the value in place (`input.os-param-number`), Esc cancels, a double-click opens
   the input with the value selected; each cell shows "›" and a ± tolerance icon.
+  psui: a click frames the configured value cell (blue 2 px, the keyboard on it, Part Studio shortcuts quiet), typing
+  replaces the value in place, Enter opens it, Esc unframes, a double-click edits with the value selected; a plain
+  number in a length / angle cell commits with the workspace unit ("40" → "40 mm"). Verified on :102 (Extrude 1 /
+  Depth, Big).
 - [x] c0bbde51 P0 REGEN-NO-CANCEL fixed (psui 10-27): a newer run that evaluates fewer features (the rollback bar above the running feature, a dialog on an earlier feature) aborts the running one; its finished features stay cached, so the rollback shows at once (app on cli-fillet-hang.noshape: 0 ms, 7 cached, while Fillet 2 ran). Was: a newer regeneration waits for a stale one instead of cancelling it: open a copy of
   /root/qa-scratch/tickets/cli-fillet-hang.noshape in green 502416cc (NOSHAPE_PERF=1); while the opening regen is still
   in Fillet 2 (it fails after the 30 s blend budget), drag the rollback bar above Fillet 2: schedule_regen #2 at 05:16:57,
