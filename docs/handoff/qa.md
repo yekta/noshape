@@ -8,7 +8,9 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   Direction first too), Fillet edges, Shell faces and a custom feature with `"Filter" : EntityType.EDGE`. **Not fixed**: a
   custom feature whose filter is `EntityType.EDGE && QueryFilterCompound.ALLOWS_AXIS` (MaxNumberOfPicks 2) still gets no
   hover and no pick in the dialog (the API takes the edges), so the user's custom-feature example stays broken in v0.4.10.
-  Needs a psui owner for compound query filters in the pick filter.
+  Cause (confirmed in the app 11:00): studio.rs `filter_of` intersects `EDGE` (EDGE | SKETCH_EDGE) with LINE / ALLOWS_AXIS
+  bits, leaving SKETCH_EDGE only, so `EDGE && GeometryType.LINE` takes sketch lines but no part edges either. Needs an
+  owner (custom crate): `EntityType.EDGE` should carry LINEAR_EDGE / CIRCULAR_EDGE / SOLID_EDGE for the intersection.
 - release/v0.4.9 (7ee597e0) still lacks 2d6719c2 (Windows include), a117663d (DRAFT-HANG budget) and 011aaf43 (serial
   booleans, BOOL-THREAD-CRASH; replays running). Recut / cherry-pick. Earlier: the Windows build fails on `#include <cxxabi.h>` in crates/kernel/cpp/common.cpp:1273
   (MSVC C1083; also on main). Needs a guard before the release can publish (TICKETS "Release v0.4.9").
