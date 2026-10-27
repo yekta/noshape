@@ -36,11 +36,11 @@ then edits, undo/redo, rollback and suppress.
 |---|---|---|---|---|
 | Insert Part 1 (first instance) | placed, view fits, free DOF glyph (not fixed) | same (assembly/80, free glyph) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Insert Part 2, click to place, ✓ | Instances (2) | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Cylindrical mate (tool search), pin face then hole face | pin moves into the hole, HUD at the 2nd pick, two connector chips | same (MT10, MT13) | ✅ |  |
-| HUD ✓ | commits Cylindrical 1 (hidden, light grey row) and opens "Cylindrical 2" | "Commit current mate and start a new mate" (behaviours 1329) | ✅ |  |
-| Drag the pin | slides along the axis; nothing fixed, so a sideways drag moves both | — | ✅ (plausible) |  |
-| Edit the mate, type list | Slider, Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened, Parallel; retype renames the row ("Pin slot 1") | same order (behaviours 5941), MT12 | ✅ |  |
-| Undo the retype | back to Cylindrical 1 | — | ✅ |  |
+| Cylindrical mate (tool search), pin face then hole face | pin moves into the hole, HUD at the 2nd pick, two connector chips | same (MT10, MT13) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| HUD ✓ | commits Cylindrical 1 (hidden, light grey row) and opens "Cylindrical 2" | "Commit current mate and start a new mate" (behaviours 1329) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Drag the pin | slides along the axis; nothing fixed, so a sideways drag moves both | — | ✅ (plausible) | 0.4.10+ / 1c853f78 10-27 |
+| Edit the mate, type list | Slider, Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened, Parallel; retype renames the row ("Pin slot 1") | same order (behaviours 5941), MT12 | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Undo the retype | back to Cylindrical 1 | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 
 ## P2 drawing (same session)
 | Step | Ours | Live | Status | Verified |
@@ -69,8 +69,8 @@ then edits, undo/redo, rollback and suppress.
 | Circular pattern of Part 3 about a hole rim | 3 copies around the hole axis; each copy gets a new palette colour | copies' colour? (request p3 (b)) | ? |  |
 | P1-4 re-check on green 62524c30 (skb 7b972911) | points snapped to the origin's horizontal: no visible point at the origin; Hole on "Vertices of Sketch 6" previews only the 2 real points. Data still holds a hidden construction "Origin stand-in" point at (0,0) with the Horizontal constraints on it (sketch_get lists it) | ✅ UI / minor data note for skb (live: no entity, constraint to the external Origin) |  |
 | SEL1 on green 62524c30 | Fillet: a sketch line adds nothing, a plate edge adds "Edge of Extrude 1" | ✅ |  |
-| Instance right-click (Part 1 <1>, mated) | Properties…, Instance properties… / Hide … Fix, Use best available tessellation, Show mates, Hide mates / Edit in context … Switch to Part Studio 1 / Copy Part 1 <1> / Move to new subassembly, Change to version…, Export…, Release… / Zoom to selection … | same order (behaviours 1259, 1357; Add comment out of scope) | ✅ |  |
-| Fix, then drag the fixed plate | ground glyph on Part 1 <1> and on the root row; dragging draws the fix glyph at the cursor and nothing moves | same (behaviours 1210, 1268) | ✅ (cursor shape not checked) |  |
+| Instance right-click (Part 1 <1>, mated) | Properties…, Instance properties… / Hide … Fix, Use best available tessellation, Show mates, Hide mates / Edit in context … Switch to Part Studio 1 / Copy Part 1 <1> / Move to new subassembly, Change to version…, Export…, Release… / Zoom to selection … | same order (behaviours 1259, 1357; Add comment out of scope) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Fix, then drag the fixed plate | ground glyph on Part 1 <1> and on the root row; dragging draws the fix glyph at the cursor and nothing moves | same (behaviours 1210, 1268) | ✅ (cursor shape not checked) | 0.4.10+ / 1c853f78 10-27 |
 | Sketch dimension (view normal, rectangle, d on the top edge, place) | value box "78.15024 mm" selected, ± icon, ✓ ✕; 50 + Enter → label "50", width 50 | box at full precision (behaviours 4788 "12.53718 mm") | ✅ |  |
 | Plane (tool search; "Did you mean: Mate connector") | Entities "Top plane", type Offset, Offset distance 25 mm + flip, ☐ Flip normal; type list Offset, Plane point, Line angle, Point normal, Three point, Mid plane, Curve point, Tangent | same (behaviours 332) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Split (Part tab) of the plate by Plane 1 at 2.5 mm | dialog Part / Face, Parts, surfaces, or curves to split, Entity to split with, ☐ Keep tools, ☐ Trim to face boundaries, ☑ Keep both sides; result Parts 6 → 7 | same (behaviours 329) | ✅ | 0.4.10+ / 1c853f78 10-27 |
@@ -97,8 +97,8 @@ then edits, undo/redo, rollback and suppress.
 ## Pass 28, green af9f1e4c (assembly limits, live answers p2/p4/p5)
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
-| Cylindrical mate dialog | Limits only (no Offset), 4 limit rows Z ≑ / Z ⌶ / rotation min / max, "No minimum" / "No maximum" | same (behaviours 5942, 5959); Simulation connection excluded (simulation) | ✅ |  |
-| Limits Z max `5` + Enter | applies and closes the dialog | 1st Enter applies, 2nd accepts | ✅ P2-A2 (skasm 10-27 GUI: "30" + Enter → "30 deg" selected, dialog open; 2nd Enter accepts) |  |
+| Cylindrical mate dialog | Limits only (no Offset), 4 limit rows Z ≑ / Z ⌶ / rotation min / max, "No minimum" / "No maximum" | same (behaviours 5942, 5959); Simulation connection excluded (simulation) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Limits Z max `5` + Enter | applies and closes the dialog | 1st Enter applies, 2nd accepts | ✅ P2-A2 (skasm 10-27 GUI: "30" + Enter → "30 deg" selected, dialog open; 2nd Enter accepts) | 0.4.10+ / 1c853f78 10-27 |
 | Drag the pin past the limit | stops at 5.0 mm along the hole connector's Z (it points down); the unfixed plate is pulled along | — | ✅ |  |
 | Shell 1 mm, live's p2 model (depth 10, R1, 4 through holes) | "Could not shell part with selections." | OK 3998.627 mm³, 33 faces | ✗ **P1-16** (kern) |  |
 | Shell 2.5 mm, same | OK 8487.861 mm³, 53 faces | OK 8503.961 mm³, 47 faces | ✗ **P1-16** |  |
