@@ -1100,8 +1100,8 @@ Runs the sketch editor's drawing tool on the clicks you give, exactly as clickin
 - bezier: Bezier through control points.
 - conic: [start, end, control].
 - slot: Click on an existing line/arc (its centerline), then a point setting the width.
-- inscribed_polygon: [center, vertex]; `sides` sets the number of sides (default 6).
-- circumscribed_polygon: [center, edge midpoint]; `sides` as above.
+- inscribed_polygon: [center, the middle of an edge] (the construction circle touches the edges); `sides` sets the number of sides (default 6).
+- circumscribed_polygon: [center, vertex] (the construction circle goes through the vertices); `sides` as above.
 - ellipse: [center, major axis end, point setting the minor radius].
 - elliptical_arc: [center, major axis end, start point (also sets the minor radius), end point] (counter-clockwise).
 
