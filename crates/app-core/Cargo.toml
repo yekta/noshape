@@ -24,6 +24,9 @@ async-channel = "2"
 rust-embed = "8"
 serde_json.workspace = true
 serde.workspace = true
+# The file dialogs (file_dialogs.rs): the native dialog, the documents folder.
+rfd = "0.15"
+dirs = "6"
 # The selection-count cursor sets an image cursor through the platform (cursor.rs).
 raw-window-handle = "0.6"
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

@@ -1,0 +1,24 @@
+[package]
+name = "noshape-drawing-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's Drawing studio UI: the drawing editor, its tools, panels and dialogs. Built on noshape-app-core; the noshape binary registers what it needs of the app (drawing_hooks)."
+
+[dependencies]
+noshape-app-core.workspace = true
+noshape-render.workspace = true
+noshape-model.workspace = true
+noshape-store.workspace = true
+noshape-units.workspace = true
+noshape-sketch.workspace = true
+noshape-kernel.workspace = true
+noshape-ops.workspace = true
+noshape-scene.workspace = true
+gpui-kit.workspace = true
+anyhow.workspace = true
+glam.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "tiff"] }
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

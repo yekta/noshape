@@ -207,7 +207,7 @@ impl DrawingEditor {
         let csv = noshape_model::drawing::inspection::rows_csv(&self.inspection_rows(all));
         let this = cx.entity().downgrade();
         let file = format!("{name} {}.csv", if all { "drawing definition list" } else { "inspection list" });
-        crate::files::request_save_path("Export inspection list", file, "csv", window, cx, move |path, cx| {
+        crate::file_dialogs::request_save_path("Export inspection list", file, "csv", window, cx, move |path, cx| {
             let msg = match std::fs::write(&path, csv) {
                 Ok(()) => format!("Exported {}", path.display()),
                 Err(e) => format!("Export failed: {e}"),

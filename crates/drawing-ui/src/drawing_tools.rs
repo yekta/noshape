@@ -9,7 +9,7 @@ use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::views;
 use noshape_model::drawing::*;
 
-pub(crate) use noshape_scene::drawing_tools::geom::*;
+pub use noshape_scene::drawing_tools::geom::*;
 use noshape_scene::drawing_tools as dt;
 
 impl DrawingEditor {

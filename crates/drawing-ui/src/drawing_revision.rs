@@ -35,7 +35,7 @@ pub struct RevisionDlg {
 /// The drawing's revisions (oldest first) from the document's release log
 /// (store meta "releases", kept by the release workflow).
 pub fn revisions(doc: &crate::doc_model::DocModel, tab: noshape_model::document::TabId) -> Vec<RevisionRow> {
-    noshape_model::drawing::tables::revision_rows(&crate::release_dialog::release_log(doc), tab)
+    noshape_model::drawing::tables::revision_rows(&crate::drawing_hooks::release_log(doc), tab)
 }
 
 const CORNERS: [(TableCorner, &str); 4] = [(TableCorner::TopLeft, "Top left"), (TableCorner::TopRight, "Top right"), (TableCorner::BottomLeft, "Bottom left"), (TableCorner::BottomRight, "Bottom right")];

@@ -10,7 +10,6 @@
 use crate::doc_model::DocModel;
 use noshape_model::document::TabId;
 use noshape_model::drawing::sheet::{Anchor, Text2};
-use noshape_model::release::{ItemKind, ItemState, PackageKind};
 
 /// The fill, `rgba(192,192,192,0.25)` (blended in sRGB, as exports do).
 pub const COLOR: [u8; 3] = [192, 192, 192];
@@ -21,30 +20,10 @@ pub const ALPHA: f32 = 0.25;
 pub const EDITOR_COLOR: u32 = 0xc0c0c0;
 pub const EDITOR_ALPHA: f32 = 0.25;
 
-/// The watermark of a drawing tab, if any: watermarks on, the drawing
-/// revision managed (when "Hide watermark for drawings that are not revision
-/// managed" is on) and its state's text not empty. In the workspace a
-/// drawing is In progress, or Obsolete once its latest revision is; a
-/// version that released it shows Released (Obsolete if obsoleted since).
+/// The watermark of a drawing tab, if any (the release settings and log are the app's:
+/// `release_dialog::drawing_watermark_text`).
 pub fn text(doc: &DocModel, tab: TabId) -> Option<String> {
-    let settings = crate::release_dialog::release_settings();
-    if !settings.show_watermark || (settings.hide_watermark_unmanaged && crate::release_dialog::tab_not_revision_managed(doc, tab)) {
-        return None;
-    }
-    let log = crate::release_dialog::release_log(doc);
-    let pn = crate::release_dialog::tab_part_number(doc, tab);
-    let obsolete = !pn.is_empty() && log.state(&pn) == ItemState::Obsolete;
-    let marks = &settings.watermarks;
-    let released_here = doc.session.viewing.and_then(|mv| {
-        let version = doc.session.store.list_versions().ok()?.into_iter().find(|v| v.microversion == mv)?.id.to_string();
-        log.at_version(&version).into_iter().find(|p| p.kind == PackageKind::Release && p.items.iter().any(|i| i.tab == tab && i.kind == ItemKind::Drawing && !i.reverted))
-    });
-    let text = match (released_here.is_some(), obsolete) {
-        (_, true) => &marks.obsolete,
-        (true, false) => &marks.released,
-        (false, false) => &marks.in_progress,
-    };
-    (!text.trim().is_empty()).then(|| text.clone())
+    crate::drawing_hooks::watermark_text(doc, tab)
 }
 
 /// The watermark as sheet text, along the diagonal from the bottom left.

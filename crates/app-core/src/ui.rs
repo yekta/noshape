@@ -1363,10 +1363,11 @@ mod tests {
             }
         }
         let mut files = Vec::new();
-        // Every app crate's sources (crates/app-core, crates/app, …).
+        // Every app crate's sources (crates/app-core, crates/app, the studio UIs crates/*-ui).
         for e in std::fs::read_dir(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..")).unwrap().flatten() {
             let src = e.path().join("src");
-            if e.file_name().to_string_lossy().starts_with("app") && src.is_dir() {
+            let name = e.file_name().to_string_lossy().to_string();
+            if (name.starts_with("app") || name.ends_with("-ui")) && src.is_dir() {
                 walk(&src, &mut files);
             }
         }

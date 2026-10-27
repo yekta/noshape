@@ -40,7 +40,7 @@ actions!(
         NewDocument,
         /// Open the Create Drawing dialog (request in `drawing_create`).
         CreateDrawing,
-        /// Activate the tab set by `workspace::request_activate_tab`.
+        /// Activate the tab set by `request_activate_tab` (below).
         ActivateRequestedTab,
         /// Open the Export modal of the item set by `workspace::request_export`.
         ExportRequestedItem,
@@ -303,4 +303,20 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         // Drawing
         KeyBinding::new("ctrl-q", DrawingUpdate, Some("Drawing")),
     ]
+}
+
+/// Tab to activate, set by views that are not subscribed to by the
+/// workspace (e.g. a drawing view's "Switch to <Part Studio>").
+static REQUESTED_TAB: parking_lot::Mutex<Option<noshape_model::document::TabId>> = parking_lot::Mutex::new(None);
+
+/// Ask the workspace to switch to `tab` (it handles [`ActivateRequestedTab`]
+/// by taking [`take_requested_tab`]).
+pub fn request_activate_tab(tab: noshape_model::document::TabId, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
+    *REQUESTED_TAB.lock() = Some(tab);
+    window.dispatch_action(Box::new(ActivateRequestedTab), cx);
+}
+
+/// The tab [`request_activate_tab`] asked for, once.
+pub fn take_requested_tab() -> Option<noshape_model::document::TabId> {
+    REQUESTED_TAB.lock().take()
 }

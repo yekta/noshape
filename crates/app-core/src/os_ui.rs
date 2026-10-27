@@ -268,6 +268,22 @@ fn checkbox_with(id: impl Into<ElementId>, label: AnyElement, on: bool) -> State
         .child(label)
 }
 
+/// Chrome's native checkbox box (13 px, `#0075ff` when checked): the Preferences pages' checkboxes and the drawing
+/// dialogs' native ones (moved from `PreferencesView::checkbox_box`).
+pub fn checkbox_box(on: bool) -> Div {
+    div()
+        .size(px(13.))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(2.))
+        .border_1()
+        .border_color(if on { rgb(0x0075ff) } else { rgb(0x767676) })
+        .bg(if on { rgb(0x0075ff) } else { rgb(0xffffff) })
+        .when(on, |d| d.child(Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff))))
+}
+
 /// A dialog row with a 12 px `#666` label at the left and a value field
 /// (underlined, right-aligned number) at the right, 26 px tall (§3.9).
 pub fn param_row(label: impl Into<SharedString>, field: impl IntoElement) -> Div {

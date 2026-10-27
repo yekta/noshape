@@ -1637,7 +1637,7 @@ impl Render for Workspace {
                 }
             }))
             .on_action(cx.listener(|this, _: &ActivateRequestedTab, window, cx| {
-                if let Some(t) = REQUESTED_TAB.lock().take() {
+                if let Some(t) = crate::actions::take_requested_tab() {
                     this.activate(t, window, cx);
                 }
             }))
@@ -1981,9 +1981,6 @@ impl Workspace {
     }
 }
 
-/// Tab to activate, set by views that are not subscribed to by the
-/// workspace (e.g. a drawing view's "Switch to <Part Studio>").
-static REQUESTED_TAB: parking_lot::Mutex<Option<TabId>> = parking_lot::Mutex::new(None);
 static REQUESTED_EXPORT: parking_lot::Mutex<Option<(TabId, Vec<noshape_model::BodyId>)>> = parking_lot::Mutex::new(None);
 
 /// Open the Export modal of a tab's item (parts of a Part Studio, or the
@@ -2009,11 +2006,8 @@ pub fn request_import(window: &mut Window, cx: &mut App) {
     }
 }
 
-/// Ask the workspace to switch to `tab`.
-pub fn request_activate_tab(tab: TabId, window: &mut Window, cx: &mut App) {
-    *REQUESTED_TAB.lock() = Some(tab);
-    window.dispatch_action(Box::new(ActivateRequestedTab), cx);
-}
+/// Ask the workspace to switch to `tab` (app-core, so the studio crates can ask too).
+pub use crate::actions::request_activate_tab;
 
 impl Workspace {
     /// Export one tab's item: its parts (Part Studio) or the tab.

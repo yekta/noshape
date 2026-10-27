@@ -28,6 +28,7 @@ noshape-featurescript = { path = "crates/featurescript" }
 noshape-ops = { path = "crates/ops" }
 noshape-scene = { path = "crates/scene" }
 noshape-app-core = { path = "crates/app-core" }
+noshape-drawing-ui = { path = "crates/drawing-ui" }
 
 gpui-kit = "0.7.3"
 wgpu = "29"
@@ -64,6 +65,9 @@ debug = false
 # The app crate (138k lines of UI code; the GPU does the heavy work) unoptimised in dev builds: its codegen is the
 # slowest step of every rebuild. Geometry crates stay at opt-level 1 so tests and the dev app stay fast.
 [profile.dev.package.noshape]
+opt-level = 0
+# The Drawing studio UI, split out of the app (docs/CRATES.md): unoptimised like the app.
+[profile.dev.package.noshape-drawing-ui]
 opt-level = 0
 
 [profile.release]

@@ -73,7 +73,7 @@ pub struct ChooserState {
     pub other: bool,
     pub url: Option<Entity<InputState>>,
     pub other_cat: Option<usize>,
-    pub other_docs: Option<Vec<crate::start_library::DocEntry>>,
+    pub other_docs: Option<Vec<crate::library::DocEntry>>,
     /// Each scanned document's latest version ("V1", else "Start"), its
     /// row's second line.
     pub other_versions: HashMap<std::path::PathBuf, String>,
@@ -157,7 +157,7 @@ impl OtherDoc {
     }
 
     /// Its reference key for tab `tab` at the shown version, and the label.
-    pub(crate) fn key(&self, tab: TabId) -> Option<(String, String)> {
+    pub fn key(&self, tab: TabId) -> Option<(String, String)> {
         let v = self.versions.get(self.version)?;
         Some((crate::derived::ExternalRef { path: self.path.clone(), microversion: v.microversion, tab: tab.to_string() }.key(), format!("{} {}", self.name, v.label)))
     }
@@ -339,7 +339,7 @@ impl DrawingEditor {
             }
         });
         self.chooser.other_model = Some((model.clone(), sub));
-        crate::history_panel::open_create_version_in(model, window, cx);
+        crate::drawing_hooks::create_version(model, window, cx);
     }
 
     fn pick_current(&mut self, id: TabId, part: Option<BodyId>, cx: &mut Context<Self>) {
@@ -361,7 +361,7 @@ impl DrawingEditor {
         cx.spawn(async move |this, cx| {
             let (docs, versions) = cx
                 .background_spawn(async {
-                    let docs = crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs;
+                    let docs = crate::drawing_hooks::library_docs();
                     let versions: HashMap<std::path::PathBuf, String> = docs
                         .iter()
                         .filter(|d| !d.broken && !d.trashed)
@@ -395,7 +395,7 @@ impl DrawingEditor {
     fn search_other(&mut self, cx: &mut Context<Self>) {
         let text = self.chooser.url.as_ref().map(|s| s.read(cx).value().trim().to_string()).unwrap_or_default();
         let path = std::path::PathBuf::from(text.trim_start_matches("file://"));
-        if path.extension().is_some_and(|e| e == crate::start_library::EXT) && path.exists() {
+        if path.extension().is_some_and(|e| e == crate::library::EXT) && path.exists() {
             self.open_other(&path, cx);
         } else {
             self.ensure_other_docs(cx);
@@ -536,7 +536,7 @@ impl DrawingEditor {
                 })),
         );
         let me = self.doc.read(cx).session.path.clone();
-        let mut docs: Vec<crate::start_library::DocEntry> = self.chooser.other_docs.clone().unwrap_or_default().into_iter().filter(|d| !d.trashed && !d.broken && d.path != me).collect();
+        let mut docs: Vec<crate::library::DocEntry> = self.chooser.other_docs.clone().unwrap_or_default().into_iter().filter(|d| !d.trashed && !d.broken && d.path != me).collect();
         match (cat, query.as_ref().map(|q| q.to_lowercase())) {
             // Local documents are all the user's own: nothing is shared or public.
             (Some(3 | 4), _) => docs.clear(),
@@ -892,7 +892,7 @@ impl DrawingEditor {
                 .hover(|d| d.bg(pal.row_hover))
                 .child(crate::assets::icon("import", 14., cx))
                 .child("Import...")
-                .on_click(|_, window, cx| crate::workspace::request_import(window, cx))
+                .on_click(|_, window, cx| crate::drawing_hooks::import(window, cx))
         };
         let panel = if self.chooser.other {
             match other_doc {
@@ -928,7 +928,7 @@ impl DrawingEditor {
                 .py(px(4.))
                 .gap(px(4.))
                 .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(doc_name))).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(place)))
-                .child(chooser_square("dr-ch-version", "version", "Create version…", false, cx).on_click(move |_, window, cx| crate::history_panel::open_create_version_in(doc.clone(), window, cx)))
+                .child(chooser_square("dr-ch-version", "version", "Create version…", false, cx).on_click(move |_, window, cx| crate::drawing_hooks::create_version(doc.clone(), window, cx)))
                 .child(chooser_square("dr-ch-graph", "version-graph", "Version graph", self.chooser.graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.chooser.graph = !this.chooser.graph;
                     cx.notify();

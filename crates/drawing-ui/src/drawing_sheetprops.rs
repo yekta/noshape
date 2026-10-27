@@ -73,7 +73,7 @@ fn parse_sheet_len(text: &str, inches: bool) -> Option<f64> {
 /// OsUnitLengthLineEdit`): a number gets the drawing's unit ("12" →
 /// "12 in", "1+1" → "1 in": the leading number), a number with its own unit
 /// stays as typed ("300 mm"), anything else reverts to `last`.
-pub(crate) fn commit_sheet_len(text: &str, last: &str, inches: bool) -> String {
+pub fn commit_sheet_len(text: &str, last: &str, inches: bool) -> String {
     let t = text.trim();
     let Some(n) = crate::drawing_wt::leading_number(t) else { return last.to_string() };
     if t.find(|c: char| c.is_ascii_alphabetic()).is_some() && parse_sheet_len(t, inches).is_some() {
@@ -95,7 +95,7 @@ impl DrawingEditor {
     /// Import…); the sheet takes the template's format.
     fn select_dwt(&mut self, si: usize, window: &mut Window, cx: &mut Context<Self>) {
         let ed = cx.entity();
-        crate::file_tab_view::pick_file(self.doc.clone(), "Select a DWT", &[noshape_model::file_tab::FileKind::Template], &["dwt"], window, cx, move |file, _, cx| {
+        crate::drawing_hooks::pick_file(self.doc.clone(), "Select a DWT", &[noshape_model::file_tab::FileKind::Template], &["dwt"], window, cx, move |file, _, cx| {
             let result = file.bytes().ok_or_else(|| "The file can't be read".to_string()).and_then(|b| dwt::read_dwt(&b));
             ed.update(cx, |t, cx| match result {
                 Ok(templates) => {
@@ -387,7 +387,7 @@ impl DrawingEditor {
                 .p_0()
                 .child(crate::assets::icon(&crate::assets::icon_path("link"), 16., cx))
                 .tooltip("Switch to reference")
-                .on_click(move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx))
+                .on_click(move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx))
                 .into_any_element(),
         });
         Some(

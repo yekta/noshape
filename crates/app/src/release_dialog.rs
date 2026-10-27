@@ -125,6 +125,33 @@ pub fn tab_not_revision_managed(doc: &DocModel, tab: TabId) -> bool {
     doc.session.store.get_meta(&format!("tab_not_revision_managed:{}", tab.0)).ok().flatten().is_some_and(|b| b == b"1")
 }
 
+/// The watermark of a drawing tab, if any (Company settings › Release management › Watermarks on drawings;
+/// the drawing studio asks through `drawing_hooks::watermark_text`): watermarks on, the drawing
+/// revision managed (when "Hide watermark for drawings that are not revision
+/// managed" is on) and its state's text not empty. In the workspace a
+/// drawing is In progress, or Obsolete once its latest revision is; a
+/// version that released it shows Released (Obsolete if obsoleted since).
+pub fn drawing_watermark_text(doc: &DocModel, tab: TabId) -> Option<String> {
+    let settings = release_settings();
+    if !settings.show_watermark || (settings.hide_watermark_unmanaged && tab_not_revision_managed(doc, tab)) {
+        return None;
+    }
+    let log = release_log(doc);
+    let pn = tab_part_number(doc, tab);
+    let obsolete = !pn.is_empty() && log.state(&pn) == noshape_model::release::ItemState::Obsolete;
+    let marks = &settings.watermarks;
+    let released_here = doc.session.viewing.and_then(|mv| {
+        let version = doc.session.store.list_versions().ok()?.into_iter().find(|v| v.microversion == mv)?.id.to_string();
+        log.at_version(&version).into_iter().find(|p| p.kind == PackageKind::Release && p.items.iter().any(|i| i.tab == tab && i.kind == ItemKind::Drawing && !i.reverted))
+    });
+    let text = match (released_here.is_some(), obsolete) {
+        (_, true) => &marks.obsolete,
+        (true, false) => &marks.released,
+        (false, false) => &marks.in_progress,
+    };
+    (!text.trim().is_empty()).then(|| text.clone())
+}
+
 /// Release items for a tab (tab menu Release…; Release__typical_release_workflow):
 /// a Part Studio's parts; an Assembly and everything in its Bill of
 /// Materials (parts and subassemblies); a Drawing and the parts or

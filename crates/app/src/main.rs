@@ -6,7 +6,9 @@
 #![recursion_limit = "256"]
 
 // The app's base layer (docs/CRATES.md), under its old paths.
-use noshape_app_core::{actions, assets, cached_slice, camera_menu, color_mixer, cursor, derived, doc_model, export_naming, gpu, graphics_prefs, graphics_prefs_dialog, i18n, isolate_ui, named_views_dialog, nav_trace, navigation, os_menu, os_select, os_ui, overlay_labels, quantity_field, scene_builder, section_dialog, session, start_thumbnail, theme, tool_synonyms, tool_text, toolbar_customize, ui, viewport};
+use noshape_app_core::{actions, assets, cached_slice, camera_menu, color_mixer, cursor, custom_tables, derived, doc_model, export_naming, gpu, graphics_prefs, graphics_prefs_dialog, i18n, isolate_ui, named_views_dialog, nav_trace, navigation, os_menu, os_select, os_ui, overlay_labels, quantity_field, scene_builder, section_dialog, session, start_thumbnail, theme, tool_synonyms, tool_text, toolbar_customize, ui, viewport};
+// The Drawing studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_drawing_hooks`.
+use noshape_drawing_ui::{drawing_create, drawing_keys, drawing_sketch, drawing_view};
 mod fs_profile;
 mod live_server;
 mod std_source;
@@ -16,7 +18,6 @@ mod assembly_view;
 mod config_visibility;
 mod material_libraries;
 mod numbering_prefs;
-mod drawing_watermark;
 mod release_conditions;
 mod release_prefs;
 mod release_settings;
@@ -25,73 +26,9 @@ mod revision_tools;
 mod company_settings;
 mod material_prefs;
 mod release_thumbs;
-mod custom_tables;
 mod doc_dialogs;
-mod drawing_centermark;
-mod drawing_create;
 mod shortcuts_page;
-mod drawing_drawprops;
-mod drawing_insert;
-mod drawing_keys;
-mod drawing_sketch_dim;
-mod drawing_label;
-mod drawing_leaders;
-mod drawing_mbd;
-mod drawing_extra;
-mod drawing_more;
-mod drawing_painter;
-mod drawing_inspection;
-mod drawing_panels;
-mod drawing_export;
-mod drawing_smart;
-mod drawing_sketch;
-mod drawing_hatch;
-mod drawing_images;
-mod drawing_break;
-mod drawing_aux;
-mod drawing_chooser;
-mod drawing_crop;
-mod drawing_detail;
-mod drawing_revision;
-mod drawing_view_sketches;
-mod drawing_hide_parts;
-mod drawing_note;
-mod drawing_cell_panel;
-mod drawing_cells;
-mod drawing_note_color;
-mod drawing_refs;
-mod drawing_color;
-mod drawing_callout;
-mod drawing_gdt;
-mod drawing_ruler;
-mod drawing_table_dlg;
-mod drawing_custom_table;
-mod drawing_chrome;
-mod drawing_launcher;
-mod drawing_jog;
-mod drawing_related;
-mod drawing_move_sheet;
-mod drawing_styles;
-mod drawing_hide_edges;
-mod drawing_inplace;
-mod drawing_linestyle;
-mod drawing_section_edit;
-mod drawing_replicate;
-mod drawing_toolbar;
-mod drawing_palette;
-mod drawing_datum;
-mod drawing_table_tool;
-mod drawing_weld;
 mod file_tab_view;
-mod drawing_props;
-mod drawing_scene;
-mod drawing_section;
-mod drawing_shaded;
-mod drawing_wt;
-mod drawing_sheetprops;
-mod drawing_tools;
-mod drawing_ui;
-mod drawing_view;
 mod feature_dialog;
 mod feature_studio;
 mod fs_notices;
@@ -302,6 +239,22 @@ pub(crate) fn apply_kit_theme(cx: &mut App) {
     });
 }
 
+/// What the Drawing studio (noshape-drawing-ui) needs of the app: the workspace, other documents' windows, file tabs,
+/// the release log, the documents library, Create version, the export rules link, a preference.
+fn register_drawing_hooks() {
+    noshape_drawing_ui::drawing_hooks::register(noshape_drawing_ui::drawing_hooks::Hooks {
+        import: workspace::request_import,
+        open_document_window: |path, gpu, cx| files::open_document_window(path, None, gpu, cx),
+        pick_file: |doc, title, kinds, exts, window, cx, on_pick| file_tab_view::pick_file(doc, title, kinds, exts, window, cx, on_pick),
+        release_log: release_dialog::release_log,
+        watermark_text: release_dialog::drawing_watermark_text,
+        library_docs: || start_library::Library::default().scan(&start_library::ScanInput::current()).docs,
+        create_version: history_panel::open_create_version_in,
+        export_rules_link: preferences_window::export_rules_link,
+        light_model_space: || preferences_window::ListPrefs::load().drawing_light_model_space,
+    });
+}
+
 fn main() {
     noshape_render::perf::process_start();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
@@ -312,6 +265,7 @@ fn main() {
     noshape_model::custom::register();
     // Feature Studio imports of other documents / versions read their snapshots.
     noshape_model::custom::set_external_tab_loader(derived::external_tab);
+    register_drawing_hooks();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);

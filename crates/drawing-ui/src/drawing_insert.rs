@@ -127,14 +127,14 @@ impl DrawingEditor {
     /// Other documents: a Part Studio (or one of its parts) or an assembly
     /// of another document's version (`key`: its `ExternalRef` key, `label`:
     /// "<document> <version>").
-    pub(crate) fn choose_external(&mut self, key: String, tab: TabId, part: Option<noshape_model::BodyId>, label: String, cx: &mut Context<Self>) {
+    pub fn choose_external(&mut self, key: String, tab: TabId, part: Option<noshape_model::BodyId>, label: String, cx: &mut Context<Self>) {
         self.choose_source(tab, part, cx);
         self.insert.pinned = Some(PinnedVersion { id: key, name: label });
         self.ensure_sources(false, cx);
         self.update_preview(cx);
     }
 
-    pub(crate) fn choose_source(&mut self, source: TabId, part: Option<noshape_model::BodyId>, cx: &mut Context<Self>) {
+    pub fn choose_source(&mut self, source: TabId, part: Option<noshape_model::BodyId>, cx: &mut Context<Self>) {
         self.insert.chooser = None;
         self.insert.panel = false;
         self.insert.pinned = None;
@@ -174,7 +174,7 @@ impl DrawingEditor {
         self.set_tool(Tool::InsertView { source, orientation, part }, cx);
     }
 
-    pub(crate) fn set_insert_orientation(&mut self, o: ViewOrientation, cx: &mut Context<Self>) {
+    pub fn set_insert_orientation(&mut self, o: ViewOrientation, cx: &mut Context<Self>) {
         if let Tool::InsertView { orientation, .. } = &mut self.tool {
             *orientation = o;
         }

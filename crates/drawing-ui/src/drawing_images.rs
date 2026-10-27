@@ -31,7 +31,7 @@ impl DrawingEditor {
     pub fn insert_image(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let this = cx.entity().downgrade();
         let doc = self.doc.clone();
-        crate::file_tab_view::pick_file(doc, "Insert image", &[noshape_model::file_tab::FileKind::Image], &["png", "jpg", "jpeg", "gif"], window, cx, move |file, _, cx| {
+        crate::drawing_hooks::pick_file(doc, "Insert image", &[noshape_model::file_tab::FileKind::Image], &["png", "jpg", "jpeg", "gif"], window, cx, move |file, _, cx| {
             let read = file.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| noshape_scene::drawing_tools::image_aspect(&b));
             this.update(cx, |this, cx| {
                 match read {

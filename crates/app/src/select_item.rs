@@ -126,17 +126,7 @@ fn join_value(base: &str, cfg: &ConfigValues) -> String {
     format!("{base}\t{}", pairs.join(";"))
 }
 
-/// A document's versions (named ones newest first, then "Start") and name.
-pub(crate) fn document_versions(path: &std::path::Path) -> Option<(String, Vec<crate::derived::VersionChoice>)> {
-    let store = noshape_store::Document::open_read_only(path).ok()?;
-    let graph = store.graph().ok()?;
-    let mut versions: Vec<crate::derived::VersionChoice> = graph.versions.iter().rev().map(|v| crate::derived::VersionChoice { label: v.name.clone(), microversion: v.microversion }).collect();
-    if let Some(root) = graph.microversions.iter().find(|m| m.parents.is_empty()) {
-        versions.push(crate::derived::VersionChoice { label: "Start".into(), microversion: root.id });
-    }
-    let name = store.meta().map(|m| m.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
-    Some((name, versions))
-}
+pub(crate) use crate::derived::document_versions;
 
 /// Changes on Main since microversion `mv`.
 pub(crate) fn changes_since(path: &std::path::Path, mv: noshape_store::MicroversionId) -> usize {

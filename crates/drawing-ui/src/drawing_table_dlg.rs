@@ -367,7 +367,7 @@ impl DrawingEditor {
                             .text_color(gpui_kit::rgb(0x1651b0))
                             .cursor_pointer()
                             .child(source_label.clone())
-                            .when_some(source_tab, |l, tab| l.on_click(move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)))
+                            .when_some(source_tab, |l, tab| l.on_click(move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)))
                             .into_any_element(),
                     ))
                 })

@@ -18,8 +18,9 @@ target structure and the rules that keep it.
 | 5 | **`noshape-model`** (facade) | re-exports model-data, model-core, custom, assembly and drawing under the old paths; holds the model integration tests (`crates/model/tests`) |
 | 2–5 | `noshape-store`, `noshape-scene`, `noshape-render` | persistence, scene building, the wgpu renderer |
 | 6 | `noshape-ops`, `noshape-cli` | the agent API |
-| 7 | **`noshape-app-core`** | the app's base layer: theme, assets (icons, i18n tables; the files stay in `crates/app/assets`), base widgets (`ui`, `os_ui`, `os_menu`, `os_select`, `quantity_field`, …), actions, cursors, touch, the GPU context, the 3D viewport and navigation, the camera menu, the dialogs and panels the Part Studio and the assembly share (graphics preferences, named views, section view, customize toolbar, tool synonyms), `paths` (`config_dir`). Never references a studio |
-| 8 | `noshape` (the binary) and, planned, one crate per studio UI above app-core: workspace/chrome, Part Studio UI, sketch UI, assembly UI, drawing UI, other studios | GPUI application |
+| 7 | **`noshape-app-core`** | the app's base layer: theme, assets (icons, i18n tables; the files stay in `crates/app/assets`), base widgets (`ui`, `os_ui`, `os_menu`, `os_select`, `quantity_field`, …), actions, cursors, touch, the GPU context, the 3D viewport and navigation, the camera menu, the dialogs and panels the Part Studio and the assembly share (graphics preferences, named views, section view, customize toolbar, tool synonyms), what several studios share (`custom_tables`, `file_dialogs`: the save/open dialogs, `library::DocEntry`, `actions::request_activate_tab`, `derived::document_versions`, `os_ui::checkbox_box`), `paths` (`config_dir`). Never references a studio |
+| 8 | **`noshape-drawing-ui`** | the Drawing studio UI (`drawing_*`: the editor, its tools, panels and dialogs). What it needs of the app (the workspace's Import, other documents' windows, file tabs, the release log and watermark, the documents library, Create version, the export rules link, a preference) are the hooks in `drawing_hooks`, registered by main.rs at startup |
+| 9 | `noshape` (the binary) and, planned, one crate per studio UI above app-core: workspace/chrome, Part Studio UI, sketch UI, assembly UI, other studios | GPUI application |
 
 `noshape-model` re-exports every `noshape-model-data` module under the same path (`noshape_model::document`,
 `noshape_model::drawing::Sheet`, …), so code above it doesn't change when types move down.
@@ -97,8 +98,33 @@ target structure and the rules that keep it.
   | a studio file (drawing_view.rs) | the app | 40 s (was 47 s quiet, 51–66 s loaded, with the whole app one crate) |
   | app-core (ui.rs) | the app | 91 s (app-core, then the app) |
 
-- Next: the app (124k lines above app-core), one studio at a time, each at a moment agreed with its owner: variables
-  (3.5k) first, then drawing UI (27k), assembly UI (23k), Part Studio (34k), each on `noshape-app-core`. What has to be
-  cut first: the studios reach `files`, `workspace`, `release_dialog`, `preferences_window`, `history_panel`, `start_library`
-  (hooks or moves); modules that only need app-core today and could move down with their studio or into app-core when
-  shared: `sketch_mode`, `sketch_fonts`, `measure_panel`, `doc_panels`, `mouse_prefs`, `import_dialog`.
+- 2026-10-27: `noshape-drawing-ui` (27k lines, 64 `drawing_*` files: the Drawing studio UI) split out of the app above
+  app-core; `noshape` is now 96k lines, app-core 15k. The app re-exports the four modules it uses (`drawing_create`,
+  `drawing_keys`, `drawing_sketch`, `drawing_view`) at its root; `drawing_prefs` (a Preferences page) stayed in the app.
+  Edges cut: `request_activate_tab` (+ its static) moved to app-core `actions` (`workspace` re-exports it); the
+  save/open dialogs moved to app-core `file_dialogs` (`files` re-exports them); `custom_tables` (shared with the Part
+  Studio) and `select_item::document_versions` (to `derived`) moved to app-core; `DocEntry`/`EXT` moved to app-core
+  `library`; `PreferencesView::checkbox_box` is `os_ui::checkbox_box`; `sketch_mode`/`toolbar_prefs` were re-exports of
+  `noshape_scene`/`noshape_ops`, used directly. The rest are hooks (`drawing_hooks::Hooks`, registered by
+  `register_drawing_hooks` in main.rs before the app runs): the workspace's Import, opening another document's window,
+  `file_tab_view::pick_file`, the release log, the drawing watermark text (moved to
+  `release_dialog::drawing_watermark_text`), the documents library scan, Create version, the export rules link, the
+  light model space preference. The crate is opt-level 0 in dev like the app. The source guards scan `crates/app*` and
+  `crates/*-ui`; the menu coverage test and scripts read `crates/drawing-ui/src` (files `drawing_*` → area drawing).
+  Measured warm, incremental, machine load 18–38 (other agents), edit → `cargo build -p noshape`:
+
+  | edit in | rebuild | time |
+  |---|---|---|
+  | drawing UI (drawing_view.rs) | the app | 35–74 s, typically ~50 s (drawing-ui ~18 s, then the app ~27 s: any change to a crate makes its dependents recompile) |
+  | Part Studio (part_studio/mod.rs) | the app | 36–80 s, typically ~42 s |
+  | drawing UI | `cargo build -p noshape-drawing-ui` (check, tests) | ~18 s, without the app |
+
+  So the split makes drawing-UI checks and unit tests fast but not yet the binary: the app (96k lines) still re-checks
+  after any upstream change. The binary gets faster as more of it moves out (the app's own share shrinks).
+
+- Next: the app (96k lines above app-core and drawing-ui), one studio at a time, each at a moment agreed with its
+  owner: variables (3.5k), assembly UI (23k), Part Studio (34k), each on `noshape-app-core`, cut the way drawing-ui
+  was (moves into app-core when shared, a `*_hooks` module for the rest). What they reach: `files`, `workspace`,
+  `release_dialog`, `preferences_window`, `history_panel`, `start_library`; modules that only need app-core today and
+  could move down with their studio or into app-core when shared: `sketch_mode`, `sketch_fonts`, `measure_panel`,
+  `doc_panels`, `mouse_prefs`, `import_dialog`.

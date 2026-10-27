@@ -394,9 +394,9 @@ mod white_guard {
         // Built from pieces so this test's own source doesn't match.
         let pats = [["bg(gpui_kit::", "white())"].concat(), [".bg(", "white())"].concat()];
         let mut bad = Vec::new();
-        // Every app crate's sources (crates/app-core, crates/app, …).
+        // Every app crate's sources (crates/app-core, crates/app, the studio UIs crates/*-ui).
         let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut stack: Vec<_> = std::fs::read_dir(&crates).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().starts_with("app")).map(|e| e.path().join("src")).filter(|p| p.is_dir()).collect();
+        let mut stack: Vec<_> = std::fs::read_dir(&crates).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().starts_with("app") || e.file_name().to_string_lossy().ends_with("-ui")).map(|e| e.path().join("src")).filter(|p| p.is_dir()).collect();
         while let Some(dir) = stack.pop() {
             for e in std::fs::read_dir(&dir).unwrap().flatten() {
                 let p = e.path();

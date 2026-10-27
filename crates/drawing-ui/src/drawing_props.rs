@@ -341,7 +341,7 @@ impl DrawingEditor {
             && let Some(name) = self.doc.read(cx).session.doc.tab(*source).map(|t| t.name.clone())
         {
             let tab = *source;
-            out.push(MenuEntry::item(format!("Switch to {name}"), move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)));
+            out.push(MenuEntry::item(format!("Switch to {name}"), move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)));
         }
         // Live drawing/290: Move to sheet…, Copy, Paste as table (always).
         out.push(MenuEntry::item("Move to sheet...", move |t, _, cx| t.open_move_sheet(crate::drawing_move_sheet::MoveTarget::View(id), cx)));
@@ -434,7 +434,7 @@ impl DrawingEditor {
 
     /// Align views ▸ Vertically / Horizontally: the next view clicked keeps
     /// its place and this view's center lines up with it.
-    pub(crate) fn start_align_views(&mut self, id: ViewId, vertical: bool, cx: &mut Context<Self>) {
+    pub fn start_align_views(&mut self, id: ViewId, vertical: bool, cx: &mut Context<Self>) {
         self.align_views = Some((id, vertical));
         self.status = Some("Align views: select the view to align with".into());
         cx.notify();
@@ -748,7 +748,7 @@ impl DrawingEditor {
             .child(crate::assets::icon(if is_asm { "assembly" } else { "part" }, 20., cx))
             .child(div().id("vp-ref-link").text_color(gpui_kit::rgb(0x0088cc)).cursor_pointer().child(source_name).on_click(move |_, w, cx| {
                 if let Some(tab) = source_tab {
-                    crate::workspace::request_activate_tab(tab, w, cx);
+                    crate::actions::request_activate_tab(tab, w, cx);
                 }
             }))
             .into_any_element();

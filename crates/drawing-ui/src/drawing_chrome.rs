@@ -132,7 +132,7 @@ impl RenderOnce for DrCheckbox {
             .text_color(self.label_style.map_or(pal.text, |s| gpui_kit::rgb(s.1)))
             .when(self.disabled, |d| d.opacity(0.5))
             .when(handler.is_some(), |d| d.cursor_pointer())
-            .child(if self.native { crate::preferences_window::PreferencesView::checkbox_box(checked) } else { custom_box() })
+            .child(if self.native { crate::os_ui::checkbox_box(checked) } else { custom_box() })
             .children(label)
             .when_some(self.tooltip, |d, t| d.tooltip(crate::ui::tooltip(t)))
             .when_some(handler, |d, f| d.on_click(move |_, w, cx| f(&!checked, w, cx)))

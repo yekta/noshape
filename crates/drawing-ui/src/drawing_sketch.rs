@@ -42,12 +42,12 @@ impl DrawingEditor {
     }
 
     /// The sketch point nearest the cursor (within 6 px), if any.
-    pub(crate) fn sketch_point_at(&self, c: [f64; 2]) -> Option<(EntityId, [f64; 2])> {
+    pub fn sketch_point_at(&self, c: [f64; 2]) -> Option<(EntityId, [f64; 2])> {
         self.pk().sketch_point_at(c)
     }
 
     /// The hovered sketch entity (curves via their pick id).
-    pub(crate) fn sketch_entity_at(&self) -> Option<EntityId> {
+    pub fn sketch_entity_at(&self) -> Option<EntityId> {
         self.pk().sketch_entity_at()
     }
 
@@ -385,7 +385,7 @@ impl DrawingEditor {
         let this = cx.entity().downgrade();
         let doc = self.doc.clone();
         use noshape_model::file_tab::FileKind;
-        crate::file_tab_view::pick_file(doc, "Insert DXF or DWG", &[FileKind::Drawing2d], &["dxf", "dwg"], window, cx, move |file, _, cx| {
+        crate::drawing_hooks::pick_file(doc, "Insert DXF or DWG", &[FileKind::Drawing2d], &["dxf", "dwg"], window, cx, move |file, _, cx| {
             let parsed = file.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| noshape_sketch::cad::parse_cad(&b).map_err(|e| e.to_string()));
             this.update(cx, |this, cx| match parsed {
                 Ok(d) => {
@@ -454,7 +454,7 @@ impl DrawingEditor {
             if c.kind.is_dimension() {
                 continue;
             }
-            let Some(icon) = crate::sketch_mode::constraint_icon(&c.kind) else { continue };
+            let Some(icon) = noshape_scene::sketch_mode::constraint_icon(&c.kind) else { continue };
             for e in c.kind.entities() {
                 if sk.entity(e).is_some_and(|x| x.external) || !(all || hovered == Some(e)) {
                     continue;

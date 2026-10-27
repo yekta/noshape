@@ -951,17 +951,7 @@ impl PreferencesView {
     }
 
     pub(crate) fn checkbox_box(on: bool) -> Div {
-        div()
-            .size(px(13.))
-            .flex_none()
-            .flex()
-            .items_center()
-            .justify_center()
-            .rounded(px(2.))
-            .border_1()
-            .border_color(if on { rgb(0x0075ff) } else { rgb(0x767676) })
-            .bg(if on { rgb(0x0075ff) } else { rgb(0xffffff) })
-            .when(on, |d| d.child(Icon::new(IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff))))
+        crate::os_ui::checkbox_box(on)
     }
 
     fn render_profile(&self, cx: &mut Context<Self>) -> AnyElement {

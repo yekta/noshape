@@ -167,7 +167,7 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
 pub struct DrawingEditor {
     pub doc: Entity<DocModel>,
     pub tab: TabId,
-    pub(crate) gpu: Gpu,
+    pub gpu: Gpu,
     target_id: u64,
     pub focus: FocusHandle,
     /// Cached parts of the editor (toolbar, panel layer): see `crate::cached_slice`.
@@ -227,7 +227,7 @@ pub struct DrawingEditor {
     backdrops: ColoredHandles,
     paper: Option<(MeshHandle, MeshHandle, [f64; 2])>,
     overlay_handles: Option<(LinesHandle, PointsHandle)>,
-    pub(crate) geometry_dirty: bool,
+    pub geometry_dirty: bool,
     frame_dirty: bool,
     seq: u64,
     last_presented: u64,
@@ -946,7 +946,7 @@ impl DrawingEditor {
         // the canvas in the model-space colour; on Dark view the foreground
         // ink (ACI 7) draws white, other colours stay.
         let model = d.sheets.get(si).and_then(|s| s.imported.as_ref()).is_some_and(|i| i.model);
-        let dark = model && !crate::preferences_window::ListPrefs::load().drawing_light_model_space;
+        let dark = model && !crate::drawing_hooks::light_model_space();
         self.model_bg = model.then_some(if dark { 0x000000 } else { 0xffffff });
         // A model space has no paper and no watermark.
         self.watermark = if model { None } else { crate::drawing_watermark::text(self.doc.read(cx), self.tab) };

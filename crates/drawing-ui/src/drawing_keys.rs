@@ -185,7 +185,7 @@ impl DrawingEditor {
     /// tooltips.
     pub fn render_shortcut_toolbar(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let at = self.shortcut_toolbar?;
-        let shown = crate::part_studio::toolbar_prefs::ToolbarPrefs::load().drawing_shortcut_tools(&DEFAULT_SHORTCUT_TOOLS);
+        let shown = noshape_ops::prefs::ToolbarPrefs::load().drawing_shortcut_tools(&DEFAULT_SHORTCUT_TOOLS);
         let mut row = gpui_kit::component::h_flex().w(px(175.)).flex_wrap().px(px(2.));
         for &(name, icon, act) in SHORTCUT_CATALOGUE.iter().filter(|t| shown.iter().any(|n| n == t.0)) {
             row = row.child(

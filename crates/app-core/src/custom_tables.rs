@@ -37,7 +37,7 @@ pub struct TableRef {
 }
 
 fn my_tables_path() -> std::path::PathBuf {
-    crate::files::config_dir().join("custom_tables.json")
+    crate::paths::config_dir().join("custom_tables.json")
 }
 
 /// "My custom tables": the tables the user added (newest last).
@@ -50,7 +50,7 @@ pub fn add_my_table(t: TableRef) {
     let mut list = my_tables();
     if !list.contains(&t) {
         list.push(t);
-        let _ = std::fs::create_dir_all(crate::files::config_dir());
+        let _ = std::fs::create_dir_all(crate::paths::config_dir());
         let _ = std::fs::write(my_tables_path(), serde_json::to_vec_pretty(&list).unwrap_or_default());
     }
 }

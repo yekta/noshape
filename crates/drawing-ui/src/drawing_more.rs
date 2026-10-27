@@ -465,7 +465,7 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    pub(crate) fn open_cut_angle_panel(&mut self, view: ViewId, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_cut_angle_panel(&mut self, view: ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(p) = self.current_sheet().section_points(view).filter(|p| p.len() == 2) else { return };
         let ang = (p[1][1] - p[0][1]).atan2(p[1][0] - p[0][0]).to_degrees();
         let input = self.input(&format::format_number(ang, None, 3), window, cx);

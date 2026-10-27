@@ -66,7 +66,7 @@ fn table_ref(kind: &TableKind, doc: &noshape_model::Document) -> Option<TableRef
         _ => None,
     }
     .unwrap_or_else(|| name.clone());
-    let version_label = ext.and_then(|e| crate::select_item::document_versions(&e.path).and_then(|(_, vs)| vs.into_iter().find(|v| v.microversion == e.microversion).map(|v| v.label)));
+    let version_label = ext.and_then(|e| crate::derived::document_versions(&e.path).and_then(|(_, vs)| vs.into_iter().find(|v| v.microversion == e.microversion).map(|v| v.label)));
     Some(TableRef { fs: *fs, name: name.clone(), display, version: fs_version.clone(), version_label, fs_name })
 }
 
@@ -293,23 +293,23 @@ impl DrawingEditor {
             && let Some(name) = doc.tab(key.tab).map(|t| t.name.clone())
         {
             let tab = key.tab;
-            out.push(MenuEntry::item(format!("Switch to {name}"), move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)));
+            out.push(MenuEntry::item(format!("Switch to {name}"), move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)));
         }
         if let TableKind::Custom { studio, fs, fs_version, .. } = &t.kind {
         let (studio, fs) = (*studio, *fs);
         let studio_name = doc.tab(studio).map(|t| t.name.clone()).unwrap_or_default();
-        out.push(MenuEntry::item(format!("Switch to Custom tables : {studio_name}"), move |_, w, cx| crate::workspace::request_activate_tab(studio, w, cx)));
+        out.push(MenuEntry::item(format!("Switch to Custom tables : {studio_name}"), move |_, w, cx| crate::actions::request_activate_tab(studio, w, cx)));
         if let Some(e) = fs_version.as_deref().and_then(crate::derived::ExternalRef::parse) {
             let path = e.path;
             out.push(MenuEntry::item("Open Feature Studio in linked document", move |t, _, cx| {
                 let gpu = t.gpu.clone();
-                if let Err(e) = crate::files::open_document_window(path.clone(), None, gpu, cx) {
+                if let Err(e) = crate::drawing_hooks::open_document_window(path.clone(), gpu, cx) {
                     t.status = Some(format!("Could not open the document: {e:#}").into());
                 }
             }));
         } else {
             let fs_name = doc.tab(fs).map(|t| t.name.clone()).unwrap_or_default();
-            out.push(MenuEntry::item(format!("Switch to {fs_name}"), move |_, w, cx| crate::workspace::request_activate_tab(fs, w, cx)));
+            out.push(MenuEntry::item(format!("Switch to {fs_name}"), move |_, w, cx| crate::actions::request_activate_tab(fs, w, cx)));
         }
         }
         out.push(MenuEntry::item("Move to sheet...", move |t, _, cx| t.open_move_sheet(crate::drawing_move_sheet::MoveTarget::Table(id), cx)));
@@ -531,7 +531,7 @@ impl DrawingEditor {
                     .gap(px(4.))
                     .child(crate::assets::icon(icon, 18., cx))
                     .child(div().truncate().text_size(px(13.)).text_color(gpui_kit::rgb(0x1651b0)).child(text))
-                    .when_some(tab, |l, tab| l.cursor_pointer().tooltip(crate::ui::tooltip(format!("Switch to the tab: {tip}"))).on_click(move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)))
+                    .when_some(tab, |l, tab| l.cursor_pointer().tooltip(crate::ui::tooltip(format!("Switch to the tab: {tip}"))).on_click(move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)))
                     .into_any_element()
             };
             let chosen = d.chosen.clone();

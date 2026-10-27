@@ -61,7 +61,7 @@ impl DrawingEditor {
     }
 
     /// Show sheet `i` (no undo entry: undo / redo and reloads).
-    pub(crate) fn show_sheet(&mut self, i: usize, cx: &mut Context<Self>) {
+    pub fn show_sheet(&mut self, i: usize, cx: &mut Context<Self>) {
         self.sheet = i;
         self.selection.clear();
         self.tool = Tool::Select;
@@ -289,7 +289,7 @@ impl DrawingEditor {
         let replaced = part.clone();
         let assembly = matches!(self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content), Some(noshape_model::document::TabContent::Assembly(_)));
         let mut out = vec![
-            MenuEntry::item("Switch to reference", move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)),
+            MenuEntry::item("Switch to reference", move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)),
             MenuEntry::Separator,
             MenuEntry::item("Replace...", move |t, _, cx| {
                 t.insert.replace = Some(tab);
@@ -347,7 +347,7 @@ impl DrawingEditor {
                     cx.stop_propagation();
                     let mut entries = vec![MenuEntry::Submenu("Properties".into(), this.table_entries(id, cx).into_iter().filter(|x| !matches!(x, MenuEntry::Separator)).collect())];
                     if let Some(tab) = source {
-                        entries.push(MenuEntry::item("Switch to BOM", move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)));
+                        entries.push(MenuEntry::item("Switch to BOM", move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)));
                     }
                     entries.push(MenuEntry::item("Delete", move |t, _, cx| {
                         t.selection.clear();
@@ -435,7 +435,7 @@ impl DrawingEditor {
     /// Onshape's sheet tabs at the top-left of the drawing area ("Sheet1",
     /// the active one on a `#c7c7c7` chip) while the Sheets panel is closed.
     /// The canvas draws them under its tool dialogs, which cover them.
-    pub(crate) fn render_sheet_tabs(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub fn render_sheet_tabs(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let mut tabs = h_flex().absolute().top(px(4.)).left(px(4.)).gap(px(2.));
         for (i, s) in self.drawing.sheets.iter().enumerate() {
@@ -776,7 +776,7 @@ impl DrawingEditor {
     }
 
     /// A point in a view: snap, else the cursor position in the view.
-    pub(crate) fn view_point(&self, view: Option<ViewId>) -> Option<PickedPoint> {
+    pub fn view_point(&self, view: Option<ViewId>) -> Option<PickedPoint> {
         self.pk().view_point(self.cursor, view)
     }
 
@@ -1550,7 +1550,7 @@ impl DrawingEditor {
         out
     }
 
-    pub(crate) fn set_view_config(&mut self, view: ViewId, input: &str, value: &str, cx: &mut Context<Self>) {
+    pub fn set_view_config(&mut self, view: ViewId, input: &str, value: &str, cx: &mut Context<Self>) {
         let (input, value) = (input.to_string(), value.to_string());
         self.edit_view("View configuration", view, cx, |v| {
             if let ViewKind::Base { config, .. } = &mut v.kind {
@@ -1563,7 +1563,7 @@ impl DrawingEditor {
     /// Move a section view to the other side of its cutting line.
     /// Section line › Flip direction: the arrows and labels swap sides and
     /// the view regenerates in place (Onshape).
-    pub(crate) fn flip_section(&mut self, id: ViewId, cx: &mut Context<Self>) {
+    pub fn flip_section(&mut self, id: ViewId, cx: &mut Context<Self>) {
         self.edit_view("Flip direction", id, cx, |v| v.flip = !v.flip);
     }
 
@@ -1690,7 +1690,7 @@ impl DrawingEditor {
         out
     }
 
-    pub(crate) fn edit_table(&mut self, id: u64, name: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Table)) {
+    pub fn edit_table(&mut self, id: u64, name: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Table)) {
         self.edit_sheet(name, cx, |s| {
             if let Some(t) = s.table_mut(id) {
                 f(t);
@@ -1904,7 +1904,7 @@ impl DrawingEditor {
         }
     }
 
-    pub(crate) fn label_row(label: &str, el: AnyElement) -> AnyElement {
+    pub fn label_row(label: &str, el: AnyElement) -> AnyElement {
         let pal = p();
         h_flex().gap_2().items_center().child(div().w(px(84.)).text_xs().text_color(pal.text_muted).child(label.to_string())).child(el).into_any_element()
     }
