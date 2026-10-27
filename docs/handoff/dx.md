@@ -141,6 +141,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- **disk-loop.sh breaks builds in busy target dirs** (3 of dx's land.sh runs on 10-27 failed: "failed to write
+  …/.fingerprint/…/invoked.timestamp", "could not parse/generate dep info …noshape_app_core-….d", "unable to copy
+  …/incremental/…-working/….o"): its 30-min pass runs prune-build.py / prune-deps.py / fix-fingerprints.py and the
+  incremental `find … -mmin +30 -exec rm -rf` on every target dir, without the `busy` check the floor step has.
+  Please skip a dir while a cargo uses it (`busy "$t" && continue`), as the floor does.
 - **Display meshing runs one part at a time** (kernel mesh.cpp, core's area; PLAN 2.7 import target, also regen):
   mesh_prepare holds the global `mesh_mutex` around BRepMesh and mesh_fill takes it again for BRepTools::Clean, so
   `regen::display::mesh_in_parallel`'s 36 jobs of the NIST import queue on it: NOSHAPE_KERNEL_PROFILE summed

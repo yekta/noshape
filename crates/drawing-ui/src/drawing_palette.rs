@@ -274,6 +274,9 @@ impl DrawingEditor {
                         .child(div().w(px(20.)).h_full().flex_none().flex().items_center().justify_center().border_l_1().border_color(gpui_kit::rgb(0xcccccc)).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x000000)))),
                 )
                 .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+                // As wide as the button, or as the longest row (a browser
+                // select; "Fit with tolerance" ran out of a 45 px list).
+                m = m.min_width(widest(&items));
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_palette(|d| f(d), cx))));
@@ -368,6 +371,7 @@ impl DrawingEditor {
                 // Live: the content and an 8 x 4 black caret.
                 .child(h_flex().gap(px(3.)).child(content).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x000000))))
                 .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+                    m = m.min_width(widest(&items));
                     for (l, on, f) in &items {
                         let (e, f) = (ed.clone(), f.clone());
                         m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_palette(|d| f(d), cx))));
@@ -586,4 +590,9 @@ impl DrawingEditor {
                 .into_any_element(),
         )
     }
+}
+
+/// A select list's width for its longest row (13 px text, the row's padding).
+fn widest<T, U>(items: &[(String, T, U)]) -> f32 {
+    items.iter().map(|i| i.0.chars().count()).max().unwrap_or(0) as f32 * 7.5 + 24.0
 }
