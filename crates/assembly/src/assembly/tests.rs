@@ -4373,3 +4373,19 @@ fn random_assembly_edits_never_panic() {
         }
     }
 }
+
+/// Live (docs/parity/workflow-assembly-sweep.md row 9, E16): a mate
+/// connector whose secondary axis is parallel to its primary axis fails with
+/// Onshape's text.
+#[test]
+fn secondary_axis_parallel_to_the_primary_fails_as_live() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let mut mc = AsmMateConnector::new(MateId(20), "Mate connector 1".into(), conn(1, top.clone(), Inference::Centroid));
+    mc.secondary_axis = Some(conn(1, top, Inference::Centroid));
+    let asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body, DVec3::ZERO, true)], connectors: vec![mc], ..Default::default() };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert_eq!(res.connectors[0].message.as_deref(), Some("Failed to resolve mate connector. Secondary axis conflicts with primary axis."));
+}
