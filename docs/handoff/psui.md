@@ -88,6 +88,13 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   EXPR-ENTER-COMMITS. BOX-FILLET-FACES is a preselection (box drawn before the dialog opened), DIALOG-OK-STATE has
   bundle notes: both wait for live (REQUESTS psui 10-27). perf.yml on main dispatched 15:01: 40526871683 (bench),
   40526882894 (bench, COLD=1): read their "Speed targets" lines into the table below.
+- 10-27 15:10–17:00: 6bff20a7 section value box Esc (interaction 6.3 / 6.4 verified); 5.1 / 5.3 mass properties
+  verified against live's numbers; 6016d717 measure: Curvature deviation only where an edge meets the face (4.1 / 4.2
+  verified on live's "psb measure" part, rebuilt by /root/psui-scratch/meas/mk*.py); 1c853f78 SHORTCUT-MAP-FOCUS;
+  bf088793 REORDER-MISSING-MSG (model-core: a part not yet made is a missing selection); 85a2cb76 BOX-FILLET-FACES
+  (planar-face fields take no cylinder, `face_fits`) + DIALOG-OK-STATE (range errors disable ✓, "Syntax error in
+  expression."); dea57d5c TAB-EXPORT-MISSING; 2044128a HOLE-SIZE-NO-DIAMETER (the size table applies with std logic
+  too; overridden info for unsynced holes); b0a4cab0 VAR-BARE-UNIT + SKETCH-RMB-ITEMS (curve).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -133,8 +140,17 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-0. Live answers pending (REQUESTS psui 10-27): BOX-FILLET-FACES preselection, DIALOG-OK-STATE (a) / (b), the part hover
-   look in a part field (PART-HOVER-RED look). Apply each as answered.
+0. Live answers pending (REQUESTS psui 10-27): the part hover look in a part field (PART-HOVER-RED look), the
+   section cap colour where two parts overlap (reopened PS-SECTION item: ours sums the colours to white), the mate
+   connector disc over a face (interaction 3.4), MENU-TRUNCATE. Apply each as answered.
+0b. Cold start: with the Metal shader cache cleared (perf.yml 40526882894, COLD=1) the first frame is 1.28–1.96 s:
+   our 8 first-frame pipelines (already compiled in parallel; naga 29 already compacts each to its entry point)
+   take 480–670 ms and start only after the first window draws (`hold_prewarm`). Experiment ready in
+   /root/psui-scratch/prewarm-early.diff (`NOSHAPE_PREWARM=early`: compile at device-ready on utility-QoS threads);
+   measure it with a COLD=1 run whose variants set it, before landing as default. Bigger lever: precompiled
+   metallibs (wgpu 29 passthrough `metallib`) built by the macOS release job.
+0c. Retina orbit 76 fps (target 120) is GPU-bound (submit→done ≈ 17 ms mean, 45 ms p95 at 2388×1588, 4× MSAA):
+   diagnostic run 40537102560 (variants msaa1 / noao / nosil / nolines / nobacksil at 2×) shows where it goes.
 
 1. Our base part shading differs a few units from live's (block top (140,185,212) vs (145,181,203)), which is what
    the preview samples still differ by.
