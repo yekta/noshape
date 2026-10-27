@@ -165,7 +165,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   re-evaluates all 29 features (886 ms), far over the 50 ms undo budget; keep more states (or every undo target) cached
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
-- [x] (core 10-27: live's numbers exactly, 1 mm 3998.632 / 33 faces, 2.5 mm 8503.961 / 47; kernel test shell.rs shell_block_with_close_holes_like_onshape back in T1) P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
+- [x] verified watcher CLI 04:06 (≥ green bcf401ca, has 239fa250; qa5 pass28/build.py: 2.5 mm 8503.961 mm³ / 47 faces, 1 mm 3998.630 / 33, live 8503.961 / 47 and 3998.627 / 33) (core 10-27: live's numbers exactly, 1 mm 3998.632 / 33 faces, 2.5 mm 8503.961 / 47; kernel test shell.rs shell_block_with_close_holes_like_onshape back in T1) P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
   (live OK 3998.627 mm³ / 33 faces), 2.5 mm 8487.861 / 53 faces (live 8503.961 / 47); cause, WIP branch agent/qa5 and test
   in docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop" (qa5 2026-10-26, green a08e3eda)
 - [ ] P2 I1 (qa5, re-checked) the same model imported three ways gives three volumes: live/samples/g25-b.x_t 7583.001,
@@ -313,7 +313,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   release build before closing (qa 2026-10-27)
   skasm 10-27 (e5567eca): the app's steps also redid the DOF analysis (the loaded sketch had none): now computed once before
   the drag; qa's bigsketch in the app (dev, load ~40): 42–125 → 13–18 ms per step (spikes ~40 ms).
-- [x] ac0645bc (triad on the copy) reopened (qa 19555ca3: the copy lands at the pointer, selected, Ø dimension copied, no prompt = live; but the
+- [x] verified bcf401ca (qa 04:20: Sketch 2 circle, Ctrl+C, pointer elsewhere, Ctrl+V: the copy is centred on the pointer, selected, Transform active with its manipulator on the copy, no prompt) ac0645bc (triad on the copy) reopened (qa 19555ca3: the copy lands at the pointer, selected, Ø dimension copied, no prompt = live; but the
   Transform manipulator sits on the original circle / sketch origin, not on the copy's centre as live;
   tickets/sketch-paste-manipulator-on-original.png) 6329b168 P2 SKETCH-PASTE Ctrl+C / Ctrl+V of a dimensioned circle in a sketch: ours pastes the copy exactly on top of the
   original (prompt "Pasted; drag or transform the selection into place"); live (behaviours "qa (2026-10-26, P2 sketch)")
