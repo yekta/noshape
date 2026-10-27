@@ -457,11 +457,15 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
   // back (a draft keeps the sketch end: its neutral plane).
   const bool   back = std::abs(draft_angle) <= 1e-12;
   const gp_Vec from = back ? ve : vs;
-  if (from.Magnitude() > 1e-12)
+  // Swept back, the cylinders are re-framed in place (frame_cylinders_
+  // toward_sketch adds pcurves to their edges): the prism must not share
+  // edges with the caller's profile (a sketch region other threads read:
+  // qa BOOL-THREAD-CRASH), so the profile is copied.
+  if (from.Magnitude() > 1e-12 || back)
   {
     gp_Trsf t;
     t.SetTranslation(from);
-    tr = std::make_unique<BRepBuilderAPI_Transform>(base, t, false);
+    tr = std::make_unique<BRepBuilderAPI_Transform>(base, t, back);
     if (!tr->IsDone())
       fail_op("could not translate profile");
     base = tr->Shape();
@@ -539,11 +543,11 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   HHist                     hist;
   TopoDS_Shape              base = profile.shape;
   std::unique_ptr<BRepBuilderAPI_Transform> tr;
-  if (std::abs(start_offset) > 1e-12)
+  // Copied: its cylinders are re-framed in place below (see op_prism).
   {
     gp_Trsf t;
     t.SetTranslation(gp_Vec(dir) * start_offset);
-    tr = std::make_unique<BRepBuilderAPI_Transform>(base, t, false);
+    tr = std::make_unique<BRepBuilderAPI_Transform>(base, t, true);
     base = tr->Shape();
     merge_into(hist, history_of({profile.shape}, *tr));
   }
@@ -662,11 +666,11 @@ OpOut op_revol(const OcShape& profile, P3 origin, P3 axis, double a0, double a1)
   // (the tapping screws' crown sphere against its recess).
   const gp_Dir z_new = ax.Direction().Reversed();
   const double start = full ? 0.0 : a0;
-  if (std::abs(start) > 1e-12)
+  // Copied: its cylinders are re-framed in place below (see op_prism).
   {
     gp_Trsf t;
     t.SetRotation(ax, start);
-    tr   = std::make_unique<BRepBuilderAPI_Transform>(base, t, false);
+    tr   = std::make_unique<BRepBuilderAPI_Transform>(base, t, true);
     base = tr->Shape();
     merge_into(hist, history_of(args, *tr));
   }
