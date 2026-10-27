@@ -6,19 +6,20 @@
 #![recursion_limit = "256"]
 
 // The app's base layer (docs/CRATES.md), under its old paths.
-use noshape_app_core::{actions, assets, cached_slice, camera_menu, cursor, custom_tables, derived, doc_files, doc_model, export_naming, file_tab_view, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, properties_dialog, scene_builder, session, start_thumbnail, theme, ui, viewport};
+use noshape_app_core::{actions, assets, cached_slice, camera_menu, cursor, custom_tables, derived, doc_files, doc_model, file_tab_view, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, properties_dialog, scene_builder, session, start_library, start_thumbnail, start_trash, theme, ui, viewport};
 // The Drawing studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_drawing_hooks`.
-use noshape_drawing_ui::{drawing_create, drawing_keys, drawing_view};
+use noshape_drawing_ui::{drawing_create, drawing_view};
 // The Assembly studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_assembly_hooks`.
 use noshape_assembly_ui::{assembly_scene, assembly_view};
 // The Part Studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_part_studio_hooks`.
 use noshape_part_studio_ui::{part_studio, select_item};
 // The Variable Studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_variable_hooks`.
 use noshape_variable_studio_ui::{variable_insert, variable_studio};
+// Preferences (docs/CRATES.md), under their old paths; what they need of the app: `register_preferences_hooks`.
+use noshape_preferences_ui::{material_libraries, preferences_window, prefs_general, units_prefs};
 mod fs_profile;
 mod live_server;
 mod std_source;
-mod material_libraries;
 mod numbering_prefs;
 mod release_conditions;
 mod release_prefs;
@@ -26,7 +27,6 @@ mod release_settings;
 mod revision_template;
 mod revision_tools;
 mod company_settings;
-mod material_prefs;
 mod release_thumbs;
 mod doc_dialogs;
 mod shortcuts_page;
@@ -43,17 +43,9 @@ mod workspace_protection;
 mod repair_mode;
 mod merge_dialog;
 mod version_properties;
-mod units_prefs;
 mod doc_panels;
-mod mouse_prefs;
-mod drawing_prefs;
-mod preferences_window;
 mod release_dialog;
-mod prefs_general;
-mod prefs_export_rules;
-mod start_library;
 mod start_search;
-mod start_trash;
 mod shortcuts;
 mod smoke;
 mod start_window;
@@ -325,6 +317,23 @@ fn register_variable_hooks() {
     });
 }
 
+/// What the Preferences pages (noshape-preferences-ui) need of the app: the Part Studio's tools for the Shortcut
+/// toolbars page, refreshing the documents page, re-theming the app.
+fn register_preferences_hooks() {
+    noshape_preferences_ui::preferences_hooks::register(noshape_preferences_ui::preferences_hooks::Hooks {
+        part_studio_toolbar_tools: || {
+            part_studio::shortcut_cmds::toolbar_feature_ids()
+                .into_iter()
+                .filter_map(|id| noshape_model::features::get(id).map(|t| (id.to_string(), t.name.to_string(), part_studio::feature_icon(id))))
+                .collect()
+        },
+        sketch_prefs_rows: part_studio::shortcut_cmds::sketch_prefs_rows,
+        default_sketch_shortcut_names: part_studio::shortcut_cmds::default_sketch_shortcut_names,
+        refresh_start_window: start_window::refresh,
+        apply_kit_theme,
+    });
+}
+
 fn main() {
     noshape_render::perf::process_start();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
@@ -339,6 +348,7 @@ fn main() {
     register_assembly_hooks();
     register_part_studio_hooks();
     register_variable_hooks();
+    register_preferences_hooks();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);

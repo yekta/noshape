@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-pub use noshape_app_core::library::{DocEntry, EXT, decode_thumbnail};
+pub use crate::library::{DocEntry, EXT, decode_thumbnail};
 
 #[derive(Clone)]
 struct Cached {
@@ -52,13 +52,13 @@ pub struct ScanInput {
 
 impl ScanInput {
     pub fn current() -> Self {
-        let mut folders = vec![crate::files::documents_dir()];
-        for f in crate::files::watched_folders() {
+        let mut folders = vec![crate::file_dialogs::documents_dir()];
+        for f in crate::doc_files::watched_folders() {
             if !folders.contains(&f) {
                 folders.push(f);
             }
         }
-        Self { recent: crate::files::recent(), folders, trash: crate::start_trash::Trash::load().documents() }
+        Self { recent: crate::doc_files::recent(), folders, trash: crate::start_trash::Trash::load().documents() }
     }
 }
 
@@ -208,7 +208,7 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
 }
 
 /// A document file's thumbnail (Reference manager rows).
-pub(crate) fn file_thumbnail(path: &Path) -> Option<Arc<RenderImage>> {
+pub fn file_thumbnail(path: &Path) -> Option<Arc<RenderImage>> {
     read_meta(path).ok()?.thumbnail.as_deref().and_then(decode_thumbnail)
 }
 
@@ -429,7 +429,7 @@ pub fn format_onshape_time(ms: i64) -> String {
     let Some(t) = Local.timestamp_millis_opt(ms).single() else { return "—".into() };
     let today = Local::now().date_naive();
     // Preferences › Units › Time format.
-    let clock = if crate::units_prefs::time_24h() { t.format("%H:%M") } else { t.format("%-I:%M %p") }.to_string();
+    let clock = if crate::user_units::time_24h() { t.format("%H:%M") } else { t.format("%-I:%M %p") }.to_string();
     match (today - t.date_naive()).num_days() {
         0 => format!("{clock} Today"),
         1 => format!("{clock} Yesterday"),
@@ -461,7 +461,7 @@ pub struct Labels {
 
 impl Labels {
     fn file() -> PathBuf {
-        crate::files::config_dir().join("labels.json")
+        crate::paths::config_dir().join("labels.json")
     }
 
     pub fn load() -> Self {

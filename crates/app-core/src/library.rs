@@ -1,5 +1,5 @@
 //! The local document library's entries (the start window's documents list, the drawing Insert view picker's Other
-//! documents): what a scan of the `.noshape` files reports. The scan itself is the app's `start_library`.
+//! documents): what a scan of the `.noshape` files reports. The scan itself is `start_library`.
 
 use gpui_kit::RenderImage;
 use std::path::{Path, PathBuf};

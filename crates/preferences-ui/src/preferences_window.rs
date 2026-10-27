@@ -12,7 +12,7 @@
 
 use crate::actions::CloseWindow;
 use crate::os_ui as os;
-use crate::part_studio::toolbar_prefs::ToolbarPrefs;
+use noshape_ops::prefs::ToolbarPrefs;
 use crate::shortcuts::{self, Entry, KeyStyle, Recorded, Tab};
 use crate::theme::p;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
@@ -77,7 +77,7 @@ pub struct ListPrefs {
 }
 
 fn list_prefs_path() -> std::path::PathBuf {
-    crate::files::config_dir().join("preferences.json")
+    crate::paths::config_dir().join("preferences.json")
 }
 
 impl ListPrefs {
@@ -173,7 +173,7 @@ pub fn forget_if(id: WindowId, cx: &mut App) -> bool {
 }
 
 /// The account pages' title bar: the logo, and the user at the right.
-pub(crate) fn account_title_bar(cx: &App) -> AnyElement {
+pub fn account_title_bar(cx: &App) -> AnyElement {
     let pal = p();
     TitleBar::new()
         .h(px(crate::ui::NAVBAR_H))
@@ -272,7 +272,7 @@ impl Focusable for PreferencesView {
 
 impl PreferencesView {
     fn new(page: Page, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let name_saved = crate::files::user_name_pref().unwrap_or_default();
+        let name_saved = crate::doc_files::user_name_pref().unwrap_or_default();
         let name = cx.new(|cx| InputState::new(window, cx).placeholder(noshape_store::os_login()).default_value(name_saved.clone()));
         let subs = vec![cx.subscribe_in(&name, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change) {
@@ -457,7 +457,7 @@ impl PreferencesView {
     }
 
     /// A section heading: 18 px / 500 over a 1 px `#333` rule.
-    pub(crate) fn heading(title: impl Into<SharedString>, extra: Option<AnyElement>) -> Div {
+    pub fn heading(title: impl Into<SharedString>, extra: Option<AnyElement>) -> Div {
         let pal = p();
         v_flex().child(
             h_flex()
@@ -828,7 +828,7 @@ impl PreferencesView {
         })
         .w(px(150.));
         // Tools that can be on the 5x2 S toolbar (id, name, icon), and the ones shown.
-        use crate::part_studio::shortcut_cmds as sc;
+        use crate::preferences_hooks as sc;
         let (items, shown): (Vec<(String, String, SharedString)>, Vec<String>) = if self.toolbar_context == 3 {
             use crate::drawing_keys as dk;
             let all = dk::SHORTCUT_CATALOGUE.iter().map(|t| (t.0.to_string(), t.0.to_string(), crate::assets::icon_path(t.1))).collect();
@@ -837,10 +837,7 @@ impl PreferencesView {
             let all = crate::assembly_view::shortcut_catalog().into_iter().map(|(id, name, icon)| (id.to_string(), name.to_string(), crate::assets::icon_path(icon))).collect();
             (all, self.asm_toolbar_draft.shortcut_tools())
         } else if self.toolbar_context == 1 {
-            let all = sc::toolbar_feature_ids()
-                .into_iter()
-                .filter_map(|id| noshape_model::features::get(id).map(|t| (id.to_string(), t.name.to_string(), crate::part_studio::feature_icon(id))))
-                .collect();
+            let all = sc::part_studio_toolbar_tools();
             (all, self.toolbar_draft.shortcut_tools())
         } else {
             // Onshape's own list and wording (live: "Extrude", "Revolve" first,
@@ -950,7 +947,7 @@ impl PreferencesView {
             .into_any_element()
     }
 
-    pub(crate) fn checkbox_box(on: bool) -> Div {
+    pub fn checkbox_box(on: bool) -> Div {
         crate::os_ui::checkbox_box(on)
     }
 
@@ -973,9 +970,9 @@ impl PreferencesView {
             .child(h_flex().mt(px(25.)).pl(px(15.)).child(Self::save_button("profile-save", "Save", changed).when(changed, |b| {
                 b.on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                     let v = this.name.read(cx).value().to_string();
-                    crate::files::set_user_name_pref(&v);
+                    crate::doc_files::set_user_name_pref(&v);
                     this.name_saved = v.trim().to_string();
-                    crate::start_window::refresh(cx);
+                    crate::preferences_hooks::refresh_start_window(cx);
                     window.refresh();
                     cx.notify();
                 }))

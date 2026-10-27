@@ -36,7 +36,7 @@ pub struct Trash {
 }
 
 fn dir() -> PathBuf {
-    crate::files::config_dir().join("trash")
+    crate::paths::config_dir().join("trash")
 }
 
 fn index() -> PathBuf {

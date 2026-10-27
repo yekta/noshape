@@ -1,0 +1,23 @@
+[package]
+name = "noshape-preferences-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's Preferences window and its pages (general, theming, units, mouse, drawings, export rules, material libraries, toolbars and keyboard shortcuts). Built on noshape-app-core, noshape-drawing-ui and noshape-assembly-ui (their toolbar settings); the noshape binary registers what it needs of the app (preferences_hooks)."
+
+[dependencies]
+noshape-app-core.workspace = true
+noshape-drawing-ui.workspace = true
+noshape-assembly-ui.workspace = true
+noshape-model.workspace = true
+noshape-store.workspace = true
+noshape-units.workspace = true
+noshape-ops.workspace = true
+noshape-scene.workspace = true
+gpui-kit.workspace = true
+anyhow.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

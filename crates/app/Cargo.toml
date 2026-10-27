@@ -18,6 +18,7 @@ noshape-drawing-ui.workspace = true
 noshape-assembly-ui.workspace = true
 noshape-part-studio-ui.workspace = true
 noshape-variable-studio-ui.workspace = true
+noshape-preferences-ui.workspace = true
 noshape-render.workspace = true
 noshape-model.workspace = true
 noshape-store.workspace = true

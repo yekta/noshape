@@ -17,7 +17,6 @@ use gpui_kit::*;
 use noshape_model::document::TabContent;
 use noshape_model::material_library::MaterialLibrary;
 
-/// A Material Library tab of a local document, added to the account.
 // The added libraries (a preferences file), shared with the Part Studio's Material panel (noshape-app-core).
 pub use noshape_app_core::material_libraries::{AddedLibrary, added, onshape_listed, set_added, set_onshape_listed};
 
@@ -76,7 +75,7 @@ type OnAdd = std::rc::Rc<dyn Fn(Option<AddedLibrary>, &mut Window, &mut App)>;
 /// Open the modal; `on_add` gets the picked library (None = the Onshape
 /// Material Library).
 pub fn open(on_add: impl Fn(Option<AddedLibrary>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
-    let me = crate::files::user_name_pref().or_else(|| std::env::var("USER").ok()).unwrap_or_default();
+    let me = crate::doc_files::user_name_pref().or_else(|| std::env::var("USER").ok()).unwrap_or_default();
     let view = cx.new(|_| AddLibraryDialog { filter: 0, local: local_libraries(), me, selected: None, on_add: std::rc::Rc::new(on_add) });
     window.open_dialog(cx, move |dialog, _, _| os::modal(dialog, "Add material library", 800.).child(view.clone()));
 }

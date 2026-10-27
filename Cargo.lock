@@ -4320,6 +4320,7 @@ dependencies = [
  "noshape-model",
  "noshape-ops",
  "noshape-part-studio-ui",
+ "noshape-preferences-ui",
  "noshape-render",
  "noshape-scene",
  "noshape-sketch",
@@ -4370,6 +4371,7 @@ dependencies = [
  "parking_lot",
  "raw-window-handle",
  "rfd",
+ "rusqlite",
  "rust-embed",
  "serde",
  "serde_json",
@@ -4648,6 +4650,27 @@ dependencies = [
  "noshape-render",
  "noshape-scene",
  "noshape-sketch",
+ "noshape-store",
+ "noshape-units",
+ "noshape-workspace-hack",
+ "parking_lot",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "noshape-preferences-ui"
+version = "0.4.6"
+dependencies = [
+ "anyhow",
+ "gpui-kit",
+ "log",
+ "noshape-app-core",
+ "noshape-assembly-ui",
+ "noshape-drawing-ui",
+ "noshape-model",
+ "noshape-ops",
+ "noshape-scene",
  "noshape-store",
  "noshape-units",
  "noshape-workspace-hack",

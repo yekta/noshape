@@ -357,10 +357,7 @@ pub enum WorkspaceUnitsEvent {
 
 impl EventEmitter<WorkspaceUnitsEvent> for WorkspaceUnits {}
 
-/// Display decimals options ("0", "0.1", … "0.12345678").
-pub(crate) const DECIMALS: [&str; 9] = ["0", "0.1", "0.12", "0.123", "0.1234", "0.12345", "0.123456", "0.1234567", "0.12345678"];
-/// How many [`DECIMALS`] options each of `OTHER_UNITS` offers (live).
-pub(crate) const OTHER_DECIMALS: [usize; 9] = [7, 7, 8, 9, 9, 9, 8, 9, 9];
+use noshape_app_core::user_units::{DECIMALS, OTHER_DECIMALS};
 
 impl WorkspaceUnits {
     pub fn new(doc: Entity<DocModel>, cx: &mut Context<Self>) -> Self {

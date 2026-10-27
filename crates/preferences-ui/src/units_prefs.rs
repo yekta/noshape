@@ -6,13 +6,13 @@
 //! dir; new documents (`new_document`) start with these units, and document
 //! times follow the time format (`start_library::format_onshape_time`).
 
-use crate::doc_dialogs::{DECIMALS, OTHER_DECIMALS};
+pub use crate::user_units::{UserUnits, apply, current, new_document, save, time_24h};
+use crate::user_units::{DECIMALS, OTHER_DECIMALS};
 use crate::theme::p;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_units::{AngleUnit, LENGTH_UNITS_SHOWN, OTHER_UNITS, OTHER_UNITS_SHOWN, UnitPrefs};
-use serde::{Deserialize, Serialize};
+use noshape_units::{AngleUnit, LENGTH_UNITS_SHOWN, OTHER_UNITS, OTHER_UNITS_SHOWN};
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -22,60 +22,6 @@ const DEC_W: f32 = 150.;
 /// Live: Length 7 decimals options here (the Workspace units dialog has 6).
 const LENGTH_DECIMALS: usize = 7;
 const ANGLE_DECIMALS: usize = 7;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct UserUnits {
-    pub units: UnitPrefs,
-    /// Time format "24 hour" (default "12 hour").
-    pub time_24h: bool,
-    /// Decimal format › Use comma as decimal separator.
-    pub comma_decimal: bool,
-}
-
-fn path() -> std::path::PathBuf {
-    crate::files::config_dir().join("units.json")
-}
-
-static CACHE: parking_lot::RwLock<Option<UserUnits>> = parking_lot::RwLock::new(None);
-
-/// The saved preferences (read once, then cached).
-pub fn current() -> UserUnits {
-    if let Some(u) = *CACHE.read() {
-        return u;
-    }
-    let u = std::fs::read_to_string(path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
-    *CACHE.write() = Some(u);
-    u
-}
-
-fn save(u: UserUnits) {
-    *CACHE.write() = Some(u);
-    if let Ok(t) = serde_json::to_string_pretty(&u) {
-        let p = path();
-        if let Some(dir) = p.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        let _ = std::fs::write(p, t);
-    }
-}
-
-/// Applies the saved decimal separator (at startup).
-pub fn apply() {
-    noshape_units::set_comma_decimal(current().comma_decimal);
-}
-
-/// A new, empty document with the user's default units.
-pub fn new_document() -> noshape_model::Document {
-    let mut d = noshape_model::Document::new();
-    d.settings.units = current().units;
-    d
-}
-
-/// Document times use the 24 hour clock.
-pub fn time_24h() -> bool {
-    current().time_24h
-}
 
 /// How a pick (the option's index) changes the draft.
 type SetFn = Rc<dyn Fn(&mut UserUnits, usize)>;
@@ -398,6 +344,7 @@ impl Render for DecimalPrefsView {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use noshape_units::UnitPrefs;
     // `gpui_kit::*` (via super) exports gpui's `test` attribute; use std's.
     use std::prelude::v1::test;
 

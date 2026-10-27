@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 pub(crate) use noshape_app_core::paths::config_dir;
 pub use noshape_app_core::file_dialogs::{documents_dir, native_dialogs_available, request_open_path, request_open_paths, request_save_path};
-pub use noshape_app_core::doc_files::{OpenDocs, add_recent, canonical, is_document_open, new_document_path, recent, remove_recent, replace_recent, set_user_name_pref, set_watched_folders, user_name_pref, watched_folders};
+pub use noshape_app_core::doc_files::{OpenDocs, add_recent, canonical, is_document_open, new_document_path, recent, remove_recent, replace_recent, set_watched_folders, user_name_pref, watched_folders};
 
 /// App-level window lifecycle: keeps the open-document registry current and
 /// shows the start window when the last document window closes. Quits when
