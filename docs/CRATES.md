@@ -18,11 +18,17 @@ target structure and the rules that keep it.
 | 5 | **`noshape-model`** (facade) | re-exports model-data, model-core, custom, assembly and drawing under the old paths; holds the model integration tests (`crates/model/tests`) |
 | 2–5 | `noshape-store`, `noshape-scene`, `noshape-render` | persistence, scene building, the wgpu renderer |
 | 6 | `noshape-ops`, `noshape-cli` | the agent API |
-| 7 | **`noshape-app-core`** | the app's base layer: theme, assets (icons, i18n tables; the files stay in `crates/app/assets`), base widgets (`ui`, `os_ui`, `os_menu`, `os_select`, `quantity_field`, …), actions, cursors, touch, the GPU context, the 3D viewport and navigation, the camera menu, the dialogs and panels the Part Studio and the assembly share (graphics preferences, named views, section view, customize toolbar, tool synonyms), what several studios share (`custom_tables`, `file_dialogs`: the save/open dialogs, `library::DocEntry`, `actions::request_activate_tab`, `derived::document_versions`, `os_ui::checkbox_box`, the Configuration visibility conditions dialog `config_visibility`, the Properties dialogs `properties_dialog`, the View cube widget `view_cube`, the Reflection analysis's settings `reflection`, the Edit in context data `assembly_context`, `library::decode_thumbnail`), `paths` (`config_dir`). Never references a studio |
+| 7 | **`noshape-app-core`** | the app's base layer: theme, assets (icons, i18n tables; the files stay in `crates/app/assets`), base widgets (`ui`, `os_ui`, `os_menu`, `os_select`, `quantity_field`, …), actions, cursors, touch, the GPU context, the 3D viewport and navigation, the camera menu, the dialogs and panels the Part Studio and the assembly share (graphics preferences, named views, section view, customize toolbar, tool synonyms), what several studios share (`custom_tables`, `file_dialogs`: the save/open dialogs, `library::DocEntry`, `actions::request_activate_tab`, `derived::document_versions`, `os_ui::checkbox_box`, the Configuration visibility conditions dialog `config_visibility`, the Properties dialogs `properties_dialog`, the View cube widget `view_cube`, the Reflection analysis's settings `reflection`, the Edit in context data `assembly_context`, `library::decode_thumbnail`, file tabs `file_tab_view`, the documents library scan and the Trash `start_library`/`start_trash`, the recent list, watched folders, open-documents registry and other documents `doc_files`, the user's units `user_units`, tab thumbnails `tab_thumbnail`, Repair `repair_mode`, the keyboard shortcuts registry and keymap `shortcuts`), `paths` (`config_dir`). Never references a studio |
 | 8 | **`noshape-drawing-ui`** | the Drawing studio UI (`drawing_*`: the editor, its tools, panels and dialogs). What it needs of the app (the workspace's Import, other documents' windows, file tabs, the release log and watermark, the documents library, Create version, the export rules link, a preference) are the hooks in `drawing_hooks`, registered by main.rs at startup |
 | 8 | **`noshape-assembly-ui`** | the Assembly studio UI (`assembly_*`: the editor, its panels, dialogs and tools; `measure_panel`, which only the assembly uses). Builds on `noshape-drawing-ui` (Create drawing). What it needs of the app (other documents' windows, the documents library and its folders, the release dialogs, Create version, tab properties, a preference, the Part Studio's Export and Input propagation dialogs, the Variable Studio's tables) are the hooks in `assembly_hooks`, registered by main.rs at startup |
 | 8 | **`noshape-part-studio-ui`** | the Part Studio UI (`part_studio/`: the editor, its panels, tools and menus; `feature_dialog`, `sketch_mode`, `sketch_fonts`, `var_complete`, `compare_graphics`, the FeatureScript reference fields `fs_reference` and the Select item panel `select_item`, which the Feature Studio's import shares). Builds on `noshape-drawing-ui` (Create drawing). What it needs of the app (other documents' windows, the documents library, the release dialogs, Create version, preferences and the shortcuts page, the Variable Studio's tables and Type select, Compare and Repair, the added material libraries' materials and the Add material library modal) are the hooks in `part_studio_hooks`, registered by main.rs at startup |
-| 9 | `noshape` (the binary) and, planned, one crate per studio UI above app-core: workspace/chrome, Part Studio UI, sketch UI, other studios | GPUI application |
+| 8 | **`noshape-variable-studio-ui`** | the Variable Studio (`variable_studio`, `variable_config`, `variable_import`, `variable_insert`: the Variable table panel). Hooks (`variable_hooks`): another document's window, Create version |
+| 9 | **`noshape-preferences-ui`** | the Preferences window and its pages (`preferences_window`, `prefs_general`, `prefs_export_rules`, `units_prefs`, `mouse_prefs`, `drawing_prefs`, `material_prefs`, `material_libraries`). Builds on drawing-ui and assembly-ui (their toolbar settings). Hooks (`preferences_hooks`): the Part Studio's tools for Shortcut toolbars, refreshing the documents page, re-theming |
+| 10 | **`noshape-release-ui`** | release management (`release_dialog` + `release_add_source`, `release_workflow`; `release_prefs`, `release_conditions`, `release_settings`, `release_thumbs`, `revision_template`, `revision_tools`, `numbering_prefs`) and Company settings (`company_settings`, which only hosts these pages). Builds on preferences-ui. Hooks (`release_hooks`): other documents' and versions' windows, Create version, the workspace's Export |
+| 10 | **`noshape-feature-studio-ui`** | the Feature Studio (`feature_studio`, `fs_notices`, `fs_search`, `fs_import`, `fs_profile`, `std_source`). Builds on preferences-ui (Labs). Hooks (`feature_studio_hooks`): Create version, a Feature Studio of a version in its own window |
+| 11 | **`noshape-history-ui`** | Versions and history (`history_panel`, `compare_mode`, `merge_dialog`, `version_properties`). Builds on release-ui (release rows and dialogs) and feature-studio-ui (the code compare's highlighting). Hooks (`history_hooks`): the Part Studio's feature icons, the Workspace protection dialog |
+| 11 | **`noshape-start-ui`** | the documents page (`start_window`, `start_search`). Builds on preferences-ui and release-ui (its Preferences and Company settings menu items). Hooks (`start_hooks`): a document's window, the build label |
+| 12 | `noshape` (the binary) and, planned, the workspace/chrome as a crate above the studios | GPUI application: the workspace, tab manager, document panels and dialogs, files, shortcuts page, main.rs (registers every crate's hooks before the app runs), smoke |
 
 `noshape-model` re-exports every `noshape-model-data` module under the same path (`noshape_model::document`,
 `noshape_model::drawing::Sheet`, …), so code above it doesn't change when types move down.
@@ -50,9 +56,10 @@ target structure and the rules that keep it.
 zed-industries/zed has 251 crates; its binary crate (`crates/zed`) is ~22k lines and its `main.rs` is mostly
 `<feature>::init(cx)` calls (settings, project, debugger_ui, command_palette, language_models, …). Each feature is a
 crate that registers itself from `init`: the `workspace` crate defines the item/panel traits and a registry and never
-names a feature, so editing a feature recompiles that crate and a small binary. Ours (10-27): the binary `noshape` is
-97k lines (Part Studio UI 34k, assembly UI 23k, workspace/chrome, preferences, release management, start window), so
-every edit below it recompiles 97k lines (35–60 s).
+names a feature, so editing a feature recompiles that crate and a small binary. Ours (10-27 morning): the binary
+`noshape` was 97k lines (Part Studio UI 34k, assembly UI 23k, workspace/chrome, preferences, release management, start
+window), so every edit below it recompiled 97k lines (35–60 s). 10-27 noon: 6.4k (the workspace/chrome, files, main.rs, smoke), with
+the Part Studio UI, the other studios and the document features in their own crates.
 
 Plan, one step at a time (each lands green; the owning agent is warned before its files move):
 1. ~~`noshape-assembly-ui` (assembly_*, 23k) out of the binary, like `noshape-drawing-ui` (hooks for app-level calls).~~
@@ -61,8 +68,10 @@ Plan, one step at a time (each lands green; the owning agent is warned before it
    binary is 30k lines.
 2. `noshape-workspace`: the workspace and chrome with a **studio registry** (a trait per tab kind: create the view,
    menus, toolbar, save/restore; studios register from their `init(cx)`), so the workspace never names a studio.
-3. `noshape-part-studio-ui` (part_studio/ + feature_dialog, 38k), then Variable Studio, Feature Studio, start window,
-   preferences, release management/history as their own crates, each with `init(cx)`.
+3. `noshape-part-studio-ui` (part_studio/ + feature_dialog, 38k; psui), then Variable Studio, Feature Studio, start
+   window, preferences, release management/history as their own crates, each with `init(cx)`. ~~The six small crates~~
+   done 10-27 with hooks (see Progress); their `init(cx)` comes with step 2 (hooks become actions,
+   docs/APP-ARCHITECTURE.md).
 4. The binary: `main.rs` calling the `init`s plus app wiring, ~10–20k lines.
 
 ## Progress
@@ -198,8 +207,46 @@ Plan, one step at a time (each lands green; the owning agent is warned before it
   The binary barely moved at this load: the app's own share is now small, but a changed dependency still makes it
   recompile and relink. The win is the crate's checks and unit tests (4 s instead of the app).
 
-- Next: the app (30k lines above app-core, drawing-ui, assembly-ui and part-studio-ui), one studio at a time, each at a moment agreed
-  with its owner: variables (3.5k), each on `noshape-app-core`, cut the way drawing-ui
-  was (moves into app-core when shared, a `*_hooks` module for the rest). What they reach: `files`, `workspace`,
-  `release_dialog`, `preferences_window`, `history_panel`, `start_library`; modules that only need app-core today and
-  could move down with their studio or into app-core when shared: `doc_panels`, `mouse_prefs`, `import_dialog`.
+- 2026-10-27: six small app crates split out of the binary, one commit each, each the drawing-ui pattern (crate-root
+  `use noshape_app_core::*`, the app re-exports the moved modules it uses at its root so `crate::x::…` paths are
+  unchanged, a `<area>_hooks` module for upward calls registered by `register_<area>_hooks` in main.rs before the app
+  runs, opt-level 0 in dev): `noshape-variable-studio-ui` (3.4k lines), `noshape-preferences-ui` (3.2k),
+  `noshape-release-ui` (5.1k), `noshape-feature-studio-ui` (3.5k), `noshape-history-ui` (3.6k), `noshape-start-ui`
+  (3.8k); with the Part Studio split (above, landed first; `var_complete` and `compare_graphics` went with it)
+  `noshape` is now 6.4k lines (was 30k after the Part Studio, 71k before both), app-core 19.5k. Dependencies
+  between them are acyclic: preferences-ui on drawing-ui and assembly-ui (their toolbar settings), release-ui on
+  preferences-ui (Company settings, which only hosts release pages, moved with release), feature-studio-ui on
+  preferences-ui (Labs), history-ui on release-ui and feature-studio-ui (release rows, the code compare's
+  highlighting), start-ui on preferences-ui and release-ui (its user menu); variable-studio-ui only on app-core.
+  Moved down into app-core, being shared: `file_tab_view`, `start_library` and `start_trash` (the documents library
+  scan and the Trash), `doc_files` (from `files`: the recent list, watched folders, the user name, the open-documents
+  registry; `other_documents` from `variable_insert`), `user_units` (the data of `units_prefs`, doc_dialogs' decimals
+  options), `tab_thumbnail` (from `tab_manager`), `repair_mode`, `shortcuts` (the registry and keymap; the app's
+  `shortcuts` keeps `run_in_drawing`; the Part Studio split moved it too); `material_libraries` (the Add material library modal and `materials_of`; its data is app-core's since the Part Studio split) went to preferences-ui. Used directly instead of app
+  re-exports: `noshape_ops::import`, `noshape_ops::docedit::place_after`, `noshape_ops::versions::PUBLISHED_FS_KEY`,
+  `noshape_ops::prefs::ToolbarPrefs`, `noshape_scene::asm_scene`, `derived::document_versions`. Hooks: variable
+  (another document's window, Create version), preferences (the Part Studio's toolbar tools and sketch rows for
+  Shortcut toolbars, refreshing the documents page, `apply_kit_theme`), release (documents' and versions' windows,
+  Create version, the workspace's Export), Feature Studio (Create version, opening std's source at a version: the
+  workspace's `goto_studio`), history (the Part Studio's feature icons, the Workspace protection dialog), start (a
+  document's window, the build label). The app dropped resvg, tiny-skia, regex, dirs, chrono, serde and rusqlite.
+  The menu coverage test and scripts also read `crates/variable-studio-ui/src` and `crates/history-ui/src`
+  (`variable_*`, `history_panel.rs` → area document); the source guards already scan `crates/*-ui`. Measured warm,
+  incremental, machine load 20–27 (other agents), edit (a one-line probe, added then removed) → `cargo build -p
+  noshape`, on the 6.4k-line binary:
+
+  | edit in | rebuild | time |
+  |---|---|---|
+  | the workspace (workspace.rs) | the app | 7–14 s (was 37–45 s with the 71k-line app, at load ~40) |
+  | history UI (history_panel.rs) | the app | 9–16 s (history-ui, then the app) |
+  | Variable Studio (variable_studio.rs) | the app | 10–13.5 s |
+  | documents page (start_window.rs) | the app | 11–13 s |
+  | history UI (history_panel.rs) | `cargo check -p noshape-history-ui` | 7 s, without the app |
+
+  Before the rebase on the Part Studio split (46k-line binary, load 13–17): workspace 13–14 s, history UI 15–19 s,
+  Variable Studio 14 s. Most of what is left is linking the binary and re-checking the crates above the edited one.
+
+- Next: step 2 (`noshape-actions` + `noshape-workspace`
+  with the studio registry; the hooks become actions and each crate gets its `init(cx)`, docs/APP-ARCHITECTURE.md).
+  What stays in the binary meanwhile: workspace, tab_manager, tab_thumbs, doc_panels, doc_dialogs, files,
+  shortcuts(_page), import_dialog, material_library_view, workspace_protection, live_server, agent_window, smoke.
