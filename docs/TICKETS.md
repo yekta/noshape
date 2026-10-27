@@ -64,7 +64,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (shell; cli/clifuzz-72sb.log) with no kernel segfault line and no OOM kill this time (an abort or a panic; stderr not
   captured); replay C hung > 25 min at step 105 (delete); seed 93's replay died at step 114 (draft), its original crash
   step, again without a kernel line. So serial booleans turned the segfaults into silent deaths or hangs, not fixed.
-  Replays with stderr saved are running (qa 09:20).
+  Seed 93 on the watcher CLI 08:30 then ran all 120 steps (stderr saved, nothing): still nondeterministic. Fuzz batch 9
+  runs with stderr saved to catch the next one (qa 09:21).
   core 10-27: b0e757f3 stops one data race (in-place pcurves written into the caller's profile edges by the cylinder
   re-framing); the seed-72 replay with it: 2 of 3 runs complete all 106 steps, the 3rd still died at step 81 in
   `BOPAlgo_PaveFiller::ForceInterfEF` on a pool thread (BOPAlgo_PaveFiller_5.cxx, also changed by OCCT patch 0001, after
