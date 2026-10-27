@@ -881,8 +881,14 @@ rust::Vec<double> line_crossings(const OcShape& s, P3 p, P3 dir, double len)
   const gp_Vec d(dir.x, dir.y, dir.z);
   if (d.Magnitude() < 1e-12 || !(len > 0))
     fail_invalid("line needs a direction and a length");
-  IntCurvesFace_ShapeIntersector it;
-  it.Load(s.shape, Precision::Confusion());
+  std::lock_guard<std::mutex> g(s.myLineLock);
+  if (!s.myLineHits)
+  {
+    auto loaded = std::make_shared<IntCurvesFace_ShapeIntersector>();
+    loaded->Load(s.shape, Precision::Confusion());
+    s.myLineHits = loaded;
+  }
+  IntCurvesFace_ShapeIntersector& it = *s.myLineHits;
   it.Perform(gp_Lin(to_pnt(p), gp_Dir(d)), 0.0, len);
   if (!it.IsDone())
     fail_op("line intersection failed");

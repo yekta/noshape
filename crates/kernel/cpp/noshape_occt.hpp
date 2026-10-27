@@ -18,6 +18,8 @@
 #include <NCollection_List.hxx>
 #include <TopoDS_Shape.hxx>
 
+class IntCurvesFace_ShapeIntersector; // geom.cpp line_crossings
+
 #include <chrono>
 #include <typeinfo>
 #include <array>
@@ -291,6 +293,12 @@ public:
     std::call_once(mySurfaceFlag, [&] { mySurface = compute(); });
     return mySurface;
   }
+
+  // The loaded line intersector of line_crossings (geom.cpp): building it
+  // costs more than a crossing, and std's probes cast hundreds of lines at
+  // one body. Its Perform keeps results inside: used under the lock.
+  mutable std::mutex                                       myLineLock;
+  mutable std::shared_ptr<IntCurvesFace_ShapeIntersector> myLineHits;
 
   // Ancestor maps (CSR offsets, values) by kind * 16 + ancestor kind,
   // computed once: regeneration asks for the same ones of a body many times.
