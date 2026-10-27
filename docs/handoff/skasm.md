@@ -69,7 +69,11 @@ Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs do
 6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
    isn't back within 300 ticks); fine on CI runners presumably.
 7. Standard content PEM®: our catalogue has no PEM component (live lists 40 under 6 standards); asked live for the
-   component FeatureScript / features crawl (REQUESTS 10-27). Implement from that data once it lands.
+   component FeatureScript / features crawl (REQUESTS 10-27). Implement from that data once it lands. 11 non-PEM
+   components are missing too (/root/skasm-scratch/sc/compare.py lists them: DIN 7050/7051/967 tapping, DIN 923, 6908,
+   ISO 7379, 10512, NASM 45938 + /4, NAS 1129 ×2); their tables exist for some (dom/skb-sc-fsrules, skb-sc-comp) but
+   skb's generator (/root/skb-scratch/gen) maps other column names; asked live for each default size's volume / faces
+   to check the geometry against.
 8. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
    noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture` (clean 10-27, also
    after the exact-flip rule: 200 seeds, 418 s).
