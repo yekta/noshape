@@ -250,7 +250,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Likely cause (docs/handoff/kernel-robustness.md, gate (a)): `schedule_regen` aborts each running run "it doesn't
   extend"; a rollback above the running feature is a prefix of the running run, so it is treated as extended and waits
   for the whole run instead of taking the cached prefix at once.
-- [ ] P2 LOFT-SKETCH-HIDE a Loft hides only its first profile's sketch: Sketch 1 = 40×40 square on Top, Plane 1 = Top
+- [x] a9f68288 P2 LOFT-SKETCH-HIDE fixed (psui 10-27): every sketch a feature uses is hidden (a loft both profiles), also one picked in a later edit (model-core `used_sketches`, ops::studio). Was: a Loft hides only its first profile's sketch: Sketch 1 = 40×40 square on Top, Plane 1 = Top
   offset 40, Sketch 2 = Ø24 circle on it (/root/qa-scratch/loft2.noshape); Loft, pick the circle then the square, ✓: Sketch 2
   goes grey with the eye-slash, Sketch 1 stays shown (its menu says Hide) and its outline stays drawn; pick the square first
   and it's the other way round (only Sketch 1 hidden, the circle stays drawn). Live hides every sketch a feature uses
