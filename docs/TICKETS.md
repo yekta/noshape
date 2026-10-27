@@ -191,6 +191,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   valid_solid (BRepCheck_Analyzer), ShapeFix_Solid::SolidFromShell, IntTools_BeanFaceIntersector. Repro: copy
   tickets/cli-shell-hang-pre.noshape, `python3 bin/shrepro.py <cli> <copy>` (deletes Shell 5, re-adds it from
   tickets/cli-shell-hang-args.json). A failing shell should fail fast (budget like the blends').
+  Release v0.4.9 Linux artifact (7ee597e0, a release build): tickets/cli-delete-crash.noshape opens in 148 s, of which
+  Shell 3 119.9 s and Shell 2 21.6 s (NOSHAPE_PERF); the seed-66 shell still 58.7 s on the watcher CLI 06:09. Shells have
+  no budget yet (qa 08:00).
 - [ ] P0 REGEN-SPEED (core 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
