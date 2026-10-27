@@ -144,6 +144,7 @@ pub fn ops() -> Vec<Op> {
                 opt("fixed", json!({ "type": "boolean" }), "Fix or unfix."),
                 opt("hidden", json!({ "type": "boolean" }), "Hide or show."),
                 opt("suppressed", json!({ "type": "boolean" }), "Suppress or unsuppress."),
+                opt("state", json!({ "type": "string", "enum": ["fixed", "unfixed", "hidden", "shown", "suppressed", "unsuppressed"] }), "One of the above by name (instead of its boolean)."),
             ],
             mutates: true,
             destructive: false,
@@ -838,27 +839,37 @@ fn set_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let asm = assembly(od, tab)?;
     let ids = a.array("instances")?.iter().enumerate().map(|(i, v)| find_instance(asm, v.as_str().unwrap_or_default(), &format!("instances[{i}]"))).collect::<Result<Vec<_>, _>>()?;
     let values = super::configuration::asm::values(od, tab, asm);
+    // `state` names one of them ("fixed", "unfixed", "hidden", "shown",
+    // "suppressed", "unsuppressed"): what agents try first.
+    let state = match a.opt_str("state")? {
+        None => None,
+        Some(st) => Some(STATES.iter().find(|x| x.0 == st).map(|x| (x.1, x.2)).ok_or_else(|| OpError::param("state", &format!("one of {}", STATES.iter().map(|x| x.0).collect::<Vec<_>>().join(", "))))?),
+    };
+    let flag = |k: &str| a.get(k).and_then(Value::as_bool).or(state.filter(|s| s.0 == k).map(|s| s.1));
     let mut changed = false;
-    if let Some(f) = a.get("fixed").and_then(Value::as_bool) {
+    if let Some(f) = flag("fixed") {
         let r = solve(od, tab, &SolveOptions::default())?;
         commit(od, tab, sa::fix_description(f), &r, |a| sa::set_fixed(a, &ids, f))?;
         changed = true;
     }
-    if let Some(h) = a.get("hidden").and_then(Value::as_bool) {
+    if let Some(h) = flag("hidden") {
         let r = solve(od, tab, &SolveOptions::default())?;
         commit(od, tab, sa::hide_description(h), &r, |a| sa::set_hidden(a, &ids, h))?;
         changed = true;
     }
-    if let Some(s) = a.get("suppressed").and_then(Value::as_bool) {
+    if let Some(s) = flag("suppressed") {
         let r = solve(od, tab, &SolveOptions::default())?;
         commit(od, tab, sa::suppress_description(s), &r, |a| sa::set_suppressed(a, &ids, s, &values))?;
         changed = true;
     }
     if !changed {
-        return Err(OpError::invalid("give fixed, hidden or suppressed"));
+        return Err(OpError::invalid("give fixed, hidden, suppressed or state"));
     }
     Ok(describe(od, tab)?.into())
 }
+
+/// assembly_set_state's `state` values: (name, field, value).
+const STATES: [(&str, &str, bool); 6] = [("fixed", "fixed", true), ("unfixed", "fixed", false), ("hidden", "hidden", true), ("shown", "hidden", false), ("suppressed", "suppressed", true), ("unsuppressed", "suppressed", false)];
 
 fn delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;

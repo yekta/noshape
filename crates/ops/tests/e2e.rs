@@ -771,7 +771,9 @@ fn width_mate_centres_the_tab() {
     let (base, tab) = (by_x(-30.0), by_x(100.0));
     let b = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": base }))["instance"].as_str().unwrap().to_string();
     let t = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": tab }))["instance"].as_str().unwrap().to_string();
-    call(&mut ctx, "assembly_set_state", json!({ "instance": b, "fixed": true }));
+    // As agents write it: one `instance`, the `state` by name.
+    let st = call(&mut ctx, "assembly_set_state", json!({ "instance": b, "state": "fixed" }));
+    assert!(st["instances"].as_array().unwrap().iter().any(|i| i["id"] == b.as_str() && i["fixed"] == true), "{st}");
     let face = |ctx: &mut Ctx, inst: &str, nx: f64| call(ctx, "assembly_entities", json!({ "instance": inst, "kind": "faces", "normal": [nx, 0, 0] }))["faces"][0]["id"].clone();
     let (t_pos, t_neg, b_pos, b_neg) = (face(&mut ctx, &t, 1.0), face(&mut ctx, &t, -1.0), face(&mut ctx, &b, 1.0), face(&mut ctx, &b, -1.0));
     let m = call(&mut ctx, "assembly_mate", json!({ "type": "width", "a": { "instance": t, "entity": t_pos }, "b": { "instance": b, "entity": b_pos }, "c": { "instance": b, "entity": b_neg }, "d": { "instance": t, "entity": t_neg } }));

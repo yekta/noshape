@@ -2370,6 +2370,7 @@ Examples:
 | `fixed` | boolean |  | Fix or unfix. |
 | `hidden` | boolean |  | Hide or show. |
 | `suppressed` | boolean |  | Suppress or unsuppress. |
+| `state` | one of `fixed`, `unfixed`, `hidden`, `shown`, `suppressed`, `unsuppressed` |  | One of the above by name (instead of its boolean). |
 
 #### assembly_delete
 
