@@ -311,7 +311,7 @@ the app.
 The operations by group. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
-- **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
+- **document**: [`document_create`](#document_create), [`document_update_workspace`](#document_update_workspace), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
 - **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
 - **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
@@ -405,6 +405,24 @@ Examples:
 | `path` | string | required | Where to create it, e.g. "/tmp/bracket.noshape". Must not exist. |
 | `length_unit` | one of `mm`, `cm`, `m`, `in`, `ft`, `yd`, `um` |  | Workspace length unit (default mm): bare numbers in length fields use it. |
 | `angle_unit` | one of `deg`, `rad` |  | Workspace angle unit (default deg). |
+
+#### document_update_workspace
+
+References to other documents' versions with a newer version (☰ › Update workspace…), and updating them (edits the document (one undoable history entry)).
+
+Lists the Derived features and inserted Variable Studios that use an older version of another document than its newest one (`outdated`: what, its version, the newest). With `apply`, points them all at their newest version in one edit ("Update workspace"), as the dialog's Update.
+
+Examples:
+
+```json
+{}
+{"apply": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `apply` | boolean |  | Update them all. |
 
 #### document_open
 
@@ -2042,7 +2060,7 @@ Examples:
 | `field` | one of `value`, `description` |  | Variable Studio: the Value (default) or Description cell. |
 | `param` | string |  | Parameter id, or "suppressed" (Part Studio, Assembly; required there). |
 | `input` | string |  | List or Checkbox input id or name (required, except to unconfigure). |
-| `unconfigure` | boolean |  | Variable Studio: the configured cell's Unconfigure from <input>. |
+| `unconfigure` | boolean |  | Unconfigure: a Part Studio feature's `param` (the dialog's configure mode, clicking the configured field again; the feature keeps its own value) or a Variable Studio cell (Unconfigure from <input>). |
 
 #### config_set_value
 
@@ -2639,9 +2657,9 @@ Examples:
 
 #### assembly_set_feature_state
 
-Suppress or unsuppress mates, relations, groups and patterns; show or hide mate connectors (edits the document (one undoable history entry)).
+Suppress or unsuppress mates, relations, groups, patterns and mate connectors; show or hide mate connectors (edits the document (one undoable history entry)).
 
-The list's Suppress / Unsuppress ("Suppress mate", "Suppress pattern"; a configured mate changes in the default configuration) and the mate connectors' eye ("Hide mate connector"). Features already in the asked state are left alone.
+The list's Suppress / Unsuppress ("Suppress mate", "Suppress pattern", "Suppress mate connector"; a configured mate changes in the default configuration) and the mate connectors' eye ("Hide mate connector"). Features already in the asked state are left alone.
 
 Examples:
 

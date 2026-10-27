@@ -278,6 +278,12 @@ fn configurations() {
     assert!((volume(&mut ctx) - 40.0 * 20.0 * 10.0).abs() < 1e-3);
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert_eq!(hist["history"][0]["description"], "Part Studio 1 :: Edit configured value");
+    // Unconfigure the depth: the column goes, the feature keeps its value.
+    call(&mut ctx, "config_configure", json!({ "feature": ext, "param": "depth", "unconfigure": true }));
+    let list = call(&mut ctx, "config_list", json!({}));
+    assert!(!list["configured"].as_array().unwrap().iter().any(|c| c["param"] == "depth"), "{list}");
+    let e = try_call(&mut ctx, "config_configure", json!({ "feature": ext, "param": "depth", "unconfigure": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("param"), "{e:?}");
 }
 
 // ------------------------------------------------------------ sketch edit tools
@@ -679,6 +685,32 @@ fn hole_standard_sets_the_table_sizes() {
     let e = try_call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "style": "C_BORE" } })).unwrap_err();
     assert!(e.param.as_deref() == Some("params.style") && e.message.contains("styleV2"), "{e:?}");
     call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": g["params"].clone() }));
+}
+
+/// ☰ › Update workspace: a Variable Studio inserted from another document's
+/// V1 is listed once that document has a V2, and moved to it.
+#[test]
+fn update_workspace_moves_references_to_newer_versions() {
+    let mut ctx = Ctx::new();
+    let lib = scratch("update-ws-lib.noshape");
+    call(&mut ctx, "document_create", json!({ "path": lib.to_str().unwrap() }));
+    call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "Sizes" }));
+    call(&mut ctx, "variable_create", json!({ "tab": "Sizes", "name": "w", "value": "10 mm" }));
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let user = scratch("update-ws-user.noshape");
+    call(&mut ctx, "document_create", json!({ "path": user.to_str().unwrap() }));
+    call(&mut ctx, "variable_insert_studio", json!({ "studio": "Sizes", "document": lib.to_str().unwrap(), "version": "V1" }));
+    let none = call(&mut ctx, "document_update_workspace", json!({}));
+    assert_eq!(none["outdated"], json!([]), "{none}");
+    // The library moves on.
+    call(&mut ctx, "variable_set", json!({ "doc": lib.to_str().unwrap(), "tab": "Sizes", "variable": "w", "value": "20 mm" }));
+    call(&mut ctx, "history_create_version", json!({ "doc": lib.to_str().unwrap(), "name": "V2" }));
+    let l = call(&mut ctx, "document_update_workspace", json!({ "doc": user.to_str().unwrap() }));
+    assert_eq!((l["outdated"][0]["from"].as_str(), l["outdated"][0]["to"].as_str()), (Some("V1"), Some("V2")), "{l}");
+    call(&mut ctx, "document_update_workspace", json!({ "doc": user.to_str().unwrap(), "apply": true }));
+    let v = call(&mut ctx, "variable_list", json!({ "doc": user.to_str().unwrap() }));
+    assert_eq!(v["studio_tables"][0]["version"], "V2", "{v}");
+    assert!(v["visible_at_end"]["#w"].as_str().is_some_and(|w| w.starts_with("20")), "{v}");
 }
 
 /// The sheet metal table through the API: rows as the panel lists them, a

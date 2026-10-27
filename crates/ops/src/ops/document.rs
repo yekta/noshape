@@ -28,6 +28,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "document",
+            verb: "update_workspace",
+            summary: "References to other documents' versions with a newer version (☰ › Update workspace…), and updating them",
+            description: "Lists the Derived features and inserted Variable Studios that use an older version of another document than its newest one (`outdated`: what, its version, the newest). With `apply`, points them all at their newest version in one edit (\"Update workspace\"), as the dialog's Update.",
+            fields: vec![doc_field(), opt("apply", json!({ "type": "boolean", "default": false }), "Update them all.")],
+            mutates: true,
+            destructive: false,
+            run: update_workspace,
+        },
+        Op {
+            group: "document",
             verb: "open",
             summary: "Open a document file and make it current",
             description: "Opens an existing .noshape file. Later calls without `doc` use it. A feature whose regeneration stopped the last process that evaluated it (a kernel crash) is rolled back on open (the rollback bar above it, one history entry) and named in `recovered`, so the document opens; edit or delete it, then move the rollback bar back.",
@@ -394,4 +404,20 @@ fn tab_delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         d.remove_tab(tab);
     })?;
     Ok(json!({ "deleted": name, "users_now_broken": users }).into())
+}
+
+fn update_workspace(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::workspace_update as wu;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let list = wu::outdated(od.doc());
+    let rows: Vec<Value> = list.iter().map(|o| json!({ "reference": o.label, "from": o.from, "to": o.to.label })).collect();
+    if a.bool_or("apply", false)? && !list.is_empty() {
+        od.session.edit_document(wu::DESCRIPTION, |d| list.iter().for_each(|o| wu::apply(o, d)))?;
+        return Ok(json!({ "updated": rows }).into());
+    }
+    let mut v = json!({ "outdated": rows });
+    if list.is_empty() {
+        v["note"] = json!("All references to other documents are up to date.");
+    }
+    Ok(v.into())
 }

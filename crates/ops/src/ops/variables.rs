@@ -525,7 +525,13 @@ fn list_value(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
             v
         })
         .collect();
-    let all: serde_json::Map<String, Value> = r.context.variables.iter().map(|(k, q)| (format!("#{k}"), json!(shown(q)))).collect();
+    // The Variable Studio tables' variables (outer), then the configuration's
+    // and the Variable features' (later ones win).
+    let ps = doc::studio(od.doc(), tab)?;
+    let mut scope = noshape_model::variables::element_variables(od.doc(), tab);
+    scope.extend(ps.configuration.variable_values(&od.current_config(tab)?, &units));
+    scope.extend(r.context.variables.iter().map(|(k, q)| (k.clone(), *q)));
+    let all: serde_json::Map<String, Value> = scope.iter().map(|(k, q)| (format!("#{k}"), json!(shown(q)))).collect();
     let mut v = json!({ "variables": rows, "visible_at_end": all });
     // The Variable Studio tables shown under them (variable_insert_studio).
     let tables = tables_json(od.doc(), tab)["tables"].clone();

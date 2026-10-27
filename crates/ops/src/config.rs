@@ -148,6 +148,17 @@ pub fn delete_option(ps: &mut PartStudio, input: &str, option: &str) {
     }
 }
 
+pub const UNCONFIGURE_PARAMETER: &str = "Unconfigure parameter";
+
+/// A configured parameter's Unconfigure (the feature dialog's configure
+/// mode, clicking a configured field again): its column goes; the feature
+/// keeps its own value. False when it wasn't configured.
+pub fn unconfigure_parameter(ps: &mut PartStudio, feature: FeatureId, param: &str) -> bool {
+    let n = ps.configuration.configured.len();
+    ps.configuration.configured.retain(|c| !(c.feature == feature && c.param == param));
+    ps.configuration.configured.len() < n
+}
+
 pub const CONFIGURE_PARAMETER: &str = "Configure parameter";
 
 /// Configure a feature parameter (or its suppression, [`SUPPRESSED_PARAM`])

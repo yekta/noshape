@@ -45,6 +45,7 @@ pub mod variable_studio;
 pub mod versions;
 pub mod vs_config;
 pub mod window;
+pub mod workspace_update;
 
 pub use doc::{Ctx, OpenDoc};
 pub use window::UiRequest;

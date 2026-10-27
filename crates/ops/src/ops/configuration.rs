@@ -120,7 +120,7 @@ pub fn ops() -> Vec<Op> {
                 opt("field", json!({ "type": "string", "enum": ["value", "description"] }), "Variable Studio: the Value (default) or Description cell."),
                 opt("param", s(), "Parameter id, or \"suppressed\" (Part Studio, Assembly; required there)."),
                 opt("input", s(), "List or Checkbox input id or name (required, except to unconfigure)."),
-                opt("unconfigure", json!({ "type": "boolean" }), "Variable Studio: the configured cell's Unconfigure from <input>."),
+                opt("unconfigure", json!({ "type": "boolean" }), "Unconfigure: a Part Studio feature's `param` (the dialog's configure mode, clicking the configured field again; the feature keeps its own value) or a Variable Studio cell (Unconfigure from <input>)."),
             ],
             mutates: true,
             destructive: false,
@@ -566,17 +566,25 @@ fn configure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if vs::is_vs(ctx, a)? {
         return vs::configure(ctx, a);
     }
-    if let Some(k) = ["variable", "field", "unconfigure"].into_iter().find(|k| a.get(k).is_some()) {
+    if let Some(k) = ["variable", "field"].into_iter().find(|k| a.get(k).is_some()) {
         return Err(OpError::param(k, "Variable Studios only (`tab` names one)"));
     }
     if asm::is_assembly(ctx, a)? {
+        if a.get("unconfigure").is_some() {
+            return Err(OpError::param("unconfigure", "Part Studios and Variable Studios: an assembly's column goes with config_delete_input or its input's table"));
+        }
         return asm::configure(ctx, a);
     }
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;
     let feature = feature_arg(ps, a, "feature")?;
-    let input = find_input(ps, a.str("input")?, "input")?;
     let param = param_id(a.str("param")?).to_string();
+    if a.bool_or("unconfigure", false)? {
+        return edit(od, tab, config::UNCONFIGURE_PARAMETER, |ps| {
+            if config::unconfigure_parameter(ps, feature, &param) { Ok(json!({ "unconfigured": param })) } else { Err(OpError::param("param", "not configured")) }
+        });
+    }
+    let input = find_input(ps, a.str("input")?, "input")?;
     if ps.configuration.configured.iter().any(|c| c.feature == feature && c.param == param) {
         return Err(OpError::param("param", "already configured"));
     }

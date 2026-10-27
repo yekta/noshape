@@ -100,8 +100,8 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "assembly",
             verb: "set_feature_state",
-            summary: "Suppress or unsuppress mates, relations, groups and patterns; show or hide mate connectors",
-            description: "The list's Suppress / Unsuppress (\"Suppress mate\", \"Suppress pattern\"; a configured mate changes in the default configuration) and the mate connectors' eye (\"Hide mate connector\"). Features already in the asked state are left alone.",
+            summary: "Suppress or unsuppress mates, relations, groups, patterns and mate connectors; show or hide mate connectors",
+            description: "The list's Suppress / Unsuppress (\"Suppress mate\", \"Suppress pattern\", \"Suppress mate connector\"; a configured mate changes in the default configuration) and the mate connectors' eye (\"Hide mate connector\"). Features already in the asked state are left alone.",
             fields: vec![doc_field(), asm_field(), req("features", strings(), "Feature ids or names."), opt("suppressed", json!({ "type": "boolean" }), "Suppress or unsuppress."), opt("hidden", json!({ "type": "boolean" }), "Mate connectors: hide or show.")],
             mutates: true,
             destructive: false,
@@ -297,15 +297,22 @@ fn set_feature_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         if let Some(want) = sup {
             let now = conf.mate(id).map(|m| m.suppressed).or_else(|| asm.relations.iter().find(|r| r.id == id).map(|r| r.suppressed)).or_else(|| asm.groups.iter().find(|g| g.id == id).map(|g| g.suppressed));
             let pattern = asm.pattern(id).map(|p| p.suppressed);
+            let connector = asm.connectors.iter().find(|c| c.id == id).map(|c| c.suppressed);
             let result = solve(od, tab, &SolveOptions::default())?;
-            match (now, pattern) {
-                (Some(now), _) if now != want => commit(od, tab, "Suppress mate", &result, |a| sa::toggle_mate_suppressed(a, id, &values))?,
-                (None, Some(now)) if now != want => commit(od, tab, "Suppress pattern", &result, |a| {
+            match (now, pattern, connector) {
+                (Some(now), _, _) if now != want => commit(od, tab, "Suppress mate", &result, |a| sa::toggle_mate_suppressed(a, id, &values))?,
+                (None, Some(now), _) if now != want => commit(od, tab, "Suppress pattern", &result, |a| {
                     if let Some(p) = a.patterns.iter_mut().find(|p| p.id == id) {
                         p.suppressed = !p.suppressed;
                     }
                 })?,
-                (None, None) => return Err(OpError::param("features", "only mates, relations, groups and patterns can be suppressed")),
+                // A mate connector's menu › Suppress / Unsuppress.
+                (None, None, Some(now)) if now != want => commit(od, tab, "Suppress mate connector", &result, |a| {
+                    if let Some(c) = a.connectors.iter_mut().find(|c| c.id == id) {
+                        c.suppressed = want;
+                    }
+                })?,
+                (None, None, None) => return Err(OpError::param("features", "only mates, relations, groups, patterns and mate connectors can be suppressed")),
                 _ => {}
             }
         }

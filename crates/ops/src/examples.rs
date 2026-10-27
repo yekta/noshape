@@ -114,6 +114,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("sheetmetal_move_bend", &[r##"{"bend": "Bend B", "by": -1}"##]),
     ("sheetmetal_convert_to_rip", &[r##"{"bend": "Bend A"}"##]),
     ("sheetmetal_export_flat", &[r##"{"part": "Part 1", "file": "/tmp/flat.dxf"}"##]),
+    ("document_update_workspace", &[r##"{}"##, r##"{"apply": true}"##]),
     ("variable_list", &[r##"{}"##]),
     ("variable_create", &[r##"{"name": "wall", "value": "2.5 mm"}"##, r##"{"name": "holes", "kind": "NUMBER", "value": 4}"##]),
     ("variable_set", &[r##"{"variable": "wall", "value": "3 mm"}"##, r##"{"name": "wall", "value": "3 mm"}"##, r##"{"variable": "wall", "new_name": "thickness"}"##]),
