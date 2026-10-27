@@ -20,7 +20,9 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
   26c7a498: a new mate between free parts of one Part Studio moves the later part's instance (live: the plate, Part 2,
   onto the smaller block, Part 1); other studios keep the size rule. Test of live's mate edits (Flip primary axis
   brings the pin back upright, Offset Z 5 mm): mate_flip::editing_a_mate_between_free_parts_moves_the_pin_back_upright.
-  00956cb2 DIN 6908 (the previous session's).
+  00956cb2 DIN 6908 (the previous session's). 2d9a275c speed-target tests; fbfe810c ISO 10511 / 7040 = live;
+  0b0f1abd sketch regions with long splines 36× faster (qa's fuzz sketch 1.46 s → 40 ms; fixture
+  tests/fixtures/solve/fz211-final.json). qa's skfuzz 211 on the dev CLI: slowest step 0.74 s (qa: 290 s).
 - 10-27 afternoon (after the app split): 3d99e40d sketch value boxes as live's rule capture (corner rectangle, 3 point
   circle, center point arc, 3 point arc); 12740dfc REPLICATE-EDGE-DEFAULT; 71bc6f56 ISO 10512 nut (= live's B-rep);
   DIN 6908 washer (= live).

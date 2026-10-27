@@ -757,6 +757,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   gradients from the fit's factored, banded system (O(n) a value instead of O(n²) fits a Jacobian row). Same sketch in
   the sketch crate (dev build, load 35–50): the Coincident 68 s → 0.3–0.7 s, the −10 dimension after it 0.2–0.4 s, both
   still "over defined" as before. T1 test sketch solve_time::sk211_constraints_on_a_94_point_fit_spline_solve_quickly
+  skasm 10-27 15:05: also 0b0f1abd (regions with long splines 36× faster) and allocation-free spline evaluation: qa's
+  bin/skfuzz.py 211 200 on the dev CLI: slowest step 0.74 s (was up to 290 s), mean 0.34 s a step at 300–440 entities
+  (each step includes a full sketch_get); sk211time.py: Coincident 0.8 s, the dimension 0.5 s
 - [x] verified 4e568f3f (qa 13:12: asm5 Assembly 1 › Replicate, Instances Part 2 <1> (Revolute 1 fills itself): "Match edges on face", tooltip "Edge match scope", last field "Faces to find match in") 12740dfc P2 REPLICATE-EDGE-DEFAULT Replicate on a mate whose connectors sit on circular edges: ours lists the right options
   (Match edges on plane / on face / individual edges) but starts on **Match edges on plane** and keeps the last field as
   "Parts to find match in"; live starts on **Match edges on face** (the select's tooltip "Edge match scope") and renames
