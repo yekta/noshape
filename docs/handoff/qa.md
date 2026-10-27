@@ -167,6 +167,13 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
+## 10:00–10:10 (green 3197362b, watcher CLI 09:50; other agents paused for the app split)
+- Running: A/B budget fuzz (seeds 130–137, NOSHAPE_BLEND_BUDGET default vs 100000; logs cli/clifuzz-13*on/off.log,
+  results cli/ab-on.out / ab-off.out, stderr err-on/off-*.txt); cold-open consistency fuzzer bin/clifuzz_cold.py (every 10
+  steps a fresh CLI opens a backup and must match volumes / statuses; seeds 140–141, so far all OK); batch 9 (120–127).
+- Sheet metal vs live "fs (10-23 05:00)": volumes, boxes, flat patterns (80.126106 / 76.126106 × 20) exact; SM-FACES (P3:
+  10 faces vs 14). UI: construction toggle (q), Measure details panel, assembly fuzz on 3197362b (600 actions) clean.
+
 ## 09:40–10:00 (greens dacce5e7 → 3197362b, watcher CLI 09:50)
 - Verified: UNDO-NOOP-SHIFT (minimal repro + bin/undochk_noop.py seed 5 full path; note history_list returns 50 entries,
   the checkers now track the head id), API-MATE-RETYPE-NAME.
