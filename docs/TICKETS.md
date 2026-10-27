@@ -276,6 +276,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P1 MEASURE-MAX-DIST Max dist between curved faces comes from sampled points, not the exact maximum: two tubes
+  (Ø40 / Ø20 × 30, axes 50 mm apart; /root/qa-scratch/rev.noshape, Part 1 / Part 2 outer cylinders) → ours "Max dist
+  94.850 mm" (app status bar) / 94.849984 (query_measure, from (−19.975, −0.997, 30), a mesh vertex, to (70, 0, 0)); exact
+  √(90² + 30²) = 94.868 (from (−20, 0, 30)). Parallel axes 50.000 and Min 10.000 are exact. Live measures on the exact
+  geometry (Parasolid); a 0.018 mm error shows at 3 decimals (qa 2026-10-27, green 4854cad4)
 - [ ] P2 EMPTY-COMMIT a feature with an empty required selection can be committed: new Extrude, nothing picked, Enter,
   Enter → ours commits a red "Extrude 1" (green 525c619b). Live keeps the dialog open: the ✓ is disabled (`button-ok
   disabled`), and Enter, ✓ or Ctrl+Enter do nothing until a region is picked (behaviours "qa (2026-10-27, P2 batch 2)"
