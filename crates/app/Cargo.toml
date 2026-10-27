@@ -21,6 +21,7 @@ noshape-variable-studio-ui.workspace = true
 noshape-preferences-ui.workspace = true
 noshape-release-ui.workspace = true
 noshape-feature-studio-ui.workspace = true
+noshape-history-ui.workspace = true
 noshape-render.workspace = true
 noshape-model.workspace = true
 noshape-store.workspace = true

@@ -176,12 +176,12 @@ impl ItemProperties {
                         if let Some(t) = at.tab(tab)
                             && let TabContent::Drawing(d) = &t.content
                         {
-                            if let Some(img) = crate::tab_manager::drawing_thumbnail(&at, &versions, d, t.name.clone()) {
+                            if let Some(img) = crate::tab_thumbnail::drawing_thumbnail(&at, &versions, d, t.name.clone()) {
                                 out.push((tab, img));
                             }
                             continue;
                         }
-                        if let Some(img) = crate::tab_manager::tab_thumbnail(&at, tab, assembly, &evaluator, &gpu).await {
+                        if let Some(img) = crate::tab_thumbnail::tab_thumbnail(&at, tab, assembly, &evaluator, &gpu).await {
                             out.push((tab, img));
                         }
                     }

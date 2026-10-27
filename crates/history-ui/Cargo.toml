@@ -1,0 +1,25 @@
+[package]
+name = "noshape-history-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's Versions and history UI: the history panel, Create version, version properties, compare (graphics and Feature Studio code) and merge. Built on noshape-app-core, noshape-release-ui (release rows and dialogs) and noshape-feature-studio-ui (code highlighting in the compare); the noshape binary registers what it needs of the app (history_hooks)."
+
+[dependencies]
+noshape-app-core.workspace = true
+noshape-release-ui.workspace = true
+noshape-feature-studio-ui.workspace = true
+noshape-render.workspace = true
+noshape-model.workspace = true
+noshape-store.workspace = true
+noshape-units.workspace = true
+noshape-ops.workspace = true
+noshape-scene.workspace = true
+gpui-kit.workspace = true
+anyhow.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+# Local times in the versions panel ("1:15 PM Today").
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+serde_json.workspace = true
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

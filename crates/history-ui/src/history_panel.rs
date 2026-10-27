@@ -1214,7 +1214,7 @@ impl Render for HistoryPanel {
                             m
                         };
                         let dp = d5.clone();
-                        let m = m.item(crate::os_menu::OsMenuItem::new("Workspace protection…").on_click(move |_, window, cx| crate::workspace_protection::open_dialog(dp.clone(), b, window, cx)));
+                        let m = m.item(crate::os_menu::OsMenuItem::new("Workspace protection…").on_click(move |_, window, cx| crate::history_hooks::workspace_protection(dp.clone(), b, window, cx)));
                         let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Workspace(b), window, cx)));
                         // Live (qa5 DOC4): Delete on every workspace row; Main can't be
                         // deleted (help), so it is greyed there.

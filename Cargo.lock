@@ -4317,6 +4317,7 @@ dependencies = [
  "noshape-assembly-ui",
  "noshape-drawing-ui",
  "noshape-feature-studio-ui",
+ "noshape-history-ui",
  "noshape-kernel",
  "noshape-model",
  "noshape-ops",
@@ -4528,6 +4529,28 @@ dependencies = [
  "noshape-workspace-hack",
  "parking_lot",
  "regex",
+ "serde_json",
+]
+
+[[package]]
+name = "noshape-history-ui"
+version = "0.4.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "gpui-kit",
+ "log",
+ "noshape-app-core",
+ "noshape-feature-studio-ui",
+ "noshape-model",
+ "noshape-ops",
+ "noshape-release-ui",
+ "noshape-render",
+ "noshape-scene",
+ "noshape-store",
+ "noshape-units",
+ "noshape-workspace-hack",
+ "parking_lot",
  "serde_json",
 ]
 

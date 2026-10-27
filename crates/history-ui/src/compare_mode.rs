@@ -539,7 +539,7 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
                     None => c.flex_1(),
                 };
                 c.when(show, |c| {
-                    c.child(svg().path(crate::part_studio::feature_icon(&r.type_id)).size(px(16.)).flex_none().text_color(pal.text))
+                    c.child(svg().path(crate::history_hooks::feature_icon(&r.type_id)).size(px(16.)).flex_none().text_color(pal.text))
                         .child(div().min_w_0().truncate().text_color(if shown { rgb(0x000000) } else { rgb(0xaaaaaa) }).child(crate::ui::user_text(r.name.clone())))
                 })
             };

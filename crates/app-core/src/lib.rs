@@ -34,6 +34,7 @@ pub mod paths;
 pub mod properties_dialog;
 pub mod quantity_field;
 pub mod reflection;
+pub mod repair_mode;
 pub mod scene_builder;
 pub mod section_dialog;
 pub mod session;
