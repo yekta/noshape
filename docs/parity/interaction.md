@@ -62,7 +62,7 @@ selection and hover per step, rows in brackets).
 
 | # | Behaviour | Live / source | Status |
 |---|---|---|---|
-| 4.1 | Readout per selection: labels and order (Parallel dist, Angle, Perp …, Center dist, Min/Max dist, Diameter, Radius, Center, Point, Area, Length, Curvature deviation) | L399–403; B `setMeasurements` priorityTypes | 🔧 (P 11.1 ✅ partly) |
+| 4.1 | Readout per selection: labels and order (Parallel dist, Angle, Perp …, Center dist, Min/Max dist, Diameter, Radius, Center, Point, Area, Length, Curvature deviation) | L399–403; B `setMeasurements` priorityTypes; dom/measure-readouts-final.txt | 🔧 (the order per case follows the live capture, model-core regen::measure, U `readout_rules_for_face_pairs`; app 10-27: two parallel faces → Parallel dist · Area · Min dist · Max dist = live case (1); the other cases not yet side by side) |
 | 4.2 | Point–point, edge–face, face–face, min/max distance values equal `query_measure` | L4611, L4618 | 🔧 |
 | 4.3 | Default planes add only angles and distances; a plane alone: "No measurements available for current selection." | L8938–8960; U `default_planes_add_only_angles_and_distances` | ✅ U |
 | 4.4 | A vertex or edge with a plane (AN1): Top + vertical edge reads Perp line and plane angle · Curvature deviation · Min dist · Length (the edge's); vertex / edge midpoint / circle read their Min dist | L8949 (c); U `edge_vertex_midpoint_and_circle_with_the_top_plane` | ✅ U (edge rows exact, Curvature deviation also for a perpendicular line; vertex / circle rows beyond Min dist not captured live) |
