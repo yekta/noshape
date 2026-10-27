@@ -4867,3 +4867,26 @@ fn title_block_maps_the_drawings_own_properties() {
     let e = try_call(&mut ctx, "drawing_element_properties", json!({ "drawing": tab, "set": { "bogus": "x" } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set.bogus"), "{e:?}");
 }
+
+/// Live ("(7) Dragging feature rows"): a fillet moved above the Extrude its edge comes from fails with its own
+/// empty-selection message and "1 missing selection"; the feature list says how many selections are missing.
+#[test]
+fn a_fillet_moved_above_its_extrude_reports_its_missing_selection() {
+    let mut ctx = Ctx::new();
+    let path = scratch("missing-selection.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let sketch = sk["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let edge = call(&mut ctx, "query_entities", json!({ "kind": "edges" }))["edges"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": [edge], "radius": "2 mm" } }));
+    call(&mut ctx, "feature_reorder", json!({ "features": ["Fillet 1"], "to": 1 }));
+    let list = call(&mut ctx, "feature_list", json!({}));
+    let fillet = list["features"].as_array().unwrap().iter().find(|f| f["name"] == "Fillet 1").unwrap();
+    assert_eq!(fillet["status"], "Error", "{list}");
+    assert_eq!(fillet["message"], "Select edges or faces to fillet.");
+    assert_eq!(fillet["missing_selections"], 1);
+    assert_eq!(list["failed"][0]["missing_selections"], 1, "{list}");
+}

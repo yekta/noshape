@@ -113,6 +113,14 @@ impl Body {
         cell.get_or_init(|| names.iter().enumerate().map(|(i, n)| (n.clone(), i)).collect())
     }
 
+    /// Whether a face, edge or vertex of this body has exactly the name `n`
+    /// (the first, cheap step of `find_faces` / `find_edges` / `find_vertices`).
+    pub fn has_exact(&self, n: &TopoName) -> bool {
+        Self::lookup(&self.face_lookup, &self.faces).contains_key(n)
+            || Self::lookup(&self.edge_lookup, &self.edges).contains_key(n)
+            || Self::lookup(&self.vertex_lookup, &self.vertices).contains_key(n)
+    }
+
     /// Indices of faces matching a name: exact, else all split descendants.
     pub fn find_faces(&self, n: &TopoName) -> Vec<usize> {
         let map = Self::lookup(&self.face_lookup, &self.faces);

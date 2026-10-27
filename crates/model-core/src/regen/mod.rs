@@ -319,7 +319,8 @@ impl Regenerator {
                         // empty-input message ("Select face or sketch region to
                         // extrude.") with "1 missing selection".
                         let own = |id: FeatureId| studio.features.iter().any(|g| g.id == id);
-                        let (pruned, missing) = eval::drop_missing_regions(params, &ctx, &own);
+                        // A sketch keeps "The sketch plane could not be found" for a face that is gone.
+                        let (pruned, missing) = eval::drop_missing_regions(params, &ctx, &own, f.type_id != "sketch");
                         let params = pruned.as_ref().unwrap_or(params);
                         state.missing = missing;
                         // Geometry of Assembly contexts joins the feature's context only

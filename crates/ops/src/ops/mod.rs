@@ -154,6 +154,10 @@ pub(crate) fn regen_report_with(od: &mut OpenDoc, tab: TabId, keep: &[noshape_mo
             if s.underdefined {
                 v["underdefined"] = json!(true);
             }
+            // The row tooltip's second line ("1 missing selection") and warning triangle.
+            if s.missing > 0 {
+                v["missing_selections"] = json!(s.missing);
+            }
             // A custom feature's FeatureScript notices (the notices panel's Monitor) say why.
             let fs = custom_output(od.doc(), &tab_name, f);
             if let Some(o) = &fs {
@@ -162,6 +166,9 @@ pub(crate) fn regen_report_with(od: &mut OpenDoc, tab: TabId, keep: &[noshape_mo
             }
             if matches!(s.status, noshape_model::display::FeatureStatus::Error) {
                 let mut x = json!({ "feature": f.id.to_string(), "name": f.name, "message": s.message, "faulty_params": s.faulty });
+                if s.missing > 0 {
+                    x["missing_selections"] = json!(s.missing);
+                }
                 if let Some(o) = fs {
                     x["notices"] = o["notices"].clone();
                 }

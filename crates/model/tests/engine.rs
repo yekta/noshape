@@ -1331,3 +1331,34 @@ fn transform_above_its_part_misses_its_part() {
     assert_eq!(st.message, empty_msg);
     assert_eq!(st.missing, 1);
 }
+
+/// Live ("(7) Dragging feature rows"): a Chamfer dragged above the Extrude its edge comes from fails with its own
+/// empty-selection message and "1 missing selection" (with the row's warning triangle); so does a Fillet whose edge
+/// an earlier fillet consumed (live L20, "Fillet R7 z did not regenerate properly: Select edges or faces to fillet.
+/// 1 missing selection").
+#[test]
+fn a_feature_above_the_one_that_made_its_edge_misses_its_edge() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.04, 0.03, "20 mm");
+    let r = t.ok();
+    let edge = edge_near(&r.context.bodies[0], DVec3::new(0.02, 0.0, 0.02));
+    let fillet = t.add("fillet", &[("entities", q(vec![edge.clone()])), ("radius", e("2 mm"))]);
+    let again = t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("1 mm"))]);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|st| st.id == again).unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    assert_eq!(st.message.as_deref(), Some("Select edges or faces to fillet."));
+    assert_eq!(st.missing, 1);
+    // The first fillet moved above the Extrude.
+    let i = t.ps.features.iter().position(|f| f.id == fillet).unwrap();
+    let f = t.ps.features.remove(i);
+    let j = t.ps.features.iter().position(|g| g.id == x).unwrap();
+    t.ps.features.insert(j, f);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|st| st.id == fillet).unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    assert_eq!(st.message.as_deref(), Some("Select edges or faces to fillet."));
+    assert_eq!(st.missing, 1);
+    // The second one now finds its edge.
+    assert_eq!(r.display.features.iter().find(|st| st.id == again).unwrap().status, FeatureStatus::Ok);
+}

@@ -181,9 +181,35 @@ fn is_sketch_ref(r: &Reference) -> bool {
 /// Copy of `params` without the sketch regions that don't resolve in `ctx`
 /// (their sketch is gone or comes later, or it no longer has the region)
 /// and the parts of this studio's features (`own`) that don't exist there,
-/// and how many were left out; `None` when everything resolves.
-pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(FeatureId) -> bool) -> (Option<ParamValues>, usize) {
-    fn resolves(r: &Reference, ctx: &Context, own: &dyn Fn(FeatureId) -> bool) -> bool {
+/// and, with `topo`, the faces, edges and vertices of this studio's features
+/// that no body has there, and how many were left out; `None` when everything
+/// resolves.
+pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(FeatureId) -> bool, topo: bool) -> (Option<ParamValues>, usize) {
+    /// Whether every face `n` is named after comes from this studio's features
+    /// (sketch and wire-body curves are left alone).
+    fn own_topo(n: &TopoName, own: &dyn Fn(FeatureId) -> bool) -> bool {
+        match n {
+            TopoName::Face { feature, .. } => own(*feature),
+            TopoName::Split { parent, .. } => own_topo(parent, own),
+            TopoName::Edge { faces, .. } => faces.iter().all(|f| own_topo(f, own)),
+            TopoName::Vertex { faces, .. } => !faces.is_empty() && faces.iter().all(|f| own_topo(f, own)),
+            TopoName::Boundary { face, .. } => own_topo(face, own),
+            TopoName::Wire { .. } => false,
+        }
+    }
+    let resolves = |r: &Reference| -> bool {
+        match r {
+            // A face, edge or vertex of a feature that comes later in the list, or that a feature before this one
+            // consumed (live "(7) Dragging feature rows": a Chamfer dragged above the Extrude its edge comes from
+            // fails with "Select edges or faces to chamfer." and "1 missing selection"; L20 Fillet R7 likewise).
+            // Exact names first: the fuzzy lookups scan a body's entities.
+            Reference::Face(n) if topo && own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_faces(n).is_empty()),
+            Reference::Edge(n) if topo && own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_edges(n).is_empty()),
+            Reference::Vertex(n) if topo && own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_vertices(n).is_empty()),
+            _ => region_or_part_resolves(r, ctx, own),
+        }
+    };
+    fn region_or_part_resolves(r: &Reference, ctx: &Context, own: &dyn Fn(FeatureId) -> bool) -> bool {
         match r {
             Reference::SketchRegion { sketch, key } => ctx
                 .sketch(*sketch)
@@ -195,16 +221,16 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
             _ => true,
         }
     }
-    fn prune(v: &ParamValues, ctx: &Context, own: &dyn Fn(FeatureId) -> bool, missing: &mut usize) -> Option<ParamValues> {
+    fn prune(v: &ParamValues, resolves: &dyn Fn(&Reference) -> bool, missing: &mut usize) -> Option<ParamValues> {
         let mut out: Option<ParamValues> = None;
         for (k, p) in v.0.iter() {
             let new = match p {
-                ParamValue::Query(q) if q.iter().any(|r| !resolves(r, ctx, own)) => {
-                    *missing += q.iter().filter(|r| !resolves(r, ctx, own)).count();
-                    Some(ParamValue::Query(q.iter().filter(|r| resolves(r, ctx, own)).cloned().collect()))
+                ParamValue::Query(q) if q.iter().any(|r| !resolves(r)) => {
+                    *missing += q.iter().filter(|r| !resolves(r)).count();
+                    Some(ParamValue::Query(q.iter().filter(|r| resolves(r)).cloned().collect()))
                 }
                 ParamValue::Array(items) => {
-                    let pruned: Vec<Option<ParamValues>> = items.iter().map(|it| prune(it, ctx, own, missing)).collect();
+                    let pruned: Vec<Option<ParamValues>> = items.iter().map(|it| prune(it, resolves, missing)).collect();
                     pruned.iter().any(|x| x.is_some()).then(|| ParamValue::Array(items.iter().zip(pruned).map(|(it, x)| x.unwrap_or_else(|| it.clone())).collect()))
                 }
                 _ => None,
@@ -216,7 +242,7 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
         out
     }
     let mut missing = 0;
-    let out = prune(params, ctx, own, &mut missing);
+    let out = prune(params, &resolves, &mut missing);
     (out, missing)
 }
 
