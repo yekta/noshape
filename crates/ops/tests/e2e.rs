@@ -681,6 +681,33 @@ fn hole_standard_sets_the_table_sizes() {
     call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": g["params"].clone() }));
 }
 
+/// A Width mate through the API (api F19, fixed by skasm cdde1c06): the
+/// block's two X faces centred between the base's.
+#[test]
+fn width_mate_centres_the_tab() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "width-mate.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-30, -10], [30, 10]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[100, -10], [120, 10]] }));
+    let regions: Vec<Value> = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    let by_x = |lo: f64| parts["parts"].as_array().unwrap().iter().find(|p| (num(&p["bounding_box"]["min"][0]) - lo).abs() < 1e-6).unwrap()["id"].as_str().unwrap().to_string();
+    let (base, tab) = (by_x(-30.0), by_x(100.0));
+    let b = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": base }))["instance"].as_str().unwrap().to_string();
+    let t = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": tab }))["instance"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_set_state", json!({ "instance": b, "fixed": true }));
+    let face = |ctx: &mut Ctx, inst: &str, nx: f64| call(ctx, "assembly_entities", json!({ "instance": inst, "kind": "faces", "normal": [nx, 0, 0] }))["faces"][0]["id"].clone();
+    let (t_pos, t_neg, b_pos, b_neg) = (face(&mut ctx, &t, 1.0), face(&mut ctx, &t, -1.0), face(&mut ctx, &b, 1.0), face(&mut ctx, &b, -1.0));
+    let m = call(&mut ctx, "assembly_mate", json!({ "type": "width", "a": { "instance": t, "entity": t_pos }, "b": { "instance": b, "entity": b_pos }, "c": { "instance": b, "entity": b_neg }, "d": { "instance": t, "entity": t_neg } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    // Centred: the tab's +X face at x = 10. Left: the two slides in the slot
+    // plane and the turn about the width axis.
+    let f = call(&mut ctx, "assembly_entities", json!({ "instance": t, "kind": "faces", "normal": [1, 0, 0] }));
+    assert!((num(&f["faces"][0]["centroid"][0]) - 10.0).abs() < 1e-6, "{f}");
+    assert_eq!(call(&mut ctx, "assembly_list", json!({}))["dof"], 3);
+}
+
 /// drawing_get lists the silhouettes of curved faces with the model edges,
 /// and a callout anchors on one (qa4 DRW-SIL).
 #[test]
