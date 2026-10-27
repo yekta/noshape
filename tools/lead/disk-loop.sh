@@ -18,7 +18,7 @@ while true; do
   for d in /root/target-core /root/target-psui /root/target-skasm /root/target-dx /root/target-exp; do
     find $d/debug/deps -maxdepth 1 -type f -executable ! -name '*.so' -mmin +45 -amin +30 -delete 2>/dev/null
   done
-  find /root/target-lead/debug/deps -maxdepth 1 -type f -executable ! -name "*.so" -mmin +120 -amin +60 -delete 2>/dev/null
+  # (not target-lead: the watcher reuses its test executables every run; deleting them made cargo run missing files, 10-27)
   python3 /tmp/lead/prune-build.py /root/target-core /root/target-psui /root/target-skasm /root/target-dx /root/target-lead /root/target-exp >> /tmp/lead/disk-loop.log 2>&1
   python3 /tmp/lead/prune-deps.py /root/target-core/debug/deps /root/target-psui/debug/deps /root/target-skasm/debug/deps /root/target-dx/debug/deps /root/target-lead/debug/deps >> /tmp/lead/disk-loop.log 2>&1
   python3 /tmp/lead/fix-fingerprints.py /root/target-core /root/target-psui /root/target-skasm /root/target-dx /root/target-lead >> /tmp/lead/disk-loop.log 2>&1

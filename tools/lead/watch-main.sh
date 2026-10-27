@@ -16,6 +16,10 @@ check() {
   o=$(nice -n -5 tools/tiers/t0.sh 2>&1) || { echo "T0:"; echo "$o" | fails; [ -z "$(echo "$o" | fails)" ] && echo "$o" | tail -5; return; }
   log "  T0 $((SECONDS-t0)) s"; t0=$SECONDS
   o=$(nice -n -5 tools/tiers/t1.sh --no-fail-fast 2>&1); local rc=$?
+  # A test executable deleted under cargo (disk cleanup) fails as "could not execute process": run once more.
+  if [ $rc -ne 0 ] && echo "$o" | grep -qE "could not execute process|No such file or directory \(os error 2\)"; then
+    log "  T1 retry (missing test executable)"; o=$(nice -n -5 tools/tiers/t1.sh --no-fail-fast 2>&1); rc=$?
+  fi
   log "  T1 $((SECONDS-t0)) s"; t0=$SECONDS
   [ $rc -ne 0 ] && { echo "T1:"; echo "$o" | fails; [ -z "$(echo "$o" | fails)" ] && echo "$o" | tail -5; }
   # Build-script output ("warning: <crate>@<ver>: ..." from OCCT headers) isn't a lint; clippy's own errors are.
@@ -58,7 +62,9 @@ while true; do
       { echo "RED $(git -C $REPO rev-parse --short $m) at $(date -u +%H:%M)"; echo "$f"; echo "--- commits since last-green:"; echo "$since" | cut -c1-120; } > $ST
       log "RED $m: $(echo "$f" | head -3 | tr '\n' ' ' | cut -c1-200)"
       # One culprit: revert it at once (on top of the newest main).
-      if [ "$(echo "$since" | grep -c .)" = 1 ] && [ "$(git -C $REPO rev-list --count --merges last-green..$m)" = 0 ]; then
+      if [ "$(echo "$since" | grep -c .)" = 1 ] && [ "$(git -C $REPO rev-list --count --merges last-green..$m)" = 0 ] \
+         && git -C $REPO diff --name-only "$(echo "$since" | cut -d' ' -f1)~1" "$(echo "$since" | cut -d' ' -f1)" | grep -qvE '^(docs/|.*\.md$)'; then
+        # (only code can be a culprit: a docs-only commit red means infra, 10-27)
         c=$(echo "$since" | cut -d' ' -f1)
         git fetch -q origin; git checkout -q --detach origin/main
         if $G revert --no-edit "$c" >/dev/null 2>&1 && git commit -q --amend -m "lead: revert $(git log -1 --format=%s $c | cut -c1-80)" -m "Reverted by the watcher: main red on T0/T1 ($(echo "$f" | grep -m1 -E 'FAILED|panicked|error' | cut -c1-150)). Re-land it fixed." && git push -q origin HEAD:main; then
