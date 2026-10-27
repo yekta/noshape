@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Requests to the lead (qa, updated 2026-10-27 13:20)
+## Requests to the lead (qa, updated 2026-10-27 13:05)
 - BUDGET-LONGJMP (add45a95, in green 4e568f3f): re-running seeds 120 / 131 / 72 on the watcher CLI 12:59 (logs
   cli/clifuzz-{120,131,72}L.log); results go into the ticket.
 - v0.4.10 (e8e0f62d = e8858e61) fixes the built-in dialogs' picks (LP-DIRECTION-PICK, checked on its artifact) but not
@@ -196,7 +196,7 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
-## 13:20–14:00 (greens 4e568f3f → eb4338a8)
+## 13:05–13:45 (greens 4e568f3f → eb4338a8)
 - Verified on eb4338a8: EDGE-HIGHLIGHT-LOOK (1× profiles = live's new capture to a few units), SIL-AXIS-VIEW-GONE (gone
   again), REGEN-NO-CANCEL (stale run aborted; the thumbnail then re-runs the head in the background, by design).
 - 4e568f3f: tool-open smoke 87 / 87 dialogs pixel-identical to 0d75aa8e; pick sweep 28 / 28 dialogs identical (hover
@@ -210,7 +210,7 @@ in Extrude's regions field picks the face), ORD-BASE.
   PART-HOVER-RED (P2 psui). Asked live: part names after Split (ours renumber every default-named part), and the
   sketch line under an edge-on plane.
 
-## 12:40–13:20 (greens e598c3a5 → 4e568f3f; qa moved to the Motile account at 12:40)
+## 12:40–13:05 (greens e598c3a5 → 4e568f3f; qa moved to the Motile account at 12:40)
 - Verified: OK-DISABLED-HOVER, CONFIG-CELL-EDIT-LOOK, EXPORT-OBJ-MTL (e598c3a5), REPLICATE-EDGE-DEFAULT (4e568f3f).
 - 30-feature part on e598c3a5 (load 45–68): open 1.18 s; Extrude 1 edits 460 / 1056 / 1327 ms; 3rd undo back 883 ms
   (REGEN-SPEED unchanged); section view (Plane 1, tan preview caps, "Section plane 1 (Top)" = live).
