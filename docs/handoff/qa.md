@@ -25,7 +25,7 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-27 17:50)
+## Requests to the lead (qa, updated 2026-10-27 15:41)
 - OTF-FIRST-KEY (P1 skasm) breaks typing a value right after drawing (the most common sketch flow); it is also in v0.4.10.
 - SURF-EXTRUDE-SKETCH-EDGES (P1, core or psui): a surface/thin extrude of a whole sketch picked from the list fails.
 - BUDGET-LONGJMP (add45a95, in green 4e568f3f): re-running seeds 120 / 131 / 72 on the watcher CLI 12:59 (logs
