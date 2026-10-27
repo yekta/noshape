@@ -204,3 +204,48 @@ fn new_mate_from_the_origin_moves_the_part() {
     assert!(t.iter().all(|v| v.abs() < 1e-6), "the pin's bottom centre on the origin: {t:?}");
     let _ = std::fs::remove_file(&path);
 }
+
+/// The edge (or face) of `inst` whose midpoint is `at` (mm).
+fn entity_at(ctx: &mut Ctx, inst: &str, kind: &str, at: [f64; 3]) -> String {
+    let list = call(ctx, "assembly_entities", json!({ "instance": inst, "kind": kind }));
+    let key = if kind == "edges" { "midpoint" } else { "centroid" };
+    let e = list[kind].as_array().unwrap().iter().find(|e| (0..3).all(|k| (e[key][k].as_f64().unwrap_or(1e9) - at[k]).abs() < 1e-6)).unwrap_or_else(|| panic!("no {kind} at {at:?}"));
+    e["id"].as_str().unwrap().to_string()
+}
+
+/// Live "skb (10-24) linear pattern edge direction": an assembly linear
+/// pattern runs along the picked edge's B-rep direction (a planar face's
+/// normal). A block drawn (0,0)-(40,0)-(40,20)-(0,20) and extruded 10 mm:
+/// its bottom front edge runs +X, its top back edge −X, its vertical edge
+/// at (40, 0) −Z, the top face +Z.
+#[test]
+fn linear_pattern_follows_the_edge_direction() {
+    let dir = std::env::temp_dir().join(format!("noshape-pattern-dir-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let cases: [(&str, [f64; 3], [f64; 3]); 4] = [("edges", [20.0, 0.0, 0.0], [10.0, 0.0, 0.0]), ("edges", [20.0, 20.0, 10.0], [-10.0, 0.0, 0.0]), ("edges", [40.0, 0.0, 5.0], [0.0, 0.0, -10.0]), ("faces", [20.0, 10.0, 10.0], [0.0, 0.0, 10.0])];
+    let mut bad = Vec::new();
+    for (k, (kind, at, want)) in cases.iter().enumerate() {
+        let path = dir.join(format!("p{k}.noshape"));
+        let _ = std::fs::remove_file(&path);
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "tab": "Part Studio 1" }))["sketch"].as_str().unwrap().to_string();
+        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tab": "Part Studio 1", "tool": "line", "points": [[0, 0], [40, 0], [40, 20], [0, 20], [0, 0]] }));
+        let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk, "tab": "Part Studio 1" }))["regions"][0]["id"].as_str().unwrap().to_string();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" }, "tab": "Part Studio 1" }));
+        call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "pin" }));
+        studio(&mut ctx, "pin", json!({ "tool": "circle", "points": [[0, 0], [2, 0]] }), "10 mm");
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "pin", "part": "Part 1" }));
+        let e = entity_at(&mut ctx, "Part 1 <1>", kind, *at);
+        call(&mut ctx, "assembly_pattern", json!({ "kind": "linear", "seeds": ["Part 1 <2>"], "direction": { "instance": "Part 1 <1>", "entity": e }, "distance": "10 mm", "count": 2 }));
+        let list = call(&mut ctx, "assembly_list", json!({}));
+        let copy = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == "Part 1 <3>").expect("the copy").clone();
+        let t: Vec<f64> = copy["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+        if !near([t[0], t[1], t[2]], *want, 1e-6) {
+            bad.push(format!("{kind} at {at:?}: copy at {t:?}, live {want:?}"));
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
