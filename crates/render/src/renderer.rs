@@ -1912,6 +1912,31 @@ pub struct RenderParams<'a> {
     pub pick: bool,
 }
 
+/// The process's GPU: the first high-performance adapter, its device and queue (see [`Renderer::new_async`]).
+fn shared_device() -> Result<&'static (wgpu::Adapter, wgpu::Device, wgpu::Queue), RenderError> {
+    static SHARED: std::sync::OnceLock<Result<(wgpu::Adapter, wgpu::Device, wgpu::Queue), (bool, String)>> = std::sync::OnceLock::new();
+    let made = SHARED.get_or_init(|| {
+        pollster::block_on(async {
+            let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
+            let adapter = instance
+                .request_adapter(&wgpu::RequestAdapterOptions {
+                    power_preference: wgpu::PowerPreference::HighPerformance,
+                    compatible_surface: None,
+                    force_fallback_adapter: false,
+                })
+                .await
+                .map_err(|e| (false, e.to_string()))?;
+            let (device, queue) = Renderer::request_device(&adapter).await.map_err(|e| (true, e))?;
+            Ok((adapter, device, queue))
+        })
+    });
+    match made {
+        Ok(d) => Ok(d),
+        Err((false, e)) => Err(RenderError::NoAdapter(e.clone())),
+        Err((true, e)) => Err(RenderError::Device(e.clone())),
+    }
+}
+
 impl Renderer {
     pub fn new() -> Result<Self, RenderError> {
         pollster::block_on(Self::new_async())
@@ -1922,17 +1947,12 @@ impl Renderer {
         pollster::block_on(Self::new_preferring(prefer))
     }
 
+    /// A renderer on the process's shared GPU device ([`shared_device`]): every offscreen renderer (tests, the CLI,
+    /// thumbnails) uses the one adapter, device and queue, made once and never torn down. A new Vulkan instance and
+    /// device per renderer, dropped after each test, crashed lavapipe now and then inside libvulkan (GPU-TEST-SEGV).
     pub async fn new_async() -> Result<Self, RenderError> {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: None,
-                force_fallback_adapter: false,
-            })
-            .await
-            .map_err(|e| RenderError::NoAdapter(e.to_string()))?;
-        Self::on_adapter(adapter).await
+        let (adapter, device, queue) = shared_device()?;
+        Ok(Self::with_device(adapter, device.clone(), queue.clone()))
     }
 
     /// A renderer on the first adapter `prefer` accepts (e.g. the GPU the UI
@@ -1946,7 +1966,13 @@ impl Renderer {
     }
 
     async fn on_adapter(adapter: wgpu::Adapter) -> Result<Self, RenderError> {
-        let (device, queue) = adapter
+        let (device, queue) = Self::request_device(&adapter).await.map_err(RenderError::Device)?;
+        Ok(Self::with_device(&adapter, device, queue))
+    }
+
+    /// The device the renderer asks of an adapter.
+    async fn request_device(adapter: &wgpu::Adapter) -> Result<(wgpu::Device, wgpu::Queue), String> {
+        adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("noshape"),
                 required_features: adapter.features() & Self::WANTED_FEATURES,
@@ -1956,8 +1982,7 @@ impl Renderer {
                 trace: wgpu::Trace::Off,
             })
             .await
-            .map_err(|e| RenderError::Device(e.to_string()))?;
-        Ok(Self::with_device(&adapter, device, queue))
+            .map_err(|e| e.to_string())
     }
 
     /// Optional device features the renderer uses when the device has them

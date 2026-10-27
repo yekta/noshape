@@ -360,11 +360,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 ## Part Studio UI (psui)
 - [ ] P1 SIL-AXIS-VIEW-GONE (regression in green e598c3a5, likely 69de3163 "image-based silhouettes can't throw a back face"): in an exact standard view a cylinder's side silhouettes are no longer drawn: tickets/tubes6.noshape (6 revolved tubes Ø40/Ø20 × 30), view cube › Front: each tube is a shaded rectangle with dark top / bottom edges but **no left / right outline**; row through the middle, left side x675…686: e598c3a5 `F5F8FA… D2DADF 546E7D 4E6877` (no line), green 0d75aa8e `F5F8FA… 3B3C3D 3A4D58 4E6877` (the 1 px dark line) (tickets/sil/front-e598c3a5.png, front-0d75aa8e.png, zoom-e598-vs-0d75.png). Iso views still have them. Live (behaviours "perf (10-22 01:00): silhouettes of a cylinder and a sphere", Front view, DPR 1): cylinder side silhouettes are a 1 px #343434-class line with one AA neighbour, like model edges (qa 2026-10-27 13:10, green e598c3a5)
 - [ ] P2 PARTS-SHIFT-RANGE Shift+click in the Parts list adds only the clicked part, not the range: 6 parts, click Part 2, Shift+click Part 5 → Part 2 + Part 5 selected (tickets/parts-shift-click-e598.png; Parts 3, 4 not); live selects the whole range (behaviours "qa4 round 4 s5 multi-part menu" (1): click Part 2, Shift+click Edited → all 3, like the feature list); ours does ranges in the feature list (Revolve 1 → Linear pattern 1 OK). Also: right after the Shift+click the list and viewport still showed the old state (Part 5 only hovered, its tooltip up) until the pointer moved again (qa 2026-10-27 13:00, green e598c3a5)
-- [ ] P1 GPU-TEST-SEGV (lead 2026-10-27) GPU test binaries crash now and then with SIGSEGV inside libvulkan (lavapipe) on
+- [x] P1 GPU-TEST-SEGV (lead 2026-10-27) GPU test binaries crash now and then with SIGSEGV inside libvulkan (lavapipe) on
   this machine: ops `--test all` (hidden_edges, per core) at 09:31 and render `--test all` (offscreen) at 12:13; the next
   run passes. The watcher retries T1 once on it (/tmp/lead/flaky.log counts them). Find the cause (Renderer/Instance
   creation per test vs one shared device, lavapipe thread-safety, a missing device wait before drop) and fix it so a
   GPU test never crashes the process.
+  - psui (landed with this note): reproduced: the render test binary in three parallel loops died with SIGSEGV once
+    in 27 runs (rc 139). Under gdb the crash is on the main thread in `__run_exit_handlers` after every test passed,
+    jumping to unmapped code (`?? ()`) while a pipeline-compile thread is still up: an exit handler / destructor of a
+    driver library (lavapipe's ICD or Mesa's EGL, both loaded per wgpu Instance) after that library was unloaded.
+    Every `Renderer::new` made its own Instance + device and dropped it, so the loader loaded and unloaded the
+    drivers for each test. Now `Renderer::new` / `new_async` use one process-wide adapter, device and queue
+    (`renderer::shared_device`), made once and never dropped (the app's Metal-matching path keeps its own). After:
+    90 runs in three parallel loops, no crash; the render tests take 24 s instead of 45. Stress test
+    offscreen::renderers_on_many_threads_share_the_device (8 threads × 4 renderers). The ops crash (hidden_edges)
+    renders through scene::png::Offscreen → Renderer::new, the same path.
 - [x] verified e598c3a5 (qa 12:46: plate.noshape new Extrude: ✓ #CCE9CC with the pointer on it while nothing is picked, #74CE3A hovered once a face is picked) P3 OK-DISABLED-HOVER a disabled ✓ lights up on hover: new Extrude with nothing picked, ✓ is the disabled pale green
   #CCE9CC, but with the pointer on it it turns the enabled #74CE3A (and stays inert), so it looks clickable
   (tickets/empty-commit-disabled{,-hover}-0a25.png). Live's ✓ is `button-ok disabled` and a disabled button has no hover

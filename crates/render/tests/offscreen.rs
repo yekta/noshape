@@ -487,6 +487,30 @@ fn a_thin_plate_draws_nothing_past_its_outline() {
     }
 }
 
+/// GPU-TEST-SEGV: renderers made and dropped on many threads at once (tests in one binary run in parallel) share
+/// the process's one device; each renders its frame. With a Vulkan instance and device per renderer, lavapipe
+/// crashed the process now and then inside libvulkan.
+#[test]
+fn renderers_on_many_threads_share_the_device() {
+    if Renderer::new().is_err() {
+        eprintln!("skipping: no GPU");
+        return;
+    }
+    std::thread::scope(|s| {
+        for _ in 0..8 {
+            s.spawn(|| {
+                for _ in 0..4 {
+                    let mut r = Renderer::new().expect("the shared device");
+                    let mut scene = Scene::default();
+                    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 1)))));
+                    let f = r.render(RenderParams { scene: &scene, camera: &iso_camera(), width: 64, height: 48, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
+                    assert_eq!(f.bgra.len(), 64 * 48 * 4);
+                }
+            });
+        }
+    });
+}
+
 /// Regression (stale frames): back-to-back scene changes for one target,
 /// including changes of only an instance color or only a pick state, must
 /// each render their own content (instance/state uploads are skipped only

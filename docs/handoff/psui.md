@@ -72,15 +72,20 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   a back face across the screen (a push divided by a finite step's on-screen length); now analytic, offscreen test
   a_thin_plate_draws_nothing_past_its_outline (1× / 2×). Not reproducible on Linux, so the most likely cause, not a
   confirmed one. 11e7e6aa FS-EDITOR-COMPLETE (1): Ctrl+Space stays in the Feature Studio's code editor.
+- 10-27 15:40 89c4d147: EDGE-HIGHLIGHT-LOOK (P1, user) as live's capture: 5 CSS px band, opaque rim, 78 % core, no
+  dark outline; hovered + selected = selected; face boundaries 2 device px; plain edges 1 CSS px; lines don't write
+  depth (the AO pass shaded the band's lifted depth). Test scene edge_looks. With it a913de0e REGEN-NO-CANCEL (2):
+  the 84 s stale run was the document thumbnail, now aborted when the view regenerates. Also landed today:
+  8cdd189f PERF-TOTAL-MISMATCH, 8d9246ab CONFIG-INPUT-ID, 7d371f34 OK-DISABLED-HOVER + CONFIG-CELL-EDIT-LOOK.
+- 10-27 16:10: GPU-TEST-SEGV (P1, lead): GPU tests crashed in a driver's exit handler after it was unloaded (each
+  Renderer::new loaded and dropped its own Vulkan instance + device); one process-wide device now (renderer
+  `shared_device`), 90 / 90 clean runs where the old binary died once in 27.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
 ## In progress
 
-- EDGE-HIGHLIGHT-LOOK (1), the edge looks: waiting for live's 1× / 2× capture (REQUESTS line "psui (2026-10-27, P1,
-  from the user) EDGE-HIGHLIGHT-LOOK"). Live's 1× profile (behaviours 18762) has the dark layer half a pixel above
-  the light band (2 px dark above, 1 below, band 5 px): two primitives drawn separately; ours is one band in fs_line
-  (1 / 6 / 1). Match per state with an offscreen test each once the capture is in.
+(nothing unlanded)
 
 Residuals found today: a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
@@ -112,9 +117,6 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-0. EDGE-HIGHLIGHT-LOOK (P1, user v0.4.10 macOS Retina): a hovered edge has a dark border; a black region at
-   the plate's bottom right. Match live's hovered / selected / both looks at 1x / 2x (REQUESTS "psui (10-27)
-   EDGE-HIGHLIGHT-LOOK"), offscreen test per state.
 1. Our base part shading differs a few units from live's (block top (140,185,212) vs (145,181,203)), which is what
    the preview samples still differ by.
 3. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache
