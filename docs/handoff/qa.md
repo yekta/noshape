@@ -15,6 +15,19 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 - SHELL-WALLS: wrong solid with status OK (also in v0.4.8).
 
 ## Daily release smoke
+### v0.4.9 recut (release/v0.4.9 7ee597e0 = main 502416cc + "Release v0.4.9"), 2026-10-27 05:00, smoke on green 502416cc
+- **The earlier blocker is gone**: the recut contains bf8aaee2 / 87e8275f (crash guard, OCCT patch, DOC-POISON rollback),
+  7a04ba4d (SHELL-WALLS) and 97081557 (blend budget). The five crash documents open in the green app (bcf401ca and later);
+  cli-fillet-hang.noshape opens in 47 s (Fillet 2 fails after the 30 s budget) instead of hanging.
+- OK: 30-feature part full regen 634 ms on open; edit commits 707 / 396 / 344 / 200 / 318 / 498 ms (load ~25, REGEN-SPEED
+  still over 200 ms); undo 1 / 1 ms, then 618 / 390 ms past two states; Create Drawing (suggested views, 1:2) + PDF (1 page
+  letter, 1.5); STEP and Parasolid export → import 60779.484 = live (48 faces); STL / 3MF / OBJ meshes closed, 3MF manifold;
+  assembly opens, a revolute pin drags without moving off its hole; kill -9 right after a Suppress keeps it; geometry
+  matrices on the watcher CLI 04:48: fillet 32/32, boolean 11/11 exact.
+- Known open in the release: DRAFT-HANG (P0: a draft can spin forever; the app's regen then never ends), SHELL-SLOW (a
+  failing shell 52 s), REGEN-SPEED, API-REMOVE-DIR (P1: scripted REMOVE extrudes miss; featmatrix's hole patterns fail).
+- Pending: the CI artifact (run 40452492018) for the version string and the crash documents.
+
 ### v0.4.9 candidate (release/v0.4.9 2650df69 = main 34ab98f7 + CI fix; CI run 40434076347 Linux artifact), 2026-10-27 03:10
 - **Blocker:** the build segfaults opening 4 of qa's 5 crash documents (SHELL-SLAB-GPF, FILLET-SEGV, FILLET-SEGV-BLEND,
   DRAFT-SEGV-DOC); it predates bf8aaee2 / 87e8275f / 7a04ba4d. Green 19555ca3 opens all five. See TICKETS "Release v0.4.9".

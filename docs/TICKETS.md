@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## Release v0.4.9 (qa, 2026-10-27 02:55)
-- [ ] P0 release/v0.4.9 (2650df69 = 34ab98f7 + CI fix) predates bf8aaee2 (kernel crash guard + OCCT patch 0002), dx's
+- [x] resolved by the recut (qa 05:05: release/v0.4.9 is now 7ee597e0 = main 502416cc + "Release v0.4.9", which has all of them; CI artifact check pending) P0 release/v0.4.9 (2650df69 = 34ab98f7 + CI fix) predates bf8aaee2 (kernel crash guard + OCCT patch 0002), dx's
   crash markers / open rollback (DOC-POISON) and 7a04ba4d (SHELL-WALLS / SHELL-FILLETED-BOX). As cut it ships the Shell
   and Fillet segfaults that leave documents unopenable (SHELL-SLAB-GPF, FILLET-SEGV: regressions since v0.4.8; the green
   app 4d2f6b0c crashed on them, 19555ca3 doesn't). Cherry-pick those fixes onto the release branch (PLAN 2.2) or cut from
