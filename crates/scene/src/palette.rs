@@ -32,9 +32,11 @@ pub mod viewport {
     /// selected (live selection/08, part-studio/qa4-r5-s9-6d, 6e).
     pub const POINT_HOVER: [u32; 3] = [0xf8c488, 0xc49a6a, 0xffd8ac];
     pub const POINT_SELECTED: [u32; 3] = [0xfac012, 0xc4960b, 0xffd65b];
-    /// Bodies a feature creates, while its dialog is open (shaded, seen
-    /// through; live part-studio/230 reads `#8494a0` on the lit faces).
-    pub const FEATURE_PREVIEW: u32 = 0x92aec5;
+    /// Bodies a feature creates and an Add's tool, while its dialog is open:
+    /// opaque in the preview blend's model with the feature (shaded with
+    /// the preview lighting), mixed at 0.7 over the model before it; live
+    /// part-studio/230 reads `#8494a0` on the top over white.
+    pub const FEATURE_PREVIEW: u32 = 0x678495;
     /// A Remove / Intersect tool body: cutting (dark gray) or missing the
     /// parts (dark red; live `#803f43` shaded).
     pub const TOOL_PREVIEW: u32 = 0x3a3d40;

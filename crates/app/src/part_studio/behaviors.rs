@@ -279,7 +279,8 @@ pub struct UiState {
     /// The info message whose 5 s auto-dismiss is running (live: Onshape's
     /// message bubbles close after 5000 ms; errors and warnings stay).
     pub message_timed: Option<(noshape_model::display::FeatureStatus, String)>,
-    /// Preview slider value and the model before the edited feature.
+    /// Preview slider value (the preview blend's alpha, 0.7 at rest) and
+    /// the model before the edited feature.
     pub preview_opacity: f32,
     pub preview_before: Option<Arc<StudioDisplay>>,
     /// Regeneration context before the edited feature.
@@ -294,9 +295,15 @@ pub struct UiState {
     /// (onDecalFeatureChange sizes the decal when they first are).
     pub decal_sized: Option<(noshape_model::reference::FeatureId, String)>,
     pub preview_task: Option<Task<()>>,
-    /// Remove / Intersect previews (live part-studio/234-237): the tool
+    /// Add / Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
     pub preview_tool: Option<(Arc<StudioDisplay>, noshape_model::FeatureId)>,
+    /// The tool previews an Add (drawn in the preview tone, with edges).
+    pub preview_tool_adds: bool,
+    /// The edited feature draws its new bodies in the preview tone
+    /// (sketch-based bodies: live part-studio/230; a pattern's or mirror's
+    /// copies keep their parts' colours, p1audit skip-02).
+    pub preview_tone: bool,
     /// A feature drag's drop slot: the hovered row and whether the cursor is
     /// in its lower half (lands after it; live F33).
     pub feature_drop: std::rc::Rc<std::cell::Cell<Option<(usize, bool)>>>,
@@ -550,7 +557,7 @@ impl UiState {
             tb_custom: None,
             iso_slider_drag: None,
             message_timed: None,
-            preview_opacity: 1.0,
+            preview_opacity: crate::feature_dialog::PREVIEW_REST,
             preview_before: None,
             before_context: None,
             decal_sized: None,
@@ -558,6 +565,8 @@ impl UiState {
             std_edit_task: None,
             preview_task: None,
             preview_tool: None,
+            preview_tool_adds: false,
+            preview_tone: false,
             feature_drop: Default::default(),
             hole_prev: None,
             preview_tool_task: None,
@@ -1964,7 +1973,9 @@ impl PartStudioView {
         let tool_op = self.edit.as_ref().is_some_and(|e| {
             let f = &e.dialog.read(cx).feature;
             let failing = self.display.feature_state(f.id).is_some_and(|s| s.status == FeatureStatus::Error);
-            matches!(f.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft") && (matches!(f.params.enum_("operationType"), "REMOVE" | "INTERSECT") || (f.params.enum_("operationType") == "ADD" && failing))
+            // Live: an Add shows its tool too, over the untouched part.
+            let _ = failing;
+            matches!(f.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft") && matches!(f.params.enum_("operationType"), "ADD" | "REMOVE" | "INTERSECT")
         });
         if !tool_op {
             self.ui.preview_tool = None;
@@ -1975,6 +1986,7 @@ impl PartStudioView {
         let Some((mut studio, upto)) = self.effective_studio(cx) else { return };
         let Some(index) = self.edit.as_ref().map(|e| e.index) else { return };
         let Some(fid) = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id) else { return };
+        let adds = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.params.enum_("operationType") == "ADD");
         if let Some(f) = studio.features.get_mut(index) {
             f.params.set("operationType", noshape_model::params::ParamValue::Enum("NEW".into()));
         }
@@ -1993,6 +2005,7 @@ impl PartStudioView {
                 .await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.preview_tool = Some((Arc::new(display), fid));
+                this.ui.preview_tool_adds = adds;
                 // "Selected tools and targets do not intersect." is a Remove /
                 // Intersect note; a failing Add only shows its tool red (BOOL4b).
                 let removes = this.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).feature.params.enum_("operationType"), "REMOVE" | "INTERSECT"));
@@ -2029,10 +2042,16 @@ impl PartStudioView {
     /// (not while a Remove / Intersect tool or the preview slider is shown).
     pub(super) fn preview_body_ids(&self) -> Vec<noshape_model::BodyId> {
         let (Some(_), Some(before)) = (&self.edit, &self.ui.preview_before) else { return Vec::new() };
-        if self.ui.preview_tool.is_some() || self.ui.preview_opacity < 0.999 {
+        let old: std::collections::HashSet<&noshape_model::BodyId> = before.bodies.iter().map(|b| &b.id).collect();
+        if let Some((tool, _)) = &self.ui.preview_tool {
+            if !self.preview_tool_blended() {
+                return Vec::new();
+            }
+            return tool.bodies.iter().filter(|b| !old.contains(&b.id)).map(|b| b.id.clone()).collect();
+        }
+        if !self.ui.preview_tone {
             return Vec::new();
         }
-        let old: std::collections::HashSet<&noshape_model::BodyId> = before.bodies.iter().map(|b| &b.id).collect();
         self.display.bodies.iter().filter(|b| !old.contains(&b.id)).map(|b| b.id.clone()).collect()
     }
 
@@ -2062,41 +2081,34 @@ impl PartStudioView {
     }
 
     pub(super) fn display_for_scene_inner(&self) -> Arc<StudioDisplay> {
-        /// Opacity of a feature's new bodies while its dialog is open (with
-        /// the renderer's preview lighting, see the offscreen test
-        /// `feature_preview_shading_matches_onshape`).
-        const FEATURE_PREVIEW_ALPHA: f32 = 0.7;
-        // Preview slider: blend the model before the feature (fading out)
-        // with the result (fading in).
-        if self.edit.is_some()
-            && self.ui.preview_opacity < 0.999
-            && let Some(before) = &self.ui.preview_before
-        {
-            let s = self.ui.preview_opacity;
-            let mut d = (*self.display).clone();
-            for b in &mut d.bodies {
-                b.color[3] *= s.max(0.02);
-            }
-            for b in &before.bodies {
-                let mut b = b.clone();
-                b.color[3] *= (1.0 - s).max(0.02);
-                d.bodies.push(b);
-            }
-            return Arc::new(d);
-        }
         // Live (part-studio/234-237): a Remove / Intersect shows its tool body
         // see-through: dark red while it doesn't reach the parts (the
         // feature fails), dark gray once it cuts.
+        // Live (behaviours "psui (10-26, P1) Feature preview look"): an Add,
+        // Remove or Intersect leaves the parts as they were and shows its
+        // tool body (the preview blend's model with the feature): an Add's in
+        // the preview tone with its edges, a Remove's / Intersect's gray, red
+        // while it reaches no part or fails (part-studio/234-237), no edges.
         if let (Some(_), Some((tool, fid)), Some(before)) = (&self.edit, &self.ui.preview_tool, &self.ui.preview_before) {
             let old: std::collections::HashSet<&noshape_model::BodyId> = before.bodies.iter().map(|b| &b.id).collect();
             let failed = self.tool_missed() || self.display.features.iter().any(|f| f.id == *fid && f.status == noshape_model::display::FeatureStatus::Error);
-            let c = crate::theme::lin(if failed { crate::theme::viewport::TOOL_PREVIEW_FAIL } else { crate::theme::viewport::TOOL_PREVIEW });
+            let adds = self.ui.preview_tool_adds;
+            let c = crate::theme::lin(if failed { crate::theme::viewport::TOOL_PREVIEW_FAIL } else if adds { crate::theme::viewport::FEATURE_PREVIEW } else { crate::theme::viewport::TOOL_PREVIEW });
             let mut d = (*self.display).clone();
-            // No edges on the tool (live 236); red nearly opaque, gray see-through.
+            // An Add: the parts as they were (the preview blend mixes the tool
+            // in). A Remove / Intersect (not blended yet: its tool would hide
+            // inside the uncut part) keeps the cut result with its tool see-
+            // through over it, red nearly opaque.
+            let blended = adds && !failed;
+            if blended {
+                d.bodies = before.bodies.clone();
+            }
             for b in tool.bodies.iter().filter(|b| !old.contains(&b.id)) {
                 let mut b = b.clone();
-                b.color = [c[0], c[1], c[2], if failed { 0.9 } else { 0.6 }];
-                b.mesh = Arc::new(noshape_model::display::MeshBuffers { edges: Vec::new(), vertices: Vec::new(), ..(*b.mesh).clone() });
+                b.color = [c[0], c[1], c[2], if blended { 1.0 } else if failed { 0.9 } else { 0.6 }];
+                if !blended {
+                    b.mesh = Arc::new(noshape_model::display::MeshBuffers { edges: Vec::new(), vertices: Vec::new(), ..(*b.mesh).clone() });
+                }
                 d.bodies.push(b);
             }
             return Arc::new(d);
@@ -2118,9 +2130,12 @@ impl PartStudioView {
             return Arc::new(d);
         }
         // Live (part-studio/230): while a feature dialog is open, bodies the
-        // feature creates show in the part shading but blue-gray and
-        // see-through, so the picked regions show under them.
+        // feature creates show in the preview shading, blue-gray; they are
+        // opaque in the preview blend's model with the feature, which is
+        // mixed over the model before it (`preview_mix_base`), so the picked
+        // regions show under them.
         if self.edit.is_some()
+            && self.ui.preview_tone
             && let Some(before) = &self.ui.preview_before
         {
             let old: std::collections::HashSet<&noshape_model::BodyId> = before.bodies.iter().map(|b| &b.id).collect();
@@ -2128,7 +2143,7 @@ impl PartStudioView {
                 let mut d = (*self.display).clone();
                 let c = crate::theme::lin(crate::theme::viewport::FEATURE_PREVIEW);
                 for b in d.bodies.iter_mut().filter(|b| !old.contains(&b.id)) {
-                    b.color = [c[0], c[1], c[2], FEATURE_PREVIEW_ALPHA];
+                    b.color = [c[0], c[1], c[2], 1.0];
                 }
                 return Arc::new(d);
             }

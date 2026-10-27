@@ -240,12 +240,12 @@ fn shade_preview(normal_in: vec3<f32>, front: bool, base: vec3<f32>) -> vec3<f32
     let light = normalize(right * 0.866 - g.camera_up.xyz * 0.5);
     return base * (PREVIEW_AMBIENT + PREVIEW_DIFFUSE * max(dot(n, light), 0.0));
 }
-// Fitted to live part-studio/230 with the target blending in sRGB values
-// (see-through: the box's back faces, then its front faces, at the preview
-// alpha). Onshape draws the preview opaque into a texture of its own and
-// mixes that over the frame (uPreviewTexture, uPreviewAlpha): one layer.
+// Fitted to live part-studio/230 (and psui-prv-01's Add boss): Onshape
+// draws the model with the feature opaque into a texture of its own and
+// mixes it over the model before it at the slider's 0.7 (uPreviewTexture,
+// uPreviewAlpha; `Scene::preview_mix`).
 const PREVIEW_AMBIENT: f32 = 0.58;
-const PREVIEW_DIFFUSE: f32 = 0.64;
+const PREVIEW_DIFFUSE: f32 = 0.95;
 
 // Zebra stripes (Onshape's analysis tool): the reflection of a room with
 // black and white stripes around the viewer, horizontal unless flipped

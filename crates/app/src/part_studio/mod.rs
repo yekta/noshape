@@ -258,6 +258,9 @@ pub struct PartStudioView {
     pub(crate) viewport: Entity<Viewport>,
     display: Arc<StudioDisplay>,
     built: Option<BuiltScene>,
+    /// While a feature dialog previews: the model before the feature, the
+    /// preview blend's base (`preview_mix_base`).
+    built_base: Option<BuiltScene>,
     cache: GpuCache,
     pub selection: Vec<Reference>,
     hover: Option<Reference>,
@@ -410,6 +413,7 @@ impl PartStudioView {
             viewport,
             display: Arc::new(StudioDisplay::defaults()),
             built: None,
+            built_base: None,
             cache: GpuCache::default(),
             selection: Vec::new(),
             hover: None,
@@ -740,6 +744,7 @@ impl PartStudioView {
         let built = scene_builder::build(&shown, &opts, &mut self.cache, self.gpu.uploader());
         let prio = built.picks.priority_fn();
         self.built = Some(built);
+        self.build_preview_base(&opts, cx);
         self.ui.pick_filter = None;
         // Thickness analysis follows every edit.
         if geometry_changed && self.ui.thickness.as_ref().is_some_and(|t| !t.parts.is_empty()) {
@@ -839,6 +844,10 @@ impl PartStudioView {
         let mut o = self.opts.clone();
         o.replaced_meshes = self.thickness_meshes(cx);
         o.preview_bodies = self.preview_body_ids();
+        // The preview blend's model with the feature (`preview_mix_base`).
+        if self.preview_mix_base(cx).is_some() {
+            o.body_layer = noshape_render::scene::compare::TARGET;
+        }
         o.display_only = self.ui.transform_ghost.clone();
         // Isolate (live ui/iso-901): the planes fade to faint outlines; below
         // 10 % the other parts are solid washed-out ghosts.
@@ -865,6 +874,34 @@ impl PartStudioView {
         o
     }
 
+    /// The model before the edited feature while its dialog previews
+    /// (live previewBlend: both models drawn, mixed at the preview slider's
+    /// value). Not for sketches (no preview slider), nor while a Remove /
+    /// Intersect tool (or a failing Add's) or a Transform's ghosts show
+    /// (drawn directly).
+    fn preview_mix_base(&self, cx: &App) -> Option<Arc<StudioDisplay>> {
+        let e = self.edit.as_ref()?;
+        if self.sketch.is_some() || e.dialog.read(cx).feature.type_id == "sketch" || !self.ui.transform_ghost.is_empty() || (self.ui.preview_tool.is_some() && !self.preview_tool_blended()) {
+            return None;
+        }
+        self.ui.preview_before.clone()
+    }
+
+    /// The tool preview is an Add's that regenerates: blended like any
+    /// preview (`display_for_scene_inner`).
+    pub(super) fn preview_tool_blended(&self) -> bool {
+        self.ui.preview_tool_adds && !self.tool_missed() && !self.ui.preview_tool.as_ref().is_some_and(|(_, fid)| self.display.features.iter().any(|f| f.id == *fid && f.status == noshape_model::display::FeatureStatus::Error))
+    }
+
+    /// Build [`Self::built_base`] with the view options of the scene.
+    fn build_preview_base(&mut self, opts: &SceneOptions, cx: &App) {
+        let base = self.preview_mix_base(cx);
+        self.built_base = base.map(|d| {
+            let o = SceneOptions { show_planes: false, show_sketches: false, show_origin: false, body_layer: noshape_render::scene::compare::BASE, preview_bodies: Vec::new(), display_only: Vec::new(), ..opts.clone() };
+            scene_builder::build(&d, &o, &mut self.cache, self.gpu.uploader())
+        });
+    }
+
     /// Rebuild the scene for changed view options (same display).
     pub(super) fn rebuild_scene(&mut self, cx: &mut Context<Self>) {
         if self.built.is_none() {
@@ -875,6 +912,7 @@ impl PartStudioView {
         let shown = self.display_for_scene();
         let opts = self.scene_options(cx);
         self.built = Some(scene_builder::build(&shown, &opts, &mut self.cache, self.gpu.uploader()));
+        self.build_preview_base(&opts, cx);
         self.refresh_scene(true, cx);
         cx.notify();
     }
@@ -1127,6 +1165,17 @@ impl PartStudioView {
             (None, None) => self.selection.len(),
             (None, Some(e)) => count_picks(&e.dialog.read(cx).feature.params),
         };
+        // A feature preview (live previewBlend): the model before the feature
+        // under the one with it, mixed at the preview slider's value.
+        if let Some(base) = &self.built_base {
+            scene.instances.extend(base.scene.instances[..base.static_instances].iter().cloned().map(|mut i| {
+                i.pickable = false;
+                // Past any highlight state.
+                i.pick_base = 1 << 30;
+                i
+            }));
+            scene.preview_mix = Some(self.ui.preview_opacity);
+        }
         // Versions and history › Compare: both sides (crate::compare_graphics).
         let (mode, up) = (self.opts.display_mode, self.gpu.uploader());
         let owner = crate::compare_graphics::Owner::<Self> { get: |this: &mut Self| &mut this.compare_gfx, then: |this, cx| this.refresh_scene(false, cx) };
@@ -1909,7 +1958,8 @@ impl PartStudioView {
         });
         let history = DraftHistory::new(&dialog.read(cx).feature);
         self.ui.orient_pending = self.ui.orient_on_edit && dialog.read(cx).feature.type_id == "sketch";
-        self.ui.preview_opacity = 1.0;
+        self.ui.preview_opacity = crate::feature_dialog::PREVIEW_REST;
+        self.ui.preview_tone = matches!(dialog.read(cx).feature.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft");
         self.ui.preview_before = None;
         self.ui.before_context = None;
         // A new feature's first change runs std's editing logic with an

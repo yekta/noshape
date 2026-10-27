@@ -880,7 +880,9 @@ fn hidden_only_lines_show_only_behind_geometry() {
 
 /// Feature previews shade like Onshape's (live part-studio/230, default
 /// view, white background): the top and front faces alike, the right side
-/// lighter, flat (no highlight), and see-through.
+/// lighter, flat (no highlight); the box is opaque in the preview blend's
+/// model with the feature, mixed at the slider's 0.7 over the model before it
+/// (here nothing: the white background).
 #[test]
 fn feature_preview_shading_matches_onshape() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
@@ -892,10 +894,11 @@ fn feature_preview_shading_matches_onshape() {
         }
     };
     let (w, h) = (400u32, 300u32);
-    // The app's preview color and opacity (theme FEATURE_PREVIEW, part_studio FEATURE_PREVIEW_ALPHA).
-    let color = [srgb_lin(0x92), srgb_lin(0xae), srgb_lin(0xc5), 0.7];
-    let mut scene = Scene::default();
-    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.05, -0.05], [0.05, 0.05, 0.05], 1)))).with_color(color).preview());
+    // The app's preview color (palette FEATURE_PREVIEW), opaque, and the
+    // preview slider's rest value.
+    let color = [srgb_lin(0x67), srgb_lin(0x84), srgb_lin(0x95), 1.0];
+    let mut scene = Scene { preview_mix: Some(0.7), ..Default::default() };
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.05, -0.05], [0.05, 0.05, 0.05], 1)))).with_color(color).preview().compare_layer(compare::TARGET));
     let mut cam = Camera::default();
     cam.fit_box(glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05), w as f64 / h as f64);
     let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();

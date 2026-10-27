@@ -3730,7 +3730,7 @@ const LIVE_EMPTY_FIELD: f32 = 26.328125;
 
 /// Where Onshape's preview slider handle rests (live: 69% of the track).
 /// From there to the right end the feature shows fully; to the left it fades.
-const PREVIEW_REST: f32 = 0.7;
+pub(crate) const PREVIEW_REST: f32 = 0.7;
 
 impl FeatureDialog {
     /// Onshape's preview slider (noUi, live): a 112 px, 2 px `#777` track
@@ -3745,7 +3745,7 @@ impl FeatureDialog {
             let v = (f32::from(x - b.left()) / f32::from(b.size.width).max(1.)).clamp(0., 1.);
             if (v - this.preview).abs() > f32::EPSILON {
                 this.preview = v;
-                cx.emit(DialogEvent::PreviewOpacity((v / PREVIEW_REST).min(1.)));
+                cx.emit(DialogEvent::PreviewOpacity(v));
                 cx.notify();
             }
         };
