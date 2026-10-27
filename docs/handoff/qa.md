@@ -179,7 +179,7 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
-## 10:10–10:35 (green e8858e61)
+## 10:10–10:45 (green e8858e61)
 - LP-DIRECTION-PICK: v0.4.9 reproduced, green verified (pattern Direction in all three modes, Fillet, Shell, plain custom
   edge query); compound custom filters (`EDGE && LINE`, `EDGE && ALLOWS_AXIS`) still take sketch edges only (ticket,
   cause in studio.rs). Release smoke row added.
