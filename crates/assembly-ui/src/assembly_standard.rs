@@ -14,7 +14,7 @@ use noshape_model::assembly::standard::{self, Shape, StandardSpec};
 /// A face or edge selected before Insert opened (live: pre-select hole
 /// edges or faces, or planar faces with holes, then Insert).
 #[derive(Clone)]
-pub(crate) struct StdPick {
+pub struct StdPick {
     /// The holes it gives (connector on each hole's edge).
     pub holes: Vec<MateConnectorRef>,
     /// A planar face (enables Insert closest / furthest when it has holes).
@@ -23,7 +23,7 @@ pub(crate) struct StdPick {
 
 /// Standard content state of the Insert dialog.
 #[derive(Default)]
-pub(crate) struct StdUi {
+pub struct StdUi {
     /// Component, size and length chosen in the tab.
     pub spec: Option<StandardSpec>,
     /// Auto-size: waiting for a hole (circular edge, cylindrical or planar face).
@@ -934,7 +934,7 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
 /// Part number pencil, live skb/800): kept in the config directory for the
 /// user, keyed by the full configuration.
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
-pub(crate) struct StdProps {
+pub struct StdProps {
     #[serde(default)]
     pub part_number: String,
     /// None = the generated description.
@@ -943,7 +943,7 @@ pub(crate) struct StdProps {
 }
 
 fn std_props_path() -> std::path::PathBuf {
-    crate::files::config_dir().join("standard_content_properties.json")
+    crate::paths::config_dir().join("standard_content_properties.json")
 }
 
 /// The configuration's key: the spec with its defaults spelt out.
@@ -966,7 +966,7 @@ fn load_std_props() -> std::collections::BTreeMap<String, StdProps> {
     saved.into_iter().map(|(k, v)| (serde_json::from_str::<StandardSpec>(&k).map(|s| std_props_key(&s)).unwrap_or(k), v)).collect()
 }
 
-pub(crate) fn std_props(spec: &StandardSpec) -> StdProps {
+pub fn std_props(spec: &StandardSpec) -> StdProps {
     load_std_props().remove(&std_props_key(spec)).unwrap_or_default()
 }
 

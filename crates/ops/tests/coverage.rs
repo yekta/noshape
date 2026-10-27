@@ -65,8 +65,9 @@ fn menu_labels() -> BTreeSet<String> {
     let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../app/src");
     let core = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../app-core/src");
     let drawing = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../drawing-ui/src");
+    let assembly = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assembly-ui/src");
     let mut files: Vec<(String, std::path::PathBuf)> = Vec::new();
-    let tops = std::fs::read_dir(&src).expect("app sources").chain(std::fs::read_dir(&core).expect("app-core sources")).chain(std::fs::read_dir(&drawing).expect("drawing-ui sources"));
+    let tops = std::fs::read_dir(&src).expect("app sources").chain(std::fs::read_dir(&core).expect("app-core sources")).chain(std::fs::read_dir(&drawing).expect("drawing-ui sources")).chain(std::fs::read_dir(&assembly).expect("assembly-ui sources"));
     for e in tops.flatten() {
         let name = e.file_name().to_string_lossy().to_string();
         let area = if name.starts_with("assembly_") {

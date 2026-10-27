@@ -14,7 +14,7 @@ use noshape_model::assembly::analysis::{AssemblyMass, assembly_mass_properties, 
 use noshape_model::assembly::eval::InstancePath;
 
 /// Mass properties dialog state.
-pub(crate) struct AsmMassUi {
+pub struct AsmMassUi {
     /// Face tab (else Part).
     pub faces: bool,
     /// Faces to measure (Face tab; picked in the graphics area).
@@ -453,7 +453,7 @@ impl AssemblyView {
 /// Zebra stripes settings: stripe count, flipped, edges shown (live
 /// analysis/50: 35, off, on).
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct ZebraSettings {
+pub struct ZebraSettings {
     pub stripes: u32,
     pub flip: bool,
     pub show_edges: bool,
@@ -466,7 +466,7 @@ impl Default for ZebraSettings {
 }
 
 /// The open Zebra stripes dialog.
-pub(crate) struct ZebraDialog {
+pub struct ZebraDialog {
     pub settings: ZebraSettings,
     stripes: Entity<crate::quantity_field::QuantityInput>,
     _sub: Subscription,
@@ -577,7 +577,7 @@ impl AssemblyView {
 
 /// The user's mass unit (Workspace units › Mass: Kilogram, Gram, Pound,
 /// Ounce): (symbol, per kilogram).
-pub(crate) fn mass_unit(units: &noshape_units::UnitPrefs) -> (&'static str, f64) {
+pub fn mass_unit(units: &noshape_units::UnitPrefs) -> (&'static str, f64) {
     match units.other[2].0 {
         1 => ("g", 1000.0),
         2 => ("lb", 2.204_622_621_848_776),
@@ -589,7 +589,7 @@ pub(crate) fn mass_unit(units: &noshape_units::UnitPrefs) -> (&'static str, f64)
 /// A Mass and section properties value as Onshape writes it (live 738–739):
 /// three decimals without trailing zeros ("5.77", "11000"), and values that
 /// would read 0.000 in exponent form ("-3.307e-4").
-pub(crate) fn number(x: f64) -> String {
+pub fn number(x: f64) -> String {
     let fixed = noshape_units::to_fixed(x, 3);
     if x != 0.0 && fixed.trim_start_matches('-') == "0.000" {
         return format!("{x:.3e}");

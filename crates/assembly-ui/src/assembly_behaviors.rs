@@ -12,11 +12,11 @@ use crate::os_menu::{OsMenu, OsMenuItem};
 use noshape_model::assembly::ops::{FilterCommand, InstanceClipboard, ListFilter, RowInfo, RowKind};
 use std::rc::Rc;
 
-pub(crate) type MenuAct = Rc<dyn Fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>)>;
+pub type MenuAct = Rc<dyn Fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>)>;
 
 /// One context menu entry (built from the view state when the menu opens).
 #[derive(Clone)]
-pub(crate) enum MenuEntry {
+pub enum MenuEntry {
     Item { label: String, icon: Option<&'static str>, disabled: bool, act: MenuAct },
     Sub { label: String, children: Vec<MenuEntry> },
     Sep,
@@ -32,7 +32,7 @@ fn icon_item(label: impl Into<String>, icon: &'static str, act: impl Fn(&mut Ass
 
 /// Fill a popup menu with entries; separators at the ends or doubled are dropped.
 /// Onshape's right-click menu ([`OsMenu`]: 12 px, 22 px rows).
-pub(crate) fn fill_menu(mut m: OsMenu, entries: Vec<MenuEntry>, view: Entity<AssemblyView>, window: &mut Window, cx: &mut Context<OsMenu>) -> OsMenu {
+pub fn fill_menu(mut m: OsMenu, entries: Vec<MenuEntry>, view: Entity<AssemblyView>, window: &mut Window, cx: &mut Context<OsMenu>) -> OsMenu {
     let mut cleaned: Vec<MenuEntry> = Vec::new();
     for e in entries {
         if matches!(e, MenuEntry::Sep) && cleaned.last().is_none_or(|l| matches!(l, MenuEntry::Sep)) {
@@ -73,7 +73,7 @@ pub(crate) fn fill_menu(mut m: OsMenu, entries: Vec<MenuEntry>, view: Entity<Ass
 
 /// Instance row being dragged in the list.
 #[derive(Clone)]
-pub(crate) struct InstanceDrag {
+pub struct InstanceDrag {
     pub id: InstanceId,
     pub label: SharedString,
 }
@@ -87,7 +87,7 @@ impl Render for InstanceDrag {
 
 /// Mate feature row being dragged in the list (reorder).
 #[derive(Clone)]
-pub(crate) struct MateDrag {
+pub struct MateDrag {
     pub id: MateId,
     pub label: SharedString,
 }
@@ -102,7 +102,7 @@ impl Render for MateDrag {
 /// A section plane (origin, normal, offset along it, flipped) and its
 /// in-plane X axis (the rotate handles turn it about X and Y).
 #[derive(Clone, Debug)]
-pub(crate) struct AsmSectionPlane {
+pub struct AsmSectionPlane {
     pub origin: DVec3,
     pub normal: DVec3,
     pub offset: f64,
@@ -146,11 +146,11 @@ impl AsmSectionPlane {
     }
 }
 
-pub(crate) use crate::assembly_scene::SectionHandle;
+pub use crate::assembly_scene::SectionHandle;
 
 /// Section view state (Onshape's Section view dialog, as in the Part Studio).
 #[derive(Clone, Debug, Default)]
-pub(crate) struct AsmSection {
+pub struct AsmSection {
     pub planes: Vec<AsmSectionPlane>,
     /// Include tab: only the listed instances are cut (Exclude: they aren't).
     pub include: bool,
@@ -161,7 +161,7 @@ pub(crate) struct AsmSection {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct AsmSectionDialog {
+pub struct AsmSectionDialog {
     /// The "Items" field takes picks (else "Section planes").
     pub items_active: bool,
     /// The plane the dialog edits (the manipulator's).
@@ -184,7 +184,7 @@ const MAX_SECTION_PLANES: usize = 3;
 /// its axis; base: the point on the plane) and the dragged value (length
 /// from the start / angle).
 #[derive(Clone, Debug)]
-pub(crate) struct SectionDrag {
+pub struct SectionDrag {
     pub handle: SectionHandle,
     pub plane0: AsmSectionPlane,
     pub s0: f64,
@@ -200,7 +200,7 @@ pub(crate) struct SectionDrag {
 /// to origin" (1)): the world point, the entity highlighted orange (a face
 /// outlined, an edge or vertex) and a face's corner dots.
 #[derive(Clone, Debug)]
-pub(crate) struct SectionSnap {
+pub struct SectionSnap {
     pub point: DVec3,
     pub path: noshape_model::assembly::eval::InstancePath,
     pub entity: Reference,
@@ -214,7 +214,7 @@ const SECTION_SNAP_VERTEX_PX: f64 = 22.0;
 
 /// The value box after a section drag (live: Onshape's canvas number box,
 /// focused and selected; Enter moves the plane from the drag's start).
-pub(crate) struct SectionValue {
+pub struct SectionValue {
     pub handle: SectionHandle,
     pub plane0: AsmSectionPlane,
     pub input: Entity<crate::quantity_field::QuantityInput>,
@@ -223,13 +223,13 @@ pub(crate) struct SectionValue {
 
 /// Row being renamed inline.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RenameRow {
+pub enum RenameRow {
     Instance(InstanceId),
     Feature(MateId),
 }
 
 /// Add selection to folder…'s "Folder name" dialog: the members and the name.
-pub(crate) struct FolderNameDialog {
+pub struct FolderNameDialog {
     instances: Vec<InstanceId>,
     features: Vec<MateId>,
     input: Entity<InputState>,
@@ -238,7 +238,7 @@ pub(crate) struct FolderNameDialog {
 
 /// View state of the behaviours in this module.
 #[derive(Default)]
-pub(crate) struct AsmUi {
+pub struct AsmUi {
     /// A dialog or panel covers the viewport's top left (last render):
     /// zoom to fit centres the model in the rest (as the Part Studio).
     pub left_open: bool,
@@ -319,7 +319,7 @@ pub(crate) struct AsmUi {
     pub insert_other_cat: Option<usize>,
     /// Owned by me: the folder being browsed (None = the top level).
     pub insert_other_dir: Option<std::path::PathBuf>,
-    pub insert_other_docs: Option<Vec<crate::start_library::DocEntry>>,
+    pub insert_other_docs: Option<Vec<crate::library::DocEntry>>,
     pub insert_other_query: Option<String>,
     /// Latest version name of each listed document.
     pub insert_other_versions: HashMap<std::path::PathBuf, String>,
@@ -463,8 +463,8 @@ pub(crate) struct AsmUi {
     pub msg_fading: Option<String>,
     /// Interference detection dialog.
     pub interference: Option<super::interference::InterferenceDialog>,
-    pub reflection: Option<crate::part_studio::reflection::ReflectionSettings>,
-    pub reflection_last: Option<crate::part_studio::reflection::ReflectionSettings>,
+    pub reflection: Option<crate::reflection::ReflectionSettings>,
+    pub reflection_last: Option<crate::reflection::ReflectionSettings>,
     pub env_gpu: std::cell::RefCell<Option<(String, noshape_render::ImageHandle)>>,
     pub env_preview: Option<(&'static str, Arc<RenderImage>)>,
     /// The angular value's radius, fixed when first shown for a mate.
@@ -1098,9 +1098,9 @@ impl AssemblyView {
             edit.push(item("Open linked document", move |_, _, cx| {
                 use noshape_model::assembly::eval::ExternalStudios as _;
                 // The referenced version, on the referenced tab.
-                let Ok((handle, _)) = crate::files::open_version_window(r.path.clone(), r.microversion, gpu.clone(), cx) else { return };
+                let Ok(handle) = crate::assembly_hooks::open_version_window(r.path.clone(), r.microversion, gpu.clone(), cx) else { return };
                 if let Some((_, tab)) = AppExternal.studio(&key) {
-                    let _ = handle.update(cx, |_, window, cx| window.defer(cx, move |window, cx| crate::workspace::request_activate_tab(tab, window, cx)));
+                    let _ = handle.update(cx, |_, window, cx| window.defer(cx, move |window, cx| crate::actions::request_activate_tab(tab, window, cx)));
                 }
             }));
         }
@@ -1291,14 +1291,14 @@ impl AssemblyView {
             let InstanceSource::Part { studio, body, config } = &inst.source else { continue };
             // The part's name: the instance name without its " <n>".
             let name = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
-            for it in crate::release_dialog::part_items(self.doc.read(cx), *studio, std::slice::from_ref(body), &[name], config) {
+            for it in crate::assembly_hooks::release_part_items(self.doc.read(cx), *studio, std::slice::from_ref(body), &[name], config) {
                 if !items.iter().any(|x: &noshape_model::release::ReleaseItem| x.same_object(&it)) {
                     items.push(it);
                 }
             }
         }
         if !items.is_empty() {
-            crate::release_dialog::open_release_candidate(self.doc.clone(), items, window, cx);
+            crate::assembly_hooks::open_release_candidate(self.doc.clone(), items, window, cx);
         }
     }
 
@@ -1751,7 +1751,7 @@ impl AssemblyView {
             item(if list_props { "Hide instance list properties" } else { "Show instance list properties" }, move |t, _, cx| {
                 t.ui.list_properties = !list_props;
                 // Kept as Preferences › Assembly settings › Display instance list properties.
-                crate::preferences_window::set_instance_list_properties(!list_props);
+                crate::assembly_hooks::set_instance_list_properties(!list_props);
                 cx.notify();
             }),
             MenuEntry::Sep,
@@ -1781,8 +1781,8 @@ impl AssemblyView {
         m.push(item("Export…", |t, w, cx| t.open_asm_export(None, w, cx)));
         // Live (qa5 CA2): Release… after Export… (the assembly's release items).
         m.push(item("Release…", |t, w, cx| {
-            let items = crate::release_dialog::tab_items(t.doc.read(cx), t.tab);
-            crate::release_dialog::open_release_candidate(t.doc.clone(), items, w, cx);
+            let items = crate::assembly_hooks::release_tab_items(t.doc.read(cx), t.tab);
+            crate::assembly_hooks::open_release_candidate(t.doc.clone(), items, w, cx);
         }));
         m.push(MenuEntry::Sep);
         m.push(item("Expand all", |t, _, cx| t.expand_all(true, cx)));
@@ -2438,14 +2438,14 @@ impl AssemblyView {
 
 /// Animate playback type (Onshape: Single, Reciprocate, Loop).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum Playback {
+pub enum Playback {
     Single,
     Reciprocate,
     Loop,
 }
 
 /// Animate mate dialog state.
-pub(crate) struct AnimState {
+pub struct AnimState {
     pub mate: MateId,
     /// Driven free value (0 = Rz, 1..3 = Tx/Ty/Tz).
     pub dof: usize,
@@ -2488,7 +2488,7 @@ const VALUE_TEXT_ASC: f64 = 11.5;
 
 /// Live's mate angle label number: up to 3 decimals, trailing zeros dropped
 /// ("275.326", and "0" at 0°; qa5 MT7).
-pub(crate) fn mate_angle_label(deg: f64) -> String {
+pub fn mate_angle_label(deg: f64) -> String {
     let t = noshape_units::to_fixed(deg, 3);
     if t.contains('.') { t.trim_end_matches('0').trim_end_matches('.').to_string() } else { t }
 }
@@ -3347,7 +3347,7 @@ impl AssemblyView {
             return None;
         }
         let set_last = move |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
-            match crate::release_dialog::last_viewed_config(studio) {
+            match crate::assembly_hooks::last_viewed_config(studio) {
                 Some(v) => {
                     this.set_config_panel_values(&v, window, cx);
                     this.ui.insert_config.insert(studio, v);
@@ -3979,7 +3979,7 @@ impl AssemblyView {
     /// "Edit section view…": the dialog on the current section, where ✕
     /// turns the section off (live behaviours "Edit section view…": it does
     /// not restore it, even with nothing changed).
-    pub(crate) fn edit_section(&mut self, cx: &mut Context<Self>) {
+    pub fn edit_section(&mut self, cx: &mut Context<Self>) {
         let Some(s) = self.ui.section.as_mut().filter(|s| s.dialog.is_none() && !s.planes.is_empty()) else { return };
         s.dialog = Some(AsmSectionDialog { items_active: false, active: s.planes.len() - 1, chosen: false, saved: None, popup: None, popup_plane: None });
         self.rebuild_scene(false, cx);
@@ -3987,7 +3987,7 @@ impl AssemblyView {
     }
 
     /// "Turn off section view" (also with the dialog open).
-    pub(crate) fn turn_off_section(&mut self, cx: &mut Context<Self>) {
+    pub fn turn_off_section(&mut self, cx: &mut Context<Self>) {
         self.ui.section = None;
         self.rebuild_scene(false, cx);
         cx.notify();
@@ -4535,10 +4535,10 @@ impl AssemblyView {
         // Through the user's export rules (Preferences › User export rules).
         let tab_name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
         let values = crate::export_naming::values(&self.doc.read(cx).name(), &tab_name, &base, None);
-        let base = crate::export_naming::default_name(noshape_model::export_rules::ExportElement::Assembly, crate::part_studio::export::ExportSettings::default().format.label(), &values, base);
-        let run: crate::part_studio::export::RunExport = std::rc::Rc::new(move |s, name, window, cx| {
+        let base = crate::export_naming::default_name(noshape_model::export_rules::ExportElement::Assembly, noshape_ops::export::ExportSettings::default().format.label(), &values, base);
+        let run: crate::assembly_hooks::RunExport = std::rc::Rc::new(move |s, name, window, cx| {
             let (v, ids) = (view.clone(), ids.clone());
-            if let Some(msg) = crate::part_studio::export::missing_writer(s.format) {
+            if let Some(msg) = noshape_ops::export::missing_writer(s.format) {
                 v.update(cx, |this, cx| {
                     this.message = Some((true, msg));
                     cx.notify();
@@ -4550,7 +4550,7 @@ impl AssemblyView {
             if s.options == 2 {
                 v.update(cx, |this, cx| {
                     let asm = this.export_assembly(ids.as_deref(), s.hidden, cx);
-                    this.message = Some(match crate::part_studio::export::store_export(&this.doc, this.tab, &file, |p| crate::part_studio::export::write_assembly_export(&s, p, &asm), cx) {
+                    this.message = Some(match crate::assembly_hooks::store_export(&this.doc, this.tab, &file, |p| noshape_ops::export::write_assembly_export(&s, p, &asm), cx) {
                         Ok(f) => (false, format!("Stored {f}")),
                         Err(e) => (true, format!("Export failed: {e:#}")),
                     });
@@ -4558,14 +4558,14 @@ impl AssemblyView {
                 });
                 return;
             }
-            crate::files::request_save_path("Export", file, s.format.ext(), window, cx, move |path, cx| {
+            crate::file_dialogs::request_save_path("Export", file, s.format.ext(), window, cx, move |path, cx| {
                 v.update(cx, |this, cx| {
                     let asm = this.export_assembly(ids.as_deref(), s.hidden, cx);
-                    this.message = Some(match crate::part_studio::export::write_assembly_export(&s, &path, &asm) {
+                    this.message = Some(match noshape_ops::export::write_assembly_export(&s, &path, &asm) {
                         Ok(p) => {
                             // Download and store file in a new tab.
                             if s.options == 1 {
-                                crate::part_studio::export::store_written(&this.doc, this.tab, &p, cx);
+                                crate::assembly_hooks::store_written(&this.doc, this.tab, &p, cx);
                             }
                             (false, format!("Exported {}", p.display()))
                         }
@@ -4575,7 +4575,7 @@ impl AssemblyView {
                 });
             });
         });
-        crate::part_studio::export::open_export_modal(base, true, run, window, cx);
+        crate::assembly_hooks::open_export_modal(base, true, run, window, cx);
     }
 
     /// Tab › Export… of an Assembly tab: the whole assembly.
@@ -4586,9 +4586,9 @@ impl AssemblyView {
     /// What to export: instances `ids` (None: all), hidden ones only with
     /// "Include hidden instances in export"; STEP keeps the assembly
     /// (`noshape_ops::export::write_assembly_export`).
-    fn export_assembly(&self, ids: Option<&[InstanceId]>, include_hidden: bool, cx: &App) -> crate::part_studio::export::AssemblyExport {
+    fn export_assembly(&self, ids: Option<&[InstanceId]>, include_hidden: bool, cx: &App) -> noshape_ops::export::AssemblyExport {
         let root = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into());
-        crate::part_studio::export::AssemblyExport::of(&root, &self.result, ids, include_hidden)
+        noshape_ops::export::AssemblyExport::of(&root, &self.result, ids, include_hidden)
     }
 }
 

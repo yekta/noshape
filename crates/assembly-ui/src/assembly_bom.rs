@@ -19,7 +19,7 @@ const COL_W: f32 = 140.;
 const ROW_H: f32 = 34.;
 
 /// A BOM cell being typed in: (row, column).
-pub(crate) struct BomEdit {
+pub struct BomEdit {
     pub row: usize,
     pub col: BomColumn,
     pub input: Entity<InputState>,
@@ -156,7 +156,7 @@ impl AssemblyView {
             let lines = bom::lines(doc, self.tab, &self.result, &s);
             (bom::table_text(doc, &self.result, &lines, &s, true), doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default())
         };
-        crate::files::request_save_path("Export to CSV", bom::csv_file_name(&name), "csv", window, cx, move |path, _| {
+        crate::file_dialogs::request_save_path("Export to CSV", bom::csv_file_name(&name), "csv", window, cx, move |path, _| {
             if let Err(e) = std::fs::write(&path, text) {
                 log::error!("BOM export to {}: {e}", path.display());
             }
@@ -530,7 +530,7 @@ fn srgb(v: f32) -> f32 {
 
 /// The text a keystroke types into a selected BOM cell: a printable
 /// character without Ctrl / Alt / Cmd / Fn (those stay shortcuts).
-pub(crate) fn typed_text(k: &gpui_kit::Keystroke) -> Option<String> {
+pub fn typed_text(k: &gpui_kit::Keystroke) -> Option<String> {
     if k.modifiers.control || k.modifiers.alt || k.modifiers.platform || k.modifiers.function {
         return None;
     }

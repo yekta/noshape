@@ -285,7 +285,7 @@ impl MetaForm {
 }
 
 /// A bold 14 px label, with a red "*" for required fields.
-pub(crate) fn label(text: &'static str, required: bool) -> Div {
+pub fn label(text: &'static str, required: bool) -> Div {
     h_flex()
         .h(px(21.))
         .gap(px(3.))
@@ -297,7 +297,7 @@ pub(crate) fn label(text: &'static str, required: bool) -> Div {
 }
 
 /// A disabled-looking field (`#eee`, `#ccc` border) with an optional caret.
-pub(crate) fn gray_box(text: String, caret: bool) -> Div {
+pub fn gray_box(text: String, caret: bool) -> Div {
     h_flex()
         .h(px(34.))
         .w_full()
@@ -355,7 +355,7 @@ fn check_row(id: &'static str, text: &'static str, on: bool) -> Stateful<Div> {
 }
 
 /// A footer button: Apply / Save (`#1651b0`, 40 % until edited) or Close (`#d7d7d7`).
-pub(crate) fn footer_button(id: &'static str, text: &'static str, primary: bool, enabled: bool) -> Stateful<Div> {
+pub fn footer_button(id: &'static str, text: &'static str, primary: bool, enabled: bool) -> Stateful<Div> {
     div()
         .id(id)
         .h(px(34.))
@@ -600,7 +600,7 @@ impl Render for MetaForm {
 }
 
 /// The 57 px Bootstrap modal header with a 24 px / 500 title.
-pub(crate) fn modal_header(title: &'static str, width: f32) -> Div {
+pub fn modal_header(title: &'static str, width: f32) -> Div {
     h_flex()
         .w(px(width - 2.))
         .h(px(57.))
@@ -610,7 +610,7 @@ pub(crate) fn modal_header(title: &'static str, width: f32) -> Div {
         .child(div().text_size(px(24.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).child(title))
 }
 
-pub(crate) fn bootstrap_modal(dialog: gpui_kit::component::dialog::Dialog, title: &'static str, width: f32, top: f32) -> gpui_kit::component::dialog::Dialog {
+pub fn bootstrap_modal(dialog: gpui_kit::component::dialog::Dialog, title: &'static str, width: f32, top: f32) -> gpui_kit::component::dialog::Dialog {
     dialog
         .w(px(width))
         .margin_top(px(top))
@@ -712,11 +712,11 @@ pub fn open_instance_properties(instance: String, designator: String, on_save: i
 /// The Properties modal's least (and default) size; live `resizableModal`
 /// (`metadata-dialog`, resizeX + resizeY), kept across sessions as Onshape
 /// keeps it in localStorage.
-pub(crate) const PROPS_MIN: (f32, f32) = (800., 542.);
+pub const PROPS_MIN: (f32, f32) = (800., 542.);
 
 thread_local! {
     static PROPS_SIZE: std::cell::Cell<(f32, f32)> = std::cell::Cell::new(
-        std::fs::read_to_string(crate::files::config_dir().join("properties_modal_size.txt"))
+        std::fs::read_to_string(crate::paths::config_dir().join("properties_modal_size.txt"))
             .ok()
             .and_then(|t| {
                 let (w, h) = t.trim().split_once(' ')?;
@@ -726,7 +726,7 @@ thread_local! {
     );
 }
 
-pub(crate) fn props_size() -> (f32, f32) {
+pub fn props_size() -> (f32, f32) {
     PROPS_SIZE.with(|s| s.get())
 }
 
@@ -747,7 +747,7 @@ impl Render for ModalResize {
 /// `.modal-resizable-ew` 5 px at the right, `.modal-resizeable-se` 10 px in
 /// the corner). The modal stays centred horizontally, so its width grows
 /// on both sides; its top stays.
-pub(crate) fn resizable_props(dialog: gpui_kit::component::dialog::Dialog) -> gpui_kit::component::dialog::Dialog {
+pub fn resizable_props(dialog: gpui_kit::component::dialog::Dialog) -> gpui_kit::component::dialog::Dialog {
     let handle = |id: &'static str, x: bool, y: bool, cursor: CursorStyle| {
         div().id(id).absolute().cursor(cursor).on_drag(ModalResize { x, y }, |d, _, _, cx| cx.new(|_| d.clone()))
     };
@@ -774,7 +774,7 @@ pub(crate) fn resizable_props(dialog: gpui_kit::component::dialog::Dialog) -> gp
                 }
                 if (w, h) != props_size() {
                     PROPS_SIZE.with(|s| s.set((w, h)));
-                    let p = crate::files::config_dir().join("properties_modal_size.txt");
+                    let p = crate::paths::config_dir().join("properties_modal_size.txt");
                     if let Some(dir) = p.parent() {
                         let _ = std::fs::create_dir_all(dir);
                     }

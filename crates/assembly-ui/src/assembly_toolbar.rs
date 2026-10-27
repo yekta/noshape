@@ -8,12 +8,12 @@ use gpui_kit::component::menu::DropdownMenu as _;
 
 // The tool sets, the user's toolbar and its file (shared with the agent
 // API's ui_toolbar).
-pub(crate) use noshape_ops::prefs::{ASM_SHORTCUT_EXTRAS as SHORTCUT_EXTRAS, ASM_TOOLSETS as TOOLSETS, AsmToolbarPrefs, asm_tool_info as tool_info};
+pub use noshape_ops::prefs::{ASM_SHORTCUT_EXTRAS as SHORTCUT_EXTRAS, ASM_TOOLSETS as TOOLSETS, AsmToolbarPrefs, asm_tool_info as tool_info};
 
 /// Every tool the S toolbar can hold (Preferences › Shortcut toolbars ›
 /// Assembly, live's 30): (id, name, icon), in list order; the toolbar shows
 /// the ticked ones in this order.
-pub(crate) fn shortcut_catalog() -> Vec<(&'static str, &'static str, &'static str)> {
+pub fn shortcut_catalog() -> Vec<(&'static str, &'static str, &'static str)> {
     TOOLSETS
         .iter()
         .flat_map(|s| s.iter())

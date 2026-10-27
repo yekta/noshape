@@ -12,7 +12,7 @@ use noshape_units::{Dim, EmptyScope, Quantity};
 
 /// What a viewport click picks while a dialog field is active.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum PickMode {
+pub enum PickMode {
     /// Implicit mate connector inference points (plus origin / assembly connectors).
     Inference,
     /// Bare faces, edges and vertices (tangent mates).
@@ -20,7 +20,7 @@ pub(crate) enum PickMode {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum PatternDialogKind {
+pub enum PatternDialogKind {
     Linear,
     Circular,
     Mirror,
@@ -38,20 +38,20 @@ impl PatternDialogKind {
             PatternDialogKind::Replicate => "Replicate",
         }
     }
-    pub(crate) fn matched(self) -> bool {
+    pub fn matched(self) -> bool {
         matches!(self, PatternDialogKind::PartPattern | PatternDialogKind::Replicate)
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RenameTarget {
+pub enum RenameTarget {
     Explode(usize),
     /// An explode step (view, step).
     ExplodeStep(usize, usize),
 }
 
 
-pub(crate) struct McSession {
+pub struct McSession {
     pub id: MateId,
     pub editing: bool,
     pub name: String,
@@ -126,7 +126,7 @@ impl McSession {
     }
 }
 
-pub(crate) struct PatternSession {
+pub struct PatternSession {
     pub kind: PatternDialogKind,
     pub editing: Option<MateId>,
     pub name: String,
@@ -164,7 +164,7 @@ pub(crate) struct PatternSession {
 
 /// One row of live's Mirror strategy table.
 #[derive(Clone, Copy, Default)]
-pub(crate) struct MirrorRow {
+pub struct MirrorRow {
     /// Mirror action Derived (else Transform).
     pub derived: bool,
     pub placement: noshape_model::assembly::MirrorPlacement,
@@ -174,7 +174,7 @@ pub(crate) struct MirrorRow {
     pub symmetric: Option<bool>,
 }
 
-pub(crate) struct ManipValue {
+pub struct ManipValue {
     pub handle: ManipHandle,
     pub axis: DVec3,
     pub center: DVec3,
@@ -185,7 +185,7 @@ pub(crate) struct ManipValue {
     _sub: Subscription,
 }
 
-pub(crate) struct ConfigSession {
+pub struct ConfigSession {
     pub instance: InstanceId,
     /// Configuration inputs of the instance's Part Studio.
     pub inputs: Vec<noshape_model::configuration::ConfigInput>,
@@ -205,7 +205,7 @@ pub(crate) struct ConfigSession {
 /// The Replace instance dialog (live assembly/833–836): the instances to
 /// replace, the chosen replacement (source, name), Replace all instances,
 /// and whether the replacement picker is open.
-pub(crate) struct ReplaceSession {
+pub struct ReplaceSession {
     pub instances: Vec<InstanceId>,
     pub all: bool,
     pub replacement: Option<(InstanceSource, String)>,
@@ -3036,7 +3036,7 @@ impl AssemblyView {
 
 /// Manipulator context menu actions.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) enum TriadAction {
+pub enum TriadAction {
     MoveToOrigin,
     /// Align triad axis k with world +Z (`true`: anti-align, -Z).
     AlignZ(usize, bool),
@@ -3047,7 +3047,7 @@ pub(crate) enum TriadAction {
 /// The exploded view's rollback bar being dragged (Onshape's
 /// `ns-list-item-rollbackbar`): dropped after a step, the view plays up to it.
 #[derive(Clone)]
-pub(crate) struct ExplodeRollbackDrag {
+pub struct ExplodeRollbackDrag {
     pub view: usize,
     /// Where the bar was grabbed (the ghost is drawn that far up-left of the
     /// cursor; padding by it centres the pill on the cursor).
@@ -3075,7 +3075,7 @@ impl Render for ExplodeRollbackDrag {
 
 /// Explode step being dragged in the panel (reorder).
 #[derive(Clone)]
-pub(crate) struct ExplodeStepDrag {
+pub struct ExplodeStepDrag {
     pub index: usize,
     pub label: SharedString,
 }
@@ -3875,7 +3875,7 @@ const OTHER_SOURCES: [(&str, &str); 5] = [("Owned by me", "src-owned"), ("Recent
 /// its versions (named ones newest first, then Start), the one shown, and
 /// that version's Part Studios and assemblies.
 #[derive(Clone)]
-pub(crate) struct OtherDoc {
+pub struct OtherDoc {
     pub path: std::path::PathBuf,
     pub name: String,
     pub versions: Vec<crate::derived::VersionChoice>,
@@ -3956,7 +3956,7 @@ impl AssemblyView {
         cx.spawn(async move |this, cx| {
             let (docs, versions) = cx
                 .background_spawn(async {
-                    let docs = crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs;
+                    let docs = crate::assembly_hooks::library_docs();
                     // Each document's latest version name (grey under the name).
                     let versions: HashMap<std::path::PathBuf, String> = docs.iter().filter_map(|d| OtherDoc::open(&d.path).ok().and_then(|o| o.versions.first().map(|v| (d.path.clone(), v.label.clone())))).collect();
                     (docs, versions)
@@ -3975,7 +3975,7 @@ impl AssemblyView {
     /// document, other text lists the documents whose name contains it.
     pub(super) fn search_other_documents(&mut self, text: String, cx: &mut Context<Self>) {
         let path = std::path::PathBuf::from(text.trim_start_matches("file://"));
-        if path.extension().is_some_and(|e| e == crate::start_library::EXT) && path.exists() {
+        if path.extension().is_some_and(|e| e == crate::library::EXT) && path.exists() {
             self.pick_other_document(path, cx);
             return;
         }
@@ -4140,7 +4140,7 @@ impl AssemblyView {
                         let path = d.path.clone();
                         let gpu = self.gpu.clone();
                         move |_, _, cx| {
-                            let _ = crate::files::open_document_window(path.clone(), None, gpu.clone(), cx);
+                            let _ = crate::assembly_hooks::open_document_window(path.clone(), gpu.clone(), cx);
                         }
                     }))
                     .child(square("ins-other-graph", "version-graph", "Version graph", d.graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -4255,7 +4255,7 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .child(format!("Create a version in {}.", d.name))
                                 .on_click(move |_, _, cx| {
-                                    let _ = crate::files::open_document_window(path.clone(), None, gpu.clone(), cx);
+                                    let _ = crate::assembly_hooks::open_document_window(path.clone(), gpu.clone(), cx);
                                 }),
                         ),
                 );
@@ -4417,7 +4417,7 @@ impl AssemblyView {
         }
         let me = self.doc.read(cx).session.path.clone();
         let loading = self.ui.insert_other_docs.as_ref().is_none_or(|d| d.is_empty()) && self.ui.insert_other_versions.is_empty();
-        let mut docs: Vec<crate::start_library::DocEntry> = self.ui.insert_other_docs.clone().unwrap_or_default().into_iter().filter(|d| !d.trashed && !d.broken && d.path != me).collect();
+        let mut docs: Vec<crate::library::DocEntry> = self.ui.insert_other_docs.clone().unwrap_or_default().into_iter().filter(|d| !d.trashed && !d.broken && d.path != me).collect();
         let q = query.as_ref().map(|q| q.to_lowercase());
         match (cat, &q) {
             // Local documents are all the user's own; nothing is shared or public.
@@ -4433,11 +4433,11 @@ impl AssemblyView {
         // name; a click opens one), then the documents at that level.
         if cat == Some(0) && q.is_none() {
             let root = docs_root();
-            let outside: Vec<std::path::PathBuf> = crate::files::watched_folders().into_iter().map(|f| canon_dir(&f)).filter(|f| !f.starts_with(&root) && f.is_dir()).collect();
+            let outside: Vec<std::path::PathBuf> = crate::assembly_hooks::watched_folders().into_iter().map(|f| canon_dir(&f)).filter(|f| !f.starts_with(&root) && f.is_dir()).collect();
             let here = self.ui.insert_other_dir.clone();
             let dirs: Vec<std::path::PathBuf> = match &here {
-                Some(dir) => crate::start_window::subfolders(dir),
-                None => crate::start_window::subfolders(&root).into_iter().chain(outside.iter().cloned()).collect(),
+                Some(dir) => crate::assembly_hooks::subfolders(dir),
+                None => crate::assembly_hooks::subfolders(&root).into_iter().chain(outside.iter().cloned()).collect(),
             };
             docs.retain(|d| {
                 let f = canon_dir(d.folder());
@@ -4594,7 +4594,7 @@ impl AssemblyView {
 
 /// The documents folder (canonical): the top of Owned by me.
 fn docs_root() -> std::path::PathBuf {
-    canon_dir(&crate::files::documents_dir())
+    canon_dir(&crate::file_dialogs::documents_dir())
 }
 
 fn canon_dir(p: &std::path::Path) -> std::path::PathBuf {

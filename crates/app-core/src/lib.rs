@@ -2,10 +2,12 @@
 //! and the 3D viewport. It never references a studio; the studio UIs and the `noshape` binary build on it.
 
 pub mod actions;
+pub mod assembly_context;
 pub mod assets;
 pub mod cached_slice;
 pub mod camera_menu;
 pub mod color_mixer;
+pub mod config_visibility;
 pub mod cursor;
 pub mod custom_tables;
 pub mod derived;
@@ -26,7 +28,9 @@ pub mod os_select;
 pub mod os_ui;
 pub mod overlay_labels;
 pub mod paths;
+pub mod properties_dialog;
 pub mod quantity_field;
+pub mod reflection;
 pub mod scene_builder;
 pub mod section_dialog;
 pub mod session;
@@ -37,4 +41,5 @@ pub mod tool_text;
 pub mod toolbar_customize;
 pub mod touch;
 pub mod ui;
+pub mod view_cube;
 pub mod viewport;

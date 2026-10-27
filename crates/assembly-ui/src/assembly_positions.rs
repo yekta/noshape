@@ -12,14 +12,14 @@ use super::*;
 use gpui_kit::component::input::InputEvent;
 
 /// "Driving mate selector": mates listed, their degrees of freedom checked.
-pub(crate) struct NpDriver {
+pub struct NpDriver {
     pub mates: Vec<MateId>,
     pub checked: Vec<(MateId, u8)>,
     pub expanded: HashSet<MateId>,
 }
 
 /// A table cell being typed in: (row, column) — column 0 is the name.
-pub(crate) struct NpCell {
+pub struct NpCell {
     pub row: usize,
     pub col: usize,
     pub input: Entity<InputState>,
@@ -657,7 +657,7 @@ impl AssemblyView {
 
 /// Onshape's yellow editing banner (`#fab601`, 13 px, 28 px tall) with a
 /// white "Done" button; shown at the top centre over the toolbar row.
-pub(crate) fn yellow_banner(text: String, done: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> AnyElement {
+pub fn yellow_banner(text: String, done: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> AnyElement {
     h_flex()
         .id("yellow-banner")
         .occlude()

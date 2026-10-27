@@ -77,7 +77,7 @@ struct Catalog {
 
 /// The floating mate toolbar being moved by its handle (grab offset).
 #[derive(Clone)]
-pub(crate) struct HudDrag(pub Arc<Mutex<Point<Pixels>>>);
+pub struct HudDrag(pub Arc<Mutex<Point<Pixels>>>);
 
 struct HudDragGhost;
 
@@ -109,7 +109,7 @@ struct RelationSession {
 
 #[path = "assembly_panels.rs"]
 mod panels;
-pub(crate) use panels::*;
+pub use panels::*;
 
 
 /// Key in `expanded` that marks the "Mate features" folder as collapsed.
@@ -119,8 +119,8 @@ const RELATION_KINDS: [RelationType; 4] = [RelationType::Gear, RelationType::Rac
 
 #[path = "assembly_behaviors.rs"]
 mod behaviors;
-pub(crate) use behaviors::*;
-pub(crate) use props::StaleContexts;
+pub use behaviors::*;
+pub use props::StaleContexts;
 
 #[path = "assembly_standard.rs"]
 mod standard_content;
@@ -137,7 +137,7 @@ mod positions;
 #[path = "assembly_bom.rs"]
 mod bom_panel;
 #[path = "assembly_mass.rs"]
-pub(crate) mod mass;
+pub mod mass;
 // What an agent's call asks of this view (live mode).
 #[path = "agent_window/assembly.rs"]
 mod agent_window;
@@ -147,8 +147,8 @@ mod reflection;
 mod config_panel;
 #[path = "assembly_toolbar.rs"]
 mod toolbar;
-pub(crate) use toolbar::{AsmToolbarPrefs, shortcut_catalog};
-pub(crate) use standard_content::*;
+pub use toolbar::{AsmToolbarPrefs, shortcut_catalog};
+pub use standard_content::*;
 
 struct DragState {
     top: InstanceId,
@@ -249,7 +249,7 @@ struct FeatureRow {
 /// Explode step edit dialog.
 /// The "Explode step" dialog (live assembly/805–813): a step just made by
 /// a drag (`created`) or one being edited (double click / Edit…).
-pub(crate) struct StepEdit {
+pub struct StepEdit {
     pub view: usize,
     pub step: usize,
     pub created: bool,
@@ -273,7 +273,7 @@ pub(crate) struct StepEdit {
 /// An explode drag's value as live rounds it (qa5 EXV5, live 805/810:
 /// "Distance 18.9 mm", "Rotation angle 55 deg"): whole degrees, 0.1 mm
 /// (0.01 in in imperial workspaces).
-pub(crate) fn explode_drag_round(v: f64, rotation: bool, units: &noshape_units::UnitPrefs) -> f64 {
+pub fn explode_drag_round(v: f64, rotation: bool, units: &noshape_units::UnitPrefs) -> f64 {
     use noshape_units::LengthUnit as L;
     let step = if rotation {
         1f64.to_radians()
@@ -307,11 +307,11 @@ pub struct AssemblyView {
     pub tab: TabId,
     doc: Entity<DocModel>,
     gpu: Gpu,
-    pub(crate) viewport: Entity<Viewport>,
+    pub viewport: Entity<Viewport>,
     /// Variable Studio tables in the Variable table panel.
-    var_tables: HashMap<TabId, Entity<crate::variable_studio::VariableStudioView>>,
+    var_tables: HashMap<TabId, AnyView>,
     /// View cube hover cell and last painted origin (`view_cube`).
-    cube_hover: Option<crate::part_studio::view_cube::CubeCell>,
+    cube_hover: Option<crate::view_cube::CubeCell>,
     cube_origin: Option<Point<Pixels>>,
     /// Cached parts of the view (toolbar, list rows, graphics overlay): see
     /// `crate::cached_slice`.
@@ -413,7 +413,7 @@ pub enum AssemblyViewEvent {
     ActivateTab(TabId),
     /// Instance menu › Edit in context: open the Part Studio with the
     /// assembly as context graphics.
-    EditInContext(TabId, Box<crate::part_studio::AssemblyContext>),
+    EditInContext(TabId, Box<crate::assembly_context::AssemblyContext>),
 }
 
 impl EventEmitter<AssemblyViewEvent> for AssemblyView {}
@@ -562,7 +562,7 @@ impl AssemblyView {
             show_mates: false,
             show_connectors: false,
             // Onshape's Insert dialog starts with the Parts filter on.
-            ui: AsmUi { insert_filter: (true, false), tb_prefs: toolbar::AsmToolbarPrefs::load(), list_properties: crate::preferences_window::ListPrefs::load().instance_list_properties, graphics: crate::graphics_prefs::get(cx), ..Default::default() },
+            ui: AsmUi { insert_filter: (true, false), tb_prefs: toolbar::AsmToolbarPrefs::load(), list_properties: crate::assembly_hooks::instance_list_properties(), graphics: crate::graphics_prefs::get(cx), ..Default::default() },
             expanded: HashSet::new(),
             message: None,
             mc: None,
@@ -4513,7 +4513,7 @@ impl AssemblyView {
                         )
                         .child(square("ins-create-version", "version", "Create version…", cx).on_click({
                             let doc = self.doc.clone();
-                            move |_, w, cx| crate::history_panel::open_create_version_in(doc.clone(), w, cx)
+                            move |_, w, cx| crate::assembly_hooks::create_version(doc.clone(), w, cx)
                         }))
                         .child(square("ins-version-graph", "version-graph", "Version graph", cx).on_click(|_, w, cx| w.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),
                 )
@@ -4877,7 +4877,7 @@ impl AssemblyView {
         for s in studios {
             if !self.var_tables.contains_key(&s) {
                 let (doc, host) = (self.doc.clone(), self.tab);
-                let view = cx.new(|cx| crate::variable_studio::VariableStudioView::new_in_panel(doc, s, host, window, cx));
+                let view = crate::assembly_hooks::variable_table(doc, s, host, window, cx);
                 self.var_tables.insert(s, view);
             }
         }
@@ -4890,13 +4890,12 @@ impl AssemblyView {
     fn render_variables_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let refs = noshape_model::variables::element_studios(&self.doc.read(cx).session.doc, self.tab);
-        let target = crate::variable_insert::InsertTarget::Element(self.tab);
         let tables: Vec<AnyElement> = refs
             .iter()
             .enumerate()
             .filter_map(|(k, r)| match &r.external {
                 // Another document's studio: read-only (Onshape).
-                Some(_) => crate::variable_insert::readonly_table(&self.doc, target, r, k, refs.len(), cx),
+                Some(_) => crate::assembly_hooks::readonly_variable_table(&self.doc, self.tab, r, k, refs.len(), cx),
                 None => self.var_tables.get(&r.studio).map(|v| v.clone().into_any_element()),
             })
             .map(|t| div().pb(px(10.)).child(t).into_any_element())
@@ -4953,7 +4952,7 @@ impl AssemblyView {
                     .bg(gpui_kit::rgb(0xeeeeee))
                     .border_t_1()
                     .border_color(gpui_kit::rgb(0xcccccc))
-                    .child(div().flex_1().flex().justify_center().child(crate::variable_insert::panel_footer(self.doc.clone(), self.tab, cx)))
+                    .child(div().flex_1().flex().justify_center().child(crate::assembly_hooks::variable_panel_footer(self.doc.clone(), self.tab, cx)))
                     .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))),
             )
             .into_any_element()
@@ -5272,7 +5271,7 @@ impl AssemblyView {
     fn render_view_controls(&mut self, cx: &mut Context<Self>) -> AnyElement {
         // Onshape: the same View cube as the Part Studio, 15 px from the
         // graphics area's top-right corner, with the camera menu under it.
-        use crate::part_studio::view_cube::{CubeHooks, view_cube};
+        use crate::view_cube::{CubeHooks, view_cube};
         // The cube is drawn into the 3D frame (perf).
         let hover = self.cube_hover;
         self.viewport.update(cx, |vp, cx| vp.set_view_cube(Some(hover), cx));
@@ -5356,7 +5355,7 @@ impl AssemblyView {
     }
 
     /// Keep the camera for "Previous view" (before a view change).
-    pub(crate) fn push_camera_history(&mut self, cx: &App) {
+    pub fn push_camera_history(&mut self, cx: &App) {
         let cam = self.viewport.read(cx).camera;
         if self.ui.cam_history.last() != Some(&cam) {
             self.ui.cam_history.push(cam);
@@ -5454,7 +5453,7 @@ impl AssemblyView {
     }
 
     /// The camera menu's picks ([`crate::camera_menu`]).
-    pub(crate) fn on_camera_action(&mut self, a: crate::camera_menu::Action, w: &mut Window, cx: &mut Context<Self>) {
+    pub fn on_camera_action(&mut self, a: crate::camera_menu::Action, w: &mut Window, cx: &mut Context<Self>) {
         use crate::camera_menu::Action;
         match a {
             Action::View(sv) => {
@@ -6014,7 +6013,7 @@ mod tests {
 /// A suppressed row's name in the instance list (instances, mates,
 /// patterns): grey italic struck through, as Onshape's `suppressed` rows
 /// (live assembly/198 "Revolute 1", 140–142; qa5 P2-A5).
-pub(crate) fn suppressed_text(d: Div, suppressed: bool) -> Div {
+pub fn suppressed_text(d: Div, suppressed: bool) -> Div {
     d.when(suppressed, |d| d.italic().line_through())
 }
 

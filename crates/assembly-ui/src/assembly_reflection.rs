@@ -8,11 +8,11 @@
 //! ✕ / Esc turns it off.
 
 use super::*;
-use crate::part_studio::environment_maps;
-use crate::part_studio::reflection::{EnvImageRef, ReflectionSettings};
+use noshape_scene::environment_maps;
+use crate::reflection::{EnvImageRef, ReflectionSettings};
 
 /// The open Reflection analysis dialog.
-pub(crate) struct ReflectionDialog {
+pub struct ReflectionDialog {
     pub settings: ReflectionSettings,
     rotation: Entity<crate::quantity_field::QuantityInput>,
     /// The "Select image" panel: tab (0 Current document, 1 Other

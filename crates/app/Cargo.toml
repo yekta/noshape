@@ -15,6 +15,7 @@ winresource = "0.1"
 [dependencies]
 noshape-app-core.workspace = true
 noshape-drawing-ui.workspace = true
+noshape-assembly-ui.workspace = true
 noshape-render.workspace = true
 noshape-model.workspace = true
 noshape-store.workspace = true

@@ -6,16 +6,14 @@
 #![recursion_limit = "256"]
 
 // The app's base layer (docs/CRATES.md), under its old paths.
-use noshape_app_core::{actions, assets, cached_slice, camera_menu, color_mixer, cursor, custom_tables, derived, doc_model, export_naming, gpu, graphics_prefs, graphics_prefs_dialog, i18n, isolate_ui, named_views_dialog, nav_trace, navigation, os_menu, os_select, os_ui, overlay_labels, quantity_field, scene_builder, section_dialog, session, start_thumbnail, theme, tool_synonyms, tool_text, toolbar_customize, ui, viewport};
+use noshape_app_core::{actions, assets, cached_slice, camera_menu, color_mixer, config_visibility, cursor, custom_tables, derived, doc_model, export_naming, gpu, graphics_prefs, graphics_prefs_dialog, i18n, isolate_ui, named_views_dialog, nav_trace, navigation, os_menu, os_select, os_ui, overlay_labels, properties_dialog, quantity_field, scene_builder, section_dialog, session, start_thumbnail, theme, tool_synonyms, tool_text, toolbar_customize, ui, viewport};
 // The Drawing studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_drawing_hooks`.
 use noshape_drawing_ui::{drawing_create, drawing_keys, drawing_sketch, drawing_view};
+// The Assembly studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_assembly_hooks`.
+use noshape_assembly_ui::{assembly_scene, assembly_view};
 mod fs_profile;
 mod live_server;
 mod std_source;
-mod assembly_mate_dialog;
-mod assembly_scene;
-mod assembly_view;
-mod config_visibility;
 mod material_libraries;
 mod numbering_prefs;
 mod release_conditions;
@@ -52,13 +50,11 @@ mod mouse_prefs;
 mod drawing_prefs;
 mod part_studio;
 mod preferences_window;
-mod properties_dialog;
 mod release_dialog;
 mod sketch_mode;
 mod sketch_fonts;
 mod prefs_general;
 mod prefs_export_rules;
-mod measure_panel;
 mod start_library;
 mod start_search;
 mod start_trash;
@@ -257,6 +253,35 @@ fn register_drawing_hooks() {
     });
 }
 
+/// What the Assembly studio (noshape-assembly-ui) needs of the app: other documents' windows, the documents library
+/// and its folders, the release dialogs, Create version, tab properties, a preference, the Part Studio's Export and
+/// Input propagation dialogs, the Variable Studio's tables.
+fn register_assembly_hooks() {
+    noshape_assembly_ui::assembly_hooks::register(noshape_assembly_ui::assembly_hooks::Hooks {
+        open_document_window: |path, gpu, cx| files::open_document_window(path, None, gpu, cx),
+        open_version_window: |path, version, gpu, cx| files::open_version_window(path, version, gpu, cx).map(|(handle, _)| handle),
+        library_docs: || start_library::Library::default().scan(&start_library::ScanInput::current()).docs,
+        watched_folders: files::watched_folders,
+        subfolders: start_window::subfolders,
+        file_thumbnail: start_library::file_thumbnail,
+        release_part_items: release_dialog::part_items,
+        release_tab_items: release_dialog::tab_items,
+        open_release_candidate: release_dialog::open_release_candidate,
+        last_viewed_config: release_dialog::last_viewed_config,
+        create_version: history_panel::open_create_version_in,
+        tab_properties: doc_dialogs::tab_properties,
+        instance_list_properties: || preferences_window::ListPrefs::load().instance_list_properties,
+        set_instance_list_properties: preferences_window::set_instance_list_properties,
+        open_export_modal: part_studio::export::open_export_modal,
+        store_export: |doc, tab, file, write, cx| part_studio::export::store_export(doc, tab, file, write, cx),
+        store_written: part_studio::export::store_written,
+        open_propagation_dialog: part_studio::input_propagation::open_propagation_dialog,
+        variable_table: |doc, studio, host, window, cx| cx.new(|cx| variable_studio::VariableStudioView::new_in_panel(doc, studio, host, window, cx)).into(),
+        readonly_variable_table: |doc, element, r, k, n, cx| variable_insert::readonly_table(doc, variable_insert::InsertTarget::Element(element), r, k, n, cx),
+        variable_panel_footer: variable_insert::panel_footer,
+    });
+}
+
 fn main() {
     noshape_render::perf::process_start();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
@@ -268,6 +293,7 @@ fn main() {
     // Feature Studio imports of other documents / versions read their snapshots.
     noshape_model::custom::set_external_tab_loader(derived::external_tab);
     register_drawing_hooks();
+    register_assembly_hooks();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);

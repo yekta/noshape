@@ -959,7 +959,7 @@ const MATE_TYPE_ORDER: [MateType; 8] = [MateType::Slider, MateType::Cylindrical,
 
 /// The Flip primary axis icon for a mate's alignment (`flip_primary`: the
 /// connectors' Z axes agree, which is Onshape's flip flag off).
-pub(crate) fn flip_icon_name(flip_primary: bool) -> &'static str {
+pub fn flip_icon_name(flip_primary: bool) -> &'static str {
     if flip_primary { "flip-direction" } else { "flip-direction-opposite" }
 }
 

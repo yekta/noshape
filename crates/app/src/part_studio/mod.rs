@@ -47,7 +47,7 @@ pub(crate) mod toolbar_prefs;
 pub mod view_cube;
 mod view_tools;
 mod in_context;
-pub use in_context::{AssemblyContext, ContextOccurrence, PartStudioEvent, context_arrow_icon};
+pub use in_context::PartStudioEvent;
 
 use crate::actions::*;
 use crate::sketch_mode::SketchEditor;

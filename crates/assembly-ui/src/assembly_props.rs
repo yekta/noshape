@@ -7,7 +7,7 @@ use crate::properties_dialog::{MetaSpec, MetaValues};
 use gpui_kit::component::input::InputEvent;
 use std::rc::Rc;
 
-pub(crate) use noshape_ops::assembly::DynTarget;
+pub use noshape_ops::assembly::DynTarget;
 use noshape_model::assembly::BomBehavior;
 
 /// The dialogs' gray "?" help button (14 px, `#888`).
@@ -77,7 +77,7 @@ impl AssemblyView {
             }
             _ => {
                 if let Some(studio) = inst.source.studio() {
-                    crate::doc_dialogs::tab_properties(self.doc.clone(), studio, window, cx);
+                    crate::assembly_hooks::tab_properties(self.doc.clone(), studio, window, cx);
                 }
             }
         }
@@ -424,7 +424,7 @@ impl AssemblyView {
                     .into_any_element(),
             );
         }
-        Some(div().id(SharedString::from(format!("ctx-icon-{}", top.0))).flex_none().tooltip(crate::ui::tooltip(tip)).child(crate::part_studio::context_arrow_icon(false, !primary)).into_any_element())
+        Some(div().id(SharedString::from(format!("ctx-icon-{}", top.0))).flex_none().tooltip(crate::ui::tooltip(tip)).child(crate::assembly_context::context_arrow_icon(false, !primary)).into_any_element())
     }
 
     /// Instance › Set as primary instance ▸ <context>: the context is
@@ -465,7 +465,7 @@ impl AssemblyView {
             .occurrences
             .iter()
             .filter(|o| o.top() != top && !o.hidden && matches!(o.kind, BodyKind::Solid | BodyKind::Surface))
-            .map(|o| crate::part_studio::ContextOccurrence {
+            .map(|o| crate::assembly_context::ContextOccurrence {
                 top: o.top(),
                 name: self.assembly(cx).and_then(|a| a.instance(o.top())).map(|i| i.name.clone()).unwrap_or_else(|| o.instance_name.clone()),
                 mesh: o.mesh.clone(),
@@ -480,7 +480,7 @@ impl AssemblyView {
         };
         let camera = Some(self.camera_in(to_studio, cx));
         let context = self.add_assembly_context(studio, Some(top), existing, to_studio, None, cx);
-        cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::part_studio::AssemblyContext { assembly: self.tab, assembly_name, part, occurrences, insert_at: None, camera, context })));
+        cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::assembly_context::AssemblyContext { assembly: self.tab, assembly_name, part, occurrences, insert_at: None, camera, context })));
     }
 
     /// The Assembly context (snapshot) a Part Studio shows while edited in
@@ -513,7 +513,7 @@ impl AssemblyView {
 
 /// A referenced document with a newer version (Reference manager row).
 #[derive(Clone)]
-pub(crate) struct RefDoc {
+pub struct RefDoc {
     pub name: String,
     /// "Main" (this document's workspace) or the pinned version's label.
     pub current: String,
@@ -529,7 +529,7 @@ pub(crate) struct RefDoc {
 
 /// The open Reference manager: tab (0 Update to latest, 1 Selective
 /// update), documents, checked rows and per-row chosen versions.
-pub(crate) struct RefManager {
+pub struct RefManager {
     /// Change to version…: only these instances (else every reference).
     pub scope: Option<Vec<InstanceId>>,
     pub tab: u8,
@@ -550,7 +550,7 @@ impl AssemblyView {
         if local && let Ok(vs) = dm.session.store.list_versions() {
             let versions: Vec<crate::derived::VersionChoice> = vs.iter().rev().map(|v| crate::derived::VersionChoice { label: v.name.clone(), microversion: v.microversion }).collect();
             if !versions.is_empty() {
-                let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::start_library::decode_thumbnail);
+                let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::library::decode_thumbnail);
                 out.push(RefDoc { name: dm.name(), current: dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()), versions, keys: Vec::new(), path: dm.session.path.clone(), thumbnail });
             }
         }
@@ -575,7 +575,7 @@ impl AssemblyView {
                 continue;
             }
             let current = versions.iter().find(|v| v.microversion == mv).map(|v| v.label.clone()).unwrap_or_else(|| format!("state {}", mv.short()));
-            let thumbnail = crate::start_library::file_thumbnail(&path);
+            let thumbnail = crate::assembly_hooks::file_thumbnail(&path);
             out.push(RefDoc { name: info.name, current, versions, keys, path, thumbnail });
         }
         out
@@ -896,7 +896,7 @@ impl AssemblyView {
             doc.edit_document("Create Part Studio in context", cx, |d| {
                 let name = d.next_tab_name("Part Studio");
                 let id = d.add_tab(&name, TabContent::PartStudio(noshape_model::PartStudio::new()));
-                crate::workspace::place_after(d, id, Some(after));
+                noshape_ops::docedit::place_after(d, id, Some(after));
                 new_tab = Some(id);
             })
         });
@@ -906,7 +906,7 @@ impl AssemblyView {
             .occurrences
             .iter()
             .filter(|o| !o.hidden && matches!(o.kind, BodyKind::Solid | BodyKind::Surface))
-            .map(|o| crate::part_studio::ContextOccurrence {
+            .map(|o| crate::assembly_context::ContextOccurrence {
                 top: o.top(),
                 name: self.assembly(cx).and_then(|a| a.instance(o.top())).map(|i| i.name.clone()).unwrap_or_else(|| o.instance_name.clone()),
                 mesh: o.mesh.clone(),
@@ -918,7 +918,7 @@ impl AssemblyView {
         let insert_at = Some(frame_to_placement(&frame));
         let camera = Some(self.camera_in(to_studio, cx));
         let context = self.add_assembly_context(studio, None, None, to_studio, insert_at, cx);
-        cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::part_studio::AssemblyContext { assembly: self.tab, assembly_name, part: None, occurrences, insert_at, camera, context })));
+        cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::assembly_context::AssemblyContext { assembly: self.tab, assembly_name, part: None, occurrences, insert_at, camera, context })));
         cx.notify();
     }
 

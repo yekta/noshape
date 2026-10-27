@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-pub use noshape_app_core::library::{DocEntry, EXT};
+pub use noshape_app_core::library::{DocEntry, EXT, decode_thumbnail};
 
 #[derive(Clone)]
 struct Cached {
@@ -102,21 +102,6 @@ fn list_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>, dirs: &mut Vec<Pat
             out.push(p);
         }
     }
-}
-
-pub(crate) fn decode_thumbnail(png: &[u8]) -> Option<Arc<RenderImage>> {
-    let img = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?;
-    let mut rgba = img.to_rgba8();
-    // GPUI render images are BGRA. The white background becomes
-    // transparent so thumbnails sit on hovered and selected rows like
-    // Onshape's.
-    for px in rgba.as_chunks_mut::<4>().0 {
-        px.swap(0, 2);
-        if px[0] >= 250 && px[1] >= 250 && px[2] >= 250 {
-            *px = [0; 4];
-        }
-    }
-    Some(Arc::new(RenderImage::new(vec![image::Frame::new(rgba)])))
 }
 
 impl Library {

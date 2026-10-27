@@ -8,7 +8,7 @@ use noshape_ops::window::{DisplaySet, ListAct, Selected};
 
 impl AssemblyView {
     /// A display setting (view_display).
-    pub(crate) fn agent_display(&mut self, set: DisplaySet, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn agent_display(&mut self, set: DisplaySet, window: &mut Window, cx: &mut Context<Self>) {
         match set {
             DisplaySet::IsolateInstances { transparent, instances } => self.isolate_cmd(transparent, instances, cx),
             DisplaySet::ExitIsolate => {
@@ -37,7 +37,7 @@ impl AssemblyView {
     }
 
     /// The selection (ui_select): instances, or Clear selection.
-    pub(crate) fn agent_select(&mut self, sel: Selected, cx: &mut Context<Self>) {
+    pub fn agent_select(&mut self, sel: Selected, cx: &mut Context<Self>) {
         self.clear_selection();
         if let Selected::Instances(ids) = sel {
             self.selected = ids;
@@ -47,7 +47,7 @@ impl AssemblyView {
     }
 
     /// The instance list and mate rows (ui_list), as their menus do it.
-    pub(crate) fn agent_list(&mut self, act: ListAct, cx: &mut Context<Self>) {
+    pub fn agent_list(&mut self, act: ListAct, cx: &mut Context<Self>) {
         match act {
             ListAct::All(expand) => self.expand_all(expand, cx),
             ListAct::Instances { tops, expand } => {
@@ -81,7 +81,7 @@ impl AssemblyView {
     }
 
     /// The user's toolbar settings changed (ui_toolbar): as after Customize toolbar….
-    pub(crate) fn agent_reload_toolbar(&mut self, cx: &mut Context<Self>) {
+    pub fn agent_reload_toolbar(&mut self, cx: &mut Context<Self>) {
         self.ui.tb_prefs = super::toolbar::AsmToolbarPrefs::load();
         cx.notify();
     }

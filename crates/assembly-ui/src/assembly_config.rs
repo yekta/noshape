@@ -25,13 +25,13 @@ const ROW_H: f32 = 34.;
 /// "+ Configure assembly features" mode: the input being configured, and
 /// the mate whose dialog is open for picking parameters.
 #[derive(Clone)]
-pub(crate) struct CfgMode {
+pub struct CfgMode {
     pub input: String,
     pub mate: Option<MateId>,
 }
 
 /// A configuration table text cell being typed in.
-pub(crate) struct CfgEdit {
+pub struct CfgEdit {
     pub key: String,
     pub input: Entity<InputState>,
     _sub: Subscription,
@@ -396,7 +396,7 @@ impl AssemblyView {
         }
         let instances: Vec<(InstanceId, String)> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
         let Some(asm) = self.assembly(cx).cloned() else { return };
-        let mut rows: crate::part_studio::input_propagation::PropagationRows = Vec::new();
+        let mut rows: crate::assembly_hooks::PropagationRows = Vec::new();
         for (iid, name) in instances {
             let theirs = self.instance_source_inputs(iid, cx);
             let cells: Vec<Option<bool>> = inputs
@@ -414,11 +414,11 @@ impl AssemblyView {
         let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
         let view = cx.entity().downgrade();
         let ids: Vec<String> = inputs.iter().map(|i| i.0.clone()).collect();
-        let on_confirm: crate::part_studio::input_propagation::OnConfirm = Rc::new(move |picked, _: &mut Window, cx: &mut App| {
+        let on_confirm: crate::assembly_hooks::OnConfirm = Rc::new(move |picked, _: &mut Window, cx: &mut App| {
             let ids = ids.clone();
             let _ = view.update(cx, |this, cx| this.propagate_asm_inputs(&ids, &picked, cx));
         });
-        crate::part_studio::input_propagation::open_propagation_dialog(name, inputs, rows, checked, on_confirm, window, cx);
+        crate::assembly_hooks::open_propagation_dialog(name, inputs, rows, checked, on_confirm, window, cx);
     }
 
     /// Configure the picked instances' inputs to follow the assembly's (each

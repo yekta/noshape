@@ -9,7 +9,7 @@ use noshape_model::drawing::views::{SourceKey, source_hash};
 type ThumbKey = (TabId, Option<BodyId>);
 
 #[derive(Default)]
-pub(crate) struct InsertThumbs {
+pub struct InsertThumbs {
     /// (Part Studio, part or None for the whole studio) -> picture.
     pub images: HashMap<ThumbKey, Arc<RenderImage>>,
     /// Content hash each studio's pictures were made for.
@@ -164,7 +164,7 @@ impl AssemblyView {
 
 /// Another document's Part Studio (pinned version key) and one of its parts
 /// (`None`: the whole studio).
-pub(crate) type ExternalThumbKey = (String, Option<BodyId>);
+pub type ExternalThumbKey = (String, Option<BodyId>);
 
 /// A camera looking at the box normal to a sketch plane (its X right).
 fn fit_camera_normal(lo: DVec3, hi: DVec3, aspect: f64, frame: &noshape_model::display::PlaneFrame) -> noshape_render::Camera {

@@ -12,7 +12,7 @@ use super::*;
 use noshape_model::assembly::analysis::{InstanceInterference, instance_interferences};
 
 /// The open Interference detection dialog.
-pub(crate) struct InterferenceDialog {
+pub struct InterferenceDialog {
     pub instances: Vec<InstanceId>,
     pub include_standard: bool,
     pub top_only: bool,
