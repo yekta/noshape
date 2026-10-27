@@ -223,7 +223,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   but its result (7 features, all cached, 1 ms) only arrives at 05:17:30, when Fillet 2's budget ran out; the spinner
   stays for 33 s for a rollback that costs nothing. The blend budget is cancellable (core 97081557: "jumps back when the
   budget is spent or the regeneration is cancelled"), but scheduling a new regen doesn't cancel the running one. Same
-  shape as DRAFT-HANG's stuck app (there forever). Live: a new edit supersedes the one being computed (qa 2026-10-27,
+  shape as DRAFT-HANG's stuck app (there forever). PRIORITIES P0 "aborting stale work"; live never makes a cheap edit wait (qa 2026-10-27,
   green 502416cc)
 - [ ] P2 LOFT-SKETCH-HIDE a Loft hides only its first profile's sketch: Sketch 1 = 40×40 square on Top, Plane 1 = Top
   offset 40, Sketch 2 = Ø24 circle on it (/root/qa-scratch/loft2.noshape); Loft, pick the circle then the square, ✓: Sketch 2
