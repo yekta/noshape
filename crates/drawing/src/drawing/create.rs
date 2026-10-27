@@ -86,11 +86,11 @@ pub fn source_frame(doc: &Document, src: &DrawingSource) -> Option<[[f64; 3]; 2]
 /// source gets one view of the sketch, facing its plane (`frame`).
 pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>, bounds: Option<(DVec3, DVec3)>, suggested: bool, frame: Option<[[f64; 3]; 2]>) -> Drawing {
     let mut d = Drawing::default();
-    // Formats › Locked is the default for new drawings.
-    d.props.formats_locked = true;
+    // Formats › Lock: Unlocked on new drawings (live's ANSI and ISO dumps,
+    // dom/drawing-properties-formats-*).
     apply_template(&mut d, 0, template);
     super::templates::template_precisions(&mut d.props, template.dim_units().imperial());
-    super::templates::template_sizes(&mut d.props, template.dim_units().imperial());
+    super::templates::template_sizes(&mut d.props, template.style == super::TitleBlockStyle::Ansi);
     let (Some(src), true) = (source, suggested) else { return d };
     if src.sketch.is_some() {
         let (lo, hi) = bounds.unwrap_or((DVec3::splat(-0.05), DVec3::splat(0.05)));

@@ -132,7 +132,7 @@ pub fn set_title_style(drawing: &mut Drawing, sheet: usize, style: TitleBlockSty
 pub fn template_props(t: &DrawingTemplate, file: &str) -> DrawingProps {
     let mut p = DrawingProps { units: Some(t.dim_units()), decimal_comma: t.decimal_comma, template: Some(file.to_string()), ..DrawingProps::default() };
     template_precisions(&mut p, t.dim_units().imperial());
-    template_sizes(&mut p, t.dim_units().imperial());
+    template_sizes(&mut p, t.style == TitleBlockStyle::Ansi);
     p
 }
 
@@ -153,7 +153,11 @@ pub fn template_precisions(p: &mut DrawingProps, imperial: bool) {
     p.tolerance_trailing_zeros = imperial;
 }
 
-/// Onshape's templates' text and arrow sizes (mm). Inch (live
+/// Onshape's templates' text and arrow sizes (mm), by standard: ANSI
+/// templates, inch or mm, use the inch-round sizes (live "Drawing
+/// properties: … ANSI vs ISO": ANSI_A_MM's tables 3.048 mm text, 1.524
+/// padding, hole indicator arrowhead 4.572, inspection 2.032), ISO / JIS
+/// the metric ones (3.5, 1.5, 2.5, 2.0). ANSI (live
 /// dom/drawing-properties-dimensions-ansi, -annotations; ANSI_A_INCH):
 /// text 0.1200 in, arrowheads 0.1800, text gap 0.0900, geometry gap
 /// 0.0625, extension past line 0.0800, stack gap 0.0500, datum size 0.1200,
@@ -161,9 +165,13 @@ pub fn template_precisions(p: &mut DrawingProps, imperial: bool) {
 /// widgets, ISO A3): text 3.5, arrowheads 2.5, text and geometry gap
 /// 0.625, extension 1.25, stack gap 1.25, datum 3.5, center of mass 6.35,
 /// inspection text 2.0.
-pub fn template_sizes(p: &mut DrawingProps, imperial: bool) {
+pub fn template_sizes(p: &mut DrawingProps, ansi: bool) {
     let inch = |v: f64| v * 25.4;
-    if imperial {
+    // Tables › All tables padding; Hole tables › Indicator style and arrowhead.
+    (p.table_h_padding, p.table_v_padding) = if ansi { (inch(0.06), inch(0.06)) } else { (1.5, 1.5) };
+    p.table_styles.hole_indicator_iso = !ansi;
+    p.table_styles.hole_indicator_arrow = Some(if ansi { inch(0.18) } else { 2.5 });
+    if ansi {
         (p.dim_text_height, p.dim_arrow, p.ann_text_height, p.ann_arrow) = (inch(0.12), inch(0.18), inch(0.12), inch(0.18));
         (p.dim_text_gap, p.dim_geometry_gap, p.dim_extension) = (inch(0.09), inch(0.0625), inch(0.08));
         (p.callout_stack_gap, p.datum_size, p.com_diameter) = (inch(0.05), inch(0.12), inch(0.25));

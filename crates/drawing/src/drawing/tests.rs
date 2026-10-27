@@ -3128,3 +3128,22 @@ fn adjust_linestyle_patterns_as_live() {
     assert_eq!(LinePattern::Center.dashes(1.0), vec![5.715, 1.143, 1.143, 1.143]);
     assert!((LinePattern::Dotted.dashes(1.0).iter().sum::<f64>() - 3.175).abs() < 1e-12);
 }
+
+/// Template sizes follow the standard, not the units (live "Drawing
+/// properties: … ANSI vs ISO"): an ANSI template in mm keeps the inch-round
+/// sizes; ISO has its own. New drawings' formats are unlocked.
+#[test]
+fn template_sizes_follow_the_standard() {
+    let mut ansi_mm = templates::template_by_name("ANSI A").unwrap();
+    ansi_mm.inches = false;
+    assert!(!ansi_mm.dim_units().imperial());
+    let a = create::create_drawing(&ansi_mm, None, None, false, None);
+    assert!((a.props.table_h_padding - 1.524).abs() < 1e-9 && (a.props.inspection_text_height - 2.032).abs() < 1e-9);
+    assert!(!a.props.table_styles.hole_indicator_iso && (a.props.table_styles.hole_indicator_arrow.unwrap() - 4.572).abs() < 1e-9);
+    assert!((a.props.ann_text_height - 3.048).abs() < 1e-9);
+    assert!(!a.props.formats_locked);
+    let i = create::create_drawing(&templates::template_by_name("ISO A3").unwrap(), None, None, false, None);
+    assert!((i.props.table_h_padding - 1.5).abs() < 1e-9 && (i.props.inspection_text_height - 2.0).abs() < 1e-9);
+    assert!(i.props.table_styles.hole_indicator_iso && (i.props.table_styles.hole_indicator_arrow.unwrap() - 2.5).abs() < 1e-9);
+    assert!((i.props.ann_text_height - 3.5).abs() < 1e-9);
+}
