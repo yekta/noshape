@@ -315,13 +315,13 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
 - **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
-- **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
+- **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move), [`variable_insert_studio`](#variable_insert_studio), [`variable_remove_studio`](#variable_remove_studio), [`variable_move_studio`](#variable_move_studio), [`variable_create_studio`](#variable_create_studio), [`variable_studio_settings`](#variable_studio_settings)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_duplicate_input`](#config_duplicate_input), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_animate`](#assembly_animate), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance), [`assembly_switch_to_tab`](#assembly_switch_to_tab), [`assembly_open_linked_document`](#assembly_open_linked_document)
 - **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly), [`context_go_to_assembly`](#context_go_to_assembly)
 - **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_edit_detail`](#drawing_edit_detail), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_edit_hatch`](#drawing_edit_hatch), [`drawing_title_field`](#drawing_title_field), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_mbd`](#drawing_mbd), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_open_feature_studio`](#drawing_open_feature_studio), [`drawing_switch_sheet`](#drawing_switch_sheet), [`drawing_sheets_panel`](#drawing_sheets_panel)
 - **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_search_tools`](#ui_search_tools), [`ui_shortcuts`](#ui_shortcuts), [`ui_select`](#ui_select), [`ui_list`](#ui_list)
-- **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
+- **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_version_properties`](#history_version_properties), [`history_publish`](#history_publish), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
@@ -518,8 +518,8 @@ The tab bar's "+" menu. Gets the next default name ("Part Studio 2") unless `nam
 Examples:
 
 ```json
-{"kind": "Part Studio", "name": "Housing"}
-{"kind": "Assembly"}
+{"kind": "partstudio", "name": "Housing"}
+{"kind": "assembly"}
 ```
 
 | field | type | | description |
@@ -1076,7 +1076,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
-| `plane` | string | required | Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector. |
+| `plane` | string or object | required | Plane: `plane:top`, `plane:front`, `plane:right`, a Plane feature (`fplane:…`), a planar face id or a mate connector; or `{"query": {query_entities arguments}}` matching one planar face (e.g. the top face: {"query": {"kind": "faces", "normal": [0, 0, 1], "near": [0, 0, 1000], "limit": 1}}). |
 | `name` | string |  | Name (default "Sketch N"). |
 | `disable_imprinting` | boolean |  | The dialog's Disable imprinting (default off). |
 
@@ -1664,7 +1664,7 @@ Adds the drawing's geometry, in the file's units unless `units` is given, center
 Examples:
 
 ```json
-{"sketch": "Sketch 1", "file": "/tmp/outline.dxf", "units": "mm"}
+{"sketch": "Sketch 1", "file": "/tmp/outline.dxf", "units": "Millimeter"}
 ```
 
 | field | type | | description |
@@ -1702,7 +1702,7 @@ Examples:
 
 The variables of a Part Studio or a Variable Studio, with their values.
 
-Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables). Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).
+Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables) and the inserted Variable Studio tables (`studio_tables`). Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).
 
 Examples:
 
@@ -1714,7 +1714,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
-| `copy` | boolean |  | Part Studio: the Variables panel's Copy table, `copied` being the text it puts on the clipboard (a header row, then name, type, value, description per variable, tab-separated). A row's Copy copies its description (`description` here). |
+| `copy` | boolean |  | The table's Copy table (Part Studio: the Variables panel's; Variable Studio: its ⋯ menu's), `copied` being the text it puts on the clipboard (a header row, then name, type, value, description per variable, tab-separated). A row's Copy copies its description (`description` here). |
 
 #### variable_create
 
@@ -1726,7 +1726,7 @@ Examples:
 
 ```json
 {"name": "wall", "value": "2.5 mm"}
-{"name": "holes", "kind": "INTEGER", "value": 4}
+{"name": "holes", "kind": "NUMBER", "value": 4}
 ```
 
 | field | type | | description |
@@ -1748,16 +1748,19 @@ Examples:
 
 ```json
 {"variable": "wall", "value": "3 mm"}
+{"name": "wall", "value": "3 mm"}
+{"variable": "wall", "new_name": "thickness"}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
-| `variable` | string | required | Variable name (with or without #) or its feature id. |
+| `variable` | string |  | The variable to change: its name (with or without #) or feature id. When omitted, `name` names it. |
 | `value` | string or number |  | New expression. |
 | `kind` | one of `LENGTH`, `ANGLE`, `NUMBER`, `ANY` |  | New kind. |
-| `name` | string |  | New name. |
+| `new_name` | string |  | New name (renames it). |
+| `name` | string |  | With `variable`: the new name (as `new_name`). Without it: the variable to change, as variable_create names it. |
 | `description` | string |  | New description. |
 
 #### variable_delete
@@ -1795,13 +1798,110 @@ Examples:
 | `variable` | string | required | Variable name or feature id. |
 | `by` | integer | required | -1: up, 1: down. |
 
+#### variable_insert_studio
+
+Insert a Variable Studio (or some of its variables) into a Part Studio, Assembly or Variable Studio (edits the document (one undoable history entry)).
+
+The Variable table's Insert Variable Studio dialog: the studio's variables become #names in `tab`'s expressions, shown as a read-only table under its own variables. Inserting a studio again replaces its reference. `variables` inserts only those (the dialog's variable rows); a configured studio is inserted in one configuration (`configuration`: its inputs by name or id, e.g. {"Size": "Large"}; default: its defaults); `document` + `version` insert another document's studio at a named version. One edit ("Insert Variable Studio"). The document's first Variable Studio is inserted into every Part Studio and Assembly already ("Insert into all Part Studios and Assemblies", variable_studio_settings). Returns `tab`'s inserted tables.
+
+Examples:
+
+```json
+{"studio": "Variable Studio 2"}
+{"tab": "Assembly 1", "studio": "Sizes", "variables": ["width"], "configuration": {"Size": "Large"}}
+{"studio": "Variable Studio 1", "document": "/home/me/library.noshape", "version": "V1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | The Part Studio, Assembly or Variable Studio whose Variable table gets it, by name or id. Default: the first Part Studio. |
+| `studio` | string | required | The Variable Studio tab, by name or id (in `document` when given). |
+| `variables` | array of string |  | Only these variables (names, with or without #). Default: the whole table. |
+| `configuration` | object or string |  | A configured studio's configuration: input name or id -> option name or id (List), true/false (Checkbox), an expression (Variable); or "default" (Reset to default) or "last_viewed" (Set to last viewed: the configuration the studio shows). |
+| `document` | string |  | Another .noshape document's studio (with `version`). |
+| `version` | string |  | With `document`: the name of one of its versions (the dialog lists named versions only). |
+
+#### variable_remove_studio
+
+Remove an inserted Variable Studio from a Variable table (Remove reference) (edits the document (one undoable history entry); deletes or overwrites).
+
+The inserted table's menu › Remove reference: its variables stop being available in `tab` (expressions using them then fail). Also removes an automatically inserted studio from this one tab. One edit ("Remove reference").
+
+Examples:
+
+```json
+{"studio": "Variable Studio 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | The Part Studio, Assembly or Variable Studio whose Variable table gets it, by name or id. Default: the first Part Studio. |
+| `studio` | string | required | The inserted Variable Studio, by tab name or id. |
+
+#### variable_move_studio
+
+Move an inserted Variable Studio's table up or down (its menu's Move up / Move down) (edits the document (one undoable history entry)).
+
+The order decides which table's variable wins when two define the same name (the later one). One edit ("Move table up" / "Move table down").
+
+Examples:
+
+```json
+{"studio": "Variable Studio 2", "by": -1}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | The Part Studio, Assembly or Variable Studio whose Variable table gets it, by name or id. Default: the first Part Studio. |
+| `studio` | string | required | The inserted Variable Studio, by tab name or id. |
+| `by` | one of -1, 1 | required | -1: up, 1: down. |
+
+#### variable_create_studio
+
+Create a Variable Studio from a Part Studio's or Assembly's Variable table (edits the document (one undoable history entry)).
+
+The Variable table's Create Variable Studio: a new Variable Studio tab right after `tab` ("Variable Studio N"), shown in `tab`'s Variable table at once (the document's first studio is inserted into all Part Studios and Assemblies; a later one only into `tab`). One edit ("Insert tab : Variable Studio"). Then add its variables with variable_create {"tab": <its name>, ...}.
+
+Examples:
+
+```json
+{}
+{"tab": "Assembly 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly, by name or id. Default: the first Part Studio. |
+
+#### variable_studio_settings
+
+A Variable Studio's "Insert into all Part Studios and Assemblies" checkbox (edits the document (one undoable history entry)).
+
+On: the studio's variables are available in every Part Studio and Assembly of the document (except where its reference was removed). A configured studio can't be inserted into all (the checkbox is greyed). One edit ("Insert into all Part Studios and Assemblies" / "Do not insert into all Part Studios and Assemblies").
+
+Examples:
+
+```json
+{"tab": "Variable Studio 1", "insert_into_all": false}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | The Variable Studio, by name or id. |
+| `insert_into_all` | boolean | required | The checkbox. |
+
 ### config
 
 #### config_list
 
 The Part Studio's configuration inputs, configurations and configured parameters.
 
-Inputs (List with its configurations, Checkbox, Variable with default and range) with ids, and every configured parameter with its value per configuration.
+Inputs (List with its configurations, Checkbox, Variable with default and range) with ids, and every configured parameter with its value per configuration. A Variable Studio's configured cells are a variable's Value or Description, and `active` is the configuration it shows (saved with it).
 
 Examples:
 
@@ -1812,7 +1912,8 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
+| `copy` | boolean |  | Variable Studio: each input's ⋯ › Copy table text (`copied`: input id -> tab-separated text). |
 
 #### config_add_input
 
@@ -1830,7 +1931,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `kind` | one of `list`, `checkbox`, `variable` | required | Input kind. |
 | `name` | string |  | Name (default "Configuration", "List 2", "Checkbox 1"...; required for a variable: its #name). |
 | `variable_kind` | one of `LENGTH`, `ANGLE`, `INTEGER`, `REAL`, `TEXT` |  | Variable: kind (default LENGTH). |
@@ -1850,7 +1951,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input id or name. |
 | `name` | string |  | New name. |
 | `value` | string or number |  | Variable input: new default. |
@@ -1869,7 +1970,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input id or name. |
 
 #### config_add_option
@@ -1887,7 +1988,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | List input id or name. |
 | `name` | string | required | Configuration name (e.g. "Large"). |
 
@@ -1895,7 +1996,7 @@ Examples:
 
 Rename or delete a configuration of a List input (edits the document (one undoable history entry)).
 
-A List keeps at least one configuration.
+A List keeps at least one configuration. A Variable Studio's row menu also has Set as default, Move up / down and Duplicate row (one edit each).
 
 Examples:
 
@@ -1907,17 +2008,20 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | List input id or name. |
 | `option` | string | required | Configuration id or name. |
 | `name` | string |  | New name. |
 | `delete` | boolean |  | Delete it. |
+| `set_default` | boolean |  | Variable Studio: Set as default. |
+| `move` | one of -1, 1 |  | Variable Studio: Move up (-1) / down (1). |
+| `duplicate` | boolean |  | Variable Studio: Duplicate row ("<name> copy" under it, with its values). |
 
 #### config_configure
 
-Make a parameter (or suppression) of a feature, assembly instance or mate configured by a List or Checkbox input (edits the document (one undoable history entry)).
+Make a parameter (or suppression) of a feature, assembly instance or mate, or a Variable Studio cell, configured by an input (edits the document (one undoable history entry)).
 
-Every configuration starts with the current value; then set values with config_set_value. Part Studio: `feature` and `param`, a parameter id of the feature (see feature_schema) or "suppressed" (Configure suppression). Assembly: `instance` with `param` "suppressed", or `mate` with "suppressed", "offset", "offset_x", "offset_y", "offset_z", "rotation" or "flip_primary".
+Every configuration starts with the current value; then set values with config_set_value. Part Studio: `feature` and `param`, a parameter id of the feature (see feature_schema) or "suppressed" (Configure suppression). Assembly: `instance` with `param` "suppressed", or `mate` with "suppressed", "offset", "offset_x", "offset_y", "offset_z", "rotation" or "flip_primary". Variable Studio: `variable` and `field` (the cell's Configure with <input>; a configuration Variable `input` is the Value's "Set to #<input>"), or `unconfigure`.
 
 Examples:
 
@@ -1929,12 +2033,15 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `feature` | string |  | Feature id or name (Part Studio). |
 | `instance` | string |  | Instance id or name (Assembly). |
 | `mate` | string |  | Mate id or name (Assembly). |
-| `param` | string | required | Parameter id, or "suppressed". |
-| `input` | string | required | List or Checkbox input id or name. |
+| `variable` | string |  | Variable name (Variable Studio). |
+| `field` | one of `value`, `description` |  | Variable Studio: the Value (default) or Description cell. |
+| `param` | string |  | Parameter id, or "suppressed" (Part Studio, Assembly; required there). |
+| `input` | string |  | List or Checkbox input id or name (required, except to unconfigure). |
+| `unconfigure` | boolean |  | Variable Studio: the configured cell's Unconfigure from <input>. |
 
 #### config_set_value
 
@@ -1951,11 +2058,13 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `feature` | string |  | Feature id or name (Part Studio). |
 | `instance` | string |  | Instance id or name (Assembly). |
 | `mate` | string |  | Mate id or name (Assembly). |
-| `param` | string | required | Parameter id, or "suppressed" (see config_configure). |
+| `variable` | string |  | Variable name (Variable Studio). |
+| `field` | one of `value`, `description` |  | Variable Studio: the Value (default) or Description cell. |
+| `param` | string |  | Parameter id, or "suppressed" (see config_configure; Part Studio, Assembly). |
 | `configuration` | string or boolean | required | Configuration id/name, or true/false. |
 | `value` | any | required | The value. |
 
@@ -1963,7 +2072,7 @@ Examples:
 
 Choose the configuration the Part Studio shows (the Configurations box).
 
-Sets the active value of configuration inputs; later regenerations, queries, renders, exports and feature edits use it (feature_edit then edits that configuration's configured values). `values` maps each input (id or name) to a List configuration (id or name), true/false for a Checkbox, or an expression for a configuration Variable ("40 mm"). Inputs not given keep their current value; `reset: true` returns every input to its default first. View state: no history entry, as in the app.
+Sets the active value of configuration inputs; later regenerations, queries, renders, exports and feature edits use it (feature_edit then edits that configuration's configured values). A Variable Studio's shown configuration is saved with it (one edit per input changed, "Change configuration"). `values` maps each input (id or name) to a List configuration (id or name), true/false for a Checkbox, or an expression for a configuration Variable ("40 mm"). Inputs not given keep their current value; `reset: true` returns every input to its default first. View state: no history entry, as in the app.
 
 Examples:
 
@@ -1975,15 +2084,15 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `values` | object |  | Input -> value. |
 | `reset` | boolean |  | Start from the default configuration. |
 
 #### config_copy_inputs
 
-Copy configuration inputs from another Part Studio or an Assembly (edits the document (one undoable history entry)).
+Copy configuration inputs from another Part Studio, an Assembly or a Variable Studio (edits the document (one undoable history entry)).
 
-Copy input / Copy all inputs in `from` (a Part Studio, or an Assembly's Copy all inputs), then Paste inputs in this Part Studio: the inputs whose ids this Part Studio doesn't have yet (with their options and visibility conditions; conditions on inputs not pasted are repaired). Inputs with the same id can then drive Derived features (config_propagate).
+Copy input / Copy all inputs in `from` (a Part Studio, or an Assembly's Copy all inputs), then Paste inputs in this Part Studio: the inputs whose ids this Part Studio doesn't have yet (with their options and visibility conditions; conditions on inputs not pasted are repaired). Inputs with the same id can then drive Derived features (config_propagate). A Variable Studio pastes into its own panel (`tab`) and can be `from`.
 
 Examples:
 
@@ -1996,7 +2105,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `from` | string | required | Part Studio or Assembly to copy from. |
 | `inputs` | array of string |  | Input ids or names (default all). |
 
@@ -2015,7 +2124,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input id or name. |
 
 #### config_propagate
@@ -2035,7 +2144,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input id or name. |
 | `features` | array of string |  | Part Studios: Derived features (ids or names). |
 | `instances` | array of string |  | Assemblies: instances (ids or names). |
@@ -2055,7 +2164,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input id or name. |
 | `id` | string |  | New input id. |
 | `options` | object |  | Option renames: {option: new id}. |
@@ -2076,7 +2185,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input id or name. |
 | `visibility` | object or null |  | The conditions; omitted or null: always shown. |
 
@@ -2093,7 +2202,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input to move. |
 | `to` | string | required | Input whose place it takes. |
 
@@ -3261,7 +3370,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
-| `edges` | boolean |  | Include each view's edges. |
+| `edges` | boolean |  | Include each view's edges: its model edges (line / circle / arc / curve) and the silhouettes of curved faces (`silhouette`), in sheet mm. |
 
 #### drawing_insert_view
 
@@ -5044,6 +5153,44 @@ Examples:
 | `name` | string | required | Version name ("V1"). |
 | `description` | string |  | Description. |
 
+#### history_version_properties
+
+A version's or workspace's Properties… (name and description) (edits the document (one undoable history entry)).
+
+The Versions and history panel's row menu › Properties…: renames `version` or `branch` (a workspace) and sets its description. Not an undoable edit (as in the app).
+
+Examples:
+
+```json
+{"version": "V1", "name": "Prototype", "description": "First prototype"}
+{"branch": "experiment", "description": "Trying a thinner wall"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `version` | string |  | Version name or id. |
+| `branch` | string |  | Branch (workspace) name or id. |
+| `name` | string |  | New name. |
+| `description` | string |  | New description (empty clears it). |
+
+#### history_publish
+
+A version's Publish FeatureScript…: publish its custom features and tables (edits the document (one undoable history entry)).
+
+The version row menu › Publish FeatureScript…: allowed once every requirement is met (at least one custom feature or table, a PDF in the document, no FeatureScript errors or warnings, every custom feature described and used in a Part Studio, every Feature Studio committed); the error lists the unmet ones. Published versions are found by the documents page's advanced search (Published FeatureScript).
+
+Examples:
+
+```json
+{"version": "V2"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `version` | string | required | Version name or id. |
+
 #### history_create_branch
 
 Create a branch (workspace) from the current state and switch to it (edits the document (one undoable history entry)).
@@ -5780,7 +5927,7 @@ Examples:
 | `files` | array of string | required | Paths of the files. |
 | `combine` | boolean |  | Combine to a single Part Studio (default: one Part Studio per file). |
 | `appearances` | boolean |  | Import appearances. |
-| `density` | boolean |  | Import material density (native parts and assemblies). |
+| `density` | boolean |  | Import material density: offered (and used) only when a file is one of Onshape's types for it (Parasolid x_t / x_b, SOLIDWORKS, Solid Edge, NX / Creo prt / asm, CATIA, zip); not STEP. |
 | `y_up` | boolean |  | Orient imported models with Y axis up. |
 | `mesh_unit` | one of `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard` |  | STL / OBJ units (default: the workspace unit; OBJ: Meter). |
 | `composite` | boolean |  | Create a composite part. |
