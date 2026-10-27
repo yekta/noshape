@@ -2,15 +2,15 @@ name: CI
 
 on:
   # Test tiers (docs/TESTS.md). The lead's watcher tests every main commit with T0+T1 on Linux and moves the tag
-  # `last-green` when it passes; CI runs T1 on each new last-green and on the daily release branch (release/v*), on all
-  # three platforms, and is never cancelled. T2 (deep: oracles, big models) runs weekly here on macOS and Windows and
-  # never blocks anything.
+  # `last-green`. CI runs T1 on Linux, macOS and Windows: every 3 hours on the current last-green (scheduled, so runs
+  # don't cancel each other; a tag push per green commit did, 10-27), and on each release branch (release/v*). T2
+  # (deep) runs Sundays on all three and never blocks anything.
   push:
     branches: [ci, 'release/v*']
-    tags: [last-green]
   pull_request:
   schedule:
-    - cron: '0 2 * * 0' # Sundays 02:00 UTC: T2 on all three platforms
+    - cron: '17 */3 * * *' # T1 on the current last-green
+    - cron: '0 2 * * 0'    # Sundays 02:00 UTC: T2 on main
   workflow_dispatch:
     inputs:
       tier:
@@ -20,7 +20,6 @@ on:
         default: t1
 
 concurrency:
-  # A newer last-green waits for the running one instead of cancelling it (GitHub keeps only the newest pending run).
   group: ci-${{ github.ref }}
   cancel-in-progress: false
 
@@ -61,6 +60,9 @@ jobs:
             exe: noshape.exe
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Scheduled T1 runs test the current last-green (the watcher's newest green main commit).
+          ref: ${{ github.event.schedule == '17 */3 * * *' && 'refs/tags/last-green' || '' }}
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
@@ -118,23 +120,23 @@ jobs:
       # Windows runs the tiers in PowerShell: in Git Bash, /usr/bin/link shadows MSVC's link.exe and every build script
       # fails to link (10-27).
       - name: Test (T1 core)
-        if: github.event_name != 'schedule' && inputs.tier != 't2' && runner.os != 'Windows'
+        if: github.event.schedule != '0 2 * * 0' && inputs.tier != 't2' && runner.os != 'Windows'
         shell: bash
         run: tools/tiers/t1.sh --locked --no-fail-fast
 
       - name: Test (T1 core, Windows)
-        if: github.event_name != 'schedule' && inputs.tier != 't2' && runner.os == 'Windows'
+        if: github.event.schedule != '0 2 * * 0' && inputs.tier != 't2' && runner.os == 'Windows'
         shell: pwsh
         run: cargo test --locked --workspace --no-fail-fast
 
       - name: Test (T2 deep; never blocks)
-        if: (github.event_name == 'schedule' || inputs.tier == 't2') && runner.os != 'Windows'
+        if: (github.event.schedule == '0 2 * * 0' || inputs.tier == 't2') && runner.os != 'Windows'
         continue-on-error: true
         shell: bash
         run: tools/tiers/t2.sh --locked
 
       - name: Test (T2 deep, Windows; never blocks)
-        if: (github.event_name == 'schedule' || inputs.tier == 't2') && runner.os == 'Windows'
+        if: (github.event.schedule == '0 2 * * 0' || inputs.tier == 't2') && runner.os == 'Windows'
         continue-on-error: true
         shell: pwsh
         run: |

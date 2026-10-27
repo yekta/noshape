@@ -5,6 +5,8 @@
 #                                                          pushing the branch runs CI (T1 on Linux, macOS, Windows).
 #   cut-release.sh tag <version>                           after that CI run passed: tag v<version> on the branch head;
 #                                                          release.yml builds the bundles and publishes the release.
+#   cut-release.sh now <version> <sha>                     <sha> already passed the scheduled 3-platform CI (a last-green):
+#                                                          branch + tag at once (the version bump can't break tests).
 set -eu
 W=/root/projects/noshape-wt/release; G="git -c user.name=yekta -c user.email=ngyekta@gmail.com"
 cd $W; git fetch -q origin --tags -f
@@ -30,5 +32,7 @@ tag)
   git tag -f v$V; git push -q origin v$V
   echo "tagged v$V at $(git rev-parse --short HEAD); release.yml publishes"
   git checkout -q --detach origin/main;;
-*) echo "usage: cut-release.sh branch <version> <sha> [<fix sha>...] | tag <version>"; exit 2;;
+now)
+  "$0" branch "$2" "$3" && "$0" tag "$2";;
+*) echo "usage: cut-release.sh branch <version> <sha> [<fix sha>...] | tag <version> | now <version> <sha>"; exit 2;;
 esac
