@@ -1,5 +1,5 @@
 //! The instance and mate menus: subassemblies (Move to new / Create empty /
-//! Dissolve), folders, Copy and paste, Change configuration, Lock / follow
+//! Dissolve), the instance list's drag and drop, folders, Copy and paste, Change configuration, Lock / follow
 //! position, Instance properties, tessellation and Dynamic suppression.
 
 use super::{assembly, asm_field, commit, describe, find_instance, find_mate, solve, target};
@@ -46,6 +46,23 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: dissolve_subassembly,
+        },
+        Op {
+            group: "assembly",
+            verb: "move_instance",
+            summary: "Drag instances in the instance list: reorder, into a folder or a subassembly",
+            description: "The instance list's drag and drop, one of: `before` (dropped on an instance row: placed above it, joining its folder; \"end\": the end of the list) → \"Reorder instances\"; `folder` (dropped on a folder row) → \"Add to folder\"; `subassembly` (dropped on a subassembly instance: they move into that subassembly, keeping their places, with the mates among them) → \"Move to subassembly\". Pattern and mirror copies don't move into a subassembly.",
+            fields: vec![
+                doc_field(),
+                asm_field(),
+                instances(),
+                opt("before", s(), "Instance id or name to drop above, or \"end\"."),
+                opt("folder", s(), "Folder id or name (assembly_list `folders`)."),
+                opt("subassembly", s(), "Subassembly instance id or name."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: move_instance,
         },
         Op {
             group: "assembly",
@@ -201,6 +218,53 @@ fn dissolve_subassembly(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let r = solve(od, tab, &SolveOptions::default())?;
     commit_doc(od, tab, sa::DISSOLVE_SUBASSEMBLY, &r, |d| sa::dissolve_subassemblies(d, tab, &ids))?;
+    Ok(describe(od, tab)?.into())
+}
+
+fn move_instance(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let asm = &assembly(od, tab)?.clone();
+    let ids = instance_list(asm, a, "instances")?;
+    let given: Vec<&str> = ["before", "folder", "subassembly"].into_iter().filter(|k| a.get(k).is_some()).collect();
+    if given.len() != 1 {
+        return Err(OpError::invalid("give one of `before`, `folder` or `subassembly`"));
+    }
+    if let Some(k) = a.opt_str("subassembly")? {
+        let sub = find_instance(asm, k, "subassembly")?;
+        if !matches!(asm.instance(sub).map(|i| &i.source), Some(InstanceSource::Assembly { .. })) {
+            return Err(OpError::param("subassembly", "not a subassembly instance"));
+        }
+        let r = solve(od, tab, &SolveOptions::default())?;
+        if sa::would_cycle(od.doc(), asm, &ids, sub) {
+            return Err(OpError::invalid(sa::CYCLIC_SUBASSEMBLY));
+        }
+        let moved = commit_doc(od, tab, sa::MOVE_TO_SUBASSEMBLY, &r, |d| sa::move_into_subassembly(d, tab, &ids, sub))?.map_err(OpError::invalid)?;
+        let mut v = describe(od, tab)?;
+        v["moved"] = json!(moved.iter().map(|i| i.0).collect::<Vec<_>>());
+        return Ok(v.into());
+    }
+    let r = solve(od, tab, &SolveOptions::default())?;
+    if let Some(k) = a.opt_str("folder")? {
+        let f = find_folder(asm, k).ok_or_else(|| OpError::param("folder", "no such folder (see assembly_list)"))?;
+        commit(od, tab, sa::ADD_TO_FOLDER, &r, |x| {
+            for id in &ids {
+                x.move_into_folder(*id, f);
+            }
+        })?;
+    } else {
+        let before = match a.str("before")? {
+            "end" => None,
+            k => Some(find_instance(asm, k, "before")?),
+        };
+        if before.is_some_and(|b| ids.contains(&b)) {
+            return Err(OpError::param("before", "one of the moved instances"));
+        }
+        commit(od, tab, sa::REORDER_INSTANCES, &r, |x| {
+            for id in &ids {
+                x.move_instance(*id, before);
+            }
+        })?;
+    }
     Ok(describe(od, tab)?.into())
 }
 

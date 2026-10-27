@@ -36,11 +36,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - 556bdcb5 Hole add: std holeEditLogic two passes not three (~330 → ~270 ms; the rest is FeatureScript speed, core).
 - 8bc476b0 sheet metal table through the API (sheetmetal_* ops, ops::sheetmetal); SM-MODIFY-JOINT ticket for core.
 - 16cdcf6d one-line open errors; 6a21a5d0 assembly_set_state `state`; D8 and D12 rows verified in workflow-drawing.md.
-- In progress: OPEN-ERROR-SILENT part 2 (app, start_window.rs + files.rs: the error bubble stays until ×, and the Open
-  dialog's failures show it): /root/dx-scratch/openerr/patch.py, to apply when the lead's app freeze ends.
+- 8993ea92 audit of the app's edit history texts, part 1: config_configure unconfigure, mate connector suppression,
+  document_update_workspace, variable_list visible_at_end.
+- (this commit) audit part 2: assembly_move_instance (the instance list's drops: Reorder instances / Add to folder /
+  Move to subassembly), assembly_exploded_view `move` (Reorder : Explode steps), assembly_pattern mirror `strategy`
+  (Derived / Transform + Placement per seed; makes the "-Mirrored" Part Studio like the dialog's Update),
+  drawing_image (Move to sheet, Image borders); OPEN-ERROR-SILENT part 2 (the start window's open error stays until ×;
+  the Open dialog's failures show it); app's image menu and Mirror dialog call the shared ops functions. Removed the
+  stale MENUS line sk-dim-tol (skasm's 4c58bbd4 dropped that menu item; coverage:: failed on main).
 
 ## Next (in order, after landing)
-1. OPEN-ERROR-SILENT part 2 (see In progress).
+1. Audit leftovers: Part Studio "Move configuration input" (config input order outside Variable Studios), "Move
+   annotation" (Part Studio annotation offset), Hide all instances, Discard unregenerated changes, Save custom color,
+   Update material library: check each against the ops, add what's missing.
 2. API: benchmarks done for Variable Studio, in-context, sheet metal (/root/dx-scratch/bench/*.py); next: drive a model
    through the MCP server with a real client; render_image of the window camera (image size).
 3. Drawings (P2): PDF Selectable text with a subset NotoSans (Normal text is already filled outlines); ui2's

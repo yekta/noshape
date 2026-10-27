@@ -9,7 +9,8 @@ use crate::{Ctx, assembly as sa};
 use noshape_model::assembly::analysis::{instance_interferences, matched_targets};
 use noshape_model::assembly::bom::{self, BomColumn, BomType};
 use noshape_model::assembly::eval::SolveOptions;
-use noshape_model::assembly::{Assembly, InstanceId, InstancePattern, LinearDirection, MateId, PatternKind, ReplicateScope, ScopeEntity};
+use noshape_model::assembly::{Assembly, InstanceId, InstancePattern, LinearDirection, MateId, MirrorPlacement, PatternKind, ReplicateScope, ScopeEntity};
+use noshape_model::document::TabId;
 use noshape_units::ExprValue;
 use serde_json::{Value, json};
 
@@ -43,7 +44,12 @@ pub fn ops() -> Vec<Op> {
                 opt("equal_spacing", json!({ "type": "boolean" }), "Linear: `distance` is the total; circular: spread over the angle (default true for circular)."),
                 opt("second", json!({ "type": "object" }), "Linear: a second direction {\"direction\": connector, \"distance\", \"count\", \"opposite\"}."),
                 opt("centered", json!({ "type": "boolean" }), "Linear / circular: the seed in the middle, `count` instances (the seed included) each way."),
-                opt("handed", json!({ "type": "boolean" }), "Mirror: use mirrored copies of the parts (\"Create mirrored parts\") instead of rigid copies."),
+                opt("handed", json!({ "type": "boolean" }), "Mirror: every seed's Mirror action Derived (shorthand for `strategy`)."),
+                opt(
+                    "strategy",
+                    json!({ "type": "array", "items": { "type": "object", "properties": { "instance": { "type": "string" }, "action": { "type": "string", "enum": ["transform", "derived"] }, "placement": { "type": "string", "enum": PLACEMENTS.map(|p| p.0) } }, "required": ["instance"] } }),
+                    "Mirror: the Mirror strategy table, per seed {\"instance\", \"action\", \"placement\"}. `transform` (default) places a rigid copy of the part; `derived` uses its opposite-handed version from the Part Studio's \"<Part Studio>-Mirrored\" Part Studio (made when missing: one more edit, \"Create mirrored Part Studio\", in the folder \"Mirrored parts and assemblies\"). `placement` (Derived): auto (default) or the bounding box / origin plane the copy is placed by. Seeds left out keep their row (a new pattern: transform, auto).",
+                ),
                 opt("mate", s(), "Part pattern / replicate: the seed's mate to follow (default: the seed's only mate)."),
                 opt("scope", json!({ "type": "string", "enum": SCOPES.iter().map(|x| x.0).collect::<Vec<_>>() }), "Replicate: where to match (default: faces_in_parts, or edges_on_plane when the seed mate is on an edge)."),
                 opt("scope_refs", json!({ "type": "array", "items": { "type": "object" } }), "Replicate: \"Parts to find match in\": [{\"instance\": id or name, \"entity\": a face / edge id (none: the whole part)}]."),
@@ -162,14 +168,29 @@ pub(super) fn patterns_json(a: &Assembly) -> Vec<Value> {
     a.patterns
         .iter()
         .map(|p| {
-            json!({
+            let mut v = json!({
                 "id": format!("pattern:{}", p.id.0),
                 "name": p.name,
                 "kind": kind_id(&p.kind),
                 "seeds": p.seeds.iter().map(|i| format!("inst:{}", i.0)).collect::<Vec<_>>(),
                 "instances": p.generated.iter().map(|g| format!("inst:{}", g.instance.0)).collect::<Vec<_>>(),
                 "suppressed": p.suppressed,
-            })
+            });
+            if let PatternKind::Mirror { handed, derived, placement, .. } = &p.kind {
+                v["strategy"] = json!(p
+                    .seeds
+                    .iter()
+                    .map(|id| {
+                        let place = placement.iter().find(|(s, _)| s == id).map_or(MirrorPlacement::Auto, |(_, p)| *p);
+                        json!({
+                            "instance": format!("inst:{}", id.0),
+                            "action": if *handed || derived.contains(id) { "derived" } else { "transform" },
+                            "placement": PLACEMENTS.iter().find(|x| x.1 == place).map_or("auto", |x| x.0),
+                        })
+                    })
+                    .collect::<Vec<_>>());
+            }
+            v
         })
         .collect()
 }
@@ -189,6 +210,17 @@ fn count_arg(v: Option<&Value>, key: &str) -> Result<Option<u32>, OpError> {
         Some(v) => v.as_f64().map(|n| Some(n.round().clamp(1.0, 2500.0) as u32)).ok_or_else(|| OpError::param(key, "Instance count must be a whole number")),
     }
 }
+
+/// The Mirror strategy's Placement type column.
+const PLACEMENTS: [(&str, MirrorPlacement); 7] = [
+    ("auto", MirrorPlacement::Auto),
+    ("bounding_box_xy", MirrorPlacement::BoxXY),
+    ("bounding_box_yz", MirrorPlacement::BoxYZ),
+    ("bounding_box_zx", MirrorPlacement::BoxZX),
+    ("origin_xy", MirrorPlacement::OriginXY),
+    ("origin_yz", MirrorPlacement::OriginYZ),
+    ("origin_zx", MirrorPlacement::OriginZX),
+];
 
 fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
@@ -226,12 +258,12 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(PatternKind::Circular { axis, angle, count, opposite, equal_spacing, centered }) => {
             o = Old { dir: Some(axis.clone()), dist: Some(angle.text.clone()), count: Some(*count), opposite: *opposite, equal: Some(*equal_spacing), centered: *centered, ..o };
         }
-        Some(PatternKind::Mirror { plane, handed, .. }) => o = Old { dir: Some(plane.clone()), handed: *handed, ..o },
+        Some(PatternKind::Mirror { plane, handed, derived, placement, .. }) => o = Old { dir: Some(plane.clone()), handed: *handed, derived: derived.clone(), placement: placement.clone(), ..o },
         Some(PatternKind::PartPattern { mate }) => o.mate = Some(*mate),
         Some(PatternKind::Replicate { mate, scope, scope_refs, .. }) => o = Old { mate: Some(*mate), scope: *scope, scope_refs: scope_refs.clone(), ..o },
         None => {}
     }
-    let Old { dir: o_dir, dist: o_dist, count: o_count, opposite: o_opp, equal: o_equal, second: o_second, centered: o_centered, handed: o_handed, mate: o_mate, scope: o_scope, scope_refs: o_refs } = o;
+    let Old { dir: o_dir, dist: o_dist, count: o_count, opposite: o_opp, equal: o_equal, second: o_second, centered: o_centered, handed: o_handed, derived: o_derived, placement: o_placement, mate: o_mate, scope: o_scope, scope_refs: o_refs } = o;
     let same_kind = old.as_ref().is_some_and(|p| kind_id(&p.kind) == kind);
     let keep = |o: bool| same_kind && o;
     let (d_dist, d_count) = sa::pattern_defaults(kind == "circular");
@@ -268,7 +300,53 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             PatternKind::Linear { direction: axis.ok_or_else(|| OpError::param("direction", "Select a direction (edge, face or mate connector)"))?, distance, count, opposite, equal_spacing: equal, second, centered }
         }
         "circular" => PatternKind::Circular { axis: axis.ok_or_else(|| OpError::param("direction", "Select the axis of pattern"))?, angle: distance, count, opposite, equal_spacing: equal, centered },
-        "mirror" => PatternKind::Mirror { plane: axis.ok_or_else(|| OpError::param("direction", "Select the mirror plane (planar face or mate connector)"))?, handed: a.get("handed").and_then(Value::as_bool).unwrap_or(keep(o_handed)), derived: Vec::new(), placement: Vec::new(), mirrored_studios: vec![] },
+        "mirror" => {
+            let plane = axis.ok_or_else(|| OpError::param("direction", "Select the mirror plane (planar face or mate connector)"))?;
+            let (mut derived, mut placement) = if same_kind { (o_derived, o_placement) } else { (Vec::new(), Vec::new()) };
+            let mut handed = keep(o_handed);
+            if let Some(h) = a.get("handed").and_then(Value::as_bool) {
+                // The dialog writes per-seed rows; `handed` stays for older documents.
+                handed = false;
+                derived = if h { seeds.clone() } else { Vec::new() };
+            }
+            for (i, row) in a.opt_array("strategy")?.into_iter().flatten().enumerate() {
+                let f = format!("strategy[{i}]");
+                let id = find_instance(&asm, row.get("instance").and_then(Value::as_str).unwrap_or_default(), &format!("{f}.instance"))?;
+                if !seeds.contains(&id) {
+                    return Err(OpError::param(&format!("{f}.instance"), "not a seed of this mirror"));
+                }
+                if handed {
+                    handed = false;
+                    derived = seeds.clone();
+                }
+                match row.get("action").and_then(Value::as_str) {
+                    Some("derived") if !derived.contains(&id) => derived.push(id),
+                    Some("transform") => derived.retain(|d| *d != id),
+                    Some("derived") | None => {}
+                    Some(_) => return Err(OpError::param(&format!("{f}.action"), "transform or derived")),
+                }
+                if let Some(p) = row.get("placement") {
+                    let p = PLACEMENTS.iter().find(|x| Some(x.0) == p.as_str()).map(|x| x.1).ok_or_else(|| OpError::param(&format!("{f}.placement"), &PLACEMENTS.map(|p| p.0).join(", ")))?;
+                    placement.retain(|(s, _)| *s != id);
+                    if p != MirrorPlacement::Auto {
+                        placement.push((id, p));
+                    }
+                }
+            }
+            derived.retain(|d| seeds.contains(d));
+            placement.retain(|(d, _)| seeds.contains(d));
+            // Update: the Derived parts' "-Mirrored" Part Studios.
+            let missing: Vec<TabId> = sa::derived_seed_studios(&asm, &derived).into_iter().filter(|s| od.doc().mirrored_studio(*s).is_none()).collect();
+            if !missing.is_empty() {
+                od.session.edit_document(sa::CREATE_MIRRORED_STUDIO, |d| {
+                    for s in &missing {
+                        d.ensure_mirrored_studio(*s);
+                    }
+                })?;
+            }
+            let mirrored_studios = sa::mirrored_studios(od.doc(), &asm, &derived);
+            PatternKind::Mirror { plane, handed, derived, placement, mirrored_studios }
+        }
         "part_pattern" => PatternKind::PartPattern { mate: mate()? },
         _ => {
             let mate = mate()?;
@@ -471,6 +549,8 @@ struct Old {
     second: Option<LinearDirection>,
     centered: bool,
     handed: bool,
+    derived: Vec<InstanceId>,
+    placement: Vec<(InstanceId, MirrorPlacement)>,
     mate: Option<MateId>,
     scope: Option<ReplicateScope>,
     scope_refs: Vec<ScopeEntity>,

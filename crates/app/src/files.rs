@@ -231,6 +231,7 @@ pub fn prompt_open(gpu: Gpu, cx: &mut App) {
     let open = move |path: PathBuf, cx: &mut App| {
         if let Err(e) = open_document_window(path, None, gpu, cx) {
             log::error!("open failed: {e:#}");
+            crate::start_window::show_with_error(format!("Could not open document: {e:#}"), cx);
         }
     };
     if !native_dialogs_available()

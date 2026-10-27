@@ -90,7 +90,14 @@ pub fn show_with_error(message: impl Into<String>, cx: &mut App) {
     show(cx);
     let message = message.into();
     if let Some(handle) = cx.try_global::<StartWindowGlobal>().map(|g| g.handle) {
-        let _ = handle.update(cx, |_, window, cx| StartView::notify(window, cx, AlertKind::Error, message));
+        // A document that couldn't be opened (qa OPEN-ERROR-SILENT): the
+        // bubble stays until its × closes it; an 8 s one could run out before
+        // a slow start showed the window.
+        let _ = handle.update(cx, |_, window, cx| {
+            let id = cx.default_global::<StartToast>().1 + 1;
+            *cx.default_global::<StartToast>() = StartToast(Some(Toast { kind: AlertKind::Error.into(), bold: None, text: message, restore: None, brief: false }), id);
+            window.refresh();
+        });
     }
 }
 

@@ -4455,3 +4455,90 @@ fn step_assembly_same_named_parts_get_distinct_instances() {
     names.sort();
     assert_eq!(names, ["Part 1 <1>", "Part 1 <2>"], "{l}");
 }
+
+/// Edits the app makes that the API lacked (the audit of its history texts):
+/// the instance list's drops (Reorder instances, Add to folder, Move to
+/// subassembly), Reorder : Explode steps, the Mirror strategy (Derived
+/// copies from the "-Mirrored" Part Studio) and an image's Move to sheet /
+/// Image borders.
+#[test]
+fn instance_drops_explode_reorder_mirror_strategy_and_image_menu() {
+    let mut ctx = Ctx::new();
+    let (b, p) = two_part_assembly(&mut ctx, "drops_mirror.noshape");
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let names = |v: &Value| v["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    // Reorder: the pin dropped above the block.
+    let before = names(&call(&mut ctx, "assembly_list", json!({})));
+    let r = call(&mut ctx, "assembly_move_instance", json!({ "instances": [p], "before": b }));
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Reorder instances");
+    assert_eq!(names(&r), vec![before[1].clone(), before[0].clone()], "{r}");
+    let r = call(&mut ctx, "assembly_move_instance", json!({ "instances": [p], "before": "end" }));
+    assert_eq!(names(&r), before, "{r}");
+    let e = try_call(&mut ctx, "assembly_move_instance", json!({ "instances": [p], "before": b, "folder": "x" })).unwrap_err();
+    assert!(e.message.contains("one of"), "{e:?}");
+    // Add to folder: a folder holding the block, then the pin dropped on it.
+    let f = call(&mut ctx, "assembly_add_folder", json!({ "instances": [b], "name": "Base" }));
+    let r = call(&mut ctx, "assembly_move_instance", json!({ "instances": [p], "folder": f["folder"].to_string() }));
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Add to folder");
+    assert_eq!(r["folders"][0]["instances"].as_array().unwrap().len(), 2, "{r}");
+    // Move to subassembly: the pin dropped onto an empty subassembly.
+    let cs = call(&mut ctx, "assembly_create_subassembly", json!({}));
+    let sub = cs["new_instance"]["id"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "assembly_move_instance", json!({ "instances": [p], "subassembly": sub }));
+    assert_eq!(last(&mut ctx), "Move to subassembly");
+    assert_eq!(r["moved"].as_array().unwrap().len(), 1, "{r}");
+    assert!(!r["instances"].as_array().unwrap().iter().any(|i| i["id"] == p), "{r}");
+    let e = try_call(&mut ctx, "assembly_move_instance", json!({ "instances": [sub], "subassembly": sub })).unwrap_err();
+    assert!(e.message.contains("cyclical"), "{e:?}");
+    let e = try_call(&mut ctx, "assembly_move_instance", json!({ "instances": [b], "subassembly": b })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("subassembly"), "{e:?}");
+
+    // Reorder : Explode steps.
+    call(&mut ctx, "assembly_exploded_view", json!({ "action": "add" }));
+    call(&mut ctx, "assembly_explode_step", json!({ "view": "Explode 1", "instances": [b], "direction": [0, 0, 1], "distance": "10 mm" }));
+    call(&mut ctx, "assembly_explode_step", json!({ "view": "Explode 1", "instances": [sub], "direction": [1, 0, 0], "distance": "20 mm" }));
+    let ev = call(&mut ctx, "assembly_exploded_view", json!({ "action": "move", "view": "Explode 1", "step": 2, "to": 1 }));
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Reorder : Explode steps");
+    assert_eq!(ev["exploded_views"][0]["step_instances"], json!([[sub], [b]]), "{ev}");
+    let e = try_call(&mut ctx, "assembly_exploded_view", json!({ "action": "move", "view": "Explode 1", "step": 1, "to": 3 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("to"));
+
+    // Mirror strategy: the block mirrored across its +X face, Derived.
+    let faces = call(&mut ctx, "assembly_entities", json!({ "instance": b, "kind": "faces", "normal": [1, 0, 0] }));
+    let face = faces["faces"][0]["id"].as_str().unwrap().to_string();
+    let m = call(&mut ctx, "assembly_pattern", json!({ "kind": "mirror", "seeds": [b], "direction": { "instance": b, "entity": face }, "strategy": [{ "instance": b, "action": "derived", "placement": "origin_xy" }] }));
+    let h = call(&mut ctx, "history_list", json!({ "limit": 2 }))["history"].as_array().unwrap().iter().map(|h| h["description"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert!(h[0].ends_with(":: Insert : Mirror 1") && h[1] == "Create mirrored Part Studio", "{h:?}");
+    let tabs = call(&mut ctx, "document_info", json!({}))["tabs"].clone();
+    assert!(tabs.as_array().unwrap().iter().any(|t| t["name"] == "Part Studio 1-Mirrored"), "{tabs}");
+    let pat = m["patterns"].as_array().unwrap().iter().find(|x| x["name"] == "Mirror 1").unwrap().clone();
+    assert_eq!(pat["strategy"], json!([{ "instance": b, "action": "derived", "placement": "origin_xy" }]), "{pat}");
+    assert_eq!(m["created"].as_array().unwrap().len(), 1, "{m}");
+    // Back to Transform: no second Part Studio.
+    let m = call(&mut ctx, "assembly_pattern", json!({ "edit": "Mirror 1", "strategy": [{ "instance": b, "action": "transform", "placement": "auto" }] }));
+    let pat = m["patterns"].as_array().unwrap().iter().find(|x| x["name"] == "Mirror 1").unwrap().clone();
+    assert_eq!(pat["strategy"][0]["action"], "transform", "{pat}");
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Edit : Mirror 1");
+    let e = try_call(&mut ctx, "assembly_pattern", json!({ "edit": "Mirror 1", "strategy": [{ "instance": sub }] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("strategy[0].instance"));
+
+    // Image menu: Move to sheet, Image borders.
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "action": "add" }));
+    let png = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packaging/icons/noshape-256.png");
+    let r = call(&mut ctx, "drawing_insert_image", json!({ "drawing": tab, "sheet": 1, "path": png.to_str().unwrap(), "position": [20, 20] }));
+    let img = r["image"].clone();
+    let r = call(&mut ctx, "drawing_image", json!({ "drawing": tab, "sheet": 1, "image": img, "move_to": 2 }));
+    assert!(last(&mut ctx).ends_with(":: Move image to sheet"));
+    assert_eq!(r["images"].as_array().unwrap().len(), 1, "{r}");
+    assert_eq!(r["image"], 1, "{r}");
+    let s1 = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "sheet": 1 }));
+    assert!(s1["images"].as_array().unwrap().is_empty(), "{s1}");
+    call(&mut ctx, "drawing_image", json!({ "drawing": tab, "sheet": 2, "image": 1, "borders": true }));
+    assert!(last(&mut ctx).ends_with(":: Image borders"));
+    let pr = call(&mut ctx, "drawing_properties", json!({ "drawing": tab }));
+    assert_eq!(pr["properties"]["image_borders"], true, "{pr}");
+    let e = try_call(&mut ctx, "drawing_image", json!({ "drawing": tab, "sheet": 2, "image": 1, "move_to": 2 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("move_to"));
+}

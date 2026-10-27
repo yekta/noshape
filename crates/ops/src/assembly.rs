@@ -906,6 +906,63 @@ pub fn contains_assembly(doc: &noshape_model::Document, tab: TabId, target: TabI
     })
 }
 
+/// The instance list's drops: onto an instance row (above it), a folder
+/// row or a subassembly instance row.
+pub const REORDER_INSTANCES: &str = "Reorder instances";
+pub const ADD_TO_FOLDER: &str = "Add to folder";
+pub const MOVE_TO_SUBASSEMBLY: &str = "Move to subassembly";
+pub const CYCLIC_SUBASSEMBLY: &str = "Cannot move the instance into the subassembly because it would create cyclical references";
+
+/// Whether moving `ids` into subassembly instance `sub_inst` would put a
+/// subassembly inside itself.
+pub fn would_cycle(doc: &noshape_model::Document, a: &Assembly, ids: &[InstanceId], sub_inst: InstanceId) -> bool {
+    let Some(InstanceSource::Assembly { assembly: sub_tab, .. }) = a.instance(sub_inst).map(|i| &i.source) else { return false };
+    ids.iter().any(|id| a.instance(*id).is_some_and(|i| matches!(i.source, InstanceSource::Assembly { assembly, .. } if contains_assembly(doc, assembly, *sub_tab, 0))))
+}
+
+/// Dropped onto subassembly instance `sub_inst`: the instances move into
+/// that subassembly (its tab), keeping their places. Err when one of them
+/// is or contains that subassembly. The moved instances.
+pub fn move_into_subassembly(doc: &mut noshape_model::Document, tab: TabId, ids: &[InstanceId], sub_inst: InstanceId) -> Result<Vec<InstanceId>, &'static str> {
+    use noshape_model::document::TabContent;
+    let Some(TabContent::Assembly(parent)) = doc.tab(tab).map(|t| &t.content) else { return Ok(vec![]) };
+    let Some(InstanceSource::Assembly { assembly: sub_tab, .. }) = parent.instance(sub_inst).map(|i| i.source.clone()) else { return Ok(vec![]) };
+    if would_cycle(doc, parent, ids, sub_inst) {
+        return Err(CYCLIC_SUBASSEMBLY);
+    }
+    let Some(TabContent::Assembly(mut sub)) = doc.tab(sub_tab).map(|t| t.content.clone()) else { return Ok(vec![]) };
+    let mut moved = Vec::new();
+    if let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) {
+        moved = parent.move_into_subassembly(ids, sub_inst, &mut sub);
+    }
+    if let Some(t) = doc.tab_mut(sub_tab) {
+        t.content = TabContent::Assembly(sub);
+    }
+    Ok(moved)
+}
+
+/// The Mirror strategy's Update (live "skb (10-23 15:30)").
+pub const CREATE_MIRRORED_STUDIO: &str = "Create mirrored Part Studio";
+
+/// The Part Studios of the Derived mirror seeds that are part instances, once each.
+pub fn derived_seed_studios(a: &Assembly, derived: &[InstanceId]) -> Vec<TabId> {
+    let mut out = Vec::new();
+    for id in derived {
+        if let Some(InstanceSource::Part { studio, .. }) = a.instance(*id).map(|i| &i.source)
+            && !out.contains(studio)
+        {
+            out.push(*studio);
+        }
+    }
+    out
+}
+
+/// A Mirror's (source Part Studio, its "-Mirrored" Part Studio) pairs for
+/// its Derived seeds: the Derived copies use the mirrored studio's parts.
+pub fn mirrored_studios(doc: &noshape_model::Document, a: &Assembly, derived: &[InstanceId]) -> Vec<(TabId, TabId)> {
+    derived_seed_studios(a, derived).into_iter().filter_map(|s| doc.mirrored_studio(s).map(|m| (s, m))).collect()
+}
+
 /// Insert a Part Studio sketch as an instance ("Insert : Sketch 1").
 pub fn insert_sketch(a: &mut Assembly, studio: TabId, sketch: noshape_model::FeatureId, name: &str, config: ConfigValues) -> InstanceId {
     let id = InstanceId(a.next_id());

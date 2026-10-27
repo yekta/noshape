@@ -15,6 +15,29 @@ use noshape_scene::drawing_tools::{Sel, SheetPick, Tool};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// An image's context menu (the drawing's images, live "dl (10-22)").
+pub const MOVE_IMAGE_TO_SHEET: &str = "Move image to sheet";
+pub const IMAGE_BORDERS: &str = "Image borders";
+
+/// The image menu's Show / Hide image borders (every image of the drawing).
+pub fn image_borders_label(on: bool) -> &'static str {
+    if on { "Hide image borders" } else { "Show image borders" }
+}
+
+/// Move to sheet › `to`: image `id` of sheet `from` goes to sheet `to` at
+/// the same place, numbered after that sheet's images. Its new id.
+pub fn move_image_to_sheet(d: &mut Drawing, from: usize, id: u64, to: usize) -> Option<u64> {
+    if from == to || to >= d.sheets.len() {
+        return None;
+    }
+    let k = d.sheets.get(from)?.images.iter().position(|x| x.id == id)?;
+    let mut im = d.sheets[from].images.remove(k);
+    im.id = d.sheets[to].images.iter().map(|x| x.id).max().unwrap_or(0) + 1;
+    let new = im.id;
+    d.sheets[to].images.push(im);
+    Some(new)
+}
+
 /// Store meta key of the document's release log (the app's release dialog).
 pub const RELEASES_META_KEY: &str = "releases";
 

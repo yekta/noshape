@@ -301,6 +301,23 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "image",
+            summary: "An image's context menu: Move to sheet, Show / Hide image borders",
+            description: "Right-click an image: `move_to` (Move to sheet ›) moves image `image` to that sheet at the same place, numbered after its images (\"Move image to sheet\"; replies with that sheet and the new id); `borders` is Show image borders (true) / Hide image borders (false), for every image of the drawing (\"Image borders\"). Delete an image with drawing_delete.",
+            fields: with(
+                common(),
+                vec![
+                    req("image", json!({ "type": "integer" }), "Image id (drawing_get `images`)."),
+                    opt("move_to", json!({ "type": ["integer", "string"] }), "Sheet to move it to: number (1 = first) or name."),
+                    opt("borders", json!({ "type": "boolean" }), "Show (true) or hide (false) image borders."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: image,
+        },
+        Op {
+            group: "drawing",
             verb: "custom_table",
             summary: "Insert a custom table, or edit a custom table's properties",
             description: "The Custom table dialog: custom table `table` (its name or display name) defined by a Feature Studio of this document, computed on Part Studio `studio` (default: the Part Studio of `view`, else the first one shown in the drawing), placed with its `corner` at `position` (sheet mm). With `id`: Custom table properties of that table (Part Studio, table, order, corner; unset fields kept). One edit (\"Custom table\" / \"Custom table properties\"). Its rows are in drawing_get's tables.",
@@ -1862,6 +1879,42 @@ fn insert_cad(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut out = reply(od, t.tab, t.sheet, false)?;
     out["entities"] = json!(n);
     Ok(out.into())
+}
+
+fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = drawing_tab(od, a)?;
+    let mut d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
+    let sheet = sheet_index(&d, a)?;
+    let id = a.opt_u64("image")?.ok_or_else(|| OpError::param("image", "required"))?;
+    if !d.sheets[sheet].images.iter().any(|x| x.id == id) {
+        return Err(OpError::param("image", "no such image on the sheet (drawing_get `images`)"));
+    }
+    match (a.get("move_to"), a.get("borders").and_then(Value::as_bool)) {
+        (Some(m), None) => {
+            let to = match m {
+                Value::Number(n) => n.as_u64().filter(|n| (1..=d.sheets.len() as u64).contains(n)).map(|n| n as usize - 1),
+                Value::String(s) => d.sheets.iter().position(|x| x.name == *s),
+                _ => None,
+            }
+            .ok_or_else(|| OpError::param("move_to", &format!("a sheet number or name: {}", d.sheets.iter().map(|x| x.name.clone()).collect::<Vec<_>>().join(", "))))?;
+            if to == sheet {
+                return Err(OpError::param("move_to", "the image is on that sheet"));
+            }
+            let new = dr::move_image_to_sheet(&mut d, sheet, id, to).expect("checked");
+            // The drawing stays on its sheet, as the menu leaves it.
+            commit(od, tab, sheet, d, dr::MOVE_IMAGE_TO_SHEET)?;
+            let mut out = reply(od, tab, to, false)?;
+            out["image"] = json!(new);
+            Ok(out.into())
+        }
+        (None, Some(on)) => {
+            d.props.image_borders = on;
+            commit(od, tab, sheet, d, dr::IMAGE_BORDERS)?;
+            Ok(reply(od, tab, sheet, false)?.into())
+        }
+        _ => Err(OpError::invalid("give one of `move_to` or `borders`")),
+    }
 }
 
 fn drawing_sketch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

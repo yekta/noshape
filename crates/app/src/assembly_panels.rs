@@ -1121,16 +1121,7 @@ impl AssemblyView {
                 let rows: Vec<(InstanceId, MirrorRow)> = s.seeds.iter().map(|id| (*id, s.mirror_rows.get(id).copied().unwrap_or_default())).collect();
                 let derived: Vec<InstanceId> = rows.iter().filter(|(_, r)| r.derived && r.created).map(|(id, _)| *id).collect();
                 // The Derived seeds' Part Studios and their "-Mirrored" ones (made by Update).
-                let doc = &self.doc.read(cx).session.doc;
-                let mut mirrored_studios = Vec::new();
-                for id in &derived {
-                    if let Some(InstanceSource::Part { studio, .. }) = asm.instance(*id).map(|i| &i.source)
-                        && let Some(m) = doc.mirrored_studio(*studio)
-                        && !mirrored_studios.contains(&(*studio, m))
-                    {
-                        mirrored_studios.push((*studio, m));
-                    }
-                }
+                let mirrored_studios = noshape_ops::assembly::mirrored_studios(&self.doc.read(cx).session.doc, asm, &derived);
                 PatternKind::Mirror {
                     plane: s.axis.clone().ok_or("Select the mirror plane (planar face or mate connector)")?,
                     handed: false,
@@ -2006,7 +1997,7 @@ impl AssemblyView {
                                     };
                                     if !missing.is_empty() {
                                         this.doc.update(cx, |d, cx| {
-                                            d.edit_document("Create mirrored Part Studio", cx, |doc| {
+                                            d.edit_document(noshape_ops::assembly::CREATE_MIRRORED_STUDIO, cx, |doc| {
                                                 for s in &missing {
                                                     doc.ensure_mirrored_studio(*s);
                                                 }

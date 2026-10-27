@@ -128,17 +128,13 @@ impl DrawingEditor {
             .map(|(i, s)| {
                 MenuEntry::item(s.name.clone(), move |t, _, cx| {
                     t.selection.clear();
-                    t.edit("Move image to sheet", cx, |d| {
-                        if let Some(k) = d.sheets[cur].images.iter().position(|x| x.id == id) {
-                            let mut im = d.sheets[cur].images.remove(k);
-                            im.id = d.sheets[i].images.iter().map(|x| x.id).max().unwrap_or(0) + 1;
-                            d.sheets[i].images.push(im);
-                        }
+                    t.edit(noshape_ops::drawing::MOVE_IMAGE_TO_SHEET, cx, |d| {
+                        noshape_ops::drawing::move_image_to_sheet(d, cur, id, i);
                     });
                 })
             })
             .collect();
-        let mut out = vec![MenuEntry::item(if borders { "Hide image borders" } else { "Show image borders" }, move |t, _, cx| t.edit("Image borders", cx, |d| d.props.image_borders = !borders))];
+        let mut out = vec![MenuEntry::item(noshape_ops::drawing::image_borders_label(borders), move |t, _, cx| t.edit(noshape_ops::drawing::IMAGE_BORDERS, cx, |d| d.props.image_borders = !borders))];
         if !sheets.is_empty() {
             out.push(MenuEntry::Submenu("Move to sheet".into(), sheets));
         }
