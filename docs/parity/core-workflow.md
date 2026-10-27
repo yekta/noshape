@@ -36,7 +36,7 @@ it, so re-take positions after every selection.
 | 2.8 | Select two lines, E | Equal; glyphs shown | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 2.9 | D, pick circle, place | Value box opens with the full value selected ("20.479094 mm") | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 2.10 | Bare "25" + Enter | Ø25, box closes | ✅ (but see F3) | 0.4.10+ / 1c853f78 10-27 |
-| 2.11 | Double-click the dimension, "1 in" + Enter | Ø25.4, tan background | ❌ (DIM-AC-ENTER) | 0.4.10+ / 1c853f78 10-27 |
+| 2.11 | Double-click the dimension, "1 in" + Enter | Ø25.4, tan background | ✅ (DIM-AC-ENTER fixed 189663bf) | 0.4.10+ / f16b31c6 10-27 |
 | 2.12 | "10+5" + Enter | Label "ƒ 15" (expression prefix) | ✅ re-checked 10-23: "ƒ 15" (was ✗ F4) | 0.4.10+ / 1c853f78 10-27 |
 | 2.13 | Re-open it | Box shows "(10+5) mm" | ✅ re-checked 10-23: "(10+5) mm" (was ✗ F5) | 0.4.10+ / 1c853f78 10-27 |
 | 2.14 | Type, Esc | Reverts and blurs; box stays | ✅ | 0.4.10+ / 1c853f78 10-27 |
@@ -114,7 +114,7 @@ it, so re-take positions after every selection.
 
 | # | Step | Live | Status | Verified |
 |---|---|---|---|---|
-| 7.1 | Part Studio tab › Export…, STEP | Dialog (Parasolid default), STEP options, file written | ❌ (TAB-EXPORT-MISSING) (3 solids, mm) | 0.4.10+ / 1c853f78 10-27 |
+| 7.1 | Part Studio tab › Export…, STEP | Dialog (Parasolid default), STEP options, file written | ✅ (TAB-EXPORT-MISSING fixed dea57d5c) (3 solids, mm) | 0.4.10+ / f16b31c6 10-27 |
 | 7.2 | STEP contents | Products named as in live's export | ✅ (v0.4.6 gate): flat products Part 1…n, AP242 header (was ✗ F26) |  |
 | 7.3 | Quit, start, Recently opened, open | Thumbnail, all tabs and features back | ✅ (single click selects; double click opens: ? vs live) | 0.4.10+ / 1c853f78 10-27 |
 
