@@ -43,6 +43,23 @@ target structure and the rules that keep it.
    regenerate or move views go in `noshape-model` (e.g. `drawing/links_tests.rs`, `configuration_tests.rs`).
 5. **Keep crates under ~25k lines.** When one grows past that, split it along these lines before it becomes a tangle.
 
+## Target for the app: Zed's layout (checked 2026-10-27)
+
+zed-industries/zed has 251 crates; its binary crate (`crates/zed`) is ~22k lines and its `main.rs` is mostly
+`<feature>::init(cx)` calls (settings, project, debugger_ui, command_palette, language_models, …). Each feature is a
+crate that registers itself from `init`: the `workspace` crate defines the item/panel traits and a registry and never
+names a feature, so editing a feature recompiles that crate and a small binary. Ours (10-27): the binary `noshape` is
+97k lines (Part Studio UI 34k, assembly UI 23k, workspace/chrome, preferences, release management, start window), so
+every edit below it recompiles 97k lines (35–60 s).
+
+Plan, one step at a time (each lands green; the owning agent is warned before its files move):
+1. `noshape-assembly-ui` (assembly_*, 23k) out of the binary, like `noshape-drawing-ui` (hooks for app-level calls).
+2. `noshape-workspace`: the workspace and chrome with a **studio registry** (a trait per tab kind: create the view,
+   menus, toolbar, save/restore; studios register from their `init(cx)`), so the workspace never names a studio.
+3. `noshape-part-studio-ui` (part_studio/ + feature_dialog, 38k), then Variable Studio, Feature Studio, start window,
+   preferences, release management/history as their own crates, each with `init(cx)`.
+4. The binary: `main.rs` calling the `init`s plus app wiring, ~10–20k lines.
+
 ## Progress
 
 - 2026-10-26: `noshape-model-data` split out of `noshape-model` (26k lines moved; model 98k → 72k).
