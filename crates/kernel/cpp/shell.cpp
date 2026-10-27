@@ -20,6 +20,7 @@
 
 #include "internal.hpp"
 #include <chrono>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <BRepBuilderAPI_MakeEdge.hxx>
@@ -1749,7 +1750,17 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     std::fprintf(stderr, "slabs: %d tools, union volume %.6g\n", tools.Extent(), volume_of(union_));
   if (sign < 0)
   {
-    BRepAlgoAPI_Common co(solid, union_);
+    BRepAlgoAPI_Common co;
+    {
+      ShapeList a1, a2;
+      a1.Append(solid);
+      a2.Append(union_);
+      co.SetArguments(a1);
+      co.SetTools(a2);
+      // In parallel: a quarter faster on qa's shell matrix (SHELL-SLOW).
+      co.SetRunParallel(true);
+      co.Build();
+    }
     if (co.HasErrors() || !co.IsDone())
     {
       if (dbg)
