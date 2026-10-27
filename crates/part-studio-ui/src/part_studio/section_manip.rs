@@ -27,8 +27,6 @@ const RING_GAP_PX: f64 = 14.0;
 const BASE_PX: f64 = 8.0;
 /// Arrow glyph length (px), as `manipulators.rs` draws it.
 const ARROW_PX: f64 = super::manipulators::ARROW_SHAFT_PX + super::manipulators::ARROW_HEAD_PX;
-/// Snap window around 5° multiples (live: 82.046 and 92.111 stay free).
-const SNAP_DEG: f64 = 2.0;
 /// A dragged base snaps onto a vertex within this many px (live ≈22).
 const VERTEX_SNAP_PX: f64 = 22.0;
 /// Over a face, onto one of its edges within this many px (live ≈30–35).
@@ -95,10 +93,9 @@ pub(super) fn ring_axes(n: DVec3) -> [DVec3; 2] {
     [a, n.cross(a).normalize()]
 }
 
-/// A dragged angle (deg) as live shows it: 5° multiples within 2°.
-pub(super) fn snap_deg(deg: f64) -> f64 {
-    let s = (deg / 5.0).round() * 5.0;
-    if (deg - s).abs() < SNAP_DEG { s } else { (deg * 1000.0).round() / 1000.0 }
+/// A dragged angle (deg) as live shows it: [`crate::viewport::angular_snap_deg`].
+pub(super) fn snap_deg(deg: f64, radius_px: f64, shift: bool) -> f64 {
+    crate::viewport::angular_snap_deg(deg, radius_px, shift)
 }
 
 /// "15 deg", "97.686 deg".
@@ -261,7 +258,11 @@ impl PartStudioView {
                 let Some(q) = on_plane(self, *position, r.axis, r.pivot, cx) else { return Some(true) };
                 let w = q - r.pivot;
                 let a = r.axis.dot(r.from.cross(w)).atan2(r.from.dot(w));
-                let deg = snap_deg(a.to_degrees());
+                let wpp = {
+                    let v = self.viewport.read(cx);
+                    v.camera.world_per_pixel(v.size().y)
+                };
+                let deg = snap_deg(a.to_degrees(), w.length() / wpp.max(1e-12), window.modifiers().shift);
                 self.set_section_rotation(RingDrag { deg, ..r }, window, cx);
                 self.open_section_box(window, cx);
                 Some(true)
@@ -618,9 +619,16 @@ mod tests {
     #[test]
     fn rotation_snaps_and_reads_as_live() {
         // Live's ring B log: 82.046, 92.111, 97.206 free; 85, 90, 95 snapped.
+        // Near the ring (5° steps, ±2°).
         for (raw, shown) in [(82.046, 82.046), (84.0, 85.0), (88.5, 90.0), (92.111, 92.111), (94.2, 95.0), (97.206, 97.206), (15.4, 15.0)] {
-            assert!((snap_deg(raw) - shown).abs() < 1e-9, "{raw} -> {}", snap_deg(raw));
+            assert!((snap_deg(raw, 100.0, false) - shown).abs() < 1e-9, "{raw} -> {}", snap_deg(raw, 100.0, false));
         }
+        // Live's rule: 2.5° stays, 3.1° snaps to 5°; farther out whole
+        // degrees (5° is 52 px at 600 px), then tenths; Shift never snaps.
+        assert!((snap_deg(2.5, 100.0, false) - 2.5).abs() < 1e-9 && (snap_deg(3.1, 100.0, false) - 5.0).abs() < 1e-9);
+        assert!((snap_deg(3.4, 600.0, false) - 3.0).abs() < 1e-9 && (snap_deg(3.6, 600.0, false) - 4.0).abs() < 1e-9);
+        assert!((snap_deg(3.44, 4000.0, false) - 3.4).abs() < 1e-9);
+        assert!((snap_deg(3.1, 100.0, true) - 3.1).abs() < 1e-9);
         assert_eq!(deg_text(15.0), "15 deg");
         assert_eq!(deg_text(97.686), "97.686 deg");
         // Top: ring A about Y, ring B about X (live).

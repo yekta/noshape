@@ -2535,7 +2535,7 @@ impl AssemblyView {
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
-                if self.drag_section(*position, cx) {
+                if self.drag_section(*position, window.modifiers().shift, cx) {
                     return;
                 }
                 if self.snap_drag.is_some() {

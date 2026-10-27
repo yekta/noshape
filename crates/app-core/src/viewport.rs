@@ -60,6 +60,28 @@ fn interactive_style(style: noshape_render::Style, d: &nav::DetailSettings) -> n
 /// Point under the cursor for a ray (origin, direction), if any.
 pub type OrbitPivotFn = Arc<dyn Fn(DVec3, DVec3) -> Option<DVec3> + Send + Sync>;
 
+/// A rotation manipulator's dragged angle (deg) as live snaps it
+/// (behaviours "skasm (2026-10-27) assembly sweep leftovers" (1), the
+/// bundle's getSnapAngle): the step is the coarsest of 5°, 1° and 0.1° whose
+/// arc at the pointer's distance from the axis (`radius_px`) is at most 50 px;
+/// the angle snaps to it within 0.4 (1 + o / 3) steps (o the step's index:
+/// ±2° at 5°; whole and tenth degrees always); Shift held doesn't snap.
+/// Otherwise 3 decimals.
+pub fn angular_snap_deg(deg: f64, radius_px: f64, shift: bool) -> f64 {
+    let free = (deg * 1000.0).round() / 1000.0;
+    if shift {
+        return free;
+    }
+    for (o, step) in [5.0f64, 1.0, 0.1].into_iter().enumerate() {
+        if radius_px * step.to_radians() <= 50.0 {
+            let a = deg / step;
+            let c = a.round();
+            return if (c - a).abs() <= 0.4 * (1.0 + o as f64 / 3.0) { c * step } else { free };
+        }
+    }
+    free
+}
+
 #[derive(Clone, Debug)]
 pub enum ViewportEvent {
     Hover(Option<u32>),

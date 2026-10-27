@@ -4233,7 +4233,7 @@ impl AssemblyView {
     /// Dragging a handle: the arrow moves the plane along its normal (the
     /// value is the distance from the drag's start), a ring turns it
     /// (snapping to 5° near one), the base moves the manipulator over it.
-    pub(super) fn drag_section(&mut self, position: glam::DVec2, cx: &mut Context<Self>) -> bool {
+    pub(super) fn drag_section(&mut self, position: glam::DVec2, shift: bool, cx: &mut Context<Self>) -> bool {
         let Some(d) = self.ui.section_drag.clone() else { return false };
         let pl0 = &d.plane0;
         let new_plane = match d.handle {
@@ -4247,15 +4247,12 @@ impl AssemblyView {
             SectionHandle::Ring(k) => {
                 let c = pl0.base() + pl0.dir() * crate::assembly_scene::SECTION_RINGS_PX * self.wpp_at(pl0.base(), cx);
                 let axis = Self::ring_axis(pl0, k);
-                let Some(v) = self.ray_plane_at(position, c, axis, cx).and_then(|p| (p - c).try_normalize()) else { return true };
-                let mut angle = d.v0.cross(v).dot(axis).atan2(d.v0.dot(v));
-                // Live: 5° multiples catch the drag near them (UNCONFIRMED
-                // window: 2°; 92.111 and 97.206 were left free).
-                let deg = angle.to_degrees();
-                let near = (deg / 5.0).round() * 5.0;
-                if (deg - near).abs() < 2.0 {
-                    angle = near.to_radians();
-                }
+                let Some(p) = self.ray_plane_at(position, c, axis, cx) else { return true };
+                let Some(v) = (p - c).try_normalize() else { return true };
+                // Live's snap (5° / 1° / 0.1° by the pointer's distance).
+                let radius_px = (p - c).length() / self.wpp_at(c, cx).max(1e-12);
+                let deg = crate::viewport::angular_snap_deg(d.v0.cross(v).dot(axis).atan2(d.v0.dot(v)).to_degrees(), radius_px, shift);
+                let angle = deg.to_radians();
                 Some((Self::rotated_plane(pl0, k, angle), angle))
             }
             SectionHandle::Base => {
