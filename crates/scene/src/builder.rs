@@ -1109,8 +1109,10 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         }
     }
     // What is selected isn't pre-highlighted again (live selection/05 =
-    // 04, sketch/23 = 22, "plane and mate connector hover" (c)).
-    if let Some(h) = hover.filter(|h| !selection.contains(h)) {
+    // 04, sketch/23 = 22, "plane and mate connector hover" (c)), except a
+    // part edge: hovered it gets the hover's dark outline back round a
+    // lighter core (live 10-27, behaviours "psui light samples block").
+    if let Some(h) = hover.filter(|h| !selection.contains(h) || matches!(h, Reference::Edge(_))) {
         mark(h, state::HOVER, &mut scene);
     }
     // A face's boundary edges: solid, without the dark core of an edge

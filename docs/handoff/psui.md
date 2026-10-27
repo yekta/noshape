@@ -65,8 +65,8 @@ that touches the model: ~12 min.
 2. Preview blend residuals (behaviours "psui (10-26, P1) Feature preview look"; SPECS CORRECTION 10-27: live's Remove
    cuts the part and draws the grey tool over it, as ours, so Remove / Intersect are right unblended); live draws the active field's picked region outline
    full orange over the preview (ours: 30 % behind the tool); at slider 1 live's top face is lighter than ours.
-3. Edge selected + hovered (live: the hover's dark outline round a (255,188,64) core): ours never hovers a selected
-   entity (builder `hover.filter(|h| !selection.contains(h))`).
+3. (Done 10-27: a hovered selected edge draws the hover's dark outline round the selection colour and a
+   (255,188,64) core, as live.)
 4. (In the second batch: the highlight from Onshape's orthographic eye, offscreen test
    `the_highlight_moves_across_an_orthographic_view`.) Check perspective views against live too.
 5. Dihedral panel: layout as live (Units select, read-only Max / Min, threshold rows with our dihedral-high / -low

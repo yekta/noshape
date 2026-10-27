@@ -829,8 +829,9 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     o.world = mix(wa, wb, t);
     o.style = l.style;
     o.across = side * half;
-    // 1: a hovered part edge, 2: a selected one (fs_line draws the band).
-    o.core = select(0.0, select(2.0, 1.0, (st & HOVER) != 0u), own_edge);
+    // 1: a hovered part edge, 2: a selected one, 3: both (fs_line draws
+    // the band).
+    o.core = select(0.0, select(2.0, select(1.0, 3.0, (st & SELECTED) != 0u), (st & HOVER) != 0u), own_edge);
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
 }
@@ -856,11 +857,14 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
     // the centre out in logical px): hovered, a pale core (255,211,160),
     // the hover colour, then a dark outline (26,35,40) on both sides;
     // selected, a darker core (203,138,15) shading out to the selection
-    // colour, no outline.
+    // colour, no outline; selected and hovered, the hover's outline round
+    // the selection colour and a (255,188,64) core.
     if (i.core > 0.0) {
         let a = abs(i.across) / max(g.viewport.z, 1.0);
         var c: vec3<f32>;
-        if (i.core < 1.5) {
+        if (i.core > 2.5) {
+            if (a > 2.75) { c = vec3(26.0, 35.0, 40.0) / 255.0; } else if (a > 1.25) { c = linear_to_srgb(g.select.rgb); } else { c = vec3(255.0, 188.0, 64.0) / 255.0; }
+        } else if (i.core < 1.5) {
             if (a > 2.75) { c = vec3(26.0, 35.0, 40.0) / 255.0; } else if (a > 1.25) { c = linear_to_srgb(i.color.rgb); } else { c = vec3(255.0, 211.0, 160.0) / 255.0; }
         } else {
             if (a > 1.5) { c = linear_to_srgb(i.color.rgb); } else if (a > 0.5) { c = vec3(217.0, 156.0, 35.0) / 255.0; } else { c = vec3(203.0, 138.0, 15.0) / 255.0; }
