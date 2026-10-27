@@ -63,7 +63,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   part); live may keep the source part's colour.
 
 ## Next (in order, after landing)
-1. Audit leftovers: "Move annotation" (part_annotation has no move of the datum box's offset). Covered elsewhere:
+1. Audit done ("Move annotation" = part_annotation move, landed). Covered elsewhere:
    Move configuration input (config_reorder_inputs), Hide all instances (assembly_set_state on every instance), Save
    custom color (any colour is settable), Update material library (material_library_update, this landing).
 2. API: benchmarks done for Variable Studio, in-context, sheet metal (/root/dx-scratch/bench/*.py); next: drive a model

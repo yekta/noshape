@@ -246,7 +246,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_change_to_version", &[r##"{"version": "V1"}"##, r##"{"version": "V2", "instances": ["Part 1 <1>"]}"##]),
     ("config_duplicate_input", &[r##"{"tab": "Assembly 1", "input": "Configuration"}"##]),
     ("part_configured_properties", &[r##"{"part": "body:F1a2b.0", "action": "add_property", "property": "Description"}"##, r##"{"part": "body:F1a2b.0", "action": "set", "property": "Description", "value": "Long bracket"}"##]),
-    ("part_annotation", &[r##"{"action": "add_datum", "face": "face:eJyrVkr…"}"##, r##"{"action": "delete", "annotation": 1}"##]),
+    ("part_annotation", &[r##"{"action": "add_datum", "face": "face:eJyrVkr…"}"##, r##"{"action": "delete", "annotation": 1}"##, r##"{"action": "move", "annotation": 1, "offset": [40, 25]}"##]),
     ("analysis_draft", &[r##"{"pull": "plane:top", "angle": "3 deg"}"##, r##"{"pull": "plane:top", "flip": true, "undercut": false, "parts": ["Part 1"]}"##]),
     ("analysis_flatten", &[r##"{"faces": ["face:eJyrVkr…"]}"##, r##"{"faces": ["face:eJyrVkr…"], "rips": ["edge:eJyrVkr…"], "export": {"format": "DXF", "file": "/tmp/flat.dxf"}}"##]),
     ("drawing_templates", &[r##"{}"##]),

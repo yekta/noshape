@@ -3696,6 +3696,15 @@ fn assembly_and_part_studio_menu_gaps() {
     let r = call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "delete", "annotation": 1 }));
     assert_eq!(last(&mut ctx), "Delete annotation");
     assert_eq!(r["annotations"].as_array().unwrap().len(), 1, "{r}");
+    // Dragging the letter box away (and back).
+    let id = r["annotations"][0]["id"].clone();
+    let r = call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "move", "annotation": id, "offset": [40, -12.5] }));
+    assert_eq!(last(&mut ctx), "Move annotation");
+    assert_eq!(r["annotations"][0]["offset"], json!([40.0, -12.5]), "{r}");
+    let r = call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "move", "annotation": id, "offset": [0, 0] }));
+    assert!(r["annotations"][0].get("offset").is_none(), "{r}");
+    let e = try_call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "move", "annotation": 99, "offset": [1, 1] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("annotation"), "{e:?}");
     let e = try_call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "add_datum", "face": "plane:top" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("face"), "{e:?}");
 }

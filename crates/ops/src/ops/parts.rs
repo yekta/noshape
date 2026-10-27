@@ -66,14 +66,15 @@ pub fn ops() -> Vec<Op> {
             group: "part",
             verb: "annotation",
             summary: "Part Studio annotations: add a datum, list, delete",
-            description: "Inspection panel › Datum and the annotations' right-click › Delete annotation (Model definitions; annotations aren't features). `add_datum` puts datum `letter` (default the next free letter) on planar face `face`, lying in the face's plane at its center (\"Datum\"); `delete` removes annotation `annotation` (\"Delete annotation\"). Without `action`, lists them.",
+            description: "Inspection panel › Datum and the annotations' right-click › Delete annotation (Model definitions; annotations aren't features). `add_datum` puts datum `letter` (default the next free letter) on planar face `face`, lying in the face's plane at its center (\"Datum\"); `delete` removes annotation `annotation` (\"Delete annotation\"); `move` is dragging its letter box: `offset` [right, up] from the triangle in screen pixels along the symbol's plane axes, drawn with a dashed leader ([0, 0] puts it back; \"Move annotation\"). Without `action`, lists them (with each moved box's `offset`).",
             fields: vec![
                 doc_field(),
                 tab_field(),
-                opt("action", json!({ "type": "string", "enum": ["add_datum", "delete"] }), "What to do (default: list)."),
+                opt("action", json!({ "type": "string", "enum": ["add_datum", "delete", "move"] }), "What to do (default: list)."),
                 opt("face", s(), "add_datum: a planar face id."),
                 opt("letter", s(), "add_datum: the datum letter."),
-                opt("annotation", json!({ "type": "integer" }), "delete: the annotation id."),
+                opt("annotation", json!({ "type": "integer" }), "delete / move: the annotation id."),
+                opt("offset", json!({ "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }), "move: [right, up] in screen pixels."),
             ],
             mutates: true,
             destructive: false,
@@ -279,7 +280,23 @@ fn annotation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 Ok(())
             })?;
         }
-        Some(_) => return Err(OpError::param("action", "add_datum or delete")),
+        Some("move") => {
+            let id = a.opt_u64("annotation")?.ok_or_else(|| OpError::param("annotation", "an annotation id (part_annotation)"))? as u32;
+            if !crate::doc::studio(od.doc(), tab)?.annotations.iter().any(|x| x.id == id) {
+                return Err(OpError::param("annotation", "no such annotation"));
+            }
+            let o = a.opt_array("offset")?.ok_or_else(|| OpError::param("offset", "[right, up] in screen pixels"))?;
+            let v: Vec<f64> = o.iter().filter_map(serde_json::Value::as_f64).collect();
+            let [x, y] = v[..] else { return Err(OpError::param("offset", "two numbers")) };
+            let offset = if x == 0.0 && y == 0.0 { None } else { Some([x, y]) };
+            edit_studio(od, tab, "Move annotation", |ps| {
+                if let Some(x) = ps.annotations.iter_mut().find(|x| x.id == id) {
+                    x.offset = offset;
+                }
+                Ok(())
+            })?;
+        }
+        Some(_) => return Err(OpError::param("action", "add_datum, delete or move")),
     }
     let ps = crate::doc::studio(od.doc(), tab)?;
     let list: Vec<serde_json::Value> = ps
@@ -289,7 +306,11 @@ fn annotation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let kind = match &x.kind {
                 AnnotationKind::Datum { letter } => json!({ "datum": letter }),
             };
-            json!({ "id": x.id, "kind": kind, "face": refs::to_id(&x.face) })
+            let mut v = json!({ "id": x.id, "kind": kind, "face": refs::to_id(&x.face) });
+            if let Some(o) = x.offset {
+                v["offset"] = json!(o);
+            }
+            v
         })
         .collect();
     Ok(json!({ "annotations": list }).into())

@@ -5400,23 +5400,25 @@ Examples:
 
 Part Studio annotations: add a datum, list, delete (edits the document (one undoable history entry)).
 
-Inspection panel › Datum and the annotations' right-click › Delete annotation (Model definitions; annotations aren't features). `add_datum` puts datum `letter` (default the next free letter) on planar face `face`, lying in the face's plane at its center ("Datum"); `delete` removes annotation `annotation` ("Delete annotation"). Without `action`, lists them.
+Inspection panel › Datum and the annotations' right-click › Delete annotation (Model definitions; annotations aren't features). `add_datum` puts datum `letter` (default the next free letter) on planar face `face`, lying in the face's plane at its center ("Datum"); `delete` removes annotation `annotation` ("Delete annotation"); `move` is dragging its letter box: `offset` [right, up] from the triangle in screen pixels along the symbol's plane axes, drawn with a dashed leader ([0, 0] puts it back; "Move annotation"). Without `action`, lists them (with each moved box's `offset`).
 
 Examples:
 
 ```json
 {"action": "add_datum", "face": "face:eJyrVkr…"}
 {"action": "delete", "annotation": 1}
+{"action": "move", "annotation": 1, "offset": [40, 25]}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
-| `action` | one of `add_datum`, `delete` |  | What to do (default: list). |
+| `action` | one of `add_datum`, `delete`, `move` |  | What to do (default: list). |
 | `face` | string |  | add_datum: a planar face id. |
 | `letter` | string |  | add_datum: the datum letter. |
-| `annotation` | integer |  | delete: the annotation id. |
+| `annotation` | integer |  | delete / move: the annotation id. |
+| `offset` | array of number |  | move: [right, up] in screen pixels. |
 
 #### part_set_material
 
