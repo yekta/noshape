@@ -108,7 +108,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 |---|---|---|---|
 | 4.1 | Entities selected before starting a feature fill its first compatible field | A §2.3 | ✅ |
 | 4.2 | A sketch selected in the feature list preselects all its regions (Extrude, Revolve…) | features_and_parts_lists | ✅ (app 10-24: "Face of Sketch 2" preselected) |
-| 4.3 | Planes / features selected in the list preselect plane / feature fields | A §2.3 | 🔧 |
+| 4.3 | Planes / features selected in the list preselect plane / feature fields | A §2.3 | ✅ (10-27: Top in the list → Plane 1's "Top plane"; Sketch 1's row → Extrude's "Face of Sketch 1") |
 | 4.4 | Clicking the active toolbar tool again (or its shortcut) leaves its dialog open as it is (live 10-27; only ✓ / ✕ / Esc close it) | Home__selection | ✅ |
 | 4.5 | Picking a tool from a toolbar dropdown makes it the group's face for the session | A §2.3 | ✅ (10-27: Face blend from the Fillet ▾ takes the group's button) |
 | 4.6 | Toolbar tooltips show the shortcut | A §2.2 | ✅ |
