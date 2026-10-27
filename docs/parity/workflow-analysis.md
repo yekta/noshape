@@ -27,8 +27,8 @@ Status: ✅ matches live/expected, ✗ differs (finding #), ? live data missing.
 | 16 | Analysis tools menu | Curve/surface analysis…, Deviation…, Connection…, Dihedral…, Interference detection…, Zebra stripes…, Reflection analysis…, Curvature color map, Draft analysis…, Flatten surfaces… (free plan: no Thickness) | same + Thickness analysis… | ✅ (paid plans have it) | 0.4.10+ / 8602df0d 10-27 (bracket24) |
 | 17 | Draft analysis: Top row as mold split direction | ? | **not accepted**; the top face works → legend Steep / Undercut / Side 1 / Side 2, colours, hover angle "90.00°" | ✗ ADV1 / ? |  |
 | 18 | Curve/surface analysis on a fillet face | combs | Entities to analyze, ☑ Curvature combs, U/V curves 8, ☑ Sketch inflection points, ☐ Minimum radius, ☐ Extend across face, ☐ Control point grids, Scale; magenta combs | ? |  |
-| 19 | Interference detection, Part 1 + Part 3 | "Part 1 and Part 3", parts translucent with amber outlines, red volume; dialog snapped right (W−600, H−401) | same, same position | ✅ |  |
-| 20 | Hover the row | yellow box + "L x W x H" of the overlap | yellow box; tooltip **"35.485 mm x 20.233 mm x 10 mm"** for a 30 × 20 × 10 overlap | ✗ AN4 |  |
+| 19 | Interference detection, Part 1 + Part 3 | "Part 1 and Part 3", parts translucent with amber outlines, red volume; dialog snapped right (W−600, H−401) | same, same position | ✅ | 0.4.10+ / 8602df0d 10-27 (bracket + Transform copy +10 X: Part 1 and Part 2, amber outlines, red overlap) |
+| 20 | Hover the row | yellow box + "L x W x H" of the overlap | yellow box; tooltip **"35.485 mm x 20.233 mm x 10 mm"** for a 30 × 20 × 10 overlap | ✗ AN4 | 0.4.10+ / 8602df0d 10-27: tooltip "70 mm x 50 mm x 60 mm" = the exact overlap box (tickets/interference-tooltip-8602.png); qa5's block + shifted copy not re-run |
 
 ## Findings (2026-10-21)
 
