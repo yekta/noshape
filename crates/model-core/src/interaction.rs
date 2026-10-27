@@ -632,6 +632,12 @@ pub fn features_using(features: &[Feature], r: &Reference) -> Vec<FeatureId> {
 /// The sketch a feature was built from (Onshape's "Edit Sketch 1…" entry
 /// for an extrude, revolve…): the first sketch its selections reference.
 pub fn source_sketch(features: &[Feature], f: &Feature) -> Option<FeatureId> {
+    used_sketches(features, f).into_iter().next()
+}
+
+/// Every sketch a feature's selections reference, in order (a loft's
+/// profiles; live hides them all when the feature is made).
+pub fn used_sketches(features: &[Feature], f: &Feature) -> Vec<FeatureId> {
     fn walk(values: &ParamValues, out: &mut Vec<FeatureId>) {
         for v in values.0.values() {
             match v {
@@ -646,7 +652,13 @@ pub fn source_sketch(features: &[Feature], f: &Feature) -> Option<FeatureId> {
     }
     let mut ids = Vec::new();
     walk(&f.params, &mut ids);
-    ids.into_iter().find(|id| *id != f.id && features.iter().any(|g| g.id == *id && g.type_id == "sketch"))
+    let mut out: Vec<FeatureId> = Vec::new();
+    for id in ids {
+        if id != f.id && !out.contains(&id) && features.iter().any(|g| g.id == id && g.type_id == "sketch") {
+            out.push(id);
+        }
+    }
+    out
 }
 
 /// Onshape: clicking a sketch curve while a region field is active picks

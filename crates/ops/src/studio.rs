@@ -20,11 +20,7 @@ pub fn edit_description(name: &str) -> String {
 /// when it opened), advance the bar, and hide the sketch it consumes (Onshape
 /// hides the sketch a new feature uses). Returns where it went.
 pub fn insert_feature(ps: &mut PartStudio, feature: Feature, index: usize) -> usize {
-    if let Some(sid) = noshape_model::interaction::source_sketch(&ps.features, &feature)
-        && !ps.auto_hidden.contains(&sid)
-    {
-        ps.auto_hidden.push(sid);
-    }
+    hide_used_sketches(ps, &feature, &[]);
     let at = index.min(ps.features.len());
     ps.features.insert(at, feature);
     if let Some(r) = ps.rollback {
@@ -34,6 +30,18 @@ pub fn insert_feature(ps: &mut PartStudio, feature: Feature, index: usize) -> us
     at
 }
 
+/// The sketches `feature` uses (all of a loft's profiles) follow it from
+/// now on, except those it already used (`before`: a sketch the user
+/// showed by hand stays shown). Live (qa LOFT-SKETCH-HIDE): every sketch a
+/// committed feature uses is hidden, also one picked in a later edit.
+fn hide_used_sketches(ps: &mut PartStudio, feature: &Feature, before: &[FeatureId]) {
+    for sid in noshape_model::interaction::used_sketches(&ps.features, feature) {
+        if !before.contains(&sid) && !ps.auto_hidden.contains(&sid) {
+            ps.auto_hidden.push(sid);
+        }
+    }
+}
+
 /// Live ("psb (10-25 l)" sketch visibility): a consumed sketch is hidden
 /// while at least one unsuppressed feature uses it, shown again when the
 /// last one is suppressed or deleted; a sketch shown or hidden by hand
@@ -41,7 +49,7 @@ pub fn insert_feature(ps: &mut PartStudio, feature: Feature, index: usize) -> us
 pub fn sync_sketch_visibility(ps: &mut PartStudio) {
     ps.auto_hidden.retain(|id| ps.features.iter().any(|f| f.id == *id));
     for sid in ps.auto_hidden.clone() {
-        let consumed = ps.features.iter().any(|f| !f.suppressed && f.id != sid && noshape_model::interaction::source_sketch(&ps.features, f) == Some(sid));
+        let consumed = ps.features.iter().any(|f| !f.suppressed && f.id != sid && noshape_model::interaction::used_sketches(&ps.features, f).contains(&sid));
         if let Some(sk) = ps.feature_mut(sid) {
             sk.hidden = consumed;
         }
@@ -51,12 +59,15 @@ pub fn sync_sketch_visibility(ps: &mut PartStudio) {
 /// Accept an edited feature's dialog: configured parameters go to the active
 /// configuration's row, the rest to the feature.
 pub fn edit_feature(ps: &mut PartStudio, index: usize, feature: Feature, config: &ConfigValues) {
+    let before = ps.features.get(index).map(|f| noshape_model::interaction::used_sketches(&ps.features, f)).unwrap_or_default();
+    hide_used_sketches(ps, &feature, &before);
     let PartStudio { features, configuration, .. } = ps;
     if let Some(slot) = features.get_mut(index) {
         let mut feature = feature;
         configuration.store_edit(slot, &mut feature, config);
         *slot = feature;
     }
+    sync_sketch_visibility(ps);
 }
 
 /// "Delete : Extrude 1, Fillet 1".
@@ -735,5 +746,33 @@ mod sketch_visibility_tests {
         set_suppressed(&mut ps, &[id1], true);
         set_suppressed(&mut ps, &[id1], false);
         assert!(!hidden(&ps), "(c3) the manual show stays");
+    }
+
+    /// qa LOFT-SKETCH-HIDE: a loft hides both profiles' sketches; an
+    /// Extrude committed without a region hides the sketch picked in a
+    /// later edit.
+    #[test]
+    fn every_sketch_a_feature_uses_is_hidden() {
+        let units = noshape_units::UnitPrefs::default();
+        let mut ps = PartStudio::new();
+        let (a, b) = (ps.new_feature("sketch", &units).unwrap(), ps.new_feature("sketch", &units).unwrap());
+        let (sa, sb) = (a.id, b.id);
+        ps.features.push(a);
+        ps.features.push(b);
+        let mut loft = ps.new_feature("loft", &units).unwrap();
+        loft.params.set("profiles", ParamValue::Query(vec![Reference::Sketch(sb), Reference::Sketch(sa)]));
+        insert_feature(&mut ps, loft, 2);
+        assert!(ps.feature(sa).unwrap().hidden && ps.feature(sb).unwrap().hidden, "both profiles hidden");
+        let mut ps = PartStudio::new();
+        let sk = ps.new_feature("sketch", &units).unwrap();
+        let sid = sk.id;
+        ps.features.push(sk);
+        let empty = ps.new_feature("extrude", &units).unwrap();
+        insert_feature(&mut ps, empty.clone(), 1);
+        assert!(!ps.feature(sid).unwrap().hidden);
+        let mut picked = empty;
+        picked.params.set("entities", ParamValue::Query(vec![Reference::Sketch(sid)]));
+        edit_feature(&mut ps, 1, picked, &ConfigValues::default());
+        assert!(ps.feature(sid).unwrap().hidden, "the sketch picked in the edit is hidden");
     }
 }
