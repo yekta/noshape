@@ -518,7 +518,7 @@ pub struct PenSpan {
 pub fn centered_phase(len: f64, pattern: &[f64]) -> f64 {
     let period: f64 = pattern.iter().sum();
     let Some(&first) = pattern.first() else { return 0.0 };
-    if !(period > 0.0) || !(len > 0.0) {
+    if period.is_nan() || len.is_nan() || period <= 0.0 || len <= 0.0 {
         return 0.0;
     }
     let tail = period - first;
