@@ -106,9 +106,9 @@ place). parity/sketch.md all ✅. Assembly P2:
    earlier, rows 109 / 170), workflow-configured-assembly (1–5, 8
    ✅; CA3 closed by ui, CA4 and A15 rechecked on green).
 4. Which part moves when a new mate joins two free parts: done (be0dd33e, 26c7a498: the later part of one studio
-   moves). Mate edits match live's two UI runs. Open (asked live, REQUESTS "a NEW Revolute made in the UI mate
-   dialog"): a dialog-made flipped mate turns the pin about its connector X with rz 0 in ours (new_mate_holds), live's
-   REST-made one turned it about Z × w (rz −157.48°); which does live's dialog do?
+   moves). Mate edits match live's two UI runs. Live's dialog-made mates (request 1490): the dialog starts on the
+   alignment needing no turn, Flip turns the moving part 180° about its connector X with rz 0 = ours; only REST-made
+   mates turn about Z × w (our oracle R3 path). Closed.
 5. Slot: rechecked 10-27 against live spec-slot-06 (Ø20 leader, glyph groups, colours as live); the once-seen
    highlighted centre line was not reproduced.
 6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
@@ -154,4 +154,8 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
 ## Requests to the lead
-(none)
+- "Show calculation variance" in Mass properties (live: behaviours "skasm (2026-10-27) calculation variance": every
+  value gets " ± 4.000e-1 mm³"-style text, 3-decimal scientific, not persisted). The assembly panel
+  (assembly-ui/assembly_mass.rs) is mine, the Part Studio one psui's (part-studio-ui menus.rs ~1329), and the numbers
+  need an error bound from the kernel's mass-property integration (core: e.g. BRepGProp::VolumeProperties with Eps
+  returns the achieved error). Who owns it? I can do the assembly panel's text once the kernel gives a bound.
