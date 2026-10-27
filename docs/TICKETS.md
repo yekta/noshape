@@ -297,6 +297,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 LEFT-RAIL-WHERE-USED the Part Studio's left rail is Versions and history, Create version…, Document notes, Performance
+  errors detected, Release drafts; live's is Versions and history, Create version…, Comments, Document notes, **Where used**,
+  Performance errors detected, AI Advisor (behaviours 1559 / 1563). Comments and AI Advisor are cloud; "Where used" (which
+  tabs use this element) isn't there; "Release drafts" isn't on live's rail (a Free account has no release management)
+  (qa 2026-10-27, green dacce5e7)
 - [ ] P1 MEASURE-MAX-DIST Max dist between curved faces comes from sampled points, not the exact maximum: two tubes
   (Ø40 / Ø20 × 30, axes 50 mm apart; /root/qa-scratch/rev.noshape, Part 1 / Part 2 outer cylinders) → ours "Max dist
   94.850 mm" (app status bar) / 94.849984 (query_measure, from (−19.975, −0.997, 30), a mesh vertex, to (70, 0, 0)); exact
