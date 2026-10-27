@@ -18,6 +18,8 @@
 #include <NCollection_List.hxx>
 #include <TopoDS_Shape.hxx>
 
+#include <chrono>
+#include <typeinfo>
 #include <array>
 #include <cstdint>
 #include <exception>
@@ -51,6 +53,9 @@ void                            install_crash_guard();
 #endif
 
 namespace noshape {
+bool kernel_profile_on();
+void kernel_profile_add(const char* what, std::chrono::steady_clock::duration took);
+
 // Runs `f` under the crash guard: false when it throws or crashes (a
 // fallback inside an op that may crash OCCT, so the op can go on).
 template <class F>
@@ -114,7 +119,25 @@ catch (...)
 }
 
 template <typename Try, typename Fail>
+static void trycatch_timed(Try&& func, Fail&& fail) noexcept;
+
+template <typename Try, typename Fail>
 static void trycatch(Try&& func, Fail&& fail) noexcept
+{
+  // NOSHAPE_KERNEL_PROFILE: time every bridge call by function (printed at
+  // exit, common.cpp).
+  if (noshape::kernel_profile_on())
+  {
+    const auto t0 = std::chrono::steady_clock::now();
+    trycatch_timed(func, fail);
+    noshape::kernel_profile_add(typeid(Try).name(), std::chrono::steady_clock::now() - t0);
+    return;
+  }
+  trycatch_timed(func, fail);
+}
+
+template <typename Try, typename Fail>
+static void trycatch_timed(Try&& func, Fail&& fail) noexcept
 {
 #ifdef _WIN32
   trycatch_guarded(func, fail);

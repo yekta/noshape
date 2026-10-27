@@ -793,8 +793,12 @@ impl<'a> EvalCtx<'a> {
                 };
                 // Many tools (pattern instances): the many-tools options.
                 let opts = if tools.len() >= 8 { Self::many_tools_options() } else { k::BooleanOptions::default() };
-                let before: Vec<(BodyId, f64)> = if kind == BodyKind::Solid && op != "INTERSECT" {
-                    targets.iter().map(|&i| (self.ctx.bodies[i].id.clone(), self.ctx.bodies[i].shape.volume().unwrap_or(0.0))).collect()
+                // A part the boolean leaves as it was: same topology counts
+                // and box, then the same volume (measured only then: comparing
+                // volumes for every boolean measured each body twice per
+                // feature, REGEN-SPEED).
+                let before: Vec<(BodyId, Shape)> = if kind == BodyKind::Solid && op != "INTERSECT" {
+                    targets.iter().map(|&i| (self.ctx.bodies[i].id.clone(), self.ctx.bodies[i].shape.clone())).collect()
                 } else {
                     Vec::new()
                 };
@@ -803,8 +807,22 @@ impl<'a> EvalCtx<'a> {
                 // (live oracle_p1 E9/E11/E12: a tool inside the part or apart
                 // from it, the latter kept as its own part; E13: a cut that
                 // misses).
-                let unchanged = !before.is_empty()
-                    && before.iter().all(|(id, v)| self.ctx.bodies.iter().find(|b| &b.id == id).and_then(|b| b.shape.volume().ok()).is_some_and(|after| (after - v).abs() <= 1e-9 * v.abs().max(1e-12)));
+                let same = |a: &Shape, b: &Shape| -> bool {
+                    let counts = |s: &Shape| [ShapeType::Face, ShapeType::Edge, ShapeType::Vertex].map(|k| s.count(k));
+                    if counts(a) != counts(b) {
+                        return false;
+                    }
+                    let (Ok(ba), Ok(bb)) = (a.bounding_box(false), b.bounding_box(false)) else { return false };
+                    let tol = 1e-6 * ba.diagonal().max(1e-12);
+                    if (ba.min - bb.min).abs().max_element() > tol || (ba.max - bb.max).abs().max_element() > tol {
+                        return false;
+                    }
+                    match (a.volume(), b.volume()) {
+                        (Ok(va), Ok(vb)) => (va - vb).abs() <= 1e-9 * va.abs().max(1e-12),
+                        _ => false,
+                    }
+                };
+                let unchanged = !before.is_empty() && before.iter().all(|(id, old)| self.ctx.bodies.iter().find(|b| &b.id == id).is_some_and(|b| same(old, &b.shape)));
                 if unchanged {
                     self.infos.push(if op == "ADD" { NO_GEOMETRY_CHANGE } else { TOOLS_MISS_TARGETS }.into());
                 }

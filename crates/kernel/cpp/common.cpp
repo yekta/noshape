@@ -1,5 +1,7 @@
 // Shapes, lists, topology exploration, validation and history building.
 #include "internal.hpp"
+#include <mutex>
+#include <map>
 #include <fstream>
 #include <cstdlib>
 #include <csignal>
@@ -1229,5 +1231,56 @@ void dump_op(const char* name, const TopoDS_Shape& s, const std::vector<TopoDS_S
   }
   out << params << "\n";
   std::ofstream((base + ".txt").c_str()) << out.str();
+}
+} // namespace noshape
+
+#include <cxxabi.h>
+namespace noshape {
+namespace {
+struct KernelProfile
+{
+  std::mutex                                                  lock;
+  std::map<std::string, std::pair<long, double>>              calls; // name -> (count, ms)
+  ~KernelProfile()
+  {
+    std::vector<std::pair<std::string, std::pair<long, double>>> rows(calls.begin(), calls.end());
+    std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.second.second > b.second.second; });
+    std::fprintf(stderr, "kernel profile (NOSHAPE_KERNEL_PROFILE):\n");
+    for (const auto& [name, v] : rows)
+      std::fprintf(stderr, "  %9.1f ms %7ld  %s\n", v.second, v.first, name.c_str());
+  }
+};
+KernelProfile& kernel_profile()
+{
+  static KernelProfile p;
+  return p;
+}
+// The bridge function's name from its lambda's type ("...$op_fillet(...)::<lambda()>").
+std::string bridge_name(const char* mangled)
+{
+  int   st  = 0;
+  char* dem = abi::__cxa_demangle(mangled, nullptr, nullptr, &st);
+  std::string n = dem != nullptr ? dem : mangled;
+  std::free(dem);
+  const size_t paren = n.find('(');
+  size_t       end   = paren == std::string::npos ? n.size() : paren;
+  size_t       start = n.rfind('$', end);
+  return start == std::string::npos ? n.substr(0, end) : n.substr(start + 1, end - start - 1);
+}
+} // namespace
+
+bool kernel_profile_on()
+{
+  static const bool on = std::getenv("NOSHAPE_KERNEL_PROFILE") != nullptr;
+  return on;
+}
+
+void kernel_profile_add(const char* what, std::chrono::steady_clock::duration took)
+{
+  KernelProfile&              p = kernel_profile();
+  std::lock_guard<std::mutex> g(p.lock);
+  auto&                       v = p.calls[bridge_name(what)];
+  v.first += 1;
+  v.second += std::chrono::duration<double, std::milli>(took).count();
 }
 } // namespace noshape
