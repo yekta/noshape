@@ -81,12 +81,12 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.2 | Rotation speed: 3 full turns per viewport diagonal | `ROTATION_CYCLES_PER_SCREEN` | ✅ L, R, U `drag_rotate_rate_matches_live` |  |
 | 1.3 | Rotate centre: the geometry under the cursor; else the average of ~2000 visible-depth samples (planes excluded, ≥ 4 hits); else the same with the planes' depth (only planes visible); else the model centre when it fits the view; else the cursor ray at the model's depth | `getRotateCenterForCanvasLocation`, `getRotateCenterBasedOnWindowDepths({includePlanes})`, `DepthSamplingPass` | ✅ fixed 10-24: moves wait for the visible-depth centre (Onshape finds it before rotating; ours comes back from the render worker a frame or two later), then apply about it; R: the centre stays put on screen (< 0.01 px) on Wayland and X11 | 0.4.10+ / 2a6d0167 10-27 |
 | 1.4 | Rotation inertia: speed averaged per step, continues if released within 50 ms, decays ×0.77 per 60 Hz frame (time based), stops under 1 px/step | `performStopRotationAnimation` | ✅ L (client code: speed ½(speed+Δ), ×0.77 per 16.67 ms, > 1 px) = U `inertia_decays_like_onshape`; R: no coast under 20 fps, as Onshape |  |
-| 1.5 | Alt+right-drag: constrained rotate (horizontal = about world Z, vertical = pitch); first animates to the nearest floor-down view (125 ms, 250 ms if over 45°) | help (Windows column); `AXIS_ROTATE` | ✅ fixed 10-24: the levelling event adds no rotation (Onshape `axisRotateCanvasTag`); L 190 px of 200 turn; R: 53.2507° for 80 px after levelling, elevation and right.z unchanged |  |
+| 1.5 | Alt+right-drag: constrained rotate (horizontal = about world Z, vertical = pitch); first animates to the nearest floor-down view (125 ms, 250 ms if over 45°) | help (Windows column); `AXIS_ROTATE` | ✅ fixed 10-24: the levelling event adds no rotation (Onshape `axisRotateCanvasTag`); L 190 px of 200 turn; R: 53.2507° for 80 px after levelling, elevation and right.z unchanged | 0.4.10+ / fa61ba6f 10-27 |
 | 1.6 | Ctrl+right-drag: 2D pan | help table | ✅ | 0.4.10+ / 2a6d0167 10-27 |
 | 1.7 | Middle-drag: 2D pan | help table | ✅ | 0.4.10+ / 2a6d0167 10-27 |
 | 1.8 | Pan keeps the point under the cursor under it (perspective: in the plane through the geometry under the cursor) | `pan` | ✅ L: start point ends under the pointer to 1e-4 px; R: (200, 100) drag → 223.607 px |  |
 | 1.9 | Shift+right-drag rotates (Shift is not bound; it does not pan) | `getClosestMode`, `usesShiftKey` | ✅ qa4 10-23 (Front → the Right face comes in, no pan) | 0.4.10+ / 2a6d0167 10-27 |
-| 1.10 | Ctrl+middle-drag pans (closest binding) | `getClosestMode` | ✅ |  |
+| 1.10 | Ctrl+middle-drag pans (closest binding) | `getClosestMode` | ✅ | 0.4.10+ / fa61ba6f 10-27 |
 | 1.11 | Pressing/releasing Ctrl or Alt mid-drag switches mode (rotate ↔ pan ↔ constrained) without lifting the button | `updateManipulationMode` per drag event | ✅ R: right-drag −100 px, Ctrl held +100 px, released −100 px → the view turns 200 px worth (the Ctrl part pans) |  |
 | 1.12 | A second button pressed mid-drag re-resolves the mode | `updateInputState` | ✅ R: right-drag, middle pressed (closest binding other than Rotate = Pan, as `getClosestMode`), middle released (Rotate) → turns 200 px worth. Fixed 10-25: on Wayland gpui forgot the right button when the middle one was released, ending the drag |  |
 | 1.13 | Releasing outside the graphics area ends the drag | — | ✅ fixed 10-25: the drag also follows the pointer over the panels (Onshape's dragHelper is jQuery UI `mouse`, bound to the document; ours stopped at the viewport edge) and ends on release there; R: 220 px from the viewport into the feature list → 146.442° = 3 turns/diagonal, no change after the release |  |
@@ -97,7 +97,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.18 | Perspective zoom dollies the eye along the cursor ray by distance × i/6, within 0.05–50 scene diameters | `zoomPoint`, `dollyAlong` | ✅ live "nav2 perspective zoom" (10-25): fit 446.8626 mm and nine wheel events at the live pointer match to 2 µm (U `perspective_wheel_matches_live_onshape`); right-drag 3 turns/diagonal as in ortho. ⏳ the zoom-out stop (live 3240.83 mm, ours one step earlier) awaits the live `canZoom` values (REQUESTS "nav2 (P1) (10-25 b") |  |
 | 1.19 | Zoom limits: no zoom out once the model is under 100 px across, no zoom in past 2^24 px/m | `canZoom` | ✅ U `zoom_limits_like_can_zoom` (app-core navigation, from the bundle) |  |
 | 1.20 | Horizontal scroll (tilt wheel, sideways swipe) does nothing | `zoomOnMouseWheelScroll` (`wheelDeltaX > wheelDeltaY` → ignored); live navigation/17 | ✅ R: horizontal wheel → no zoom (X11 and Wayland) | 0.4.10+ / 2a6d0167 10-27 |
-| 1.20b | Shift+wheel and Ctrl+wheel zoom exactly like the wheel (Linux; macOS and Chrome on Windows turn Shift+wheel horizontal before Onshape sees it, so it does nothing there) | live navigation/15–16 | ✅ R: Shift / Ctrl+wheel zoom like the wheel; Windows Shift+wheel now zooms too (Chromium keeps it vertical) |  |
+| 1.20b | Shift+wheel and Ctrl+wheel zoom exactly like the wheel (Linux; macOS and Chrome on Windows turn Shift+wheel horizontal before Onshape sees it, so it does nothing there) | live navigation/15–16 | ✅ R: Shift / Ctrl+wheel zoom like the wheel; Windows Shift+wheel now zooms too (Chromium keeps it vertical) | 0.4.10+ / fa61ba6f 10-27 |
 | 1.21 | Scrolling during a box selection does nothing | `onMouseWheelScroll` | ✅ R: three wheel notches during a left-drag box → no camera change |  |
 | 1.22 | Left-drag: box select (left→right window, right→left crossing); never navigates | Home__selection; no flag for the left button | ✅ | 0.4.10+ / 2a6d0167 10-27 |
 
@@ -120,13 +120,13 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 3.1 | Arrow keys rotate 15° about the camera's up (←/→) or right (↑/↓) axis through the camera target; ← from Front brings the Right face in, ↑ the Bottom (= dragging that way) | help; `rotateInDirection`; live navigation/75–80 | ✅ R: ← turns exactly 15.000°, ↑ 15.000° (Wayland and X11); live navigation/75–80 directions, qa4 in-app | 0.4.10+ / 2a6d0167 10-27 |
-| 3.2 | Shift+arrows 90°, Ctrl+arrows 5° | help | ✅ angles / 🔧 axes |  |
+| 3.2 | Shift+arrows 90°, Ctrl+arrows 5° | help | ✅ angles / 🔧 axes | 0.4.10+ / fa61ba6f 10-27 |
 | 3.3 | Each step animates linearly over 250 ms | `animateRotation`, `CAMERA_SHORT_ANIMATION_TIME_MS` | 🔧 (was 500 ms, eased) |  |
 | 3.4 | Holding an arrow rotates continuously: every key repeat starts another step that runs alongside the earlier ones (they add up) | help; `setAllowRepeat` for ROTATE_*, `startAnimation`; live navigation/910–921: a 1 s hold (X repeat 660 ms / 25 Hz, 11 keydowns) turns 165° | ✅ nav 10-19: a 1 s held ← turns 165°, as live navigation/910–921 |  |
 | 3.5 | Ctrl+Shift+arrows pan: the model moves 150 px toward the arrow (measured at the scene centre), 250 ms smootherstep; ignored while the camera animates | help; `animatePan`, `animateTo` | ✅ R: Ctrl+Shift+→ moves the model exactly 150 px, no rotation | 0.4.10+ / 2a6d0167 10-27 |
 | 3.6 | Z zooms out ×1.75, Shift+Z in ×1.75, about the view centre, 250 ms, clamped to the zoom limits | help; `animateZoom`, `adjustCameraToValidZoom` | ✅ R: Z ×1.75 out, Shift+Z ×1/1.75 in (world per pixel, exact) | 0.4.10+ / 2a6d0167 10-27 |
 | 3.7 | All of 3.1–3.6 work in Assemblies too | `getIsInPartStudio() \|\| getIsInAssembly()` | 🔧 (Assembly had none) |  |
-| 3.8 | Up/Down with the rollback bar selected move the bar instead | `handleRotateUp` | ✅ (FeatureList context) |  |
+| 3.8 | Up/Down with the rollback bar selected move the bar instead | `handleRotateUp` | ✅ (FeatureList context) | 0.4.10+ / fa61ba6f 10-27 |
 | 3.9 | View animations (standard views, fit, N) use Onshape's smootherstep easing | `animateTo` | 🔧 (was smoothstep) |  |
 
 ## 4. View cube
