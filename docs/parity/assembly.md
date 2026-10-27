@@ -31,13 +31,13 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K12 | `Enter` commits the dialog | H:shortcuts | ✅ | mate dialog |  |
 | K13 | `Shift+Enter` commits and starts another of the same command | H:shortcuts | ✅ | mate dialog: commits and reopens the same mate type |  |
 | K14 | `Esc` cancels the command / closes menus, exits isolate | H:shortcuts | ✅ | Insert: Esc closes and keeps placed instances |  |
-| K15 | `Space` clears the selection | H:shortcuts | ✅ | |  |
+| K15 | `Space` clears the selection | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 |
 | K16 | `Delete` / `Backspace` deletes the selection (instances or mate feature) | H:shortcuts | ✅ | |  |
-| K17 | `Shift+N` renames the selected instance or feature inline | H:shortcuts | ✅ | |  |
+| K17 | `Shift+N` renames the selected instance or feature inline | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 (opens; Esc doesn't cancel: ASM-RENAME-ESC) |
 | K18 | `y` hides the hovered or selected instances | H:shortcuts | ✅ | hover in graphics or list |  |
 | K19 | `Shift+Y` shows hidden instances | H:shortcuts | ✅ | |  |
 | K20 | `Shift+I` isolates hovered/selected (repeated presses add) | H:shortcuts, H:View__isolate | ✅ | |  |
-| K21 | `Shift+T` makes hovered/selected transparent (cumulative) | H:shortcuts | ✅ | transparent instances are not pickable |  |
+| K21 | `Shift+T` makes hovered/selected transparent (cumulative) | H:shortcuts | ✅ | transparent instances are not pickable | 0.4.10+ / c9c66d1c 10-27 (Make transparent, pin translucent) |
 | K22 | `Ctrl+C` / `Ctrl+V` copy / paste instances (mates and MCs among them come along) | E§24.7, AS-05 | ✅ | model test `copy_paste_duplicates_instances_with_their_mates`; paste follows the cursor, click places |  |
 | K23 | `s` opens the shortcut toolbar at the cursor | E§2, B `OPEN_MINI_TOOLBAR` | ✅ | assembly tool set, kept inside the graphics area | 0.4.10+ / c9c66d1c 10-27 (assembly tool set at the cursor) |
 | K24 | `Shift+/` keyboard shortcut list | H:shortcuts | ✅ | assembly list overlay | 0.4.10+ / c9c66d1c 10-27 (Assembly keyboard shortcuts list) |
