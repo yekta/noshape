@@ -4,9 +4,6 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 ## Requests to the lead (qa, updated 2026-10-27 13:20)
-- **SIL-AXIS-VIEW-GONE (P1 psui, regression in green e598c3a5 / 4e568f3f)**: cylinder side silhouettes are gone in exact
-  standard views (Front of revolved tubes); 0d75aa8e draws them. Likely 69de3163 (EDGE-HIGHLIGHT-LOOK (2), silhouette
-  push now analytic). Ships if a release is cut from these greens.
 - BUDGET-LONGJMP (add45a95, in green 4e568f3f): re-running seeds 120 / 131 / 72 on the watcher CLI 12:59 (logs
   cli/clifuzz-{120,131,72}L.log); results go into the ticket.
 - v0.4.10 (e8e0f62d = e8858e61) fixes the built-in dialogs' picks (LP-DIRECTION-PICK, checked on its artifact) but not
@@ -198,6 +195,20 @@ edge's midpoint), READOUT-AXES, EXT-2ND-DEPTH, EXPORT-DXF-OPTIONS (DXF R14, mm, 
 FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress | Dynamic suppression ▸ | Expand ▸ | Collapse ▸ |
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
+
+## 13:20–14:00 (greens 4e568f3f → eb4338a8)
+- Verified on eb4338a8: EDGE-HIGHLIGHT-LOOK (1× profiles = live's new capture to a few units), SIL-AXIS-VIEW-GONE (gone
+  again), REGEN-NO-CANCEL (stale run aborted; the thumbnail then re-runs the head in the background, by design).
+- 4e568f3f: tool-open smoke 87 / 87 dialogs pixel-identical to 0d75aa8e; pick sweep 28 / 28 dialogs identical (hover
+  crops differ only by load timing; checked by hand); featmatrix 14 / 14, holematrix 12 / 12 on the watcher CLI 12:59.
+- BUDGET-LONGJMP fuzz on the watcher CLI 12:59 (has add45a95): seed 120 ran all 150 steps (it deadlocked at step 28
+  twice before); seed 72 died once at step 63 (delete; marker Mirror 8; no kernel trap, so an abort; the saved document
+  opens fine, tickets/cli-72L-died.noshape) and its replay with stderr ran all 106 steps clean: nondeterministic, i.e.
+  BOOL-THREAD-CRASH still there; seed 131 see TICKETS.
+- UI walk on eb4338a8: Split by Front plane (halves 14137.167 = half the tube), Transform › Translate by XYZ (type
+  list = live's order), Plane offset; drawing of the tubes (suggested views) → DWG-REVOLVE-SEAM (P1 dx). New:
+  PART-HOVER-RED (P2 psui). Asked live: part names after Split (ours renumber every default-named part), and the
+  sketch line under an edge-on plane.
 
 ## 12:40–13:20 (greens e598c3a5 → 4e568f3f; qa moved to the Motile account at 12:40)
 - Verified: OK-DISABLED-HOVER, CONFIG-CELL-EDIT-LOOK, EXPORT-OBJ-MTL (e598c3a5), REPLICATE-EDGE-DEFAULT (4e568f3f).
