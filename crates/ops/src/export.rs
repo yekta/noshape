@@ -615,7 +615,7 @@ fn dos_time(unix: u64) -> (u16, u16) {
     if y < 1980 {
         return (0, (1 << 5) | 1);
     }
-    let time = ((rem / 3600) << 11 | (rem % 3600 / 60) << 5 | (rem % 60) / 2) as u16;
+    let time = (((rem / 3600) << 11) | ((rem % 3600 / 60) << 5) | ((rem % 60) / 2)) as u16;
     let date = (((y - 1980).min(127) << 9) | (m << 5) | d) as u16;
     (time, date)
 }

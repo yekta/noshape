@@ -89,7 +89,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (Snap mode, shared with the assembly view). I1: STEP surface-curve modes ruled out. FLAT-FORM-STYLES filed (needs
   core's flat-pattern data). CONFIG-INPUT-ID waits on live (REQUESTS dx 10-27 P3).
 - Evening 10-27: CONFIG-INPUT-ID Checkbox as live's dialog (name required, id from it, default checked) in
-  config_add_input (Part Studio and Assembly); the dialogs are psui's (request below).
+  config_add_input (Part Studio and Assembly); the dialogs are psui's (request below). EXPORT-OBJ-ZIP-NAME (the save
+  prompt says .zip; zip entries dated). FLAT-FORM-STYLES done: counterbore / countersink heads in the flat (native
+  route; a std-built flat, i.e. a std sheet metal feature after the hole, has no heads yet: check next).
 - Audit of edit texts (10-27 afternoon): left uncovered on purpose: "Use view geometry" (a step of the drawing sketch's
   constrain tool), "Edit configured dimension" (= config_set_value), "Copy view label" (Alt+drag copy of a label).
 - Live answered I1 (behaviours "dx (2026-10-27, P2 I1 …)") and the flat-pattern line styles (REQUESTS dx 10-27 P3): read the latter next.
