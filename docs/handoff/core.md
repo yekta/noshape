@@ -121,6 +121,13 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   perf.yml / T2 tests for each target: not yet written.
 
 ## Next, in order
+0. **P0 Boolean speed-up, docs/BOOLEAN-SPEEDUP.md (lead, 10-27 19:40; the user's plan, binding).** Phase 0 first
+   (recorder, corpus, replay, the small-part flame graph and the knurl thread-scaling run): its small-part answer
+   also decides how REGEN-SPEED's per-boolean ~15 ms gets cut, so item 1 continues through it. Then, one agent
+   doing both: Phase 2 (local Booleans: Extrude 3 under the 400-fin plate 2.7 s → < 150 ms, the everyday case)
+   before Phase 1 (OCCT patch 0004, parallel serial phases: knurl 210 s → < 90 s); Phase 3 only if Phase 0
+   supports it. Each phase: same results and history, deterministic at 1/4/16 threads, OCCT fallback with a
+   NOSHAPE_BOOL_<NAME>=0 switch, numbers before/after in this file.
 1. P0 REGEN-SPEED (open): per regeneration ~15 ms per boolean (OCCT build), fillet/chamfer ~10 ms + ~6 ms check, the
    display meshing ~45 ms. Ideas: check only the blend's new/modified faces instead of the whole part; fewer
    unify passes; profile with NOSHAPE_KERNEL_PROFILE=1 on the probe. Live: 2–9 ms per feature.
