@@ -3022,7 +3022,7 @@ impl SketchEditor {
             .collect()
     }
 
-    /// Where a box (and the dimension it makes) sits: its label, or for a
+    /// Where a box sits: its label, or for a
     /// circle with `away`, beside the rim on that side, the box's near edge
     /// 14 px off it (the box is centred on the point; 24 px high, its width
     /// from the value text as the app draws it).
@@ -3066,8 +3066,6 @@ impl SketchEditor {
         let text = noshape_model::quantity_text::commit_text(text.trim().trim_start_matches('=').trim(), dim, units, vars);
         let q = noshape_units::evaluate_as(&text, dim, units, vars).map_err(|e| e.to_string())?;
         let expr = is_expression(&text).then_some(text.as_str());
-        // The dimension takes the box's place.
-        let f = OtfField { label: self.otf_label(data, &f, units), ..f };
         self.commit_otf_value(data, o, f, q.value, expr)
     }
 
