@@ -88,13 +88,13 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.4 | Box select left→right = window (fully inside), right→left = crossing | Home__selection | ✅ |
 | 3.5 | Window box is solid, crossing box dashed | Home__selection; A §5.2 | ✅ |
 | 3.6 | Box select: left→right takes what is wholly inside (faces and edges, no parts or part vertices), right→left what it touches; Ctrl+drag box deselects (live 10-27) | Home__selection | ✅ (live 10-27: window box #1651B0 20 % fill / 60 % solid border, crossing #FFC20E 20 % / 60 % dashed 9 on 8 off, both ~1.5 px; ours within 1 level) |
-| 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | 🔧 |
+| 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | ✅ live 10-27: only what the field accepts, edges only when it takes edges (Fillet: 12 edges, no face) |
 | 3.8 | Selected entities show quick values in the Measure readout | A §5.1 | ✅ |
 | 3.9 | Selection count next to the cursor, 1–5 ("5" for five or more) | Home__selection; live cursors/ | ✅ (Onshape bakes the digit into the cursor image; GPUI has no image cursors, so a black digit with a white outline is drawn at the arrow's lower right) |
 | 3.10 | Midpoints of edges show on hover and can be picked (measure, planes) | Home__selection | ✅ (part edges and open sketch curves; with a dialog open when its field takes points. Look as live qa4-r5-s9-6: hovering the edge shows a 9 px dark see-through ring at its midpoint (render point style RING); a selected midpoint is an 11 px #fac012 disc with a #c4960b ring and #ffd65b centre; a hovered midpoint target draws the same marker in orange #f8c488/#c49a6a/#ffd8ac. Within 9 px of the marker the midpoint is the hover target and the edge highlight goes, as live (checked 10-27).) |
 | 3.11 | Select other lists faces and edges under the cursor nearest first; hovering a row highlights it; click/Enter picks; list closes | Home__select_other | ✅ (psui 10-27, see 1.18; a row click picks it, Esc closes) |
-| 3.12 | Select other picks go to the active dialog field | Home__select_other | 🔧 |
-| 3.13 | Select other from the face/edge context menu | Home__select_other | 🔧 |
+| 3.12 | Select other picks go to the active dialog field | Home__select_other | ✅ live 10-27: the list holds only what the field accepts (no part row in Fillet); a row fills the field |
+| 3.13 | Select other from the face/edge context menu | Home__select_other | ✅ live 10-27: right-click + (100, 51), nothing highlighted; with a dialog the menu is Confirm · Cancel · Hide other / all parts · Curve/surface analysis · Isolate · Make transparent · Select ▸ · Select other · zoom items |
 | 3.14 | Selecting a face or part highlights the features that created/modified it in the feature list, and its part in the Parts list (related-highlight (236,240,244), live 10-27) | features_and_parts_lists | ✅ |
 | 3.15 | Hovering a feature in the list highlights its geometry | features_and_parts_lists ("Hover over a feature…") | ✅ (app 10-24) |
 | 3.16 | Selecting a feature in the list highlights its geometry (its part amber) and relates its part row (live 10-27) | A §5.3 (FEATURE_HIGHLIGHT) | ✅ |
@@ -188,7 +188,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.23 | Copy sketch / Paste sketch onto a plane or planar face | Home__context_menus | ✅ (verified: Copy sketch, Front plane > Paste sketch) |
 | 6.24 | Show dimensions (feature/face/sketch menus): the sketch's dimensions in 3D, parts see-through, hover gold on tan, double-click edits the sketch, click elsewhere or Esc hides; Export as DXF/DWG | Home__context_menus; live part-studio/40–42 | ✅ (Create Drawing of Sketch N… via asb's sketch views) |
 | 6.25 | Pause regeneration (banner: Regenerate / Regenerate and exit / Discard) ; regeneration times panel (hover highlights) | features_and_parts_lists | ✅ paused mode as live 10-27: the 343 × 28 amber banner over an emptied toolbar (Undo / Redo stay), ▶\| at 0.4 until something waits, New folder gone, pause at 0.5, Create version… off the rail, edited rows bold italic, dialogs preview nothing (no manipulator, no rollback), ✕ discards without asking. Live's Depth corner mark in a paused dialog not done |
-| 6.26 | Collapse the whole list; drag the feature/parts separator | features_and_parts_lists | 🔧 |
+| 6.26 | Collapse the whole list; drag the feature/parts separator | features_and_parts_lists | ✅ live 10-27: each list down to its 30 px header, panel width from its default 205 px |
 | 6.27 | Default plane row menu (live): Rename | New sketch…, Offset plane…, Size to Part Studio (Paste sketch when a sketch was copied) | Hide, Hide other planes, Hide all planes | Zoom to selection, View normal to | Show dependencies…; origin: Rename | Hide | Show dependencies… | Hide, Hide other planes, Hide all planes | ✅ |
 | 6.28 | Default planes/origin can be hidden (never deleted: Delete does nothing, no Delete in their menu, live 10-27) | part_studios | ✅ |
 | 6.29 | Clicking empty list space clears the feature selection | (Onshape behaviour) | ✅ (app 10-24) |
@@ -211,8 +211,8 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 |---|---|---|---|
 | 6.35 | Add selection to folder | features_and_parts_lists | ✅ |
 | 6.36 | Expand/collapse a folder | features_and_parts_lists | ✅ |
-| 6.37 | Folder menu: Rename, Suppress/Unsuppress (all contents), Unpack folder | features_and_parts_lists | 🔧 (Suppress added, "Remove" renamed) |
-| 6.38 | Nested folders; Expand all / Collapse all | features_and_parts_lists | 🔧 |
+| 6.37 | Folder menu: Rename, Suppress/Unsuppress (all contents), Unpack folder | features_and_parts_lists | ✅ live 10-27: Rename · Add selection to folder… · Suppress · Dynamic suppression · Roll to here · Expand · Collapse · Delete · Unpack folder |
+| 6.38 | Nested folders; Expand all / Collapse all | features_and_parts_lists | ✅ "Name (n)" rows, 19 px per level; Expand ▸ / Collapse ▸ hold Expand all / Collapse all (live 10-25 2b-folder-menu-expand) |
 
 ## 7. Parts list (features_and_parts_lists §Parts list, A §3.9)
 

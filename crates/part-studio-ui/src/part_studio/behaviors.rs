@@ -991,9 +991,9 @@ impl PartStudioView {
             if let Some((_, filter, _)) = dialog.read(cx).active_filter() {
                 let current = dialog.read(cx).selected_refs();
                 dialog.update(cx, |d, cx| {
-                    for t in targets.iter().filter(|t| kind_matches(t.kind, &t.reference, filter)) {
-                        if current.contains(&t.reference) == deselect {
-                            d.add_pick(t.reference.clone(), cx);
+                    for r in box_field_picks(&targets, filter) {
+                        if current.contains(r) == deselect {
+                            d.add_pick(r.clone(), cx);
                         }
                     }
                 });
@@ -2481,6 +2481,11 @@ impl PartStudioView {
                 hits.push(b);
             }
         }
+        // Live 10-27 (part-studio.md 3.12 / 3.13): with a dialog field active the list holds only what the field
+        // accepts (Fillet: its edges and faces, no "Part 1" row).
+        if let Some((_, filter, _)) = self.edit.as_ref().and_then(|e| e.dialog.read(cx).active_filter()) {
+            hits.retain(|r| select_other_fits(r, filter));
+        }
         let n = hits.len();
         let index = (!from_menu && n > 0).then(|| if backwards { n - 1 } else { 1 % n });
         self.hover = if from_menu { None } else { index.and_then(|i| hits.get(i).cloned()) };
@@ -3605,6 +3610,26 @@ pub(super) fn box_takes(k: PickKind) -> bool {
     !matches!(k, PickKind::Plane | PickKind::Origin | PickKind::Connector)
 }
 
+/// Whether a Select other entry (a face, edge, vertex or part along the ray) goes into a field of `filter`.
+pub(super) fn select_other_fits(r: &Reference, filter: QueryFilter) -> bool {
+    let kind = match r {
+        Reference::Body(_) => return filter.intersects(QueryFilter::BODY),
+        Reference::Edge(_) => PickKind::Edge,
+        Reference::Vertex(_) => PickKind::Vertex,
+        _ => PickKind::Face,
+    };
+    kind_matches(kind, r, filter)
+}
+
+/// What a box puts in the active dialog field: what the field accepts, and only edges when it takes edges (live
+/// 10-27, part-studio.md 3.7: a box around a block in Fillet's Entities to fillet, which takes faces too, gives the
+/// 12 edges and no face; Shell's and Extrude's face fields get the 6 faces).
+pub(super) fn box_field_picks(targets: &[PickTarget], filter: QueryFilter) -> Vec<&Reference> {
+    let fits: Vec<&PickTarget> = targets.iter().filter(|t| kind_matches(t.kind, &t.reference, filter)).collect();
+    let edges = fits.iter().any(|t| t.kind == PickKind::Edge);
+    fits.into_iter().filter(|t| !(edges && t.kind == PickKind::Face)).map(|t| &t.reference).collect()
+}
+
 /// The roll items of a feature row's menu, (Roll to here, Roll to end), for
 /// row `i` with the rollback bar before row `rollback_at` (live "qa4 round 5
 /// s2 rollback follow-up"): Roll to here unless the bar is right below the
@@ -3779,7 +3804,33 @@ mod field_point_tests {
 
 #[cfg(test)]
 mod box_take_tests {
-    use super::{PickKind, box_takes};
+    use super::{PickKind, PickTarget, QueryFilter, Reference, box_field_picks, box_takes};
+    #[test]
+    fn a_box_into_an_edge_field_takes_edges_not_faces() {
+        let t = |kind, i: u32| PickTarget { reference: Reference::SketchEntity { sketch: noshape_model::reference::FeatureId(1), entity: i }, kind, anchor: None };
+        let targets = [t(PickKind::Face, 1), t(PickKind::Edge, 2), t(PickKind::Face, 3), t(PickKind::Edge, 4)];
+        let fillet = noshape_model::features::get("fillet").and_then(|f| f.params.iter().find_map(|p| match p.kind {
+            noshape_model::params::ParamKind::Query { filter, .. } => Some(filter),
+            _ => None,
+        }));
+        let fillet = fillet.expect("Fillet's Entities to fillet");
+        assert!(fillet.intersects(QueryFilter::ANY_FACE), "Fillet takes faces too");
+        assert_eq!(box_field_picks(&targets, fillet), vec![&targets[1].reference, &targets[3].reference]);
+        assert_eq!(box_field_picks(&targets, QueryFilter::ANY_FACE), vec![&targets[0].reference, &targets[2].reference]);
+    }
+
+    #[test]
+    fn select_other_in_a_fillet_lists_no_part() {
+        use super::select_other_fits;
+        let fillet = noshape_model::features::get("fillet").and_then(|f| f.params.iter().find_map(|p| match p.kind {
+            noshape_model::params::ParamKind::Query { filter, .. } => Some(filter),
+            _ => None,
+        }));
+        let fillet = fillet.expect("Fillet's Entities to fillet");
+        assert!(!select_other_fits(&Reference::Body(noshape_model::BodyId { feature: noshape_model::reference::FeatureId(1), index: 0 }), fillet));
+        assert!(select_other_fits(&Reference::Body(noshape_model::BodyId { feature: noshape_model::reference::FeatureId(1), index: 0 }), QueryFilter::BODY));
+    }
+
     #[test]
     fn box_takes_no_planes_origin_or_connectors() {
         for k in [PickKind::Plane, PickKind::Origin, PickKind::Connector] {

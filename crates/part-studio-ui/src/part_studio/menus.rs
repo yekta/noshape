@@ -169,9 +169,64 @@ impl PartStudioView {
             };
 
             match (target_ref.clone(), kind) {
-                // A dialog is open: only what doesn't start another command.
-                (Some(r), Some(k)) if editing || in_sketch => {
+                // A sketch is open: only what doesn't start another command.
+                (Some(r), Some(k)) if in_sketch => {
                     m = select_menu(m, &r, k, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r));
+                }
+                // A feature dialog is open. Live 10-27 (behaviours "psui (10-27) part-studio.md 3.12 / 3.13", an
+                // edge with Fillet open): Confirm Fillet 2 · Cancel · Hide other parts · Hide all parts ·
+                // Curve/surface analysis… · Isolate… · Make transparent… · Select ▸ · Select other… · (Add comment,
+                // cloud) · Zoom to fit · Zoom to selection · Align view with vertical axis.
+                (Some(r), Some(k)) if editing => {
+                    exits_first = true;
+                    if let Some(name) = editing_name.clone().filter(|_| editing_tool.is_some()) {
+                        m = m
+                            .item(item(&format!("Confirm {name}"), Box::new(|this, w, cx| this.accept_edit(false, w, cx))))
+                            .item(item("Cancel", Box::new(|this, w, cx| this.cancel_edit(w, cx))))
+                            .separator();
+                    }
+                    if let Some(b) = body.clone() {
+                        if several_parts {
+                            let keep = b.clone();
+                            m = m
+                                .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {
+                                    let others: Vec<Reference> = this.display.bodies.iter().filter(|d| d.id != keep).map(|d| Reference::Body(d.id.clone())).collect();
+                                    this.set_visibility(&others, true, cx);
+                                    this.hover = None;
+                                })))
+                                .item(item(&crate::i18n::template("Hide all __label__", &[("label", "parts")]), Box::new(|this, _, cx| {
+                                    let all: Vec<Reference> = this.display.bodies.iter().map(|d| Reference::Body(d.id.clone())).collect();
+                                    this.set_visibility(&all, true, cx);
+                                    this.hover = None;
+                                })));
+                        }
+                        let rc = r.clone();
+                        let (bi, bt) = (b.clone(), b.clone());
+                        m = m
+                            .item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
+                                this.selection = vec![rc.clone()];
+                                this.ui.analysis_tool = None;
+                                this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
+                            })))
+                            .item(item("Isolate…", Box::new(move |this, w, cx| {
+                                this.selection = vec![Reference::Body(bi.clone())];
+                                this.hover = None;
+                                this.isolate(super::behaviors::IsolateMode::Isolate, w, cx);
+                            })))
+                            .item(item("Make transparent…", Box::new(move |this, w, cx| {
+                                this.selection = vec![Reference::Body(bt.clone())];
+                                this.hover = None;
+                                this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
+                            })))
+                            .separator();
+                    }
+                    m = select_menu(m, &r, k, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r));
+                    if planar {
+                        m = m.item(normal_to(&r));
+                    } else if linear_edge {
+                        let ra = r.clone();
+                        m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| this.align_view_vertical(&ra, cx))));
+                    }
                 }
                 // Default and feature planes.
                 (Some(r), Some(PickKind::Plane)) => {
@@ -348,9 +403,10 @@ impl PartStudioView {
                                 this.hover = None;
                             })));
                         // Live 10-27 (behaviours "spec: psui part-studio.md 8.8
-                        // / 8.10", a face of one of three parts): Hide other
-                        // parts and Hide all parts follow, as in the parts list.
-                        if k == PickKind::Face && several_parts {
+                        // / 8.10", a face of one of three parts; "3.12 / 3.13",
+                        // an edge): Hide other parts and Hide all parts follow,
+                        // as in the parts list.
+                        if matches!(k, PickKind::Face | PickKind::Edge) && several_parts {
                             let keep = b.clone();
                             m = m
                                 .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {

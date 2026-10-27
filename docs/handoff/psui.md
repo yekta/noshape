@@ -62,6 +62,9 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   removed part's ghost (254,191,76), silhouette only, full colour at any slider position; a blended Add's "with"
   model is the result in the part's colour (boss over the block top at 0.7: ours (96,129,147) / (130,172,197), live
   (104,131,148) / (129,164,186): the 0.7 mix of the part shade over the block, as live).
+- 10-27 11:50: part-studio.md 3.7 (a box into a field that takes edges puts in only edges), 3.12 / 3.13 (Select
+  other lists only what the active field accepts; the entity menu with a dialog open in live's order), 6.26 (each
+  list down to its 30 px header), 6.37 / 6.38 checked as live. Verified on :102.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -96,8 +99,6 @@ that touches the model: ~12 min.
 
 1. Our base part shading differs a few units from live's (block top (140,185,212) vs (145,181,203)), which is what
    the preview samples still differ by.
-2. part-studio.md 🔧 rows waiting for live (asked 10-27): 3.7 box into a dialog field (ours: Fillet takes the 6 faces),
-   3.12 / 3.13 Select other into a field, 6.26 / 6.37 / 6.38 list separator and folder menus.
 3. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache
    needs vendoring wgpu-hal 29, or smaller per-pipeline shader modules (naga's MSL writer emits the whole module per
    stage). perf.yml without `-f ref=` measures the latest release: run 40464678503 (v0.4.8) failed its gates on

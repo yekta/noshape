@@ -5512,7 +5512,9 @@ impl Render for PartStudioView {
                             .flex_none()
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<SeparatorDrag>, _, cx| {
                                 let panel = f32::from(e.bounds.size.height).max(1.0);
-                                let h = f32::from(e.bounds.bottom() - e.event.position.y).clamp(60.0, (panel - 120.0).max(60.0));
+                                // Live 10-27 (part-studio.md 6.26): each list goes down to its 30 px header row; the
+                                // parts list's upper limit is the Features header (it shrinks to fit, below).
+                                let h = f32::from(e.bounds.bottom() - e.event.position.y).clamp(30.0, panel.max(30.0));
                                 let share = h / panel;
                                 if this.ui.parts_height.is_none_or(|p| (share - p).abs() * panel > 0.5) {
                                     this.ui.parts_height = Some(share);
@@ -5551,7 +5553,7 @@ impl Render for PartStudioView {
                                     // panel until the separator is dragged. A share of the panel, so
                                     // both sections keep room when the panel gets shorter (the
                                     // FeatureScript notices panel under the tab bar).
-                                    .child(slices.parts.clone().cached(StyleRefinement::default().w_full().h(relative(self.ui.parts_height.unwrap_or(0.35))).min_h(px(30.)).flex_none())),
+                                    .child(slices.parts.clone().cached(StyleRefinement::default().w_full().h(relative(self.ui.parts_height.unwrap_or(0.35))).min_h(px(30.)).flex_shrink_1())),
                             )
                             .into_any_element()
                     })
