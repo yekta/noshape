@@ -85,7 +85,10 @@ that touches the model: ~12 min.
    drawn 13 px disc (`overlay::cube_hit`).
 4. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache
    needs vendoring wgpu-hal 29, or smaller per-pipeline shader modules (naga's MSL writer emits the whole module per
-   stage). Measure with perf.yml (run 40464678503 dispatched 07:02).
+   stage). perf.yml without `-f ref=` measures the latest release: run 40464678503 (v0.4.8) failed its gates on
+   the paravirtual macOS runners (NIST assembly texture "orbit" 33.2 → 19.3 fps; that log is the pan run, kind
+   mislabelled; the orbit log reads 30.8 fps). Run 40467324821 (`-f ref=main`, 07:28) measures main: read its
+   summaries into viewport-performance.md and compare.
 5. interaction.md 🔧 rows left: 4.1–4.4, 4.8, 4.9, 5.1, 5.3, 6.2–6.8 (6.7's camera menu), 2.3, 2.6.
 6. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
