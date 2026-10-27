@@ -107,8 +107,12 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 - 10-27 21:40–23:30 (new psui session on a fresh account): ecc38c5a BOX-DIALOG-PANIC (P0 release blocker,
   regression of df28c320: `box_select` read the dialog inside its own update; T1 GPUI test
   box_select_with_a_dialog_open, which panics without the fix), SECTION-DIALOG-STACK (starting a feature ends the
-  Section view dialog as with ✓, T1 test), TABS-PANEL-FOCUS (the Tab manager doesn't take the focus). Then the
-  part hover look (0d below) as live: render hover_outline.rs.
+  Section view dialog as with ✓, T1 test), TABS-PANEL-FOCUS (the Tab manager doesn't take the focus). bf131a31 the
+  part hover look (0d below) as live: render hover_outline.rs. Then interaction 6.2 (Section view manipulator hover
+  and rotate glyph as live, T1 test). Experiment branch psui-perf-pulled (lines pulled from a storage buffer,
+  `NOSHAPE_PERF_LINES=pulled`, pixel-identical offscreen) measured by perf.yml 40599691793 (variants r1/p1/r2/p2 at
+  2x): land it opt-in or as default only if p1/p2 beat r1/r2. Perf 40590825262 (main 27e0f950, Retina orbit):
+  macOS 14 base 64.6 / 73.1 fps, no lines 84.4; macOS 15 base 52.0 / 61.3, no lines 96.4.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 

@@ -962,9 +962,10 @@ impl PartStudioView {
         let hovered: Vec<Reference> = hovered.into_iter().filter(|r| !(trimming && matches!(r, Reference::SketchEntity { .. }))).collect();
         // A pattern instance point under the cursor hides the geometry hover
         // (live p1audit skip-03: the edge under the hovered point stays unlit).
-        let hovered = if self.ui.toggle_hover.is_some() { Vec::new() } else { hovered };
-        // A manipulator handle under the cursor hides the geometry hover.
-        let on_handle = self.ui.manip_hover || self.ui.triad_hover.is_some();
+        // A manipulator handle under the cursor hides the geometry hover too (live qa4-r5-s9-5b–e: on a Section view
+        // handle only the handle lights, not the face or plane under it).
+        let on_handle = self.ui.manip_hover || self.ui.triad_hover.is_some() || self.ui.section_hover.is_some();
+        let hovered = if self.ui.toggle_hover.is_some() || on_handle { Vec::new() } else { hovered };
         let single_hover = if hovered.len() == 1 && self.ui.list_hover.is_none() && self.ui.var_hover.is_none() && self.ui.ct.hover.is_none() && !on_handle { hovered.first().cloned() } else { None };
         // Live (sketch/08-09): while a drawing tool is active, regions under
         // the cursor don't light up.
@@ -994,7 +995,9 @@ impl PartStudioView {
         extra.extend(self.consumed_picks_overlay(&selection, &accent));
         extra.extend(self.select_other_overlay());
         extra.extend(self.measure_overlay(cx));
-        extra.extend(self.midpoint_overlay(cx));
+        if !on_handle {
+            extra.extend(self.midpoint_overlay(cx));
+        }
         extra.extend(self.shown_dims_overlay(cx));
         extra.extend(self.hole_callout_overlay(cx));
         extra.extend(self.analysis_tool_overlay());

@@ -19,10 +19,14 @@ use noshape_model::reference::Reference;
 use noshape_render::{Drawable, Instance, LineData, LineSegment};
 use noshape_scene::builder::PickKind;
 
-/// Ring geometry (screen px): its radius, and the gap from the arrow's apex
-/// to the rings' centre.
-const RING_PX: f64 = 9.0;
-const RING_GAP_PX: f64 = 14.0;
+/// Ring geometry (screen px; live qa4-r5-s9-5b / 5f: the rings ≈14 px across, touching the arrow's
+/// apex, their axis lines ≈40 px long crossing there): the ring radius, its centre past the apex, and each axis
+/// line's half length.
+const RING_PX: f64 = 7.0;
+const RING_PAST_APEX_PX: f64 = 8.0;
+const RING_AXIS_PX: f64 = 22.0;
+/// The pointer this close to the rings' centre (px) is on no handle.
+const RING_DEAD_PX: f64 = 3.0;
 /// The base circle's radius (px).
 const BASE_PX: f64 = 8.0;
 /// Arrow glyph length (px), as `manipulators.rs` draws it.
@@ -111,7 +115,7 @@ impl SectionManip {
     }
 
     pub(super) fn ring_center(&self, wpp: f64) -> DVec3 {
-        self.tip() + self.arrow.dir * (ARROW_PX + RING_GAP_PX + RING_PX) * wpp
+        self.tip() + self.arrow.dir * (ARROW_PX + RING_PAST_APEX_PX) * wpp
     }
 
     /// Ring `k`'s points (a circle about its axis) and its axis line.
@@ -123,7 +127,7 @@ impl SectionManip {
             let t = i as f64 / 24.0 * std::f64::consts::TAU;
             c + (u * t.cos() + v * t.sin()) * r
         });
-        (pts.collect(), [c - ax * r * 1.6, c + ax * r * 1.6])
+        (pts.collect(), [c - ax * RING_AXIS_PX * wpp, c + ax * RING_AXIS_PX * wpp])
     }
 
     /// The base circle faces the viewer (`view` its direction; live: round
@@ -197,6 +201,10 @@ impl PartStudioView {
         let near = |pts: &[DVec3]| pts.windows(2).filter_map(|w| seg(w[0], w[1])).fold(f64::INFINITY, f64::min);
         let tip = s.tip();
         let wpp = self.section_wpp(tip, cx)?;
+        // Live (qa4-r5-s9-5b): the glyph's exact centre, where the rings cross, highlights nothing.
+        if vp.project(s.ring_center(wpp)).is_some_and(|c| c.distance(p) < RING_DEAD_PX) {
+            return None;
+        }
         let mut best: Vec<(SectionHandle, f64)> = vec![(SectionHandle::Arrow, seg(tip, tip + s.arrow.dir * ARROW_PX * wpp).unwrap_or(f64::INFINITY))];
         for k in 0..2 {
             let (pts, axis) = s.ring(k, wpp);
@@ -577,7 +585,8 @@ pub(super) fn section_glyph(s: &SectionManip, hover: Option<SectionHandle>, drag
         } else if hover == Some(h) {
             (crate::theme::rgb8(0x467bb1), crate::theme::rgb8(0x467bb1))
         } else {
-            (crate::theme::rgb8(0xc2c7cb), crate::theme::rgb8(0xe6e8e9))
+            // Live qa4-r5-s9-5f: grey edges ≈ (147,155,160), the core ≈ (246,247,247).
+            (crate::theme::rgb8(0x939ba0), crate::theme::rgb8(0xf6f7f7))
         }
     };
     let mut draw = |pts: &[DVec3], h: SectionHandle| {

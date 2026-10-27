@@ -352,3 +352,35 @@ fn a_feature_started_over_the_section_dialog_accepts_it(cx: &mut TestAppContext)
     })
     .unwrap();
 }
+
+/// Interaction 6.2 (live qa4-r5-s9-5b / 5f): each rotate handle of the Section view manipulator lights alone along
+/// its axis line, and the glyph's exact centre, where the two cross, is on no handle.
+#[gpui::test]
+fn section_rotate_handles_and_their_dead_centre(cx: &mut TestAppContext) {
+    use super::super::section_manip::SectionHandle;
+    // A rectangle sketch gives the model its bounds (the manipulator stands on them).
+    let (window, view) = sketch_with(cx, "section-glyph", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.finish_sketch(w, cx);
+            v.section_through(Reference::Plane(DatumPlane::Top), w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    view.update(cx, |v, cx| {
+        let s = v.section_manip().expect("the section manipulator");
+        let vp = v.viewport.read(cx);
+        let tip = s.arrow.base + s.arrow.dir * s.arrow.length;
+        let (p0, p1) = (vp.project(tip).unwrap(), vp.project(tip + vp.camera.right() * 1e-3).unwrap());
+        let wpp = 1e-3 / (p1 - p0).length();
+        let centre = s.ring_center(wpp);
+        let at = |p: glam::DVec3| vp.project(p).unwrap();
+        assert_eq!(v.section_handle_at(&s, at(centre), cx), None, "the centre is on no handle");
+        for k in 0..2 {
+            assert_eq!(v.section_handle_at(&s, at(centre + s.axes[k] * 16.0 * wpp), cx), Some(SectionHandle::Ring(k)), "along axis {k}");
+        }
+    });
+}
