@@ -64,6 +64,15 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   std_oracle's `set_std_route` is per thread now (process-wide it turned oracle_p1's extrudes into std's when both
   ran in one binary: "Select face or sketch region to extrude." under T2). SHELL-WALLS-CORNER void (exact mitre).
 
+- ce7a161a REGEN-SPEED: a blend is checked where it changed (`valid_blend`, features.cpp: new faces fully, the whole
+  shape for closure / orientation by edge use counts; BRepCheck's topology-only pass alone cost 6 ms): 7.6 → 2.6 ms a
+  blend; the probe's features 278 → 224 ms.
+- 9f7459f9 WIN-CRASH-GUARD: cpp/seh.cpp (MSVC only) __try/__except around each bridge call (trycatch) and run_guarded;
+  std::terminate inside a guarded call is raised as structured exception 0xE0A50001 (per-thread terminate handler).
+  The crash tests run on every platform again. Verifying in CI run 40481396224 (dispatched on main, 09:31).
+  Also fixed there: BudgetHold / blend_budget_seconds were declared only on Linux but used everywhere since cb84d673:
+  macOS and Windows don't build between cb84d673 and 9f7459f9.
+
 - a01dca62 Hole add speed: line_crossings keeps OCCT's loaded line intersector on the shape. Left in std's hole probe:
   min_distance (~140 calls, ~0.8 ms each, BRepExtrema rebuilt per call).
 
@@ -113,6 +122,8 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
 ## Requests to the lead
+- macOS / Windows don't compile on main between cb84d673 and 9f7459f9 (my Linux-only declarations, fixed in
+  9f7459f9): don't take a last-green from that window into a release; CI run 40481396224 checks 9f7459f9.
 - Forward-oriented edges (kern's proposal, P0 class: EdgeInfo.start/end follow a reversed edge but its parameters,
   tangents and circle frame don't, and many callers pair them): handing every edge out FORWARD (common.cpp
   `sub_shape`/`sub_shapes`, patch in /root/core-scratch/forward-edges.patch) passes every kernel, model, model-core,
