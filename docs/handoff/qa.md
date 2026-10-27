@@ -39,6 +39,17 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   Linear pattern in Feature, Part and Face mode: Direction pre-highlights and picks an edge at its middle and a face (not
   the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
   (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
+### v0.4.10 (tag e8e0f62d = main e8858e61 + "Release v0.4.10"; CI run 40486478859 Linux artifact), smoke 10:54
+- Has 4e55b01f (LP-DIRECTION-PICK), a117663d (DRAFT-HANG budget), 011aaf43 (serial booleans), c30baf56 (markers);
+  **not** 1e3c419c (custom features' compound edge filters: `EDGE && GeometryType.LINE` / `ALLOWS_AXIS` still take
+  sketch edges only) and still the longjmp budgets (BUDGET-LONGJMP, BOOL-THREAD-CRASH).
+- OK: start page "0.4.10.e8e0f62df5d6"; **hover + pick in a feature dialog**: Linear pattern › Feature pattern ›
+  Extrude 2 › Direction takes the edge at its midpoint ("Edge of Extrude 1", highlighted on hover) and the top face
+  ("Face of Extrude 1"); Fillet edge, Shell face (tickets/lp-pick-v0410-*.png); kill -9 0.3 s after Suppress keeps
+  it; drawing (ANSI A suggested views) → PDF 1 page letter, DXF, DWG; STEP / Parasolid export → import 24800 exact;
+  mate DOF matrix 8 / 8.
+- Running: crash / hang documents through the CLI (cli/crashdocs-v0410.out), geometry matrices (cli/mat-v0410.out).
+
 ### v0.4.9 recut (release/v0.4.9 7ee597e0 = main 502416cc + "Release v0.4.9"), 2026-10-27 05:00, smoke on green 502416cc
 - **The earlier blocker is gone**: the recut contains bf8aaee2 / 87e8275f (crash guard, OCCT patch, DOC-POISON rollback),
   7a04ba4d (SHELL-WALLS) and 97081557 (blend budget). The five crash documents open in the green app (bcf401ca and later);
