@@ -4184,3 +4184,52 @@ fn iso_7380_button_head_matches_live() {
 
 
 
+
+/// Live's texts (docs/parity/workflow-assembly-sweep.md rows 1–5, 7, 12):
+/// relations on mates of the wrong kind, a relation whose mate is gone or
+/// failed, and a mate with both connectors on one instance.
+#[test]
+fn relation_and_mate_errors_use_live_texts() {
+    use super::eval::relation_values;
+    let err = |k, a, b| relation_values(k, a, b).unwrap_err();
+    assert_eq!(err(RelationType::Gear, MateType::Slider, MateType::Revolute), "Gear relations require two rotational degrees of freedom.");
+    assert_eq!(err(RelationType::RackAndPinion, MateType::Revolute, MateType::Revolute), "Rack and pinion relations require one translational degree of freedom and one rotational degree of freedom.");
+    assert_eq!(err(RelationType::Screw, MateType::Revolute, MateType::Revolute), "Screw relations require one cylindrical mate.");
+    assert_eq!(err(RelationType::Linear, MateType::Revolute, MateType::Revolute), "Linear relations require two translational degrees of freedom.");
+    assert!(relation_values(RelationType::Gear, MateType::Revolute, MateType::Cylindrical).is_ok());
+
+    let f = doc_with(vec![plate_with_hole(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (plate, rp) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let hole = cylinder_face(&rp);
+    let pf = cylinder_face(&rq);
+    let gear = |mates: [MateId; 2]| Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates, ratio: ExprValue::new("1"), reverse: false, suppressed: false, base: None };
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true),
+            part_instance(2, "Pin <1>", f.studios[1], pin.clone(), DVec3::ZERO, false),
+            part_instance(3, "Pin <2>", f.studios[1], pin, DVec3::ZERO, false),
+        ],
+        mates: vec![
+            mate(10, MateType::Revolute, conn(1, hole.clone(), Inference::MidAxis), conn(2, pf.clone(), Inference::MidAxis)),
+            mate(11, MateType::Revolute, conn(1, hole, Inference::MidAxis), conn(3, pf.clone(), Inference::MidAxis)),
+        ],
+        relations: vec![gear([MateId(10), MateId(99)])],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert_eq!(res.relations[0].message.as_deref(), Some("One or more mates in this relation do not exist."));
+    // A mated instance fixed too: the mate fails, so does the relation.
+    asm.relations = vec![gear([MateId(10), MateId(11)])];
+    asm.instance_mut(InstanceId(3)).unwrap().fixed = true;
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert_eq!(res.relations[0].message.as_deref(), Some("One or more mates in this relation are invalid."));
+    // Both connectors on one instance.
+    asm.instance_mut(InstanceId(3)).unwrap().fixed = false;
+    asm.relations.clear();
+    asm.mates.push(mate(12, MateType::Fastened, conn(2, pf.clone(), Inference::MidAxis), conn(2, pf, Inference::Centroid)));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let m12 = res.mates.iter().find(|m| m.id == MateId(12)).unwrap();
+    assert_eq!(m12.message.as_deref(), Some("Mate connectors are on same instance."));
+}
