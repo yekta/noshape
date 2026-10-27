@@ -4316,6 +4316,7 @@ dependencies = [
  "noshape-app-core",
  "noshape-assembly-ui",
  "noshape-drawing-ui",
+ "noshape-feature-studio-ui",
  "noshape-kernel",
  "noshape-model",
  "noshape-ops",
@@ -4331,7 +4332,6 @@ dependencies = [
  "noshape-workspace-hack",
  "open",
  "parking_lot",
- "regex",
  "rfd",
  "rusqlite",
  "serde",
@@ -4501,6 +4501,23 @@ dependencies = [
  "noshape-units",
  "noshape-workspace-hack",
  "parking_lot",
+]
+
+[[package]]
+name = "noshape-feature-studio-ui"
+version = "0.4.6"
+dependencies = [
+ "anyhow",
+ "gpui-kit",
+ "log",
+ "noshape-app-core",
+ "noshape-model",
+ "noshape-ops",
+ "noshape-preferences-ui",
+ "noshape-store",
+ "noshape-workspace-hack",
+ "parking_lot",
+ "regex",
 ]
 
 [[package]]

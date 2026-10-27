@@ -31,7 +31,7 @@ pub fn std_definition(name: &str) -> Option<(&'static str, usize, usize)> {
 /// The local "std" document (created on first use).
 fn std_document() -> anyhow::Result<PathBuf> {
     let version = noshape_model::custom::STD_VERSION;
-    let dir = crate::files::config_dir().join(format!("std-{version}"));
+    let dir = crate::paths::config_dir().join(format!("std-{version}"));
     std::fs::create_dir_all(&dir)?;
     let path = dir.join("std.noshape");
     if path.exists() {
@@ -51,11 +51,5 @@ fn std_document() -> anyhow::Result<PathBuf> {
 pub fn open(module: &str, line: usize, column: usize, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
     let path = std_document()?;
     let head = crate::session::Session::open(&path)?.head()?;
-    let (handle, ws) = crate::files::open_version_window(path, head, gpu, cx)?;
-    let module = module.to_string();
-    // After the new window has shown its first tab.
-    handle.update(cx, |_, window, cx| {
-        window.defer(cx, move |window, cx| ws.update(cx, |w, cx| w.goto_studio(&module, line, column, window, cx)));
-    })?;
-    Ok(())
+    crate::feature_studio_hooks::open_studio_in_version(path, head, module.to_string(), line, column, gpu, cx)
 }

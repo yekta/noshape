@@ -6,28 +6,24 @@
 #![recursion_limit = "256"]
 
 // The app's base layer (docs/CRATES.md), under its old paths.
-use noshape_app_core::{actions, assets, cached_slice, camera_menu, cursor, custom_tables, derived, doc_files, doc_model, file_tab_view, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, properties_dialog, scene_builder, session, start_library, start_thumbnail, start_trash, theme, ui, viewport};
+use noshape_app_core::{actions, assets, cached_slice, camera_menu, cursor, derived, doc_files, doc_model, file_tab_view, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, properties_dialog, scene_builder, session, start_library, start_thumbnail, start_trash, theme, ui, viewport};
 // The Drawing studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_drawing_hooks`.
 use noshape_drawing_ui::{drawing_create, drawing_view};
 // The Assembly studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_assembly_hooks`.
 use noshape_assembly_ui::{assembly_scene, assembly_view};
 // The Part Studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_part_studio_hooks`.
-use noshape_part_studio_ui::{part_studio, select_item};
+use noshape_part_studio_ui::part_studio;
 // The Variable Studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_variable_hooks`.
 use noshape_variable_studio_ui::{variable_insert, variable_studio};
 // Preferences (docs/CRATES.md), under their old paths; what they need of the app: `register_preferences_hooks`.
 use noshape_preferences_ui::{material_libraries, preferences_window, units_prefs};
 // Release management (docs/CRATES.md), under its old paths; what it needs of the app: `register_release_hooks`.
 use noshape_release_ui::{company_settings, release_dialog, release_settings};
-mod fs_profile;
+// The Feature Studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_feature_studio_hooks`.
+use noshape_feature_studio_ui::{feature_studio, fs_notices, fs_search, std_source};
 mod live_server;
-mod std_source;
 mod doc_dialogs;
 mod shortcuts_page;
-mod feature_studio;
-mod fs_notices;
-mod fs_import;
-mod fs_search;
 mod import_dialog;
 mod material_library_view;
 mod files;
@@ -338,6 +334,22 @@ fn register_release_hooks() {
     });
 }
 
+/// What the Feature Studio (noshape-feature-studio-ui) needs of the app: Create version, a Feature Studio of a version
+/// in a window of its own (std's source).
+fn register_feature_studio_hooks() {
+    noshape_feature_studio_ui::feature_studio_hooks::register(noshape_feature_studio_ui::feature_studio_hooks::Hooks {
+        create_version: history_panel::open_create_version_in,
+        open_studio_in_version: |path, version, module, line, column, gpu, cx| {
+            let (handle, ws) = files::open_version_window(path, version, gpu, cx)?;
+            // After the new window has shown its first tab.
+            handle.update(cx, |_, window, cx| {
+                window.defer(cx, move |window, cx| ws.update(cx, |w, cx| w.goto_studio(&module, line, column, window, cx)));
+            })?;
+            Ok(())
+        },
+    });
+}
+
 fn main() {
     noshape_render::perf::process_start();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
@@ -354,6 +366,7 @@ fn main() {
     register_variable_hooks();
     register_preferences_hooks();
     register_release_hooks();
+    register_feature_studio_hooks();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);

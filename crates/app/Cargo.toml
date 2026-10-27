@@ -20,6 +20,7 @@ noshape-part-studio-ui.workspace = true
 noshape-variable-studio-ui.workspace = true
 noshape-preferences-ui.workspace = true
 noshape-release-ui.workspace = true
+noshape-feature-studio-ui.workspace = true
 noshape-render.workspace = true
 noshape-model.workspace = true
 noshape-store.workspace = true
@@ -40,7 +41,6 @@ rfd = "0.15"
 dirs = "6"
 # Local times in the documents page and the versions panel ("1:15 PM Today").
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-regex = "1"
 serde_json.workspace = true
 serde.workspace = true
 rusqlite.workspace = true

@@ -1,0 +1,19 @@
+[package]
+name = "noshape-feature-studio-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's Feature Studio UI: the FeatureScript editor, its notices, search, import panel, profiler and std's source. Built on noshape-app-core and noshape-preferences-ui (the Labs switches); the noshape binary registers what it needs of the app (feature_studio_hooks)."
+
+[dependencies]
+noshape-app-core.workspace = true
+noshape-preferences-ui.workspace = true
+noshape-model.workspace = true
+noshape-store.workspace = true
+noshape-ops.workspace = true
+gpui-kit.workspace = true
+anyhow.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+regex = "1"
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

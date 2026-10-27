@@ -1337,11 +1337,11 @@ impl ToolbarFit {
 /// The compact snippet button's face: the last-used snippet (an Onshape
 /// preference that survives reloads), "Length parameter" at first.
 fn snippet_face() -> String {
-    std::fs::read_to_string(crate::files::config_dir().join("feature_studio_snippet.txt")).ok().map(|t| t.trim().to_string()).filter(|t| SNIPPET_MENUS.iter().any(|m| m.2.iter().any(|(l, _)| l == t))).unwrap_or_else(|| "Length parameter".into())
+    std::fs::read_to_string(crate::paths::config_dir().join("feature_studio_snippet.txt")).ok().map(|t| t.trim().to_string()).filter(|t| SNIPPET_MENUS.iter().any(|m| m.2.iter().any(|(l, _)| l == t))).unwrap_or_else(|| "Length parameter".into())
 }
 
 fn set_snippet_face(label: &str) {
-    let p = crate::files::config_dir().join("feature_studio_snippet.txt");
+    let p = crate::paths::config_dir().join("feature_studio_snippet.txt");
     if let Some(dir) = p.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
@@ -1816,7 +1816,7 @@ fn lex(src: &str) -> Vec<(Range<usize>, Tok)> {
 /// The editor's colours for each line of `src` (line-relative byte ranges;
 /// only the styled runs). Used by the Feature Studio compare
 /// (compare_mode.rs), so block comments keep their colour across lines.
-pub(crate) fn line_styles(src: &str) -> Vec<Vec<(Range<usize>, HighlightStyle)>> {
+pub fn line_styles(src: &str) -> Vec<Vec<(Range<usize>, HighlightStyle)>> {
     let mut starts = vec![0];
     starts.extend(src.match_indices('\n').map(|(i, _)| i + 1));
     let mut out: Vec<Vec<(Range<usize>, HighlightStyle)>> = vec![Vec::new(); starts.len()];
