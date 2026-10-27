@@ -556,6 +556,9 @@ fn file_uri_list(paths: &FileDragPaths) -> String {
 pub struct ClickState {
     last_mouse_button: Option<MouseButton>,
     last_click: Instant,
+    /// NOSHAPE PATCH: the compositor time of the last press (ms), see the
+    /// X11 client's `last_click_time`.
+    last_click_time: Option<u32>,
     last_location: Point<Pixels>,
     current_count: usize,
 }
@@ -1179,6 +1182,7 @@ impl WaylandConnection {
             external_drag: None,
             click: ClickState {
                 last_click: Instant::now(),
+                last_click_time: None,
                 last_mouse_button: None,
                 last_location: Point::default(),
                 current_count: 0,
@@ -2688,9 +2692,9 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
             }
             wl_pointer::Event::Button {
                 serial,
+                time,
                 button,
                 state: WEnum::Value(button_state),
-                ..
             } => {
                 // Record presses only. Requests referencing this serial (popup grabs,
                 // interactive moves) are declined when given a release serial.
@@ -2721,7 +2725,11 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                                 state = client.borrow_mut();
                             }
                         }
-                        let click_elapsed = state.click.last_click.elapsed();
+                        // NOSHAPE PATCH: the interval between the presses' own times.
+                        let click_elapsed = match state.click.last_click_time {
+                            Some(t) => std::time::Duration::from_millis(u64::from(time.wrapping_sub(t))),
+                            None => state.click.last_click.elapsed(),
+                        };
 
                         if click_elapsed < DOUBLE_CLICK_INTERVAL
                             && state
@@ -2739,6 +2747,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                         }
 
                         state.click.last_click = Instant::now();
+                        state.click.last_click_time = Some(time);
                         state.click.last_mouse_button = Some(button);
                         state.click.last_location = state.mouse_location.unwrap();
 

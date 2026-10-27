@@ -190,6 +190,10 @@ pub struct X11ClientState {
     graphical_environment: GraphicalEnvironment,
 
     pub(crate) last_click: Instant,
+    /// NOSHAPE PATCH: the X server time of the last press (ms): double
+    /// clicks are measured between the presses themselves, not when they
+    /// are handled (a press handled late behind slow work still counts).
+    pub(crate) last_click_time: Option<u32>,
     pub(crate) last_mouse_button: Option<MouseButton>,
     pub(crate) last_location: Point<Pixels>,
     pub(crate) current_count: usize,
@@ -523,6 +527,7 @@ impl X11Connection {
                 loop_handle: handle.clone(),
                 common,
                 last_click: Instant::now(),
+                last_click_time: None,
                 last_mouse_button: None,
                 last_location: Point::new(px(0.0), px(0.0)),
                 current_count: 0,
@@ -1338,7 +1343,11 @@ impl X11Client {
                 }
                 match button_or_scroll_from_event_detail(event.detail) {
                     Some(ButtonOrScroll::Button(button)) => {
-                        let click_elapsed = state.last_click.elapsed();
+                        // NOSHAPE PATCH: the interval between the presses' own times.
+                        let click_elapsed = match state.last_click_time {
+                            Some(t) => std::time::Duration::from_millis(u64::from(event.time.wrapping_sub(t))),
+                            None => state.last_click.elapsed(),
+                        };
                         if click_elapsed < DOUBLE_CLICK_INTERVAL
                             && state
                                 .last_mouse_button
@@ -1351,6 +1360,7 @@ impl X11Client {
                         }
 
                         state.last_click = Instant::now();
+                        state.last_click_time = Some(event.time);
                         state.last_mouse_button = Some(button);
                         state.last_location = position;
                         let current_count = state.current_count;
