@@ -624,7 +624,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [x] verified bcf401ca (qa: Boss 1 row menu "Edit Boss sketch 1…") 51689c87 P2 MENU-SKETCH-TAG fixed ("Edit Boss sketch…": the tag only when the name doesn't contain
   the type, as the tooltips). Original report: feature row menu: ours "Edit Boss sketch 1 [Sketch]…" for a custom-named sketch; live "Edit Boss
   sketch 1…" (no type tag; behaviours "qa (2026-10-26, P2 batch)" (2)) (qa 2026-10-26, build 4d2f6b0c)
-- [x] 67bca14a P2 PANEL-BLEED: live bleeds through the same way (behaviours "psui (10-27, PANEL-BLEED
+- [x] verified green e8858e61 (qa 11:59: lpd.noshape, Shift+W then Shift+D: "Edges to show dihedral" starts empty; 1st Esc closes the Dihedral panel, 2nd cancels the Revolve; the panel now has Units / Max / Min / threshold / Scale; tickets/panel-bleed-green.png) 67bca14a P2 PANEL-BLEED: live bleeds through the same way (behaviours "psui (10-27, PANEL-BLEED
   follow-up)": both panels at x 246, y 79, the analysis panel on top at rgba(255,255,255,0.95), the dialog's rows
   faint under it). Fixed what differed: the analysis field starts empty over a feature dialog, and with the focus in
   the dialog the 1st Esc closes the analysis panel, the 2nd cancels the dialog; Dihedral's field "Edges to show
