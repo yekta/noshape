@@ -992,7 +992,7 @@ pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
         Vertical { .. } => "vertical",
         Tangent { .. } => "tangent",
         Equal { .. } => "equal",
-        Midpoint { .. } => "midpoint",
+        Midpoint { .. } | MidpointOf { .. } => "midpoint",
         Symmetric { .. } => "symmetric",
         Fix { .. } => "fix",
         Normal { .. } => "normal",
@@ -2409,9 +2409,10 @@ impl SketchEditor {
                 if (m.pos - click.pos).length() < 1e-9 {
                     return EditOutcome::none();
                 }
+                // Live: the line runs from the clicked end to the mirrored one.
                 let pa = sk.add_point(m.pos * 2.0 - click.pos);
                 let pb = sk.add_point(click.pos);
-                let Ok(line) = sk.add_line_between(pa, pb) else { return EditOutcome::none() };
+                let Ok(line) = sk.add_line_between(pb, pa) else { return EditOutcome::none() };
                 let mid = sk.add_point(m.pos);
                 let _ = sk.add_constraint(ConstraintKind::Midpoint { point: mid, curve: line });
                 attach(sk, mid, None, &m);
@@ -2522,10 +2523,12 @@ impl SketchEditor {
                     return EditOutcome::redraw();
                 }
                 let c: Vec<Click> = std::mem::take(&mut self.clicks);
-                match sk.three_point_circle(c[0].pos, c[1].pos, c[2].pos) {
-                    Ok(id) => {
-                        for cl in &c {
-                            rim_autos(sk, id, cl);
+                // Live: a construction point at each click, on the circle.
+                match sk.three_point_circle_points(c[0].pos, c[1].pos, c[2].pos) {
+                    Ok(ids) => {
+                        let id = ids.curves[0];
+                        for (q, cl) in ids.points.iter().zip(&c) {
+                            attach(sk, *q, None, cl);
                         }
                         self.finish_create(data, &[id]);
                         self.set_otf(data, vec![diameter_field(&data.sketch, id, self.world_per_px)]);
@@ -2707,6 +2710,16 @@ impl SketchEditor {
                     Ok(id) => {
                         if let Some(ctr) = sk.entity(id).and_then(|e| e.center()) {
                             attach(sk, ctr, None, &c[0]);
+                        }
+                        // Live (behaviours "spec: skasm sketch tools"): a
+                        // horizontal major-axis click makes the ellipse
+                        // Horizontal (its major axis).
+                        for a in c[1].inference.iter().flat_map(|i| &i.constraints) {
+                            if matches!(a, AutoConstraint::HorizontalLine | AutoConstraint::VerticalLine)
+                                && let Some(k) = a.to_constraint(id, Some(id))
+                            {
+                                let _ = sk.add_constraint(k);
+                            }
                         }
                         self.finish_create(data, &[id]);
                         let w = self.world_per_px;
@@ -5996,7 +6009,7 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
             Some(b) => vec![a, b],
             None => vec![a],
         },
-        Midpoint { point, .. } => vec![point],
+        Midpoint { point, .. } | MidpointOf { point, .. } => vec![point],
         Pierce { point, .. } => vec![point],
         Quadrant { point, .. } => vec![point],
         Symmetric { a, b, .. } => vec![a, b],
@@ -7310,6 +7323,7 @@ mod tests {
             click(&mut ed, &mut d, p);
         }
         assert_eq!(count(&d, EntityKind::Ellipse), 1);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { b: None, .. })), "live: a horizontal major axis is Horizontal");
         // bezier: Esc removes the curve in progress
         let (mut ed, mut d) = editor(Tool::Bezier);
         click(&mut ed, &mut d, v(0.01, 0.01));
@@ -7913,6 +7927,34 @@ mod tests {
         let c = d.sketch.curve(line).unwrap();
         assert!(((c.start_point() + c.end_point()) * 0.5 - v(0.021, 0.023)).length() < 1e-9);
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Midpoint { .. })));
+        assert!((c.start_point() - v(0.031, 0.027)).length() < 1e-9, "live: from the clicked end");
+    }
+
+    /// Live (behaviours "spec: skasm sketch tools"): a center point
+    /// rectangle's centre is a construction point, Midpoint of both
+    /// diagonals (no diagonal lines); a 3 point circle has a construction
+    /// point Coincident with it at each click.
+    #[test]
+    fn center_rectangle_and_three_point_circle_as_live() {
+        let (mut ed, mut d) = editor(Tool::CenterRect);
+        click(&mut ed, &mut d, v(0.011, 0.013));
+        click(&mut ed, &mut d, v(0.021, 0.019));
+        assert_eq!(count(&d, EntityKind::Line), 4, "no construction diagonals");
+        let mids = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::MidpointOf { .. })).count();
+        assert_eq!(mids, 2);
+        let centre = d.sketch.entities().find(|e| e.kind() == EntityKind::Point && e.construction).map(|e| e.id).unwrap();
+        assert!((d.sketch.point(centre).unwrap() - v(0.011, 0.013)).length() < 1e-9);
+        assert_eq!(d.sketch.solve().dof, Some(4));
+
+        let (mut ed, mut d) = editor(Tool::ThreePointCircle);
+        for p in [v(0.011, 0.013), v(0.021, 0.019), v(0.015, 0.025)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert_eq!(count(&d, EntityKind::Circle), 1);
+        let cons: Vec<EntityId> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Point && e.construction).map(|e| e.id).collect();
+        assert_eq!(cons.len(), 3);
+        let on = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Coincident { a, .. } if cons.contains(&a))).count();
+        assert_eq!(on, 3);
     }
 
     #[test]

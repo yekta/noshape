@@ -41,6 +41,9 @@ pub enum ConstraintKind {
     Equal { a: EntityId, b: EntityId },
     /// Point at the midpoint of a line or arc.
     Midpoint { point: EntityId, curve: EntityId },
+    /// Point halfway between points `a` and `b` (live's MIDPOINT on three
+    /// points: a center point rectangle's centre on its diagonals).
+    MidpointOf { point: EntityId, a: EntityId, b: EntityId },
     /// `a` and `b` (points, lines, circles or arcs) symmetric about line `axis`.
     Symmetric { a: EntityId, b: EntityId, axis: EntityId },
     /// Locks the entity at its current position.
@@ -182,6 +185,7 @@ impl ConstraintKind {
                 v.push(*point);
                 v.push(*curve);
             }
+            MidpointOf { point, a, b } => v.extend([*point, *a, *b]),
             Symmetric { a, b, axis } => {
                 v.push(*a);
                 v.push(*b);
@@ -261,6 +265,11 @@ impl ConstraintKind {
                 r(point);
                 r(curve)
             }
+            MidpointOf { point, a, b } => {
+                r(point);
+                r(a);
+                r(b)
+            }
             Symmetric { a, b, axis } => {
                 r(a);
                 r(b);
@@ -321,7 +330,7 @@ impl ConstraintKind {
             Vertical { .. } => "Vertical",
             Tangent { .. } => "Tangent",
             Equal { .. } => "Equal",
-            Midpoint { .. } => "Midpoint",
+            Midpoint { .. } | MidpointOf { .. } => "Midpoint",
             Symmetric { .. } => "Symmetric",
             Fix { .. } => "Fix",
             Offset { .. } | OffsetPair { .. } => "Offset",

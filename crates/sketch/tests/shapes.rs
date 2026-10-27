@@ -132,3 +132,18 @@ fn arcs_and_circles() {
         _ => panic!(),
     }
 }
+
+/// Live (behaviours "spec: skasm sketch tools"): the corner rectangle's
+/// Horizontal is on the edge at the second click's y, its Perpendicular
+/// between that edge and the one at the first click's x.
+#[test]
+fn corner_rectangle_constraints_follow_the_click_order() {
+    let mut sk = Sketch::new();
+    let r = sk.corner_rectangle(v(0.0, 1.0), v(2.0, 0.0));
+    let at_y = |sk: &Sketch, y: f64| r.curves.iter().copied().find(|c| matches!(sk.curve(*c), Some(Curve2::Line { a, b }) if (a.y - y).abs() < 1e-12 && (b.y - y).abs() < 1e-12)).unwrap();
+    let at_x = |sk: &Sketch, x: f64| r.curves.iter().copied().find(|c| matches!(sk.curve(*c), Some(Curve2::Line { a, b }) if (a.x - x).abs() < 1e-12 && (b.x - x).abs() < 1e-12)).unwrap();
+    let (top, left) = (at_y(&sk, 0.0), at_x(&sk, 0.0));
+    assert!(sk.constraints().any(|c| c.kind == ConstraintKind::Horizontal { a: top, b: None }));
+    assert!(sk.constraints().any(|c| c.kind == ConstraintKind::Perpendicular { a: top, b: left }));
+    assert_eq!(sk.solve().dof, Some(4));
+}

@@ -1093,6 +1093,13 @@ impl<'a, L: Lookup> Builder<'a, L> {
                     _ => Err("midpoint needs a line or an arc".into()),
                 }
             }
+            K::MidpointOf { point, a, b } => {
+                let (pp, pa, pb) = (self.pt(*point)?, self.pt(*a)?, self.pt(*b)?);
+                for k in 0..2 {
+                    self.lin(Lin::new().p(2.0, pp[k]).p(-1.0, pa[k]).p(-1.0, pb[k]));
+                }
+                Ok(())
+            }
             K::Symmetric { a, b, axis } => {
                 let ax = self.line(*axis)?;
                 let (ka, kb) = (self.kind(*a)?, self.kind(*b)?);

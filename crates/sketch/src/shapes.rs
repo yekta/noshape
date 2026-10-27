@@ -46,14 +46,17 @@ impl Sketch {
     }
 
     /// Axis-aligned rectangle from two opposite corners. Live Onshape (REST,
-    /// qa5 sketch tools): Perpendicular top / left, Parallel bottom / top and
-    /// left / right, Horizontal top.
+    /// qa5 sketch tools; behaviours "spec: skasm sketch tools"): Perpendicular
+    /// top / left, Parallel bottom / top and left / right, Horizontal top,
+    /// where "top" is the edge at `p1`'s y and "left" the one at `p0`'s x.
     pub fn corner_rectangle(&mut self, p0: DVec2, p1: DVec2) -> ShapeIds {
         let (lo, hi) = (p0.min(p1), p0.max(p1));
         let pts: Vec<EntityId> = [lo, DVec2::new(hi.x, lo.y), hi, DVec2::new(lo.x, hi.y)].iter().map(|p| self.add_point(*p)).collect();
         let lines = self.closed_polyline(&pts);
         let mut out = ShapeIds { points: pts, curves: lines.clone(), ..Default::default() };
-        let [bottom, right, top, left] = [lines[0], lines[1], lines[2], lines[3]];
+        // The edges run counter-clockwise: low y, high x, high y, low x.
+        let (bottom, top) = if p1.y >= p0.y { (lines[0], lines[2]) } else { (lines[2], lines[0]) };
+        let (left, right) = if p0.x <= p1.x { (lines[3], lines[1]) } else { (lines[1], lines[3]) };
         self.c(&mut out, ConstraintKind::Perpendicular { a: top, b: left });
         self.c(&mut out, ConstraintKind::Parallel { a: bottom, b: top });
         self.c(&mut out, ConstraintKind::Parallel { a: left, b: right });
@@ -61,16 +64,19 @@ impl Sketch {
         out
     }
 
-    /// Axis-aligned rectangle from its center and a corner. A construction
-    /// diagonal carries a midpoint constraint to the center point.
+    /// Axis-aligned rectangle from its center and a corner. Live (behaviours
+    /// "spec: skasm sketch tools"): the corner rectangle's lines and
+    /// constraints plus a construction point at the centre, the Midpoint of
+    /// both diagonals' corners (no diagonal lines).
     pub fn center_rectangle(&mut self, center: DVec2, corner: DVec2) -> ShapeIds {
-        let h = (corner - center).abs();
-        let mut out = self.corner_rectangle(center - h, center + h);
-        let diag = self.add_line_between(out.points[0], out.points[2]).unwrap();
-        self.set_construction(diag, true).unwrap();
+        // Live: the clicked corner is the first ("bottom" / "left" there).
+        let mut out = self.corner_rectangle(corner, center * 2.0 - corner);
         let cp = self.add_point(center);
-        self.c(&mut out, ConstraintKind::Midpoint { point: cp, curve: diag });
-        out.construction.push(diag);
+        let _ = self.set_construction(cp, true);
+        let p = out.points.clone();
+        self.c(&mut out, ConstraintKind::MidpointOf { point: cp, a: p[2], b: p[0] });
+        self.c(&mut out, ConstraintKind::MidpointOf { point: cp, a: p[3], b: p[1] });
+        out.construction.push(cp);
         out.points.push(cp);
         out
     }
@@ -249,6 +255,22 @@ impl Sketch {
     pub fn three_point_circle(&mut self, p1: DVec2, p2: DVec2, p3: DVec2) -> Result<EntityId> {
         let (c, r) = circle_through(p1, p2, p3).ok_or_else(|| SketchError::InvalidGeometry("collinear points".into()))?;
         Ok(self.add_circle(c, r))
+    }
+
+    /// Live's 3 point circle tool (behaviours "spec: skasm sketch tools"):
+    /// the circle plus a construction point at each click, Coincident with
+    /// it. `points` are the three, in click order.
+    pub fn three_point_circle_points(&mut self, p1: DVec2, p2: DVec2, p3: DVec2) -> Result<ShapeIds> {
+        let circle = self.three_point_circle(p1, p2, p3)?;
+        let mut out = ShapeIds { curves: vec![circle], ..Default::default() };
+        for p in [p1, p2, p3] {
+            let q = self.add_point(p);
+            self.set_construction(q, true)?;
+            self.c(&mut out, ConstraintKind::Coincident { a: q, b: circle });
+            out.construction.push(q);
+            out.points.push(q);
+        }
+        Ok(out)
     }
 
     /// Arc tangent to the curve ending at point `from`, from that point to
