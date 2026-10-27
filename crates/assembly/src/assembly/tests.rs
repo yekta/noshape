@@ -4185,7 +4185,7 @@ fn iso_7380_button_head_matches_live() {
 
 
 
-/// Live's texts (docs/parity/workflow-assembly-sweep.md rows 1–5, 7, 8, 10, 12, 13):
+/// Live's texts (docs/parity/workflow-assembly-sweep.md rows 1–5, 7, 8, 10, 12, 13, 28):
 /// relations on mates of the wrong kind, a relation whose mate is gone or
 /// failed, and a mate with both connectors on one instance.
 #[test]
@@ -4252,6 +4252,18 @@ fn relation_and_mate_errors_use_live_texts() {
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     let m15 = res.mates.iter().find(|m| m.id == MateId(15)).unwrap();
     assert_eq!(m15.message.as_deref(), Some("Two width mate connectors are required."));
+    // The pin's part gone from its Part Studio (row 28, live E15): the
+    // instance and the mate on its face.
+    asm.mates.pop();
+    let lost = BodyId { feature: crate::reference::FeatureId(9999), index: 0 };
+    if let InstanceSource::Part { body, .. } = &mut asm.instance_mut(InstanceId(3)).unwrap().source {
+        *body = lost;
+    }
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let node = res.nodes.iter().find(|n| n.path == vec![InstanceId(3)]).expect("the instance row");
+    assert_eq!(node.error.as_deref(), Some("Failed to resolve instance."));
+    let m11 = res.mates.iter().find(|m| m.id == MateId(11)).unwrap();
+    assert_eq!(m11.message.as_deref(), Some("Failed to resolve the instance for mate."));
 }
 
 /// Random assembly edits (seeded): mates of every type between random faces
