@@ -15,6 +15,7 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 - cdde1c06 F19 Width mate in any pick order + DOF cache across evaluations, per-group DOF length scale.
 - c76cdcf4 assembly least change measured at the bodies' mate connectors (oracle_asm R1 matches live; R1 out of KNOWN;
   R3/C1 now keep rz 0, still KNOWN for live's −157.5°).
+- 2d4c73d2 first insert into an empty assembly fitted beside the 300 px Insert dialog (qa5 A1).
 - 7dc7aee4 assembly Section view: a clicked face fills Section planes (an instance press had armed a part drag, so the
   click became a selection; `update_capture` now treats the open dialog as busy).
 - eb076e34, d1cf1ff7: tests for the secondary-axis and Replicate-nothing-matches texts.
@@ -45,8 +46,10 @@ Sketch P1: no open items (parity/sketch.md all ✅; workflow-sketch-tools.md rec
    /root/skasm-scratch/qa/asm1.py over MCP).
 2. docs/parity/assembly.md G5 exploded views (⏳): verify against live 800–826 (workflow-exploded-named-positions.md
    rows 2–15 are from an old pass; recheck them).
-3. workflow-mates.md / workflow-assembly.md / workflow-configured-assembly.md: old passes; recheck their ✗ rows on green
-   (several are fixed in code, e.g. MT3–MT6).
+3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; left:
+   A10 a toolbar tooltip staying after a click (app-core tooltips)), workflow-configured-assembly (1, 2, 8 ✅; left: CA3
+   Change configuration dialog body translucent, CA4 Tab leaving that dialog, A15 selection colours / root row),
+   workflow-exploded-named-positions (2–4, 7, 11, 14, 16 ✅; left: 5 minor, EXV6 pill (in code, unverified), NP2).
 4. Which part moves when neither is fixed in an exact flip (live's rule open, behaviours R3 note); ours moves the first
    connector's part (as live in 10 of 14 runs).
 5. Slot: live shows all 3 offset glyphs at the end cap; after the commit live's centre line is plain dark blue (ours
