@@ -281,6 +281,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Top at z 0 under a 40×30×20 block, default direction): ours "No target parts selected for hole."; live "None of the holes
   intersected a part." with Merge scope flagged (behaviours L56/L57 and "H1 flipped"); live keeps "No target parts…" for
   a cleared scope only (qa 2026-10-26, v0.4.8 + main CLI)
+  qa 09:30 (watcher CLI 08:30): the same hole is now flipped into the part by itself (feature_get oppositeDirection true,
+  scope filled) and cuts (23793.819 = block − hole), status INFO "Parameters have been overridden." Live's dialog doesn't
+  auto-flip a hole (L57: "Opposite direction does not flip itself"); it reports "None of the holes intersected a part."
 - [ ] P2 PATTERN-REAPPLY-CUT-ONLY Feature pattern with ☑ Reapply features of a Remove extrude alone (its sketch not in
   the pattern; 40×30×10 block, Ø6 cut through all at x 10 drawn on the top face, direction = a bottom edge, 15 mm, count 4):
   ours moves the cut to each instance (3 holes, 706.858 mm³ removed, OK); live L40 (behaviours ~8484): the reapplied cut
