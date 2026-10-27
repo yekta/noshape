@@ -158,20 +158,20 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 7.6 | Two parallel lines: distance (implies parallel) | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.7 | Two lines at an angle: angle; the quadrant follows the cursor | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.8 | Circle: diameter; arc: radius | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 7.9 | Arc length: both end points then the arc | H:dimension | ✅ (T:sm) |  |
+| 7.9 | Arc length: both end points then the arc | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.10 | Point / line / circle to a construction line, cursor across it: centerline dimension (twice the distance) | H:dimension | ✅ (T:sm, T:ux) |  |
-| 7.11 | Ellipse: major / minor diameter | B§4.2 | ✅ (T:sm) |  |
-| 7.12 | Dimension to the sketch origin | H:dimension | ✅ (T:sm) |  |
+| 7.11 | Ellipse: major / minor diameter | B§4.2 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
+| 7.12 | Dimension to the sketch origin | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.13 | Dimension to planes / model edges | H:dimension | ✅ (planes as trace lines, model edges / vertices as linked reference geometry) |  |
 | 7.14 | Over-defining dimensions are made driven: plain grey value ("Ø10", no parentheses) and the value box still opens, no toast | H:dimension; live "qa4 round 5 s5 driven dims" (1) | ✅ (test `driven_labels_and_offset_side_as_live`; GUI :103 skasm 10-26: second Ø on a dimensioned circle opens the box, grey plain "Ø10" after Esc) | 0.4.10+ / 203c4d6f 10-27 (duplicate Ø → driven grey plain; h + v + aligned length all stay driving: asked live 18:50) |
 | 7.15 | Driven ↔ driving from the context menu ("Change to driving/driven dimension") | H:dimension | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 7.16 | Double-click a dimension to edit its value | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 7.16a | Esc on an untouched value box (new or reopened) closes it at once (a new dimension keeps its measured value); a changed box reverts on the first Esc, closes on the second; a bare expression is stored with the document unit ("2*5" → "(2*5) mm") | live qa4 round 5 v3 s5 (DIM-ESC-UNTOUCHED, DIM-EXPR-UNIT) | ✅ (app; `quantity_text::simple` no longer reads "*5" as a unit; tests `dimension_expression_keeps_the_unit`, `expressions_get_the_unit_around_them`) | 0.4.10+ / 2d9a275c 10-27 |
 | 7.17 | Editing moves both dimensioned sides by half (except radius / diameter) | H:dimension | ✅ (T:ux) |  |
-| 7.18 | Negative values flip direction (distance, angle, line length); not allowed for arc, radius, diameter | H:dimension | ✅ (T:sm) |  |
-| 7.19 | Drag the dimension label to move it | B§4 | ✅ |  |
+| 7.18 | Negative values flip direction (distance, angle, line length); not allowed for arc, radius, diameter | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
+| 7.19 | Drag the dimension label to move it | B§4 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 7.20 | Select + Delete removes a dimension; context menu Delete | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 7.21 | Expression indicator next to values that use expressions; Show expressions shows them (≤70 chars) | H:sketch_basics | ✅ |  |
+| 7.21 | Expression indicator next to values that use expressions; Show expressions shows them (≤70 chars) | H:sketch_basics | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 7.22 | Errors: "A dimension cannot be created between these items." / "Could not create the dimension." | i18n | ✅ |  |
 | 7.23 | Driving dimensions black, driven gray, hover/selected gold, conflicting red | Home__colors, B§4.5 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 7.24 | Tolerances, precision, configure dimension | B§4.3 | ✅ (tolerance types, deviations, precision; configure dimension) |  |
@@ -198,7 +198,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.11 | Constraints to planes / model edges | H:working_with_constraints | ✅ (same reference mechanism as dimensions) |  |
 | 8.12 | Glyphs show for the hovered entity (show after hover, hide after 750 ms); all with Show constraints | H:working_with_constraints, B§3.5 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 8.13 | Hover a glyph highlights its entities (yellow); click selects it; Delete removes it | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 8.14 | Drag glyphs to move them | H:working_with_constraints | ✅ |  |
+| 8.14 | Drag glyphs to move them | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.15 | Conflicting constraints: white glyph on red | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.16 | External (Use) constraints have a blue glyph background | H:working_with_constraints | ✅ (GUI :103 Equal to projected model circle gives blue glyph backgrounds; external-equal.png) |  |
 | 8.17 | Equal: if one curve is dimensioned, its size wins | H:equal | ✅ (solver) | 0.4.10+ / 203c4d6f 10-27 |
@@ -256,7 +256,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.20 | Use: hover preview of the projection | H:use | ✅ (GUI :103 m8.png: hovering the cylinder top edge highlights it and previews the projected circle on the sketch plane; click creates it) |  |
 | 11.21 | Use silhouette edges | H:use | ✅ (cylinders, cones, spheres, tori; verified on the demo plate) |  |
 | 11.22 | Intersection: face crossing the sketch plane | H:intersection | ✅ |  |
-| 11.23 | Text cannot be patterned / mirrored in a sketch | H:text | ✅ |  |
+| 11.23 | Text cannot be patterned / mirrored in a sketch | H:text | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 
 ## 12. Context menus
 
@@ -316,7 +316,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 14.29 | Show constraints starts off in a new session (live sketch/00, 01, 10) and the dialog remembers the last setting (live 44, 200) | Live sketch/00–10, 44, 200 | ✅ (static default off, remembered via `set_show_constraints`; an earlier entry here wrongly said "on") | not verified: ours starts ☑ on a fresh HOME (1c853f78), as core-workflow 2.2 wants; 14.29 says off (live sketch/00) — conflicting rows, see handoff |
 | 14.30 | Pattern instance counts are on-canvas `Nx` labels (click to type); the linear spacing is an on-canvas value (click to type, expressions allowed); no options panel for linear pattern | Live sketch/136–138 | ✅ (T:sm `pattern_count_labels_default_to_live_counts_and_accept_typing`; GUI :103 k4.png, k4b.png) |  |
 | 14.31 | No floating options panel for fillet, polygon, conic (they use the manipulator / spinner / rho box) | Live sketch/87–98, 84–86, 110–115 | ✅ (GUI :103 k3-enter-c.png: no panel) |  |
-| 14.32 | Circular pattern defaults to 3 instances | Live sketch/138 | ✅ (T:sm) |  |
+| 14.32 | Circular pattern defaults to 3 instances | Live sketch/138 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 14.33 | Circular pattern / Transform still use the floating options panel (live: on-canvas only) | Live sketch/138–139 | ✅ (circular: `3x` label + open-pattern angle value, GUI :103 k5-open-c/k5-90-c.png; transform: triad on the selection, rotation/scale fields appear once dragged, GUI k5-xf-c/k5-rot-c.png; T:sm `transform_triad_follows_the_selection_until_its_center_is_dragged`; no options panels remain for patterns/transform) |  |
 | 14.34 | Right-click on a model edge in a sketch: Confirm \| Use \| Hide Part, Curve/surface analysis…, Isolate…, Make transparent… \| Clear selection, Select ▸, Select other… \| zoom/view items incl. Align view with vertical axis | Live sketch/204 | ⏳ (model-edge layout added: Confirm | Use | Hide <part>, Curve/surface analysis…, Isolate…, Make transparent… | Clear selection, Select other… | ⏳ (model-edge layout: Confirm | Use | Hide <part>, Curve/surface analysis…, Isolate…, Make transparent… | Clear selection, Select ▸ (edge/face criteria + Create selection…), Select other… | ✅ (GUI :103 m7-edge-menu.png matches live 204: Confirm | Use | Hide Part 1, Curve/surface analysis…, Isolate…, Make transparent… | Clear selection, Select ▸ (Tangent connected, Loop/chain, Parallel, Equal radius, Create selection…; m7-sub-c.png), Select other… | Zoom to fit, Zoom to selection, View normal (+ Align view for straight edges); Add comment is a cloud-only exclusion) |  |
 | 14.35 | Bottom-right one-line readout of the sketch selection: Length / Diameter / Radius / Point X Y Z / Distance / Parallel dist / Angle (deg); nothing for mixed selections | Live behaviours.md §Drawing tools (status bar), sketch/108, 136, 139 | ✅ (T:sm; GUI :103 m5-readout-c.png "Diameter: 50.8 mm") | 0.4.10+ / 203c4d6f 10-27 |
