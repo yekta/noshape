@@ -119,7 +119,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 5.3 | Continuing to sketch leaves the geometry undimensioned (box disappears) | H:sketch_basics | ✅ |
 | 5.4 | Rectangles: length box, Enter, width box, Enter | H:corner_rectangle | ✅ |
 | 5.5 | Ellipse / elliptical arc: primary then secondary diameter | H:ellipse | ✅ (T:sm) |
-| 5.6 | Polygon: diameter of the construction circle | H:inscribed_polygon | ✅ |
+| 5.6 | Polygon: no value box and no Ø dimension (live spec 10-26 "Sketch polygon commits": seed + circular pattern, no DIAMETER; the Help's "diameter of the construction circle" is only the readout) | H:inscribed_polygon | ✅ (scene test `polygon_sides_typed_and_midpoint_line`: no box) |
 | 5.7 | Fillet: radius box right after the first fillet | H:sketch_fillet | ✅ |
 | 5.8 | `=#var` uses a variable; expressions with units and functions | H:sketch_basics | ✅ |
 | 5.9 | Esc closes the box without dimensioning | — | ✅ |
