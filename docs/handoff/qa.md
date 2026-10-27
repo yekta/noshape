@@ -14,7 +14,13 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 - SHELL-WALLS: wrong solid with status OK (also in v0.4.8).
 
 ## Daily release smoke
-(none yet: the first daily release under the new plan is due 2026-10-27 ~05:00 UTC)
+### v0.4.9 candidate (release/v0.4.9 2650df69 = main 34ab98f7 + CI fix; CI run 40434076347 Linux artifact), 2026-10-27 03:10
+- **Blocker:** the build segfaults opening 4 of qa's 5 crash documents (SHELL-SLAB-GPF, FILLET-SEGV, FILLET-SEGV-BLEND,
+  DRAFT-SEGV-DOC); it predates bf8aaee2 / 87e8275f / 7a04ba4d. Green 19555ca3 opens all five. See TICKETS "Release v0.4.9".
+- OK: 30-feature part opens (full regen 618 ms at load ~40), 60779.484 mm³ = live; edit Extrude 1 → 12 commits (710 ms),
+  undo cached (2 ms); new Part Studio: centre rectangle + dims, extrude, fillet, shell; Create Drawing (suggested views,
+  1:2, 4 views) in ~10 s; drawing PDF export (1 page letter, PDF 1.5).
+- Not run: assembly, import/export round trip, kill -9 durability (done on green the day before).
 
 Checklist (30 min, on /root/green/noshape at the release commit; numbers to compare in brackets):
 1. tests/perf/live-30-features.noshape: opens, mass properties 60779.484 mm³; edit Extrude 1 10 → 12, ✓, Ctrl+Z, Ctrl+Y
