@@ -214,7 +214,109 @@ fn max_row(a: &Shape, b: &Shape) -> Option<(String, Measurement)> {
             }
         }
     }
-    best.map(|(_, p, q)| dist_row("Max dist", p, q))
+    best.map(|(_, p, q)| {
+        let (p, q) = refine_max(std::slice::from_ref(a), std::slice::from_ref(b), p, q);
+        dist_row("Max dist", p, q)
+    })
+}
+
+/// The farthest pair of two shapes from the farthest sampled pair `(p, q)` (vertices, mesh nodes), on the exact
+/// geometry: each end in turn moves to the point of its own shapes, near where it is, farthest from the other end,
+/// until neither moves (MEASURE-MAX-DIST: two tubes' mesh nodes read 94.850 where the rims are 94.868 apart; live
+/// measures the exact geometry).
+fn refine_max(a: &[Shape], b: &[Shape], mut p: DVec3, mut q: DVec3) -> (DVec3, DVec3) {
+    for _ in 0..12 {
+        let q2 = farthest_near(b, q, p);
+        let p2 = farthest_near(a, p, q2);
+        let moved = p2.distance(p) + q2.distance(q);
+        (p, q) = (p2, q2);
+        if moved <= 1e-12 * (1.0 + p.distance(q)) {
+            break;
+        }
+    }
+    (p, q)
+}
+
+/// The point of `shapes` locally farthest from `from`, starting at `at` (a point on them): over the faces and edges
+/// through `at`, a pattern search in the face's (u, v) (kept on the bounded face) or the edge's parameter.
+fn farthest_near(shapes: &[Shape], at: DVec3, from: DVec3) -> DVec3 {
+    let tol = 1e-6 * (1.0 + at.distance(from));
+    let (mut best, mut best_d) = (at, at.distance(from));
+    for s in shapes {
+        for f in s.faces() {
+            let Ok(pr) = f.project_point(at) else { continue };
+            let Ok([u0, u1, v0, v1]) = f.uv_bounds() else { continue };
+            if pr.distance > tol || !(u1 > u0 && v1 > v0) {
+                continue;
+            }
+            let on_face = |x: DVec3| f.project_point(x).is_ok_and(|r| r.distance <= tol);
+            let (mut u, mut v) = (pr.u, pr.v);
+            let mut d = pr.point.distance(from);
+            let (mut su, mut sv) = ((u1 - u0) * 0.05, (v1 - v0) * 0.05);
+            while su > (u1 - u0) * 1e-13 || sv > (v1 - v0) * 1e-13 {
+                let step = [(su, 0.0), (-su, 0.0), (0.0, sv), (0.0, -sv)].into_iter().find_map(|(du, dv)| {
+                    let (nu, nv) = ((u + du).clamp(u0, u1), (v + dv).clamp(v0, v1));
+                    let x = f.point_at_uv(nu, nv).ok()?;
+                    (x.distance(from) > d && on_face(x)).then_some((nu, nv, x.distance(from)))
+                });
+                match step {
+                    Some((nu, nv, nd)) => (u, v, d) = (nu, nv, nd),
+                    None => (su, sv) = (su * 0.5, sv * 0.5),
+                }
+            }
+            if d > best_d
+                && let Ok(x) = f.point_at_uv(u, v)
+            {
+                (best, best_d) = (x, d);
+            }
+        }
+        for e in s.edges() {
+            let Ok(info) = e.edge_info() else { continue };
+            let (t0, t1) = (info.first_param, info.last_param);
+            if info.degenerated || t1.partial_cmp(&t0) != Some(std::cmp::Ordering::Greater) {
+                continue;
+            }
+            let at_t = |t: f64| e.point_at(t).ok();
+            // Where `at` is on the edge: the nearest of 64 samples, then refined.
+            let n = 64;
+            let Some((mut t, mut near)) = (0..=n).filter_map(|i| {
+                let t = t0 + (t1 - t0) * i as f64 / n as f64;
+                Some((t, at_t(t)?.distance(at)))
+            }).min_by(|x, y| x.1.total_cmp(&y.1)) else { continue };
+            let mut st = (t1 - t0) / n as f64;
+            while st > (t1 - t0) * 1e-13 {
+                match [st, -st].into_iter().find_map(|dt| {
+                    let nt = (t + dt).clamp(t0, t1);
+                    let dd = at_t(nt)?.distance(at);
+                    (dd < near).then_some((nt, dd))
+                }) {
+                    Some((nt, dd)) => (t, near) = (nt, dd),
+                    None => st *= 0.5,
+                }
+            }
+            if near > tol {
+                continue;
+            }
+            let mut d = at_t(t).map_or(0.0, |x| x.distance(from));
+            let mut st = (t1 - t0) * 0.05;
+            while st > (t1 - t0) * 1e-13 {
+                match [st, -st].into_iter().find_map(|dt| {
+                    let nt = (t + dt).clamp(t0, t1);
+                    let nd = at_t(nt)?.distance(from);
+                    (nd > d).then_some((nt, nd))
+                }) {
+                    Some((nt, nd)) => (t, d) = (nt, nd),
+                    None => st *= 0.5,
+                }
+            }
+            if d > best_d
+                && let Some(x) = at_t(t)
+            {
+                (best, best_d) = (x, d);
+            }
+        }
+    }
+    best
 }
 
 fn is_right_angle(t: f64) -> bool {
@@ -519,8 +621,9 @@ pub struct EntityDistance {
 }
 
 /// Minimum (or, with `maximum`, the largest) distance between the shapes of
-/// two references. The maximum is taken over points sampled on both (their
-/// vertices, mesh nodes and edge polylines).
+/// two references. The maximum starts from points sampled on both (their
+/// vertices, mesh nodes and edge polylines) and is refined on the exact
+/// geometry (`refine_max`).
 pub fn entity_distance(ctx: &Context, a: &Reference, b: &Reference, maximum: bool) -> Option<EntityDistance> {
     let (sa, sb) = (resolve_shapes(ctx, a), resolve_shapes(ctx, b));
     if sa.is_empty() || sb.is_empty() {
@@ -540,16 +643,19 @@ pub fn entity_distance(ctx: &Context, a: &Reference, b: &Reference, maximum: boo
         return best;
     }
     let (pa, pb) = (sample_points(&sa), sample_points(&sb));
-    let mut best: Option<EntityDistance> = None;
+    let mut best: Option<(f64, DVec3, DVec3)> = None;
     for p in &pa {
         for q in &pb {
             let d = q.distance(*p);
-            if best.is_none_or(|b| d > b.distance) {
-                best = Some(EntityDistance { distance: d, delta: *q - *p });
+            if best.is_none_or(|b| d > b.0) {
+                best = Some((d, *p, *q));
             }
         }
     }
-    best
+    best.map(|(_, p, q)| {
+        let (p, q) = refine_max(&sa, &sb, p, q);
+        EntityDistance { distance: p.distance(q), delta: q - p }
+    })
 }
 
 fn sample_points(shapes: &[Shape]) -> Vec<glam::DVec3> {
@@ -614,6 +720,26 @@ mod tests {
         // One part alone: its own inertia (no shift).
         let one = mass_properties(&ctx, &[BodyId { feature: FeatureId(1), index: 0 }], &|_| None).unwrap();
         assert!((one.inertia.y_axis.y - 160.0).abs() < 1e-6);
+    }
+
+    /// MEASURE-MAX-DIST (qa 10-27): Max dist between two Ø40 × 30 cylinders 50 apart is exact, from the rims:
+    /// √(90² + 30²) between the side faces, 90 between the top circles (mesh nodes read 94.850 and 89.981).
+    #[test]
+    fn max_dist_is_exact_on_curved_faces_and_circles() {
+        let cyl = |x: f64| k::make_cylinder(&k::Plane::new(DVec3::new(x, 0.0, 0.0), DVec3::Z, DVec3::X), 20.0, 30.0, std::f64::consts::TAU).unwrap();
+        let side = |c: &Shape| c.faces().into_iter().max_by(|a, b| a.area().unwrap_or(0.0).total_cmp(&b.area().unwrap_or(0.0))).unwrap();
+        let top = |c: &Shape| c.edges().into_iter().find(|e| matches!(e.edge_curve(), Ok(k::Curve::Circle { center, .. }) if center.z > 29.0)).unwrap();
+        let (a, b) = (cyl(0.0), cyl(50.0));
+        let max = |x: Shape, y: Shape| {
+            measure_shapes(&[vec![x], vec![y]]).into_iter().find_map(|(l, m)| match m {
+                Measurement::Distance { distance, .. } if l == "Max dist" => Some(distance),
+                _ => None,
+            })
+        };
+        let faces = max(side(&a), side(&b)).expect("a Max dist row");
+        assert!((faces - (90.0f64 * 90.0 + 30.0 * 30.0).sqrt()).abs() < 1e-6, "faces: {faces}");
+        let circles = max(top(&a), top(&b)).expect("a Max dist row");
+        assert!((circles - 90.0).abs() < 1e-6, "circles: {circles}");
     }
 
     /// The Measure tool with nothing selected (or a selection that resolves
