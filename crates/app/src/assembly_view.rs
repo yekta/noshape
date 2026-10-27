@@ -4737,12 +4737,13 @@ impl AssemblyView {
         let name = self.relation_name(cx);
         let valid = self.relation_valid(cx);
         // Live E6 / E7: "Gear 3 did not regenerate properly: Gear relations
-        // require two rotational degrees of freedom."
+        // require two rotational degrees of freedom.", also while the mates
+        // are missing (live's empty dialog).
         let title_tip = self
             .assembly(cx)
             .and_then(|a| noshape_ops::assembly::check_relation(a, kind, r.a, r.b).err())
-            .filter(|(typed, _)| *typed)
-            .map(|(_, e)| format!("{name} did not regenerate properly: {e}"));
+            .map(|(typed, e)| if typed { e } else { noshape_model::assembly::eval::relation_requirement(kind).to_string() })
+            .map(|e| format!("{name} did not regenerate properly: {e}"));
         let items = RELATION_KINDS.iter().map(|k| (SharedString::from(noshape_ops::assembly::relation_name(*k)), SharedString::from(noshape_ops::assembly::relation_name(*k)))).collect();
         self.relation_select.update(cx, |sel, _| sel.set_items(items, noshape_ops::assembly::relation_name(kind)));
         let select = div().w(px(194.)).h(px(28.)).child(self.relation_select.clone());

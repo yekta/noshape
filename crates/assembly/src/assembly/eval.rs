@@ -346,6 +346,17 @@ fn translational_value(t: MateType) -> Option<usize> {
     }
 }
 
+/// What a relation type needs of its mates: live's error for mates that
+/// don't fit, also the empty dialog's (behaviours "Relations").
+pub fn relation_requirement(kind: RelationType) -> &'static str {
+    match kind {
+        RelationType::Gear => "Gear relations require two rotational degrees of freedom.",
+        RelationType::RackAndPinion => "Rack and pinion relations require one translational degree of freedom and one rotational degree of freedom.",
+        RelationType::Screw => "Screw relations require one cylindrical mate.",
+        RelationType::Linear => "Linear relations require two translational degrees of freedom.",
+    }
+}
+
 /// Free value indices a relation couples on its two mates, or why the
 /// mates do not fit the relation type.
 pub fn relation_values(kind: RelationType, a: MateType, b: MateType) -> Result<(usize, usize), String> {
@@ -355,19 +366,19 @@ pub fn relation_values(kind: RelationType, a: MateType, b: MateType) -> Result<(
     match kind {
         RelationType::Gear => match (rotational_value(a), rotational_value(b)) {
             (Some(x), Some(y)) => Ok((x, y)),
-            _ => Err("Gear relations require two rotational degrees of freedom.".into()),
+            _ => Err(relation_requirement(kind).into()),
         },
         RelationType::RackAndPinion => match (rotational_value(a), translational_value(b)) {
             (Some(x), Some(y)) => Ok((x, y)),
-            _ => Err("Rack and pinion relations require one translational degree of freedom and one rotational degree of freedom.".into()),
+            _ => Err(relation_requirement(kind).into()),
         },
         RelationType::Screw => match a {
             MateType::Cylindrical => Ok((0, 3)),
-            _ => Err("Screw relations require one cylindrical mate.".into()),
+            _ => Err(relation_requirement(kind).into()),
         },
         RelationType::Linear => match (translational_value(a), translational_value(b)) {
             (Some(x), Some(y)) => Ok((x, y)),
-            _ => Err("Linear relations require two translational degrees of freedom.".into()),
+            _ => Err(relation_requirement(kind).into()),
         },
     }
 }
