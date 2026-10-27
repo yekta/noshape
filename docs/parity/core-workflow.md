@@ -36,7 +36,7 @@ it, so re-take positions after every selection.
 | 2.8 | Select two lines, E | Equal; glyphs shown | ✅ |  |
 | 2.9 | D, pick circle, place | Value box opens with the full value selected ("20.479094 mm") | ✅ |  |
 | 2.10 | Bare "25" + Enter | Ø25, box closes | ✅ (but see F3) |  |
-| 2.11 | Double-click the dimension, "1 in" + Enter | Ø25.4, tan background | ✅ |  |
+| 2.11 | Double-click the dimension, "1 in" + Enter | Ø25.4, tan background | ❌ (DIM-AC-ENTER) | 0.4.10+ / 1c853f78 10-27 |
 | 2.12 | "10+5" + Enter | Label "ƒ 15" (expression prefix) | ✅ re-checked 10-23: "ƒ 15" (was ✗ F4) |  |
 | 2.13 | Re-open it | Box shows "(10+5) mm" | ✅ re-checked 10-23: "(10+5) mm" (was ✗ F5) |  |
 | 2.14 | Type, Esc | Reverts and blurs; box stays | ✅ |  |
