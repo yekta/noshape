@@ -44,6 +44,20 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   Open: the race itself (OCCT patch 0001's EF/VF changes are the first suspect: BOPAlgo_PaveFiller_5.cxx), and
   OSD_Parallel::For loops that still run several booleans at once (cut_slabs, fuse_slabs, fuse_trimmed).
 
+- cb84d673 SHELL-SLOW (part): plates whose only concave faces are through holes (+ hole-rim fillet tori) shell by
+  regions (shell.cpp `by_regions`: hole tube r + t, torus sectors): the kernel matrix's hole plates 0.7–1.1 s → 81–93 ms,
+  same volumes. Shells run on the blends' 30 s CPU budget (`op_shell_solid`; qa's 2-min delete-crash shell fails after
+  31 s). `BudgetHold` keeps the budget from jumping out of a parallel BRepCheck (pool workers would use the abandoned
+  frame): wrap any OSD-parallel work reachable from a budgeted op in one. Tool: `NOSHAPE_REPLAY=<dir>/<name> cargo test
+  -p noshape-kernel --test all crash_inputs::replay_one -- --ignored --nocapture` replays a NOSHAPE_DUMP_OPS capture.
+  NOSHAPE_SHELL_DEBUG=1 prints why regions/offset decline ("regions: a concave edge" + where).
+
+- (next commit) oracle_p1 LP2 / CP2 as live again (T2, red in the 10-27 nightly; T1 test
+  `oracle_p1::overhanging_pattern_copies_merge_with_the_part_as_live`): pattern.rs `overhang_growth` takes the part's
+  exact box (the tolerance-padded one left the column's bottom 0.05 µm under the part's, no merge). kernel_robustness
+  `patterns_match_onshape` M3 (T2): Up to extrudes no longer seat their circles (seated, the boss's seam fell on the
+  target cylinder's seam line and the fuse lost 0.035 mm³); their cylinders are still framed as live.
+
 - a01dca62 Hole add speed: line_crossings keeps OCCT's loaded line intersector on the shape. Left in std's hole probe:
   min_distance (~140 calls, ~0.8 ms each, BRepExtrema rebuilt per call).
 
@@ -72,8 +86,9 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 1. P0 REGEN-SPEED (open): per regeneration ~15 ms per boolean (OCCT build), fillet/chamfer ~10 ms + ~6 ms check, the
    display meshing ~45 ms. Ideas: check only the blend's new/modified faces instead of the whole part; fewer
    unify passes; profile with NOSHAPE_KERNEL_PROFILE=1 on the probe. Live: 2–9 ms per feature.
-2. P0 SHELL-SLOW (open): slab fuse of 20–45 overlapping tools 0.4–5 s (qa's shell_that_breaks part 9 s);
-   NOSHAPE_SHELL_DEBUG=1 times each stage. The 43 s delete-crash shell input is in /root/core-scratch/slow-shells.
+2. P0 SHELL-SLOW (open): parts with concave edges still go to slabs (fuse of 20–45 overlapping tools 0.4–5 s; qa's
+   shell_that_breaks part 9 s); NOSHAPE_SHELL_DEBUG=1 times each stage. The delete-crash shell input (now fails on the
+   budget) is in /root/core-scratch/slow-shells. Next: regions for concave edges between planes (pockets, steps).
 3. P0 `qa_regressions::shell_that_breaks_the_part_fails` (T2): live fails too; ours fails only by an invalid OCCT
    result (platform-dependent). Needs Parasolid's rule (TICKETS note).
 4. P1 SHELL-WALLS-CORNER (fillets meeting at a sharp corner keep ~0.47·R mm³ more in live), std_oracle hole scope,

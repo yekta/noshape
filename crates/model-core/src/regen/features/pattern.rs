@@ -756,7 +756,9 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
 /// less the part, the pieces touching the footprint (none when it rests on
 /// the part); faces named after the copy's nearest.
 fn overhang_growth(body: &Shape, tool: &NamedShape) -> Option<NamedShape> {
-    let bb = body.bounding_box(false).ok()?;
+    // The exact box: one padded by the tolerance put the column's bottom
+    // 0.05 µm under the part's, too far to merge with it (LP2 24 faces).
+    let bb = body.bounding_box(true).ok()?;
     let reach = (bb.max - bb.min).length() * 2.0;
     let tol = reach * 1e-9;
     let contains = |a: &k::BoundingBox, b: &k::BoundingBox| a.min.x <= b.min.x + tol && a.min.y <= b.min.y + tol && a.min.z <= b.min.z + tol && b.max.x <= a.max.x + tol && b.max.y <= a.max.y + tol && b.max.z <= a.max.z + tol;

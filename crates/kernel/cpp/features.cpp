@@ -551,10 +551,10 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
     base = tr->Shape();
     merge_into(hist, history_of({profile.shape}, *tr));
   }
-  // The profile's full circles restarted at the frame's x (see op_prism).
-  occ::handle<BRepTools_ReShape> seat = new BRepTools_ReShape;
-  base = seat_circles(base, dir.Reversed(), seat);
-  merge_into(hist, seat->History());
+  // The profile's circles keep their start (no seat_circles as in op_prism):
+  // seated, a boss up to a cylinder lying along x put its seam on the
+  // cylinder's seam line and the fuse lost 0.035 mm³ of it (kernel_robustness
+  // patterns_match_onshape M3).
   // Through-all length: generous multiple of the combined bounding box.
   const double          len = 2.0 * bbox_diag({base, until.shape}) + 1.0;
   BRepPrimAPI_MakePrism prism(base, gp_Vec(dir) * len, false, true);
@@ -631,7 +631,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   HistoryBuilder hb(args, result);
   hb.add_history(hist.get());
   auto moved = [&](const TopoDS_Shape& s) -> TopoDS_Shape {
-    return seat->Value(tr ? tr->ModifiedShape(s) : s);
+    return tr ? tr->ModifiedShape(s) : s;
   };
   hb.add_mapped(0, REL_FIRST, [&](const TopoDS_Shape& s) {
     return images_of(spH, prism.FirstShape(moved(s)));

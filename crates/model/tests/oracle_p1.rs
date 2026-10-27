@@ -751,6 +751,14 @@ fn outcome(r: &RegenResult) -> Outcome {
         _ => "ERROR",
     };
     let parts: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).collect();
+    // NOSHAPE_ORACLE_FACES=1: each case's faces (to find a face-count difference).
+    if std::env::var_os("NOSHAPE_ORACLE_FACES").is_some() {
+        for f in parts.iter().flat_map(|b| b.shape.faces()) {
+            let c = f.centroid().unwrap_or_default() * 1e3;
+            let a = f.area().unwrap_or(0.0) * 1e6;
+            eprintln!("  face {:?} centroid {:.3} {:.3} {:.3} area {a:.4}", f.face_surface().map(|s| format!("{s:?}").chars().take(60).collect::<String>()), c.x, c.y, c.z);
+        }
+    }
     Outcome {
         status,
         text: s.message.clone().unwrap_or_default(),
@@ -1174,6 +1182,20 @@ fn p1_features_match_live() {
         }
     }
     assert!(report.is_empty(), "differences from live:\n{report}");
+}
+
+/// Feature-pattern copies hanging over the block's edge grow down to its
+/// bottom and merge with it, as live (LP2 21 faces, CP2 10; a column padded
+/// by the box tolerance stopped 0.05 µm short and kept its own bottom face).
+#[test]
+fn overhanging_pattern_copies_merge_with_the_part_as_live() {
+    for (name, s) in pattern_cases().into_iter().filter(|c| c.0 == "LP2" || c.0 == "CP2") {
+        let got = outcome(&s.regen());
+        let live = LIVE.iter().find(|l| l.0 == name).unwrap();
+        let band = BANDS.iter().find(|b| b.0 == name).unwrap();
+        assert_eq!((got.status, got.faces, got.parts), (live.1, live.4, live.6), "{name}: {got:?}");
+        assert!(got.volume >= band.1[0] && got.volume <= band.1[1], "{name}: {got:?}");
+    }
 }
 
 /// A Feature pattern whose instances all miss the part fails asking for

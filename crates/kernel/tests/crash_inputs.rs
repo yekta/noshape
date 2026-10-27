@@ -54,12 +54,18 @@ fn replay(name: &str) -> String {
         }
         "shell" => {
             let side = if p[4] == "1" { ShellSide::Outside } else { ShellSide::Inside };
-            shell_solid(&s, &subs, after(&p, "thickness", 1)[0], side, ShellMethod::Auto)
+            // NOSHAPE_REPLAY_METHOD: 1 offset only, 2 slabs only (compare paths).
+            let method = match std::env::var("NOSHAPE_REPLAY_METHOD").as_deref() {
+                Ok("1") => ShellMethod::Offset,
+                Ok("2") => ShellMethod::Slabs,
+                _ => ShellMethod::Auto,
+            };
+            shell_solid(&s, &subs, after(&p, "thickness", 1)[0], side, method)
         }
         other => panic!("unknown op {other}"),
     };
     match r {
-        Ok(r) => format!("ok valid {}", r.shape.is_valid()),
+        Ok(r) => format!("ok valid {} volume {:.9e} faces {}", r.shape.is_valid(), r.shape.volume().unwrap_or(0.0), r.shape.faces().len()),
         Err(e) => format!("error {e}"),
     }
 }
