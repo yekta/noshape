@@ -63,6 +63,20 @@ impl Sketch {
         self.cache.analysis.as_ref().is_some_and(|(rev, _)| *rev == self.cache.revision)
     }
 
+    /// Makes the DOF analysis current without moving this sketch: it is
+    /// run on a copy (a solve with `analyze`), and only the analysis is
+    /// kept. Drags keep it current, so a drag's regenerations don't redo it.
+    pub fn refresh_analysis(&mut self) {
+        if self.analysis_current() {
+            return;
+        }
+        let mut probe = self.clone();
+        probe.solve();
+        if probe.cache.revision == self.cache.revision {
+            self.cache.analysis = probe.cache.analysis;
+        }
+    }
+
     // ------------------------------------------------------------------
     // queries
 

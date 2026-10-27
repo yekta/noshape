@@ -3087,6 +3087,11 @@ impl SketchEditor {
                     return EditOutcome::none();
                 }
                 let handle = if is_point(&data.sketch, entity) { DragHandle::Point(entity) } else { DragHandle::Entity { id: entity, grab: start } };
+                // The DOF analysis once, before the drag: dragging keeps it
+                // current, so every step's regeneration reuses it instead of
+                // redoing it (qa SKETCH-DRAG-BIG: 30–50 ms per step on 1000
+                // entities).
+                data.sketch.refresh_analysis();
                 self.drag = Some(DragState::Geometry { handle });
                 self.tool_drag(data, p)
             }

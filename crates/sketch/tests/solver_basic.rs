@@ -301,3 +301,24 @@ fn analysis_stays_current_through_drags_only() {
     sk.add_constraint(ConstraintKind::Length { curve: l, value: 1.0 }).unwrap();
     assert!(!sk.analysis_current());
 }
+
+/// qa SKETCH-DRAG-BIG: a sketch without a current DOF analysis (a loaded
+/// document's) gets one before a drag without moving, and the drag keeps it
+/// current, so a solve without `analyze` (a drag step's regeneration)
+/// reports it instead of redoing it.
+#[test]
+fn refreshed_analysis_survives_a_drag_without_moving_the_sketch() {
+    let mut sk = Sketch::new();
+    let r = sk.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
+    sk.solve();
+    let mut sk: Sketch = serde_json::from_str(&serde_json::to_string(&sk).unwrap()).unwrap();
+    assert!(!sk.analysis_current(), "a loaded sketch has no analysis");
+    let before: Vec<_> = r.points.iter().map(|p| sk.point(*p).unwrap()).collect();
+    sk.refresh_analysis();
+    assert!(sk.analysis_current());
+    assert!(r.points.iter().zip(&before).all(|(p, b)| sk.point(*p).unwrap() == *b), "nothing moved");
+    sk.drag(&[(DragHandle::Point(r.points[2]), v(0.05, 0.03))]);
+    assert!(sk.analysis_current(), "a drag keeps the analysis");
+    let rep = sk.solve_with(&SolveOptions { analyze: false, ..Default::default() });
+    assert_eq!(rep.dof, Some(4), "{rep:?}");
+}
