@@ -729,6 +729,9 @@ impl PartStudioView {
     /// curve bounds or the part a face is on (None: no field is active).
     pub(super) fn field_takes(&self, t: &PickTarget, cx: &App) -> Option<bool> {
         let (_, filter, _) = self.edit.as_ref()?.dialog.read(cx).active_filter()?;
+        if self.edit.as_ref().is_some_and(|e| made_by(&t.reference, e.dialog.read(cx).feature.id)) {
+            return Some(false);
+        }
         Some((kind_matches(t.kind, &t.reference, filter) && self.face_fits(&t.reference, filter)) || self.curve_region(&t.reference, filter).is_some() || self.part_for_field(&t.reference, filter).is_some())
     }
 
@@ -848,6 +851,11 @@ impl PartStudioView {
     /// field (with filter feedback) or toggles the selection.
     pub(super) fn pick(&mut self, target: PickTarget, cx: &mut Context<Self>) {
         if self.insert_go_pick(&target.reference, cx) {
+            return;
+        }
+        // The open feature's own preview geometry is never picked (PREVIEW-SELF-PICK: a fillet face of the preview
+        // went in as a reference to the feature itself).
+        if self.edit.as_ref().is_some_and(|e| made_by(&target.reference, e.dialog.read(cx).feature.id)) {
             return;
         }
         if let Some(e) = &self.edit {
@@ -1041,7 +1049,8 @@ impl PartStudioView {
             if let Some((_, filter, _)) = dialog.read(cx).active_filter() {
                 let current = dialog.read(cx).selected_refs();
                 dialog.update(cx, |d, cx| {
-                    let fitting: Vec<PickTarget> = targets.iter().filter(|t| self.face_fits(&t.reference, filter)).cloned().collect();
+                    let own = dialog.read(cx).feature.id;
+                    let fitting: Vec<PickTarget> = targets.iter().filter(|t| self.face_fits(&t.reference, filter) && !made_by(&t.reference, own)).cloned().collect();
                     for r in box_field_picks(&fitting, filter) {
                         if current.contains(r) == deselect {
                             d.add_pick(r.clone(), cx);
@@ -3671,6 +3680,24 @@ impl PartStudioView {
     }
 }
 
+/// Whether `r` is geometry feature `f` made (a face it created, or an edge / vertex touching one): the open feature's
+/// own preview, which its dialog can't pick.
+pub(super) fn made_by(r: &Reference, f: FeatureId) -> bool {
+    use noshape_model::reference::TopoName;
+    fn name(n: &TopoName, f: FeatureId) -> bool {
+        match n {
+            TopoName::Edge { faces, .. } => faces.iter().any(|x| name(x, f)),
+            TopoName::Vertex { faces, .. } => faces.iter().any(|x| name(x, f)),
+            TopoName::Boundary { face, .. } => name(face, f),
+            n => n.creator() == Some(f),
+        }
+    }
+    match r {
+        Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => name(n, f),
+        _ => false,
+    }
+}
+
 /// Whether a face of this surface passes a field filter that takes no face of any kind ([`PartStudioView::face_fits`]).
 pub(super) fn surface_fits(s: &noshape_kernel::Surface, filter: QueryFilter) -> bool {
     match s {
@@ -3908,6 +3935,19 @@ mod box_take_tests {
         assert!(super::surface_fits(&plane, extrude));
         assert!(!super::surface_fits(&cylinder, extrude));
         assert!(super::surface_fits(&cylinder, QueryFilter::PLANAR_FACE | QueryFilter::CYLINDRICAL_FACE));
+    }
+
+    /// PREVIEW-SELF-PICK: the open feature's own faces and the edges touching them aren't picked.
+    #[test]
+    fn a_feature_does_not_pick_its_own_geometry() {
+        use noshape_model::reference::{FeatureId, Role, TopoName};
+        use std::sync::Arc;
+        let face = |f: u64| Arc::new(TopoName::Face { feature: FeatureId(f), role: Role::New(0) });
+        let fillet = FeatureId(2);
+        assert!(super::made_by(&Reference::Face((*face(2)).clone()), fillet));
+        assert!(super::made_by(&Reference::Edge(TopoName::Edge { faces: [face(1), face(2)], ordinal: 0 }), fillet));
+        assert!(!super::made_by(&Reference::Edge(TopoName::Edge { faces: [face(1), face(1)], ordinal: 0 }), fillet));
+        assert!(!super::made_by(&Reference::Face((*face(1)).clone()), fillet));
     }
 
     #[test]

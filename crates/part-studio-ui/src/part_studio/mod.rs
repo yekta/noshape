@@ -1051,6 +1051,7 @@ impl PartStudioView {
         let shown = self.with_plane_drag(self.display.clone());
         let extra_len = extra.len();
         let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
+        self.tint_selected_owners(&mut scene, &selection, cx);
         // with_highlights' overlays, then the extra ones (see the preview's POST tags).
         let (highlights_end, extra_end) = (scene.instances.len() - extra_len, scene.instances.len());
         // A selected Decal row tints its image like a selected face (live).

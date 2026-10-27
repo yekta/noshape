@@ -36,6 +36,36 @@ impl PartStudioView {
         self.display.bodies.iter().find(|b| b.face_refs.contains(on) || b.edge_refs.contains(on) || b.vertex_refs.contains(on)).map(|b| b.id.clone())
     }
 
+    /// A selected connector's owner part tinted yellow-green: its colour mixed 0.6 toward MATE_CONNECTOR_SECONDARY
+    /// (242,255,128) before lighting (live "psui (2026-10-27, P2) interaction 3.4": the default blue's top face
+    /// (142,187,214) becomes (186,214,166); hovered it stays as it is).
+    pub(super) fn tint_selected_owners(&self, scene: &mut noshape_render::Scene, selection: &[Reference], cx: &App) {
+        let owners: Vec<BodyId> = self
+            .display
+            .connectors
+            .iter()
+            .filter(|c| self.connector_look(&c.reference, selection) == ConnectorLook::Selected)
+            .filter_map(|c| self.connector_owner(&c.reference, cx))
+            .collect();
+        if owners.is_empty() {
+            return;
+        }
+        // Scene body indices: 1-based among the shown bodies, in display order (scene builder `build`).
+        let shown: Vec<&BodyId> = self.display.bodies.iter().filter(|b| !b.hidden).map(|b| &b.id).collect();
+        let to_srgb = |c: f32| if c <= 0.003_130_8 { c * 12.92 } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 };
+        let to_lin = |c: f32| if c <= 0.040_45 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) };
+        const SECONDARY: [f32; 3] = [242.0 / 255.0, 1.0, 128.0 / 255.0];
+        for b in owners {
+            let Some(k) = shown.iter().position(|x| **x == b) else { continue };
+            let body = k as u32 + 1;
+            for i in scene.instances.iter_mut().filter(|i| i.body == body && matches!(i.drawable, noshape_render::Drawable::Mesh(_)) && !i.pick_only && !i.back_silhouette && i.color[3] >= 0.999) {
+                for (c, s) in i.color.iter_mut().take(3).zip(SECONDARY) {
+                    *c = to_lin(to_srgb(*c) * 0.4 + s * 0.6);
+                }
+            }
+        }
+    }
+
     /// The glyphs (per frame) and the lit connectors' owner-part overlays.
     pub(super) fn connector_overlays(&self, selection: &[Reference], cx: &App) -> (Option<std::sync::Arc<scene_builder::ConnectorGlyphs>>, Vec<Instance>) {
         let glyphs = scene_builder::connector_glyphs(&self.display, |r| self.connector_look(r, selection));
