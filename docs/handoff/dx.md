@@ -61,9 +61,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   vertices (EXPORT-MESH-SHARED); 71e8357e PDF Text: Selectable embeds the drawing fonts (TrueType subsets, ToUnicode);
   c7928bb4 API-REMOVE-DIR closed per the lead (the dialog's flip, documented); c30baf56 CRASH-MARKER-COPIES (a marker
   applies only to files its dead process had open, `<pid>.docs`).
-- (this commit) Derived carries a source part's explicit appearance (live: red stays red; a default colour is the
+- bea661f1 Derived carries a source part's explicit appearance (live: red stays red; a default colour is the
   target's next one, as ours already was); query_parts reports each part's `color`; RHINO-GREEN: RHINO is listed (app
   dialog and export_parts) only in builds with openNURBS (kernel::RHINO_EXPORT from the build script's cfg).
+- 3b23c8d1 history_list filters (the history panel's search ▾, ops::history_filter shared with the panel); ui_list on
+  Variable Studios and collapse_tables. 872c2e2e release_create / release_revision_history: the Release candidate
+  dialog's items, checks and commit moved to ops (release.rs, release_settings.rs, release_conditions.rs; the app's
+  modules re-export them). Menu coverage: 0 planned items in every area (was 26).
+- 771afc0d Extrude add P1 closed with measurements (7–25 ms once std's prewarm has run); I1 narrowed (x_t blend tube,
+  spine, edges exact; live's per-face areas requested); flat-pattern line styles need live (requested).
 - Agent benchmark 10-27: part → ISO A3 drawing with suggested views → 80 and Ø16 dimensions → note → Selectable PDF in
   1.2 s through the API (/root/dx-scratch/w/py/bench_dwg.py); pdftotext reads every label.
 
