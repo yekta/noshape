@@ -18,7 +18,7 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   top, 1st Esc closes it).
 - Merge-loss audit (tickets/merge-audit-1027.txt): checked in the app and **not** lost: e4799ab4 Thicken flip, 703545e4 Move
   face Direction, 38a14f20 midpoint marker (replaced by a newer live capture), 8284b6b4 (O key does nothing), 5b048262 (box
-  takes no planes / Origin), 259270b6 (box line colours), 11e83152 not reproducible as written. Not checked: 98ae008e edge LOD,
+  takes no planes / Origin), 259270b6 (box line colours), Not checked: 11e83152 (failing feature inputs red; my try hit FILLET-OVERSIZE), 98ae008e edge LOD,
   6c040449 assembly section arrow, 4a0e07c2 Hole merge scope, 4083c486 watermarks.
 - bin/oversize.py (CLI oversize / overlap matrix on a 40×20×10 block). No CLI for green builds after 12:08; geometry checks
   on newer greens are in the app.
