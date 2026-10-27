@@ -57,6 +57,17 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - Signal-handler state (crash guard, budget) needs `std::atomic_signal_fence` after it is set, or the compiler may drop
   the store before a loop.
 
+## Live specs not yet implemented (behaviours "spec: core revolve/surface frames and edge directions",
+## "spec: core Hole surface frames", "spec: core SHELL-SLOW")
+- Revolved cones are framed at their apex (z = −axis, "from the apex into the cone"), tori and spheres at their centre;
+  `reframe_cylinder` covers cylinders only (cones/spheres/tori need their own (u, v) maps).
+- Extruded circle EDGES keep the sketch circle's frame (x +X, t = 0 at +X, ccw); our seat_circles restarts them at the
+  face frame's x (−X for an extrude up) so the cylinder's seam sits at u = 0 (needed by the booleans: the Flange's
+  mirror common). Matching both needs the seam moved without moving the edge's start (an edge range [pi, 3 pi]?).
+- Side faces of an extrude: x = the direction of its bottom (sketch) edge; check ours.
+- SHELL-SLOW: live shells qa's plates in 4–7 ms of server time; our slabs take 1–3 s (serial booleans). Needs a
+  different construction for prismatic parts (by_regions extended to holes / collapsing fillets), not tuning.
+
 ## Next, in order
 1. P0 REGEN-SPEED (open): per regeneration ~15 ms per boolean (OCCT build), fillet/chamfer ~10 ms + ~6 ms check, the
    display meshing ~45 ms. Ideas: check only the blend's new/modified faces instead of the whole part; fewer
