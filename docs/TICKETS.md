@@ -38,6 +38,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Three runs of one sequence, three different crash points: frequent enough to hit in a session.
   The v0.4.8 release CLI runs the same seed to the end (106 steps, no crash; some op results differ there, so this only
   hints at a regression since v0.4.8).
+  Fourth occurrence (qa 07:55), watcher CLI 06:09 (≥ 4756f9be): fuzz seed 93 step 114 (draft; marker: Extrude 9
+  evaluating), "segfault at 410 / general protection fault … [b154ced]" = `BOPAlgo_PaveFiller::ForceInterfEF` on pool
+  threads 1005390 / 1005403 (log cli/clifuzz-93y.log). Two of the last 24 seeds die this way.
   core 10-27: b0e757f3 stops one data race (in-place pcurves written into the caller's profile edges by the cylinder
   re-framing); the seed-72 replay with it: 2 of 3 runs complete all 106 steps, the 3rd still died at step 81 in
   `BOPAlgo_PaveFiller::ForceInterfEF` on a pool thread (BOPAlgo_PaveFiller_5.cxx, also changed by OCCT patch 0001, after
@@ -104,7 +107,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   document then crashes on every open (DRAFT-SEGV-DOC, SHELL-SLAB-GPF, FILLET-SEGV, FILLET-SEGV-BLEND). Whatever the kernel bug, one bad feature must not
   make a document unopenable: commit after a successful regen, and/or run kernel ops so a crash only fails that feature
   (subprocess / signal guard), and/or open with the last feature rolled back after a crash on open (qa 2026-10-26)
-- [x] verified green app 502416cc (qa 04:56: cli-fillet-hang.noshape opens in 47 s, Fillet 2 red after 33.5 s, Shell 1 10.4 s (SHELL-SLOW); no hang. Residual: each failing blend still stalls ~30 s where live fails at once) checked on watcher CLI 04:06 (qa 04:40): cli-fillet-hang.noshape opens in 42 s, Fillet 2 "Failed to fillet selections."; the chamfer repro (bin/chrepro.py) fails after 30.8 s "Failed to chamfer selections." (core 10-27: a 30 s CPU budget on fillets/chamfers, cancellable; the hang document: Fillet 2 fails after the budget, the regeneration finishes; making that fillet succeed (OCCT's approximation) is open) P0 FILLET-HANG a Fillet runs for > 15 min (stopped by hand) in OCCT's blend approximation (`BRepBlend_AppFuncRoot::
+- [x] verified green app 502416cc (qa 04:56: cli-fillet-hang.noshape opens in 47 s, Fillet 2 red after 33.5 s, Shell 1 10.4 s (SHELL-SLOW); no hang. Residual: each failing blend still stalls ~30 s where live fails at once; fuzz seed 95 step 96 (suppress) on the watcher CLI 06:09 sat > 5 min re-evaluating the features after it, last in Fillet 7: several failing blends at ~30 s each add up; doc tickets/cli-suppress-stall.noshape) checked on watcher CLI 04:06 (qa 04:40): cli-fillet-hang.noshape opens in 42 s, Fillet 2 "Failed to fillet selections."; the chamfer repro (bin/chrepro.py) fails after 30.8 s "Failed to chamfer selections." (core 10-27: a 30 s CPU budget on fillets/chamfers, cancellable; the hang document: Fillet 2 fails after the budget, the regeneration finishes; making that fillet succeed (OCCT's approximation) is open) P0 FILLET-HANG a Fillet runs for > 15 min (stopped by hand) in OCCT's blend approximation (`BRepBlend_AppFuncRoot::
   SearchLocation` / `NCollection_BaseSequence::Find` ← Approx_SweepApproximation ← BRepBlend_AppSurface ←
   ChFi3d_Builder::CompleteData … ← noshape checked_blend / scaled_blend ← op_fillet features.cpp:3049, `checked`, size 5)
   with no timeout or abort; the app would freeze on it. Opening the saved document in a fresh process hangs too (> 30 min,
