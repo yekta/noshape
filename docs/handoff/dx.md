@@ -114,10 +114,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 
 ## Speed (PLAN 2.7: ≥ 2× faster than live; crates/ops/tests/dx_perf.rs, `--ignored --nocapture`)
 - Drawing of the qa5 bracket with the 4 standard views (drawing_create, Suggested views: every view computed):
-  **178 ms** median of 5 (first 360 ms), dev build, 10-27 14:15; one more Front view 13 ms. Live: pending
-  (REQUESTS dx 10-27 P1 speed). Release number: next perf.yml `model` run.
-- NIST assembly import, STEP / Parasolid (live's own exports, to go in tests/perf/): pending live's files. Ours
-  meanwhile, on our own export of tests/perf/nist-mtc-crada-assembly.noshape (36 parts, STEP 11.9 MB), kernel only
+  **178 ms** median of 5 (first 360 ms), dev build, 10-27 14:15; one more Front view 13 ms. **Live: 30.1 s** to all
+  four views drawn (server part 3.0 s), Insert view 3.0 s (server 1.3 s) (behaviours "dx speed: drawing creation and
+  NIST import"; their box was loaded). Way past 2×. Release number: next perf.yml `model` run.
+- NIST assembly import, live's own exports (tests/perf/nist-mtc-crada-assembly.step / .x_t): **live STEP 38.7 s,
+  x_t 24.5 s** to done (32.5 / 21.3 s to the Assembly tab). Ours, CLI import_files (dev, machine at load ~45):
+  STEP 37–44 s, x_t 59–74 s, ~50 s of it display meshing serialized on the kernel's global mesh_mutex (request
+  below); target ≤ 19 / 12 s. x_t of an assembly now imports as live (Assembly + "<file> parts"). Earlier, on our own export of tests/perf/nist-mtc-crada-assembly.noshape (36 parts, STEP 11.9 MB), kernel only
   (C++ -O2): read STEP 9.3 s, write x_t 8.1 s, read x_t 35 s → **3.0 s** (10-27: attributes indexed once, bodies
   healed in parallel, second fins' SP-curves matched in parallel; same volumes / faces bit for bit). STEP next. Parasolid export of that
   Part Studio crashed the kernel on 3 parts (OCCT 8.0.1 SweptToElementary null face): fixed f2279b3c.
@@ -137,6 +140,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- **Display meshing runs one part at a time** (kernel mesh.cpp, core's area; PLAN 2.7 import target, also regen):
+  mesh_prepare holds the global `mesh_mutex` around BRepMesh and mesh_fill takes it again for BRepTools::Clean, so
+  `regen::display::mesh_in_parallel`'s 36 jobs of the NIST import queue on it: NOSHAPE_KERNEL_PROFILE summed
+  mesh_prepare 396 s / mesh_fill 311 s (waiting) / mesh.brepmesh 46 s, ~50 s wall of a 60 s import. The lock
+  guards triangulations BRepMesh writes into shared TShapes (instances). Proposal (dx can do it if you clear it,
+  else core): mesh a private topology copy per job (`BRepBuilderAPI_Copy(shape, false, true)`, same MapShapes
+  order, geometry shared read-only) with no lock; the original then never carries a triangulation, so the Clean
+  (and its lock) goes too. Expected: the import's meshing ≈ 46 s / cores.
 - I1 (P2) is core's now: the kernel's face integrator under-reports our STEP blend faces (Gauss 13.18188 vs a fine mesh
   13.19411 on the same face); dx ruled out the reader and the geometry (TICKETS I1 has the numbers).
 - assembly-ui (after your move settles): assembly_mate_dialog.rs set_type renames a default name inline; it can call

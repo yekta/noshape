@@ -8,6 +8,10 @@ https://www.nist.gov/ctl/smart-connected-systems-division/smart-connected-manufa
 
 Used by `.github/workflows/perf.yml` (benchmarks: `.github/perf/`).
 
+`nist-mtc-crada-assembly.step` / `.x_t`: the same assembly as Onshape exports it (STEP AP242 and Parasolid 38.1 text,
+from its import of NIST's SOLIDWORKS rev-D zip; live behaviours "dx speed: drawing creation and NIST import"): the
+files live timed importing (PLAN 2.7, `crates/ops/tests/dx_perf.rs` `timed_nist_import`).
+
 `parts-1000.noshape`: 1000 pins (Ø4 × 10 mm) as a 40 × 25 Part pattern of new parts, one shared shape drawn with
 instancing (`crates/ops/tests/many_parts.rs` `write_parts_1000_fixture`).
 
