@@ -61,6 +61,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Ixy −0.006832 (exactly 0) and CoM x 5.8e-5 (0). At the panel's 3 decimals that reads Lxy −0.007, Lxx ≠ Lyy; live
   (Parasolid) is exact there. Looks mesh- or sample-based like MEASURE-MAX-DIST (qa 2026-10-27, watcher CLI 08:12)
   A 40×30×10 Steel box is exact (CoM (20, 15, 5), Ixx / Iyy / Izz 7.850 / 13.345 / 19.625), so only curved faces drift.
+  bin/massmatrix.py (revolved Steel solids, watcher CLI 08:30): volumes and areas exact to 1e-10 in all; inertia sphere
+  −1.0e-6, cone ±3e-6 (invisible), tube Ixx +1.0e-5 and Ixy −0.0068 (exactly 0), torus R30 r5 Ixx 54.11200 vs 54.11261
+  (−1.1e-5: reads 54.112 vs 54.113). OCCT's BRepGProp default precision; ask it for a tighter epsilon (or Gauss order)
+  for the inertia tensor.
 - [ ] P0 BOOL-THREAD-CRASH the process dies inside OCCT booleans on a worker thread, nondeterministically: CLI fuzz seed 72 on
   the watcher CLI 04:06 (≥ bcf401ca, crash guard and blend budget in): run 1 died at step 105 (delete Extrude 8; marker:
   Extrude 10 evaluating), kernel log "general protection fault … in noshape-cli[b13430a]" =
