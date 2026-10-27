@@ -12,9 +12,9 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | Key | Live action | Ours | Status | Verified |
 |---|---|---|---|---|
 | Shift+/ | Keyboard shortcuts modal: tabs General, Part Studio, Assembly, 3D view, Sketch, Feature Studio, Drawing; search; legend | same (no ↗ pop-out) | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| Enter / Shift+Enter / Esc | accept / accept & repeat / cancel | Plane: Shift+Enter commits Plane 2 and opens Plane 3 | ✅ |  |
+| Enter / Shift+Enter / Esc | accept / accept & repeat / cancel | Plane: Shift+Enter commits Plane 2 and opens Plane 3 | ✅ | 0.4.10+ / dd1b5037 10-27 (Plane: Shift+Enter commits Plane 1, opens Plane 2) |
 | Space | clear selection | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| Delete / Backspace | delete selection | deletes a feature row (core F15 fixed) | ✅ |  |
+| Delete / Backspace | delete selection | deletes a feature row (core F15 fixed) | ✅ | 0.4.10+ / dd1b5037 10-27 (Plane 1 row + Delete: gone at once; Ctrl+Z back) |
 | Ctrl+C / Ctrl+V | copy / paste | part copy → paste opens Derived (DOC3) | ✅ / ✗ DOC3 |  |
 | Shift+C | Curve/surface analysis | opens (re-uses the last entity "Face of Fillet 1") | ✅ / ? | 0.4.10+ / dd1b5037 10-27 |
 | Shift+D | Dihedral analysis | opens | ✅ | 0.4.10+ / dd1b5037 10-27 |
@@ -29,7 +29,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | s | Shortcut toolbar (Part Studio: Sketch, Extrude, Revolve, Sweep, Loft / Fillet, Chamfer, Hole, Boolean, Transform) | 5×2 toolbar at the cursor | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Alt+C | Search tools | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Alt+T | Tab manager | opens the Tabs panel with thumbnails | ✅ | 0.4.10+ / dd1b5037 10-27 (opens; Esc doesn't close it, live asked) |
-| Ctrl+A | nothing in the Part Studio | nothing | ✅ |  |
+| Ctrl+A | nothing in the Part Studio | nothing | ✅ | 0.4.10+ / dd1b5037 10-27 (no pixel changes) |
 
 ## Part Studio / 3D view
 
@@ -42,7 +42,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | ← → ↑ ↓ | rotate 15°: from Front, Left brings Right in, Up brings Bottom in | same direction and step | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Shift+arrows / Ctrl+arrows / Ctrl+Shift+arrows | coarse / precision rotate / pan | Shift+← from Front → Right (90°), Ctrl+← a small step | ✅ / ? (angles) |  |
 | Shift+P | hide all construction | planes hidden / back | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| y / Shift+Y | hide / show selected parts | ✅ | ✅ |  |
+| y / Shift+Y | hide / show selected parts | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 (y hides; Shift+Y shows only with the pointer over the hidden part = live behaviours psui 2.16/2.17) |
 | p | hide/show planes | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Shift+I | Make isolate | Isolate dialog (Transparency / Component controls) | ✅ dialog; **planes stay visible** (live: other parts and planes/origin go translucent) | ✗ KB3 |  |
 | Shift+T | Make transparent | "Make transparent" dialog | ✅ |  |
