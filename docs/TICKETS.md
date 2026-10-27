@@ -456,6 +456,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P1 UNDO-NOOP-SHIFT a no-op operation pushes an undo step without a history entry, so undo/redo shift by one and
+  say the wrong thing: copy of tests/perf/live-30-features.noshape, feature_edit Boss 4 depth 5 → 2 mm, then
+  feature_suppress Boss 2 suppressed:false (already unsuppressed: no history entry); history_undo → "Edit : Boss 4" but
+  Boss 4 stays 2 mm; history_undo again → "Insert feature : Chamfer 5" but it is the Boss 4 edit that comes back (5 mm);
+  history_redo → "Insert feature : Chamfer 5". Found by bin/undochk.py (seed 5: undoing 11 entries ends at 60784.58,
+  not the original 60779.48). Related, app (green 4854cad4): opening Extrude 1 and ✓ without a change records "Edit :
+  Extrude 1", so the next Ctrl+Z seems to do nothing (live asked whether an unchanged ✓ makes a history entry, qa batch 2
+  (7)) (qa 2026-10-27, watcher CLI 08:12)
 - [ ] P2 DWG-DIM-TWO-EDGES drawing Dimension (d): click a view's left vertical edge, then its right vertical edge: ours
   places the left edge's length (82) at the second click; live switches to the horizontal line-to-line distance between
   the two edges after the second click and places it on the third (behaviours "qa (2026-10-27, P2 batch 2)" (2)); repro
