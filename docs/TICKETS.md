@@ -206,11 +206,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   does for tool switches (live: Shift+E with a dialog open replaces it, behaviours 7371) (qa 2026-10-26, build 4d2f6b0c)
 
 ## Sketch + assembly (skasm)
-- [ ] P1 SKETCH-DRAG-BIG dragging a corner in a 1000-entity sketch (10 × 10 rectangles + 100 circles, made with
+- [x] 3bcb5145 P1 SKETCH-DRAG-BIG dragging a corner in a 1000-entity sketch (10 × 10 rectangles + 100 circles, made with
   sketch_draw shapes; /root/qa-scratch/cli/bigsketch.noshape) re-evaluates the sketch feature per drag step in 72–113 ms
   (green dev build, load ~25; NOSHAPE_PERF "regen: 1 features evaluated"); budget: under one 60 Hz frame. Re-time on a
   release build; the step looks like a full sketch regen (regions included) rather than a solver-only update (qa
   2026-10-26, build 4d2f6b0c)
+  skasm 10-27: the step was the sketch regions' hole search (~40 ms); now regions 3.5 ms, the sketch regen ~12 ms (dev
+  build under load); perf test scene sketch_perf::big_shape_sketch_drag_step_parts. Re-time on a release build.
 - [x] 6329b168 P2 SKETCH-PASTE Ctrl+C / Ctrl+V of a dimensioned circle in a sketch: ours pastes the copy exactly on top of the
   original (prompt "Pasted; drag or transform the selection into place"); live (behaviours "qa (2026-10-26, P2 sketch)")
   pastes it centred on the pointer, selected, with the sketch Transform tool active and its manipulator on the copy, no
