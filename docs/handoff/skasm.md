@@ -84,7 +84,8 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 Measured 10-27 14:00 in the dev test profile (opt-level 1; no release build: disk under the 30 GB floor), load ~40;
 release is faster. Each is a timed T2/perf test with the target as its gate.
 - Sketch drag step, ~200 entities (219 entities, 178 constraints; pointer move + solve + the sketch's regeneration):
-  **median 5.19 ms** (solve 1.48 ms), worst 17 ms. Target < 8 ms. Full solve with the DOF analysis: **1.15 ms**
+  **median 3.52 ms** (solve 1.03 ms; 10-27 after CONFLICT-COLLAPSE-ON-DRAG: a drag solves only the dragged
+  components), worst 14 ms. Target < 8 ms. Full solve with the DOF analysis: **0.96 ms**
   (target < 8 ms). `cargo test -p noshape-scene --test all sketch_perf::speed_target -- --ignored --nocapture`.
 - Assembly drag, 200 instances / 300 mates: frame with the scene **median 5.40 ms** in plane, **6.18 ms** off plane
   (worst 23–26 ms); target 120 fps = 8.33 ms. Insert into the 300-mate assembly **11.9 ms** (target ≤ 20 ms). Adding

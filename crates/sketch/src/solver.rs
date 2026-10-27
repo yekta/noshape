@@ -833,9 +833,15 @@ impl System {
             }
         }
         let mut var_local = vec![NONE; nv];
+        // A drag solves only the components holding dragged geometry; the
+        // others are evaluated where they are (CONFLICT-COLLAPSE-ON-DRAG: a
+        // line with conflicting Horizontal + Vertical collapsed to a point,
+        // "solved", when another entity was dragged; live leaves it as is).
+        let held = SolveOptions { max_iterations: 0, ..opts.clone() };
         for comp in &comps {
             let x0: Vec<f64> = comp.vars.iter().map(|&pv| self.p.values[pv as usize]).collect();
-            let mut res = self.solve_comp(comp, &mut var_local, &out.var_of, opts);
+            let solve = self.drag_target.is_empty() || comp.vars.iter().any(|v| self.drag_target.contains_key(v));
+            let mut res = self.solve_comp(comp, &mut var_local, &out.var_of, if solve { opts } else { &held });
             // Drag polishing: re-pull dragged parameters to their targets so the
             // dragged geometry lands exactly on the cursor when feasible.
             for _ in 0..2 {
@@ -1108,29 +1114,37 @@ impl Sketch {
         // collapse a line to a point (Vertical on a Horizontal line) don't
         // solve: the line stays, its constraints are the conflicting ones
         // ("Sketch could not be solved.", red).
-        let collapsed: Vec<EntityId> = self
-            .entities()
-            .filter(|e| e.kind() == EntityKind::Line)
-            .filter(|e| {
-                let len = |sk: &Sketch| match sk.curve(e.id) {
-                    Some(crate::Curve2::Line { a, b }) => Some((b - a).length()),
-                    _ => None,
-                };
-                matches!((len(&snapshot), len(self)), (Some(before), Some(after)) if before > 1e-9 && after <= 1e-9)
-            })
-            .map(|e| e.id)
-            .collect();
+        let collapsed = self.collapsed_lines(&snapshot);
         if collapsed.is_empty() {
             return rep;
         }
         *self = snapshot;
+        self.collapse_report(rep, &collapsed)
+    }
+
+    /// `rep` for a solve reverted because it collapsed `collapsed`: their
+    /// constraints are the conflicting ones.
+    fn collapse_report(&self, mut rep: SolveReport, collapsed: &[EntityId]) -> SolveReport {
         let conflicting: Vec<ConstraintId> = self.constraints().filter(|c| c.driving && c.kind.entities().iter().any(|x| collapsed.contains(x))).map(|c| c.id).collect();
-        let mut rep = rep;
-        for id in &collapsed {
+        for id in collapsed {
             rep.entity_states.insert(*id, ConstraintState::OverConstrained);
         }
         rep.status = SolveStatus::Overconstrained { conflicting };
+        rep.drag_solved = false;
         rep
+    }
+
+    /// Lines of `before` that have collapsed to a point here.
+    fn collapsed_lines(&self, before: &Sketch) -> Vec<EntityId> {
+        let len = |sk: &Sketch, id| match sk.curve(id) {
+            Some(crate::Curve2::Line { a, b }) => Some((b - a).length()),
+            _ => None,
+        };
+        self.entities()
+            .filter(|e| e.kind() == EntityKind::Line)
+            .filter(|e| matches!((len(before, e.id), len(self, e.id)), (Some(b), Some(a)) if b > 1e-9 && a <= 1e-9))
+            .map(|e| e.id)
+            .collect()
     }
 
     /// The driving dimensions: (id, the value measured now, the target).
@@ -1205,12 +1219,19 @@ impl Sketch {
         // doesn't converge soon sits at a limit of the constraints.
         let opts = SolveOptions { analyze: false, max_iterations: 8, ..SolveOptions::default() };
         let targets = self.drag_targets(handles);
+        let start = self.clone();
         let report = run(self, &opts, &targets);
+        // A drag never satisfies its constraints by collapsing a line (one
+        // with Horizontal + Vertical, dragged itself): it doesn't move.
+        let collapsed = self.collapsed_lines(&start);
+        if !collapsed.is_empty() {
+            *self = start;
+            return self.collapse_report(report, &collapsed);
+        }
         if report.drag_solved {
             return report;
         }
         const SUBSTEPS: usize = 4;
-        let start = self.clone();
         let mut best: Option<SolveReport> = None;
         for k in 1..=SUBSTEPS {
             let f = k as f64 / SUBSTEPS as f64;
@@ -1231,8 +1252,10 @@ impl Sketch {
                 })
                 .collect();
             let targets = self.drag_targets(&partial);
+            let prev = self.clone();
             let r = run(self, &opts, &targets);
-            if !r.drag_solved {
+            if !r.drag_solved || !self.collapsed_lines(&start).is_empty() {
+                *self = prev;
                 break;
             }
             best = Some(r);

@@ -348,3 +348,36 @@ fn drags_work_beside_conflicting_constraints() {
     assert!((sk.point(p).unwrap() - DVec2::new(-2.0, 2.5)).length() < 1e-12);
     assert_eq!(sk.endpoints(l).unwrap(), line_before, "the conflicting line keeps its state");
 }
+
+/// CONFLICT-COLLAPSE-ON-DRAG: a line with conflicting Horizontal +
+/// Vertical keeps its state (and the sketch its error) while another line
+/// is dragged, and doesn't move when dragged itself (live).
+#[test]
+fn a_conflicting_line_does_not_collapse_on_drag() {
+    let mut sk = Sketch::new();
+    let l = sk.add_line(DVec2::new(0.045, 0.07), DVec2::new(0.065, 0.07));
+    sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+    sk.add_constraint_ext(ConstraintKind::Vertical { a: l, b: None }, true).unwrap();
+    let r = sk.solve();
+    assert!(!r.is_solved(), "{r:?}");
+    let ends = |sk: &Sketch| match sk.curve(l) {
+        Some(Curve2::Line { a, b }) => (a, b),
+        _ => panic!(),
+    };
+    let before = ends(&sk);
+    let free = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.02, 0.01));
+    sk.solve();
+    let Some(Geometry::Line { end, .. }) = sk.entity(free).map(|e| e.geometry.clone()) else { panic!() };
+    let r = sk.drag(&[(DragHandle::Point(end), DVec2::new(0.025, 0.015))]);
+    assert!(r.drag_solved && !r.is_solved(), "{r:?}");
+    assert!((sk.point(end).unwrap() - DVec2::new(0.025, 0.015)).length() < 1e-12);
+    assert_eq!(ends(&sk), before, "the conflicting line keeps its state");
+    let r = sk.solve();
+    assert!(!r.is_solved(), "the sketch still reads unsolved: {r:?}");
+    assert_eq!(ends(&sk), before);
+    let Some(Geometry::Line { start, .. }) = sk.entity(l).map(|e| e.geometry.clone()) else { panic!() };
+    let r = sk.drag(&[(DragHandle::Point(start), DVec2::new(0.05, 0.08))]);
+    assert!(!r.is_solved(), "{r:?}");
+    let (a, b) = ends(&sk);
+    assert!((b - a).length() > 1e-6, "dragging the line itself doesn't collapse it: {a:?} {b:?}");
+}
