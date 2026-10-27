@@ -31,6 +31,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Third occurrence on the watcher CLI 04:48 (≥ 502416cc): the same seed's replay died at step 84 (draft; marker: Shell 3
   evaluating), "segfault at 10 … [b0db1d8]" = `BOPAlgo_Builder::FillInternalShapes` again (log cli/clifuzz-72xr.log).
   Three runs of one sequence, three different crash points: frequent enough to hit in a session.
+  The v0.4.8 release CLI runs the same seed to the end (106 steps, no crash; some op results differ there, so this only
+  hints at a regression since v0.4.8).
 - [ ] P0 COMMIT-LATENCY edit commit on tests/perf/live-30-features.noshape is over budget on main (perf.yml run
   40421862773, abac9266, 10-27): "commit shown in" 315–378 ms (macOS 14) and 241–635 ms (macOS 15), budget ≤ 200 ms
   (PLAN 2.6; perf measured 174 / 149 ms on 10-26 before the later landings). The time is the model: regen[preview]
