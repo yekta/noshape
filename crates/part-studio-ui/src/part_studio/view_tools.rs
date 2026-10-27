@@ -502,7 +502,17 @@ impl PartStudioView {
                                 .mx_auto()
                                 .mt(px(10.))
                                 .relative()
-                                .child(div().id("sc-rows").size_full().overflow_y_scroll().track_scroll(&self.ui.shortcut_scroll).pt(px(3.)).pb(px(8.)).pr(px(gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH)).child(v_flex().children(body)))
+                                .child(div().id("sc-rows").size_full().overflow_y_scroll()
+                                    // "Input": the Part Studio's bare-key shortcuts stay quiet while the map has the
+                                    // keyboard, as while typing; Shift+/ and Esc close it here.
+                                    .when_some(self.ui.shortcut_list_focus.clone(), |d, f| d.track_focus(&f).key_context("ShortcutMap Input"))
+                                    .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                                        let k = &ev.keystroke;
+                                        if k.key == "escape" || k.key == "?" || (k.key == "/" && k.modifiers.shift) {
+                                            cx.stop_propagation();
+                                            this.toggle_shortcut_sheet(window, cx);
+                                        }
+                                    })).track_scroll(&self.ui.shortcut_scroll).pt(px(3.)).pb(px(8.)).pr(px(gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH)).child(v_flex().children(body)))
                                 .when(long, |d| d.child(gpui_kit::component::menu::native_scrollbar(&self.ui.shortcut_scroll, cx)))
                                 .on_drag_move(cx.listener(|this, e: &DragMoveEvent<gpui_kit::component::menu::NativeThumbDrag>, window, cx| {
                                     gpui_kit::component::menu::native_scrollbar_drag(&this.ui.shortcut_scroll, e.event.position.y);
@@ -530,12 +540,16 @@ impl PartStudioView {
                     cx.notify();
                 }
             });
-            // Typing goes to the search box right away (and bare-letter
-            // shortcuts stay quiet while the map is open).
-            st.update(cx, |s, cx| s.focus(window, cx));
+            // Live (behaviours "qa (2026-10-27) Keyboard shortcuts modal",
+            // SHORTCUT-MAP-FOCUS): the list takes the keyboard, not the
+            // search box; Shift+/ and Esc close the map.
+            let list = cx.focus_handle();
+            window.focus(&list, cx);
+            self.ui.shortcut_list_focus = Some(list);
             self.ui.shortcut_filter = Some((st, sub));
         } else {
             self.ui.shortcut_filter = None;
+            self.ui.shortcut_list_focus = None;
             window.focus(&self.focus, cx);
         }
         cx.notify();

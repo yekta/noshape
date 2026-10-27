@@ -34,7 +34,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 1.13 | Ctrl/⌘+Z / Ctrl+Y / ⇧⌘Z undo/redo; inside a dialog they step the dialog's own edits | keyboard_shortcuts; A §2.1 | ✅ | 0.4.10+ / 83577e88 10-27 |
 | 1.14 | Shift+N renames the selected feature in place | keyboard_shortcuts | ✅ | 0.4.10+ / 83577e88 10-27 |
 | 1.15 | Alt/⌥+C opens Search tools | keyboard_shortcuts; Home__search_tools | ✅ | 0.4.10+ / 83577e88 10-27 |
-| 1.16 | Shift+/ toggles the keyboard shortcut map | keyboard_shortcuts | ❌ (SHORTCUT-MAP-FOCUS) | 0.4.10+ / 6011065d 10-27 |
+| 1.16 | Shift+/ toggles the keyboard shortcut map | keyboard_shortcuts | 🔧 (SHORTCUT-MAP-FOCUS fixed: the list has the keyboard, Shift+/ / Esc close) | 0.4.10+ / 6011065d 10-27 |
 | 1.17 | Shift+/ opens Onshape's shortcut sheet: tabs General, Part Studio, Assembly, 3D view, Sketch, Feature Studio, Drawing; key chips + action, 🔒 locked; search across tabs; legend | live (shortcuts/, dom/keyboard-shortcuts.txt) | ✅ (the live 114-row list) | 0.4.10+ / 83577e88 10-27 |
 | 1.18 | ` (grave) opens Select other at the cursor | keyboard_shortcuts; Home__select_other | ✅ (psui 10-27, as live "spec: psui part-studio.md … Select other": the list at the pointer + (100, 51), each part after its nearest face, row 2 bold and pre-highlighted) | 0.4.10+ / 83577e88 10-27 |
 | 1.19 | ` again moves down the Select other list, Shift+` up, Enter picks | Home__select_other | ✅ (psui 10-27: ` and ↓ step down and wrap, Enter picks; live's Shift+` does nothing, so ours no longer steps back on it) | 0.4.10+ / 83577e88 10-27 |

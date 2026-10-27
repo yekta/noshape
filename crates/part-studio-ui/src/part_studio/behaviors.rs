@@ -343,6 +343,8 @@ pub struct UiState {
     pub dyn_suppression: Option<(DynTarget, Entity<InputState>, Subscription)>,
     /// Shortcut map search box.
     pub shortcut_filter: Option<(Entity<InputState>, Subscription)>,
+    /// The shortcut map's list: it has the keyboard while the map is open.
+    pub shortcut_list_focus: Option<FocusHandle>,
     pub shortcut_query: String,
     /// Shortcut sheet tab (General, Part Studio, …).
     pub shortcut_tab: usize,
@@ -597,6 +599,7 @@ impl UiState {
             shortcut_query: String::new(),
             shortcut_tab: 0,
             shortcut_scroll: gpui_kit::ScrollHandle::new(),
+            shortcut_list_focus: None,
             recent_tools: Vec::new(),
             orient_on_edit: false,
             orient_pending: false,
