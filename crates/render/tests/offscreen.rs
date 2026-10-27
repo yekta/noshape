@@ -1539,6 +1539,33 @@ fn preview_mix_blends_the_model_before_and_after() {
     assert!(before[o..o + 3] != after[o..o + 3], "the boxes should differ there");
 }
 
+/// A feature preview picks the model with the feature: the frame draws the
+/// model before it (an unpickable copy over the same faces), which must not
+/// hide the picks (regression: no face could be picked in a feature dialog).
+#[test]
+fn a_preview_picks_the_model_with_the_feature() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mesh = r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 1));
+    let mut scene = Scene { preview_mix: Some(0.7), ..Default::default() };
+    scene.instances.push(Instance::new(Drawable::Mesh(mesh.clone())).compare_layer(compare::TARGET));
+    let mut base = Instance::new(Drawable::Mesh(mesh)).compare_layer(compare::BASE);
+    base.pickable = false;
+    base.pick_base = 1 << 30;
+    scene.instances.push(base);
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.0175, 4.0 / 3.0);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: 400, height: 300, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
+    let id = f.pick.unwrap().ids[(150 * 400 + 200) as usize];
+    assert!((1..=6).contains(&id), "the centre picks {id}, not a face of the model with the feature");
+}
+
 /// A preview's highlight lines (compare::POST) stay whole over the mix:
 /// a line the new body covers keeps its colour, where an untagged one
 /// shows at the mix's 30 % (live: a picked region under the new boss stays

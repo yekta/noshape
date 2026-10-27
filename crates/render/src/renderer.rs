@@ -2942,6 +2942,12 @@ impl Renderer {
             self.queue.write_buffer(&self.globals_pick, 0, bytemuck::bytes_of(&globals));
             let mut lists = std::mem::take(&mut self.lists);
             lists.mesh_error_px = last.style.detail.mesh_error_px;
+            // A feature preview picks the model with the feature: the frame's
+            // list leaves that out (it draws the model before), and the
+            // unpickable base copy would hide every pick behind it.
+            if last.scene.compare.is_none() && last.scene.preview_mix.is_some() {
+                lists.skip_compare = crate::scene::compare::BASE;
+            }
             lists.build(&last.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, last.device_pixel_ratio), true, &mut self.mesh_lod_memory);
             let bind_inst = self.prepare_slots(SLOTS_PICK, &lists.slots);
             let tex = self.targets[&target].tex.as_ref().expect("textures");
