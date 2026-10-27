@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Release blockers seen by qa (updated 2026-10-27 04:40, green bcf401ca)
+## Release blockers seen by qa (updated 2026-10-27 06:10, green 4756f9be; see the newest "Green" section)
 - Verified in the green app bcf401ca: the five crash documents open (DOC-POISON guard), TWO-PROCESS-LOST-EDIT (both edits
   kept). Still open P0: DRAFT-HANG (draft defeaturing spins; the app's regen never ends and blocks later ones), FILLET-HANG
   (budget 97081557 on main, checked on the watcher CLI: fillet / chamfer fail after ~30 s; not in green yet), SHELL-SLOW,
@@ -149,6 +149,14 @@ edge's midpoint), READOUT-AXES, EXT-2ND-DEPTH, EXPORT-DXF-OPTIONS (DXF R14, mm, 
 FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress | Dynamic suppression ▸ | Expand ▸ | Collapse ▸ |
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
+
+## Green 4756f9be (2026-10-27 06:05–06:10)
+- Verified: DRAFT-HANG (both docs open in 27 / 45 s; each failing draft still stalls ~11 s), CRASH-MARKER-COPIES,
+  TWO-PROCESS-LOST-EDIT's live half (the other window follows within 2.5 s).
+- Since 05:22: BOOL-THREAD-CRASH (P0 core, 3 crashes of fuzz seed 72 on the watcher CLIs, v0.4.8 survives it);
+  LOFT-SKETCH-HIDE widened (an extrude whose region is picked on edit); API-REMOVE-DIR closed by the lead (by design);
+  release Windows CI failed; my scripts: holematrix → styleV2, featmatrix → explicit oppositeDirection + X edge.
+- Open P0 now: BOOL-THREAD-CRASH, REGEN-NO-CANCEL, SHELL-SLOW (52 s failing shell), REGEN-SPEED.
 
 ## Green 502416cc (2026-10-27 04:53–05:22)
 - Verified: FILLET-HANG (the hang doc opens in 47 s; residual 30 s stall per failing blend), EXPORT-MESH-SHARED,
