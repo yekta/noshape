@@ -4496,3 +4496,28 @@ fn iso_10511_and_7040_nuts_match_live() {
         }
     }
 }
+
+/// ANSI commercial taper pins and slotted spring pins with live's whole size
+/// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
+/// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size
+/// regenerates.
+#[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
+fn ansi_taper_and_spring_pin_sizes_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for (name, live) in [
+        ("Commercial class taper pin", &["#7/0", "#6/0", "#5/0", "#4/0", "#3/0", "#2/0", "#0", "#1", "#2", "#3", "#4", "#5", "#6", "#7", "#8", "#9", "#10", "#11", "#12", "#13", "#14"][..]),
+        ("Slotted spring pin", &["1/16", "5/64", "3/32", "1/8", "9/64", "5/32", "3/16", "7/32", "1/4", "5/16", "3/8", "7/16", "1/2", "5/8", "3/4"][..]),
+    ] {
+        let c = CATALOGUE.iter().find(|c| c.name == name).expect(name);
+        let names: Vec<&str> = c.sizes.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(names, live, "{name}");
+        for s in &c.sizes {
+            let mut spec = StandardSpec::new(c);
+            spec.set_size(&s.name);
+            let r = standard::regenerate(&spec).unwrap();
+            assert!(r.display.features.iter().all(|f| f.message.is_none()), "{name} {}", s.name);
+            assert!(standard::part_body(&r).is_some(), "{name} {}", s.name);
+        }
+    }
+}

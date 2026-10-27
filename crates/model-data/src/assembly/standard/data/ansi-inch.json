@@ -75975,6 +75975,125 @@
     },
     "sizes": [
      {
+      "name": "#7/0",
+      "label": "Taper pin #7/0",
+      "d": 0.0625,
+      "dims": {
+       "d": 0.0625
+      },
+      "lengths": [
+       "0.25",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1"
+      ]
+     },
+     {
+      "name": "#6/0",
+      "label": "Taper pin #6/0",
+      "d": 0.078,
+      "dims": {
+       "d": 0.078
+      },
+      "lengths": [
+       "0.25",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ]
+     },
+     {
+      "name": "#5/0",
+      "label": "Taper pin #5/0",
+      "d": 0.094,
+      "dims": {
+       "d": 0.094
+      },
+      "lengths": [
+       "0.25",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ]
+     },
+     {
+      "name": "#4/0",
+      "label": "Taper pin #4/0",
+      "d": 0.109,
+      "dims": {
+       "d": 0.109
+      },
+      "lengths": [
+       "0.25",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ]
+     },
+     {
+      "name": "#3/0",
+      "label": "Taper pin #3/0",
+      "d": 0.125,
+      "dims": {
+       "d": 0.125
+      },
+      "lengths": [
+       "0.25",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ]
+     },
+     {
+      "name": "#2/0",
+      "label": "Taper pin #2/0",
+      "d": 0.141,
+      "dims": {
+       "d": 0.141
+      },
+      "lengths": [
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2",
+       "2.25",
+       "2.5",
+       "2.75"
+      ]
+     },
+     {
       "name": "#0",
       "label": "Taper pin #0",
       "d": 0.156,
@@ -76421,9 +76540,9 @@
      {
       "name": "#14",
       "label": "Taper pin #14",
-      "d": 1.521,
+      "d": 1.523,
       "dims": {
-       "d": 1.521
+       "d": 1.523
       },
       "lengths": [
        "3",
@@ -76470,7 +76589,7 @@
       ]
      }
     ],
-    "source": "ASME B18.8.2 (values as reproduced in Machinery's Handbook 29th ed. per source) (Taper pins (inch series), 1/4 in per foot (1:48) taper); https://jhm3rd.github.io/Tools/Taper%20pins.html (table + calculator code, cites Machinery's Handbook 29th ed.); https://championfasteners.com.au/blog-tutorial/how-to-measure-imperial-taper-pins/ (large end diameters #0..#10)"
+    "source": "Sizes, diameters, chamfers and lengths from Onshape's own table (dom/skb-sc-fsrules/ANSI_inch_Pins_studs_..._Commercial_class_taper_pin__FSRules.fs); earlier: ASME B18.8.2 (values as reproduced in Machinery's Handbook 29th ed. per source) (Taper pins (inch series), 1/4 in per foot (1:48) taper); https://jhm3rd.github.io/Tools/Taper%20pins.html (table + calculator code, cites Machinery's Handbook 29th ed.); https://championfasteners.com.au/blog-tutorial/how-to-measure-imperial-taper-pins/ (large end diameters #0..#10)"
    },
    {
     "category": "Pins & studs",
@@ -78118,6 +78237,37 @@
       ]
      },
      {
+      "name": "9/64",
+      "label": "Slotted spring pin 9/64",
+      "d": 0.149,
+      "dims": {
+       "d": 0.149,
+       "c": 0.044,
+       "s": 0.028
+      },
+      "lengths": [
+       "0.375",
+       "0.4375",
+       "0.5",
+       "0.5625",
+       "0.625",
+       "0.6875",
+       "0.75",
+       "0.8125",
+       "0.875",
+       "0.9375",
+       "1",
+       "1.125",
+       "1.25",
+       "1.375",
+       "1.5",
+       "1.625",
+       "1.75",
+       "1.875",
+       "2"
+      ]
+     },
+     {
       "name": "5/32",
       "label": "Slotted spring pin 5/32",
       "d": 0.167,
@@ -78219,7 +78369,7 @@
       "d": 0.264,
       "dims": {
        "d": 0.264,
-       "c": 0.068,
+       "c": 0.065,
        "s": 0.048
       },
       "lengths": [
@@ -78351,9 +78501,67 @@
        "3.75",
        "4"
       ]
+     },
+     {
+      "name": "5/8",
+      "label": "Slotted spring pin 5/8",
+      "d": 0.653,
+      "dims": {
+       "d": 0.653,
+       "c": 0.125,
+       "s": 0.125
+      },
+      "lengths": [
+       "2",
+       "2.25",
+       "2.5",
+       "2.75",
+       "3",
+       "3.25",
+       "3.5",
+       "3.75",
+       "4",
+       "4.25",
+       "4.5",
+       "4.75",
+       "5",
+       "5.25",
+       "5.5",
+       "5.75",
+       "6"
+      ]
+     },
+     {
+      "name": "3/4",
+      "label": "Slotted spring pin 3/4",
+      "d": 0.784,
+      "dims": {
+       "d": 0.784,
+       "c": 0.15,
+       "s": 0.15
+      },
+      "lengths": [
+       "2",
+       "2.25",
+       "2.5",
+       "2.75",
+       "3",
+       "3.25",
+       "3.5",
+       "3.75",
+       "4",
+       "4.25",
+       "4.5",
+       "4.75",
+       "5",
+       "5.25",
+       "5.5",
+       "5.75",
+       "6"
+      ]
      }
     ],
-    "source": "ANSI/ASME B18.8.2 (edition not stated by sources) (Slotted type spring pins (standard duty, inch series)); https://www.engineersedge.com/roll_pin.htm; https://www.spirol.com/assets/files/sltp-slotted-spring-pin-design-guide-us.pdf (SPIROL Standard Inch slotted pins, 'meet or exceed ASME B18.8.2', table p.5)"
+    "source": "Sizes, diameters, chamfers and lengths from Onshape's own table (dom/skb-sc-fsrules/ANSI_inch_Pins_studs_..._Slotted_spring_pin__FSRules.fs); earlier: ANSI/ASME B18.8.2 (edition not stated by sources) (Slotted type spring pins (standard duty, inch series)); https://www.engineersedge.com/roll_pin.htm; https://www.spirol.com/assets/files/sltp-slotted-spring-pin-design-guide-us.pdf (SPIROL Standard Inch slotted pins, 'meet or exceed ASME B18.8.2', table p.5)"
    },
    {
     "category": "Pins & studs",
