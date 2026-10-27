@@ -192,6 +192,18 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
+## 11:35–12:03 (green e8858e61 still; watcher build 0a25dd1a = all six app crates split, 11:32)
+- The split's hooks (main.rs-registered calls from the split UI crates) all open on 0a25dd1a: Part context menu ›
+  Assign material (Material panel, Onshape Material Library), Export (Parasolid 38.1), Release (Create Release
+  candidate), Create Drawing (templates, creates "Part 1 Drawing 1" with Insert view); right strip Variable table;
+  help › Keyboard shortcuts; Derived (Part Studio field); + › Create Variable Studio / Feature Studio (template
+  FeatureScript 3095 common.fs); Assembly › Insert › Current / Other documents › Owned by me (the library lists the
+  documents at Start); document menu; Release drafts panel; tab manager. Shots tickets/split-0a25/.
+- Verified on 0a25dd1a: LP-DIRECTION-PICK compound filters, MEASURE-MAX-DIST, EMPTY-COMMIT, CONFIG-CELL-EDIT; on green:
+  LOFT-SKETCH-HIDE, PANEL-BLEED, P1-4; on v0.4.10: SKETCH-DRAG-BIG (7–16 ms steps at load 47). REGEN-NO-CANCEL half
+  (rollback instant, stale run not aborted), PS-SECTION-RED reopened (overlap is a hole). New P3: OK-DISABLED-HOVER,
+  CONFIG-CELL-EDIT-LOOK. 3f5f69ed / cc6c4b54 are CI test items (T1/T2), not UI-verifiable here.
+
 ## 10:10–10:45 (green e8858e61)
 - LP-DIRECTION-PICK: v0.4.9 reproduced, green verified (pattern Direction in all three modes, Fillet, Shell, plain custom
   edge query); compound custom filters (`EDGE && LINE`, `EDGE && ALLOWS_AXIS`) still take sketch edges only (ticket,
