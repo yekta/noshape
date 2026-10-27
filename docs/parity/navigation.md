@@ -159,11 +159,11 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 6.1 | Pan: right-drag, Ctrl+right-drag, middle-drag, Ctrl+middle-drag (default preset); the sheet follows 1:1; no context menu after a right-drag | Mouse controls 2D column; live navigation/41–43 | 🔧 |  |
 | 6.2 | Other presets' 2D bindings (e.g. SOLIDWORKS Shift+middle zoom, Creo Ctrl+middle zoom) | Mouse controls 2D column | 🔧 |  |
 | 6.3 | Wheel zoom about the pointer ×1.06 per notch (same as 3D); Shift/Ctrl+wheel the same; horizontal nothing; trackpad scroll and pinch as in 3D | live navigation/32–40 | 🔧 |  |
-| 6.4 | No rotation of any kind; plain arrow keys do nothing | Mouse controls; live navigation/52–53 | ✅ |  |
+| 6.4 | No rotation of any kind; plain arrow keys do nothing | Mouse controls; live navigation/52–53 | ✅ | 0.4.10+ / fa61ba6f 10-27 |
 | 6.5 | Z zooms out ×½, Shift+Z in ×2, about the view centre | live navigation/50–51 | 🔧 (was ×0.8/×1.25) |  |
 | 6.6 | Ctrl+Shift+arrows move the sheet 10 % of the canvas width toward the arrow | live navigation/54–55 | 🔧 (missing) |  |
 | 6.7 | Double middle click and F zoom to fit the sheet | live navigation/45–46, 56 | 🔧 (double middle missing) |  |
-| 6.8 | Left-drag on empty sheet: box select | live navigation/44 | ✅ |  |
+| 6.8 | Left-drag on empty sheet: box select | live navigation/44 | ❌ (DRAWING-BOX-SELECT) | 0.4.10+ / fa61ba6f 10-27 |
 
 ## 7. Touchscreen (iOS, Android and browser table)
 
