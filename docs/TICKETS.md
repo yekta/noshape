@@ -534,6 +534,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Likely cause (docs/handoff/kernel-robustness.md, gate (a)): `schedule_regen` aborts each running run "it doesn't
   extend"; a rollback above the running feature is a prefix of the running run, so it is treated as extended and waits
   for the whole run instead of taking the cached prefix at once.
+  - psui (10-27 14:50): the 84 s run in qa's reopen was the document thumbnail, not the view: the opening document had
+    no thumbnail, the thumbnailer waited its 60 s for the busy view, then regenerated the whole head in parallel with
+    its own Regenerator (0 cached) and no cancel. A thumbnail regeneration now stops when one of the document's Part
+    Studio views starts regenerating (`start_thumbnail::regen_started` aborts it) and is made again once things settle.
 - [x] verified green e8858e61 (qa 11:56: loft2.noshape, old Loft deleted, Sketch 1 shown again; new Loft picking the circle first then the square, ✓: both Sketch 1 and Sketch 2 get the eye-slash and their outlines go; tickets/loft-sketch-hide-green.png) a9f68288 P2 LOFT-SKETCH-HIDE fixed (psui 10-27): every sketch a feature uses is hidden (a loft both profiles), also one picked in a later edit (model-core `used_sketches`, ops::studio). Was: a Loft hides only its first profile's sketch: Sketch 1 = 40×40 square on Top, Plane 1 = Top
   offset 40, Sketch 2 = Ø24 circle on it (/root/qa-scratch/loft2.noshape); Loft, pick the circle then the square, ✓: Sketch 2
   goes grey with the eye-slash, Sketch 1 stays shown (its menu says Hide) and its outline stays drawn; pick the square first

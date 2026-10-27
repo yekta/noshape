@@ -14,7 +14,7 @@ use gpui_kit::*;
 use noshape_model::display::StudioDisplay;
 use noshape_model::document::{TabContent, TabId};
 use noshape_model::partstudio::PartStudio;
-use noshape_model::regen::{RegenOptions, Regenerator};
+use noshape_model::regen::{RegenCancel, RegenOptions, Regenerator};
 use noshape_render::{Camera, Style};
 use noshape_units::Quantity;
 use parking_lot::Mutex;
@@ -52,10 +52,33 @@ struct Shown {
 /// A view's display and the studio and document variables it was made from.
 pub type Made = (Arc<PartStudio>, BTreeMap<String, Quantity>, Arc<StudioDisplay>);
 
-/// A Part Studio view started regenerating.
+/// Each document's thumbnail regeneration while it runs (a closed or busy Part Studio regenerated here).
+#[derive(Default)]
+struct ThumbnailJobs(HashMap<PathBuf, RegenCancel>);
+
+impl Global for ThumbnailJobs {}
+
+/// A thumbnail regeneration stopped by the user's own work: nothing is stored, it runs again later.
+#[derive(Debug)]
+struct Cancelled;
+
+impl std::fmt::Display for Cancelled {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("thumbnail regeneration cancelled")
+    }
+}
+
+impl std::error::Error for Cancelled {}
+
+/// A Part Studio view started regenerating. The document's thumbnail regeneration stops: the view's work comes first
+/// (REGEN-NO-CANCEL: one that had given up waiting for a slow opening run burned a core for 85 s next to it), and the
+/// thumbnail is made again once things settle.
 pub fn regen_started(path: &Path, tab: TabId, cx: &mut App) {
     let shown = cx.default_global::<StudioDisplays>().0.entry((path.to_path_buf(), tab)).or_default();
     shown.pending.get_or_insert_with(Instant::now);
+    if let Some(job) = cx.try_global::<ThumbnailJobs>().and_then(|j| j.0.get(path)) {
+        job.abort();
+    }
 }
 
 /// A Part Studio view finished regenerating: `made` the head display (else
@@ -121,6 +144,8 @@ struct Job {
     doc_vars: std::collections::BTreeMap<String, noshape_units::Quantity>,
     engine: Arc<Mutex<Engine>>,
     gpu: Gpu,
+    /// Stops the regeneration ([`regen_started`]).
+    cancel: RegenCancel,
 }
 
 impl Job {
@@ -131,8 +156,12 @@ impl Job {
             let display = match self.shown {
                 Some(d) => d,
                 None => {
-                    let opts = RegenOptions { document_variables: self.doc_vars, ..Default::default() };
-                    Arc::new(engine.regen.regenerate(&self.studio, &self.config, &self.units, &opts).display)
+                    let opts = RegenOptions { document_variables: self.doc_vars, cancel: Some(self.cancel.clone()), ..Default::default() };
+                    let r = engine.regen.regenerate(&self.studio, &self.config, &self.units, &opts);
+                    if r.cancelled {
+                        return Err(Cancelled.into());
+                    }
+                    Arc::new(r.display)
                 }
             };
             let has_bodies = display.bodies.iter().any(|b| !b.hidden);
@@ -260,7 +289,7 @@ impl Thumbnailer {
     /// Snapshot what to render (first Part Studio at the branch head).
     /// `may_wait`: for an open view that is regenerating, `Prepared::Wait`
     /// (else regenerate here).
-    fn prepare(&mut self, may_wait: bool, cx: &App) -> Prepared {
+    fn prepare(&mut self, may_wait: bool, cx: &mut App) -> Prepared {
         let session = &self.doc.read(cx).session;
         if session.read_only() {
             // Viewing history: the in-memory document is not the head.
@@ -287,11 +316,17 @@ impl Thumbnailer {
             Source::Regenerate => None,
         };
         self.dirty = false;
-        Prepared::Job(Box::new(Job { shown, config: studio.configuration.defaults(), studio, units: doc.settings.units, doc_vars, engine: self.engine.clone(), gpu: self.gpu.clone() }))
+        let cancel = RegenCancel::default();
+        let path = session.path.clone();
+        let job = Job { shown, config: studio.configuration.defaults(), studio, units: doc.settings.units, doc_vars, engine: self.engine.clone(), gpu: self.gpu.clone(), cancel: cancel.clone() };
+        cx.default_global::<ThumbnailJobs>().0.insert(path, cancel);
+        Prepared::Job(Box::new(job))
     }
 
     fn store(&mut self, result: anyhow::Result<Option<Vec<u8>>>, cx: &mut Context<Self>) {
         match result {
+            // Stopped for the user's own work: again later.
+            Err(e) if e.is::<Cancelled>() => self.dirty = true,
             Ok(png) => self.doc.update(cx, |d, _| {
                 if let Err(e) = d.session.store.set_thumbnail(png.as_deref()) {
                     log::warn!("could not store thumbnail: {e}");
