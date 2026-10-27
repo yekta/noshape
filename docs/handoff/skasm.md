@@ -41,15 +41,14 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 
 ## Next, in order
 Sketch P1: no open items (parity/sketch.md all ✅; workflow-sketch-tools.md rechecked 10-27). Assembly P2:
-1. docs/parity/workflow-assembly-sweep.md still 🔧: 19 second half ("Missing mate to be matched."), 28 badges'
-   tooltips, 34 (assembly section view: rings, chips by direction, menu; face picks fixed 7dc7aee4). GUI on /root/green/noshape with /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins, made by
-   /root/skasm-scratch/qa/asm1.py over MCP).
-2. docs/parity/assembly.md G5 exploded views (⏳): verify against live 800–826 (workflow-exploded-named-positions.md
-   rows 2–15 are from an old pass; recheck them).
+1. docs/parity/workflow-assembly-sweep.md row 34 still 🔧 (assembly section view: the base's snap to edges, Flip,
+   red overlap caps; rings / chips / menu done). Rows 19 and 28 ✅ 10-27. GUI on /root/green/noshape with
+   /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins, made by /root/skasm-scratch/qa/asm1.py over MCP).
+2. docs/parity/assembly.md G5 exploded views (⏳): workflow-exploded-named-positions 2–4, 7, 11, 14–16 ✅ 10-27 (EXV6
+   rollback pill checked); left: 5 minor, NP2.
 3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; left:
-   A10 a toolbar tooltip staying after a click (app-core tooltips)), workflow-configured-assembly (1, 2, 8 ✅; left: CA3
-   Change configuration dialog body translucent, CA4 Tab leaving that dialog, A15 selection colours / root row),
-   workflow-exploded-named-positions (2–4, 7, 11, 14–16 ✅; left: 5 minor, NP2).
+   A10 a toolbar tooltip staying after a click (app-core tooltips, psui's area)), workflow-configured-assembly (1–5, 8
+   ✅; CA3 closed by ui, CA4 and A15 rechecked on green).
 4. Which part moves when neither is fixed in an exact flip (live's rule open, behaviours R3 note); ours moves the first
    connector's part (as live in 10 of 14 runs).
 5. Slot: live shows all 3 offset glyphs at the end cap; after the commit live's centre line is plain dark blue (ours
