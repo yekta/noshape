@@ -148,7 +148,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.22 | Mouse wheel over a focused numeric field (mm document, live 10-27): ±1, Shift ±10, Ctrl ±0.1 (integers ±1); only while focused with no uncommitted typed text; a step out of the field's range is ignored (Depth goes below 0) | Home__numeric_fields | ✅ |
 | 5.23 | Field shows the converted value after accepting, the original text when focused | Home__numeric_fields | ✅ (fixed: focusing showed the converted text) |
 | 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | ✅ (app 10-24) |
-| 5.25 | Preview opacity slider (blends the model before and after the feature) | Home__dialogs | 🔧 |
+| 5.25 | Preview opacity slider (blends the model before and after the feature) | Home__dialogs | ✅ (live previewBlend: both models mixed at the slider, 0.7 at rest; the active field's highlight lines drawn whole over the mix, also at 1, as live part-studio/psui-prv-01 / -05b) |
 | 5.26 | Rename the feature from the dialog title | Home__dialogs | ✅ (double-click the title) |
 | 5.27 | Dialog movable and resizable; help (?) icon | Home__dialogs | ✅ (move by the title, resize by the bottom-right grip; size kept for the session) |
 | 5.28 | Boolean "Convert to expression" / "Convert to checkbox" (evaluated at regeneration with upstream variables) | feature_basics | ✅ (starts as true/false text, focused) |
