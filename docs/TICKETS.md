@@ -681,7 +681,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   solves such edits at once; in the app this would freeze the sketch for minutes (P0 "responsiveness while editing").
   Analytic derivatives for the fit-spline equations (or re-fit once per Newton step, not per variable), and a solve
   time budget that reports failure fast (qa 12:30, CLI 12:08; v0.4.10 timing running)
-- [x] 12740dfc P2 REPLICATE-EDGE-DEFAULT Replicate on a mate whose connectors sit on circular edges: ours lists the right options
+- [x] verified 4e568f3f (qa 13:12: asm5 Assembly 1 › Replicate, Instances Part 2 <1> (Revolute 1 fills itself): "Match edges on face", tooltip "Edge match scope", last field "Faces to find match in") 12740dfc P2 REPLICATE-EDGE-DEFAULT Replicate on a mate whose connectors sit on circular edges: ours lists the right options
   (Match edges on plane / on face / individual edges) but starts on **Match edges on plane** and keeps the last field as
   "Parts to find match in"; live starts on **Match edges on face** (the select's tooltip "Edge match scope") and renames
   the last field **"Faces to find match in"** (behaviours "qa (2026-10-27, P2 batch 2)" (4)); repro asm5.noshape-like
