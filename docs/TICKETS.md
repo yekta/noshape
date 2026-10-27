@@ -354,7 +354,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (app-core actions.rs:185 SwitchRecentTab) and jumps to Part Studio 1 mid-edit (tickets/fs-ctrl-space-before.png /
   -after.png). Live: the FS editor has an autocomplete list (its command list has DISMISS_AUTOCOMPLETE, Esc;
   live-exploration.md 5.11); what opens it (typing, Ctrl+Space) and what it lists are asked in REQUESTS "qa (2026-10-27,
-  FS-EDITOR-COMPLETE)". At least Ctrl+Space shouldn't switch tabs while the code editor has focus (qa 2026-10-27 10:55,
+  FS-EDITOR-COMPLETE)". At least Ctrl+Space shouldn't switch tabs while the code editor has focus (qa 2026-10-27 10:40,
   green e8858e61)
 - [x] 1e3c419c P1 LP-DIRECTION-PICK (user-reported) hover / pick read nothing in feature dialogs. Repro doc /root/qa-scratch/lpd.noshape
   (Sketch 1 rectangle 60×40, Extrude 1 10; Sketch 2 on the top face 10×10, Extrude 2 Add 8). Linear pattern › Feature

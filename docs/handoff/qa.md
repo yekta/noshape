@@ -198,6 +198,11 @@ in Extrude's regions field picks the face), ORD-BASE.
   undo / redo, suppress, re-commit of changed source all right; a syntax error committed puts every instance in Error
   "Feature Studio has errors: Line 45: …". Not ticketed: an opBoolean SUBTRACT that consumes the whole target leaves no
   part and status OK (live unknown).
+- Assembly Fastened mate on asm5: hover on a hole rim shows the connector, both picks go in (tickets/pick-green-asm-*.png).
+- Baseline before the app split reaches green (screens in /root/qa-scratch/baseline-e8858e61/): Feature Studio editor
+  (+ Ctrl+Shift+F search panel), Performance and Document notes panels, help menu, start page (logo), user menu,
+  Preferences window. Compare after the next green. New: FS-EDITOR-COMPLETE (P2). Main's Cargo version is still 0.4.6
+  (start page footer "0.4.6.e8858e61fb4d"); only the release branch bumps it.
 - Fuzz: batch 9 (seeds 120–127, watcher CLI 08:30): seed 120 hit the 1500 s timeout again (the BUDGET-LONGJMP malloc
   deadlock seed), 121–127 clean. Budget A/B (seeds 130–137, CLI 09:50, on vs NOSHAPE_BLEND_BUDGET=100000): 130 clean on
   both; still running (~23 min a seed). Cold-open fuzz 140–141 consistent.
