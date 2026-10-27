@@ -17,66 +17,66 @@ it, so re-take positions after every selection.
 
 | # | Step | Live | Status | Verified |
 |---|---|---|---|---|
-| 1.1 | Start window › Create › Document… | Dialog with the name "Untitled document" selected | ✅ |  |
-| 1.2 | Type a name, Enter | Creates and opens it | ✅ |  |
-| 1.3 | New document contents | Part Studio 1 (active) + Assembly 1; "Features (4)", Default geometry, rollback bar under Right, "Parts (0)"; isometric | ✅ |  |
+| 1.1 | Start window › Create › Document… | Dialog with the name "Untitled document" selected | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 1.2 | Type a name, Enter | Creates and opens it | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 1.3 | New document contents | Part Studio 1 (active) + Assembly 1; "Features (4)", Default geometry, rollback bar under Right, "Parts (0)"; isometric | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 1.4 | Start window footer version | (ours) should read the release version | ✅ re-checked 10-23 on main 88fbf8f5: footer "(0.4.6.88fbf8f5fa11)" = release version + commit (was ✗ F27) |  |
 
 ## 2. Sketch on Top (live: "Sketch mode", "Input behaviour" › G)
 
 | # | Step | Live | Status | Verified |
 |---|---|---|---|---|
-| 2.1 | Sketch, then click Top in the list | Sketch 1 dialog, plane "Top plane", no tool active, view not rotated | ✅ |  |
-| 2.2 | Sketch dialog defaults | ☐ Disable imprinting, **☑ Show constraints**, ☐ Show expressions, ☑ Show errors | ✅ re-checked 10-23 (main 88fbf8f5): ☑ Show constraints, ☑ Show errors (was ✗ F1) |  |
-| 2.3 | N | Animated view normal to the plane | ✅ |  |
-| 2.4 | L, click, click, click (chain) | Previous segment's length boxed, live length in blue | ✅ |  |
-| 2.5 | Enter mid-chain | The boxed length becomes a driving dimension; the tool stays | ✅ |  |
-| 2.6 | Esc | One Esc ends the chain and exits the tool | ✅ |  |
-| 2.7 | G (corner rectangle), C (circle), A (3-point arc) | As live | ✅ |  |
-| 2.8 | Select two lines, E | Equal; glyphs shown | ✅ |  |
-| 2.9 | D, pick circle, place | Value box opens with the full value selected ("20.479094 mm") | ✅ |  |
-| 2.10 | Bare "25" + Enter | Ø25, box closes | ✅ (but see F3) |  |
+| 2.1 | Sketch, then click Top in the list | Sketch 1 dialog, plane "Top plane", no tool active, view not rotated | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 2.2 | Sketch dialog defaults | ☐ Disable imprinting, **☑ Show constraints**, ☐ Show expressions, ☑ Show errors | ✅ re-checked 10-23 (main 88fbf8f5): ☑ Show constraints, ☑ Show errors (was ✗ F1) | 0.4.10+ / 1c853f78 10-27 |
+| 2.3 | N | Animated view normal to the plane | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 2.4 | L, click, click, click (chain) | Previous segment's length boxed, live length in blue | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 2.5 | Enter mid-chain | The boxed length becomes a driving dimension; the tool stays | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 2.6 | Esc | One Esc ends the chain and exits the tool | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 2.7 | G (corner rectangle), C (circle), A (3-point arc) | As live | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 2.8 | Select two lines, E | Equal; glyphs shown | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 2.9 | D, pick circle, place | Value box opens with the full value selected ("20.479094 mm") | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 2.10 | Bare "25" + Enter | Ø25, box closes | ✅ (but see F3) | 0.4.10+ / 1c853f78 10-27 |
 | 2.11 | Double-click the dimension, "1 in" + Enter | Ø25.4, tan background | ❌ (DIM-AC-ENTER) | 0.4.10+ / 1c853f78 10-27 |
-| 2.12 | "10+5" + Enter | Label "ƒ 15" (expression prefix) | ✅ re-checked 10-23: "ƒ 15" (was ✗ F4) |  |
-| 2.13 | Re-open it | Box shows "(10+5) mm" | ✅ re-checked 10-23: "(10+5) mm" (was ✗ F5) |  |
-| 2.14 | Type, Esc | Reverts and blurs; box stays | ✅ |  |
-| 2.15 | Unknown "#w" + Enter | "Create variable" popup next to the field (Name "w") | ✅ re-checked 10-23: Create variable popup, Name "w" (was ✗ F6) |  |
-| 2.16 | "abc" + Enter | Pink field, red underline, ✓ disabled, box stays open, hover "Enter a valid expression." | ✅ re-checked 10-23: pink, red underline, ✓ disabled (was ✗ F7) |  |
+| 2.12 | "10+5" + Enter | Label "ƒ 15" (expression prefix) | ✅ re-checked 10-23: "ƒ 15" (was ✗ F4) | 0.4.10+ / 1c853f78 10-27 |
+| 2.13 | Re-open it | Box shows "(10+5) mm" | ✅ re-checked 10-23: "(10+5) mm" (was ✗ F5) | 0.4.10+ / 1c853f78 10-27 |
+| 2.14 | Type, Esc | Reverts and blurs; box stays | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 2.15 | Unknown "#w" + Enter | "Create variable" popup next to the field (Name "w") | ✅ re-checked 10-23: Create variable popup, Name "w" (was ✗ F6) | 0.4.10+ / 1c853f78 10-27 |
+| 2.16 | "abc" + Enter | Pink field, red underline, ✓ disabled, box stays open, hover "Enter a valid expression." | ✅ re-checked 10-23: pink, red underline, ✓ disabled (was ✗ F7) | 0.4.10+ / 1c853f78 10-27 |
 | 2.17 | Arc radius, point-point, line-point dimensions | Created, typed values applied | ✅ |  |
 | 2.18 | Type the value immediately after the placing click | Applied (keys not lost) | ✅ (checked with 20 ms steps) |  |
-| 2.19 | Enter with no tool active | Does **not** accept the sketch (live sketch/311) | ✅ (see F2) |  |
-| 2.20 | ✓ | Sketch 1 in the list, under-defined badge | ✅ |  |
+| 2.19 | Enter with no tool active | Does **not** accept the sketch (live sketch/311) | ✅ (see F2) | 0.4.10+ / 1c853f78 10-27 |
+| 2.20 | ✓ | Sketch 1 in the list, under-defined badge | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 2.21 | Dimension crash (user report, macOS) | – | not reproduced on Linux (all dimension kinds above) |  |
 
 ## 3. Features (live: "Part Studio: features, selection, menus", "Feature dialog basics", "Input behaviour")
 
 | # | Step | Live | Status | Verified |
 |---|---|---|---|---|
-| 3.1 | Shift+E, click the rectangle region | "Face of Sketch 1", 25 mm default, Part 1 preview | ✅ |  |
-| 3.2 | Depth: 1st click / "30" Enter / Enter | Selects all / "30 mm" re-selected, dialog stays / commits; sketch hidden | ✅ |  |
-| 3.3 | Shift+7 | Isometric | ✅ |  |
-| 3.4 | Shift+F, two edges, "3" Enter Enter | Fillet 1 | ✅ |  |
+| 3.1 | Shift+E, click the rectangle region | "Face of Sketch 1", 25 mm default, Part 1 preview | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 3.2 | Depth: 1st click / "30" Enter / Enter | Selects all / "30 mm" re-selected, dialog stays / commits; sketch hidden | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 3.3 | Shift+7 | Isometric | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 3.4 | Shift+F, two edges, "3" Enter Enter | Fillet 1 | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 3.5 | Chamfer on the vertical edge meeting both 3 mm fillets: 5 mm, then 2 mm | 5 mm: **error "Distance of chamfer on face too large."** (live G46: Onshape refuses it too); 2 mm builds Onshape's 10-face shape | (F8 fixed per kern 10-22; re-run) |  |
 | 3.6 | Shell, remove top face, 2.5 / 1 mm | Shells (2.5 mm: 13946.59 mm³, 21 faces, kern 10-22) | (F9 fixed per kern 10-22; re-run) |  |
-| 3.7 | After Enter committed a value, Esc | Cancels the dialog (no pending edit) | ✅ |  |
+| 3.7 | After Enter committed a value, Esc | Cancels the dialog (no pending edit) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 3.8 | Sketch points on the top face; Hole from the sketch | One chip "Vertices of Sketch 2"; one hole per point | ✅ re-checked 10-23: one chip "Vertices of Sketch 2", one hole per point (was ✗ F10) |  |
 | 3.9 | Hole defaults and callout | Drilled 1/4 (6.35 mm), 12 mm blind, 118 deg; "Ø6.35 ↧ 12" callout; row "Ø 6.35 mm ↧ 12 mm" | ✅ |  |
 | 3.10 | Linear pattern, Part type: Part 1, edge, 40 mm × 3 | Part 2/3, default colour rotation #a5a5a5, #3b61b4 | ✅ |  |
 | 3.11 | Direction field, click near the edge's midpoint | Filtered to the edge ("Edge of Part 1") | ✅ re-checked 10-23: an edge/line, not a midpoint (was ✗ F11) |  |
 | 3.12 | Linear pattern, Feature type: Hole, edge, 10 mm × 2 | Holes copied on Part 1 | ✅ re-checked 10-23: holes copied 10 mm along the edge, Part 1 intact (was ✗ F12 (Part 1 destroyed)) |  |
-| 3.13 | Esc while a select's search box is open | Closes the list only | ✅ re-checked 10-23: list closes, dialog stays (was ✗ F13) |  |
+| 3.13 | Esc while a select's search box is open | Closes the list only | ✅ re-checked 10-23: list closes, dialog stays (was ✗ F13) | 0.4.10+ / 1c853f78 10-27 |
 | 3.14 | Mirror, Part type: Part 3 about Right | Part 4 | ✅ |  |
-| 3.15 | Shift+X while a feature dialog is open | ? | ✅ re-checked 10-23: Shift+X does nothing while the dialog is open (was ✗ F14 (Section view opens on top of the open Mirror dialog)) |  |
+| 3.15 | Shift+X while a feature dialog is open | ? | ✅ re-checked 10-23: Shift+X does nothing while the dialog is open (was ✗ F14 (Section view opens on top of the open Mirror dialog)) | 0.4.10+ / 1c853f78 10-27 |
 | 3.16 | Boolean union Part 3 + Part 4 | Touching parts: one part. Parts that don't touch (live 10-22): **two unchanged parts, the row stays black with no error**, and while editing a blue info bubble **"Boolean resulted in no geometry change…"** (psb BOOL1) | ✅ touching; disjoint: re-run |  |
 
 ## 4. Edit, roll back, reorder, suppress, delete, undo (live: "Rollback bar", "Right-click menus")
 
 | # | Step | Live | Status | Verified |
 |---|---|---|---|---|
-| 4.1 | Double-click Extrude 1, depth 25, Enter Enter | Rolled back while editing; model regenerates | ✅ re-checked 10-23: rolled back while editing; Part 1 kept (was ✗ F12 (Part 1 disappears silently)) |  |
+| 4.1 | Double-click Extrude 1, depth 25, Enter Enter | Rolled back while editing; model regenerates | ✅ re-checked 10-23: rolled back while editing; Part 1 kept (was ✗ F12 (Part 1 disappears silently)) | 0.4.10+ / 1c853f78 10-27 |
 | 4.2 | Feature row right-click › Suppress | Struck-through italic; model updates | ✅ |  |
 | 4.3 | Drag Fillet 1 below Chamfer 1 | Drop line + pill; reordered | ✅ (Fillet then fails: F8) |  |
-| 4.4 | Ctrl+Z / Ctrl+Y / Ctrl+Z | Undo / redo the reorder | ✅ |  |
+| 4.4 | Ctrl+Z / Ctrl+Y / Ctrl+Z | Undo / redo the reorder | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 4.5 | Click a row, ↑ ↑ / ↓ ↓ | Rollback bar moves; light blue while focused | ✅ |  |
 | 4.6 | Select a feature row, Delete key | Deletes it | ✅ re-checked 10-23: Delete removes the feature, Ctrl+Z restores (was ✗ F15) |  |
 | 4.7 | Right-click › Delete; Ctrl+Z | Deleted; restored | ✅ |  |
