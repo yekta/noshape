@@ -683,7 +683,10 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     BRepMesh_IncrementalMesh mesher;
     mesher.SetShape(s.shape);
     mesher.ChangeParameters() = prm;
-    mesher.Perform(ctx);
+    {
+      const KernelTimer timer("mesh.brepmesh");
+      mesher.Perform(ctx);
+    }
     for (int i = 1; i <= m->faces.Extent(); ++i)
     {
       const TopoDS_Face& f = TopoDS::Face(m->faces(i));

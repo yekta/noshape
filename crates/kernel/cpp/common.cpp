@@ -1328,6 +1328,23 @@ bool kernel_profile_on()
   return on;
 }
 
+std::chrono::steady_clock::duration kernel_profile_now()
+{
+#ifdef __linux__
+  static const bool cpu = [] {
+    const char* v = std::getenv("NOSHAPE_KERNEL_PROFILE");
+    return v != nullptr && std::string(v) == "cpu";
+  }();
+  if (cpu)
+  {
+    timespec ts{};
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+    return std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
+  }
+#endif
+  return std::chrono::steady_clock::now().time_since_epoch();
+}
+
 void kernel_profile_add_named(const char* name, std::chrono::steady_clock::duration took)
 {
   KernelProfile&              p = kernel_profile();

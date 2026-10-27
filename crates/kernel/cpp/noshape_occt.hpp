@@ -154,22 +154,25 @@ int run_budgeted(double cpu_seconds, F&& f)
 }
 
 bool kernel_profile_on();
+// The profile's clock: wall time, or this thread's CPU time with
+// NOSHAPE_KERNEL_PROFILE=cpu (comparisons on a loaded machine; Linux).
+std::chrono::steady_clock::duration kernel_profile_now();
 void kernel_profile_add(const char* what, std::chrono::steady_clock::duration took);
 void kernel_profile_add_named(const char* name, std::chrono::steady_clock::duration took);
 // A step inside an op in the NOSHAPE_KERNEL_PROFILE table ("op.step").
 struct KernelTimer
 {
   const char*                           what;
-  std::chrono::steady_clock::time_point t0;
+  std::chrono::steady_clock::duration    t0;
   explicit KernelTimer(const char* w)
       : what(w),
-        t0(std::chrono::steady_clock::now())
+        t0(kernel_profile_on() ? kernel_profile_now() : std::chrono::steady_clock::duration{})
   {
   }
   ~KernelTimer()
   {
     if (kernel_profile_on())
-      kernel_profile_add_named(what, std::chrono::steady_clock::now() - t0);
+      kernel_profile_add_named(what, kernel_profile_now() - t0);
   }
 };
 
@@ -252,9 +255,9 @@ static void trycatch(Try&& func, Fail&& fail) noexcept
   // exit, common.cpp).
   if (noshape::kernel_profile_on())
   {
-    const auto t0 = std::chrono::steady_clock::now();
+    const auto t0 = noshape::kernel_profile_now();
     trycatch_timed(func, fail);
-    noshape::kernel_profile_add(typeid(Try).name(), std::chrono::steady_clock::now() - t0);
+    noshape::kernel_profile_add(typeid(Try).name(), noshape::kernel_profile_now() - t0);
     return;
   }
   trycatch_timed(func, fail);
