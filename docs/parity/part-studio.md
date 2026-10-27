@@ -87,7 +87,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.3 | Hover pre-highlights the entity under the cursor | A §5.3 | ✅ |
 | 3.4 | Box select left→right = window (fully inside), right→left = crossing | Home__selection | ✅ |
 | 3.5 | Window box is solid, crossing box dashed | Home__selection; A §5.2 | ✅ |
-| 3.6 | Box select: left→right takes what is wholly inside (faces and edges, no parts or part vertices), right→left what it touches; Ctrl+drag box deselects (live 10-27) | Home__selection | ✅ (crossing box colour asked of live; ours is the bundle's #FFC20E 9-on-8-off) |
+| 3.6 | Box select: left→right takes what is wholly inside (faces and edges, no parts or part vertices), right→left what it touches; Ctrl+drag box deselects (live 10-27) | Home__selection | ✅ (live 10-27: window box #1651B0 20 % fill / 60 % solid border, crossing #FFC20E 20 % / 60 % dashed 9 on 8 off, both ~1.5 px; ours within 1 level) |
 | 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | 🔧 |
 | 3.8 | Selected entities show quick values in the Measure readout | A §5.1 | ✅ |
 | 3.9 | Selection count next to the cursor, 1–5 ("5" for five or more) | Home__selection; live cursors/ | ✅ (Onshape bakes the digit into the cursor image; GPUI has no image cursors, so a black digit with a white outline is drawn at the arrow's lower right) |
