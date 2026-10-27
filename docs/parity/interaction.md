@@ -50,8 +50,8 @@ selection and hover per step, rows in brackets).
 | # | Behaviour | Live / source | Status |
 |---|---|---|---|
 | 3.1 | Hovered face: boundary only, #FFC685 ~2 px, no fill (light and dark) | L257, L11317 | ✅ R hover target (hover-top); look 🔧 |
-| 3.2 | Hovered edge: thickened #FFC685; a 9 px dark hollow ring at its midpoint; near the midpoint (a few px) the midpoint becomes the target (11 px orange ring) | L258, L14599–14612; behaviours "icons2 midpoint radius" | 🔧 (behaviors.rs `update_hover`: the dark 9 px ring while the edge is hovered, the midpoint the target inside the 9 px window, orange ring, the edge unlit; not in sketches nor with a field that takes no points) |
-| 3.3 | Hovered vertex: a light-orange dot | L259 | 🔧 |
+| 3.2 | Hovered edge: thickened #FFC685; a 9 px dark hollow ring at its midpoint; near the midpoint (a few px) the midpoint becomes the target (11 px orange ring) | L258, L14599–14612; behaviours "icons2 midpoint radius" | ✅ (psui 10-27, app vs live selection/06, 06b: the edge lit #FFC685 with the dark midpoint ring; with no dialog the edge stays the target at the midpoint, as live; the midpoint target only with a field that takes points) |
+| 3.3 | Hovered vertex: a light-orange dot | L259 | ✅ (psui 10-27: the 11 px disc #F8C488, centre #FFD8AC, as palette POINT_HOVER from live part-studio/qa4-r5-s9-6d) |
 | 3.4 | Hovered plane / mate connector colours | B only (`SECTION_PLANE…`, `MATE_CONNECTOR_PRE_SELECTED_COLOR`) | ❓ (a colour capture for icons2, who owns hover visuals) |
 | 3.5 | Timing ("reduce mouse hover highlight" on): below 0.15 px/ms the pick runs on every move; faster, the old highlight clears (unless still under the pointer) and the pick waits min(5 × average pick ms, 250 ms) after the pointer pauses (average = EMA 0.8/0.2 of pick times) | live "nav2 pre-highlight" 1–2 | 🔧 (viewport.rs `prehighlight_delay`, GPU hover-pick time as the average; plain selection only; test `prehighlight_waits_for_a_pause_as_live`) |
 | 3.6 | Leaving the graphics area clears the pre-highlight at once (next frame) | live "nav2 pre-highlight" 4; B `onMouseLeave` | ✅ R (hover-leave) |

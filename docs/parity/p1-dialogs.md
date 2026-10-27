@@ -95,3 +95,7 @@ Ours disabled ✓ while a selection field was in error. 🔧
   widths.
 - ⏳ Dialog x: live dumps show the dialog at x 246 (10-18) and 248 (10-26);
   ours is at 246.
+- ✅ Draft `INITIAL_FOCUS_ON_EDIT` (live behaviours "psui (10-26) Draft edit focus"): on edit the faces / parting
+  edges field is the active one, the plane / pull direction field a normal white field; a new Draft opens on Neutral
+  plane. Ours does the same (`focus_for_edit`).
+- ✅ Dialog x: 246 is right; live's own dialog on the shared account had been dragged to x 40.

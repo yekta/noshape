@@ -186,7 +186,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Deleting this tab will result in failed or missing features in 1 tab" and below it one row per affected tab (tab icon +
   name), [Delete] [Cancel] (live part-studio/1584-p9-tab-delete-confirm.png, behaviours "(7) Delete the "qa5 src" tab")
   (qa 2026-10-26, build 4d2f6b0c)
-- [x] (psui, this commit) P2 LOFT-PROFILE-LIST fixed: each entry "› name ×", 24 px entries 30 px apart with live's 1 px
+- [x] 72e41465 P2 LOFT-PROFILE-LIST fixed: each entry "› name ×", 24 px entries 30 px apart with live's 1 px
   rgba(0,0,0,0.2) divider, nothing under the field; › opens the entry's fields inside the field (its query field active,
   the array's border stays blue), as live psui-loft-00/01. Original report: Loft dialog with two profiles: ours lists the chips without live's › expander and repeats the
   names in a second, grey, indented list under the field ("Face of Sketch 2 / Face of Sketch 1",
