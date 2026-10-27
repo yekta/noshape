@@ -1909,8 +1909,10 @@ impl SketchEditor {
                 self.message = Some("Adjust the preview, then press Enter to confirm".into());
                 EditOutcome::redraw()
             }
-            Err(e) => {
-                self.message = Some(if chamfer { format!("Cannot chamfer selected point. {e}") } else { format!("Cannot fillet selected point. {e}") });
+            // Live's text alone (i18n; FILLET-POINT-MSG: the solver's reason
+            // isn't shown).
+            Err(_) => {
+                self.message = Some(if chamfer { "Cannot chamfer selected point.".to_string() } else { "Cannot fillet selected point.".to_string() });
                 EditOutcome::redraw()
             }
         }
@@ -3428,7 +3430,13 @@ impl SketchEditor {
                     let target = if target == noshape_sketch::ORIGIN { origin_point(&mut data.sketch) } else { target };
                     // The hidden Origin stand-in is constrained to, not merged into.
                     let is_pt = is_pt && !data.sketch.entity(target).is_some_and(|e| e.reference_only);
-                    let ok = if is_pt {
+                    // Already coincident with it (a point held on the origin,
+                    // dragged and released where it stays): nothing to add
+                    // (DUP-COINCIDENT: every release added another one).
+                    let already = data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if (a == id && b == target) || (a == target && b == id)));
+                    let ok = if already {
+                        false
+                    } else if is_pt {
                         // Keep the fixed/external point when merging.
                         let ext = data.sketch.entity(target).is_some_and(|e| e.external);
                         if ext || !data.sketch.entity(id).is_some_and(|e| e.external) { data.sketch.merge_points(id, target).is_ok() } else { data.sketch.merge_points(target, id).is_ok() }
@@ -8096,6 +8104,32 @@ mod tests {
         }
         let b = ed.otf_boxes(&d, &units);
         assert!((b[0].0 - v(0.030, 0.030)).length() < 1e-6, "box on the chord: {:?}", b[0].0);
+    }
+
+    /// DUP-COINCIDENT: a line end held on the origin, dragged and released
+    /// (it can't move) keeps its one Coincident; every release added another.
+    #[test]
+    fn a_point_held_on_the_origin_keeps_one_coincident() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(0.0, 0.0), v(0.02, 0.01));
+        let end = d.sketch.endpoints(l).unwrap().0;
+        let origin = origin_point(&mut d.sketch);
+        d.sketch.add_constraint(ConstraintKind::Coincident { a: end, b: origin }).unwrap();
+        d.sketch.solve();
+        let count = |d: &SketchData| d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Coincident { .. })).count();
+        let n = count(&d);
+        for _ in 0..2 {
+            ed.hover = Some(end);
+            ed.pointer_move(&mut d, v(0.0, 0.0), false, false);
+            ed.hover = Some(end);
+            ed.tool_down(&mut d, v(0.0, 0.0), Some(end), false, false);
+            for k in 1..=5 {
+                ed.pointer_move(&mut d, v(0.002 * k as f64, 0.0), false, false);
+                ed.tool_drag(&mut d, v(0.002 * k as f64, 0.0));
+            }
+            ed.tool_up(&mut d, v(0.01, 0.0));
+            assert_eq!(count(&d), n, "no second coincident");
+        }
     }
 
     /// Live (behaviours "skasm (2026-10-27, P1) sketch value boxes: center
