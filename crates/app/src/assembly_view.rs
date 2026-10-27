@@ -801,7 +801,10 @@ impl AssemblyView {
         self.rebuild_scene(true, cx);
         if !self.fitted_once && let Some(bounds) = self.result.bounds() {
             self.fitted_once = true;
-            let inset = if self.ui.left_open || self.insert_open { 220.0 + 2.0 * 12.0 } else { 0.0 };
+            // The panel over the view's left: the 300 px Insert dialog
+            // (qa5 1.4: the first insert was fitted under it), else a 220 px
+            // feature dialog.
+            let inset = if self.insert_open { 300.0 + 2.0 * 12.0 } else if self.ui.left_open { 220.0 + 2.0 * 12.0 } else { 0.0 };
             self.viewport.update(cx, |vp, cx| {
                 (vp.fit_bounds, vp.fit_inset_left) = (Some(bounds), inset);
                 vp.camera.set_view(StandardView::Trimetric);
