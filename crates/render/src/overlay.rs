@@ -604,6 +604,10 @@ pub mod view_cube {
     /// Onshape's back-face-culled mesh: the far faces' frames seen through
     /// the gaps, a white disk under each near corner, the near faces' white
     /// squares.
+    /// How far from its centre a corner takes the pointer, in half edges
+    /// (its disc is 0.24).
+    const CORNER_HIT: f64 = 0.31;
+
     pub fn cube_shapes(rotation: DQuat) -> Vec<CubeShape> {
         let inv = rotation.inverse();
         let h = HALF_EDGE;
@@ -645,8 +649,14 @@ pub mod view_cube {
     }
 
     /// Front-most cube cell under a point (pixels from the widget center, y up).
+    /// A visible corner takes the pointer a little beyond its drawn disc
+    /// (live 10-27, iso: (1829,156) lights the corner whose disc spans y
+    /// 159–169), before the faces around it.
     pub fn cube_hit(rotation: DQuat, p: DVec2) -> Option<CubeCell> {
-        cube_shapes(rotation).into_iter().rev().find(|s| point_in_poly(p, &s.poly)).map(|s| s.cell)
+        let shapes = cube_shapes(rotation);
+        let inv = rotation.inverse();
+        let corner = shapes.iter().filter(|s| s.cell.0.iter().all(|c| *c != 0)).find(|s| (inv * (s.cell.dir() * (0.8 * HALF_EDGE))).truncate().distance(p) <= CORNER_HIT * HALF_EDGE);
+        corner.map(|s| s.cell).or_else(|| shapes.into_iter().rev().find(|s| point_in_poly(p, &s.poly)).map(|s| s.cell))
     }
 
     /// What's under a widget point: an arrow's pseudo cell or a cube cell.

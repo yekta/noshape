@@ -389,6 +389,9 @@ mod tests {
         let rot = Camera::rotation_for(StandardView::Isometric);
         // The corner nearest the viewer projects to the center.
         assert_eq!(cube_hit(rot, DVec2::ZERO), Some(CubeCell([1, -1, 1])));
+        // Live 10-27: it takes the pointer ~8 px up (its disc is ~7 px), then the Top face.
+        assert_eq!(cube_hit(rot, DVec2::new(0.0, 8.5)), Some(CubeCell([1, -1, 1])));
+        assert_eq!(cube_hit(rot, DVec2::new(0.0, 12.0)), Some(CubeCell([0, 0, 1])));
         // Three near faces, three far frames, four corner disks.
         assert_eq!(cube_shapes(rot).len(), 10);
         assert!(CubeCell([0, 0, 1]).rotation().abs_diff_eq(Camera::rotation_for(StandardView::Top), 1e-9));

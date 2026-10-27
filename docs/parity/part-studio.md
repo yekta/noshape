@@ -250,7 +250,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 9.2 | Double-click the middle button zooms to fit (live 10-27) | View__zoom_to_fit | ✅ |
 | 9.3 | View cube in the upper right turns with the camera | view_navigation | ✅ (iso: the Top face fill 1803–1854 × 127–156 = live's pixels) |
 | 9.4 | Click a cube face for that standard view | view_navigation | ✅ |
-| 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | ✅ (live's corner takes the pointer ~8 px from its centre, ours on the drawn 13 px disc only) |
+| 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | ✅ (a corner takes the pointer up to 0.31 half edges (9 px) from its centre, live's ~8 px beyond its disc) |
 | 9.6 | Cube faces/edges/corners highlight on hover, (188,226,247) = #90cef1 at 0.6; no name or tooltip (live 10-27) | A §6.2 | ✅ |
 | 9.7 | Cube arrows rotate 15° (Shift 90°, Ctrl 5°); arc arrows roll | A §6.2 | ✅ (psui 10-27, as live "spec: psui part-studio.md 9.7": ▶ brings the left side in view, ▲ the front face, the right arc rolls clockwise; 15° / Ctrl 5° / Shift 90°) |
 | 9.8 | Camera menu (live order): Isometric/Dimetric/Trimetric | Named views…, Previous view | Zoom to fit/window | Perspective, Orient normal to sketch on edit | ✓ display ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… | live dom/menu-camera-render.txt | ✅ (Graphics preferences… and Highlight boundary edges by ui) |

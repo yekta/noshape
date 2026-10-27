@@ -81,16 +81,14 @@ that touches the model: ~12 min.
 2. part-studio.md 🔧 rows waiting for live (asked 10-27): 3.7 box into a dialog field (ours: Fillet takes the 6 faces),
    3.12 / 3.13 Select other into a field, 6.26 / 6.37 / 6.38 list separator and folder menus. Dihedral comb length vs
    Scale and its "Min: 90 deg" label (asked). Ctrl+M Mate connector defaults (asked). Crossing box colour (asked).
-3. View cube corner hit: live takes the corner ~8 px from its centre (pointer at (1829,156) in iso), ours only on the
-   drawn 13 px disc (`overlay::cube_hit`).
-4. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache
+3. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache
    needs vendoring wgpu-hal 29, or smaller per-pipeline shader modules (naga's MSL writer emits the whole module per
    stage). perf.yml without `-f ref=` measures the latest release: run 40464678503 (v0.4.8) failed its gates on
    the paravirtual macOS runners (NIST assembly texture "orbit" 33.2 → 19.3 fps; that log is the pan run, kind
    mislabelled; the orbit log reads 30.8 fps). Run 40467324821 (`-f ref=main`, 07:28) measures main: read its
    summaries into viewport-performance.md and compare.
-5. interaction.md 🔧 rows left: 4.1–4.4, 4.8, 4.9, 5.1, 5.3, 6.2–6.8 (6.7's camera menu), 2.3, 2.6.
-6. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
+4. interaction.md 🔧 rows left: 4.1, 4.2, 4.8, 4.9, 5.1, 5.3, 6.2–6.4, 6.8, 2.3, 2.6.
+5. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
 ## Requests to the lead
 
