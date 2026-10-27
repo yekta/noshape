@@ -29,6 +29,11 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - 502416cc REGEN-SPEED: ancestor maps and surface properties cached on the C++ shape (a Mutex inside the Rust Shape
   trips clippy's mutable_key_type wherever Shape is a hash key: keep such caches in OcShape).
 - Tickets checked on main 10-27: std_oracle hole scope and draft_curve level parting line pass (Linux).
+- 64f6f79a kern's P6 remainder: revolved (mid-height, z against the axis as drawn), Up to (2 um past the far end) and
+  Hole (start, z along the drill) cylinder frames as live; `reframe_cylinder` (features.cpp) re-frames any cylinder face
+  in place. Full revolves keep their profile where it is (turning it to the new x moved seams the screw recesses rely
+  on), so a revolved cylinder's seam sits at u = pi of its new frame; extrudes have it at u = 0 (seat_circles: with u = pi
+  the demo Flange's mirror common lost most of the part).
 
 ## OCCT patches (patches/occt)
 - 0001 kern's congruent-pair reuse (TKBO). 0002 core's crash fixes (TKOffset Draft_Modification_1, TKGeomBase
@@ -50,8 +55,8 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
    result (platform-dependent). Needs Parasolid's rule (TICKETS note).
 4. P1 SHELL-WALLS-CORNER (fillets meeting at a sharp corner keep ~0.47·R mm³ more in live), std_oracle hole scope,
    draft_curve parting line, Extrude add 308 ms, the elliptic boss face blend, FILLET-HANG's fillet itself.
-5. kern's open items: forward-oriented edges, revolve / Hole cylinder frames (live "fs (10-26 b)" f/g), up-to extrudes
-   (op_prism_until isn't re-framed), slot arcs (live answered "core (2026-10-26)" in behaviours.md: check it).
+5. kern's open items: forward-oriented edges (proposal: hand out edges FORWARD so start/end, parameters and tangents
+   agree; touches every caller of edge_info). Cylinder frames: done (64f6f79a).
 
 ## End-of-day walk (10-27 03:45, green 8165fca6)
 - Opened qa's qa-1026-ps2-shell.noshape in the green app on :101: Part Studio 1 (live's 30 features) regenerates, Part
