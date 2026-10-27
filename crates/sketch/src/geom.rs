@@ -265,7 +265,15 @@ impl Curve2 {
 
     fn closest_numeric(&self, p: DVec2) -> (f64, DVec2, f64) {
         let size = self.size().max(1e-9);
-        let samples = self.tessellate_params(size * 2e-3);
+        self.closest_from_samples(p, &self.tessellate_params(size * 2e-3))
+    }
+
+    /// [`Curve2::closest`] from samples made at 2e-3 of the curve's size
+    /// (analytic for lines, circles and arcs).
+    pub(crate) fn closest_from_samples(&self, p: DVec2, samples: &[(f64, DVec2)]) -> (f64, DVec2, f64) {
+        if matches!(self, Curve2::Line { .. } | Curve2::Circle { .. } | Curve2::Arc { .. }) {
+            return self.closest(p);
+        }
         let (t0, t1) = self.domain();
         let mut best = (t0, f64::MAX);
         // closest on polyline segments

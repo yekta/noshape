@@ -2,8 +2,43 @@
 //! Newton refinement for ellipses and NURBS), robust to tangency and to
 //! endpoints lying on the other curve within tolerance.
 
-use crate::geom::{angle_in_range, norm_angle, Curve2};
+use crate::geom::{angle_in_range, norm_angle, BBox, Curve2};
 use glam::DVec2;
+use std::cell::OnceCell;
+
+/// A curve with its box, size and samples worked out once: a sketch's
+/// regions intersect every pair of curves, and a spline's box, size and
+/// samples are each an adaptive tessellation (a 94-point fit spline's were
+/// made again for every one of its partners: seconds a regeneration).
+pub(crate) struct Prepared<'a> {
+    pub curve: &'a Curve2,
+    pub bbox: BBox,
+    size: f64,
+    samples: OnceCell<Vec<(f64, DVec2)>>,
+}
+
+impl<'a> Prepared<'a> {
+    pub fn new(curve: &'a Curve2) -> Self {
+        Self::with_bbox(curve, curve.bbox())
+    }
+
+    /// With the curve's box already known.
+    pub fn with_bbox(curve: &'a Curve2, bbox: BBox) -> Self {
+        Prepared { curve, bbox, size: bbox.size().max_element(), samples: OnceCell::new() }
+    }
+
+    /// Samples at 2e-3 of the curve's size.
+    fn samples(&self) -> &[(f64, DVec2)] {
+        self.samples.get_or_init(|| self.curve.tessellate_params(self.size.max(1e-9) * 2e-3))
+    }
+
+    fn closest(&self, p: DVec2) -> (f64, DVec2, f64) {
+        match self.curve {
+            Curve2::Line { .. } | Curve2::Circle { .. } | Curve2::Arc { .. } => self.curve.closest(p),
+            c => c.closest_from_samples(p, self.samples()),
+        }
+    }
+}
 
 /// An intersection point with the parameters on both curves.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -151,10 +186,12 @@ fn wrap(c: &Curve2, t: f64) -> f64 {
     if c.is_periodic() { a + (t - a).rem_euclid(b - a) } else { t.clamp(a, b) }
 }
 
-fn generic(c1: &Curve2, c2: &Curve2, tol: f64, out: &mut Vec<Intersection>) {
-    let s = c1.size().max(c2.size()).max(1e-9);
-    let p1 = c1.tessellate_params(s * 2e-3);
-    let p2 = c2.tessellate_params(s * 2e-3);
+/// Samples of both curves (each at 2e-3 of its own size), crossing
+/// segments refined by Newton.
+fn generic(g1: &Prepared, g2: &Prepared, tol: f64, out: &mut Vec<Intersection>) {
+    let (c1, c2) = (g1.curve, g2.curve);
+    let s = g1.size.max(g2.size).max(1e-9);
+    let (p1, p2) = (g1.samples(), g2.samples());
     let bb2: Vec<(DVec2, DVec2)> = p2.windows(2).map(|w| (w[0].1.min(w[1].1), w[0].1.max(w[1].1))).collect();
     let slack = s * 1e-3;
     for w1 in p1.windows(2) {
@@ -221,8 +258,14 @@ fn generic(c1: &Curve2, c2: &Curve2, tol: f64, out: &mut Vec<Intersection>) {
 
 /// Intersections of two curves (including touching endpoints within `tol`).
 pub fn intersect(c1: &Curve2, c2: &Curve2, tol: f64) -> Vec<Intersection> {
+    intersect_prepared(&Prepared::new(c1), &Prepared::new(c2), tol)
+}
+
+/// [`intersect`] of prepared curves.
+pub(crate) fn intersect_prepared(g1: &Prepared, g2: &Prepared, tol: f64) -> Vec<Intersection> {
+    let (c1, c2) = (g1.curve, g2.curve);
     let mut out = Vec::new();
-    if !c1.bbox().expanded(tol).intersects(&c2.bbox().expanded(tol)) {
+    if !g1.bbox.expanded(tol).intersects(&g2.bbox.expanded(tol)) {
         return out;
     }
     let circ = |c: &Curve2| matches!(c, Curve2::Circle { .. } | Curve2::Arc { .. });
@@ -235,17 +278,17 @@ pub fn intersect(c1: &Curve2, c2: &Curve2, tol: f64) -> Vec<Intersection> {
             out.extend(tmp.into_iter().map(|x| Intersection { t1: x.t2, t2: x.t1, point: x.point }));
         }
         (a, b) if circ(a) && circ(b) => circ_circ(a, b, tol, &mut out),
-        _ => generic(c1, c2, tol, &mut out),
+        _ => generic(g1, g2, tol, &mut out),
     }
     // endpoints lying on the other curve
-    for (ca, cb, first) in [(c1, c2, true), (c2, c1, false)] {
+    for (ca, gb, first) in [(c1, g2, true), (c2, g1, false)] {
         if ca.is_periodic() {
             continue;
         }
         let (a, b) = ca.domain();
         for t in [a, b] {
             let p = ca.point(t);
-            let (u, _, d) = cb.closest(p);
+            let (u, _, d) = gb.closest(p);
             if d <= tol {
                 out.push(if first { Intersection { t1: t, t2: u, point: p } } else { Intersection { t1: u, t2: t, point: p } });
             }

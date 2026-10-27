@@ -28,3 +28,19 @@ fn sk211_constraints_on_a_94_point_fit_spline_solve_quickly() {
     eprintln!("coincident {coincident:?}, distance {distance:?}");
     assert!(coincident < Duration::from_secs(20) && distance < Duration::from_secs(20), "coincident {coincident:?}, distance {distance:?}");
 }
+
+/// The end of qa's sketch fuzz (seed 211, 200 steps: 438 entities, five fit
+/// splines, 1397 regions). Its regions took 1.5 s (dev build): each curve
+/// pair re-derived a long spline's box, size and samples, and every
+/// half-edge its curve's size, each a tessellation; now ~40 ms.
+#[test]
+fn fuzz_sketch_regions_quickly() {
+    let path = format!("{}/tests/fixtures/solve/fz211-final.json", env!("CARGO_MANIFEST_DIR"));
+    let sk: Sketch = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let t = Instant::now();
+    let regions = sk.regions();
+    let took = t.elapsed();
+    eprintln!("{} regions in {took:?}", regions.len());
+    assert_eq!(regions.len(), 1397);
+    assert!(took < Duration::from_secs(1), "{took:?}");
+}

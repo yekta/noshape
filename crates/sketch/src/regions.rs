@@ -8,7 +8,7 @@
 use crate::entities::EntityKind;
 use crate::geom::{BBox, Curve2};
 use crate::ids::EntityId;
-use crate::intersect::intersect;
+use crate::intersect::{intersect_prepared, Prepared};
 use crate::nurbs::Nurbs;
 use crate::sketch::Sketch;
 use glam::DVec2;
@@ -147,11 +147,33 @@ impl ProfileSegment {
                 let (t0, t1) = (*start_angle, *end_angle);
                 0.5 * (radius * radius * (t1 - t0) + radius * (center.x * (t1.sin() - t0.sin()) - center.y * (t1.cos() - t0.cos())))
             }
+            ProfileSegment::Spline { .. } => {
+                // Gauss-Legendre (8 points) per knot span: exact for a
+                // polynomial spline (x y' is of degree 2p - 1 there); a
+                // rational one gets 4 pieces a span. One curve for all the
+                // evaluations (a sketch with long splines spent most of its
+                // regions here).
+                let nb = self.nurbs().unwrap();
+                let (a, b) = nb.domain();
+                let mut ks: Vec<f64> = nb.knots.iter().copied().filter(|k| *k > a && *k < b).collect();
+                ks.dedup();
+                ks.insert(0, a);
+                ks.push(b);
+                let sub = if nb.weights.is_some() { 4 } else { 1 };
+                let mut acc = 0.0;
+                for w in ks.windows(2) {
+                    for k in 0..sub {
+                        let (t0, t1) = (w[0] + (w[1] - w[0]) * k as f64 / sub as f64, w[0] + (w[1] - w[0]) * (k + 1) as f64 / sub as f64);
+                        for (x, gw) in GL8 {
+                            let d = nb.eval_ders(0.5 * (t0 + t1) + 0.5 * (t1 - t0) * x);
+                            acc += gw * 0.5 * (t1 - t0) * 0.5 * d[0].perp_dot(d[1]);
+                        }
+                    }
+                }
+                acc
+            }
             _ => {
-                let pieces = match self {
-                    ProfileSegment::Spline { knots, .. } => (knots.len() * 2).clamp(8, 400),
-                    _ => 16,
-                };
+                let pieces = 16;
                 let mut acc = 0.0;
                 for k in 0..pieces {
                     let (s0, s1) = (k as f64 / pieces as f64, (k + 1) as f64 / pieces as f64);
@@ -163,6 +185,15 @@ impl ProfileSegment {
                 }
                 acc
             }
+        }
+    }
+
+    /// A box containing the segment: a spline's control polygon's (convex
+    /// hull property), exact for the others.
+    pub fn hull_bbox(&self) -> BBox {
+        match self {
+            ProfileSegment::Spline { control_points, .. } => BBox::from_points(control_points.iter().copied()),
+            _ => self.to_curve().bbox(),
         }
     }
 
@@ -373,11 +404,8 @@ struct Edge {
     v1: usize,
 }
 
-fn tolerance(curves: &[(EntityId, Curve2)]) -> f64 {
-    let mut bb = BBox::EMPTY;
-    for (_, c) in curves {
-        bb = bb.union(&c.bbox());
-    }
+fn tolerance(boxes: &[BBox]) -> f64 {
+    let bb = boxes.iter().fold(BBox::EMPTY, |a, b| a.union(b));
     1e-9 * bb.size().max_element().max(1.0)
 }
 
@@ -441,16 +469,17 @@ fn merge_points(pts: &[DVec2], tol: f64) -> (Vec<usize>, Vec<DVec2>) {
     (cluster, pos)
 }
 
-fn build_edges(curves: &[(EntityId, Curve2)], tol: f64) -> (Vec<Edge>, Vec<DVec2>) {
+fn build_edges(curves: &[(EntityId, Curve2)], boxes: &[BBox], tol: f64) -> (Vec<Edge>, Vec<DVec2>) {
     let n = curves.len();
-    let bbs: Vec<BBox> = curves.iter().map(|(_, c)| c.bbox().expanded(tol)).collect();
+    let prep: Vec<Prepared> = curves.iter().zip(boxes).map(|((_, c), b)| Prepared::with_bbox(c, *b)).collect();
+    let bbs: Vec<BBox> = prep.iter().map(|g| g.bbox.expanded(tol)).collect();
     let mut splits: Vec<Vec<f64>> = vec![Vec::new(); n];
     for i in 0..n {
         for j in i + 1..n {
             if !bbs[i].intersects(&bbs[j]) {
                 continue;
             }
-            for x in intersect(&curves[i].1, &curves[j].1, tol) {
+            for x in intersect_prepared(&prep[i], &prep[j], tol) {
                 splits[i].push(x.t1);
                 splits[j].push(x.t2);
             }
@@ -541,6 +570,8 @@ fn build_edges(curves: &[(EntityId, Curve2)], tol: f64) -> (Vec<Edge>, Vec<DVec2
 
 struct Arrangement {
     curves: Vec<(EntityId, Curve2)>,
+    /// Each curve's size (its box's larger side).
+    sizes: Vec<f64>,
     edges: Vec<Edge>,
     verts: Vec<DVec2>,
 }
@@ -548,9 +579,12 @@ struct Arrangement {
 impl Arrangement {
     fn new(sk: &Sketch) -> Arrangement {
         let curves = sketch_curves(sk);
-        let tol = tolerance(&curves);
-        let (edges, verts) = build_edges(&curves, tol);
-        Arrangement { curves, edges, verts }
+        // Each curve's box once (a spline's is a tessellation).
+        let boxes: Vec<BBox> = curves.iter().map(|(_, c)| c.bbox()).collect();
+        let tol = tolerance(&boxes);
+        let (edges, verts) = build_edges(&curves, &boxes, tol);
+        let sizes = boxes.iter().map(|b| b.size().max_element()).collect();
+        Arrangement { curves, sizes, edges, verts }
     }
 
     /// Half-edge h = 2*e (forward) or 2*e+1 (reversed): origin, target.
@@ -573,7 +607,7 @@ impl Arrangement {
         let (t, sign) = if h.is_multiple_of(2) { (e.t0, 1.0) } else { (e.t1, -1.0) };
         let d = c.ders(t);
         let mut dir = d[1] * sign;
-        if dir.length() < 1e-12 * c.size().max(1e-12) {
+        if dir.length() < 1e-12 * self.sizes[e.curve].max(1e-12) {
             let tt = if h.is_multiple_of(2) { e.t0 + 1e-6 * (e.t1 - e.t0) } else { e.t1 - 1e-6 * (e.t1 - e.t0) };
             dir = c.point(tt) - d[0];
         }
@@ -694,7 +728,12 @@ impl Arrangement {
         // A face's fine outline is made only for a sample inside its box
         // (qa SKETCH-DRAG-BIG: 200 loops × 200 faces of finely tessellated
         // circles took ~40 ms of every drag step).
-        let boxes: Vec<BBox> = cycles.iter().map(|c| if c.area > 0.0 { c.lp.bbox() } else { BBox::EMPTY }).collect();
+        // Boxes that contain the faces: a spline piece's control polygon's
+        // (its exact box is a tessellation: 1400 of them took most of a
+        // regeneration of a sketch with long splines). They only narrow the
+        // search; the winding test decides.
+        let edge_boxes: Vec<BBox> = (0..self.edges.len()).map(|e| self.he_segment(2 * e).0.hull_bbox()).collect();
+        let boxes: Vec<BBox> = cycles.iter().map(|c| if c.area > 0.0 { c.hes.iter().fold(BBox::EMPTY, |b, &h| b.union(&edge_boxes[h / 2])) } else { BBox::EMPTY }).collect();
         let polys: Vec<std::cell::OnceCell<Vec<DVec2>>> = cycles.iter().map(|_| std::cell::OnceCell::new()).collect();
         let poly = |fi: usize| {
             polys[fi].get_or_init(|| {
@@ -733,10 +772,17 @@ impl Arrangement {
             }
             boundary.sort();
             boundary.dedup();
-            let key = outer.bbox().center();
-            regions.push((Region { id: RegionId { boundary, ordinal: 0 }, outer, holes: hl }, key));
+            regions.push((Region { id: RegionId { boundary, ordinal: 0 }, outer, holes: hl }, DVec2::ZERO));
         }
-        // ordinals for identical boundary sets
+        // Ordinals for identical boundary sets, by their outer boxes' centres
+        // (worked out only for those).
+        regions.sort_by(|a, b| a.0.id.boundary.cmp(&b.0.id.boundary));
+        for i in 0..regions.len() {
+            let shared = (i > 0 && regions[i - 1].0.id.boundary == regions[i].0.id.boundary) || (i + 1 < regions.len() && regions[i + 1].0.id.boundary == regions[i].0.id.boundary);
+            if shared {
+                regions[i].1 = regions[i].0.outer.bbox().center();
+            }
+        }
         regions.sort_by(|a, b| a.0.id.boundary.cmp(&b.0.id.boundary).then(a.1.x.total_cmp(&b.1.x)).then(a.1.y.total_cmp(&b.1.y)));
         for i in 1..regions.len() {
             if regions[i].0.id.boundary == regions[i - 1].0.id.boundary {
@@ -749,7 +795,7 @@ impl Arrangement {
 
 fn wires(sk: &Sketch) -> Vec<Wire> {
     let curves = sketch_curves(sk);
-    let tol = tolerance(&curves);
+    let tol = tolerance(&curves.iter().map(|(_, c)| c.bbox()).collect::<Vec<_>>());
     let mut out = Vec::new();
     let mut open: Vec<usize> = Vec::new();
     for (i, (id, c)) in curves.iter().enumerate() {
@@ -919,4 +965,28 @@ pub fn find_region_in(regions: &[Region], id: &RegionId) -> Option<Region> {
         }
     }
     best.map(|b| regions[b.1].clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A spline segment's area term (Gauss-Legendre per knot span) equals
+    /// brute-force quadrature over thousands of pieces.
+    #[test]
+    fn spline_area_term_is_exact_per_span() {
+        let nb = Nurbs::interpolate(&[DVec2::new(0.0, 0.0), DVec2::new(0.3, 0.9), DVec2::new(1.1, 1.2), DVec2::new(1.4, 0.2), DVec2::new(2.9, 0.7), DVec2::new(3.0, -0.4)]).unwrap();
+        let seg = ProfileSegment::Spline { control_points: nb.ctrl.clone(), knots: nb.knots.clone(), degree: nb.degree, weights: None };
+        let pieces = 20000;
+        let mut brute = 0.0;
+        for k in 0..pieces {
+            let (s0, s1) = (k as f64 / pieces as f64, (k + 1) as f64 / pieces as f64);
+            for (x, w) in GL8 {
+                let (p, d, dp) = seg.ders_at(0.5 * (s0 + s1) + 0.5 * (s1 - s0) * x);
+                brute += w * 0.5 * (s1 - s0) * 0.5 * p.perp_dot(d) * dp;
+            }
+        }
+        let a = seg.area_term();
+        assert!((a - brute).abs() < 1e-12, "{a} vs {brute}");
+    }
 }
