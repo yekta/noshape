@@ -35,6 +35,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   0.221954 kg and Izz 55.488606 right, but Ixx 44.391247 / Iyy 44.390476 (both exactly m(3(R²+r²)+h²)/12 = 44.39082),
   Ixy −0.006832 (exactly 0) and CoM x 5.8e-5 (0). At the panel's 3 decimals that reads Lxy −0.007, Lxx ≠ Lyy; live
   (Parasolid) is exact there. Looks mesh- or sample-based like MEASURE-MAX-DIST (qa 2026-10-27, watcher CLI 08:12)
+  A 40×30×10 Steel box is exact (CoM (20, 15, 5), Ixx / Iyy / Izz 7.850 / 13.345 / 19.625), so only curved faces drift.
 - [ ] P0 BOOL-THREAD-CRASH the process dies inside OCCT booleans on a worker thread, nondeterministically: CLI fuzz seed 72 on
   the watcher CLI 04:06 (≥ bcf401ca, crash guard and blend budget in): run 1 died at step 105 (delete Extrude 8; marker:
   Extrude 10 evaluating), kernel log "general protection fault … in noshape-cli[b13430a]" =
