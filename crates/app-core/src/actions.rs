@@ -141,6 +141,10 @@ actions!(
     ]
 );
 
+/// Where Ctrl+Space goes back to the previous tab: anywhere in a document window but the Feature Studio's code
+/// editor.
+pub const RECENT_TAB_CONTEXT: &str = "Workspace && !(FeatureStudio > Input)";
+
 /// Onshape's default key bindings (before user customizations; the app binds them with the user's customizations,
 /// Preferences › Keyboard shortcuts, through its `shortcuts::init`).
 pub fn default_key_bindings() -> Vec<KeyBinding> {
@@ -182,7 +186,8 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("shift-?", ToggleShortcutHelp, doc),
         KeyBinding::new("?", ToggleShortcutHelp, doc),
         KeyBinding::new("alt-t", TabManager, doc_mod),
-        KeyBinding::new("ctrl-space", SwitchRecentTab, doc_mod),
+        // Not from the Feature Studio's code editor, where Ctrl+Space is the editor's own (FS-EDITOR-COMPLETE).
+        KeyBinding::new("ctrl-space", SwitchRecentTab, Some(RECENT_TAB_CONTEXT)),
         KeyBinding::new("[", MeasureTool, doc),
         KeyBinding::new("ctrl-m", MateConnectorTool, doc_mod),
         KeyBinding::new("k", ToggleMateConnectors, doc),
@@ -319,4 +324,21 @@ pub fn request_activate_tab(tab: noshape_model::document::TabId, window: &mut gp
 /// The tab [`request_activate_tab`] asked for, once.
 pub fn take_requested_tab() -> Option<noshape_model::document::TabId> {
     REQUESTED_TAB.lock().take()
+}
+
+#[cfg(test)]
+mod recent_tab_tests {
+    use super::RECENT_TAB_CONTEXT;
+    use gpui_kit::{KeyBindingContextPredicate, KeyContext};
+
+    #[test]
+    fn ctrl_space_leaves_the_feature_studio_editor_alone() {
+        let p = KeyBindingContextPredicate::parse(RECENT_TAB_CONTEXT).unwrap();
+        let ctx = |names: &[&str]| names.iter().map(|n| KeyContext::parse(n).unwrap()).collect::<Vec<_>>();
+        assert!(p.depth_of(&ctx(&["Workspace", "PartStudio"])).is_some());
+        assert!(p.depth_of(&ctx(&["Workspace", "FeatureStudio"])).is_some(), "the Feature Studio outside its editor");
+        assert!(p.depth_of(&ctx(&["Workspace", "PartStudio", "Input"])).is_some(), "a Part Studio field");
+        assert!(p.depth_of(&ctx(&["Workspace", "FeatureStudio", "Input"])).is_none());
+        assert!(p.depth_of(&ctx(&["Workspace", "FeatureStudio", "CodePane", "Input"])).is_none());
+    }
 }

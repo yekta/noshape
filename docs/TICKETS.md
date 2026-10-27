@@ -403,6 +403,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   live-exploration.md 5.11); what opens it (typing, Ctrl+Space) and what it lists are asked in REQUESTS "qa (2026-10-27,
   FS-EDITOR-COMPLETE)". At least Ctrl+Space shouldn't switch tabs while the code editor has focus (qa 2026-10-27 10:40,
   green e8858e61)
+  - psui (this commit): Ctrl+Space no longer switches tabs from the code editor (binding context
+    `actions::RECENT_TAB_CONTEXT`, "Workspace && !(FeatureStudio > Input)"; checked on cfs2.noshape). The completion
+    list waits for live's answer (REQUESTS "qa (2026-10-27, FS-EDITOR-COMPLETE)").
 - [x] 1e3c419c P1 LP-DIRECTION-PICK (user-reported) hover / pick read nothing in feature dialogs. Repro doc /root/qa-scratch/lpd.noshape
   (Sketch 1 rectangle 60×40, Extrude 1 10; Sketch 2 on the top face 10×10, Extrude 2 Add 8). Linear pattern › Feature
   pattern › Features to pattern = Extrude 2 › click Direction › hover / click the front top edge.
