@@ -47,6 +47,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   steps) or run budgeted kernel calls in a child process; never longjmp from a signal across arbitrary code (the
   crash guard's `on_crash` siglongjmp has the same hazard, but it only runs once something has already crashed)
   (qa 2026-10-27 09:35)
+  `BudgetHold` (which defers the jump) is used at two call sites only (features.cpp:2411, 2646); OCCT's own
+  allocations (Standard::Allocate → malloc, NCollection allocators) inside a budgeted call are never held.
 - [ ] P1 WIN-CRASH-GUARD the kernel crash guard (common.cpp, sigsetjmp/sigaction) is POSIX-only: on Windows a crash inside
   OCCT (e.g. kernel/tests/data/crash/fillet-blend-segv, FILLET-SEGV-BLEND) still kills the process (the release/v0.4.9
   CI run 40469839948 died with STATUS_ACCESS_VIOLATION in crash_inputs; that test is now cfg(unix)). Add the Windows
