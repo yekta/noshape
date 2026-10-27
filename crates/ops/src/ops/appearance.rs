@@ -26,6 +26,31 @@ pub fn ops() -> Vec<Op> {
             run: list,
         },
         Op {
+            group: "material",
+            verb: "library_update",
+            summary: "Replace a Material Library tab's materials with a CSV file's",
+            description: "A Material Library tab's menu › Update…: the CSV (columns Category, Name, Density [kg/m^3], then any extra columns; one material per row) from local file `path`, or its text as `csv`, replaces the library (\"Update material library\"). Its materials are then in material_list and part_set_material. Make the tab with tab_create kind materiallibrary.",
+            fields: vec![
+                doc_field(),
+                req("tab", s(), "Material Library tab, by name or id."),
+                opt("path", s(), "Local CSV file."),
+                opt("csv", s(), "The CSV text (instead of `path`)."),
+            ],
+            mutates: true,
+            destructive: true,
+            run: library_update,
+        },
+        Op {
+            group: "material",
+            verb: "library_export",
+            summary: "Export a Material Library tab as a CSV file",
+            description: "A Material Library tab's menu › Export…: the library as CSV (the columns library_update reads) written to `path`; without `path`, replies with the text.",
+            fields: vec![doc_field(), req("tab", s(), "Material Library tab, by name or id."), opt("path", s(), "Where to write the CSV file.")],
+            mutates: false,
+            destructive: false,
+            run: library_export,
+        },
+        Op {
             group: "part",
             verb: "set_material",
             summary: "Assign a material to parts (density for mass properties)",
@@ -129,6 +154,47 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         .map(|m| json!({ "library": m.library, "name": m.name, "category": m.category, "density_kg_m3": (m.density * 1000.0).round() / 1000.0 }))
         .collect();
     Ok(json!({ "materials": rows }).into())
+}
+
+fn library_tab(od: &crate::OpenDoc, a: &Args) -> Result<noshape_model::document::TabId, OpError> {
+    use noshape_model::document::TabContent;
+    doc::tab_of_kind(od.doc(), Some(a.str("tab")?), "Material Library", |c| matches!(c, TabContent::MaterialLibrary(_))).map_err(|e| e.with_param("tab"))
+}
+
+fn library_update(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::document::TabContent;
+    use noshape_model::material_library::MaterialLibrary;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = library_tab(od, a)?;
+    let text = match (a.opt_str("path")?, a.opt_str("csv")?) {
+        (Some(p), None) => std::fs::read_to_string(p).map_err(|e| OpError::param("path", &e.to_string()))?,
+        (None, Some(t)) => t.to_string(),
+        _ => return Err(OpError::invalid("give one of `path` or `csv`")),
+    };
+    let field = if a.get("path").is_some() { "path" } else { "csv" };
+    let lib = MaterialLibrary::from_csv(&text).map_err(|e| OpError::param(field, &format!("Could not read the material library: {e}")))?;
+    let n = lib.materials.len();
+    od.session.edit_tab(tab, ap::UPDATE_MATERIAL_LIBRARY, |c| {
+        if let TabContent::MaterialLibrary(l) = c {
+            *l = lib;
+        }
+    })?;
+    Ok(json!({ "materials": n }).into())
+}
+
+fn library_export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::document::TabContent;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = library_tab(od, a)?;
+    let Some(TabContent::MaterialLibrary(lib)) = od.doc().tab(tab).map(|t| &t.content) else { unreachable!() };
+    let csv = lib.to_csv();
+    match a.opt_str("path")? {
+        Some(p) => {
+            std::fs::write(p, &csv).map_err(|e| OpError::param("path", &format!("Export failed: {e}")))?;
+            Ok(json!({ "path": p, "materials": lib.materials.len() }).into())
+        }
+        None => Ok(json!({ "csv": csv, "materials": lib.materials.len() }).into()),
+    }
 }
 
 fn set_material(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

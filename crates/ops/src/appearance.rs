@@ -5,6 +5,9 @@
 use noshape_model::partstudio::{Appearance, AppearanceTarget, FaceAppearance, PartStudio, TessQuality};
 use noshape_model::reference::{BodyId, FeatureId, Reference};
 
+/// A Material Library tab's Update… (also the history text).
+pub const UPDATE_MATERIAL_LIBRARY: &str = "Update material library";
+
 /// kg/m³ per lb/in³ (the Material panel shows lb/in³).
 pub const LB_IN3: f64 = 27_679.904_710_191;
 

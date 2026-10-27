@@ -147,6 +147,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("part_remove_appearance", &[r##"{"parts": ["Part 1"]}"##]),
     ("part_appearances", &[r##"{}"##]),
     ("material_list", &[r##"{"search": "steel"}"##]),
+    ("material_library_update", &[r##"{"tab": "Material Library 1", "path": "/tmp/materials.csv"}"##, r##"{"tab": "Material Library 1", "csv": "Category,Name,Density [kg/m^3]\nMetals,Brass C360,8500\n"}"##]),
+    ("material_library_export", &[r##"{"tab": "Material Library 1", "path": "/tmp/materials.csv"}"##]),
     // queries, analysis, render
     ("query_parts", &[r##"{}"##]),
     ("query_entities", &[r##"{"kind": "faces", "surface": "plane", "normal": [0, 0, 1]}"##, r##"{"kind": "edges", "created_by": "Extrude 1"}"##, r##"{"kind": "edges", "direction": [0, 0, 1]}"##, r##"{"kind": "edges", "at": [[0, 0, 3], [80, 0, 3], [40, 44, 6]]}"##, r##"{"kind": "faces", "context": true, "surface": "plane"}"##]),

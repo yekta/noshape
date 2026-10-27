@@ -53,10 +53,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   feature's params field by field); (b) live shows B's edit in A's open tab within seconds: `Session::sync_external()`
   (ops, this commit) loads a head another process moved; the app has to poll it (request to the lead below).
 
+## Daily walk 10-27 03:40 (green 8165fca6, :131, /root/dx-scratch/w/o*.png)
+- No regressions in my area. Open of a truncated file: the error bubble stays (OPEN-ERROR-SILENT verified). Drawing
+  from ISO A3 suggested views: first-angle layout, hole centre mark; Export › PDF: 1.5, A3 landscape, 5 layers, Flate,
+  92,359 B (live 92,767). Variable Studio: typed "12" → "12 mm". Part › Export… Parasolid 38.1 then + › Import…: the
+  dialog offers material density for x_t, Import 1 rebuilds the same part, "CAD Imports" folder. Derived of Part
+  Studio 1 into it: dialog, configuration row and the part as DER1/DER10.
+- Open question (REQUESTS dx 10-27): a derived part takes the target studio's next default colour (gray as a second
+  part); live may keep the source part's colour.
+
 ## Next (in order, after landing)
-1. Audit leftovers: Part Studio "Move configuration input" (config input order outside Variable Studios), "Move
-   annotation" (Part Studio annotation offset), Hide all instances, Discard unregenerated changes, Save custom color,
-   Update material library: check each against the ops, add what's missing.
+1. Audit leftovers: "Move annotation" (part_annotation has no move of the datum box's offset). Covered elsewhere:
+   Move configuration input (config_reorder_inputs), Hide all instances (assembly_set_state on every instance), Save
+   custom color (any colour is settable), Update material library (material_library_update, this landing).
 2. API: benchmarks done for Variable Studio, in-context, sheet metal (/root/dx-scratch/bench/*.py); next: drive a model
    through the MCP server with a real client; render_image of the window camera (image size).
 3. Drawings (P2): PDF Selectable text with a subset NotoSans (Normal text is already filled outlines); ui2's

@@ -4542,3 +4542,29 @@ fn instance_drops_explode_reorder_mirror_strategy_and_image_menu() {
     let e = try_call(&mut ctx, "drawing_image", json!({ "drawing": tab, "sheet": 2, "image": 1, "move_to": 2 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("move_to"));
 }
+
+/// A Material Library tab's Update… / Export… through the API: its
+/// materials then assign like the Onshape library's.
+#[test]
+fn material_library_update_and_export() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "matlib.noshape");
+    let t = call(&mut ctx, "tab_create", json!({ "kind": "materiallibrary" }));
+    let tab = t["tab"]["name"].as_str().or(t["name"].as_str()).unwrap_or("Material Library 1").to_string();
+    let r = call(&mut ctx, "material_library_update", json!({ "tab": tab, "csv": "Category,Name,Density [kg/m^3],Supplier\nMetals,Brass C360,8500,Acme\nPlastics,\"PEEK, natural\",1300,\n" }));
+    assert_eq!(r["materials"], 2, "{r}");
+    let h = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(h.ends_with(":: Update material library"), "{h}");
+    let l = call(&mut ctx, "material_list", json!({ "search": "peek" }));
+    let mine: Vec<&Value> = l["materials"].as_array().unwrap().iter().filter(|m| m["library"] == tab.as_str()).collect();
+    assert!(mine.len() == 1 && mine[0]["name"] == "PEEK, natural" && mine[0]["density_kg_m3"] == 1300.0, "{l}");
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    let part = parts["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_material", json!({ "tab": "Part Studio 1", "part": part, "material": "Brass C360", "library": tab }));
+    let e = call(&mut ctx, "material_library_export", json!({ "tab": tab }));
+    assert_eq!(e["csv"], "Category,Name,Density [kg/m^3],Supplier\nMetals,Brass C360,8500,Acme\nPlastics,\"PEEK, natural\",1300,\n", "{e}");
+    let err = try_call(&mut ctx, "material_library_update", json!({ "tab": tab, "csv": "Name\nX\n" })).unwrap_err();
+    assert_eq!(err.param.as_deref(), Some("csv"), "{err:?}");
+    let err = try_call(&mut ctx, "material_library_update", json!({ "tab": "Part Studio 1", "csv": "x" })).unwrap_err();
+    assert_eq!(err.param.as_deref(), Some("tab"), "{err:?}");
+}

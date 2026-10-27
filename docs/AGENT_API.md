@@ -323,7 +323,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_search_tools`](#ui_search_tools), [`ui_shortcuts`](#ui_shortcuts), [`ui_select`](#ui_select), [`ui_list`](#ui_list)
 - **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_version_properties`](#history_version_properties), [`history_publish`](#history_publish), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
-- **material**: [`material_list`](#material_list)
+- **material**: [`material_list`](#material_list), [`material_library_update`](#material_library_update), [`material_library_export`](#material_library_export)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
@@ -5518,6 +5518,44 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `search` | string |  | Only materials whose name or category contains this. |
+
+#### material_library_update
+
+Replace a Material Library tab's materials with a CSV file's (edits the document (one undoable history entry); deletes or overwrites).
+
+A Material Library tab's menu › Update…: the CSV (columns Category, Name, Density [kg/m^3], then any extra columns; one material per row) from local file `path`, or its text as `csv`, replaces the library ("Update material library"). Its materials are then in material_list and part_set_material. Make the tab with tab_create kind materiallibrary.
+
+Examples:
+
+```json
+{"tab": "Material Library 1", "path": "/tmp/materials.csv"}
+{"tab": "Material Library 1", "csv": "Category,Name,Density [kg/m^3]\nMetals,Brass C360,8500\n"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | Material Library tab, by name or id. |
+| `path` | string |  | Local CSV file. |
+| `csv` | string |  | The CSV text (instead of `path`). |
+
+#### material_library_export
+
+Export a Material Library tab as a CSV file.
+
+A Material Library tab's menu › Export…: the library as CSV (the columns library_update reads) written to `path`; without `path`, replies with the text.
+
+Examples:
+
+```json
+{"tab": "Material Library 1", "path": "/tmp/materials.csv"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | Material Library tab, by name or id. |
+| `path` | string |  | Where to write the CSV file. |
 
 ### query
 

@@ -104,7 +104,7 @@ fn confirm(doc: Entity<DocModel>, tab: TabId, lib: MaterialLibrary, window: &mut
             .on_ok(move |_, _, cx| {
                 let lib = lib2.clone();
                 doc.update(cx, |d, cx| {
-                    d.edit_tab(tab, "Update material library", cx, move |c| {
+                    d.edit_tab(tab, noshape_ops::appearance::UPDATE_MATERIAL_LIBRARY, cx, move |c| {
                         if let TabContent::MaterialLibrary(l) = c {
                             *l = lib;
                         }
