@@ -343,7 +343,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P1 LP-DIRECTION-PICK (user-reported) hover / pick read nothing in feature dialogs. Repro doc /root/qa-scratch/lpd.noshape
+- [x] 884577bd P1 LP-DIRECTION-PICK (user-reported) hover / pick read nothing in feature dialogs. Repro doc /root/qa-scratch/lpd.noshape
   (Sketch 1 rectangle 60×40, Extrude 1 10; Sketch 2 on the top face 10×10, Extrude 2 Add 8). Linear pattern › Feature
   pattern › Features to pattern = Extrude 2 › click Direction › hover / click the front top edge.
   - **v0.4.9 release** (Linux tarball, 7ee597e0 + fixes): the edge at its middle shows no pre-highlight and the click picks
@@ -381,6 +381,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     | D `ALLOWS_AXIS` alone | "Edge of Extrude 1" | — |
     B (`EDGE && GeometryType.LINE`) is probably the most common edge filter in custom features. Screenshots:
     tickets/pick-green-custom-{A-axisedge-model-none,A-axisedge-sketch-only,B-edge-line-none,C-edge-solid-ok,D-allows-axis-ok}.png
+  - psui: the v0.4.9 part is PREVIEW-NO-PICK (fixed 4e55b01f; render test a_preview_picks_the_edges_of_the_model_with_the_feature
+    now covers edges too). The compound filters: custom/studio.rs `filter_of`'s `&&` takes any model edge (EDGE) as
+    covering the linear and circular ones, so `EDGE && ALLOWS_AXIS` takes linear, circular and sketch edges, `EDGE &&
+    GeometryType.LINE` linear and sketch edges, `EDGE && CIRCLE` circular ones (model test
+    custom_features::compound_edge_filters_take_model_edges).
 - [ ] P3 PERF-TOTAL-MISMATCH the Performance panel and its Regeneration times dialog give two totals for the same studio:
   live-30-features.noshape just opened (regen from cache) → panel "Total regeneration time: 46ms", stopwatch › dialog footer
   "Total regen time: 314ms" (the per-feature column sums to ~314). Live reads one number in both places (behaviours 17899);

@@ -702,8 +702,15 @@ fn filter_of(f: Option<&Ann>) -> QueryFilter {
         Ann::And(a, b) if matches!(&**a, Ann::Enum(t, m) if enum_filter(t, m).is_none()) => filter_of(Some(b)),
         Ann::And(a, b) => {
             let (x, y) = (filter_of(Some(a)), filter_of(Some(b)));
-            // Refinements: EDGE && LINE -> linear edges, FACE && PLANE -> planar faces...
-            let i = QueryFilter(x.0 & y.0);
+            // Refinements: EDGE && LINE -> linear edges, FACE && PLANE -> planar faces... Any model edge (EDGE)
+            // includes the linear and circular ones, so `EDGE && GeometryType.LINE` / `EDGE && ALLOWS_AXIS` keep
+            // the part's straight edges, not only sketch lines (LP-DIRECTION-PICK).
+            const SHAPED: u32 = QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0;
+            let shaped = |f: QueryFilter| if f.intersects(QueryFilter::EDGE) { f.0 | SHAPED } else { f.0 };
+            let mut i = QueryFilter(shaped(x) & shaped(y));
+            if (x.0 | y.0) & SHAPED == 0 {
+                i.0 &= !SHAPED;
+            }
             if i.0 != 0 { i } else { if x.0.count_ones() <= y.0.count_ones() { x } else { y } }
         }
         Ann::Not(_) => QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0 | QueryFilter::BODY.0),

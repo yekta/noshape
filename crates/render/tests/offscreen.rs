@@ -1566,6 +1566,64 @@ fn a_preview_picks_the_model_with_the_feature() {
     assert!((1..=6).contains(&id), "the centre picks {id}, not a face of the model with the feature");
 }
 
+/// While a feature dialog previews, a part's edges hover and pick like its faces (LP-DIRECTION-PICK: v0.4.9's
+/// pick pass drew only the unpickable base, so a Linear pattern's Direction took no edge): the visible edges of
+/// the model with the feature pick their ids through the mix, as without a preview.
+#[test]
+fn a_preview_picks_the_edges_of_the_model_with_the_feature() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (lo, hi) = ([-0.01f32, -0.01, -0.01], [0.01f32, 0.01, 0.01]);
+    let c = |i: u32| [if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }];
+    let pairs = [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)];
+    let mid = |k: usize| {
+        let (a, b) = (c(pairs[k].0), c(pairs[k].1));
+        glam::DVec3::new((a[0] + b[0]) as f64 * 0.5, (a[1] + b[1]) as f64 * 0.5, (a[2] + b[2]) as f64 * 0.5)
+    };
+    let cam = iso_camera();
+    let (w, h) = (400u32, 300u32);
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let (mesh, edges) = (r.upload_mesh(&primitives::box_mesh(lo, hi, 1)), r.upload_lines(&primitives::box_edges(lo, hi, 10, 1.5)));
+    let picks = |r: &mut Renderer, preview: bool| {
+        let mut scene = Scene::default();
+        if preview {
+            scene.preview_mix = Some(0.7);
+            scene.instances.push(Instance::new(Drawable::Mesh(mesh.clone())).compare_layer(compare::TARGET));
+            scene.instances.push(Instance::new(Drawable::Lines(edges.clone())).compare_layer(compare::TARGET));
+            for d in [Drawable::Mesh(mesh.clone()), Drawable::Lines(edges.clone())] {
+                let mut base = Instance::new(d).compare_layer(compare::BASE);
+                base.pickable = false;
+                base.pick_base = 1 << 30;
+                scene.instances.push(base);
+            }
+        } else {
+            scene.instances.push(Instance::new(Drawable::Mesh(mesh.clone())));
+            scene.instances.push(Instance::new(Drawable::Lines(edges.clone())));
+        }
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
+        let pick = f.pick.unwrap();
+        (0..12)
+            .map(|k| {
+                let s = cam.project(mid(k), vp, 0.02).unwrap();
+                pick.id_at(s.x as i32, s.y as i32).unwrap_or(0)
+            })
+            .collect::<Vec<u32>>()
+    };
+    let plain = picks(&mut r, false);
+    let visible: Vec<usize> = (0..12).filter(|&k| plain[k] == 10 + k as u32).collect();
+    assert!(visible.len() >= 6, "an iso box shows at least 6 edges: {plain:?}");
+    let previewed = picks(&mut r, true);
+    for k in visible {
+        assert_eq!(previewed[k], 10 + k as u32, "edge {k} under the preview picks {} (plain {:?}, preview {previewed:?})", previewed[k], plain);
+    }
+}
+
 /// A preview's highlight lines (compare::POST) stay whole over the mix:
 /// a line the new body covers keeps its colour, where an untagged one
 /// shows at the mix's 30 % (live: a picked region under the new boss stays

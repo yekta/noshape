@@ -869,6 +869,46 @@ fn std_edge_filters_match_builtin() {
     assert!(report.is_empty(), "edge filters differ from the std:\n{report}");
 }
 
+/// A custom feature's compound edge filters take the part's edges, not only sketch curves (LP-DIRECTION-PICK:
+/// `EntityType.EDGE && QueryFilterCompound.ALLOWS_AXIS` and `EntityType.EDGE && GeometryType.LINE` picked nothing
+/// on a part, because EDGE's bits and the other side's met only in SKETCH_EDGE).
+#[test]
+fn compound_edge_filters_take_model_edges() {
+    use noshape_model::params::{ParamKind, QueryFilter};
+    let field = |filter: &str| {
+        let src = studio(&format!(
+            r#"
+annotation {{ "Feature Type Name" : "Picks" }}
+export const picks = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {{
+        annotation {{ "Name" : "Edges", "Filter" : {filter}, "MaxNumberOfPicks" : 2 }}
+        definition.edges is Query;
+    }}
+    {{
+    }});
+"#
+        ));
+        let compiled = custom::compile(TabId(1), &src);
+        let def = compiled.feature("picks").unwrap_or_else(|| panic!("{filter}: {:?}", compiled.diagnostics));
+        match def.feature_type.params.iter().find(|p| p.id == "edges").map(|p| &p.kind) {
+            Some(ParamKind::Query { filter, .. }) => *filter,
+            other => panic!("{filter}: no query field ({:?})", other.is_some()),
+        }
+    };
+    let axis = field("EntityType.EDGE && QueryFilterCompound.ALLOWS_AXIS");
+    assert!(axis.intersects(QueryFilter::LINEAR_EDGE) && axis.intersects(QueryFilter::CIRCULAR_EDGE) && axis.intersects(QueryFilter::SKETCH_EDGE), "{axis:?}");
+    let line = field("EntityType.EDGE && GeometryType.LINE");
+    assert!(line.intersects(QueryFilter::LINEAR_EDGE) && line.intersects(QueryFilter::SKETCH_EDGE), "{line:?}");
+    assert!(!line.intersects(QueryFilter(QueryFilter::CIRCULAR_EDGE.0 | QueryFilter::EDGE.0)), "a LINE field takes no curved edge: {line:?}");
+    let circle = field("EntityType.EDGE && GeometryType.CIRCLE");
+    assert!(circle.intersects(QueryFilter::CIRCULAR_EDGE) && !circle.intersects(QueryFilter::LINEAR_EDGE), "{circle:?}");
+    // Unchanged: a plain edge field, and edges of solids.
+    assert_eq!(field("EntityType.EDGE"), QueryFilter::ANY_EDGE);
+    let solid = field("EntityType.EDGE && BodyType.SOLID");
+    assert!(solid.intersects(QueryFilter::EDGE) && !solid.intersects(QueryFilter::SKETCH_EDGE), "{solid:?}");
+}
+
 /// Standard library features whose generated dialog equals the built-in one.
 const EXPECTED_IDENTICAL_DIALOGS: &[&str] = &[
     "bodyDraft", "booleanBodies", "boundarySurface", "chamfer", "circularPattern", "compositeCurve", "compositePart", "constrainedSurface", "cPlane", "cPoint", "curvePattern",
