@@ -115,7 +115,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 5.1 | Right after creation a box shows the suggested value (line length, circle diameter, arc radius) | H:sketch_basics, H:line | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 5.2 | Typing a value or expression and Enter adds a driving dimension | H:line | ❌ (OTF-FIRST-KEY) | 0.4.10+ / 2d9a275c 10-27 |
+| 5.2 | Typing a value or expression and Enter adds a driving dimension | H:line | ✅ (OTF-FIRST-KEY fixed 0537ac91) | 0.4.10+ / 6cbb24e0 10-27 |
 | 5.3 | Continuing to sketch leaves the geometry undimensioned (box disappears) | H:sketch_basics | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 5.4 | Rectangles: length box, Enter, width box, Enter | H:corner_rectangle | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 5.5 | Ellipse / elliptical arc: primary then secondary diameter | H:ellipse | ✅ (T:sm) |  |
