@@ -217,6 +217,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P0 REGEN-NO-CANCEL a newer regeneration waits for a stale one instead of cancelling it: open a copy of
+  /root/qa-scratch/tickets/cli-fillet-hang.noshape in green 502416cc (NOSHAPE_PERF=1); while the opening regen is still
+  in Fillet 2 (it fails after the 30 s blend budget), drag the rollback bar above Fillet 2: schedule_regen #2 at 05:16:57,
+  but its result (7 features, all cached, 1 ms) only arrives at 05:17:30, when Fillet 2's budget ran out; the spinner
+  stays for 33 s for a rollback that costs nothing. The blend budget is cancellable (core 97081557: "jumps back when the
+  budget is spent or the regeneration is cancelled"), but scheduling a new regen doesn't cancel the running one. Same
+  shape as DRAFT-HANG's stuck app (there forever). Live: a new edit supersedes the one being computed (qa 2026-10-27,
+  green 502416cc)
 - [ ] P2 LOFT-SKETCH-HIDE a Loft hides only its first profile's sketch: Sketch 1 = 40×40 square on Top, Plane 1 = Top
   offset 40, Sketch 2 = Ø24 circle on it (/root/qa-scratch/loft2.noshape); Loft, pick the circle then the square, ✓: Sketch 2
   goes grey with the eye-slash, Sketch 1 stays shown (its menu says Hide) and its outline stays drawn; pick the square first
