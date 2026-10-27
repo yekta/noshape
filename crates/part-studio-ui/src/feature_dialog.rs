@@ -1148,6 +1148,13 @@ impl FeatureDialog {
         self.dirty |= ok;
     }
 
+    /// Live `canSubmit` (woolsthorpe): ✓, Enter and Ctrl+Enter commit only a dirty dialog (an edit, or a
+    /// regeneration without an error): a new Extrude with nothing picked stays open (EMPTY-COMMIT). The Sketch
+    /// dialog has its own rules.
+    pub fn can_submit(&self) -> bool {
+        self.dirty || self.feature.type_id == "sketch"
+    }
+
     pub fn set_status(&mut self, s: Option<(FeatureStatus, String)>, cx: &mut Context<Self>) {
         if self.status != s {
             self.status = s;

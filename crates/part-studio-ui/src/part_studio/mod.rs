@@ -2050,12 +2050,20 @@ impl PartStudioView {
         if self.edit.is_some() {
             self.accept_edit(false, window, cx);
         }
+        // One that can't be submitted yet (nothing picked) has nothing to keep.
+        if self.edit.is_some() {
+            self.cancel_edit(window, cx);
+        }
     }
 
     fn accept_edit(&mut self, repeat: bool, window: &mut Window, cx: &mut Context<Self>) {
         // Live (ui (10-26 c), VAR-INVALID): a value of the wrong type keeps
         // the dialog open; nothing is created.
         if self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).value_error(cx).is_some()) {
+            return;
+        }
+        // Live (EMPTY-COMMIT): nor does one that isn't dirty yet (a new Extrude with nothing picked).
+        if self.sketch.is_none() && self.edit.as_ref().is_some_and(|e| !e.dialog.read(cx).can_submit()) {
             return;
         }
         self.close_create_selection_of_dialog(cx);

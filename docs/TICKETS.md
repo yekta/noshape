@@ -419,7 +419,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Performance errors detected, AI Advisor (behaviours 1559 / 1563). Comments and AI Advisor are cloud; "Where used" (which
   tabs use this element) isn't there; "Release drafts" isn't on live's rail (a Free account has no release management)
   (qa 2026-10-27, green dacce5e7)
-- [x] 3c7fa0fe P1 MEASURE-MAX-DIST Max dist between curved faces comes from sampled points, not the exact maximum: two tubes
+- [x] 1cc65def P1 MEASURE-MAX-DIST Max dist between curved faces comes from sampled points, not the exact maximum: two tubes
   (Ø40 / Ø20 × 30, axes 50 mm apart; /root/qa-scratch/rev.noshape, Part 1 / Part 2 outer cylinders) → ours "Max dist
   94.850 mm" (app status bar) / 94.849984 (query_measure, from (−19.975, −0.997, 30), a mesh vertex, to (70, 0, 0)); exact
   √(90² + 30²) = 94.868 (from (−20, 0, 30)). Parallel axes 50.000 and Min 10.000 are exact. Live measures on the exact
@@ -430,10 +430,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   its faces' / edges' locally farthest point from the other, a (u, v) or parameter search kept on the bounded face);
   rev.noshape's tubes read 94.86833 from (−20, 0, 30); test measure::max_dist_is_exact_on_curved_faces_and_circles
   (faces √(90² + 30²), top circles 90).
-- [ ] P2 EMPTY-COMMIT a feature with an empty required selection can be committed: new Extrude, nothing picked, Enter,
+- [x] COMMIT P2 EMPTY-COMMIT a feature with an empty required selection can be committed: new Extrude, nothing picked, Enter,
   Enter → ours commits a red "Extrude 1" (green 525c619b). Live keeps the dialog open: the ✓ is disabled (`button-ok
   disabled`), and Enter, ✓ or Ctrl+Enter do nothing until a region is picked (behaviours "qa (2026-10-27, P2 batch 2)"
   (5)) (qa 2026-10-27, green 4854cad4)
+  psui: ✓, Enter and Ctrl+Enter commit only a dirty dialog (live `canSubmit`: an edit or a regeneration without an
+  error; `FeatureDialog::can_submit`, checked in `accept_edit`); verified on :102: a new Extrude with nothing picked
+  stays open through Enter, Enter, Ctrl+Enter; a picked face then commits; an existing Extrude opened for edit
+  commits on Enter.
 - [ ] P2 CONFIG-CELL-EDIT a configured value can't be edited in the Configuration panel's table: Configure Part Studio,
   add row "Big", Linear pattern 1 › Instance count › right-click › Configure (column "Linear pattern 1 / Instance count",
   3 / 3, toast as live); a click, double-click or typing on Big's "3" cell does nothing (no blue frame, no edit), while
