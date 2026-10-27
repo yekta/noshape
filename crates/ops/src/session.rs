@@ -69,6 +69,21 @@ fn keep_tab_bar(doc: &Document, name: &str, restored: Option<Vec<u8>>) -> Option
 /// Store meta key of a protected workspace (`workspace_protected:<branch>`).
 pub const PROTECTED_KEY: &str = "workspace_protected:";
 
+/// Whether process `pid` still runs (a crash marker of a live process is an
+/// evaluation in progress, not a crash).
+fn process_alive(pid: u32) -> bool {
+    if cfg!(target_os = "linux") {
+        return Path::new("/proc").join(pid.to_string()).exists();
+    }
+    #[cfg(unix)]
+    let alive = std::process::Command::new("kill").args(["-0", &pid.to_string()]).stderr(std::process::Stdio::null()).status().is_ok_and(|s| s.success());
+    #[cfg(windows)]
+    let alive = std::process::Command::new("tasklist").args(["/FI", &format!("PID eq {pid}"), "/NH"]).output().is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()));
+    #[cfg(not(any(unix, windows)))]
+    let alive = false;
+    alive
+}
+
 pub struct Session {
     pub path: PathBuf,
     pub store: Store,
@@ -81,6 +96,9 @@ pub struct Session {
     pub active_tab: Option<TabId>,
     /// Onshape's "Switch to view only mode" (☰ menu).
     pub view_only: bool,
+    /// What opening did to features that had crashed a process while they
+    /// were evaluated ([`Session::open`]): one note per feature.
+    pub recovered: Vec<String>,
     /// Set while an allowed edit runs on a protected workspace (release
     /// metadata; [`Session::with_protection_lifted`]).
     protection_lifted: bool,
@@ -95,7 +113,8 @@ impl Session {
         let name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Untitled".into());
         store.set_name(&name)?;
         let branch = store.default_branch()?;
-        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, protection_lifted: false })
+        noshape_model::regen::crash_guard::enable(noshape_model::regen::crash_guard::default_dir());
+        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false })
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -106,7 +125,48 @@ impl Session {
         let doc = Document::from_blobs(&store.read_all(head)?)?;
         // Undo works across sessions: rebuild the stack from the history.
         let undo = UndoStack::from_history(&store, branch, 500).unwrap_or_else(|_| UndoStack::new(branch).with_limit(500));
-        Ok(Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false, protection_lifted: false })
+        let mut s = Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false };
+        noshape_model::regen::crash_guard::enable(noshape_model::regen::crash_guard::default_dir());
+        if let Some(dir) = noshape_model::regen::crash_guard::dir() {
+            s.recovered = s.recover_crashed_features(dir);
+        }
+        Ok(s)
+    }
+
+    /// qa DOC-POISON: a feature whose evaluation killed a process (its
+    /// crash marker left behind, `noshape_model::regen::crash_guard`) would
+    /// kill every process that opens the document. Each Part Studio of this
+    /// document holding one gets its rollback bar above it (one undoable
+    /// edit, named so the history says why), so the document opens and the
+    /// feature can be edited or deleted. Markers of other documents stay.
+    pub fn recover_crashed_features(&mut self, dir: &Path) -> Vec<String> {
+        use noshape_model::document::TabContent;
+        let mut notes = Vec::new();
+        for m in noshape_model::regen::crash_guard::markers(dir) {
+            if m.pid == std::process::id() || process_alive(m.pid) {
+                continue;
+            }
+            let hit = self.doc.tabs.iter().find_map(|t| match &t.content {
+                TabContent::PartStudio(ps) => ps.features.iter().position(|f| f.id.to_string() == m.feature).map(|i| (t.id, i, ps.rollback_index(), ps.features[i].name.clone())),
+                _ => None,
+            });
+            let Some((tab, index, rollback, name)) = hit else { continue };
+            if index < rollback {
+                let lifted = std::mem::replace(&mut self.protection_lifted, true);
+                let r = self.edit_tab(tab, &format!("Roll back above {name}: it stopped noshape while regenerating"), |c| {
+                    if let TabContent::PartStudio(ps) = c {
+                        ps.rollback = Some(index);
+                    }
+                });
+                self.protection_lifted = lifted;
+                if r.is_err() {
+                    continue;
+                }
+                notes.push(format!("{name} stopped noshape the last time it regenerated: the rollback bar is now above it. Edit or delete it, then move the rollback bar back."));
+            }
+            let _ = std::fs::remove_file(&m.path);
+        }
+        notes
     }
 
     pub fn name(&self) -> String {
@@ -501,6 +561,44 @@ mod tests {
         s.with_protection_lifted(|s| s.edit_tab(tab, "Release", |_| ())).unwrap();
         s.set_branch_protected(main, false).unwrap();
         s.edit_tab(tab, "Rename", |_| ()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// qa DOC-POISON: a feature that crashed a process (its marker left by
+    /// a process that is gone) is rolled back on open, once, with a note;
+    /// the document then opens without evaluating it.
+    #[test]
+    fn a_feature_that_crashed_is_rolled_back_on_open() {
+        use noshape_model::document::TabContent;
+        let dir = std::env::temp_dir().join(format!("noshape-session-poison-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("p.noshape");
+        let _ = std::fs::remove_file(&path);
+        let mut doc = Document::new();
+        let units = doc.settings.units;
+        let tab = doc.tabs.iter_mut().find(|t| matches!(t.content, TabContent::PartStudio(_))).expect("a Part Studio");
+        let (tab_id, TabContent::PartStudio(ps)) = (tab.id, &mut tab.content) else { unreachable!() };
+        for _ in 0..3 {
+            let f = ps.new_feature("extrude", &units).expect("extrude");
+            ps.features.push(f);
+        }
+        let (bad, name) = (ps.features[1].id, ps.features[1].name.clone());
+        drop(Session::create(&path, doc).unwrap());
+        // The marker a crashed process left (no such process runs).
+        let markers = noshape_model::regen::crash_guard::default_dir();
+        std::fs::create_dir_all(&markers).unwrap();
+        let marker = markers.join(format!("4294967294-{}.marker", std::process::id()));
+        std::fs::write(&marker, format!("4294967294\n{bad}\n{name}\n")).unwrap();
+        let s = Session::open(&path).unwrap();
+        let TabContent::PartStudio(ps) = &s.doc.tab(tab_id).unwrap().content else { unreachable!() };
+        assert_eq!(ps.rollback, Some(1), "the rollback bar above the feature");
+        assert!(s.recovered.len() == 1 && s.recovered[0].contains(&name), "{:?}", s.recovered);
+        assert!(!marker.exists(), "the marker is cleared");
+        let last = s.store.history(s.branch).unwrap()[0].description.clone();
+        assert!(last.ends_with(&format!(":: Roll back above {name}: it stopped noshape while regenerating")), "{last}");
+        drop(s);
+        // Opened again: nothing more to do.
+        assert!(Session::open(&path).unwrap().recovered.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

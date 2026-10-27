@@ -409,7 +409,7 @@ Examples:
 
 Open a document file and make it current.
 
-Opens an existing .noshape file. Later calls without `doc` use it.
+Opens an existing .noshape file. Later calls without `doc` use it. A feature whose regeneration stopped the last process that evaluated it (a kernel crash) is rolled back on open (the rollback bar above it, one history entry) and named in `recovered`, so the document opens; edit or delete it, then move the rollback bar back.
 
 Examples:
 

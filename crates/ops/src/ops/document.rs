@@ -30,7 +30,7 @@ pub fn ops() -> Vec<Op> {
             group: "document",
             verb: "open",
             summary: "Open a document file and make it current",
-            description: "Opens an existing .noshape file. Later calls without `doc` use it.",
+            description: "Opens an existing .noshape file. Later calls without `doc` use it. A feature whose regeneration stopped the last process that evaluated it (a kernel crash) is rolled back on open (the rollback bar above it, one history entry) and named in `recovered`, so the document opens; edit or delete it, then move the rollback bar back.",
             fields: vec![req("path", s(), "Path of the .noshape file.")],
             mutates: false,
             destructive: false,
@@ -256,7 +256,7 @@ pub(crate) fn describe(od: &OpenDoc) -> Value {
     let tabs: Vec<Value> = d.ordered_tabs().iter().map(|t| json!({ "id": t.id.to_string(), "name": t.name, "kind": t.content.kind_name(), "folder": folder_of(t.id) })).collect();
     let folders: Vec<Value> = d.settings.folders.iter().map(|f| json!({ "id": f.id.to_string(), "name": f.name, "folder": folder_of(f.id) })).collect();
     let u = &d.settings.units;
-    json!({
+    let mut v = json!({
         "path": od.session.path.display().to_string(),
         "name": od.session.name(),
         "tabs": tabs,
@@ -267,7 +267,12 @@ pub(crate) fn describe(od: &OpenDoc) -> Value {
         "read_only": od.session.read_only(),
         "branch": od.session.store.list_branches().ok().and_then(|l| l.into_iter().find(|b| b.id == od.session.branch)).map(|b| b.name),
         "protected": od.session.is_protected(),
-    })
+    });
+    // Features that had stopped a process while regenerating, rolled back on open (qa DOC-POISON).
+    if !od.session.recovered.is_empty() {
+        v["recovered"] = json!(od.session.recovered);
+    }
+    v
 }
 
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

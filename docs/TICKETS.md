@@ -47,7 +47,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   /root/qa-scratch/tickets/cli-fillet2-segv.noshape, backtrace tickets/cli-fillet2-segv-bt.txt. Needs a guard (validate
   the pcurves before the blend, or run the fillet where a signal can't take the process down) (qa 2026-10-27, main CLI
   ~20:18 and v0.4.8)
-- [ ] P0 DOC-POISON a feature whose regeneration crashes the process is already committed to the document, so the
+- [x] (dx 10-27: crash markers around each feature evaluation (model-core regen::crash_guard); Session::open rolls a Part Studio back above a feature whose evaluation stopped a process, one named history entry, notes in `recovered` (document_open); app and CLI alike since both open through ops::session; checked on cli-fillet-segv.noshape. The kernel crashes themselves stay open for core) P0 DOC-POISON a feature whose regeneration crashes the process is already committed to the document, so the
   document then crashes on every open (DRAFT-SEGV-DOC, SHELL-SLAB-GPF, FILLET-SEGV, FILLET-SEGV-BLEND). Whatever the kernel bug, one bad feature must not
   make a document unopenable: commit after a successful regen, and/or run kernel ops so a crash only fails that feature
   (subprocess / signal guard), and/or open with the last feature rolled back after a crash on open (qa 2026-10-26)
@@ -219,7 +219,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [ ] P2 API-DERIVED-BY-NAME feature_add importDerived with `partStudio: "Part Studio 1"` (the tab's name) is accepted and
+- [x] (dx 5ef64eb8: a tab name or id is resolved, a non-Part-Studio tab refused with `params.partStudio`) P2 API-DERIVED-BY-NAME feature_add importDerived with `partStudio: "Part Studio 1"` (the tab's name) is accepted and
   the feature fails "Error regenerating."; only the tab id works. Accept the name as tab_* ops do, or refuse it as an
   invalid_argument naming the expected id (main CLI ~20:18) (qa 2026-10-26)
 - [ ] P2 OPEN-ERROR-SILENT `noshape bad.noshape` with a truncated file ("sqlite: database disk image is malformed") or a

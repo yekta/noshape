@@ -9,6 +9,7 @@
 //! cached per shape, so unchanged bodies are never re-meshed.
 
 pub mod context;
+pub mod crash_guard;
 pub mod derived;
 mod display;
 pub mod runs;
@@ -305,6 +306,8 @@ impl Regenerator {
                         if let Some(c) = &opts.cancel {
                             c.evaluating(f.id);
                         }
+                        // A crash in here leaves the marker behind (qa DOC-POISON).
+                        let _crash_guard = crash_guard::enter(f.id, &f.name);
                         // Query variables (`#name` selections) expand against the upstream context.
                         let expanded = eval::expand_query_variables(params, &ctx);
                         let params = expanded.as_ref().unwrap_or(params);
