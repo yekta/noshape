@@ -55,8 +55,8 @@ Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs do
    /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins), asm2 (a pin through the plate), ps2 (Part Studio overlap).
 2. docs/parity/assembly.md G5 exploded views: workflow-exploded-named-positions rechecked 10-27 (EXV6 rollback pill,
    NP2 header measured against live 155); qa/asm3.noshape = asm1 + Revolute + a named position driving it.
-3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; left:
-   A10 a toolbar tooltip staying after a click (app-core tooltips, psui's area)), workflow-configured-assembly (1–5, 8
+3. Old passes rechecked 10-27: workflow-mates (8, 10, 12, 13 ✅), workflow-assembly (A1–A6, A9, A11, A12 ✅; A10 fixed
+   earlier, rows 109 / 170), workflow-configured-assembly (1–5, 8
    ✅; CA3 closed by ui, CA4 and A15 rechecked on green).
 4. Exact flip with nothing fixed: which part turns now follows a rule fitted to live's 14 R3 runs (the first
    connector's part when the common Z's first non-zero coordinate is negative, else the second's; solver test
