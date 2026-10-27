@@ -462,6 +462,9 @@ pub struct SketchEditor {
     /// Shift held while moving: show all glyphs temporarily (Onshape).
     pub shift_held: bool,
     pub polygon_sides: usize,
+    /// The last committed polygon's centre and 2nd click: live shows its Ø
+    /// in a grey box (a readout, not a dimension) until the next polygon.
+    polygon_readout: Option<(DVec2, DVec2)>,
     pub fillet_radius: f64,
     pub offset_distance: f64,
     pub offset_flip: bool,
@@ -1052,6 +1055,7 @@ impl SketchEditor {
             opened_options,
             shift_held: false,
             polygon_sides: 6,
+            polygon_readout: None,
             fillet_radius: 0.005,
             offset_distance: 0.005,
             offset_flip: false,
@@ -1121,6 +1125,7 @@ impl SketchEditor {
     pub fn set_tool(&mut self, tool: Tool) {
         // Pressing the active tool's key again toggles back to select.
         let previous = self.tool;
+        self.polygon_readout = None;
         self.tool = if self.tool == tool && tool != Tool::Select { Tool::Select } else { tool };
         // Live: a polygon tool session starts at 6 sides; within it the next
         // polygon keeps the last count.
@@ -2657,6 +2662,7 @@ impl SketchEditor {
             }
             Tool::Polygon | Tool::CircumPolygon => {
                 if self.clicks.is_empty() {
+                    self.polygon_readout = None;
                     self.clicks.push(click);
                     return EditOutcome::redraw();
                 }
@@ -2684,6 +2690,7 @@ impl SketchEditor {
                         // The click's inferences (live: Horizontal with the centre) go to its point.
                         attach(sk, ids.points[0], None, &rim);
                         // Live makes no dimension (its boxed Ø is a readout).
+                        self.polygon_readout = Some((c.pos, rim.pos));
                         self.finish_create(data, &ids.curves);
                         EditOutcome::changed()
                     }
@@ -4268,6 +4275,16 @@ impl SketchEditor {
     // ------------------------------------------------------------ overlay
 
     /// Preview geometry, inference guides, picks, box selection and dimension
+    /// The committed polygon's grey-boxed Ø readout (live: after Enter, at
+    /// the drawing readout's place, until the next polygon starts).
+    pub fn polygon_readout(&self, units: &UnitPrefs) -> Option<(DVec2, String)> {
+        let (a, tip) = self.polygon_readout?;
+        let e0 = EntityId(0);
+        let r = (tip - a).length();
+        let text = dim_value_text(&ConstraintKind::Diameter { curve: e0, value: r * 2.0 }, r * 2.0, units);
+        Some((circle_readout_at(a, tip, label_width_px(&text), self.world_per_px), text))
+    }
+
     /// Live values next to the rubber-band preview while drawing (live
     /// Onshape: line length, rectangle width and height, circle `Ø`, arc `R`,
     /// 13 px light blue, no box). Positions are sketch coordinates.
@@ -4356,15 +4373,7 @@ impl SketchEditor {
                         // centre for a mostly horizontal cursor, else
                         // straight below (above) the shape.
                         let text = dia(r * 2.0);
-                        let w = label_width_px(&text);
-                        let at = if r >= px * (w + 40.0) {
-                            *a + d * 0.5
-                        } else if d.x.abs() > d.y.abs() {
-                            *a + DVec2::new(-d.x.signum() * (r + px * (w * 0.5 + 4.0)), 0.0)
-                        } else {
-                            *a + DVec2::new(0.0, -d.y.signum() * (r + px * 22.0))
-                        };
-                        out.push((at, text));
+                        out.push((circle_readout_at(*a, *a + d, label_width_px(&text), px), text));
                     }
                 }
             }
@@ -5660,6 +5669,23 @@ fn arrow(out: &mut Vec<[DVec2; 2]>, tip: DVec2, dir: DVec2, s: f64) {
     }
 }
 
+/// Where a circle's / polygon's Ø readout sits (live, behaviours "skasm
+/// (2026-10-27) where the live Ø readout sits"): halfway to the cursor
+/// `tip` when the label (`w` px wide) fits there, otherwise outside: across
+/// the centre for a mostly horizontal cursor, else straight below (above)
+/// the shape.
+fn circle_readout_at(a: DVec2, tip: DVec2, w: f64, px: f64) -> DVec2 {
+    let d = tip - a;
+    let r = d.length();
+    if r >= px * (w + 40.0) {
+        a + d * 0.5
+    } else if d.x.abs() > d.y.abs() {
+        a + DVec2::new(-d.x.signum() * (r + px * (w * 0.5 + 4.0)), 0.0)
+    } else {
+        a + DVec2::new(0.0, -d.y.signum() * (r + px * 22.0))
+    }
+}
+
 /// Screen width of a dimension value at 14 px (Roboto, digits ~7.6 px).
 pub fn label_width_px(text: &str) -> f64 {
     // 16 px text (Onshape's dimension values).
@@ -6872,6 +6898,10 @@ mod tests {
             let at_middle = lines.iter().any(|c| ((c.start_point() + c.end_point()) * 0.5 - rim).length() < 1e-9);
             assert_eq!((at_vertex, at_middle), (on_vertex, !on_vertex), "{tool:?}");
             assert!(ed.otf.is_none(), "live makes no Ø dimension");
+            let (at, text) = ed.polygon_readout(&UnitPrefs::default()).expect("the boxed Ø readout");
+            assert!((at - v(0.025, 0.02)).length() < 1e-9 && text.starts_with('Ø'), "{at} {text}");
+            click(&mut ed, &mut data, v(0.07, 0.02));
+            assert!(ed.polygon_readout(&UnitPrefs::default()).is_none(), "the next polygon clears it");
             assert!(data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::CircularPatternLink { .. })), "the edges are a circular pattern");
             let circle = data.sketch.entities().find(|e| e.kind() == EntityKind::Circle).map(|e| data.sketch.curve(e.id).unwrap());
             assert!(matches!(circle, Some(Curve2::Circle { radius, .. }) if (radius - 0.01).abs() < 1e-9), "{tool:?}: the circle goes through the click");

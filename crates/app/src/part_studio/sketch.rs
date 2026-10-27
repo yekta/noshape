@@ -3325,6 +3325,32 @@ impl PartStudioView {
             let w = crate::sketch_mode::label_width_px(&text) as f32 * 13.0 / 14.0;
             out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 9.0)).text_size(px(13.)).text_color(rgb(0x449ccd)).whitespace_nowrap().child(text).into_any_element());
         }
+        // The committed polygon's Ø in a grey box (live skasm-poly-6: bg
+        // (248,249,250), 1 px (158,166,172), text (97,107,115); a readout).
+        if let Some((pos, text)) = ed.polygon_readout(&units)
+            && let Some((x, y)) = project(pos)
+        {
+            let w = crate::sketch_mode::label_width_px(&text) as f32 * 13.0 / 14.0 + 8.0;
+            out.push(
+                div()
+                    .absolute()
+                    .left(px(x - w * 0.5))
+                    .top(px(y - 11.0))
+                    .h(px(22.))
+                    .px(px(4.))
+                    .flex()
+                    .items_center()
+                    .bg(rgb(0xf8f9fa))
+                    .border_1()
+                    .border_color(rgb(0x9ea6ac))
+                    .rounded(px(2.))
+                    .text_size(px(13.))
+                    .text_color(rgb(0x616b73))
+                    .whitespace_nowrap()
+                    .child(text)
+                    .into_any_element(),
+            );
+        }
 
         // ---- value of the dimension being placed (follows the cursor)
         if let Some((kind, pos, v)) = ed.dimension_preview(&data)
