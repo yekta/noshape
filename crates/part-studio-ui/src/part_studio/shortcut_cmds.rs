@@ -137,9 +137,29 @@ pub fn default_sketch_shortcut_names() -> Vec<&'static str> {
 }
 
 /// The sketch S toolbar's tools (Preferences › Shortcut toolbars › Sketch).
-pub(super) fn sketch_shortcut_toolbar(prefs: &super::toolbar_prefs::ToolbarPrefs) -> Vec<Tool> {
+pub(super) fn sketch_shortcut_toolbar(prefs: &super::toolbar_prefs::ToolbarPrefs) -> Vec<SketchShortcut> {
     let defaults = default_sketch_shortcut_names();
-    prefs.sketch_shortcut_tools(&defaults).iter().filter_map(|n| super::sketch::all_sketch_tools().find(|t| tool_name(*t) == n)).collect()
+    // Live: in the Preferences list's order, not the order they were ticked.
+    let order: Vec<String> = sketch_prefs_rows().into_iter().map(|(id, _, _)| id).collect();
+    let mut names = prefs.sketch_shortcut_tools(&defaults);
+    names.sort_by_key(|n| order.iter().position(|o| o == n).unwrap_or(usize::MAX));
+    names
+        .iter()
+        .filter_map(|n| match n.as_str() {
+            // Live (behaviours 3242–3250): the Sketch list starts with these two feature tools (SKETCH-S-EXTRUDE).
+            "Extrude" => Some(SketchShortcut::Feature("extrude")),
+            "Revolve" => Some(SketchShortcut::Feature("revolve")),
+            n => super::sketch::all_sketch_tools().find(|t| tool_name(*t) == n).map(SketchShortcut::Tool),
+        })
+        .collect()
+}
+
+/// A button of the sketch S toolbar: a sketch tool, or a feature started from the sketch (it finishes the sketch
+/// and takes its regions, `start_feature`).
+#[derive(Clone, Copy)]
+pub(super) enum SketchShortcut {
+    Tool(Tool),
+    Feature(&'static str),
 }
 
 /// Feature types of the Part Studio toolbar, in toolbar order (the tools

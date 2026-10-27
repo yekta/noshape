@@ -2978,7 +2978,25 @@ impl PartStudioView {
         };
         let mut buttons: Vec<AnyElement> = Vec::new();
         if self.sketch.is_some() {
-            for tool in super::shortcut_cmds::sketch_shortcut_toolbar(&self.ui.toolbar) {
+            for item in super::shortcut_cmds::sketch_shortcut_toolbar(&self.ui.toolbar) {
+                let tool = match item {
+                    super::shortcut_cmds::SketchShortcut::Tool(t) => t,
+                    super::shortcut_cmds::SketchShortcut::Feature(id) => {
+                        buttons.push(
+                            btn(SharedString::from(format!("mini-{id}")), feature_icon(id), cx)
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                                        cx.stop_propagation();
+                                        this.ui.mini_toolbar = None;
+                                        this.start_feature(id, window, cx);
+                                    }),
+                                )
+                                .into_any_element(),
+                        );
+                        continue;
+                    }
+                };
                 buttons.push(
                     btn(SharedString::from(format!("mini-{}", tool.icon())), tool.icon().into(), cx)
                         .on_mouse_down(
