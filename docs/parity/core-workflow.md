@@ -88,8 +88,8 @@ it, so re-take positions after every selection.
 |---|---|---|---|---|
 | 5.1 | Variable (Plane ▾ dropdown): w, 20 | "#w = 20 mm" | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 5.2 | Plane ▾ dropdown contents | … Variable, Query variable, **Composite part, Tag** | ✅ (v0.4.6 gate): list scrolls to Composite part / Tag (was ✗ F17 (last items cut off at the window bottom)) | 0.4.10+ / 1c853f78 10-27 |
-| 5.3 | Drag the variable to the top; Extrude 1 depth "#w" | Parts 20 mm | ✅ |  |
-| 5.4 | Select a face / two faces | "Area: 856.366 mm²" / a distance | ✅ |  |
+| 5.3 | Drag the variable to the top; Extrude 1 depth "#w" | Parts 20 mm | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 5.4 | Select a face / two faces | "Area: 856.366 mm²" / a distance | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 5.5 | Mass properties, no material | ? centre of mass shown | ? F18 (centre of mass and inertia blank) |  |
 | 5.6 | Material warning | Goes with the Mass properties dialog | ✅ (v0.4.6 gate): page toast ≈3.4 s, gone ≈8 s (= live) (was ✗ F19 (stays; later covers the sketch dialog's ✓)) |  |
 | 5.7 | Configurations panel › Configure Part Studio; add row "Long" | List input, Default / Long, info box | ✅ |  |
@@ -102,19 +102,19 @@ it, so re-take positions after every selection.
 
 | # | Step | Live | Status | Verified |
 |---|---|---|---|---|
-| 6.1 | Assembly tab, I | Insert dialog | ✅ |  |
-| 6.2 | Click Part 2, click; click Part 3, click | Inserted; **the first instance lands at the origin** | ✅ re-checked 10-23: first instance at the assembly origin (was ✗ F25) |  |
+| 6.1 | Assembly tab, I | Insert dialog | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 6.2 | Click Part 2, click; click Part 3, click | Inserted; **the first instance lands at the origin** | ✅ re-checked 10-23: first instance at the assembly origin (was ✗ F25) | 0.4.10+ / 1c853f78 10-27 |
 | 6.3 | Instance filter "3" | Filters the list | ✅ |  |
-| 6.4 | Fastened mate (M): two faces | Mate HUD, solves, "Fastened 1" | ✅ |  |
-| 6.5 | + › Create Drawing…, ANSI_A_MM, OK | Model picker, then Insert view following the cursor | ✅ |  |
-| 6.6 | Place front, right and top views; Esc | Projected views | ✅ |  |
-| 6.7 | Dimension tool, pick an edge, place | Dimension "17"; tool stays active | ✅ (two-edge distance not retried) |  |
+| 6.4 | Fastened mate (M): two faces | Mate HUD, solves, "Fastened 1" | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 6.5 | + › Create Drawing…, ANSI_A_MM, OK | Model picker, then Insert view following the cursor | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 6.6 | Place front, right and top views; Esc | Projected views | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 6.7 | Dimension tool, pick an edge, place | Dimension "17"; tool stays active | ✅ (two-edge distance not retried) | 0.4.10+ / 1c853f78 10-27 |
 
 ## 7. Export, save, reopen
 
 | # | Step | Live | Status | Verified |
 |---|---|---|---|---|
-| 7.1 | Part Studio tab › Export…, STEP | Dialog (Parasolid default), STEP options, file written | ✅ (3 solids, mm) |  |
+| 7.1 | Part Studio tab › Export…, STEP | Dialog (Parasolid default), STEP options, file written | ❌ (TAB-EXPORT-MISSING) (3 solids, mm) | 0.4.10+ / 1c853f78 10-27 |
 | 7.2 | STEP contents | Products named as in live's export | ✅ (v0.4.6 gate): flat products Part 1…n, AP242 header (was ✗ F26) |  |
 | 7.3 | Quit, start, Recently opened, open | Thumbnail, all tabs and features back | ✅ (single click selects; double click opens: ? vs live) |  |
 
