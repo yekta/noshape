@@ -74,13 +74,10 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-1. Highlights over the preview blend (P1 residual, behaviours "psui (10-26, P1) Feature preview look"; also the
-   Delete part ghost's (255,192,76) outline, 1.12): live draws the active field's picks after the mix, depth-tested
-   against the model before the feature, so a picked region under the boss and a deleted part's outline stay full
-   orange; ours draws them in the "with" model only (30 % under the boss, nothing for a deleted part). Design: a
-   post-mix pass (new `compare` tag) drawing the base scene's highlighted lines into the frame with the main pass's
-   depth (store it when preview_mix; MSAA: render into the MSAA buffer + resolve into a texture, then composite over
-   the frame, or single-sample line pipelines against `depth_sample`). At slider 1 live's top face is lighter.
+1. Highlights over the preview blend: the active field's highlight lines (a picked region's outline) now show whole
+   over the mix (compare::POST, the renderer's preview-post pass against the frame's depth). Left: the Delete part
+   ghost's (255,192,76) outline (the deleted part exists only in the base model, which carries no highlights), and at
+   slider 1 live's top face is lighter.
 2. part-studio.md 🔧 rows waiting for live (asked 10-27): 3.7 box into a dialog field (ours: Fillet takes the 6 faces),
    3.12 / 3.13 Select other into a field, 6.26 / 6.37 / 6.38 list separator and folder menus. Dihedral comb length vs
    Scale and its "Min: 90 deg" label (asked). Ctrl+M Mate connector defaults (asked). Crossing box colour (asked).

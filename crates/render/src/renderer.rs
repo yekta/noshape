@@ -50,6 +50,8 @@ const SLOTS_SAMPLE: usize = 2;
 const SLOTS_COMPARE_OVER: usize = 3;
 const SLOTS_COMPARE_BASE: usize = 4;
 const SLOTS_COMPARE_TARGET: usize = 5;
+/// A feature preview's [`crate::scene::compare::POST`] lines over the "with" layer.
+const SLOTS_PREVIEW_POST: usize = 6;
 
 /// Polygon offsets as Onshape sets them (webgl bundle `setZOffset(z)` =
 /// `polygonOffset(z / 29, z)`; MAXIMUM_Z_OFFSET 29, PART_FACES_Z_OFFSET 27,
@@ -618,6 +620,10 @@ struct DrawLists {
     slot_of: Vec<u32>,
     /// Compare mode: the version left out ([`crate::scene::compare`]; 0 none).
     skip_compare: u8,
+    /// Feature previews: [`crate::scene::compare::POST`] instances left out
+    /// (the "with" layer), or the only ones drawn (its post pass).
+    skip_post: bool,
+    only_post: bool,
     /// Color passes: the frame's detail, for the bodies drawn as their box
     /// ([`lod_boxes`]); pick passes always draw full detail.
     lod: Option<Detail>,
@@ -890,6 +896,10 @@ impl DrawLists {
         let sprite_margin = margin(24.0);
         for (i, inst) in scene.instances.iter().enumerate() {
             if self.skip_compare != 0 && inst.compare == self.skip_compare {
+                continue;
+            }
+            let post = inst.compare == crate::scene::compare::POST;
+            if (post && self.skip_post) || (!post && self.only_post) {
                 continue;
             }
             // A body's box instead of the body, never both; one level of
@@ -1773,7 +1783,7 @@ pub struct Renderer {
     bind_sample: Option<wgpu::BindGroup>,
     /// Draw-order buffers ([`SLOTS_COLOR`], [`SLOTS_PICK`],
     /// [`SLOTS_SAMPLE`]) and their instance bind groups.
-    slot_buffers: [SlotBuffer; 6],
+    slot_buffers: [SlotBuffer; 7],
     /// GPU copies of the state / instance buffers (skip unchanged uploads).
     last_states: Vec<u32>,
     last_inst: Vec<u8>,
@@ -1783,6 +1793,7 @@ pub struct Renderer {
     mesh_lod_memory: MeshLodMemory,
     /// Compare mode: both versions' draw lists.
     lists_over: DrawLists,
+    lists_post: DrawLists,
     targets: HashMap<u64, TargetState>,
     pending: VecDeque<PendingRead>,
     ready: Vec<Completed>,
@@ -2146,6 +2157,7 @@ impl Renderer {
             lists: DrawLists::default(),
             mesh_lod_memory: MeshLodMemory::default(),
             lists_over: DrawLists::default(),
+            lists_post: DrawLists::default(),
             targets: HashMap::new(),
             pending: VecDeque::new(),
             ready: Vec::new(),
@@ -2589,6 +2601,7 @@ impl Renderer {
         let compare_frame = (comparing || req.scene.preview_mix.is_some()).then(|| {
             let mut over = std::mem::take(&mut self.lists_over);
             over.skip_compare = if comparing { 0 } else { crate::scene::compare::BASE };
+            over.skip_post = !comparing;
             over.lod = Some(req.style.detail);
             over.mesh_error_px = req.style.detail.mesh_error_px;
             over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
@@ -2598,6 +2611,17 @@ impl Renderer {
                 .map(|v| req.scene.instances.iter().enumerate().filter(|(_, i)| comparing && i.compare == v && !i.pick_only && i.color[3] >= 1.0 && matches!(i.drawable, Drawable::Mesh(_))).map(|(k, _)| k as u32).collect::<Vec<u32>>());
             let bind_faces = [self.prepare_slots(SLOTS_COMPARE_BASE, &faces[0]), self.prepare_slots(SLOTS_COMPARE_TARGET, &faces[1])];
             (over, bind_over, faces, bind_faces)
+        });
+        // A feature preview's highlights over the "with" layer (compare::POST).
+        let post_frame = (req.scene.compare.is_none() && req.scene.preview_mix.is_some() && req.scene.instances.iter().any(|i| i.compare == crate::scene::compare::POST)).then(|| {
+            let mut post = std::mem::take(&mut self.lists_post);
+            post.only_post = true;
+            post.lod = Some(req.style.detail);
+            post.mesh_error_px = req.style.detail.mesh_error_px;
+            post.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
+            post.apply_detail(&req.style.detail);
+            let bind = self.prepare_slots(SLOTS_PREVIEW_POST, &post.slots);
+            (post, bind)
         });
         if perf::enabled() {
             perf::record_ms("r.culled_instances", lists.culled as f32);
@@ -2729,8 +2753,9 @@ impl Renderer {
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &tex.depth,
-                    // Kept for the ambient occlusion pass.
-                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: if ao_strength > 0.001 { wgpu::StoreOp::Store } else { wgpu::StoreOp::Discard } }),
+                    // Kept for the ambient occlusion pass and a preview's
+                    // highlights over the "with" layer.
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: if ao_strength > 0.001 || post_frame.is_some() { wgpu::StoreOp::Store } else { wgpu::StoreOp::Discard } }),
                     stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store: wgpu::StoreOp::Discard }),
                 }),
                 timestamp_writes: timer.as_ref().zip(timer_slot).and_then(|(t, i)| t.writes(i, cap_planes.is_none(), !ao_on)),
@@ -2764,7 +2789,8 @@ impl Renderer {
                         view,
                         depth_slice: None,
                         resolve_target: resolve,
-                        ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: if resolve.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store } },
+                        // Kept for the post pass (drawn on and resolved again).
+                        ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: if resolve.is_some() && post_frame.is_none() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store } },
                     })],
                     depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                         view: &c.over.depth,
@@ -2786,6 +2812,36 @@ impl Renderer {
             if let Some(ao) = ao.as_ref().filter(|_| ao_on) {
                 let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength, timestamp_writes: None };
                 ao.encode(device, queue, &mut encoder, &c.over.depth_sample, &c.over.resolve_view, frame);
+            }
+            // A preview's highlights on the "with" layer, against the frame's
+            // depth (the model before the feature): what the new body covers
+            // stays drawn, so the mix keeps it whole (live previewBlend).
+            if let Some((post, bind_post)) = post_frame.as_ref() {
+                let (view, resolve) = match &c.over.color_msaa {
+                    Some(v) => (v, Some(&c.over.resolve_view)),
+                    None => (&c.over.resolve_view, None),
+                };
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("preview-post"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view,
+                        depth_slice: None,
+                        resolve_target: resolve,
+                        ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: if resolve.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store } },
+                    })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &tex.depth,
+                        depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Discard }),
+                        stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Discard }),
+                    }),
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                pass.set_bind_group(0, bind_color, &[]);
+                pass.set_bind_group(1, bind_post, &[]);
+                pass.set_bind_group(3, &c.tint, &[]);
+                draw_lists(&mut pass, post, &req.scene.instances, pipelines, bind_post, DrawMode { outline, ..Default::default() });
             }
             // Onshape blends the mix onto a WebGL canvas, which is not sRGB:
             // the stored (gamma) values are mixed, so this pass draws
@@ -2847,6 +2903,9 @@ impl Renderer {
         self.lists = lists;
         if let Some((over, ..)) = compare_frame {
             self.lists_over = over;
+        }
+        if let Some((post, _)) = post_frame {
+            self.lists_post = post;
         }
         drop(t_encode);
         Ok(())

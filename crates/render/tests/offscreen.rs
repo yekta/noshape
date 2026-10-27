@@ -1539,6 +1539,45 @@ fn preview_mix_blends_the_model_before_and_after() {
     assert!(before[o..o + 3] != after[o..o + 3], "the boxes should differ there");
 }
 
+/// A preview's highlight lines (compare::POST) stay whole over the mix:
+/// a line the new body covers keeps its colour, where an untagged one
+/// shows at the mix's 30 % (live: a picked region under the new boss stays
+/// fully outlined).
+#[test]
+fn preview_highlights_stay_whole_over_the_mix() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (400u32, 300u32);
+    let floor = Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.03, -0.03, -0.002], [0.03, 0.03, 0.0], 1)))).with_color([0.6, 0.6, 0.6, 1.0]).compare_layer(compare::BASE);
+    let floor_too = floor.clone().compare_layer(compare::TARGET);
+    // The new body, over the line.
+    let boss = Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, 0.0], [0.01, 0.01, 0.01], 10)))).with_color([0.2, 0.35, 0.5, 1.0]).compare_layer(compare::TARGET);
+    let mut line = LineData::default();
+    line.push_polyline(&[[-0.008, 0.0, 0.0], [0.008, 0.0, 0.0]], [255, 0, 0, 255], 0, 3.0, 0);
+    let outline = Instance::new(Drawable::Lines(r.upload_lines(&line))).with_color([1.0, 0.0, 0.0, 1.0]);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Top);
+    cam.fit_box(glam::DVec3::new(-0.03, -0.03, 0.0), glam::DVec3::new(0.03, 0.03, 0.01), w as f64 / h as f64);
+    let red_at_centre = |r: &mut Renderer, tag: u8| {
+        let scene = Scene { instances: vec![floor.clone(), floor_too.clone(), boss.clone(), outline.clone().compare_layer(tag)], preview_mix: Some(0.7), ..Default::default() };
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        // The reddest pixel across the line at the centre (antialiased edges).
+        (h / 2 - 3..h / 2 + 4).map(|y| {
+            let o = ((y * w + w / 2) * 4) as usize;
+            (f.bgra[o + 2], f.bgra[o + 1])
+        }).max_by_key(|(r, g)| *r as i32 - *g as i32).unwrap()
+    };
+    let (plain, post) = (red_at_centre(&mut r, 0), red_at_centre(&mut r, compare::POST));
+    assert!(post.0 >= 245 && post.1 <= 20, "the post line lost its colour under the new body: {post:?}");
+    assert!(plain.0 < 160, "an untagged line under the new body shows at the mix: {plain:?}");
+}
+
 /// Label quads and shadows are drawn like GPUI draws a div with
 /// `.rounded(4).border_1().shadow_xs()` (overlay.wgsl `fs_quad` /
 /// `fs_shadow`): solid background inside, the full border color on the

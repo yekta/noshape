@@ -340,6 +340,11 @@ pub struct Instance {
 pub mod compare {
     pub const BASE: u8 = 1;
     pub const TARGET: u8 = 2;
+    /// A feature preview's highlights ([`super::Scene::preview_mix`]): drawn
+    /// with the frame (the model before the feature) and again over the
+    /// model with it, against the frame's depth, so the mix keeps them whole
+    /// (live: a picked region under the new boss stays fully outlined).
+    pub const POST: u8 = 3;
 }
 
 /// The compare blend of a frame (0 = base, 1 = target).

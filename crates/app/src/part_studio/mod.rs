@@ -1180,6 +1180,11 @@ impl PartStudioView {
         // A feature preview (live previewBlend): the model before the feature
         // under the one with it, mixed at the preview slider's value.
         if let Some(base) = &self.built_base {
+            // Live: the highlight lines (a picked region's outline) show
+            // whole over the mix, also where the new body covers them.
+            for inst in scene.instances[built.static_instances..].iter_mut().filter(|i| matches!(i.drawable, noshape_render::Drawable::Lines(_))) {
+                inst.compare = noshape_render::scene::compare::POST;
+            }
             scene.instances.extend(base.scene.instances[..base.static_instances].iter().cloned().map(|mut i| {
                 i.pickable = false;
                 // Past any highlight state.
