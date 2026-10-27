@@ -8,19 +8,19 @@ Built with the CLI (/root/qa5-scratch/pass3/mkbracket.py → /tmp/qa5/home/Docum
 then opened in the app (/tmp/qa5/noshape-1448). All times are **debug builds**; live times pending ("qa5 bracket").
 Status: ✅ matches live/expected, ✗ differs, ? live data pending.
 
-| # | Step | Expected | Ours | CLI call (s) | Status |
-|---|---|---|---|---|---|
-| 1 | Extrude base 8 | 32000 | 32000.0, 6 faces | 0.12 | ✅ |
-| 2 | Wall 60 Add | 65280 | 65280.0, 8 | 0.21 | ✅ |
-| 3 | 2 holes Remove Through all | 64475.7523 | 64475.7523, 10 | 0.22 | ✅ |
-| 4 | Fillet R5 ×2 | 64389.9115 | 64389.9115, 12 | 0.32 | ✅ |
-| 5 | Chamfer 1 | 64349.9115 | 64349.9115, 13 | 0.24 | ✅ |
-| 6 | Wall hole + Linear pattern 25×3 | 63671.3275 | 63671.3275, 16 | 0.33 + 0.44 | ✅ |
-| 7 | Gusset 5 Add | 65431.3275 | 65431.3275, 18 | 0.52 | ✅ |
-| 8 | Feature mirror of the gusset about Plane 1 (Reapply features off, the default) | 67191.3275 (live result ?) | **Error "Could not create all instances as entered. Try selecting "Reapply features" option."**; with Reapply ☑: **67191.3275, 20 faces** | 0.41 | ✗ **ADV9** (? until live answers) |
-| 9 | App: Features header stopwatch | live: "Show regeneration times" (per-feature times; Performance panel total) | floating "Regeneration times" popup: total **438.4 ms** on open (Extrude 2 74 ms, Extrude 5 75 ms, Mirror 92 ms) | – | ? (look + live times pending) |
-| 10 | Edit Extrude 1 depth 8 → 10 (later features roll back while the dialog is open) | 73262.5555 by hand | **73262.555**, total regen **278.9 ms**, no errors | – | ✅ / ? time |
-| 11 | Ctrl+Z | back to 8 | back to 8 | – | ✅ |
+| # | Step | Expected | Ours | CLI call (s) | Status | Verified |
+|---|---|---|---|---|---|---|
+| 1 | Extrude base 8 | 32000 | 32000.0, 6 faces | 0.12 | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
+| 2 | Wall 60 Add | 65280 | 65280.0, 8 | 0.21 | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
+| 3 | 2 holes Remove Through all | 64475.7523 | 64475.7523, 10 | 0.22 | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
+| 4 | Fillet R5 ×2 | 64389.9115 | 64389.9115, 12 | 0.32 | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
+| 5 | Chamfer 1 | 64349.9115 | 64349.9115, 13 | 0.24 | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
+| 6 | Wall hole + Linear pattern 25×3 | 63671.3275 | 63671.3275, 16 | 0.33 + 0.44 | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
+| 7 | Gusset 5 Add | 65431.3275 | 65431.3275, 18 | 0.52 | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
+| 8 | Feature mirror of the gusset about Plane 1 (Reapply features off, the default) | 67191.3275 (live result ?) | **Error "Could not create all instances as entered. Try selecting "Reapply features" option."**; with Reapply ☑: **67191.3275, 20 faces** | 0.41 | ✗ **ADV9** (? until live answers) |  |
+| 9 | App: Features header stopwatch | live: "Show regeneration times" (per-feature times; Performance panel total) | floating "Regeneration times" popup: total **438.4 ms** on open (Extrude 2 74 ms, Extrude 5 75 ms, Mirror 92 ms) | – | ? (look + live times pending) |  |
+| 10 | Edit Extrude 1 depth 8 → 10 (later features roll back while the dialog is open) | 73262.5555 by hand | **73262.555**, total regen **278.9 ms**, no errors | – | ✅ / ? time | 0.4.10+ / 8602df0d 10-27 (73262.555 = live; commit 342 ms: REGEN-SPEED) |
+| 11 | Ctrl+Z | back to 8 | back to 8 | – | ✅ | 0.4.10+ / 8602df0d 10-27 (Ctrl+Z 3.3 ms) |
 
 Findings: **ADV9** feature mirror of an Add extrude that touches two faces fails without Reapply features (psb; confirm with live step 8).
 
@@ -74,18 +74,18 @@ Steps 1–7 OK (65431.3275 after the gusset); step 8 feature mirror (Reapply off
 | PERF2 | debug build only here; re-measure on a release build | perf |
 
 ## Re-run pass 24 (qa5, 2026-10-24 23:5x, CLI target-engine 13:51, pass3/mkbracket2.py)
-| Step | Ours | Status |
-|---|---|---|
-| 1–7 (base, wall, holes, fillet R5, chamfer, wall hole, pattern 25×3, gusset) | all Ok; 32000 → 65280 → 64475.7523 → 64389.9115 → 64349.9115 → 64123.7169 → 63671.3275 → 65431.3275 mm³; each call ≤ 0.6 s | ✅ |
-| 8 ADV9 Feature mirror of the gusset (Reapply off) | Error "Could not create all instances as entered. Try selecting "Reapply features" option." (live OK 67191.3275) | ✗ still on main; psb's fix 853cf16b is in ready/psb (FAILED in the queue 20:01) |
+| Step | Ours | Status | Verified |
+|---|---|---|---|
+| 1–7 (base, wall, holes, fillet R5, chamfer, wall hole, pattern 25×3, gusset) | all Ok; 32000 → 65280 → 64475.7523 → 64389.9115 → 64349.9115 → 64123.7169 → 63671.3275 → 65431.3275 mm³; each call ≤ 0.6 s | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
+| 8 ADV9 Feature mirror of the gusset (Reapply off) | Error "Could not create all instances as entered. Try selecting "Reapply features" option." (live OK 67191.3275) | ✗ still on main; psb's fix 853cf16b is in ready/psb (FAILED in the queue 20:01) |  |
 
 ## Release re-check v0.4.8 (qa5, 2026-10-25 02:15, release asset noshape-cli 0.4.8 linux-x86_64, pass3/mkbracket2.py)
-| Step | Ours | Status |
-|---|---|---|
-| 1–7 | same as pass 24: 32000 → … → 65431.3275 mm³, 18 faces; each step 0.1–0.3 s | ✅ |
-| 8 ADV9 Feature mirror of the gusset | Error "Could not create all instances as entered…"; app tree shows Mirror 1 red | ✗ still in v0.4.8 (psb) |
-| 8 ADV9 on main 10195656 (target-engine CLI 06:17) | same Error | ✗ still; psb's fix 853cf16b sits in ready/psb, whose queue status is CONFLICT since 21:44 (not re-marked yet) |
-| 8 ADV9 on green 461aefb0 (app, psb 853cf16b) | Mirror 1 regenerates (row not red); the mirrored gusset sits at the wall's right end | ✅ **fixed** |
+| Step | Ours | Status | Verified |
+|---|---|---|---|
+| 1–7 | same as pass 24: 32000 → … → 65431.3275 mm³, 18 faces; each step 0.1–0.3 s | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
+| 8 ADV9 Feature mirror of the gusset | Error "Could not create all instances as entered…"; app tree shows Mirror 1 red | ✗ still in v0.4.8 (psb) |  |
+| 8 ADV9 on main 10195656 (target-engine CLI 06:17) | same Error | ✗ still; psb's fix 853cf16b sits in ready/psb, whose queue status is CONFLICT since 21:44 (not re-marked yet) |  |
+| 8 ADV9 on green 461aefb0 (app, psb 853cf16b) | Mirror 1 regenerates (row not red); the mirrored gusset sits at the wall's right end | ✅ **fixed** | 0.4.10+ / 8602df0d 10-27 (Mirror 1 Ok) |
 
 ## Re-run on green 8602df0d (qa, 2026-10-27 19:58, app, /root/qa5-scratch/run/docs/bracket24.noshape copy)
 - Opened as built (pass 24), Linear pattern 1 is red "Could not create all instances as entered…": its direction edge is the
