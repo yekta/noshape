@@ -37,7 +37,7 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   Linear pattern in Feature, Part and Face mode: Direction pre-highlights and picks an edge at its middle and a face (not
   the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
   (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
-### v0.4.10 (tag e8e0f62d = main e8858e61 + "Release v0.4.10"; CI run 40486478859 Linux artifact), smoke 10:54
+### v0.4.10 (tag e8e0f62d = main e8858e61 + "Release v0.4.10"; published 11:01, its Linux tarball is byte-identical to the CI run 40486478859 artifact smoked here; Linux, macOS, Windows assets), smoke 10:54
 - Has 4e55b01f (LP-DIRECTION-PICK), a117663d (DRAFT-HANG budget), 011aaf43 (serial booleans), c30baf56 (markers);
   **not** 1e3c419c (custom features' compound edge filters: `EDGE && GeometryType.LINE` / `ALLOWS_AXIS` still take
   sketch edges only) and still the longjmp budgets (BUDGET-LONGJMP, BOOL-THREAD-CRASH).
