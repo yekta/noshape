@@ -60,7 +60,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 3.6 | Shift (hold) shows all constraint glyphs while moving | H:working_with_constraints | ✅ |  |
 | 3.7 | Alt (hold) while drawing a rectangle makes a square | H:corner_rectangle | ✅ |  |
 | 3.8 | Alt+←/→ switches between on-the-fly dimension boxes | H:sketch_basics | ✅ |  |
-| 3.9 | Delete / Backspace deletes selected entities, constraints and dimensions | H:dimension, H:working_with_constraints | ✅ |  |
+| 3.9 | Delete / Backspace deletes selected entities, constraints and dimensions | H:dimension, H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 3.10 | Space clears the sketch selection | B§8.2 | ✅ |  |
 | 3.11 | Ctrl+C / Ctrl+V copy / paste sketch entities | H:sketch_basics | ✅ (T:ux) |  |
 | 3.12 | `#` typed without `=` in a sketch value box is the view shortcut; `=#var` enters a variable | H:sketch_basics | ✅ |  |
@@ -208,43 +208,43 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 9.1 | Click selects; clicking more adds; clicking a selected entity deselects | Onshape | ✅ |  |
-| 9.2 | Box select left→right: window (entirely inside) | B§5.4 | ✅ |  |
+| 9.1 | Click selects; clicking more adds; clicking a selected entity deselects | Onshape | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 9.2 | Box select left→right: window (entirely inside) | B§5.4 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 9.3 | Box select right→left: crossing (anything the box touches) | B§5.4 | ✅ (T:sm) |  |
-| 9.4 | Hover highlights orange, selection amber, related entities yellow | H:working_with_constraints | ✅ |  |
+| 9.4 | Hover highlights orange, selection amber, related entities yellow | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 9.5 | Not fully constrained points win over fully constrained ones under the cursor | H:sketch_tools | ✅ (T:ux; fresh GUI :103 free point overlapping fixed origin drags away while origin stays fixed; current-point-priority.png) |  |
-| 9.6 | Clicking a closed region selects it | B§1.6 | ✅ |  |
+| 9.6 | Clicking a closed region selects it | B§1.6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 9.7 | Select other (`) | B§5.4 | ✅ (GUI :103 backtick opens candidate popup; select-other-focus.png) |  |
-| 9.8 | Click in empty space clears the selection | Onshape | ✅ |  |
+| 9.8 | Click in empty space clears the selection | Onshape | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 
 ## 10. Dragging and solving
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 10.1 | With no tool, under-defined points and curves drag with the solver | H:working_with_constraints | ✅ |  |
+| 10.1 | With no tool, under-defined points and curves drag with the solver | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 10.2 | Fully defined / fixed geometry does not move | Home__colors | ✅ |  |
 | 10.3 | Dropping a point on another point merges them; on a curve makes it coincident | B§7.1 | ✅ |  |
 | 10.4 | Dropping a point on the origin constrains it to the origin | B§7.1 | ✅ (T:sm) |  |
 | 10.5 | Shift while dragging suppresses the snap | B§7.1 | ✅ (T:sm) |  |
-| 10.6 | Colors: blue under-defined, black fully defined, red over-defined, per entity | Home__colors | ✅ (theme palette: #0000d0 / black / #cd0000) |  |
+| 10.6 | Colors: blue under-defined, black fully defined, red over-defined, per entity | Home__colors | ✅ (theme palette: #0000d0 / black / #cd0000) | 0.4.10+ / 2d9a275c 10-27 |
 | 10.7 | Text boxes drag as a whole | H:text | ✅ |  |
 
 ## 11. Edit tools
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 11.1 | Fillet: click a vertex, radius box; later vertices make equal fillets | H:sketch_fillet | ✅ |  |
+| 11.1 | Fillet: click a vertex, radius box; later vertices make equal fillets | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 11.2 | Fillet: click two curves | H:sketch_fillet | ✅ (T:sm) |  |
 | 11.3 | Fillet keeps a virtual sharp with the coincident constraints | H:sketch_fillet | ✅ |  |
 | 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ✅ (T:sm; red preview, radius manipulator) |  |
 | 11.5 | Chamfer: vertex or two lines, two distance dimensions (45° default) | H:sketch_chamfer | ✅ (T:ux) |  |
-| 11.6 | Trim: click removes up to the nearest intersections, whole curve when unbounded | H:trim | ✅ |  |
+| 11.6 | Trim: click removes up to the nearest intersections, whole curve when unbounded | H:trim | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 11.7 | Trim: drag across curves trims everything crossed | H:trim | ✅ (T:sm) |  |
 | 11.8 | Trim: click a standalone point deletes it | H:trim | ✅ (T:sm) |  |
 | 11.9 | Extend: click a line or arc to extend to the next boundary | H:extend | ✅ |  |
 | 11.10 | Extend: "Unable to extend the selected geometry." | i18n | ✅ (GUI :103 extending an unbounded circle reports exact message; extend-error.png; T:sm added) |  |
 | 11.11 | Split: click a curve where to split | H:sketch_split | ✅ |  |
-| 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves. Live "psb (10-24 j)": the copies get their own points joined by Coincidents, sharp outer corners, own centres; one OFFSET per further pair (all on the first picked pair) and one DISTANCE on that pair (a lone curve: one OFFSET), no Parallel / Concentric; free ends unconstrained; editing the distance moves every copy; a new offset starts away from the region (a circle outward), the flip isn't remembered | H:offset; live psb (10-24 j), qa4 round 5 s1 follow-up | ✅ (GUI :103 skasm 10-26: one edge offsets away from the region with the arrow, Enter creates it and opens the "5 mm" box with ± ✓ ✕; `Sketch::offset_tool`, `ConstraintKind::OffsetCurve`; tests `offset_tool_makes_live_constraints_on_a_chain`, `offset_tool_on_the_closed_loop_and_a_circle`) |  |
+| 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves. Live "psb (10-24 j)": the copies get their own points joined by Coincidents, sharp outer corners, own centres; one OFFSET per further pair (all on the first picked pair) and one DISTANCE on that pair (a lone curve: one OFFSET), no Parallel / Concentric; free ends unconstrained; editing the distance moves every copy; a new offset starts away from the region (a circle outward), the flip isn't remembered | H:offset; live psb (10-24 j), qa4 round 5 s1 follow-up | ✅ (GUI :103 skasm 10-26: one edge offsets away from the region with the arrow, Enter creates it and opens the "5 mm" box with ± ✓ ✕; `Sketch::offset_tool`, `ConstraintKind::OffsetCurve`; tests `offset_tool_makes_live_constraints_on_a_chain`, `offset_tool_on_the_closed_loop_and_a_circle`) | 0.4.10+ / 2d9a275c 10-27 |
 | 11.12a | Offset takes one chain: a curve not connected to the pending one is only selected (again: deselected) with "Can only offset a single chain at once."; the preview stays | live qa4 round 5 s1 follow-up (5) (OFF-TOAST) | ✅ (test `offset_takes_one_chain`) |  |
 | 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) |  |
 | 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) |  |
@@ -267,7 +267,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 12.3 | Paste sketch entities (clipboard holds sketch entities) | B§9 | ✅ |  |
 | 12.4 | View normal to sketch plane; Exit tool; Clear selection | B§9 | ✅ |  |
 | 12.5 | Use (model edge under the cursor) | B§9 | ✅ (GUI :103 right-click unused model edge offers Use; model-context-use.png) |  |
-| 12.6 | Spline in progress: Confirm spline; Bezier: Escape bezier | H:spline, H:bezier | ✅ (T:sm) |  |
+| 12.6 | Spline in progress: Confirm spline; Bezier: Escape bezier | H:spline, H:bezier | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 12.7 | Dimension: Change to driving / driven dimension, Delete | H:dimension | ✅ |  |
 | 12.8 | Constraint glyph: Delete | H:working_with_constraints | ✅ |  |
 | 12.9 | Add comment, Configure dimension | H:dimension | ✅ Configure dimension. Add comment belongs to Onshape comments, a cloud-only feature excluded by TEAM-RULES |  |
