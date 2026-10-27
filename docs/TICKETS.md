@@ -189,6 +189,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 LOFT-SKETCH-HIDE a Loft hides only its first profile's sketch: Sketch 1 = 40×40 square on Top, Plane 1 = Top
+  offset 40, Sketch 2 = Ø24 circle on it (/root/qa-scratch/loft2.noshape); Loft, pick the circle then the square, ✓: Sketch 2
+  goes grey with the eye-slash, Sketch 1 stays shown (its menu says Hide) and its outline stays drawn; pick the square first
+  and it's the other way round (only Sketch 1 hidden, the circle stays drawn). Live hides every sketch a feature uses
+  (behaviours "The used sketch is hidden automatically"); a loft uses both (qa 2026-10-27, build 16cdcf6d)
 - [x] verified 19555ca3 (qa: double-click on fins-400 opens Extrude 1) 3b089573 P1 DCLICK-HEAVY fixed (psui 10-27): the X11 and Wayland backends counted clicks by when each press was handled
   (`Instant::now()`), so a second press waiting behind the first click's work (fins-400 here: ~0.9 s) started a new
   click, and the row was selected and deselected. Now the presses' own event times (X server / compositor ms) decide
@@ -229,7 +234,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Deleting this tab will result in failed or missing features in 1 tab" and below it one row per affected tab (tab icon +
   name), [Delete] [Cancel] (live part-studio/1584-p9-tab-delete-confirm.png, behaviours "(7) Delete the "qa5 src" tab")
   (qa 2026-10-26, build 4d2f6b0c)
-- [x] 72e41465 P2 LOFT-PROFILE-LIST fixed: each entry "› name ×", 24 px entries 30 px apart with live's 1 px
+- [x] verified 16cdcf6d (qa: two profiles list "› Face of Sketch 2 ×" / "› Face of Sketch 1 ×" with ↑↓, nothing under the field; › opens "Faces and sketch regions" inside the entry) 72e41465 P2 LOFT-PROFILE-LIST fixed: each entry "› name ×", 24 px entries 30 px apart with live's 1 px
   rgba(0,0,0,0.2) divider, nothing under the field; › opens the entry's fields inside the field (its query field active,
   the array's border stays blue), as live psui-loft-00/01. Original report: Loft dialog with two profiles: ours lists the chips without live's › expander and repeats the
   names in a second, grey, indented list under the field ("Face of Sketch 2 / Face of Sketch 1",
@@ -303,7 +308,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [x] verified dc3a03f6 (qa: name accepted, Derived OK 12000 mm³) (dx 5ef64eb8: a tab name or id is resolved, a non-Part-Studio tab refused with `params.partStudio`) P2 API-DERIVED-BY-NAME feature_add importDerived with `partStudio: "Part Studio 1"` (the tab's name) is accepted and
   the feature fails "Error regenerating."; only the tab id works. Accept the name as tab_* ops do, or refuse it as an
   invalid_argument naming the expected id (main CLI ~20:18) (qa 2026-10-26)
-- [x] 16cdcf6d + 3dfa5710 (dx: one-line reason; the error bubble now stays until its × instead of timing out before a slow start shows the window, and File › Open failures show it too) P2 OPEN-ERROR-SILENT `noshape bad.noshape` with a truncated file ("sqlite: database disk image is malformed") or a
+- [ ] reopened 16cdcf6d (qa 2026-10-27: the one-line message is right, "Could not open document: opening notdoc.noshape: not a noshape document ×" / "…: sqlite: database disk image is malformed", but the bubble still goes away by itself: shown at 3 s and 6 s after launch, gone at 9 s with no click on ×, while the documents list finishes loading; tickets/oe3-*.png, oe2.png) 16cdcf6d + 3dfa5710 (dx: one-line reason; the error bubble now stays until its × instead of timing out before a slow start shows the window, and File › Open failures show it too) P2 OPEN-ERROR-SILENT `noshape bad.noshape` with a truncated file ("sqlite: database disk image is malformed") or a
   non-noshape file ("not a noshape document") opens the Documents window with no message; the error is only in the log.
   Show it (an error dialog/toast naming the file and the reason) (qa 2026-10-26, build 4d2f6b0c)
 - [x] (dx 10-27: the scale list is live's, and automatic centre marks go on whole circles only, not on a rounded corner's arc) P2 DRAWING-SCALE Create Drawing › ANSI_A_MM › Suggested views of an ~82×82×20 part: ours picks scale 0.75 and the
