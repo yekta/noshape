@@ -12,57 +12,39 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (569dabca19a397e932f2db54) in noshape mm test.
 
 ## Landed on main
-(nothing yet: paused by the lead 10-26 ~22:40 while the crates are split)
+- cdde1c06 F19 Width mate in any pick order + DOF cache across evaluations, per-group DOF length scale.
+- c76cdcf4 assembly least change measured at the bodies' mate connectors (oracle_asm R1 matches live; R1 out of KNOWN;
+  R3/C1 now keep rz 0, still KNOWN for live's −157.5°).
+- 6329b168 sketch: polygons as live (seed + circular pattern; Inscribed = edge middle, Circumscribed = vertex; no Ø
+  dimension), Point tool on the Origin, paste at the pointer + Transform (SKETCH-PASTE), unsolvable constraint keeps
+  the shape; API polygon descriptions.
 
-## Parked on origin agent/skasm (on main c9540ae6+, 10-26 ~22:40), in order
-1. `skasm: Width mate solves in any pick order …` (F19 + DOF cache, from skb b826d8f8, plus `group_length`: the
-   DOF analysis and its cache key use each group's own length scale, so an instance inserted far away no longer
-   misses every group's cache entry). **Checked:** `mate_flip::` (new layout) passes, model `--lib
-   assembly::solver` 15/15, clippy -p noshape-model -p noshape-ops clean (on the pre-rebase base). **Not yet:** T0
-   (the run was stopped by the pause). Next: T0, then push to main.
-2. `WIP skasm: …` (sketch, not yet compiled; GUI-checked on :103 against live where noted):
-   - tools/tiers/t0.sh (lead's): the "in no test binary" check skips crates that keep cargo's test discovery (no
-     `autotests = false`; crates/app has one test file, merge-tests.py leaves it alone). Without it T0 fails on main.
-   - Polygons as live (behaviours "skasm (2026-10-26) Sketch polygon commits"): 2nd click Inscribed = an edge's
-     middle (circle tangent), Circumscribed = a vertex (circle through it); seed edge + circular pattern about the
-     circle centre (`CircularPatternLink` on its ends, one Coincident joint), Inscribed: construction midpoint +
-     Midpoint + Tangent, Circumscribed: seed end Coincident on the circle; the click's inference goes to its point;
-     no Ø dimension box after the commit (live makes none); spinner by the clicked edge; preview dots at the centre
-     and vertices. Tests: scene `polygon_second_click_is_an_edge_middle_inscribed_and_a_vertex_circumscribed`,
-     `polygon_sides_typed_and_midpoint_line`, sketch tests/shapes.rs `polygons_and_slot` (DOF 4, area).
-   - Unsolvable constraint (V on a Horizontal line): the shape before the solve stays, toast "Sketch could not be
-     solved." (`solve_after_constraint` returns false; test `vertical_on_a_horizontal_line_does_not_solve`).
-   - Point tool on the Origin (or any point) makes a new point Coincident with it (behaviours "dx (2026-10-26, for
-     skasm) Point tool on the Origin"); test `point_tool_on_the_origin_makes_a_point_coincident_with_it`.
-   - SKETCH-PASTE (ticket): Ctrl+V lands centred on the pointer, selected, Transform tool active, no prompt
-     (test `copy_paste_selection`).
-   - Dimension context menu without "Tolerance and precision…" (live has none).
-   - docs: parity/sketch.md 7.14, 8.7, 8.7a–d, 11.12, 14.24 ✅ (GUI evidence), 4.19 🔧 until the polygon commit
-     lands; TICKETS P1-4 data closed (fixed since 5c94bb51).
-   To land: `cargo test -p noshape-sketch`, `cargo test -p noshape-scene --lib sketch_mode`, clippy -p
-   noshape-sketch -p noshape-scene -p noshape --all-targets, T0; GUI re-check of the polygon commit (glyphs);
-   mark SKETCH-PASTE [x].
+## WIP on agent/skasm
+- `WIP skasm (app, after the app split)`: crates/app/src/part_studio/sketch.rs: the constraint shortcut shows the
+  unsolvable toast at once (now it shows with the next editor action), dimension menu without "Tolerance and
+  precision…" (parity 8.7d 🔧 until then). Land after the lead's app split (rebase, re-find the file).
 
 ## Next, in order
-1. Land 1 and 2 above (after the lead's crate split: rebase, fix paths).
-2. oracle_asm R1 (−6° turn on a Revolute): least change measured at the body's mate connectors (mean), not its part
-   origin. Patch ready: `python3 /root/skasm-scratch/anchor.py` (edits model/assembly/solver.rs least_change, adds
-   `anchor`). Baseline oracle passes (/root/skasm-scratch/oracle-base.log: R1 turn 0.1048 rad). After the patch:
-   `cargo test -p noshape-model --test all oracle_asm:: -- --ignored --nocapture`; if R1 matches, drop it from KNOWN
-   in the same commit; no other case may change status.
-3. agent/perf 7594798b assembly drag bench (viewport.rs `BenchKind::Drag` + bench.sh doc; patch in
-   /root/skasm-scratch/bench.patch, unbuilt): build, run once (NOSHAPE_PERF=1 NOSHAPE_PERF_ORBIT=300
-   NOSHAPE_PERF_BENCH=drag on tests/perf/pins-assembly-1000.noshape), land with a note (psui's file).
-4. Assembly perf: `cargo test -p noshape-ops --test all assembly_perf:: -- --ignored --nocapture` (insert into 200
-   pins / 300 mates; targets: edits < 100 ms, drag step < 16.7 ms).
-5. GUI-verify docs/parity/workflow-assembly-sweep.md's 🔧 rows (all their messages are on main in code).
-6. oracle_asm M1 is live's own failing (over-constrained) case: low value. CP1/R3/C1 wait on core's cylinder axis.
-7. End-of-day walk of sketch + assembly workflows in /root/green/noshape against live (PLAN: ~04:00 UTC).
+1. P1 SKETCH-DRAG-BIG (qa): a drag step in a 1000-entity sketch re-evaluates the sketch feature (72–113 ms). Per step
+   the feature regen clones the sketch, solves it again (already solved by the drag), computes regions (pairwise
+   curve intersections, hole assignment by winding) and wires. Perf test ready to add:
+   `python3 /root/skasm-scratch/dragbig_patch.py` (scene tests/sketch_perf.rs `big_shape_sketch_drag_step_parts`,
+   times solve / regions / regen apart). Then make the slow part incremental (sketch crate / model-core regen).
+2. agent/perf 7594798b assembly drag bench (viewport.rs; app: after the app split). Patch /root/skasm-scratch/bench.patch.
+3. Assembly perf: `cargo test -p noshape-ops --test all assembly_perf:: -- --ignored --nocapture`.
+4. GUI-verify docs/parity/workflow-assembly-sweep.md's 🔧 rows (their messages are on main in code).
+5. oracle_asm R3/C1 (live turns the flipped pin −157.5°); M1 is live's own failing case.
+6. End-of-day walk of sketch + assembly workflows in /root/green/noshape against live (~04:00 UTC).
 
 ## Build times (10-26, load 30–55, 4 agents building)
 - First build of app + cli on this target dir: 60 min. First test build of ops tests: 20 min.
 - After rebasing on c9540ae6 (workspace-hack, tests/all.rs): `cargo test -p noshape-ops --test all mate_flip::`
-  recompiled everything: 955 s. Edit → test time with incremental builds: not measured yet.
+  recompiled everything: 955 s.
+- 10-27, layered crates, load ~30: first build after the rebase 254 s (model-core lib tests). Edit in
+  model-core/assembly/solver.rs → `cargo test -p noshape-model-core --lib assembly::solver` 108–122 s; →
+  `cargo test -p noshape-model --test all oracle_asm::` 113 s. Sketch-crate edit → `cargo test -p noshape-sketch`
+  35 s; scene edit → `cargo test -p noshape-scene --lib` 92 s (first after a sketch change). Clippy of model-core +
+  model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
 ## Requests to the lead
-- tools/tiers/t0.sh: see parked item 2 (its check fails on main for crates/app's single test file).
+(none)

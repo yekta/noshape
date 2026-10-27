@@ -208,7 +208,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (green dev build, load ~25; NOSHAPE_PERF "regen: 1 features evaluated"); budget: under one 60 Hz frame. Re-time on a
   release build; the step looks like a full sketch regen (regions included) rather than a solver-only update (qa
   2026-10-26, build 4d2f6b0c)
-- [ ] P2 SKETCH-PASTE Ctrl+C / Ctrl+V of a dimensioned circle in a sketch: ours pastes the copy exactly on top of the
+- [x] 6329b168 P2 SKETCH-PASTE Ctrl+C / Ctrl+V of a dimensioned circle in a sketch: ours pastes the copy exactly on top of the
   original (prompt "Pasted; drag or transform the selection into place"); live (behaviours "qa (2026-10-26, P2 sketch)")
   pastes it centred on the pointer, selected, with the sketch Transform tool active and its manipulator on the copy, no
   prompt; the Ø dimension is pasted too (as ours) (qa 2026-10-26, build 4d2f6b0c)
