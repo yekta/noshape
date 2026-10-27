@@ -161,6 +161,12 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
+## Green 136c6738 (2026-10-27 08:10–08:20)
+- UI workflows OK: Revolve (dialog = live revolve-01; full revolve of a 10×30 rectangle about a sketch line 28274.334
+  exact), Part linear pattern ×3 / 50 mm along the Right plane's normal (3 parts, exact), drawing Section view (Vertical,
+  label A, placed beside the parent: hatched 20×82), Shell dialog = live shell-02 (✓ waits for the slow preview).
+- Fuzz: batches 7 clean; 6 had BOOL-THREAD-CRASH #4 (seed 93) and a 5-min blend stall (seed 95); batch 8 running.
+
 ## Green 4756f9be (2026-10-27 06:05–06:10)
 - Verified: DRAFT-HANG (both docs open in 27 / 45 s; each failing draft still stalls ~11 s), CRASH-MARKER-COPIES,
   TWO-PROCESS-LOST-EDIT's live half (the other window follows within 2.5 s).
