@@ -78,13 +78,21 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   (worst 23–26 ms); target 120 fps = 8.33 ms. Insert into the 300-mate assembly **11.9 ms** (target ≤ 20 ms). Adding
   a mate 40 ms. 1000 free pins: drag frame 1.49 ms, insert 3.9 ms. `cargo test -p noshape-ops --test all
   assembly_perf:: -- --ignored --nocapture --test-threads=1`.
-- Next: the drag worst cases (18–26 ms spikes in both), the sketch step's regeneration (3.7 of 5.2 ms).
+- Re-run 14:40 (load ~30): assembly drag frame median 1.48–2.93 ms, worst ≤ 3.05 ms; insert 5.7–7.7 ms; 1000 pins
+  drag 1.4–1.5 ms. Sketch step per-step times (3 runs): worst 5–9 ms, sporadic (no step pattern): the earlier
+  18–26 ms worst cases were machine load, not a code path.
+- Next for speed: the sketch step's regeneration (3.7 of 5.2 ms in the dev build).
 
 ## WIP on agent/skasm
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
 
 ## Next, in order
+Lead 10-27 order: P1 tickets (none open) → PLAN 2.7 speed targets (met, above) → assembly.md's 7 🔧 rows (T11 is the
+theme owner's; I15 / LA50–LA55 are standard content) → mates/assembly workflow gaps (all ✅; UNCONFIRMED details asked
+live, REQUESTS "assembly sweep leftovers") → standard content. 10-27 15:00: ISO 10511 / 7040 on live's template and
+tables (fbfe810c). The other missing components (DIN 7050 / 7051 / 967 / 923, ISO 7379, NASM 45938 + /4, NAS 1129 ×2,
+PEM ×52) need live's /features (the recipe; one size's surfaces don't give the formulas), 429 until ~10-28 03:00.
 Sketch P1: value boxes done for every tool live measured (center rectangle and tangent arc not measured: default
 place). parity/sketch.md all ✅. Assembly P2:
 1. docs/parity/workflow-assembly-sweep.md: all rows ✅ 10-27 (34 left UNCONFIRMED: the 2° snap window). Filed
