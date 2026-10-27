@@ -147,13 +147,14 @@ fn timed_nist_import() {
             let mut ctx = Ctx::new();
             call(&mut ctx, "document_create", json!({ "path": dir.join("nist.noshape").to_str().unwrap() }));
             let t = Instant::now();
-            call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
-            let q = call(&mut ctx, "query_parts", json!({}));
+            let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
             runs.push(t.elapsed().as_secs_f64() * 1000.0);
-            parts = q["parts"].as_array().map(|p| p.len()).unwrap_or(0);
+            // As live: an Assembly and a Part Studio of the 8 distinct parts.
+            assert!(r["tabs"].as_array().unwrap().iter().any(|t| t["kind"] == "Assembly"), "{r}");
+            parts = r["parts"].as_array().map(|p| p.len()).unwrap_or(0);
             let _ = std::fs::remove_dir_all(&dir);
         }
-        assert!(parts > 0);
+        assert_eq!(parts, 8);
         report(&format!("NIST import {ext} ({parts} parts)"), runs);
     }
 }

@@ -120,7 +120,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - NIST assembly import, live's own exports (tests/perf/nist-mtc-crada-assembly.step / .x_t): **live STEP 38.7 s,
   x_t 24.5 s** to done (32.5 / 21.3 s to the Assembly tab). Ours, CLI import_files (dev, machine at load ~45):
   STEP 37–44 s, x_t 59–74 s, ~50 s of it display meshing serialized on the kernel's global mesh_mutex (request
-  below); target ≤ 19 / 12 s. x_t of an assembly now imports as live (Assembly + "<file> parts"). Earlier, on our own export of tests/perf/nist-mtc-crada-assembly.noshape (36 parts, STEP 11.9 MB), kernel only
+  below); target ≤ 19 / 12 s. dx_perf::timed_nist_import (dev, load ~45, Assembly + 8 parts as live): STEP 41.8 s,
+  x_t 48.0 s. x_t of an assembly now imports as live (Assembly + "<file> parts"). Earlier, on our own export of tests/perf/nist-mtc-crada-assembly.noshape (36 parts, STEP 11.9 MB), kernel only
   (C++ -O2): read STEP 9.3 s, write x_t 8.1 s, read x_t 35 s → **3.0 s** (10-27: attributes indexed once, bodies
   healed in parallel, second fins' SP-curves matched in parallel; same volumes / faces bit for bit). STEP next. Parasolid export of that
   Part Studio crashed the kernel on 3 parts (OCCT 8.0.1 SweptToElementary null face): fixed f2279b3c.
