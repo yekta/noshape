@@ -104,6 +104,28 @@ How:
 | Sketch drag step | under one 60 Hz frame |
 | Feature dialog add (std editing logic) | ≤ 150 ms |
 
+### 2.7 Beat Onshape on speed (lead, 2026-10-27)
+
+Parity is the floor; speed is where we win. Every everyday operation gets a measured live time (the live agent times
+them in Onshape: behaviours.md "speed: …", pointers in live/SPECS.md) and a target of **at least 2× faster than live**
+wherever the work is local (no network, no server queue). Owners and first targets:
+
+| Area | Operation (reference document) | Live | Target |
+|---|---|---|---|
+| core | full regen of the 30-feature part (tests/perf/live-30-features.noshape) | 171 ms (server) | ≤ 80 ms |
+| core | edit commit shown on that part | ~300+ ms (incl. network) | ≤ 100 ms |
+| core | Shell on a filleted plate with holes (qa shell matrix) | < 1 s | ≤ 200 ms |
+| core | big-plate.noshape regen | 617 ms | ≤ 250 ms |
+| psui | orbit / pan / zoom, NIST assembly at Retina | (live fps) | 120 fps |
+| psui | cold start to first frame / open a document | (live) | ≤ 1 s / ≤ 0.5 s |
+| skasm | sketch drag step, sketch solve on a 200-entity sketch | (live) | < 8 ms |
+| skasm | assembly drag, 200 instances / insert into 300 mates | (live) | 120 fps / ≤ 20 ms |
+| dx | drawing view creation (4 standard views of the bracket) | (live) | ≤ 2× faster |
+| dx | STEP / Parasolid import of the NIST assembly | (live) | ≤ 2× faster |
+
+Each target gets a timed test in perf.yml (release build, macOS runner, median of runs) or a T2 benchmark here, and
+a line in docs/handoff/<area>.md with the current number. Speed regressions are P0.
+
 ## 3. Day one for the new thread
 
 1. **Read** this file, docs/HANDOFF.md, docs/handoff/*.md (every agent wrote its state, open items and WIP branch on
