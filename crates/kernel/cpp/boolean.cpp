@@ -1428,8 +1428,9 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
   ShapeList           planes;
   if (!slab_planes(boxes, tb, 25, ax, at, planes))
     return false;
-  const std::atomic<bool>* flag = t_cancel;
-  BRepAlgoAPI_Splitter     sp;
+  const std::atomic<bool>*     flag = t_cancel;
+  std::unique_ptr<KernelTimer> lap  = std::make_unique<KernelTimer>("slabs.split");
+  BRepAlgoAPI_Splitter         sp;
   ShapeList                one;
   one.Append(target);
   sp.SetArguments(one);
@@ -1459,6 +1460,7 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
   std::vector<TopoDS_Shape> res((size_t)nslab);
   std::vector<HHist>        hs((size_t)nslab);
   std::vector<char>         failed((size_t)nslab, 0);
+  lap = std::make_unique<KernelTimer>("slabs.cuts");
   OSD_Parallel::For(0, nslab, [&](int k) {
     const auto& p = pieces[(size_t)k];
     const auto& q = tools[(size_t)k];
@@ -1488,6 +1490,13 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
       failed[(size_t)k] = 1;
       return;
     }
+    // Checked here, a slab at a time in parallel: the whole part's check
+    // (its faces with 400 hole loops) cost ~300 ms.
+    if (!BRepCheck_Analyzer(c.Shape()).IsValid())
+    {
+      failed[(size_t)k] = 1;
+      return;
+    }
     res[(size_t)k] = c.Shape();
     hs[(size_t)k]  = new BRepTools_History(to_list(concat(p, q)), c);
   });
@@ -1504,9 +1513,11 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
     parts.push_back(res[(size_t)k]);
   }
   std::vector<TopoDS_Shape> shared;
+  lap                              = std::make_unique<KernelTimer>("slabs.join");
   const TopoDS_Shape        joined = parts.size() < 2 ? TopoDS_Shape() : join_on_shared_faces(parts, shared);
   if (joined.IsNull())
     return false;
+  lap      = std::make_unique<KernelTimer>("slabs.history");
   HHist h3 = new BRepTools_History();
   for (const TopoDS_Shape& f : shared)
     h3->Remove(f);
@@ -1517,9 +1528,15 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
   HHist h = compose(concat({target}, t), stages);
   if (cancelled(flag))
     return false;
+  lap                  = std::make_unique<KernelTimer>("slabs.unify");
   const TopoDS_Shape r = unify(joined, h);
-  // The whole joined part (406 faces for 400 holes): checked in parallel.
-  if (!BRepCheck_Analyzer(r, true, true).IsValid())
+  lap                  = std::make_unique<KernelTimer>("slabs.check");
+  // The slabs were checked; joined on their shared faces and unified, the
+  // part must still be closed.
+  int solids = 0;
+  for (TopExp_Explorer e(r, TopAbs_SOLID); e.More(); e.Next())
+    ++solids;
+  if (solids != 1 || !closed_and_oriented(r))
     return false;
   out  = r;
   hist = h;

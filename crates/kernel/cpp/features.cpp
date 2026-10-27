@@ -2397,6 +2397,29 @@ OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness,
 // hair smaller (1e-7..1e-5 relative) succeeds, and the sliver faces it leaves
 // are then removed. An input that is invalid already keeps OCCT's result.
 
+// Closed and oriented: every edge bounds faces twice, once each way (a
+// seam twice in its face). BRepCheck's topology-only pass cost 6 ms on live's
+// 30-feature part.
+bool closed_and_oriented(const TopoDS_Shape& r)
+{
+  NCollection_DataMap<TopoDS_Shape, std::pair<int, int>, TopTools_ShapeMapHasher> uses;
+  for (TopExp_Explorer f(r, TopAbs_FACE); f.More(); f.Next())
+    for (TopExp_Explorer e(f.Current(), TopAbs_EDGE); e.More(); e.Next())
+    {
+      if (BRep_Tool::Degenerated(TopoDS::Edge(e.Current())))
+        continue;
+      if (!uses.IsBound(e.Current()))
+        uses.Bind(e.Current(), {0, 0});
+      std::pair<int, int>& u = uses.ChangeFind(e.Current());
+      ++u.first;
+      u.second += e.Current().Orientation() == TopAbs_FORWARD ? 1 : e.Current().Orientation() == TopAbs_REVERSED ? -1 : 2;
+    }
+  for (decltype(uses)::Iterator it(uses); it.More(); it.Next())
+    if (it.Value().first != 2 || it.Value().second != 0)
+      return false;
+  return true;
+}
+
 // An op's result checked where the op changed it (a blend's, a shell's) (REGEN-SPEED: the
 // whole-part check cost more than the blend, 7.6 vs 5.9 ms a fillet on live's
 // 30-feature part): its faces that aren't the input's in full (geometry,
@@ -2418,23 +2441,8 @@ bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r)
       B.Add(changed, e.Current());
       ++n;
     }
-  // Closed and oriented: every edge bounds faces twice, once each way (a
-  // seam twice in its face). BRepCheck's topology-only pass cost 6 ms here.
-  NCollection_DataMap<TopoDS_Shape, std::pair<int, int>, TopTools_ShapeMapHasher> uses;
-  for (TopExp_Explorer f(r, TopAbs_FACE); f.More(); f.Next())
-    for (TopExp_Explorer e(f.Current(), TopAbs_EDGE); e.More(); e.Next())
-    {
-      if (BRep_Tool::Degenerated(TopoDS::Edge(e.Current())))
-        continue;
-      if (!uses.IsBound(e.Current()))
-        uses.Bind(e.Current(), {0, 0});
-      std::pair<int, int>& u = uses.ChangeFind(e.Current());
-      ++u.first;
-      u.second += e.Current().Orientation() == TopAbs_FORWARD ? 1 : e.Current().Orientation() == TopAbs_REVERSED ? -1 : 2;
-    }
-  for (decltype(uses)::Iterator it(uses); it.More(); it.Next())
-    if (it.Value().first != 2 || it.Value().second != 0)
-      return false;
+  if (!closed_and_oriented(r))
+    return false;
   // In parallel for many faces (the pool's workers use this frame).
   BudgetHold hold;
   return n == 0 || BRepCheck_Analyzer(changed, true, n > 16).IsValid();

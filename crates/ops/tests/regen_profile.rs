@@ -38,6 +38,10 @@ fn fixtures(rows: &mut Vec<Row>) {
     std::fs::create_dir_all(&tmp).unwrap();
     let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).collect();
     files.sort();
+    // NOSHAPE_PROFILE_ONLY=<part of a file name>: those fixtures only.
+    if let Ok(only) = std::env::var("NOSHAPE_PROFILE_ONLY") {
+        files.retain(|p| p.to_string_lossy().contains(&only));
+    }
     for path in files {
         let copy = tmp.join(path.file_name().unwrap());
         std::fs::copy(&path, &copy).unwrap();
@@ -118,7 +122,9 @@ fn sheet_metal(rows: &mut Vec<Row>) {
 fn regen_profile() {
     let mut rows: Vec<Row> = Vec::new();
     fixtures(&mut rows);
-    sheet_metal(&mut rows);
+    if std::env::var_os("NOSHAPE_PROFILE_ONLY").is_none() {
+        sheet_metal(&mut rows);
+    }
     rows.sort_by(|a, b| b.3.total_cmp(&a.3));
     for (i, (model, name, ty, ms)) in rows.iter().take(15).enumerate() {
         eprintln!("profile: #{} {ms:.1} ms  {name} ({ty})  in {model}", i + 1);

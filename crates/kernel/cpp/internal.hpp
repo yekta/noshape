@@ -83,6 +83,8 @@ bool bop_parallel();
 // `r` valid where it differs from `input`: its faces not the input's in full,
 // the whole shape for closure and orientation (features.cpp).
 bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r);
+// Every edge used twice, once each way (features.cpp).
+bool closed_and_oriented(const TopoDS_Shape& r);
 
 class HistoryBuilder
 {

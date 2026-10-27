@@ -156,7 +156,7 @@ int run_budgeted(double cpu_seconds, F&& f)
 
 bool kernel_profile_on();
 // The profile's clock: wall time, or this thread's CPU time with
-// NOSHAPE_KERNEL_PROFILE=cpu (comparisons on a loaded machine; Linux).
+// NOSHAPE_KERNEL_PROFILE=cpu (comparisons on a loaded machine; Linux), =proc for the process (pool threads too).
 std::chrono::steady_clock::duration kernel_profile_now();
 void kernel_profile_add(const char* what, std::chrono::steady_clock::duration took);
 void kernel_profile_add_named(const char* name, std::chrono::steady_clock::duration took);

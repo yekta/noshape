@@ -1354,14 +1354,17 @@ bool kernel_profile_on()
 std::chrono::steady_clock::duration kernel_profile_now()
 {
 #ifdef __linux__
-  static const bool cpu = [] {
+  // cpu: this thread's CPU time; proc: the process's (OCCT's pool threads
+  // too; run one test at a time).
+  static const int clock = [] {
     const char* v = std::getenv("NOSHAPE_KERNEL_PROFILE");
-    return v != nullptr && std::string(v) == "cpu";
+    const std::string m = v != nullptr ? v : "";
+    return m == "cpu" ? (int)CLOCK_THREAD_CPUTIME_ID : m == "proc" ? (int)CLOCK_PROCESS_CPUTIME_ID : -1;
   }();
-  if (cpu)
+  if (clock >= 0)
   {
     timespec ts{};
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+    clock_gettime((clockid_t)clock, &ts);
     return std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
   }
 #endif

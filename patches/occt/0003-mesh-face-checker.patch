@@ -1,0 +1,29 @@
+--- a/src/ModelingAlgorithms/TKMesh/BRepMesh/BRepMesh_FaceChecker.cxx
++++ b/src/ModelingAlgorithms/TKMesh/BRepMesh/BRepMesh_FaceChecker.cxx
+@@ -255,10 +255,26 @@
+ 
+   // TODO: Tolerance is set to twice value of face deflection in order to fit regressions.
+   BndBox2dTreeSelector aSelector(2 * myDFace->GetDeflection());
++  // noshape: a wire whose box misses this wire's box can't cross it (the
++  // segments' boxes are enlarged by Precision::Confusion only): skipped
++  // without walking its tree (a face with 400 hole loops walked 160 000
++  // trees, 300-400 ms of a big plate's display mesh).
++  const Handle(IMeshData::BndBox2dTree)& aBndBoxTree1 = myWiresBndBoxTree->Value(theWireIndex);
++  Bnd_Box2d                              aWireBox1;
++  if (!aBndBoxTree1.IsNull() && !aBndBoxTree1->IsEmpty())
++  {
++    aWireBox1 = aBndBoxTree1->Root().Bnd();
++    aWireBox1.Enlarge(Precision::Confusion());
++  }
+   for (int aWireIt = theWireIndex; aWireIt < myDFace->WiresNb(); ++aWireIt)
+   {
+     const Handle(IMeshData::BndBox2dTree)& aBndBoxTree2 = myWiresBndBoxTree->Value(aWireIt);
+     const occ::handle<Segments>&           aSegments2   = myWiresSegments->Value(aWireIt);
++    if (aWireIt != theWireIndex && !aWireBox1.IsVoid() && !aBndBoxTree2.IsNull() && !aBndBoxTree2->IsEmpty()
++        && aWireBox1.IsOut(aBndBoxTree2->Root().Bnd()))
++    {
++      continue;
++    }
+ 
+     aSelector.SetSegments(aSegments2);
+     for (int aSegmentIt = 0; aSegmentIt < aSegments1->Length(); ++aSegmentIt)
