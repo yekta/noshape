@@ -116,7 +116,7 @@ it, so re-take positions after every selection.
 |---|---|---|---|---|
 | 7.1 | Part Studio tab › Export…, STEP | Dialog (Parasolid default), STEP options, file written | ❌ (TAB-EXPORT-MISSING) (3 solids, mm) | 0.4.10+ / 1c853f78 10-27 |
 | 7.2 | STEP contents | Products named as in live's export | ✅ (v0.4.6 gate): flat products Part 1…n, AP242 header (was ✗ F26) |  |
-| 7.3 | Quit, start, Recently opened, open | Thumbnail, all tabs and features back | ✅ (single click selects; double click opens: ? vs live) |  |
+| 7.3 | Quit, start, Recently opened, open | Thumbnail, all tabs and features back | ✅ (single click selects; double click opens: ? vs live) | 0.4.10+ / 1c853f78 10-27 |
 
 ## 8. Context menus: every item clicked once (added 10-22 after qa5's Parts-list Rename crash on aa75fdf)
 
