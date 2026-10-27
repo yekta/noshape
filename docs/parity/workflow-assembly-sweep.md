@@ -36,8 +36,8 @@ the error-string table's.
 | 19 | Replicate without target scope / mate (E12) | "A target scope must be selected." / "Missing mate to be matched." (dialog title) | "Select parts to find match in" / our own | 🔧 |
 | 20 | Pattern count 0 or 2501 (E13) | count pink, title black, tooltip "… did not regenerate properly:  A parameter value is not valid." (two spaces) | pink, no tooltip | 🔧 |
 | 21 | Pattern distance / angle 0 (E13) | "Linear pattern distance must be positive. A parameter value is not valid." / "Circular pattern angle must be positive. …" | no check | 🔧 |
-| 22 | Insert the assembly into itself (E14) | not offered; search "No assemblies match current search." | not offered; "No results." | 🔧 |
-| 24 | Second pick on the same instance (E1) | not accepted; title "Fastened 1 did not regenerate properly: Mate needs two mate connectors." | a yellow alert "Select a mate connector on a different instance" | 🔧 |
+| 22 | Insert the assembly into itself (E14) | not offered; search "No assemblies match current search." | not offered; "No results." | ✅ (GUI green 19555ca3, skasm 10-27) |
+| 24 | Second pick on the same instance (E1) | not accepted; title "Fastened 1 did not regenerate properly: Mate needs two mate connectors." | a yellow alert "Select a mate connector on a different instance" | ✅ (GUI green 19555ca3, skasm 10-27) |
 | 25 | Dialog errors (all assembly feature dialogs) | red title with tooltip "<name> did not regenerate properly: <text>" (mate, relation, pattern) | red title, no tooltip; mate errors in a yellow alert box | ✅ (GUI green dc3a03f6, skasm 10-27) |
 | 26 | Tangent dialog fields | two "Face, edge or vertex" fields; incomplete: "Tangent mate needs two entities." | one "Mate connectors" field | ✅ (GUI green 19555ca3, skasm 10-27: two "Face, edge or vertex" fields, empty → "Nothing selected.") |
 | 27 | Width tab field | "Tab mate connector(s)" | "Tab mate connectors" | ✅ (GUI green 19555ca3, skasm 10-27) |
