@@ -308,8 +308,11 @@ fn shell_of_a_box_filleted_all_round_has_a_sharp_cavity() {
 /// SHELL-FILLETED-BOX", cases 22–24, 27, 28): 80 x 50 x 10 mm plates with a
 /// centred Ø20 hole and the top face filleted R, shelled t > R with the top
 /// removed; v0.4.8 lost walls in every one (#22 6305.5 vs 9559.7). Within
-/// 0.55·R mm³: live's top fillets keep more at the plate's sharp corners
-/// than OCCT's mitre (R1 −0.47, R2 −0.96 in every case, before any collapse).
+/// 0.55·R mm³ (R1 −0.47, R2 −0.96 in every case): live's volumes here are
+/// REST mass properties at LOW precision, off by the same order (+0.28 /
+/// +0.61 mm³ on a 40 × 30 × 20 block with R2 / R4 top fillets, behaviours
+/// "core (2026-10-27)"); its corners are the exact mitre OCCT builds
+/// (blend `top_edge_fillets_mitre_at_sharp_corners_as_live`).
 #[test]
 fn shell_matrix_cases_with_a_hole_keep_their_walls() {
     let _ = set_working_scale(1000.0);
@@ -324,5 +327,39 @@ fn shell_matrix_cases_with_a_hole_keep_their_walls() {
         eprintln!("R{r} t{t}: {v:.4} mm³ (live {want}) {} faces", out.count(ShapeType::Face));
         assert!(out.is_valid(), "R{r} t{t}");
         assert!((v - want).abs() < 0.55 * r, "R{r} t{t}: {v} vs {want}");
+    }
+}
+
+/// Live's rule for blind holes (behaviours "core (2026-10-27 b)", qa5 P1-5's
+/// 75.554 × 20.245 × 15 block, Ø6.35 holes from the top, top removed): the
+/// shell fails as soon as the hole's lowest flat level (a drilled tip's
+/// shoulder or a flat bottom) is less than 2t above the floor.
+#[test]
+fn shell_fails_when_a_blind_holes_bottom_is_within_2t_of_the_floor() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let r = 3.175 * mm;
+    let tip = r / 59f64.to_radians().tan();
+    let part = |depth: f64, drilled: bool| {
+        let mut s = bx([0.0; 3], [75.554 * mm, 20.245 * mm, 15.0 * mm]);
+        for y in [6.0, 14.245] {
+            let z = (15.0 - depth) * mm;
+            let mut tool = cyl_z(15.0 * mm, y * mm, z, r, 16.0 * mm - z);
+            if drilled {
+                let cone = make_cone(&Plane::from_normal(DVec3::new(15.0 * mm, y * mm, z - tip), DVec3::Z), 0.0, r, tip, std::f64::consts::TAU).unwrap();
+                tool = fuse(&tool, &cone).unwrap().shape;
+            }
+            s = cut(&s, &tool).unwrap().shape;
+        }
+        s
+    };
+    for (depth, drilled, t, ok) in [(10.0, false, 2.5, true), (10.5, false, 2.5, false), (12.0, false, 1.0, true), (10.0, true, 2.5, true), (10.5, true, 2.5, false), (12.0, true, 2.5, false)] {
+        let s = part(depth, drilled);
+        let top = faces_where(&s, |c| c.z > 15.0 * mm - 1e-9);
+        let out = shell_solid(&s, &top, t * mm, ShellSide::Inside, ShellMethod::Auto);
+        assert_eq!(out.is_ok(), ok, "depth {depth} drilled {drilled} t {t}: {:?}", out.as_ref().map(|o| vol(&o.shape) * 1e9).map_err(|e| e.to_string()));
+        if let Ok(o) = out {
+            assert!(o.shape.is_valid(), "depth {depth} drilled {drilled} t {t}");
+        }
     }
 }

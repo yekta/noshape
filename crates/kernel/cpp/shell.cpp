@@ -31,6 +31,7 @@
 #include <BRepAlgoAPI_Splitter.hxx>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <IntCurvesFace_ShapeIntersector.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_Common.hxx>
@@ -440,6 +441,66 @@ bool in_onshape_mitre_band(const TopoDS_Shape& solid, const std::vector<TopoDS_S
           return true;
       }
     }
+  return false;
+}
+
+// Whether a blind hole's bottom lies less than 2t above a kept face under
+// it: live (behaviours "core (2026-10-27 b)", qa5 P1-5's block, 26 cases)
+// fails the shell as soon as the hole's lowest flat level (the shoulder of a
+// drilled tip, or a flat bottom) is less than 2t above the outer floor, its
+// offset t below the cavity floor; a through hole never. (Live also fails at
+// t <= ~1 when the tip cone's offset apex dips under the cavity floor: two
+// points only, not ruled here.)
+bool blind_hole_floor_too_thin(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
+{
+  ShapeIMap rm;
+  for (const TopoDS_Shape& f : removed)
+    rm.Add(f);
+  IntCurvesFace_ShapeIntersector hits;
+  bool                           loaded = false;
+  for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(e.Current());
+    if (rm.Contains(f))
+      continue;
+    BRepAdaptor_Surface a(f, false);
+    // A hole's wall: concave (the outward normal points at the axis), all round.
+    if (a.GetType() != GeomAbs_Cylinder || a.Cylinder().Position().Direct() != (f.Orientation() == TopAbs_REVERSED))
+      continue;
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    if (u1 - u0 < 2 * M_PI - 1e-6)
+      continue;
+    if (!loaded)
+    {
+      hits.Load(solid, 1e-9);
+      loaded = true;
+    }
+    const gp_Cylinder cyl = a.Cylinder();
+    const gp_Ax3&     ax  = cyl.Position();
+    const double      r = cyl.Radius(), eps = 1e-3 * r;
+    for (const auto& [v, sense] : {std::pair{v0, -1.0}, std::pair{v1, 1.0}})
+    {
+      // From inside the hole near its end, a quarter radius off the axis (a
+      // drilled tip's apex sits on it), on along the axis: into the bottom
+      // (none at an open end), then out through the face under it.
+      const gp_Dir d = sense > 0 ? ax.Direction() : ax.Direction().Reversed();
+      const gp_Pnt p = ElSLib::Value(0, v, gp_Cylinder(ax, 0.25 * r)).Translated(gp_Vec(d) * -eps);
+      hits.Perform(gp_Lin(p, d), 0, RealLast());
+      std::vector<std::pair<double, int>> ws;
+      for (int i = 1; i <= hits.NbPnt(); ++i)
+        ws.emplace_back(hits.WParameter(i), i);
+      std::sort(ws.begin(), ws.end());
+      if (ws.size() < 2 || hits.Transition(ws[0].second) != IntCurveSurface_In || hits.Transition(ws[1].second) != IntCurveSurface_Out)
+        continue;
+      const TopoDS_Face& floor = hits.Face(ws[1].second);
+      BRepAdaptor_Surface fa(floor, false);
+      if (rm.Contains(floor) || fa.GetType() != GeomAbs_Plane || !fa.Plane().Axis().Direction().IsParallel(d, 1e-9))
+        continue;
+      if (ws[1].first - eps < 2 * t * (1 - 1e-9))
+        return true;
+    }
+  }
   return false;
 }
 
@@ -2024,6 +2085,8 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   const double sign = outward ? 1.0 : -1.0;
   if (!outward && in_onshape_mitre_band(solid.shape, removed, thickness))
     fail_op("shell failed (Parasolid can't build this wall: live G51)");
+  if (!outward && blind_hole_floor_too_thin(solid.shape, removed, thickness))
+    fail_op("shell failed (Parasolid can't offset a blind hole's bottom past the cavity floor: live 'core (2026-10-27 b)')");
   const double gap = outward ? std::numeric_limits<double>::infinity() : offsets_touch_gap(solid.shape, removed, thickness);
   if (gap <= 1e-8)
     fail_op("shell failed (Parasolid can't build walls whose offsets touch)");

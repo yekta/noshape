@@ -427,9 +427,10 @@ fn extrude_moved_above_its_sketch_fails_on_the_missing_region() {
 /// qa5 P1-5 (live: "Could not shell part with selections."): block 75.554 ×
 /// 20.245 × 15, R2 on 3 vertical edges, a 1 mm chamfer chain, two Ø6.35 ×
 /// 12 drilled holes and a feature pattern of them; Shell 2.5 mm off the top
-/// face broke the part into 4 slivers and reported Ok.
+/// face broke the part into 4 slivers and reported Ok. Live's rule
+/// (behaviours "core (2026-10-27 b)"): the holes' shoulders sit 3 mm above
+/// the floor, less than 2t.
 #[test]
-#[ignore = "T2: macOS arm64 differs (red on CI 10-26)"]
 fn shell_that_breaks_the_part_fails() {
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();

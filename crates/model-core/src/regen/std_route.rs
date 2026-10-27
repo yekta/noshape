@@ -17,14 +17,19 @@ pub fn set_std_sheet_metal(on: bool) {
     STD_SHEET_METAL.store(on, std::sync::atomic::Ordering::Relaxed);
 }
 
-/// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
-/// makes std run them instead, the oracle the native ones are tested
-/// against (tests/std_oracle.rs).
-static STD_ROUTE: LazyLock<parking_lot::RwLock<Vec<String>>> = LazyLock::new(Default::default);
+thread_local! {
+    /// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
+    /// makes std run them instead, the oracle the native ones are tested
+    /// against (tests/std_oracle.rs). Per thread (a regeneration evaluates its
+    /// features on the calling thread): process-wide, std_oracle's route
+    /// leaked into the tests running beside it (oracle_p1's extrudes came
+    /// out as std's "Select face or sketch region to extrude.").
+    static STD_ROUTE: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
 
-/// Run these core feature types by std (empty: all native again).
+/// Run these core feature types by std on this thread (empty: all native again).
 pub fn set_std_route(types: &[&str]) {
-    *STD_ROUTE.write() = types.iter().map(|t| t.to_string()).collect();
+    STD_ROUTE.with_borrow_mut(|r| *r = types.iter().map(|t| t.to_string()).collect());
 }
 
 macro_rules! core_features {
@@ -82,7 +87,7 @@ macro_rules! std_features {
         /// The std evaluator of a built-in feature type, if std runs it.
         pub fn evaluator(type_id: &str) -> Option<EvalFn> {
             if let Some(&(.., f)) = CORE.iter().find(|(t, ..)| *t == type_id)
-                && STD_ROUTE.read().iter().any(|t| t == type_id)
+                && STD_ROUTE.with_borrow(|r| r.iter().any(|t| t == type_id))
             {
                 return Some(f);
             }

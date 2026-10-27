@@ -257,3 +257,21 @@ fn fillet_wider_than_its_faces_like_onshape() {
     let res = fillet_checked(&b, &edge, &[50.0 * MM]).unwrap();
     assert_eq!(res.shape.count(ShapeType::Face), 5);
 }
+
+/// Fillets on a block's four top edges meet the sharp vertical edges in an
+/// exact mitre, as live (behaviours "core (2026-10-27)" SHELL-WALLS-CORNER:
+/// 40 × 30 × 20, R2 23882.890721 / R4 23543.834555 mm³ at HIGH, 10 faces,
+/// no corner patch; the exact mitre gives 23882.890820 / 23543.834784).
+#[test]
+fn top_edge_fillets_mitre_at_sharp_corners_as_live() {
+    setup();
+    for (r, want) in [(2.0, 23882.890820), (4.0, 23543.834784)] {
+        let s = bx([0.0; 3], [40.0, 30.0, 20.0]);
+        let top = edges_where(&s, |i| (i.start.z - 20.0 * MM).abs() < 1e-9 && (i.end.z - 20.0 * MM).abs() < 1e-9);
+        let f = fillet_checked(&s, &top, &[r * MM]).unwrap().shape;
+        let v = vol_mm3(&f);
+        // Volume integration noise: R4 +0.0016 (live HIGH itself −0.0002).
+        assert!((v - want).abs() < 5e-3, "R{r}: {v} vs live {want}");
+        assert_eq!(f.faces().len(), 10, "R{r}");
+    }
+}

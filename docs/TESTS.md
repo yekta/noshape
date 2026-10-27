@@ -58,7 +58,6 @@ delete the line to bring it back to T1. Record the move below.
 | ops/tests: `many_parts` (`assembly_perf`, `big_plate_perf`, `regen_profile` were already all ignored) | 900 parts, 19 s |
 | kernel/tests: `export` (whole file), `planar_mesh` | export round trips compare last digits across platforms (`rhino_breps_are_valid` red on Windows 10-26); Parasolid import 36 s; planar mesh stress 33 s |
 | kernel/tests/draft_curve `level_parting_line_matches_occt` | exact match vs OCCT; red on all platforms 10-26 |
-| model/tests/qa_regressions `shell_that_breaks_the_part_fails` | red on macOS arm64 in every CI run of 10-26 (ticket: core modelling) |
 | model/tests/features_c `parting_line_draft_on_curves_as_live` | 44 s |
 | model/tests/custom_features `std_sheet_metal_matches_onshape` | 45 s |
 | model/src/assembly/tests.rs: 18 standard-content recipe tests (`*_match_live`, `*_regenerates_on_every_head`, `standard_content_parts_regenerate_with_mate_connectors`, …) | standard content long tail (P3) vs live; 7–144 s each |
