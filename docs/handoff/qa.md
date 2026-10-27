@@ -162,6 +162,16 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
+## Green 4854cad4 (2026-10-27 08:17–08:30)
+- REGEN-SPEED: commit median ~250 ms at load ~27 (serial booleans didn't slow it). Replays of seeds 72 / 93 on the
+  serial-boolean CLI (08:12) running to check BOOL-THREAD-CRASH.
+- UI workflows OK: Assembly from scratch (Insert dialog, 2 parts, Fastened mate by edge centres), configurations (Configure
+  Part Studio, row Big, Instance count › Configure, value set through the dialog: Parts (5)) but CONFIG-CELL-EDIT (P2),
+  Variable feature (#len = 12 mm, (x) row; used before its definition → pink field, red title), drawing BOM table
+  (Item / Quantity / Part number / Description, quantities right), drawing Detail view (DETAIL A, SCALE 1:1), 12 feature
+  dialogs side by side with live's captures (Boolean, Draft, Split, Transform, Circular pattern, Thicken, Sweep, Helix,
+  Rib, Move face, Delete face, Offset surface): identical. UI fuzz on the drawing tab 600 actions clean.
+
 ## Green 136c6738 (2026-10-27 08:10–08:20)
 - UI workflows OK: Revolve (dialog = live revolve-01; full revolve of a 10×30 rectangle about a sketch line 28274.334
   exact), Part linear pattern ×3 / 50 mm along the Right plane's normal (3 parts, exact), drawing Section view (Vertical,
