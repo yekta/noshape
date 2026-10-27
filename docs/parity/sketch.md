@@ -85,7 +85,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 4.13 | Tangent arc tool: start at a curve end, click the end; tangent constraint | H:arc_tangent | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.14 | Center point arc: center, start (radius), end; the sweep follows the cursor's direction | H:center_point_arc | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.15 | Ellipse: center, primary axis, secondary radius; a horizontal / vertical major-axis click makes it Horizontal / Vertical (live spec 10-27 "majorAxisSnap0") | H:ellipse | ✅ (T:sm; snap skasm 10-27) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.16 | Elliptical arc: center, primary axis, secondary radius + start, end on the construction ellipse | H:elliptical_arc | ✅ (T:sm) |  |
+| 4.16 | Elliptical arc: center, primary axis, secondary radius + start, end on the construction ellipse | H:elliptical_arc | ✅ (T:sm) | 0.4.10+ / 965d3f56 10-27 (centre, axis, 3rd click = minor radius + start, end) |
 | 4.17 | Elliptical arc start/end snap to the axis / quadrant points | H:elliptical_arc | ✅ (axis / quadrant snaps on the construction ellipse) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.18 | Conic: start, end, control point; rho value | H:conic | ✅ (T:ux, T:sm; GUI :103 rho field auto-focus and 0.7 Enter verified; /tmp/skb/2026-10-18/conic-rho*.png) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.19 | Inscribed / circumscribed polygon: center, circumference; construction circle. Inscribed: the 2nd click is an edge's middle (circle tangent to the edges); circumscribed: a vertex (circle through the vertices) | H:inscribed_polygon; live skasm 10-26 (behaviours "skasm sketch polygons") | ✅ (geometry and constraints as live 10-26 (seed + circular pattern; inscribed Midpoint + Tangent, circumscribed Coincident on the circle; no Ø dimension), test `polygon_second_click_is_an_edge_middle_inscribed_and_a_vertex_circumscribed`; GUI :103 10-27) | 0.4.10+ / 2d9a275c 10-27 |
@@ -118,7 +118,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 5.2 | Typing a value or expression and Enter adds a driving dimension | H:line | ✅ (OTF-FIRST-KEY fixed 0537ac91) | 0.4.10+ / 6cbb24e0 10-27 |
 | 5.3 | Continuing to sketch leaves the geometry undimensioned (box disappears) | H:sketch_basics | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 5.4 | Rectangles: length box, Enter, width box, Enter | H:corner_rectangle | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 5.5 | Ellipse / elliptical arc: primary then secondary diameter | H:ellipse | ✅ (T:sm) |  |
+| 5.5 | Ellipse / elliptical arc: primary then secondary diameter | H:ellipse | ✅ (T:sm) | 0.4.10+ / 965d3f56 10-27 (readout Ø primary, then Ø secondary) |
 | 5.6 | Polygon: no value box and no Ø dimension (live spec 10-26 "Sketch polygon commits": seed + circular pattern, no DIAMETER; the Help's "diameter of the construction circle" is only the readout) | H:inscribed_polygon | ✅ (scene test `polygon_sides_typed_and_midpoint_line`: no box) | 0.4.10+ / 2d9a275c 10-27 |
 | 5.7 | Fillet: radius box right after the first fillet | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 5.8 | `=#var` uses a variable; expressions with units and functions | H:sketch_basics | ✅ |  |
@@ -236,7 +236,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.1 | Fillet: click a vertex, radius box; later vertices make equal fillets | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 11.2 | Fillet: click two curves | H:sketch_fillet | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.3 | Fillet keeps a virtual sharp with the coincident constraints | H:sketch_fillet | ✅ |  |
-| 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ✅ (T:sm; red preview, radius manipulator) |  |
+| 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ❌ (SKETCH-FILLET-STUCK-RADIUS) (T:sm; red preview, radius manipulator) | 0.4.10+ / 965d3f56 10-27 |
 | 11.5 | Chamfer: vertex or two lines, two distance dimensions (45° default) | H:sketch_chamfer | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.6 | Trim: click removes up to the nearest intersections, whole curve when unbounded | H:trim | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 11.7 | Trim: drag across curves trims everything crossed | H:trim | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
@@ -246,11 +246,11 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.11 | Split: click a curve where to split | H:sketch_split | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves. Live "psb (10-24 j)": the copies get their own points joined by Coincidents, sharp outer corners, own centres; one OFFSET per further pair (all on the first picked pair) and one DISTANCE on that pair (a lone curve: one OFFSET), no Parallel / Concentric; free ends unconstrained; editing the distance moves every copy; a new offset starts away from the region (a circle outward), the flip isn't remembered | H:offset; live psb (10-24 j), qa4 round 5 s1 follow-up | ✅ (GUI :103 skasm 10-26: one edge offsets away from the region with the arrow, Enter creates it and opens the "5 mm" box with ± ✓ ✕; `Sketch::offset_tool`, `ConstraintKind::OffsetCurve`; tests `offset_tool_makes_live_constraints_on_a_chain`, `offset_tool_on_the_closed_loop_and_a_circle`) | 0.4.10+ / 2d9a275c 10-27 |
 | 11.12a | Offset takes one chain: a curve not connected to the pending one is only selected (again: deselected) with "Can only offset a single chain at once."; the preview stays | live qa4 round 5 s1 follow-up (5) (OFF-TOAST) | ✅ (test `offset_takes_one_chain`) |  |
-| 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) |  |
+| 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) | 0.4.10+ / 965d3f56 10-27 (ellipse + mirror line preselected: resolves at once) |
 | 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
-| 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) |  |
-| 11.16 | Pattern preview limited to 10 instances | H:sketch_linear_pattern | ✅ |  |
-| 11.17 | Edit pattern from the pattern glyph | H:sketch_linear_pattern | ✅ (T:sm; linear and circular instances are linked to the seed, see 14.1) |  |
+| 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) | 0.4.10+ / 965d3f56 10-27 (3x / 1x manipulators, count label edit, Enter accepts) |
+| 11.16 | Pattern preview limited to 10 instances | H:sketch_linear_pattern | ✅ | 0.4.10+ / 965d3f56 10-27 (count 15: preview 10) |
+| 11.17 | Edit pattern from the pattern glyph | H:sketch_linear_pattern | ✅ (T:sm; linear and circular instances are linked to the seed, see 14.1) | 0.4.10+ / 965d3f56 10-27 (right-click glyph › Edit pattern; count 15 → 3) |
 | 11.18 | Transform: triad manipulator (move, rotate, scale, free-drag center), Enter commits, Esc cancels | H:sketch_transform | ✅ (click in space / Enter commit, Esc cancel) |  |
 | 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ✅ (planar curves project exactly; non-planar edges project to a fitted spline like Onshape; other sketches; linked); a used circle / arc has a construction centre point, its line ends are not (live "skb (10-25) sketch Use on a face sketch", 4b5ac4fe) |  |
 | 11.20 | Use: hover preview of the projection | H:use | ✅ (GUI :103 m8.png: hovering the cylinder top edge highlights it and previews the projected circle on the sketch plane; click creates it) |  |
@@ -340,7 +340,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | Point glyphs | up-left of the point (box top-left −27, −26) with a 1 px `#a8b2bb` leader | up-right, no leader | ✅ |  |
 | Box | plain white square, no border, radius or shadow | radius 2 + shadow | ✅ |  |
 | Icon | spans 14 px of the box | 11 px | ✅ (18 px icon) |  |
-| Hovered glyph `#fcda7f`, toolbar, inference glyph | | | ✅ |  |
+| Hovered glyph `#fcda7f`, toolbar, inference glyph | | | ✅ | 0.4.10+ / 965d3f56 10-27 (Equal glyph bg #fcda7f, both ellipses #ffc685; pattern glyph see SKETCH-PATTERN-GLYPH-HOVER) |
 | Rectangle corner coincident glyphs | four, at the corners | none: our corners share points, no coincident constraints | → skb (model) |  |
 | Hovered / selected sketch line | `#fec788` / `#feab10` ~80 % over the black line (darker core `#ca9e6b` / `#ca870b`) | the line recoloured, solid | → render owner (the line stays under a translucent highlight) |  |
 | Dimension value box (hover / selected) | 27 px high, centred on the value (sketch/24) | 22 px | ✅ |  |
