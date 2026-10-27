@@ -83,7 +83,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   /root/qa-scratch/tickets/cli-fillet-hang.noshape (history ends "Insert feature : Fillet 2"); stack
   tickets/cli-fillet-hang-bt-tail.txt. Needs a time / iteration budget on blends (fail the feature) and the regen must stay
   abortable (qa 2026-10-27, main CLI 19555ca3)
-- [ ] P0 TWO-PROCESS-LOST-EDIT the same .noshape opened by two app processes (e.g. `noshape doc.noshape` twice, or a
+- [x] (dx 10-27: a session merges its edit onto a head another process moved, three-way, then reloads; both edits kept in arrival order as live; session::tests::two_writers_of_one_file_keep_both_edits. Left: same-feature two-field edits keep ours (core merge.rs), and the other window shows the change only at its next edit) P0 TWO-PROCESS-LOST-EDIT the same .noshape opened by two app processes (e.g. `noshape doc.noshape` twice, or a
   file-manager double-click while it's open) gives two independent windows; edits from both are written, but the later
   writer's microversion takes the earlier one as parent while carrying its own stale state, so the earlier edit silently
   vanishes from the head. Repro: open /root/qa-scratch/l30.noshape twice; in A suppress Boss 1, in B rename Boss 2 →
@@ -285,7 +285,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [x] verified dc3a03f6 (qa: name accepted, Derived OK 12000 mm³) (dx 5ef64eb8: a tab name or id is resolved, a non-Part-Studio tab refused with `params.partStudio`) P2 API-DERIVED-BY-NAME feature_add importDerived with `partStudio: "Part Studio 1"` (the tab's name) is accepted and
   the feature fails "Error regenerating."; only the tab id works. Accept the name as tab_* ops do, or refuse it as an
   invalid_argument naming the expected id (main CLI ~20:18) (qa 2026-10-26)
-- [ ] P2 OPEN-ERROR-SILENT `noshape bad.noshape` with a truncated file ("sqlite: database disk image is malformed") or a
+- [x] 16cdcf6d + 3dfa5710 (dx: one-line reason; the error bubble now stays until its × instead of timing out before a slow start shows the window, and File › Open failures show it too) P2 OPEN-ERROR-SILENT `noshape bad.noshape` with a truncated file ("sqlite: database disk image is malformed") or a
   non-noshape file ("not a noshape document") opens the Documents window with no message; the error is only in the log.
   Show it (an error dialog/toast naming the file and the reason) (qa 2026-10-26, build 4d2f6b0c)
 - [x] (dx 10-27: the scale list is live's, and automatic centre marks go on whole circles only, not on a rounded corner's arc) P2 DRAWING-SCALE Create Drawing › ANSI_A_MM › Suggested views of an ~82×82×20 part: ours picks scale 0.75 and the

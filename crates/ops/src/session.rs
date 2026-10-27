@@ -102,7 +102,14 @@ pub struct Session {
     /// Set while an allowed edit runs on a protected workspace (release
     /// metadata; [`Session::with_protection_lifted`]).
     protection_lifted: bool,
+    /// The microversion `doc` was read from or last committed as. When the
+    /// branch head has moved past it (another process wrote the file), a
+    /// commit merges onto the head ([`Session::rebase`]).
+    seen: MicroversionId,
 }
+
+/// Store names and their new content (None deletes the name).
+type Changes = Vec<(String, Option<Vec<u8>>)>;
 
 impl Session {
     pub fn create(path: impl AsRef<Path>, doc: Document) -> Result<Self> {
@@ -113,10 +120,11 @@ impl Session {
         let name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Untitled".into());
         store.set_name(&name)?;
         let branch = store.default_branch()?;
+        let seen = store.head(branch)?;
         // The document's features may need the FeatureScript host (custom features, std-run features).
         noshape_model::custom::register();
         noshape_model::regen::crash_guard::enable(noshape_model::regen::crash_guard::default_dir());
-        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false })
+        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false, seen })
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -132,7 +140,7 @@ impl Session {
         noshape_model::custom::register();
         // Undo works across sessions: rebuild the stack from the history.
         let undo = UndoStack::from_history(&store, branch, 500).unwrap_or_else(|_| UndoStack::new(branch).with_limit(500));
-        let mut s = Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false };
+        let mut s = Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false, seen: head };
         noshape_model::regen::crash_guard::enable(noshape_model::regen::crash_guard::default_dir());
         if let Some(dir) = noshape_model::regen::crash_guard::dir() {
             s.recovered = s.recover_crashed_features(dir);
@@ -302,10 +310,7 @@ impl Session {
         if settings {
             changes.push((META_BLOB.to_string(), Some(self.doc.settings_blob())));
         }
-        if self.tab_bar_only(&changes)? {
-            return Ok(self.undo.commit_not_undoable(&mut self.store, &changes, description)?);
-        }
-        Ok(self.undo.commit(&mut self.store, &changes, description)?)
+        self.write(changes, description, true)
     }
 
     /// Commit the whole document as an edit Ctrl+Z can't undo (deleting a
@@ -313,7 +318,49 @@ impl Session {
     pub fn commit_all_not_undoable(&mut self, description: &str) -> Result<MicroversionId> {
         self.ensure_unprotected()?;
         let changes = self.all_changes()?;
-        Ok(self.undo.commit_not_undoable(&mut self.store, &changes, description)?)
+        self.write(changes, description, false)
+    }
+
+    /// Commit `changes` (an edit of `doc`) onto the branch head. A head
+    /// another process moved since `doc` was read (the file open in two
+    /// windows, an agent writing it: qa TWO-PROCESS-LOST-EDIT) gets them
+    /// merged on top, then `doc` is that result: like live, where every
+    /// writer appends to one workspace and neither loses the other's edit.
+    fn write(&mut self, changes: Changes, description: &str, undoable: bool) -> Result<MicroversionId> {
+        let (changes, moved) = self.rebase(changes)?;
+        let after = if undoable && !self.tab_bar_only(&changes)? {
+            self.undo.commit(&mut self.store, &changes, description)?
+        } else {
+            self.undo.commit_not_undoable(&mut self.store, &changes, description)?
+        };
+        if moved {
+            self.reload(after)?;
+        }
+        self.seen = after;
+        Ok(after)
+    }
+
+    /// `changes` against the head: as given when the head is the one `doc`
+    /// was read from; else only the names this edit changed (against what
+    /// `doc` was read from), each merged three-way with the head's (tabs
+    /// feature by feature, [`noshape_model::merge::merge_tab_blobs`]; on a
+    /// clash ours wins). Whether the head had moved.
+    fn rebase(&self, changes: Changes) -> Result<(Changes, bool)> {
+        let head = self.head()?;
+        if head == self.seen {
+            return Ok((changes, false));
+        }
+        let mut out = Vec::new();
+        for (name, ours) in changes {
+            let base = self.store.read(self.seen, &name)?;
+            if base == ours {
+                continue;
+            }
+            let theirs = self.store.read(head, &name)?;
+            let merged = if theirs == base || !name.starts_with("tab/") { ours } else { noshape_model::merge::merge_tab_blobs(base.as_deref(), ours.as_deref(), theirs.as_deref()) };
+            out.push((name, merged));
+        }
+        Ok((out, true))
     }
 
     fn all_changes(&self) -> Result<Vec<(String, Option<Vec<u8>>)>> {
@@ -335,10 +382,7 @@ impl Session {
     pub fn commit_all(&mut self, description: &str) -> Result<MicroversionId> {
         self.ensure_unprotected()?;
         let changes = self.all_changes()?;
-        if self.tab_bar_only(&changes)? {
-            return Ok(self.undo.commit_not_undoable(&mut self.store, &changes, description)?);
-        }
-        Ok(self.undo.commit(&mut self.store, &changes, description)?)
+        self.write(changes, description, true)
     }
 
     /// Whether `changes` (against the head) touch nothing but the tab bar:
@@ -379,6 +423,7 @@ impl Session {
 
     fn reload(&mut self, mv: MicroversionId) -> Result<()> {
         self.doc = Document::from_blobs(&self.store.read_all(mv)?)?;
+        self.seen = mv;
         Ok(())
     }
 
@@ -659,7 +704,7 @@ mod tests {
         s.commit(&[tab], true, "Edit").unwrap();
         assert!(s.can_undo());
         s.edit_document("Rename tab : B", |d| d.tab_mut(tab).unwrap().name = "B".into()).unwrap();
-        let other = s.edit_document("Insert tab : Part Studio 2", |d| d.add_tab("Part Studio 2", TabContent::PartStudio(Default::default()))).unwrap();
+        let other = s.edit_document("Insert tab : Part Studio 2", |d| d.add_tab("Part Studio 2", TabContent::PartStudio(noshape_model::partstudio::PartStudio::new()))).unwrap();
         let order = vec![other, tab];
         s.edit_document("Reorder tabs", |d| d.settings.tab_order = order.clone()).unwrap();
         s.undo().unwrap();
@@ -715,5 +760,57 @@ mod tests {
         s.commit(&[tab], false, "Pin view reference").unwrap();
         let docs = s.pinned_documents();
         assert_eq!(docs.keys().collect::<Vec<_>>(), vec![&v]);
+    }
+
+    /// qa TWO-PROCESS-LOST-EDIT: the file open in two processes (here two
+    /// sessions). A suppresses Extrude 1; B, which never saw that, renames
+    /// Extrude 2. Live keeps both, in arrival order, and B sees A's edit.
+    #[test]
+    fn two_writers_of_one_file_keep_both_edits() {
+        use noshape_model::document::TabContent;
+        let dir = std::env::temp_dir().join(format!("noshape-session-two-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("p.noshape");
+        let _ = std::fs::remove_file(&path);
+        let mut doc = Document::new();
+        let units = doc.settings.units;
+        let tab = doc.tabs.iter_mut().find(|t| matches!(t.content, TabContent::PartStudio(_))).expect("a Part Studio");
+        let (tab_id, TabContent::PartStudio(ps)) = (tab.id, &mut tab.content) else { unreachable!() };
+        for _ in 0..2 {
+            let f = ps.new_feature("extrude", &units).expect("extrude");
+            ps.features.push(f);
+        }
+        drop(Session::create(&path, doc).unwrap());
+        let mut a = Session::open(&path).unwrap();
+        let mut b = Session::open(&path).unwrap();
+        let studio = |s: &Session| match &s.doc.tab(tab_id).unwrap().content {
+            TabContent::PartStudio(ps) => ps.clone(),
+            _ => unreachable!(),
+        };
+        a.edit_tab(tab_id, "Suppress : Extrude 1", |c| {
+            if let TabContent::PartStudio(ps) = c {
+                ps.features[0].suppressed = true;
+            }
+        })
+        .unwrap();
+        b.edit_tab(tab_id, "Rename : Renamed in B", |c| {
+            if let TabContent::PartStudio(ps) = c {
+                ps.features[1].name = "Renamed in B".into();
+            }
+        })
+        .unwrap();
+        let both = |ps: &noshape_model::partstudio::PartStudio| ps.features[0].suppressed && ps.features[1].name == "Renamed in B";
+        assert!(both(&studio(&b)), "B shows A's edit after its own");
+        // A's next edit keeps B's too (a tab added: the whole document is written).
+        a.edit_document("Insert tab", |d| d.add_tab("Part Studio 2", TabContent::PartStudio(Default::default()))).unwrap();
+        assert!(both(&studio(&a)));
+        let tabs = a.doc.tabs.len();
+        drop((a, b));
+        let c = Session::open(&path).unwrap();
+        assert!(both(&studio(&c)));
+        assert_eq!(c.doc.tabs.len(), tabs);
+        let h: Vec<String> = c.store.history(c.branch).unwrap().into_iter().take(3).map(|m| m.description).collect();
+        assert!(h[0] == "Insert tab" && h[1].ends_with(":: Rename : Renamed in B") && h[2].ends_with(":: Suppress : Extrude 1"), "{h:?}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -23,7 +23,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   properties / publish, Hole Standard, sketch_create plane query, variable_set name / new_name, Derived by tab name…);
   f0da1ca3 batch 2 (singular list args, legacy hidden params refused, VS configuration rules as live, one VERSION).
 - b29afb6f fixed my own mistake: 36e4da66 had pushed TICKETS.md mid-rebase with conflict markers (qa's tickets restored).
-- (this commit) P0 DOC-POISON: crash markers around each feature evaluation (model-core `regen::crash_guard`, enabled by
+- 87e8275f P0 DOC-POISON: crash markers around each feature evaluation (model-core `regen::crash_guard`, enabled by
   `ops::session::Session::open/create`); Session::open rolls a Part Studio back above a feature whose evaluation
   stopped a process ("Roll back above <name>: it stopped noshape while regenerating"), notes in `Session::recovered`
   and document_open / document_info `recovered`. Checked on qa's cli-fillet-segv.noshape: open 1 aborts in the kernel
@@ -38,12 +38,20 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - 16cdcf6d one-line open errors; 6a21a5d0 assembly_set_state `state`; D8 and D12 rows verified in workflow-drawing.md.
 - 8993ea92 audit of the app's edit history texts, part 1: config_configure unconfigure, mate connector suppression,
   document_update_workspace, variable_list visible_at_end.
-- (this commit) audit part 2: assembly_move_instance (the instance list's drops: Reorder instances / Add to folder /
+- 3dfa5710 audit part 2: assembly_move_instance (the instance list's drops: Reorder instances / Add to folder /
   Move to subassembly), assembly_exploded_view `move` (Reorder : Explode steps), assembly_pattern mirror `strategy`
   (Derived / Transform + Placement per seed; makes the "-Mirrored" Part Studio like the dialog's Update),
   drawing_image (Move to sheet, Image borders); OPEN-ERROR-SILENT part 2 (the start window's open error stays until ×;
   the Open dialog's failures show it); app's image menu and Mirror dialog call the shared ops functions. Removed the
   stale MENUS line sk-dim-tol (skasm's 4c58bbd4 dropped that menu item; coverage:: failed on main).
+
+- (this commit) P0 TWO-PROCESS-LOST-EDIT: a Session remembers the microversion its document was read from; when
+  another process moved the head, a commit merges this edit's names three-way onto it (tabs feature by feature,
+  noshape_model::merge) and reloads, so neither writer loses an edit (live: one workspace, writers append). Test
+  session::tests::two_writers_of_one_file_keep_both_edits. Left: (a) two writers changing different fields of the
+  *same* feature: merge_part_studio keeps ours for a feature changed on both sides (core's merge.rs could merge the
+  feature's params field by field); (b) live shows B's edit in A's open tab within seconds; the app only picks it up at
+  A's next edit (needs a file watch / head poll in the app).
 
 ## Next (in order, after landing)
 1. Audit leftovers: Part Studio "Move configuration input" (config input order outside Variable Studios), "Move
