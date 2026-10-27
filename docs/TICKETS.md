@@ -37,6 +37,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli-shell-gpf, cli-fillet-segv, cli-fillet2-segv and cli-draft-segv.noshape** (/root/qa-scratch/tickets/; green 19555ca3
   opens all five).
 ## Core modelling (core)
+- [ ] P1 FEATURE-PATTERN-ADD-Y a Feature pattern of an **Add** extrude loses the instances along some directions:
+  steps (bin/fp2var.py): plate 300 × 200 × 3 (Top), sketch Ø10 on its top face at (20,20), Extrude Add 10 mm; Linear
+  pattern › Feature pattern of it, 40 mm. Along the plate's X edge 3 instances: right. Along its Y edge (direction
+  either way), 3 instances: **Error "Could not create all instances as entered. Try selecting "Reapply features""**,
+  only the seed boss; with Reapply features on: right. With Second direction on, the second-direction instances are
+  dropped **silently, status OK**: 2 × 2 → 2 bosses, 7 × 5 → 7 (should be 35). New-body extrude 2 × 2 → 4 parts
+  (right), Part pattern 3 × 2 → 6 (right). Same on CLI 09:50 and v0.4.10. Live patterns an added boss in any in-plane
+  direction without Reapply (confirming in REQUESTS "qa (2026-10-27, FEATURE-PATTERN-ADD-Y)") (qa 2026-10-27 11:13,
+  v0.4.10 artifact / CLI 09:50)
 - [ ] P3 SM-FACES Sheet metal model › Extrude of an open L ((0,0)–(50,0)–(50,30), Blind 20, thickness 2, R3; live "fs (10-23
   05:00)"): volumes exact (3211.3274 / flipped 3051.3274) and the folded boxes = live, but ours has **10 faces**, live **14**
   (12 PLANE + 2 CYLINDER): live keeps each end face (z 0 and z 20) split into wall / bend / wall pieces, ours merges each end
@@ -348,6 +357,31 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P1 EDGE-HIGHLIGHT-LOOK (user-reported, v0.4.10 macOS) a hovered model edge is a light band with a dark border on
+  both sides; hovered and selected edges must match live exactly (width at 1× and 2×, colours, outline or not). User
+  shot: /root/qa-scratch/tickets/ehl/user-report.png (zoom user-edge-zoom.png). Reproduced on the v0.4.10 Linux
+  artifact (tickets/ehl/plate.noshape = bin/platedoc.py: 300 × 200 × 3 plate, patterned Ø10 bosses; iso, hover the
+  top-front edge away from its midpoint; column profiles across the edge, top → bottom):
+  | state | ours 1× (v0.4.10) | live 1× (behaviours 18762, psui 1456) |
+  |---|---|---|
+  | at rest | 1 px **#000000** | 1 px (20,27,30) + AA (99,131,150) / (64,85,97) |
+  | edge hovered | dark 1 px #171F23, **6 px** band FFC685 FFC685 FFD3A0 FFD3A0 FFD3A0 FFC685, dark 1 px #1A2328 | dark 2 px (26,35,40) (29,29,29), **5 px** band (253,198,135) (255,211,160)×2 (241,197,146) (255,198,133), dark 1 px (15,19,22) |
+  | edge selected (pointer on background) | 5–6 px BDA96A FFA90A D99C23 CB8A0F D99C23 F8A40A, no outline | 5 px (251,170,18) (221,161,41) (203,138,15) (213,151,29) (255,169,10), no outline |
+  | selected + hovered | outline + FFA90A / FFBC40 core | outline + (255,188,64) core |
+  - **2×** (GPUI_X11_SCALE_FACTOR=2, tickets/ehl/v0410-2x-hover*.png): hover = 2 px #1A2328, 11 px band (3 FFC685 +
+    5 FFD3A0 + 3 FFC685), 2 px #1A2328: every width doubled. The user's 2× macOS shot has exactly this structure (2–3 px
+    #1C2327, 3 + 5 + 3 band in display-profile colours #F6C88E / #F8D5A7), so ours is consistent across platforms.
+  - So against live's 1× capture: the dark outline on hover **is** live's (the user's "unlike live" conflicts with psui
+    1456 — the pending capture REQUESTS "psui (2026-10-27, P1, from the user) EDGE-HIGHLIGHT-LOOK" should settle it,
+    especially at 2× / Retina); the differences already measurable are the hover band (6 px with a 3 px core vs 5 px
+    with 2), the outline split (1/1 vs 2/1) and the rest line (#000000 vs (20,27,30)). At 2× the question is whether
+    live doubles the band and outline (ours: 15 px in all).
+  - Hovering the top face while its edge is selected draws the edge with the hover outline (face hover lights its
+    boundary); live draws a hovered face's boundary 3 px (255,198,133) with no outline (behaviours 18762 "face
+    hovered"). To compare once live's capture is in.
+  - The black region at the bottom right of the user's shot did **not** reproduce on v0.4.10 Linux (1× and 2×): iso,
+    zoom into the plate's corner down to its vertex, tilts above and below the top face, bottom view. Not filed as
+    BLACK-REGION; needs the user's document (or it is macOS / Metal-only) (qa 2026-10-27 11:13, v0.4.10 artifact)
 - [ ] P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
   List → id "Configuration" (renamed "Size", the id stays "Configuration"), Checkbox → "Checkbox_2" (ops/config.rs
   add_input → fs_identifier(name)). Live gives a List a random internal id `List_8iFesnytxapQpg` (behaviours 5915, 6098:
