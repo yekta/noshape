@@ -8,8 +8,9 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 (/root/core-scratch/env.sh; long jobs via /root/core-scratch/job.sh <log> "<cmd>").
 
 ## Landed on main (10-26 / 10-27)
-- 81c8d9cd psb's face blend WIP (curved sides, live's message rule). Open (T2 `features_c::face_blend_on_an_elliptic_boss_as_live`):
-  the elliptic boss gives 10 faces (the boss side in two halves) vs live's 9; the curvature section fails.
+- 81c8d9cd psb's face blend WIP (curved sides, live's message rule). a2b34ade: the elliptic boss as live (a sketch
+  ellipse's halves become one edge, so the extruded side is one face; closed lofts start a quarter turn past the seam);
+  open (T2 `features_c::face_blend_curvature_on_an_elliptic_boss_as_live`): the curvature section's fuse comes back empty.
 - 3f5f69ed P0 CP1: extruded cylinders framed as live (features.cpp `seat_circles` + `frame_cylinders_toward_sketch`).
 - bf8aaee2 (+ 0145f35c fixture) P0 crashes DRAFT-SEGV-DOC, SHELL-SLAB-GPF, FILLET-SEGV, FILLET-SEGV-BLEND: OCCT patch
   0002, crash guard (signals inside a bridge call fail that call; `run_guarded` inside ops), fillet_past_end_faces
@@ -54,7 +55,8 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 3. P0 `qa_regressions::shell_that_breaks_the_part_fails` (T2): live fails too; ours fails only by an invalid OCCT
    result (platform-dependent). Needs Parasolid's rule (TICKETS note).
 4. P1 SHELL-WALLS-CORNER (fillets meeting at a sharp corner keep ~0.47·R mm³ more in live), std_oracle hole scope,
-   draft_curve parting line, Extrude add 308 ms, the elliptic boss face blend, FILLET-HANG's fillet itself.
+   Extrude add (Hole add: std holeEditLogic is OCCT-bound in its probe), the elliptic boss curvature blend,
+   FILLET-HANG's fillet itself. Live asked (REQUESTS core 10-27, 10-27 b): fillet corner geometry, shell_that_breaks rule.
 5. kern's open items: forward-oriented edges (proposal: hand out edges FORWARD so start/end, parameters and tangents
    agree; touches every caller of edge_info). Cylinder frames: done (64f6f79a).
 
