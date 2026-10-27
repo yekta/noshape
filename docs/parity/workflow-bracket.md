@@ -86,3 +86,9 @@ Steps 1–7 OK (65431.3275 after the gusset); step 8 feature mirror (Reapply off
 | 8 ADV9 Feature mirror of the gusset | Error "Could not create all instances as entered…"; app tree shows Mirror 1 red | ✗ still in v0.4.8 (psb) |
 | 8 ADV9 on main 10195656 (target-engine CLI 06:17) | same Error | ✗ still; psb's fix 853cf16b sits in ready/psb, whose queue status is CONFLICT since 21:44 (not re-marked yet) |
 | 8 ADV9 on green 461aefb0 (app, psb 853cf16b) | Mirror 1 regenerates (row not red); the mirrored gusset sits at the wall's right end | ✅ **fixed** |
+
+## Re-run on green 8602df0d (qa, 2026-10-27 19:58, app, /root/qa5-scratch/run/docs/bracket24.noshape copy)
+- Opened as built (pass 24), Linear pattern 1 is red "Could not create all instances as entered…": its direction edge is the
+  base's back bottom edge, which runs −X (live behaviours "qa (2026-10-27, P1) PATTERN-EDGE-DIR-FLIPPED": same in live; the
+  v0.4.8 +X was wrong). With the pattern's direction flipped: every feature Ok, 67191.328 mm³ / 20868.476 mm² = live; Extrude 1
+  8 → 10: 73262.555 = live (commit 342 ms at load ~45); Ctrl+Z 3.3 ms back to 67191.328.
