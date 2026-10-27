@@ -360,7 +360,7 @@ impl Workspace {
             return;
         }
         let name = doc.session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
-        let users: Vec<String> = doc.session.doc.tab_users(tab).into_iter().filter_map(|u| doc.session.doc.tab(u).map(|t| t.name.clone())).collect();
+        let users: Vec<(String, &'static str)> = doc.session.doc.tab_users(tab).into_iter().filter_map(|u| doc.session.doc.tab(u).map(|t| (t.name.clone(), kind_of(&t.content)))).collect();
         let model = self.doc.clone();
         let ws = cx.entity().downgrade();
         // Afterwards the keyboard goes back to the active tab (Ctrl+Z etc.).
@@ -389,13 +389,26 @@ impl Workspace {
             return;
         }
         use gpui_kit::component::WindowExt as _;
-        let tab_name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         let delete = std::rc::Rc::new(delete);
         window.open_dialog(cx, move |dialog, _, cx| {
             let delete = delete.clone();
-            // Onshape modal: title bar, message, blue Delete then gray Cancel.
-            crate::os_ui::modal(dialog, "Delete tabs", 460.)
-                .child(crate::os_ui::modal_body().child(format!("Deleting \"{tab_name}\" may cause errors in {} that use it: {}.", if users.len() == 1 { "the tab" } else { "the tabs" }, users.join(", "))))
+            // Live (part-studio/1584): a 598 px "Delete tabs" modal, a yellow
+            // warning box 10 px in, then a row per tab that uses this one
+            // (its tab icon and name), blue Delete then gray Cancel.
+            let n = users.len();
+            let warning = format!("Deleting this tab will result in failed or missing features in {n} {}", if n == 1 { "tab" } else { "tabs" });
+            let rows = users.iter().map(|(name, kind)| {
+                h_flex().h(px(26.)).pl(px(23.)).gap(px(3.)).text_size(px(13.33)).text_color(p().text).child(crate::assets::icon(tab_icon(kind), 14., cx)).child(name.clone())
+            });
+            crate::os_ui::modal_doc_page(dialog, "Delete tabs", 598.)
+                .child(
+                    crate::os_ui::modal_body()
+                        .pt(px(17.))
+                        .pb(px(7.))
+                        .gap(px(13.))
+                        .child(crate::ui::alert(crate::ui::AlertKind::Warning).h(px(53.)).pl(px(15.)).gap(px(3.)).text_size(px(13.33)).child(crate::assets::icon("warning-outline", 18., cx)).child(warning))
+                        .child(gpui_kit::component::v_flex().children(rows)),
+                )
                 .footer(
                     crate::os_ui::modal_footer()
                         .child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Delete")))
