@@ -85,6 +85,8 @@ fn keys(cx: &mut TestAppContext, window: AnyWindowHandle, keys: &[&str]) {
         let mut ks = Keystroke::parse(k).unwrap();
         if k.chars().count() == 1 {
             ks.key_char = Some(k.to_string());
+        } else if *k == "space" {
+            ks.key_char = Some(" ".into());
         }
         cx.update_window(window, |_, w, cx| {
             w.dispatch_keystroke(ks, cx);
@@ -184,4 +186,25 @@ fn a_point_drags_beside_conflicting_dimensions(cx: &mut TestAppContext) {
     drag(cx, window, &view, (800., 300.), (860., 330.), 6);
     let moved = point(cx) - before;
     assert!(moved.length() > 1e-4, "the point stayed: {moved:?}");
+}
+
+/// DIM-AC-ENTER / EXPR-PARSE-JUNK: in a dimension's value box, `1 in` opens
+/// the unit list, and one Enter commits 1 in (25.4 mm) and closes the box, as
+/// live; the `26` typed next goes nowhere near it (two Enters were needed, and
+/// the `26` landed in the box: 126 in).
+#[gpui::test]
+fn dimension_box_enter_commits_with_the_unit_list_open(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "dim-ac", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["5", "0", "enter", "escape", "escape"]);
+    let cid = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.value().is_some()).unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_dim_edit(cid, w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["1", "space", "i", "n"]);
+    assert!(cx.update(|cx| view.read(cx).ui_ref().is_some_and(|u| u.dim_completion.is_some())), "the unit list is open");
+    keys(cx, window, &["enter"]);
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "one Enter closes the box");
+    keys(cx, window, &["2", "6"]);
+    assert!(near(&dimensions(cx, &view), &[0.0254]), "{:?}", dimensions(cx, &view));
 }
