@@ -141,7 +141,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.15 | Missing references shown red; Clear missing references | feature_basics | ✅ (verified: red rows, accept disabled, Clear missing references) | 0.4.10+ / 6011065d 10-27 |
 | 5.16 | Reorder picks in order-sensitive fields by dragging a row | feature_basics | ✅ (10-27, Loft profiles: ⇅ turns the rows' × into ≡ grips and shows DONE; dragging a grip draws the drop line and moves the pick. The Move up/down menu items were removed: live menus only have Clear all) |  |
 | 5.17 | Tab moves between fields (inputs and checkboxes) | feature_basics | ✅ | 0.4.10+ / 6011065d 10-27 |
-| 5.18 | Space toggles a focused checkbox; arrows/Enter in dropdowns | feature_basics | ❌ (SPACE-CHECKBOX) (Space toggles a checkbox; Enter/Space opens a dropdown, arrows move, Enter picks — the list opens without the current value highlighted) | 0.4.10+ / 6011065d 10-27 |
+| 5.18 | Space toggles a focused checkbox; arrows/Enter in dropdowns | feature_basics | ✅ (SPACE-CHECKBOX fixed d6e49c94) (Space toggles a checkbox; Enter/Space opens a dropdown, arrows move, Enter picks — the list opens without the current value highlighted) | 0.4.10+ / 2a6d0167 10-27 |
 | 5.19 | Numeric fields accept expressions, units and #variables | Home__numeric_fields | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.20 | Invalid expression: red outline and message | Home__numeric_fields | ✅ | 0.4.10+ / 6011065d 10-27 |
 | 5.21 | Expressions show their evaluated value | Home__numeric_fields | ✅ (10-27: "10+5" → "15 mm" once unfocused) | 0.4.10+ / 6011065d 10-27 |
