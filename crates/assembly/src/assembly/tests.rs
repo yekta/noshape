@@ -4253,3 +4253,111 @@ fn relation_and_mate_errors_use_live_texts() {
     let m15 = res.mates.iter().find(|m| m.id == MateId(15)).unwrap();
     assert_eq!(m15.message.as_deref(), Some("Two width mate connectors are required."));
 }
+
+/// Random assembly edits (seeded): mates of every type between random faces
+/// and edges with random inferences, deleted mates, fixes, suppressions,
+/// moves, drags and the mate-being-defined solve, each evaluated. Nothing
+/// may panic and every solved placement stays finite. `ASM_FUZZ_SEEDS=a..b`
+/// / `ASM_FUZZ_STEPS=n` widen it.
+#[test]
+#[ignore = "T2: fuzz"]
+fn random_assembly_edits_never_panic() {
+    let f = doc_with(vec![block_studio(), plate_with_hole(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let parts: Vec<(TabId, BodyId, Vec<Reference>)> = f
+        .studios
+        .iter()
+        .map(|&s| {
+            let (b, r) = body_of(&mut ev, &f.doc, s);
+            let body = &r.context.bodies[0];
+            let refs = body.faces.iter().map(|n| Reference::Face((**n).clone())).chain(body.edges.iter().map(|n| Reference::Edge((**n).clone()))).collect();
+            (s, b, refs)
+        })
+        .collect();
+    let range = std::env::var("ASM_FUZZ_SEEDS").ok().and_then(|s| s.split_once("..").and_then(|(a, b)| Some((a.parse::<u64>().ok()?, b.parse::<u64>().ok()?)))).unwrap_or((1, 4));
+    let steps: usize = std::env::var("ASM_FUZZ_STEPS").ok().and_then(|s| s.parse().ok()).unwrap_or(60);
+    const TYPES: [MateType; 11] = [MateType::Fastened, MateType::Revolute, MateType::Slider, MateType::Planar, MateType::Cylindrical, MateType::PinSlot, MateType::Ball, MateType::Parallel, MateType::Tangent, MateType::Width, MateType::Fastened];
+    const INFS: [Inference; 7] = [Inference::Centroid, Inference::Center, Inference::Midpoint, Inference::Vertex, Inference::TopAxis, Inference::MidAxis, Inference::BottomAxis];
+    for seed in range.0..range.1 {
+        eprintln!("seed {seed}");
+        let mut state = seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1;
+        let mut rnd = |n: usize| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state % n as u64) as usize
+        };
+        let mut asm = Assembly::default();
+        let mut next = 1u64;
+        let mut log = Vec::new();
+        for step in 0..steps {
+            let t_step = std::time::Instant::now();
+            let n = asm.instances.len();
+            match if n < 2 { 0 } else { rnd(10) } {
+                0 | 1 => {
+                    let (s, b, _) = &parts[rnd(parts.len())];
+                    let at = DVec3::new(rnd(200) as f64 - 100.0, rnd(200) as f64 - 100.0, rnd(100) as f64) * 1e-3;
+                    asm.instances.push(part_instance(next, &format!("P <{next}>"), *s, b.clone(), at, n == 0));
+                    log.push(format!("insert {next}"));
+                    next += 1;
+                }
+                2..=4 => {
+                    let t = TYPES[rnd(TYPES.len())];
+                    let mut pick = |asm: &Assembly| {
+                        let i = &asm.instances[rnd(asm.instances.len())];
+                        let refs = &parts.iter().find(|p| matches!(&i.source, InstanceSource::Part { studio, .. } if *studio == p.0)).unwrap().2;
+                        conn(i.id.0, refs[rnd(refs.len())].clone(), INFS[rnd(INFS.len())])
+                    };
+                    let (a, b) = (pick(&asm), pick(&asm));
+                    let mut m = mate(next, t, a, b);
+                    if t == MateType::Width {
+                        m.extra = vec![pick(&asm), pick(&asm)];
+                    }
+                    m.flip_primary = rnd(2) == 0;
+                    log.push(format!("mate {next} {t:?}"));
+                    asm.mates.push(m);
+                    next += 1;
+                }
+                5 if !asm.mates.is_empty() => {
+                    let k = rnd(asm.mates.len());
+                    log.push(format!("delete mate {}", asm.mates[k].id.0));
+                    asm.mates.remove(k);
+                }
+                6 => {
+                    let k = rnd(n);
+                    asm.instances[k].fixed = !asm.instances[k].fixed;
+                    log.push(format!("fix {}", asm.instances[k].id.0));
+                }
+                7 => {
+                    let k = rnd(n);
+                    asm.instances[k].suppressed = rnd(3) == 0;
+                    log.push(format!("suppress {}", asm.instances[k].id.0));
+                }
+                _ => {}
+            }
+            let mut opts = SolveOptions::default();
+            match rnd(4) {
+                0 if !asm.instances.is_empty() => {
+                    let i = asm.instances[rnd(asm.instances.len())].id;
+                    opts.drags.push((i, DVec3::ZERO, DVec3::new(rnd(100) as f64, rnd(100) as f64, rnd(100) as f64) * 1e-3));
+                }
+                1 if !asm.mates.is_empty() => opts.only_mate = Some(asm.mates[rnd(asm.mates.len())].id),
+                _ => {}
+            }
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| ev.evaluate(&f.doc, &asm, &opts, None)));
+            let Ok(res) = res else { panic!("seed {seed} step {step} panicked; log: {log:?}") };
+            if t_step.elapsed().as_secs_f64() > 2.0 {
+                eprintln!("seed {seed} step {step}: evaluation took {:.1} s; log: {log:?}", t_step.elapsed().as_secs_f64());
+            }
+            for (id, p) in &res.solved.placements {
+                assert!(p.translation.iter().chain(p.rotation.iter()).all(|v| v.is_finite()), "seed {seed} step {step}: {id:?} at {p:?}; log: {log:?}");
+            }
+            // Keep the solve, as the app does after an edit.
+            for (id, p) in res.solved.placements.clone() {
+                if let Some(i) = asm.instance_mut(id) {
+                    i.placement = p;
+                }
+            }
+        }
+    }
+}
