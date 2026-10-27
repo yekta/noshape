@@ -54,10 +54,10 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 4.1 | Strip › Exploded views | panel, centred Add exploded view, Learn more link | same | ✅ |  |
-| 4.2 | Add exploded view | banner "Editing Explode 1 [Done]", reduced toolbar, Explode 1 + rollback bar, info box | same | ✅ |  |
-| 4.3 | Select pin, drag Z arrow | "Explode step" dialog: Translation ▾, Instances, ☐ Specify direction, Distance, ☑ Explode lines, field; info box gone; row "Explode step 1" | same | ✅ |  |
-| 4.4 | ✓, Done | unexploded graphics, banner gone | same | ✅ |  |
+| 4.1 | Strip › Exploded views | panel, centred Add exploded view, Learn more link | same | ✅ | 0.4.10+ / daf1f50c 10-27 (Assembly 2 in a pin.noshape copy) |
+| 4.2 | Add exploded view | banner "Editing Explode 1 [Done]", reduced toolbar, Explode 1 + rollback bar, info box | same | ✅ | 0.4.10+ / daf1f50c 10-27 (Assembly 2 in a pin.noshape copy) |
+| 4.3 | Select pin, drag Z arrow | "Explode step" dialog: Translation ▾, Instances, ☐ Specify direction, Distance, ☑ Explode lines, field; info box gone; row "Explode step 1" | same | ✅ | 0.4.10+ / daf1f50c 10-27 (Assembly 2 in a pin.noshape copy) |
+| 4.4 | ✓, Done | unexploded graphics, banner gone | same | ✅ | 0.4.10+ / daf1f50c 10-27 (Assembly 2 in a pin.noshape copy) |
 | 4.5 | BOM panel | BOM type Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description | same; Part 3 quantity 6 | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
 | 4.6 | Double-click Part number, "PN-001", Enter | commits, selection moves one row down | same | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
 | 4.7 | Type into the selected cell | typing starts editing | **nothing happens** (typed text lost) | ✅ (GUI :103 skasm 10-27: "PN-002" typed into a selected cell lands whole, Enter commits); was ✗ A11 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) ("PN-002" typed into the selected cell) |
