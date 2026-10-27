@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Session 3 (qa on a fresh account, from 19:05; greens fa61ba6f → 965d3f56 → 8602df0d → dd1b5037 → daf1f50c → c9c66d1c)
+## Session 3 (qa on a fresh account, from 19:05; greens fa61ba6f → 965d3f56 → 8602df0d → dd1b5037 → daf1f50c → c9c66d1c → acd6acce / 73708f00)
 - **P0 BOX-DIALOG-PANIC (psui, release blocker, at the top of TICKETS)**: any box selection with a feature dialog open panics the
   app since df28c320 (greens dd1b5037 → c9c66d1c). Found by bin/fuzz.py (seeds 41, 43 both die on it); UI fuzzing is pointless
   until it's fixed. Re-test: wf-block, Shift+F, drag a box over the part.
@@ -18,6 +18,9 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   P1 CONFLICT-COLLAPSE-ON-DRAG, P2 ASM-PATTERN-EDIT-TAKES-SELECTION, P2 SKETCH-FILLET-STUCK-RADIUS, P2 SECTION-DIALOG-STACK,
   P2 DATUM-SCALE-DETACHED, P2 BALLOON-WRONG-ITEM, P3 SKETCH-PATTERN-GLYPH-HOVER, P3 ORIGIN-COINCIDENT-GLYPH,
   P3 TABS-PANEL-FOCUS, P3 MATE-ANGLE-360.
+- 21:26: parity rows verified 961 of 2031 (675 at the session start). assembly.md 57/261 (keys, menus, mate dialog, triad
+  menus R7–R9: click the handle first, then right-click), drawing.md 32/186 (keys, toolbar, views). New since 21:12: P2
+  J-KEY-NO-EFFECT, P2 ASM-RENAME-ESC, P3 DRAWING-SHIFT-SLASH; sketch point menus verified (e52e8015).
 - REGEN-SPEED on c9c66d1c (load ~33): commits median 313 ms, 3rd undo 137 ms (numbers in the ticket).
 - CLI fuzz seed 150 (main CLI 12:08): 150 steps clean.
 - Live requests open: FILLET-OVERSIZE chamfer cases, assembly instance filter vs pattern instances, datums vs sheet scale.
