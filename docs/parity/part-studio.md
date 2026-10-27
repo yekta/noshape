@@ -163,56 +163,56 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 6.1 | Feature count in the header | features_and_parts_lists | ✅ |  |
-| 6.2 | Default geometry rows (Origin, Top, Front, Right) | features_and_parts_lists | ✅ |  |
-| 6.3 | Each feature with its tool icon | features_and_parts_lists | ✅ |  |
-| 6.4 | Double-click a feature to edit it | A §3.3 | ✅ |  |
-| 6.5 | Click toggles a feature in the selection (additive) | features_and_parts_lists ("just click to select additional items") | ✅ (app 10-24) |  |
-| 6.6 | Shift+click selects a range, hidden sketches included (live 10-27) | Home__selection | ✅ |  |
-| 6.7 | Drag a feature to reorder | features_and_parts_lists | ✅ |  |
-| 6.8 | Dragging a selected feature moves every selected feature (non-contiguous allowed) | features_and_parts_lists | ✅ (10-27: Sketch 3 + Extrude 3 dragged above Sketch 2: a "2 items" chip, the drop line, both move) |  |
-| 6.9 | A reorder above a feature's dependencies is done (no refusal, no toast); the feature then fails on its missing selection | live qa4 round 5 v3 s8 (REORDER-INVALID) | ✅ (the app no longer checks the order; test `extrude_above_its_sketch_misses_its_region`) |  |
-| 6.10 | Search box filters by name or type: Default geometry rows and parts by name too, each run of dropped rows one "..." (Parts too), "Features (M of N)" counting the kept default rows, no error icon while filtering (live 10-27) | features_and_parts_lists | ✅ |  |
-| 6.11 | Filter commands :errors :warnings :suppressed :hidden :shown :type :name :folder :variable :part | features_and_parts_lists | ✅ (:partnumber / :revision match the parts' Part number / Revision properties; live 10-27: ":" alone matches nothing, ":type" / ":part" alone don't filter, ":hidden" / ":shown" take default rows and parts) |  |
-| 6.12 | Error icon in the header (17 px at x 45, "N feature(s) failed to regenerate"), title "Features …"; click filters ":errors " (live 10-27) | features_and_parts_lists | ✅ |  |
-| 6.13 | Failed features red with the error as tooltip | Home__error_indicators | ✅ |  |
-| 6.14 | Suppressed features struck through | features_and_parts_lists | ✅ |  |
-| 6.15 | Under-defined sketch indicator | features_and_parts_lists | ✅ (blue text) |  |
+| 6.1 | Feature count in the header | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.2 | Default geometry rows (Origin, Top, Front, Right) | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.3 | Each feature with its tool icon | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.4 | Double-click a feature to edit it | A §3.3 | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.5 | Click toggles a feature in the selection (additive) | features_and_parts_lists ("just click to select additional items") | ✅ (app 10-24) | 0.4.10+ / 6011065d 10-27 |
+| 6.6 | Shift+click selects a range, hidden sketches included (live 10-27) | Home__selection | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.7 | Drag a feature to reorder | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.8 | Dragging a selected feature moves every selected feature (non-contiguous allowed) | features_and_parts_lists | ✅ (10-27: Sketch 3 + Extrude 3 dragged above Sketch 2: a "2 items" chip, the drop line, both move) | 0.4.10+ / 6011065d 10-27 |
+| 6.9 | A reorder above a feature's dependencies is done (no refusal, no toast); the feature then fails on its missing selection | live qa4 round 5 v3 s8 (REORDER-INVALID) | ✅ (the app no longer checks the order; test `extrude_above_its_sketch_misses_its_region`) | 0.4.10+ / 6011065d 10-27 |
+| 6.10 | Search box filters by name or type: Default geometry rows and parts by name too, each run of dropped rows one "..." (Parts too), "Features (M of N)" counting the kept default rows, no error icon while filtering (live 10-27) | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.11 | Filter commands :errors :warnings :suppressed :hidden :shown :type :name :folder :variable :part | features_and_parts_lists | ✅ (:partnumber / :revision match the parts' Part number / Revision properties; live 10-27: ":" alone matches nothing, ":type" / ":part" alone don't filter, ":hidden" / ":shown" take default rows and parts) | 0.4.10+ / 6011065d 10-27 |
+| 6.12 | Error icon in the header (17 px at x 45, "N feature(s) failed to regenerate"), title "Features …"; click filters ":errors " (live 10-27) | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.13 | Failed features red with the error as tooltip | Home__error_indicators | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.14 | Suppressed features struck through | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.15 | Under-defined sketch indicator | features_and_parts_lists | ✅ (blue text) | 0.4.10+ / 6011065d 10-27 |
 | 6.16 | Missing-selection / warning yellow triangle | features_and_parts_lists | 🔧 (12 px #FAB601 badge with a white !, the icon's bottom right, at live's pixels: part-studio/2071; shown for Warning status — missing-selection tracking itself is not modelled) |  |
-| 6.17 | Eye icon on hover hides/shows sketches, planes, mate connectors | features_and_parts_lists | ✅ (app 10-24) |  |
-| 6.18 | Rename in place (context menu / Shift+N) | features_and_parts_lists | ✅ |  |
-| 6.19 | Feature context menu in the live order: Rename | Edit…, Edit <sketch>…, Copy sketch | Add selection to folder… | Show/Hide | Export as DXF/DWG… | Suppress, Configure suppression, Dynamic suppression ▸ | Zoom to selection, View normal to | Show dependencies… | Roll to here (not on the last feature) | sketch/feature appearance | Delete | live (dom/context-menus-partstudio.txt) | ✅ (Create Drawing of Sketch N… via asb's sketch views; Add comment out of scope: cloud comments) |  |
-| 6.20 | Several selected features: Add selection to folder… | Suppress, Dynamic suppression ▸ | Clear selection | appearance | Delete | live | ✅ (Section view… through the selected sketches' / planes' planes) |  |
-| 6.21 | Show dependencies…: "Dependencies of X" panel at the dialog position: parents, ▲, the feature, ▼, children (icons, hover highlights, tooltips) | live (part-studio/100) | ✅ |  |
-| 6.22 | Dynamic suppression ▸ Add expression… (expression editor, ƒx icon, live true/false preview) | live | ✅ |  |
-| 6.23 | Copy sketch / Paste sketch onto a plane or planar face | Home__context_menus | ✅ (verified: Copy sketch, Front plane > Paste sketch) |  |
+| 6.17 | Eye icon on hover hides/shows sketches, planes, mate connectors | features_and_parts_lists | ✅ (app 10-24) | 0.4.10+ / 6011065d 10-27 |
+| 6.18 | Rename in place (context menu / Shift+N) | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.19 | Feature context menu in the live order: Rename | Edit…, Edit <sketch>…, Copy sketch | Add selection to folder… | Show/Hide | Export as DXF/DWG… | Suppress, Configure suppression, Dynamic suppression ▸ | Zoom to selection, View normal to | Show dependencies… | Roll to here (not on the last feature) | sketch/feature appearance | Delete | live (dom/context-menus-partstudio.txt) | ✅ (Create Drawing of Sketch N… via asb's sketch views; Add comment out of scope: cloud comments) | 0.4.10+ / 6011065d 10-27 |
+| 6.20 | Several selected features: Add selection to folder… | Suppress, Dynamic suppression ▸ | Clear selection | appearance | Delete | live | ✅ (Section view… through the selected sketches' / planes' planes) | 0.4.10+ / 6011065d 10-27 |
+| 6.21 | Show dependencies…: "Dependencies of X" panel at the dialog position: parents, ▲, the feature, ▼, children (icons, hover highlights, tooltips) | live (part-studio/100) | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.22 | Dynamic suppression ▸ Add expression… (expression editor, ƒx icon, live true/false preview) | live | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.23 | Copy sketch / Paste sketch onto a plane or planar face | Home__context_menus | ✅ (verified: Copy sketch, Front plane > Paste sketch) | 0.4.10+ / 6011065d 10-27 |
 | 6.24 | Show dimensions (feature/face/sketch menus): the sketch's dimensions in 3D, parts see-through, hover gold on tan, double-click edits the sketch, click elsewhere or Esc hides; Export as DXF/DWG | Home__context_menus; live part-studio/40–42 | ✅ (Create Drawing of Sketch N… via asb's sketch views) |  |
-| 6.25 | Pause regeneration (banner: Regenerate / Regenerate and exit / Discard) ; regeneration times panel (hover highlights) | features_and_parts_lists | ✅ paused mode as live 10-27: the 343 × 28 amber banner over an emptied toolbar (Undo / Redo stay), ▶\| at 0.4 until something waits, New folder gone, pause at 0.5, Create version… off the rail, edited rows bold italic, dialogs preview nothing (no manipulator, no rollback), ✕ discards without asking. Live's Depth corner mark in a paused dialog not done |  |
-| 6.26 | Collapse the whole list; drag the feature/parts separator | features_and_parts_lists | ✅ live 10-27: each list down to its 30 px header, panel width from its default 205 px |  |
-| 6.27 | Default plane row menu (live): Rename | New sketch…, Offset plane…, Size to Part Studio (Paste sketch when a sketch was copied) | Hide, Hide other planes, Hide all planes | Zoom to selection, View normal to | Show dependencies…; origin: Rename | Hide | Show dependencies… | Hide, Hide other planes, Hide all planes | ✅ |  |
-| 6.28 | Default planes/origin can be hidden (never deleted: Delete does nothing, no Delete in their menu, live 10-27) | part_studios | ✅ |  |
-| 6.29 | Clicking empty list space clears the feature selection | (Onshape behaviour) | ✅ (app 10-24) |  |
+| 6.25 | Pause regeneration (banner: Regenerate / Regenerate and exit / Discard) ; regeneration times panel (hover highlights) | features_and_parts_lists | ✅ paused mode as live 10-27: the 343 × 28 amber banner over an emptied toolbar (Undo / Redo stay), ▶\| at 0.4 until something waits, New folder gone, pause at 0.5, Create version… off the rail, edited rows bold italic, dialogs preview nothing (no manipulator, no rollback), ✕ discards without asking. Live's Depth corner mark in a paused dialog not done | 0.4.10+ / 6011065d 10-27 |
+| 6.26 | Collapse the whole list; drag the feature/parts separator | features_and_parts_lists | ✅ live 10-27: each list down to its 30 px header, panel width from its default 205 px | 0.4.10+ / 6011065d 10-27 |
+| 6.27 | Default plane row menu (live): Rename | New sketch…, Offset plane…, Size to Part Studio (Paste sketch when a sketch was copied) | Hide, Hide other planes, Hide all planes | Zoom to selection, View normal to | Show dependencies…; origin: Rename | Hide | Show dependencies… | Hide, Hide other planes, Hide all planes | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.28 | Default planes/origin can be hidden (never deleted: Delete does nothing, no Delete in their menu, live 10-27) | part_studios | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.29 | Clicking empty list space clears the feature selection | (Onshape behaviour) | ✅ (app 10-24) | 0.4.10+ / 6011065d 10-27 |
 
 ### Rollback bar
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 6.30 | Drag the bar to roll back/forward; model shows up to the bar | features_and_parts_lists | ✅ |  |
-| 6.31 | Right-click a feature > Roll to here / Roll to end | features_and_parts_lists; live "qa4 round 5 s2 rollback follow-up" | ✅ Roll to here unless the bar is right below the feature, Roll to end while the bar isn't at the end (`behaviors::roll_items`, tested on live's four menus). A rolled-back feature: Rename \| Add selection to folder… \| Suppress, Dynamic suppression ▸ \| Roll to here, Roll to end \| Delete (no Edit…, Zoom to selection, Show dependencies…, appearance); with a feature dialog open only Rename \| Suppress, Dynamic suppression ▸ (R5-S3-b). Add comment is cloud |  |
-| 6.32 | (Right-click the bar > Roll to end) | features_and_parts_lists | ✅ removed (live has no menu on the bar) |  |
-| 6.33 | Select the bar, ↑/↓ step one feature | features_and_parts_lists | ✅ (also after clicking a feature row; the bar turns #a0c7dd while focused) |  |
-| 6.34 | Features below the bar greyed; new features inserted at the bar | A §3.2 | ✅ |  |
-| 6.34a | Dragging the bar or a feature row near the list's top/bottom autoscrolls it | live "psb (10-24 k)" | ✅ 70–75 px edge zones, ~30 → 205 px/s toward the edge, faster past it (~370 px/s at 40 px, ~600 at 190 px out), also with the pointer beside the panel (only its height counts); a frame loop keeps scrolling while the pointer rests and stops at the ends (`behaviors::list_autoscroll_speed`, tested against live's speeds) |  |
-| 6.34b | The bar dropped over the Default geometry rows or header lands at the top slot (drop line under the last default row) | live "qa4 round 5 s2 rollback follow-up" (3) | ✅ (app: drop on Origin → every feature rolled back) |  |
+| 6.30 | Drag the bar to roll back/forward; model shows up to the bar | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.31 | Right-click a feature > Roll to here / Roll to end | features_and_parts_lists; live "qa4 round 5 s2 rollback follow-up" | ✅ Roll to here unless the bar is right below the feature, Roll to end while the bar isn't at the end (`behaviors::roll_items`, tested on live's four menus). A rolled-back feature: Rename \| Add selection to folder… \| Suppress, Dynamic suppression ▸ \| Roll to here, Roll to end \| Delete (no Edit…, Zoom to selection, Show dependencies…, appearance); with a feature dialog open only Rename \| Suppress, Dynamic suppression ▸ (R5-S3-b). Add comment is cloud | 0.4.10+ / 6011065d 10-27 |
+| 6.32 | (Right-click the bar > Roll to end) | features_and_parts_lists | ✅ removed (live has no menu on the bar) | 0.4.10+ / 6011065d 10-27 |
+| 6.33 | Select the bar, ↑/↓ step one feature | features_and_parts_lists | ✅ (also after clicking a feature row; the bar turns #a0c7dd while focused) | 0.4.10+ / 6011065d 10-27 |
+| 6.34 | Features below the bar greyed; new features inserted at the bar | A §3.2 | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.34a | Dragging the bar or a feature row near the list's top/bottom autoscrolls it | live "psb (10-24 k)" | ✅ 70–75 px edge zones, ~30 → 205 px/s toward the edge, faster past it (~370 px/s at 40 px, ~600 at 190 px out), also with the pointer beside the panel (only its height counts); a frame loop keeps scrolling while the pointer rests and stops at the ends (`behaviors::list_autoscroll_speed`, tested against live's speeds) | 0.4.10+ / 6011065d 10-27 |
+| 6.34b | The bar dropped over the Default geometry rows or header lands at the top slot (drop line under the last default row) | live "qa4 round 5 s2 rollback follow-up" (3) | ✅ (app: drop on Origin → every feature rolled back) | 0.4.10+ / 6011065d 10-27 |
 
 ### Folders
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 6.35 | Add selection to folder | features_and_parts_lists | ✅ |  |
-| 6.36 | Expand/collapse a folder | features_and_parts_lists | ✅ |  |
-| 6.37 | Folder menu: Rename, Suppress/Unsuppress (all contents), Unpack folder | features_and_parts_lists | ✅ live 10-27: Rename · Add selection to folder… · Suppress · Dynamic suppression · Roll to here · Expand · Collapse · Delete · Unpack folder |  |
-| 6.38 | Nested folders; Expand all / Collapse all | features_and_parts_lists | ✅ "Name (n)" rows, 19 px per level; Expand ▸ / Collapse ▸ hold Expand all / Collapse all (live 10-25 2b-folder-menu-expand) |  |
+| 6.35 | Add selection to folder | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.36 | Expand/collapse a folder | features_and_parts_lists | ✅ | 0.4.10+ / 6011065d 10-27 |
+| 6.37 | Folder menu: Rename, Suppress/Unsuppress (all contents), Unpack folder | features_and_parts_lists | ✅ live 10-27: Rename · Add selection to folder… · Suppress · Dynamic suppression · Roll to here · Expand · Collapse · Delete · Unpack folder | 0.4.10+ / 6011065d 10-27 |
+| 6.38 | Nested folders; Expand all / Collapse all | features_and_parts_lists | ✅ "Name (n)" rows, 19 px per level; Expand ▸ / Collapse ▸ hold Expand all / Collapse all (live 10-25 2b-folder-menu-expand) | 0.4.10+ / 6011065d 10-27 |
 
 ## 7. Parts list (features_and_parts_lists §Parts list, A §3.9)
 
