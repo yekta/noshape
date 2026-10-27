@@ -16,6 +16,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - 10-27 after the model split: first build after the rebase ~8 min (+ the kernel's C++ once for ccache); edit
   model-core regen + ops session → `cargo test -p noshape-model-core --lib regen::crash_guard::` then `-p noshape-ops
   --lib session::`: ~6 min for both (model-core, ops rebuild under load); ops `e2e::` run 11 s.
+- 10-27 03:00–04:10 (load 30–55): ops edit → one e2e test 1–3 min; session.rs edit → `--lib session::` ~1 min;
+  first test after a rebase onto app-core ~6 min; clippy -p noshape (app) after an ops edit ~4–7 min; T0 ~2–5 min.
+  Every cargo invocation after a kernel or Cargo.lock change re-runs the kernel's build script (C++ from ccache,
+  ~1–2 min each time); a full landing check (coverage + e2e + clippy app/ops + T0) is 13–25 min.
 
 ## Landed on main (2026-10-26/27)
 - aa563bcd ui2's DL12 piece; c63d2bf5 drawings / data exchange (ANSI thread arcs, PDF FlateDecode, material density

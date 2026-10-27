@@ -65,6 +65,34 @@ impl Tessellation {
         let r = self.faces[i];
         &self.indices[r.first_index as usize..(r.first_index + r.index_count) as usize]
     }
+    /// One vertex per distinct position: `(positions, remap)`, `remap[i]`
+    /// being vertex `i`'s index in `positions`. Faces carry their own
+    /// vertices; welded, a solid's faces join on their edges' shared points
+    /// into the closed mesh 3MF needs (qa EXPORT-MESH-SHARED).
+    pub fn welded_positions(&self) -> (Vec<[f32; 3]>, Vec<u32>) {
+        let mut at: std::collections::HashMap<[u32; 3], u32> = std::collections::HashMap::new();
+        let mut positions = Vec::new();
+        let remap = self
+            .positions
+            .iter()
+            .map(|p| {
+                // +0.0 makes -0.0 and 0.0 one key.
+                let key = p.map(|c| (c + 0.0).to_bits());
+                *at.entry(key).or_insert_with(|| {
+                    positions.push(*p);
+                    positions.len() as u32 - 1
+                })
+            })
+            .collect();
+        (positions, remap)
+    }
+
+    /// The triangles over [`Self::welded_positions`]'s vertices, those that
+    /// welding collapses (two corners at one point) left out.
+    pub fn welded_triangles(&self, remap: &[u32]) -> Vec<[u32; 3]> {
+        self.indices.as_chunks::<3>().0.iter().map(|t| t.map(|i| remap[i as usize])).filter(|t| t[0] != t[1] && t[1] != t[2] && t[0] != t[2]).collect()
+    }
+
     /// Polyline of edge `i` (empty for degenerated edges and seams, which
     /// Onshape has not: see [`Shape::shown_topology`]).
     pub fn edge_polyline(&self, i: usize) -> &[[f32; 3]] {

@@ -629,11 +629,14 @@ pub fn write_stl(shape: &Shape, path: &Path, deflection: f64, format: StlFormat)
 }
 
 /// Write a tessellation as Wavefront OBJ (one group per face, with normals).
+/// Faces share the vertices where they meet (one `v` per position), each
+/// keeping its own normals (`vn`), so edges stay sharp.
 pub fn write_obj_mesh(mesh: &Tessellation, path: &Path) -> Result<()> {
     let f = std::fs::File::create(path)?;
     let mut w = std::io::BufWriter::new(f);
     writeln!(w, "# noshape-kernel OBJ export")?;
-    for p in &mesh.positions {
+    let (positions, remap) = mesh.welded_positions();
+    for p in &positions {
         writeln!(w, "v {} {} {}", p[0], p[1], p[2])?;
     }
     for n in &mesh.normals {
@@ -645,8 +648,12 @@ pub fn write_obj_mesh(mesh: &Tessellation, path: &Path) -> Result<()> {
         }
         writeln!(w, "g face{fi}")?;
         for t in mesh.face_indices(fi).as_chunks::<3>().0 {
-            let (a, b, c) = (t[0] + 1, t[1] + 1, t[2] + 1);
-            writeln!(w, "f {a}//{a} {b}//{b} {c}//{c}")?;
+            let [a, b, c] = t.map(|i| remap[i as usize] + 1);
+            if a == b || b == c || a == c {
+                continue;
+            }
+            let [na, nb, nc] = t.map(|i| i + 1);
+            writeln!(w, "f {a}//{na} {b}//{nb} {c}//{nc}")?;
         }
     }
     w.flush()?;

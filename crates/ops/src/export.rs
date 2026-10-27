@@ -470,11 +470,14 @@ fn three_mf(meshes: &[(String, k::Tessellation, [f32; 4])]) -> Vec<u8> {
     model.push_str("</basematerials>\n");
     for (i, (name, m, _)) in meshes.iter().enumerate() {
         let _ = writeln!(model, "<object id=\"{}\" name=\"{}\" type=\"model\" pid=\"1\" pindex=\"{i}\"><mesh><vertices>", i + 2, xml_escape(name));
-        for p in &m.positions {
+        // 3MF Core: a manifold mesh by index (each edge in two triangles):
+        // the faces' vertices welded.
+        let (positions, remap) = m.welded_positions();
+        for p in &positions {
             let _ = writeln!(model, "<vertex x=\"{}\" y=\"{}\" z=\"{}\"/>", p[0] * 1000.0, p[1] * 1000.0, p[2] * 1000.0);
         }
         model.push_str("</vertices><triangles>\n");
-        for t in m.indices.as_chunks::<3>().0 {
+        for t in m.welded_triangles(&remap) {
             let _ = writeln!(model, "<triangle v1=\"{}\" v2=\"{}\" v3=\"{}\"/>", t[0], t[1], t[2]);
         }
         model.push_str("</triangles></mesh></object>\n");
@@ -587,6 +590,32 @@ mod tests {
         assert_eq!(super::base64(b"ab"), "YWI=");
         assert_eq!(super::base64(b"abc"), "YWJj");
         assert_eq!(super::base64(b"a"), "YQ==");
+    }
+
+    /// qa EXPORT-MESH-SHARED: a 3MF body is one closed mesh by index (every
+    /// edge in exactly two triangles, once each way), so slicers find no
+    /// open edges; the faces' shared points are one vertex.
+    #[test]
+    fn three_mf_bodies_are_manifold_by_index() {
+        use noshape_kernel as k;
+        use std::collections::HashMap;
+        let block = k::make_box(&k::Plane::xy(), 0.04, 0.03, 0.01).unwrap();
+        let pin = k::make_cylinder(&k::Plane::new(glam::DVec3::new(0.02, 0.015, -0.01), glam::DVec3::Z, glam::DVec3::X), 0.005, 0.03, std::f64::consts::TAU).unwrap();
+        let part = k::cut(&block, &pin).unwrap().shape;
+        let m = k::tessellate(&part, 0.0001, 0.35, true).unwrap();
+        let xml = String::from_utf8_lossy(&super::three_mf(&[("Part 1".into(), m.clone(), [0.5, 0.5, 0.5, 1.0])])).to_string();
+        let attr = |l: &str, k: &str| -> u32 { l.split(&format!("{k}=\"")).nth(1).unwrap().split('"').next().unwrap().parse().unwrap() };
+        let tris: Vec<[u32; 3]> = xml.lines().filter(|l| l.starts_with("<triangle ")).map(|l| [attr(l, "v1"), attr(l, "v2"), attr(l, "v3")]).collect();
+        let verts = xml.lines().filter(|l| l.starts_with("<vertex ")).count();
+        assert!(verts < m.positions.len(), "welded: {verts} of {}", m.positions.len());
+        let mut directed: HashMap<(u32, u32), u32> = HashMap::new();
+        for t in &tris {
+            for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+                *directed.entry((a, b)).or_default() += 1;
+            }
+        }
+        let bad: Vec<_> = directed.iter().filter(|((a, b), n)| **n != 1 || directed.get(&(*b, *a)) != Some(&1)).collect();
+        assert!(bad.is_empty(), "{} of {} directed edges unmatched", bad.len(), directed.len());
     }
 
     #[test]
