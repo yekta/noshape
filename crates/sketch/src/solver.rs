@@ -66,6 +66,10 @@ pub struct SolveReport {
     pub invalid: Vec<ConstraintId>,
     pub iterations: usize,
     pub max_residual: f64,
+    /// A drag: the components holding the dragged geometry solved and it
+    /// moved, whatever the rest of the sketch does (which `status` reports).
+    #[serde(default)]
+    pub drag_solved: bool,
 }
 
 impl SolveReport {
@@ -940,11 +944,13 @@ pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget],
         // that fail keep their state (`System::solve` restores them), and
         // conflicts elsewhere don't stop it (a sketch with one conflicting
         // constraint let nothing be dragged, not even a free point).
+        // The status is the whole sketch's, for a drag too: Solved only when
+        // every equation is within the tolerance (SKETCH-SOLVED-WITH-RESIDUAL:
+        // a drag beside a failing component reported Solved with its residual).
         let drag_ok = is_drag && out.comps.iter().zip(&out.comp_ok).all(|(c, ok)| *ok || !c.vars.iter().any(|v| sys.drag_target.contains_key(v)));
-        let status = if is_drag {
-            if drag_ok { SolveStatus::Solved } else { SolveStatus::Failed { reason: format!("solver did not converge (max residual {:.3e})", out.max_residual) } }
-        } else if !out.all_converged {
-            SolveStatus::Failed { reason: format!("solver did not converge (max residual {:.3e})", out.max_residual) }
+        let failed = || SolveStatus::Failed { reason: format!("solver did not converge (max residual {:.3e})", out.max_residual) };
+        let status = if !out.all_converged || out.max_residual > opts.tolerance {
+            failed()
         } else if conflicting.is_empty() {
             SolveStatus::Solved
         } else {
@@ -962,6 +968,7 @@ pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget],
             invalid: sys.invalid.clone(),
             iterations: out.iterations,
             max_residual: out.max_residual,
+            drag_solved: drag_ok,
         };
         if opts.analyze {
             let a = analyze(sk, &mut sys, &out, &conflicting);
@@ -1199,7 +1206,7 @@ impl Sketch {
         let opts = SolveOptions { analyze: false, max_iterations: 8, ..SolveOptions::default() };
         let targets = self.drag_targets(handles);
         let report = run(self, &opts, &targets);
-        if report.is_solved() {
+        if report.drag_solved {
             return report;
         }
         const SUBSTEPS: usize = 4;
@@ -1225,7 +1232,7 @@ impl Sketch {
                 .collect();
             let targets = self.drag_targets(&partial);
             let r = run(self, &opts, &targets);
-            if !r.is_solved() {
+            if !r.drag_solved {
                 break;
             }
             best = Some(r);

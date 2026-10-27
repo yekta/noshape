@@ -101,13 +101,24 @@ fn random_perturbations_resolve() {
 /// slots, arcs), constraints and dimensions between random entities, trims,
 /// splits, fillets, offsets, deletes and drags, each followed by a solve
 /// and the regions. Nothing may panic, a solve that reports Solved leaves
-/// no residual, and every point stays finite. `SKETCH_FUZZ_SEEDS=a..b` /
-/// `SKETCH_FUZZ_STEPS=n` widen it.
+/// no residual, and every point stays finite. T1: seeds 1–3 × 60 steps
+/// (~1.6 s dev build; seed 2 step 55 is SKETCH-SOLVED-WITH-RESIDUAL's drag);
+/// `SKETCH_FUZZ_SEEDS=a..b` / `SKETCH_FUZZ_STEPS=n` widen it.
+#[test]
+fn random_sketch_edits_never_panic() {
+    fuzz((1, 4), 60);
+}
+
+/// The wider run (T2): seeds 1–5 × 80 steps by default.
 #[test]
 #[ignore = "T2: fuzz"]
-fn random_sketch_edits_never_panic() {
-    let range = std::env::var("SKETCH_FUZZ_SEEDS").ok().and_then(|s| s.split_once("..").and_then(|(a, b)| Some((a.parse::<u64>().ok()?, b.parse::<u64>().ok()?)))).unwrap_or((1, 6));
-    let steps: usize = std::env::var("SKETCH_FUZZ_STEPS").ok().and_then(|s| s.parse().ok()).unwrap_or(80);
+fn random_sketch_edits_never_panic_wide() {
+    fuzz((1, 6), 80);
+}
+
+fn fuzz(default_seeds: (u64, u64), default_steps: usize) {
+    let range = std::env::var("SKETCH_FUZZ_SEEDS").ok().and_then(|s| s.split_once("..").and_then(|(a, b)| Some((a.parse::<u64>().ok()?, b.parse::<u64>().ok()?)))).unwrap_or(default_seeds);
+    let steps: usize = std::env::var("SKETCH_FUZZ_STEPS").ok().and_then(|s| s.parse().ok()).unwrap_or(default_steps);
     for seed in range.0..range.1 {
         eprintln!("seed {seed}");
         let mut rng = Rng(seed * 2 + 1);

@@ -99,3 +99,7 @@ delete the line to bring it back to T1. Record the move below.
 | model/tests/features_c `face_blend_on_an_elliptic_boss_as_live` (core, 10-26/27) | 5 s of face blends (rolling ball, conic, asymmetric on the elliptic boss: as live since 10-27) |
 | model/tests/features_c `face_blend_curvature_on_an_elliptic_boss_as_live` (core, 10-27) | open difference from live: the curvature section fails (OCCT's fuse with the lofted tool comes back empty) |
 | kernel/tests/crash_inputs `replay_one` (core, 10-27) | a tool: replays and times one NOSHAPE_DUMP_OPS capture named by NOSHAPE_REPLAY |
+
+- **Back to T1 (skasm 10-27, lead's SKETCH-SOLVED-WITH-RESIDUAL):** sketch `fuzz::random_sketch_edits_never_panic` at
+  seeds 1–3 × 60 steps (1.6 s dev build); the wider default (1–5 × 80) stays T2 as
+  `random_sketch_edits_never_panic_wide`.

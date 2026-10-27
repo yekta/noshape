@@ -340,7 +340,8 @@ fn drags_work_beside_conflicting_constraints() {
     let Some(Curve2::Circle { center, .. }) = sk.curve(c) else { panic!() };
     let Some(Geometry::Circle { center: cid, .. }) = sk.entity(c).map(|e| e.geometry.clone()) else { panic!() };
     let r = sk.drag(&[(DragHandle::Point(cid), center + DVec2::new(0.5, 0.25))]);
-    assert!(r.is_solved(), "{r:?}");
+    // It moved; the sketch as a whole still doesn't solve (never Solved with a residual).
+    assert!(r.drag_solved && !r.is_solved(), "{r:?}");
     let Some(Curve2::Circle { center: moved, .. }) = sk.curve(c) else { panic!() };
     assert!((moved - center - DVec2::new(0.5, 0.25)).length() < 1e-9, "the circle moved by {:?}", moved - center);
     sk.drag(&[(DragHandle::Point(p), DVec2::new(-2.0, 2.5))]);
