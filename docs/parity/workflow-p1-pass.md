@@ -11,7 +11,7 @@ then edits, undo/redo, rollback and suppress.
 | Extrude right after ✓ | field empty and active, 25 mm, ✓ disabled | same (part-studio/1290) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Enter in Depth | applies, dialog stays; 2nd Enter commits | same (behaviours 252) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Fillet (Shift+F), 3 vertical edges, R2 | chips "Edge of Extrude 1" ×3, preview, 15270.061 mm³ | radius arrow on the **last** pick | ✗ P1-3 (psb): ours on the first pick |  |
-| Chamfer (tool search), 1 mm, tangent propagation | 7-edge chain chamfered (faces 9 → 16) | — | ✅ |  |
+| Chamfer (tool search), 1 mm, tangent propagation | 7-edge chain chamfered (faces 9 → 16) | — | ✅ | 0.4.10+ / fa61ba6f 10-27 (wf-block, bottom chain) |
 | Sketch on a preselected face | "Face of Extrude 1" in Sketch plane | same | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Points aligned with the origin | a 3rd point entity at (0,0) + Horizontal constraints | no entity; a Horizontal constraint from each point to the **external** Origin | ✅ P1-4 (5c94bb51: an external reference-only Origin entity, never drawn or listed; sketch_get names "origin"; e2e `sketch_get_names_the_origin_not_a_hidden_point`) | 0.4.10+ / 203c4d6f 10-27 |
 | Hole on 2 picked points | "Vertices of Sketch 2" (one chip); 2 holes, −633.385 mm³; title "Ø 6.35 mm ↧ 12 mm" ✅ | **two chips "Vertex of Sketch 1"** (one per click; "Vertices of …" only when the sketch row is picked) | ✗ **P1-8** (ui) |  |
@@ -92,14 +92,14 @@ then edits, undo/redo, rollback and suppress.
 | P2-D1 on green af9f1e4c (fix 817d9cb1) | assembly drawing, tilted plate: d on the middle hole rim → "Ø.394" preview, prompt "Click to place the dimension, or select a second entity" | — | ✅ **fixed** |  |
 | STEP import ("+" › Import…, bracket.step) | "Import to Onshape" options; Import → tab "bracket" + folder "CAD Imports" | same dialog (behaviours 1051) | ✅ | 0.4.10+ / f16b31c6 10-27 (imported our own STEP export) |
 | Assembly drawing after the unrelated import | Update ⟳ turns saturated (out of date) | unrelated changes? (request 10-26 p5) | ? |  |
-| Part Studio tab menu (green af9f1e4c) | Delete / Open in new browser tab, Rename, Properties…, Show code / Duplicate, Copy to clipboard / Select as document thumbnail / Move to document… (no Export…) | the newer live captures (behaviours 6561, 7153) list exactly these; the older one (280) also had Export… | ✅ | superseded: live has Export… (TAB-EXPORT-MISSING, fixed dea57d5c, verified f16b31c6); row 49 is the current one |
+| Part Studio tab menu (green af9f1e4c) | Delete / Open in new browser tab, Rename, Properties…, Show code / Duplicate, Copy to clipboard / Select as document thumbnail / Move to document… (no Export…) | the newer live captures (behaviours 6561, 7153) list exactly these; the older one (280) also had Export… | ✅ | superseded by row 49 (TAB-EXPORT-MISSING verified f16b31c6) |
 
 ## Pass 28, green af9f1e4c (assembly limits, live answers p2/p4/p5)
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
 | Cylindrical mate dialog | Limits only (no Offset), 4 limit rows Z ≑ / Z ⌶ / rotation min / max, "No minimum" / "No maximum" | same (behaviours 5942, 5959); Simulation connection excluded (simulation) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Limits Z max `5` + Enter | applies and closes the dialog | 1st Enter applies, 2nd accepts | ✅ P2-A2 (skasm 10-27 GUI: "30" + Enter → "30 deg" selected, dialog open; 2nd Enter accepts) | 0.4.10+ / 1c853f78 10-27 |
-| Drag the pin past the limit | stops at 5.0 mm along the hole connector's Z (it points down); the unfixed plate is pulled along | — | ✅ |  |
+| Drag the pin past the limit | stops at 5.0 mm along the hole connector's Z (it points down); the unfixed plate is pulled along | — | ✅ | 0.4.10+ / fa61ba6f 10-27 (asm5, plate fixed: pin stops ~5 mm down the hole connector's Z, the copy follows) |
 | Shell 1 mm, live's p2 model (depth 10, R1, 4 through holes) | "Could not shell part with selections." | OK 3998.627 mm³, 33 faces | ✗ **P1-16** (kern) |  |
 | Shell 2.5 mm, same | OK 8487.861 mm³, 53 faces | OK 8503.961 mm³, 47 faces | ✗ **P1-16** |  |
 | Mass properties, nothing selected | all parts measured (7178.097 mm³), toast after 3.6 s, hides by itself | field empty, values blank, no toast | ✗ **P1-17** (ui) |  |
@@ -114,12 +114,12 @@ then edits, undo/redo, rollback and suppress.
 | Pin about the middle hole's rim, ✓ | copy in hole 3; "Circular pattern 1 ▸ Part 2 <2>", Instances (3); info bubble "1 instance(s) created." | live: no bubble or toast (behaviours "qa5 (10-26 p6)" (1)) | ✅ (ours shows none either; `accept_pattern`) | 0.4.10+ / 6cbb24e0 10-27 |
 | Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✅ P2-A4 (f4f7d14a, qa verified 21d6a89e on green 16cdcf6d) | 0.4.10+ / 6cbb24e0 10-27 |
 | Mate type → Revolute | Offset, Limits (rotation min / max kept); row "Revolute 1"; Z offset 0 (the pin rises to mid-height) | same (behaviours 5942) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
-| Fix the plate, drag the revolute pin | rotates only: axis stays on hole 1 (0.002 mm), plate unchanged; the copy follows | behaviours 5948 (1) | ✅ |  |
+| Fix the plate, drag the revolute pin | rotates only: axis stays on hole 1 (0.002 mm), plate unchanged; the copy follows | behaviours 5948 (1) | ✅ | 0.4.10+ / fa61ba6f 10-27 (asm5) |
 | Mate row right-click (hidden Revolute) | Rename, Edit…, Reset / Show, Show all mates, Isolate…, Make transparent… / Edit named position driver mate… / Suppress, Dynamic suppression ▸ / Animate… / Add selection to folder… / Expand ▸, Collapse ▸ / Delete | same (behaviours 1361; Add comment is cloud) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Suppress the mate | row grey struck-through, not italic; the pin drags freely out of the hole | grey italic struck-through | ✅ P2-A5 (9703d9b9, qa verified ba5df2f5 on green 19555ca3) | 0.4.10+ / 6cbb24e0 10-27 (ours italic too; live behaviours 1297 says gray italic struck-through, so 'not italic' above may be wrong) |
 | Ctrl+Z / Ctrl+Y on the suppress | unsuppressed / suppressed again | — | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
-| Circular pattern 1 count 4 (edit), Enter twice | stays open (P2-A1, fix 9bf8475b not in this green) | 2nd Enter accepts | ✅ P2-A1 (qa re-check on a08e3eda) |  |
-| Instance list header after count 4 | "Instances (5)" | top-level rows: "Instances (3)" | ✅ P2-A6 (9703d9b9, qa verified 21d6a89e) |  |
+| Circular pattern 1 count 4 (edit), Enter twice | stays open (P2-A1, fix 9bf8475b not in this green) | 2nd Enter accepts | ✅ P2-A1 (qa re-check on a08e3eda) | 0.4.10+ / fa61ba6f 10-27: count + Enter accepts at once, = live (behaviours 4299: Instance count Enter accepts the dialog; Distance's 1st Enter keeps it, ours too) |
+| Instance list header after count 4 | "Instances (5)" | top-level rows: "Instances (3)" | ✅ P2-A6 (9703d9b9, qa verified 21d6a89e) | 0.4.10+ / fa61ba6f 10-27 (Instances (3) with 4 pattern children) |
 | Replicate dialog, Instances = Part 2 <1> | Mate to be matched auto-filled "Revolute 1"; Match faces in parts ▾; Parts to find match in (red) | same (behaviours 5969–5970) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | … pending list row while open | none | "Replicate 1" row with an error badge at once | ✅ P2-A7 (9703d9b9, qa verified 21d6a89e; skasm 10-27: the Replicate row with its badge) | 0.4.10+ / 6cbb24e0 10-27 |
 | Parts to find match in = plate, ✓ | pins in both free Ø10 holes; "Replicate 1" ▸ Part 2 <5>, <6>, Mate features (2) | same structure (behaviours 5973) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
