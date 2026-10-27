@@ -7,13 +7,13 @@ then edits, undo/redo, rollback and suppress.
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
 | Sketch on Top (Sketch → Top row) | dialog Top plane, ☑ Show constraints, view stays iso, header "Features (4)" | same, header "Features (5)" (sketch/501) | ✗ P1-1 (ui); header icons grey ✗ P1-2 (ui) |  |
-| Corner rectangle | width/height values stay while the tool is active | same (sketch/06) | ✅ |  |
+| Corner rectangle | width/height values stay while the tool is active | same (sketch/06) | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | Extrude right after ✓ | field empty and active, 25 mm, ✓ disabled | same (part-studio/1290) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Enter in Depth | applies, dialog stays; 2nd Enter commits | same (behaviours 252) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Fillet (Shift+F), 3 vertical edges, R2 | chips "Edge of Extrude 1" ×3, preview, 15270.061 mm³ | radius arrow on the **last** pick | ✗ P1-3 (psb): ours on the first pick |  |
 | Chamfer (tool search), 1 mm, tangent propagation | 7-edge chain chamfered (faces 9 → 16) | — | ✅ |  |
 | Sketch on a preselected face | "Face of Extrude 1" in Sketch plane | same | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
-| Points aligned with the origin | a 3rd point entity at (0,0) + Horizontal constraints | no entity; a Horizontal constraint from each point to the **external** Origin | ✅ P1-4 (5c94bb51: an external reference-only Origin entity, never drawn or listed; sketch_get names "origin"; e2e `sketch_get_names_the_origin_not_a_hidden_point`) |  |
+| Points aligned with the origin | a 3rd point entity at (0,0) + Horizontal constraints | no entity; a Horizontal constraint from each point to the **external** Origin | ✅ P1-4 (5c94bb51: an external reference-only Origin entity, never drawn or listed; sketch_get names "origin"; e2e `sketch_get_names_the_origin_not_a_hidden_point`) | 0.4.10+ / 203c4d6f 10-27 |
 | Hole on 2 picked points | "Vertices of Sketch 2" (one chip); 2 holes, −633.385 mm³; title "Ø 6.35 mm ↧ 12 mm" ✅ | **two chips "Vertex of Sketch 1"** (one per click; "Vertices of …" only when the sketch row is picked) | ✗ **P1-8** (ui) |  |
 | Linear pattern › Feature pattern | order Part / Feature / Face ✅; chip **"Hole 1"**; Direction pink until picked ✅ | chip **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name) | ✗ **P1-9** (ui) |  |
 | Shell 2.5 mm (top face) | 8960 mm³, 59 faces | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
@@ -67,7 +67,7 @@ then edits, undo/redo, rollback and suppress.
 | Revolve about a profile line | full cylinder; axis chip "Sketch 4 line" | chip text? ("Edge of Sketch N" in live lists; request p3 (a)) | ? |  |
 | Circular pattern dialog | Axis of pattern, Angle 360 deg, Instance count 4 + ↻, ☑ Equal spacing, ☐ Centered, › ☐ Skip instances | same (behaviours 331) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Circular pattern of Part 3 about a hole rim | 3 copies around the hole axis; each copy gets a new palette colour | copies' colour? (request p3 (b)) | ? |  |
-| P1-4 re-check on green 62524c30 (skb 7b972911) | points snapped to the origin's horizontal: no visible point at the origin; Hole on "Vertices of Sketch 6" previews only the 2 real points. Data still holds a hidden construction "Origin stand-in" point at (0,0) with the Horizontal constraints on it (sketch_get lists it) | ✅ UI / minor data note for skb (live: no entity, constraint to the external Origin) |  |
+| P1-4 re-check on green 62524c30 (skb 7b972911) | points snapped to the origin's horizontal: no visible point at the origin; Hole on "Vertices of Sketch 6" previews only the 2 real points. Data still holds a hidden construction "Origin stand-in" point at (0,0) with the Horizontal constraints on it (sketch_get lists it) | ✅ UI / minor data note for skb (live: no entity, constraint to the external Origin) | 0.4.10+ / 203c4d6f 10-27 |
 | SEL1 on green 62524c30 | Fillet: a sketch line adds nothing, a plate edge adds "Edge of Extrude 1" | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Instance right-click (Part 1 <1>, mated) | Properties…, Instance properties… / Hide … Fix, Use best available tessellation, Show mates, Hide mates / Edit in context … Switch to Part Studio 1 / Copy Part 1 <1> / Move to new subassembly, Change to version…, Export…, Release… / Zoom to selection … | same order (behaviours 1259, 1357; Add comment out of scope) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Fix, then drag the fixed plate | ground glyph on Part 1 <1> and on the root row; dragging draws the fix glyph at the cursor and nothing moves | same (behaviours 1210, 1268) | ✅ (cursor shape not checked) | 0.4.10+ / 1c853f78 10-27 |
@@ -142,8 +142,8 @@ then edits, undo/redo, rollback and suppress.
 | P1-15 (ui 76da6649) | view-cube face hover #bce2f7 | ✅ fixed | 0.4.10+ / 1c853f78 10-27 |
 | P1-12 (ui 9bc26682) | Revolve axis chip "Edge of Sketch 2" | ✅ fixed | 0.4.10+ / 2a6d0167 10-27 (axis-line.noshape: "Edge of Sketch 1") |
 | P1-7 (ui 9bc26682) | failing hidden sketch row red | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
-| P1-14 (ui 2a85db38) | new document: inertia header "(lb mm²)" | ✅ fixed |  |
-| P1-3 (psb 44927ecb) | Fillet arrow on the last picked edge | ✅ fixed |  |
-| P1-13 (psb 44927ecb) | part-pattern copies keep the seed colour | ✅ fixed |  |
+| P1-14 (ui 2a85db38) | new document: inertia header "(lb mm²)" | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 |
+| P1-3 (psb 44927ecb) | Fillet arrow on the last picked edge | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 |
+| P1-13 (psb 44927ecb) | part-pattern copies keep the seed colour | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 |
 | P1-5 (psb a52d1e44) | Shell 2.5 on the depth-15 model: "Could not shell part with selections." | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | P1-16 (kern) | Shell 1 mm on live's p2 model still fails; 2.5 mm 8487.861 mm³ | ✗ open |  |
