@@ -754,7 +754,7 @@ impl PartStudioView {
                 }
             })
         });
-        cx.default_global::<crate::assembly_view::StaleContexts>().0.remove(&(tab, id));
+        cx.default_global::<crate::assembly_context::StaleContexts>().0.remove(&(tab, id));
         self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::TabChanged(tab)));
     }
 
@@ -817,7 +817,7 @@ impl PartStudioView {
         // Out-of-date contexts (as the assembly last saw them) get a blue dot
         // after the header and before their name in the list (live 520–521).
         let tab = self.tab;
-        let stale: HashSet<u32> = cx.try_global::<crate::assembly_view::StaleContexts>().map(|g| g.0.iter().filter(|(t, _)| *t == tab).map(|(_, id)| *id).collect()).unwrap_or_default();
+        let stale: HashSet<u32> = cx.try_global::<crate::assembly_context::StaleContexts>().map(|g| g.0.iter().filter(|(t, _)| *t == tab).map(|(_, id)| *id).collect()).unwrap_or_default();
         let any_stale = contexts.iter().any(|c| stale.contains(&c.0));
         let pal = p();
         let view = cx.entity();

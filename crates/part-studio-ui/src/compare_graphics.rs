@@ -46,8 +46,8 @@ impl CompareGraphics {
     /// are regenerated (`owner.then` runs when they are).
     pub fn scene<V: 'static>(&mut self, doc: &Entity<DocModel>, tab: TabId, mode: noshape_scene::builder::DisplayMode, up: &Uploader, owner: Owner<V>, cx: &mut Context<V>) -> Option<Scene> {
         let Owner { get, then } = owner;
-        let blend = crate::compare_mode::blend(doc, cx)?;
-        let (base, base_config, target, target_config) = crate::compare_mode::documents(doc, cx)?;
+        let blend = crate::part_studio_hooks::compare_blend(doc, cx)?;
+        let (base, base_config, target, target_config) = crate::part_studio_hooks::compare_documents(doc, cx)?;
         let key = (Arc::as_ptr(&base) as usize, Arc::as_ptr(&target) as usize, tab);
         if self.key != Some(key) {
             self.key = Some(key);
@@ -82,7 +82,7 @@ impl CompareGraphics {
     /// Whether the compare state changed since the last call (start, stop,
     /// a slider move): the owner then builds its scene again.
     pub fn changed(&mut self, doc: &Entity<DocModel>, cx: &App) -> bool {
-        let blend = crate::compare_mode::blend(doc, cx);
+        let blend = crate::part_studio_hooks::compare_blend(doc, cx);
         std::mem::replace(&mut self.seen, blend) != blend
     }
 

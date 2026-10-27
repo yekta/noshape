@@ -14,9 +14,9 @@ mod material_data;
 mod material_panel;
 mod config_panel;
 mod custom_tables;
-pub(crate) mod input_propagation;
+pub mod input_propagation;
 mod config_ids;
-pub(crate) mod config_var_dialog;
+pub mod config_var_dialog;
 mod annotations_ui;
 mod scope;
 mod default_tolerances;
@@ -32,18 +32,18 @@ mod box_select;
 mod section;
 mod section_manip;
 mod sketch;
-pub(crate) mod shortcut_cmds;
+pub mod shortcut_cmds;
 mod analysis_tools;
-pub(crate) use noshape_scene::environment_maps;
-pub(crate) mod reflection;
+pub use noshape_scene::environment_maps;
+pub mod reflection;
 mod thickness;
 mod flatten_tool;
 mod draft_tool;
-pub(crate) mod export;
+pub mod export;
 mod connector_look;
 mod plane_handles;
 mod shown_dims;
-pub(crate) mod toolbar_prefs;
+pub mod toolbar_prefs;
 pub mod view_cube;
 mod view_tools;
 mod in_context;
@@ -192,7 +192,7 @@ struct EditSession {
 }
 
 /// Snapshots of the draft feature while its dialog is open.
-pub(crate) struct DraftHistory {
+pub struct DraftHistory {
     undo: Vec<Feature>,
     redo: Vec<Feature>,
     /// The draft as of the last checkpoint.
@@ -204,12 +204,12 @@ pub(crate) struct DraftHistory {
 impl DraftHistory {
     const LIMIT: usize = 200;
 
-    pub(crate) fn new(f: &Feature) -> Self {
+    pub fn new(f: &Feature) -> Self {
         Self { undo: Vec::new(), redo: Vec::new(), last: f.clone(), dragging: false }
     }
 
     /// Record `current` if it differs from the last checkpoint.
-    pub(crate) fn checkpoint(&mut self, current: &Feature) -> bool {
+    pub fn checkpoint(&mut self, current: &Feature) -> bool {
         if *current == self.last {
             return false;
         }
@@ -223,7 +223,7 @@ impl DraftHistory {
     }
 
     /// The draft to restore for Undo (`current` is the live draft).
-    pub(crate) fn undo(&mut self, current: &Feature) -> Option<Feature> {
+    pub fn undo(&mut self, current: &Feature) -> Option<Feature> {
         // Unrecorded changes (e.g. mid-drag) are undone first.
         self.checkpoint(current);
         let prev = self.undo.pop()?;
@@ -231,7 +231,7 @@ impl DraftHistory {
         Some(prev)
     }
 
-    pub(crate) fn redo(&mut self) -> Option<Feature> {
+    pub fn redo(&mut self) -> Option<Feature> {
         let next = self.redo.pop()?;
         self.undo.push(std::mem::replace(&mut self.last, next.clone()));
         Some(next)
@@ -255,7 +255,7 @@ pub struct PartStudioView {
     gpu: Gpu,
     /// Versions and history › Compare graphics.
     compare_gfx: crate::compare_graphics::CompareGraphics,
-    pub(crate) viewport: Entity<Viewport>,
+    pub viewport: Entity<Viewport>,
     display: Arc<StudioDisplay>,
     built: Option<BuiltScene>,
     /// While a feature dialog previews: the model before the feature, the
@@ -350,7 +350,7 @@ impl Focusable for PartStudioView {
 
 impl PartStudioView {
     /// The 3D viewport (smoke test).
-    pub(crate) fn viewport_entity(&self) -> Entity<Viewport> {
+    pub fn viewport_entity(&self) -> Entity<Viewport> {
         self.viewport.clone()
     }
 
@@ -479,7 +479,7 @@ impl PartStudioView {
 
     /// Apply the Graphics preferences: field of view, shading, line widths
     /// and colors, construction line pattern.
-    pub(crate) fn apply_graphics_prefs(&mut self, cx: &mut Context<Self>) {
+    pub fn apply_graphics_prefs(&mut self, cx: &mut Context<Self>) {
         let g = crate::graphics_prefs::get(cx);
         self.opts.graphics = g;
         self.viewport.update(cx, |vp, cx| {
@@ -1208,7 +1208,7 @@ impl PartStudioView {
         let owner = crate::compare_graphics::Owner::<Self> { get: |this: &mut Self| &mut this.compare_gfx, then: |this, cx| this.refresh_scene(false, cx) };
         match self.compare_gfx.scene(&self.doc, self.tab, mode, up, owner, cx) {
             Some(compare) => scene = compare,
-            None if crate::compare_mode::blend(&self.doc, cx).is_none() => self.compare_gfx.clear(),
+            None if crate::part_studio_hooks::compare_blend(&self.doc, cx).is_none() => self.compare_gfx.clear(),
             None => {}
         }
         let (tool_cursor, overlay_cursor) = (self.viewport_tool_cursor(), self.viewport_overlay_cursor());
@@ -1880,7 +1880,7 @@ impl PartStudioView {
         let name = file.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
         let tab = noshape_model::file_tab::FileTab::new(&name, &bytes, noshape_model::file_tab::now());
         let mut added = None;
-        self.doc.update(cx, |d, cx| d.edit_document(&format!("Import {name}"), cx, |d| added = Some(crate::file_tab_view::add_file_tab(d, tab, None, None))));
+        self.doc.update(cx, |d, cx| d.edit_document(&format!("Import {name}"), cx, |d| added = Some(noshape_ops::import::add_file_tab(d, tab, None, None))));
         let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) else { return };
         self.set_reference_sources(&dialog, cx);
         if let Some(id) = added {
@@ -1951,9 +1951,9 @@ impl PartStudioView {
             DialogEvent::CreateVariable(v) => this.create_variable_from_field(v, cx),
             DialogEvent::ImportReference { param, file } => this.import_reference_file(param.clone(), file.clone(), cx),
             // Create version…: this document's dialog, or another document opened in its window.
-            DialogEvent::CreateVersion(None) => crate::history_panel::open_create_version_in(this.doc.clone(), window, cx),
+            DialogEvent::CreateVersion(None) => crate::part_studio_hooks::create_version(this.doc.clone(), window, cx),
             DialogEvent::CreateVersion(Some(path)) => {
-                let _ = crate::files::open_document_window(path.clone(), None, this.gpu.clone(), cx);
+                let _ = crate::part_studio_hooks::open_document_window(path.clone(), this.gpu.clone(), cx);
             }
             DialogEvent::PreviewOpacity(v) => {
                 this.ui.preview_opacity = *v;
@@ -2001,7 +2001,7 @@ impl PartStudioView {
             let picked = d.selected_refs();
             d.grouped_sketches = vertex_sets.iter().filter(|(_, v)| v.len() >= 2 && v.iter().all(|r| picked.contains(r))).map(|(id, _)| *id).collect();
             d.sketch_vertices = Arc::new(move |id| vertex_sets.get(&id).cloned().unwrap_or_default());
-            d.width = crate::preferences_window::ListPrefs::load().feature_dialog_widths.get(&d.feature.type_id).map(|w| px(*w as f32));
+            d.width = crate::part_studio_hooks::feature_dialog_width(&d.feature.type_id).map(|w| px(w as f32));
             d.variables = vars;
             d.final_available = later;
             window.focus(&d.focus_handle(cx), cx);
@@ -2033,7 +2033,7 @@ impl PartStudioView {
 
     /// Accepts the open feature dialog or sketch, if any (a document-level
     /// panel such as Workspace units takes its place).
-    pub(crate) fn accept_open_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn accept_open_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.edit.is_some() {
             self.accept_edit(false, window, cx);
         }
@@ -3237,7 +3237,7 @@ impl PartStudioView {
                                 v1.update(cx, |this, cx| {
                                     this.ui.show_part_props = !this.ui.show_part_props;
                                     // The same setting as Preferences › Display parts list properties.
-                                    crate::preferences_window::set_parts_list_properties(this.ui.show_part_props);
+                                    crate::part_studio_hooks::set_parts_list_properties(this.ui.show_part_props);
                                     cx.notify();
                                 })
                             }))
@@ -3474,7 +3474,7 @@ impl PartStudioView {
         let several_parts = self.display.bodies.len() > 1;
         // Release…: the part's number and whether it has released revisions.
         let part_number = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty());
-        let has_revisions = part_number.as_ref().is_some_and(|pn| !crate::release_dialog::release_log(self.doc.read(cx)).revisions(pn).is_empty());
+        let has_revisions = part_number.as_ref().is_some_and(|pn| !crate::part_studio_hooks::release_log(self.doc.read(cx)).revisions(pn).is_empty());
         let part_icon = match b.kind {
             _ if b.composite.is_some() => "composite-part",
             // Onshape's svg-icon-part-mesh (live G27).
@@ -3620,12 +3620,12 @@ impl PartStudioView {
                         move |this, w, cx| {
                             let t = targets(this, &b);
                             let names: Vec<String> = t.iter().map(|id| this.display.body(id).map(|d| d.name.clone()).unwrap_or_default()).collect();
-                            let items = crate::release_dialog::part_items(this.doc.read(cx), this.tab, &t, &names, &this.config_values);
-                            crate::release_dialog::open_release_candidate(this.doc.clone(), items, w, cx);
+                            let items = crate::part_studio_hooks::release_part_items(this.doc.read(cx), this.tab, &t, &names, &this.config_values);
+                            crate::part_studio_hooks::open_release_candidate(this.doc.clone(), items, w, cx);
                         }
                     })));
                 if has_revisions && let Some(pn) = part_number.clone() {
-                    m = m.item(item("Revision history", Box::new(move |this, w, cx| crate::release_dialog::open_revision_history(this.doc.clone(), pn.clone(), w, cx))));
+                    m = m.item(item("Revision history", Box::new(move |this, w, cx| crate::part_studio_hooks::open_revision_history(this.doc.clone(), pn.clone(), w, cx))));
                 }
                 m = m
                     .separator()
@@ -5485,7 +5485,7 @@ impl Render for PartStudioView {
                     }))
                     // Compare mode (compare_mode.rs, live ui2/953): the compare
                     // panel takes the Features and parts list's place.
-                    .child(if let Some(panel) = crate::compare_mode::render_panel(&self.doc, self.tab, cx) {
+                    .child(if let Some(panel) = crate::part_studio_hooks::compare_panel(&self.doc, self.tab, cx) {
                         panel
                     } else if self.ui.list_collapsed {
                         // Collapsed Features and parts list: Onshape collapses it
@@ -5562,9 +5562,7 @@ impl Render for PartStudioView {
                                         d.width = Some(width);
                                         // Live writes the width as the edge moves, per feature type.
                                         if changed {
-                                            let mut prefs = crate::preferences_window::ListPrefs::load();
-                                            prefs.feature_dialog_widths.insert(d.feature.type_id.clone(), f32::from(width) as u32);
-                                            prefs.save();
+                                            crate::part_studio_hooks::set_feature_dialog_width(&d.feature.type_id, f32::from(width) as u32);
                                         }
                                         cx.notify();
                                     });
@@ -5595,12 +5593,12 @@ impl Render for PartStudioView {
                             // Slow regeneration: the working overlay (pending.rs).
                             .children(self.render_pending_overlay(cx))
                             // Compare mode: the Main ○—— V3 blend slider, top centre (live 953).
-                            .children(crate::compare_mode::render_slider(&self.doc, cx).map(|slider| div().absolute().top(px(4.)).left_0().right_0().flex().justify_center().child(slider))),
+                            .children(crate::part_studio_hooks::compare_slider(&self.doc, cx).map(|slider| div().absolute().top(px(4.)).left_0().right_0().flex().justify_center().child(slider))),
                     )
                     // Versions and history › View in repair (repair_mode.rs, live
                     // rp-906): the 567 px Repair panel right of the graphics; its
                     // view-only second view comes from perf.
-                    .children(crate::repair_mode::render_panel(&self.doc, None, cx))
+                    .children(crate::part_studio_hooks::repair_panel(&self.doc, None, cx))
                     .children(right),
             )
             .children(tb_panel);
@@ -5617,7 +5615,7 @@ impl PartStudioView {
     }
 
     /// Performance panel › Tab performance and Tab graphics.
-    pub fn tab_perf(&self, cx: &App) -> crate::doc_panels::TabPerf {
+    pub fn tab_perf(&self, cx: &App) -> TabPerf {
         let mut features: Vec<(String, usize)> = Vec::new();
         for f in self.studio(cx).map(|s| s.features.as_slice()).unwrap_or_default() {
             let name = noshape_model::features::get(&f.type_id).map(|t| t.name.to_string()).unwrap_or_else(|| f.type_id.clone());
@@ -5630,7 +5628,7 @@ impl PartStudioView {
         let sum = |f: fn(&noshape_model::display::BodyDisplay) -> usize| d.bodies.iter().map(f).sum::<usize>();
         let sketch: usize = d.sketches.iter().map(|s| s.curves.len() + s.points.len()).sum();
         let primitives = [("Faces", sum(|b| b.face_refs.len())), ("Edges", sum(|b| b.mesh.edges.iter().filter(|p| !p.is_empty()).count())), ("Vertices", sum(|b| b.vertex_refs.len())), ("Sketch entities", sketch), ("Planes", d.planes.len())];
-        crate::doc_panels::TabPerf { regen_ms: d.regen_ms, features, primitives: primitives.into_iter().map(|(k, n)| (k.to_string(), n)).collect() }
+        TabPerf { regen_ms: d.regen_ms, features, primitives: primitives.into_iter().map(|(k, n)| (k.to_string(), n)).collect() }
     }
 
     /// Performance panel › the stopwatch: the feature list's regeneration times.
@@ -5696,7 +5694,7 @@ fn count_picks(p: &noshape_model::params::ParamValues) -> usize {
 /// .toLowerCase())`), the type as named in the UI language. Live: "Mount
 /// [Extrude]", "<- Path [Sketch]", but "<- Boss sketch 2" (qa4 r5 s8);
 /// German "Sketch 1 [Skizze]"; default names ("Draft 1") stay as they are.
-pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
+pub fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
     match f.feature_type().map(|t| crate::i18n::type_name(t.name)) {
         Some(t) if needs_type_tag(&f.name, &t) => format!("{} [{t}]", f.name),
         _ => f.name.clone(),
@@ -5706,6 +5704,16 @@ pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
 /// Whether a name gets its feature type in brackets (see [`typed_name`]).
 fn needs_type_tag(name: &str, type_name: &str) -> bool {
     !type_name.is_empty() && !format!(" {} ", name.to_lowercase()).contains(&type_name.to_lowercase())
+}
+
+/// The active tab's numbers for the Performance panel (Part Studios only).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TabPerf {
+    pub regen_ms: f32,
+    /// Feature type name and count.
+    pub features: Vec<(String, usize)>,
+    /// Kind of drawn primitive and count.
+    pub primitives: Vec<(String, usize)>,
 }
 
 #[cfg(test)]

@@ -189,7 +189,7 @@ pub struct UiState {
     /// Custom tables panel (selected table, its result, the hovered row).
     pub ct: super::custom_tables::CtState,
     /// Variable Studio tables shown in the Variable table panel.
-    pub var_tables: std::collections::HashMap<noshape_model::document::TabId, Entity<crate::variable_studio::VariableStudioView>>,
+    pub var_tables: std::collections::HashMap<noshape_model::document::TabId, AnyView>,
     /// Section view planes (Shift+X).
     pub section: Vec<super::section::SectionPlane>,
     /// Section view dialog, and the parts excluded (false) or the only ones
@@ -545,7 +545,7 @@ impl UiState {
             collapsed_sections: HashSet::from(["composites"]),
             parts_height: None,
             // Preferences › Part Studio settings › Display parts list properties.
-            show_part_props: crate::preferences_window::parts_list_properties(),
+            show_part_props: crate::part_studio_hooks::parts_list_properties(),
             list_collapsed: false,
             mass_faces: false,
             com: None,
@@ -1221,7 +1221,7 @@ impl PartStudioView {
         let g = noshape_ops::sketch_export::sketch_sheet(sk);
         let name = sk.name.clone();
         let view = cx.entity();
-        crate::files::request_save_path("Export sketch", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
+        crate::file_dialogs::request_save_path("Export sketch", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
             let data = if ext == "svg" { noshape_model::drawing::export::to_svg(&g) } else { noshape_model::drawing::export::to_dxf(&g) };
             let msg = match std::fs::write(&path, data) {
                 Ok(()) => format!("Exported {}", path.display()),
@@ -1237,7 +1237,7 @@ impl PartStudioView {
         let Some(g) = noshape_ops::sketch_export::face_sheet(ctx, &self.display, &r) else { return };
         let Some(name) = self.display.bodies.iter().find(|b| b.face_refs.contains(&r)).map(|b| b.name.clone()) else { return };
         let view = cx.entity();
-        crate::files::request_save_path("Export face", format!("{name} face.dxf"), "dxf", window, cx, move |path, cx| {
+        crate::file_dialogs::request_save_path("Export face", format!("{name} face.dxf"), "dxf", window, cx, move |path, cx| {
             let msg = match std::fs::write(&path, noshape_model::drawing::export::to_dxf(&g)) {
                 Ok(()) => format!("Exported {}", path.display()),
                 Err(e) => format!("Export failed: {e}"),
@@ -2309,7 +2309,7 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ camera
 
-    pub(crate) fn push_camera_history(&mut self, cx: &App) {
+    pub fn push_camera_history(&mut self, cx: &App) {
         let cam = self.viewport.read(cx).camera;
         if self.ui.cam_history.last() != Some(&cam) {
             self.ui.cam_history.push(cam);
@@ -2320,7 +2320,7 @@ impl PartStudioView {
     }
 
     /// Camera menu "Previous view".
-    pub(crate) fn previous_view(&mut self, cx: &mut Context<Self>) {
+    pub fn previous_view(&mut self, cx: &mut Context<Self>) {
         if let Some(cam) = self.ui.cam_history.pop() {
             self.viewport.update(cx, |vp, cx| vp.animate_to(cam, cx));
         }

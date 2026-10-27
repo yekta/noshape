@@ -32,7 +32,7 @@ pub struct VarInputDialog {
 }
 
 /// The dimension of a configuration variable type (`None` for Text).
-pub(crate) use noshape_ops::config::kind_dim;
+pub use noshape_ops::config::kind_dim;
 
 /// Default / Minimum / Maximum of a new variable of `kind` (live 702).
 fn prefill(kind: VariableKind, units: &UnitPrefs) -> [String; 3] {
@@ -46,14 +46,14 @@ fn prefill(kind: VariableKind, units: &UnitPrefs) -> [String; 3] {
 }
 
 /// Fields that don't evaluate (Default, Minimum, Maximum).
-pub(crate) fn invalid_values(dim: Option<Dim>, values: [&str; 3], units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> [bool; 3] {
+pub fn invalid_values(dim: Option<Dim>, values: [&str; 3], units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> [bool; 3] {
     let Some(dim) = dim else { return [false; 3] };
     values.map(|v| noshape_units::evaluate_as(v, dim, units, vars).is_err())
 }
 
 /// The range error and the fields it marks (Default, Minimum, Maximum)
 /// (bundle `validateRange`; live 703–707).
-pub(crate) fn range_error(dim: Option<Dim>, values: [&str; 3], units: &UnitPrefs) -> Option<(&'static str, [bool; 3])> {
+pub fn range_error(dim: Option<Dim>, values: [&str; 3], units: &UnitPrefs) -> Option<(&'static str, [bool; 3])> {
     let dim = dim?;
     let val = |t: &str| noshape_units::evaluate_as(t, dim, units, &noshape_units::EmptyScope).ok().map(|q| q.value);
     let unit_of = |t: &str| t.split_whitespace().nth(1).map(str::to_string);

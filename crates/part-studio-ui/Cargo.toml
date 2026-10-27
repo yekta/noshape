@@ -1,0 +1,27 @@
+[package]
+name = "noshape-part-studio-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's Part Studio UI: the Part Studio editor, its feature dialog, sketch mode, panels and tools. Built on noshape-app-core (and noshape-drawing-ui for Create drawing); the noshape binary registers what it needs of the app (part_studio_hooks)."
+
+[dependencies]
+noshape-app-core.workspace = true
+noshape-drawing-ui.workspace = true
+noshape-render.workspace = true
+noshape-model.workspace = true
+noshape-store.workspace = true
+noshape-units.workspace = true
+noshape-sketch.workspace = true
+noshape-kernel.workspace = true
+noshape-ops.workspace = true
+noshape-scene.workspace = true
+gpui-kit.workspace = true
+anyhow.workspace = true
+glam.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "tiff"] }
+serde_json.workspace = true
+serde.workspace = true
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

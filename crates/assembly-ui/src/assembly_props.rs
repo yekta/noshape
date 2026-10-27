@@ -1024,12 +1024,7 @@ impl AssemblyView {
     }
 }
 
-/// Part Studio contexts (studio tab, context id) whose assembly has moved on
-/// since their last update, as last seen by the assembly.
-#[derive(Default)]
-pub struct StaleContexts(pub std::collections::HashSet<(TabId, u32)>);
-
-impl Global for StaleContexts {}
+pub use crate::assembly_context::StaleContexts;
 
 #[cfg(test)]
 mod tests {

@@ -6,11 +6,13 @@
 #![recursion_limit = "256"]
 
 // The app's base layer (docs/CRATES.md), under its old paths.
-use noshape_app_core::{actions, assets, cached_slice, camera_menu, color_mixer, config_visibility, cursor, custom_tables, derived, doc_model, export_naming, gpu, graphics_prefs, graphics_prefs_dialog, i18n, isolate_ui, named_views_dialog, nav_trace, navigation, os_menu, os_select, os_ui, overlay_labels, properties_dialog, quantity_field, scene_builder, section_dialog, session, start_thumbnail, theme, tool_synonyms, tool_text, toolbar_customize, ui, viewport};
+use noshape_app_core::{actions, assets, cached_slice, camera_menu, config_visibility, cursor, custom_tables, derived, doc_model, export_naming, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, properties_dialog, scene_builder, session, start_thumbnail, theme, ui, viewport};
 // The Drawing studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_drawing_hooks`.
-use noshape_drawing_ui::{drawing_create, drawing_keys, drawing_sketch, drawing_view};
+use noshape_drawing_ui::{drawing_create, drawing_keys, drawing_view};
 // The Assembly studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_assembly_hooks`.
 use noshape_assembly_ui::{assembly_scene, assembly_view};
+// The Part Studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_part_studio_hooks`.
+use noshape_part_studio_ui::{part_studio, select_item};
 mod fs_profile;
 mod live_server;
 mod std_source;
@@ -27,18 +29,14 @@ mod release_thumbs;
 mod doc_dialogs;
 mod shortcuts_page;
 mod file_tab_view;
-mod feature_dialog;
 mod feature_studio;
 mod fs_notices;
-mod fs_reference;
-mod select_item;
 mod fs_import;
 mod fs_search;
 mod import_dialog;
 mod material_library_view;
 mod files;
 mod history_panel;
-mod compare_graphics;
 mod compare_mode;
 mod workspace_protection;
 mod repair_mode;
@@ -48,11 +46,8 @@ mod units_prefs;
 mod doc_panels;
 mod mouse_prefs;
 mod drawing_prefs;
-mod part_studio;
 mod preferences_window;
 mod release_dialog;
-mod sketch_mode;
-mod sketch_fonts;
 mod prefs_general;
 mod prefs_export_rules;
 mod start_library;
@@ -63,7 +58,6 @@ mod smoke;
 mod start_window;
 mod tab_manager;
 mod tab_thumbs;
-mod var_complete;
 mod variable_import;
 mod variable_insert;
 mod variable_studio;
@@ -282,6 +276,49 @@ fn register_assembly_hooks() {
     });
 }
 
+/// What the Part Studio (noshape-part-studio-ui) needs of the app: other documents' windows, the documents library,
+/// the release dialogs, Create version, preferences and the shortcuts page, the Variable Studio's tables, Compare and
+/// Repair, the added material libraries.
+fn register_part_studio_hooks() {
+    noshape_part_studio_ui::part_studio_hooks::register(noshape_part_studio_ui::part_studio_hooks::Hooks {
+        open_document_window: |path, gpu, cx| files::open_document_window(path, None, gpu, cx),
+        library_docs: || start_library::Library::default().scan(&start_library::ScanInput::current()).docs,
+        other_documents: variable_insert::other_documents,
+        release_log: release_dialog::release_log,
+        release_part_items: release_dialog::part_items,
+        open_release_candidate: release_dialog::open_release_candidate,
+        open_revision_history: release_dialog::open_revision_history,
+        note_viewed_config: release_dialog::note_viewed_config,
+        last_viewed_config: release_dialog::last_viewed_config,
+        create_version: history_panel::open_create_version_in,
+        show_keyboard_shortcuts: |cx| preferences_window::show(preferences_window::Page::KeyboardShortcuts, cx),
+        show_shortcuts_page: shortcuts_page::show,
+        key_chip: |text, style| preferences_window::key_chip(text, style),
+        export_rules_link: preferences_window::export_rules_link,
+        parts_list_properties: preferences_window::parts_list_properties,
+        set_parts_list_properties: preferences_window::set_parts_list_properties,
+        feature_dialog_width: |type_id| preferences_window::ListPrefs::load().feature_dialog_widths.get(type_id).copied(),
+        set_feature_dialog_width: |type_id, width| {
+            let mut prefs = preferences_window::ListPrefs::load();
+            prefs.feature_dialog_widths.insert(type_id.to_string(), width);
+            prefs.save();
+        },
+        variable_table: |doc, studio, host, window, cx| cx.new(|cx| variable_studio::VariableStudioView::new_in_panel(doc, studio, host, window, cx)).into(),
+        readonly_variable_table: |doc, element, r, k, n, cx| variable_insert::readonly_table(doc, variable_insert::InsertTarget::Element(element), r, k, n, cx),
+        variable_panel_footer: variable_insert::panel_footer,
+        variable_type_cell: |id, options, current, on_select| variable_studio::type_cell(id, options, current, on_select),
+        compare_blend: compare_mode::blend,
+        compare_documents: compare_mode::documents,
+        compare_panel: compare_mode::render_panel,
+        compare_slider: compare_mode::render_slider,
+        repair_open: repair_mode::is_open,
+        repair_close: repair_mode::close,
+        repair_panel: repair_mode::render_panel,
+        materials_of: material_libraries::materials_of,
+        open_add_material_library: |on_add, window, cx| material_libraries::open(on_add, window, cx),
+    });
+}
+
 fn main() {
     noshape_render::perf::process_start();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
@@ -294,6 +331,7 @@ fn main() {
     noshape_model::custom::set_external_tab_loader(derived::external_tab);
     register_drawing_hooks();
     register_assembly_hooks();
+    register_part_studio_hooks();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);

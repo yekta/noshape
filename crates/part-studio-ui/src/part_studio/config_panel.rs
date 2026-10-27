@@ -446,7 +446,7 @@ impl PartStudioView {
             let current = KINDS.iter().position(|(k, _)| *k == r.kind).unwrap_or(0);
             let v_kind = cx.entity();
             // Drawn as an inserted Variable Studio's (live psb/t-807, qa5 VS3).
-            let kind_select = crate::variable_studio::type_cell(SharedString::from(format!("pvar-kind-{fid}")), KINDS.iter().map(|(_, n)| n.to_string()).collect(), current, move |i, _, cx| {
+            let kind_select = crate::part_studio_hooks::variable_type_cell(SharedString::from(format!("pvar-kind-{fid}")), KINDS.iter().map(|(_, n)| n.to_string()).collect(), current, move |i, _, cx| {
                 let kind = KINDS[i].0;
                 v_kind.update(cx, |this, cx| {
                     let units = this.doc.read(cx).session.doc.settings.units;
@@ -604,14 +604,13 @@ impl PartStudioView {
         for (k, r) in refs.iter().enumerate() {
             // Another document's studio: read-only (Onshape).
             let body: AnyElement = if r.external.is_some() {
-                let target = crate::variable_insert::InsertTarget::Element(self.tab);
-                match crate::variable_insert::readonly_table(&self.doc, target, r, k, refs.len(), cx) {
+                match crate::part_studio_hooks::readonly_variable_table(&self.doc, self.tab, r, k, refs.len(), cx) {
                     Some(t) => t.into_any_element(),
                     None => continue,
                 }
             } else {
                 let (doc, host, s) = (self.doc.clone(), self.tab, r.studio);
-                self.ui.var_tables.entry(s).or_insert_with(|| cx.new(|cx| crate::variable_studio::VariableStudioView::new_in_panel(doc, s, host, window, cx))).clone().into_any_element()
+                self.ui.var_tables.entry(s).or_insert_with(|| crate::part_studio_hooks::variable_table(doc, s, host, window, cx)).clone().into_any_element()
             };
             // The header's title area is the drag handle (between the fold
             // chevron and ⋯, which stay clickable).
@@ -737,7 +736,7 @@ impl PartStudioView {
     /// The Variable table footer (live, part-studio/77): a split button
     /// "Create Variable Studio | ▴" whose menu also has Insert Variable Studio.
     fn variable_panel_footer(&self, cx: &mut Context<Self>) -> AnyElement {
-        crate::variable_insert::panel_footer(self.doc.clone(), self.tab, cx)
+        crate::part_studio_hooks::variable_panel_footer(self.doc.clone(), self.tab, cx)
     }
 
     /// Add a configuration input of one of Onshape's kinds (List, Checkbox, Variable).
@@ -2019,7 +2018,7 @@ impl PartStudioView {
                             let sub = cx.subscribe(&s, move |this, _, ev: &crate::os_select::OsSelectEvent, cx| {
                                 let crate::os_select::OsSelectEvent::Picked(id) = ev;
                                 this.config_values.0.insert(iid.clone(), id.to_string());
-                                crate::release_dialog::note_viewed_config(this.tab, &this.config_values);
+                                crate::part_studio_hooks::note_viewed_config(this.tab, &this.config_values);
                                 this.config_dirty(cx);
                             });
                             self.ui.cfg_selects.insert(input.id.clone(), (s.clone(), sub));
@@ -2543,7 +2542,7 @@ impl PartStudioView {
 
     fn set_config_value(&mut self, input: &str, value: String, window: &mut Window, cx: &mut Context<Self>) {
         self.config_values.0.insert(input.to_string(), value);
-        crate::release_dialog::note_viewed_config(self.tab, &self.config_values);
+        crate::part_studio_hooks::note_viewed_config(self.tab, &self.config_values);
         self.schedule_regen(window, cx);
         cx.notify();
     }
@@ -2578,7 +2577,7 @@ impl PartStudioView {
                     return;
                 }
                 this.config_values.0.insert(i.id.clone(), v);
-                crate::release_dialog::note_viewed_config(this.tab, &this.config_values);
+                crate::part_studio_hooks::note_viewed_config(this.tab, &this.config_values);
                 this.config_dirty(cx);
             });
         }
@@ -2645,7 +2644,7 @@ impl PartStudioView {
             .when(self.has_frames(), |d| d.child(btn("panel-cut", "cut-list", "Cut list", RightPanel::CutList, cx)))
             // Live rp-906/914: with the Repair panel open, its wrench "Repair
             // panel" (active, joined to the panel) closes it.
-            .when(crate::repair_mode::is_open(&self.doc, cx), |d| {
+            .when(crate::part_studio_hooks::repair_open(&self.doc, cx), |d| {
                 let doc = self.doc.clone();
                 d.child(
                     div()
@@ -2664,7 +2663,7 @@ impl PartStudioView {
                         .border_color(pal.border_strong)
                         .child(crate::assets::icon("repair", 20., cx))
                         .tip("Repair panel", crate::ui::TipSide::Left)
-                        .on_click(move |_, _, cx| crate::repair_mode::close(&doc, cx)),
+                        .on_click(move |_, _, cx| crate::part_studio_hooks::repair_close(&doc, cx)),
                 )
             })
             .into_any_element()

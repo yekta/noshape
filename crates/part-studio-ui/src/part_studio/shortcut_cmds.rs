@@ -92,14 +92,14 @@ const FEATURES: &[(&str, &str)] = &[
 ];
 
 /// A sketch tool's name: its toolbar tooltip without the key ("Line").
-pub(crate) fn tool_name(t: Tool) -> &'static str {
+pub fn tool_name(t: Tool) -> &'static str {
     let l = t.label();
     l.rsplit_once(" (").map_or(l, |(n, _)| n)
 }
 
 /// Preferences › Shortcut toolbars › Sketch: Onshape's list, in its order
 /// and wording (live dom preferences-shortcut-toolbars.json, 56 rows).
-pub(crate) const SKETCH_PREFS_LIST: [&str; 56] = [
+pub const SKETCH_PREFS_LIST: [&str; 56] = [
     "Extrude", "Revolve", "Line", "Midpoint line", "Corner rectangle", "Center point rectangle", "Aligned rectangle", "Center point circle", "3 point circle", "Ellipse",
     "3 point arc", "Tangent arc", "Center point arc", "Elliptical arc", "Conic", "Inscribed polygon", "Circumscribed polygon", "Spline", "Bezier", "Spline control point",
     "Point", "Text", "Use", "Intersection", "Construction", "Fillet", "Chamfer", "Trim", "Extend", "Split",
@@ -110,7 +110,7 @@ pub(crate) const SKETCH_PREFS_LIST: [&str; 56] = [
 
 /// The Sketch list's rows: (stored id: our tool's name, or the row's name
 /// for the Part Studio commands on it; Onshape's label; icon path).
-pub(crate) fn sketch_prefs_rows() -> Vec<(String, &'static str, gpui_kit::SharedString)> {
+pub fn sketch_prefs_rows() -> Vec<(String, &'static str, gpui_kit::SharedString)> {
     SKETCH_PREFS_LIST
         .iter()
         .map(|&name| match sketch_tool(name) {
@@ -132,7 +132,7 @@ pub(crate) fn sketch_prefs_rows() -> Vec<(String, &'static str, gpui_kit::Shared
 }
 
 /// Onshape's default sketch S toolbar, by name.
-pub(crate) fn default_sketch_shortcut_names() -> Vec<&'static str> {
+pub fn default_sketch_shortcut_names() -> Vec<&'static str> {
     super::sketch::SKETCH_SHORTCUT_TOOLS.iter().map(|t| tool_name(*t)).collect()
 }
 
@@ -144,7 +144,7 @@ pub(super) fn sketch_shortcut_toolbar(prefs: &super::toolbar_prefs::ToolbarPrefs
 
 /// Feature types of the Part Studio toolbar, in toolbar order (the tools
 /// the Part Studio S toolbar can show).
-pub(crate) fn toolbar_feature_ids() -> Vec<&'static str> {
+pub fn toolbar_feature_ids() -> Vec<&'static str> {
     super::TOOLBAR.iter().flat_map(|g| g.iter()).flat_map(|items| items.iter().copied()).collect()
 }
 
@@ -164,7 +164,7 @@ pub(super) fn sketch_tool(name: &str) -> Option<Tool> {
 
 impl PartStudioView {
     /// Runs a customized shortcut of an action without a GPUI action.
-    pub(crate) fn run_shortcut(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn run_shortcut(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(e) = shortcuts::entry(id) else { return };
         match e.tab {
             Tab::General => self.run_general(e.name, window, cx),

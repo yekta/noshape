@@ -6,11 +6,11 @@ def git(*a): return subprocess.run(['git','-C',R,*a],capture_output=True,text=Tr
 def labels(tree):
     out=set()
     files=[]
-    for p in git('ls-tree','--name-only',tree,'crates/app/src/','crates/app-core/src/','crates/drawing-ui/src/','crates/assembly-ui/src/').split():
+    for p in git('ls-tree','--name-only',tree,'crates/app/src/','crates/app-core/src/','crates/drawing-ui/src/','crates/assembly-ui/src/','crates/part-studio-ui/src/').split():
         n=p.split('/')[-1]
         area=('assembly' if n.startswith('assembly_') else 'drawing' if n.startswith('drawing_') else 'document' if (n.startswith('variable_') or n=='history_panel.rs') else 'partStudio' if n=='feature_dialog.rs' else 'view' if n=='camera_menu.rs' else None)
         if area and n.endswith('.rs'): files.append((area,p))
-    for p in git('ls-tree','--name-only',tree,'crates/app/src/part_studio/').split(): files.append(('partStudio',p))
+    for p in git('ls-tree','--name-only',tree,'crates/part-studio-ui/src/part_studio/','crates/app/src/part_studio/').split(): files.append(('partStudio',p))
     for area,p in files:
         t=git('show',f'{tree}:{p}')
         for pat in ['item("','OsMenuItem::new("']:

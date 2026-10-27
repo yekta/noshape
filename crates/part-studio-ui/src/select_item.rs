@@ -94,7 +94,7 @@ pub struct SelectItemPanel {
     url: Entity<InputState>,
     category: Option<usize>,
     doc_query: Option<String>,
-    docs: Option<Vec<crate::start_library::DocEntry>>,
+    docs: Option<Vec<crate::library::DocEntry>>,
     /// Latest version label and whether it has matching tabs, per document.
     doc_info: HashMap<PathBuf, (String, bool)>,
     other: Option<VersionedDoc>,
@@ -126,10 +126,10 @@ fn join_value(base: &str, cfg: &ConfigValues) -> String {
     format!("{base}\t{}", pairs.join(";"))
 }
 
-pub(crate) use crate::derived::document_versions;
+pub use crate::derived::document_versions;
 
 /// Changes on Main since microversion `mv`.
-pub(crate) fn changes_since(path: &std::path::Path, mv: noshape_store::MicroversionId) -> usize {
+pub fn changes_since(path: &std::path::Path, mv: noshape_store::MicroversionId) -> usize {
     let Ok(store) = noshape_store::Document::open_read_only(path) else { return 0 };
     let Ok(history) = store.default_branch().and_then(|b| store.history(b)) else { return 0 };
     history.iter().take_while(|m| m.id != mv).count()
@@ -272,7 +272,7 @@ impl SelectItemPanel {
         cx.spawn(async move |this, cx| {
             let (docs, info) = cx
                 .background_spawn(async move {
-                    let docs = crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs;
+                    let docs = crate::part_studio_hooks::library_docs();
                     let info: HashMap<PathBuf, (String, bool)> = docs
                         .iter()
                         .filter_map(|d| {
@@ -298,7 +298,7 @@ impl SelectItemPanel {
     /// the documents whose name contains it.
     fn search_documents(&mut self, text: String, cx: &mut Context<Self>) {
         let path = PathBuf::from(text.trim_start_matches("file://"));
-        if path.extension().is_some_and(|e| e == crate::start_library::EXT) && path.exists() {
+        if path.extension().is_some_and(|e| e == crate::library::EXT) && path.exists() {
             self.open_other_document(path, cx);
             return;
         }
@@ -426,7 +426,7 @@ impl SelectItemPanel {
                                 .child(crate::assets::icon("configuration", 20., cx))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
-                                    if let Some(v) = k2.parse::<u64>().ok().or_else(|| u64::from_str_radix(&k2, 16).ok()).and_then(|t| crate::release_dialog::last_viewed_config(noshape_model::TabId(t))) {
+                                    if let Some(v) = k2.parse::<u64>().ok().or_else(|| u64::from_str_radix(&k2, 16).ok()).and_then(|t| crate::part_studio_hooks::last_viewed_config(noshape_model::TabId(t))) {
                                         this.cfg_edit.insert(k2.clone(), v);
                                         this.expanded.insert(k2.clone());
                                     }
@@ -834,7 +834,7 @@ impl SelectItemPanel {
                 .child(div().pl(px(3.)).text_size(px(14.67)).font_weight(FontWeight::MEDIUM).truncate().child(title)),
         );
         let me = self.doc_path.clone();
-        let mut docs: Vec<crate::start_library::DocEntry> = self.docs.clone().unwrap_or_default().into_iter().filter(|d| !d.trashed && !d.broken && Some(&d.path) != me.as_ref()).collect();
+        let mut docs: Vec<crate::library::DocEntry> = self.docs.clone().unwrap_or_default().into_iter().filter(|d| !d.trashed && !d.broken && Some(&d.path) != me.as_ref()).collect();
         let q = query.as_ref().map(|q| q.to_lowercase());
         match (category, &q) {
             (_, Some(q)) => docs.retain(|d| d.name.to_lowercase().contains(q.as_str())),

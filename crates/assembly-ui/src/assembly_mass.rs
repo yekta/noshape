@@ -12,6 +12,8 @@ use super::*;
 use gpui_kit::component::input::InputEvent;
 use noshape_model::assembly::analysis::{AssemblyMass, assembly_mass_properties, face_section_properties};
 use noshape_model::assembly::eval::InstancePath;
+// Shared with the Part Studio's Mass properties (noshape-app-core).
+pub use crate::properties_dialog::{mass_number as number, mass_unit};
 
 /// Mass properties dialog state.
 pub struct AsmMassUi {
@@ -575,28 +577,6 @@ impl AssemblyView {
     }
 }
 
-/// The user's mass unit (Workspace units › Mass: Kilogram, Gram, Pound,
-/// Ounce): (symbol, per kilogram).
-pub fn mass_unit(units: &noshape_units::UnitPrefs) -> (&'static str, f64) {
-    match units.other[2].0 {
-        1 => ("g", 1000.0),
-        2 => ("lb", 2.204_622_621_848_776),
-        3 => ("oz", 35.273_961_949_580_41),
-        _ => ("kg", 1.0),
-    }
-}
-
-/// A Mass and section properties value as Onshape writes it (live 738–739):
-/// three decimals without trailing zeros ("5.77", "11000"), and values that
-/// would read 0.000 in exponent form ("-3.307e-4").
-pub fn number(x: f64) -> String {
-    let fixed = noshape_units::to_fixed(x, 3);
-    if x != 0.0 && fixed.trim_start_matches('-') == "0.000" {
-        return format!("{x:.3e}");
-    }
-    let t = fixed.trim_end_matches('0').trim_end_matches('.');
-    if t == "-0" { "0".into() } else { t.to_string() }
-}
 
 /// "<value> <unit>", or empty without a value.
 fn with_unit_opt(v: Option<String>, unit: String) -> String {

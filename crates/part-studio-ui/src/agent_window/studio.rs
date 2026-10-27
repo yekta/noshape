@@ -10,7 +10,7 @@ use noshape_ops::window::{DisplaySet, ListAct, Selected};
 
 impl PartStudioView {
     /// A display setting (view_display).
-    pub(crate) fn agent_display(&mut self, set: DisplaySet, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn agent_display(&mut self, set: DisplaySet, window: &mut Window, cx: &mut Context<Self>) {
         match set {
             DisplaySet::IsolateParts { transparent, parts } => {
                 // As the part menu's Isolate… / Make transparent…: on these parts.
@@ -47,7 +47,7 @@ impl PartStudioView {
     }
 
     /// The selection (ui_select): entities, or Clear selection.
-    pub(crate) fn agent_select(&mut self, sel: Selected, cx: &mut Context<Self>) {
+    pub fn agent_select(&mut self, sel: Selected, cx: &mut Context<Self>) {
         self.selection = match sel {
             Selected::Studio(refs) => refs,
             Selected::Instances(_) | Selected::Clear => Vec::new(),
@@ -58,7 +58,7 @@ impl PartStudioView {
     }
 
     /// The feature list (ui_list), as its menus do it.
-    pub(crate) fn agent_list(&mut self, act: ListAct, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn agent_list(&mut self, act: ListAct, window: &mut Window, cx: &mut Context<Self>) {
         match act {
             ListAct::All(open) => self.set_all_folders_collapsed(!open, cx),
             ListAct::Folders { ids, open } => {
@@ -72,7 +72,7 @@ impl PartStudioView {
     }
 
     /// The user's toolbar settings changed (ui_toolbar): as after Customize toolbar….
-    pub(crate) fn agent_reload_toolbar(&mut self, cx: &mut Context<Self>) {
+    pub fn agent_reload_toolbar(&mut self, cx: &mut Context<Self>) {
         self.ui.toolbar = super::toolbar_prefs::ToolbarPrefs::load();
         cx.notify();
     }

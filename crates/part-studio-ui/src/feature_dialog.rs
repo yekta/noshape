@@ -177,9 +177,9 @@ pub struct FeatureDialog {
     /// Tabs reference parameters can pick (file tabs, Part Studios).
     pub ref_sources: Vec<crate::fs_reference::RefSource>,
     /// The open "Select …" panel of a reference parameter.
-    pub(crate) ref_picker: Option<crate::fs_reference::RefPicker>,
+    pub ref_picker: Option<crate::fs_reference::RefPicker>,
     /// Its "Import…" was clicked (handled at the next render, which has a window).
-    pub(crate) ref_import: Option<noshape_model::params::ReferenceKind>,
+    pub ref_import: Option<noshape_model::params::ReferenceKind>,
     /// The document name its "Current document" tab shows.
     pub ref_document_name: String,
     /// Pictures of Part Studios and parts in that panel (`tab`, `tab#part`).
@@ -1164,7 +1164,7 @@ impl FeatureDialog {
 
     /// The error a field shows: the feature's error when the regeneration
     /// names this parameter.
-    pub(crate) fn field_error(&self, id: &str) -> Option<String> {
+    pub fn field_error(&self, id: &str) -> Option<String> {
         let (FeatureStatus::Error, msg) = self.status.as_ref()? else { return None };
         if !self.faulty.is_empty() {
             return self.faulty.iter().any(|f| f == id).then(|| msg.clone());
@@ -1423,7 +1423,7 @@ impl FeatureDialog {
     /// sketch's dimension box, live: an unknown `#w` + Enter opens it with
     /// the name prefilled and the field's previous value). The caller draws
     /// it ([`Self::external_create_variable_popup`]).
-    pub(crate) fn open_external_create_variable(&mut self, f: ExternalField, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_external_create_variable(&mut self, f: ExternalField, window: &mut Window, cx: &mut Context<Self>) {
         self.external_field = Some((f.path.to_string(), f.state, f.kind));
         self.baselines.insert(f.path.to_string(), f.previous);
         self.open_create_variable(f.path.to_string(), f.name, window, cx);
@@ -1432,7 +1432,7 @@ impl FeatureDialog {
 
     /// Drop the Create variable popup of outside field `path` (its box was
     /// closed: a new box starts without it, qa5 F32).
-    pub(crate) fn close_external_create_variable(&mut self, path: &str, cx: &mut Context<Self>) {
+    pub fn close_external_create_variable(&mut self, path: &str, cx: &mut Context<Self>) {
         if self.create_var.as_ref().is_some_and(|c| c.path == path) {
             self.create_var = None;
         }
@@ -1443,7 +1443,7 @@ impl FeatureDialog {
     }
 
     /// The open Create variable popup of outside field `path`, if any.
-    pub(crate) fn external_create_variable_popup(&mut self, path: &str, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub fn external_create_variable_popup(&mut self, path: &str, cx: &mut Context<Self>) -> Option<AnyElement> {
         self.create_var.as_ref().is_some_and(|c| c.path == path && self.external_field.as_ref().is_some_and(|f| f.0 == path)).then(|| self.render_create_variable(cx))
     }
 
@@ -3130,7 +3130,7 @@ impl FeatureDialog {
 
     /// The Derived source as a reference value for the panel: `tab[#part]`,
     /// then the source configuration after a tab (`input=value;…`).
-    pub(crate) fn derived_reference_value(&self) -> String {
+    pub fn derived_reference_value(&self) -> String {
         let studio = self.feature.params.text("partStudio").to_string();
         let parts: Vec<String> = self.feature.params.query("parts").iter().filter_map(|r| match r {
             Reference::Body(b) => Some(b.to_string()),
@@ -3157,7 +3157,7 @@ impl FeatureDialog {
 
     /// A pick in the Select Part Studio panel: the studio (or one of its
     /// parts) and its configuration become the Derived parameters.
-    pub(crate) fn pick_derived_source(&mut self, value: &str, cx: &mut Context<Self>) {
+    pub fn pick_derived_source(&mut self, value: &str, cx: &mut Context<Self>) {
         use noshape_model::regen::features::importing::DERIVED_CONFIG_PREFIX;
         let (base, cfg) = value.split_once('\t').unwrap_or((value, ""));
         let (key, part) = split_part_value(base);
@@ -3796,7 +3796,7 @@ const LIVE_EMPTY_FIELD: f32 = 26.328125;
 
 /// Where Onshape's preview slider handle rests (live: 69% of the track).
 /// From there to the right end the feature shows fully; to the left it fades.
-pub(crate) const PREVIEW_REST: f32 = 0.7;
+pub const PREVIEW_REST: f32 = 0.7;
 
 impl FeatureDialog {
     /// Onshape's preview slider (noUi, live): a 112 px, 2 px `#777` track
@@ -3926,7 +3926,7 @@ fn split_part_value(value: &str) -> (String, Option<String>) {
 
 /// A field outside the dialog asking for the Create variable popup
 /// ([`FeatureDialog::open_external_create_variable`]).
-pub(crate) struct ExternalField {
+pub struct ExternalField {
     /// The field's path in the dialog (any unique key).
     pub path: &'static str,
     pub state: Entity<InputState>,

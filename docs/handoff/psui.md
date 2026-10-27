@@ -54,7 +54,12 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 
 ## In progress
 
-(nothing unlanded)
+- 10-27 10:00: the Part Studio UI split (lead's top priority): `crates/part-studio-ui` (noshape-part-studio-ui) with
+  `part_studio/`, `feature_dialog`, `agent_window/studio.rs`, `sketch_mode`, `sketch_fonts`, `var_complete`,
+  `compare_graphics`, `fs_reference`, `select_item`; app-core gained `shortcuts`, `material_libraries` (data),
+  `properties_dialog::{mass_unit, mass_number}`, `assembly_context::StaleContexts`; the rest are
+  `part_studio_hooks` registered in main.rs (docs/CRATES.md Progress). Branch psui-split. Parked WIP (Delete ghost
+  silhouette, blended Add colour) is d0e0a74b on agent/psui, unverified.
 
 Residuals found today: live outlines the Delete part ghost (255,192,76) (ours none); a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
@@ -81,6 +86,8 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+0. LP-DIRECTION-PICK (P1, user; PREVIEW-NO-PICK in v0.4.9, fixed 4e55b01f): check the offscreen preview-pick test
+   covers edges as well as faces (the user hovers edges); extend it if not.
 1. Highlights over the preview blend: the active field's highlight lines (a picked region's outline) now show whole
    over the mix (compare::POST, the renderer's preview-post pass against the frame's depth). Left: the Delete part
    ghost's (255,192,76) outline (the deleted part exists only in the base model, which carries no highlights; live
@@ -103,6 +110,4 @@ that touches the model: ~12 min.
 
 ## Requests to the lead
 
-- 10-27 07:50: P1 PREVIEW-NO-PICK (TICKETS): every build from 8bf820e0 (10-27 ~01:30) to 4e55b01f, so v0.4.8 and
-  any v0.4.9 cut before 4e55b01f, can't hover or pick anything in the graphics while a feature dialog previews
-  (new Extrude: the top face can't be picked). Fixed in 4e55b01f; please take it into the v0.4.9 recut.
+(none; 4e55b01f is in v0.4.10)

@@ -5,7 +5,7 @@ use noshape_ops::coverage::{Cover, MENUS, SHORTCUTS};
 use noshape_ops::{registry, values};
 use std::collections::BTreeSet;
 
-const SHORTCUT_CMDS_RS: &str = include_str!("../../app/src/part_studio/shortcut_cmds.rs");
+const SHORTCUT_CMDS_RS: &str = include_str!("../../part-studio-ui/src/part_studio/shortcut_cmds.rs");
 
 /// `<prefix>:<name>` ids of the shortcut registry (`ENTRIES`).
 fn shortcut_ids() -> Vec<String> {
@@ -66,8 +66,9 @@ fn menu_labels() -> BTreeSet<String> {
     let core = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../app-core/src");
     let drawing = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../drawing-ui/src");
     let assembly = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assembly-ui/src");
+    let part_studio = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../part-studio-ui/src");
     let mut files: Vec<(String, std::path::PathBuf)> = Vec::new();
-    let tops = std::fs::read_dir(&src).expect("app sources").chain(std::fs::read_dir(&core).expect("app-core sources")).chain(std::fs::read_dir(&drawing).expect("drawing-ui sources")).chain(std::fs::read_dir(&assembly).expect("assembly-ui sources"));
+    let tops = std::fs::read_dir(&src).expect("app sources").chain(std::fs::read_dir(&core).expect("app-core sources")).chain(std::fs::read_dir(&drawing).expect("drawing-ui sources")).chain(std::fs::read_dir(&assembly).expect("assembly-ui sources")).chain(std::fs::read_dir(&part_studio).expect("part-studio-ui sources"));
     for e in tops.flatten() {
         let name = e.file_name().to_string_lossy().to_string();
         let area = if name.starts_with("assembly_") {
@@ -85,7 +86,7 @@ fn menu_labels() -> BTreeSet<String> {
         };
         files.push((area.into(), e.path()));
     }
-    for e in std::fs::read_dir(src.join("part_studio")).expect("part studio sources").flatten() {
+    for e in std::fs::read_dir(part_studio.join("part_studio")).expect("part studio sources").flatten() {
         files.push(("partStudio".into(), e.path()));
     }
     let mut out = BTreeSet::new();

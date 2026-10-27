@@ -175,7 +175,7 @@ impl PartStudioView {
             .on_click(move |e: &ClickEvent, window, cx| {
                 let label = format!("Switch to {fs_name}");
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                    m.item(crate::os_menu::OsMenuItem::new(label.clone()).disabled(!workspace_fs).on_click(move |_, w, cx| crate::workspace::request_activate_tab(fs_tab, w, cx)))
+                    m.item(crate::os_menu::OsMenuItem::new(label.clone()).disabled(!workspace_fs).on_click(move |_, w, cx| crate::actions::request_activate_tab(fs_tab, w, cx)))
                 });
                 crate::os_menu::open(e.position(), menu, window, cx);
             });
@@ -493,7 +493,7 @@ impl PartStudioView {
                 );
                 // Local documents are all owned and created by this user;
                 // nothing is shared, public or a sample here.
-                let docs = if matches!(c, 1..=3) { crate::variable_insert::other_documents(&self.doc.read(cx).session.path) } else { Vec::new() };
+                let docs = if matches!(c, 1..=3) { crate::part_studio_hooks::other_documents(&self.doc.read(cx).session.path) } else { Vec::new() };
                 if docs.is_empty() {
                     list = list.child(div().p(px(10.)).text_size(px(11.)).font_weight(FontWeight::BOLD).child("No documents available."));
                 }

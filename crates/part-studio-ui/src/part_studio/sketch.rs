@@ -2149,7 +2149,7 @@ impl PartStudioView {
     fn choose_dxf(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
         let win = window.window_handle();
-        crate::files::request_open_path("Insert DXF or DWG", "DXF or DWG drawing", &["dxf", "DXF", "dwg", "DWG"], window, cx, move |path, cx| {
+        crate::file_dialogs::request_open_path("Insert DXF or DWG", "DXF or DWG drawing", &["dxf", "DXF", "dwg", "DWG"], window, cx, move |path, cx| {
             // The fallback chooser confirms inside a window update. Defer so
             // the same window is available when regeneration needs it.
             cx.defer(move |cx| {
@@ -2199,7 +2199,7 @@ impl PartStudioView {
 
     fn choose_image(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
-        crate::files::request_open_path("Insert image", "Image", &["png", "jpg", "jpeg", "gif", "bmp", "PNG", "JPG", "JPEG"], window, cx, move |path, cx| {
+        crate::file_dialogs::request_open_path("Insert image", "Image", &["png", "jpg", "jpeg", "gif", "bmp", "PNG", "JPG", "JPEG"], window, cx, move |path, cx| {
             view.update(cx, |this, cx| this.load_image_file(&path, cx));
         });
     }

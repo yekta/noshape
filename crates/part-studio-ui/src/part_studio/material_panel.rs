@@ -96,7 +96,7 @@ impl PartStudioView {
         };
         let source = self.material_sources(cx).get(library).map(|(s, _)| s.clone()).unwrap_or(Source::Onshape);
         if let Source::Added(l) = &source {
-            return to_entries(&crate::material_libraries::materials_of(l));
+            return to_entries(&crate::part_studio_hooks::materials_of(l));
         }
         if let Source::Doc(i) = source {
             let doc = self.doc.read(cx);
@@ -499,7 +499,7 @@ impl PartStudioView {
     /// account and chosen in the select.
     fn open_add_material_library(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
-        crate::material_libraries::open(
+        crate::part_studio_hooks::open_add_material_library(
             move |lib, _, cx| {
                 view.update(cx, |this, cx| {
                     let sources = this.material_sources(cx);

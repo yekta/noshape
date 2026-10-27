@@ -16,51 +16,10 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabContent;
 use noshape_model::material_library::MaterialLibrary;
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// A Material Library tab of a local document, added to the account.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct AddedLibrary {
-    pub path: PathBuf,
-    pub tab: u64,
-    pub name: String,
-    pub document: String,
-    pub owner: String,
-}
-
-fn prefs_path() -> PathBuf {
-    crate::files::config_dir().join("material_libraries.json")
-}
-
-/// The libraries added to the account, in the order they were added.
-pub fn added() -> Vec<AddedLibrary> {
-    std::fs::read(prefs_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
-}
-
-pub fn set_added(list: &[AddedLibrary]) {
-    let _ = std::fs::write(prefs_path(), serde_json::to_vec_pretty(list).unwrap_or_default());
-}
-
-fn onshape_removed_path() -> PathBuf {
-    crate::files::config_dir().join("material_library_onshape_removed")
-}
-
-/// Whether the Onshape Material Library is listed (Preferences › Material
-/// libraries can remove it too, live prefs/05; Add material library… →
-/// Onshape brings it back).
-pub fn onshape_listed() -> bool {
-    !onshape_removed_path().exists()
-}
-
-pub fn set_onshape_listed(on: bool) {
-    let p = onshape_removed_path();
-    if on {
-        let _ = std::fs::remove_file(p);
-    } else {
-        let _ = std::fs::write(p, b"");
-    }
-}
+// The added libraries (a preferences file), shared with the Part Studio's Material panel (noshape-app-core).
+pub use noshape_app_core::material_libraries::{AddedLibrary, added, onshape_listed, set_added, set_onshape_listed};
 
 /// The materials of an added library (its document's current state).
 pub fn materials_of(lib: &AddedLibrary) -> MaterialLibrary {

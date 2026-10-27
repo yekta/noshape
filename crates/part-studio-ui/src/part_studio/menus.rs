@@ -612,11 +612,11 @@ impl PartStudioView {
             noshape_model::regen::measure::mass_properties(ctx, std::slice::from_ref(&body), &density)?.mass
         });
         // Live (assembly/1246: "2 lb"): masses in the document's mass unit.
-        let (msym, mfac) = crate::assembly_view::mass::mass_unit(&self.doc.read(cx).session.doc.settings.units);
+        let (msym, mfac) = crate::properties_dialog::mass_unit(&self.doc.read(cx).session.doc.settings.units);
         let spec = MetaSpec {
             category: "Onshape Part",
             material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())),
-            computed_mass: computed.map(|m| format!("{} {msym}", crate::assembly_view::mass::number(m * mfac))),
+            computed_mass: computed.map(|m| format!("{} {msym}", crate::properties_dialog::mass_number(m * mfac))),
             bom_options: None,
             values: MetaValues {
                 name,
@@ -626,7 +626,7 @@ impl PartStudioView {
                 // (Release__typical_release_workflow).
                 revision: props.revision.clone().unwrap_or_default(),
                 meta: props.meta.clone(),
-                mass_override: props.mass_override.map(|m| format!("{} {msym}", crate::assembly_view::mass::number(m * mfac))),
+                mass_override: props.mass_override.map(|m| format!("{} {msym}", crate::properties_dialog::mass_number(m * mfac))),
                 bom: 0,
             },
         };
@@ -683,8 +683,8 @@ impl PartStudioView {
                 view.update(cx, |this, cx| this.refresh_scene(true, cx));
             },
             move |window, cx| {
-                let items = crate::release_dialog::part_items(doc_r.read(cx), tab, std::slice::from_ref(&body_r), std::slice::from_ref(&name_r), &config_r);
-                crate::release_dialog::open_release_candidate(doc_r.clone(), items, window, cx)
+                let items = crate::part_studio_hooks::release_part_items(doc_r.read(cx), tab, std::slice::from_ref(&body_r), std::slice::from_ref(&name_r), &config_r);
+                crate::part_studio_hooks::open_release_candidate(doc_r.clone(), items, window, cx)
             },
             window,
             cx,
@@ -708,7 +708,7 @@ impl PartStudioView {
         };
         let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_else(|| "flat".into());
         let view = cx.entity();
-        crate::files::request_save_path("Export flat pattern", format!("{name} flat.{ext}"), ext, window, cx, move |path, cx| {
+        crate::file_dialogs::request_save_path("Export flat pattern", format!("{name} flat.{ext}"), ext, window, cx, move |path, cx| {
             // DXF as live's "Export DXF/DWG of Flat pattern" writes it (SM14).
             let bytes = if ext == "dxf" {
                 noshape_model::sheetmetal::flat_dxf::flat_dxf(&flat, &Default::default())
@@ -1066,7 +1066,7 @@ impl PartStudioView {
                 };
                 let i = mp.inertia * scale;
                 // Live: in the document's mass unit (Workspace units › Mass).
-                let (msym, mfac) = crate::assembly_view::mass::mass_unit(&units);
+                let (msym, mfac) = crate::properties_dialog::mass_unit(&units);
                 let scale_of = [i.x_axis.x, i.y_axis.y, i.z_axis.z].into_iter().fold(0.0f64, |a, x| a.max(x.abs())) * mfac / f;
                 let v = |x: f64| mass_number(x * mfac / f, scale_of);
                 mass_view = Some(MassView {
@@ -1087,7 +1087,7 @@ impl PartStudioView {
                 // (qa4 round 4 S3, part-studio/2382) keeps the whole dialog
                 // with "Parts to measure" empty and every value blank.
                 let units = self.doc.read(cx).session.doc.settings.units;
-                let (msym, _) = crate::assembly_view::mass::mass_unit(&units);
+                let (msym, _) = crate::properties_dialog::mass_unit(&units);
                 mass_view = Some(MassView::blank(units.length.symbol(), msym, reference.map(|c| c.name)));
             }
         } else {
@@ -1771,7 +1771,7 @@ impl PartStudioView {
             let typed = st.read(cx).value().to_string();
             // A bare number is in the document's mass unit ("2" → "2 lb"
             // live); another unit converts.
-            let (msym, mfac) = crate::assembly_view::mass::mass_unit(&this.doc.read(cx).session.doc.settings.units);
+            let (msym, mfac) = crate::properties_dialog::mass_unit(&this.doc.read(cx).session.doc.settings.units);
             let bare = !typed.chars().any(|c| c.is_ascii_alphabetic());
             let parsed = if bare { typed.trim().parse::<f64>().ok().filter(|v| *v > 0.0).map(|v| v / mfac) } else { crate::properties_dialog::parse_mass(&typed) };
             if let Some(v) = parsed {
@@ -1959,7 +1959,7 @@ fn mass_number(x: f64, scale: f64) -> String {
     if x.abs() <= scale.abs() * 1e-9 {
         return "0".into();
     }
-    crate::assembly_view::mass::number(x)
+    crate::properties_dialog::mass_number(x)
 }
 
 /// A point in a mate connector's frame (origin, X, Y, Z).

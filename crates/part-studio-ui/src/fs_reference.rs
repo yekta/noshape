@@ -92,7 +92,7 @@ pub fn sources(doc: &Document, except: &str, parts: impl Fn(&str) -> Vec<(noshap
     out
 }
 
-pub(crate) fn accepts(kind: ReferenceKind, s: &RefSource) -> bool {
+pub fn accepts(kind: ReferenceKind, s: &RefSource) -> bool {
     match (&s.what, kind) {
         (RefSourceKind::File(_, ext), ReferenceKind::Csv) => ext == "csv",
         (RefSourceKind::File(k, _), ReferenceKind::Image) => *k == FileKind::Image,
@@ -125,7 +125,7 @@ fn source_tab(value: &str) -> &str {
 
 /// The value of one part of Part Studio `key`: `tab#part`, or for another
 /// document / version `ext:mv|tab#part|path`.
-pub(crate) fn part_value(key: &str, body: &noshape_model::BodyId) -> String {
+pub fn part_value(key: &str, body: &noshape_model::BodyId) -> String {
     match crate::derived::ExternalRef::parse(key) {
         Some(r) => format!("ext:{}|{}#{body}|{}", r.microversion, r.tab, r.path.display()),
         None => format!("{key}#{body}"),
@@ -135,7 +135,7 @@ pub(crate) fn part_value(key: &str, body: &noshape_model::BodyId) -> String {
 impl FeatureDialog {
     /// The parameter row: label, then the bordered field (blue while its
     /// panel is open).
-    pub(crate) fn render_reference_field(&mut self, label: &'static str, path: &str, kind: ReferenceKind, value: &str, cx: &mut Context<Self>) -> AnyElement {
+    pub fn render_reference_field(&mut self, label: &'static str, path: &str, kind: ReferenceKind, value: &str, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let (icon, placeholder) = texts(kind);
         let open = self.ref_picker.as_ref().is_some_and(|r| r.path == path);
@@ -240,7 +240,7 @@ impl FeatureDialog {
     }
 
     /// The 300×559 "Select …" panel right of the dialog, or nothing.
-    pub(crate) fn render_reference_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub fn render_reference_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         if let Some(kind) = self.ref_import.take() {
             self.import_reference(kind, window, cx);
         }
@@ -263,7 +263,7 @@ impl FeatureDialog {
             _ => &["csv", "CSV"],
         };
         let view = cx.entity();
-        crate::files::request_open_path("Import", "Files", exts, window, cx, move |file, cx| {
+        crate::file_dialogs::request_open_path("Import", "Files", exts, window, cx, move |file, cx| {
             view.update(cx, |_, cx| cx.emit(DialogEvent::ImportReference { param: path, file }));
         });
     }

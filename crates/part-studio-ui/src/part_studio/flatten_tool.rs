@@ -275,7 +275,7 @@ impl PartStudioView {
                 Err(e) => return self.flash_info(format!("Export failed: {e}"), cx),
             };
             let view = cx.entity();
-            crate::files::request_save_path("Export flattened surface", "Flattened.x_t".to_string(), "x_t", window, cx, move |path, cx| {
+            crate::file_dialogs::request_save_path("Export flattened surface", "Flattened.x_t".to_string(), "x_t", window, cx, move |path, cx| {
                 if let Err(e) = noshape_kernel::write_parasolid(&path, &[sheet], noshape_kernel::LengthUnit::Meter, false) {
                     view.update(cx, |this, cx| this.flash_info(format!("Export failed: {e}"), cx));
                 }
@@ -293,7 +293,7 @@ impl PartStudioView {
             _ => "svg",
         };
         let view = cx.entity();
-        crate::files::request_save_path("Export flattened surface", format!("Flattened.{ext}"), ext, window, cx, move |path, cx| {
+        crate::file_dialogs::request_save_path("Export flattened surface", format!("Flattened.{ext}"), ext, window, cx, move |path, cx| {
             if let Err(e) = std::fs::write(&path, text) {
                 view.update(cx, |this, cx| this.flash_info(format!("Export failed: {e}"), cx));
             }

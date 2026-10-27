@@ -221,17 +221,17 @@ impl PartStudioView {
     }
 }
 
-pub(crate) type OnConfirm = std::rc::Rc<dyn Fn(Vec<(usize, FeatureId)>, &mut Window, &mut App)>;
+pub type OnConfirm = std::rc::Rc<dyn Fn(Vec<(usize, FeatureId)>, &mut Window, &mut App)>;
 
 /// Rows of the Input propagation dialog: (row key, reference name, per
 /// input: None = can't propagate, Some(already propagated)).
-pub(crate) type PropagationRows = Vec<(FeatureId, String, Vec<Option<bool>>)>;
+pub type PropagationRows = Vec<(FeatureId, String, Vec<Option<bool>>)>;
 
 /// Open the Input propagation dialog (live 443) for `owner_name`'s inputs
 /// (id, name) over `rows`; ✓ hands the newly ticked (input index, row key)
 /// to `on_confirm`. Shared with the assembly (skb: rows are instances, the
 /// key their id).
-pub(crate) fn open_propagation_dialog(owner_name: String, inputs: Vec<(String, String)>, rows: PropagationRows, checked: Vec<Vec<bool>>, on_confirm: OnConfirm, window: &mut Window, cx: &mut App) {
+pub fn open_propagation_dialog(owner_name: String, inputs: Vec<(String, String)>, rows: PropagationRows, checked: Vec<Vec<bool>>, on_confirm: OnConfirm, window: &mut Window, cx: &mut App) {
     let width = 320. + 300. * inputs.len() as f32;
     let dialog = cx.new(|_| PropagationDialog { studio_name: owner_name, inputs, rows, checked, on_confirm });
     window.open_dialog(cx, move |d, _, _| d.w(px(width)).margin_top(px(80.)).close_button(false).p_0().gap_0().rounded(px(4.)).child(dialog.clone()));

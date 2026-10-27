@@ -21,7 +21,7 @@ pub(super) enum PaletteItem {
 }
 
 impl PartStudioView {
-    pub(crate) fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let st = cx.new(|cx| InputState::new(window, cx));
         let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
@@ -45,7 +45,7 @@ impl PartStudioView {
     }
 
     /// The "Search tools" / "Close search" toggle.
-    pub(crate) fn toggle_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn toggle_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette.is_some() {
             self.close_palette(window, cx);
         } else if !self.ui.palette_closed.is_some_and(|t| t.elapsed() < std::time::Duration::from_millis(400)) {
@@ -334,7 +334,7 @@ impl PartStudioView {
                     row = row.child(div().px(px(2.)).text_size(px(16.)).text_color(pal.text).child("/"));
                 }
                 for k in group {
-                    row = row.child(crate::preferences_window::key_chip(k.clone(), r.style));
+                    row = row.child(crate::part_studio_hooks::key_chip(k.clone(), r.style));
                 }
             }
             row
@@ -384,7 +384,7 @@ impl PartStudioView {
                     cx.notify();
                 }))
         });
-        let chip = |style| crate::preferences_window::key_chip("example", style);
+        let chip = |style| crate::part_studio_hooks::key_chip("example", style);
         let legend = h_flex()
             .gap(px(5.))
             .px(px(8.))
@@ -464,7 +464,7 @@ impl PartStudioView {
                                         .child("Customize keyboard shortcuts")
                                         // Onshape opens the account Preferences page (a new tab)
                                         // at Keyboard shortcuts; the sheet stays open here.
-                                        .on_click(|_: &ClickEvent, _, cx| crate::preferences_window::show(crate::preferences_window::Page::KeyboardShortcuts, cx)),
+                                        .on_click(|_: &ClickEvent, _, cx| crate::part_studio_hooks::show_keyboard_shortcuts(cx)),
                                 )
                                 .child(div().flex_1())
                                 .children(search.map(|st| div().w(px(198.)).h(px(34.)).child(Input::new(&st).h(px(34.)))))
@@ -478,7 +478,7 @@ impl PartStudioView {
                                         .top(px(-4.))
                                         .cursor_pointer()
                                         .child(crate::assets::icon("popout-arrow", 14., cx))
-                                        .on_click(|_: &ClickEvent, window, cx| crate::shortcuts_page::show(Some(window.bounds().size), cx)),
+                                        .on_click(|_: &ClickEvent, window, cx| crate::part_studio_hooks::show_shortcuts_page(Some(window.bounds().size), cx)),
                                 )
                                 .child(
                                     div()

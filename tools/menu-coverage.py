@@ -6,19 +6,22 @@ crates/ops/src/coverage.rs MENUS, and MENUS lists no item the UI no longer has.
     tools/menu-coverage.py [commit]      (default: the working tree)
 
 Exit 1 with the lines to add / remove. Run by the shared pre-push hook when a push to main changes
-crates/app/src, crates/app-core/src, crates/drawing-ui/src, crates/assembly-ui/src or the coverage map. Keep the parsing in step with `menu_labels` in the Rust test.
+crates/app/src, crates/app-core/src, crates/drawing-ui/src, crates/assembly-ui/src, crates/part-studio-ui/src or the coverage map. Keep the parsing in step with `menu_labels` in the Rust test.
 """
 import os, re, subprocess, sys
+
+# The Part Studio's sources (crates/app/src/part_studio/ before the noshape-part-studio-ui split).
+PART_STUDIO_DIRS = ("crates/part-studio-ui/src/part_studio/", "crates/app/src/part_studio/")
 
 ROOT = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
 
 
 def files_at(commit):
-    """{path: text} of crates/app/src (top level and part_studio/), crates/app-core/src, crates/drawing-ui/src, crates/assembly-ui/src and the coverage map."""
+    """{path: text} of crates/app/src, crates/app-core/src, crates/drawing-ui/src, crates/assembly-ui/src, crates/part-studio-ui/src (top level and part_studio/) and the coverage map."""
     wanted = []
     if commit:
-        names = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", commit, "crates/app/src", "crates/app-core/src", "crates/drawing-ui/src", "crates/assembly-ui/src"], capture_output=True, text=True).stdout.split()
-        wanted = [n for n in names if n.count("/") == 3 or n.startswith("crates/app/src/part_studio/")]
+        names = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", commit, "crates/app/src", "crates/app-core/src", "crates/drawing-ui/src", "crates/assembly-ui/src", "crates/part-studio-ui/src"], capture_output=True, text=True).stdout.split()
+        wanted = [n for n in names if n.count("/") == 3 or n.startswith(PART_STUDIO_DIRS)]
         wanted.append("crates/ops/src/coverage.rs")
         p = subprocess.Popen(["git", "-C", ROOT, "cat-file", "--batch"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         out, _ = p.communicate("".join(f"{commit}:{n}\n" for n in wanted).encode())
@@ -30,20 +33,20 @@ def files_at(commit):
             i = head_end + 1 + size + 1
         return texts
     texts = {}
-    for crate in ("app", "app-core", "drawing-ui", "assembly-ui"):
+    for crate in ("app", "app-core", "drawing-ui", "assembly-ui", "part-studio-ui"):
         top = os.path.join(ROOT, "crates", crate, "src")
         for name in os.listdir(top):
             if name.endswith(".rs"):
                 texts[f"crates/{crate}/src/{name}"] = open(os.path.join(top, name), encoding="utf-8").read()
-    src = os.path.join(ROOT, "crates/app/src")
+    src = os.path.join(ROOT, "crates/part-studio-ui/src")
     for name in os.listdir(os.path.join(src, "part_studio")):
-        texts[f"crates/app/src/part_studio/{name}"] = open(os.path.join(src, "part_studio", name), encoding="utf-8").read()
+        texts[f"crates/part-studio-ui/src/part_studio/{name}"] = open(os.path.join(src, "part_studio", name), encoding="utf-8").read()
     texts["crates/ops/src/coverage.rs"] = open(os.path.join(ROOT, "crates/ops/src/coverage.rs"), encoding="utf-8").read()
     return texts
 
 
 def area_of(path):
-    if path.startswith("crates/app/src/part_studio/"):
+    if path.startswith(PART_STUDIO_DIRS):
         return "partStudio"
     name = os.path.basename(path)
     if name.startswith("assembly_"):

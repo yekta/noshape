@@ -51,3 +51,10 @@ pub fn context_arrow_icon(solid: bool, dashed: bool) -> AnyElement {
         .child(div().absolute().top_0().left_0().child(crate::ui::glyph(if dashed { "incontext-arrow-dashed" } else { "incontext-arrow-outline" }, 20., ink)))
         .into_any_element()
 }
+
+/// Part Studio contexts (studio tab, context id) whose assembly has moved on
+/// since their last update, as last seen by the assembly.
+#[derive(Default)]
+pub struct StaleContexts(pub std::collections::HashSet<(noshape_model::document::TabId, u32)>);
+
+impl Global for StaleContexts {}

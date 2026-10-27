@@ -110,7 +110,7 @@ impl PartStudioView {
 
     fn upload_environment(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
-        crate::files::request_open_path("Upload image", "Image", &["png", "jpg", "jpeg", "gif", "bmp", "PNG", "JPG", "JPEG"], window, cx, move |path, cx| {
+        crate::file_dialogs::request_open_path("Upload image", "Image", &["png", "jpg", "jpeg", "gif", "bmp", "PNG", "JPG", "JPEG"], window, cx, move |path, cx| {
             let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "image".into());
             match std::fs::read(&path) {
                 Ok(bytes) if image::load_from_memory(&bytes).is_ok() => view.update(cx, |this, cx| this.choose_environment(EnvImageRef::Encoded { name, bytes: bytes.into() }, cx)),

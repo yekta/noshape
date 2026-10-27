@@ -24,7 +24,7 @@ thread_local! {
     /// The tables' share of the height the user dragged (live: kept across
     /// a reload as a proportion, "ui (10-24 a)" (3)).
     static SPLIT: std::cell::Cell<Option<f32>> = std::cell::Cell::new(
-        std::fs::read_to_string(crate::files::config_dir().join("sheet_metal_split.txt")).ok().and_then(|t| t.trim().parse().ok()),
+        std::fs::read_to_string(crate::paths::config_dir().join("sheet_metal_split.txt")).ok().and_then(|t| t.trim().parse().ok()),
     );
     /// The tables' share when the splitter was pressed, and the pointer y.
     static SPLIT_PRESS: std::cell::Cell<(f32, Pixels)> = const { std::cell::Cell::new((0.5, Pixels::ZERO)) };
@@ -731,7 +731,7 @@ impl PartStudioView {
                 let f = h / total;
                 if SPLIT.with(|s| s.get()) != Some(f) {
                     SPLIT.with(|s| s.set(Some(f)));
-                    let _ = std::fs::write(crate::files::config_dir().join("sheet_metal_split.txt"), f.to_string());
+                    let _ = std::fs::write(crate::paths::config_dir().join("sheet_metal_split.txt"), f.to_string());
                     window.refresh();
                 }
             })

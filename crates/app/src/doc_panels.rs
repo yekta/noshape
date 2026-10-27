@@ -248,15 +248,7 @@ fn inline(src: &str) -> StyledText {
     StyledText::new(text).with_highlights(runs)
 }
 
-/// The active tab's numbers for the Performance panel (Part Studios only).
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct TabPerf {
-    pub regen_ms: f32,
-    /// Feature type name and count.
-    pub features: Vec<(String, usize)>,
-    /// Kind of drawn primitive and count.
-    pub primitives: Vec<(String, usize)>,
-}
+pub use crate::part_studio::TabPerf;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PerfSnapshot {

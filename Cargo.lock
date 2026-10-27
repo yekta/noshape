@@ -4319,6 +4319,7 @@ dependencies = [
  "noshape-kernel",
  "noshape-model",
  "noshape-ops",
+ "noshape-part-studio-ui",
  "noshape-render",
  "noshape-scene",
  "noshape-sketch",
@@ -4626,6 +4627,31 @@ dependencies = [
  "serde",
  "serde_json",
  "tiff",
+]
+
+[[package]]
+name = "noshape-part-studio-ui"
+version = "0.4.6"
+dependencies = [
+ "anyhow",
+ "glam 0.34.1",
+ "gpui-kit",
+ "image",
+ "log",
+ "noshape-app-core",
+ "noshape-drawing-ui",
+ "noshape-kernel",
+ "noshape-model",
+ "noshape-ops",
+ "noshape-render",
+ "noshape-scene",
+ "noshape-sketch",
+ "noshape-store",
+ "noshape-units",
+ "noshape-workspace-hack",
+ "parking_lot",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
