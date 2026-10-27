@@ -1555,6 +1555,8 @@ impl SketchEditor {
         if let Some(inf) = &click.inference
             && inf.kind == InferenceKind::Endpoint
             && let Some(AutoConstraint::CoincidentPoint(p)) = inf.constraints.first()
+            // On the Origin: a point of its own, coincident (live).
+            && !is_origin(sk, *p)
         {
             let rest = inf.constraints.iter().skip(1).copied().collect();
             return (*p, rest);
@@ -4229,7 +4231,8 @@ impl SketchEditor {
             for e in glyph_entities(sk, &c.kind) {
                 let Some(anchor) = glyph_anchor(sk, e) else { continue };
                 let offset = data.glyph_offsets.get(&glyph_key(c.id, e)).map(|o| DVec2::new(o[0], o[1]));
-                let external = c.kind.entities().iter().any(|x| sk.entity(*x).is_some_and(|x| x.external));
+                // The Origin's glyphs are the usual grey on white (live).
+                let external = c.kind.entities().iter().any(|x| sk.entity(*x).is_some_and(|x| x.external) && !is_origin(sk, *x));
                 out.push(GlyphInfo { constraint: c.id, icon, entity: e, anchor, on_point: is_point(sk, e), offset, external });
             }
         }
@@ -5361,6 +5364,12 @@ fn attach(sk: &mut Sketch, pt: EntityId, curve: Option<EntityId>, click: &Click)
                 if own {
                     continue;
                 }
+                // Live (ORIGIN-COINCIDENT-GLYPH; REST: COINCIDENT start-to-Origin):
+                // a point on the Origin gets a Coincident, with its glyph.
+                if is_origin(sk, q) {
+                    let _ = sk.add_constraint(ConstraintKind::Coincident { a: pt, b: q });
+                    continue;
+                }
                 if sk.merge_points(pt, q).is_ok() {
                     out = q;
                 }
@@ -5477,6 +5486,11 @@ fn crosses_box(sk: &Sketch, id: EntityId, lo: DVec2, hi: DVec2, tol: f64) -> boo
 }
 
 /// The fixed point on the sketch origin (created on first use).
+/// The sketch's Origin point ([`origin_point`]).
+fn is_origin(sk: &Sketch, e: EntityId) -> bool {
+    sk.entity(e).is_some_and(|e| e.external && e.reference_only && matches!(e.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12))
+}
+
 pub fn origin_point(sk: &mut Sketch) -> EntityId {
     let existing = sk.entities().find(|e| e.external && matches!(e.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12)).map(|e| e.id);
     existing.unwrap_or_else(|| {
@@ -7146,7 +7160,8 @@ mod tests {
         click(&mut ed, &mut d, v(0.03, PX * 2.0));
         let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).unwrap().id;
         let (s, _) = d.sketch.endpoints(line).unwrap();
-        assert!(d.sketch.entity(s).unwrap().external, "start point is the fixed origin point");
+        // Live: the start is coincident with the Origin (ORIGIN-COINCIDENT-GLYPH).
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if a == s && is_origin(&d.sketch, b))), "start coincident with the Origin");
         assert_eq!(d.sketch.point(s).unwrap(), DVec2::ZERO);
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: None } if a == line)));
     }
@@ -8168,6 +8183,23 @@ mod tests {
             ed.tool_up(&mut d, v(0.01, 0.0));
             assert_eq!(count(&d), n, "no second coincident");
         }
+    }
+
+    /// ORIGIN-COINCIDENT-GLYPH (live "qa4 r5 s6" (4)): a line drawn from the
+    /// Origin shows the coincident glyph at that end, grey on white like any
+    /// other (not the external references' blue).
+    #[test]
+    fn a_line_from_the_origin_shows_its_coincident_glyph() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        ed.cancel();
+        let l = d.sketch.entities().find(|e| e.kind() == EntityKind::Line && !e.construction).map(|e| e.id).unwrap();
+        let start = d.sketch.endpoints(l).unwrap().0;
+        assert!(d.sketch.point(start).unwrap().length() < 1e-12);
+        let g: Vec<_> = ed.constraint_glyphs(&d).into_iter().filter(|g| g.icon == "coincident").collect();
+        assert_eq!(g.len(), 1, "one coincident glyph: {:?}", g.iter().map(|g| (g.entity, g.anchor)).collect::<Vec<_>>());
+        assert!(!g[0].external, "the Origin's glyph isn't tinted as an external reference");
     }
 
     /// Live (behaviours "skasm (2026-10-27, P1) sketch value boxes: center
