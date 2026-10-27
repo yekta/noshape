@@ -302,9 +302,22 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
     if refs.is_empty() {
         return err_at(&["surfaceEntities"], "Select sketch curves to extrude.");
     }
-    let mut tools = Vec::new();
+    // A sketch picked whole (its row in the feature list: "Edges of Sketch 2",
+    // qa SURF-EXTRUDE-SKETCH-EDGES) stands for its curves, as live.
+    let mut curves: Vec<(crate::reference::FeatureId, u32)> = Vec::new();
     for r in refs {
-        let Reference::SketchEntity { sketch, entity } = r else { continue };
+        match r {
+            Reference::SketchEntity { sketch, entity } => curves.push((*sketch, *entity)),
+            Reference::Sketch(sketch) => {
+                if let Some(s) = ev.ctx.sketch(*sketch) {
+                    curves.extend(s.sketch.entities().filter(|e| e.kind().is_curve() && !e.construction).map(|e| (*sketch, e.id.0)));
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut tools = Vec::new();
+    for (sketch, entity) in &curves {
         let Some(s) = ev.ctx.sketch(*sketch).cloned() else { continue };
         let id = noshape_sketch::EntityId(*entity);
         let Some(curve) = s.sketch.curve(id) else { continue };

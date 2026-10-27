@@ -4809,3 +4809,25 @@ fn assembly_snap_fastens_face_to_face() {
     let e = try_call(&mut ctx, "assembly_snap", json!({ "a": { "instance": p, "entity": pin_bottom["id"] }, "b": { "instance": p, "entity": pin_bottom["id"] } })).unwrap_err();
     assert!(e.message.contains("different instance"), "{e:?}");
 }
+
+/// qa SURF-EXTRUDE-SKETCH-EDGES: a Surface extrude of a sketch picked whole
+/// (its feature-list row: "Edges of Sketch 1", a `sketch:` reference)
+/// extrudes all its curves, as picking the circle itself does (live).
+#[test]
+fn surface_extrude_of_a_whole_sketch() {
+    let mut ctx = Ctx::new();
+    let path = scratch("surface-sketch.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let sketch = sk["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "circle", "points": [[0, 0], [10, 0]] }));
+    let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "bodyType": "SURFACE", "surfaceEntities": [format!("sketch:{sketch}")], "depth": "20 mm" } }));
+    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    let bodies = parts["parts"].as_array().unwrap();
+    assert_eq!(bodies.len(), 1, "{parts}");
+    assert!(bodies[0]["kind"].as_str().unwrap().contains("Surface"), "{parts}");
+    // A Ø20 × 20 tube: 2π·10·20 mm².
+    let area = num(&bodies[0]["surface_area"]);
+    assert!((area - 2.0 * std::f64::consts::PI * 200.0).abs() < 1e-6, "{area}");
+}
