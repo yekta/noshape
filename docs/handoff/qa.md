@@ -53,7 +53,10 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-27 15:41)
+## Requests to the lead (qa, updated 2026-10-27 20:44)
+- **P0 BOX-DIALOG-PANIC (psui, new 20:42)**: since df28c320 (greens dd1b5037, daf1f50c) any box selection with a feature dialog open
+  panics the app (FeatureDialog read inside its own update, behaviors.rs:1052). One-line fix; it must not ship at 05:00.
+- P0 FILLET-OVERSIZE-OK (core): overlapping two-edge fillets / chamfers report Ok with impossible solids (live asked).
 - Conflicting parity rows: sketch.md 14.29 says "Show constraints starts off in a new session" (live sketch/00), core-workflow.md 2.2 says ☑ (re-checked 10-23, was F1); live's behaviours 120 also shows ☑ (likely remembered). Ours: ☑ on a fresh profile. Needs one decision (and the other row changed).
 - core-workflow.md 3.10 expects part-pattern copies in the colour rotation; workflow-p1-pass P1-13 (live) says copies keep the seed colour, which ours does. 3.10 should be rewritten.
 - OTF-FIRST-KEY (P1 skasm) breaks typing a value right after drawing (the most common sketch flow); it is also in v0.4.10.
