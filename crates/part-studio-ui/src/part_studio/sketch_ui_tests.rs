@@ -278,3 +278,33 @@ fn dimension_box_escape_as_live(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "the second Esc closes it");
     assert!(near(&dimensions(cx, &view), &measured), "{:?}", dimensions(cx, &view));
 }
+
+/// The number of sides typed before the polygon's rim click (live: digits set
+/// the side count while the polygon tool waits for its circumference); the
+/// click after the rim's commits it.
+#[gpui::test]
+fn polygon_sides_typed_before_the_rim_click(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "polygon", Tool::Polygon);
+    click(cx, window, &view, (600., 400.));
+    keys(cx, window, &["8"]);
+    click(cx, window, &view, (680., 400.));
+    click(cx, window, &view, (680., 400.));
+    let lines = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && !e.construction).count());
+    assert_eq!(lines, 8);
+}
+
+/// Enter in a Line chain (live): the last segment's boxed length becomes a
+/// driving dimension at its measured value.
+#[gpui::test]
+fn enter_in_a_line_chain_dimensions_the_last_segment(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "line-chain", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    click(cx, window, &view, (700., 450.));
+    let last = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).map(|e| e.id).max().and_then(|l| d.sketch.curve(l)).map(|c| c.length()).unwrap()
+    });
+    keys(cx, window, &["enter"]);
+    assert!(near(&dimensions(cx, &view), &[last]), "{:?} vs {last}", dimensions(cx, &view));
+}
