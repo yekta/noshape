@@ -86,8 +86,8 @@ it, so re-take positions after every selection.
 
 | # | Step | Live | Status | Verified |
 |---|---|---|---|---|
-| 5.1 | Variable (Plane ▾ dropdown): w, 20 | "#w = 20 mm" | ✅ |  |
-| 5.2 | Plane ▾ dropdown contents | … Variable, Query variable, **Composite part, Tag** | ✅ (v0.4.6 gate): list scrolls to Composite part / Tag (was ✗ F17 (last items cut off at the window bottom)) |  |
+| 5.1 | Variable (Plane ▾ dropdown): w, 20 | "#w = 20 mm" | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| 5.2 | Plane ▾ dropdown contents | … Variable, Query variable, **Composite part, Tag** | ✅ (v0.4.6 gate): list scrolls to Composite part / Tag (was ✗ F17 (last items cut off at the window bottom)) | 0.4.10+ / 1c853f78 10-27 |
 | 5.3 | Drag the variable to the top; Extrude 1 depth "#w" | Parts 20 mm | ✅ |  |
 | 5.4 | Select a face / two faces | "Area: 856.366 mm²" / a distance | ✅ |  |
 | 5.5 | Mass properties, no material | ? centre of mass shown | ? F18 (centre of mass and inertia blank) |  |
