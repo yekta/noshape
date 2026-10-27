@@ -74,7 +74,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.19 | Shift+T makes the hovered/selected parts transparent (0.29 of the colour over white, Part 1 top (222,235,243) as live 10-27); cumulative by hover | keyboard_shortcuts; View__make_transparent | ✅ |
 | 2.20 | Shift+X opens the Section view dialog (again with a section on: turns it off) | keyboard_shortcuts | ✅ |
 | 2.21 | Shift+V named views | keyboard_shortcuts | ✅ |
-| 2.22 | Shift+R view in high quality (4x finer tessellation, notice) | keyboard_shortcuts | 🔧 (notice = live's 433×28 #90cef1 bar at the graphics top centre, 13 px text, white Disable button; part-studio/lod4-fill-shiftR) |
+| 2.22 | Shift+R view in high quality (4x finer tessellation, notice) | keyboard_shortcuts | ✅ 10-27: the bar at live's exact box 866–1298 × 76–103 (notice = live's 433×28 #90cef1 bar at the graphics top centre, 13 px text, white Disable button; part-studio/lod4-fill-shiftR) |
 | 2.23 | Alt+click selects through transparent geometry | keyboard_shortcuts | 🔧 (isolate/transparent and translucent part appearances) |
 | 2.24 | Perspective view only from the camera menu (no key, like Onshape; O was a noshape extra, removed 10-23); off in every new graphics area, per Part Studio tab for the session (no Set as default, no preference: live 10-23 a2); field of view 45° vertical (Graphics preferences) in Part Studios and assemblies | View__perspective_view | ✅ |
 
@@ -110,7 +110,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 4.2 | A sketch selected in the feature list preselects all its regions (Extrude, Revolve…) | features_and_parts_lists | ✅ (app 10-24: "Face of Sketch 2" preselected) |
 | 4.3 | Planes / features selected in the list preselect plane / feature fields | A §2.3 | 🔧 |
 | 4.4 | Clicking the active toolbar tool again (or its shortcut) leaves its dialog open as it is (live 10-27; only ✓ / ✕ / Esc close it) | Home__selection | ✅ |
-| 4.5 | Picking a tool from a toolbar dropdown makes it the group's face for the session | A §2.3 | 🔧 |
+| 4.5 | Picking a tool from a toolbar dropdown makes it the group's face for the session | A §2.3 | ✅ (10-27: Face blend from the Fillet ▾ takes the group's button) |
 | 4.6 | Toolbar tooltips show the shortcut | A §2.2 | ✅ |
 | 4.7 | Customize toolbar (drag tool sets, Reset) | part_studios | ✅ (built by an earlier pass: move tool sets, remove/restore tools, reset) |
 | 4.8 | Search tools: typing filters tools, Enter runs the first, Esc closes | Home__search_tools | ✅ |
