@@ -484,9 +484,13 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
                 let t = angle.unwrap_or_else(|| std::f64::consts::FRAC_PI_2 - d.angle_between(n).min(std::f64::consts::PI - d.angle_between(n)));
                 if is_right_angle(t) {
                     out.push(("Perp line and plane angle".into(), Measurement::Angle(t)));
-                    // Live (AN1 c): a perpendicular line reads it too.
-                    out.push(("Curvature deviation".into(), Measurement::Percent(0.0)));
-                    out.extend(min());
+                    // Live: only where the line meets the face (AN1 c: a vertical edge standing on Top; psb measure
+                    // 5a: a vertical edge 7.07 mm off the top face reads no Curvature deviation).
+                    let rows: Vec<(String, Measurement)> = min().collect();
+                    if rows.iter().any(|(_, m)| matches!(m, Measurement::Distance { distance, .. } if distance.abs() < 1e-9)) {
+                        out.push(("Curvature deviation".into(), Measurement::Percent(0.0)));
+                    }
+                    out.extend(rows);
                     out.extend(face_area());
                     out.extend(max());
                 } else {
@@ -814,6 +818,24 @@ mod tests {
         let rows = measure(&ctx, &[c, top]);
         let d = min_dist(&rows).expect("circle + Top: a Min dist");
         assert!((d - 0.003).abs() < 1e-9, "{d}");
+    }
+
+    /// Live "psb measure" (5a): a vertical edge 10 mm below a perpendicular face it doesn't meet reads "Perp line and
+    /// plane angle", Min dist, Area, Max dist, Length: no Curvature deviation (that row only where they meet, AN1 c).
+    #[test]
+    fn a_perpendicular_edge_apart_from_the_face_has_no_curvature_deviation() {
+        let lower = k::make_box(&k::Plane::xy(), 0.04, 0.02, 0.01).unwrap();
+        let upper = k::make_box(&k::Plane::new(DVec3::new(0.0, 0.0, 0.02), DVec3::Z, DVec3::X), 0.04, 0.02, 0.01).unwrap();
+        let edge = lower.edges().into_iter().find(|e| matches!(e.edge_curve(), Ok(k::Curve::Line { direction, .. }) if direction.z.abs() > 0.9)).unwrap();
+        // The upper box's bottom face: its lowest horizontal one.
+        let z = |f: &Shape| match f.face_surface() {
+            Ok(k::Surface::Plane(p)) if p.normal.normalize().z.abs() > 0.9 => Some(p.origin.z),
+            _ => None,
+        };
+        let face = upper.faces().into_iter().filter(|f| z(f).is_some()).min_by(|a, b| z(a).unwrap().total_cmp(&z(b).unwrap())).unwrap();
+        let rows = measure_shapes(&[vec![edge], vec![face]]);
+        let labels: Vec<&str> = rows.iter().map(|(l, _)| l.as_str()).collect();
+        assert_eq!(labels, ["Perp line and plane angle", "Min dist", "Area", "Max dist", "Length"]);
     }
 
     /// qa4 round 4 S3-a: a surface body has no mass properties (ours gave a
