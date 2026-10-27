@@ -4602,3 +4602,49 @@ fn derived_parts_carry_explicit_appearances_only() {
     call(&mut ctx, "part_set_appearance", json!({ "tab": "Part Studio 1", "parts": [a], "color": "#ff0000" }));
     assert_eq!(colours(&mut ctx), ["#9dcfed", "#ff0000"], "an explicit appearance comes along");
 }
+
+/// The Versions and history panel's search ▾ through history_list: by tab,
+/// tab kind, author and time, and text in the description.
+#[test]
+fn history_list_filters_as_the_history_panel() {
+    let mut ctx = Ctx::new();
+    let (_b, _p) = two_part_assembly(&mut ctx, "history_filter.noshape");
+    call(&mut ctx, "variable_create", json!({ "tab": "Part Studio 1", "name": "w", "value": "5 mm" }));
+    let all = call(&mut ctx, "history_list", json!({ "limit": 100 }))["history"].as_array().unwrap().len();
+    let descs = |r: &Value| r["history"].as_array().unwrap().iter().map(|h| h["description"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let asm = descs(&call(&mut ctx, "history_list", json!({ "tab": "Assembly 1", "limit": 100 })));
+    assert!(!asm.is_empty() && asm.iter().all(|d| d.starts_with("Assembly 1 :: ")), "{asm:?}");
+    let ps = descs(&call(&mut ctx, "history_list", json!({ "kinds": ["partstudio"], "limit": 100 })));
+    assert!(ps.iter().any(|d| d.ends_with("Create variable")) && !ps.iter().any(|d| d.starts_with("Assembly 1 :: ")), "{ps:?}");
+    assert!(ps.len() + asm.len() <= all);
+    let found = descs(&call(&mut ctx, "history_list", json!({ "search": "ASSEMBLY 1 :: INSERT", "limit": 100 })));
+    assert!(found.len() >= 2 && found.iter().all(|d| d.starts_with("Assembly 1 :: Insert")), "{found:?}");
+    // This process wrote everything: "Not me" lists nothing, "Only me" all.
+    assert!(descs(&call(&mut ctx, "history_list", json!({ "modified_by": "not_me" }))).is_empty());
+    let first = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["time"].as_str().unwrap().parse::<i64>().unwrap();
+    assert_eq!(descs(&call(&mut ctx, "history_list", json!({ "from": first + 1 }))).len(), 0);
+    assert!(!descs(&call(&mut ctx, "history_list", json!({ "to": first }))).is_empty());
+    let e = try_call(&mut ctx, "history_list", json!({ "kinds": ["sketch"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("kinds[0]"));
+}
+
+/// ui_list on a Variable Studio: its Configurations panel's Expand all /
+/// Collapse all, and Collapse all tables (also from a Part Studio's
+/// Variable table panel).
+#[test]
+fn ui_list_variable_studio_display() {
+    let mut ctx = Ctx::new();
+    let path = scratch("ui_list_vs.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let vs = call(&mut ctx, "tab_create", json!({ "kind": "variablestudio" }))["tab"]["name"].as_str().unwrap().to_string();
+    call(&mut ctx, "variable_studio_settings", json!({ "tab": vs, "insert_into_all": false }));
+    call(&mut ctx, "config_add_input", json!({ "tab": vs, "kind": "list" }));
+    let r = call(&mut ctx, "ui_list", json!({ "tab": vs, "action": "collapse_all" }));
+    assert_eq!(r["inputs_open"], false, "{r}");
+    let r = call(&mut ctx, "ui_list", json!({ "tab": vs, "action": "expand_all" }));
+    assert_eq!(r["inputs_open"], true, "{r}");
+    call(&mut ctx, "ui_list", json!({ "tab": vs, "action": "collapse_tables" }));
+    call(&mut ctx, "ui_list", json!({ "tab": "Part Studio 1", "action": "collapse_tables" }));
+    let e = try_call(&mut ctx, "ui_list", json!({ "tab": vs, "action": "filter", "text": "x" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("action"));
+}

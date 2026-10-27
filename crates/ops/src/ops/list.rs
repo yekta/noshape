@@ -1,8 +1,9 @@
 //! The window's lists: the Part Studio feature list's folders (Expand all /
 //! Collapse all in list) and filter (Filter feature list); the Assembly's
 //! instance tree (Expand / Collapse selected / all, Find in instance list)
-//! and mate rows (Expand / Collapse). View state, kept per tab (ui_state);
-//! with the app open the window shows the same.
+//! and mate rows (Expand / Collapse); a Variable Studio's configuration
+//! inputs (Expand all / Collapse all) and Collapse all tables. View state,
+//! kept per tab (ui_state); with the app open the window shows the same.
 
 use super::{doc_field, s, strings};
 use crate::error::OpError;
@@ -14,17 +15,17 @@ use noshape_model::assembly::eval::InstanceNode;
 use noshape_model::document::{TabContent, TabId};
 use serde_json::{Value, json};
 
-const ACTIONS: [&str; 7] = ["get", "expand_all", "collapse_all", "expand", "collapse", "filter", "find"];
+const ACTIONS: [&str; 8] = ["get", "expand_all", "collapse_all", "expand", "collapse", "filter", "find", "collapse_tables"];
 
 pub fn ops() -> Vec<Op> {
     vec![Op {
         group: "ui",
         verb: "list",
         summary: "The feature and instance lists: expand / collapse folders, subassemblies and mates, filter the feature list, find an instance",
-        description: "View state of a tab's lists (`get` reads it). Part Studios: `expand_all` / `collapse_all` (Expand all in list / Collapse all in list: the folders), `expand` / `collapse` folders `items` (names), `filter` (Filter feature list: `text` as the list's search box takes it — names and type names, or `:errors`, `:suppressed`, `:variable \"name\"`, `:type x`, …; \"\" clears; returns the features shown). Assemblies: `expand_all` / `collapse_all` (the instance tree, patterns and mates), `expand` / `collapse` `items`: subassembly instances (Expand selected / Collapse selected) or mates (a mate row's Expand / Collapse), `find` (Find in instance list: selects the instance, its list row shown). With the app open the window shows the same.",
+        description: "View state of a tab's lists (`get` reads it). Part Studios: `expand_all` / `collapse_all` (Expand all in list / Collapse all in list: the folders), `expand` / `collapse` folders `items` (names), `filter` (Filter feature list: `text` as the list's search box takes it — names and type names, or `:errors`, `:suppressed`, `:variable \"name\"`, `:type x`, …; \"\" clears; returns the features shown). Assemblies: `expand_all` / `collapse_all` (the instance tree, patterns and mates), `expand` / `collapse` `items`: subassembly instances (Expand selected / Collapse selected) or mates (a mate row's Expand / Collapse), `find` (Find in instance list: selects the instance, its list row shown). Variable Studios: `expand_all` / `collapse_all` (the Configurations panel's ⋯ › Expand all / Collapse all: its inputs). Any of the three: `collapse_tables` (the Variable table's ⋯ › Collapse all tables). With the app open the window shows the same.",
         fields: vec![
             doc_field(),
-            opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the window's tab."),
+            opt("tab", s(), "Part Studio, Assembly or Variable Studio tab, by name or id. Default: the window's tab."),
             req("action", json!({ "type": "string", "enum": ACTIONS }), "What to do."),
             opt("items", strings(), "expand / collapse / find: folder names (Part Studio); instance or mate ids or names (Assembly)."),
             opt("text", s(), "filter: the feature list's search text."),
@@ -35,10 +36,18 @@ pub fn ops() -> Vec<Op> {
     }]
 }
 
-fn list_tab(od: &OpenDoc, a: &Args) -> Result<(TabId, bool), OpError> {
+#[derive(Clone, Copy, PartialEq)]
+enum ListTab {
+    Studio,
+    Assembly,
+    Variables,
+}
+
+fn list_tab(od: &OpenDoc, a: &Args) -> Result<(TabId, ListTab), OpError> {
     let kind = |c: &TabContent| match c {
-        TabContent::PartStudio(_) => Some(false),
-        TabContent::Assembly(_) => Some(true),
+        TabContent::PartStudio(_) => Some(ListTab::Studio),
+        TabContent::Assembly(_) => Some(ListTab::Assembly),
+        TabContent::VariableStudio(_) => Some(ListTab::Variables),
         _ => None,
     };
     let d = od.doc();
@@ -47,8 +56,8 @@ fn list_tab(od: &OpenDoc, a: &Args) -> Result<(TabId, bool), OpError> {
         None => od.window.active_tab.filter(|t| d.tab(*t).is_some_and(|t| kind(&t.content).is_some())).or_else(|| d.ordered_tabs().into_iter().find(|t| kind(&t.content).is_some()).map(|t| t.id)).ok_or_else(|| OpError::not_found("the document has no Part Studio or Assembly").with_param("tab"))?,
     };
     let t = d.tab(tab).expect("found");
-    let asm = kind(&t.content).ok_or_else(|| OpError::invalid(format!("tab `{}` is a {}: lists are a Part Studio's or Assembly's", t.name, t.content.kind_name())).with_param("tab"))?;
-    Ok((tab, asm))
+    let k = kind(&t.content).ok_or_else(|| OpError::invalid(format!("tab `{}` is a {}: lists are a Part Studio's, Assembly's or Variable Studio's", t.name, t.content.kind_name())).with_param("tab"))?;
+    Ok((tab, k))
 }
 
 fn items(a: &Args) -> Result<Vec<String>, OpError> {
@@ -59,7 +68,7 @@ fn items(a: &Args) -> Result<Vec<String>, OpError> {
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let doc = a.opt_str("doc")?;
     let od = ctx.doc(doc)?;
-    let (tab, assembly) = list_tab(od, a)?;
+    let (tab, kind) = list_tab(od, a)?;
     let action = a.str("action")?;
     if !ACTIONS.contains(&action) {
         return Err(OpError::param("action", &ACTIONS.join(", ")));
@@ -67,7 +76,22 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut st = od.window.lists.get(&tab).cloned().unwrap_or_default();
     let mut acts = Vec::new();
     let mut out = json!({});
-    if assembly {
+    if action == "collapse_tables" {
+        acts.push(ListAct::Tables);
+    } else if kind == ListTab::Variables {
+        match action {
+            "get" => {}
+            "expand_all" | "collapse_all" => {
+                let open = action == "expand_all";
+                st.inputs_open = Some(open);
+                acts.push(ListAct::All(open));
+            }
+            _ => return Err(OpError::param("action", "in a Variable Studio: get, expand_all, collapse_all or collapse_tables")),
+        }
+        if let Some(open) = st.inputs_open {
+            out["inputs_open"] = json!(open);
+        }
+    } else if kind == ListTab::Assembly {
         let asm = super::assembly::assembly(od, tab)?.clone();
         let result = super::assembly::solve_assembly(od, tab, &asm, &Default::default());
         match action {

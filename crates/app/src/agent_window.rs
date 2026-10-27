@@ -7,7 +7,7 @@
 use super::{TabView, Workspace, request_activate_tab};
 use crate::viewport::Viewport;
 use gpui_kit::*;
-use noshape_ops::window::{CameraMove, SheetMove};
+use noshape_ops::window::{CameraMove, ListAct, SheetMove};
 use noshape_render::Projection;
 use noshape_scene::camera_ops as co;
 
@@ -115,9 +115,11 @@ impl Workspace {
                 }),
                 _ => {}
             },
+            R::List { tab, act: ListAct::Tables } => crate::variable_studio::collapse_all_tables(tab, cx),
             R::List { tab, act } => match self.views.get(&tab) {
                 Some(TabView::PartStudio(v)) => v.update(cx, |v, cx| v.agent_list(act, window, cx)),
                 Some(TabView::Assembly(v)) => v.update(cx, |v, cx| v.agent_list(act, cx)),
+                Some(TabView::Variables(v)) => v.update(cx, |v, cx| v.agent_list(act, cx)),
                 _ => {}
             },
             R::ReloadToolbars => {

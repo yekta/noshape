@@ -67,7 +67,7 @@ impl PartStudioView {
                 }
             }
             ListAct::Filter(text) => self.set_filter(&text, window, cx),
-            ListAct::Instances { .. } | ListAct::Mates { .. } | ListAct::Find(_) => {}
+            ListAct::Instances { .. } | ListAct::Mates { .. } | ListAct::Find(_) | ListAct::Tables => {}
         }
     }
 

@@ -42,55 +42,10 @@ enum RowKind {
 /// A popup anchor: a field's bounds from the last paint.
 type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
 
-/// The search ▾ panel's "Modified by" choices.
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
-enum ModifiedBy {
-    #[default]
-    Any,
-    OnlyMe,
-    NotMe,
-}
-
-impl ModifiedBy {
-    fn label(self) -> &'static str {
-        match self {
-            ModifiedBy::Any => "Any",
-            ModifiedBy::OnlyMe => "Only me",
-            ModifiedBy::NotMe => "Not me",
-        }
-    }
-}
-
-/// The history filter (live documents/117): tab, tab types, author and a
-/// time range (ms).
-#[derive(Clone, Default, PartialEq)]
-struct HistoryFilter {
-    tab: Option<TabId>,
-    kinds: Vec<&'static str>,
-    by: ModifiedBy,
-    from: Option<i64>,
-    to: Option<i64>,
-}
-
-impl HistoryFilter {
-    fn is_active(&self) -> bool {
-        *self != HistoryFilter::default()
-    }
-}
+use noshape_ops::history_filter::{HistoryFilter, ModifiedBy};
 
 /// Tab types of the filter panel, in Onshape's order (kind, icon, tooltip).
 const FILTER_KINDS: [(&str, &str, &str); 5] = [("partstudio", "part-studio", "Part Studio"), ("assembly", "assembly", "Assembly"), ("drawing", "drawing", "Drawing"), ("featurestudio", "feature-studio", "Feature Studio"), ("file", "file", "File")];
-
-fn filter_kind(c: &TabContent) -> &'static str {
-    match c {
-        TabContent::PartStudio(_) => "partstudio",
-        TabContent::Assembly(_) => "assembly",
-        TabContent::Drawing(_) => "drawing",
-        TabContent::FeatureStudio(_) => "featurestudio",
-        TabContent::File(_) => "file",
-        TabContent::VariableStudio(_) | TabContent::MaterialLibrary(_) => "",
-    }
-}
 
 /// The toggles under "Search history" (live documents/118–119): 30x30,
 /// radius 3; on = `#eaeaea` with an inset 0 1 1 shadow, off = clear.
@@ -107,11 +62,6 @@ fn filter_toggle(id: &'static str, icon: &'static str, on: bool, cx: &App) -> St
         .when(on, |d| d.bg(rgb(0xeaeaea)).shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.247), offset: point(px(0.), px(1.)), blur_radius: px(1.), spread_radius: px(0.), inset: true }]))
         .when(!on, |d| d.hover(|d| d.bg(rgb(0xeaeaea))))
         .child(crate::assets::icon(icon, 20., cx))
-}
-
-/// Is `author` the local user (Preferences name, OS full name or login)?
-fn is_me(author: &str) -> bool {
-    !author.is_empty() && [noshape_store::local_user_name(), noshape_store::os_user_name(), noshape_store::os_login()].iter().any(|n| n == author)
 }
 
 /// One row of the table: a workspace (branch head), a version, the Start
@@ -191,35 +141,9 @@ impl HistoryPanel {
     /// Does a microversion pass the applied filter?
     fn change_matches(&mut self, m: &noshape_store::MicroversionInfo, cx: &App) -> bool {
         let f = self.filter.clone();
-        match f.by {
-            ModifiedBy::Any => {}
-            ModifiedBy::OnlyMe => {
-                if !is_me(&m.author) {
-                    return false;
-                }
-            }
-            ModifiedBy::NotMe => {
-                if is_me(&m.author) {
-                    return false;
-                }
-            }
-        }
-        if f.from.is_some_and(|t| m.created < t) || f.to.is_some_and(|t| m.created > t) {
-            return false;
-        }
-        if f.tab.is_none() && f.kinds.is_empty() {
-            return true;
-        }
         let session = &self.doc.read(cx).session;
-        let tabs = self
-            .changed_tabs
-            .entry(m.id)
-            .or_insert_with(|| {
-                let Some(parent) = m.parents.first() else { return Vec::new() };
-                session.store.diff(*parent, m.id).unwrap_or_default().iter().filter_map(|c| c.name.strip_prefix("tab/")).filter_map(|h| u64::from_str_radix(h, 16).ok()).map(TabId).collect()
-            })
-            .clone();
-        tabs.iter().any(|t| f.tab.is_none_or(|ft| ft == *t) && (f.kinds.is_empty() || session.doc.tab(*t).is_some_and(|tab| f.kinds.contains(&filter_kind(&tab.content)))))
+        let cache = &mut self.changed_tabs;
+        f.matches(m, &session.doc, || cache.entry(m.id).or_insert_with(|| noshape_ops::history_filter::changed_tabs(&session.store, m)).clone())
     }
 
     /// Read the panel's date fields ("mm/dd/yyyy, hh:mm"; the time is optional).
@@ -302,7 +226,7 @@ impl HistoryPanel {
             let view = view.clone();
             let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                 m = m.select_list(148.);
-                for by in [ModifiedBy::Any, ModifiedBy::OnlyMe, ModifiedBy::NotMe] {
+                for by in ModifiedBy::ALL {
                     let v = view.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new(by.label()).on_click(move |_, _, cx| v.update(cx, |t, cx| {
                         t.filter_edit.by = by;

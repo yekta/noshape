@@ -32,8 +32,17 @@ pub fn ops() -> Vec<Op> {
             group: "history",
             verb: "list",
             summary: "The edit history of the current branch, newest first",
-            description: "Microversions with their description (\"Part Studio 1 :: Insert feature : Extrude 1\"), author and time, plus versions and branches.",
-            fields: vec![doc_field(), opt("limit", json!({ "type": "integer", "minimum": 1 }), "At most this many entries (default 50).")],
+            description: "Microversions with their description (\"Part Studio 1 :: Insert feature : Extrude 1\"), author and time (ms since 1970), plus versions and branches. The Versions and history panel's search ▾ filters them: `tab` (changes to that tab), `kinds` (changes to tabs of these kinds), `modified_by`, a `from` / `to` time range, and `search` (text in the description); `limit` counts the entries that pass.",
+            fields: vec![
+                doc_field(),
+                opt("limit", json!({ "type": "integer", "minimum": 1 }), "At most this many entries (default 50)."),
+                opt("search", s(), "Only entries whose description contains this (any case)."),
+                opt("tab", s(), "Only changes to this tab (name or id)."),
+                opt("kinds", json!({ "type": "array", "items": { "type": "string", "enum": crate::history_filter::KINDS } }), "Only changes to tabs of these kinds."),
+                opt("modified_by", json!({ "type": "string", "enum": ["any", "only_me", "not_me"] }), "Modified by (default any)."),
+                opt("from", json!({ "type": "integer" }), "Only changes at or after this time (ms since 1970)."),
+                opt("to", json!({ "type": "integer" }), "Only changes at or before this time (ms since 1970)."),
+            ],
             mutates: false,
             destructive: false,
             run: list,
@@ -137,10 +146,28 @@ fn redo(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
+    use crate::history_filter::{HistoryFilter, KINDS, ModifiedBy, changed_tabs};
     let limit = a.opt_u64("limit")?.unwrap_or(50) as usize;
+    let mut f = HistoryFilter::default();
+    if let Some(t) = a.opt_str("tab")? {
+        f.tab = Some(crate::doc::tab_of_kind(od.doc(), Some(t), "tab", |_| true).map_err(|e| e.with_param("tab"))?);
+    }
+    for (i, k) in a.opt_array("kinds")?.into_iter().flatten().enumerate() {
+        f.kinds.push(KINDS.into_iter().find(|x| Some(*x) == k.as_str()).ok_or_else(|| OpError::param(&format!("kinds[{i}]"), &KINDS.join(", ")))?);
+    }
+    f.by = match a.opt_str("modified_by")? {
+        None | Some("any") => ModifiedBy::Any,
+        Some("only_me") => ModifiedBy::OnlyMe,
+        Some("not_me") => ModifiedBy::NotMe,
+        Some(_) => return Err(OpError::param("modified_by", "any, only_me or not_me")),
+    };
+    let time = |k: &str| a.get(k).map(|v| v.as_i64().ok_or_else(|| OpError::param(k, "ms since 1970 (an entry's `time`)"))).transpose();
+    (f.from, f.to) = (time("from")?, time("to")?);
+    let q = a.opt_str("search")?.unwrap_or("").trim().to_lowercase();
     let store = &od.session.store;
     let hist = store.history(od.session.branch).map_err(|e| OpError::new("io", e.to_string()))?;
-    let entries: Vec<_> = hist.iter().take(limit).map(|m| json!({ "id": m.id.to_string(), "description": m.description, "author": m.author, "time": format!("{:?}", m.created) })).collect();
+    let doc = &od.session.doc;
+    let entries: Vec<_> = hist.iter().filter(|m| (q.is_empty() || m.description.to_lowercase().contains(&q)) && f.matches(m, doc, || changed_tabs(store, m))).take(limit).map(|m| json!({ "id": m.id.to_string(), "description": m.description, "author": m.author, "time": format!("{:?}", m.created) })).collect();
     let versions: Vec<_> = store.list_versions().map_err(|e| OpError::new("io", e.to_string()))?.into_iter().map(|v| json!({ "id": v.id.to_string(), "name": v.name, "microversion": v.microversion.to_string() })).collect();
     let branches: Vec<_> = store.list_branches().map_err(|e| OpError::new("io", e.to_string()))?.into_iter().map(|b| json!({ "id": b.id.to_string(), "name": b.name, "current": b.id == od.session.branch })).collect();
     Ok(json!({ "history": entries, "versions": versions, "branches": branches }).into())

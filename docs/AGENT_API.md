@@ -5078,7 +5078,7 @@ Examples:
 
 The feature and instance lists: expand / collapse folders, subassemblies and mates, filter the feature list, find an instance.
 
-View state of a tab's lists (`get` reads it). Part Studios: `expand_all` / `collapse_all` (Expand all in list / Collapse all in list: the folders), `expand` / `collapse` folders `items` (names), `filter` (Filter feature list: `text` as the list's search box takes it — names and type names, or `:errors`, `:suppressed`, `:variable "name"`, `:type x`, …; "" clears; returns the features shown). Assemblies: `expand_all` / `collapse_all` (the instance tree, patterns and mates), `expand` / `collapse` `items`: subassembly instances (Expand selected / Collapse selected) or mates (a mate row's Expand / Collapse), `find` (Find in instance list: selects the instance, its list row shown). With the app open the window shows the same.
+View state of a tab's lists (`get` reads it). Part Studios: `expand_all` / `collapse_all` (Expand all in list / Collapse all in list: the folders), `expand` / `collapse` folders `items` (names), `filter` (Filter feature list: `text` as the list's search box takes it — names and type names, or `:errors`, `:suppressed`, `:variable "name"`, `:type x`, …; "" clears; returns the features shown). Assemblies: `expand_all` / `collapse_all` (the instance tree, patterns and mates), `expand` / `collapse` `items`: subassembly instances (Expand selected / Collapse selected) or mates (a mate row's Expand / Collapse), `find` (Find in instance list: selects the instance, its list row shown). Variable Studios: `expand_all` / `collapse_all` (the Configurations panel's ⋯ › Expand all / Collapse all: its inputs). Any of the three: `collapse_tables` (the Variable table's ⋯ › Collapse all tables). With the app open the window shows the same.
 
 Examples:
 
@@ -5092,8 +5092,8 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the window's tab. |
-| `action` | one of `get`, `expand_all`, `collapse_all`, `expand`, `collapse`, `filter`, `find` | required | What to do. |
+| `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the window's tab. |
+| `action` | one of `get`, `expand_all`, `collapse_all`, `expand`, `collapse`, `filter`, `find`, `collapse_tables` | required | What to do. |
 | `items` | array of string |  | expand / collapse / find: folder names (Part Studio); instance or mate ids or names (Assembly). |
 | `text` | string |  | filter: the feature list's search text. |
 
@@ -5192,7 +5192,7 @@ Examples:
 
 The edit history of the current branch, newest first.
 
-Microversions with their description ("Part Studio 1 :: Insert feature : Extrude 1"), author and time, plus versions and branches.
+Microversions with their description ("Part Studio 1 :: Insert feature : Extrude 1"), author and time (ms since 1970), plus versions and branches. The Versions and history panel's search ▾ filters them: `tab` (changes to that tab), `kinds` (changes to tabs of these kinds), `modified_by`, a `from` / `to` time range, and `search` (text in the description); `limit` counts the entries that pass.
 
 Examples:
 
@@ -5204,6 +5204,12 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `limit` | integer |  | At most this many entries (default 50). |
+| `search` | string |  | Only entries whose description contains this (any case). |
+| `tab` | string |  | Only changes to this tab (name or id). |
+| `kinds` | array of one of `partstudio`, `assembly`, `drawing`, `featurestudio`, `file` |  | Only changes to tabs of these kinds. |
+| `modified_by` | one of `any`, `only_me`, `not_me` |  | Modified by (default any). |
+| `from` | integer |  | Only changes at or after this time (ms since 1970). |
+| `to` | integer |  | Only changes at or before this time (ms since 1970). |
 
 #### history_create_version
 

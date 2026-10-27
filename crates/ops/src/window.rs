@@ -58,6 +58,9 @@ pub enum ListAct {
     Mates { mates: Vec<noshape_model::assembly::MateId>, expand: bool },
     /// Find in instance list.
     Find(noshape_model::assembly::InstanceId),
+    /// The Variable table's "…" › Collapse all tables (a Variable Studio,
+    /// or a Part Studio's / Assembly's Variable table panel).
+    Tables,
 }
 
 /// A tab's list state as the agent set it.
@@ -71,6 +74,9 @@ pub struct ListState {
     pub expanded: BTreeSet<Vec<u64>>,
     /// Expanded mate rows (mate ids).
     pub expanded_mates: BTreeSet<u64>,
+    /// A Variable Studio's configuration inputs shown (Expand all) or
+    /// folded (Collapse all); None: as the user left them.
+    pub inputs_open: Option<bool>,
 }
 
 /// What a tab has selected.

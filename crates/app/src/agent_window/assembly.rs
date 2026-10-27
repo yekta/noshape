@@ -76,7 +76,7 @@ impl AssemblyView {
                 self.ui.scroll_to_selection = true;
                 self.refresh_scene(false, cx);
             }
-            ListAct::Folders { .. } | ListAct::Filter(_) => {}
+            ListAct::Folders { .. } | ListAct::Filter(_) | ListAct::Tables => {}
         }
     }
 

@@ -95,6 +95,22 @@ pub(super) fn cell_menu(m: crate::os_menu::OsMenu, view: Entity<VariableStudioVi
 }
 
 impl VariableStudioView {
+    /// ui_list on a Variable Studio: the Configurations panel's ⋯ › Expand
+    /// all / Collapse all (its inputs), as the menu does it.
+    pub(crate) fn agent_list(&mut self, act: noshape_ops::window::ListAct, cx: &mut Context<Self>) {
+        if let noshape_ops::window::ListAct::All(open) = act {
+            if open {
+                self.cfg_folded.clear();
+            } else {
+                let ids: Vec<String> = self.studio(cx).map(|s| s.configuration.inputs.iter().map(|i| i.id.clone()).collect()).unwrap_or_default();
+                self.cfg_folded.extend(ids);
+            }
+            cx.notify();
+        }
+    }
+}
+
+impl VariableStudioView {
     /// The button at the right edge (open or not), centred on its height
     /// (live document/10 x 1888–1919; help config-panel-02).
     pub(super) fn render_config_tab(&self, cx: &mut Context<Self>) -> AnyElement {
