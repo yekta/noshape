@@ -43,7 +43,9 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   72 twice on the watcher CLI 04:06); REGEN-NO-CANCEL (P0). **The release CI's Windows build failed** (TICKETS).
 - Known open in the release: DRAFT-HANG (P0: a draft can spin forever; the app's regen then never ends), SHELL-SLOW (a
   failing shell 52 s), REGEN-SPEED, API-REMOVE-DIR (P1: scripted REMOVE extrudes miss; featmatrix's hole patterns fail).
-- Pending: the CI artifact (run 40452492018) for the version string and the crash documents.
+- CI artifact (run 40452492018, Linux; checked 08:05): version 0.4.9.7ee597e05af9; the five crash documents open;
+  fillet-hang opens in 68 s; **draft-hang never finishes (DRAFT-HANG ships)**; **Windows build fails (cxxabi.h)**;
+  cli-delete-crash opens in 148 s (Shell 3 120 s, SHELL-SLOW).
 
 ### v0.4.9 candidate (release/v0.4.9 2650df69 = main 34ab98f7 + CI fix; CI run 40434076347 Linux artifact), 2026-10-27 03:10
 - **Blocker:** the build segfaults opening 4 of qa's 5 crash documents (SHELL-SLAB-GPF, FILLET-SEGV, FILLET-SEGV-BLEND,
