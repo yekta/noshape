@@ -1085,10 +1085,10 @@ fn same_buffers(a: &Instance, b: &Instance, pick: bool) -> bool {
 /// Draw slots the line quad index buffer covers ([`Pipelines::quad_index`]).
 const QUAD_INDEX_SLOTS: u32 = 1 << 16;
 
-/// `NOSHAPE_PERF_LINES=plain`: line quads drawn with six vertices each, not indexed (for the benchmarks).
-fn plain_lines() -> bool {
-    static PLAIN: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *PLAIN.get_or_init(|| std::env::var("NOSHAPE_PERF_LINES").is_ok_and(|v| v == "plain"))
+/// `NOSHAPE_PERF_LINES=indexed`: line quads drawn indexed, four vertex shaders each (for the benchmarks).
+fn indexed_lines() -> bool {
+    static INDEXED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *INDEXED.get_or_init(|| std::env::var("NOSHAPE_PERF_LINES").is_ok_and(|v| v == "indexed"))
 }
 
 fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, mode: DrawMode) {
@@ -1715,7 +1715,7 @@ struct Pipelines {
     /// over the "under" one.
     compare_dn: Lazy,
     compare_mix: Lazy,
-    /// Line quads drawn indexed ([`QUAD_INDEX_SLOTS`] slots; `None` with `NOSHAPE_PERF_LINES=plain`).
+    /// Line quads drawn indexed ([`QUAD_INDEX_SLOTS`] slots) under `NOSHAPE_PERF_LINES=indexed`; `None` by default.
     quad_index: Option<wgpu::Buffer>,
     msaa: u32,
     /// The [`Lazy`] pipelines are compiling (see [`Pipelines::start_deferred`]).
@@ -2389,10 +2389,11 @@ impl Renderer {
             image_blend,
             compare_dn,
             compare_mix,
-            quad_index: (!plain_lines()).then(|| {
+            quad_index: indexed_lines().then(|| {
                 // Slot k's six vertices are k·6 + [0, 1, 2, 0, 2, 5]: `line_vertex`'s corners 3 and 4 repeat 0 and 2,
-                // so each segment runs four vertex shaders instead of six (the line pass was the GPU cost of a
-                // Retina orbit: perf.yml 40537102560, 82 fps without lines against 71).
+                // so each segment runs four vertex shaders instead of six. Measured on the macOS runners at 2×
+                // (perf.yml 40563115906, NIST assembly): p95 frame 25 ms against 46, but the mean 19.4 against
+                // 17.3 and 69 fps against 75, so not the default.
                 let idx: Vec<u32> = (0..QUAD_INDEX_SLOTS).flat_map(|k| [0u32, 1, 2, 0, 2, 5].map(|i| k * 6 + i)).collect();
                 self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some("line quad indices"), contents: bytemuck::cast_slice(&idx), usage: wgpu::BufferUsages::INDEX })
             }),
