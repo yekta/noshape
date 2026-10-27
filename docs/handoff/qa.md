@@ -179,6 +179,18 @@ FOLDER-EXPAND-UNDO, FOLDER-MENU (Rename | Add selection to folder… | Suppress 
 Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER-NAME-INLINE. Not re-checked yet: SEL-REJECT-TOAST (couldn't trigger: an edge click
 in Extrude's regions field picks the face), ORD-BASE.
 
+## 10:10–11:10 (green e8858e61)
+- LP-DIRECTION-PICK: v0.4.9 reproduced, green verified (pattern Direction in all three modes, Fillet, Shell, plain custom
+  edge query); compound custom filters (`EDGE && LINE`, `EDGE && ALLOWS_AXIS`) still take sketch edges only (ticket,
+  cause in studio.rs). Release smoke row added.
+- Feature tool open smoke (bin/toolsmoke.sh, 87 names from featnames.txt via Search tools, lpd.noshape): 79 dialogs open
+  and cancel cleanly (Esc leaves the 8 base features), no panic in the log; the other 8 (Derived mirror, Import, Point,
+  Recognize, Rip, Cube, Sphere, Copy part) aren't in Search tools because they're `.hidden()` types (internal /
+  deprecated / FS primitives), as expected. Contact sheets: /root/qa-scratch/ts/sheet0–3.png.
+- Fuzz: batch 9 (seeds 120–127, watcher CLI 08:30): seed 120 hit the 1500 s timeout again (the BUDGET-LONGJMP malloc
+  deadlock seed), 121–127 clean. Budget A/B (seeds 130–137, CLI 09:50, on vs NOSHAPE_BLEND_BUDGET=100000): 130 clean on
+  both; still running (~23 min a seed). Cold-open fuzz 140–141 consistent.
+
 ## 10:00–10:10 (green 3197362b, watcher CLI 09:50; other agents paused for the app split)
 - Running: A/B budget fuzz (seeds 130–137, NOSHAPE_BLEND_BUDGET default vs 100000; logs cli/clifuzz-13*on/off.log,
   results cli/ab-on.out / ab-off.out, stderr err-on/off-*.txt); cold-open consistency fuzzer bin/clifuzz_cold.py (every 10
