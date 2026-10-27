@@ -71,6 +71,9 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
 8. Re-run /root/qa-scratch/bin/{shellmatrix,hollowmatrix,holematrix,rimmatrix,boolmatrix}.py if a CLI is shipped.
 
 ## Setup that works
+- **No approval prompts** (lead 09:40): no wildcard rm, no pkill/killall/pattern kills, nothing outside the worktree and
+  /root/qa-scratch, no sudo. Start the app with q.sh `appstart <bin> <doc> [secs] [log]` (saves the timeout's PID in
+  /root/qa-scratch/app.pid) and stop it with `appstop`; fuzzers run detached with `timeout` and are polled via their logs.
 - **Crash markers** (`/tmp/noshape-regen/*.marker`, CRASH-MARKER-COPIES): a process killed mid-regen (kill -9, `timeout`)
   leaves one, and the next document opened with that feature id (any copy of the same fixture) opens rolled back. After
   a kill test, expect the next copy of that fixture to open rolled back, or remove your own dead pids' markers first.
