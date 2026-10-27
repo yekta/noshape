@@ -54,6 +54,16 @@ pub fn add_input(ps: &mut PartStudio, label: &str) -> String {
     id
 }
 
+/// Live's Checkbox create dialog (CONFIG-INPUT-ID, live 10-27): a required
+/// Name, its FeatureScript id made from it ("My flag" → `My_flag`), and
+/// Default (checked when the dialog opens). Returns its id.
+pub fn add_checkbox_input(ps: &mut PartStudio, name: &str, default: bool) -> String {
+    let taken: Vec<String> = ps.configuration.inputs.iter().map(|i| i.id.clone()).collect();
+    let id = fs_identifier(name, &taken);
+    ps.configuration.inputs.push(ConfigInput { id: id.clone(), name: name.to_string(), kind: ConfigInputKind::Checkbox { default }, visible_when: None, excluded: false });
+    id
+}
+
 pub const ADD_VARIABLE_INPUT: &str = "Add configuration variable";
 
 /// The Create variable dialog with "Configuration variable" checked.

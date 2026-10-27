@@ -39,7 +39,8 @@ pub fn ops() -> Vec<Op> {
                 doc_field(),
                 cfg_tab_field(),
                 req("kind", json!({ "type": "string", "enum": ["list", "checkbox", "variable"] }), "Input kind."),
-                opt("name", s(), "Name (default \"Configuration\", \"List 2\", \"Checkbox 1\"...; required for a variable: its #name)."),
+                opt("name", s(), "Name (a List: \"Configuration\", then \"List input 1\"...; required for a Checkbox, whose id is made from it as live's (\"My flag\" → My_flag), and for a variable: its #name)."),
+                opt("default", json!({ "type": "boolean", "default": true }), "Checkbox: Default (checked, as live's dialog opens)."),
                 opt("variable_kind", json!({ "type": "string", "enum": ["LENGTH", "ANGLE", "INTEGER", "REAL", "TEXT"] }), "Variable: kind (default LENGTH)."),
                 opt("value", json!({ "type": ["string", "number"] }), "Variable: default value expression."),
                 opt("range", json!({ "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 }), "Variable: [min, max] expressions."),
@@ -453,8 +454,13 @@ fn add_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             };
             edit(od, tab, config::ADD_VARIABLE_INPUT, |ps| Ok(json!({ "input": config::add_variable_input(ps, name.trim_start_matches('#'), &vk, &value, range) })))
         }
-        "list" | "checkbox" => {
-            let label = if kind == "list" { "List" } else { "Checkbox" };
+        "checkbox" => {
+            let name = name.filter(|n| !n.trim().is_empty()).ok_or_else(|| OpError::param("name", "a checkbox needs a name (its FeatureScript id is made from it)"))?;
+            let default = a.bool_or("default", true)?;
+            edit(od, tab, config::ADD_INPUT, |ps| Ok(json!({ "input": config::add_checkbox_input(ps, name.trim(), default) })))
+        }
+        "list" => {
+            let label = "List";
             edit(od, tab, config::ADD_INPUT, |ps| {
                 let id = config::add_input(ps, label);
                 if let Some(n) = name {

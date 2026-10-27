@@ -1953,7 +1953,8 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `kind` | one of `list`, `checkbox`, `variable` | required | Input kind. |
-| `name` | string |  | Name (default "Configuration", "List 2", "Checkbox 1"...; required for a variable: its #name). |
+| `name` | string |  | Name (a List: "Configuration", then "List input 1"...; required for a Checkbox, whose id is made from it as live's ("My flag" → My_flag), and for a variable: its #name). |
+| `default` | boolean |  | Checkbox: Default (checked, as live's dialog opens). |
 | `variable_kind` | one of `LENGTH`, `ANGLE`, `INTEGER`, `REAL`, `TEXT` |  | Variable: kind (default LENGTH). |
 | `value` | string or number |  | Variable: default value expression. |
 | `range` | array of string |  | Variable: [min, max] expressions. |

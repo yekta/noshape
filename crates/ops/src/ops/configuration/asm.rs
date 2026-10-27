@@ -195,6 +195,11 @@ pub(super) fn add_input(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::OpOu
         "TEXT" => VariableKind::Text,
         _ => VariableKind::Length,
     };
+    // Live's Checkbox dialog: a required Name, Default checked.
+    if kind == "checkbox" && name.as_deref().is_none_or(|n| n.trim().is_empty()) {
+        return Err(OpError::param("name", "a checkbox needs a name (its FeatureScript id is made from it)"));
+    }
+    let checked = a.bool_or("default", true)?;
     let value = a.get("value").map(|v| text(v, "value")).transpose()?;
     if a.get("range").is_some() {
         return Err(OpError::param("range", "assembly configuration variables have no range"));
@@ -203,6 +208,9 @@ pub(super) fn add_input(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::OpOu
         let id = asm_config::add_input(x, label);
         if let Some(n) = &name {
             asm_config::rename_input(x, &id, n);
+        }
+        if let Some(ConfigInputKind::Checkbox { default }) = x.configuration.inputs.iter_mut().find(|i| i.id == id).map(|i| &mut i.kind) {
+            *default = checked;
         }
         if kind == "variable"
             && let Some(ConfigInputKind::Variable { kind: k, default, .. }) = x.configuration.inputs.iter_mut().find(|i| i.id == id).map(|i| &mut i.kind)

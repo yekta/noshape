@@ -88,6 +88,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   arc_condition and drawing_view_edit cutting_line_angle (shared, the drawing UI calls them); 7bca8284 assembly_snap
   (Snap mode, shared with the assembly view). I1: STEP surface-curve modes ruled out. FLAT-FORM-STYLES filed (needs
   core's flat-pattern data). CONFIG-INPUT-ID waits on live (REQUESTS dx 10-27 P3).
+- Evening 10-27: CONFIG-INPUT-ID Checkbox as live's dialog (name required, id from it, default checked) in
+  config_add_input (Part Studio and Assembly); the dialogs are psui's (request below).
 - Audit of edit texts (10-27 afternoon): left uncovered on purpose: "Use view geometry" (a step of the drawing sketch's
   constrain tool), "Edit configured dimension" (= config_set_value), "Copy view label" (Alt+drag copy of a label).
 - Live answered I1 (behaviours "dx (2026-10-27, P2 I1 …)") and the flat-pattern line styles (REQUESTS dx 10-27 P3): read the latter next.
@@ -131,6 +133,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   `noshape_ops::in_context::refreshed_in(&old, &result, asm, None, Some(<this Part Studio's tab>))` (a Part Studio
   created in context then updates like live; today the app keeps refusing it), and the app's out-of-date dot should use
   `out_of_date_in(.., Some(tab))`. The API already does (dx, e2e part_studio_created_in_context_updates).
+- psui (part-studio-ui config_panel.rs, assembly-ui assembly_config.rs): live's "Checkbox" button opens a create
+  dialog (Name, empty and required; Default, checked) and the id comes from the Name ("My flag" → My_flag). Ours adds
+  "Checkbox N", unchecked, at once. The Part Studio's dialog should call `noshape_ops::config::add_checkbox_input(ps,
+  name, default)` (the API's config_add_input does, CONFIG-INPUT-ID); the Variable Studio's dialog already matches.
 - RHINO-GREEN: please build the watcher / green app with `OPENNURBS_ROOT=/root/opennurbs` (release.yml builds with it,
   dx's builds too). Hiding RHINO in builds without it needs a kernel build.rs cfg, i.e. a C++ rebuild for everyone; not
   worth it unless you want it.

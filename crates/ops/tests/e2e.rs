@@ -270,7 +270,8 @@ fn configurations() {
     assert_eq!(list["active"][&w], "50 mm", "{list}");
 
     // A Checkbox suppressing the extrude.
-    let c = call(&mut ctx, "config_add_input", json!({ "kind": "checkbox", "name": "Hide block" }));
+    let c = call(&mut ctx, "config_add_input", json!({ "kind": "checkbox", "name": "Hide block", "default": false }));
+    assert_eq!(c["input"], "Hide_block", "the id from the name, as live's: {c}");
     let cb = c["input"].as_str().unwrap().to_string();
     call(&mut ctx, "config_configure", json!({ "feature": ext, "param": "suppressed", "input": cb }));
     call(&mut ctx, "config_set_value", json!({ "feature": ext, "param": "suppressed", "configuration": true, "value": true }));
@@ -634,6 +635,15 @@ fn variable_studio_configurations() {
     assert_eq!(e.param.as_deref(), Some("name"), "{e:?}");
     let cb = call(&mut ctx, "config_add_input", json!({ "tab": vs, "kind": "checkbox", "name": "Lite" }));
     assert_eq!(cb["input"], "Lite", "{cb}");
+    // Live's Part Studio Checkbox dialog (CONFIG-INPUT-ID): the Name is
+    // required, the id is made from it, Default is checked.
+    let e = try_call(&mut ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "checkbox" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"), "{e:?}");
+    let cb = call(&mut ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "checkbox", "name": "My flag" }));
+    assert_eq!(cb["input"], "My_flag", "{cb}");
+    let l = call(&mut ctx, "config_list", json!({ "tab": "Part Studio 1" }));
+    let flag = l["inputs"].as_array().unwrap().iter().find(|i| i["id"] == "My_flag").cloned().unwrap();
+    assert_eq!(flag["default"], true, "{flag}");
 }
 
 /// The Versions and history panel's Properties… and Publish FeatureScript….
@@ -3007,7 +3017,7 @@ fn configuration_panel_inputs() {
     assert!(size["configurations"].as_array().unwrap().iter().any(|o| o["id"] == "large"), "{size}");
     assert_eq!(try_call(&mut ctx, "config_edit_ids", json!({ "input": "Size", "id": "2bad" })).unwrap_err().param.as_deref(), Some("id"));
     // Visibility: Size shows only with Lite unchecked.
-    let lite = call(&mut ctx, "config_add_input", json!({ "kind": "checkbox", "name": "Lite" }))["input"].as_str().unwrap().to_string();
+    let lite = call(&mut ctx, "config_add_input", json!({ "kind": "checkbox", "name": "Lite", "default": false }))["input"].as_str().unwrap().to_string();
     let e = try_call(&mut ctx, "config_visibility", json!({ "input": "Size", "visibility": { "conditions": [{ "input": lite, "test": { "Is": ["false"] } }] } })).unwrap_err();
     assert!(e.message.contains("not above"), "{e:?}");
     call(&mut ctx, "config_reorder_inputs", json!({ "input": lite, "to": "Size" }));
