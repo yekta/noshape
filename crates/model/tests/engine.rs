@@ -1307,3 +1307,27 @@ fn extrude_above_its_sketch_misses_its_region() {
     assert_eq!(st.missing, 1);
     assert_eq!(noshape_model::regen::missing_text(st.missing), "1 missing selection");
 }
+
+/// Live ("(7) Dragging feature rows", REORDER-MISSING-MSG): a Transform moved above the feature that made its part
+/// fails like an empty one (its own empty-selection message, not "Cannot resolve entities.") with one missing
+/// selection.
+#[test]
+fn transform_above_its_part_misses_its_part() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+    let part = BodyId { feature: x, index: 0 };
+    let tr = t.add("transform", &[("entities", q(vec![Reference::Body(part)]))]);
+    let empty = t.add("transform", &[]);
+    let r = t.regen();
+    let empty_msg = r.display.features.iter().find(|st| st.id == empty).unwrap().message.clone();
+    assert!(empty_msg.is_some(), "an empty Transform fails");
+    // Move the Transform to the top of the list.
+    let i = t.ps.features.iter().position(|f| f.id == tr).unwrap();
+    let f = t.ps.features.remove(i);
+    t.ps.features.insert(0, f);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|st| st.id == tr).unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    assert_eq!(st.message, empty_msg);
+    assert_eq!(st.missing, 1);
+}
