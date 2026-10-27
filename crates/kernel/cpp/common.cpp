@@ -6,6 +6,12 @@
 #include <cstdlib>
 #include <csignal>
 #include <cstring>
+#ifdef __linux__
+  #include <ucontext.h>
+// The program's own code (GNU linkers define these).
+extern "C" char __executable_start;
+extern "C" char etext;
+#endif
 
 #include <atomic>
 #include <cmath>
@@ -1245,6 +1251,23 @@ void crash_inside_kernel(uint8_t kind)
         }) == 1)
       fail_op("spin took too long");
   }
+  else if (kind == 4)
+  {
+    // Endless allocation under short budgets (qa BUDGET-LONGJMP): a jump
+    // out of malloc / free would leave the heap locked; every budget must
+    // end with the heap usable.
+    for (int i = 0; i < 10; ++i)
+      run_budgeted(0.05, [] {
+        for (;;)
+        {
+          std::vector<double>* v = new std::vector<double>(64 + (size_t)std::rand() % 4096, 1.0);
+          delete v;
+        }
+      });
+    std::vector<double> after(1 << 16, 2.0);
+    if (after.back() == 2.0)
+      fail_op("allocation took too long");
+  }
   else
     std::raise(SIGSEGV);
 }
@@ -1385,10 +1408,32 @@ double thread_cpu_seconds()
 namespace {
 const int budget_signal = SIGRTMIN + 3;
 
-void on_budget_tick(int, siginfo_t*, void*)
+// Whether the interrupted instruction is the program's own code (OCCT and
+// the bridge are linked in statically), not a shared library's: the C
+// library's malloc / free (their arena lock), libstdc++, libm, the dynamic
+// linker. A jump out of those left the arena locked (qa BUDGET-LONGJMP: a
+// later free() waited forever) or the heap half updated (likely
+// BOOL-THREAD-CRASH's late "silent" deaths); the next tick, 100 ms of CPU
+// later, finds the thread back in OCCT.
+bool in_own_code(const void* uctx)
+{
+  const ucontext_t* uc = static_cast<const ucontext_t*>(uctx);
+  if (uc == nullptr)
+    return false;
+  #if defined(__x86_64__)
+  const uintptr_t pc = (uintptr_t)uc->uc_mcontext.gregs[REG_RIP];
+  #elif defined(__aarch64__)
+  const uintptr_t pc = (uintptr_t)uc->uc_mcontext.pc;
+  #else
+  const uintptr_t pc = 0;
+  #endif
+  return pc >= (uintptr_t)&__executable_start && pc < (uintptr_t)&etext;
+}
+
+void on_budget_tick(int, siginfo_t*, void* uctx)
 {
   sigjmp_buf* env = budget_jmp;
-  if (env == nullptr || budget_hold > 0)
+  if (env == nullptr || budget_hold > 0 || !in_own_code(uctx))
     return;
   const bool over   = thread_cpu_seconds() > budget_limit;
   const bool cancel = budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed);

@@ -350,3 +350,18 @@ fn a_kernel_call_over_its_budget_fails() {
     assert!(t.elapsed().as_secs_f64() < 5.0);
     assert!((make_box_corners(DVec3::ZERO, DVec3::ONE).unwrap().volume().unwrap() - 1.0).abs() < 1e-12);
 }
+
+/// A budget never ends a call inside malloc / free (qa BUDGET-LONGJMP: a jump
+/// out of the C library left its heap locked, the next free() waited forever):
+/// ten 50 ms budgets over a loop that does nothing but allocate, then the heap
+/// still works.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_budget_never_stops_a_call_inside_the_allocator() {
+    let t = std::time::Instant::now();
+    let e = crash_inside_kernel(4).unwrap_err();
+    assert!(e.to_string().contains("allocation took too long"), "{e}");
+    assert!(t.elapsed().as_secs_f64() < 20.0);
+    let v: Vec<u64> = (0..1 << 20).collect();
+    assert_eq!(v.len(), 1 << 20);
+}
