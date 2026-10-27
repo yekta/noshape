@@ -11,6 +11,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   `#include <cxxabi.h>`, GCC/Clang only, unguarded; blame d85c3029, REGEN-SPEED). Still on main, so main's Windows build
   is broken too (the watcher builds Linux only). Guard it (`#if !defined(_MSC_VER)`) or demangle another way. Linux and
   macOS jobs succeeded (06:29) (qa 07:50)
+  Fixed on main by 2d6719c2 (qa 08:20: not yet on release/v0.4.9, still 7ee597e0); with a117663d (DRAFT-HANG) and 011aaf43
+  (BOOL-THREAD-CRASH, serial booleans) it is what a recut needs
   core 10-27: the lead's 2d6719c2 guards it on main (the release branch needs it too).
 - [ ] P0 the recut ships DRAFT-HANG: on the release's Linux artifact (run 40452492018, 0.4.9.7ee597e05af9) a copy of
   tickets/cli-draft-hang.noshape never finishes its opening regen (> 150 s, spinner); the draft budget a117663d came after

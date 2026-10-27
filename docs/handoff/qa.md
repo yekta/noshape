@@ -4,7 +4,8 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 ## Requests to the lead (qa, updated 2026-10-27 07:55)
-- release/v0.4.9 (7ee597e0): the Windows build fails on `#include <cxxabi.h>` in crates/kernel/cpp/common.cpp:1273
+- release/v0.4.9 (7ee597e0) still lacks 2d6719c2 (Windows include), a117663d (DRAFT-HANG budget) and 011aaf43 (serial
+  booleans, BOOL-THREAD-CRASH; replays running). Recut / cherry-pick. Earlier: the Windows build fails on `#include <cxxabi.h>` in crates/kernel/cpp/common.cpp:1273
   (MSVC C1083; also on main). Needs a guard before the release can publish (TICKETS "Release v0.4.9").
 - BOOL-THREAD-CRASH (P0 core) is very likely in the release: nondeterministic segfaults in OCCT booleans on pool threads
   (fuzz seed 72 crashed 3 times on the 04:06 / 04:48 watcher CLIs; v0.4.8 survives it). Decide whether it blocks v0.4.9.
