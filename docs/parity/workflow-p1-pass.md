@@ -110,14 +110,14 @@ then edits, undo/redo, rollback and suppress.
 | Done, then double-click Explode 1 | plain row, unexploded; re-enters editing fully exploded | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Step row right-click | Edit… / Rename / — / Delete | same (behaviours 815) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Esc with no dialog in explode editing | toolbar back but still exploded, row stays active with the rollback bar; the next double-click leaves instead of re-entering | Esc = Done | ✅ P2-A3 (skasm 10-27 GUI: Esc → no banner, plain "Explode 1", no rollback bar, assembled) | 0.4.10+ / 1c853f78 10-27 |
-| Assembly circular pattern dialog | Instances, Axis of pattern (+ clock), Angle 360 deg, Instance count 2 (+ ↻), ☑ Equal spacing, ☐ Centered; ✓ pale until Instances is set | same (behaviours 6186, 8704) | ✅ |  |
-| Pin about the middle hole's rim, ✓ | copy in hole 3; "Circular pattern 1 ▸ Part 2 <2>", Instances (3); info bubble "1 instance(s) created." | live: no bubble or toast (behaviours "qa5 (10-26 p6)" (1)) | ✅ (ours shows none either; `accept_pattern`) |  |
-| Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✅ P2-A4 (f4f7d14a, qa verified 21d6a89e on green 16cdcf6d) |  |
-| Mate type → Revolute | Offset, Limits (rotation min / max kept); row "Revolute 1"; Z offset 0 (the pin rises to mid-height) | same (behaviours 5942) | ✅ |  |
+| Assembly circular pattern dialog | Instances, Axis of pattern (+ clock), Angle 360 deg, Instance count 2 (+ ↻), ☑ Equal spacing, ☐ Centered; ✓ pale until Instances is set | same (behaviours 6186, 8704) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
+| Pin about the middle hole's rim, ✓ | copy in hole 3; "Circular pattern 1 ▸ Part 2 <2>", Instances (3); info bubble "1 instance(s) created." | live: no bubble or toast (behaviours "qa5 (10-26 p6)" (1)) | ✅ (ours shows none either; `accept_pattern`) | 0.4.10+ / 6cbb24e0 10-27 |
+| Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✅ P2-A4 (f4f7d14a, qa verified 21d6a89e on green 16cdcf6d) | 0.4.10+ / 6cbb24e0 10-27 |
+| Mate type → Revolute | Offset, Limits (rotation min / max kept); row "Revolute 1"; Z offset 0 (the pin rises to mid-height) | same (behaviours 5942) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Fix the plate, drag the revolute pin | rotates only: axis stays on hole 1 (0.002 mm), plate unchanged; the copy follows | behaviours 5948 (1) | ✅ |  |
-| Mate row right-click (hidden Revolute) | Rename, Edit…, Reset / Show, Show all mates, Isolate…, Make transparent… / Edit named position driver mate… / Suppress, Dynamic suppression ▸ / Animate… / Add selection to folder… / Expand ▸, Collapse ▸ / Delete | same (behaviours 1361; Add comment is cloud) | ✅ |  |
-| Suppress the mate | row grey struck-through, not italic; the pin drags freely out of the hole | grey italic struck-through | ✅ P2-A5 (9703d9b9, qa verified ba5df2f5 on green 19555ca3) |  |
-| Ctrl+Z / Ctrl+Y on the suppress | unsuppressed / suppressed again | — | ✅ |  |
+| Mate row right-click (hidden Revolute) | Rename, Edit…, Reset / Show, Show all mates, Isolate…, Make transparent… / Edit named position driver mate… / Suppress, Dynamic suppression ▸ / Animate… / Add selection to folder… / Expand ▸, Collapse ▸ / Delete | same (behaviours 1361; Add comment is cloud) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
+| Suppress the mate | row grey struck-through, not italic; the pin drags freely out of the hole | grey italic struck-through | ✅ P2-A5 (9703d9b9, qa verified ba5df2f5 on green 19555ca3) | 0.4.10+ / 6cbb24e0 10-27 (ours italic too; live behaviours 1297 says gray italic struck-through, so 'not italic' above may be wrong) |
+| Ctrl+Z / Ctrl+Y on the suppress | unsuppressed / suppressed again | — | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
 | Circular pattern 1 count 4 (edit), Enter twice | stays open (P2-A1, fix 9bf8475b not in this green) | 2nd Enter accepts | ✅ P2-A1 (qa re-check on a08e3eda) |  |
 | Instance list header after count 4 | "Instances (5)" | top-level rows: "Instances (3)" | ✅ P2-A6 (9703d9b9, qa verified 21d6a89e) |  |
 | Replicate dialog, Instances = Part 2 <1> | Mate to be matched auto-filled "Revolute 1"; Match faces in parts ▾; Parts to find match in (red) | same (behaviours 5969–5970) | ✅ |  |
