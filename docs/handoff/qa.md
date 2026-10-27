@@ -3,8 +3,28 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+## Session 3 (qa on a fresh account, from 19:05; greens fa61ba6f → 965d3f56 → 8602df0d)
+- Verified: EXPORT-OBJ-ZIP-NAME (fa61ba6f); re-verified SURF-EXTRUDE-SKETCH-EDGES and BOX-FILLET-FACES on fa61ba6f. No other
+  "fixed, not verified" tickets of mine are in green.
+- workflow-p1-pass **done** (every ✅ row verified; row 121: an Instance count Enter accepts the dialog = live behaviours 4299).
+- sketch.md: ~40 more rows verified in the app (ellipse, elliptical arc, mirror, linear pattern + edit, bezier degree, paste /
+  transform, Use, fillet R5, coincident, §14 rows); 1.8's "Enter accepts" is outdated (live: Enter doesn't, behaviours 214 /
+  4824; ours = live). ~45 rows left, mostly T:-only (tests) or needing a variable / text / circular pattern setup.
+- New: **P1 PATTERN-EDGE-DIR-FLIPPED** (core: qa5's bracket regenerates with Linear pattern 1 failing; stored edge now −X; live
+  asked), **P1 SKETCH-GLYPH-LAYOUT-LOST** (skasm regression: psb's 10-25 merges a7913bbe / 8439c48c dropped 45690459, 74dc1f8c and
+  7fa4f33d's UI halves), P2 ASM-PATTERN-EDIT-TAKES-SELECTION, P2 SKETCH-FILLET-STUCK-RADIUS, P3 SKETCH-PATTERN-GLYPH-HOVER.
+- Merge-loss audit (tickets/merge-audit-1027.txt: app commits since 10-20 whose added lines are < 50 % present in today's
+  tree): checked in the app and **not** lost (reworked later): e4799ab4 Thicken flip, 703545e4 Move face Direction, 38a14f20
+  midpoint ring (replaced by qa4-r5-s9-6d's disc, colours exact). Not yet checked: 8284b6b4 (perspective / O key), 98ae008e
+  (edge LOD), 6c040449 (assembly section arrow), 11e83152 (failing feature inputs red), 4a0e07c2 (Hole merge scope), 4083c486
+  (watermarks), 259270b6 (box line colours), 5b048262 (box never takes planes).
+- v0.4.11 was published 15:13 (not smoked by qa yet); the v0.4.10 binary in rel/k/v0410 is gone (disk loop).
+- Next: the audit's unchecked rows; sketch.md rest; then the untouched P1 checklists (workflow-feature-sweep,
+  workflow-advanced-part-studio, workflow-keyboard-mouse, workflow-analysis, workflow-surfaces, cursors, workflow-units).
+  04:30: P0 blockers list at the top of TICKETS for the 05:00 release.
+
 ## Parity re-verification (lead 10-27 13:50; standing, high priority)
-**P1 verified: 674 of 804 rows** (❌ open: SKETCH-LINE-MENU, FILLET-POINT-MSG (sketch.md); DIALOG-OK-STATE resolved f16b31c6; HOLE-SIZE-NO-DIAMETER, DIM-AC-ENTER, TAB-EXPORT-MISSING fixed and verified f16b31c6; OTF-FIRST-KEY, BOX-FILLET-FACES, SURF-EXTRUDE-SKETCH-EDGES fixed and verified (6cbb24e0 / 203c4d6f); SPACE-CHECKBOX and SHORTCUT-MAP-FOCUS fixed and verified). Column "Verified" = `0.4.10+ / <green> <date>`
+**P1 verified: see session 3 (pv.py count: 715 of 2025 rows overall)** (❌ open: SKETCH-LINE-MENU, FILLET-POINT-MSG (sketch.md); DIALOG-OK-STATE resolved f16b31c6; HOLE-SIZE-NO-DIAMETER, DIM-AC-ENTER, TAB-EXPORT-MISSING fixed and verified f16b31c6; OTF-FIRST-KEY, BOX-FILLET-FACES, SURF-EXTRUDE-SKETCH-EDGES fixed and verified (6cbb24e0 / 203c4d6f); SPACE-CHECKBOX and SHORTCUT-MAP-FOCUS fixed and verified). Column "Verified" = `0.4.10+ / <green> <date>`
 (green after v0.4.10). Helper: /root/qa-scratch/bin/pv.py (`count`, `list FILE`, `set FILE ROW TEXT [--fail TICKET]`);
 sessions /root/qa-scratch/bin/pvs.sh, shots /root/qa-scratch/pv/. Live reference = behaviours.md; rows with no live record
 go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (left: 5.8b, 5.16, 5.34, 6.24 (need a dimensioned sketch), 7.6 (needs surfaces / composite), 10.7a / 10.8 (section manipulator, 3 planes), 11.4 (no-material mass props asked live), 13.13 (configurations); sketch.md §1–8 in progress (rows exercised in the app marked; T:-only rows left for later); workflow-sketch-tools.md done (left: SK5 CLI, SEL1); workflow-booleans.md 28/28 (bool-base / merge-base copies in qa-scratch, volumes via bin/qparts.sh); 5.2 Enter on an empty feature asked live). Session moved to the Stablecog account 14:10; §4–5 on green 6011065d.
