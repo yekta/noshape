@@ -10,6 +10,13 @@ From 2026-10-26 (docs/PLAN.md 2.1). Every test is in exactly one tier. Scripts a
 
 All scripts take extra cargo args (`--locked`, `-p <crate>`, `--release`). Set `CARGO_TARGET_DIR` to your own dir.
 
+## Landing: `tools/tiers/land.sh` (lead, 10-27)
+
+The only way to put work on main. It rebases on origin/main, runs clippy and the full tests of every crate the change
+touches plus every crate that depends on them (T0 too when the app, ops or cli is affected), and pushes only if all
+of it is green. Docs-only changes push without a build. Main red from a pushed change means land.sh wasn't used.
+A flaky test (passes alone, fails in parallel, or fails now and then) goes to T2 at once with a ticket for its owner.
+
 ## T0 smoke
 
 - Builds the app (`-p noshape`) and the CLI.
