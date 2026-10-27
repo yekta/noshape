@@ -66,9 +66,10 @@ Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs do
    ✅; CA3 closed by ui, CA4 and A15 rechecked on green).
 4. Which part moves when a new mate joins two free parts: done (be0dd33e) from 27 live runs; open: two different
    parts of similar size (untested in live), and edits of an existing mate between free parts (still the second
-   connector's part stays).
-5. Slot: live shows all 3 offset glyphs at the end cap; after the commit live's centre line is plain dark blue (ours
-   stayed highlighted once, not reproduced).
+   connector's part stays; REST updates of a mate feature came back ERROR in my tab, so it needs a UI run in live:
+   /root/skasm-scratch/live/flip7.mjs).
+5. Slot: rechecked 10-27 against live spec-slot-06 (Ø20 leader, glyph groups, colours as live); the once-seen
+   highlighted centre line was not reproduced.
 6. Assembly drag bench (psui's, viewport.rs) gives up on llvmpipe ("nothing under the viewport centre": the hover pick
    isn't back within 300 ticks); fine on CI runners presumably.
 7. Standard content PEM®: our catalogue has no PEM component (live lists 40 under 6 standards); asked live for the
