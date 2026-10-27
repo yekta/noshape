@@ -117,7 +117,8 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
 3. UI keystroke tests (docs/TESTS.md, part-studio-ui sketch_ui_tests.rs, 7 tests): extend to other P1 sketch key
    flows (`=#var` in a value box, polygon sides typed, Tab between rectangle boxes, Enter in a Line chain). The harness
    is part-studio-ui only; assembly-ui could opt in the same way (dev-dependency on noshape-ui-test-support + gpui).
-4. Standard content (P3): ANSI taper pin crowned ends (live's /features ~22:45 UTC, see Landed); DIN 7050 / 7051 /
+4. Standard content (P3): ANSI taper pin crowned ends done 10-27 (live's rule from its B-rep alone: the seams l
+   apart, the large one at d/2, crown spheres symmetric; = live's volume / areas / bbox); DIN 7050 / 7051 /
    967 / 923, ISO 7379, NASM 45938 + /4, NAS 1129 ×2, PEM ×52 need live's /features (~10-28 03:00); live's studio
    default geometry for each is in behaviours "skasm (2026-10-27) standard content gaps" (faces, volumes) to test
    against.

@@ -1833,6 +1833,25 @@ export const pin = defineFeature(function(context is Context, id is Id, definiti
             // d at the large end, the diameter shrinking 1 : taper (ASME
             // B18.8.2 1/4 in per foot = 1 : 48, ISO 2339 1 : 50).
             const small = r - l / definition.taper / 2;
+            if (definition.r > r)
+            {
+                // Live's ANSI pin (behaviours "… ANSI Commercial class taper
+                // pin B-rep", request 1504): crowned ends, spheres of radius
+                // r on the axis at +-zc (symmetric about the origin), each
+                // through its seam with the cone; the seams l apart, the
+                // large one at d / 2.
+                const cr = definition.r;
+                const big = sqrt(cr * cr - r * r);
+                const low = sqrt(cr * cr - small * small);
+                const zl = (l - low + big) / 2;
+                const zc = zl - big;
+                const zs = zl - l;
+                const m1 = (atan2(zl - zc, r) + 90 * degree) / 2;
+                const m2 = (atan2(zs + zc, small) - 90 * degree) / 2;
+                revolveProfile(context, id + "pin", [{ "p" : rz(Z, zc + cr) }, { "p" : rz(r, zl), "mid" : rz(cr * cos(m1), zc + cr * sin(m1)) }, { "p" : rz(small, zs) },
+                        { "p" : rz(Z, -zc - cr), "mid" : rz(cr * cos(m2), -zc + cr * sin(m2)) }]);
+                return;
+            }
             revolveProfile(context, id + "pin", [{ "p" : rz(Z, Z) }, { "p" : rz(r, Z) }, { "p" : rz(small, -l) }, { "p" : rz(Z, -l) }]);
             return;
         }

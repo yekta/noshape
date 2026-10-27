@@ -4497,6 +4497,36 @@ fn iso_10511_and_7040_nuts_match_live() {
     }
 }
 
+/// Live's ANSI commercial taper pin B-rep (behaviours "skasm (2026-10-27)
+/// standard content gaps (addendum): ANSI Commercial class taper pin B-rep",
+/// request 1504): crowned ends (spheres of END_CROWN_RADIUS) and the 1:48
+/// cone, three faces, centred on the origin along Z; volume and face areas.
+#[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
+fn ansi_taper_pin_has_live_crowned_ends() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Commercial class taper pin").unwrap();
+    for (size, length, vol, areas, zmax) in [("#7/0", "0.25", 11.855162..=11.865563, [1.73483, 2.08252, 30.35146], 3.34111), ("#4", "1", 761.465751..=761.632538, [28.04676, 33.74725, 485.6233], 13.44461)] {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        spec.length = Some(length.into());
+        assert_eq!(spec.part_name(), format!("Taper pin {size} x {length}"));
+        let r = standard::regenerate(&spec).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let v = b.shape.volume().unwrap() * 1e9;
+        let mut a: Vec<f64> = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap() * 1e6).collect();
+        a.sort_by(f64::total_cmp);
+        let bb = b.shape.bounding_box(true).unwrap();
+        eprintln!("{size} x {length}: {} faces {a:?}, {v} mm³, z {} .. {}", b.faces.len(), bb.min.z * 1e3, bb.max.z * 1e3);
+        assert_eq!(b.faces.len(), 3, "{size}");
+        assert!(vol.contains(&v), "{size}: {v} mm³, live {vol:?}");
+        for (x, live) in a.iter().zip(areas) {
+            assert!((x - live).abs() < 1e-3 * live, "{size}: face areas {a:?}, live {areas:?}");
+        }
+        assert!((bb.max.z * 1e3 - zmax).abs() < 1e-3 && (bb.min.z * 1e3 + zmax).abs() < 1e-3, "{size}: z {} .. {}, live +-{zmax}", bb.min.z * 1e3, bb.max.z * 1e3);
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size
