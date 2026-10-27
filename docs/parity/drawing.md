@@ -43,7 +43,7 @@ First audit (2026-10-18, code reading): 28 ✅, 142 🔧, 188 ❌, 7 n/a of 365.
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
 | K1 | `f` = Zoom to fit. | H:drawings | ✅ | `app/src/actions.rs` binds `f` to ZoomToFit. Handled in `dv:render` on_action, which calls `zoom_to_fit`. | 0.4.10+ / acd6acce 10-27 (asm5 drawing) |
-| K2 | `w` = Zoom window. | H:drawings | ✅ | `w` (and empty-sheet menu "Zoom to window"): drag a box, the sheet zooms to it; a click zooms in 2x (`drawing_keys.rs`) |  |
+| K2 | `w` = Zoom window. | H:drawings | ✅ | `w` (and empty-sheet menu "Zoom to window"): drag a box, the sheet zooms to it; a click zooms in 2x (`drawing_keys.rs`) | 0.4.10+ / acd6acce 10-27 (w, drag a box: zooms to it) |
 | K3 | `Shift+z` = Zoom in, `z` = Zoom out. | H:drawings | ✅ | ZoomIn ×1.25 and ZoomOut ×0.8 about the canvas center (`dv:render`). | 0.4.10+ / acd6acce 10-27 (asm5 drawing) |
 | K4 | `d` = Dimension (smart dimension). | H:drawings, H:drawing_-_dimension | ✅ | `dt:on_key` maps `d` to `DimTool::Linear` (smart orientation via `auto_orientation`). Pressing it again does not exit (see T24). | 0.4.10+ / daf1f50c 10-27 (asm5 drawing walk) |
 | K5 | `Shift+r` = Radial dimension ("Places a radial dimension on an arc or circle"). | H:drawings, H:Home__keyboard_shortcuts_and_hotkeys | ✅ | `dt:on_key` maps `("r", true)` to `DimTool::Radius`. | 0.4.10+ / acd6acce 10-27 (asm5 drawing) |
