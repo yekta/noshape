@@ -4347,6 +4347,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "noshape-assembly"
+version = "0.4.6"
+dependencies = [
+ "glam 0.34.1",
+ "nalgebra",
+ "noshape-kernel",
+ "noshape-model-core",
+ "noshape-model-data",
+ "noshape-sketch",
+ "noshape-units",
+ "noshape-workspace-hack",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "noshape-cli"
 version = "0.4.6"
 dependencies = [
@@ -4371,6 +4387,7 @@ dependencies = [
  "log",
  "miniz_oxide 0.8.9",
  "nalgebra",
+ "noshape-assembly",
  "noshape-featurescript",
  "noshape-kernel",
  "noshape-model-core",
@@ -4424,6 +4441,7 @@ dependencies = [
  "log",
  "miniz_oxide 0.8.9",
  "nalgebra",
+ "noshape-assembly",
  "noshape-drawing",
  "noshape-featurescript",
  "noshape-kernel",

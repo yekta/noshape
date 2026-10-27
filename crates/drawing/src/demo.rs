@@ -1,7 +1,7 @@
 //! Demo documents with drawings (they build drawing views).
 
 use noshape_model_core::configuration::ConfigValues;
-pub use noshape_model_core::demo::*;
+pub use noshape_assembly::demo::*;
 use noshape_model_core::document::{Document, TabContent};
 
 /// The demo document plus a Drawing tab of the plate: front/top/right and

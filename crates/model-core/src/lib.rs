@@ -1,5 +1,5 @@
-//! noshape-model-core: regeneration and the rest of the model logic (drawings are noshape-drawing; the
-//! noshape-model facade puts everything under one path).
+//! noshape-model-core: regeneration and the rest of the model logic (assemblies are noshape-assembly, drawings
+//! noshape-drawing; the noshape-model facade puts everything under one path).
 //!
 //! * [`document`]: documents and tabs.
 //! * [`partstudio`]: feature lists; [`features`]: feature schemas;
@@ -14,7 +14,8 @@ pub mod flatten;
 pub mod interference;
 pub use noshape_model_data::fits;
 pub mod release;
-pub mod assembly;
+/// Assembly data (the evaluation, solving and analysis are in noshape-assembly).
+pub use noshape_model_data::assembly;
 pub mod compare;
 pub use noshape_model_data::configuration;
 pub mod custom;
@@ -31,7 +32,6 @@ pub mod in_context;
 pub mod interaction;
 pub use noshape_model_data::material_library;
 pub mod merge;
-pub mod native_assembly;
 pub use noshape_model_data::naming;
 pub use noshape_model_data::params;
 pub use noshape_model_data::partstudio;

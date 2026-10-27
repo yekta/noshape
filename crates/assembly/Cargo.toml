@@ -1,0 +1,20 @@
+[package]
+name = "noshape-assembly"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's assemblies: evaluation, the mate solver, analysis (interference, exploded views), BOM, standard content, native assembly import, in-context snapshots. Data types are in noshape-model-data."
+
+[dependencies]
+noshape-units.workspace = true
+noshape-kernel.workspace = true
+noshape-model-data.workspace = true
+noshape-model-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+glam.workspace = true
+nalgebra.workspace = true
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+[dev-dependencies]
+noshape-sketch.workspace = true

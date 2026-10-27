@@ -980,9 +980,7 @@ pub struct AssemblyEvaluator {
 pub type StudioOptions = Arc<dyn Fn(&Document) -> RegenOptions + Send + Sync>;
 
 /// Body id of an inserted sketch's wire body (one per sketch feature).
-pub fn sketch_body_id(sketch: FeatureId) -> BodyId {
-    BodyId { feature: sketch, index: u32::MAX }
-}
+pub use crate::reference::sketch_body_id;
 
 /// A sketch's (non-construction) curves and standalone points as one wire
 /// body, for Insert › Sketches. `None` when the sketch has no geometry.

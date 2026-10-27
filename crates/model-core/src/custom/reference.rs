@@ -312,9 +312,9 @@ fn swept_body_query(body: &crate::regen::context::Body, op: &str) -> Option<Valu
 }
 
 /// The picked part of a `PartStudioData` value.
-/// (A sketch is listed like a part, as `assembly::eval::sketch_body_id`.)
+/// (A sketch is listed like a part, as `reference::sketch_body_id`.)
 fn picked_parts(ctx: &crate::regen::context::Context, part: Option<&str>) -> Vec<crate::reference::BodyId> {
-    let sketches = ctx.sketches.iter().map(|s| crate::assembly::eval::sketch_body_id(s.feature));
+    let sketches = ctx.sketches.iter().map(|s| crate::reference::sketch_body_id(s.feature));
     ctx.bodies.iter().map(|b| b.id.clone()).chain(sketches).filter(|b| part.is_some_and(|p| b.to_string() == p)).collect()
 }
 
@@ -476,7 +476,7 @@ fn build_part_studio(i: &mut noshape_featurescript::interp::Interp, a: Vec<Value
             st.name_transient(part_transient(&tab, &b.id), crate::reference::Reference::Body(b.id.clone()));
         }
         for sk in &ctx.sketches {
-            st.name_transient(part_transient(&tab, &crate::assembly::eval::sketch_body_id(sk.feature)), crate::reference::Reference::Sketch(sk.feature));
+            st.name_transient(part_transient(&tab, &crate::reference::sketch_body_id(sk.feature)), crate::reference::Reference::Sketch(sk.feature));
         }
     }
     Ok(c.value())

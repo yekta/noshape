@@ -3,7 +3,7 @@ name = "noshape-model-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "noshape's model core: regeneration, features, the FeatureScript host and std, assembly solving, in-context, analysis. Above noshape-model-data; noshape-drawing and the noshape-model facade build on it."
+description = "noshape's model core: regeneration, features, the FeatureScript host and std, in-context, analysis. Above noshape-model-data; noshape-assembly, noshape-drawing and the noshape-model facade build on it."
 
 [dependencies]
 noshape-units.workspace = true

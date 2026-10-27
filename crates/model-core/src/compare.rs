@@ -537,7 +537,7 @@ mod tests {
 
     #[test]
     fn studio_feature_diff() {
-        let mut old = crate::demo::demo_document();
+        let mut old = crate::demo::plate_document();
         let mut new = old.clone();
         let units = UnitPrefs::default();
         let tab = new.tabs.iter().position(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap();
@@ -559,7 +559,7 @@ mod tests {
 
     #[test]
     fn features_side_by_side() {
-        let base = crate::demo::demo_document();
+        let base = crate::demo::plate_document();
         let mut target = base.clone();
         let units = UnitPrefs::default();
         let tab = target.tabs.iter().position(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap();
@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn moved_features_get_two_rows() {
-        let base = crate::demo::demo_document();
+        let base = crate::demo::plate_document();
         let mut target = base.clone();
         let tab = target.tabs.iter().position(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap();
         let TabContent::PartStudio(ps) = &mut target.tabs[tab].content else { unreachable!() };
@@ -603,7 +603,7 @@ mod tests {
 
     #[test]
     fn rollback_moves_are_reported() {
-        let old = crate::demo::demo_document();
+        let old = crate::demo::plate_document();
         let mut new = old.clone();
         let tab = new.tabs.iter().position(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap();
         let TabContent::PartStudio(ps) = &mut new.tabs[tab].content else { unreachable!() };

@@ -1,18 +1,25 @@
 //! noshape-model: the headless CAD document model, as one path.
 //!
 //! A facade over the layered crates (docs/CRATES.md): `noshape-model-data` (the document data), `noshape-model-core`
-//! (regeneration, features, FeatureScript, assemblies) and `noshape-drawing` (drawing views and export). Every module
-//! keeps its old path: `noshape_model::document`, `noshape_model::regen`, `noshape_model::drawing::views`, …
+//! (regeneration, features, FeatureScript), `noshape-assembly` (assembly evaluation, solving, analysis) and
+//! `noshape-drawing` (drawing views and export). Every module keeps its old path: `noshape_model::document`,
+//! `noshape_model::regen`, `noshape_model::assembly::eval`, `noshape_model::drawing::views`, …
 
 pub use noshape_model_core::*;
+
+/// Assembly data and logic.
+pub use noshape_assembly::assembly;
+/// Assembly contexts (the snapshots of an evaluated assembly come from noshape-assembly).
+pub use noshape_assembly::in_context;
+pub use noshape_assembly::native_assembly;
 
 /// Drawing data and logic.
 pub use noshape_drawing::drawing;
 
-/// Demo documents (the ones with drawings come from noshape-drawing).
+/// Demo documents (the ones with assemblies come from noshape-assembly, with drawings from noshape-drawing).
 pub mod demo {
+    pub use noshape_assembly::demo::*;
     pub use noshape_drawing::demo::demo_document_with_drawing;
-    pub use noshape_model_core::demo::*;
 }
 
 /// Demo fabrication documents.

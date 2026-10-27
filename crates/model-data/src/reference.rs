@@ -151,6 +151,11 @@ pub struct BodyId {
     pub index: u32,
 }
 
+/// Body id of an inserted sketch's wire body (one per sketch feature).
+pub fn sketch_body_id(sketch: FeatureId) -> BodyId {
+    BodyId { feature: sketch, index: u32::MAX }
+}
+
 impl fmt::Display for BodyId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}", self.feature, self.index)

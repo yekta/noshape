@@ -11,12 +11,13 @@ target structure and the rules that keep it.
 |---|---|---|
 | 0 | `noshape-units`, `noshape-sketch`, `noshape-kernel`, `noshape-featurescript` | quantities, the sketch solver, the OCCT kernel bridge, the FeatureScript language |
 | 1 | **`noshape-model-data`** | the document data model: documents, tabs, Part Studio feature lists, feature schemas, params, references, configurations, variables, and the data types of Assemblies, Drawings (sheets, views, annotations, templates, fonts) and Feature Studios. Serde types and plain methods on them; **no evaluation** |
-| 2 | **`noshape-model-core`** | regeneration, features, FeatureScript host/std, assembly solving, in-context, analysis |
-| 3 | **`noshape-drawing`** | drawing views, HLR projection, sheet building, tables, export (PDF/DXF/DWG/DWT), the demo documents with drawings |
-| 3 | **`noshape-model`** (facade) | re-exports model-data, model-core and drawing under the old paths; holds the model integration tests (`crates/model/tests`) |
-| 2–3 | `noshape-store`, `noshape-scene`, `noshape-render` | persistence, scene building, the wgpu renderer |
-| 4 | `noshape-ops`, `noshape-cli` | the agent API |
-| 5 | app crates (planned split of `noshape`): workspace/chrome, Part Studio UI, sketch UI, assembly UI, drawing UI, other studios, the binary | GPUI application |
+| 2 | **`noshape-model-core`** | regeneration, features, FeatureScript host/std, in-context (context bodies in regeneration), analysis |
+| 3 | **`noshape-assembly`** | assembly evaluation, the mate solver, assembly analysis (interference, exploded views), BOM, standard content, native assembly import, in-context snapshots, the demo documents with assemblies |
+| 4 | **`noshape-drawing`** | drawing views, HLR projection, sheet building, tables, export (PDF/DXF/DWG/DWT), the demo documents with drawings |
+| 4 | **`noshape-model`** (facade) | re-exports model-data, model-core, assembly and drawing under the old paths; holds the model integration tests (`crates/model/tests`) |
+| 2–4 | `noshape-store`, `noshape-scene`, `noshape-render` | persistence, scene building, the wgpu renderer |
+| 5 | `noshape-ops`, `noshape-cli` | the agent API |
+| 6 | app crates (planned split of `noshape`): workspace/chrome, Part Studio UI, sketch UI, assembly UI, drawing UI, other studios, the binary | GPUI application |
 
 `noshape-model` re-exports every `noshape-model-data` module under the same path (`noshape_model::document`,
 `noshape_model::drawing::Sheet`, …), so code above it doesn't change when types move down.
@@ -51,9 +52,21 @@ target structure and the rules that keep it.
   | model data | core (check) | 9 s |
   | app | the app | 47 s |
 
+- 2026-10-27: `noshape-assembly` (11.5k lines) split out above the core (evaluation, solver, analysis, BOM, standard
+  content, native assembly import, the in-context snapshots of an evaluated assembly, the demo document's assembly);
+  `noshape-model-core` is now 47k lines and no longer contains any assembly logic (`sketch_body_id` moved to
+  `reference`, the core's `in_context` keeps what regeneration needs, `demo::plate_document` is the demo without the
+  assembly). noshape-drawing builds on noshape-assembly. Measured warm, incremental, on a loaded machine (load ~30
+  from the other agents), edit → rebuild:
+
+  | edit in | rebuild | time |
+  |---|---|---|
+  | assembly logic (eval) | assembly unit tests | 6.5 s |
+  | assembly logic (eval) | the app | 54–66 s (loaded; the drawing row above was 35 s quiet) |
+
 - Next: the app (138k lines), one studio at a time, each at a moment agreed with its owner: variables (3.5k) first,
   then drawing UI (27k), assembly UI (23k), Part Studio (34k), with `app-core` (widgets, viewport, shared panels) under
   them. What has to be cut first (measured 10-26): the base widgets reach the whole app through `ui`/`navigation` →
   `files::config_dir` (move to a base `paths` module), `os_ui` → `preferences_window::show` (a hook), `actions` →
   `shortcuts::init` (call it from main); the studios reach `files`, `workspace`, `release_dialog`, `preferences_window`,
-  `history_panel`, `start_library` (hooks or moves). Then assembly logic out of the model core.
+  `history_panel`, `start_library` (hooks or moves).
