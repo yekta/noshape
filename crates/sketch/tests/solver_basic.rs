@@ -322,3 +322,28 @@ fn refreshed_analysis_survives_a_drag_without_moving_the_sketch() {
     let rep = sk.solve_with(&SolveOptions { analyze: false, ..Default::default() });
     assert_eq!(rep.dof, Some(4), "{rep:?}");
 }
+
+/// Conflicting constraints in one part of a sketch don't stop drags in the
+/// rest: a line with two different lengths (its component never solves)
+/// stays as it is, while a separate circle and a free point drag (both used
+/// to stay put).
+#[test]
+fn drags_work_beside_conflicting_constraints() {
+    let mut sk = Sketch::new();
+    let l = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(1.0, 0.0));
+    sk.add_constraint(ConstraintKind::Length { curve: l, value: 1.0 }).unwrap();
+    sk.add_constraint_ext(ConstraintKind::Length { curve: l, value: 2.0 }, true).unwrap();
+    let c = sk.add_circle(DVec2::new(5.0, 5.0), 1.0);
+    let p = sk.add_point(DVec2::new(-3.0, 2.0));
+    sk.solve();
+    let line_before = sk.endpoints(l).unwrap();
+    let Some(Curve2::Circle { center, .. }) = sk.curve(c) else { panic!() };
+    let Some(Geometry::Circle { center: cid, .. }) = sk.entity(c).map(|e| e.geometry.clone()) else { panic!() };
+    let r = sk.drag(&[(DragHandle::Point(cid), center + DVec2::new(0.5, 0.25))]);
+    assert!(r.is_solved(), "{r:?}");
+    let Some(Curve2::Circle { center: moved, .. }) = sk.curve(c) else { panic!() };
+    assert!((moved - center - DVec2::new(0.5, 0.25)).length() < 1e-9, "the circle moved by {:?}", moved - center);
+    sk.drag(&[(DragHandle::Point(p), DVec2::new(-2.0, 2.5))]);
+    assert!((sk.point(p).unwrap() - DVec2::new(-2.0, 2.5)).length() < 1e-12);
+    assert_eq!(sk.endpoints(l).unwrap(), line_before, "the conflicting line keeps its state");
+}
