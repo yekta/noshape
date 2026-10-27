@@ -3272,43 +3272,63 @@ impl PartStudioView {
             );
         }
 
-        // ---- pattern glyphs (right-click: Edit pattern)
+        // ---- pattern glyphs (right-click: Edit pattern). Live (behaviours
+        // "icons2 … sketch Linear pattern", sketch/2222): the glyph left of the
+        // seed, a plain 20 px box like the constraint glyphs; hovering it
+        // lights the whole pattern (`SketchEditor::hover_pattern`).
         for pat in &data.patterns {
             let ents: Vec<noshape_sketch::EntityId> = pat.instances.iter().flatten().map(|e| noshape_sketch::EntityId(*e)).filter(|e| data.sketch.kind(*e).is_some_and(|k| k != noshape_sketch::EntityKind::Point)).collect();
-            let hovered = ed.hover.is_some_and(|h| ents.contains(&h) || pat.seeds.contains(&h.0));
+            let pid = pat.id;
+            let glyph_hovered = ed.hover_pattern == Some(pid);
+            let hovered = glyph_hovered || ed.hover.is_some_and(|h| ents.contains(&h) || pat.seeds.contains(&h.0));
             if !(show_all || hovered) {
                 continue;
             }
-            let Some(first) = ents.first() else { continue };
-            let Some(anchor) = data.sketch.curve(*first).map(|c| {
-                let (a, b) = c.domain();
-                c.point((a + b) * 0.5)
-            }) else {
+            // The seed's on-screen extent: the glyph sits left of it.
+            let seed_px: Vec<(f32, f32)> = pat
+                .seeds
+                .iter()
+                .map(|e| noshape_sketch::EntityId(*e))
+                .flat_map(|e| if data.sketch.kind(e) == Some(noshape_sketch::EntityKind::Point) { data.sketch.point(e).into_iter().collect() } else { data.sketch.tessellate(e, ed.world_per_px * 2.0) })
+                .filter_map(&project)
+                .collect();
+            if seed_px.is_empty() {
                 continue;
-            };
-            let Some((x, y)) = project(anchor) else { continue };
-            let pid = pat.id;
+            }
+            let left = seed_px.iter().map(|p| p.0).fold(f32::INFINITY, f32::min);
+            let (top, bottom) = seed_px.iter().fold((f32::INFINITY, f32::NEG_INFINITY), |(a, b), p| (a.min(p.1), b.max(p.1)));
+            let (x, y) = (left - 6.0 - 20.0, (top + bottom) * 0.5 - 10.0);
             let icon = if pat.circular { "sketch-circular-pattern" } else { "sketch-linear-pattern" };
             out.push(
                 div()
                     .id(SharedString::from(format!("pattern-glyph-{pid}")))
                     .absolute()
-                    .left(px(x + 6.0))
-                    .top(px(y + 6.0))
-                    .size(px(18.))
+                    .left(px(x))
+                    .top(px(y))
+                    .size(px(20.))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .rounded(px(3.))
-                    .bg(rgb(0xf2f2f2))
-                    .border_1()
-                    .border_color(rgb(0x9aa5af))
+                    .bg(rgb(if glyph_hovered { 0xfcda7f } else { 0xffffff }))
                     .cursor_pointer()
-                    .child(icon_px(icon, 13.0, rgb(0x000000)))
+                    .child(icon_px(icon, 18.0, rgb(0x000000)))
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        if let Some(ed) = &mut this.sketch {
+                            let new = if *h { Some(pid) } else if ed.hover_pattern == Some(pid) { None } else { ed.hover_pattern };
+                            if new != ed.hover_pattern {
+                                ed.hover_pattern = new;
+                                if new.is_some() {
+                                    this.hover = None;
+                                }
+                                this.refresh_scene(false, cx);
+                                cx.notify();
+                            }
+                        }
+                    }))
                     .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
                         cx.stop_propagation();
                         if let Some(ui) = this.ui_mut() {
-                            ui.pattern_menu = Some((pid, x + 12.0, y + 26.0));
+                            ui.pattern_menu = Some((pid, x + 6.0, y + 28.0));
                         }
                         cx.notify();
                     }))

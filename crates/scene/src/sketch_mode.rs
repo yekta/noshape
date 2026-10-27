@@ -452,6 +452,8 @@ pub struct SketchEditor {
     pub selected_regions: Vec<Vec<u32>>,
     /// Hovered dimension label or constraint glyph.
     pub hover_constraint: Option<ConstraintId>,
+    /// Hovered sketch pattern glyph (pattern id).
+    pub hover_pattern: Option<u32>,
     /// Entity whose glyphs stay visible briefly after hover ends.
     pub glyph_entity: Option<(EntityId, std::time::Instant)>,
     drag: Option<DragState>,
@@ -1057,6 +1059,7 @@ impl SketchEditor {
             hover_region: None,
             selected_regions: Vec::new(),
             hover_constraint: None,
+            hover_pattern: None,
             glyph_entity: None,
             drag: None,
             box_end: None,
@@ -5152,6 +5155,26 @@ impl SketchEditor {
             } else {
                 let pts3: Vec<[f32; 3]> = data.sketch.tessellate(*e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
                 lines.push_polyline(&pts3, [0xf2, 0xff, 0x80, 150], 0, 5.0, on_top);
+            }
+        }
+        // A hovered pattern glyph (live sketch/2222): every instance's curves
+        // secondary yellow, the seed's included; their centre points orange.
+        if let Some(pat) = self.hover_pattern.and_then(|id| data.patterns.iter().find(|p| p.id == id)) {
+            let orange = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
+            for e in pat.seeds.iter().chain(pat.instances.iter().flatten()).map(|e| EntityId(*e)) {
+                let Some(ent) = data.sketch.entity(e) else { continue };
+                let centre = match ent.geometry {
+                    noshape_sketch::Geometry::Point { .. } => Some(e),
+                    noshape_sketch::Geometry::Circle { center, .. } | noshape_sketch::Geometry::Arc { center, .. } | noshape_sketch::Geometry::Ellipse { center, .. } | noshape_sketch::Geometry::EllipticalArc { center, .. } => Some(center),
+                    _ => None,
+                };
+                if let Some(p) = centre.and_then(|c| data.sketch.point(c)) {
+                    points.points.push(PointSprite { position: w(p), color: orange, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
+                }
+                if !is_point(&data.sketch, e) {
+                    let pts3: Vec<[f32; 3]> = data.sketch.tessellate(e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
+                    lines.push_polyline(&pts3, [0xf2, 0xff, 0x80, 255], 0, 3.0, on_top);
+                }
             }
         }
         // Spline tangent handles: white points joined to the spline ends.
