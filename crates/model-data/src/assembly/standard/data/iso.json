@@ -15839,7 +15839,9 @@
     "shape": "nut",
     "form": {
      "form": 5,
-     "both": 0
+     "both": 1,
+     "cska": 45,
+     "ca": 30
     },
     "sizes": [
      {
@@ -15847,11 +15849,15 @@
       "label": "Prevailing torque nut M3x0.5",
       "d": 3.0,
       "dims": {
+       "cb": 3.85,
+       "cd": 0.810345,
+       "cr": 0.734375,
        "d": 3.0,
+       "dh": 2.459,
        "s": 5.5,
-       "m": 4.8,
-       "w": 2.45,
-       "de": 4.84
+       "w": 2.15,
+       "m": 4.5,
+       "de": 5.5
       }
      },
      {
@@ -15859,11 +15865,15 @@
       "label": "Prevailing torque nut M4x0.7",
       "d": 4.0,
       "dims": {
+       "cb": 4.9,
+       "cd": 1.068966,
+       "cr": 0.96875,
        "d": 4.0,
+       "dh": 3.242,
        "s": 7.0,
-       "m": 6.5,
-       "w": 3.3,
-       "de": 6.2
+       "w": 2.9,
+       "m": 6.0,
+       "de": 7.0
       }
      },
      {
@@ -15871,11 +15881,15 @@
       "label": "Prevailing torque nut M5x0.80",
       "d": 5.0,
       "dims": {
+       "cb": 5.6,
+       "cd": 0.827586,
+       "cr": 0.75,
        "d": 5.0,
+       "dh": 4.134,
        "s": 8.0,
-       "m": 6.95,
        "w": 4.4,
-       "de": 7.2
+       "m": 6.8,
+       "de": 8.0
       }
      },
      {
@@ -15883,11 +15897,15 @@
       "label": "Prevailing torque nut M6x1.00",
       "d": 6.0,
       "dims": {
+       "cb": 7.0,
+       "cd": 1.068966,
+       "cr": 0.96875,
        "d": 6.0,
+       "dh": 4.917,
        "s": 10.0,
-       "m": 8.0,
        "w": 4.9,
-       "de": 8.88
+       "m": 8.0,
+       "de": 10.0
       }
      },
      {
@@ -15895,11 +15913,15 @@
       "label": "Prevailing torque nut M8x1.25",
       "d": 8.0,
       "dims": {
+       "cb": 9.1,
+       "cd": 1.055172,
+       "cr": 0.95625,
        "d": 8.0,
+       "dh": 6.647,
        "s": 13.0,
-       "m": 9.5,
        "w": 6.44,
-       "de": 11.63
+       "m": 9.5,
+       "de": 13.0
       }
      },
      {
@@ -15907,11 +15929,15 @@
       "label": "Prevailing torque nut M10x1.50",
       "d": 10.0,
       "dims": {
+       "cb": 11.2,
+       "cd": 1.331034,
+       "cr": 1.20625,
        "d": 10.0,
+       "dh": 8.376,
        "s": 16.0,
-       "m": 11.9,
        "w": 8.04,
-       "de": 14.63
+       "m": 11.9,
+       "de": 16.0
       }
      },
      {
@@ -15919,11 +15945,15 @@
       "label": "Prevailing torque nut M12x1.75",
       "d": 12.0,
       "dims": {
+       "cb": 12.6,
+       "cd": 1.562069,
+       "cr": 1.415625,
        "d": 12.0,
+       "dh": 10.106,
        "s": 18.0,
-       "m": 14.9,
        "w": 10.37,
-       "de": 16.63
+       "m": 14.9,
+       "de": 18.0
       }
      },
      {
@@ -15931,11 +15961,15 @@
       "label": "Prevailing torque nut M14x2.00",
       "d": 14.0,
       "dims": {
+       "cb": 15.4,
+       "cd": 1.724138,
+       "cr": 1.5625,
        "d": 14.0,
-       "s": 21.0,
-       "m": 17.0,
-       "w": 12.1,
-       "de": 19.64
+       "dh": 11.835,
+       "s": 22.0,
+       "w": 12.5,
+       "m": 17.5,
+       "de": 22.0
       }
      },
      {
@@ -15943,11 +15977,15 @@
       "label": "Prevailing torque nut M16x2.00",
       "d": 16.0,
       "dims": {
+       "cb": 16.8,
+       "cd": 1.724138,
+       "cr": 1.5625,
        "d": 16.0,
+       "dh": 13.385,
        "s": 24.0,
-       "m": 19.1,
        "w": 14.1,
-       "de": 22.49
+       "m": 19.1,
+       "de": 24.0
       }
      },
      {
@@ -15955,11 +15993,15 @@
       "label": "Prevailing torque nut M18x2.50",
       "d": 18.0,
       "dims": {
+       "cb": 18.9,
+       "cd": 2.068966,
+       "cr": 1.875,
        "d": 18.0,
+       "dh": 15.294,
        "s": 27.0,
-       "m": 21.2,
-       "w": 15.1,
-       "de": 24.85
+       "w": 15.5,
+       "m": 21.5,
+       "de": 27.0
       }
      },
      {
@@ -15967,11 +16009,15 @@
       "label": "Prevailing torque nut M20x2.50",
       "d": 20.0,
       "dims": {
+       "cb": 21.0,
+       "cd": 2.034483,
+       "cr": 1.84375,
        "d": 20.0,
+       "dh": 17.294,
        "s": 30.0,
-       "m": 23.0,
        "w": 16.9,
-       "de": 27.7
+       "m": 22.8,
+       "de": 30.0
       }
      },
      {
@@ -15979,11 +16025,15 @@
       "label": "Prevailing torque nut M24x3.00",
       "d": 24.0,
       "dims": {
+       "cb": 25.2,
+       "cd": 2.37931,
+       "cr": 2.15625,
        "d": 24.0,
+       "dh": 20.752,
        "s": 36.0,
-       "m": 27.1,
        "w": 20.2,
-       "de": 33.25
+       "m": 27.1,
+       "de": 36.0
       }
      },
      {
@@ -15991,11 +16041,15 @@
       "label": "Prevailing torque nut M30x3.50",
       "d": 30.0,
       "dims": {
+       "cb": 32.2,
+       "cd": 2.862069,
+       "cr": 2.59375,
        "d": 30.0,
+       "dh": 26.211,
        "s": 46.0,
-       "m": 32.6,
        "w": 24.3,
-       "de": 42.75
+       "m": 32.6,
+       "de": 46.0
       }
      },
      {
@@ -16003,15 +16057,19 @@
       "label": "Prevailing torque nut M36x4.00",
       "d": 36.0,
       "dims": {
+       "cb": 38.5,
+       "cd": 3.275862,
+       "cr": 2.96875,
        "d": 36.0,
+       "dh": 31.67,
        "s": 55.0,
-       "m": 38.9,
        "w": 29.4,
-       "de": 51.11
+       "m": 38.9,
+       "de": 55.0
       }
      }
     ],
-    "source": "ISO 7040:2025 (4th edition, 2025-06; EN ISO 7040:2025 identical) (Fasteners — Prevailing torque hexagon nuts — Regular nuts (with non-metallic insert)); https://www.globalfastener.com/standards/detail.php?sid=MjU3OTQ= (ISO 7040-2025 dimension table, all values); https://standards.iteh.ai/catalog/standards/iso/a3b63e8a-5c1a-4aff-8122-47124d4dc067/iso-7040-2025 (edition, title, scope M3-M39, Annex A for D < M5); https://www.evs.ee/en/iso-7040-2025 (edition / scope); https://www.fasten.it/en/norms/norm/DIN_EN_ISO_7040 (DIN EN ISO 7040:2013 = ISO 7040:2012 values: s, h, m, e; cross-check); https://www.fasteners.eu/standards/ISO/7040/ (older table with da, dw, m' ; cross-check only)"
+    "source": "Onshape's own table (the component's FSRules, dom/skb-sc-fsrules/ISO_7040__FSRules.fs) and its B-rep template (behaviours \"skasm (2026-10-27) standard content gaps\", addendum 1488); earlier: ISO 7040:2025 (4th edition, 2025-06; EN ISO 7040:2025 identical) (Fasteners — Prevailing torque hexagon nuts — Regular nuts (with non-metallic insert)); https://www.globalfastener.com/standards/detail.php?sid=MjU3OTQ= (ISO 7040-2025 dimension table, all values); https://standards.iteh.ai/catalog/standards/iso/a3b63e8a-5c1a-4aff-8122-47124d4dc067/iso-7040-2025 (edition, title, scope M3-M39, Annex A for D < M5); https://www.evs.ee/en/iso-7040-2025 (edition / scope); https://www.fasten.it/en/norms/norm/DIN_EN_ISO_7040 (DIN EN ISO 7040:2013 = ISO 7040:2012 values: s, h, m, e; cross-check); https://www.fasteners.eu/standards/ISO/7040/ (older table with da, dw, m' ; cross-check only)"
    },
    {
     "category": "Nuts",
@@ -16244,19 +16302,57 @@
     "shape": "nut",
     "form": {
      "form": 5,
-     "both": 0
+     "both": 1,
+     "cska": 45,
+     "ca": 30
     },
     "sizes": [
+     {
+      "name": "M2",
+      "label": "Prevailing torque nut thin M2x0.40",
+      "d": 2.0,
+      "dims": {
+       "cb": 2.8,
+       "cd": 0.62069,
+       "cr": 0.5625,
+       "d": 2.0,
+       "dh": 1.567,
+       "s": 4.0,
+       "w": 1.0,
+       "m": 2.8,
+       "de": 4.0
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "Prevailing torque nut thin M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "cb": 3.5,
+       "cd": 0.672414,
+       "cr": 0.609375,
+       "d": 2.5,
+       "dh": 2.013,
+       "s": 5.0,
+       "w": 1.25,
+       "m": 3.2,
+       "de": 5.0
+      }
+     },
      {
       "name": "M3",
       "label": "Prevailing torque nut thin M3x0.50",
       "d": 3.0,
       "dims": {
+       "cb": 3.85,
+       "cd": 0.810345,
+       "cr": 0.734375,
        "d": 3.0,
+       "dh": 2.459,
        "s": 5.5,
-       "m": 3.9,
        "w": 1.55,
-       "de": 4.56
+       "m": 3.9,
+       "de": 5.5
       }
      },
      {
@@ -16264,11 +16360,15 @@
       "label": "Prevailing torque nut thin M4x0.70",
       "d": 4.0,
       "dims": {
+       "cb": 4.9,
+       "cd": 1.051724,
+       "cr": 0.953125,
        "d": 4.0,
+       "dh": 3.242,
        "s": 7.0,
-       "m": 5.0,
        "w": 1.95,
-       "de": 5.9
+       "m": 5.0,
+       "de": 7.0
       }
      },
      {
@@ -16276,11 +16376,15 @@
       "label": "Prevailing torque nut thin M5x0.80",
       "d": 5.0,
       "dims": {
+       "cb": 5.6,
+       "cd": 0.87931,
+       "cr": 0.796875,
        "d": 5.0,
+       "dh": 4.134,
        "s": 8.0,
-       "m": 5.0,
        "w": 2.45,
-       "de": 6.9
+       "m": 5.0,
+       "de": 8.0
       }
      },
      {
@@ -16288,11 +16392,15 @@
       "label": "Prevailing torque nut thin M6x1.00",
       "d": 6.0,
       "dims": {
+       "cb": 7.0,
+       "cd": 1.068966,
+       "cr": 0.96875,
        "d": 6.0,
+       "dh": 4.917,
        "s": 10.0,
-       "m": 6.0,
        "w": 2.9,
-       "de": 8.9
+       "m": 6.0,
+       "de": 10.0
       }
      },
      {
@@ -16300,11 +16408,15 @@
       "label": "Prevailing torque nut thin M8x1.25",
       "d": 8.0,
       "dims": {
+       "cb": 9.1,
+       "cd": 1.055172,
+       "cr": 0.95625,
        "d": 8.0,
+       "dh": 6.647,
        "s": 13.0,
-       "m": 6.76,
        "w": 3.7,
-       "de": 11.6
+       "m": 6.76,
+       "de": 13.0
       }
      },
      {
@@ -16312,11 +16424,15 @@
       "label": "Prevailing torque nut thin M10x1.50",
       "d": 10.0,
       "dims": {
+       "cb": 11.2,
+       "cd": 1.331034,
+       "cr": 1.20625,
        "d": 10.0,
+       "dh": 8.376,
        "s": 16.0,
-       "m": 8.56,
        "w": 4.7,
-       "de": 14.6
+       "m": 8.56,
+       "de": 16.0
       }
      },
      {
@@ -16324,11 +16440,15 @@
       "label": "Prevailing torque nut thin M12x1.75",
       "d": 12.0,
       "dims": {
+       "cb": 12.6,
+       "cd": 1.562069,
+       "cr": 1.415625,
        "d": 12.0,
+       "dh": 10.106,
        "s": 18.0,
-       "m": 10.23,
        "w": 5.7,
-       "de": 16.6
+       "m": 10.23,
+       "de": 18.0
       }
      },
      {
@@ -16336,11 +16456,15 @@
       "label": "Prevailing torque nut thin M14x2.00",
       "d": 14.0,
       "dims": {
+       "cb": 15.4,
+       "cd": 1.768966,
+       "cr": 1.603125,
        "d": 14.0,
-       "s": 21.0,
-       "m": 11.32,
-       "w": 6.42,
-       "de": 19.6
+       "dh": 11.835,
+       "s": 22.0,
+       "w": 6.2,
+       "m": 11.33,
+       "de": 22.0
       }
      },
      {
@@ -16348,11 +16472,31 @@
       "label": "Prevailing torque nut thin M16x2.00",
       "d": 16.0,
       "dims": {
+       "cb": 16.8,
+       "cd": 1.724138,
+       "cr": 1.5625,
        "d": 16.0,
+       "dh": 13.385,
        "s": 24.0,
-       "m": 12.42,
        "w": 7.42,
-       "de": 22.5
+       "m": 12.42,
+       "de": 24.0
+      }
+     },
+     {
+      "name": "M18",
+      "label": "Prevailing torque nut thin M18x2.50",
+      "d": 18.0,
+      "dims": {
+       "cb": 18.9,
+       "cd": 1.793103,
+       "cr": 1.625,
+       "d": 18.0,
+       "dh": 15.294,
+       "s": 27.0,
+       "w": 8.3,
+       "m": 13.5,
+       "de": 27.0
       }
      },
      {
@@ -16360,11 +16504,15 @@
       "label": "Prevailing torque nut thin M20x2.50",
       "d": 20.0,
       "dims": {
+       "cb": 21.0,
+       "cd": 2.0,
+       "cr": 1.8125,
        "d": 20.0,
+       "dh": 17.294,
        "s": 30.0,
-       "m": 14.9,
        "w": 9.1,
-       "de": 27.7
+       "m": 14.9,
+       "de": 30.0
       }
      },
      {
@@ -16372,11 +16520,15 @@
       "label": "Prevailing torque nut thin M24x3.00",
       "d": 24.0,
       "dims": {
+       "cb": 25.2,
+       "cd": 2.37931,
+       "cr": 2.15625,
        "d": 24.0,
+       "dh": 20.752,
        "s": 36.0,
-       "m": 17.8,
        "w": 10.9,
-       "de": 33.2
+       "m": 17.8,
+       "de": 36.0
       }
      },
      {
@@ -16384,11 +16536,15 @@
       "label": "Prevailing torque nut thin M30x3.50",
       "d": 30.0,
       "dims": {
+       "cb": 32.2,
+       "cd": 2.862069,
+       "cr": 2.59375,
        "d": 30.0,
+       "dh": 26.211,
        "s": 46.0,
-       "m": 22.2,
        "w": 13.9,
-       "de": 42.8
+       "m": 22.2,
+       "de": 46.0
       }
      },
      {
@@ -16396,15 +16552,19 @@
       "label": "Prevailing torque nut thin M36x4.00",
       "d": 36.0,
       "dims": {
+       "cb": 38.5,
+       "cd": 2.965517,
+       "cr": 2.6875,
        "d": 36.0,
+       "dh": 31.67,
        "s": 55.0,
-       "m": 25.5,
        "w": 16.9,
-       "de": 51.1
+       "m": 25.5,
+       "de": 55.0
       }
      }
     ],
-    "source": "ISO 10511:2012 (2012-12-15); superseded by ISO 10511:2025 whose table could not be obtained (Prevailing torque type hexagon thin nuts (with non-metallic insert)); https://standards.iteh.ai/catalog/standards/iso/27064848-41d0-4be3-9393-43410d340d5f/iso-10511-2012 (iTeh preview PDFs of ISO 10511:2012, English and French, incl. Table 1 — all values); https://www.fasten.it/en/norms/norm/DIN_EN_ISO_10511 (DIN EN ISO 10511 tables: P, e, s, m, h; cross-check); https://amesweb.info/Fasteners/Metric_Hex_Nuts/Hex-Jam-Nylon-Lock-Nut.aspx (amesweb calculator, ISO 10511 results per size; cross-check of all columns); https://standards.iteh.ai/catalog/standards/iso/256fc508-e5de-40ec-b7d5-ec8a7e3c2802/iso-10511-2025 (2025 edition title; preview has no table)"
+    "source": "Onshape's own table (the component's FSRules, dom/skb-sc-fsrules/ISO_10511__FSRules.fs) and its B-rep template (behaviours \"skasm (2026-10-27) standard content gaps\", addendum 1488); earlier: ISO 10511:2012 (2012-12-15); superseded by ISO 10511:2025 whose table could not be obtained (Prevailing torque type hexagon thin nuts (with non-metallic insert)); https://standards.iteh.ai/catalog/standards/iso/27064848-41d0-4be3-9393-43410d340d5f/iso-10511-2012 (iTeh preview PDFs of ISO 10511:2012, English and French, incl. Table 1 — all values); https://www.fasten.it/en/norms/norm/DIN_EN_ISO_10511 (DIN EN ISO 10511 tables: P, e, s, m, h; cross-check); https://amesweb.info/Fasteners/Metric_Hex_Nuts/Hex-Jam-Nylon-Lock-Nut.aspx (amesweb calculator, ISO 10511 results per size; cross-check of all columns); https://standards.iteh.ai/catalog/standards/iso/256fc508-e5de-40ec-b7d5-ec8a7e3c2802/iso-10511-2025 (2025 edition title; preview has no table)"
    },
    {
     "category": "Nuts",

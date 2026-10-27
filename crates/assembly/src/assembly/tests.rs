@@ -4463,3 +4463,36 @@ fn din_6908_washer_matches_live() {
     assert_eq!(b.faces.len(), 4);
     assert!((12.144..=12.154).contains(&v), "{v} mm³, live 12.144 – 12.154");
 }
+
+/// ISO 10511 thin and ISO 7040 prevailing torque nuts on live's template
+/// (behaviours "skasm (2026-10-27) standard content gaps", addendum 1488):
+/// ISO 10512's (bore at the thread's minor diameter, 90 degree countersinks,
+/// 30 degree corner chamfers on both faces, collar of diameter s with its
+/// top rounded (h − m) 5/16 and its floor (h − m) 10/29 down) but the collar
+/// bored 0.7 s as DIN 985. Live at the studios' defaults: 27 faces each;
+/// M3 × 0.5 thin 69.461 – 69.504 mm³, 136.3028 mm²; M5 × 0.8 257.282 –
+/// 257.396 mm³, 338.7503 mm².
+#[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
+fn iso_10511_and_7040_nuts_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for (name, size, vol, live_area) in [("Prevailing torque nut thin ISO 10511", "M3", 69.461..=69.504, 136.3028), ("Prevailing torque nut ISO 7040", "M5", 257.282..=257.396, 338.7503)] {
+        let c = CATALOGUE.iter().find(|c| c.name == name).expect(name);
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        let r = standard::regenerate(&spec).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let v = b.shape.volume().unwrap() * 1e9;
+        let area: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap() * 1e6).sum();
+        eprintln!("{name} {size}: {} faces, {v} mm³, {area} mm²", b.faces.len());
+        assert_eq!(b.faces.len(), 27, "{name}");
+        assert!(vol.contains(&v), "{name}: {v} mm³, live {vol:?}");
+        assert!((area - live_area).abs() < 1e-2, "{name}: {area} mm², live {live_area}");
+        for s in &c.sizes {
+            let mut spec = StandardSpec::new(c);
+            spec.set_size(&s.name);
+            let r = standard::regenerate(&spec).unwrap();
+            assert!(r.display.features.iter().all(|f| f.message.is_none()), "{name} {}", s.name);
+        }
+    }
+}
