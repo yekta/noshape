@@ -3003,8 +3003,9 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_split_closed(
   }
 }
 
-// CPU seconds a fillet or chamfer may take (qa FILLET-HANG: > 1 h in OCCT's
-// blend approximation); NOSHAPE_BLEND_BUDGET overrides (tests).
+// CPU seconds a fillet, chamfer, draft or face deletion may take (qa
+// FILLET-HANG: > 1 h in OCCT's blend approximation; DRAFT-HANG: > 20 min in
+// its defeaturing); NOSHAPE_BLEND_BUDGET overrides (tests).
 static double blend_budget_seconds()
 {
   const char* v = std::getenv("NOSHAPE_BLEND_BUDGET");
@@ -3980,7 +3981,7 @@ static TopoDS_Shape end_cone_at_apex(const TopoDS_Shape& input, const TopoDS_Fac
   }
 }
 
-OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF& neutral,
+static OpOut op_draft_unbudgeted(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF& neutral,
                double angle)
 {
   require_non_null(s.shape, "shape");
@@ -4024,9 +4025,21 @@ OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF&
   return make_result(args, r, h.get());
 }
 
+OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF& neutral,
+               double angle)
+{
+  OpOut out;
+  const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_draft_unbudgeted(s, faces, dir, neutral, angle); });
+  if (r == 1)
+    fail_op("draft took too long");
+  if (r == 2)
+    fail_op("cancelled");
+  return out;
+}
+
 // ---------------------------------------------------------------- defeature / offsets
 
-OpOut op_defeature(const OcShape& s, const OcShapeList& faces)
+static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
 {
   require_non_null(s.shape, "shape");
   if (faces.items.empty())
@@ -4035,7 +4048,10 @@ OpOut op_defeature(const OcShape& s, const OcShapeList& faces)
   BRepAlgoAPI_Defeaturing mk;
   mk.SetShape(s.shape);
   mk.AddFacesToRemove(to_list(faces.items));
-  mk.SetRunParallel(true);
+  // On this thread, so its CPU budget (run_budgeted) counts the work: in
+  // parallel the caller only waits and its budget never ran out (qa
+  // DRAFT-HANG: 623 s in one call).
+  mk.SetRunParallel(false);
   mk.SetToFillHistory(true);
   mk.Build();
   if (!mk.IsDone() || mk.HasErrors())
@@ -4043,6 +4059,18 @@ OpOut op_defeature(const OcShape& s, const OcShapeList& faces)
   std::vector<TopoDS_Shape> args{s.shape};
   HHist                     h = history_of(args, mk);
   return make_result(args, mk.Shape(), h.get());
+}
+
+OpOut op_defeature(const OcShape& s, const OcShapeList& faces)
+{
+  OpOut out;
+  // A face deletion takes milliseconds; a third of a blend's budget.
+  const int r = run_budgeted(blend_budget_seconds() / 3, [&] { out = op_defeature_unbudgeted(s, faces); });
+  if (r == 1)
+    fail_op("delete faces took too long");
+  if (r == 2)
+    fail_op("cancelled");
+  return out;
 }
 
 OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
