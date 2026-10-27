@@ -88,8 +88,7 @@ that touches the model: ~12 min.
    (109,149,175): the two don't agree under one model (cap post-mix at 50 %), so ask live for the boss top at
    slider 1 with the cap's region excluded (e.g. Depth 25 mm, sample the top's far corner) before changing it.
 2. part-studio.md 🔧 rows waiting for live (asked 10-27): 3.7 box into a dialog field (ours: Fillet takes the 6 faces),
-   3.12 / 3.13 Select other into a field, 6.26 / 6.37 / 6.38 list separator and folder menus. Dihedral comb length vs
-   Scale and its "Min: 90 deg" label (asked).
+   3.12 / 3.13 Select other into a field, 6.26 / 6.37 / 6.38 list separator and folder menus.
 3. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache
    needs vendoring wgpu-hal 29, or smaller per-pipeline shader modules (naga's MSL writer emits the whole module per
    stage). perf.yml without `-f ref=` measures the latest release: run 40464678503 (v0.4.8) failed its gates on

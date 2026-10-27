@@ -218,7 +218,10 @@ impl PartStudioView {
         {
             selection = sd.curves.iter().map(|c| Reference::SketchEntity { sketch: sk, entity: c.entity }).collect();
         }
-        let mut options = self.ui.tool_memory.options.get(key).cloned().unwrap_or_default();
+        let mut options = self.ui.tool_memory.options.get(key).cloned().unwrap_or_else(|| {
+            // Live 10-27: Dihedral's Scale opens mid-track.
+            ToolOptions { scale: if kind == ToolKind::Dihedral { 0.5 } else { ToolOptions::default().scale }, ..Default::default() }
+        });
         if kind == ToolKind::Zebra {
             options.zebra = self.ui.zebra.unwrap_or(options.zebra);
             // Zebra stripes and the curvature color map replace each other.
@@ -231,7 +234,7 @@ impl PartStudioView {
             options.reflection = self.ui.reflection.clone().unwrap_or(options.reflection);
             self.ui.zebra = None;
         }
-        let slider = cx.new(|_| SliderState::new().min(0.05).max(1.0).step(0.01).default_value(options.scale));
+        let slider = cx.new(|_| SliderState::new().min(if kind == ToolKind::Dihedral { 0.0 } else { 0.05 }).max(1.0).step(0.01).default_value(options.scale));
         let sub = cx.subscribe_in(&slider, window, |this: &mut Self, _, ev: &SliderEvent, _, cx| {
             let (SliderEvent::Change(v) | SliderEvent::Release(v)) = ev;
             if let Some(t) = &mut this.ui.analysis_tool {
@@ -602,6 +605,24 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// World length per unit of comb tooth. Dihedral (live 10-27): the
+    /// longest tooth is 0.138 × the parts' diagonal at mid-track (99 px on
+    /// a 40 × 20 × 10 block) and grows ×3.4 per quarter of the track (9 px
+    /// at its start, ×130 to its end).
+    fn comb_factor(&self, t: &AnalysisTool, res: &ToolResult) -> f64 {
+        let max = res.combs.iter().map(|(c, _)| c.max_len()).fold(0.0, f64::max);
+        if max <= 0.0 {
+            return 0.0;
+        }
+        if t.kind == ToolKind::Dihedral {
+            let parts = self.display.bodies.iter().filter(|b| !b.hidden).filter_map(|b| b.bounds).reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)));
+            let size = parts.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1);
+            return size * 0.1376 * 3.4f64.powf((t.options.scale as f64 - 0.5) / 0.25) / max;
+        }
+        let size = self.fit_bounds().map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1);
+        size * 0.25 * t.options.scale as f64 / max
+    }
+
     /// Combs, envelopes, control polygons and markers over the model.
     pub(super) fn analysis_tool_overlay(&self) -> Vec<Instance> {
         if let Some(s) = &self.ui.flatten {
@@ -613,9 +634,7 @@ impl PartStudioView {
         let Some(t) = &self.ui.analysis_tool else { return Vec::new() };
         let Some(res) = &t.result else { return Vec::new() };
         let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
-        let size = self.fit_bounds().map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1);
-        let max = res.combs.iter().map(|(c, _)| c.max_len()).fold(0.0, f64::max);
-        let k = if max > 0.0 { size * 0.25 * t.options.scale as f64 / max } else { 0.0 };
+        let k = self.comb_factor(t, res);
         let mut lines = LineData::default();
         for (comb, color) in &res.combs {
             let mut tips = Vec::with_capacity(comb.base.len());
@@ -741,6 +760,35 @@ impl PartStudioView {
             && let Some((r, at)) = t.result.as_ref().and_then(|r| r.min_radius)
         {
             out.extend(value(&format!("R {}", fmt_len(r)), 0xd228c8, [8., -8.], at));
+        }
+        // Dihedral (live 10-27): "Max: …" and "Min: …" once per panel, bold
+        // with a light halo, centred 13 px above the tooth tip where each
+        // extreme occurs.
+        if t.kind == ToolKind::Dihedral
+            && let Some(res) = &t.result
+        {
+            let k = self.comb_factor(t, res);
+            let teeth = res.combs.iter().flat_map(|(c, _)| c.base.iter().zip(&c.teeth));
+            // (tooth length, tip) of the longest and the shortest tooth.
+            let mut hi: Option<(f64, DVec3)> = None;
+            let mut lo: Option<(f64, DVec3)> = None;
+            for (b, tooth) in teeth {
+                let (len, tip) = (tooth.length(), *b + *tooth * k);
+                if hi.is_none_or(|(m, _)| len > m) {
+                    hi = Some((len, tip));
+                }
+                if lo.is_none_or(|(m, _)| len < m) {
+                    lo = Some((len, tip));
+                }
+            }
+            let angle = |rad: f64| if t.options.radians { format!("{} rad", noshape_units::format_number(rad, 3)) } else { format!("{} deg", noshape_units::format_number(rad.to_degrees(), 2)) };
+            for (name, e) in [("Max", hi), ("Min", lo)] {
+                if let Some((len, at)) = e {
+                    let text = format!("{name}: {}", angle(len));
+                    let label = crate::overlay_labels::HaloText { text: &text, text_size: 13.0, color: gpui_kit::rgb(0x111111).into(), halo: gpui_kit::rgb(0xffffff).into(), above: 13.0 };
+                    out.extend(crate::overlay_labels::halo_text(window, cx, &label, at));
+                }
+            }
         }
         out
     }

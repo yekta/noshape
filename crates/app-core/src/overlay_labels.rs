@@ -97,6 +97,32 @@ pub fn value_box(window: &Window, cx: &App, b: &ValueBox, anchor: glam::DVec3) -
     Some(Label { anchor, offset: b.offset, rects, masks: vec![(mask, [m.origin.x.0, m.origin.y.0], rgba(b.text_color))], ..Default::default() })
 }
 
+/// Bold text with a light halo and no box (live's Dihedral "Max: 90 deg").
+pub struct HaloText<'a> {
+    pub text: &'a str,
+    pub text_size: f32,
+    pub color: Hsla,
+    pub halo: Hsla,
+    /// Its bottom this many logical px over the anchor (centred on it).
+    pub above: f32,
+}
+
+/// A [`HaloText`] at `anchor`.
+pub fn halo_text(window: &Window, cx: &App, t: &HaloText, anchor: glam::DVec3) -> Option<Label> {
+    let (text, text_size, color, halo, above) = (t.text, t.text_size, t.color, t.halo, t.above);
+    let scale = window.scale_factor();
+    let font = Font { family: cx.theme().font_family.clone(), weight: FontWeight::BOLD, ..Default::default() };
+    let line_height = px(text_size * 1.25);
+    let m = window.rasterize_text_line(SharedString::from(text.to_string()), font, px(text_size), line_height, color, point(px(0.), px(0.)))?;
+    let mask = Mask { width: m.size.width.0 as u32, height: m.size.height.0 as u32, alpha: Arc::new(m.alpha), offset: [0, 0], density: 1 };
+    let (w, h) = (mask.width as f32 / scale, f32::from(line_height));
+    let d = scale.round().max(1.0) as i32;
+    let o = [m.origin.x.0 + d, m.origin.y.0 + d];
+    let mut masks: Vec<(Mask, [i32; 2], ORgba)> = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)].into_iter().map(|(x, y)| (mask.clone(), [o[0] + x * d, o[1] + y * d], rgba(halo))).collect();
+    masks.push((mask, o, rgba(color)));
+    Some(Label { anchor, offset: [-w * 0.5 - 1.0, -above - h], masks, ..Default::default() })
+}
+
 /// A text leaf of a [`RowBox`]: `div().child(text)` (italic or not, its own
 /// color) with a right margin (logical px).
 pub struct Leaf<'a> {
