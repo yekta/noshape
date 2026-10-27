@@ -9,6 +9,7 @@
 
 #include "rust/cxx.h"
 
+#include <GProp_GProps.hxx>
 #include <Standard_Failure.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopTools_ShapeMapHasher.hxx>
@@ -166,12 +167,22 @@ public:
   OcShape& operator=(const OcShape&) = delete;
 
   const ShapeIMap& map(TopAbs_ShapeEnum kind) const;
+  // Volume properties, computed once (`compute` runs the first time):
+  // regeneration asks for a body's volume before and after each boolean.
+  template <class F>
+  const GProp_GProps& volume_props(F&& compute) const
+  {
+    std::call_once(myVolumeFlag, [&] { myVolume = compute(); });
+    return myVolume;
+  }
 
   TopoDS_Shape shape;
 
 private:
   mutable std::once_flag myFlags[TopAbs_SHAPE + 1];
   mutable ShapeIMap      myMaps[TopAbs_SHAPE + 1];
+  mutable std::once_flag myVolumeFlag;
+  mutable GProp_GProps   myVolume;
 };
 
 // Growable list of shapes used to pass shape arrays across the bridge.

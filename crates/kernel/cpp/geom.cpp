@@ -766,7 +766,7 @@ static PropsF to_props(const GProp_GProps& g)
 PropsF props_volume(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
-  return to_props(volume_props(s.shape));
+  return to_props(s.volume_props([&] { return volume_props(s.shape); }));
 }
 
 PropsF props_surface(const OcShape& s)
