@@ -222,10 +222,10 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 10.1 | With no tool, under-defined points and curves drag with the solver | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 10.2 | Fully defined / fixed geometry does not move | Home__colors | ✅ |  |
-| 10.3 | Dropping a point on another point merges them; on a curve makes it coincident | B§7.1 | ✅ |  |
-| 10.4 | Dropping a point on the origin constrains it to the origin | B§7.1 | ✅ (T:sm) |  |
-| 10.5 | Shift while dragging suppresses the snap | B§7.1 | ✅ (T:sm) |  |
+| 10.2 | Fully defined / fixed geometry does not move | Home__colors | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 10.3 | Dropping a point on another point merges them; on a curve makes it coincident | B§7.1 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 10.4 | Dropping a point on the origin constrains it to the origin | B§7.1 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
+| 10.5 | Shift while dragging suppresses the snap | B§7.1 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 10.6 | Colors: blue under-defined, black fully defined, red over-defined, per entity | Home__colors | ✅ (theme palette: #0000d0 / black / #cd0000) | 0.4.10+ / 2d9a275c 10-27 |
 | 10.7 | Text boxes drag as a whole | H:text | ✅ |  |
 
