@@ -2265,28 +2265,13 @@ impl AssemblyView {
     /// Move the source connector's instance face-to-face onto the target and fasten them.
     fn perform_snap(&mut self, src: MateConnectorRef, dst: MateConnectorRef, cx: &mut Context<Self>) {
         let units = self.units(cx);
-        let (Some(fs), Some(fd)) = (self.result.connector_world(&src, &units), self.result.connector_world(&dst, &units)) else {
-            self.message = Some((true, "Snap: a mate connector could not be resolved.".into()));
-            return;
-        };
-        let fixed = |id: InstanceId, a: &Assembly| id == InstanceId::ORIGIN || a.instance(id).is_some_and(|i| i.fixed);
-        let Some(asm) = self.assembly(cx) else { return };
-        // The source moves unless it is fixed and the target is free.
-        let (mover, moving_conn, stay_conn, fm, ft) = if fixed(src.instance, asm) && !fixed(dst.instance, asm) { (dst.instance, dst.clone(), src.clone(), fd, fs) } else { (src.instance, src.clone(), dst.clone(), fs, fd) };
-        if fixed(mover, asm) {
-            self.message = Some((false, "Snap: both instances are fixed.".into()));
+        let Some(mut next) = self.assembly(cx).cloned() else { return };
+        // As the agent API's assembly_snap (noshape_ops::assembly::snap).
+        if let Err(m) = noshape_ops::assembly::snap(&mut next, &self.result, src, dst, &units) {
+            self.message = Some((m.contains("resolved"), m.into()));
             return;
         }
-        let Some(pose) = self.result.solved.placement(mover) else { return };
-        let np = noshape_model::assembly::eval::snap_placement(&pose, &fm, &ft);
-        self.edit("Insert : Fastened (snap)", cx, |a| {
-            if let Some(i) = a.instance_mut(mover) {
-                i.placement = np;
-            }
-            let id = MateId(a.next_id());
-            let name = a.next_feature_name("Fastened");
-            a.mates.push(Mate::new(id, name, MateType::Fastened, moving_conn, stay_conn));
-        });
+        self.edit(noshape_ops::assembly::SNAP_DESCRIPTION, cx, |a| *a = next);
         self.message = Some((false, "Snapped and fastened. Pick another pair, or press Shift+S to leave snap mode.".into()));
     }
 

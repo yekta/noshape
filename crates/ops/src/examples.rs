@@ -221,6 +221,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_move_to_subassembly", &[r##"{"instances": ["Wheel <1>", "Axle <1>"]}"##]),
     ("assembly_create_subassembly", &[r##"{}"##]),
     ("assembly_dissolve_subassembly", &[r##"{"instances": ["Assembly 2 <1>"]}"##]),
+    ("assembly_snap", &[r##"{"a": {"instance": "Bolt <1>", "entity": "face:…"}, "b": {"instance": "Base <1>", "entity": "face:…"}}"##]),
     ("assembly_move_instance", &[r##"{"instances": ["Bolt <1>"], "before": "Base <1>"}"##, r##"{"instances": ["Bolt <1>", "Bolt <2>"], "subassembly": "Fasteners <1>"}"##]),
     ("assembly_add_folder", &[r##"{"instances": ["Bolt <1>", "Bolt <2>"], "name": "Fasteners"}"##]),
     ("assembly_unpack_folder", &[r##"{"folder": "Fasteners"}"##]),

@@ -964,6 +964,36 @@ pub fn mirrored_studios(doc: &noshape_model::Document, a: &Assembly, derived: &[
     derived_seed_studios(a, derived).into_iter().filter_map(|s| doc.mirrored_studio(s).map(|m| (s, m))).collect()
 }
 
+/// Snap mode's edit (the history text).
+pub const SNAP_DESCRIPTION: &str = "Insert : Fastened (snap)";
+
+/// Snap mode (Shift+S; a mate connector on each of two instances): the
+/// first pick's instance moves face to face onto the second (the second
+/// moves instead when the first is fixed and it isn't), and a Fastened mate
+/// joins them. Refused with the app's message. The new mate.
+pub fn snap(a: &mut Assembly, result: &AssemblyResult, src: MateConnectorRef, dst: MateConnectorRef, units: &noshape_units::UnitPrefs) -> Result<MateId, &'static str> {
+    if src.instance == dst.instance {
+        return Err("Snap: pick the target on a different instance.");
+    }
+    let (Some(fs), Some(fd)) = (result.connector_world(&src, units), result.connector_world(&dst, units)) else {
+        return Err("Snap: a mate connector could not be resolved.");
+    };
+    let fixed = |id: InstanceId, a: &Assembly| id == InstanceId::ORIGIN || a.instance(id).is_some_and(|i| i.fixed);
+    let (mover, moving, stay, fm, ft) = if fixed(src.instance, a) && !fixed(dst.instance, a) { (dst.instance, dst, src, fd, fs) } else { (src.instance, src, dst, fs, fd) };
+    if fixed(mover, a) {
+        return Err("Snap: both instances are fixed.");
+    }
+    let pose = result.solved.placement(mover).ok_or("Snap: a mate connector could not be resolved.")?;
+    let np = noshape_model::assembly::eval::snap_placement(&pose, &fm, &ft);
+    if let Some(i) = a.instance_mut(mover) {
+        i.placement = np;
+    }
+    let id = MateId(a.next_id());
+    let name = a.next_feature_name("Fastened");
+    a.mates.push(Mate::new(id, name, MateType::Fastened, moving, stay));
+    Ok(id)
+}
+
 /// Insert a Part Studio sketch as an instance ("Insert : Sketch 1").
 pub fn insert_sketch(a: &mut Assembly, studio: TabId, sketch: noshape_model::FeatureId, name: &str, config: ConfigValues) -> InstanceId {
     let id = InstanceId(a.next_id());

@@ -117,6 +117,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "assembly",
+            verb: "snap",
+            summary: "Snap mode: move an instance face to face onto another and fasten them",
+            description: Box::leak(format!("Snap mode (Shift+S): a mate connector on each of two instances; the first one's instance moves face to face onto the second (the second moves when the first is fixed and it isn't), and a Fastened mate joins them. One edit (\"Insert : Fastened (snap)\"). Refused as the app refuses: the same instance, both instances fixed. {CONNECTOR_DOC}").into_boxed_str()),
+            fields: vec![doc_field(), asm_field(), req("a", json!({ "type": "object" }), "The connector on the instance to move."), req("b", json!({ "type": "object" }), "The connector to snap onto.")],
+            mutates: true,
+            destructive: false,
+            run: snap,
+        },
+        Op {
+            group: "assembly",
             verb: "transform",
             summary: "Move an instance to a placement",
             description: "Sets the instance's translation (workspace units) and optional rotation (axis + angle) as when dragging it or using Transform; mates then pull mated instances.",
@@ -666,6 +676,21 @@ fn expr(o: &serde_json::Map<String, Value>, key: &str) -> Option<noshape_units::
         Value::String(s) => Some(noshape_units::ExprValue::new(s.clone())),
         _ => None,
     }
+}
+
+fn snap(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let asm = assembly(od, tab)?.clone();
+    let before = solve(od, tab, &SolveOptions::default())?;
+    let conn = |key: &str| -> Result<MateConnectorRef, OpError> { Ok(resolve_entity(&before, parse_connector(&asm, od, tab, a.get(key).ok_or_else(|| OpError::param(key, "required"))?, key)?, &units)) };
+    let (src, dst) = (conn("a")?, conn("b")?);
+    // Refused before anything is written.
+    sa::snap(&mut asm.clone(), &before, src.clone(), dst.clone(), &units).map_err(OpError::invalid)?;
+    let id = commit(od, tab, sa::SNAP_DESCRIPTION, &before, |x| sa::snap(x, &before, src, dst, &units).ok())?;
+    let mut v = describe(od, tab)?;
+    v["mate"] = json!(id.map(|m| format!("mate:{}", m.0)));
+    Ok(v.into())
 }
 
 fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -64,7 +64,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("assembly:Replace instance", Op("assembly_replace")),
     ("assembly:Replicate", Op("assembly_pattern")),
     ("assembly:Show mates mode", Op("view_display")),
-    ("assembly:Snap mode", Op("view_display")),
+    ("assembly:Snap mode", Op("assembly_snap")),
     ("assembly:Tangent mate", Op("assembly_mate")),
     ("assembly:Width mate", Op("assembly_mate")),
     ("view3d:Back view", Op("render_image")),

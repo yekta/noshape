@@ -4779,3 +4779,23 @@ fn drawing_orientation_flip_and_cutting_line_angle() {
     let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": dw, "view": top["id"], "action": "cutting_line_angle", "to": 45 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
 }
+
+/// Snap mode through the API: the pin's bottom face onto the block's top
+/// face, face to face, fastened (one edit, as the window's).
+#[test]
+fn assembly_snap_fastens_face_to_face() {
+    let mut ctx = Ctx::new();
+    let (b, p) = two_part_assembly(&mut ctx, "snap.noshape");
+    let face = |ctx: &mut Ctx, inst: &str, n: [f64; 3]| call(ctx, "assembly_entities", json!({ "instance": inst, "kind": "faces", "surface": "plane", "normal": n }))["faces"][0].clone();
+    let (pin_bottom, block_top) = (face(&mut ctx, &p, [0.0, 0.0, -1.0]), face(&mut ctx, &b, [0.0, 0.0, 1.0]));
+    let r = call(&mut ctx, "assembly_snap", json!({ "a": { "instance": p, "entity": pin_bottom["id"] }, "b": { "instance": b, "entity": block_top["id"] } }));
+    assert!(r["mate"].as_str().is_some_and(|m| m.starts_with("mate:")), "{r}");
+    let h = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert_eq!(h, "Assembly 1 :: Insert : Fastened (snap)");
+    let mates = r["mates"].as_array().unwrap();
+    assert!(mates.iter().any(|m| m["name"] == "Fastened 1" && m["type"] == "fastened"), "{r}");
+    let now = face(&mut ctx, &p, [0.0, 0.0, -1.0]);
+    assert!((num(&now["centroid"][2]) - num(&block_top["centroid"][2])).abs() < 1e-6, "face to face: {now} vs {block_top}");
+    let e = try_call(&mut ctx, "assembly_snap", json!({ "a": { "instance": p, "entity": pin_bottom["id"] }, "b": { "instance": p, "entity": pin_bottom["id"] } })).unwrap_err();
+    assert!(e.message.contains("different instance"), "{e:?}");
+}
