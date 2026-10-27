@@ -59,6 +59,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   document then crashes on every open (DRAFT-SEGV-DOC, SHELL-SLAB-GPF, FILLET-SEGV, FILLET-SEGV-BLEND). Whatever the kernel bug, one bad feature must not
   make a document unopenable: commit after a successful regen, and/or run kernel ops so a crash only fails that feature
   (subprocess / signal guard), and/or open with the last feature rolled back after a crash on open (qa 2026-10-26)
+- [ ] P0 FILLET-HANG a Fillet runs for > 15 min (stopped by hand) in OCCT's blend approximation (`BRepBlend_AppFuncRoot::
+  SearchLocation` / `NCollection_BaseSequence::Find` ← Approx_SweepApproximation ← BRepBlend_AppSurface ←
+  ChFi3d_Builder::CompleteData … ← noshape checked_blend / scaled_blend ← op_fillet features.cpp:3049, `checked`, size 5)
+  with no timeout or abort; the app would freeze on it. Opening the saved document in a fresh process hangs too (> 10 min).
+  clifuzz_dbg.py seed 40 step 9 on the watcher CLI 19555ca3 (log /root/qa-scratch/cli/clifuzz-40n.log "9 fillet-args"); doc
+  /root/qa-scratch/tickets/cli-fillet-hang.noshape (history ends "Insert feature : Fillet 2"); stack
+  tickets/cli-fillet-hang-bt-tail.txt. Needs a time / iteration budget on blends (fail the feature) and the regen must stay
+  abortable (qa 2026-10-27, main CLI 19555ca3)
 - [ ] P0 TWO-PROCESS-LOST-EDIT the same .noshape opened by two app processes (e.g. `noshape doc.noshape` twice, or a
   file-manager double-click while it's open) gives two independent windows; edits from both are written, but the later
   writer's microversion takes the earlier one as parent while carrying its own stale state, so the earlier edit silently
