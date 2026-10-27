@@ -36,6 +36,14 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   on), so a revolved cylinder's seam sits at u = pi of its new frame; extrudes have it at u = 0 (seat_circles: with u = pi
   the demo Flange's mirror common lost most of the part).
 
+- b0e757f3 / 011aaf43 P0 BOOL-THREAD-CRASH (partly): sweeps copy their profile before the in-place cylinder re-framing
+  (a data race on the caller's sketch-region edges); OCCT booleans serial by default (`bop_parallel()`, common.cpp;
+  NOSHAPE_BOP_PARALLEL=1 restores). qa's seed-72 replay (`NSCLI=<cli> FZTAG=<tag> python3
+  /root/qa-scratch/bin/clifuzz_trace.py 72 106`, ~12–18 min a run): parallel 2/3 complete (crash in
+  BOPAlgo_PaveFiller::ForceInterfEF on a pool thread), serial 3/3. Cost: the shell test set 8.1 → 12.9 s (SHELL-SLOW).
+  Open: the race itself (OCCT patch 0001's EF/VF changes are the first suspect: BOPAlgo_PaveFiller_5.cxx), and
+  OSD_Parallel::For loops that still run several booleans at once (cut_slabs, fuse_slabs, fuse_trimmed).
+
 ## OCCT patches (patches/occt)
 - 0001 kern's congruent-pair reuse (TKBO). 0002 core's crash fixes (TKOffset Draft_Modification_1, TKGeomBase
   Extrema_ExtCS, TKShHealing ShapeUpgrade_UnifySameDomain). Local: patched sources in /root/core-scratch/occt-patch/b,
