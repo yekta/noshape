@@ -4441,10 +4441,11 @@ impl PartStudioView {
             let mut m = menu.item(rename).separator().item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
             if let Some((sid, sname)) = source_sketch.clone() {
                 // Live (de-sc-4): „Sketch 1 [Skizze]“ bearbeiten …, the sketch's
-                // type in brackets when its name doesn't start with it (in the
-                // UI language; English "Edit Sketch 1…").
+                // type in brackets unless its name contains it (in the UI
+                // language; English "Edit Sketch 1…", "Edit Boss sketch 1…",
+                // MENU-SKETCH-TAG).
                 let sketch_type = crate::i18n::type_name("Sketch");
-                let shown = if sname.starts_with(sketch_type.as_str()) { sname.clone() } else { format!("{sname} [{sketch_type}]") };
+                let shown = if needs_type_tag(&sname, &sketch_type) { format!("{sname} [{sketch_type}]") } else { sname.clone() };
                 m = m.item(item(&format!("Edit {shown}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))));
             }
             if is_sketch {

@@ -1835,9 +1835,12 @@ impl GpuTimer {
 
     /// Timestamp writes of slot `i`: start of the color pass, end of the
     /// last pass of the frame.
-    fn writes(&self, i: usize, begin: bool, end: bool) -> wgpu::RenderPassTimestampWrites<'_> {
+    /// None when the pass writes neither stamp (wgpu rejects a write with
+    /// no index: a section view's colour pass with ambient occlusion on,
+    /// PERF-SECTION-PANIC).
+    fn writes(&self, i: usize, begin: bool, end: bool) -> Option<wgpu::RenderPassTimestampWrites<'_>> {
         let base = 2 * i as u32;
-        wgpu::RenderPassTimestampWrites { query_set: &self.set, beginning_of_pass_write_index: begin.then_some(base), end_of_pass_write_index: end.then_some(base + 1) }
+        (begin || end).then(|| wgpu::RenderPassTimestampWrites { query_set: &self.set, beginning_of_pass_write_index: begin.then_some(base), end_of_pass_write_index: end.then_some(base + 1) })
     }
 
     /// Copy slot `i`'s timestamps out (after the frame's passes).
@@ -2685,7 +2688,7 @@ impl Renderer {
                             ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
                         })],
                         depth_stencil_attachment: None,
-                        timestamp_writes: timer.as_ref().zip(timer_slot).map(|(t, i)| t.writes(i, true, false)),
+                        timestamp_writes: timer.as_ref().zip(timer_slot).and_then(|(t, i)| t.writes(i, true, false)),
                         occlusion_query_set: None,
                         multiview_mask: None,
                     });
@@ -2720,7 +2723,7 @@ impl Renderer {
                     depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: if ao_strength > 0.001 { wgpu::StoreOp::Store } else { wgpu::StoreOp::Discard } }),
                     stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store: wgpu::StoreOp::Discard }),
                 }),
-                timestamp_writes: timer.as_ref().zip(timer_slot).map(|(t, i)| t.writes(i, cap_planes.is_none(), !ao_on)),
+                timestamp_writes: timer.as_ref().zip(timer_slot).and_then(|(t, i)| t.writes(i, cap_planes.is_none(), !ao_on)),
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
@@ -2734,7 +2737,7 @@ impl Renderer {
         if ao_strength > 0.001
             && let Some(ao) = ao.as_ref()
         {
-            let timestamp_writes = timer.as_ref().zip(timer_slot).map(|(t, i)| t.writes(i, false, true));
+            let timestamp_writes = timer.as_ref().zip(timer_slot).and_then(|(t, i)| t.writes(i, false, true));
             let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength, timestamp_writes };
             ao.encode(device, queue, &mut encoder, &tex.depth_sample, color_view, frame);
         }
