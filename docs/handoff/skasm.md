@@ -80,7 +80,11 @@ Sketch P1: no open items (parity/sketch.md all ✅; live's 10-27 sketch specs do
    ISO 7379, 10512, NASM 45938 + /4, NAS 1129 ×2); their tables exist for some (dom/skb-sc-fsrules, skb-sc-comp) but
    skb's generator (/root/skb-scratch/gen) maps other column names; asked live for each default size's volume / faces
    to check the geometry against.
-8. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
+8. Sketch solve time in broken sketches: the fuzz (random constraints, 200–600 entities) shows failing solves
+   taking ~95 ms (conflicts) and ~940 ms when not converging: `solve` retries up to 8 times with conflicts
+   excluded (sketch/src/solver.rs ~922), each a whole-sketch solve. Real edits revert a conflicting constraint, so
+   only a sketch opened already broken pays it; candidate fix: retry only the failing component.
+8b. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
    noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture` (clean 10-27, also
    after the exact-flip rule: 200 seeds, 418 s).
 9. End-of-day walk, daily (~04:00 UTC): see below.
