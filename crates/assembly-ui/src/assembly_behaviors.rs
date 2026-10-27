@@ -4545,7 +4545,9 @@ impl AssemblyView {
                 });
                 return;
             }
-            let file = format!("{name}.{}", s.format.ext());
+            // The saved file's own extension (OBJ downloads a .zip, as live).
+            let ext = s.file_ext(true);
+            let file = format!("{name}.{ext}");
             // Options › Store file in a new tab: no download.
             if s.options == 2 {
                 v.update(cx, |this, cx| {
@@ -4558,7 +4560,7 @@ impl AssemblyView {
                 });
                 return;
             }
-            crate::file_dialogs::request_save_path("Export", file, s.format.ext(), window, cx, move |path, cx| {
+            crate::file_dialogs::request_save_path("Export", file, ext, window, cx, move |path, cx| {
                 v.update(cx, |this, cx| {
                     let asm = this.export_assembly(ids.as_deref(), s.hidden, cx);
                     this.message = Some(match noshape_ops::export::write_assembly_export(&s, &path, &asm) {

@@ -59,7 +59,9 @@ impl PartStudioView {
             return;
         }
         let name = if name.is_empty() { self.studio_name(cx) } else { name };
-        let ext = s.format.ext();
+        // The saved file's own extension (OBJ downloads a .zip, as live).
+        let several = if bodies.is_empty() { self.context.as_ref().is_some_and(|c| c.bodies.len() > 1) } else { bodies.len() > 1 };
+        let ext = s.file_ext(several);
         // Options › Store file in a new tab: no download.
         if s.options == 2 {
             let msg = match store_export(&self.doc, self.tab, &format!("{name}.{ext}"), |p| self.write_part_export(&s, p, &bodies), cx) {

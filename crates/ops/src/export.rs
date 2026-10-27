@@ -117,6 +117,15 @@ pub struct ExportSettings {
     pub options: usize,
 }
 
+impl ExportSettings {
+    /// The extension of the file the export saves (the save prompt's name
+    /// and filter): a zip for OBJ (with its .mtl), URDF, and "Export unique
+    /// parts as individual files" when there is more than one part.
+    pub fn file_ext(&self, several_parts: bool) -> &'static str {
+        if matches!(self.format, PartFormat::Obj | PartFormat::Urdf) || (self.individual && several_parts) { "zip" } else { self.format.ext() }
+    }
+}
+
 impl Default for ExportSettings {
     fn default() -> Self {
         Self {
@@ -584,8 +593,34 @@ fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
-/// A zip archive with the files stored (no compression).
+/// A zip archive with the files stored (no compression), dated now (UTC).
 fn stored_zip(files: &[(&str, &[u8])]) -> Vec<u8> {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    stored_zip_at(files, dos_time(secs))
+}
+
+/// MS-DOS (time, date) of a Unix time: 2-second steps, years from 1980.
+fn dos_time(unix: u64) -> (u16, u16) {
+    let (days, rem) = ((unix / 86_400) as i64, unix % 86_400);
+    // Civil date from days since 1970-01-01 (H. Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    if y < 1980 {
+        return (0, (1 << 5) | 1);
+    }
+    let time = ((rem / 3600) << 11 | (rem % 3600 / 60) << 5 | (rem % 60) / 2) as u16;
+    let date = (((y - 1980).min(127) << 9) | (m << 5) | d) as u16;
+    (time, date)
+}
+
+fn stored_zip_at(files: &[(&str, &[u8])], (time, date): (u16, u16)) -> Vec<u8> {
     let mut out = Vec::new();
     let mut central = Vec::new();
     for (name, data) in files {
@@ -600,7 +635,8 @@ fn stored_zip(files: &[(&str, &[u8])]) -> Vec<u8> {
             h.extend_from_slice(&20u16.to_le_bytes()); // version needed
             h.extend_from_slice(&0u16.to_le_bytes()); // flags
             h.extend_from_slice(&0u16.to_le_bytes()); // stored
-            h.extend_from_slice(&0u32.to_le_bytes()); // time, date
+            h.extend_from_slice(&time.to_le_bytes());
+            h.extend_from_slice(&date.to_le_bytes());
             h.extend_from_slice(&crc.to_le_bytes());
             h.extend_from_slice(&(data.len() as u32).to_le_bytes());
             h.extend_from_slice(&(data.len() as u32).to_le_bytes());
@@ -706,6 +742,16 @@ mod tests {
             super::set_part_format(&mut s, i);
             assert_eq!(s.format, *f);
         }
+    }
+
+    #[test]
+    fn zip_entries_are_dated() {
+        // 2026-10-27 12:54:31 UTC.
+        let (time, date) = super::dos_time(1_793_105_671);
+        assert_eq!((date >> 9, (date >> 5) & 15, date & 31), (46, 10, 27));
+        assert_eq!((time >> 11, (time >> 5) & 63, (time & 31) * 2), (12, 54, 30));
+        let z = super::stored_zip_at(&[("a.txt", b"hi")], (time, date));
+        assert_eq!(&z[10..14], &[time.to_le_bytes(), date.to_le_bytes()].concat()[..]);
     }
 
     #[test]
