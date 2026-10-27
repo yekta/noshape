@@ -348,6 +348,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (tickets/curve-analysis-over-extrude.png). Either the panel must be opaque or the analysis tool must replace the feature dialog as live
   does for tool switches (live: Shift+E with a dialog open replaces it, behaviours 7371) (qa 2026-10-26, build 4d2f6b0c)
 
+- [ ] P2 PS-SECTION-RED Part Studio section caps fill overlapping parts' material solid red; live's Part Studio doesn't
+  (behaviours "skb (10-24) assembly section" (5): "overlapping parts' caps are grey-hatched with no red overlap fill";
+  only the assembly shows the red interference, part-studio/2406–2414). Repro: /root/skasm-scratch/qa/ps2.noshape (block
+  + a pin as a new part through it, made by qa/ps2.py), view menu › Section view…, pick Front, ✓: the pin's cap inside
+  the block is red (/root/skasm-scratch/ps-section-red-overlap.png). The shader paints any 2-part count red
+  (crates/render shaders.wgsl `fs_section_cap`, `parts > 1.0`) with no per-scene switch; the assembly needs it on
+  (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
+
 ## Sketch + assembly (skasm)
 - [x] 3bcb5145 P1 SKETCH-DRAG-BIG dragging a corner in a 1000-entity sketch (10 × 10 rectangles + 100 circles, made with
   sketch_draw shapes; /root/qa-scratch/cli/bigsketch.noshape) re-evaluates the sketch feature per drag step in 72–113 ms
