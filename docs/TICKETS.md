@@ -265,7 +265,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   still open on green) hovering a selection chip in a feature dialog (e.g. "Face of
   Sketch 1" in Extrude 1) shows the chip's tooltip but the viewport doesn't change at all (pixel-identical); live turns the
   hovered chip's entity yellow-green #f2ff80 (qa 2026-10-26)
-- [ ] P2 FOLDER-NAME-INLINE (qa4 round 5, still open on green) feature rows › Add selection to folder… opens a separate
+- [x] P2 FOLDER-NAME-INLINE not a bug (psui 10-27): live behaviours "(1) Add selection to folder… → a popup dialog, not
+  inline" supersedes the s8 note: a 220 × 69 "Folder name" dialog beside the list, "New folder" selected, as ours
+  (qa4 round 5, still open on green) feature rows › Add selection to folder… opens a separate
   "Folder name" box (tickets/folder-name-box-ours.png); live names the new folder inline in its row (input prefilled
   "New folder"); the separate box belongs to the header's New folder button (behaviours "qa4 round 5 s8") (qa 2026-10-26)
 - [ ] P2 DEPTH-RANGE (live answered, behaviours "qa (2026-10-26, P2) Extrude Depth out of range") a length above 500 m
