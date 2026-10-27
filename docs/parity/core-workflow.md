@@ -104,7 +104,7 @@ it, so re-take positions after every selection.
 |---|---|---|---|---|
 | 6.1 | Assembly tab, I | Insert dialog | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 6.2 | Click Part 2, click; click Part 3, click | Inserted; **the first instance lands at the origin** | ✅ re-checked 10-23: first instance at the assembly origin (was ✗ F25) | 0.4.10+ / 1c853f78 10-27 |
-| 6.3 | Instance filter "3" | Filters the list | ✅ |  |
+| 6.3 | Instance filter "3" | Filters the list | ✅ | 0.4.10+ / dd1b5037 10-27 ("Part" keeps Part 1 <1>, Part 2 <1>; pattern instances never match: live asked) |
 | 6.4 | Fastened mate (M): two faces | Mate HUD, solves, "Fastened 1" | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 6.5 | + › Create Drawing…, ANSI_A_MM, OK | Model picker, then Insert view following the cursor | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 6.6 | Place front, right and top views; Esc | Projected views | ✅ | 0.4.10+ / 1c853f78 10-27 |
