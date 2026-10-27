@@ -272,6 +272,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   build under load); perf test scene sketch_perf::big_shape_sketch_drag_step_parts. Re-time on a release build.
   qa 19555ca3: in the green app the drag step's sketch regen is still 50–185 ms (load 41); re-time on a quiet box /
   release build before closing (qa 2026-10-27)
+  skasm 10-27 (e5567eca): the app's steps also redid the DOF analysis (the loaded sketch had none): now computed once before
+  the drag; qa's bigsketch in the app (dev, load ~40): 42–125 → 13–18 ms per step (spikes ~40 ms).
 - [x] ac0645bc (triad on the copy) reopened (qa 19555ca3: the copy lands at the pointer, selected, Ø dimension copied, no prompt = live; but the
   Transform manipulator sits on the original circle / sketch origin, not on the copy's centre as live;
   tickets/sketch-paste-manipulator-on-original.png) 6329b168 P2 SKETCH-PASTE Ctrl+C / Ctrl+V of a dimensioned circle in a sketch: ours pastes the copy exactly on top of the
