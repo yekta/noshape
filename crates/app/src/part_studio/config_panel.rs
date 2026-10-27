@@ -1395,6 +1395,13 @@ impl PartStudioView {
             // the keyboard).
             if std::mem::take(&mut self.ui.cfg_editing_focus) {
                 st.update(cx, |s, cx| s.focus(window, cx));
+                // A value cell opened by typing takes that text; by a
+                // double-click, its value selected (live qa batch 2 (6)).
+                if let Some(t) = self.ui.cfg_edit_typed.take() {
+                    st.update(cx, |s, cx| s.set_value(t, window, cx));
+                } else if std::mem::take(&mut self.ui.cfg_edit_select) {
+                    st.update(cx, |s, cx| s.select_all(window, cx));
+                }
             }
             let (k2, st2, original) = (key.clone(), st.clone(), text.clone());
             return div()
@@ -1493,10 +1500,64 @@ impl PartStudioView {
             Some(ParamValue::Enum(s)) | Some(ParamValue::Text(s)) => s.clone(),
             _ => String::new(),
         };
-        self.config_name_cell(format!("cp-{ci}-{key}"), text, (px(13.33), FontWeight::NORMAL), window, cx, move |this, v, cx| {
+        let cell_key = format!("cp-{ci}-{key}");
+        let commit = move |this: &mut Self, v: String, cx: &mut Context<Self>| {
             let kk = kk.clone();
             this.edit_config(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |ps| noshape_ops::config::set_configured_text(ps, ci, &kk, v));
-        })
+        };
+        if self.ui.cfg_editing.as_deref() == Some(cell_key.as_str()) {
+            return self.config_name_cell(cell_key, text, (px(13.33), FontWeight::NORMAL), window, cx, commit);
+        }
+        // Live (qa batch 2 (6)): a click frames the cell and gives it the
+        // keyboard; typing then edits it, the typed text replacing the
+        // value; a double-click edits with the value selected; Esc unframes.
+        let framed = self.ui.cfg_framed.as_deref() == Some(cell_key.as_str());
+        let fh = self.ui.cfg_cell_focus.get_or_insert_with(|| cx.focus_handle()).clone();
+        let accent = p().accent;
+        let (k1, k2) = (cell_key.clone(), cell_key.clone());
+        div()
+            .id(SharedString::from(format!("cfgval-{cell_key}")))
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .flex()
+            .items_center()
+            .pl(px(3.))
+            .text_size(px(13.33))
+            .when(framed, |d| {
+                d.track_focus(&fh).border_2().border_color(accent).on_key_down(cx.listener(move |this, e: &KeyDownEvent, _, cx| {
+                    let ks = &e.keystroke;
+                    if ks.key == "escape" {
+                        this.ui.cfg_framed = None;
+                    } else if ks.key == "enter" {
+                        this.ui.cfg_editing = Some(k1.clone());
+                        this.ui.cfg_editing_focus = true;
+                        this.ui.cfg_edit_select = true;
+                    } else if let Some(ch) = ks.key_char.clone().filter(|c| !ks.modifiers.control && !ks.modifiers.platform && !ks.modifiers.alt && !c.chars().any(char::is_control)) {
+                        this.ui.cfg_editing = Some(k1.clone());
+                        this.ui.cfg_editing_focus = true;
+                        this.ui.cfg_edit_typed = Some(ch);
+                    } else {
+                        return;
+                    }
+                    cx.stop_propagation();
+                    cx.notify();
+                }))
+            })
+            .child(div().truncate().child(text))
+            .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, window, cx| {
+                this.ui.cfg_framed = Some(k2.clone());
+                if let Some(fh) = &this.ui.cfg_cell_focus {
+                    window.focus(fh, cx);
+                }
+                if e.click_count >= 2 {
+                    this.ui.cfg_editing = Some(k2.clone());
+                    this.ui.cfg_editing_focus = true;
+                    this.ui.cfg_edit_select = true;
+                }
+                cx.notify();
+            }))
+            .into_any_element()
     }
 
     /// "Configured properties" tab (Help PartStudio__configured_properties;

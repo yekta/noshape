@@ -429,6 +429,14 @@ pub struct UiState {
     pub cfg_editing: Option<String>,
     /// The rename input still has to take the keyboard (once, when it opens).
     pub cfg_editing_focus: bool,
+    /// The configuration table's framed value cell (a click frames it;
+    /// typing then edits it, live qa batch 2 (6)), and its keyboard focus.
+    pub cfg_framed: Option<String>,
+    pub cfg_cell_focus: Option<FocusHandle>,
+    /// How the value cell's editor opens: with the typed text replacing the
+    /// value, or with the value selected (double-click).
+    pub cfg_edit_typed: Option<String>,
+    pub cfg_edit_select: bool,
     pub cfg_filter: Option<Entity<InputState>>,
     /// Feature list "Configurations" box: one select per List input.
     pub cfg_selects: std::collections::HashMap<String, (Entity<crate::os_select::OsSelect>, Subscription)>,
@@ -626,6 +634,10 @@ impl UiState {
             cfg_drop: None,
             cfg_editing: None,
             cfg_editing_focus: false,
+            cfg_framed: None,
+            cfg_cell_focus: None,
+            cfg_edit_typed: None,
+            cfg_edit_select: false,
             cfg_filter: None,
             cfg_selects: Default::default(),
             zebra: None,
