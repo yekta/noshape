@@ -691,17 +691,17 @@ impl Arrangement {
         let outers: Vec<usize> = (0..cycles.len()).filter(|&i| cycles[i].area <= 0.0).collect();
         let mut holes: Vec<Vec<usize>> = vec![Vec::new(); cycles.len()];
         let bbox_tol = 1e-5;
-        let polys: Vec<Option<Vec<DVec2>>> = cycles
-            .iter()
-            .map(|c| {
-                if c.area > 0.0 {
-                    let t = c.lp.bbox().size().max_element().max(1e-12) * bbox_tol;
-                    Some(c.lp.tessellate(t))
-                } else {
-                    None
-                }
+        // A face's fine outline is made only for a sample inside its box
+        // (qa SKETCH-DRAG-BIG: 200 loops × 200 faces of finely tessellated
+        // circles took ~40 ms of every drag step).
+        let boxes: Vec<BBox> = cycles.iter().map(|c| if c.area > 0.0 { c.lp.bbox() } else { BBox::EMPTY }).collect();
+        let polys: Vec<std::cell::OnceCell<Vec<DVec2>>> = cycles.iter().map(|_| std::cell::OnceCell::new()).collect();
+        let poly = |fi: usize| {
+            polys[fi].get_or_init(|| {
+                let t = boxes[fi].size().max_element().max(1e-12) * bbox_tol;
+                cycles[fi].lp.tessellate(t)
             })
-            .collect();
+        };
         for &o in &outers {
             if cycles[o].area.abs() <= 0.0 {
                 continue;
@@ -715,7 +715,7 @@ impl Arrangement {
                 if best.is_some_and(|b| cycles[b].area <= cycles[fi].area) {
                     continue;
                 }
-                if winding(polys[fi].as_ref().unwrap(), sample) != 0 {
+                if boxes[fi].expanded(boxes[fi].size().max_element() * bbox_tol).contains(sample) && winding(poly(fi), sample) != 0 {
                     best = Some(fi);
                 }
             }

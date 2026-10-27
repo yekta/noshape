@@ -227,3 +227,51 @@ fn sketch_drag_regeneration_only() {
     let s = stats(frames);
     println!("regeneration per drag step: median {:.2} ms, worst {:.2} ms", s.median.as_secs_f64() * 1e3, s.worst.as_secs_f64() * 1e3);
 }
+
+/// qa SKETCH-DRAG-BIG: 10 × 10 corner rectangles and 100 circles (made as
+/// sketch_draw shapes make them), a corner dragged: the solve, the regions
+/// and the regeneration of each step, timed apart.
+#[test]
+#[ignore]
+fn big_shape_sketch_drag_step_parts() {
+    let mut sk = Sketch::new();
+    let mut corner = None;
+    for i in 0..10 {
+        for j in 0..10 {
+            let (x, y) = (i as f64 * 0.03, j as f64 * 0.03);
+            let r = sk.corner_rectangle(v(x, y), v(x + 0.02, y + 0.015));
+            corner.get_or_insert(r.points[2]);
+            sk.add_circle(v(x + 0.025, y + 0.024), 0.003);
+        }
+    }
+    let corner = corner.unwrap();
+    sk.solve();
+    let mut data = SketchData { sketch: sk, ..Default::default() };
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    let fid = f.id;
+    ps.features.push(f);
+    let mut regen = Regenerator::new();
+    let opts = RegenOptions { editing_sketch: Some(fid), ..Default::default() };
+    regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    let from = data.sketch.point(corner).unwrap();
+    let (mut solve, mut regions, mut regenerate) = (Vec::new(), Vec::new(), Vec::new());
+    for i in 1..=60 {
+        let p = from + v(0.00002 * (i % 40) as f64, 0.00001 * (i % 40) as f64);
+        let t = Instant::now();
+        data.sketch.drag(&[(noshape_sketch::DragHandle::Point(corner), p)]);
+        solve.push(t.elapsed());
+        let t = Instant::now();
+        let _ = data.sketch.regions();
+        regions.push(t.elapsed());
+        let t = Instant::now();
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        regenerate.push(t.elapsed());
+    }
+    let ms = |s: Stats| format!("median {:.2} ms, worst {:.2} ms", s.median.as_secs_f64() * 1e3, s.worst.as_secs_f64() * 1e3);
+    println!("{} entities: drag solve {}; regions {}; regeneration {}", data.sketch.entities().count(), ms(stats(solve)), ms(stats(regions)), ms(stats(regenerate)));
+}
