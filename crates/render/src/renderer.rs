@@ -574,6 +574,10 @@ struct PendingRead {
     buffer: Option<wgpu::Buffer>,
     submission: wgpu::SubmissionIndex,
     state: Arc<AtomicU8>,
+    /// When it was submitted and when the GPU finished it (ns since [`perf::process_start`], set by the completion
+    /// callback; 0 until then): `r.done_ms`, the frame's GPU time where there are no timestamp queries (Metal).
+    submitted_ns: u64,
+    done_ns: Arc<std::sync::atomic::AtomicU64>,
 }
 
 /// Per-frame draw lists (reused to avoid per-frame allocation).
@@ -2918,18 +2922,28 @@ impl Renderer {
         }
         let state = Arc::new(AtomicU8::new(MAP_PENDING));
         let st = state.clone();
+        let since_start = || perf::process_start().elapsed().as_nanos() as u64;
+        let submitted_ns = since_start();
+        let done_ns = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let done = done_ns.clone();
         let kind = match (&readback, present_texture) {
             (Some(readback), _) => {
-                readback.slice(..).map_async(wgpu::MapMode::Read, move |r| st.store(if r.is_ok() { MAP_OK } else { MAP_FAILED }, Ordering::Release));
+                readback.slice(..).map_async(wgpu::MapMode::Read, move |r| {
+                    done.store(since_start(), Ordering::Relaxed);
+                    st.store(if r.is_ok() { MAP_OK } else { MAP_FAILED }, Ordering::Release)
+                });
                 ReadKind::Frame { seq, width, height, padded_row: tex.padded_row }
             }
             (None, Some(texture)) => {
-                queue.on_submitted_work_done(move || st.store(MAP_OK, Ordering::Release));
+                queue.on_submitted_work_done(move || {
+                    done.store(since_start(), Ordering::Relaxed);
+                    st.store(MAP_OK, Ordering::Release)
+                });
                 ReadKind::Texture { seq, texture }
             }
             (None, None) => unreachable!("a frame either reads back or keeps its texture"),
         };
-        pending.push_back(PendingRead { target, kind, buffer: readback, submission, state });
+        pending.push_back(PendingRead { target, kind, buffer: readback, submission, state, submitted_ns, done_ns });
         ts.in_flight += 1;
         ts.last = Some(FrameState { scene: req.scene, camera: req.camera, device_pixel_ratio: dpr, style: req.style });
         self.lists = lists;
@@ -3079,7 +3093,7 @@ impl Renderer {
         let state = Arc::new(AtomicU8::new(MAP_PENDING));
         let st = state.clone();
         buffer.slice(..).map_async(wgpu::MapMode::Read, move |r| st.store(if r.is_ok() { MAP_OK } else { MAP_FAILED }, Ordering::Release));
-        self.pending.push_back(PendingRead { target, kind: ReadKind::Pick { regions }, buffer: Some(buffer), submission, state });
+        self.pending.push_back(PendingRead { target, kind: ReadKind::Pick { regions }, buffer: Some(buffer), submission, state, submitted_ns: 0, done_ns: Default::default() });
     }
 
     /// Onshape's `DepthSamplingPass`: the pick pass again, into a viewport
@@ -3208,6 +3222,13 @@ impl Renderer {
 
     fn finish(&mut self, r: PendingRead) {
         let ok = r.state.load(Ordering::Acquire) == MAP_OK;
+        // Submit to done: the frame's GPU time (plus its wait behind the frame before it, if any).
+        if ok && perf::enabled() && matches!(r.kind, ReadKind::Texture { .. } | ReadKind::Frame { .. }) {
+            let done = r.done_ns.load(Ordering::Relaxed);
+            if done > r.submitted_ns {
+                perf::record_ms("r.done_ms", (done - r.submitted_ns) as f32 / 1e6);
+            }
+        }
         if matches!(r.kind, ReadKind::Texture { .. } | ReadKind::Frame { .. })
             && let Some(p) = &mut self.pipelines
         {

@@ -1405,6 +1405,7 @@ impl Viewport {
             log::info!(target: "perf", "orbit bench: start ({} frames, {} instances, {:.0}x{:.0} logical px, scale {})", b.frames, self.scene.instances.len(), f32::from(self.bounds.size.width), f32::from(self.bounds.size.height), self.scale);
             noshape_render::perf::reset();
             noshape_render::perf::series_start("r.gpu_ms");
+            noshape_render::perf::series_start("r.done_ms");
             b.started = Some(Instant::now());
             b.frames_at_start = self.frames_presented;
             match b.kind {
@@ -1426,8 +1427,16 @@ impl Viewport {
             let draw = noshape_render::perf::Stats::of(&mut b.window_draw);
             let wait = noshape_render::perf::Stats::of(&mut b.drawable_wait);
             let gpu = noshape_render::perf::Stats::of(&mut noshape_render::perf::series_take("r.gpu_ms"));
-            // Our GPU time per frame, where the device has timestamp queries.
-            let gpu = if gpu.n > 0 { format!(" | GPU per frame mean {:.2} p95 {:.2} ms", gpu.mean, gpu.p95) } else { String::new() };
+            let done = noshape_render::perf::Stats::of(&mut noshape_render::perf::series_take("r.done_ms"));
+            // Our GPU time per frame: from timestamp queries where the device has them, else (Metal) each frame's
+            // submit to done (its GPU work, plus any wait behind the frame before it).
+            let gpu = if gpu.n > 0 {
+                format!(" | GPU per frame mean {:.2} p95 {:.2} ms", gpu.mean, gpu.p95)
+            } else if done.n > 0 {
+                format!(" | GPU per frame mean {:.2} p95 {:.2} ms (submit to done)", done.mean, done.p95)
+            } else {
+                String::new()
+            };
             let (w, h) = ((f32::from(self.bounds.size.width) * self.scale).round(), (f32::from(self.bounds.size.height) * self.scale).round());
             log::info!(
                 target: "perf",

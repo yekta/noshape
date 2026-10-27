@@ -13,8 +13,8 @@
 # during the orbit. Env: FRAMES (default 300), DELAY (seconds from launch
 # until the bench starts, default 90), VARIANTS (extra texture-mode orbit runs
 # for diagnosis, `name:VAR=value[,VAR=value]` separated by spaces, e.g.
-# `msaa1:NOSHAPE_PERF_MSAA=1 nolines:NOSHAPE_PERF_SKIP=lines`; logged as
-# `texture+<name>-orbit.log`), BENCH_ENV (`VAR=value[,VAR=value]` for every
+# `msaa1:NOSHAPE_PERF_MSAA=1 nolines:NOSHAPE_PERF_SKIP=lines`; `name@pan:…` runs a pan (or zoom) instead;
+# logged as `texture+<name>-<kind>.log`), BENCH_ENV (`VAR=value[,VAR=value]` for every
 # run, before a variant's own), COLD (macOS: clear the Metal shader cache
 # before every launch, so each launch is a cold start).
 #
@@ -41,7 +41,12 @@ wait_for() { # pattern log seconds
 }
 RUNS=()
 for mode in "${MODES[@]}"; do RUNS+=("$mode:orbit:" "$mode:zoom:" "$mode:pan:"); done
-for v in ${VARIANTS:-}; do RUNS+=("texture+${v%%:*}:orbit:${v#*:}"); done
+# A variant `name@kind:VARS` runs that bench kind (orbit, pan or zoom; default orbit).
+for v in ${VARIANTS:-}; do
+  name=${v%%:*}; vkind=orbit
+  if [[ $name == *@* ]]; then vkind=${name#*@}; name=${name%%@*}; fi
+  RUNS+=("texture+$name:$vkind:${v#*:}")
+done
 for run in "${RUNS[@]}"; do
   label=${run%%:*}; rest=${run#*:}; kind=${rest%%:*}; extra=${rest#*:}
   mode=${label%%+*}

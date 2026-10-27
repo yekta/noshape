@@ -210,16 +210,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The PLAN 2.7 speed target runs: orbit, pan and zoom at a Retina pixel ratio, driven by frames (the
+          # camera moves as each frame arrives, not on the runner's slow timer); analyze.py reports them.
           - name: macOS 15 (Apple silicon)
             os: macos-15
             asset: macos-arm64.dmg
             modes: texture readback
             gates: --stills --gate-ui-cpu-p95 UI --gate-gpu-p95 GPU
+            variants: retina@orbit:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames retina@pan:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames retina@zoom:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames
           - name: macOS 14 (Apple silicon)
             os: macos-14
             asset: macos-arm64.dmg
             modes: texture readback
             gates: --stills --gate-ui-cpu-p95 UI --gate-gpu-p95 GPU
+            variants: retina@orbit:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames retina@pan:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames retina@zoom:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames
           - name: Windows (WARP)
             os: windows-latest
             asset: windows-x86_64.zip
@@ -287,7 +291,7 @@ jobs:
       - name: Benchmarks
         if: runner.os != 'Windows'
         env:
-          VARIANTS: ${{ inputs.variants || '' }}
+          VARIANTS: ${{ inputs.variants || matrix.variants || '' }}
           BENCH_ENV: ${{ inputs.env || '' }}
           COLD: ${{ inputs.cold || '' }}
         run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ inputs.modes || matrix.modes }}
@@ -312,6 +316,8 @@ jobs:
       - name: Summary and gates
         id: analyze
         shell: bash
+        env:
+          COLD: ${{ inputs.cold || '' }}
         run: |
           gates="${{ matrix.gates }}"
           gates="${gates//UI/$UI_CPU_P95_MS}"; gates="${gates//GPU/$GPU_P95_MS}"

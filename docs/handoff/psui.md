@@ -83,6 +83,14 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
+## Speed targets (PLAN 2.7), current numbers
+
+| target | goal | current (where measured) |
+|---|---|---|
+| orbit / pan / zoom, NIST assembly at Retina | 120 fps | presented 30.5–31.3 fps on the paravirtual macOS runners (their timer caps it; perf.yml 40493040035, v0.4.10, 1194×794 device px, not Retina); UI CPU p95 0.4–0.9 ms; GPU time not reported on Metal (no timestamps) |
+| cold start to first frame | ≤ 1 s | Metal shader cache cleared: 1.34–2.09 s (pipelines 0.50–0.98 s); warm cache 0.48–0.83 s; a job's first launch 2.5–3.4 s (runs 40421880164 / 40421862773) |
+| open a document | ≤ 0.5 s | app to document window 0.34–0.55 s + window to first frame 0.55–0.95 s cold (viewport-performance.md 10-26) |
+
 ## In progress
 
 (nothing unlanded)

@@ -23,7 +23,7 @@ SUMMARY = re.compile(
     r"p50 (?P<p50>[\d.]+) p95 (?P<p95>[\d.]+) p99 (?P<p99>[\d.]+) max (?P<max>[\d.]+) ms \| over 16.7 ms: (?P<o16>\d+) "
     r"\((?P<o16p>\d+)%\), over 8.3 ms: (?P<o8>\d+) \((?P<o8p>\d+)%\) \| UI-thread CPU per frame mean (?P<cpu>[\d.]+) p95 (?P<cpup95>[\d.]+) ms"
     r"(?: \| window draw per frame mean (?P<draw>[\d.]+) p95 (?P<drawp95>[\d.]+) ms, drawable wait mean (?P<wait>[\d.]+) p95 (?P<waitp95>[\d.]+) ms)?"
-    r"(?: \| GPU per frame mean (?P<gpu>[\d.]+) p95 (?P<gpup95>[\d.]+) ms)?")
+    r"(?: \| GPU per frame mean (?P<gpu>[\d.]+) p95 (?P<gpup95>[\d.]+) ms(?P<done> \(submit to done\))?)?")
 
 # (metric, label, higher is better) compared against the baseline.
 COMPARED = [("fps", "fps", True), ("p95", "frame-interval p95", False), ("cpup95", "UI CPU p95", False), ("gpup95", "GPU p95", False)]
@@ -35,7 +35,15 @@ STARTUP = {
     "window_ms": re.compile(r"first workspace render: ([\d.]+) ms since start"),
     "frame_ms": re.compile(r"first viewport frame presented: ([\d.]+) ms since start"),
     "pipelines_ms": re.compile(r"pipelines for \d+x MSAA built in ([\d.]+) ms"),
+    "opening_ms": re.compile(r"opening document: ([\d.]+) ms since start"),
 }
+
+# docs/PLAN.md 2.7 speed targets (psui): the frame-driven 2× runs (`retina@orbit` … variants) at 120 fps; the first
+# viewport frame within 1 s of process start (the job's later launches; its first pays the OS's first-run costs);
+# a document's first frame within 0.5 s of its open.
+TARGET_FPS = 120.0
+TARGET_FIRST_FRAME_MS = 1000.0
+TARGET_OPEN_MS = 500.0
 
 
 def runs(out):
@@ -52,11 +60,50 @@ def runs(out):
                 row[key] = float(s.group(1))
         if m:
             row.update({k: (float(v) if v and re.fullmatch(r"[\d.]+", v) else v) for k, v in m.groupdict().items()})
+            # Metal has no timestamps: its GPU time is each frame's submit to done (queueing included). Kept apart
+            # from the timestamp GPU time (its gate and baseline), used for the speed targets.
+            if row.pop("done", None):
+                row["done"], row["donep95"] = row.pop("gpu"), row.pop("gpup95")
+                row["gpu"] = row["gpup95"] = None
         else:
             row["kind"] = os.path.basename(log)[len(mode) + 1:-4]
             row["missing"] = True
         rows.append(row)
     return rows
+
+
+def speed_targets(rows, started):
+    """Report lines for the PLAN 2.7 speed targets (report only: not gates until met)."""
+    out = ["Speed targets (docs/PLAN.md 2.7):", ""]
+    for kind in ("orbit", "pan", "zoom"):
+        r = next((x for x in rows if x["mode"] == "texture+retina" and x.get("kind") == kind and not x.get("missing")), None)
+        if r is None:
+            out.append(f"- {kind} at 2× (frame-driven): not run")
+        else:
+            # What the frame costs us (the runner's own presentation slows down later in a job): the fps the
+            # viewport could sustain, from the slower of the UI thread's and the GPU's p95 per frame.
+            gpu = r["gpup95"] if r.get("gpup95") is not None else r.get("donep95")
+            cost = max(r["cpup95"], gpu) if gpu is not None else None
+            capable = f"; sustainable ≈ {1000.0 / cost:.0f} fps from UI CPU p95 {r['cpup95']:.2f} ms, GPU p95 {gpu:.2f} ms" if cost else ""
+            out.append(f"- {kind} at 2× (frame-driven, {r['px']} device px): presented {r['fps']:.1f} fps{capable}; target {TARGET_FPS:.0f}: "
+                       f"{'met' if r['fps'] >= TARGET_FPS or (cost is not None and 1000.0 / cost >= TARGET_FPS) else 'not met'}")
+    # Cold: the job's first launch (shader and OS caches cold), or every launch of a `cold` run (COLD=1 clears the
+    # Metal shader cache before each); warm: the later launches.
+    cold_run = bool(os.environ.get("COLD"))
+    first = [r["frame_ms"] for r in started if r["log"] == "texture-orbit.log"]
+    cold = [r["frame_ms"] for r in started] if cold_run else first
+    warm = [] if cold_run else [r["frame_ms"] for r in started if r["log"] != "texture-orbit.log"]
+    for name, vals in (("cold start", cold), ("warm start", warm)):
+        if vals:
+            med = sorted(vals)[len(vals) // 2]
+            out.append(f"- {name} to the first viewport frame (median of {len(vals)}): {med:.0f} ms, target {TARGET_FIRST_FRAME_MS:.0f}: "
+                       f"{'met' if med <= TARGET_FIRST_FRAME_MS else 'not met'}")
+    opens = [r["frame_ms"] - r["opening_ms"] for r in started if r.get("opening_ms") is not None]
+    if opens:
+        med = sorted(opens)[len(opens) // 2]
+        out.append(f"- open a document to its first frame (median of {len(opens)}): {med:.0f} ms, target {TARGET_OPEN_MS:.0f}: "
+                   f"{'met' if med <= TARGET_OPEN_MS else 'not met'}")
+    return out
 
 
 def compare_stills(out):
@@ -122,6 +169,7 @@ def main():
                   "| launch | window drawn | first viewport frame | shader compile |", "|---|---|---|---|"]
         for i, r in enumerate(started):
             lines.append(f"| {'first' if i == 0 and r['log'] == 'texture-orbit.log' else 'later'}: {r['log'][:-4]} | {ms(r.get('window_ms'))} | {ms(r.get('frame_ms'))} | {ms(r.get('pipelines_ms'))} |")
+    lines += [""] + speed_targets(rows, started)
     failures = []
     ran = {r["mode"] for r in rows if not r.get("missing")}
     if args.stills and not {"texture", "readback"} <= ran:
