@@ -53,7 +53,7 @@ impl AppCursor {
     }
 
     /// The CSS name of a standard cursor.
-    pub(crate) fn css(self) -> Option<&'static str> {
+    pub fn css(self) -> Option<&'static str> {
         Some(match self {
             Self::Move => "move",
             Self::ZoomIn => "zoom-in",
@@ -191,7 +191,7 @@ fn standard_art(cursor: AppCursor) -> Option<Art> {
 
 /// The cursor image: straight-alpha BGRA rows, its side and hot spot in
 /// device pixels.
-pub(crate) struct CursorImage {
+pub struct CursorImage {
     pub bgra: Vec<u8>,
     pub side: u32,
     pub hot: (u32, u32),
@@ -209,7 +209,7 @@ fn render(art: Art, scale: f32, cx: &App) -> Option<CursorImage> {
 }
 
 /// The image of `cursor` (custom art, or our drawing of a standard one).
-pub(crate) fn image(cursor: AppCursor, windows: bool, scale: f32, cx: &App) -> Option<CursorImage> {
+pub fn image(cursor: AppCursor, windows: bool, scale: f32, cx: &App) -> Option<CursorImage> {
     render(art(cursor, windows).or_else(|| standard_art(cursor))?, scale, cx)
 }
 

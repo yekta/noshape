@@ -1,7 +1,7 @@
 //! Application actions and default key bindings (Onshape's shortcut map).
 //! `secondary` = Cmd on macOS, Ctrl elsewhere.
 
-use gpui_kit::{App, KeyBinding, actions};
+use gpui_kit::{KeyBinding, actions};
 
 actions!(
     noshape,
@@ -141,13 +141,8 @@ actions!(
     ]
 );
 
-/// Binds the default keys with the user's customizations
-/// (Preferences › Keyboard shortcuts, see `shortcuts`).
-pub fn bind_default_keys(cx: &mut App) {
-    crate::shortcuts::init(cx, default_key_bindings());
-}
-
-/// Onshape's default key bindings (before user customizations).
+/// Onshape's default key bindings (before user customizations; the app binds them with the user's customizations,
+/// Preferences › Keyboard shortcuts, through its `shortcuts::init`).
 pub fn default_key_bindings() -> Vec<KeyBinding> {
     // Bare-letter bindings must not fire while typing in an input.
     let ps = Some("PartStudio && !Input");

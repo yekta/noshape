@@ -40,7 +40,7 @@ pub const LANGUAGES: [(&str, &str); 9] = [
 pub const DEFAULT: &str = "en";
 
 #[derive(rust_embed::RustEmbed)]
-#[folder = "assets"]
+#[folder = "../app/assets"]
 #[include = "i18n/*.tsv"]
 struct Tables;
 

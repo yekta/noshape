@@ -1,0 +1,47 @@
+[package]
+name = "noshape-app-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's app base layer: theme, assets, widgets, menus, actions, cursors, the GPU context and the 3D viewport. Never references a studio; the studio UIs and the noshape binary build on it."
+
+[dependencies]
+noshape-render.workspace = true
+noshape-model.workspace = true
+noshape-store.workspace = true
+noshape-units.workspace = true
+noshape-sketch.workspace = true
+noshape-ops.workspace = true
+noshape-scene.workspace = true
+gpui-kit.workspace = true
+anyhow.workspace = true
+glam.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+ahash.workspace = true
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "tiff"] }
+async-channel = "2"
+rust-embed = "8"
+serde_json.workspace = true
+serde.workspace = true
+# The selection-count cursor sets an image cursor through the platform (cursor.rs).
+raw-window-handle = "0.6"
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
+x11rb = { version = "0.13", features = ["render", "cursor", "resource_manager"] }
+# For its Wayland image-cursor hook (vendored and patched, see the workspace Cargo.toml).
+gpui-pre-linux = { version = "=0.3.9", default-features = false }
+# Its GPU context, shared with the 3D viewport renderer (gpu.rs; vendored and patched).
+gpui-pre-wgpu = { version = "=0.3.9", default-features = false }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+gpui-pre-macos = "0.3.9"
+objc2 = "0.6"
+# The viewport's Metal textures, handed to gpui's renderer (gpu.rs).
+objc2-metal = { version = "0.3", default-features = false, features = ["std", "MTLDevice", "MTLResource", "MTLTexture"] }
+objc2-app-kit = { version = "0.3", features = ["NSCursor", "NSImage"] }
+objc2-foundation = { version = "0.3", features = ["NSData", "NSGeometry"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }

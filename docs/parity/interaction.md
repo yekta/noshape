@@ -105,7 +105,7 @@ Only the trace hook is in the ready batch. Everything else below (box overlay an
 manipulator, the replay suite, the AN1 test) is the **WIP commit on agent/nav2** after it: clippy-clean
 (target-qa, 15:35) but its unit tests had not finished running; cherry-pick and test before taking it.
 
-- **Trace hook** (✅ committed): `nav_trace::highlights` (crates/app/src/nav_trace.rs), called once in
+- **Trace hook** (✅ committed): `nav_trace::highlights` (crates/app-core/src/nav_trace.rs), called once in
   part_studio/mod.rs `refresh_scene` before `scene_builder::with_highlights`; writes `{"highlights": {studio,
   selection, hover}}` lines on change. The assembly (assembly_view.rs) and menus.rs one-liners are cleared
   but not added.

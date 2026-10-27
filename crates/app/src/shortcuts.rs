@@ -7,7 +7,7 @@
 //! key, plus the Onshape-controlled (🔒) rows the Shift+/ sheet shows.
 //! Customizations are stored in `<config>/noshape/keyboard-shortcuts.json`
 //! and applied to GPUI's keymap at startup and right after every edit:
-//! the default bindings of `actions::bind_default_keys` stay exactly as
+//! the default bindings of `actions::default_key_bindings` stay exactly as
 //! they are until an action is customized; then its default bindings are
 //! replaced by the new key (same contexts), or dropped when it is disabled.
 //! Actions without a default key are bound to [`RunShortcut`], which the
@@ -350,7 +350,7 @@ pub fn update(cx: &mut App, f: impl FnOnce(&mut Shortcuts)) {
 /// Marks the bindings this module manages in the keymap.
 const META: KeyBindingMetaIndex = KeyBindingMetaIndex(0x5_c0de);
 
-/// The default bindings of `actions::bind_default_keys`.
+/// The default bindings of `actions::default_key_bindings`.
 struct DefaultBindings(Vec<KeyBinding>);
 impl Global for DefaultBindings {}
 

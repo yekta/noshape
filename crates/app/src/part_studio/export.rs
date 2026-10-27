@@ -205,7 +205,7 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                     .gap(px(4.))
                     .items_end()
                     .child(crate::os_ui::field_label("File name"))
-                    .child(crate::os_ui::export_rules_link("ex-rules"))
+                    .child(crate::preferences_window::export_rules_link("ex-rules"))
                     .child(div().flex_1())
                     .child(div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x555555)).flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?")),
             )

@@ -23,7 +23,7 @@ pub fn save_graphics(prefs: &GraphicsPrefs) {
 }
 
 /// The Graphics preferences dialog's number fields and their ranges
-/// (crates/app/src/graphics_prefs_dialog.rs rows).
+/// (crates/app-core/src/graphics_prefs_dialog.rs rows).
 const NUMBERS: [(&str, f64, f64); 9] = [
     ("ambient_occlusion", 0.0, 1.0),
     ("fov_deg", 20.0, 120.0),

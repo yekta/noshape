@@ -18,7 +18,7 @@ use noshape_units::{AngleUnit, Dim, LengthUnit, UnitPrefs, VariableScope};
 
 // The commit rule is shared with the model (sketch dimensions stored by
 // any path, the agent API included, carry their unit).
-pub(crate) use noshape_model::quantity_text::{commit_text, unit_word};
+pub use noshape_model::quantity_text::{commit_text, unit_word};
 use noshape_model::quantity_text::simple;
 
 /// The step of one ↑ / ↓ / wheel notch in the workspace unit of `dim`.
@@ -45,14 +45,14 @@ fn base_step(dim: Dim, prefs: &UnitPrefs) -> f64 {
 
 /// The modifiers of a step.
 #[derive(Clone, Copy, Default)]
-pub(crate) struct StepMods {
+pub struct StepMods {
     pub shift: bool,
     pub ctrl: bool,
 }
 
 /// What a field steps: its dimension, the workspace units, the variables,
 /// whether it is a count, and its range in workspace units.
-pub(crate) struct Stepping<'a> {
+pub struct Stepping<'a> {
     pub dim: Dim,
     pub prefs: &'a UnitPrefs,
     pub scope: &'a dyn VariableScope,
@@ -63,7 +63,7 @@ pub(crate) struct Stepping<'a> {
 /// The field's text after one step up (`up`) or down, or None when the
 /// value can't step: an expression, a value that doesn't evaluate, or a
 /// step out of the range.
-pub(crate) fn step_text(text: &str, up: bool, mods: StepMods, f: &Stepping) -> Option<String> {
+pub fn step_text(text: &str, up: bool, mods: StepMods, f: &Stepping) -> Option<String> {
     let Stepping { dim, prefs, scope, integer, range } = *f;
     simple(text)?;
     let q = noshape_units::evaluate_as(text, dim, prefs, scope).ok()?;
@@ -94,13 +94,13 @@ pub(crate) fn step_text(text: &str, up: bool, mods: StepMods, f: &Stepping) -> O
 }
 
 /// The hover text of an invalid number field (live).
-pub(crate) const INVALID_TIP: &str = "Enter a valid expression.";
+pub const INVALID_TIP: &str = "Enter a valid expression.";
 
 /// Onshape's invalid number field (dialog fields, the sketch dimension box):
 /// a pink `#f9ebec` fill, a 2 px `#bd3039` underline and the hover
 /// "Enter a valid expression.". `el` is the field's box (with a bottom
 /// border, positioned); unchanged when `invalid` is false.
-pub(crate) fn invalid_field(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool) -> gpui_kit::Stateful<gpui_kit::Div> {
+pub fn invalid_field(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool) -> gpui_kit::Stateful<gpui_kit::Div> {
     use gpui_kit::{ParentElement as _, StatefulInteractiveElement as _, Styled as _, div, px};
     if !invalid {
         return el;
@@ -116,7 +116,7 @@ pub(crate) fn invalid_field(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool
 
 /// [`invalid_field`] with the hover text of why the value doesn't evaluate
 /// ([`eval_message`]).
-pub(crate) fn invalid_field_tip(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool, tip: String) -> gpui_kit::Stateful<gpui_kit::Div> {
+pub fn invalid_field_tip(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool, tip: String) -> gpui_kit::Stateful<gpui_kit::Div> {
     use gpui_kit::{ParentElement as _, StatefulInteractiveElement as _, Styled as _, div, px};
     if !invalid {
         return el;
@@ -134,7 +134,7 @@ pub(crate) fn invalid_field_tip(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: 
 /// (10-26 c)): "Cannot use angle as length.", "Cannot add angle and
 /// length.", "Cannot apply cos to length.", else "Enter a valid
 /// expression.".
-pub(crate) fn eval_message(err: &noshape_units::ExprError) -> String {
+pub fn eval_message(err: &noshape_units::ExprError) -> String {
     use noshape_units::{EvalError, ExprError};
     let n = |d: Dim| if d == Dim::UNITLESS { "number".to_string() } else { d.name() };
     match err {
@@ -146,11 +146,11 @@ pub(crate) fn eval_message(err: &noshape_units::ExprError) -> String {
 }
 
 /// The hover text of an invalid count field (live: Zebra stripes count).
-pub(crate) const INVALID_INT_TIP: &str = "Enter an integer.";
+pub const INVALID_INT_TIP: &str = "Enter an integer.";
 
 /// What a [`QuantityInput`] holds and how it shows it.
 #[derive(Clone)]
-pub(crate) struct QuantitySpec {
+pub struct QuantitySpec {
     /// The field's dimension (`Dim::UNITLESS` for counts and plain numbers).
     pub dim: Dim,
     /// A count: whole numbers only, stepped by 1, never given a unit.
@@ -219,7 +219,7 @@ impl QuantitySpec {
 
 /// How a [`QuantityInput`] commit happened.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CommitVia {
+pub enum CommitVia {
     Enter,
     /// Tab or click-away.
     Blur,
@@ -228,7 +228,7 @@ pub(crate) enum CommitVia {
 }
 
 /// What a [`QuantityInput`] tells its owner.
-pub(crate) enum QuantityEvent {
+pub enum QuantityEvent {
     /// The text was edited (each keystroke); nothing committed yet.
     Changed,
     /// The text was committed and rewritten by Onshape's rules; read
@@ -256,7 +256,7 @@ pub(crate) enum QuantityEvent {
 /// - ↑ / ↓ step a plain value (Shift ×10, Ctrl ×0.1, counts ±1), the wheel
 ///   too while focused;
 /// - a 1 px `#d7d7d7` underline, blue on hover, 2 px blue while focused.
-pub(crate) struct QuantityInput {
+pub struct QuantityInput {
     state: gpui_kit::Entity<gpui_kit::component::input::InputState>,
     spec: QuantitySpec,
     units: UnitPrefs,

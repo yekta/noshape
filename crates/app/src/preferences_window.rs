@@ -1143,6 +1143,21 @@ impl Render for PreferencesView {
     }
 }
 
+/// The Export dialogs' "View export rules" (live: a small blue link next to
+/// the File name label): opens Preferences at User export rules; the
+/// dialog stays open.
+pub fn export_rules_link(id: &'static str) -> Stateful<Div> {
+    div()
+        .id(id)
+        .pb(px(1.))
+        .text_size(px(12.))
+        .text_color(rgb(0x094174))
+        .cursor_pointer()
+        .hover(|d| d.underline())
+        .child("View export rules")
+        .on_click(|_, _, cx| show(Page::ExportRules, cx))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

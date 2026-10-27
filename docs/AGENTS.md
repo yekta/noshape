@@ -33,7 +33,7 @@ and the Onshape research specs in `research/sections/` (what each feature must d
 * Persistent naming (`crates/model/src/naming.rs`, `reference.rs`): every face a feature creates
   must get a deterministic name from (feature id, role, source); edges/vertices derive from faces.
   Choose roles so that names stay stable when unrelated upstream geometry changes.
-* UI: GPUI via `gpui-kit`; colors from `crates/app/src/theme.rs`; icons are SVGs in
+* UI: GPUI via `gpui-kit`; colors from `crates/app-core/src/theme.rs`; icons are SVGs in
   `crates/app/assets/icons/` referenced with `assets::icon_path(name)`.
 * Performance matters: no blocking work on the UI thread (use `cx.background_spawn`), cache
   derived data, avoid per-frame allocation.

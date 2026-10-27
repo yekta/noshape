@@ -20,7 +20,7 @@ Sources:
   1.75, `DRAG_ZOOM_FACTOR` 10, `MIN_MODEL_PIXEL_SIZE` 100,
   `USE_CENTRAL_ZOOM_OUT` 0, `CAMERA_SHORT_ANIMATION_TIME_MS` 250).
 
-Code: `crates/app/src/navigation.rs` (all input→camera math, unit tested:
+Code: `crates/app-core/src/navigation.rs` (all input→camera math, unit tested:
 `cargo test -p noshape navigation`), `viewport.rs` (3D input), the drawing
 canvas (`drawing_tools.rs` / `drawing_view.rs`, 2D).
 

@@ -6,7 +6,7 @@ def git(*a): return subprocess.run(['git','-C',R,*a],capture_output=True,text=Tr
 def labels(tree):
     out=set()
     files=[]
-    for p in git('ls-tree','--name-only',tree,'crates/app/src/').split():
+    for p in git('ls-tree','--name-only',tree,'crates/app/src/','crates/app-core/src/').split():
         n=p.split('/')[-1]
         area=('assembly' if n.startswith('assembly_') else 'drawing' if n.startswith('drawing_') else 'document' if (n.startswith('variable_') or n=='history_panel.rs') else 'partStudio' if n=='feature_dialog.rs' else 'view' if n=='camera_menu.rs' else None)
         if area and n.endswith('.rs'): files.append((area,p))

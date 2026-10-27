@@ -51,7 +51,7 @@ impl DrawingEditor {
             let strs = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
             let mut body = crate::os_ui::modal_body()
                 // Live drawing/40: "View export rules" next to the label.
-                .child(gpui_kit::component::h_flex().gap(px(4.)).items_end().child(crate::os_ui::field_label("File name")).child(crate::os_ui::export_rules_link("ex-rules")))
+                .child(gpui_kit::component::h_flex().gap(px(4.)).items_end().child(crate::os_ui::field_label("File name")).child(crate::preferences_window::export_rules_link("ex-rules")))
                 .child(Input::new(&file).h(px(34.)).text_size(px(14.)))
                 .child(select("ex-format", "Format", DrawingFormat::ALL.iter().map(|f| f.label().to_string()).collect(), DrawingFormat::ALL.iter().position(|x| *x == f).unwrap_or(0), |s, i| {
                     s.format = DrawingFormat::ALL[i];

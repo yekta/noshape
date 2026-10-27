@@ -27,6 +27,7 @@ noshape-render = { path = "crates/render" }
 noshape-featurescript = { path = "crates/featurescript" }
 noshape-ops = { path = "crates/ops" }
 noshape-scene = { path = "crates/scene" }
+noshape-app-core = { path = "crates/app-core" }
 
 gpui-kit = "0.7.3"
 wgpu = "29"

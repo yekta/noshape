@@ -6,7 +6,7 @@ crates/ops/src/coverage.rs MENUS, and MENUS lists no item the UI no longer has.
     tools/menu-coverage.py [commit]      (default: the working tree)
 
 Exit 1 with the lines to add / remove. Run by the shared pre-push hook when a push to main changes
-crates/app/src or the coverage map. Keep the parsing in step with `menu_labels` in the Rust test.
+crates/app/src, crates/app-core/src or the coverage map. Keep the parsing in step with `menu_labels` in the Rust test.
 """
 import os, re, subprocess, sys
 
@@ -14,10 +14,10 @@ ROOT = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=Tr
 
 
 def files_at(commit):
-    """{path: text} of crates/app/src (top level and part_studio/) and the coverage map."""
+    """{path: text} of crates/app/src (top level and part_studio/), crates/app-core/src and the coverage map."""
     wanted = []
     if commit:
-        names = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", commit, "crates/app/src"], capture_output=True, text=True).stdout.split()
+        names = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", commit, "crates/app/src", "crates/app-core/src"], capture_output=True, text=True).stdout.split()
         wanted = [n for n in names if n.count("/") == 3 or n.startswith("crates/app/src/part_studio/")]
         wanted.append("crates/ops/src/coverage.rs")
         p = subprocess.Popen(["git", "-C", ROOT, "cat-file", "--batch"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -30,10 +30,12 @@ def files_at(commit):
             i = head_end + 1 + size + 1
         return texts
     texts = {}
+    for crate in ("app", "app-core"):
+        top = os.path.join(ROOT, "crates", crate, "src")
+        for name in os.listdir(top):
+            if name.endswith(".rs"):
+                texts[f"crates/{crate}/src/{name}"] = open(os.path.join(top, name), encoding="utf-8").read()
     src = os.path.join(ROOT, "crates/app/src")
-    for name in os.listdir(src):
-        if name.endswith(".rs"):
-            texts[f"crates/app/src/{name}"] = open(os.path.join(src, name), encoding="utf-8").read()
     for name in os.listdir(os.path.join(src, "part_studio")):
         texts[f"crates/app/src/part_studio/{name}"] = open(os.path.join(src, "part_studio", name), encoding="utf-8").read()
     texts["crates/ops/src/coverage.rs"] = open(os.path.join(ROOT, "crates/ops/src/coverage.rs"), encoding="utf-8").read()

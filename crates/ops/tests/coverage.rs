@@ -63,8 +63,10 @@ fn every_ui_command_is_listed() {
 /// `coverage::MENUS`): `item("…")`, `icon_item("…")`, `OsMenuItem::new("…")`.
 fn menu_labels() -> BTreeSet<String> {
     let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../app/src");
+    let core = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../app-core/src");
     let mut files: Vec<(String, std::path::PathBuf)> = Vec::new();
-    for e in std::fs::read_dir(&src).expect("app sources").flatten() {
+    let tops = std::fs::read_dir(&src).expect("app sources").chain(std::fs::read_dir(&core).expect("app-core sources"));
+    for e in tops.flatten() {
         let name = e.file_name().to_string_lossy().to_string();
         let area = if name.starts_with("assembly_") {
             "assembly"

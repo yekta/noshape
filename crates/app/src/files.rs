@@ -6,9 +6,7 @@ use gpui_kit::component::TitleBar;
 use gpui_kit::*;
 use std::path::{Path, PathBuf};
 
-pub(crate) fn config_dir() -> PathBuf {
-    noshape_scene::config_dir()
-}
+pub(crate) use noshape_app_core::paths::config_dir;
 
 pub fn documents_dir() -> PathBuf {
     let base = dirs::document_dir().or_else(|| dirs::home_dir().map(|h| h.join("Documents"))).unwrap_or_else(|| PathBuf::from("."));

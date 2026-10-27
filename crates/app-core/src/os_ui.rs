@@ -222,21 +222,6 @@ pub fn field_label(text: impl Into<SharedString>) -> Div {
     div().pt(px(4.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(p().text).child(text.into())
 }
 
-/// The Export dialogs' "View export rules" (live: a small blue link next to
-/// the File name label): opens Preferences at User export rules; the
-/// dialog stays open.
-pub fn export_rules_link(id: &'static str) -> Stateful<Div> {
-    div()
-        .id(id)
-        .pb(px(1.))
-        .text_size(px(12.))
-        .text_color(rgb(0x094174))
-        .cursor_pointer()
-        .hover(|d| d.underline())
-        .child("View export rules")
-        .on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::ExportRules, cx))
-}
-
 /// An info box ("No additional folders"): `#def1fb`, outline `#b2ddf6`,
 /// text `#094174`.
 pub fn info_box(text: impl Into<SharedString>) -> Div {

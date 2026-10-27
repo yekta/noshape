@@ -1,0 +1,37 @@
+//! noshape's app base layer (docs/CRATES.md): theme, assets, base widgets, menus, actions, cursors, the GPU context
+//! and the 3D viewport. It never references a studio; the studio UIs and the `noshape` binary build on it.
+
+pub mod actions;
+pub mod assets;
+pub mod cached_slice;
+pub mod camera_menu;
+pub mod color_mixer;
+pub mod cursor;
+pub mod derived;
+pub mod doc_model;
+pub mod export_naming;
+pub mod gpu;
+pub mod graphics_prefs;
+pub mod graphics_prefs_dialog;
+pub mod i18n;
+pub mod isolate_ui;
+pub mod named_views_dialog;
+pub mod nav_trace;
+pub mod navigation;
+pub mod os_menu;
+pub mod os_select;
+pub mod os_ui;
+pub mod overlay_labels;
+pub mod paths;
+pub mod quantity_field;
+pub mod scene_builder;
+pub mod section_dialog;
+pub mod session;
+pub mod start_thumbnail;
+pub mod theme;
+pub mod tool_synonyms;
+pub mod tool_text;
+pub mod toolbar_customize;
+pub mod touch;
+pub mod ui;
+pub mod viewport;

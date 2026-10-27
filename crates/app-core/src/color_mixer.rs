@@ -15,7 +15,7 @@ use std::rc::Rc;
 
 /// The mixer's colour (hue 0–360, saturation and value 0–1) and drag.
 #[derive(Clone, Copy, Default)]
-pub(crate) struct MixerState {
+pub struct MixerState {
     pub h: f32,
     pub s: f32,
     pub v: f32,
@@ -41,7 +41,7 @@ impl MixerState {
     }
 }
 
-pub(crate) fn hsv_to_rgb(h: f32, s: f32, v: f32) -> [u8; 3] {
+pub fn hsv_to_rgb(h: f32, s: f32, v: f32) -> [u8; 3] {
     let h = (h.rem_euclid(360.)) / 60.;
     let c = v * s;
     let x = c * (1. - (h % 2. - 1.).abs());
@@ -57,7 +57,7 @@ pub(crate) fn hsv_to_rgb(h: f32, s: f32, v: f32) -> [u8; 3] {
     [((r + m) * 255.).round() as u8, ((g + m) * 255.).round() as u8, ((b + m) * 255.).round() as u8]
 }
 
-pub(crate) fn rgb_to_hsv(c: [u8; 3]) -> (f32, f32, f32) {
+pub fn rgb_to_hsv(c: [u8; 3]) -> (f32, f32, f32) {
     let [r, g, b] = c.map(|x| x as f32 / 255.);
     let max = r.max(g).max(b);
     let min = r.min(g).min(b);
@@ -75,16 +75,16 @@ pub(crate) fn rgb_to_hsv(c: [u8; 3]) -> (f32, f32, f32) {
 }
 
 /// How a view reaches its mixer.
-pub(crate) type Field<V> = fn(&mut V) -> Option<&mut MixerState>;
+pub type Field<V> = fn(&mut V) -> Option<&mut MixerState>;
 /// The colour picked (on every press and drag step).
-pub(crate) type OnColor<V> = fn(&mut V, [u8; 3], &mut Window, &mut Context<V>);
+pub type OnColor<V> = fn(&mut V, [u8; 3], &mut Window, &mut Context<V>);
 
 fn rgba(c: [u8; 3]) -> Rgba {
     gpui_kit::rgb(((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32)
 }
 
 /// The square and the strip.
-pub(crate) fn mixer<V: 'static>(st: &MixerState, field: Field<V>, on_color: OnColor<V>, cx: &mut Context<V>) -> AnyElement {
+pub fn mixer<V: 'static>(st: &MixerState, field: Field<V>, on_color: OnColor<V>, cx: &mut Context<V>) -> AnyElement {
     let hue = hsv_to_rgb(st.h, 1., 1.);
     let sq: Rc<Cell<Bounds<Pixels>>> = Default::default();
     let strip: Rc<Cell<Bounds<Pixels>>> = Default::default();

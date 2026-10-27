@@ -16,7 +16,7 @@ use x11rb::rust_connection::RustConnection;
 
 /// Cursor theme names for a CSS cursor name, in the order Chrome looks them
 /// up on X11.
-pub(crate) fn theme_names(css: &str) -> &'static [&'static str] {
+pub fn theme_names(css: &str) -> &'static [&'static str] {
     match css {
         // Chrome shows all-scroll for `move` (Blink doesn't tell them apart).
         "move" => &["all-scroll", "fleur", "size_all"],

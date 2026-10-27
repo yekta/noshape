@@ -154,7 +154,7 @@ impl Job {
 
 /// Isometric camera framing the box tightly (projected extents, not the
 /// bounding sphere, so flat parts fill the thumbnail).
-pub(crate) fn fit_camera(lo: glam::DVec3, hi: glam::DVec3, aspect: f64) -> Camera {
+pub fn fit_camera(lo: glam::DVec3, hi: glam::DVec3, aspect: f64) -> Camera {
     let mut camera = Camera::default();
     let (right, up) = (camera.right(), camera.up());
     let center = (lo + hi) * 0.5;
@@ -175,7 +175,7 @@ pub(crate) fn fit_camera(lo: glam::DVec3, hi: glam::DVec3, aspect: f64) -> Camer
 }
 
 /// Thumbnail look: Onshape's white document thumbnails.
-pub(crate) fn thumbnail_style() -> Style {
+pub fn thumbnail_style() -> Style {
     Style {
         background_top: crate::theme::lin(0xffffff),
         background_bottom: crate::theme::lin(0xffffff),

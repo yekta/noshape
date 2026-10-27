@@ -11,30 +11,30 @@ use gpui_kit::*;
 use std::rc::Rc;
 
 /// The transparency slider's range: the opacity of the parts left out.
-pub(crate) const ALPHA_MIN: f32 = 0.12;
-pub(crate) const ALPHA_MAX: f32 = 0.9;
+pub const ALPHA_MIN: f32 = 0.12;
+pub const ALPHA_MAX: f32 = 0.9;
 
 /// The slider position of opacity `alpha`.
-pub(crate) fn alpha_t(alpha: f32) -> f32 {
+pub fn alpha_t(alpha: f32) -> f32 {
     ((alpha - ALPHA_MIN) / (ALPHA_MAX - ALPHA_MIN)).clamp(0.0, 1.0)
 }
 
 /// The opacity at slider position `t`.
-pub(crate) fn t_alpha(t: f32) -> f32 {
+pub fn t_alpha(t: f32) -> f32 {
     ALPHA_MIN + t * (ALPHA_MAX - ALPHA_MIN)
 }
 
 /// Where a view keeps the slider being dragged.
-pub(crate) type SliderDrag<V> = fn(&mut V) -> &mut Option<&'static str>;
+pub type SliderDrag<V> = fn(&mut V) -> &mut Option<&'static str>;
 /// A view action.
-pub(crate) type Act<V> = fn(&mut V, &mut Window, &mut Context<V>);
+pub type Act<V> = fn(&mut V, &mut Window, &mut Context<V>);
 /// A slider's new position, 0 to 1.
-pub(crate) type SetT<V> = Rc<dyn Fn(&mut V, f32, &mut Window, &mut Context<V>)>;
+pub type SetT<V> = Rc<dyn Fn(&mut V, f32, &mut Window, &mut Context<V>)>;
 /// A pick in the Expand select, by index.
-pub(crate) type PickIx = Rc<dyn Fn(usize, &mut Window, &mut App)>;
+pub type PickIx = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
 /// What the dialog shows and does.
-pub(crate) struct IsoDialog<V> {
+pub struct IsoDialog<V> {
     /// `PanelOffsets` key of the dialog (shared by both studios).
     pub key: &'static str,
     pub title: &'static str,
@@ -59,7 +59,7 @@ pub(crate) struct IsoDialog<V> {
 }
 
 /// The dialog (placed by the caller).
-pub(crate) fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyElement {
+pub fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyElement {
     let pal = crate::theme::p();
     let section = |t: &'static str| div().pl(px(3.)).h(px(15.)).mt(px(10.)).mb(px(10.)).text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x666666)).child(t);
     let (close, toggle) = (d.close, d.toggle_select);

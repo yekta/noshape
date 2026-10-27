@@ -791,7 +791,7 @@ pub struct MouseControls {
 static MOUSE_CONTROLS: RwLock<Option<MouseControls>> = RwLock::new(None);
 
 fn mouse_controls_path() -> std::path::PathBuf {
-    crate::files::config_dir().join("mouse-controls.json")
+    crate::paths::config_dir().join("mouse-controls.json")
 }
 
 impl MouseControls {

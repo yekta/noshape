@@ -808,7 +808,7 @@ impl Viewport {
     }
 
     /// Zoom so the box (viewport-local corners) fills the view.
-    pub(crate) fn zoom_to_box(&mut self, a: DVec2, b: DVec2, cx: &mut Context<Self>) {
+    pub fn zoom_to_box(&mut self, a: DVec2, b: DVec2, cx: &mut Context<Self>) {
         if let Some(to) = noshape_scene::camera_ops::zoom_to_window(&self.camera, a, b, self.size()) {
             self.animate_to(to, cx);
         }

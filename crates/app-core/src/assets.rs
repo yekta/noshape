@@ -5,7 +5,7 @@ use gpui_kit::{AssetSource, Result, SharedString};
 use std::borrow::Cow;
 
 #[derive(rust_embed::RustEmbed)]
-#[folder = "assets"]
+#[folder = "../app/assets"]
 #[include = "icons/*.svg"]
 struct AppIcons;
 

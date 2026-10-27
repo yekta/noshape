@@ -34,7 +34,7 @@ pub const LEFT_PANEL_W: f32 = 206.;
 
 thread_local! {
     static LEFT_W: std::cell::Cell<f32> = std::cell::Cell::new(
-        std::fs::read_to_string(crate::files::config_dir().join("left_panel_width.txt")).ok().and_then(|t| t.trim().parse::<f32>().ok()).filter(|w| w.is_finite()).unwrap_or(LEFT_PANEL_W).max(LEFT_PANEL_W),
+        std::fs::read_to_string(crate::paths::config_dir().join("left_panel_width.txt")).ok().and_then(|t| t.trim().parse::<f32>().ok()).filter(|w| w.is_finite()).unwrap_or(LEFT_PANEL_W).max(LEFT_PANEL_W),
     );
 }
 
@@ -82,7 +82,7 @@ pub fn drag_left_panel(e: &DragMoveEvent<LeftSplitDrag>) -> bool {
         return false;
     }
     LEFT_W.with(|c| c.set(w));
-    let p = crate::files::config_dir().join("left_panel_width.txt");
+    let p = crate::paths::config_dir().join("left_panel_width.txt");
     if let Some(dir) = p.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
@@ -1022,7 +1022,7 @@ thread_local! {
     /// Where each panel dialog was moved, by panel (shared by the Part
     /// Studio and the assembly), kept across sessions.
     static PANEL_OFFSETS: std::cell::RefCell<std::collections::HashMap<String, (f32, f32)>> = std::cell::RefCell::new(
-        std::fs::read_to_string(crate::files::config_dir().join("panel_positions.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default(),
+        std::fs::read_to_string(crate::paths::config_dir().join("panel_positions.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default(),
     );
 }
 
@@ -1082,7 +1082,7 @@ impl PanelOffsets {
                 return;
             }
             m.insert(key.to_string(), offset);
-            let p = crate::files::config_dir().join("panel_positions.json");
+            let p = crate::paths::config_dir().join("panel_positions.json");
             if let Some(dir) = p.parent() {
                 let _ = std::fs::create_dir_all(dir);
             }
@@ -1118,7 +1118,7 @@ const RIGHT_PANEL_MIN: f32 = 235.;
 
 thread_local! {
     static RIGHT_W: std::cell::Cell<f32> = std::cell::Cell::new(
-        std::fs::read_to_string(crate::files::config_dir().join("right_panel_width.txt")).ok().and_then(|t| t.trim().parse::<f32>().ok()).filter(|w| w.is_finite()).unwrap_or(RIGHT_PANEL_W).max(RIGHT_PANEL_MIN),
+        std::fs::read_to_string(crate::paths::config_dir().join("right_panel_width.txt")).ok().and_then(|t| t.trim().parse::<f32>().ok()).filter(|w| w.is_finite()).unwrap_or(RIGHT_PANEL_W).max(RIGHT_PANEL_MIN),
     );
 }
 
@@ -1159,7 +1159,7 @@ pub fn right_resizable<E: InteractiveElement + ParentElement>(panel: E, inset: f
             let w = (f32::from(e.bounds.right() - e.event.position.x) - inset).round().clamp(RIGHT_PANEL_MIN, max);
             if w != right_panel_w() {
                 RIGHT_W.with(|c| c.set(w));
-                let p = crate::files::config_dir().join("right_panel_width.txt");
+                let p = crate::paths::config_dir().join("right_panel_width.txt");
                 if let Some(dir) = p.parent() {
                     let _ = std::fs::create_dir_all(dir);
                 }
@@ -1173,7 +1173,7 @@ thread_local! {
     /// Table column widths the user dragged, by table and column; kept
     /// across sessions as live keeps them (reopen and reload).
     static COL_WIDTHS: std::cell::RefCell<std::collections::HashMap<String, f32>> = std::cell::RefCell::new(
-        std::fs::read_to_string(crate::files::config_dir().join("table_columns.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default(),
+        std::fs::read_to_string(crate::paths::config_dir().join("table_columns.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default(),
     );
     /// The column width and the pointer x when a grip was pressed.
     static COL_PRESS: std::cell::Cell<(f32, Pixels)> = const { std::cell::Cell::new((0., Pixels::ZERO)) };
@@ -1224,7 +1224,7 @@ pub fn col_grip(table: &str, col: &str, default: f32) -> Stateful<Div> {
                     return false;
                 }
                 m.insert(key, w);
-                let p = crate::files::config_dir().join("table_columns.json");
+                let p = crate::paths::config_dir().join("table_columns.json");
                 if let Some(dir) = p.parent() {
                     let _ = std::fs::create_dir_all(dir);
                 }
@@ -1363,7 +1363,13 @@ mod tests {
             }
         }
         let mut files = Vec::new();
-        walk(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
+        // Every app crate's sources (crates/app-core, crates/app, …).
+        for e in std::fs::read_dir(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..")).unwrap().flatten() {
+            let src = e.path().join("src");
+            if e.file_name().to_string_lossy().starts_with("app") && src.is_dir() {
+                walk(&src, &mut files);
+            }
+        }
         let mut bad = Vec::new();
         for f in files {
             let text = std::fs::read_to_string(&f).unwrap();

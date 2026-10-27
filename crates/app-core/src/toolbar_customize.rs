@@ -20,7 +20,7 @@ use std::cell::Cell;
 
 /// A tool of the Tools panel.
 #[derive(Clone)]
-pub(crate) struct PanelTool {
+pub struct PanelTool {
     /// The tool, as a one-tool slice of the studio's static tool lists.
     pub ids: &'static [&'static str],
     pub label: SharedString,
@@ -29,14 +29,14 @@ pub(crate) struct PanelTool {
 }
 
 /// How a view reaches its customize state.
-pub(crate) type Field<V> = fn(&mut V) -> Option<&mut Customize>;
+pub type Field<V> = fn(&mut V) -> Option<&mut Customize>;
 /// The saved tool set order and removed tools.
-pub(crate) type Saved = (Vec<usize>, Vec<String>);
+pub type Saved = (Vec<usize>, Vec<String>);
 /// Ends customize mode: `Some` on Save, `None` on Cancel.
-pub(crate) type Done<V> = fn(&mut V, Option<Saved>, &mut Context<V>);
+pub type Done<V> = fn(&mut V, Option<Saved>, &mut Context<V>);
 
 /// The edited toolbar while customizing.
-pub(crate) struct Customize {
+pub struct Customize {
     /// Tool set order (indices into the studio's default sets).
     pub order: Vec<usize>,
     /// Tools out of the toolbar.
@@ -48,7 +48,7 @@ pub(crate) struct Customize {
 }
 
 /// Every set once, in `order` first, the missing ones appended.
-pub(crate) fn full_order(order: &[usize], n: usize) -> Vec<usize> {
+pub fn full_order(order: &[usize], n: usize) -> Vec<usize> {
     let mut out: Vec<usize> = Vec::new();
     for i in order.iter().copied().filter(|i| *i < n) {
         if !out.contains(&i) {
@@ -108,7 +108,7 @@ fn dragged(cx: &App) -> Option<(&'static [&'static str], bool)> {
 
 /// Tools dragged in customize mode (a split tool brings its dropdown).
 #[derive(Clone)]
-pub(crate) struct ToolDrag {
+pub struct ToolDrag {
     ids: &'static [&'static str],
     icon: SharedString,
 }
@@ -127,7 +127,7 @@ impl Render for ToolDrag {
 
 /// A tool set dragged by its sled.
 #[derive(Clone)]
-pub(crate) struct ToolsetDrag {
+pub struct ToolsetDrag {
     set: usize,
 }
 
@@ -152,7 +152,7 @@ fn sled_look(d: Div) -> Div {
 
 /// A toolbar tool in customize mode: a cover drags it (cursor `move`) and
 /// keeps clicks off the tool; it is gone from the toolbar while dragged.
-pub(crate) fn tool(el: impl IntoElement, ids: &'static [&'static str], icon: SharedString, cx: &App) -> AnyElement {
+pub fn tool(el: impl IntoElement, ids: &'static [&'static str], icon: SharedString, cx: &App) -> AnyElement {
     if dragged(cx).is_some_and(|(d, bar)| bar && d == ids) {
         return div().into_any_element();
     }
@@ -180,7 +180,7 @@ pub(crate) fn tool(el: impl IntoElement, ids: &'static [&'static str], icon: Sha
 /// 34 px in the 36 px bar): `#f5f5f5`, and with `sled` the "•••" sled
 /// hanging under the bar (drawn over what is below). Drop a sled on a set
 /// to put that set before it; drop a tool from the Tools panel to put it back.
-pub(crate) fn toolset<V: 'static>(set: usize, content: impl IntoElement, sled: bool, field: Field<V>, cx: &mut Context<V>) -> AnyElement {
+pub fn toolset<V: 'static>(set: usize, content: impl IntoElement, sled: bool, field: Field<V>, cx: &mut Context<V>) -> AnyElement {
     h_flex()
         .id(SharedString::from(format!("tbset-{set}")))
         .relative()
@@ -249,7 +249,7 @@ fn button(id: &'static str, label: &'static str, primary: bool, enabled: bool) -
 /// `#f5f5f5`, a 43 px header and a 42 px footer on white). `tools` is every
 /// tool in toolbar order; `done` ends customize mode, with the edited order
 /// and removed tools on Save (None on Cancel).
-pub(crate) fn panel<V: 'static>(
+pub fn panel<V: 'static>(
     view: &mut V,
     tools: &[PanelTool],
     field: Field<V>,

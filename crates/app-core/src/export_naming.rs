@@ -5,7 +5,7 @@
 use noshape_model::export_rules::{ExportElement, ExportRules, NameValues};
 
 fn rules_path() -> std::path::PathBuf {
-    crate::files::config_dir().join("export_rules.json")
+    crate::paths::config_dir().join("export_rules.json")
 }
 
 /// The saved rules.

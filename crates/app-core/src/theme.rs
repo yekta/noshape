@@ -186,7 +186,7 @@ pub const PALETTE: Palette = Palette {
 /// Viewport colors (shared with the headless scene builder).
 pub use noshape_scene::palette::{pick, viewport, viewport_dark};
 
-pub(crate) const fn rgb_const(hex: u32) -> Rgba {
+pub const fn rgb_const(hex: u32) -> Rgba {
     Rgba {
         r: ((hex >> 16) & 0xff) as f32 / 255.0,
         g: ((hex >> 8) & 0xff) as f32 / 255.0,
@@ -394,7 +394,9 @@ mod white_guard {
         // Built from pieces so this test's own source doesn't match.
         let pats = [["bg(gpui_kit::", "white())"].concat(), [".bg(", "white())"].concat()];
         let mut bad = Vec::new();
-        let mut stack = vec![std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/src"))];
+        // Every app crate's sources (crates/app-core, crates/app, …).
+        let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut stack: Vec<_> = std::fs::read_dir(&crates).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().starts_with("app")).map(|e| e.path().join("src")).filter(|p| p.is_dir()).collect();
         while let Some(dir) = stack.pop() {
             for e in std::fs::read_dir(&dir).unwrap().flatten() {
                 let p = e.path();
