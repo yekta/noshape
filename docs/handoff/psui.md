@@ -58,12 +58,16 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   `EDGE && GeometryType.LINE`) take the part's edges (custom/studio.rs `filter_of`); offscreen test that a preview
   picks edges too. Rule from the lead: a preview / pick change lands only with a T1 test that a dialog field picks a
   face AND an edge.
+- 10-27 11:20 f65e888f: the parked WIP, verified on :102 against live's "psui preview look": Delete part outlines the
+  removed part's ghost (254,191,76), silhouette only, full colour at any slider position; a blended Add's "with"
+  model is the result in the part's colour (boss over the block top at 0.7: ours (96,129,147) / (130,172,197), live
+  (104,131,148) / (129,164,186): the 0.7 mix of the part shade over the block, as live).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
 ## In progress
 
-(nothing unlanded; parked WIP d0e0a74b on agent/psui: Delete ghost silhouette, blended Add colour)
+(nothing unlanded)
 
 Residuals found today: live outlines the Delete part ghost (255,192,76) (ours none); a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
@@ -90,15 +94,8 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-1. Highlights over the preview blend: the active field's highlight lines (a picked region's outline) now show whole
-   over the mix (compare::POST, the renderer's preview-post pass against the frame's depth). Left: the Delete part
-   ghost's (255,192,76) outline (the deleted part exists only in the base model, which carries no highlights; live
-   asked which edges). The picked region's tint and the extrude's end cap (grey at 50 %, `extrude_end_cap`) are
-   drawn over the mix too, as live at slider 0 / 1 (psui-prv-05a/b). Left: under the cap, live's boss top is the
-   part's own lit top (143,185,211), ours the preview tone at ambient: live's "with" model may draw an Add's body
-   in the part colour. But the rest shot (top over white (121,135,144), the cap over a 0.7 mix) implies a top of
-   (109,149,175): the two don't agree under one model (cap post-mix at 50 %), so ask live for the boss top at
-   slider 1 with the cap's region excluded (e.g. Depth 25 mm, sample the top's far corner) before changing it.
+1. Our base part shading differs a few units from live's (block top (140,185,212) vs (145,181,203)), which is what
+   the preview samples still differ by.
 2. part-studio.md 🔧 rows waiting for live (asked 10-27): 3.7 box into a dialog field (ours: Fillet takes the 6 faces),
    3.12 / 3.13 Select other into a field, 6.26 / 6.37 / 6.38 list separator and folder menus.
 3. Cold start first launch 2.5–3.4 s (budget 2 s): wgpu-hal isn't vendored; a per-(source, options) MTLLibrary cache
