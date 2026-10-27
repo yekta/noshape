@@ -2521,6 +2521,15 @@ pub fn mate_angle_label(deg: f64) -> String {
     let t = noshape_units::to_fixed(deg, 3);
     if t.contains('.') { t.trim_end_matches('0').trim_end_matches('.').to_string() } else { t }
 }
+/// A mate's angle as the sweep of its value arc, in [0, 2π): an angle that
+/// reads 0 or 360 at the label's 3 decimals is 0, no arc (MATE-ANGLE-360: a
+/// Revolute at 0° solved to -1e-12 drew the full circle with "360°").
+pub fn mate_angle_sweep(rad: f64) -> f64 {
+    let s = rad.rem_euclid(std::f64::consts::TAU);
+    let eps = 0.0005f64.to_radians();
+    if s < eps || std::f64::consts::TAU - s < eps { 0.0 } else { s }
+}
+
 /// Onshape `PREVIEW_ANGULAR_DIMENSION_RADIUS_PIXEL_SIZE`.
 const VALUE_ARC_RADIUS_PX: f64 = 80.0;
 
@@ -3607,7 +3616,7 @@ impl AssemblyView {
                         r
                     }
                 };
-                let sweep = on[0].rem_euclid(std::f64::consts::TAU);
+                let sweep = mate_angle_sweep(on[0]);
                 let text = if preview { format!("{}°", noshape_units::to_fixed(sweep.to_degrees(), 0)) } else { format!("{}°", mate_angle_label(sweep.to_degrees())) };
                 let frame = noshape_model::assembly::solver::Frame { origin: a.origin, rotation: b.rotation };
                 let mid = sweep * 0.5;

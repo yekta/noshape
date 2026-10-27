@@ -5975,6 +5975,10 @@ mod tests {
         assert_eq!(mate_angle_label(0.0), "0");
         assert_eq!(mate_angle_label(275.326), "275.326");
         assert_eq!(mate_angle_label(90.5), "90.5");
+        use super::behaviors::mate_angle_sweep;
+        assert_eq!(mate_angle_sweep(-1e-12), 0.0, "0°, not a full turn");
+        assert_eq!(mate_angle_sweep(1e-9), 0.0);
+        assert!((mate_angle_sweep(-0.5f64.to_radians()) - 359.5f64.to_radians()).abs() < 1e-12);
     }
 
     /// qa5 EXV5: explode drags round like live (whole degrees, 0.1 mm).
