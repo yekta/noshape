@@ -24,6 +24,8 @@ Checklist (30 min, on /root/green/noshape at the release commit; numbers to comp
 8. Re-run /root/qa-scratch/bin/{shellmatrix,hollowmatrix,holematrix,rimmatrix,boolmatrix}.py if a CLI is shipped.
 
 ## Setup that works
+- **Give the app window X focus first** (`xdotool windowfocus --sync <id>`, q.sh `focusw`): :110 has no window manager, so
+  without it GPUI sends no focus/blur events (Tab / click-away commits never fire; TAB-NO-PREVIEW was this artifact).
 - App: `cp /root/green/noshape /root/qa-scratch/noshape-<sha8>`, run with `NOSHAPE_PERF=1 NOSHAPE_PERF_PERIOD=1
   NOSHAPE_NO_NATIVE_DIALOGS=1 DISPLAY=:110`, window resized to 1600×1000 at 0,0 (xdotool). Helpers:
   /root/qa-scratch/bin/q.sh (shot, crop, clk, dclk, rclk, key, typ, settle). Regen times per feature come from the

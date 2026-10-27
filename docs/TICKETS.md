@@ -160,7 +160,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   once. On fins-400 the first click's selection highlight shows ~0.9 s later (software GL, load ~25), so the click count
   is probably measured when the event is handled instead of from the event's own timestamp; live opens the dialog on any
   double-click (qa 2026-10-26, build 4d2f6b0c)
-- [x] 606d2d0f P1 TAB-NO-PREVIEW: not an app bug, a test-display artifact (psui 10-27). On Xvfb without a window manager the
+- [x] verified dc3a03f6 with X focus (qa: Tab → preview regen; scheduled twice until 606d2d0f is green) 606d2d0f P1 TAB-NO-PREVIEW: not an app bug, a test-display artifact (psui 10-27). On Xvfb without a window manager the
   noshape window never gets X input focus, so it is never "active" and GPUI dispatches no focus / blur events at all
   (`Window::draw` sends empty focus paths for an inactive window): no input ever blurs, so nothing commits on Tab or a
   click away, while keys still arrive (xdotool sends them to the window under the pointer). With the window focused
@@ -244,7 +244,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [x] (dx 5ef64eb8: a tab name or id is resolved, a non-Part-Studio tab refused with `params.partStudio`) P2 API-DERIVED-BY-NAME feature_add importDerived with `partStudio: "Part Studio 1"` (the tab's name) is accepted and
+- [x] verified dc3a03f6 (qa: name accepted, Derived OK 12000 mm³) (dx 5ef64eb8: a tab name or id is resolved, a non-Part-Studio tab refused with `params.partStudio`) P2 API-DERIVED-BY-NAME feature_add importDerived with `partStudio: "Part Studio 1"` (the tab's name) is accepted and
   the feature fails "Error regenerating."; only the tab id works. Accept the name as tab_* ops do, or refuse it as an
   invalid_argument naming the expected id (main CLI ~20:18) (qa 2026-10-26)
 - [ ] P2 OPEN-ERROR-SILENT `noshape bad.noshape` with a truncated file ("sqlite: database disk image is malformed") or a
@@ -256,7 +256,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   1.5, 2.5 or 0.4). model/drawing/create.rs SCALES has 0.75, 1.5, 2.5, 0.4, 0.04, 0.025… Also: live puts automatic centre
   marks on full circles only; ours also marks the R20 partial arc in the Top view (behaviours "qa (2026-10-26, P2 batch)"
   (1)) (qa 2026-10-26, build 4d2f6b0c)
-- [x] (dx 10-27: changing a hidden legacy parameter that has a visible twin is refused with the name to use, `style` → `styleV2`; feature_get's own values pass back) P1 API-HOLE-STYLE (agent usability; v0.4.8 CLI, re-check on main) feature_schema "hole" lists both `style` and
+- [x] verified watcher CLI 19555ca3 (qa: `style` refused, "use `styleV2`") (dx 10-27: changing a hidden legacy parameter that has a visible twin is refused with the name to use, `style` → `styleV2`; feature_get's own values pass back) P1 API-HOLE-STYLE (agent usability; v0.4.8 CLI, re-check on main) feature_schema "hole" lists both `style` and
   `styleV2` (same enum, same description "Style"); feature_add with `style: C_BORE` (or C_SINK) is accepted, status Ok, but
   the hole stays Simple (removed volume = plain hole); only `styleV2` works. Either hide the legacy params the dialog doesn't
   show (style, isV2, holeVersion, …) or map them; an ignored parameter should at least warn. Hole geometry itself checked
