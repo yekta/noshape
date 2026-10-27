@@ -1437,7 +1437,16 @@ impl PartStudioView {
         } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_POINT)) {
             // Hole locations: every point of the sketch (Onshape), shown as
             // one "Vertices of Sketch N" row (qa5 P1-8).
-            dialog.update(cx, |d, _| d.grouped_sketches.insert(id));
+            dialog.update(cx, |d, _| {
+                d.grouped_sketches.insert(id);
+                // Kept with a Hole, so reopening it groups only these (qa5 P1-8 caveat).
+                if d.ty.params.iter().any(|s| s.id == noshape_model::features::solid::GROUPED_SKETCHES_PARAM) {
+                    let mut ids: Vec<u64> = d.grouped_sketches.iter().map(|f| f.0).collect();
+                    ids.sort_unstable();
+                    let text = ids.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(" ");
+                    d.feature.params.set(noshape_model::features::solid::GROUPED_SKETCHES_PARAM, ParamValue::Text(text));
+                }
+            });
             sketch_points(sk)
         } else if sketch.is_some() && filter.intersects(QueryFilter::SKETCH_EDGE) {
             // Curve fields (Rib's Sketch profiles, Sweep's path): the whole
@@ -2013,7 +2022,13 @@ impl PartStudioView {
             // A reopened feature holding all of a sketch's vertices shows
             // them as "Vertices of Sketch N", as picked from its row.
             let picked = d.selected_refs();
-            d.grouped_sketches = vertex_sets.iter().filter(|(_, v)| v.len() >= 2 && v.iter().all(|r| picked.contains(r))).map(|(id, _)| *id).collect();
+            let grouped = noshape_model::features::solid::GROUPED_SKETCHES_PARAM;
+            d.grouped_sketches = if d.ty.params.iter().any(|s| s.id == grouped) {
+                // A Hole records which sketches were picked whole; points clicked one by one stay single chips.
+                d.feature.params.text(grouped).split_whitespace().filter_map(|t| t.parse().ok()).map(FeatureId).collect()
+            } else {
+                vertex_sets.iter().filter(|(_, v)| v.len() >= 2 && v.iter().all(|r| picked.contains(r))).map(|(id, _)| *id).collect()
+            };
             d.sketch_vertices = Arc::new(move |id| vertex_sets.get(&id).cloned().unwrap_or_default());
             d.width = crate::part_studio_hooks::feature_dialog_width(&d.feature.type_id).map(|w| px(w as f32));
             d.variables = vars;

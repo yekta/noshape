@@ -8,6 +8,9 @@ use super::hole_tables;
 use super::{Category, FeatureType};
 use crate::params::{Hints, NumSpec, ParamSpec, ParamValues, QueryFilter};
 
+/// Hidden Hole parameter: the sketches whose points were picked whole ([`ParamSpec::text`], space-separated ids).
+pub const GROUPED_SKETCHES_PARAM: &str = "groupedSketches";
+
 pub fn register(out: &mut Vec<FeatureType>) {
     out.push(revolve());
     out.push(sweep());
@@ -355,6 +358,10 @@ pub fn hole() -> FeatureType {
         hidden(ParamSpec::enum_("style", "Style", HOLE_STYLE)),
         // Set by `hole_tables::apply_table_to_params` (dialog edit logic).
         hidden(ParamSpec::bool(hole_tables::TABLE_SYNCED_PARAM, "Table values applied", false)),
+        // The sketches whose points were picked from their feature row (their ids, space-separated): the dialog
+        // shows them as one "Vertices of Sketch N" row; points clicked one by one stay one chip each (live, qa5
+        // P1-8).
+        hidden(ParamSpec::text(GROUPED_SKETCHES_PARAM, "Sketches picked whole", "")),
         // Dialog.
         ParamSpec::enum_("unitsSystem", "Units", &[("INCH", "Inch"), ("METRIC", "Metric")]).hints(Hints::HORIZONTAL_ENUM | rem | Hints::UNCONFIGURABLE),
         ParamSpec::enum_("styleV2", "Style", HOLE_STYLE).hints(Hints::HORIZONTAL_ENUM | rem | Hints::UNCONFIGURABLE),
