@@ -25,7 +25,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | [ | Measure | opens the Measure panel | ✅ | 0.4.10+ / dd1b5037 10-27 (measure panel, workflow-analysis row 4) |
 | Ctrl+Space | Quick tab switching | not tested | ? |  |
 | Ctrl+Y / Ctrl+Z | redo / undo | ✅ (earlier workflows) | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| ` | Select other | list of faces/edges under the cursor | ✅ |  |
+| ` | Select other | list of faces/edges under the cursor | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | s | Shortcut toolbar (Part Studio: Sketch, Extrude, Revolve, Sweep, Loft / Fillet, Chamfer, Hole, Boolean, Transform) | 5×2 toolbar at the cursor | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Alt+C | Search tools | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Alt+T | Tab manager | opens the Tabs panel with thumbnails | ✅ | 0.4.10+ / dd1b5037 10-27 (opens; Esc doesn't close it, live asked) |
@@ -45,7 +45,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | y / Shift+Y | hide / show selected parts | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 (y hides; Shift+Y shows only with the pointer over the hidden part = live behaviours psui 2.16/2.17) |
 | p | hide/show planes | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Shift+I | Make isolate | Isolate dialog (Transparency / Component controls) | ✅ dialog; **planes stay visible** (live: other parts and planes/origin go translucent) | ✗ KB3 |  |
-| Shift+T | Make transparent | "Make transparent" dialog | ✅ |  |
+| Shift+T | Make transparent | "Make transparent" dialog | ✅ | 0.4.10+ / dd1b5037 10-27 (dialog: Transparency / Component controls) |
 | Shift+V | Named views | panel "Named views": New view name, +, "No views created" | ✅; **Esc does not close it** (stays through several Esc + clicks) | ? KB2 |  |
 | Shift+X | Section view | ✅ (see workflow-analysis AN3) | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Shift+R | view in high quality | not checked visually | ? |  |
@@ -78,11 +78,11 @@ d / n (workflow 3) ✅; p Projected view ✅; Shift+D, Shift+R, Ctrl+M, Shift+H 
 | Action | Live | Ours | Status | Verified |
 |---|---|---|---|---|
 | Right-drag 100 px left from Front | rotates about 55° (≈0.55°/px), Right face comes in | 50 px → ~45°, 100 px → 90°: **≈0.9°/px** | ✗ KB4 |  |
-| Middle-drag | pan | pan | ✅ |  |
-| Ctrl+right-drag | pan | pan | ✅ |  |
+| Middle-drag | pan | pan | ✅ | 0.4.10+ / dd1b5037 10-27 |
+| Ctrl+right-drag | pan | pan | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | View cube face hover | light-blue fill | ✅ | ✅ |  |
 | View cube ▶ / ▲ | ? (step) | 15° per click | ? |  |
-| Camera menu | Isometric … Section view… | same; "Turn off section view" while sectioned | ✅ / ? |  |
+| Camera menu | Isometric … Section view… | same; "Turn off section view" while sectioned | ✅ / ? | 0.4.10+ / dd1b5037 10-27 (Isometric … Section view…) |
 
 ## Other observations in this run
 
