@@ -8,6 +8,8 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   (MSVC C1083; also on main). Needs a guard before the release can publish (TICKETS "Release v0.4.9").
 - BOOL-THREAD-CRASH (P0 core) is very likely in the release: nondeterministic segfaults in OCCT booleans on pool threads
   (fuzz seed 72 crashed 3 times on the 04:06 / 04:48 watcher CLIs; v0.4.8 survives it). Decide whether it blocks v0.4.9.
+- v0.4.9 as cut ships DRAFT-HANG (verified on the CI artifact: the draft-hang document's regen never ends); a117663d
+  is after the release base. Cherry-pick or recut once the Windows include is fixed.
 - REGEN-NO-CANCEL (P0 psui) has no owner commit yet: a rollback waits up to 30 s+ behind a blend that's burning its budget.
 
 ## Release blockers seen by qa (updated 2026-10-27 06:10, green 4756f9be; see the newest "Green" section)

@@ -11,6 +11,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   `#include <cxxabi.h>`, GCC/Clang only, unguarded; blame d85c3029, REGEN-SPEED). Still on main, so main's Windows build
   is broken too (the watcher builds Linux only). Guard it (`#if !defined(_MSC_VER)`) or demangle another way. Linux and
   macOS jobs succeeded (06:29) (qa 07:50)
+- [ ] P0 the recut ships DRAFT-HANG: on the release's Linux artifact (run 40452492018, 0.4.9.7ee597e05af9) a copy of
+  tickets/cli-draft-hang.noshape never finishes its opening regen (> 150 s, spinner); the draft budget a117663d came after
+  the release's base 502416cc. Cherry-pick a117663d (and c30baf56 for markers) or recut. Same artifact: the five crash
+  documents open (6.7–32 s regen; cli-delete-crash 148 s because of a 120 s Shell 3), cli-fillet-hang opens in 68 s,
+  version string right (qa 08:05)
 - [ ] P0 the recut likely ships BOOL-THREAD-CRASH (core): the watcher CLIs 04:06 and 04:48 (≥ 502416cc, the release's
   base) segfault in OCCT booleans on pool threads three times in one fuzz sequence; v0.4.8 runs it through. To confirm
   on the release's Linux artifact when CI finishes (qa 05:55)
