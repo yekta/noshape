@@ -26,7 +26,7 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   matrices on the watcher CLI 04:48: fillet 32/32, boolean 11/11, shell 96/96 (walls everywhere; hole cases 3.5–7.4 s),
   hollow 60/60, rim 36/36, transform 5/5, split / mid plane exact; UI Part mirror about Right = 121558.969 (2×).
   featmatrix's hole patterns fail only through API-REMOVE-DIR; patmatrix's ×50/×100 overlapping holes now fail "Could not
-  create all instances as entered" on purpose (live's rule, pattern.rs copies_fail); holematrix needs styleV2.
+  create all instances as entered" on purpose (live's rule, pattern.rs copies_fail); holematrix (now styleV2) 12/12 exact.
 - Known open in the release: DRAFT-HANG (P0: a draft can spin forever; the app's regen then never ends), SHELL-SLOW (a
   failing shell 52 s), REGEN-SPEED, API-REMOVE-DIR (P1: scripted REMOVE extrudes miss; featmatrix's hole patterns fail).
 - Pending: the CI artifact (run 40452492018) for the version string and the crash documents.
