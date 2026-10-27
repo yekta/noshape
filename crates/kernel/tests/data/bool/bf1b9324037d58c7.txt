@@ -12,6 +12,6 @@ volume 0.00000000000000000e0
 faces 0
 edges 1
 vertices 2
-history fde2e0a08d1ee929
+history 2f3e491869d088aa
 ms 19.666
 path occt

@@ -55,6 +55,12 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepLib.hxx>
+#include <IntCurvesFace_ShapeIntersector.hxx>
+#include <IntTools_Context.hxx>
+#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <BRepClass3d_SolidClassifier.hxx>
+#include <BOPTools_AlgoTools3D.hxx>
+#include <BOPAlgo_Builder.hxx>
 #include <TopAbs.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <gp_Cylinder.hxx>
@@ -1991,6 +1997,321 @@ static bool fuse_on_face(const TopoDS_Shape& target, const TopoDS_Shape& tool, T
   return true;
 }
 
+// A Boolean of one small tool with a large target, done where they meet
+// (docs/BOOLEAN-SPEEDUP.md phase 2): the target's faces the tool's box
+// reaches and one ring of their neighbours go through OCCT's general fuse
+// with the tool; the pieces are kept or dropped by where they lie (a target
+// piece against the tool, a tool piece against the target, a piece the two
+// share by whether their faces point the same way); every other face stays as
+// it is (Kept). OCCT's Boolean walks the whole part several times (~1 ms a
+// face: a fin fused to the 400-fin plate's 1600 faces took 1.8 s). False
+// when it doesn't apply (NOSHAPE_BOOL_LOCAL=0: never); the caller runs the
+// whole Boolean.
+static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, int op, TopoDS_Shape& out, HHist& hist)
+{
+  auto no = [](int why) {
+    if (std::getenv("NOSHAPE_BOOL_DEBUG"))
+      std::fprintf(stderr, "local boolean: no (%d)\n", why);
+    return false;
+  };
+  if (op != 0 && op != 1)
+    return no(1);
+  {
+    const char* off = std::getenv("NOSHAPE_BOOL_LOCAL");
+    if (off != nullptr && std::string(off) == "0")
+      return no(2);
+  }
+  auto only = [](const TopoDS_Shape& x, TopAbs_ShapeEnum k, TopoDS_Shape& one) {
+    int n = 0;
+    for (TopExp_Explorer it(x, k); it.More(); it.Next(), ++n)
+      one = it.Current();
+    return n == 1;
+  };
+  TopoDS_Shape solid, shell, tsolid;
+  if (!only(target, TopAbs_SOLID, solid) || !only(solid, TopAbs_SHELL, shell) || !only(tool, TopAbs_SOLID, tsolid))
+    return no(3);
+  std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("local.maps");
+  ShapeIMap faces;
+  TopExp::MapShapes(solid, TopAbs_FACE, faces);
+  int tool_faces = 0;
+  for (TopExp_Explorer it(tsolid, TopAbs_FACE); it.More(); it.Next())
+    ++tool_faces;
+  // Worth it only on a part much bigger than the tool.
+  if (faces.Extent() < 200 || faces.Extent() < 8 * tool_faces)
+    return no(4);
+  Bnd_Box all;
+  BRepBndLib::Add(solid, all, false);
+  const double tol = 1e-7 * std::max(1.0, std::sqrt(all.SquareExtent()));
+  Bnd_Box tb;
+  BRepBndLib::Add(tsolid, tb, false);
+  tb.Enlarge(10 * tol);
+  // The faces the tool reaches, and their neighbours.
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  ShapeIMap reached, region;
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    Bnd_Box fb;
+    BRepBndLib::Add(faces(i), fb, false);
+    if (!fb.IsOut(tb))
+      reached.Add(faces(i));
+  }
+  if (reached.Extent() == 0 || reached.Extent() * 4 > faces.Extent())
+    return no(5);
+  for (int i = 1; i <= reached.Extent(); ++i)
+  {
+    region.Add(reached(i));
+    for (TopExp_Explorer e(reached(i), TopAbs_EDGE); e.More(); e.Next())
+      if (const ShapeList* fl = ef.Seek(e.Current()))
+        for (ShapeList::Iterator it(*fl); it.More(); it.Next())
+          region.Add(it.Value());
+  }
+  // The region's boundary: edges it shares with the faces left alone.
+  ShapeIMap boundary;
+  for (int i = 1; i <= region.Extent(); ++i)
+    for (TopExp_Explorer e(region(i), TopAbs_EDGE); e.More(); e.Next())
+      if (const ShapeList* fl = ef.Seek(e.Current()))
+        for (ShapeList::Iterator it(*fl); it.More(); it.Next())
+          if (!region.Contains(it.Value()))
+            boundary.Add(e.Current());
+  lap = std::make_unique<KernelTimer>("local.gf");
+  // OCCT's general fuse of the region's faces and the tool.
+  BRep_Builder    B;
+  TopoDS_Compound rc;
+  B.MakeCompound(rc);
+  for (int i = 1; i <= region.Extent(); ++i)
+    B.Add(rc, region(i));
+  BOPAlgo_Builder gf;
+  {
+    ShapeList args;
+    args.Append(rc);
+    args.Append(tsolid);
+    gf.SetArguments(args);
+  }
+  gf.SetNonDestructive(true);
+  gf.SetRunParallel(false);
+  gf.SetToFillHistory(true);
+  gf.Perform();
+  if (gf.HasErrors())
+    return no(6);
+  for (int i = 1; i <= boundary.Extent(); ++i)
+    if (!gf.Modified(boundary(i)).IsEmpty())
+      return no(7);
+  auto images = [&](const TopoDS_Shape& f) {
+    ShapeList l = gf.Modified(f);
+    if (l.IsEmpty() && !gf.IsDeleted(f))
+      l.Append(f);
+    return l;
+  };
+  lap = std::make_unique<KernelTimer>("local.pieces");
+  // Pieces of the tool's faces.
+  ShapeIMap of_tool;
+  for (TopExp_Explorer x(tsolid, TopAbs_FACE); x.More(); x.Next())
+  {
+    const ShapeList im = images(x.Current());
+    for (ShapeList::Iterator it(im); it.More(); it.Next())
+      of_tool.Add(it.Value());
+  }
+  // Pieces both sides share (coincident faces).
+  ShapeIMap of_target;
+  for (int i = 1; i <= region.Extent(); ++i)
+  {
+    const ShapeList im = images(region(i));
+    for (ShapeList::Iterator it(im); it.More(); it.Next())
+      of_target.Add(it.Value());
+  }
+  auto normal_of = [](const TopoDS_Face& f, const gp_Pnt& p) {
+    BRepAdaptor_Surface s(f);
+    double              u, v;
+    GeomAPI_ProjectPointOnSurf pr(p, BRep_Tool::Surface(f));
+    if (pr.NbPoints() == 0)
+      return gp_Vec();
+    pr.LowerDistanceParameters(u, v);
+    gp_Pnt q;
+    gp_Vec du, dv;
+    s.D1(u, v, q, du, dv);
+    gp_Vec n = du.Crossed(dv);
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    return n;
+  };
+  occ::handle<IntTools_Context> context = new IntTools_Context();
+  auto                          inner_point = [&](const TopoDS_Face& f, gp_Pnt& p) {
+    gp_Pnt2d uv;
+    return BOPTools_AlgoTools3D::PointInFace(f, p, uv, context) == 0;
+  };
+  BRepClass3d_SolidClassifier in_tool(tsolid);
+  // Inside the target: the parity of a ray's crossings (OCCT's solid
+  // classifier traced every face of the 1600-face part for each point,
+  // 1.6 s); a ray that touches anything is tried in another direction.
+  IntCurvesFace_ShapeIntersector rays;
+  rays.Load(solid, tol);
+  auto target_state = [&](const gp_Pnt& p) {
+    const gp_Dir dirs[] = {gp_Dir(0.5773, 0.5774, 0.5775), gp_Dir(-0.31, 0.83, 0.46), gp_Dir(0.71, -0.24, -0.66), gp_Dir(-0.12, -0.55, 0.83)};
+    for (const gp_Dir& d : dirs)
+    {
+      rays.Perform(gp_Lin(p, d), -tol, RealLast());
+      int  n     = 0;
+      bool clean = true;
+      for (int k = 1; k <= rays.NbPnt(); ++k)
+      {
+        if (std::abs(rays.WParameter(k)) <= 10 * tol || rays.State(k) == TopAbs_ON || rays.Transition(k) == IntCurveSurface_Tangent)
+        {
+          clean = false;
+          break;
+        }
+        ++n;
+      }
+      if (clean)
+        return n % 2 == 1 ? TopAbs_IN : TopAbs_OUT;
+    }
+    return TopAbs_ON;
+  };
+  // The target's faces' pieces.
+  NCollection_DataMap<TopoDS_Shape, ShapeList, TopTools_ShapeMapHasher> kept;
+  ShapeIMap                                                             keep;
+  for (int i = 1; i <= region.Extent(); ++i)
+  {
+    const TopoDS_Face& f = TopoDS::Face(region(i));
+    ShapeList          k;
+    const ShapeList    im = images(f);
+    for (ShapeList::Iterator it(im); it.More(); it.Next())
+    {
+      const TopoDS_Face piece = TopoDS::Face(it.Value());
+      // A piece never crosses the tool's boundary: with a vertex out of the
+      // tool's box it lies outside the tool (no point inside a face of 800
+      // edges to look for).
+      if (!of_tool.Contains(piece))
+      {
+        bool out_of_box = false;
+        for (TopExp_Explorer v(piece, TopAbs_VERTEX); v.More() && !out_of_box; v.Next())
+          out_of_box = tb.IsOut(BRep_Tool::Pnt(TopoDS::Vertex(v.Current())));
+        if (out_of_box)
+        {
+          k.Append(piece);
+          keep.Add(piece);
+          continue;
+        }
+      }
+      gp_Pnt p;
+      if (!inner_point(piece, p))
+        return no(8);
+      bool shared = false, same = false;
+      for (TopExp_Explorer x(tsolid, TopAbs_FACE); x.More() && !shared; x.Next())
+      {
+        const ShapeList tim = images(x.Current());
+        for (ShapeList::Iterator jt(tim); jt.More(); jt.Next())
+          if (jt.Value().IsSame(piece))
+          {
+            shared = true;
+            same   = normal_of(f, p).Dot(normal_of(TopoDS::Face(x.Current()), p)) > 0;
+          }
+      }
+      bool take;
+      if (shared)
+        take = op == 0 ? same : !same;
+      else
+      {
+        in_tool.Perform(p, tol);
+        if (in_tool.State() == TopAbs_ON)
+          return no(9);
+        take = in_tool.State() == TopAbs_OUT;
+      }
+      if (take)
+      {
+        const TopoDS_Shape oriented = piece;
+        k.Append(oriented);
+        keep.Add(oriented);
+      }
+    }
+    kept.Bind(f, k);
+  }
+  lap = std::make_unique<KernelTimer>("local.tool_pieces");
+  // The tool's faces' pieces (a cut keeps those inside the target, turned).
+  for (TopExp_Explorer x(tsolid, TopAbs_FACE); x.More(); x.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(x.Current());
+    ShapeList          k;
+    const ShapeList    im = images(f);
+    for (ShapeList::Iterator it(im); it.More(); it.Next())
+    {
+      if (of_target.Contains(it.Value()))
+        continue; // shared: decided with the target's
+      const TopoDS_Face piece = TopoDS::Face(it.Value());
+      gp_Pnt            p;
+      if (!inner_point(piece, p))
+        return no(10);
+      const TopAbs_State st = target_state(p);
+      if (st == TopAbs_ON)
+        return no(11);
+      const bool take = op == 0 ? st == TopAbs_OUT : st == TopAbs_IN;
+      if (take)
+      {
+        const TopoDS_Shape oriented = op == 0 ? TopoDS_Shape(piece) : piece.Reversed();
+        k.Append(oriented);
+        keep.Add(oriented);
+      }
+    }
+    kept.Bind(f, k);
+  }
+  lap = std::make_unique<KernelTimer>("local.shell");
+  // The shell: the faces left alone and the pieces kept.
+  TopoDS_Shell ns;
+  B.MakeShell(ns);
+  for (TopoDS_Iterator it(shell); it.More(); it.Next())
+    if (!region.Contains(it.Value()))
+      B.Add(ns, it.Value());
+  for (int i = 1; i <= keep.Extent(); ++i)
+    B.Add(ns, keep(i));
+  ns.Closed(true);
+  TopoDS_Solid so;
+  B.MakeSolid(so);
+  B.Add(so, ns.Oriented(shell.Orientation()));
+  so.Orientation(solid.Orientation());
+  if (!closed_and_oriented(so))
+    return no(12);
+  // As OCCT's own Boolean: no BRepCheck of the result (the 400-fin plate's
+  // front face, 800 edges, took ~1 s).
+  lap = std::make_unique<KernelTimer>("local.history");
+  // History: OCCT's general fuse's, kept to what the result holds.
+  ShapeIMap in_result;
+  for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    TopExp::MapShapes(so, k, in_result);
+  HHist                     h = new BRepTools_History();
+  std::vector<TopoDS_Shape> inputs;
+  for (int i = 1; i <= region.Extent(); ++i)
+    inputs.push_back(region(i));
+  inputs.push_back(tsolid);
+  ShapeIMap seen;
+  for (const TopoDS_Shape& in : inputs)
+    for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+      for (TopExp_Explorer x(in, k); x.More(); x.Next())
+      {
+        const TopoDS_Shape& s = x.Current();
+        if (seen.Contains(s))
+          continue;
+        seen.Add(s);
+        bool any = in_result.Contains(s);
+        for (ShapeList::Iterator it(gf.Modified(s)); it.More(); it.Next())
+          if (in_result.Contains(it.Value()) && !it.Value().IsSame(s))
+          {
+            h->AddModified(s, it.Value());
+            any = true;
+          }
+        for (ShapeList::Iterator it(gf.Generated(s)); it.More(); it.Next())
+          if (in_result.Contains(it.Value()))
+            h->AddGenerated(s, it.Value());
+        if (!any)
+          h->Remove(s);
+      }
+  // As OCCT records it: both input solids replaced by the new one.
+  h->Remove(solid);
+  h->Remove(tsolid);
+  out  = so;
+  hist = h;
+  return true;
+}
+
 // The result's facets back as mesh faces; `hist` becomes the history from
 // the original (unfaceted) inputs.
 static TopoDS_Shape remesh_facets(const TopoDS_Shape& res, MeshFacets& facets, HHist& hist)
@@ -2172,6 +2493,21 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       t_bool_path = "on_face";
     if (done)
       return make_result(concat(args.items, tools.items), out, h.get());
+  }
+  // One tool where it meets a large target: the faces it reaches only.
+  if ((op == 0 || op == 1) && a.size() == 1 && t.size() == 1 && facets.source.empty() && opts.fuzzy <= 0 && opts.glue == 0)
+  {
+    TopoDS_Shape out;
+    HHist        h;
+    bool         done = false;
+    {
+      const KernelTimer timer("boolean.local");
+      done = local_boolean(a[0], t[0], op, out, h);
+    }
+    if (done)
+      t_bool_path = "local";
+    if (done)
+      return make_result(concat(args.items, tools.items), opts.unify ? unify(out, h) : out, h.get());
   }
   // Holes straight through a plate: built directly.
   if (op == 1 && a.size() == 1 && facets.source.empty())

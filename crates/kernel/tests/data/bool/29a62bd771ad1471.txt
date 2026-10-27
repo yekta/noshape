@@ -12,6 +12,6 @@ volume 3.69200000000000082e-6
 faces 16
 edges 36
 vertices 24
-history 8497e19cbc5e4b2f
+history b834f1cb18ffdbeb
 ms 0.350
 path on_face

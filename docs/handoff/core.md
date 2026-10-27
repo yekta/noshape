@@ -144,7 +144,29 @@ Phase 0 (in progress, 10-27 evening):
   BuilderSolid::PerformAreas boxing every face, PostTreat's CorrectWires, the pave filler's teardown): O(faces) at
   ~1 ms a face, however small the tool. The fin is flush with the plate's front and back faces, so `fuse_on_face`
   (which wants the footprint clear of the face's edges) declines it: phase 2 has to merge coplanar faces.
-- Answer 2 (knurl thread scaling, NOSHAPE_OCCT_THREADS=1/2/4/8/16 with /root/occt-kern's [bop] stats): running.
+- Answer 2, knurl thread scaling (diamond, NOSHAPE_BOP_PARALLEL=1, NOSHAPE_OCCT_THREADS=n, /root/occt-kern's [bop]
+  stats, release, load ~30; /root/core-scratch/knurl.log): 1 thread 451 s, 2: 382 s, 4: 259 s, 8: 239 s, 16: 276 s.
+  Seconds per phase (summed over the run's Booleans) at 16 / 8 / 4 / 2 threads: PerformEF 57 / 40 / 80 / 125,
+  PerformEE 43 / 37 / 35 / 70, PerformFF 31 / 14 / 13 / 20, MakeBlocks 22 / 11 / 12 / 17, after the last stat
+  (BuildBOP etc.) 26 / 34 / 15 / 25, RepeatIntersection 13 / 8 / 20 / 25, VF 8 / 8 / 27 / 21. From 4 threads up
+  nothing shrinks: EF, EE, FF, MakeBlocks and the build are serial-bound, phase 1's targets (EF first, as planned).
+- Corpus history hash: each output by its place (rounded centroid / size), not its index, so a fast path that
+  orders the result's faces otherwise compares equal when the relations agree (corpus rebased with LOCAL=0).
+
+Phase 2 (local Booleans), first step landed:
+- boolean.cpp `local_boolean` (NOSHAPE_BOOL_LOCAL=0: off): one tool, a solid target of ≥ 200 faces (and ≥ 8× the
+  tool's): the target's faces the tool's box reaches plus one ring, OCCT's general fuse with the tool, pieces kept by
+  place (a target piece with a vertex out of the tool's box at once, else a point against the tool; tool pieces by
+  ray parity against the target; shared pieces by their normals), the shell rebuilt from the untouched faces and
+  the pieces; history from the general fuse's, kept to the result, both input solids Deleted (OCCT's). Declines when
+  the region's boundary edges get split.
+- Corpus: 0 mismatches over 974 cases; it takes the two fin fuses: 412 faces 117 ms (OCCT ~700 ms dev), 1612
+  faces 370–413 ms (OCCT 1.57 s dev). T1: kernel `boolean_groups::a_small_fuse_on_a_big_part_is_done_locally`.
+- Extrude 3 of fins-400 (dev, whole feature): 1681 → 1336 ms. What's left there is around the Boolean: the
+  regen's unify_same_domain over the whole 1600-face result after every Boolean (~390 ms for 4 calls), the auto
+  scope's classify_point loading a classifier per new body (~140 ms / 4), ancestor maps (4816 calls, 365 ms),
+  shown_topology (223 ms), and inside the local Boolean the general fuse of the two 800-edge front / back faces
+  (the fins merge into them; ~220–350 ms). Next: unify only the region, no reload of classifiers, then the target.
 
 ## Next, in order
 0. **P0 Boolean speed-up, docs/BOOLEAN-SPEEDUP.md (lead, 10-27 19:40; the user's plan, binding).** Phase 0 first

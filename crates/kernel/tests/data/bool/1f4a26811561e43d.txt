@@ -12,6 +12,6 @@ volume 9.59787614034050785e4
 faces 14
 edges 36
 vertices 24
-history 1a3b20cd2cf0058f
+history f2a29da3a29cfcd2
 ms 1.462
 path through_holes

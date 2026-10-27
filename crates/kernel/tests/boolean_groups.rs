@@ -94,3 +94,29 @@ fn a_boss_on_a_face_fused_directly() {
     let v = r.shape.volume().unwrap();
     assert!((v - (100.0 * 60.0 * 10.0 + PI * 25.0 * 8.0) * 1e-9).abs() < 1e-12, "{v}");
 }
+
+/// A fin fused flush under a plate of 100 fins goes the local way
+/// (boolean.cpp local_boolean: only the faces it reaches and their
+/// neighbours through OCCT) and gives OCCT's whole-part result: the same
+/// solid, faces and history (the corpus replay compares all of it).
+#[test]
+fn a_small_fuse_on_a_big_part_is_done_locally() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let n = 100;
+    let len = (2 * n + 10) as f64;
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(len, 20.0, 10.0) * mm).unwrap();
+    let fins: Vec<Shape> = (0..n).map(|i| make_box_corners(DVec3::new(2.0 + 2.0 * i as f64, 0.0, 10.0) * mm, DVec3::new(3.0 + 2.0 * i as f64, 20.0, 15.0) * mm).unwrap()).collect();
+    let part = boolean(BooleanOp::Fuse, &[plate], &fins, &BooleanOptions { unify: true, ..Default::default() }).unwrap().shape;
+    assert!(part.count(ShapeType::Face) >= 200, "{}", part.count(ShapeType::Face));
+    let fin = make_box_corners(DVec3::new(2.0, 0.0, -5.0) * mm, DVec3::new(3.0, 20.0, 0.0) * mm).unwrap();
+    let local = boolean(BooleanOp::Fuse, std::slice::from_ref(&part), std::slice::from_ref(&fin), &BooleanOptions::default()).unwrap();
+    assert_eq!(last_boolean_path(), "local");
+    assert!(local.shape.is_valid());
+    let want = (len * 20.0 * 10.0 + (n + 1) as f64 * 20.0 * 5.0) * 1e-9;
+    assert!((local.shape.volume().unwrap() - want).abs() < 1e-9 * want, "{}", local.shape.volume().unwrap());
+    // The whole Boolean's result, through OCCT (a fuzzy value keeps it off the local path).
+    let whole = boolean(BooleanOp::Fuse, &[part], &[fin], &BooleanOptions { fuzzy: 1e-12, ..Default::default() }).unwrap();
+    assert_eq!(last_boolean_path(), "occt");
+    assert_eq!(noshape_kernel::bool_corpus::Summary::of(&local).differences(&noshape_kernel::bool_corpus::Summary::of(&whole)), Vec::<String>::new());
+}

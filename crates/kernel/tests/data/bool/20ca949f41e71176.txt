@@ -12,6 +12,6 @@ volume 6.96916491054084927e-6
 faces 9
 edges 18
 vertices 11
-history 13ffca58cfee9f52
+history b75298fc4efb50b5
 ms 32.371
 path occt

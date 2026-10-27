@@ -11,6 +11,9 @@ use crate::{BooleanOp, BooleanOptions, Glue, OpResult, Shape, ShapeType};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
+/// Where an output sub-shape lies: rounded point and size (micrometres).
+type Place = (i64, i64, i64, i64);
+
 /// What a Boolean produced, as recorded and compared.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Summary {
@@ -19,17 +22,38 @@ pub struct Summary {
     pub faces: usize,
     pub edges: usize,
     pub vertices: usize,
-    /// Of the sorted history records (arg, kinds, indices, relation).
+    /// Of the sorted history records, each output by its place (see [`Summary::of`]).
     pub history: u64,
 }
 
 impl Summary {
     pub fn of(r: &OpResult) -> Summary {
-        let mut recs: Vec<(u32, u8, u32, u8, u8, u32)> = r
+        // The history with each output named by where it lies, not by its
+        // index (a fast path may order the result's faces otherwise; names
+        // follow the relations): (arg, input kind, input index, relation,
+        // output kind, output signature), sorted.
+        let mut sig: std::collections::HashMap<(u8, u32), Place> = std::collections::HashMap::new();
+        let mut signature = |kind: ShapeType, i: u32| -> Place {
+            *sig.entry((kind as u8, i)).or_insert_with(|| {
+                let q = |x: f64| (x * 1e6).round() as i64;
+                let Ok(x) = r.shape.sub_shape(kind, i as usize) else { return (0, 0, 0, -1) };
+                let (p, m) = match kind {
+                    ShapeType::Face => (x.centroid().unwrap_or_default(), x.area().unwrap_or(0.0) * 1e3),
+                    ShapeType::Edge => {
+                        let m = x.edge_info().ok().and_then(|i| x.point_at(0.5 * (i.first_param + i.last_param)).ok()).unwrap_or_default();
+                        (m, x.length().unwrap_or(0.0))
+                    }
+                    ShapeType::Vertex => (x.vertex_point().unwrap_or_default(), 0.0),
+                    _ => (glam::DVec3::ZERO, 0.0),
+                };
+                (q(p.x), q(p.y), q(p.z), q(m))
+            })
+        };
+        let mut recs: Vec<(u32, u8, u32, u8, u8, Place)> = r
             .history
             .records
             .iter()
-            .map(|h| (h.arg, h.input_kind as u8, h.input_index, h.relation as u8, h.output_kind as u8, h.output_index))
+            .map(|h| (h.arg, h.input_kind as u8, h.input_index, h.relation as u8, h.output_kind as u8, signature(h.output_kind, h.output_index)))
             .collect();
         recs.sort_unstable();
         let mut hs = Fnv(0xcbf2_9ce4_8422_2325);

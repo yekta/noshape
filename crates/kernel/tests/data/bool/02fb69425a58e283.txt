@@ -8,10 +8,10 @@ objects 1
 tools 2
 target_faces 8
 valid 1
-volume 4.88023212387847028e-5
+volume 4.88023212387847096e-5
 faces 13
 edges 27
 vertices 17
-history 6ebf7b737512bd0e
+history 064e9c349e2628df
 ms 54.618
 path occt
