@@ -62,6 +62,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (qa 2026-10-27 09:35)
   `BudgetHold` (which defers the jump) is used at two call sites only (features.cpp:2411, 2646); OCCT's own
   allocations (Standard::Allocate → malloc, NCollection allocators) inside a budgeted call are never held.
+  A/B (qa 10:45, watcher CLI 09:50, clifuzz_trace seeds 130–132, budget on vs NOSHAPE_BLEND_BUDGET=100000): seed 120
+  hung again in batch 9 (CLI 08:30, 1500 s timeout, 2 of 2 runs); seed 131 **budget on hung at step 124** (feature_delete,
+  1500 s timeout) after the budget had cut a Shell at step 50; budget off, the same Shell at step 50 ran unbounded
+  for > 20 min (killed at 2400 s), so the "off" arm can't reach the later steps and the A/B can't separate the two
+  causes. 130 and 132 clean both ways. Logs /root/qa-scratch/cli/clifuzz-13{0,1,2}{on,off}.log.
 - [ ] P1 WIN-CRASH-GUARD the kernel crash guard (common.cpp, sigsetjmp/sigaction) is POSIX-only: on Windows a crash inside
   OCCT (e.g. kernel/tests/data/crash/fillet-blend-segv, FILLET-SEGV-BLEND) still kills the process (the release/v0.4.9
   CI run 40469839948 died with STATUS_ACCESS_VIOLATION in crash_inputs; that test is now cfg(unix)). Add the Windows
