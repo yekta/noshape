@@ -553,9 +553,19 @@ impl PartStudioView {
         }
     }
 
-    pub(super) fn render_context_menu(&self) -> Vec<AnyElement> {
+    pub(super) fn render_context_menu(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         match &self.context_menu {
-            Some((pos, menu, _)) => vec![deferred(anchored().position(*pos).snap_to_window_with_margin(px(8.)).child(menu.clone())).with_priority(2).into_any_element()],
+            // Live 10-27: the Esc that closes the menu also ends an isolate
+            // or make transparent (the menu itself closes on it).
+            Some((pos, menu, _)) => vec![deferred(
+                anchored().position(*pos).snap_to_window_with_margin(px(8.)).child(div().capture_action(cx.listener(|this, _: &crate::os_menu::MenuDismiss, window, cx| {
+                    if this.ui.isolate.is_some() {
+                        this.exit_isolate(window, cx);
+                    }
+                })).child(menu.clone())),
+            )
+            .with_priority(2)
+            .into_any_element()],
             None => Vec::new(),
         }
     }

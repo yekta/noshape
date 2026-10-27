@@ -5132,7 +5132,7 @@ impl PartStudioView {
         overlay.push(self.render_evaluation_tools(cx));
         // Live (part-studio/82): the Measure panel covers those buttons.
         overlay.extend(self.render_measure_panel(cx));
-        overlay.extend(self.render_context_menu());
+        overlay.extend(self.render_context_menu(cx));
         overlay.extend(self.render_section_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-section"))));
         // Value boxes at model points are drawn in the 3D frame
         // (NOSHAPE_GPUI_LABELS: as GPUI elements, for comparing).
