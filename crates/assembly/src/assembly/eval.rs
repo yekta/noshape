@@ -1245,8 +1245,11 @@ pub fn limit_keys(t: MateType) -> &'static [&'static str] {
 /// fixed"; one part moves, never both). Connector Zs exactly the wrong way
 /// round (an axial mate turns one part over): the first connector's part
 /// turns when the common Z's first non-zero coordinate is negative, else
-/// the second's. Otherwise the smaller part moves; between parts of one
-/// size the one whose connector Z points to the negative side.
+/// the second's. Otherwise, between parts of one Part Studio, the instance
+/// of the later part moves (live: the plate, Part 2, moved onto the block,
+/// Part 1, though bigger; "… which part moves — append"); between Part
+/// Studios (untested in live) the smaller part; between instances of one
+/// part the one whose connector Z points to the negative side.
 pub fn new_mate_stays(result: &AssemblyResult, m: &super::Mate, units: &UnitPrefs) -> InstanceId {
     let (a, b) = (m.a.instance, m.b.instance);
     // The assembly origin never moves.
@@ -1261,6 +1264,18 @@ pub fn new_mate_stays(result: &AssemblyResult, m: &super::Mate, units: &UnitPref
     let axial = matches!(m.mate_type, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel);
     if axial && (za.dot(zb) + wanted).abs() < 1e-9 {
         return if negative(za) { b } else { a };
+    }
+    let part_order = |c: &MateConnectorRef| {
+        let mut path = vec![c.instance];
+        path.extend(c.path.iter().copied());
+        let o = result.occurrences.iter().find(|o| o.path == path)?;
+        Some((o.studio, o.context.bodies.iter().position(|x| x.id == o.body)?))
+    };
+    if let (Some((sa, ia)), Some((sb, ib))) = (part_order(&m.a), part_order(&m.b))
+        && sa == sb
+        && ia != ib
+    {
+        return if ia > ib { b } else { a };
     }
     let size = |id: InstanceId| result.instance_bounds(id).map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.0);
     let (sa, sb) = (size(a), size(b));

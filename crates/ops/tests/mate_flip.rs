@@ -181,6 +181,43 @@ fn new_mate_between_free_parts_moves_the_smaller_one() {
     }
 }
 
+/// Live ("skasm (2026-10-27) follow-up: which part moves — append", run 3):
+/// between two parts of one Part Studio with no flip, the instance of the
+/// later part moves, not the smaller one: the plate (Part 2, ~23200 mm³)
+/// moved onto the block (Part 1, 8000 mm³), whichever connector came first;
+/// the block kept its placement exactly.
+#[test]
+fn new_mate_between_parts_of_one_studio_moves_the_later_part() {
+    for plate_first in [false, true] {
+        let dir = std::env::temp_dir().join(format!("noshape-later-mate-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(format!("later-{plate_first}.noshape"));
+        let _ = std::fs::remove_file(&path);
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        studio(&mut ctx, "Part Studio 1", json!({ "tool": "corner_rectangle", "points": [[-10, -10], [10, 10]] }), "20 mm");
+        studio(&mut ctx, "Part Studio 1", json!({ "tool": "corner_rectangle", "points": [[100, -30], [200, 30]] }), "10 mm");
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        call(&mut ctx, "assembly_transform", json!({ "instance": "Part 1 <1>", "translation": [20, 60, 30] }));
+        // The block's bottom face on the plate's top face: the Zs are opposed already.
+        let block = json!({ "instance": "Part 1 <1>", "entity": face(&mut ctx, "Part 1 <1>", [0.0, 0.0, -1.0]), "inference": "centroid" });
+        let plate = json!({ "instance": "Part 2 <1>", "entity": face(&mut ctx, "Part 2 <1>", [0.0, 0.0, 1.0]), "inference": "centroid" });
+        let (a, b) = if plate_first { (plate, block) } else { (block, plate) };
+        call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": a, "b": b }));
+        let list = call(&mut ctx, "assembly_list", json!({}));
+        let t = |name: &str| -> [f64; 3] {
+            let i = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == name).unwrap();
+            let v: Vec<f64> = i["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+            [v[0], v[1], v[2]]
+        };
+        assert!(near(t("Part 1 <1>"), [20.0, 60.0, 30.0], 1e-9), "plate first {plate_first}: the block moved to {:?}", t("Part 1 <1>"));
+        // The plate's top centre (150, 0, 10) onto the block's bottom centre (20, 60, 30).
+        assert!(near(t("Part 2 <1>"), [-130.0, 60.0, 20.0], 1e-6), "plate first {plate_first}: the plate at {:?}", t("Part 2 <1>"));
+        let _ = std::fs::remove_file(&path);
+    }
+}
+
 /// A new mate from the assembly Origin (picked first) to a free part moves
 /// the part: the origin never moves.
 #[test]
@@ -248,4 +285,59 @@ fn linear_pattern_follows_the_edge_direction() {
         let _ = std::fs::remove_file(&path);
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+/// Live ("skasm (2026-10-27) follow-up: which part moves — append", (1) and
+/// (2)): the pin (Part 2 here) Revolute'd into the plate's hole with nothing
+/// fixed and flipPrimary false was turned over onto the plate (t (314.7456,
+/// 96.6098, 20), rotationZ −157.48°, made over REST); editing the mate to Flip primary axis
+/// moves the pin back to its own upright orientation (R identity, its axis
+/// through the hole), and an Offset Z of 5 mm then moves it 5 mm along the
+/// hole connector's Z; the plate keeps its placement exactly throughout.
+#[test]
+fn editing_a_mate_between_free_parts_moves_the_pin_back_upright() {
+    let dir = std::env::temp_dir().join(format!("noshape-edit-flip-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("edit-flip.noshape");
+    let _ = std::fs::remove_file(&path);
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "tab": "Part Studio 1" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tab": "Part Studio 1", "tool": "corner_rectangle", "points": [[100, 0], [160, 40]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tab": "Part Studio 1", "tool": "circle", "points": [[130, 20], [135, 20]] }));
+    let regions = call(&mut ctx, "sketch_get", json!({ "sketch": sk, "tab": "Part Studio 1" }))["regions"].clone();
+    let ring = regions.as_array().unwrap().iter().max_by(|a, b| a["area"].as_f64().partial_cmp(&b["area"].as_f64()).unwrap()).unwrap()["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [ring], "depth": "10 mm" }, "tab": "Part Studio 1" }));
+    studio(&mut ctx, "Part Studio 1", json!({ "tool": "circle", "points": [[200, 0], [205, 0]] }), "30 mm");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    call(&mut ctx, "assembly_transform", json!({ "instance": "Part 2 <1>", "translation": [-50, 60, 40] }));
+    let pin = json!({ "instance": "Part 2 <1>", "entity": entity_at(&mut ctx, "Part 2 <1>", "faces", [150.0, 60.0, 55.0]), "inference": "mid_axis" });
+    let plate = json!({ "instance": "Part 1 <1>", "entity": entity_at(&mut ctx, "Part 1 <1>", "faces", [130.0, 20.0, 5.0]), "inference": "mid_axis" });
+    // As live's REST mate (flipPrimary false): the pin turns over onto the plate.
+    let r = call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": pin, "b": plate, "flip_primary": false }));
+    let mate = r["mate"].as_str().unwrap().to_string();
+    let pose = |ctx: &mut Ctx, name: &str| -> (Vec<f64>, Vec<f64>) {
+        let list = call(ctx, "assembly_list", json!({}));
+        let i = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == name).unwrap().clone();
+        let f = |k: &str| i[k].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<f64>>();
+        (f("translation"), f("rotation"))
+    };
+    let upright = |q: &[f64]| q[0].abs() < 1e-9 && q[1].abs() < 1e-9 && q[2].abs() < 1e-9;
+    let plate0 = pose(&mut ctx, "Part 1 <1>");
+    assert!(near([plate0.0[0], plate0.0[1], plate0.0[2]], [0.0; 3], 1e-12) && upright(&plate0.1), "the plate stays: {plate0:?}");
+    let (t, q) = pose(&mut ctx, "Part 2 <1>");
+    assert!(near([t[0], t[1], t[2]], [-70.0, 20.0, 20.0], 1e-6) && (q[0].abs() - 1.0).abs() < 1e-9, "turned over: t {t:?}, q {q:?}");
+    // Live's REST mate left it turned about Z × w instead (rz −157.48°, the
+    // pose the edit started from there); the same mate holds there too.
+    call(&mut ctx, "assembly_transform", json!({ "instance": "Part 2 <1>", "translation": [314.745604269, 96.609801613, 20], "axis": [0.195284380652, -0.980746659782, 0], "angle": "180 deg" }));
+    call(&mut ctx, "assembly_mate", json!({ "mate": mate, "flip_primary": true }));
+    let (t, q) = pose(&mut ctx, "Part 2 <1>");
+    assert_eq!(pose(&mut ctx, "Part 1 <1>"), plate0, "the plate stays");
+    assert!(upright(&q) && near([t[0], t[1], t[2]], [-70.0, 20.0, -10.0], 1e-6), "flipped back upright: t {t:?}, q {q:?}");
+    call(&mut ctx, "assembly_mate", json!({ "mate": mate, "offset": { "z": "5 mm" } }));
+    let (t, q) = pose(&mut ctx, "Part 2 <1>");
+    assert_eq!(pose(&mut ctx, "Part 1 <1>"), plate0, "the plate stays");
+    assert!(upright(&q) && near([t[0], t[1], t[2]], [-70.0, 20.0, -15.0], 1e-6), "offset 5 mm: t {t:?}, q {q:?}");
+    let _ = std::fs::remove_file(&path);
 }

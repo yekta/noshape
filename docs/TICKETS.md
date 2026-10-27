@@ -682,7 +682,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
-- [ ] P0 SKETCH-SOLVE-SPLINE-SLOW one constraint or dimension in a sketch with fit splines takes **3–5 minutes**: repro
+- [x] f34c32be P0 SKETCH-SOLVE-SPLINE-SLOW one constraint or dimension in a sketch with fit splines takes **3–5 minutes**: repro
   /root/qa-scratch/tickets/sk211-step89.noshape (Sketch 1: 273 entities — 209 points, 45 lines, 7 circles, 7 arcs, 3
   ellipses, **2 splines** — 97 constraints, dof 280; made by bin/skfuzz.py 211 89), bin/sk211time.py: Coincident
   point `:257` on spline `:215` → **175.6 s**, ends "over defined (conflicting constraints)"; then a dimension −10
@@ -694,6 +694,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   solves such edits at once; in the app this would freeze the sketch for minutes (P0 "responsiveness while editing").
   Analytic derivatives for the fit-spline equations (or re-fit once per Newton step, not per variable), and a solve
   time budget that reports failure fast (qa 12:30, CLI 12:08; v0.4.10 timing running)
+  skasm 10-27 (f34c32be): the fit spline equations (point on spline, end directions, curvature) have their own
+  gradients from the fit's factored, banded system (O(n) a value instead of O(n²) fits a Jacobian row). Same sketch in
+  the sketch crate (dev build, load 35–50): the Coincident 68 s → 0.3–0.7 s, the −10 dimension after it 0.2–0.4 s, both
+  still "over defined" as before. T1 test sketch solve_time::sk211_constraints_on_a_94_point_fit_spline_solve_quickly
 - [x] verified 4e568f3f (qa 13:12: asm5 Assembly 1 › Replicate, Instances Part 2 <1> (Revolute 1 fills itself): "Match edges on face", tooltip "Edge match scope", last field "Faces to find match in") 12740dfc P2 REPLICATE-EDGE-DEFAULT Replicate on a mate whose connectors sit on circular edges: ours lists the right options
   (Match edges on plane / on face / individual edges) but starts on **Match edges on plane** and keeps the last field as
   "Parts to find match in"; live starts on **Match edges on face** (the select's tooltip "Edge match scope") and renames
