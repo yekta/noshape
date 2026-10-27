@@ -15,6 +15,10 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 - cdde1c06 F19 Width mate in any pick order + DOF cache across evaluations, per-group DOF length scale.
 - c76cdcf4 assembly least change measured at the bodies' mate connectors (oracle_asm R1 matches live; R1 out of KNOWN;
   R3/C1 now keep rz 0, still KNOWN for live's −157.5°).
+- 8016ded6 committed polygon's grey-boxed Ø readout (live colours) until the next polygon.
+- e5567eca SKETCH-DRAG-BIG in the app: the DOF analysis once before a drag (Sketch::refresh_analysis): 42–125 → 13–18 ms
+  per step on qa's 1000-entity sketch (dev build, load ~40).
+- ac0645bc SKETCH-PASTE: the Transform triad on the copy.
 - dcd3cd30 oracle_asm R3 / C1 as live: exactly opposed axial connectors turn over about world Z × w (live's constant);
   KNOWN now holds only M1 (live's own over-constrained case).
 - c95ed870 closing Animate mate gives the keyboard back (Alt+C search got no typing).
@@ -37,7 +41,7 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 1. (Landed 10-27: the app part, toast at once, no Tolerance item.) Polygon commit: live also shows a pattern count label with its glyph (behaviours 160); ours has none. (LIMIT-PLACEHOLDER
    of 10-27 was a false alarm: the limit fields select all on focus; my test's Tab had focused the field and the
    click then placed the caret, as a browser does.) The drag bench is on main (psui c7f26470).
-2. Polygon commit: live's grey-boxed Ø readout after Enter (not a dimension; ours shows nothing) — app overlay.
+2. (done 8016ded6) Polygon commit's boxed Ø readout.
 3. Sketch regen per drag step ~11 ms on 1000 entities (dev): eval 6.3 ms (solve 2.1, regions 3.2, wires 0.6), the rest
    regen/display overhead. Inside the frame; a release build has more headroom.
 4. GUI-verify the rest of docs/parity/workflow-assembly-sweep.md's 🔧 rows (1–5, 7, 8, 10, 12–18, 25 ✅ 10-27).
@@ -47,6 +51,9 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
    noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture` (clean 10-27).
 7. End-of-day walk, daily (~04:00 UTC). 10-27 02:40 on green 19555ca3: line chain + dimension, polygon, V on H toast,
    mate dialog (types, limits, errors), Revolute + drag (only the dragged instance moves): no regressions.
+   10-27 04:00 on green 8165fca6: paste (copy at the pointer, selected, Transform triad on it): as live. Note: the sketch
+   options (Show constraints / expressions / errors) persist in ~/.config/noshape/sketch-options.json, so "Show
+   expressions" can start ticked on this box (another session saved it); not a bug.
 
 Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_perf:: -- --ignored --nocapture`):
 200 pins / 300 mates: evaluation again 6.5 ms, adding a mate 16.5 ms, inserting a pin 7.8 ms (was ~50), drag steps
