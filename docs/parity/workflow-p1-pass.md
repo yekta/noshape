@@ -8,8 +8,8 @@ then edits, undo/redo, rollback and suppress.
 |---|---|---|---|---|
 | Sketch on Top (Sketch → Top row) | dialog Top plane, ☑ Show constraints, view stays iso, header "Features (4)" | same, header "Features (5)" (sketch/501) | ✗ P1-1 (ui); header icons grey ✗ P1-2 (ui) |  |
 | Corner rectangle | width/height values stay while the tool is active | same (sketch/06) | ✅ |  |
-| Extrude right after ✓ | field empty and active, 25 mm, ✓ disabled | same (part-studio/1290) | ✅ |  |
-| Enter in Depth | applies, dialog stays; 2nd Enter commits | same (behaviours 252) | ✅ |  |
+| Extrude right after ✓ | field empty and active, 25 mm, ✓ disabled | same (part-studio/1290) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Enter in Depth | applies, dialog stays; 2nd Enter commits | same (behaviours 252) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Fillet (Shift+F), 3 vertical edges, R2 | chips "Edge of Extrude 1" ×3, preview, 15270.061 mm³ | radius arrow on the **last** pick | ✗ P1-3 (psb): ours on the first pick |  |
 | Chamfer (tool search), 1 mm, tangent propagation | 7-edge chain chamfered (faces 9 → 16) | — | ✅ |  |
 | Sketch on a preselected face | "Face of Extrude 1" in Sketch plane | same | ✅ |  |
@@ -19,9 +19,9 @@ then edits, undo/redo, rollback and suppress.
 | Shell 2.5 mm (top face) | 8960 mm³, 59 faces | — | ✅ |  |
 | Edit Extrude 1 10 → 15 mm | everything regenerates Ok but Shell returns 4 slivers, status Ok | **Shell 1 ERROR "Could not shell part with selections."**, part stays unshelled (behaviours "qa5 (10-25 p1)" (5)) | ✗ **P1-5** (psb + kern) |  |
 | Undo / Redo / Undo | 8960 ↔ slivers ↔ 8960 | — | ✅ |  |
-| Rollback bar above Shell 1 | Shell greyed italic, part unshelled (14220.74) | same | ✅ |  |
-| Suppress Fillet 1 (row menu) | italic strike-through, sharp corners, rest Ok (8446.23) | same | ✅ |  |
-| Row menus | Extrude: Rename, Edit…, Edit Sketch 1…, Show dimensions, … ✅; Fillet: no "Show dimensions" | Fillet: no "Show dimensions" either (+ Add comment, out of scope) | ✅ |  |
+| Rollback bar above Shell 1 | Shell greyed italic, part unshelled (14220.74) | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Suppress Fillet 1 (row menu) | italic strike-through, sharp corners, rest Ok (8446.23) | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Row menus | Extrude: Rename, Edit…, Edit Sketch 1…, Show dimensions, … ✅; Fillet: no "Show dimensions" | Fillet: no "Show dimensions" either (+ Add comment, out of scope) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Mirror › Feature mirror of the Hole about the Right plane | dropdown Part / Feature / Face mirror; chips "Hole 1", "Right plane"; −158.35 mm³ (two holes through the 2.5 mm floor) | — | ✅ |  |
 | Edit Fillet 1 R2 → R1 (dialog: later features greyed, "Final" ☐) | R1 applied; **Shell 1 Error "Could not shell part with selections."** at any thickness 1–2.5 mm | live? (request (6)) | ✗? **P1-6** (kern, needs live) |  |
 | Undo the R1 edit | back to 8801.649 mm³ | — | ✅ |  |
@@ -34,8 +34,8 @@ then edits, undo/redo, rollback and suppress.
 ## P2 assembly core (same session, /root/green/noshape ee654502; plate 60×20×5 with 3 Ø10 holes + Ø10×30 pin from Part Studio 1)
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
-| Insert Part 1 (first instance) | placed, view fits, free DOF glyph (not fixed) | same (assembly/80, free glyph) | ✅ |  |
-| Insert Part 2, click to place, ✓ | Instances (2) | same | ✅ |  |
+| Insert Part 1 (first instance) | placed, view fits, free DOF glyph (not fixed) | same (assembly/80, free glyph) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Insert Part 2, click to place, ✓ | Instances (2) | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Cylindrical mate (tool search), pin face then hole face | pin moves into the hole, HUD at the 2nd pick, two connector chips | same (MT10, MT13) | ✅ |  |
 | HUD ✓ | commits Cylindrical 1 (hidden, light grey row) and opens "Cylindrical 2" | "Commit current mate and start a new mate" (behaviours 1329) | ✅ |  |
 | Drag the pin | slides along the axis; nothing fixed, so a sideways drag moves both | — | ✅ (plausible) |  |
@@ -63,7 +63,7 @@ then edits, undo/redo, rollback and suppress.
 ## P1 extras, green 461aefb0
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
-| Revolve dialog | Solid / Surface / Thin, New … Intersect, Faces and sketch regions to revolve, Revolve axis (pink until set), ☑ Full revolve | same (behaviours 338, 13863) | ✅ |  |
+| Revolve dialog | Solid / Surface / Thin, New … Intersect, Faces and sketch regions to revolve, Revolve axis (pink until set), ☑ Full revolve | same (behaviours 338, 13863) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Revolve about a profile line | full cylinder; axis chip "Sketch 4 line" | chip text? ("Edge of Sketch N" in live lists; request p3 (a)) | ? |  |
 | Circular pattern dialog | Axis of pattern, Angle 360 deg, Instance count 4 + ↻, ☑ Equal spacing, ☐ Centered, › ☐ Skip instances | same (behaviours 331) | ✅ |  |
 | Circular pattern of Part 3 about a hole rim | 3 copies around the hole axis; each copy gets a new palette colour | copies' colour? (request p3 (b)) | ? |  |
@@ -72,16 +72,16 @@ then edits, undo/redo, rollback and suppress.
 | Instance right-click (Part 1 <1>, mated) | Properties…, Instance properties… / Hide … Fix, Use best available tessellation, Show mates, Hide mates / Edit in context … Switch to Part Studio 1 / Copy Part 1 <1> / Move to new subassembly, Change to version…, Export…, Release… / Zoom to selection … | same order (behaviours 1259, 1357; Add comment out of scope) | ✅ |  |
 | Fix, then drag the fixed plate | ground glyph on Part 1 <1> and on the root row; dragging draws the fix glyph at the cursor and nothing moves | same (behaviours 1210, 1268) | ✅ (cursor shape not checked) |  |
 | Sketch dimension (view normal, rectangle, d on the top edge, place) | value box "78.15024 mm" selected, ± icon, ✓ ✕; 50 + Enter → label "50", width 50 | box at full precision (behaviours 4788 "12.53718 mm") | ✅ |  |
-| Plane (tool search; "Did you mean: Mate connector") | Entities "Top plane", type Offset, Offset distance 25 mm + flip, ☐ Flip normal; type list Offset, Plane point, Line angle, Point normal, Three point, Mid plane, Curve point, Tangent | same (behaviours 332) | ✅ |  |
-| Split (Part tab) of the plate by Plane 1 at 2.5 mm | dialog Part / Face, Parts, surfaces, or curves to split, Entity to split with, ☐ Keep tools, ☐ Trim to face boundaries, ☑ Keep both sides; result Parts 6 → 7 | same (behaviours 329) | ✅ |  |
+| Plane (tool search; "Did you mean: Mate connector") | Entities "Top plane", type Offset, Offset distance 25 mm + flip, ☐ Flip normal; type list Offset, Plane point, Line angle, Point normal, Three point, Mid plane, Curve point, Tangent | same (behaviours 332) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Split (Part tab) of the plate by Plane 1 at 2.5 mm | dialog Part / Face, Parts, surfaces, or curves to split, Entity to split with, ☐ Keep tools, ☐ Trim to face boundaries, ☑ Keep both sides; result Parts 6 → 7 | same (behaviours 329) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Transform dialog | Entities to transform or copy, ▾ Translate by line (+ flip), Line or points, ☐ Copy part | same first type (behaviours 226) | ✅ |  |
 | Mass and section properties (bottom-right icon), part without material | dialog Part / Face, red "Part 2" chip, blank mass / CoM / inertia, volume 21005.949 mm³, area 4401.292 mm²; inertia header "(mm² kg)"; yellow no-material toast | header "(lb mm²)"; toast: notes disagree | ✗ **P1-14** (ui) / ? |  |
-| Section view (Shift+X), Front plane | dialog Exclude / Include, Section planes (+ plane button), Items to exclude, info "Select a plane, planar face, cylinder, cone, or mate connector."; chip "Section plane 1 (Front)", manipulator arrow + rotate glyph + ring, tan preview cut faces | same (behaviours 359) | ✅ |  |
-| Draft dialog | Neutral plane / Parting line; Neutral plane (+MC); Entities to draft; Draft angle 3 deg + ↻; ☑ Tangent propagation; ☐ Reapply fillet | same (behaviours 327) | ✅ |  |
-| Sweep dialog | Solid / Surface / Thin, New … Intersect; Faces and sketch regions to sweep; Sweep path (pink) + flip; ☐ Extend to full path; Profile control ▾ None; › ☐ Twist; ☐ Scale | same (behaviours 339) | ✅ |  |
+| Section view (Shift+X), Front plane | dialog Exclude / Include, Section planes (+ plane button), Items to exclude, info "Select a plane, planar face, cylinder, cone, or mate connector."; chip "Section plane 1 (Front)", manipulator arrow + rotate glyph + ring, tan preview cut faces | same (behaviours 359) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Draft dialog | Neutral plane / Parting line; Neutral plane (+MC); Entities to draft; Draft angle 3 deg + ↻; ☑ Tangent propagation; ☐ Reapply fillet | same (behaviours 327) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Sweep dialog | Solid / Surface / Thin, New … Intersect; Faces and sketch regions to sweep; Sweep path (pink) + flip; ☐ Extend to full path; Profile control ▾ None; › ☐ Twist; ☐ Scale | same (behaviours 339) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Loft dialog | Profiles; ⌄ End conditions (Start / End profile condition ▾ None); ☐ Guides and continuity; ☐ Path; › ☐ Connections; ☐ Show isocurves | same (behaviours 340) | ✅ |  |
-| Sketch Trim (m) on a crossing line | the clicked segment past the crossing is removed; the new end is coincident with the other line | — | ✅ |  |
-| Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ |  |
+| Sketch Trim (m) on a crossing line | the clicked segment past the crossing is removed; the new end is coincident with the other line | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ |  |
 | n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? |  |
 | View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |  |
@@ -125,10 +125,10 @@ then edits, undo/redo, rollback and suppress.
 | Parts to find match in = plate, ✓ | pins in both free Ø10 holes; "Replicate 1" ▸ Part 2 <5>, <6>, Mate features (2) | same structure (behaviours 5973) | ✅ |  |
 | Linear pattern opened from tool search | red "Linear pattern 1" row with a red dot at once, kept after picking Instances | same (behaviours 5985) | ✅ |  |
 | Mate connector (Ctrl+M) | "Mate connector 1": On entity ▾, Origin entity, ☐ Realign, ☐ Move, flip / reorient; Realign adds Primary / Secondary axis entity; Move adds X / Y / Z 0 mm, Rotate about Z ▾, Rotation angle 0 deg | same (behaviours 5960–5965) | ✅ |  |
-| Feature row drag (Extrude 3 up) | pill #1651B0 with white text at the pointer; 2 px #1651B0 drop line across the list with a hollow ring at its left end; hovered row (224,240,251) | same (live (222,241,251); "qa5 (10-25 p2)" (7)) | ✅ |  |
-| Drop above the feature's own sketch | accepted, no message; row red (170,37,45), "Features …" + red badge, tooltip "… did not regenerate properly: …" / "1 missing selection" | same | ✅ |  |
+| Feature row drag (Extrude 3 up) | pill #1651B0 with white text at the pointer; 2 px #1651B0 drop line across the list with a hollow ring at its left end; hovered row (224,240,251) | same (live (222,241,251); "qa5 (10-25 p2)" (7)) | ✅ | 0.4.10+ / 1c853f78 10-27 |
+| Drop above the feature's own sketch | accepted, no message; row red (170,37,45), "Features …" + red badge, tooltip "… did not regenerate properly: …" / "1 missing selection" | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | … row icon | plain extrude icon | ⚠ warning triangle on the row | ✗ **P1-18** (ui) |  |
-| Ctrl+Z | one step restores the order | same | ✅ |  |
+| Ctrl+Z | one step restores the order | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Assembly mirror dialog | Instances to mirror, Mirror plane (+ connector button), [Mirror strategy…] | same (behaviours 8704) | ✅ |  |
 | Drawing Note tool (n), hover | prompt only, no preview | "NOTE" preview at the pointer | ✗ **P2-D3** (ui2) |  |
 | Click, type "QA NOTE" | Note panel next to the note: Noto Sans ( Note ), 0.1200, B I U S colour, spacing, align, list, … ☐ Flag notes (greyed Flag (Drawing), 2 Characters); ruler bar over the text | same (drawing/225, behaviours 3277) | ✅ |  |
@@ -139,7 +139,7 @@ then edits, undo/redo, rollback and suppress.
 | Item | Check | Status | Verified |
 |---|---|---|---|
 | P2-A1 (skb 9bf8475b) | Circular pattern Angle 300 + Enter: applied, dialog stays; 2nd Enter accepts. Count + Enter accepts at once (live 4299) | ✅ fixed |  |
-| P1-15 (ui 76da6649) | view-cube face hover #bce2f7 | ✅ fixed |  |
+| P1-15 (ui 76da6649) | view-cube face hover #bce2f7 | ✅ fixed | 0.4.10+ / 1c853f78 10-27 |
 | P1-12 (ui 9bc26682) | Revolve axis chip "Edge of Sketch 2" | ✅ fixed |  |
 | P1-7 (ui 9bc26682) | failing hidden sketch row red | ✅ fixed |  |
 | P1-14 (ui 2a85db38) | new document: inertia header "(lb mm²)" | ✅ fixed |  |
