@@ -2217,6 +2217,9 @@ impl FeatureDialog {
                                         let text = if matches!(this.get_value(&p), Some(ParamValue::Bool(true))) { "true" } else { "false" };
                                         this.inputs.remove(&p);
                                         this.set_value(&p, ParamValue::Expr(noshape_units::ExprValue::new(text)), cx);
+                                        // Focused before it is drawn: its Enter baseline here, so the first Enter
+                                        // after typing applies the text and only the next commits (EXPR-ENTER-COMMITS).
+                                        this.baselines.insert(p.clone(), text.to_string());
                                         // The new expression field takes the keyboard.
                                         let input = this.ensure_input(&p, text, window, cx);
                                         input.update(cx, |s, cx| {
