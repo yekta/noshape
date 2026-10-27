@@ -12,6 +12,8 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 (569dabca19a397e932f2db54) in noshape mm test.
 
 ## Landed on main
+- 10-27 06:00: assembly Section view "Select default plane" popup (Top / Front / Right, Flip plane, ✓ ✕), as
+  the Part Studio's; f08016a2 a pending pattern row's badge repeats the dialog title's error.
 - cdde1c06 F19 Width mate in any pick order + DOF cache across evaluations, per-group DOF length scale.
 - c76cdcf4 assembly least change measured at the bodies' mate connectors (oracle_asm R1 matches live; R1 out of KNOWN;
   R3/C1 now keep rz 0, still KNOWN for live's −157.5°).
@@ -41,8 +43,8 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 
 ## Next, in order
 Sketch P1: no open items (parity/sketch.md all ✅; workflow-sketch-tools.md rechecked 10-27). Assembly P2:
-1. docs/parity/workflow-assembly-sweep.md row 34 still 🔧 (assembly section view: the base's snap to edges, Flip,
-   red overlap caps; rings / chips / menu done). Rows 19 and 28 ✅ 10-27. GUI on /root/green/noshape with
+1. docs/parity/workflow-assembly-sweep.md row 34 still 🔧 (assembly section view: only the red overlap caps
+   (renderer) left; base snap by ui, rings / chips / menu / Select default plane popup done). Rows 19 and 28 ✅ 10-27. GUI on /root/green/noshape with
    /root/skasm-scratch/qa/asm1.noshape (plate + 2 pins, made by /root/skasm-scratch/qa/asm1.py over MCP).
 2. docs/parity/assembly.md G5 exploded views (⏳): workflow-exploded-named-positions 2–4, 7, 11, 14–16 ✅ 10-27 (EXV6
    rollback pill checked); left: 5 minor, NP2.

@@ -171,6 +171,9 @@ pub(crate) struct AsmSectionDialog {
     pub chosen: bool,
     /// The section before the dialog opened (restored by Cancel).
     saved: Option<Box<AsmSection>>,
+    /// The "Select default plane" popup and the plane it added.
+    pub popup: Option<crate::section_dialog::PlanePopup>,
+    pub popup_plane: Option<usize>,
 }
 
 /// Most section planes the renderer cuts with.
@@ -3968,7 +3971,7 @@ impl AssemblyView {
             planes.push(AsmSectionPlane::new(f.origin, f.z(), f.x()));
         }
         let active = planes.len().saturating_sub(1);
-        self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, chosen: true, saved }) });
+        self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, chosen: true, saved, popup: None, popup_plane: None }) });
         self.rebuild_scene(false, cx);
         cx.notify();
     }
@@ -3978,7 +3981,7 @@ impl AssemblyView {
     /// not restore it, even with nothing changed).
     pub(crate) fn edit_section(&mut self, cx: &mut Context<Self>) {
         let Some(s) = self.ui.section.as_mut().filter(|s| s.dialog.is_none() && !s.planes.is_empty()) else { return };
-        s.dialog = Some(AsmSectionDialog { items_active: false, active: s.planes.len() - 1, chosen: false, saved: None });
+        s.dialog = Some(AsmSectionDialog { items_active: false, active: s.planes.len() - 1, chosen: false, saved: None, popup: None, popup_plane: None });
         self.rebuild_scene(false, cx);
         cx.notify();
     }
@@ -4387,7 +4390,7 @@ impl AssemblyView {
         let d = s.dialog.as_ref()?;
         let asm = self.assembly(cx);
         let items = s.items.iter().map(|id| asm.and_then(|a| a.instance(*id).map(|i| i.name.clone())).unwrap_or_default()).collect();
-        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.direction_name().to_string()).collect(), active: if d.chosen { d.active } else { usize::MAX }, items, popup: None };
+        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.direction_name().to_string()).collect(), active: if d.chosen { d.active } else { usize::MAX }, items, popup: d.popup };
         Some(crate::section_dialog::render(props, "asm-section", &cx.entity(), Self::on_section_action, cx))
     }
 
@@ -4417,19 +4420,67 @@ impl AssemblyView {
                     s.items.remove(i);
                 }
             }
-            // The default plane (Front) until Onshape's "Select a plane"
-            // options exist (Help: Select default plane).
+            // Live ("Select default plane", as in the Part Studio): the
+            // button opens the popup; a plane chosen there is added (and
+            // replaced by the next choice) until ✓ commits it or ✕ takes it
+            // away again.
             Action::PlaneButton => {
-                if s.planes.len() < MAX_SECTION_PLANES {
-                    s.planes.push(AsmSectionPlane::new(DVec3::ZERO, DVec3::NEG_Y, DVec3::X));
-                    if let Some(d) = &mut s.dialog {
-                        d.active = s.planes.len() - 1;
-                        d.chosen = true;
-                    }
+                if let Some(d) = &mut s.dialog {
+                    d.popup = if d.popup.is_some() { None } else { Some(Default::default()) };
+                    d.popup_plane = None;
                 }
             }
-            // The assembly opens no "Select default plane" popup yet.
-            Action::Accept | Action::Cancel | Action::PopupList | Action::PopupPick(_) | Action::PopupFlip | Action::PopupCommit | Action::PopupCancel => {}
+            Action::PopupList => {
+                if let Some(p) = s.dialog.as_mut().and_then(|d| d.popup.as_mut()) {
+                    p.list_open = !p.list_open;
+                }
+            }
+            Action::PopupPick(k) => {
+                let Some(d) = &mut s.dialog else { return };
+                let (normal, x) = [(DVec3::Z, DVec3::X), (DVec3::NEG_Y, DVec3::X), (DVec3::X, DVec3::Y)][k.min(2)];
+                let pl = AsmSectionPlane::new(DVec3::ZERO, normal, x);
+                let i = match d.popup_plane.filter(|i| *i < s.planes.len()) {
+                    Some(i) => {
+                        s.planes[i] = pl;
+                        i
+                    }
+                    None if s.planes.len() >= MAX_SECTION_PLANES => return,
+                    None => {
+                        s.planes.push(pl);
+                        s.planes.len() - 1
+                    }
+                };
+                d.popup_plane = Some(i);
+                d.active = i;
+                d.chosen = true;
+                d.items_active = false;
+                if let Some(p) = &mut d.popup {
+                    p.list_open = false;
+                }
+            }
+            // Flip plane names the other side (live: "Section plane 2 (Back)").
+            Action::PopupFlip => {
+                let Some(d) = &s.dialog else { return };
+                let i = d.popup_plane.unwrap_or(d.active);
+                if let Some(pl) = s.planes.get_mut(i) {
+                    pl.flipped = !pl.flipped;
+                }
+            }
+            Action::PopupCommit => {
+                if let Some(d) = &mut s.dialog {
+                    d.popup = None;
+                    d.popup_plane = None;
+                }
+            }
+            Action::PopupCancel => {
+                let Some(d) = &mut s.dialog else { return };
+                d.popup = None;
+                if let Some(i) = d.popup_plane.take().filter(|i| *i < s.planes.len()) {
+                    s.planes.remove(i);
+                    d.active = s.planes.len().saturating_sub(1);
+                }
+            }
+            Action::Accept | Action::Cancel => {}
         }
         self.rebuild_scene(false, cx);
         cx.notify();
