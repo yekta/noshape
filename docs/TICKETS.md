@@ -73,7 +73,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   document then crashes on every open (DRAFT-SEGV-DOC, SHELL-SLAB-GPF, FILLET-SEGV, FILLET-SEGV-BLEND). Whatever the kernel bug, one bad feature must not
   make a document unopenable: commit after a successful regen, and/or run kernel ops so a crash only fails that feature
   (subprocess / signal guard), and/or open with the last feature rolled back after a crash on open (qa 2026-10-26)
-- [ ] P0 FILLET-HANG a Fillet runs for > 15 min (stopped by hand) in OCCT's blend approximation (`BRepBlend_AppFuncRoot::
+- [x] (core 10-27: a 30 s CPU budget on fillets/chamfers, cancellable; the hang document: Fillet 2 fails after the budget, the regeneration finishes; making that fillet succeed (OCCT's approximation) is open) P0 FILLET-HANG a Fillet runs for > 15 min (stopped by hand) in OCCT's blend approximation (`BRepBlend_AppFuncRoot::
   SearchLocation` / `NCollection_BaseSequence::Find` ← Approx_SweepApproximation ← BRepBlend_AppSurface ←
   ChFi3d_Builder::CompleteData … ← noshape checked_blend / scaled_blend ← op_fillet features.cpp:3049, `checked`, size 5)
   with no timeout or abort; the app would freeze on it. Opening the saved document in a fresh process hangs too (> 30 min,

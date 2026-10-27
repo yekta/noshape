@@ -21,6 +21,7 @@
 #include <chrono>
 #include <typeinfo>
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <exception>
 #include <memory>
@@ -53,6 +54,70 @@ void                            install_crash_guard();
 #endif
 
 namespace noshape {
+// The calling thread's regeneration cancel flag (set_thread_cancel), or null.
+const std::atomic<bool>* thread_cancel_flag();
+// Budget of a blend (qa FILLET-HANG: OCCT's blend approximation never
+// returned): `f` runs with a CPU-time timer on this thread (Linux) that
+// ticks every 100 ms; once `cpu_seconds` are used or the regeneration is
+// cancelled, the tick jumps back here. 0 done, 1 over budget, 2 cancelled.
+// Elsewhere `f` just runs.
+#ifdef __linux__
+extern thread_local sigjmp_buf*             budget_jmp;
+extern thread_local double                  budget_limit;
+extern thread_local int                     budget_reason;
+extern thread_local const std::atomic<bool>* budget_cancel;
+bool                                        budget_timer_start(void*& timer);
+void                                        budget_timer_stop(void* timer);
+double                                      thread_cpu_seconds();
+#endif
+template <class F>
+int run_budgeted(double cpu_seconds, F&& f)
+{
+#ifdef __linux__
+  if (budget_jmp != nullptr)
+  {
+    f();
+    return 0;
+  }
+  void* timer = nullptr;
+  if (!budget_timer_start(timer))
+  {
+    f();
+    return 0;
+  }
+  sigjmp_buf        env;
+  sigjmp_buf* const crash_outer = crash_guard;
+  if (sigsetjmp(env, 1) != 0)
+  {
+    budget_timer_stop(timer);
+    crash_guard = crash_outer;
+    return budget_reason;
+  }
+  budget_limit  = thread_cpu_seconds() + cpu_seconds;
+  budget_cancel = thread_cancel_flag();
+  budget_jmp    = &env;
+  // Seen by the signal handler before `f` runs (else a store before an
+  // endless loop can be dropped).
+  std::atomic_signal_fence(std::memory_order_seq_cst);
+  try
+  {
+    f();
+  }
+  catch (...)
+  {
+    budget_jmp = nullptr;
+    budget_timer_stop(timer);
+    throw;
+  }
+  budget_jmp = nullptr;
+  budget_timer_stop(timer);
+#else
+  (void)cpu_seconds;
+  f();
+#endif
+  return 0;
+}
+
 bool kernel_profile_on();
 void kernel_profile_add(const char* what, std::chrono::steady_clock::duration took);
 void kernel_profile_add_named(const char* name, std::chrono::steady_clock::duration took);
@@ -88,6 +153,7 @@ bool run_guarded(F&& f) noexcept
     return false;
   }
   crash_guard = &env;
+  std::atomic_signal_fence(std::memory_order_seq_cst);
 #endif
   bool ok = true;
   try
@@ -172,6 +238,7 @@ static void trycatch_timed(Try&& func, Fail&& fail) noexcept
     return;
   }
   noshape::crash_guard = &env;
+  std::atomic_signal_fence(std::memory_order_seq_cst);
   trycatch_guarded(func, fail);
   noshape::crash_guard = outer;
 #endif
@@ -391,7 +458,7 @@ OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
               int32_t path_count);
 void  set_working_scale(double k);
 // Raises a signal inside a bridge call (tests of the crash guard): 0 SIGSEGV, 1 SIGFPE,
-// 2 std::terminate.
+// 2 std::terminate, 3 a loop under a 0.3 s budget (Linux).
 void  crash_inside_kernel(uint8_t kind);
 OpOut op_thicken(const OcShape& s, double t1, double t2);
 OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness, uint8_t join);

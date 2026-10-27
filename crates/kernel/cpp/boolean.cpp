@@ -2085,3 +2085,10 @@ std::unique_ptr<OcShape> project_normal(const OcShape& curves, const OcShape& ta
 }
 
 } // namespace noshape
+
+namespace noshape {
+const std::atomic<bool>* thread_cancel_flag()
+{
+  return t_cancel;
+}
+} // namespace noshape

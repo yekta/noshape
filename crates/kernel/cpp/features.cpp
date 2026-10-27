@@ -3003,7 +3003,15 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_split_closed(
   }
 }
 
-OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
+// CPU seconds a fillet or chamfer may take (qa FILLET-HANG: > 1 h in OCCT's
+// blend approximation); NOSHAPE_BLEND_BUDGET overrides (tests).
+static double blend_budget_seconds()
+{
+  const char* v = std::getenv("NOSHAPE_BLEND_BUDGET");
+  return v != nullptr ? std::atof(v) : 30.0;
+}
+
+static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
                 bool checked)
 {
   require_non_null(s.shape, "shape");
@@ -3077,7 +3085,19 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
   }
 }
 
-OpOut op_fillet_variable(const OcShape& s, const OcShape& edge, rust::Slice<const double> params,
+OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
+                bool checked)
+{
+  OpOut out;
+  const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_fillet_unbudgeted(s, edges, radii, checked); });
+  if (r == 1)
+    fail_op("fillet took too long");
+  if (r == 2)
+    fail_op("cancelled");
+  return out;
+}
+
+static OpOut op_fillet_variable_unbudgeted(const OcShape& s, const OcShape& edge, rust::Slice<const double> params,
                          rust::Slice<const double> radii, bool checked)
 {
   require_non_null(s.shape, "shape");
@@ -3111,6 +3131,18 @@ OpOut op_fillet_variable(const OcShape& s, const OcShape& edge, rust::Slice<cons
       return true;
     };
   });
+}
+
+OpOut op_fillet_variable(const OcShape& s, const OcShape& edge, rust::Slice<const double> params,
+                         rust::Slice<const double> radii, bool checked)
+{
+  OpOut out;
+  const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_fillet_variable_unbudgeted(s, edge, params, radii, checked); });
+  if (r == 1)
+    fail_op("fillet variable took too long");
+  if (r == 2)
+    fail_op("cancelled");
+  return out;
 }
 
 namespace {
@@ -3600,7 +3632,7 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> chamfer_as_cut(const TopoDS
   return std::make_pair(cut.Shape(), h);
 }
 
-OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& faces,
+static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, const OcShapeList& faces,
                  uint8_t mode, double d1, double d2, bool checked)
 {
   require_non_null(s.shape, "shape");
@@ -3742,6 +3774,18 @@ OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& 
     }
     throw;
   }
+}
+
+OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& faces,
+                 uint8_t mode, double d1, double d2, bool checked)
+{
+  OpOut out;
+  const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_chamfer_unbudgeted(s, edges, faces, mode, d1, d2, checked); });
+  if (r == 1)
+    fail_op("chamfer took too long");
+  if (r == 2)
+    fail_op("cancelled");
+  return out;
 }
 
 // ---------------------------------------------------------------- draft

@@ -1199,6 +1199,16 @@ void crash_inside_kernel(uint8_t kind)
     // An OCCT exception through a noexcept frame (OCCT 8's gp_Dir of a zero
     // vector): std::terminate, abort.
     [](double x) noexcept { (void)gp_Dir(x, 0, 0); }(0.0);
+  else if (kind == 3)
+  {
+    // A loop that never ends, under a 0.3 s budget (run_budgeted).
+    volatile double x = 0;
+    if (run_budgeted(0.3, [&] {
+          for (;;)
+            x = x + 1;
+        }) == 1)
+      fail_op("spin took too long");
+  }
   else
     std::raise(SIGSEGV);
 }
@@ -1293,3 +1303,80 @@ void kernel_profile_add(const char* what, std::chrono::steady_clock::duration to
   v.second += std::chrono::duration<double, std::milli>(took).count();
 }
 } // namespace noshape
+
+#ifdef __linux__
+  #include <ctime>
+  #include <unistd.h>
+  #include <sys/syscall.h>
+namespace noshape {
+thread_local sigjmp_buf*              budget_jmp    = nullptr;
+thread_local double                   budget_limit  = 0;
+thread_local int                      budget_reason = 0;
+thread_local const std::atomic<bool>* budget_cancel = nullptr;
+
+double thread_cpu_seconds()
+{
+  timespec ts{};
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+  return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+}
+
+namespace {
+const int budget_signal = SIGRTMIN + 3;
+
+void on_budget_tick(int, siginfo_t*, void*)
+{
+  sigjmp_buf* env = budget_jmp;
+  if (env == nullptr)
+    return;
+  const bool over   = thread_cpu_seconds() > budget_limit;
+  const bool cancel = budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed);
+  if (!over && !cancel)
+    return;
+  budget_jmp    = nullptr;
+  budget_reason = over ? 1 : 2;
+  siglongjmp(*env, 1);
+}
+} // namespace
+
+bool budget_timer_start(void*& timer)
+{
+  static std::once_flag once;
+  std::call_once(once, [] {
+    struct sigaction sa;
+    std::memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = on_budget_tick;
+    sa.sa_flags     = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+    sigaction(budget_signal, &sa, nullptr);
+  });
+  sigevent sev;
+  std::memset(&sev, 0, sizeof sev);
+  sev.sigev_notify          = SIGEV_THREAD_ID;
+  sev.sigev_signo           = budget_signal;
+  sev._sigev_un._tid        = (pid_t)syscall(SYS_gettid);
+  timer_t t;
+  if (timer_create(CLOCK_THREAD_CPUTIME_ID, &sev, &t) != 0)
+    return false;
+  itimerspec its;
+  std::memset(&its, 0, sizeof its);
+  its.it_value.tv_nsec    = 100000000;
+  its.it_interval.tv_nsec = 100000000;
+  if (timer_settime(t, 0, &its, nullptr) != 0)
+  {
+    timer_delete(t);
+    return false;
+  }
+  static_assert(sizeof(timer_t) <= sizeof(void*), "timer_t fits a pointer");
+  std::memcpy(&timer, &t, sizeof t);
+  return true;
+}
+
+void budget_timer_stop(void* timer)
+{
+  timer_t t;
+  std::memcpy(&t, &timer, sizeof t);
+  timer_delete(t);
+}
+} // namespace noshape
+#endif

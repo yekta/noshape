@@ -336,3 +336,15 @@ fn a_crash_inside_the_kernel_fails_only_that_call() {
     let b = make_box_corners(DVec3::ZERO, DVec3::ONE).unwrap();
     assert!((b.volume().unwrap() - 1.0).abs() < 1e-12);
 }
+
+/// A blend that never finishes fails after its CPU budget (qa FILLET-HANG:
+/// OCCT's blend approximation ran > 1 h): here a loop under a 0.3 s budget.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_kernel_call_over_its_budget_fails() {
+    let t = std::time::Instant::now();
+    let e = crash_inside_kernel(3).unwrap_err();
+    assert!(e.to_string().contains("took too long"), "{e}");
+    assert!(t.elapsed().as_secs_f64() < 5.0);
+    assert!((make_box_corners(DVec3::ZERO, DVec3::ONE).unwrap().volume().unwrap() - 1.0).abs() < 1e-12);
+}
