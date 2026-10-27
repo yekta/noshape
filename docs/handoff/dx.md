@@ -111,7 +111,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (REQUESTS dx 10-27 P1 speed). Release number: next perf.yml `model` run.
 - NIST assembly import, STEP / Parasolid (live's own exports, to go in tests/perf/): pending live's files. Ours
   meanwhile, on our own export of tests/perf/nist-mtc-crada-assembly.noshape (36 parts, STEP 11.9 MB), kernel only
-  (C++ -O2): read STEP 9.3 s, write x_t 8.1 s, **read x_t 35 s** (profiling it next). Parasolid export of that
+  (C++ -O2): read STEP 9.3 s, write x_t 8.1 s, read x_t 35 s → **3.0 s** (10-27: attributes indexed once, bodies
+  healed in parallel, second fins' SP-curves matched in parallel; same volumes / faces bit for bit). STEP next. Parasolid export of that
   Part Studio crashed the kernel on 3 parts (OCCT 8.0.1 SweptToElementary null face): fixed f2279b3c.
 
 ## Next (in order, after landing)

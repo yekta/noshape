@@ -49,6 +49,7 @@
 #include <Geom_TrimmedCurve.hxx>
 #include <GeomAdaptor_Surface.hxx>
 #include <BRepTools_ReShape.hxx>
+#include <OSD_Parallel.hxx>
 #include <ShapeFix_Edge.hxx>
 #include <ShapeFix_Face.hxx>
 #include <ShapeFix_Shape.hxx>
@@ -610,6 +611,18 @@ struct Builder
   std::map<const Geom_Surface*, std::unique_ptr<Projector>> projectors;
   // Attribute nodes by owner (built on first use).
   mutable std::map<long long, std::vector<long long>> attrs_by_owner;
+  mutable bool                                        attrs_indexed = false;
+  // Second fins' SP-curves to put on their edges' parameter (along_edge),
+  // done for all edges at once after the walk (finish_fins).
+  struct FinJob
+  {
+    TopoDS_Edge               E;
+    occ::handle<Geom2d_Curve> c;
+    double                    a, b;
+    occ::handle<Geom_Surface> S;
+    double                    tol;
+  };
+  std::vector<FinJob> fin_jobs;
   // Faces' own colours (SDL/TYSA_COLOUR on the face), by their surface.
   std::map<const Geom_Surface*, std::array<double, 3>> face_colour;
   std::map<long long, occ::handle<Geom_Curve>>   curves;
@@ -1471,15 +1484,9 @@ struct Builder
             break;
         // The other fin's SP-curve follows the edge only to within its
         // tolerance, not in its parameter: put on the edge's parameter point
-        // by point (else projected later).
+        // by point (else projected later), in finish_fins.
         if (fins.size() > 1 && fins[1].s != fins[0].s)
-          if (const occ::handle<Geom2d_Curve> pc = along_edge(E, fins[1].c, fins[1].a, fins[1].b, surface(fins[1].s), etol); !pc.IsNull())
-          {
-            double f, l;
-            BRep_Tool::Range(E, f, l);
-            B.UpdateEdge(E, pc, surface(fins[1].s), TopLoc_Location(), etol);
-            B.Range(E, surface(fins[1].s), TopLoc_Location(), f, l);
-          }
+          fin_jobs.push_back({E, fins[1].c, fins[1].a, fins[1].b, surface(fins[1].s), etol});
       }
     }
     v1.Orientation(TopAbs_FORWARD);
@@ -1487,6 +1494,29 @@ struct Builder
     B.Add(E, v1);
     B.Add(E, v2);
     return edges[idx] = E;
+  }
+
+  // The queued second fins (fin_jobs): each one's SP-curve matched to its
+  // edge in parallel (along_edge only reads the edge), then set on it.
+  void finish_fins()
+  {
+    std::vector<occ::handle<Geom2d_Curve>> pcs(fin_jobs.size());
+    OSD_Parallel::For(0, (int)fin_jobs.size(), [&](int i) {
+      const FinJob&             j = fin_jobs[i];
+      occ::handle<Geom2d_Curve> pc;
+      if (run_guarded([&] { pc = along_edge(j.E, j.c, j.a, j.b, j.S, j.tol); }))
+        pcs[i] = pc;
+    });
+    for (size_t i = 0; i < fin_jobs.size(); ++i)
+      if (!pcs[i].IsNull())
+      {
+        const FinJob& j = fin_jobs[i];
+        double        f, l;
+        BRep_Tool::Range(j.E, f, l);
+        B.UpdateEdge(j.E, pcs[i], j.S, TopLoc_Location(), j.tol);
+        B.Range(j.E, j.S, TopLoc_Location(), f, l);
+      }
+    fin_jobs.clear();
   }
 
   // A fin's SP-curve c (from a to b, along the edge) in the edge's own
@@ -1660,7 +1690,9 @@ struct Builder
     return out;
   }
 
-  TopoDS_Shape body(long long bi)
+  // A body as the file has it, before healing (heal_import; bodies share
+  // nothing, so read_xt_data heals several at once).
+  TopoDS_Shape body_raw(long long bi)
   {
     const XNode&    b    = r.at_index(bi);
     const int       type = (int)b.integer("body_type"); // 1 solid, 2 wire, 3 sheet, 6 general
@@ -1714,7 +1746,6 @@ struct Builder
     if (nsolids == 1 && part.NbChildren() == 1)
       out = last;
     check_rebuilt(out);
-    out = heal_import(out, tol);
     return out;
   }
 
@@ -1801,10 +1832,15 @@ struct Builder
 
   void attributes(long long owner, std::string& name, std::array<double, 3>& colour, bool& has_colour) const
   {
-    if (attrs_by_owner.empty())
+    // Indexed once (a file without attributes left it empty: every face
+    // rescanned the whole file).
+    if (!attrs_indexed)
+    {
+      attrs_indexed = true;
       for (const auto& [i, n] : r.nodes)
         if (n.type == 81)
           attrs_by_owner[n.ptr("owner")].push_back(i);
+    }
     const auto it = attrs_by_owner.find(owner);
     if (it == attrs_by_owner.end())
       return;
@@ -2146,11 +2182,21 @@ std::vector<XtPart> read_xt_parts(const std::string& path)
 
 std::vector<XtPart> read_xt_data(std::string data)
 {
-  Parser      p(std::move(data));
-  p.parse();
+  Parser p(std::move(data));
+  {
+    KernelTimer t("xt.parse");
+    p.parse();
+  }
   Builder              b(p);
   std::vector<XtPart>  out;
   std::set<long long>  seen;
+  // Each part's body and placement, healed and placed after the walk.
+  struct Pending
+  {
+    long long body;
+    gp_Trsf   place;
+  };
+  std::vector<Pending> pending;
   // Part: a body (with its placement), or an assembly's instances.
   std::function<void(long long, const gp_Trsf&, int)> visit = [&](long long idx, const gp_Trsf& place, int depth) {
     if (depth > 64 || !p.has(idx))
@@ -2159,11 +2205,9 @@ std::vector<XtPart> read_xt_data(std::string data)
     if (n.type == 12)
     {
       XtPart part;
-      part.shape = b.body(idx);
-      b.face_colours_of(part);
-      if (place.Form() != gp_Identity)
-        part.shape = BRepBuilderAPI_Transform(part.shape, place, true).Shape();
+      part.shape = b.body_raw(idx);
       b.attributes(idx, part.name, part.colour, part.has_colour);
+      pending.push_back({idx, place});
       out.push_back(std::move(part));
     }
     else if (n.type == 10)
@@ -2191,6 +2235,33 @@ std::vector<XtPart> read_xt_data(std::string data)
     for (const auto& [i, n] : p.nodes)
       if ((n.type == 12 || n.type == 10) && !referenced.count(i))
         visit(i, gp_Trsf(), 0);
+  // Heal the bodies in parallel (an instanced body once: its instances share
+  // its edges), each under its own crash guard (unhealed if it crashes).
+  {
+    KernelTimer t("xt.fins");
+    b.finish_fins();
+  }
+  KernelTimer                 heal_timer("xt.heal");
+  std::map<long long, size_t> first;
+  std::vector<size_t>         uniq;
+  for (size_t k = 0; k < pending.size(); ++k)
+    if (first.emplace(pending[k].body, k).second)
+      uniq.push_back(k);
+  std::vector<TopoDS_Shape> healed(pending.size());
+  const double              tol = b.tol;
+  OSD_Parallel::For(0, (int)uniq.size(), [&](int j) {
+    const size_t       k   = uniq[j];
+    const TopoDS_Shape raw = out[k].shape;
+    TopoDS_Shape       h;
+    healed[k] = run_guarded([&] { h = heal_import(raw, tol); }) && !h.IsNull() ? h : raw;
+  });
+  for (size_t k = 0; k < pending.size(); ++k)
+  {
+    out[k].shape = healed[first[pending[k].body]];
+    b.face_colours_of(out[k]);
+    if (pending[k].place.Form() != gp_Identity)
+      out[k].shape = BRepBuilderAPI_Transform(out[k].shape, pending[k].place, true).Shape();
+  }
   if (out.empty())
     fail_invalid("parasolid: no parts in the file");
   return out;
