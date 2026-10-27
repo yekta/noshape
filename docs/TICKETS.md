@@ -382,6 +382,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - The black region at the bottom right of the user's shot did **not** reproduce on v0.4.10 Linux (1× and 2×): iso,
     zoom into the plate's corner down to its vertex, tilts above and below the top face, bottom view. Not filed as
     BLACK-REGION; needs the user's document (or it is macOS / Metal-only) (qa 2026-10-27 11:13, v0.4.10 artifact)
+  - psui 69de3163: the user's black wedge was the image-based silhouette pass throwing a back face across the screen
+    (`vs_backsil` divided by a finite step's on-screen length, which can come out as nothing); its push is now
+    analytic, test a_thin_plate_draws_nothing_past_its_outline (1× and 2×). The edge looks wait for live's 2×
+    capture.
 - [ ] P3 CONFIG-INPUT-ID a Part Studio's new configuration inputs get FeatureScript ids from their names: config_add_input
   List → id "Configuration" (renamed "Size", the id stays "Configuration"), Checkbox → "Checkbox_2" (ops/config.rs
   add_input → fs_identifier(name)). Live gives a List a random internal id `List_8iFesnytxapQpg` (behaviours 5915, 6098:
@@ -472,7 +476,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   error; `FeatureDialog::can_submit`, checked in `accept_edit`); verified on :102: a new Extrude with nothing picked
   stays open through Enter, Enter, Ctrl+Enter; a picked face then commits; an existing Extrude opened for edit
   commits on Enter.
-- [x] f576b650 P2 CONFIG-CELL-EDIT a configured value can't be edited in the Configuration panel's table: Configure Part Studio,
+- [x] e013107b P2 CONFIG-CELL-EDIT a configured value can't be edited in the Configuration panel's table: Configure Part Studio,
   add row "Big", Linear pattern 1 › Instance count › right-click › Configure (column "Linear pattern 1 / Instance count",
   3 / 3, toast as live); a click, double-click or typing on Big's "3" cell does nothing (no blue frame, no edit), while
   the Name cell takes typing. Setting it through the feature dialog with Big active works (Big 5, Parts (5)). Live's
