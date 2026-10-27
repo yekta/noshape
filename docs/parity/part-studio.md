@@ -71,7 +71,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.16 | Y hides the hovered entity's part/sketch/plane (or the selection) | keyboard_shortcuts; View__hide_show | ✅ (psui 10-27: Y hides the part under the pointer, as live) |
 | 2.17 | Shift+Y shows hidden entities (selected ones, else all parts) | keyboard_shortcuts; View__hide_show | ✅ (psui 10-27: with nothing selected, Shift+Y shows only the hidden part under the pointer; over empty graphics nothing, as live) |
 | 2.18 | Shift+I isolates the hovered/selected parts (others at ~20 %) and clears the selection; over a faded part it does nothing (live 10-27: not cumulative by hover) | keyboard_shortcuts; View__isolate | ✅ |
-| 2.19 | Shift+T makes the hovered/selected parts transparent; cumulative | keyboard_shortcuts; View__make_transparent | 🔧 |
+| 2.19 | Shift+T makes the hovered/selected parts transparent (0.29 of the colour over white, Part 1 top (222,235,243) as live 10-27); cumulative by hover | keyboard_shortcuts; View__make_transparent | ✅ |
 | 2.20 | Shift+X opens the Section view dialog (again with a section on: turns it off) | keyboard_shortcuts | ✅ |
 | 2.21 | Shift+V named views | keyboard_shortcuts | ✅ |
 | 2.22 | Shift+R view in high quality (4x finer tessellation, notice) | keyboard_shortcuts | 🔧 (notice = live's 433×28 #90cef1 bar at the graphics top centre, 13 px text, white Disable button; part-studio/lod4-fill-shiftR) |

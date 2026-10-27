@@ -222,6 +222,9 @@ pub struct SceneOptions {
     /// solid but washed out, faces and edges mixed toward white by
     /// [`ISOLATE_GHOST`] in sRGB.
     pub ghost_bodies: Vec<noshape_model::BodyId>,
+    /// How far the ghosts go toward white ([`ISOLATE_GHOST`] if unset;
+    /// [`MAKE_TRANSPARENT_GHOST`] for Make transparent).
+    pub ghost_mix: Option<f32>,
     /// Isolate's planes (live ui/iso-901): no fill, the outline at
     /// [`FAINT_PLANE_ALPHA`] of its opacity (172 → 252 over white).
     pub faint_planes: bool,
@@ -245,6 +248,10 @@ pub const FAINT_PLANE_ALPHA: f32 = 0.04;
 /// How far Isolate's ghosts are mixed toward white (live iso-900 → iso-901:
 /// 160 → 234, 107 → 220, 209 → 246, i.e. 0.78 of the way, every face).
 pub const ISOLATE_GHOST: f32 = 0.78;
+/// Make transparent's parts (live 10-27, "spec: psui part-studio.md 2.18 /
+/// 2.19"): 0.29 of the colour over white on every channel (Part 1's top
+/// (142,187,214) → (222,235,243)).
+pub const MAKE_TRANSPARENT_GHOST: f32 = 0.71;
 
 /// A linear color mixed toward white by `k` in sRGB (see [`ISOLATE_GHOST`]).
 fn ghost_color(c: [f32; 4], k: f32) -> [f32; 4] {
@@ -378,7 +385,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // (The renderer draws a preview's back faces under the datum
                 // planes and picked regions and its front faces over them.)
                 let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
-                let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(ISOLATE_GHOST) } else { mesh };
+                let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(opts.ghost_mix.unwrap_or(ISOLATE_GHOST)) } else { mesh };
                 // The cap hatch's id: live's Part Studio parts read 230, 234,
                 // 238, … (occurrence id + mesh group hash; live ui (10-26),
                 // icons2 caps 3).
@@ -391,7 +398,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 (_, DisplayMode::HiddenLine) => theme::lin(theme::viewport::EDGE_UNSHADED),
                 _ => theme::lin(EDGE_COLOR),
             };
-            let edge_color = if opts.ghost_bodies.contains(&b.id) { ghost_color(edge_color, ISOLATE_GHOST) } else { edge_color };
+            let edge_color = if opts.ghost_bodies.contains(&b.id) { ghost_color(edge_color, opts.ghost_mix.unwrap_or(ISOLATE_GHOST)) } else { edge_color };
             // A mesh part's triangle sides: thin dark-grey lines at every zoom
             // (live G35, part-studio/551: #464646, 1 px), like edges hidden in
             // plain Shaded mode.

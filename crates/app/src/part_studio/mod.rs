@@ -866,6 +866,7 @@ impl PartStudioView {
             o.faint_planes = iso.mode == behaviors::IsolateMode::Isolate;
             if matches!(behaviors::iso_look(iso.opacity), behaviors::IsoLook::Ghost) {
                 o.ghost_bodies = self.isolation_transparent().into_iter().collect();
+                o.ghost_mix = (iso.mode == behaviors::IsolateMode::Transparent).then_some(scene_builder::MAKE_TRANSPARENT_GHOST);
             }
         }
         // Interference detection: the parts see-through around the red overlaps.
