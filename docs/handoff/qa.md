@@ -199,6 +199,13 @@ in Extrude's regions field picks the face), ORD-BASE.
   help › Keyboard shortcuts; Derived (Part Studio field); + › Create Variable Studio / Feature Studio (template
   FeatureScript 3095 common.fs); Assembly › Insert › Current / Other documents › Owned by me (the library lists the
   documents at Start); document menu; Release drafts panel; tab manager. Shots tickets/split-0a25/.
+- P1 Part Studio walk on 0a25dd1a (12:08): face preselected → Sketch on it, N normal view; corner rectangle (G), circle
+  (C), dimensions (D) width 25 and Ø8 (Esc on a value box keeps the measured value, as live); Offset (O) pick the
+  circle, move out, click → 5 mm box, kept with its dimension; Q toggles construction; ✓; Shift+E, picking the
+  ring region switches New → Add (as live), Enter with nothing picked stays open; rename via menu, Suppress (its
+  sketch shows again), Ctrl+Z ×2 / Ctrl+Y right, rollback bar drag above a feature, Delete of a rolled-back feature,
+  undo. No findings beyond those filed. (Offset with the right side still selected says "Can only offset a single
+  chain at once." like live.)
 - Verified on 0a25dd1a: LP-DIRECTION-PICK compound filters, MEASURE-MAX-DIST, EMPTY-COMMIT, CONFIG-CELL-EDIT; on green:
   LOFT-SKETCH-HIDE, PANEL-BLEED, P1-4; on v0.4.10: SKETCH-DRAG-BIG (7–16 ms steps at load 47). REGEN-NO-CANCEL half
   (rollback instant, stale run not aborted), PS-SECTION-RED reopened (overlap is a hole). New P3: OK-DISABLED-HOVER,
