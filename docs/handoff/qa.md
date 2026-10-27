@@ -25,7 +25,7 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   assembly opens, a revolute pin drags without moving off its hole; kill -9 right after a Suppress keeps it; geometry
   matrices on the watcher CLI 04:48: fillet 32/32, boolean 11/11, shell 96/96 (walls everywhere; hole cases 3.5–7.4 s),
   hollow 60/60, rim 36/36, transform 5/5, split / mid plane exact; UI Part mirror about Right = 121558.969 (2×).
-  featmatrix's hole patterns fail only through API-REMOVE-DIR; patmatrix's ×50/×100 overlapping holes now fail "Could not
+  featmatrix 14/14 once its REMOVE passes oppositeDirection (API-REMOVE-DIR: by design, lead's decision); patmatrix's ×50/×100 overlapping holes now fail "Could not
   create all instances as entered" on purpose (live's rule, pattern.rs copies_fail); holematrix (now styleV2) 12/12 exact.
 - Also OK (green 525c619b, 05:20–05:50): drawing Update after a depth change (views follow, the dimension stays, the
   button goes dim), STL import (+ › Import…: "l30" Part Studio, mesh 60774.111 = the file), UI sketch on a face → circle
