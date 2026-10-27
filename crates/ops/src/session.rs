@@ -71,6 +71,30 @@ pub const PROTECTED_KEY: &str = "workspace_protected:";
 
 /// Whether process `pid` still runs (a crash marker of a live process is an
 /// evaluation in progress, not a crash).
+/// The documents process `pid` has open (`<pid>.docs` beside its crash
+/// markers, one file path per line): a dead process's marker applies to
+/// these only (qa CRASH-MARKER-COPIES: a copy of the document, or another
+/// process's file with the same feature ids, is left alone).
+fn docs_file(dir: &Path, pid: u32) -> PathBuf {
+    dir.join(format!("{pid}.docs"))
+}
+
+/// The path markers know a document file by.
+fn marker_key(path: &Path) -> String {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()).to_string_lossy().to_string()
+}
+
+/// Note that this process has `path` open (see [`docs_file`]).
+fn note_open(path: &Path) {
+    let Some(dir) = noshape_model::regen::crash_guard::dir() else { return };
+    let file = docs_file(dir, std::process::id());
+    let key = marker_key(path);
+    let known = std::fs::read_to_string(&file).unwrap_or_default();
+    if !known.lines().any(|l| l == key) {
+        let _ = std::fs::write(&file, format!("{known}{key}\n"));
+    }
+}
+
 fn process_alive(pid: u32) -> bool {
     if cfg!(target_os = "linux") {
         return Path::new("/proc").join(pid.to_string()).exists();
@@ -124,6 +148,7 @@ impl Session {
         // The document's features may need the FeatureScript host (custom features, std-run features).
         noshape_model::custom::register();
         noshape_model::regen::crash_guard::enable(noshape_model::regen::crash_guard::default_dir());
+        note_open(&path);
         Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false, seen })
     }
 
@@ -145,6 +170,7 @@ impl Session {
         if let Some(dir) = noshape_model::regen::crash_guard::dir() {
             s.recovered = s.recover_crashed_features(dir);
         }
+        note_open(&s.path);
         Ok(s)
     }
 
@@ -157,8 +183,14 @@ impl Session {
     pub fn recover_crashed_features(&mut self, dir: &Path) -> Vec<String> {
         use noshape_model::document::TabContent;
         let mut notes = Vec::new();
-        for m in noshape_model::regen::crash_guard::markers(dir) {
+        let me = marker_key(&self.path);
+        let markers = noshape_model::regen::crash_guard::markers(dir);
+        for m in &markers {
             if m.pid == std::process::id() || process_alive(m.pid) {
+                continue;
+            }
+            // Only the files that process had open.
+            if !std::fs::read_to_string(docs_file(dir, m.pid)).unwrap_or_default().lines().any(|l| l == me) {
                 continue;
             }
             let hit = self.doc.tabs.iter().find_map(|t| match &t.content {
@@ -168,7 +200,7 @@ impl Session {
             let Some((tab, index, rollback, name)) = hit else { continue };
             if index < rollback {
                 let lifted = std::mem::replace(&mut self.protection_lifted, true);
-                let r = self.edit_tab(tab, &format!("Roll back above {name}: it stopped noshape while regenerating"), |c| {
+                let r = self.edit_tab(tab, &format!("Roll back above {name}: noshape stopped while regenerating it"), |c| {
                     if let TabContent::PartStudio(ps) = c {
                         ps.rollback = Some(index);
                     }
@@ -177,9 +209,23 @@ impl Session {
                 if r.is_err() {
                     continue;
                 }
-                notes.push(format!("{name} stopped noshape the last time it regenerated: the rollback bar is now above it. Edit or delete it, then move the rollback bar back."));
+                notes.push(format!("noshape stopped while {name} regenerated (a crash, or the process was killed): the rollback bar is now above it. Edit or delete it, then move the rollback bar back."));
             }
             let _ = std::fs::remove_file(&m.path);
+        }
+        // A dead process's list of open files goes with its last marker.
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            let left = noshape_model::regen::crash_guard::markers(dir);
+            for e in rd.flatten() {
+                let pid = e.path().file_name().and_then(|n| n.to_str()).and_then(|n| n.strip_suffix(".docs")).and_then(|p| p.parse::<u32>().ok());
+                if let Some(pid) = pid
+                    && pid != std::process::id()
+                    && !process_alive(pid)
+                    && !left.iter().any(|m| m.pid == pid)
+                {
+                    let _ = std::fs::remove_file(e.path());
+                }
+            }
         }
         notes
     }
@@ -652,18 +698,28 @@ mod tests {
         }
         let (bad, name) = (ps.features[1].id, ps.features[1].name.clone());
         drop(Session::create(&path, doc).unwrap());
-        // The marker a crashed process left (no such process runs).
+        // A copy of the file (qa CRASH-MARKER-COPIES): the same feature ids.
+        let copy = dir.join("copy.noshape");
+        std::fs::copy(&path, &copy).unwrap();
+        // The marker a crashed process left (no such process runs; pids stop
+        // at 2^22), with the files it had open: p.noshape only.
         let markers = noshape_model::regen::crash_guard::default_dir();
         std::fs::create_dir_all(&markers).unwrap();
-        let marker = markers.join(format!("4294967294-{}.marker", std::process::id()));
-        std::fs::write(&marker, format!("4294967294\n{bad}\n{name}\n")).unwrap();
+        let dead = 4_000_000_000 + std::process::id() % 100_000;
+        let marker = markers.join(format!("{dead}-1.marker"));
+        std::fs::write(&marker, format!("{dead}\n{bad}\n{name}\n")).unwrap();
+        let docs = super::docs_file(&markers, dead);
+        std::fs::write(&docs, format!("{}\n", super::marker_key(&path))).unwrap();
+        let c = Session::open(&copy).unwrap();
+        assert!(c.recovered.is_empty() && marker.exists(), "the copy is left alone: {:?}", c.recovered);
+        drop(c);
         let s = Session::open(&path).unwrap();
         let TabContent::PartStudio(ps) = &s.doc.tab(tab_id).unwrap().content else { unreachable!() };
         assert_eq!(ps.rollback, Some(1), "the rollback bar above the feature");
         assert!(s.recovered.len() == 1 && s.recovered[0].contains(&name), "{:?}", s.recovered);
-        assert!(!marker.exists(), "the marker is cleared");
+        assert!(!marker.exists() && !docs.exists(), "the marker and the dead process's file list are cleared");
         let last = s.store.history(s.branch).unwrap()[0].description.clone();
-        assert!(last.ends_with(&format!(":: Roll back above {name}: it stopped noshape while regenerating")), "{last}");
+        assert!(last.ends_with(&format!(":: Roll back above {name}: noshape stopped while regenerating it")), "{last}");
         drop(s);
         // Opened again: nothing more to do.
         assert!(Session::open(&path).unwrap().recovered.is_empty());

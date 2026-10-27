@@ -355,7 +355,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [ ] P2 CRASH-MARKER-COPIES a crash marker rolls back whichever document next opens with that feature id, not the file whose
+- [x] (dx 10-27: each process lists the document files it has open beside its markers (`<pid>.docs`); a dead process's marker rolls back only a file on its list, so copies and other processes' files are left alone, and the list goes with its last marker; the note now reads "noshape stopped while regenerating it" (crash or kill). Test session::tests::a_feature_that_crashed_is_rolled_back_on_open opens a copy first) P2 CRASH-MARKER-COPIES a crash marker rolls back whichever document next opens with that feature id, not the file whose
   process died: copy tests/perf/live-30-features.noshape to kd2.noshape and bur.noshape; open kd2 in the app, Boss 1 ›
   Suppress and kill -9 the app during that regeneration; open bur.noshape (never touched): it opens with the rollback bar
   above Boss 2 and a new history entry "Roll back above Boss 2: it stopped noshape while regenerating", and the marker is
