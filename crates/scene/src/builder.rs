@@ -300,10 +300,9 @@ const DISPLAY_ONLY_PICK_BASE: u32 = 1 << 30;
 
 pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache, up: &Uploader) -> BuiltScene {
     let _t = noshape_render::perf::scope("s.build");
-    let mut scene = Scene::default();
     // Live (behaviours "psui (2026-10-27, P2) PS-SECTION overlap"): a Part Studio's section caps are flat
     // interference red where two parts overlap, as an assembly's (the earlier capture saw no overlap).
-    scene.section_interference = true;
+    let mut scene = Scene { section_interference: true, ..Default::default() };
     let mut picks = PickMap::default();
 
     // ---------------------------------------------------------------- bodies
