@@ -251,7 +251,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   names in a second, grey, indented list under the field ("Face of Sketch 2 / Face of Sketch 1",
   tickets/loft-profiles-ours.png); live: one list, each entry "› Face of Sketch 1 ×" with its chevron, ↑↓ reorder button,
   nothing below the field (live ui/961-loft-two-profiles.png) (qa 2026-10-26, build 4d2f6b0c)
-- [x] 51689c87 P2 PERF-SECTION-PANIC fixed: a section view's colour pass with ambient occlusion on asked for
+- [x] verified bcf401ca (qa 04:25: NOSHAPE_PERF=1, 30-feature part, Shift+X › Plane 1 cuts the bosses: capped, no wgpu error, frames keep coming) 51689c87 P2 PERF-SECTION-PANIC fixed: a section view's colour pass with ambient occlusion on asked for
   timestamp writes with neither index (renderer.rs `GpuTimer::writes` now gives none). Reproduced on green 16cdcf6d, gone
   here. Original report: with `NOSHAPE_PERF=1` the viewport render thread panics as soon as a section view cuts a
   part (Shift+X, pick Front plane): "wgpu error: Validation Error … In a CommandEncoder, label = 'frame' / In a pass
@@ -285,7 +285,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   says "… A parameter value is not valid."; ours shows the message but never makes the field pink and rewrites "1e6 mm" to
   "1000000 mm". A valid value in other units is rewritten into document units on blur ("500 m" → "500000 mm") in both.
   0 mm matches ("Failed to extrude selections, check input.", no pink) (qa 2026-10-26, build 4d2f6b0c)
-- [x] 51689c87 P2 MENU-SKETCH-TAG fixed ("Edit Boss sketch…": the tag only when the name doesn't contain
+- [x] verified bcf401ca (qa: Boss 1 row menu "Edit Boss sketch 1…") 51689c87 P2 MENU-SKETCH-TAG fixed ("Edit Boss sketch…": the tag only when the name doesn't contain
   the type, as the tooltips). Original report: feature row menu: ours "Edit Boss sketch 1 [Sketch]…" for a custom-named sketch; live "Edit Boss
   sketch 1…" (no type tag; behaviours "qa (2026-10-26, P2 batch)" (2)) (qa 2026-10-26, build 4d2f6b0c)
 - [x] 67bca14a P2 PANEL-BLEED: live bleeds through the same way (behaviours "psui (10-27, PANEL-BLEED
