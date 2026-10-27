@@ -13,7 +13,7 @@ then edits, undo/redo, rollback and suppress.
 | Fillet (Shift+F), 3 vertical edges, R2 | chips "Edge of Extrude 1" ×3, preview, 15270.061 mm³ | radius arrow on the **last** pick | ✗ P1-3 (psb): ours on the first pick |
 | Chamfer (tool search), 1 mm, tangent propagation | 7-edge chain chamfered (faces 9 → 16) | — | ✅ |
 | Sketch on a preselected face | "Face of Extrude 1" in Sketch plane | same | ✅ |
-| Points aligned with the origin | a 3rd point entity at (0,0) + Horizontal constraints | no entity; a Horizontal constraint from each point to the **external** Origin | ✗ P1-4 (skb) |
+| Points aligned with the origin | a 3rd point entity at (0,0) + Horizontal constraints | no entity; a Horizontal constraint from each point to the **external** Origin | ✅ P1-4 (5c94bb51: an external reference-only Origin entity, never drawn or listed; sketch_get names "origin"; e2e `sketch_get_names_the_origin_not_a_hidden_point`) |
 | Hole on 2 picked points | "Vertices of Sketch 2" (one chip); 2 holes, −633.385 mm³; title "Ø 6.35 mm ↧ 12 mm" ✅ | **two chips "Vertex of Sketch 1"** (one per click; "Vertices of …" only when the sketch row is picked) | ✗ **P1-8** (ui) |
 | Linear pattern › Feature pattern | order Part / Feature / Face ✅; chip **"Hole 1"**; Direction pink until picked ✅ | chip **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name) | ✗ **P1-9** (ui) |
 | Shell 2.5 mm (top face) | 8960 mm³, 59 faces | — | ✅ |
@@ -57,7 +57,7 @@ then edits, undo/redo, rollback and suppress.
 |---|---|---|---|
 | Linear pattern (assembly): dialog | Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction | A6 (pass 21) | ✅ |
 | Pattern the pin 20 mm along the plate edge (flipped) | preview in hole 2; ✓ → "Linear pattern 1 ▸ Part 2 <2>", Instances (3) | — | ✅ |
-| Enter twice in the pattern dialog | stays open | Part Studio dialogs commit on the 2nd Enter; assembly? (request p3) | ✗? **P2-A1** |
+| Enter twice in the pattern dialog | stays open | Part Studio dialogs commit on the 2nd Enter; assembly? (request p3) | ✅ P2-A1 (skb 9bf8475b, qa re-check on a08e3eda) |
 | Exploded views panel → Add exploded view | "Editing Explode 1 [Done]" banner, Explode 1 row, "Build steps by dragging components" | EXV rows | ✅ |
 
 ## P1 extras, green 461aefb0
@@ -112,16 +112,16 @@ then edits, undo/redo, rollback and suppress.
 | Esc with no dialog in explode editing | toolbar back but still exploded, row stays active with the rollback bar; the next double-click leaves instead of re-entering | Esc = Done | ✅ P2-A3 (skasm 10-27 GUI: Esc → no banner, plain "Explode 1", no rollback bar, assembled) |
 | Assembly circular pattern dialog | Instances, Axis of pattern (+ clock), Angle 360 deg, Instance count 2 (+ ↻), ☑ Equal spacing, ☐ Centered; ✓ pale until Instances is set | same (behaviours 6186, 8704) | ✅ |
 | Pin about the middle hole's rim, ✓ | copy in hole 3; "Circular pattern 1 ▸ Part 2 <2>", Instances (3); info bubble "1 instance(s) created." | live: no bubble or toast (behaviours "qa5 (10-26 p6)" (1)) | ✅ (ours shows none either; `accept_pattern`) |
-| Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✗ **P2-A4** (skb) |
+| Edit the seed's mate | the pattern copy vanishes until ✓; seed shows z-fighting stripes | instances stay drawn | ✅ P2-A4 (f4f7d14a, qa verified 21d6a89e on green 16cdcf6d) |
 | Mate type → Revolute | Offset, Limits (rotation min / max kept); row "Revolute 1"; Z offset 0 (the pin rises to mid-height) | same (behaviours 5942) | ✅ |
 | Fix the plate, drag the revolute pin | rotates only: axis stays on hole 1 (0.002 mm), plate unchanged; the copy follows | behaviours 5948 (1) | ✅ |
 | Mate row right-click (hidden Revolute) | Rename, Edit…, Reset / Show, Show all mates, Isolate…, Make transparent… / Edit named position driver mate… / Suppress, Dynamic suppression ▸ / Animate… / Add selection to folder… / Expand ▸, Collapse ▸ / Delete | same (behaviours 1361; Add comment is cloud) | ✅ |
-| Suppress the mate | row grey struck-through, not italic; the pin drags freely out of the hole | grey italic struck-through | ✗ **P2-A5** (skb, minor) |
+| Suppress the mate | row grey struck-through, not italic; the pin drags freely out of the hole | grey italic struck-through | ✅ P2-A5 (9703d9b9, qa verified ba5df2f5 on green 19555ca3) |
 | Ctrl+Z / Ctrl+Y on the suppress | unsuppressed / suppressed again | — | ✅ |
-| Circular pattern 1 count 4 (edit), Enter twice | stays open (P2-A1, fix 9bf8475b not in this green) | 2nd Enter accepts | ✗ P2-A1 (fixed on main, pending green) |
-| Instance list header after count 4 | "Instances (5)" | top-level rows: "Instances (3)" | ✗ **P2-A6** (skb) |
+| Circular pattern 1 count 4 (edit), Enter twice | stays open (P2-A1, fix 9bf8475b not in this green) | 2nd Enter accepts | ✅ P2-A1 (qa re-check on a08e3eda) |
+| Instance list header after count 4 | "Instances (5)" | top-level rows: "Instances (3)" | ✅ P2-A6 (9703d9b9, qa verified 21d6a89e) |
 | Replicate dialog, Instances = Part 2 <1> | Mate to be matched auto-filled "Revolute 1"; Match faces in parts ▾; Parts to find match in (red) | same (behaviours 5969–5970) | ✅ |
-| … pending list row while open | none | "Replicate 1" row with an error badge at once | ✗ **P2-A7** (skb) |
+| … pending list row while open | none | "Replicate 1" row with an error badge at once | ✅ P2-A7 (9703d9b9, qa verified 21d6a89e; skasm 10-27: the Replicate row with its badge) |
 | Parts to find match in = plate, ✓ | pins in both free Ø10 holes; "Replicate 1" ▸ Part 2 <5>, <6>, Mate features (2) | same structure (behaviours 5973) | ✅ |
 | Linear pattern opened from tool search | red "Linear pattern 1" row with a red dot at once, kept after picking Instances | same (behaviours 5985) | ✅ |
 | Mate connector (Ctrl+M) | "Mate connector 1": On entity ▾, Origin entity, ☐ Realign, ☐ Move, flip / reorient; Realign adds Primary / Secondary axis entity; Move adds X / Y / Z 0 mm, Rotate about Z ▾, Rotation angle 0 deg | same (behaviours 5960–5965) | ✅ |
