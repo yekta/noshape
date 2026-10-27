@@ -529,7 +529,20 @@ impl PartStudioView {
         let at = section_box(s).occlude();
         if let Some((input, _)) = &self.ui.section_offset_edit {
             let field = gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right);
-            return Some(at.id("section-offset-field").px(px(3.)).child(gpui_kit::base::input::input_frame(div().size_full().flex().items_center().child(field))).into_any_element());
+            return Some(
+                at.id("section-offset-field")
+                    .px(px(3.))
+                    // Esc typing in the box closes it (Esc is bound to Cancel only outside fields); the next Esc
+                    // cancels the dialog (live asm/2373).
+                    .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                        if ev.keystroke.key == "escape" {
+                            cx.stop_propagation();
+                            this.close_section_dialog(false, window, cx);
+                        }
+                    }))
+                    .child(gpui_kit::base::input::input_frame(div().size_full().flex().items_center().child(field)))
+                    .into_any_element(),
+            );
         }
         // The drawn box takes the click.
         Some(
