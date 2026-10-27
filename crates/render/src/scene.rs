@@ -294,6 +294,11 @@ pub struct Instance {
     /// Only rendered into the pick buffer (invisible but selectable), e.g.
     /// B-rep vertices and sketch regions; highlights are drawn separately.
     pub pick_only: bool,
+    /// Picked like a see-through mesh: drawn first in the pick pass and
+    /// without depth writes, so what lies behind it wins (a datum plane's
+    /// border, as its fill: seen edge-on its near side would hide the
+    /// sketch curves lying in the plane).
+    pub pick_behind: bool,
     /// Added to the geometry's local (1-based) pick ids; 0 keeps them as-is.
     pub pick_base: u32,
     /// The section cap hatch's part id (Onshape: occurrence id + mesh group
@@ -400,6 +405,7 @@ impl Instance {
             over_lines: false,
             on_top: false,
             pick_only: false,
+            pick_behind: false,
             pick_base: 0,
             hatch_id: 0,
             zebra: None,
@@ -455,6 +461,11 @@ impl Instance {
     }
     pub fn pick_only(mut self) -> Self {
         self.pick_only = true;
+        self
+    }
+    /// See [`Instance::pick_behind`].
+    pub fn pick_behind(mut self) -> Self {
+        self.pick_behind = true;
         self
     }
     pub fn with_color(mut self, c: [f32; 4]) -> Self {

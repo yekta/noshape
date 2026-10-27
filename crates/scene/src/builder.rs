@@ -640,7 +640,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             if !opts.faint_planes {
                 scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([fill[0], fill[1], fill[2], theme::pick(theme::viewport::PLANE_FILL_ALPHA, theme::viewport_dark::PLANE_FILL_ALPHA)]).ignore_clip().unlit().layer(5));
             }
-            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([outline[0], outline[1], outline[2], outline_alpha]).ignore_clip().layer(5));
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([outline[0], outline[1], outline[2], outline_alpha]).ignore_clip().pick_behind().layer(5));
             // Its name in the plane at the top-left corner, inside: over the
             // plane's fill, hidden by parts in front (live selection/02);
             // Isolate takes the names away (qa5 KB3).

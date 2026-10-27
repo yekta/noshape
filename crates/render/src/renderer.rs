@@ -1160,7 +1160,9 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
             draw(pass, &lists.points, &pipelines.point_pick);
             return;
         }
+        let (behind, lines): (Vec<usize>, Vec<usize>) = lists.lines.iter().partition(|&&i| instances[i].pick_behind);
         draw(pass, &flat, &pipelines.mesh_pick_transparent);
+        draw(pass, &behind, &pipelines.line_pick_behind);
         draw(pass, &lit, &pipelines.mesh_pick_transparent);
         draw(pass, &lists.opaque, &pipelines.mesh_pick);
         // Pick-only meshes (e.g. sketch regions drawn on a part face) after
@@ -1168,7 +1170,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         // region lying exactly on a face wins even though the two
         // triangulations differ; parts in front of a region still win.
         draw(pass, &lists.pick_priority, &pipelines.mesh_pick_priority);
-        draw(pass, &lists.lines, &pipelines.line_pick);
+        draw(pass, &lines, &pipelines.line_pick);
         draw(pass, &lists.points, &pipelines.point_pick);
     } else {
         // Before the faces: its cheap fragments fill the depth of each part's
@@ -1679,6 +1681,8 @@ struct Pipelines {
     mesh_sample: Lazy,
     mesh_pick_priority: Lazy,
     line_pick: Lazy,
+    /// [`Instance::pick_behind`] lines: no depth writes.
+    line_pick_behind: Lazy,
     point_pick: Lazy,
     /// Opaque image texels (alpha >= 0.5), writing depth.
     image_opaque: Lazy,
@@ -1717,6 +1721,7 @@ impl Pipelines {
             &self.mesh_sample,
             &self.mesh_pick_priority,
             &self.line_pick,
+            &self.line_pick_behind,
             &self.point_pick,
             &self.image_opaque,
             &self.image_soft,
@@ -2307,6 +2312,7 @@ impl Renderer {
         let mesh_sample = lazy(LayoutKind::Main, P { label: "mesh-sample", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }, PLAIN);
         let mesh_pick_priority = lazy(LayoutKind::Main, P { label: "mesh-pick-p", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: priority, samples: 1 }, PLAIN);
         let line_pick = lazy(LayoutKind::Main, P { label: "line-pick", vs: "vs_line", fs: "fs_line_pick", buffers: LINE_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: 1 }, PLAIN);
+        let line_pick_behind = lazy(LayoutKind::Main, P { label: "line-pick-b", vs: "vs_line", fs: "fs_line_pick", buffers: LINE_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: 1 }, PLAIN);
         let point_pick = lazy(LayoutKind::Main, P { label: "point-pick", vs: "vs_point", fs: "fs_point_pick", buffers: POINT_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: 1 }, PLAIN);
         let image_opaque = lazy(LayoutKind::Image, P { label: "image", vs: "vs_image", fs: "fs_image_opaque", buffers: IMAGE_BUFFERS, format: COLOR_FORMAT, blend: premul, depth: Some((true, ge)), bias: none, samples: msaa }, PLAIN);
         let image_soft = lazy(LayoutKind::Image, P { label: "image-soft", vs: "vs_image", fs: "fs_image_soft", buffers: IMAGE_BUFFERS, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }, PLAIN);
@@ -2337,6 +2343,7 @@ impl Renderer {
             mesh_sample,
             mesh_pick_priority,
             line_pick,
+            line_pick_behind,
             point_pick,
             image_opaque,
             image_soft,

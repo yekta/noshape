@@ -524,6 +524,51 @@ fn a_silhouette_beside_an_edge_on_facet_is_drawn() {
     assert!((0..w).all(|x| f.bgra[((h / 2 * w + x) * 4) as usize] > 200), "both facets toward the viewer: nothing");
 }
 
+/// EDGE-ON-PLANE-PICK: a sketch line lying in a datum plane seen edge-on picks (live: "Edge of Sketch 1", the
+/// plane's edge line never takes the hover). The plane's border is drawn first in the pick pass without depth
+/// writes, as its fill: its near side lay in front of the line and hid it.
+#[test]
+fn a_line_in_an_edge_on_plane_picks_over_the_plane() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (200u32, 150u32);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Front);
+    cam.fit_sphere(glam::DVec3::ZERO, 0.03, w as f64 / h as f64);
+    // The Right plane (x = 0), edge-on in Front view: fill and border, pick id 1.
+    let e = 0.02f32;
+    let corners = [[0.0, -e, -e], [0.0, e, -e], [0.0, e, e], [0.0, -e, e]];
+    let fill = MeshData { positions: corners.to_vec(), normals: vec![[1.0, 0.0, 0.0]; 4], pick_ids: vec![1; 4], indices: vec![0, 1, 2, 0, 2, 3] };
+    let mut border = LineData::default();
+    border.push_polyline(&[corners[0], corners[1], corners[2], corners[3], corners[0]], [0, 0, 0, 0], 1, 2.0, 0);
+    // The sketch line in it, from z = 0 up, pick id 2.
+    let mut line = LineData::default();
+    line.push_polyline(&[[0.0, 0.0, 0.0], [0.0, 0.0, 0.015]], [0, 0, 0, 255], 2, 1.5, 0);
+    let scene = Scene {
+        instances: vec![
+            Instance::new(Drawable::Mesh(r.upload_mesh(&fill))).with_color([0.8, 0.85, 0.9, 0.2]).unlit().layer(5),
+            Instance::new(Drawable::Lines(r.upload_lines(&border))).with_color([0.3, 0.5, 0.8, 0.35]).pick_behind().layer(5),
+            Instance::new(Drawable::Lines(r.upload_lines(&line))).with_color([0.0, 0.0, 0.0, 1.0]).layer(10),
+        ],
+        ..Default::default()
+    };
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
+    let pick = f.pick.unwrap();
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let at = |z: f64| {
+        let s = cam.project(glam::DVec3::new(0.0, 0.0, z), vp, 0.03).unwrap();
+        pick.id_at(s.x as i32, s.y as i32).unwrap_or(0)
+    };
+    assert_eq!(at(0.0075), 2, "the middle of the line picks the line");
+    assert_eq!(at(-0.01), 1, "below the line the plane's edge picks the plane");
+}
+
 /// GPU-TEST-SEGV: renderers made and dropped on many threads at once (tests in one binary run in parallel) share
 /// the process's one device; each renders its frame. With a Vulkan instance and device per renderer, lavapipe
 /// crashed the process now and then inside libvulkan.
