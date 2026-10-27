@@ -3116,3 +3116,14 @@ fn shown_sketch_takes_its_appearance() {
     drawing.sheets[0].view_mut(ViewId(1)).unwrap().sketch_appearances = true;
     assert!(red(&drawing) > 0, "ticked: the sketch in red");
 }
+
+/// Adjust linestyle patterns in sheet mm (live "dx linestyle dash lengths":
+/// its PDF, and its DXF LTYPEs × $LTSCALE 0.5 in inches); Dashes scales them.
+#[test]
+fn adjust_linestyle_patterns_as_live() {
+    assert_eq!(LinePattern::Dashed.dashes(1.0), vec![6.35, 3.175]);
+    assert_eq!(LinePattern::Dashed.dashes(2.0), vec![12.7, 6.35]);
+    assert_eq!(LinePattern::Phantom.dashes(1.0), vec![3.175, 0.635, 0.635, 0.635, 0.635, 0.635]);
+    assert_eq!(LinePattern::Center.dashes(1.0), vec![5.715, 1.143, 1.143, 1.143]);
+    assert!((LinePattern::Dotted.dashes(1.0).iter().sum::<f64>() - 3.175).abs() < 1e-12);
+}

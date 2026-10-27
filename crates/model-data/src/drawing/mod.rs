@@ -3440,14 +3440,18 @@ impl LinePattern {
         }
     }
 
-    /// The dash pattern (mm) at scale `k`.
+    /// The dash pattern (sheet mm) at scale `k` (Dashes). Live (behaviours
+    /// "dx linestyle dash lengths"; its DXF LTYPEs × $LTSCALE 0.5, in
+    /// inches): Dashed 0.25 / 0.125 in, Phantom 0.125 + two 0.025 dashes,
+    /// Center 0.225 + 0.045, Dotted a dot every 0.125 in (drawn as a dash
+    /// as long as a 0.35 mm line is wide).
     pub fn dashes(self, k: f64) -> Vec<f64> {
         let base: &[f64] = match self {
             LinePattern::Solid => &[],
-            LinePattern::Phantom => &[8.0, 1.5, 1.5, 1.5, 1.5, 1.5],
-            LinePattern::Center => &[8.0, 1.5, 1.5, 1.5],
-            LinePattern::Dashed => &[3.0, 1.5],
-            LinePattern::Dotted => &[0.3, 1.0],
+            LinePattern::Phantom => &[3.175, 0.635, 0.635, 0.635, 0.635, 0.635],
+            LinePattern::Center => &[5.715, 1.143, 1.143, 1.143],
+            LinePattern::Dashed => &[6.35, 3.175],
+            LinePattern::Dotted => &[0.35, 2.825],
         };
         base.iter().map(|d| d * k.max(0.01)).collect()
     }
