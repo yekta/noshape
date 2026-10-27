@@ -1285,8 +1285,12 @@ pub fn hidden_edges_dashed(display: &StudioDisplay, faces: &[Reference], up: &Up
 /// outline itself; the inner edges stay black). A face boundary used by one
 /// face only (a sheet's) always shows.
 pub fn hover_silhouette(display: &StudioDisplay, faces: &[Reference], up: &Uploader) -> Option<Instance> {
-    const WIDTH: f32 = 2.6;
-    let k = theme::lin(theme::viewport::PREHIGHLIGHT);
+    silhouette(display, faces, theme::viewport::PREHIGHLIGHT, 2.6, up)
+}
+
+/// The silhouette of `faces` (see [`hover_silhouette`]) in `color`, `width` px.
+pub fn silhouette(display: &StudioDisplay, faces: &[Reference], color: u32, width: f32, up: &Uploader) -> Option<Instance> {
+    let k = theme::lin(color);
     let want: std::collections::HashSet<&Reference> = faces.iter().collect();
     let q = |p: &[f32; 3]| [(p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64, (p[2] * 1e6).round() as i64];
     let mut out = SilhouetteData::default();
@@ -1296,7 +1300,7 @@ pub fn hover_silhouette(display: &StudioDisplay, faces: &[Reference], up: &Uploa
         if !lit.contains(&true) {
             continue;
         }
-        out.segments.extend(silhouette_edges(m).segments.into_iter().filter(|s| lit.get(s.pick_id as usize - 1) == Some(&true)).map(|s| SilhouetteSegment { pick_id: 0, width: WIDTH, ..s }));
+        out.segments.extend(silhouette_edges(m).segments.into_iter().filter(|s| lit.get(s.pick_id as usize - 1) == Some(&true)).map(|s| SilhouetteSegment { pick_id: 0, width, ..s }));
         // Each face's boundary sides (used once within the face, by
         // position: a periodic face's seam is used twice) with the facet
         // normal, then paired across faces.
@@ -1325,7 +1329,7 @@ pub fn hover_silhouette(display: &StudioDisplay, faces: &[Reference], up: &Uploa
         for users in sides.values() {
             let Some(&(fi, n1, a, b)) = users.iter().find(|u| lit[u.0]) else { continue };
             let n2 = users.iter().find(|u| u.0 != fi).map_or(-n1, |u| u.1);
-            out.segments.push(SilhouetteSegment { a, b, n1: n1.into(), n2: n2.into(), pick_id: 0, width: WIDTH });
+            out.segments.push(SilhouetteSegment { a, b, n1: n1.into(), n2: n2.into(), pick_id: 0, width });
         }
     }
     (!out.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_silhouettes(&out))).with_color([k[0], k[1], k[2], 1.0]).unpickable().layer(12))

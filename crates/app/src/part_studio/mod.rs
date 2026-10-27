@@ -1189,6 +1189,19 @@ impl PartStudioView {
             // (psui-prv-05a/b: the region's tint reads the same at 0 and 1).
             // with_highlights' own overlays come before the extra ones; of
             // those only the end cap (extrude_end_cap) is a highlight.
+            // A part the feature removes (Delete part's Entities to delete):
+            // its silhouette from the model before it, on top at any slider
+            // position (live 10-27: (255,192,76), 2 px, no inner edges).
+            if let (Some(e), Some(before)) = (&self.edit, &self.ui.preview_before) {
+                let faces: Vec<Reference> = e.dialog.read(cx).active_refs().iter().filter_map(|r| match r {
+                    Reference::Body(b) if self.display.body(b).is_none() => before.body(b).map(|d| d.face_refs.clone()),
+                    _ => None,
+                }).flatten().collect();
+                if let Some(mut s) = (!faces.is_empty()).then(|| scene_builder::silhouette(before, &faces, crate::theme::viewport::REMOVED_OUTLINE, 2.0, self.gpu.uploader())).flatten() {
+                    s.compare = noshape_render::scene::compare::POST;
+                    scene.instances.push(s);
+                }
+            }
             for (k, inst) in scene.instances.iter_mut().enumerate().take(extra_end).skip(built.static_instances) {
                 let fill = matches!(inst.drawable, noshape_render::Drawable::Mesh(_)) && inst.layer == scene_builder::HIGHLIGHT_FILL_LAYER;
                 if (k < highlights_end && (fill || (matches!(inst.drawable, noshape_render::Drawable::Lines(_)) && inst.layer == scene_builder::HIGHLIGHT_LINES_LAYER))) || (k >= highlights_end && fill) {
