@@ -123,6 +123,12 @@ impl<'a> SheetPick<'a> {
     }
 
     /// The view under a sheet point (smallest containing view rectangle).
+    /// The smallest view whose box holds sheet point `s` (no margin): a
+    /// crop profile's view, not a neighbour whose corner snaps nearby.
+    pub fn view_containing(&self, s: [f64; 2]) -> Option<ViewId> {
+        smallest_view(self.built?, s, 0.0).map(|p| p.id)
+    }
+
     pub fn view_at(&self, s: [f64; 2]) -> Option<ViewId> {
         if let Some(h) = self.hover
             && let Some(Sel::View(v)) = self.sel_of_pick(h)

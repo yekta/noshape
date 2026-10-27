@@ -48,7 +48,7 @@ impl DrawingEditor {
             },
             Tool::BrokenOut { done: false, .. } => "Click the points of the closed profile in a view; Enter or double-click to close it",
             Tool::BrokenOut { .. } => "Enter the depth in the panel, or click a point that sets the depth (up to entity)",
-            Tool::CropPoly { .. } => "Click the points of the crop boundary in a view; Enter or double-click to finish",
+            Tool::CropPoly { .. } => "Click the points of the crop boundary in a view, then the first point again to close it",
             Tool::DatumTarget { anchor: None } => "Click the target point",
             Tool::DatumTarget { .. } => "Click to place the target callout",
             Tool::GdtLeader { .. } => "Click the edge or point the leader points to",
@@ -118,6 +118,14 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ clicks
 
+    /// Sheet point `c` is on a profile's first point (view coordinates), within
+    /// 8 px on screen.
+    fn on_first_point(&self, view: ViewId, points: &[[f64; 2]], c: [f64; 2]) -> bool {
+        let (Some(pl), Some(first)) = (self.placement(view), points.first()) else { return false };
+        let f = pl.to_sheet(*first);
+        (f[0] - c[0]).hypot(f[1] - c[1]) * self.zoom <= 8.0
+    }
+
     pub fn more_tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let c = self.cursor;
         match self.tool.clone() {
@@ -149,7 +157,19 @@ impl DrawingEditor {
                 if self.crop_add_point_click(c, cx) {
                     return true;
                 }
-                if let Some(pp) = self.view_point(parent) {
+                // A click on the first point closes the profile (live).
+                if let Some(view) = parent
+                    && points.len() >= 3
+                    && self.on_first_point(view, &points, c)
+                {
+                    let crop = if spline { Crop::Spline(points) } else { Crop::Polygon(points) };
+                    self.crop_done(view, crop, cx);
+                    return true;
+                }
+                // The first point: the view under it, snapping only to that
+                // view's points (a neighbour's corner nearby took the crop).
+                let target = parent.or_else(|| self.pk().view_containing(c));
+                if let Some(pp) = self.view_point(target) {
                     if self.crop_refused(pp.view) {
                         return true;
                     }

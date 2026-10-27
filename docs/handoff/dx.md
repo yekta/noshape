@@ -105,6 +105,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Live answered the derived colour question: the target's next default colour unless the source part's appearance is
   explicit (then carried); ours now does both.
 
+## Drawing walk 10-27 afternoon (green 0537ac91, :131, /root/dx-scratch/w2/s*.png)
+- Verified ✅: V36, V37, V39, V51, V66, V67, V72 (drawing.md). Fixed from it: Rotate view ▸ on views whose alignment
+  is suppressed (one rule `Sheet::turns_freely` for the menu and the API), live's rotate guide (no bubble); crop
+  profiles close on a click on their first point, and the first point no longer hands the crop to a neighbour view.
+- Open: Adjust linestyle's Dashed looks shorter than live 446 (asked live). Move to sheet shows a "Moved to Sheet2"
+  bubble and switches sheet (live: not described).
+
 ## Speed (PLAN 2.7: ≥ 2× faster than live; crates/ops/tests/dx_perf.rs, `--ignored --nocapture`)
 - Drawing of the qa5 bracket with the 4 standard views (drawing_create, Suggested views: every view computed):
   **178 ms** median of 5 (first 360 ms), dev build, 10-27 14:15; one more Front view 13 ms. Live: pending
