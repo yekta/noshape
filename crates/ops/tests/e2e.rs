@@ -1223,8 +1223,17 @@ fn import_every_format() {
         let file = scratch(&format!("import_all_{i}"));
         // STL has no units: written and read in millimeters.
         let e = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": f, "file": file.to_str().unwrap(), "units": "Millimeter" }));
-        let path = e["file"].as_str().unwrap().to_string();
+        let mut path = e["file"].as_str().unwrap().to_string();
         assert!(std::path::Path::new(&path).extension().is_some(), "{f}: the format's extension is added: {e}");
+        // OBJ downloads as a zip of the .obj and its .mtl (live): import the .obj.
+        if *f == "OBJ" {
+            assert!(path.ends_with(".zip"), "{e}");
+            let dir = scratch(&format!("import_all_{i}_obj"));
+            let _ = std::fs::create_dir_all(&dir);
+            let names = noshape_kernel::extract_zip(std::path::Path::new(&path), &dir).unwrap();
+            assert!(names.iter().any(|n| n.ends_with(".mtl")), "{names:?}");
+            path = dir.join(names.iter().find(|n| n.ends_with(".obj")).unwrap()).to_string_lossy().to_string();
+        }
         // STL in millimeters; OBJ is written (and read by default) in meters.
         let mut args = json!({ "files": [path.clone()] });
         if *f == "STL" {
