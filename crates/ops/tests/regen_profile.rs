@@ -124,3 +124,49 @@ fn regen_profile() {
         eprintln!("profile: #{} {ms:.1} ms  {name} ({ty})  in {model}", i + 1);
     }
 }
+
+/// REGEN-SPEED (core): live's 30-feature part, Extrude 1's depth edited
+/// 10 → 12 and committed, as the app does (the regenerator's cache keeps the
+/// features before the edit). Prints each re-evaluated feature's time.
+/// `cargo test --release -p noshape-ops --test all regen_profile::edit_commit_profile -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn edit_commit_profile() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf");
+    let tmp = std::env::temp_dir().join(format!("noshape-edit-profile-{}.noshape", std::process::id()));
+    std::fs::copy(dir.join("live-30-features.noshape"), &tmp).unwrap();
+    let s = noshape_ops::session::Session::open(&tmp).unwrap();
+    let units = s.doc.settings.units;
+    let ps0 = s.doc.tabs.iter().find_map(|t| if let TabContent::PartStudio(ps) = &t.content { Some(ps.clone()) } else { None }).unwrap();
+    let opts = RegenOptions::default();
+    // Five commits, each on a fresh regenerator that has the part as it was
+    // (the features before Extrude 1 cached): medians per feature.
+    let mut per: std::collections::BTreeMap<String, Vec<f32>> = Default::default();
+    let mut totals = Vec::new();
+    for _ in 0..5 {
+        let mut reg = Regenerator::new();
+        let _ = reg.regenerate(&ps0, &ConfigValues::default(), &units, &opts);
+        let mut ps = ps0.clone();
+        let ex = ps.features.iter_mut().find(|f| f.name == "Extrude 1").unwrap();
+        ex.params.set("depth", ParamValue::Expr(ExprValue::new("12 mm")));
+        let t = Instant::now();
+        let r = reg.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        totals.push(t.elapsed().as_secs_f64() * 1e3);
+        for (f, s) in ps.features.iter().zip(&r.display.features) {
+            per.entry(f.name.clone()).or_default().push(s.time_ms);
+        }
+    }
+    let median = |v: &mut Vec<f32>| {
+        v.sort_by(|a, b| a.total_cmp(b));
+        v[v.len() / 2]
+    };
+    totals.sort_by(|a, b| a.total_cmp(b));
+    let mut rows: Vec<(String, f32)> = per.into_iter().map(|(n, mut v)| (n, median(&mut v))).collect();
+    let sum: f32 = rows.iter().map(|r| r.1).sum();
+    rows.sort_by(|a, b| b.1.total_cmp(&a.1));
+    eprintln!("edit commit (depth 10 → 12), median of 5: {:.0} ms total (min {:.0}), features {sum:.0} ms", totals[2], totals[0]);
+    for (n, ms) in rows.iter().take(15) {
+        eprintln!("  {ms:6.1} ms  {n}");
+    }
+    let _ = std::fs::remove_file(&tmp);
+}
