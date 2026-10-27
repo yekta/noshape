@@ -113,11 +113,12 @@ Delete | Unpack folder). Still open (tickets): EXT-DIRECTION, CHIP-HOVER, FOLDER
 in Extrude's regions field picks the face), ORD-BASE.
 
 ## Verified on green dc3a03f6 (2026-10-27 01:55)
-qa5's P1-17 (mass properties blank with nothing measured, no toast), P1-18 (⚠ badge on a missing-selection row);
+qa5's P1-17 (mass properties blank with nothing measured, no toast), P1-18 (⚠ badge on a missing-selection row), P2-D3
+(drawing Note tool previews "NOTE" at the pointer);
 TAB-NO-PREVIEW (with X focus); API-DERIVED-BY-NAME; crash documents open with the watcher CLI 19555ca3 (app pending
 the next green, bf8aaee2). EXT-DIRECTION still open with focus.
 
-## To verify on the next green (fixed on main by qa5 after green 4d2f6b0c; P1-17, P1-18 done)
+## To verify on the next green (fixed on main by qa5 after green 4d2f6b0c; P1-17, P1-18, P2-D3 done)
 P1-1, P1-8, P1-9, P1-17, P1-18, P2-A2…A8, P2-D2, P2-D3 (docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26
 stop"; P2-A3 / A7 / A8 have no unit test: Esc in explode editing, the pending Replicate row, no "instance(s) created"
 bubble).
