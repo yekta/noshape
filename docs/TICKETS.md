@@ -4,6 +4,13 @@ T2 failures and QA findings, by area and priority (docs/PRIORITIES.md). The area
 fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now deterministic and fast
 (docs/TESTS.md).
 
+
+## Release v0.4.9 (qa, 2026-10-27 02:55)
+- [ ] P0 release/v0.4.9 (2650df69 = 34ab98f7 + CI fix) predates bf8aaee2 (kernel crash guard + OCCT patch 0002), dx's
+  crash markers / open rollback (DOC-POISON) and 7a04ba4d (SHELL-WALLS / SHELL-FILLETED-BOX). As cut it ships the Shell
+  and Fillet segfaults that leave documents unopenable (SHELL-SLAB-GPF, FILLET-SEGV: regressions since v0.4.8; the green
+  app 4d2f6b0c crashed on them, 19555ca3 doesn't). Cherry-pick those fixes onto the release branch (PLAN 2.2) or cut from
+  19555ca3. qa will smoke the release build when CI publishes it.
 ## Core modelling (core)
 - [ ] P0 COMMIT-LATENCY edit commit on tests/perf/live-30-features.noshape is over budget on main (perf.yml run
   40421862773, abac9266, 10-27): "commit shown in" 315–378 ms (macOS 14) and 241–635 ms (macOS 15), budget ≤ 200 ms
