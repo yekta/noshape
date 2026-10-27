@@ -316,6 +316,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 EXPORT-MESH-SHARED 3MF and OBJ exports don't share vertices between faces: tests/perf/live-30-features.noshape
+  › Part 1 › Export… › 3MF (Medium) gives 3700 vertices for 2495 distinct positions and 4994 triangles, and 2332 of 14982
+  directed edges have no opposite by vertex index (every face is its own island), although by position the mesh is
+  closed (volume 60774.111 vs exact 60779.484, as the STL). 3MF Core requires a manifold mesh by index (each edge used by
+  exactly two triangles), so slicers report open edges / "repaired errors"; OBJ ("# noshape-kernel OBJ export") has the same
+  per-face vertices (and is written in metres, v 0.003 = 3 mm). Weld vertices per body (keep sharp normals through vn
+  in OBJ; 3MF carries no normals). Files /root/qa-scratch/exp/l30.{3mf,obj,stl} (qa 2026-10-27, build 16cdcf6d)
 - [x] verified dc3a03f6 (qa: name accepted, Derived OK 12000 mm³) (dx 5ef64eb8: a tab name or id is resolved, a non-Part-Studio tab refused with `params.partStudio`) P2 API-DERIVED-BY-NAME feature_add importDerived with `partStudio: "Part Studio 1"` (the tab's name) is accepted and
   the feature fails "Error regenerating."; only the tab id works. Accept the name as tab_* ops do, or refuse it as an
   invalid_argument naming the expected id (main CLI ~20:18) (qa 2026-10-26)
