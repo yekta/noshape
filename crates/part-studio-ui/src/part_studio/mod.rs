@@ -3183,20 +3183,13 @@ impl PartStudioView {
         let pal = p();
         // Parts list.
         // Parts list sections by body kind (Onshape: Parts, Surfaces, Curves).
-        use noshape_model::display::BodyKind;
         // Composite parts have their own list (Help PartStudio__composite_part:
         // "the composite part in the Composite parts list"); an open one's
         // members stay in Parts.
         let sections: Vec<(&'static str, &'static str, Vec<AnyElement>, Vec<BodyId>)> = [("Parts", "parts"), ("Composite parts", "composites"), ("Surfaces", "surfaces"), ("Curves", "curves")]
             .into_iter()
             .map(|(title, key)| {
-                let of_kind = |b: &noshape_model::display::BodyDisplay| match key {
-                    "composites" => b.composite.is_some(),
-                    _ if b.composite.is_some() => false,
-                    "parts" => b.kind == BodyKind::Solid,
-                    "surfaces" => b.kind == BodyKind::Surface,
-                    _ => matches!(b.kind, BodyKind::Wire | BodyKind::Point),
-                };
+                let of_kind = |b: &noshape_model::display::BodyDisplay| part_section(b) == key;
                 let bodies: Vec<&noshape_model::display::BodyDisplay> = self.display.bodies.iter().filter(|b| of_kind(b)).collect();
                 // Filtered (live 10-27): the parts the query drops are one
                 // "..." row per run; the title keeps counting them all.
@@ -3580,7 +3573,10 @@ impl PartStudioView {
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 if ev.click_count() >= 2 {
                     this.start_part_rename(id1.clone(), window, cx);
+                } else if ev.modifiers().shift && this.edit.is_none() && this.ui.part_anchor.is_some() {
+                    this.select_part_range(&id1, cx);
                 } else {
+                    this.ui.part_anchor = Some(id1.clone());
                     this.pick_body(id1.clone(), cx);
                 }
             }))
@@ -5875,6 +5871,16 @@ mod default_row_tests {
         }
         assert!(kind_matches(PickKind::SketchCurve, &r, field("helix", "edge")));
         assert!(!kind_matches(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
+    }
+}
+
+/// The Parts list section a body is listed in: "parts", "composites", "surfaces" or "curves".
+pub(super) fn part_section(b: &noshape_model::display::BodyDisplay) -> &'static str {
+    match b.kind {
+        _ if b.composite.is_some() => "composites",
+        noshape_model::display::BodyKind::Solid => "parts",
+        noshape_model::display::BodyKind::Surface => "surfaces",
+        _ => "curves",
     }
 }
 

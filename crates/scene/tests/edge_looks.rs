@@ -207,3 +207,26 @@ fn edge_and_face_highlights_look_as_live() {
         assert_eq!(get("face selected + hovered"), fs, "{dpr}x: hovering a selected face changes nothing");
     }
 }
+
+/// PART-HOVER-RED: with the edited feature failing, its inputs (the selection) are drawn red, but a hovered part
+/// (`accent`: its faces and edges) keeps the hover colour (live: the light orange part outline).
+#[test]
+fn a_failing_feature_leaves_the_hovered_part_unred() {
+    let r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    use noshape_render::scene::state;
+    let display = block();
+    let (edge, top) = top_front(&display);
+    let up = r.uploader();
+    let mut cache = GpuCache::default();
+    let built = builder::build(&display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() }, &mut cache, &up);
+    let scene = builder::with_highlights(&built, &display, std::slice::from_ref(&edge), None, std::slice::from_ref(&top), Vec::new(), true, &up);
+    let flags = |r: &Reference| built.picks.ids_for(r).iter().map(|&id| scene.states[id as usize]).collect::<Vec<u32>>();
+    assert!(flags(&edge).iter().all(|f| f & state::ERROR != 0), "the failing feature's input is red: {:?}", flags(&edge));
+    assert!(flags(&top).iter().all(|f| f & state::ACCENT != 0 && f & state::ERROR == 0), "the hovered part's face isn't: {:?}", flags(&top));
+}

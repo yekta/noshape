@@ -119,6 +119,8 @@ pub struct UiState {
     pub list_hover: Option<FeatureId>,
     /// Last clicked feature (anchor of Shift+click ranges).
     pub anchor: Option<FeatureId>,
+    /// Last clicked part row (anchor of the Parts list's Shift+click ranges).
+    pub part_anchor: Option<BodyId>,
     /// Last viewport click (double-click detection).
     pub last_click: Option<(Reference, Instant)>,
     /// Focus of the feature list (rollback bar arrow keys).
@@ -483,6 +485,7 @@ impl UiState {
             filter_query: String::new(),
             list_hover: None,
             anchor: None,
+            part_anchor: None,
             last_click: None,
             list_focus: cx.focus_handle(),
             list_scroll: ScrollHandle::new(),
@@ -955,6 +958,26 @@ impl PartStudioView {
             _ => PickKind::Face,
         };
         PickTarget { reference: r.clone(), kind, anchor: None }
+    }
+
+    /// Shift+click in the Parts list (live "qa4 round 4 s5 multi-part menu" (1), like the feature list): the rows
+    /// from the last clicked part to this one, as the list shows them, join the selection.
+    pub(super) fn select_part_range(&mut self, b: &BodyId, cx: &mut Context<Self>) {
+        let order: Vec<BodyId> = ["parts", "composites", "surfaces", "curves"]
+            .iter()
+            .flat_map(|key| self.display.bodies.iter().filter(move |d| super::part_section(d) == *key))
+            .filter(|d| interaction::filter_row(&self.ui.filter_query, &d.name, d.hidden) != Some(false))
+            .map(|d| d.id.clone())
+            .collect();
+        let selected: Vec<BodyId> = self.selection.iter().filter_map(|r| if let Reference::Body(x) = r { Some(x.clone()) } else { None }).collect();
+        for x in interaction::list_click(&order, &selected, self.ui.part_anchor.as_ref(), b, true) {
+            let r = Reference::Body(x);
+            if !self.selection.contains(&r) {
+                self.selection.push(r);
+            }
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
     }
 
     /// Parts list click: dialog field (parts only) or additive selection.

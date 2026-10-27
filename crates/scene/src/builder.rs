@@ -967,9 +967,10 @@ pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteDa
 /// Apply hover/selection state and rebuild highlight overlays for pick-only
 /// elements. Returns a new scene sharing all static GPU buffers.
 /// `error`: the edited feature fails. Live (behaviours "URGENT (10-22)",
-/// part-studio/2022, 2028): its inputs are drawn red instead of the orange
-/// selection: edges and face outlines red, sketch regions red-outlined with
-/// a light red fill, no face fill.
+/// part-studio/2022, 2028): its inputs (`selection`) are drawn red instead of
+/// the orange selection: edges and face outlines red, sketch regions
+/// red-outlined with a light red fill, no face fill. `accent` (hovered parts
+/// and rows) keeps its colour.
 #[allow(clippy::too_many_arguments)]
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, error: bool, up: &Uploader) -> Scene {
     let _t = noshape_render::perf::scope("s.with_highlights");
@@ -1087,8 +1088,11 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             }
         }
     };
+    // Hovered parts and list rows, never red: the error colours only the
+    // failing feature's inputs (qa PART-HOVER-RED: a part hovered for an
+    // empty Split was drawn red; live's part hover is the light orange).
     for r in accent {
-        mark(r, if error { state::ERROR } else { state::ACCENT }, &mut scene);
+        mark(r, state::ACCENT, &mut scene);
     }
     // A whole selected part: Onshape's lighter part amber (live #c09039 …
     // #f0b850, part-studio/09), not a selected face's.
