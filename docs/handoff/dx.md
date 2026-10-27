@@ -42,6 +42,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D8/D14/D16.
 
 ## Requests to the lead
+- App (after the app split): crates/app/src/part_studio/sheet_metal_panel.rs has the same logic as the new
+  `noshape_ops::sheetmetal` (joint_rows, joint_edit_index, insert_joint_edit, bend_faces, bend_row_order, plain, the
+  Radius / K factor edit, Convert to rip, Move up / down); its handlers should call that module (dx can do it once the
+  app crates are settled). Until then the two copies must change together.
 - App (after the app split; 1 line each): crates/app/src/part_studio/in_context.rs:788 Update context should call
   `noshape_ops::in_context::refreshed_in(&old, &result, asm, None, Some(<this Part Studio's tab>))` (a Part Studio
   created in context then updates like live; today the app keeps refusing it), and the app's out-of-date dot should use

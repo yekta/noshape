@@ -326,6 +326,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
+- **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
@@ -5745,6 +5746,108 @@ Examples:
 | `faces` | array of string | required | Faces to flatten. |
 | `rips` | array of string |  | Rip edges. |
 | `export` | object |  | {"format": "DXF" \| "SVG" \| "STL" \| "PARASOLID", "file": path, "inner_edges": bool, "position": mate connector id, "angle": degrees, "offset": length, "origin": vertex id} |
+
+### sheetmetal
+
+#### sheetmetal_table
+
+The sheet metal table: a model's bends (radius, angle, direction, K factor) and other joints.
+
+The "Sheet metal table and flat view" panel: the sheet metal models (the Sheet metal context select), and for `model` its Bends rows in the table's order (name as "Bend A" / "Hem B", radius, angle, Up / Down from the flat pattern's bend lines, K factor, the bend's face ids) and its Other joints rows (name, style).
+
+Examples:
+
+```json
+{}
+{"model": "Sheet metal model 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
+| `model` | string |  | The sheet metal model: its feature (id or name, e.g. "Sheet metal model 1"). Default: the panel's, the first by name. |
+
+#### sheetmetal_edit_bend
+
+Change a bend's radius or K factor in the sheet metal table (adds a Modify joint) (edits the document (one undoable history entry)).
+
+Typing in a Bends row's Radius or K factor cell: a "Modify joint" of that bend with the value overridden, at the rollback bar or before the model's Finish sheet metal model; a later edit of the same bend changes that Modify joint (live). One edit per field ("Modify joint"). A bare radius is in the workspace's length unit.
+
+Examples:
+
+```json
+{"bend": "Bend A", "radius": "3 mm"}
+{"bend": 0, "k_factor": 0.45}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
+| `model` | string |  | The sheet metal model: its feature (id or name, e.g. "Sheet metal model 1"). Default: the panel's, the first by name. |
+| `bend` | string or integer | required | The Bends row: its name ("Bend A", "Hem B") or its index in sheetmetal_table's `bends`. |
+| `radius` | string or number |  | New inner radius ("3 mm", 3). |
+| `k_factor` | string or number |  | New K factor (0.45). |
+
+#### sheetmetal_move_bend
+
+Move a bend up or down in the sheet metal table (edits the document (one undoable history entry)).
+
+A Bends row's menu › Move up / Move down (the table's order is stored with the Part Studio). One edit ("Move up" / "Move down").
+
+Examples:
+
+```json
+{"bend": "Bend B", "by": -1}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
+| `model` | string |  | The sheet metal model: its feature (id or name, e.g. "Sheet metal model 1"). Default: the panel's, the first by name. |
+| `bend` | string or integer | required | The Bends row: its name ("Bend A", "Hem B") or its index in sheetmetal_table's `bends`. |
+| `by` | one of -1, 1 | required | -1: up, 1: down. |
+
+#### sheetmetal_convert_to_rip
+
+Convert a bend to a rip (a Modify joint: Rip, Edge joint) (edits the document (one undoable history entry)).
+
+A Bends row's menu › Convert <bend> to rip: a Modify joint of the bend set to Rip / Edge joint, at the rollback bar or before the model's Finish. One edit ("Convert joint to rip.").
+
+Examples:
+
+```json
+{"bend": "Bend A"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
+| `model` | string |  | The sheet metal model: its feature (id or name, e.g. "Sheet metal model 1"). Default: the panel's, the first by name. |
+| `bend` | string or integer | required | The Bends row: its name ("Bend A", "Hem B") or its index in sheetmetal_table's `bends`. |
+
+#### sheetmetal_export_flat
+
+Export a sheet metal part's flat pattern as DXF or SVG.
+
+The flat view's menu › Export DXF/DWG of Flat pattern of <part>…: the flat pattern as live writes it (outline, bend centerlines on the SHEETMETAL_BEND_LINES_UP / _DOWN layers), or an SVG of it.
+
+Examples:
+
+```json
+{"part": "Part 1", "file": "/tmp/flat.dxf"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
+| `part` | string | required | The sheet metal part (`body:…` id or name). |
+| `file` | string | required | Where to write it. |
+| `format` | one of `DXF`, `SVG` |  | File format. |
 
 ### render
 

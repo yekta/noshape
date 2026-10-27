@@ -109,6 +109,11 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("sketch_insert_dxf", &[r##"{"sketch": "Sketch 1", "file": "/tmp/outline.dxf", "units": "Millimeter"}"##]),
     ("sketch_insert_image", &[r##"{"sketch": "Sketch 1", "file": "/tmp/logo.png", "points": [[0, 0], [40, 20]]}"##]),
     // variables, configurations
+    ("sheetmetal_table", &[r##"{}"##, r##"{"model": "Sheet metal model 1"}"##]),
+    ("sheetmetal_edit_bend", &[r##"{"bend": "Bend A", "radius": "3 mm"}"##, r##"{"bend": 0, "k_factor": 0.45}"##]),
+    ("sheetmetal_move_bend", &[r##"{"bend": "Bend B", "by": -1}"##]),
+    ("sheetmetal_convert_to_rip", &[r##"{"bend": "Bend A"}"##]),
+    ("sheetmetal_export_flat", &[r##"{"part": "Part 1", "file": "/tmp/flat.dxf"}"##]),
     ("variable_list", &[r##"{}"##]),
     ("variable_create", &[r##"{"name": "wall", "value": "2.5 mm"}"##, r##"{"name": "holes", "kind": "NUMBER", "value": 4}"##]),
     ("variable_set", &[r##"{"variable": "wall", "value": "3 mm"}"##, r##"{"name": "wall", "value": "3 mm"}"##, r##"{"variable": "wall", "new_name": "thickness"}"##]),
