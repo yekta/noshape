@@ -3133,7 +3133,8 @@ impl Default for ViewTabProps {
             tangent_color: None,
             hatch_spacing: 2.5,
             section_prefix: "SECTION".into(),
-            detail_line: 2,
+            // Live dom/drawing-properties-views.txt: Phantom.
+            detail_line: 0,
             detail_prefix: "DETAIL".into(),
             detail_style: 0,
             detail_show_profile: true,
