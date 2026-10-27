@@ -370,6 +370,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     / `.CIRCLE` and `EDGE && ALLOWS_DIRECTION`: the "EDGE && LINE -> linear edges" refinement in the comment never
     yields model edges, because `EDGE` doesn't carry LINEAR_EDGE / CIRCULAR_EDGE (or SOLID_EDGE). The
     `std_edge_filters_match_builtin` test only covers std features that have a built-in twin, so it misses custom code.
+  - Confirmed in the app (green e8858e61, qa 11:00; doc /root/qa-scratch/tickets/cfs2.noshape: the lpd part plus a line
+    in Sketch 3 on Front, four custom features with 2-pick "Edges" fields). Clicking the part's top front edge and the
+    sketch line:
+    | Filter | part edge | sketch line |
+    |---|---|---|
+    | A `EDGE && ALLOWS_AXIS` | nothing | "Edge of Sketch 3" |
+    | B `EDGE && GeometryType.LINE` | nothing | (not tried) |
+    | C `EDGE && BodyType.SOLID` | "Edge of Extrude 1" | — |
+    | D `ALLOWS_AXIS` alone | "Edge of Extrude 1" | — |
+    B (`EDGE && GeometryType.LINE`) is probably the most common edge filter in custom features. Screenshots:
+    tickets/pick-green-custom-{A-axisedge-model-none,A-axisedge-sketch-only,B-edge-line-none,C-edge-solid-ok,D-allows-axis-ok}.png
 - [ ] P3 PERF-TOTAL-MISMATCH the Performance panel and its Regeneration times dialog give two totals for the same studio:
   live-30-features.noshape just opened (regen from cache) → panel "Total regeneration time: 46ms", stopwatch › dialog footer
   "Total regen time: 314ms" (the per-feature column sums to ~314). Live reads one number in both places (behaviours 17899);
