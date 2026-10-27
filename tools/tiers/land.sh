@@ -43,11 +43,26 @@ echo "== clippy"; out=$(cargo clippy $args --all-targets -- -D warnings 2>&1); r
 echo "== tests"; out=$(cargo test $args --no-fail-fast 2>&1); rc=$?
 [ $rc -eq 0 ] || { echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E 'FAILED|panicked|^error|SIGSEGV|signal:|Caused by' -A2 | head -60; fail "tests"; }
 if echo "$pkgs" | grep -qwE 'noshape|noshape-ops|noshape-cli'; then echo "== T0"; tools/tiers/t0.sh > /tmp/land-t0-$$.log 2>&1 || { tail -20 /tmp/land-t0-$$.log; fail "T0"; }; fi
-# Main may have moved while we tested: rebase again; re-test only if the new commits touch our crates.
+# Main may have moved while we tested: rebase again; re-test only if the new commits touch the crates we edit.
+tested=$(git rev-parse origin/main)
 git fetch -q origin
 if ! git merge-base --is-ancestor origin/main HEAD; then
+  moved=$(git diff --name-only "$tested" origin/main)
   git rebase -q origin/main || { git rebase --abort; fail "rebase conflict after testing"; }
-  echo "rebased on newer main; re-run land.sh if those commits touched: $pkgs"
+  # A commit in a crate this change edits wasn't tested with it (10-27: a `far` landed in kernel beside the kernel
+  # change that made `far` illegal, and main went red): test again. Clashes across crates are rarer; the watcher catches them.
+  hit=$(python3 - "$moved" "$changed" <<'P'
+import json, subprocess, sys, os
+moved, changed = sys.argv[1].split('\n'), sys.argv[2].split('\n')
+meta = json.loads(subprocess.run(['cargo', 'metadata', '--format-version', '1', '--no-deps'], capture_output=True, text=True).stdout)
+root = meta['workspace_root']
+dirs = [os.path.dirname(os.path.relpath(p['manifest_path'], root)) for p in meta['packages']]
+crate = lambda f: 'manifest' if f in ('Cargo.toml', 'Cargo.lock') else next((d for d in dirs if f.startswith(d + '/')), None)
+ours = {crate(c) for c in changed} - {None}
+print(' '.join(c for c in moved if crate(c) in ours))
+P
+)
+  [ -z "$hit" ] || fail "main changed the crates you edit while testing ($hit): re-run land.sh"
 fi
 git push -q origin HEAD:main || fail "push rejected (main moved): re-run land.sh"
 echo "LANDED $(git rev-parse --short HEAD)"
