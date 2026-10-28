@@ -158,10 +158,12 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     bool flip = false;
     if (!pl.IsNull())
     {
-      const gp_Pln p = pl->Pln().Transformed(loc.Transformation());
+      // Its normal X × Y (a left-handed frame's is minus its axis).
+      const gp_Pln  p = pl->Pln().Transformed(loc.Transformation());
+      const gp_Ax3& a = p.Position();
       b.surfaces.push_back(0);
       push3(b.surfaces, p.Location().XYZ());
-      push3(b.surfaces, p.Axis().Direction().XYZ());
+      push3(b.surfaces, a.XDirection().Crossed(a.YDirection()).XYZ());
       for (int k = 0; k < 5; ++k)
         b.surfaces.push_back(0);
     }
