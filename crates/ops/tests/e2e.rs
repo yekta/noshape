@@ -4023,6 +4023,10 @@ fn parasolid_assembly_export_and_import_round_trip() {
     assert_eq!(inst.len(), 2, "{inst:?}");
     let moved = |i: &Value| (0..3).all(|k| (num(&i["translation"][k]) - num(&before["translation"][k])).abs() < 1e-6);
     assert!(inst.iter().any(moved), "the pin where the assembly had it: {inst:?} vs {before}");
+    // Named after their parts (ASM-XT-ROUNDTRIP-NAMES: "<1>", "<2>").
+    let mut names: Vec<&str> = inst.iter().map(|i| i["name"].as_str().unwrap()).collect();
+    names.sort();
+    assert_eq!(names, ["Part 1 <1>", "Part 2 <1>"], "{inst:?}");
 }
 
 /// Live's own STEP assembly (qa4 r4 s5): the tabs, parts and placements live makes.

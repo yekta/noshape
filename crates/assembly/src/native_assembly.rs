@@ -460,6 +460,15 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
     }
     ps.insert_at_rollback(f);
     let bodies = bodies_of_parts(&ps, units, |k| k == crate::display::BodyKind::Solid);
+    // An occurrence without a name (our own Parasolid export writes none;
+    // ASM-XT-ROUNDTRIP-NAMES: they came in as "<1>", "<2>") takes its
+    // part's name in the new Part Studio ("Part 1 <1>").
+    let part_names: std::collections::HashMap<BodyId, String> = if instances.iter().any(|i| i.name.trim().is_empty()) {
+        let regen = Regenerator::new().regenerate(&ps, &ConfigValues::default(), units, &RegenOptions::default());
+        regen.context.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect()
+    } else {
+        Default::default()
+    };
     // Live (dx speed (2)): a STEP / Parasolid assembly's Part Studio keeps
     // its name on a repeat import (no " (1)"); the Assembly is numbered.
     let studio_name = if *step { format!("{stem} parts") } else { unique_name(doc, &format!("{stem} parts")) };
@@ -467,16 +476,17 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
     let mut asm = Assembly::default();
     // Numbered per name, as instance names are (two parts both named
     // "Part 1" give "Part 1 <1>" and "Part 1 <2>").
-    let mut count: std::collections::HashMap<&str, u32> = std::collections::HashMap::new();
+    let mut count: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     // The occurrences in the reverse of the file's order (live: pvz-rot-asm's
     // <1> is its second, turned occurrence), as native assemblies.
     for inst in instances.iter().rev() {
         // The part's own solid (mesh parts whose mesh is open are composites: not instanced).
         let Some(body) = bodies.get(inst.part).cloned().flatten() else { continue };
-        let n = count.entry(inst.name.as_str()).or_insert(0);
+        let name = if inst.name.trim().is_empty() { part_names.get(&body).cloned().unwrap_or_default() } else { inst.name.clone() };
+        let n = count.entry(name.clone()).or_insert(0);
         *n += 1;
         let id = InstanceId(asm.next_id());
-        asm.instances.push(Instance::new(id, format!("{} <{}>", inst.name, n), InstanceSource::Part { studio, body, config: ConfigValues::default() }, Placement::from_dmat4(&inst.transform)));
+        asm.instances.push(Instance::new(id, format!("{name} <{n}>"), InstanceSource::Part { studio, body, config: ConfigValues::default() }, Placement::from_dmat4(&inst.transform)));
     }
     let name = if *step { unique_name(doc, if root.is_empty() { stem } else { root }) } else { pvz_assembly_name(doc, root) };
     let assembly = doc.add_tab(&name, TabContent::Assembly(Box::new(asm)));
