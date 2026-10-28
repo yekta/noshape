@@ -2317,11 +2317,14 @@ OpOut op_thicken(const OcShape& s, double t1, double t2)
         fail_op("thicken failed");
       if (volume_props(sa).Mass() < volume_props(sb).Mass())
         std::swap(sa, sb);
-      BRepAlgoAPI_Cut cut(sa, sb);
-      if (cut.HasErrors() || !cut.IsDone())
+      ShapeList    ca, cb;
+      TopoDS_Shape r;
+      HHist        ch;
+      ca.Append(sa);
+      cb.Append(sb);
+      if (!quick_boolean(1, ca, cb, false, r, ch))
         fail_op("thicken failed");
-      merge_into(h, history_of({sa, sb}, cut));
-      TopoDS_Shape r = cut.Shape();
+      merge_into(h, ch);
       if (!BRepCheck_Analyzer(r).IsValid() || !(volume_props(r).Mass() > 0))
         fail_op("thicken failed");
       return make_result(args, r, h.get());
@@ -2374,11 +2377,15 @@ OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness,
     HHist                hist = history_of(args, off);
     const TopoDS_Shape&  outer = thickness < 0 ? solid.shape : offs;
     const TopoDS_Shape&  inner = thickness < 0 ? offs : solid.shape;
-    BRepAlgoAPI_Cut      cut(outer, inner);
-    if (cut.HasErrors() || !cut.IsDone())
-      fail_op("shell failed: " + algo_errors(cut));
-    hist->Merge(history_of({outer, inner}, cut));
-    return make_result(args, cut.Shape(), hist.get());
+    ShapeList            co, ci;
+    TopoDS_Shape         r;
+    HHist                ch;
+    co.Append(outer);
+    ci.Append(inner);
+    if (!quick_boolean(1, co, ci, false, r, ch))
+      fail_op("shell failed: the cut of the offset failed");
+    hist->Merge(ch);
+    return make_result(args, r, hist.get());
   }
   BRepOffsetAPI_MakeThickSolid mk;
   mk.MakeThickSolidByJoin(solid.shape, to_list(faces.items), thickness, 1e-6, BRepOffset_Skin,

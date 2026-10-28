@@ -404,8 +404,9 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   (`rust_boolean_keep`), so a chain of Booleans converts a body once. Please keep these when you touch OcShape.
 - shell.cpp: the six plain BRepAlgoAPI Fuse / Cut / Common blocks (slabs' fuse and cut, the two draft ones' cut and
   fuse) call `quick_boolean` (rust_boolean.cpp): noshape's Boolean where it takes the inputs, else the same OCCT
-  call; recorded with NOSHAPE_RECORD_BOOLEANS (path `direct` / `direct_rust`). features.cpp's are next; tell me if
-  you'd rather convert them yourself.
+  call; recorded with NOSHAPE_RECORD_BOOLEANS (path `direct` / `direct_rust`). features.cpp: Thicken's cut and
+  Shell's offset cut too (10-28 20:00). The fillet / chamfer fallbacks' cuts (balls, wedges, chamfer planes) are
+  left as they are: their tools are cylinders at angles the Rust Boolean declines anyway.
 - Found while testing (OCCT, not ours, affects `RayClassifier`): BRepClass_FaceClassifier's answer for a point
   0.04 mm from an 800-edge comb face's boundary depended on which edge the face's wire starts with (the fin plate's
   y=20 face after a unify; `classify_point` gave Outside for a point inside). Results of the Rust Boolean now start

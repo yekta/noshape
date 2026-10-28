@@ -4,6 +4,7 @@
 #include "internal.hpp"
 
 #include <chrono>
+#include <optional>
 #include <cstdlib>
 
 #include <BRepAlgoAPI_Common.hxx>
@@ -11,6 +12,7 @@
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
+#include <BRepLib.hxx>
 #include <TopExp_Explorer.hxx>
 #include <BRepTools_History.hxx>
 #include <ElCLib.hxx>
@@ -285,7 +287,8 @@ const TopoDS_Shape& input(const std::vector<const OcShape*>& srcs, uint32_t arg,
   return srcs[arg]->map(kind)(static_cast<int>(index) + 1);
 }
 
-TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs, double tol, occ::handle<BRepTools_History>& hist)
+// The result's shapes and history: `out`, `hist`; or why not.
+const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, double tol, TopoDS_Shape& result, occ::handle<BRepTools_History>& hist)
 {
   const BrepBody& b = r.body;
   BRep_Builder    bb;
@@ -314,11 +317,20 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
     occ::handle<Geom_Curve> c;
     TopLoc_Location         loc;
     double                  f = 0, l = 0, tol_e = tol;
+    // A piece's ends at its edge's own: its parameters there (as OCCT keeps them).
+    std::optional<double> at0, at1;
     if (kind == 1)
     {
-      const TopoDS_Edge src = TopoDS::Edge(input(srcs, r.edge_origin[3 * i + 1], TopAbs_EDGE, r.edge_origin[3 * i + 2]));
+      const TopoDS_Edge src = TopoDS::Edge(input(srcs, r.edge_origin[3 * i + 1], TopAbs_EDGE, r.edge_origin[3 * i + 2]).Oriented(TopAbs_FORWARD));
       c                     = BRep_Tool::Curve(src, loc, f, l);
       tol_e                 = BRep_Tool::Tolerance(src);
+      TopoDS_Vertex a, z;
+      TopExp::Vertices(src, a, z);
+      const bool closed = a.IsSame(z);
+      if (!a.IsNull() && BRep_Tool::Pnt(a).Distance(p0) < 1e-12)
+        at0 = f;
+      if (!z.IsNull() && BRep_Tool::Pnt(z).Distance(p1) < 1e-12 && !(closed && v0 != v1))
+        at1 = l;
     }
     else if (cv[0] == 0)
       c = new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)));
@@ -349,6 +361,10 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
       t0             = ElCLib::Parameter(g, p0);
       t1             = ElCLib::Parameter(g, p1);
     }
+    if (at0)
+      t0 = *at0;
+    if (at1)
+      t1 = *at1;
     if (!(t0 < t1))
       fail_op("brep: an edge against its curve");
     TopoDS_Edge e;
@@ -365,9 +381,9 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
     const TopoDS_Face& src = TopoDS::Face(input(srcs, r.face_origin[3 * i + 1], TopAbs_FACE, r.face_origin[3 * i + 2]));
     TopLoc_Location                 loc;
     const occ::handle<Geom_Surface> s0  = BRep_Tool::Surface(src, loc);
-    // A new face on a cylinder or cone gets its own surface (OCCT's pieces do; a plane's is shared).
-    const bool                      curved = occ::down_cast<Geom_Plane>(s0).IsNull();
-    const occ::handle<Geom_Surface> s = kind == 0 || !curved ? s0 : occ::handle<Geom_Surface>(occ::down_cast<Geom_Surface>(s0->Copy()));
+    // On its input face's surface: the input's edges have their curves there already. (Never change an input
+    // shape: other threads may be reading it.)
+    const occ::handle<Geom_Surface>& s = s0;
     const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(s);
     const occ::handle<Geom_ConicalSurface>     cn = occ::down_cast<Geom_ConicalSurface>(s);
     const bool                                 round = !cs.IsNull() || !cn.IsNull();
@@ -399,26 +415,19 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
       std::vector<int>  uses(ne, 0);
       for (uint32_t k = b.loop_uses[b.face_loops[i]]; k < b.loop_uses[b.face_loops[i + 1]]; ++k)
         ++uses[b.uses[k] / 2];
-      // The input's own edges: their curves on the input face's surface, onto this one's.
+      // The input's own edges: their curves on the surface (one without any: declined).
       double umin = r.face_u0[i];
       bool   placed = false;
       for (size_t k = 0; k < ne; ++k)
       {
         double f0 = 0, f1 = 0;
         occ::handle<Geom2d_Curve> pc;
-        if (uses[k] == 0 || r.edge_origin[3 * k] != 0 || (pc = BRep_Tool::CurveOnSurface(es[k], s0, loc, f0, f1)).IsNull())
+        if (uses[k] == 0 || r.edge_origin[3 * k] != 0)
           continue;
+        if ((pc = BRep_Tool::CurveOnSurface(es[k], s0, loc, f0, f1)).IsNull())
+          return "an input edge without its curve on a face";
         if (BRep_Tool::IsClosed(es[k], s0, loc))
-        {
-          double g0 = 0, g1 = 0;
-          const occ::handle<Geom2d_Curve> pr = BRep_Tool::CurveOnSurface(TopoDS::Edge(es[k].Reversed()), s0, loc, g0, g1);
-          bb.UpdateEdge(es[k], pc, pr, s, loc, BRep_Tool::Tolerance(es[k]));
-          bb.Range(es[k], s, loc, f0, f1);
           continue;
-        }
-        bb.UpdateEdge(es[k], pc, s, loc, BRep_Tool::Tolerance(es[k]));
-        // (An apex has no curve to take its range from.)
-        bb.Range(es[k], s, loc, f0, f1);
         // Its angles: from where the Boolean's start, by whole turns to where the input's edges' curves are
         // (not a seam's: it lies at either end; not an apex's: it spans them).
         if (!placed && !BRep_Tool::Degenerated(es[k]))
@@ -497,6 +506,12 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
       w.Closed(true);
       bb.Add(f, w);
     }
+    // On a plane, the curves of the edges it made stored, as OCCT's pieces have them (mass properties
+    // integrate along them; a big face's would cost more than they're worth).
+    if (!round && b.loop_uses[b.face_loops[i + 1]] - b.loop_uses[b.face_loops[i]] <= 64)
+      for (uint32_t k = b.loop_uses[b.face_loops[i]]; k < b.loop_uses[b.face_loops[i + 1]]; ++k)
+        if (r.edge_origin[3 * (b.uses[k] / 2)] != 0)
+          BRepLib::BuildPCurveForEdgeOnPlane(es[b.uses[k] / 2], f);
     fs[i] = rev ? TopoDS::Face(f.Reversed()) : f;
   }
   TopoDS_Compound out;
@@ -549,7 +564,8 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
     else
       hist->AddGenerated(in, output(h[4], h[5]));
   }
-  return out;
+  result = out;
+  return nullptr;
 }
 
 } // namespace
@@ -600,7 +616,8 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       return decline(nullptr);
   }
   const KernelTimer timer("boolean.rust.build");
-  out = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, hist);
+  if (const char* why = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, out, hist))
+    return decline(why);
   t_built.body = std::move(r.body);
   t_built.tol  = max_tol;
   t_built.set  = true;

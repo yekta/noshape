@@ -114,7 +114,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         set_rust_boolean(None);
         let mut d = Summary::of(&r).differences(&c.summary);
         // The history's hash rounds centroids: compare with OCCT's records within 2 µm.
-        if d == ["history differs"] && o.as_ref().is_ok_and(|o| same_records(&records(&r), &records(o))) {
+        if d == ["history differs"] && std::env::var_os("NOSHAPE_BREP_EXACT").is_none() && o.as_ref().is_ok_and(|o| same_records(&records(&r), &records(o))) {
             d.clear();
         }
         if !d.is_empty() {
@@ -200,27 +200,32 @@ fn brep_small_cases_match_occt() {
     assert_eq!(accepted, n, "cases declined:\n{report}");
 }
 
-/// The same result, faces in the same order with the same history, run alone and on 16 threads at once.
+/// The same result, faces in the same order with the same history, run alone and on 8 and 16 threads at once
+/// on the very same input shapes (their OcShapes and kept bodies shared): every small case. The switches it
+/// sets (`set_rust_boolean_only`) are each thread's own. (10-28: input edges the Boolean gave curves on new
+/// faces' surfaces were changed under other threads' reads; it no longer changes any input.)
 #[test]
-#[ignore = "T2: intermittent on vibe2's watcher (10-28 20:36, threads got a decline: expect at line 211); bool fixes and moves it back"]
 fn brep_results_are_the_same_on_any_thread() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/brep");
-    let names = cases(&dir);
-    let c = names.iter().filter_map(|n| load(&dir, n)).max_by_key(|c| c.target_faces).expect("cases");
-    let run = || {
-        set_rust_boolean_only(true);
-        let r = boolean(c.op, &c.objects, &c.tools, &c.opts).expect("noshape's Boolean takes it");
-        set_rust_boolean_only(false);
-        let faces: Vec<DVec3> = r.shape.sub_shapes(ShapeType::Face).iter().map(|f| f.centroid().unwrap_or_default()).collect();
-        (faces, r.history.records)
-    };
-    let alone = run();
-    let all: Vec<_> = std::thread::scope(|s| {
-        let hs: Vec<_> = (0..16).map(|_| s.spawn(run)).collect();
-        hs.into_iter().map(|h| h.join().expect("a thread")).collect()
-    });
-    for r in all {
-        assert_eq!(r, alone);
+    for name in cases(&dir) {
+        let c = load(&dir, &name).expect("a case");
+        let run = || {
+            set_rust_boolean_only(true);
+            let r = boolean(c.op, &c.objects, &c.tools, &c.opts).unwrap_or_else(|e| panic!("{name}: noshape's Boolean declined: {} ({e})", last_rust_decline()));
+            set_rust_boolean_only(false);
+            let faces: Vec<DVec3> = r.shape.sub_shapes(ShapeType::Face).iter().map(|f| f.centroid().unwrap_or_default()).collect();
+            (faces, r.history.records)
+        };
+        let alone = run();
+        for n in [8, 16] {
+            let all: Vec<_> = std::thread::scope(|s| {
+                let hs: Vec<_> = (0..n).map(|_| s.spawn(run)).collect();
+                hs.into_iter().map(|h| h.join().expect("a thread")).collect()
+            });
+            for r in all {
+                assert_eq!(r, alone, "{name} on {n} threads");
+            }
+        }
     }
 }
 
