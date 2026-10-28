@@ -235,7 +235,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 |---|---|---|---|---|
 | 11.1 | Fillet: click a vertex, radius box; later vertices make equal fillets | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 11.2 | Fillet: click two curves | H:sketch_fillet | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
-| 11.3 | Fillet keeps a virtual sharp with the coincident constraints | H:sketch_fillet | ✅ |  |
+| 11.3 | Fillet keeps a virtual sharp with the coincident constraints | H:sketch_fillet | ✅ | 0.4.10+ / da18f886 10-28 (fixed L outline, Shift+F R30: the corner keeps its virtual sharp point; tickets/fillet-typed-smaller-da18.png) |
 | 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ❌ (SKETCH-FILLET-STUCK-RADIUS) (T:sm; red preview, radius manipulator)  ❌ (SKETCH-FILLET-STUCK-RADIUS) ❌ (SKETCH-FILLET-STUCK-RADIUS)| 0.4.10+ / 77870dd4 10-28 |
 | 11.5 | Chamfer: vertex or two lines, two distance dimensions (45° default) | H:sketch_chamfer | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.6 | Trim: click removes up to the nearest intersections, whole curve when unbounded | H:trim | ✅ | 0.4.10+ / 2d9a275c 10-27 |
