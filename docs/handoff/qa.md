@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **16:00 update (green ff379982):** fuzz 75 (ff37) alive. New: P3 ASM-INTERFERENCE-NONE (assembly check with no
+  clash stays blank; live says "No interferences"), P3 DWG-CELL-MERGE-GREY. Live answered 1563 (Surface extrude takes
+  no part edges = ours). Asked live: C17 pattern after subassembly dissolve, drawing select-first constraint keys, View
+  properties Esc / overlapping Table dialog, table Shift+click (behaviours 1497 vs 5500 disagree). Verified: assembly
+  T12 / L14 / L23 / C17 / C20 (C9 → ticket), drawing CR2 / CR3 / CR8 / CR13 / T12 / T17 / T18 / K13 (tool-first) / A36 /
+  A38 / A39 / V43 / V53 / TB6.
 - **15:40 update (green ff379982, copied 15:40):** INSTANCE-NAME-STALE verified (Pin <1>). Live answered 1561
   (offset toast is sticky → TOAST-AUTOHIDE withdrawn) and 1562 (Show all = ours; live adds "Show all parts" → new P3
   SHOW-ALL-PARTS-MENU). Asked live: does Surface extrude take part edges (ours doesn't highlight them). Verified more
