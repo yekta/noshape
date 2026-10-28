@@ -505,6 +505,10 @@ impl FeatureStudioView {
             // Our Onshape menu replaces the kit's (see `symbol_menu`).
             st.set_context_menu_enabled(false);
             st.set_highlighter_factory(Rc::new(move |_| Some(Box::new(ScriptHighlighter { tab, ..Default::default() }) as Box<dyn InputHighlighter>)), cx);
+            // std's completions in Ace's list (live qa-fsc-A-list).
+            st.lsp_mut().completion_provider = Some(Rc::new(crate::fs_complete::Completions));
+            st.lsp_mut().completion_menu.ace = true;
+            st.lsp_mut().completion_menu.max_width = px(300.);
             st
         });
         // Onshape opens a new studio with the caret on line 4, under the import.

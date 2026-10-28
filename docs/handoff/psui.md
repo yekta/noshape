@@ -120,6 +120,11 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   part-studio.md 5.4b verified (✅), 6.16 note updated. perf.yml 40599691793 (psui-perf-pulled, 2x orbit): macOS 14
   p1 72.8 / p2 67.6 against r1 69.0 / r2 69.8 fps, macOS 15 p 50.3 / 60.6 against r 57.7 / 44.8 (noise ±15): pulled
   lines gain nothing measurable, the branch stays unlanded. Live asked: 2.23 Alt+click, a sketch on a face that is gone.
+- 10-28 00:30–01:40: b3bb479b Isolate "Expand: distance" as Onshape's isolate manager (bundle rule in behaviours
+  "psui (2026-10-28) Isolate"), part-studio 10.6 / 5.8 verified; FS-EDITOR-COMPLETE (P2): feature-studio-ui
+  fs_complete.rs (std index from the doc comments, hump matching, Ace ranking, call snippets) + the vendored completion
+  menu's `ace` look (gpui-component completion_menu.rs, caret_anchored.rs `shift_x`; gpui-base: a non-trigger
+  keystroke closes the list). Unknowns asked in REQUESTS (psui 10-28): snippets of non-op functions, `;`, placeholders.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 

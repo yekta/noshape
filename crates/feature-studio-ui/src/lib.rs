@@ -12,6 +12,7 @@ use noshape_preferences_ui::preferences_window;
 
 pub mod feature_studio;
 pub mod feature_studio_hooks;
+mod fs_complete;
 mod fs_import;
 pub mod fs_notices;
 mod fs_profile;

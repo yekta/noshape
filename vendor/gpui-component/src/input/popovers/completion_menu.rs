@@ -15,7 +15,7 @@ const POPOVER_GAP: Pixels = px(4.);
 use crate::{
     ActiveTheme, IndexPath, Selectable, actions, h_flex,
     input::{
-        self, EditorState,
+        self, EditorState, RopeExt as _,
         popovers::{CaretAnchoredPopup, editor_popover, render_markdown},
     },
     label::Label,
@@ -24,6 +24,7 @@ use crate::{
 
 struct ContextMenuDelegate {
     query: SharedString,
+    ace: bool,
     menu: Entity<CompletionMenu>,
     items: Vec<Rc<CompletionItem>>,
     selected_ix: usize,
@@ -47,6 +48,40 @@ struct CompletionMenuItem {
     children: Vec<AnyElement>,
     selected: bool,
     highlight_prefix: SharedString,
+    ace: bool,
+}
+
+/// The label's letters the query matches, as Ace's list: the query anywhere in
+/// the label (case-insensitive), else its letters in order, each the first of
+/// either case after the previous one.
+fn ace_hits(label: &str, query: &str) -> Vec<std::ops::Range<usize>> {
+    if query.is_empty() {
+        return Vec::new();
+    }
+    let lower = label.to_lowercase();
+    if lower.len() == label.len()
+        && let Some(at) = lower.find(&query.to_lowercase())
+    {
+        return vec![at..at + query.len()];
+    }
+    let chars: Vec<(usize, char)> = label.char_indices().collect();
+    let mut from = 0;
+    let mut hits = Vec::new();
+    for c in query.chars() {
+        let lo = c.to_lowercase().next().unwrap_or(c);
+        let up = c.to_uppercase().next().unwrap_or(c);
+        let Some(i) = chars[from.min(chars.len())..]
+            .iter()
+            .position(|(_, x)| *x == lo || *x == up)
+            .map(|p| p + from)
+        else {
+            return hits;
+        };
+        let (b, ch) = chars[i];
+        hits.push(b..b + ch.len_utf8());
+        from = i + 1;
+    }
+    hits
 }
 
 impl CompletionMenuItem {
@@ -57,7 +92,13 @@ impl CompletionMenuItem {
             children: vec![],
             selected: false,
             highlight_prefix: "".into(),
+            ace: false,
         }
+    }
+
+    fn ace(mut self, ace: bool) -> Self {
+        self.ace = ace;
+        self
     }
 
     fn highlight_prefix(mut self, s: impl Into<SharedString>) -> Self {
@@ -84,6 +125,61 @@ impl ParentElement for CompletionMenuItem {
 impl RenderOnce for CompletionMenuItem {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let item = self.item;
+        if self.ace {
+            // Ace's colours (live qa-fsc-A-list: matched #1c1c1c, the rest
+            // #666, the kind #8b8b8b, the selected row #d0dbe5).
+            // The provider's matched letters (`data`: `[[start, end], …]` byte
+            // ranges), else the query's.
+            let given: Option<Vec<std::ops::Range<usize>>> =
+                item.data.as_ref().and_then(|d| d.as_array()).map(|a| {
+                    a.iter()
+                        .filter_map(|r| {
+                            let r = r.as_array()?;
+                            let (s, e) = (r.first()?.as_u64()? as usize, r.get(1)?.as_u64()? as usize);
+                            (s < e && e <= item.label.len()).then_some(s..e)
+                        })
+                        .collect()
+                });
+            let highlights: Vec<_> = given
+                .unwrap_or_else(|| ace_hits(&item.label, &self.highlight_prefix))
+                .into_iter()
+                .map(|r| {
+                    (
+                        r,
+                        HighlightStyle {
+                            color: Some(gpui::rgb(0x1c1c1c).into()),
+                            ..Default::default()
+                        },
+                    )
+                })
+                .collect();
+            return h_flex()
+                .id(self.ix)
+                .h(px(20.))
+                .px(px(4.))
+                .justify_between()
+                .gap_2()
+                .font_family(cx.theme().mono_font_family.clone())
+                .text_size(px(13.))
+                .line_height(px(20.))
+                .text_color(gpui::rgb(0x666666))
+                .when(self.selected, |this| this.bg(gpui::rgb(0xd0dbe5)))
+                .child(
+                    div()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .child(StyledText::new(item.label.clone()).with_highlights(highlights)),
+                )
+                .when_some(item.detail.clone(), |this, detail| {
+                    this.child(
+                        div()
+                            .flex_none()
+                            .text_color(gpui::rgb(0x8b8b8b))
+                            .child(detail),
+                    )
+                })
+                .children(self.children);
+        }
 
         let deprecated = item.deprecated.unwrap_or(false);
         let matched_len = item
@@ -143,7 +239,11 @@ impl ListDelegate for ContextMenuDelegate {
         _: &mut Context<ListState<Self>>,
     ) -> Option<Self::Item> {
         let item = self.items.get(ix.row)?;
-        Some(CompletionMenuItem::new(ix.row, item.clone()).highlight_prefix(self.query.clone()))
+        Some(
+            CompletionMenuItem::new(ix.row, item.clone())
+                .highlight_prefix(self.query.clone())
+                .ace(self.ace),
+        )
     }
 
     fn set_selected_index(
@@ -193,6 +293,7 @@ impl CompletionMenu {
             let view = cx.entity();
             let menu = ContextMenuDelegate {
                 query: SharedString::default(),
+                ace: false,
                 menu: view,
                 items: vec![],
                 selected_ix: 0,
@@ -336,6 +437,10 @@ impl CompletionMenu {
                 .unwrap_or(0);
 
             this.delegate_mut().query = self.query.clone();
+            this.delegate_mut().ace = self
+                .editor
+                .upgrade()
+                .is_some_and(|e| e.read(cx).lsp().completion_menu.ace);
             this.delegate_mut().set_items(items);
             this.set_selected_index(Some(IndexPath::new(0)), window, cx);
             this.set_item_to_measure_index(IndexPath::new(longest_ix), window, cx);
@@ -362,9 +467,45 @@ impl Render for CompletionMenu {
         // The anchor is resolved in the popup's deferred prepaint from the
         // input's current-frame geometry; the content below is built there.
         let configured_max = editor.read(cx).lsp().completion_menu.max_width;
+        let ace = editor.read(cx).lsp().completion_menu.ace;
+        // The identifier before the caret (the word the list completes).
+        let query: SharedString = if ace {
+            let state = editor.read(cx);
+            let offset = state.cursor();
+            let text = state.text();
+            let start = text.line_start_offset(text.offset_to_point(offset).row);
+            let before = text.slice(start..offset).to_string();
+            let word_len: usize = before
+                .chars()
+                .rev()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .map(char::len_utf8)
+                .sum();
+            before[before.len() - word_len..].to_string().into()
+        } else {
+            SharedString::default()
+        };
         let list = self.list.clone();
         let menu = cx.weak_entity();
 
+        // Ace's list starts under the word being completed, not the caret
+        // (live qa-fsc-A-list: its text lines up with the word).
+        let word = if ace && !query.is_empty() {
+            let run = gpui::TextRun {
+                len: query.len(),
+                font: gpui::font(cx.theme().mono_font_family.clone()),
+                color: gpui::black(),
+                background_color: None,
+                underline: None,
+                strikethrough: None,
+            };
+            _window
+                .text_system()
+                .shape_line(query.clone(), cx.theme().mono_font_size, &[run], None)
+                .width
+        } else {
+            px(0.)
+        };
         deferred(CaretAnchoredPopup::new(
             self.editor.clone(),
             move |anchor, window, cx| {
@@ -391,7 +532,12 @@ impl Render for CompletionMenu {
                             .test_support()
                             .max_w(max_width)
                             .min_w(px(120.))
-                            .child(List::new(&list).max_h(MAX_MENU_HEIGHT)),
+                            .when(ace, |this| this.w(max_width).p_0().rounded_none())
+                            .child(List::new(&list).max_h(if ace {
+                                px(160.)
+                            } else {
+                                MAX_MENU_HEIGHT
+                            })),
                     )
                     .when_some(selected_documentation, |this, documentation| {
                         let mut doc = match documentation {
@@ -405,8 +551,9 @@ impl Render for CompletionMenu {
                         this.child(
                             div().child(
                                 editor_popover("completion-menu", cx)
-                                    .w(configured_max)
+                                    .w(if ace { px(430.) } else { configured_max })
                                     .px_2()
+                                    .when(ace, |this| this.font_family(cx.theme().font_family.clone()))
                                     .child(render_markdown("doc", doc, window, cx)),
                             ),
                         )
@@ -421,7 +568,8 @@ impl Render for CompletionMenu {
                     })
                     .into_any_element()
             },
-        ))
+        )
+        .shift_x(-word))
         .into_any_element()
     }
 }

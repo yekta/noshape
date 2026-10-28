@@ -581,7 +581,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (bin/cfgmatrix.py, CLI 09:50) (qa 2026-10-27 10:44, CLI 09:50)
   psui: a new List input's id is live's random List_… form (`vs_config::list_id`, as the Variable Studio's);
   Checkbox and Variable keep FeatureScript ids from their names until a capture shows live's Checkbox form.
-- [ ] (qa 12:10, green 0d75aa8e: Ctrl+Space in the editor now stays in the Feature Studio (11e7e6aa verified); no completion list yet, waits for live) P2 FS-EDITOR-COMPLETE the Feature Studio editor has no code completion, and Ctrl+Space in it leaves the tab. Steps:
+- [x] (psui 10-28, this commit: the list as live's "qa (2026-10-27) FS-EDITOR-COMPLETE" (A)–(D), checked on :102: opens on the first letter under the word, prefix matches then hump matches, kind column, doc tooltip, Enter / click insert the call snippet, Tab closes and indents, Esc only closes, `EntityType.` lists its values, `definition.` nothing; open details asked in REQUESTS psui 10-28) (qa 12:10, green 0d75aa8e: Ctrl+Space in the editor now stays in the Feature Studio (11e7e6aa verified); no completion list yet, waits for live) P2 FS-EDITOR-COMPLETE the Feature Studio editor has no code completion, and Ctrl+Space in it leaves the tab. Steps:
   /root/qa-scratch/tickets/cfs2.noshape › Feature Studio 1 › end of the source, type `opExt` (wait), then Ctrl+Space.
   Ours (green e8858e61): nothing drops down while typing; Ctrl+Space runs the document-wide "back to the previous tab"
   (app-core actions.rs:185 SwitchRecentTab) and jumps to Part Studio 1 mid-edit (tickets/fs-ctrl-space-before.png /

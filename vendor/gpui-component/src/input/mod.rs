@@ -52,6 +52,8 @@ pub use gpui_base::input::{
 pub use group::*;
 pub use input::*;
 pub use lsp_types::Position;
+/// The LSP types completion, hover and the other providers speak.
+pub use lsp_types;
 pub use number_input::{NumberInput, NumberInputEvent, NumberStep, StepAction};
 pub use otp_input::*;
 pub use state::AnyInputState;

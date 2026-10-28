@@ -26,12 +26,18 @@ pub struct CompletionMenuOptions {
     /// truncate longer labels. Widen this when hosting an editor that
     /// surfaces long completion labels.
     pub max_width: Pixels,
+    /// Ace's list (Onshape's FeatureScript editor): 300 px wide, 20 px rows
+    /// in the editor's font, the matched letters dark and the rest grey
+    /// (case-insensitive substring, else the letters in order), the detail
+    /// right-aligned, 8 rows before it scrolls.
+    pub ace: bool,
 }
 
 impl Default for CompletionMenuOptions {
     fn default() -> Self {
         Self {
             max_width: px(320.),
+            ace: false,
         }
     }
 }
@@ -148,6 +154,11 @@ impl InputBaseState<EditorMode> {
         };
 
         if !provider.is_completion_trigger(start, new_text, cx) {
+            // Typing something that starts no completion (a space, Tab's
+            // indentation) closes an open list.
+            if self.extras.context_menu_content.completion.open {
+                self.hide_context_menu(cx);
+            }
             return;
         }
 

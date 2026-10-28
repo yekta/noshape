@@ -38,6 +38,7 @@ pub(crate) struct CaretAnchoredPopup {
     editor: WeakEntity<EditorState>,
     build: Box<dyn Fn(Point<Pixels>, &mut Window, &mut App) -> AnyElement>,
     content: Option<AnyElement>,
+    shift_x: Pixels,
 }
 
 impl CaretAnchoredPopup {
@@ -49,7 +50,14 @@ impl CaretAnchoredPopup {
             editor,
             build: Box::new(build),
             content: None,
+            shift_x: Pixels::ZERO,
         }
+    }
+
+    /// Moves the popup right by `dx` (negative: left) from the caret.
+    pub(crate) fn shift_x(mut self, dx: Pixels) -> Self {
+        self.shift_x = dx;
+        self
     }
 }
 
@@ -92,7 +100,8 @@ impl Element for CaretAnchoredPopup {
         let Some(geometry) = editor.read(cx).prepaint_caret_geometry() else {
             return;
         };
-        let anchor = caret_popup_anchor(geometry);
+        let mut anchor = caret_popup_anchor(geometry);
+        anchor.x += self.shift_x;
         let mut content = (self.build)(anchor, window, cx);
         let viewport = window.viewport_size();
         content.layout_as_root(
