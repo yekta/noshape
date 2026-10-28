@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **13:45 update (green f8014efa, copied 13:27):** **SKETCH-START-INFERENCE verified** (GUI, qa-scratch/inf.noshape:
+  arc end → Tangent stored, slanted line end → Perpendicular stored, its start → Parallel, H / V still win). **REGEN-SPEED
+  re-timed with the mesh cache: no clear gain** (edits 725 / 691 / 606 ms at load 35, 426 / 165 / 198 at load 30, 3rd undo
+  131 ms; the fine refine still meshes the whole part, 82–166 ms). drawing D39 linear override = live (prefix / suffix /
+  parens / above kept, underline, clearing restores). cursors.md 38 / 39 verified (4c97692e). v0.4.12 CLI: surfaces 17 / 19,
+  feature-sweep L45 / L45b. Fuzz 72 (f801) running. 21eec57b (psui) is not in f8014efa: verify on the next green.
 - **13:09 update (green 4c97692e, no newer green since 12:50):** fuzz 71 (4c97) alive. Live 1557/1558 answered → P3
   DWG-TOOL-HINTS-PREVIEW (no drawing hints in live; cursor previews instead), DWG-FORESHORTEN-JUMP updated (live has no
   Foreshorten on the radial menu). assembly.md C23 / D6 / D17 / F6 / F8 / L13 / N9 / N10 verified; sketch 7.25 / 9.5.
@@ -219,13 +225,11 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-28 12:16)
-- **No new green since 4c97692e (12:50) as of 13:23**; main carries b7cd7b8c (P1 SKETCH-START-INFERENCE fix), aeb6e097 /
-  fd6da984 (mesh cache, REGEN-SPEED), 368d5137, 21eec57b. If main is red, those wait.
+## Requests to the lead (qa, updated 2026-10-28 13:45)
+- **REGEN-SPEED (P0):** green f8014efa with the mesh cache still commits Extrude 1 edits on live-30-features in 165–725 ms
+  (load 30–35) and the 3rd undo re-evaluates 29 features (131 ms). Booleans dominate under load (25–97 ms each).
 - **P1 SKETCH-MODEL-EDGE-SELECT (skasm, new 10-28, also in v0.4.12):** in a sketch a click on a model edge selects nothing
   and clears the selection, so "line + model edge → constraint key" (an everyday flow) can't be done; tool-first works.
-- **P1 SKETCH-START-INFERENCE (skasm, live-confirmed 1550):** a line's first click on an existing endpoint gives no
-  tangent / perpendicular / parallel inference (sketch_mode keeps chain_end None until the first segment exists).
 
 ## Earlier requests (qa, 2026-10-27 20:44)
 - **P0 BOX-DIALOG-PANIC (psui, new 20:42)**: since df28c320 (greens dd1b5037, daf1f50c) any box selection with a feature dialog open
