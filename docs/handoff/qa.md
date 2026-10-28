@@ -3,9 +3,9 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**v0.4.12 cut 05:00 (tag e936fe98 = ec96b151 + version bump; code = green 1b81b7ca).** **Morning smoke 2026-10-28 (pre-cut, greens 1b81b7ca / 3f4e10d9 / b504234e; same kernel as v0.4.12): all rows OK** (open / edit / undo times, STEP
-round trip 60779.484, kill -9 after Suppress, drawing PDF, assembly drag, dialog hover + pick, fuzz); details under
-"Daily release smoke". Redo on the release artifact when it is published; blocker list at the top of TICKETS.
+**v0.4.12 published 05:49 (tag e936fe98 = ec96b151 + version bump; code = green 1b81b7ca). Artifact smoke 06:05 on
+noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
+of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
@@ -187,6 +187,18 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   Linear pattern in Feature, Part and Face mode: Direction pre-highlights and picks an edge at its middle and a face (not
   the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
   (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
+### v0.4.12 (tag e936fe98, published 05:49; Linux tarball smoked 05:53–06:05 on the box at load 20–27)
+- Start page "(0.4.12.e936fe98a8b4)"; CLI STEP header 'NOSHAPE 0.4.12'; STEP export → import_files round trip of the
+  l30 copy 83341.148087 = 83341.148087 (this l30 file is the 34-feature variant; v0.4.11 gives the same).
+- live-30 (l30 copy) open regen 982 ms; Extrude 1 → 15 / 16 / 17: 140 / 107 / 120 ms (median 120); Ctrl+Z ×3: 1 / 1 /
+  317 ms (3rd over 50, REGEN-SPEED). kill -9 0.3 s after Suppress Boss 1 → reopens with Boss 1 suppressed.
+- Hover + pick: lpd Linear pattern › Feature pattern › Direction pre-highlights the bottom edge at its middle and takes
+  "Edge of Extrude 1", then the top face "Face of Extrude 1"; Fillet edge, Shell face; cfs "Edge pick" and "Plain edge
+  pick" take two edges each.
+- wf-block › Create Drawing (ANSI_A_MM, suggested views) › Export › PDF → 1 page, letter landscape, content right.
+- asm5 › Assembly 1: dragging the revolute pin leaves it in place (no translation).
+- Fuzz: same code as green 1b81b7ca (seeds 51 / 52 alive there).
+
 ### v0.4.10 (tag e8e0f62d = main e8858e61 + "Release v0.4.10"; published 11:01, its Linux tarball is byte-identical to the CI run 40486478859 artifact smoked here; Linux, macOS, Windows assets), smoke 10:54
 - Has 4e55b01f (LP-DIRECTION-PICK), a117663d (DRAFT-HANG budget), 011aaf43 (serial booleans), c30baf56 (markers);
   **not** 1e3c419c (custom features' compound edge filters: `EDGE && GeometryType.LINE` / `ALLOWS_AXIS` still take
