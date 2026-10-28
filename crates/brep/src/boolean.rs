@@ -818,7 +818,8 @@ impl Ctx {
         }
         let ib = self.intervals(fc, &path, t0, t1, [End::Open; 2], true)?;
         let meet = ia.iter().any(|x| ib.iter().any(|y| x[1].0.min(y[1].0) - x[0].0.max(y[0].0) > self.tol));
-        if meet { Err(Decline("faces touching along a line")) } else { Ok(()) }
+        // Where both reach it: a section along it, as where they cross.
+        if meet { self.generator(f, fc, th) } else { Ok(()) }
     }
 
     fn cyl_cyl(&mut self, f1: usize, f2: usize) -> R<()> {

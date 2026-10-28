@@ -71,6 +71,18 @@ in a direction no input favours, another one when it passes a curve's end), big 
 face pairs). Corpus: **349 of 973 taken, 0 differ from OCCT**; < 50 input faces: 348 cases, median 0.67 ms vs
 17.1 ms (OCCT, same build), total 298 vs 7046 ms (23.6×).
 
+Tangent contacts (19:10): a plane or cylinder touching a cylinder along a line both faces reach gets a section
+there (both faces split along it), as OCCT does: 364 of 973 taken, 0 differ; < 50 input faces median 0.61 ms vs
+23.0 ms.
+
+The 30-feature part (tests/perf/live-30-features, `regen_profile`, dev build, machine load 30–50, two runs each):
+| | Rust Boolean on | off |
+|---|---|---|
+| full regen (features) | 329, 370 ms | 362, 302 ms |
+| edit commit, Extrude 1 depth 10 → 12 (features, median of 5) | 208, 255 ms | 381, 372 ms |
+Full regen is within noise (fillets, chamfers and Hole are most of it); the edit commit's features are ~35–45 %
+cheaper (the Booleans after the edit: Bosses 3–5 were ~28–37 ms each, now a few ms).
+
 Locality (lead 15:05): the 1612-face fin fuse (a2121c5b) through the Rust path (NOSHAPE_BREP_BIG=1,
 NOSHAPE_BOOL_LOCAL=0) is right (0 differ) and ~55–65 ms (Rust ~30, building the shapes and make_result ~25), about
 the local Boolean's ~50 ms; plain OCCT 1.1 s. So the local Boolean stays first for targets of 200+ faces and the
