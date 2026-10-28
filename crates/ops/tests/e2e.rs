@@ -4989,3 +4989,23 @@ fn hole_table_sizes_are_the_hole_callouts() {
     assert_eq!(rows.len(), 2, "{part}");
     assert!(rows[0][3].as_str().is_some_and(|s| s.contains("6.6")) && rows[0][4] == "3", "{part}");
 }
+
+
+/// MASS-MC-FIELD: the reference mate connector is named also when the part has no material (no mass).
+#[test]
+fn mass_properties_name_the_reference_connector_without_a_material() {
+    let mut ctx = Ctx::new();
+    let path = scratch("mass-reference.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let sketch = sk["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let vertex = call(&mut ctx, "query_entities", json!({ "kind": "vertices" }))["vertices"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "mateConnector", "params": { "originQuery": [vertex] } }));
+    let mc = call(&mut ctx, "query_datums", json!({}));
+    let mc = mc["mate_connectors"][0]["id"].as_str().unwrap_or_else(|| panic!("{mc}")).to_string();
+    let m = call(&mut ctx, "query_mass_properties", json!({ "reference": mc }));
+    assert_eq!(m["reference"], "Mate connector 1", "{m}");
+}

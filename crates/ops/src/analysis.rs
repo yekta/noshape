@@ -29,7 +29,9 @@ pub fn studio_mass_properties(ctx: &Context, display: &StudioDisplay, ps: &PartS
         }
         mp.mass = Some(m);
     }
-    let mut name = None;
+    // The reference field names its connector also without a material (live ui-mass/07; MASS-MC-FIELD: the field
+    // stayed empty); the inertia moves to its frame once there is a mass.
+    let name = reference.map(|c| c.name.clone());
     if let (Some(c), Some(m)) = (reference, mp.mass) {
         let (o, x, z) = (c.origin, c.x, c.z);
         let y = z.cross(x);
@@ -38,7 +40,6 @@ pub fn studio_mass_properties(ctx: &Context, display: &StudioDisplay, ps: &PartS
         let shift = glam::DMat3::from_diagonal(glam::DVec3::splat(d.length_squared())) - glam::DMat3::from_cols(d * d.x, d * d.y, d * d.z);
         let r = glam::DMat3::from_cols(x, y, z);
         mp.inertia = r.transpose() * (mp.inertia + shift * m) * r;
-        name = Some(c.name.clone());
     }
     Some(StudioMass { props: mp, reference: name })
 }
