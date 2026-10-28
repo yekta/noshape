@@ -114,7 +114,7 @@ impmatrix16 (117 samples incl. the new psb-L11-boss-fillet.step: Part 1 8179.765
 | Re-import names | second import of g25-b → "g25-b (1)", "g25-b (2)" | ✅ (live "(1)") | 77870dd4 10-28 (UI: g25-b, g25-b (1), g25-b (2)) |
 | IM2 B-spline volumes | unchanged (ktane, McMaster, g26, g48, g49, g50 same digits as pass 16) | ✗ kern |  |
 | I1 g25-b SAT / STEP / X_T | 7585.978524 / 7582.713024 / 7583.000869, unchanged | ✗ kern |  |
-| No import errors | 0 errors over every sample (incl. qa4-s5-*) | ✅ |  |
+| No import errors | 0 errors over every sample (incl. qa4-s5-*) | ✅ | v0.4.12 CLI 10-28 (bin/impmatrix_qa.py over all 143 samples: 0 errors; out qa-scratch/impmatrix-v0412-1508.out) |
 
 ## IM2 graded under the band rule (api, 2026-10-24)
 Live: behaviours.md "api (10-24) IM2 bands" (REST massproperties `[value, lo, hi]`; the four g38b rows are from live's
@@ -176,4 +176,4 @@ REVOLVED faces "revolved". F8 isn't one in the file (see above).
 | g50-g46-shell1 / g49-chamfer1 / g49-chamfer2 | 6052.678152 / 44833.514326 / 44789.962583 (were 6053.320139 / 44833.530070 / 44789.972897) | ✅ still in band; values moved since 10-24 | v0.4.12 CLI 10-28 |
 | g35-…-rest-meters.stl | 8e-06 mm³ (read as mm) | ? unchanged (mesh unit) |  |
 | dx-asm-xt-<v>.x_t (live's assembly exports, request 1536) | v0.4.12: 12.0 / 28.1 / 33.0 / 33.1 / 37.1 / 38.1 import nothing, 25.0 / 28.0 / latest ~1e-6 mm³ (XT-ASM-SCALE). Green 98667558: 25.0 / 28.0 / 38.1 / latest OK (pin 848.23), the other five fail. Green c82818b7: 12.0 / 28.1 / 33.0 / 33.1 / 37.1 import too (3 instances, pin 848.23); c38eb9cf: 30.0 / 30.1 / 31.0 / 31.1 as well | ✅ (XT-ASM-VERSIONS fixed bfe9101d) | c82818b7 10-28 (GUI) |
-| Errors over all samples | 0 tool errors (dx-asm-xt failures come back as empty imports through the CLI) | ✅ |  |
+| Errors over all samples | 0 tool errors (dx-asm-xt failures come back as empty imports through the CLI) | ✅ | v0.4.12 CLI 10-28 (same run: 0 tool errors; 11 dx-asm-xt files and 2 zips (g39, g47) come back with no listed parts) |
