@@ -311,6 +311,8 @@ pub struct DrawingEditor {
     pub stack_dlg: Option<crate::drawing_callout::StackDlg>,
     /// BOM / cut list table dialog (drawing_table_dlg.rs).
     pub table_dlg: Option<crate::drawing_table_dlg::TableDlg>,
+    /// The Hole table dialog (with the Hole table tool).
+    pub hole_dlg: Option<crate::drawing_hole_table::HoleTableDlg>,
     /// Geometric tolerance dialog (drawing_gdt.rs).
     pub gdt_dlg: Option<crate::drawing_gdt::GdtDlg>,
     /// Custom tables: the dialog and the evaluated tables.
@@ -542,6 +544,7 @@ impl DrawingEditor {
             callout_dlg: None,
             stack_dlg: None,
             table_dlg: None,
+            hole_dlg: None,
             gdt_dlg: None,
             custom_tables: Default::default(),
             woken_centers: Vec::new(),
@@ -1426,6 +1429,7 @@ impl DrawingEditor {
         self.sync_weld_dlg(window, cx);
         self.sync_callout_dlg(window, cx);
         self.sync_table_dlg();
+        self.sync_hole_table_dlg();
         self.sync_custom_dlg(cx);
         self.sync_table_tool(window, cx);
         self.sync_cell_panel(window, cx);
@@ -1543,6 +1547,7 @@ impl DrawingEditor {
             .children(self.render_callout_dlg(cx))
             .children(self.render_stack_dlg(cx))
             .children(self.render_table_dlg(cx))
+            .children(self.render_hole_table_dlg(cx))
             .children(self.render_custom_dlg(cx))
             .children(self.render_move_sheet(cx))
             .children(self.render_table_props(cx))

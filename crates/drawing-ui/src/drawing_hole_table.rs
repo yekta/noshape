@@ -1,0 +1,163 @@
+//! Drawing editor: Onshape's Hole table dialog (live behaviours 1983):
+//! ☑ Show location data, Location precision ▾ (0 … 0.123 (Drawing) …),
+//! the view and its origin, Sheet, Order ▾ and Select fixed corner. Pick
+//! the view, then the origin (a vertex or circle center); a click places
+//! the table with these choices.
+
+use crate::drawing_view::*;
+use crate::os_ui::OsDropdownExt as _;
+use crate::theme::p;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::*;
+use noshape_model::drawing::{TableCorner, TableKind};
+
+const CORNERS: [TableCorner; 4] = [TableCorner::TopLeft, TableCorner::TopRight, TableCorner::BottomLeft, TableCorner::BottomRight];
+
+/// Location precision choices (live's list); None = "(Drawing)".
+const PRECISIONS: [(&str, Option<u8>); 8] = [("0", Some(0)), ("0.1", Some(1)), ("0.12", Some(2)), ("0.123", Some(3)), ("0.123 (Drawing)", None), ("0.1234", Some(4)), ("0.12345", Some(5)), ("0.123456", Some(6))];
+
+/// The Hole table dialog's choices.
+pub struct HoleTableDlg {
+    pub show_location: bool,
+    pub precision: Option<u8>,
+    pub bottom_to_top: bool,
+    /// Live: the 2nd corner icon is pressed at first.
+    pub corner: TableCorner,
+}
+
+impl Default for HoleTableDlg {
+    fn default() -> Self {
+        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight }
+    }
+}
+
+impl DrawingEditor {
+    /// Open / drop the dialog with the Hole table tool.
+    pub fn sync_hole_table_dlg(&mut self) {
+        let on = matches!(self.tool, Tool::Table { kind: TableTool::Hole, .. });
+        match (on, self.hole_dlg.is_some()) {
+            (true, false) => self.hole_dlg = Some(HoleTableDlg::default()),
+            (false, true) => self.hole_dlg = None,
+            _ => {}
+        }
+    }
+
+    /// A hole table just made by the tool takes the dialog's choices.
+    pub fn apply_hole_table_dlg(&self, table: &mut noshape_model::drawing::Table) {
+        let Some(d) = &self.hole_dlg else { return };
+        if let TableKind::Hole { show_location, precision, bottom_to_top, .. } = &mut table.kind {
+            (*show_location, *precision, *bottom_to_top) = (d.show_location, d.precision, d.bottom_to_top);
+        }
+        table.corner = d.corner;
+    }
+
+    pub fn render_hole_table_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let d = self.hole_dlg.as_ref()?;
+        let pal = p();
+        let ink = gpui_kit::rgb(0x333333);
+        let ed = cx.entity();
+        let (view, origin) = match &self.tool {
+            Tool::Table { view, origin, .. } => (*view, origin.is_some()),
+            _ => (None, false),
+        };
+        let view_name = view.and_then(|v| self.current_sheet().view(v)).map(|v| v.name.clone().unwrap_or_else(|| crate::drawing_props::default_view_name(&self.drawing, self.current_sheet(), v)));
+        type Set = std::rc::Rc<dyn Fn(&mut HoleTableDlg)>;
+        let select = |id: &'static str, label: String, w: f32, items: Vec<(String, bool, Set)>| {
+            let ed = ed.clone();
+            Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+                for (l, on, f) in &items {
+                    let (e, f) = (ed.clone(), f.clone());
+                    m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| {
+                        e.update(cx, |t, cx| {
+                            if let Some(d) = &mut t.hole_dlg {
+                                f(d);
+                            }
+                            cx.notify();
+                        })
+                    }));
+                }
+                m
+            })
+        };
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(8.)).child(div().w(px(70.)).text_size(px(11.)).child(label)).child(body).into_any_element();
+        let precisions: Vec<(String, bool, Set)> = PRECISIONS.iter().map(|&(l, p)| (l.to_string(), d.precision == p, std::rc::Rc::new(move |d: &mut HoleTableDlg| d.precision = p) as Set)).collect();
+        let precision_label = PRECISIONS.iter().find(|(_, p)| *p == d.precision).map(|(l, _)| l.to_string()).unwrap_or_default();
+        let orders: Vec<(String, bool, Set)> = vec![
+            ("Top to bottom".into(), !d.bottom_to_top, std::rc::Rc::new(|d: &mut HoleTableDlg| d.bottom_to_top = false) as Set),
+            ("Bottom to top".into(), d.bottom_to_top, std::rc::Rc::new(|d: &mut HoleTableDlg| d.bottom_to_top = true) as Set),
+        ];
+        let corner = d.corner;
+        let corner_btn = |k: TableCorner, i: usize, cx: &mut Context<Self>| {
+            let on = corner == k;
+            let (top, left) = (matches!(k, TableCorner::TopLeft | TableCorner::TopRight), matches!(k, TableCorner::TopLeft | TableCorner::BottomLeft));
+            div()
+                .id(("hole-table-corner", i))
+                .size(px(24.))
+                .relative()
+                .cursor_pointer()
+                .border_1()
+                .border_color(gpui_kit::rgb(0x909090))
+                .when(on, |e| e.border_b_2().border_color(pal.accent))
+                .child(crate::ui::glyph("table", 20., ink))
+                .child(div().absolute().size(px(4.)).rounded_full().bg(ink).when(top, |e| e.top(px(1.))).when(!top, |e| e.bottom(px(1.))).when(left, |e| e.left(px(1.))).when(!left, |e| e.right(px(1.))))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(d) = &mut this.hole_dlg {
+                        d.corner = k;
+                    }
+                    cx.notify();
+                }))
+        };
+        let corners: Vec<AnyElement> = CORNERS.iter().enumerate().map(|(i, k)| corner_btn(*k, i, cx).into_any_element()).collect();
+        let show = d.show_location;
+        // The view field: "Top" once picked (live "Top ×"), then the origin.
+        let field = |text: String, active: bool| {
+            div().mx(px(8.)).my(px(2.)).px(px(6.)).h(px(24.)).flex().items_center().text_size(px(12.)).when(active, |d| d.bg(gpui_kit::rgb(0xdbf1fa))).child(text).into_any_element()
+        };
+        Some(
+            v_flex()
+                .id("dr-hole-table-dlg")
+                .absolute()
+                .top(px(DIALOG_TOP))
+                .left(px(self.dialog_left()))
+                .w(px(230.))
+                .pb(px(6.))
+                .bg(pal.dialog_bg)
+                .shadow(crate::drawing_chrome::dialog_shadow())
+                .text_color(ink)
+                .text_size(px(12.))
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(
+                    h_flex()
+                        .h(px(28.))
+                        .pl(px(11.))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Hole table"))
+                        // Live: ✓ stays disabled until an origin is picked (a click places the table).
+                        .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).when(!origin, |d| d.opacity(0.3)).child(crate::ui::glyph("check", 16., gpui_kit::white())))
+                        .child(div().id("hole-table-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.tool = Tool::Select;
+                            this.hole_dlg = None;
+                            cx.notify();
+                        }))),
+                )
+                .child(
+                    h_flex().px(px(8.)).h(px(26.)).gap(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("hole-table-loc").label("Show location data").checked(show).on_click(cx.listener(|this, on: &bool, _, cx| {
+                        if let Some(d) = &mut this.hole_dlg {
+                            d.show_location = *on;
+                        }
+                        cx.notify();
+                    }))),
+                )
+                .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 120., precisions).into_any_element())))
+                .child(field(view_name.clone().unwrap_or_else(|| "Views".into()), view.is_none()))
+                .when(view.is_some(), |v| v.child(field(if origin { "Origin ✓".into() } else { "Origin: a vertex or circle center".into() }, !origin)))
+                .child(row("Sheet", div().text_size(px(12.)).child(self.current_sheet().name.clone()).into_any_element()))
+                .child(row("Order", select("hole-table-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 120., orders).into_any_element()))
+                .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
+                .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners))
+                .into_any_element(),
+        )
+    }
+}

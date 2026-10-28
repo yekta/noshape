@@ -1005,7 +1005,9 @@ impl DrawingEditor {
             }
             Tool::Table { kind, view: Some(v), origin } => {
                 let id = self.current_sheet().next_table_id();
-                let (table, name) = noshape_scene::drawing_tools::view_table(id, kind, v, origin, c);
+                let (mut table, name) = noshape_scene::drawing_tools::view_table(id, kind, v, origin, c);
+                // The Hole table dialog's choices.
+                self.apply_hole_table_dlg(&mut table);
                 self.edit_sheet(name, cx, |s| s.tables.push(table));
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Table(id)];
