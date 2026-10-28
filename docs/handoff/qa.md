@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **13:09 update (green 4c97692e, no newer green since 12:50):** fuzz 71 (4c97) alive. Live 1557/1558 answered → P3
+  DWG-TOOL-HINTS-PREVIEW (no drawing hints in live; cursor previews instead), DWG-FORESHORTEN-JUMP updated (live has no
+  Foreshorten on the radial menu). assembly.md C23 / D6 / D17 / F6 / F8 / L13 / N9 / N10 verified; sketch 7.25 / 9.5.
+  Asked live: assembly over-constrained mate texts (D21), assembly Select other (K27). Agent API query_measure = GUI = live.
+  Main has b7cd7b8c (SKETCH-START-INFERENCE fix), aeb6e097 / fd6da984 (mesh cache), 368d5137 (dx D39), 21eec57b (psui) not
+  yet green: verify those first when the watcher moves.
 - **12:53 update (greens 9da19774 → 4c97692e):** verified FOLDER-MENU-ROLL-TO-HERE residual (1649c27d) and
   MATE-CONNECTOR-PANEL-HIGHLIGHT (c9ed5cdb) on 4c97692e. Drawing: A6, A13 (diagonal fraction tofu → DWG-NOTE-DIAG-FRACTION),
   A42 (→ DWG-GDT-MENU-ORDER), K25; live 1555/1556 answered → P3 DWG-LINE-MENU, P3 READOUT-VALUE-TOOLTIP. Fuzz 71 (4c97)
