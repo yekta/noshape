@@ -40,7 +40,7 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 | Row | Ours now | Status | Verified |
 |---|---|---|---|
 | UNDO1 | Insert the qa5 bool Part Studio (3 instances) into Assembly 1, ✓, switch to the Part Studio tab and back, Ctrl+Z once: all 3 instances go (Instances (0)); Ctrl+Y brings them back | ✅ fixed | 0.4.10+ / 1c853f78 10-27 |
-| UNDO2 | Drawing of Assembly 1 (suggested views): an assembly insert shows the drawing's Update button highlighted (out of date); after Ctrl+Q, Ctrl+Z in the assembly shows it out of date again. Both directions behave the same | ✅ fixed |  |
+| UNDO2 | Drawing of Assembly 1 (suggested views): an assembly insert shows the drawing's Update button highlighted (out of date); after Ctrl+Q, Ctrl+Z in the assembly shows it out of date again. Both directions behave the same | ✅ fixed | 77870dd4 10-28 |
 
 ## Re-run pass 24 (qa5, 2026-10-24 ~00:10, main 538981d5, target-lead 23:22; d10 drawing copy)
 | Row | Live | Ours | Status | Verified |
@@ -51,5 +51,5 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | UNDO1 | Insert Part Studio 1 (2 parts) into Assembly 1, ✓, switch to the Part Studio tab and back, Ctrl+Z once: Instances (0); Ctrl+Y: both back | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| UNDO2 | Drawing of Assembly 1 (suggested views): Update button pale (disabled) when created; second insert in the assembly → saturated yellow (out of date); Ctrl+Q → pale; Ctrl+Z in the assembly (Instances 4 → 2) → saturated again. Both directions agree (live: pale / saturated, behaviours 6902) | ✅ |  |
+| UNDO2 | Drawing of Assembly 1 (suggested views): Update button pale (disabled) when created; second insert in the assembly → saturated yellow (out of date); Ctrl+Q → pale; Ctrl+Z in the assembly (Instances 4 → 2) → saturated again. Both directions agree (live: pale / saturated, behaviours 6902) | ✅ | 77870dd4 10-28 |
 | UNDO3 | not re-run (asb) | — |  |

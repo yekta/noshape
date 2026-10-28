@@ -37,7 +37,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 |---|---|---|---|---|
 | Shift+E / Shift+F / Shift+W / Shift+S | Extrude / Fillet / Revolve / Sketch | Shift+E, Shift+F ✅ (earlier); Shift+S ✅ | ✅ (Shift+W ?) | 0.4.10+ / dd1b5037 10-27 (E, F, W; S not re-run) |
 | Shift+H | hide/show sketches | no visible sketches to test | ? |  |
-| ↑ ↓ on the rollback bar | move it | ✅ (core 4.5) | ✅ |  |
+| ↑ ↓ on the rollback bar | move it | ✅ (core 4.5) | ✅ | 77870dd4 10-28 |
 | Shift+1…7 | Front, Back, Left, Right, Top, Bottom, Isometric | all correct | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | ← → ↑ ↓ | rotate 15°: from Front, Left brings Right in, Up brings Bottom in | same direction and step | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Shift+arrows / Ctrl+arrows / Ctrl+Shift+arrows | coarse / precision rotate / pan | Shift+← from Front → Right (90°), Ctrl+← a small step | ✅ / ? (angles) |  |
@@ -80,7 +80,7 @@ d / n (workflow 3) ✅; p Projected view ✅; Shift+D, Shift+R, Ctrl+M, Shift+H 
 | Right-drag 100 px left from Front | rotates about 55° (≈0.55°/px), Right face comes in | 50 px → ~45°, 100 px → 90°: **≈0.9°/px** | ✗ KB4 |  |
 | Middle-drag | pan | pan | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Ctrl+right-drag | pan | pan | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| View cube face hover | light-blue fill | ✅ | ✅ |  |
+| View cube face hover | light-blue fill | ✅ | ✅ | 77870dd4 10-28 |
 | View cube ▶ / ▲ | ? (step) | 15° per click | ? |  |
 | Camera menu | Isometric … Section view… | same; "Turn off section view" while sectioned | ✅ / ? | 0.4.10+ / dd1b5037 10-27 (Isometric … Section view…) |
 
@@ -159,4 +159,4 @@ below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | KS1 Keyboard shortcuts ↗ pop-out | page window 1440 × 900 = the app window (was a fixed 1280 × 900) | ✅ **fixed** |  |
-| Shift+R in an Assembly | toggles high quality: the 3D view menu then reads "Disable high quality" | ✅ **fixed** |  |
+| Shift+R in an Assembly | toggles high quality: the 3D view menu then reads "Disable high quality" | ✅ **fixed** | 77870dd4 10-28 |
