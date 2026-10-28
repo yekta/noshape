@@ -181,14 +181,15 @@ that touches the model: ~12 min.
 
 N00. **Check perf bisect first** (10-28 06:12): v0.4.12's perf run 40640263048 has the NIST 1× texture orbit / pan / zoom
      at 18–19 fps on both macOS runners (31 before; the first orbit, the reliable one, too; 2× frame-driven unchanged at
-     67–75). Dispatched bench-only runs: 40642410950 = bf131a31~1 (3523b8f2) and 40642419667 = bf131a31 (the part hover
+     67–75). Dispatched bench-only runs: 40642410950 = bf131a31~1 (3523b8f2) and 40643178645 = bf131a31 (re-dispatched with the full SHA; the part hover
      outline). If bf131a31 is the step: its `hover_band` also fires for any hovered face's outlined boundary (OUTLINE on
      edges), not only a whole hovered part, and stores the MSAA depth; narrow it. If both are slow, bisect further between
      27e0f950 (31 fps, run 40590825262) and bf131a31~1.
 N01. 10-28 06:00–06:30 landed: a237ae16 count fields two-step Enter (live), c8239e05 folder Roll to here / Roll to end
      and the nested rollback bar, 469aa3c6 parts list properties (7.7), blamed number fields (live "failing parameter
      marked red"). Residuals: a folder rolled to its top draws the bar above it; the guide's end tick; the parts-list
-     override isn't saved in the document; P3 LEFT-RAIL-WHERE-USED (a design: `Document::tab_users` lists the users).
+     override isn't saved in the document. 3b5ecdee LEFT-RAIL-WHERE-USED (Where used rail panel). psui's TICKETS section
+     has no open item now.
 
 N0. 10-28 04:20–06:00 landed: 54324599 Create selection's see-through result faces (3.19), 6f4dc5c3 arrow halo as live
     (6.2), 2960a143 Measure asterisk (4.9), aaaa5b4c STRIP-CLICK-THROUGH (P1), 298fbda5 MASS-MC-FIELD (P2, ops names the
