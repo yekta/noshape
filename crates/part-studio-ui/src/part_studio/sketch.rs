@@ -843,6 +843,29 @@ impl PartStudioView {
         }
     }
 
+    /// Use (u, or its button) with model edges / vertices preselected:
+    /// they are projected at once, the selection clears and no tool stays
+    /// armed (live, behaviours "qa (2026-10-28) sketch Use (u) with
+    /// preselected edges / face projects at once"; SKETCH-USE-PRESELECT).
+    /// False when nothing was preselected.
+    fn use_preselection(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(ed) = self.sketch.as_mut().filter(|ed| !ed.model_selection.is_empty()) else { return false };
+        let refs = std::mem::take(&mut ed.model_selection);
+        let (frame, wpp, cursor) = (ed.frame, ed.world_per_px, ed.cursor.unwrap_or_default());
+        let Some(ctx) = self.context.clone() else { return true };
+        let display = self.display.clone();
+        let mut changed = false;
+        for r in &refs {
+            changed |= self.with_sketch(cx, |_, data| noshape_ops::sketch_use::use_reference(data, noshape_ops::sketch_use::Model { context: &ctx, display: &display, frame: &frame }, wpp, cursor, r)) == Some(true);
+        }
+        if changed {
+            self.regen_sync(window, cx);
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+        true
+    }
+
     /// Project the hovered model edge (or all edges of a hovered face, or a vertex).
     fn use_hovered(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(r) = self.hover.clone() else { return };
@@ -945,6 +968,9 @@ impl PartStudioView {
 
     /// Toolbar activation: constraint tools apply to the selection first.
     pub(super) fn activate_tool(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
+        if tool == Tool::Use && self.use_preselection(window, cx) {
+            return;
+        }
         match tool {
             Tool::Constraint(c) => self.constraint(c, window, cx),
             t => {
@@ -4409,7 +4435,11 @@ impl PartStudioView {
             .on_action(cx.listener(|this, _: &SketchTrim, _, cx| this.set_tool(Tool::Trim, cx)))
             .on_action(cx.listener(|this, _: &SketchExtend, _, cx| this.set_tool(Tool::Extend, cx)))
             .on_action(cx.listener(|this, _: &SketchDimension, _, cx| this.set_tool(Tool::Dimension, cx)))
-            .on_action(cx.listener(|this, _: &SketchUse, _, cx| this.set_tool(Tool::Use, cx)))
+            .on_action(cx.listener(|this, _: &SketchUse, window, cx| {
+                if !this.use_preselection(window, cx) {
+                    this.set_tool(Tool::Use, cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &SketchConstruction, window, cx| this.toggle_construction(window, cx)))
             .on_action(cx.listener(|this, _: &SketchTangentArcToggle, _, cx| {
                 if let Some(ed) = &mut this.sketch {
