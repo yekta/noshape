@@ -15,7 +15,7 @@ window 1440×900.
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1.1 | Sketch on Top, G, rectangle from the origin; D 60, D 40 | fully defined (black) | same; bare "60" stored as "60" (see core F3) | ✅ | 41f60e47 10-28 (rectangle from the origin; the 60 typed then dimensioned) |
-| 1.2 | Sheet metal ▾ list | 15 items: … Corner break, Finish sheet metal model, **Flex PCB model, Finish flex PCB model**; 199 px wide | 13 items (no Flex PCB pair), 213 px | ✗ SM12 |  |
+| 1.2 | Sheet metal ▾ list | 15 items: … Corner break, Finish sheet metal model, **Flex PCB model, Finish flex PCB model**; 199 px wide | 13 items (no Flex PCB pair), 213 px | ✅ (SM12 fixed) | 64997436 10-28 (tool search "Fill"/"Corner" lists Finish flex PCB model; the Flex PCB pair is in the list) |
 | 1.3 | Sheet metal model dialog on open | Convert tab, Selections (3 query fields, Clearance 0, ☐ Include bends, ☐ Keep input parts), General, › Material, › Relief; title red + ✓ disabled until a selection | same layout and states | ✅ | 77870dd4 10-28 |
 | 1.4 | Thicken tab, click the region | chip "Face of Sketch 1" | same | ✅ | 77870dd4 10-28 |
 | 1.5 | Thickness "2" Enter, Bend radius "2" Enter | "2 mm", value re-selected, dialog stays | same | ✅ | 77870dd4 10-28 |
@@ -178,8 +178,8 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 | 6.1 strip tooltip / order | was "Sheet metal: flat pattern and bend table", last button | **qa5 fix**: "Sheet metal table and flat view", placed above Variable table (live "qa5 sm" (8)) |  |
 | SM5 Up/Down | "Down" ×3 for flanges bent up + hem (live all "Up") | ✗ still → routed fs (sign rule needs a live Down case) |  |
 | SM7 chip "Vertex" | Corner chip "Vertex" (live "Vertex of Flange 1") | **qa5 fix**: vertex chips read "Vertex of <latest creating feature>" |  |
-| SM8 Corner dialog default | "Square - Sized", Corner relief width 5 mm = live ~5854 | ✅ **withdrawn** |  |
-| SM9 Esc after a select list | 1st Esc closes the list, 2nd cancels the dialog | ✅ **fixed** |  |
-| SM10 "Exported …" notice | auto-dismisses; next dialog unobstructed | ✅ **fixed** |  |
-| SM11 select tooltip over its list | no tooltip while the list is open | ✅ **fixed** |  |
+| SM8 Corner dialog default | "Square - Sized", Corner relief width 5 mm = live ~5854 | ✅ **withdrawn** | 64997436 10-28 (GUI: Corner on smf.noshape (bin/smflange.py): Square - Sized, Corner relief width 5 mm) |
+| SM9 Esc after a select list | 1st Esc closes the list, 2nd cancels the dialog | ✅ **fixed** | 64997436 10-28 (GUI: Corner's relief list open, Esc closes it, 2nd Esc cancels Corner 1) |
+| SM10 "Exported …" notice | auto-dismisses; next dialog unobstructed | ✅ **fixed** | 64997436 10-28 (GUI: Part 1 › Export… › Parasolid › Save: 'Exported …x_t' gone within ~5 s) |
+| SM11 select tooltip over its list | no tooltip while the list is open | ✅ **fixed** | 64997436 10-28 (GUI: hover the select 2.5 s with its list open: no tooltip) |
 | SM12 / SM13 | (fixed earlier) | ✅ |  |
