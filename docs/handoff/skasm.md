@@ -108,7 +108,14 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.
-1. Open tickets: none in my section (10-28 07:15). Fixed 10-28 later: SKETCH-FILLET-EQUAL + the fillet tool reworked to
+1. Open tickets (10-28 18:30): SKETCH-RECT-DIM-GLYPHS (a) vertical edge glyph side, (b) corner Coincident glyphs,
+   (c) the top-edge glyphs on the height dimension's arrow: see its note (needs our rectangle's edges to run as live's,
+   or a direction rule, and per-corner coincident glyphs for shared points). Fixed 10-28 afternoon: MATE-LIMITS-OPPOSITE-
+   SIGN c725f68f, ASM-K-IMPLICIT-MCS 81519593, ASM-XT-ROUNDTRIP-NAMES b09814de, ASM-MC-LIST-ORDER 97c7aae3, dimension
+   labels vs glyphs f3c804b9 + 103cd81d, MATE-CONNECTOR-PANEL-HIGHLIGHT c9ed5cdb, SKETCH-START-INFERENCE b7cd7b8c,
+   SKETCH-MODEL-EDGE-SELECT 52ff661c, INSTANCE-NAME-STALE ff379982, SKETCH-HINT-OVERLAP + SKETCH-RECT-DROPDOWN-NAME
+   df97926c, ASM-TRIAD-MENU + GROUP-ROW-ERROR 19f2d38a, MATE-EXACT-FLIP-MOVER 556b8fcf (UI rule: the first pick moves);
+   SKETCH-MENU-ESC not a bug (live behaves as ours, behaviours ~197). Fixed 10-28 later: SKETCH-FILLET-EQUAL + the fillet tool reworked to
    live's request-1530 answer (4ca44aa8), RECT-TAB-LIVE (c1b58ff7), SKETCH-ENTER-NO-PLANE (b08165c0, qa verified),
    ASM-MENU-WRAP + ASM-MATE-MENU-SEPARATORS (6444d892), ASM-SELECTED-EDGES-DARK (0d05bd3b). Earlier 10-28:
    SKETCH-FILLET-STUCK-RADIUS twice more, ASM-TOOLSEARCH,
