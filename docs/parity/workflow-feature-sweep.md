@@ -23,7 +23,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 8 | Parting line scope | any parting line (non-planar, several parts), each edge's faces drafted about the edge | planar lines perpendicular to the pull, one part ("Parting lines must lie in a plane…", "…must belong to one part") | 🔧 several parts (each on its own) and stepped / sloped straight parting edges (each edge's own hinge plane) (test `parting_line_draft_on_two_parts_and_steps`); curved non-planar parting lines still refused |  |
 | 9 | Two sided | first angle on the faces "away" from the pull, second on "along"; Opposite direction doesn't change which side One sided drafts | angle on the +pull side; sides follow the flipped pull | 🔧 live L1/L2: first angle below the parting line, second above, both narrowing toward it; each Opposite flips its side's taper only (test with live's 5 volumes) |  |
 | 10 | Edit logic | hint faces, focus on Entities to draft / Parting edges when editing | none; focus on Neutral plane | 🔧 INITIAL_FOCUS_ON_EDIT (Entities to draft / Parting edges focused when an existing draft opens); the first parting edge sets "Switch face" to the steeper face (flipAlongPull). Hint faces and the side-change flip adjustment ✗ (our planar parting lines decide the sides geometrically) |  |
-| 11 | 0° draft, empty Entities to draft | — | — | 🔧 L3 0° = no change; L4 ✅ |  |
+| 11 | 0° draft, empty Entities to draft | — | — | 🔧 L3 0° = no change; L4 ✅ | 1b81b7ca 10-28 (blk40: neutral top face, front face, 0 deg → no error, 8000 mm³ unchanged (L3); the front face pick auto-advanced into Entities to draft) |
 
 ## Body draft
 Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
