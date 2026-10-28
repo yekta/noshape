@@ -3966,16 +3966,17 @@ impl AssemblyView {
             self.ui.list_scroll.scroll_to_item(ix);
         }
         let labeler = self.labeler(cx);
-        let mut mate_rows: Vec<AnyElement> = Vec::new();
-        let mut mate_ids: Vec<MateId> = Vec::new();
+        // Connectors, mates, relations and groups in creation order (their
+        // ids count up; live request 1541: "Fastened 1 · Mate connector 1";
+        // ASM-MC-LIST-ORDER: connectors came first).
+        let mut items: Vec<(MateId, AnyElement)> = Vec::new();
         for c in &asm.connectors {
             let st = result.connectors.iter().find(|s| s.id == c.id);
             let msg = st.and_then(|s| s.message.clone());
             if !self.feature_passes(noshape_model::assembly::ops::RowKind::Connector, &c.name, msg.is_some(), c.suppressed, c.hidden, false) {
                 continue;
             }
-            mate_rows.push(self.connector_row(c, msg, cx));
-            mate_ids.push(c.id);
+            items.push((c.id, self.connector_row(c, msg, cx)));
         }
         for m in &asm.mates {
             // Live (qa5 asm-056): a pattern's mates are listed under its row.
@@ -3983,8 +3984,7 @@ impl AssemblyView {
                 continue;
             }
             if let Some(row) = self.mate_list_row(m, &result, &labeler, cx) {
-                mate_rows.push(row);
-                mate_ids.push(m.id);
+                items.push((m.id, row));
             }
         }
         for r in &asm.relations {
@@ -3995,9 +3995,16 @@ impl AssemblyView {
                 continue;
             }
             let icon = icon_path(relation_icon(r.relation_type));
-            mate_rows.push(self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx));
-            mate_ids.push(r.id);
+            items.push((r.id, self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx)));
         }
+        for g in &asm.groups {
+            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Group, &g.name, false, g.suppressed, false, false) {
+                continue;
+            }
+            items.push((g.id, self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: true, inactive: g.suppressed, message: None, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx)));
+        }
+        items.sort_by_key(|(id, _)| id.0);
+        let (mut mate_ids, mut mate_rows): (Vec<MateId>, Vec<AnyElement>) = items.into_iter().unzip();
         // Live: a new relation's row ("Gear 1", selected, bold) is in the
         // list while its dialog is open.
         let new_relation = self.relation.as_ref().filter(|r| r.editing.is_none()).map(|r| (r.kind, self.relation_name(cx)));
@@ -4019,13 +4026,6 @@ impl AssemblyView {
             let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, message: (!complete).then(|| "Mate cannot resolve mate connectors.".to_string()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
-        }
-        for g in &asm.groups {
-            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Group, &g.name, false, g.suppressed, false, false) {
-                continue;
-            }
-            mate_rows.push(self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: true, inactive: g.suppressed, message: None, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx));
-            mate_ids.push(g.id);
         }
         let mate_hidden = filtering && mate_ids.iter().filter(|id| id.0 != u64::MAX).count() < asm.connectors.len() + asm.mates.len() + asm.relations.len() + asm.groups.len();
         let mate_rows = if filtering { mate_rows } else { self.fold_mate_rows(&asm, mate_ids, mate_rows, cx) };
