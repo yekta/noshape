@@ -13,7 +13,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 ## Draft
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, labels, visibility (Neutral plane / Parting line), angle 3° (0–89.9), Opposite direction ☐, second ☑, Tangent / Parting line propagation ☑, Reapply fillet ☐ | same | ✅ |  |
+| 1 | Fields | order, labels, visibility (Neutral plane / Parting line), angle 3° (0–89.9), Opposite direction ☐, second ☑, Tangent / Parting line propagation ☑, Reapply fillet ☐ | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty / unresolvable neutral plane | "Select a neutral plane." on Neutral plane | same text when empty; "The neutral plane could not be resolved" (no field) when it didn't resolve | 🔧 |  |
 | 3 | Faces gone | "Select faces to draft." on Entities to draft | "The faces to draft no longer exist" | 🔧 |  |
 | 4 | Parting line, no pull direction | "Select pull direction." on Pull direction | "Select the pull direction", no field | 🔧 |  |
@@ -40,7 +40,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Move face
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, labels, visibility, Distance 5 mm, Angle 0, Offset 0, Opposite offset ☑, Reapply fillet ☑ | same | ✅ |  |
+| 1 | Fields | order, labels, visibility, Distance 5 mm, Angle 0, Offset 0, Opposite offset ☑, Reapply fillet ☑ | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Check order | faces first: "Select faces to move." | direction / axis first | 🔧 |  |
 | 3 | No translation direction | "Cannot determine translation direction." on Direction | "Select a direction", no field | 🔧 |  |
 | 4 | Translate direction auto-fill | Direction = the first planar face picked (moveFaceEditingLogic) | stays empty | 🔧 a new Move face (Translate) takes the first planar moved face, until the user sets Direction |  |
@@ -55,7 +55,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Replace face
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | Faces to replace, Faces to replace with, Flip alignment ☐, Offset distance 0 + flip | same | ✅ |  |
+| 1 | Fields | Faces to replace, Faces to replace with, Flip alignment ☐, Offset distance 0 + flip | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty Faces to replace | "Select faces to replace." on Faces to replace | no period, no field | 🔧 |  |
 | 3 | Failure | "Could not replace faces as requested." | our own texts with kernel detail | 🔧 |  |
 | 4 | Flip alignment | used; hidden when several replace-with faces; defaults on when the normals oppose (replaceFaceEditLogic) | ignored, always shown, always off | 🔧 L7/L8: wrong sense fails "Could not replace faces as requested.", offset along the template's (flipped) normal, hidden with 2 faces, auto-ticked when the normals oppose |  |
@@ -65,7 +65,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Delete face
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | Delete faces, Type Heal / Cap / Leave open (Heal), ☑ Delete fillet faces | same | ✅ |  |
+| 1 | Fields | Delete faces, Type Heal / Cap / Leave open (Heal), ☑ Delete fillet faces | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Failure | "Could not delete selected faces." (live) | "Delete face failed (…): <kernel>", cap texts | 🔧 |  |
 | 3 | Every face picked | live: OK, the part disappears, no message | "Cannot delete every face of a part" | 🔧 |  |
 | 4 | Surface picked first | Type switches to Leave open (deleteFaceEditLogic) | stays Heal | 🔧 L10 |  |
@@ -74,7 +74,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Sweep
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, labels, defaults, Twist / Scale / Thin / Trim ends groups (dialog-sweep.txt) | same | ✅ |  |
+| 1 | Fields | order, labels, defaults, Twist / Scale / Thin / Trim ends groups (dialog-sweep.txt) | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty path | "Select entities for sweep path." on path | same | ✅ |  |
 | 3 | Thin, check order | wall checked before path: "Select faces or sketch regions to sweep." on wallShape | path first; own text, no field | 🔧 |  |
 | 4 | Path not one chain | "Sweep path curves are not all connected." on path | own text, no field | 🔧 |  |
@@ -88,7 +88,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Loft
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, labels, defaults, End conditions, Path section count 5, Connections, isocurves 10 | same | ✅ |  |
+| 1 | Fields | order, labels, defaults, End conditions, Path section count 5, Connections, isocurves 10 | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty profiles | "Select profiles in order from start to finish." on profiles | same | ✅ |  |
 | 3 | Guides, Path | supported | "…not supported yet" | 🔧 live "psb (10-24 f)". **Path**: the profiles carried along the path, Section count sections cut at even steps, live then runs a natural cubic through them (quarter arc □20: 25100.80 / 25128.64 for 5 / 10 sections); ours still comes out at the exact sweep (25132.6, within 0.13 %; the natural rebuild is rejected for path lofts, P3, test tolerance temporary); the path needn't touch the profiles (live: no error); two profiles only so far. **Guides** through polygon corners: each side face ruled between its corner columns (the guide or a straight line), sewn with the profiles; the guided edge is the guide; live's guided faces bulge a little more (one guide 5634.73 vs ours ~5628.8, four 9511.27 vs ~9511.44); "All guides should intersect each profile boundary." (no field); curved profiles, several guide curves, more than two profiles, guide continuity still "not supported yet" |  |
 | 4 | End conditions | applied, with their errors (planar profile, adjacent faces, tangency direction) | warning only | 🔧 Normal / Tangent to profile and Normal / Tangent to direction clamp the end derivative (kernel `LoftEnd`, natural_loft): live "psb (10-24) loft end derivative" (+ b): 3·ΔCP1 = m·(0.9 h + 0.1 c) at each corner column, a smoothstep between the corners, natural free end (Parasolid's interior columns carry a small extra bump: volumes within ~1.5e-5); two-profile lofts get a halfway section so OCCT smooths them; the nine live lofts (□→□ shifted / h 40 / Tangent, □→Ø16 m 0.5 / 3 / both ends / end only / Tangent 2) in test `loft_end_conditions_as_live`; texts "Only planar profiles are valid for Normal/Tangent to profile start/end condition.", "Select direction for start/end profile tangency."; Match tangent / curvature still a warning. **Tangent to profile is 🔧**: corners match live, the interior columns don't (3900 vs live 3926.46, 4943.72 vs 4925.19); the test's 30 mm³ tolerance is temporary until live's columns ("psb (10-24 h)") land |  |
@@ -101,7 +101,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Thicken
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, labels, 5 mm, Thickness 2 = 0, Keep tools ☐, merge scope, Mid plane swap | same | ✅ |  |
+| 1 | Fields | order, labels, 5 mm, Thickness 2 = 0, Keep tools ☐, merge scope, Mid plane swap | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty | "Select surfaces or faces to thicken." on entities | same | ✅ |  |
 | 3 | Keep tools off, some faces of a surface | the surface is kept unless all its faces are picked | deleted when any face is picked | 🔧 L16 |  |
 | 4 | Adjacent faces | one operation: one body | each face separately | ✗ L17: one L-shaped part of 2560 mm³ (square corner); ours 2 slabs — needs the kernel's intersection join (kern); overlapping slabs of one body are fused |  |
@@ -111,7 +111,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Wrap
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | Creation type Solid / Surface / Split (Surface), operations for Solid, flip, Trim to target, anchors, Thickness 2.5 | same | ✅ |  |
+| 1 | Fields | Creation type Solid / Surface / Split (Surface), operations for Solid, flip, Trim to target, anchors, Thickness 2.5 | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✅ (fs: the std group, collapsed) |  |
 | 3 | Filters | Tools planar only; Target cylindrical or conical only; no unwrap | wider, plus unwrap | 🔧 L20 (no unwrap; forced picks fail with live's texts) |  |
 | 4 | Errors | "Select planar faces or sketch regions to wrap." (source), "Select a cylindrical or conical face to wrap around." (destination), "Source entities must all lie on the same plane.", "Select anchor points.", auto-anchor text, "Failed to imprint edges onto destination face.", ambiguous anchor | own texts, no fields | 🔧 (unwrap keeps its own texts) |  |
@@ -120,7 +120,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Rib
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, labels, Thickness 2.5 mm, Parallel, Opposite direction ☑, Draft ☐ 3°, Extend ☐, Merge ribs ☑ | same | ✅ |  |
+| 1 | Fields | order, labels, Thickness 2.5 mm, Parallel, Opposite direction ☑, Draft ☐ 3°, Extend ☐, Merge ribs ☑ | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty profiles | "Select sketch profiles to create the ribs." on profiles | same | ✅ |  |
 | 3 | Empty Parts | "Select parts where the rib will be fitted into." | all solids used | 🔧 L22 (no field); older ribs keep using every part |  |
 | 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | 🔧 L22 Parts filled with the studio's parts on open |  |
@@ -132,7 +132,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Offset surface
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, labels, 5 mm (0 allowed), Create selection, flip | same | ✅ |  |
+| 1 | Fields | order, labels, 5 mm (0 allowed), Create selection, flip | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Nothing resolves | "Select faces, surfaces, or sketch regions to offset from." on surfacesAndFaces | "Nothing to offset"; one missing face fails the feature | 🔧 |  |
 | 3 | Kernel failure | — | raw kernel text | 🔧 L25 "Could not offset selected faces as requested."; L26 one surface per picked face |  |
 
@@ -149,7 +149,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Boundary surface
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ |  |
+| 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Profile arrays | driven-query rows "[None] Edges of Curve U1" (live L28: no limit, a third row is taken) | "Add Profile" UI | ✅ driven query with the "[#uCondition] #uProfileEntities" item label |  |
 | 3 | Boundary condition label | SHOW_LABEL | no label | 🔧 SHOW_LABEL |  |
 | 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 L28; a third profile / mid-span crossing fail with live's texts 🔧; 1U+1V 🔧 builds the sheet the U sweeps along the V (the other two sides are the profiles moved to each other's far end; live 2099) |  |
@@ -159,7 +159,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Enclose
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | Result body operation, Entities, Merge with all ☐, merge scope, Keep tools ☐ | same | ✅ |  |
+| 1 | Fields | Result body operation, Entities, Merge with all ☐, merge scope, Keep tools ☐ | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty | "Select faces, parts, or planes to form a solid." | own text | 🔧 L29 Entities marked |  |
 | 3 | No region | "Selections do not enclose a region." | own text | 🔧 ✅ L30 |  |
 | 4 | Failure | "Failed to create a part from enclosed region." | "Enclose failed: …" | 🔧 |  |
@@ -168,7 +168,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Helix
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, labels, defaults (dialog-helix.txt) | same | ✅ |  |
+| 1 | Fields | order, labels, defaults (dialog-helix.txt) | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Axis empty | "Select an object with an axis." on axis | own text, no field | 🔧 |  |
 | 3 | Circle empty | "Select a circle or arc." on edge | own text, no field | 🔧 |  |
 | 4 | Height | 1e-5–500 m (0 out of range) | 0 allowed, flat spiral | 🔧 L32 "A parameter value is not valid." (any out-of-range value, all features) |  |
@@ -181,14 +181,14 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Composite part
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | Entities, Closed ☐; closed consumes members | same | ✅ |  |
+| 1 | Fields | Entities, Closed ☐; closed consumes members | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty | "Select entities to create a composite part." (likely) | own text, no field | 🔧 L36 Entities marked |  |
 | 3 | Overlapping composites | "Cannot create a closed composite part that partially overlaps another composite part." (and open) | no check | 🔧 L36 a part of a closed composite in another closed one fails with live's text; a whole composite nests |  |
 
 ## Mate connector (Part Studio)
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields, empty origin | order, labels; "Cannot resolve entities." on Origin entity | same | ✅ |  |
+| 1 | Fields, empty origin | order, labels; "Cannot resolve entities." on Origin entity | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty owner | "Cannot determine owner of mate connector." on Select owner entity | no error | 🔧 L37 (owner inferred from the origin's part or the only part, as the dialog does) |  |
 | 3 | Owner / attachment auto-fill | from the origin entity or the only part (connectorEditLogic) | none | 🔧 L37 |  |
 | 4 | To selection, empty | "Select an entity for the mate connector attachment." on Attach to | no check | ✅ (already in refgeom.rs; the doc was stale) |  |
@@ -215,7 +215,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Hole
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, labels, enum texts, defaults, bounds, visibility (dialog-hole.txt) | same | ✅ |  |
+| 1 | Fields | order, labels, enum texts, defaults, bounds, visibility (dialog-hole.txt) | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Standard tables | holetables.gen.fs (already in crates/featurescript/std) | our own close values; missing sizes, pipe taps, PEM; labels like "1/64 (0.0156)" | 🔧 L58 read from holetables.gen.fs: every size, pipe tap and PEM entry, in live's order and with its keys ("1.00 mm (Coarse)", "1/4 (0.25)" before "E (0.25)"); paths saved with a bare pitch still resolve |  |
 | 3 | Tap drill default | 5 mm / 0.25 in | 4.2 mm / 0.201 in | 🔧 L58 values from the FS table |  |
 | 4 | Check order | counterbore, countersink, tolerances, tap drill, end, start, then "No hole points selected." | points first | 🔧 |  |
