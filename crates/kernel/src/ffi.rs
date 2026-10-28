@@ -340,10 +340,14 @@ pub(crate) mod ffi {
         fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, out: &mut BrepResult) -> bool;
         /// Notes why the C++ side declined (for `last_rust_decline`).
         fn brep_decline(reason: &str);
-        /// Whether op_boolean tries it ([`crate::set_rust_boolean`], else NOSHAPE_BOOL_RUST=1).
+        /// Whether op_boolean tries it ([`crate::set_rust_boolean`], else on unless NOSHAPE_BOOL_RUST=0).
         fn brep_enabled() -> bool;
         /// Whether a decline fails the Boolean ([`crate::set_rust_boolean_only`]).
         fn brep_strict() -> bool;
+        /// Whether Booleans are recorded (NOSHAPE_RECORD_BOOLEANS).
+        fn brep_recording() -> bool;
+        /// Records a Boolean the kernel made outside op_boolean (quick_boolean, rust_boolean.cpp).
+        fn brep_record_direct(op: u8, objects: &OcShapeList, tools: &OcShapeList, out: OpOut, parallel: bool, ms: f64, path: &str);
     }
 
     unsafe extern "C++" {
@@ -700,7 +704,7 @@ pub(crate) mod ffi {
     }
 }
 
-use crate::brep_bridge::{brep_boolean, brep_decline, brep_enabled, brep_strict};
+use crate::brep_bridge::{brep_boolean, brep_decline, brep_enabled, brep_record_direct, brep_recording, brep_strict};
 
 // SAFETY: OcShape wraps an immutable TopoDS_Shape (handles with atomic
 // reference counts); its lazily-built maps are guarded by std::call_once.

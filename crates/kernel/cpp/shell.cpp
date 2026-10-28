@@ -2056,15 +2056,12 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     ShapeList first, rest = tools;
     first.Append(rest.First());
     rest.RemoveFirst();
-    BRepAlgoAPI_Fuse fu;
-    fu.SetArguments(first);
-    fu.SetTools(rest);
-    fu.SetRunParallel(bop_parallel());
-    fu.Build();
-    if (fu.HasErrors() || !fu.IsDone())
+    TopoDS_Shape fu_out;
+    HHist        fu_hist;
+    if (!quick_boolean(0, first, rest, bop_parallel(), fu_out, fu_hist))
       return false;
-    union_ = fu.Shape();
-    hu = fu.History();
+    union_ = fu_out;
+    hu = fu_hist;
   }
   lap("fuse");
   TopoDS_Shape r;
@@ -2114,14 +2111,12 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       TopoDS_Face  big = BRepBuilderAPI_MakeFace(gp_Pln(ax), -size, size, -size, size).Face();
       tls.Append(BRepPrimAPI_MakePrism(big, gp_Vec(n) * size).Shape());
     }
-    BRepAlgoAPI_Cut cu;
-    cu.SetArguments(objs);
-    cu.SetTools(tls);
-    cu.Build();
-    if (cu.HasErrors() || !cu.IsDone())
+    TopoDS_Shape cu_out;
+    HHist        cu_hist;
+    if (!quick_boolean(1, objs, tls, false, cu_out, cu_hist))
       return false;
-    r = cu.Shape();
-    hb = cu.History();
+    r = cu_out;
+    hb = cu_hist;
   }
   lap("common");
   // Merge the faces split up by the slab construction.
@@ -2430,29 +2425,23 @@ OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, c
   {
     ShapeList args;
     args.Append(r);
-    BRepAlgoAPI_Cut cu;
-    cu.SetArguments(args);
-    cu.SetTools(removal);
-    cu.SetRunParallel(bop_parallel());
-    cu.Build();
-    if (cu.HasErrors() || !cu.IsDone())
+    TopoDS_Shape cu_out;
+    HHist        cu_hist;
+    if (!quick_boolean(1, args, removal, bop_parallel(), cu_out, cu_hist))
       fail_op("draft fallback: cut failed");
-    r = cu.Shape();
-    chain.push_back(cu.History());
+    r = cu_out;
+    chain.push_back(cu_hist);
   }
   if (!addition.IsEmpty())
   {
     ShapeList args;
     args.Append(r);
-    BRepAlgoAPI_Fuse fu;
-    fu.SetArguments(args);
-    fu.SetTools(addition);
-    fu.SetRunParallel(bop_parallel());
-    fu.Build();
-    if (fu.HasErrors() || !fu.IsDone())
+    TopoDS_Shape fu_out;
+    HHist        fu_hist;
+    if (!quick_boolean(0, args, addition, bop_parallel(), fu_out, fu_hist))
       fail_op("draft fallback: fuse failed");
-    r = fu.Shape();
-    chain.push_back(fu.History());
+    r = fu_out;
+    chain.push_back(fu_hist);
   }
   ShapeUpgrade_UnifySameDomain usd(r, true, true, false);
   usd.SetLinearTolerance(1e-7);
@@ -2721,29 +2710,23 @@ OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, con
   {
     ShapeList args;
     args.Append(r);
-    BRepAlgoAPI_Cut cu;
-    cu.SetArguments(args);
-    cu.SetTools(removal);
-    cu.SetRunParallel(bop_parallel());
-    cu.Build();
-    if (cu.HasErrors() || !cu.IsDone())
+    TopoDS_Shape cu_out;
+    HHist        cu_hist;
+    if (!quick_boolean(1, args, removal, bop_parallel(), cu_out, cu_hist))
       fail_op("draft: cut failed");
-    r = cu.Shape();
-    chain.push_back(cu.History());
+    r = cu_out;
+    chain.push_back(cu_hist);
   }
   if (!addition.IsEmpty())
   {
     ShapeList args;
     args.Append(r);
-    BRepAlgoAPI_Fuse fu;
-    fu.SetArguments(args);
-    fu.SetTools(addition);
-    fu.SetRunParallel(bop_parallel());
-    fu.Build();
-    if (fu.HasErrors() || !fu.IsDone())
+    TopoDS_Shape fu_out;
+    HHist        fu_hist;
+    if (!quick_boolean(0, args, addition, bop_parallel(), fu_out, fu_hist))
       fail_op("draft: fuse failed");
-    r = fu.Shape();
-    chain.push_back(fu.History());
+    r = fu_out;
+    chain.push_back(fu_hist);
   }
   ShapeUpgrade_UnifySameDomain usd(r, true, true, false);
   usd.SetLinearTolerance(1e-7);

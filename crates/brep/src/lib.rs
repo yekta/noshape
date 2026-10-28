@@ -15,6 +15,7 @@
 mod arrange;
 mod boolean;
 mod curve2;
+mod fxhash;
 
 pub use boolean::{boolean, Op};
 use glam::DVec3;

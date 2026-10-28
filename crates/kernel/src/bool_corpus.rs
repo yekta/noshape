@@ -142,26 +142,53 @@ pub fn recording() -> Option<PathBuf> {
     std::env::var_os("NOSHAPE_RECORD_BOOLEANS").map(PathBuf::from)
 }
 
-/// Records one call (when it isn't in the corpus yet): `run` performs it.
-pub fn record(dir: &Path, op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions, run: impl FnOnce() -> crate::Result<OpResult>) -> crate::Result<OpResult> {
+/// A case's name (a hash of its inputs, op and options) and its inputs as BREP.
+fn case_of(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions) -> Option<(String, Vec<u8>)> {
     let inputs = Shape::compound(&[Shape::compound(objects), Shape::compound(tools)]);
-    let Ok(bytes) = inputs.to_brep_bytes() else { return run() };
+    let bytes = inputs.to_brep_bytes().ok()?;
     let mut h = Fnv(0xcbf2_9ce4_8422_2325);
     h.write(&bytes);
     h.write(op_name(op).as_bytes());
     h.write(format!("{} {} {} {} {}", opts.fuzzy, glue_name(opts.glue), opts.unify, opts.parallel, opts.obb).as_bytes());
-    let name = format!("{:016x}", h.finish());
-    let txt = dir.join(format!("{name}.txt"));
-    if txt.exists() {
+    Some((format!("{:016x}", h.finish()), bytes))
+}
+
+/// Records one call (when it isn't in the corpus yet): `run` performs it.
+pub fn record(dir: &Path, op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions, run: impl FnOnce() -> crate::Result<OpResult>) -> crate::Result<OpResult> {
+    let Some((name, bytes)) = case_of(op, objects, tools, opts) else { return run() };
+    if dir.join(format!("{name}.txt")).exists() {
         return run();
     }
     let t = std::time::Instant::now();
     let r = run();
     let ms = t.elapsed().as_secs_f64() * 1e3;
     let Ok(res) = &r else { return r };
+    write_case(dir, &name, &bytes, &Call { op, objects, tools, opts }, res, ms, &crate::last_boolean_path());
+    r
+}
+
+/// One Boolean call: op, arguments, options.
+pub struct Call<'a> {
+    pub op: BooleanOp,
+    pub objects: &'a [Shape],
+    pub tools: &'a [Shape],
+    pub opts: &'a BooleanOptions,
+}
+
+/// Records a call made elsewhere (the kernel's own Booleans outside `boolean`: Shell's, the slabs'),
+/// with its time and path.
+pub fn record_result(dir: &Path, call: &Call, res: &OpResult, ms: f64, path: &str) {
+    let Some((name, bytes)) = case_of(call.op, call.objects, call.tools, call.opts) else { return };
+    if !dir.join(format!("{name}.txt")).exists() {
+        write_case(dir, &name, &bytes, call, res, ms, path);
+    }
+}
+
+fn write_case(dir: &Path, name: &str, bytes: &[u8], call: &Call, res: &OpResult, ms: f64, path: &str) {
+    let (op, objects, tools, opts) = (call.op, call.objects, call.tools, call.opts);
     let s = Summary::of(res);
     let _ = std::fs::create_dir_all(dir);
-    if std::fs::write(dir.join(format!("{name}.brep")), &bytes).is_ok() {
+    if std::fs::write(dir.join(format!("{name}.brep")), bytes).is_ok() {
         let text = format!(
             "op {}\nfuzzy {:e}\nglue {}\nunify {}\nparallel {}\nobb {}\nobjects {}\ntools {}\ntarget_faces {}\nvalid {}\nvolume {:.17e}\nfaces {}\nedges {}\nvertices {}\nhistory {:016x}\nms {:.3}\npath {}\n",
             op_name(op),
@@ -180,11 +207,10 @@ pub fn record(dir: &Path, op: BooleanOp, objects: &[Shape], tools: &[Shape], opt
             s.vertices,
             s.history,
             ms,
-            crate::last_boolean_path(),
+            path,
         );
-        let _ = std::fs::write(&txt, text);
+        let _ = std::fs::write(dir.join(format!("{name}.txt")), text);
     }
-    r
 }
 
 /// Writes `s` as the case's expected result (NOSHAPE_BOOL_REBASE: a corpus

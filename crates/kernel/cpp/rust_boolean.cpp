@@ -1,12 +1,18 @@
 // noshape's own Boolean (crates/brep, docs/BOOLEAN-SPEEDUP.md phase 3): the arguments as flat bodies, the
-// result and its history back as shapes. op_boolean runs it first with NOSHAPE_BOOL_RUST=1; it declines
+// result and its history back as shapes. op_boolean tries it (NOSHAPE_BOOL_RUST=0: never); it declines
 // anything but solids bounded by planes and cylinders, and OCCT runs as before.
 #include "internal.hpp"
 
+#include <chrono>
 #include <cstdlib>
 
+#include <BRepAlgoAPI_Common.hxx>
+#include <BRepAlgoAPI_Cut.hxx>
+#include <BRepAlgoAPI_Fuse.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
+#include <BRepLib.hxx>
+#include <TopExp_Explorer.hxx>
 #include <BRepTools_History.hxx>
 #include <ElCLib.hxx>
 #include <ElSLib.hxx>
@@ -331,7 +337,9 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
     const uint32_t kind = r.face_origin[3 * i];
     const TopoDS_Face& src = TopoDS::Face(input(srcs, r.face_origin[3 * i + 1], TopAbs_FACE, r.face_origin[3 * i + 2]));
     TopLoc_Location                 loc;
-    const occ::handle<Geom_Surface> s   = BRep_Tool::Surface(src, loc);
+    const occ::handle<Geom_Surface> s0  = BRep_Tool::Surface(src, loc);
+    // A new face gets its own surface (OCCT's pieces do).
+    const occ::handle<Geom_Surface> s = kind == 0 ? s0 : occ::handle<Geom_Surface>(occ::down_cast<Geom_Surface>(s0->Copy()));
     const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(s);
     // The face's way round against its surface's normal (to_body: a left-handed cylinder's is inward).
     const bool rev = b.reversed[i] != (!cs.IsNull() && !cs->Position().Direct());
@@ -432,6 +440,10 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
       w.Closed(true);
       bb.Add(f, w);
     }
+    // Its edges' curves on a plane too, as OCCT's pieces have them.
+    if (cs.IsNull())
+      for (TopExp_Explorer ex(f, TopAbs_EDGE); ex.More(); ex.Next())
+        BRepLib::BuildPCurveForEdgeOnPlane(TopoDS::Edge(ex.Current()), f);
     fs[i] = rev ? TopoDS::Face(f.Reversed()) : f;
   }
   TopoDS_Compound out;
@@ -629,6 +641,60 @@ void rust_boolean_keep(const OcShape& out)
   const std::lock_guard<std::mutex> lock(out.myBrepLock);
   out.myBrep    = c;
   out.myBrepTol = done.tol;
+}
+
+} // namespace noshape
+
+namespace noshape {
+
+bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bool parallel, TopoDS_Shape& out,
+                   occ::handle<BRepTools_History>& hist)
+{
+  const auto                t0 = std::chrono::steady_clock::now();
+  std::vector<TopoDS_Shape> all;
+  for (const TopoDS_Shape& x : args)
+    all.push_back(x);
+  for (const TopoDS_Shape& x : tools)
+    all.push_back(x);
+  const char* path = "direct";
+  bool        done = false;
+  // (Not in the replay's strict mode: that is for op_boolean's.)
+  if (args.Extent() == 1 && rust_boolean_on() && !brep_strict())
+  {
+    std::vector<const OcShape*>           srcs;
+    std::vector<std::unique_ptr<OcShape>> own;
+    const KernelTimer                     timer("boolean.rust.direct");
+    done = rust_boolean(op, all, srcs, own, out, hist);
+    if (done)
+      path = "direct_rust";
+  }
+  if (!done)
+  {
+    std::unique_ptr<BRepAlgoAPI_BooleanOperation> b;
+    if (op == 0)
+      b = std::make_unique<BRepAlgoAPI_Fuse>();
+    else if (op == 1)
+      b = std::make_unique<BRepAlgoAPI_Cut>();
+    else
+      b = std::make_unique<BRepAlgoAPI_Common>();
+    b->SetArguments(args);
+    b->SetTools(tools);
+    b->SetRunParallel(parallel);
+    b->Build();
+    if (b->HasErrors() || !b->IsDone())
+      return false;
+    out  = b->Shape();
+    hist = b->History();
+  }
+  if (brep_recording())
+  {
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    OcShapeList  a, t;
+    a.items.assign(all.begin(), all.begin() + args.Extent());
+    t.items.assign(all.begin() + args.Extent(), all.end());
+    brep_record_direct(op, a, t, make_result(all, out, hist.get()), parallel, ms, path);
+  }
+  return true;
 }
 
 } // namespace noshape

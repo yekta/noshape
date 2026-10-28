@@ -2,7 +2,8 @@
 //! [`ffi::BrepBody`]s (cpp/rust_boolean.cpp), calls [`brep_boolean`], and builds the result's shapes and
 //! history from the [`ffi::BrepResult`].
 
-use crate::ffi::ffi::{BrepBody, BrepResult};
+use crate::ffi::ffi::{self as raw, BrepBody, BrepResult, OcShapeList, OpOut};
+use crate::{bool_corpus, BooleanOp, BooleanOptions, OpResult, Shape};
 use noshape_brep::{Body, Curve, Edge, Face, Kind, Op, Origin, Relation, Solid, Surface, Use};
 use std::cell::{Cell, RefCell};
 use std::sync::OnceLock;
@@ -26,7 +27,7 @@ pub(crate) fn brep_strict() -> bool {
 }
 
 /// Turns noshape's own Boolean on or off for this thread's Booleans (`None`: as NOSHAPE_BOOL_RUST says,
-/// 1 = on); the corpus replay compares it with OCCT.
+/// on unless 0); the corpus replay compares it with OCCT.
 pub fn set_rust_boolean(on: Option<bool>) {
     MODE.with(|m| m.set(on));
     brep_decline("not tried (an earlier path took it)");
@@ -34,7 +35,7 @@ pub fn set_rust_boolean(on: Option<bool>) {
 
 pub(crate) fn brep_enabled() -> bool {
     static ENV: OnceLock<bool> = OnceLock::new();
-    MODE.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BOOL_RUST").is_ok_and(|v| v == "1")))
+    MODE.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BOOL_RUST").as_deref() != Ok("0")))
 }
 
 thread_local! {
@@ -170,4 +171,22 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, out: &mut BrepRe
         })
         .collect();
     true
+}
+
+pub(crate) fn brep_recording() -> bool {
+    bool_corpus::recording().is_some()
+}
+
+pub(crate) fn brep_record_direct(op: u8, objects: &OcShapeList, tools: &OcShapeList, out: OpOut, parallel: bool, ms: f64, path: &str) {
+    let Some(dir) = bool_corpus::recording() else { return };
+    let list = |l: &OcShapeList| -> Vec<Shape> { (0..raw::list_len(l).unwrap_or(0)).filter_map(|i| raw::list_get(l, i).ok()).map(Shape::from_ptr).collect() };
+    let (objects, tools) = (list(objects), list(tools));
+    let op = match op {
+        0 => BooleanOp::Fuse,
+        1 => BooleanOp::Cut,
+        _ => BooleanOp::Common,
+    };
+    let opts = BooleanOptions { parallel, ..Default::default() };
+    let call = bool_corpus::Call { op, objects: &objects, tools: &tools, opts: &opts };
+    bool_corpus::record_result(&dir, &call, &OpResult::from_ffi(out), ms, path);
 }

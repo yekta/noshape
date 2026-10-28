@@ -18,7 +18,7 @@ use crate::arrange::regions;
 use crate::curve2::{distance as distance2, inside as inside2, C2};
 use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, Solid, Surface, Use, GREY};
 use glam::{DVec2, DVec3};
-use std::collections::HashMap;
+use crate::fxhash::{HashMap, HashSet};
 use std::f64::consts::{PI, TAU};
 
 /// The Boolean operation: `args[0]` is the object, the other arguments the tools.
@@ -81,8 +81,8 @@ struct GFace {
     s: Surf,
     /// Its input boundary, every loop together.
     edges: Vec<(usize, bool)>,
-    /// The same in its parameter plane (a seam twice).
-    bound: Vec<C2>,
+    /// The same in its parameter plane (a seam twice), made when first asked for ([`Ctx::bound`]).
+    bound: std::cell::OnceCell<R<Vec<C2>>>,
     lo: DVec3,
     hi: DVec3,
 }
@@ -288,6 +288,9 @@ impl End {
     }
 }
 
+/// Pool vertices sorted by x, by the argument they belong to (None: new or several arguments').
+type ByOwner = Vec<(Option<u32>, Vec<(f64, u32)>)>;
+
 /// An interval of a path inside a face: its ends (parameter, end).
 type Ival = [(f64, End); 2];
 
@@ -298,7 +301,7 @@ struct Ctx {
     edges: Vec<GEdge>,
     solids: Vec<GSolid>,
     side_cache: HashMap<(u32, usize), i8>,
-    in_face_done: std::collections::HashSet<(usize, usize)>,
+    in_face_done: HashSet<(usize, usize)>,
     /// Curves added to each face.
     face_segs: Vec<Vec<Seg>>,
     coplanar: Vec<(usize, usize)>,
@@ -347,6 +350,34 @@ impl Ctx {
         Ok(s)
     }
 
+    /// Face `f`'s outward normal at `p` (on its surface).
+    fn normal_at(&self, f: usize, p: DVec3) -> DVec3 {
+        match self.faces[f].s {
+            Surf::Plane { n, .. } => n,
+            Surf::Cyl { o, a, flip, .. } => {
+                let w = p - o;
+                let radial = (w - a * w.dot(a)).normalize();
+                if flip { -radial } else { radial }
+            }
+        }
+    }
+
+    /// Face `f`'s boundary in its parameter plane.
+    fn bound(&self, f: usize) -> R<&[C2]> {
+        let make = || -> R<Vec<C2>> {
+            let mut bound = Vec::with_capacity(self.faces[f].edges.len());
+            let mut seen: HashMap<usize, usize> = HashMap::default();
+            for &(e, _) in &self.faces[f].edges {
+                let s = self.edge_seg(e);
+                let copy = seen.entry(e).or_insert(0);
+                bound.push(self.faces[f].curve2(self.p(s.v[0]), self.p(s.v[1]), &s.g, *copy)?);
+                *copy += 1;
+            }
+            Ok(bound)
+        };
+        self.faces[f].bound.get_or_init(make).as_deref().map_err(|e| *e)
+    }
+
     fn seg_at(&self, s: &Seg, t: f64) -> DVec3 {
         match s.g {
             Geo::Line => self.p(s.v[0]).lerp(self.p(s.v[1]), t),
@@ -386,7 +417,7 @@ impl Ctx {
 
     /// The intervals of `path` (parameters `t0..t1`) inside face `f` (with its boundary when `closed`).
     /// `ends`: the path's own end vertices, if it has them.
-    fn intervals(&mut self, f: usize, path: &Path, t0: f64, t1: f64, ends: [Option<u32>; 2], closed: bool) -> R<Vec<Ival>> {
+    fn intervals(&mut self, f: usize, path: &Path, t0: f64, t1: f64, ends: [End; 2], closed: bool) -> R<Vec<Ival>> {
         let tol = self.tol;
         let len = match path {
             Path::Line { .. } => t1 - t0,
@@ -398,9 +429,9 @@ impl Ctx {
         let geo = path.geo(t0, t1);
         let c2 = self.faces[f].curve2(path.at(t0), path.at(t1), &geo, 0)?;
         // Where it meets the face's boundary.
-        let open = |v: Option<u32>| v.map_or(End::Open, End::Vertex);
-        let mut cuts: Vec<(f64, End)> = vec![(t0, open(ends[0])), (t1, open(ends[1]))];
-        for b in &self.faces[f].bound {
+        let mut cuts: Vec<(f64, End)> = vec![(t0, ends[0]), (t1, ends[1])];
+        let bound = self.bound(f)?.to_vec();
+        for b in &bound {
             for (u, _) in c2.intersections(b, tol) {
                 let t = t0 + (t1 - t0) * u;
                 cuts.push((t, End::Point(path.at(t))));
@@ -439,13 +470,13 @@ impl Ctx {
                 continue;
             }
             let mid = c2.at(((a.0 + b.0) * 0.5 - t0) / (t1 - t0));
-            let dist = distance2(mid, &self.faces[f].bound);
+            let dist = distance2(mid, &bound);
             let inside = if dist <= tol {
                 closed
             } else if dist <= GREY * tol {
                 return Err(Decline("a curve nearly along a face's boundary"));
             } else {
-                inside2(mid, &self.faces[f].bound)
+                inside2(mid, &bound)
             };
             if !inside {
                 continue;
@@ -465,11 +496,11 @@ impl Ctx {
 
     /// Adds where `path` lies inside both faces to both, as sections.
     fn section(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64) -> R<()> {
-        let ia = self.intervals(fs, &path, t0, t1, [None, None], false)?;
+        let ia = self.intervals(fs, &path, t0, t1, [End::Open; 2], false)?;
         if ia.is_empty() {
             return Ok(());
         }
-        let ib = self.intervals(ft, &path, t0, t1, [None, None], false)?;
+        let ib = self.intervals(ft, &path, t0, t1, [End::Open; 2], false)?;
         let (ia, ib) = (wrap(ia, &path, t0, t1), wrap(ib, &path, t0, t1));
         let tol = self.tol;
         let scale = match path {
@@ -546,7 +577,20 @@ impl Ctx {
             }
             Geo::Arc { k, a0, sweep } => (Path::Circle(k), a0, a0 + sweep),
         };
-        for iv in self.intervals(f, &path, t0, t1, [Some(s.v[0]), Some(s.v[1])], true)? {
+        // An arc across a round face's seam: in two parts, a vertex where it crosses.
+        let mut parts = vec![(t0, End::Vertex(s.v[0]), t1, End::Vertex(s.v[1]))];
+        if let (Path::Circle(k), Surf::Cyl { o, a, x, y, r, th0, full: true, .. }) = (path, &self.faces[f].s) {
+            let seam = o + a * (k.c - o).dot(*a) + (x * th0.cos() + y * th0.sin()) * *r;
+            let ts = t0 + (k.angle(seam) - t0).rem_euclid(TAU);
+            if (ts - t0) * k.r > self.tol && (t1 - ts) * k.r > self.tol {
+                parts = vec![(t0, End::Vertex(s.v[0]), ts, End::Point(seam)), (ts, End::Point(seam), t1, End::Vertex(s.v[1]))];
+            }
+        }
+        let mut ivs = Vec::new();
+        for (a0, e0, a1, e1) in parts {
+            ivs.extend(self.intervals(f, &path, a0, a1, [e0, e1], true)?);
+        }
+        for iv in ivs {
             let mut ends = [0u32; 2];
             for k in 0..2 {
                 ends[k] = match iv[k].1 {
@@ -700,11 +744,11 @@ impl Ctx {
             return Ok(());
         }
         let path = Path::Line { p, d: a };
-        let ia = self.intervals(f, &path, t0, t1, [None, None], true)?;
+        let ia = self.intervals(f, &path, t0, t1, [End::Open; 2], true)?;
         if ia.is_empty() {
             return Ok(());
         }
-        let ib = self.intervals(fc, &path, t0, t1, [None, None], true)?;
+        let ib = self.intervals(fc, &path, t0, t1, [End::Open; 2], true)?;
         let meet = ia.iter().any(|x| ib.iter().any(|y| x[1].0.min(y[1].0) - x[0].0.max(y[0].0) > self.tol));
         if meet { Err(Decline("faces touching along a line")) } else { Ok(()) }
     }
@@ -720,8 +764,13 @@ impl Ctx {
         let w = w - a1 * w.dot(a1);
         let dl = w.length();
         if dl <= GREY * tol {
+            if (r1 - r2).abs() <= tol {
+                // One surface: their pieces on each other are coincident, like coplanar faces'.
+                self.coplanar.push((f1, f2));
+                return Ok(());
+            }
             if (r1 - r2).abs() <= GREY * tol {
-                return Err(Decline("coincident cylinders"));
+                return Err(Decline("cylinders nearly coincident"));
             }
             return Ok(());
         }
@@ -745,6 +794,26 @@ impl Ctx {
     }
 
     /// The pool vertices strictly inside `s`, in order from its start.
+    /// The pool vertices strictly inside `s`, in order from its start: of `lists` (each sorted by x), the
+    /// ones not `own`'s (an argument's vertices never lie inside its own edges).
+    fn split_among(&self, s: &Seg, lists: &ByOwner, own: Option<u32>) -> R<Vec<u32>> {
+        let mut chain: Vec<(f64, u32)> = Vec::new();
+        for (who, list) in lists {
+            if own.is_some() && *who == own {
+                continue;
+            }
+            let c = self.split(s, list)?;
+            for &w in &c[1..c.len() - 1] {
+                chain.push((self.seg_param(s, self.p(w)).0, w));
+            }
+        }
+        chain.sort_by(|x, y| x.0.total_cmp(&y.0));
+        let mut out = vec![s.v[0]];
+        out.extend(chain.into_iter().map(|x| x.1));
+        out.push(s.v[1]);
+        Ok(out)
+    }
+
     fn split(&self, s: &Seg, sorted_x: &[(f64, u32)]) -> R<Vec<u32>> {
         let tol = self.tol;
         let (lo, hi) = match s.g {
@@ -860,13 +929,14 @@ impl Ctx {
                         hits.push((-qb + disc.sqrt()) / qa);
                     }
                 }
+                let gb = if hits.is_empty() { &[][..] } else { self.bound(f)? };
                 for t in hits {
                     let q3 = p + r * t;
                     if t.abs() > GREY * tol && !boxes_meet(q3, q3, g.lo, g.hi, GREY * tol) {
                         continue;
                     }
                     if t.abs() <= GREY * tol {
-                        if distance2(g.to2(p), &g.bound) > tol && inside2(g.to2(p), &g.bound) {
+                        if distance2(g.to2(p), gb) > tol && inside2(g.to2(p), gb) {
                             return Err(Decline("a piece's point on another solid's face"));
                         }
                         continue;
@@ -875,10 +945,10 @@ impl Ctx {
                         continue;
                     }
                     let q = g.to2(p + r * t);
-                    if distance2(q, &g.bound) <= GREY * tol {
+                    if distance2(q, gb) <= GREY * tol {
                         continue 'dirs;
                     }
-                    if inside2(q, &g.bound) {
+                    if inside2(q, gb) {
                         odd = !odd;
                     }
                 }
@@ -945,11 +1015,11 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
     }
     let mut cx = Ctx {
         tol,
-        pool: Pool { p: Vec::new(), inputs: Vec::new(), grid: HashMap::new(), cell: GREY * tol * 1.01, tol },
+        pool: Pool { p: Vec::new(), inputs: Vec::new(), grid: HashMap::default(), cell: GREY * tol * 1.01, tol },
         faces: Vec::new(),
         edges: Vec::new(),
         solids: Vec::new(),
-        side_cache: HashMap::new(),
+        side_cache: HashMap::default(),
         in_face_done: Default::default(),
         face_segs: Vec::new(),
         coplanar: Vec::new(),
@@ -980,13 +1050,17 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
             }
         }
     }
-    // Vertices, edges, faces and solids of every argument.
+    // Vertices, edges, faces and solids of every argument (a vertex outside every other argument's box can't
+    // be one of theirs).
+    let arg_box: Vec<(DVec3, DVec3)> = args.iter().map(|b| b.vertices.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &p| (lo.min(p), hi.max(p)))).collect();
     let mut first_edge = Vec::new();
     for (ai, body) in args.iter().enumerate() {
         let a = ai as u32;
         let mut vmap = Vec::with_capacity(body.vertices.len());
         for (i, &p) in body.vertices.iter().enumerate() {
-            let w = match cx.pool.find(p)? {
+            let near = arg_box.iter().enumerate().any(|(k, b)| k != ai && boxes_meet(p, p, b.0, b.1, GREY * tol));
+            let found = if near { cx.pool.find(p)? } else { None };
+            let w = match found {
                 Some(w) => {
                     if cx.pool.inputs[w as usize].iter().any(|x| x.0 == a) {
                         return Err(Decline("two vertices of one argument coincide"));
@@ -1031,7 +1105,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
                 }
                 Surface::Cylinder { origin, axis, xdir, radius } => {
                     // A face that goes round starts at its seam (an edge it uses twice).
-                    let mut seen = std::collections::HashSet::new();
+                    let mut seen = HashSet::default();
                     let seam = edges.iter().find(|&&(e, _)| !seen.insert(e)).map(|&(e, _)| e);
                     let y = axis.cross(xdir);
                     let th0 = seam.map_or(0.0, |e| {
@@ -1041,7 +1115,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
                     Surf::Cyl { o: origin, a: axis, x: xdir, y, r: radius, flip: f.reversed, th0, full: seam.is_some() }
                 }
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Vec::new(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY });
+            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY });
         }
         for (i, s) in body.solids.iter().enumerate() {
             if s.shells.len() != 1 {
@@ -1104,16 +1178,6 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
                 *t = th0;
             }
         }
-        let mut bound = Vec::new();
-        let mut seen: HashMap<usize, usize> = HashMap::new();
-        for k in 0..cx.faces[f].edges.len() {
-            let (e, _) = cx.faces[f].edges[k];
-            let s = cx.edge_seg(e);
-            let copy = seen.entry(e).or_insert(0);
-            bound.push(cx.faces[f].curve2(cx.p(s.v[0]), cx.p(s.v[1]), &s.g, *copy)?);
-            *copy += 1;
-        }
-        cx.faces[f].bound = bound;
         let s = cx.faces[f].solid;
         cx.solids[s].lo = cx.solids[s].lo.min(lo);
         cx.solids[s].hi = cx.solids[s].hi.max(hi);
@@ -1156,8 +1220,28 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
     // Split edges.
     let mut by_x: Vec<(f64, u32)> = cx.pool.p.iter().enumerate().map(|(i, p)| (p.x, i as u32)).collect();
     by_x.sort_by(|a, b| a.0.total_cmp(&b.0));
+    // The same by owner: an argument's alone (merged ones and new ones under None).
+    let owner = |w: u32| match cx.pool.inputs[w as usize].as_slice() {
+        [(a, _)] => Some(*a),
+        _ => None,
+    };
+    let mut lists: ByOwner = Vec::new();
+    for &(x, w) in &by_x {
+        let o = owner(w);
+        match lists.iter_mut().find(|l| l.0 == o) {
+            Some(l) => l.1.push((x, w)),
+            None => lists.push((o, vec![(x, w)])),
+        }
+    }
+    // Each edge's solid, and whether anything of another argument comes near it.
+    let mut edge_solid = vec![usize::MAX; cx.edges.len()];
+    for f in &cx.faces {
+        for &(e, _) in &f.edges {
+            edge_solid[e] = f.solid;
+        }
+    }
     let mut sedges: Vec<SEdge> = Vec::new();
-    let mut sedge_of: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
+    let mut sedge_of: HashMap<(u32, u32), Vec<usize>> = HashMap::default();
     // The split edge of `s` (made if new), and whether it runs the other way.
     let mut get_sedge = |cx: &Ctx, sedges: &mut Vec<SEdge>, s: Seg| -> (usize, bool) {
         let key = (s.v[0].min(s.v[1]), s.v[0].max(s.v[1]));
@@ -1188,9 +1272,14 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
     };
     let mut edge_inner: Vec<Vec<u32>> = Vec::with_capacity(cx.edges.len());
     let mut edge_pieces: Vec<Vec<(usize, bool)>> = Vec::with_capacity(cx.edges.len());
-    for e in 0..cx.edges.len() {
+    for (e, &es) in edge_solid.iter().enumerate() {
         let s = cx.edge_seg(e);
-        let chain = cx.split(&s, &by_x)?;
+        let (lo, hi) = match s.g {
+            Geo::Line => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
+            Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
+        };
+        let near = es != usize::MAX && (0..ns).any(|t| meets[es * ns + t] && boxes_meet(lo, hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
+        let chain = if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg))? } else { vec![s.v[0], s.v[1]] };
         for &w in &chain {
             note(&mut touched, &cx.pool, w, cx.edges[e].arg);
         }
@@ -1254,11 +1343,11 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
             continue;
         }
         // The curves in the face's parameter plane (a seam's pieces on both sides).
-        let seams: std::collections::HashSet<usize> = {
-            let mut seen = std::collections::HashSet::new();
+        let seams: HashSet<usize> = {
+            let mut seen = HashSet::default();
             cx.faces[f].edges.iter().filter(|&&(e, _)| !seen.insert(e)).flat_map(|&(e, _)| edge_pieces[e].iter().map(|x| x.0)).collect()
         };
-        let mut local: HashMap<(u32, bool), u32> = HashMap::new();
+        let mut local: HashMap<(u32, bool), u32> = HashMap::default();
         let mut pts: Vec<DVec2> = Vec::new();
         let mut lsegs: Vec<([u32; 2], C2)> = Vec::with_capacity(segs.len());
         let mut lsrc: Vec<usize> = Vec::with_capacity(segs.len());
@@ -1279,7 +1368,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
                 lsrc.push(si);
             }
         }
-        let boundary: std::collections::HashSet<u32> = cx.faces[f].edges.iter().flat_map(|&(e, _)| edge_pieces[e].iter().flat_map(|x| sedges[x.0].seg.v)).collect();
+        let boundary: HashSet<u32> = cx.faces[f].edges.iter().flat_map(|&(e, _)| edge_pieces[e].iter().flat_map(|x| sedges[x.0].seg.v)).collect();
         let mut inner: Vec<u32> = local.keys().map(|k| k.0).filter(|w| !boundary.contains(w)).collect();
         inner.sort_unstable();
         inner.dedup();
@@ -1288,11 +1377,11 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         }
         face_inner[f] = inner;
         for r in regions(&pts, &lsegs)? {
-            let dist = distance2(r.inside, &cx.faces[f].bound);
+            let dist = distance2(r.inside, cx.bound(f)?);
             if dist <= GREY * tol {
                 return Err(Decline("a piece's point near its face's boundary"));
             }
-            if !inside2(r.inside, &cx.faces[f].bound) {
+            if !inside2(r.inside, cx.bound(f)?) {
                 continue;
             }
             if r.dangling {
@@ -1343,13 +1432,13 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
                     continue;
                 };
                 let q = cx.faces[g].to2(pieces[pi].inside);
-                let d = distance2(q, &cx.faces[g].bound);
+                let d = distance2(q, cx.bound(g)?);
                 if d <= GREY * tol {
                     return Err(Decline("a piece's point near a coincident face's boundary"));
                 }
-                if inside2(q, &cx.faces[g].bound) {
-                    let (Surf::Plane { n: ng, .. }, Surf::Plane { n: nf, .. }) = (&cx.faces[g].s, &cx.faces[f].s) else { unreachable!() };
-                    st = Some(if ng.dot(*nf) > 0.0 { State::OnSame } else { State::OnOpposite });
+                if inside2(q, cx.bound(g)?) {
+                    let p = pieces[pi].inside;
+                    st = Some(if cx.normal_at(g, p).dot(cx.normal_at(f, p)) > 0.0 { State::OnSame } else { State::OnOpposite });
                     break;
                 }
             }
@@ -1361,7 +1450,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         }
         within[pi] = states.iter().filter(|x| matches!(x.1, State::In | State::OnSame)).map(|x| x.0).collect();
         let ons: Vec<(usize, State)> = states.iter().copied().filter(|x| matches!(x.1, State::OnSame | State::OnOpposite)).collect();
-        if ons.len() > 1 {
+        if ons.len() > 1 && op != Op::Fuse {
             return Err(Decline("a piece on two solids"));
         }
         let in_any = states.iter().any(|x| x.1 == State::In);
@@ -1369,17 +1458,14 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         let in_tool = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg != 0);
         let on = ons.first().copied();
         if let Some((t, _)) = on {
-            if arg != 0 && cx.solids[t].arg != 0 {
+            if op != Op::Fuse && arg != 0 && cx.solids[t].arg != 0 {
                 return Err(Decline("tools coincide"));
             }
             on_pairs.push((pi, t));
         }
         keep[pi] = match op {
-            Op::Fuse => match on {
-                None => (!in_any).then_some(false),
-                Some((_, State::OnSame)) => (!in_any && arg == 0).then_some(false),
-                _ => None,
-            },
+            // Coincident pieces facing one way: the first argument's is kept; facing each other: none.
+            Op::Fuse => (!in_any && ons.iter().all(|&(t, st)| st == State::OnSame && cx.solids[t].arg > arg)).then_some(false),
             Op::Cut => {
                 if arg == 0 {
                     match on {
@@ -1398,19 +1484,22 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
             },
         };
     }
-    // Coincident pieces: the tool's goes to the object's.
-    let mut by_key: HashMap<Vec<usize>, usize> = HashMap::new();
+    // Coincident pieces: each goes to the first argument's (each has one, split the same way).
+    let mut by_key: HashMap<Vec<usize>, (usize, usize)> = HashMap::default();
     for &(pi, _) in &on_pairs {
-        if cx.faces[pieces[pi].face].arg == 0 {
-            by_key.insert(piece_key(&pieces[pi]), pi);
+        let e = by_key.entry(piece_key(&pieces[pi])).or_insert((pi, 0));
+        e.1 += 1;
+        if cx.faces[pieces[pi].face].arg < cx.faces[pieces[e.0].face].arg {
+            e.0 = pi;
         }
     }
     for &(pi, _) in &on_pairs {
-        if cx.faces[pieces[pi].face].arg != 0 {
-            match by_key.get(&piece_key(&pieces[pi])) {
-                Some(&o) => partner[pi] = Some(o),
-                None => return Err(Decline("coincident pieces differ")),
-            }
+        let (o, n) = by_key[&piece_key(&pieces[pi])];
+        if n < 2 {
+            return Err(Decline("coincident pieces differ"));
+        }
+        if o != pi {
+            partner[pi] = Some(o);
         }
     }
     // The result's faces and their edges.
@@ -1418,7 +1507,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
     if kept.is_empty() {
         return Err(Decline("an empty result"));
     }
-    let mut uses: HashMap<usize, [i32; 2]> = HashMap::new();
+    let mut uses: HashMap<usize, [i32; 2]> = HashMap::default();
     for &p in &kept {
         let flip = keep[p] == Some(true);
         for l in &pieces[p].loops {
@@ -1449,7 +1538,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         }
         i
     }
-    let mut first_user: HashMap<usize, usize> = HashMap::new();
+    let mut first_user: HashMap<usize, usize> = HashMap::default();
     for (k, &p) in kept.iter().enumerate() {
         for l in &pieces[p].loops {
             for &(s, _) in l {
@@ -1464,8 +1553,8 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
     }
     // Output entities.
     let mut out = Output::default();
-    let mut vmap: HashMap<u32, u32> = HashMap::new();
-    let mut emap: HashMap<usize, u32> = HashMap::new();
+    let mut vmap: HashMap<u32, u32> = HashMap::default();
+    let mut emap: HashMap<usize, u32> = HashMap::default();
     let mut used_s: Vec<usize> = uses.keys().copied().collect();
     used_s.sort_unstable();
     let mut used_v: Vec<u32> = used_s.iter().flat_map(|&s| sedges[s].seg.v).collect();
@@ -1486,7 +1575,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
             x.origins.len() == 1 && edge_pieces[x.origins[0]].len() == 1 && vertex_same(x.seg.v[0]) && vertex_same(x.seg.v[1])
         })
         .collect();
-    let mut sedge_flip: HashMap<usize, bool> = HashMap::new();
+    let mut sedge_flip: HashMap<usize, bool> = HashMap::default();
     for &s in &used_s {
         let x = &sedges[s];
         // Pieces of an input edge run its way.
@@ -1513,7 +1602,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
             }
         });
     }
-    let mut piece_out: HashMap<usize, u32> = HashMap::new();
+    let mut piece_out: HashMap<usize, u32> = HashMap::default();
     let mut face_same = vec![false; cx.faces.len()];
     for &p in &kept {
         let f = pieces[p].face;
@@ -1522,11 +1611,25 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         let same = !face_split[f] && pieces[p].loops.iter().flatten().all(|&(s, _)| edge_same[s]);
         face_same[f] = same;
         let src = &args[g.arg as usize].faces[g.index as usize];
+        // Each loop from where the input face's starts (its first edge's first piece), as OCCT's pieces.
+        let rank = |s: usize| -> (usize, usize) {
+            sedges[s]
+                .origins
+                .iter()
+                .filter_map(|&e| {
+                    let at = g.edges.iter().position(|x| x.0 == e)?;
+                    let k = edge_pieces[e].iter().position(|x| x.0 == s)?;
+                    Some((at, if g.edges[at].1 { edge_pieces[e].len() - 1 - k } else { k }))
+                })
+                .min()
+                .unwrap_or((usize::MAX, 0))
+        };
         let loops: Vec<Vec<Use>> = pieces[p]
             .loops
             .iter()
             .map(|l| {
-                let mut l: Vec<Use> = l.iter().map(|&(s, r)| Use { edge: emap[&s], reversed: r ^ sedge_flip[&s] }).collect();
+                let start = (0..l.len()).min_by_key(|&k| rank(l[k].0)).unwrap_or(0);
+                let mut l: Vec<Use> = l[start..].iter().chain(&l[..start]).map(|&(s, r)| Use { edge: emap[&s], reversed: r ^ sedge_flip[&s] }).collect();
                 if flip {
                     l.reverse();
                     for u in &mut l {
@@ -1542,7 +1645,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         out.face_origin.push(if same { Origin::Same { arg: g.arg, index: g.index } } else { Origin::Piece { arg: g.arg, index: g.index } });
     }
     // Solids, one per shell, outward.
-    let mut shell_of: HashMap<usize, usize> = HashMap::new();
+    let mut shell_of: HashMap<usize, usize> = HashMap::default();
     for (k, &p) in kept.iter().enumerate() {
         let c = find(&mut comp, k);
         let n = shell_of.len();
