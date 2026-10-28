@@ -2585,14 +2585,11 @@ impl PartStudioView {
         let vp = self.viewport.read(cx);
         let configured: std::collections::HashSet<u32> = data.sketch.constraints().filter(|c| c.is_dimension() && self.dimension_configuration(c.id, cx).is_some()).map(|c| c.id.0).collect();
         let regenerated = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)).map(|s| s.sketch.clone());
-        let beside = ed.labels_beside_line(data);
         let mut out = Vec::new();
         for (cid, pos, mut text, driving) in ed.dimension_labels(data, &units) {
             let anchor = ed.frame.to_world(pos);
             let Some(s) = vp.project(anchor) else { continue };
-            // Steep dimension lines: the text sits right of the line (live sketch/17).
-            let shift = if beside.contains(&cid) { crate::sketch_mode::label_width_px(&text) as f32 * 0.5 + 8.0 } else { 0.0 };
-            let (x, y) = (s.x as f32 + shift, s.y as f32);
+            let (x, y) = (s.x as f32, s.y as f32);
             let is_configured = configured.contains(&cid.0);
             if is_configured
                 && let Some(c) = regenerated.as_ref().and_then(|s| s.constraint(cid))
@@ -2600,7 +2597,7 @@ impl PartStudioView {
             {
                 text = crate::sketch_mode::dim_value_text_tol(&c.kind, v, &units, data.dimension_tolerances.get(&cid.0));
             }
-            out.push(PlacedDimension { cid, at: (x, y), anchor, shift, text, driving, configured: is_configured });
+            out.push(PlacedDimension { cid, at: (x, y), anchor, text, driving, configured: is_configured });
         }
         out
     }
@@ -2642,7 +2639,7 @@ impl PartStudioView {
         let (Some(ed), Some(data)) = (self.sketch.as_ref(), self.sketch_data(cx)) else { return Vec::new() };
         let editing = self.dim_input.as_ref().map(|(c, _, _)| *c);
         let mut out = Vec::new();
-        for PlacedDimension { cid, anchor, shift, text, driving, configured, .. } in self.placed_dimension_labels(&data, cx) {
+        for PlacedDimension { cid, anchor, text, driving, configured, .. } in self.placed_dimension_labels(&data, cx) {
             if editing == Some(cid) {
                 continue;
             }
@@ -2664,7 +2661,7 @@ impl PartStudioView {
                 radius: 4.0,
                 background: bg.map(Into::into),
                 border: configured.then(|| rgb(0xffc20e).into()),
-                offset: [shift - est_w * 0.5, -13.5],
+                offset: [-est_w * 0.5, -13.5],
             };
             if let Some(l) = crate::overlay_labels::row_box(window, cx, &b, anchor, dim_label_hit(cid)) {
                 out.push(l);
@@ -4436,7 +4433,6 @@ struct PlacedDimension {
     cid: noshape_sketch::ConstraintId,
     at: (f32, f32),
     anchor: DVec3,
-    shift: f32,
     text: String,
     driving: bool,
     configured: bool,

@@ -338,6 +338,10 @@ pub struct OtfField {
     /// value boxes right after drawing — rule capture"); `None`: `label`.
     pub place: Option<BoxPlace>,
     pub place_active: Option<BoxPlace>,
+    /// The dimension's label off a line's middle at commit time (the line
+    /// may have moved since, e.g. a rectangle's edge once its width is
+    /// typed): the line, the unit direction and the screen distance.
+    pub label_at: Option<(EntityId, DVec2, f64)>,
 }
 
 /// A value box's place relative to its geometry, in screen pixels.
@@ -2563,13 +2567,16 @@ impl SketchEditor {
                     // past the edge's glyph box (42 px) when that is on the same
                     // side (below), else 26 px; the height's on the other
                     // vertical edge, 41 px inside, where its box was.
-                    fields[0].label = mid(horizontal) + out_h * w * if out_h.y < 0.0 { 42.0 } else { 26.0 };
+                    let off = if out_h.y < 0.0 { 42.0 } else { 26.0 };
+                    fields[0].label = mid(horizontal) + out_h * w * off;
+                    fields[0].label_at = Some((horizontal, out_h, off));
                     if let Some(f) = fields.get_mut(1) {
                         f.place = Some(BoxPlace::Edge { line: vertical, u: out_v, gap: 16.0 });
                         f.place_active = other.map(|o| BoxPlace::Edge { line: o, u: out_v, gap: 14.0 });
                         if let Some(o) = other {
                             f.kind = ConstraintKind::Length { curve: o, value: 0.0 };
                             f.label = mid(o) + out_v * w * 41.0;
+                            f.label_at = Some((o, out_v, 41.0));
                         }
                     }
                 }
@@ -2770,7 +2777,7 @@ impl SketchEditor {
                         // the initial box keeps the default driving value.
                         let rho = self.conic_rho.clamp(0.01, 0.99);
                         add_dimension(data, ConstraintKind::Rho { conic: id, value: rho }, Some(label), None);
-                        self.set_otf(data, vec![OtfField { kind: ConstraintKind::Rho { conic: id, value: 0.0 }, scale: 1.0, label, place: None, place_active: None }]);
+                        self.set_otf(data, vec![OtfField { kind: ConstraintKind::Rho { conic: id, value: 0.0 }, scale: 1.0, label, place: None, place_active: None, label_at: None }]);
                         EditOutcome::changed()
                     }
                     Err(e) => {
@@ -3231,6 +3238,13 @@ impl SketchEditor {
             data.sketch.solve();
         } else {
             self.message = Some("The dimension over-defines the sketch; it was added as a driven dimension".into());
+        }
+        // The label off its line as the line now is.
+        if let Some((line, u, px)) = f.label_at
+            && let Some(Curve2::Line { a, b }) = data.sketch.curve(line)
+        {
+            let l = (a + b) * 0.5 + u * px * self.world_per_px;
+            data.dimension_labels.insert(cid.0, [l.x, l.y]);
         }
         // Next box (rectangle width after length, ellipse minor after major).
         let mut o = o;
@@ -4244,33 +4258,6 @@ impl SketchEditor {
             // plain value in grey ("Ø10"), no parentheses.
             let text = dimension_label_text(data.dimension_exprs.get(&c.id.0).map(|e| e.text.as_str()), value, self.show_expressions);
             out.push((c.id, pos, text, c.driving));
-        }
-        out
-    }
-
-    /// Linear dimensions whose dimension line runs steeper than 60°: live
-    /// Onshape writes their (horizontal) text beside the line, which stays
-    /// unbroken (sketch/17 "2.5"); flatter ones break the line around it.
-    pub fn labels_beside_line(&self, data: &SketchData) -> std::collections::HashSet<ConstraintId> {
-        let labels: std::collections::HashMap<ConstraintId, DVec2> = data.sketch.constraints().filter_map(|c| Some((c.id, self.label_pos(data, c.id, &c.kind)?))).collect();
-        let mut out = std::collections::HashSet::new();
-        for g in self.dimension_graphics(data) {
-            let Some(c) = data.sketch.constraint(g.constraint) else { continue };
-            if !matches!(c.kind, ConstraintKind::Distance { .. } | ConstraintKind::HorizontalDistance { .. } | ConstraintKind::VerticalDistance { .. } | ConstraintKind::Length { .. }) {
-                continue;
-            }
-            let Some(at) = labels.get(&g.constraint) else { continue };
-            // The dimension line: the segment passing closest to the label.
-            let line = g.segments.iter().filter(|sg| (sg[1] - sg[0]).length() > self.world_per_px * 2.0).min_by(|a, b| {
-                let d = |sg: &[DVec2; 2]| Curve2::Line { a: sg[0], b: sg[1] }.distance(*at);
-                d(a).total_cmp(&d(b))
-            });
-            if let Some(sg) = line {
-                let d = sg[1] - sg[0];
-                if d.y.abs() > d.x.abs() * 3f64.sqrt() {
-                    out.insert(g.constraint);
-                }
-            }
         }
         out
     }
@@ -5335,9 +5322,11 @@ impl SketchEditor {
             .into_iter()
             .map(|(cid, pos, text, _)| (cid, (pos, DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px)))
             .collect();
-        let beside = self.labels_beside_line(data);
+        // Live (behaviours "skasm (2026-10-28) rectangle glyphs and vertical
+        // dimension text"): the text always sits centred on the dimension
+        // line, steep ones too (a "2.5" beside its line had been dragged there).
         for mut g in self.dimension_graphics(data) {
-            if let Some((c, half)) = gaps.get(&g.constraint).filter(|_| !beside.contains(&g.constraint)) {
+            if let Some((c, half)) = gaps.get(&g.constraint) {
                 g.segments = g.segments.iter().flat_map(|sg| clip_outside_box(*sg, *c, *half)).collect();
             }
             let selected = self.selected_constraints.contains(&g.constraint);
@@ -5510,6 +5499,7 @@ fn line_length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
         let n = (b - a).try_normalize().unwrap_or(DVec2::X).perp();
         let n = if n.y < -1e-9 || (n.y.abs() <= 1e-9 && n.x < 0.0) { -n } else { n };
         f.label = (a + b) * 0.5 + n * wpp * 26.0;
+        f.label_at = Some((line, n, 26.0));
     }
     f
 }
@@ -5520,7 +5510,7 @@ fn length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
         Some(Curve2::Line { a, b }) => (a + b) * 0.5 - (b - a).try_normalize().unwrap_or(DVec2::X).perp() * wpp * 26.0,
         _ => DVec2::ZERO,
     };
-    OtfField { kind: ConstraintKind::Length { curve: line, value: 0.0 }, scale: 1.0, label, place: None, place_active: None }
+    OtfField { kind: ConstraintKind::Length { curve: line, value: 0.0 }, scale: 1.0, label, place: None, place_active: None, label_at: None }
 }
 
 /// A tangent arc's radius box (live, behaviours "… center point rectangle and
@@ -5535,13 +5525,13 @@ fn tangent_arc_box(sk: &Sketch, arc: EntityId, wpp: f64) -> Option<BoxPlace> {
 
 fn radius_field(sk: &Sketch, arc: EntityId, wpp: f64, place: Option<BoxPlace>) -> OtfField {
     let label = default_label_pos(sk, &ConstraintKind::Radius { curve: arc, value: 0.0 }, wpp).unwrap_or_default();
-    OtfField { kind: ConstraintKind::Radius { curve: arc, value: 0.0 }, scale: 1.0, label, place, place_active: place }
+    OtfField { kind: ConstraintKind::Radius { curve: arc, value: 0.0 }, scale: 1.0, label, place, place_active: place, label_at: None }
 }
 
 fn diameter_field(sk: &Sketch, circle: EntityId, wpp: f64, away: Option<DVec2>) -> OtfField {
     let place = away.map(BoxPlace::Rim);
     let label = default_label_pos(sk, &ConstraintKind::Diameter { curve: circle, value: 0.0 }, wpp).unwrap_or_default();
-    OtfField { kind: ConstraintKind::Diameter { curve: circle, value: 0.0 }, scale: 1.0, label, place, place_active: place }
+    OtfField { kind: ConstraintKind::Diameter { curve: circle, value: 0.0 }, scale: 1.0, label, place, place_active: place, label_at: None }
 }
 
 /// Primary then secondary axis diameter boxes of an ellipse / elliptical arc.
@@ -5550,8 +5540,8 @@ fn ellipse_fields(sk: &Sketch, id: EntityId, wpp: f64) -> Vec<OtfField> {
     let u = major.try_normalize().unwrap_or(DVec2::X);
     let off = wpp * 26.0;
     vec![
-        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: true, value: 0.0 }, scale: 2.0, label: center + major + u * off, place: None, place_active: None },
-        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: false, value: 0.0 }, scale: 2.0, label: center + u.perp() * (minor + off), place: None, place_active: None },
+        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: true, value: 0.0 }, scale: 2.0, label: center + major + u * off, place: None, place_active: None, label_at: None },
+        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: false, value: 0.0 }, scale: 2.0, label: center + u.perp() * (minor + off), place: None, place_active: None, label_at: None },
     ]
 }
 
@@ -6361,7 +6351,10 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
         // Live draws a tangent's glyph once, on its first entity (the line of
         // a fillet, the cap of a slot; qa5 sketch tools).
         Tangent { a, .. } => vec![a],
-        Concentric { a, b } | Parallel { a, b } | Perpendicular { a, b } | Equal { a, b } | Collinear { a, b } | Curvature { a, b } => vec![a, b],
+        // Live (same behaviours): a Parallel or Perpendicular is drawn once, on
+        // its first entity (a rectangle's on its bottom, left and top edges).
+        Parallel { a, .. } | Perpendicular { a, .. } => vec![a],
+        Concentric { a, b } | Equal { a, b } | Collinear { a, b } | Curvature { a, b } => vec![a, b],
         _ => Vec::new(),
     }
 }
@@ -8500,6 +8493,16 @@ mod tests {
         let Some(Curve2::Line { a, b }) = d.sketch.curve(curve) else { panic!() };
         assert!((a.x - 0.03).abs() < 1e-9 && (b.x - 0.03).abs() < 1e-9, "the right edge: {a:?} {b:?}");
         assert!((o.fields[1].label - v(0.03 - 41.0 * PX, 0.01)).length() < 1e-9, "height inside: {:?}", o.fields[1].label);
+        // Typed 20 x 10: the labels follow the edges as they are then.
+        let units = UnitPrefs::default();
+        let vars = std::collections::BTreeMap::<String, noshape_units::Quantity>::new();
+        ed.commit_otf(&mut d, "20", &units, &vars).unwrap();
+        ed.commit_otf(&mut d, "10", &units, &vars).unwrap();
+        let label_of = |d: &SketchData, k: fn(&ConstraintKind) -> bool| d.sketch.constraints().find(|c| k(&c.kind)).and_then(|c| d.dimension_labels.get(&c.id.0)).map(|l| DVec2::new(l[0], l[1])).unwrap();
+        let w = label_of(&d, |k| matches!(k, ConstraintKind::Length { value, .. } if (*value - 0.02).abs() < 1e-9));
+        let h = label_of(&d, |k| matches!(k, ConstraintKind::Length { value, .. } if (*value - 0.01).abs() < 1e-9));
+        assert!((w - v(0.01, -42.0 * PX)).length() < 1e-9, "width label: {w:?}");
+        assert!((h - v(0.02 - 41.0 * PX, 0.005)).length() < 1e-9, "height label: {h:?}");
     }
 
     /// Live (behaviours "skasm (2026-10-27, P1) sketch value boxes: center

@@ -136,12 +136,16 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    (line, rectangle, circle, center rectangle, tangent arc), polygon, mate dialog, Revolute + drag, linear pattern
    direction pick.
 
-Dimension labels vs glyph rows (live request 10-28, behaviours "skasm (2026-10-28) dimension labels vs glyph rows"):
-a line's value box / dimension 26 px above (away from its glyph), a corner rectangle's width 42 px below the bottom
-edge, its height on the other vertical edge 41 px inside: done (next commit). Open: our steep-dimension rule writes the
-height's text beside its line, under the right edge's Parallel glyph in a small rectangle (live centres "20" on the
-line); live's sample shows Parallel glyphs on the left and bottom edges only and a corner glyph at the bottom right,
-ours one per edge: not yet understood (one sample).
+Dimension labels vs glyph rows (live 10-28, behaviours "skasm (2026-10-28) dimension labels vs glyph rows" and
+"… rectangle glyphs and vertical dimension text"): f3c804b9 a line's value box / dimension 26 px above (away from its
+glyph), a corner rectangle's width 42 px below the bottom edge, its height on the other vertical edge 41 px inside;
+next commit: those labels follow the edges as they are after the typed value (the height's sat off once the width
+changed), dimension text always centred on its line (the "beside" rule is gone), Parallel / Perpendicular glyphs once,
+on the first entity. Open: live puts a vertical edge's glyph RIGHT of the rectangle's left edge but left of a lone
+vertical line (sketch/28): a rule by the line's direction (glyph right of start→end) fits both, but our rectangle's
+edges run CCW (top right→left, left downwards) unlike live's (both horizontals left→right, verticals upwards), so the
+rule would put our top glyph outside; and live draws a Coincident glyph up-left of each corner (−27..−8 px), ours none
+(corners are shared points).
 Walks: 10-28 04:10 on green 1b81b7ca: line chain 40 / 25 typed, rectangle 30 Tab 20, asm5 Revolute pin dragged
 (stays), j shows the hidden Revolute: no regressions. Seen: a line's dimension text ("40") and a rectangle's height
 ("20") sit under the constraint glyph rows (glyphs 20.5 px off the line, the dimension ~28 px); live's spacing there not
