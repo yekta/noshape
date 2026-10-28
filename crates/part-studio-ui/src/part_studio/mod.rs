@@ -5025,6 +5025,10 @@ pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     // highlighted nor added (live "qa4 round 5 s1 follow-up 2" (1)).
     let point_field = matches!(kind, PickKind::Face | PickKind::Vertex) && f.intersects(QueryFilter::SKETCH_POINT);
     let f = if point_field { QueryFilter(f.0 & !QueryFilter::MATE_CONNECTOR.0) } else { f };
+    // An axis field (lines, cylinders, mate connectors: Revolve's axis) takes
+    // no point as an implicit mate connector (REVOLVE-AXIS-VERTEX; revolve.fs).
+    let axis_field = f.intersects(QueryFilter(QueryFilter::LINEAR_EDGE.0 | QueryFilter::CYLINDRICAL_FACE.0));
+    let f = if axis_field && matches!(kind, PickKind::Vertex | PickKind::SketchPoint | PickKind::Origin) { QueryFilter(f.0 & !QueryFilter::MATE_CONNECTOR.0) } else { f };
     let want = |q: QueryFilter| f.intersects(q);
     match kind {
         PickKind::Face => want(QueryFilter::ANY_FACE) || want(QueryFilter::PLANE_LIKE),

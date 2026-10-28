@@ -4004,6 +4004,10 @@ mod field_point_tests {
         assert!(km(PickKind::Face, &r, QueryFilter::ANY_FACE));
         assert!(km(PickKind::Edge, &r, QueryFilter::AXIS) && km(PickKind::Edge, &r, QueryFilter::DIRECTION));
         assert!(km(PickKind::Face, &r, QueryFilter::AXIS), "a cylinder gives its axis");
+        // REVOLVE-AXIS-VERTEX: a point is no axis, though AXIS takes mate connectors.
+        let revolve_axis = QueryFilter(QueryFilter::AXIS.0 | QueryFilter::CIRCULAR_EDGE.0);
+        assert!(!km(PickKind::Vertex, &r, revolve_axis) && !km(PickKind::SketchPoint, &r, revolve_axis) && !km(PickKind::Origin, &r, revolve_axis));
+        assert!(km(PickKind::Connector, &r, revolve_axis));
         assert!(km(PickKind::SketchCurve, &r, QueryFilter::ANY_EDGE));
         // Fillet / Chamfer take part edges only (a sketch line lying on a
         // part's edge isn't picked); sketch-only fields take no part edges.
