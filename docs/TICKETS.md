@@ -341,6 +341,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   00:12, so these are load-bound, not a regression; 41f60e47 is the faster of the two under the same load.
   qa 03:00 (green 7929b13a, with core's 31f477e1 OcShape caches, load 26–36): open regen 438 ms; Extrude 1 → 11 / 9 / 13 / 8 / 12.5:
   28 features in 785 / 451 / 301 / 335 / 378 ms (median 378); Ctrl+Z ×3: 1 / 1 / 392 ms. Still over both budgets at this load.
+  qa 04:36 (green 3f4e10d9, load 18–25): open regen 176 ms; Extrude 1 → 11 / 9 / 13: 256 / 167 / 135 ms (median 167, within 200);
+  Ctrl+Z ×3: 1 / 3 / 134 ms (3rd still over 50). The commit budget is met at this load.
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
 - [x] verified watcher CLI 04:06 (≥ green bcf401ca, has 239fa250; qa5 pass28/build.py: 2.5 mm 8503.961 mm³ / 47 faces, 1 mm 3998.630 / 33, live 8503.961 / 47 and 3998.627 / 33) (core 10-27: live's numbers exactly, 1 mm 3998.632 / 33 faces, 2.5 mm 8503.961 / 47; kernel test shell.rs shell_block_with_close_holes_like_onshape back in T1) P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
