@@ -1057,6 +1057,13 @@ impl AssemblyView {
                     h.triads.push(Triad { frame: f, size: size * 0.7, strong: false });
                 }
             }
+            // The mates' connectors too, implicit ones included (live
+            // assembly/ks-k-1: both ends of each mate; ASM-K-IMPLICIT-MCS).
+            for m in self.result.mates.iter().filter(|m| !m.inactive) {
+                for f in [m.frame_a, m.frame_b].into_iter().flatten() {
+                    h.triads.push(Triad { frame: f, size: size * 0.7, strong: false });
+                }
+            }
         }
         let picking = self.pick_mode(cx).is_some();
         let hovered_overlay = self.hover_overlay;
