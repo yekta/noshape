@@ -146,7 +146,10 @@ impl DrawingEditor {
         let color_dlg = self.render_note_color(cx);
         // Above the text (and the note's ruler).
         let bottom = (self.size_px()[1] - (b.text_top.min(b.top) - above) + 6.0) as f32;
-        let left = (b.left - 3.0).max(4.0) as f32;
+        // Inside the graphics area: clear of Drawing properties / the right
+        // panels and their icon strip (qa NOTE-PANEL-UNDER-PROPS).
+        let right = self.size_px()[0] - if self.drawing_props.open || self.right_panel.is_some() { 370.0 + 35.0 } else { 0.0 };
+        let left = (b.left - 3.0).min(right - 394.0 - 4.0).max(4.0) as f32;
         Some(
             v_flex()
                 .id("dr-note-panel")

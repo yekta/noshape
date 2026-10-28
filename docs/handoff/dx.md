@@ -118,6 +118,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   live's layouts (from tests/perf's NIST x_t); older versions stay flat until live sends an assembly in each
   (REQUESTS dx 10-28). Then BALLOON-WRONG-ITEM, DRAWING-SHIFT-SLASH, the drawing.md rows in P2 order.
 
+## Morning 10-28 (landed through 91dec38b)
+- qa tickets fixed: BALLOON-WRONG-ITEM (a callout on a silhouette is that part's: the nearest visible edge decides,
+  the line of sight's closest body for silhouettes), ASM-PARASOLID-FLAT (verified by qa 06:08), CALLOUT-ON-DIMENSION
+  (attach on a dimension's lines / text, leader follows, deleted with it), CALLOUT-ALIGN-MISSING (multi-selection
+  menu), DIM-PALETTE-DROPDOWN-COLLAPSE (the launcher's palette stays open while its own list is), NOTE-PANEL-UNDER-PROPS
+  (the Note panel stays left of Drawing properties / right panels). drawing.md V43 ✅.
+- Open: TABLE-SHIFT-TAB-BLANK (P3): the cell left with Shift+Tab draws blank until editing ends (both keys go through
+  `cell_step`, which commits first, so it is in the drawing of the in-place cell; not reproduced yet), and a
+  re-entered cell's caret should go after its text (TextareaState has no caret setter used here yet).
+  DRAWING-SHIFT-SLASH: request below. Balloon 23 of qa's file: its anchor is 6.4 mm from any edge, so "----" is right
+  for where it landed.
+
 ## Evening 10-27 (landed through 24a0e15f)
 - Speed: Parasolid read 35 → 3 s; x_t assemblies import as live (Assembly + "<file> parts"); live's NIST exports in
   tests/perf; dx_perf::timed_nist_import (STEP 41.8 s / x_t 48.0 s dev, loaded; live 38.7 / 24.5 s) is held back by
@@ -171,6 +183,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- **Shift+/ in a drawing (qa DRAWING-SHIFT-SLASH, P3)**: the Keyboard shortcuts modal (tabs General … Drawing) is
+  rendered by the Part Studio view (part-studio-ui view_tools.rs `render_shortcut_sheet` / `toggle_shortcut_sheet`,
+  psui's crate) and the Assembly has its own list; the drawing editor has nothing for `ToggleShortcutHelp`. Live
+  opens the same modal everywhere, on the current workspace's tab. Proposal: move the modal into app-core as a
+  component (state: tab, query, scroll) that each editor shows with its start tab (Drawing for drawings); dx can
+  wire the drawing side once it is shared, or do the move if psui agrees.
 - App (crates/app doc_dialogs.rs `tab_properties`): a Drawing tab's Properties should also edit the drawing's own
   Part number, Revision, Description and Title 1–3 (`Drawing.meta`; the API's drawing_element_properties). Live: the
   title block's DWG NO. / REV come from them (behaviours "dx title block mappings").
