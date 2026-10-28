@@ -7,12 +7,17 @@
 #                                                          release.yml builds the bundles and publishes the release.
 #   cut-release.sh now <version> <sha>                     <sha> already passed the scheduled 3-platform CI (a last-green):
 #                                                          branch + tag at once (the version bump can't break tests).
+# Release notes first, always: /root/lead-scratch/notes/v<version>.md, a short list a user understands (Faster / Fixed /
+# Closer to Onshape; no commit subjects, ticket names or file paths). It goes on the release branch as RELEASE_NOTES.md
+# and release.yml publishes it as the release text (the user, 10-28: GitHub's generated "What's Changed" is useless).
 set -eu
 W=/root/projects/noshape-wt/release; G="git -c user.name=yekta -c user.email=ngyekta@gmail.com"
 cd $W; git fetch -q origin --tags -f
 case "$1" in
 branch)
   V=$2; S=$3; shift 3
+  N=/root/lead-scratch/notes/v$V.md
+  [ -s "$N" ] || { echo "write the release notes first: $N"; exit 1; }
   git checkout -q -B release/v$V $S
   for f in "$@"; do $G cherry-pick -x $f >/dev/null; done
   old=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
@@ -23,7 +28,8 @@ old,new=sys.argv[1],sys.argv[2]; p='Cargo.lock'; s=open(p).read()
 s=re.sub(r'(name = "noshape[^"]*"\nversion = )"'+re.escape(old)+'"', r'\1"'+new+'"', s)
 open(p,'w').write(s)
 P
-  git add Cargo.toml Cargo.lock; $G commit -q -m "Release v$V"
+  cp "$N" RELEASE_NOTES.md
+  git add Cargo.toml Cargo.lock RELEASE_NOTES.md; $G commit -q -m "Release v$V"
   git push -q -f origin release/v$V
   # CI runs on the branch only when fixes were cherry-picked (the base already passed on all three platforms).
   [ $# -gt 0 ] && gh workflow run ci.yml -R yekta/noshape --ref release/v$V && echo "CI started on release/v$V (cherry-picked fixes)"

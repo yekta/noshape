@@ -153,5 +153,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The lead's notes for this release (tools/lead/cut-release.sh puts them on the release branch), never
+          # GitHub's generated list (it only knows pull requests).
+          if gh api "repos/$GITHUB_REPOSITORY/contents/RELEASE_NOTES.md?ref=$GITHUB_REF_NAME" --jq .content > notes.b64; then
+            base64 -d notes.b64 > notes.md || true
+          fi
+          [ -s notes.md ] || echo "Release $GITHUB_REF_NAME." > notes.md
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --title "noshape $GITHUB_REF_NAME" --generate-notes
+            --title "noshape $GITHUB_REF_NAME" --notes-file notes.md
