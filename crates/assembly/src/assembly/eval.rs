@@ -1240,50 +1240,18 @@ pub fn limit_keys(t: MateType) -> &'static [&'static str] {
     }
 }
 
-/// The part that stays put when a new mate joins two free parts (live,
-/// behaviours "skasm (2026-10-27) follow-up: which part moves with nothing
-/// fixed"; one part moves, never both). Connector Zs exactly the wrong way
-/// round (an axial mate turns one part over): the first connector's part
-/// turns when the common Z's first non-zero coordinate is negative, else
-/// the second's. Otherwise, between parts of one Part Studio, the instance
-/// of the later part moves (live: the plate, Part 2, moved onto the block,
-/// Part 1, though bigger; "… which part moves — append"); between Part
-/// Studios (untested in live) the smaller part; between instances of one
-/// part the one whose connector Z points to the negative side.
-pub fn new_mate_stays(result: &AssemblyResult, m: &super::Mate, units: &UnitPrefs) -> InstanceId {
+/// The part that stays put when a new mate joins two free parts: the
+/// second pick's; the first-picked instance moves onto it, keeping its pose
+/// (live UI, behaviours "skasm (2026-10-28) UI mate with nothing fixed: exact
+/// flip", both pick orders; the flip is chosen to keep it, see
+/// `noshape_ops::assembly::default_flip_primary`). (REST-made mates, which skip
+/// that choice, turned or moved other parts: "skasm (2026-10-27) follow-up:
+/// which part moves with nothing fixed"; MATE-EXACT-FLIP-MOVER.) The assembly
+/// origin never moves.
+pub fn new_mate_stays(_result: &AssemblyResult, m: &super::Mate, _units: &UnitPrefs) -> InstanceId {
     let (a, b) = (m.a.instance, m.b.instance);
-    // The assembly origin never moves.
     if a == InstanceId::ORIGIN || b == InstanceId::ORIGIN {
         return InstanceId::ORIGIN;
-    }
-    let (Some(fa), Some(fb)) = (result.connector_world(&m.a, units), result.connector_world(&m.b, units)) else { return b };
-    let (za, zb) = (fa.z(), fb.z());
-    let negative = |v: DVec3| v.to_array().into_iter().find(|c| c.abs() > 1e-9).unwrap_or(0.0) < 0.0;
-    // Internal flip_primary true: the Z axes aligned (else opposed).
-    let wanted = if m.flip_primary { 1.0 } else { -1.0 };
-    let axial = matches!(m.mate_type, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel);
-    if axial && (za.dot(zb) + wanted).abs() < 1e-9 {
-        return if negative(za) { b } else { a };
-    }
-    let part_order = |c: &MateConnectorRef| {
-        let mut path = vec![c.instance];
-        path.extend(c.path.iter().copied());
-        let o = result.occurrences.iter().find(|o| o.path == path)?;
-        Some((o.studio, o.context.bodies.iter().position(|x| x.id == o.body)?))
-    };
-    if let (Some((sa, ia)), Some((sb, ib))) = (part_order(&m.a), part_order(&m.b))
-        && sa == sb
-        && ia != ib
-    {
-        return if ia > ib { b } else { a };
-    }
-    let size = |id: InstanceId| result.instance_bounds(id).map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.0);
-    let (sa, sb) = (size(a), size(b));
-    if (sa - sb).abs() > 1e-9 * sa.max(sb) {
-        return if sa < sb { b } else { a };
-    }
-    if negative(za) != negative(zb) {
-        return if negative(za) { b } else { a };
     }
     b
 }

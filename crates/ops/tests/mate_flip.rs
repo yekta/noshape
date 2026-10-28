@@ -144,12 +144,12 @@ fn width_mate_solves_in_any_face_order() {
     }
 }
 
-/// Live (behaviours "skasm (2026-10-27) follow-up: which part moves with
-/// nothing fixed"): a new mate between two free parts moves one of them,
-/// never both. Without a flip the smaller part (the pin) moves, whichever
-/// connector was picked first; the plate keeps its placement exactly.
+/// Live UI (behaviours "skasm (2026-10-28) UI mate with nothing fixed:
+/// exact flip"): between free parts the first-picked instance moves onto the
+/// second, keeping its pose, whichever it is; the other keeps its placement
+/// exactly. (REST-made mates moved the smaller part: those skip the UI's flip.)
 #[test]
-fn new_mate_between_free_parts_moves_the_smaller_one() {
+fn new_mate_between_free_parts_moves_the_first_pick() {
     for plate_first in [false, true] {
         let dir = std::env::temp_dir().join(format!("noshape-free-mate-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -175,19 +175,22 @@ fn new_mate_between_free_parts_moves_the_smaller_one() {
             let v: Vec<f64> = i["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
             [v[0], v[1], v[2]]
         };
-        assert!(near(t("Part 1 <1>"), [5.0, -7.0, 3.0], 1e-9), "plate first {plate_first}: the plate moved to {:?}", t("Part 1 <1>"));
-        assert!(near(t("Part 1 <2>"), [5.0, -7.0, 13.0], 1e-6), "plate first {plate_first}: the pin at {:?}", t("Part 1 <2>"));
+        if plate_first {
+            // The plate's top centre (0, 0, 10) onto the pin's bottom centre (80, 0, 0).
+            assert!(near(t("Part 1 <1>"), [80.0, 0.0, -10.0], 1e-6), "the plate at {:?}", t("Part 1 <1>"));
+            assert!(near(t("Part 1 <2>"), [80.0, 0.0, 0.0], 1e-9), "the pin moved to {:?}", t("Part 1 <2>"));
+        } else {
+            assert!(near(t("Part 1 <1>"), [5.0, -7.0, 3.0], 1e-9), "the plate moved to {:?}", t("Part 1 <1>"));
+            assert!(near(t("Part 1 <2>"), [5.0, -7.0, 13.0], 1e-6), "the pin at {:?}", t("Part 1 <2>"));
+        }
         let _ = std::fs::remove_file(&path);
     }
 }
 
-/// Live ("skasm (2026-10-27) follow-up: which part moves — append", run 3):
-/// between two parts of one Part Studio with no flip, the instance of the
-/// later part moves, not the smaller one: the plate (Part 2, ~23200 mm³)
-/// moved onto the block (Part 1, 8000 mm³), whichever connector came first;
-/// the block kept its placement exactly.
+/// The same between two parts of one Part Studio (live's REST run moved the
+/// later part, Part 2, whichever came first; the UI moves the first pick).
 #[test]
-fn new_mate_between_parts_of_one_studio_moves_the_later_part() {
+fn new_mate_between_parts_of_one_studio_moves_the_first_pick() {
     for plate_first in [false, true] {
         let dir = std::env::temp_dir().join(format!("noshape-later-mate-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -211,9 +214,15 @@ fn new_mate_between_parts_of_one_studio_moves_the_later_part() {
             let v: Vec<f64> = i["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
             [v[0], v[1], v[2]]
         };
-        assert!(near(t("Part 1 <1>"), [20.0, 60.0, 30.0], 1e-9), "plate first {plate_first}: the block moved to {:?}", t("Part 1 <1>"));
-        // The plate's top centre (150, 0, 10) onto the block's bottom centre (20, 60, 30).
-        assert!(near(t("Part 2 <1>"), [-130.0, 60.0, 20.0], 1e-6), "plate first {plate_first}: the plate at {:?}", t("Part 2 <1>"));
+        if plate_first {
+            assert!(near(t("Part 1 <1>"), [20.0, 60.0, 30.0], 1e-9), "the block moved to {:?}", t("Part 1 <1>"));
+            // The plate's top centre (150, 0, 10) onto the block's bottom centre (20, 60, 30).
+            assert!(near(t("Part 2 <1>"), [-130.0, 60.0, 20.0], 1e-6), "the plate at {:?}", t("Part 2 <1>"));
+        } else {
+            // The block's bottom centre onto the plate's top centre (150, 0, 10).
+            assert!(near(t("Part 1 <1>"), [150.0, 0.0, 10.0], 1e-6), "the block at {:?}", t("Part 1 <1>"));
+            assert!(near(t("Part 2 <1>"), [0.0, 0.0, 0.0], 1e-9), "the plate moved to {:?}", t("Part 2 <1>"));
+        }
         let _ = std::fs::remove_file(&path);
     }
 }
