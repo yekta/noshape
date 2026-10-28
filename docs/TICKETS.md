@@ -385,6 +385,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   third undo (29 features re-evaluated) stays far over 50 ms.
   qa 09:27 (green 97c7aae3 with core 89531150, load 28–34): open 913 ms, edits 406 / 323 / 196 ms (median 323), Ctrl+Z 2 / 1 /
   1277 ms: no visible change at this load.
+  qa 11:18 (green 64997436 with core f8a21d5f planar boxes / 9edc7332, NOSHAPE_PERF, load 24–30): open 458 ms; Extrude 1 →
+  11 / 9 / 13: 201 / 202 / 307 ms, Ctrl+Z ×3 3 / 1 / **131 ms**; again at load 30 (12 / 8 / 14): 357 / 284 / 606 ms, 3rd undo
+  **251 ms**. The third undo is 5–10× faster than at 09:27 (1277 ms); commit median ~290 ms, still over 200 at this load.
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
 - [x] verified watcher CLI 04:06 (≥ green bcf401ca, has 239fa250; qa5 pass28/build.py: 2.5 mm 8503.961 mm³ / 47 faces, 1 mm 3998.630 / 33, live 8503.961 / 47 and 3998.627 / 33) (core 10-27: live's numbers exactly, 1 mm 3998.632 / 33 faces, 2.5 mm 8503.961 / 47; kernel test shell.rs shell_block_with_close_holes_like_onshape back in T1) P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
