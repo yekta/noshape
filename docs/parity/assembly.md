@@ -201,7 +201,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | D2 | Two mate connector fields; picks fill the first, then auto-advance to the second | E§6.2 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | D3 | Clicking a field makes it active; × clears it | E§6.2 | ✅ | | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) (× clears the chip) |
 | D4 | Second pick moves the first connector's instance onto the second (second stays) | E§6.3 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
-| D5 | Connectors must be on different instances | E§6.1 | ✅ | |  |
+| D5 | Connectors must be on different instances | E§6.1 | ✅ | | 2292bf8c 10-28 (Fastened: a second pick on the instance already used is not taken; one chip, title tooltip "Fastened 1 did not regenerate properly: Mate needs two mate connectors.") |
 | D6 | Explicit mate connectors and the Origin pickable (graphics or list) | E§6.1 | ✅ | |  |
 | D7 | Flip primary axis (button, `a`); bottom connector flips when the top one is constrained | H:mates | ✅ | stationary side is the held one | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) (a: the pin flips to hang through the plate) |
 | D8 | Reorient secondary axis (90° steps) | H:mates | ✅ |  |
