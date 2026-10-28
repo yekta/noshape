@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf)
 
+- **17:45 update (green 5267fdaf):** **P0 BOP-PAIRS-GPF**: the green app died (GPF in IntTools_Context on a pool
+  worker, dmesg + addr2line) while a Part mirror previewed on a 54-feature CLI-fuzz document; likely f024fd0d (patch 0004).
+  Intermittent (2nd try fine). Repro attempts running: Extrude 1 edit loop on live-30-features (bin/editloop.sh, el-a.log).
+  Also: that fuzz document opens in 2 min on both 5267fdaf and 78958d0f (Shell 4 / 5: 27–34 / 55–58 s, SHELL-SLOW). GUI fuzz
+  77 (5267, 600 actions) alive; CLI fuzz 150 / 151 on the watcher's debug CLI (main 17:09) running. P1 walk on a new Part
+  Studio (rectangle + dims, extrude, shell, mass properties = analytic) fine; MENU-TRUNCATE = live (250 px cap).
 - **17:15 update (green 5267fdaf, copied 17:01; has core f024fd0d OCCT patch 0004 threaded pave filler, bool e0197071
   Rust Boolean off by default):** REGEN-SPEED A/B vs 78958d0f: no clear gain, still over 200 ms (ticket note). Fuzz 77
   (5267, live-30-features copy) running. Not yet green: df97926c (SKETCH-HINT-OVERLAP, SKETCH-RECT-DROPDOWN-NAME),
@@ -277,7 +283,10 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-28 13:35)
+## Requests to the lead (qa, updated 2026-10-28 17:45)
+- **P0 BOP-PAIRS-GPF (core, new in green 5267fdaf):** a GPF inside OCCT's IntTools_Context on a thread-pool worker
+  killed the app during a Mirror preview; it arrived with f024fd0d (patch 0004, threaded pave-filler pairs). Unless core
+  fixes it, please consider NOSHAPE_BOP_PAIRS_SERIAL=1 behaviour as the default before the 05:00 cut.
 - **REGEN-SPEED (P0):** green f8014efa with the mesh cache still commits Extrude 1 edits on live-30-features in 165–725 ms
   (load 30–35) and the 3rd undo re-evaluates 29 features (131 ms). Booleans dominate under load (25–97 ms each).
 - **P1 SKETCH-MODEL-EDGE-SELECT (skasm, new 10-28, also in v0.4.12):** in a sketch a click on a model edge selects nothing
