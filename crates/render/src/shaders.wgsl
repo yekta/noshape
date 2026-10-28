@@ -852,9 +852,11 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     var alpha: f32;
     if ((inst.params.x & 1u) != 0u) { base = srgb_to_linear(l.color.rgb); alpha = l.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
     if ((st & DIM) != 0u) { alpha = alpha * 0.3; }
-    // A selected part's edges let its amber through (live ins-902: the
-    // top/front edge peaks at 0.73 of the faces, ours at 0.53 when opaque).
-    if ((st & (BODY | HOVER | SELECTED)) == BODY) { alpha = alpha * 0.68; }
+    // A selected part's edges are a darker amber, so the part reads as one
+    // amber body (live assembly/04-insert-ghost: (156,117,47), about a third
+    // of the body amber in linear light; ASM-SELECTED-EDGES-DARK: the dark
+    // edge let through at 0.68 gave (73,55,22)).
+    if ((st & (BODY | HOVER | SELECTED)) == BODY) { base = BODY_SELECTED * 0.335; }
     // Hovering a selected part edge or face keeps the selection's look (live).
     let keep_selected = (own_edge || face_band) && (st & SELECTED) != 0u;
     o.color = vec4(select(highlight_stroke(base, st), g.select.rgb, keep_selected), alpha);
