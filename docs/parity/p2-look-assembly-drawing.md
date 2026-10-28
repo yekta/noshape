@@ -24,8 +24,8 @@ asked, → owner.
 
 | # | Item | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| DL1 | Insert view tool | opens the empty Insert view panel; [Insert] opens "Select a part or assembly" (drawing/122, 170a; behaviours 1473, 3043) | opened the chooser at once | ✅ panel first |  |
-| DL2 | Empty Insert view panel | fields greyed with grey ▼; View scale focused (2 px blue underline, dark ▼) | all alike, blue carets | ✅ |  |
+| DL1 | Insert view tool | opens the empty Insert view panel; [Insert] opens "Select a part or assembly" (drawing/122, 170a; behaviours 1473, 3043) | opened the chooser at once | ✅ panel first | 7e88e3ab 10-28 (Insert view tool opens the empty Insert view panel; its [Insert] opens "Select a part or assembly"; a drawing created from a part opens the panel prefilled with that part instead) |
+| DL2 | Empty Insert view panel | fields greyed with grey ▼; View scale focused (2 px blue underline, dark ▼) | all alike, blue carets | ✅ | 7e88e3ab 10-28 (orientation / simplification greyed with grey ▼, View scale focused with the blue underline and dark ▼; tickets/insert-view-empty-7e88.png) |
 | DL3 | Active drawing tool button | `#d1dde6` (drawing/20–22, 127) | `#eaeaea` (the Part Studio's) | ✅ | 77870dd4 10-28 |
 | DL4 | Section view dialog label | focused with "A" selected, 2 px underline (drawing/20) | not focused, 1 px, 2 px lower | 🔧 focus + 2 px ✅; the selection and Esc (the focused field swallowed it) fixed after the 17:19 build | 77870dd4 10-28 |
 | DL5 | Section view dialog checkboxes | `#ddd` 12 px boxes 2 px up / left | the kit's darker box | ✅ every drawing dialog and panel (`drawing_chrome::DrCheckbox`): the floating dialogs, view and sheet properties the 12 px `#ddd` box (live hides the native input: dom drawing-section/detail/weld/note/flat-view-properties); the Drawing properties and styles panels and the Reference manager Chrome's native 13 px box (`#767676` / `#0075ff`, live 240, 294) | 77870dd4 10-28 |
