@@ -5,6 +5,14 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97)
 
+- **04:20 update:** 05:00 blocker list pushed at the top of TICKETS (no new P0; open P0s FILLET-OVERSIZE-OK, REGEN-SPEED /
+  COMMIT-LATENCY, SHELL-SLOW, BOOL-THREAD-CRASH are all in v0.4.11). Fuzz 51 / 52 on 1b81b7ca alive. FILLET-OVERSIZE-OK
+  re-checked on 1b81b7ca (R25 D-shape, no error). Filed P2 CALLOUT-ON-DIMENSION, P3 CALLOUT-ALIGN-MISSING (dx). Rows:
+  assembly C1 C21 C22 F10 I4 I12 K13; drawing S4 V58 V66 V69 V72 (D41, A26 ❌); cursors 42 52 80; interaction 6.2;
+  feature-sweep Draft 0°, Move face up-to; release-smoke pre-check: Linear pattern Feature mode Direction hover / pick OK.
+  Next green should carry 4fa9cdf1 (REORDER-MISSING-MSG stale tooltip), c1f5d69c (ASM-TOOLSEARCH, ASM-CHANGE-CONFIG-ICON),
+  4658e826 (FS completions as snippets; CTRL-C-PART), 3062ec50 (dx view label prefix / suffix): verify those, then the
+  05:00 release smoke (checklist below) on the release's tarball and the green at its commit.
 - **04:00 update (greens da18f886 → 1b81b7ca):** fuzz 49 / 50 on da18f886 alive (51 on 1b81b7ca running). Verified: da18f886
   SKETCH-FILLET-STUCK-RADIUS (c) (a whole-leg fillet types smaller; (b) max-fit preview + Enter commit still unlike live),
   0637de45 dual row (D34), e3fd499b see-through picks (part-studio 2.23) on 1b81b7ca. SKETCH-FILLET-EQUAL still open for
