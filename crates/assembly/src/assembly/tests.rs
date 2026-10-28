@@ -2204,6 +2204,78 @@ fn move_to_new_subassembly_and_dissolve_keep_positions() {
     assert_eq!(super::ops::next_assembly_tab_name(&f.doc), "Assembly 1");
 }
 
+/// ASM-PATTERN-SUBASSEMBLY (live request 1564): a pattern whose seed and
+/// direction move to a new subassembly goes along with its copies and stays
+/// healthy; Dissolve brings it back to the top level, still healthy. A
+/// pattern whose direction stays behind isn't dependent.
+#[test]
+fn move_to_new_subassembly_takes_a_dependent_pattern() {
+    let mut f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let b = &r.context.bodies[0];
+    let edge = b
+        .edges
+        .iter()
+        .enumerate()
+        .find_map(|(i, n)| match b.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok()?.edge_info().ok()?.curve {
+            noshape_kernel::Curve::Line { direction, .. } if direction.x.abs() > 0.99 => Some(Reference::Edge((**n).clone())),
+            _ => None,
+        })
+        .unwrap();
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <1>", f.studios[0], body.clone(), DVec3::new(0.0, 0.1, 0.0), false)],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        ..Default::default()
+    };
+    asm.patterns.push(InstancePattern {
+        id: MateId(70),
+        name: "Linear pattern 1".into(),
+        kind: PatternKind::Linear { direction: conn(1, edge, Inference::Midpoint).linear_direction(), distance: ExprValue::new("25 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false },
+        seeds: vec![InstanceId(2)],
+        generated: vec![],
+        suppressed: false,
+    });
+    asm.sync_pattern(MateId(70));
+    assert!(asm.dependent_patterns(&[InstanceId(2)]).is_empty(), "the direction's part stays: not dependent");
+    assert_eq!(asm.dependent_patterns(&[InstanceId(1), InstanceId(2)]), vec![MateId(70)]);
+    let world = |res: &eval::AssemblyResult| -> Vec<DVec3> {
+        let mut v: Vec<DVec3> = res.occurrences.iter().map(|o| o.transform.transform_point3(DVec3::new(0.01, 0.005, 0.0))).collect();
+        v.sort_by(|a, b| (a.x, a.y, a.z).partial_cmp(&(b.x, b.y, b.z)).unwrap());
+        v
+    };
+    let before = world(&ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None));
+    assert_eq!(before.len(), 4);
+    let mut parent = asm.clone();
+    let sub_tab = f.doc.add_tab("Assembly 2", TabContent::Assembly(Box::default()));
+    let (sub, sub_id) = parent.move_to_new_subassembly(&[InstanceId(1), InstanceId(2)], sub_tab, "Assembly 2");
+    assert!(parent.patterns.is_empty() && parent.mates.is_empty(), "pattern and mate moved");
+    assert_eq!(parent.instances.len(), 1);
+    assert_eq!((sub.instances.len(), sub.patterns.len(), sub.mates.len()), (4, 1, 1), "seed, base and both copies inside");
+    if let Some(t) = f.doc.tabs.iter_mut().find(|t| t.id == sub_tab) {
+        t.content = TabContent::Assembly(Box::new(sub.clone()));
+    }
+    let inner = ev.evaluate(&f.doc, &sub, &SolveOptions::default(), None);
+    assert!(inner.pattern_errors.is_empty(), "{:?}", inner.pattern_errors);
+    let res = ev.evaluate(&f.doc, &parent, &SolveOptions::default(), None);
+    assert_eq!(world(&res).len(), 4);
+    for (a, b) in before.iter().zip(&world(&res)) {
+        assert!(a.distance(*b) < 1e-6, "moved: {a:?} -> {b:?}");
+    }
+    let ids = parent.dissolve_subassembly(sub_id, &sub);
+    assert_eq!((ids.len(), parent.patterns.len(), parent.mates.len()), (4, 1, 1));
+    let p = &parent.patterns[0];
+    assert!(ids.contains(&p.seeds[0]) && p.generated.iter().all(|g| ids.contains(&g.instance) && g.seed == p.seeds[0]));
+    let res = ev.evaluate(&f.doc, &parent, &SolveOptions::default(), None);
+    assert!(res.pattern_errors.is_empty(), "{:?}", res.pattern_errors);
+    assert_eq!(world(&res).len(), 4);
+    for (a, b) in before.iter().zip(&world(&res)) {
+        assert!(a.distance(*b) < 1e-6, "dissolve moved: {a:?} -> {b:?}");
+    }
+}
+
 #[test]
 fn hold_one_degree_of_freedom() {
     let f = doc_with(vec![plate_with_hole(), pin_studio()]);

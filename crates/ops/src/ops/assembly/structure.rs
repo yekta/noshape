@@ -21,7 +21,7 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "move_to_subassembly",
             summary: "Move instances to a new subassembly",
-            description: "Move to new subassembly: a new Assembly tab holds the instances and the mates among them, and one instance of it takes their place. Pattern and mirror copies stay.",
+            description: "Move to new subassembly: a new Assembly tab holds the instances and the mates among them, and one instance of it takes their place. Patterns whose seeds and references all move go along with their copies.",
             fields: vec![doc_field(), asm_field(), instances()],
             mutates: true,
             destructive: false,

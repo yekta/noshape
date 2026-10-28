@@ -2838,7 +2838,7 @@ Examples:
 
 Move instances to a new subassembly (edits the document (one undoable history entry)).
 
-Move to new subassembly: a new Assembly tab holds the instances and the mates among them, and one instance of it takes their place. Pattern and mirror copies stay.
+Move to new subassembly: a new Assembly tab holds the instances and the mates among them, and one instance of it takes their place. Patterns whose seeds and references all move go along with their copies.
 
 Examples:
 

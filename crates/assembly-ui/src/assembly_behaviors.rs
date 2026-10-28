@@ -1188,7 +1188,7 @@ impl AssemblyView {
         m.push(copy);
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
-        m.push(item("Move to new subassembly", move |t, _, cx| t.move_to_new_subassembly(tg.clone(), cx)));
+        m.push(item("Move to new subassembly", move |t, w, cx| t.move_to_new_subassembly(tg.clone(), w, cx)));
         if is_asm {
             let tg: Vec<InstanceId> = targets.iter().copied().filter(|id| asm.instance(*id).is_some_and(|i| matches!(i.source, InstanceSource::Assembly { .. }))).collect();
             m.push(item("Dissolve subassembly", move |t, _, cx| t.dissolve_subassemblies(tg.clone(), cx)));
@@ -1717,12 +1717,70 @@ impl AssemblyView {
     }
 
     /// Move to new subassembly: a new Assembly tab holding the instances
-    /// (and their mates), inserted here in their place.
-    pub(super) fn move_to_new_subassembly(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
-        let ids: Vec<InstanceId> = self.assembly(cx).map(|a| noshape_ops::assembly::movable_to_subassembly(a, &ids)).unwrap_or_default();
+    /// (and their mates and dependent patterns), inserted here in their
+    /// place. Live (request 1564): when patterns depend on the selection, a
+    /// confirm modal lists the selected and the dependent references first.
+    pub(super) fn move_to_new_subassembly(&mut self, ids: Vec<InstanceId>, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::WindowExt as _;
+        let Some(a) = self.assembly(cx) else { return };
+        let ids = noshape_ops::assembly::movable_to_subassembly(a, &ids);
         if ids.is_empty() {
             return;
         }
+        let dependent: Vec<(String, &'static str)> = a
+            .dependent_patterns(&ids)
+            .iter()
+            .filter_map(|id| a.pattern(*id))
+            .map(|p| {
+                let icon = match p.kind {
+                    PatternKind::Linear { .. } | PatternKind::PartPattern { .. } => "linear-pattern",
+                    PatternKind::Circular { .. } => "circular-pattern",
+                    PatternKind::Mirror { .. } => "mirror",
+                    PatternKind::Replicate { .. } => "replicate",
+                };
+                (p.name.clone(), icon)
+            })
+            .collect();
+        if dependent.is_empty() {
+            self.move_ids_to_new_subassembly(ids, cx);
+            return;
+        }
+        let selected: Vec<(String, &'static str)> =
+            ids.iter().filter_map(|id| a.instance(*id)).map(|i| (i.name.clone(), if matches!(i.source, InstanceSource::Assembly { .. }) { "assembly" } else { "part" })).collect();
+        let this = cx.entity();
+        window.open_dialog(cx, move |dialog, _, cx| {
+            use crate::os_ui as os;
+            let pal = p();
+            let section = |title: String, rows: &[(String, &'static str)], cx: &App| {
+                let mut list = v_flex().py(px(4.));
+                for (name, icon) in rows {
+                    list = list.child(h_flex().h(px(31.)).pl(px(16.)).gap(px(4.)).child(crate::assets::icon(icon, 14., cx)).child(div().truncate().child(crate::ui::user_text(name.clone()))));
+                }
+                v_flex()
+                    .border_1()
+                    .border_color(pal.border)
+                    .child(h_flex().h(px(31.)).px(px(6.)).gap(px(2.)).bg(pal.panel_hover).font_weight(FontWeight::SEMIBOLD).child(Icon::new(IconName::ChevronDown).size(px(12.))).child(title))
+                    .child(list)
+            };
+            let this = this.clone();
+            let ids = ids.clone();
+            os::modal(dialog, "Move to new subassembly", 598.)
+                .child(
+                    os::modal_body()
+                        .gap(px(10.))
+                        .child(section(format!("{} Selected references to be moved", selected.len()), &selected, cx))
+                        .child(section(format!("{} Dependent references to be moved", dependent.len()), &dependent, cx)),
+                )
+                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("move-sub-ok", "Move"))).child(os::modal_cancel(os::cancel_button("move-sub-cancel", "Cancel", cx))))
+                .on_ok(move |_, _, cx| {
+                    let ids = ids.clone();
+                    this.update(cx, |t, cx| t.move_ids_to_new_subassembly(ids, cx));
+                    true
+                })
+        });
+    }
+
+    fn move_ids_to_new_subassembly(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
         let mut new_id = None;
         self.edit_doc(noshape_ops::assembly::MOVE_TO_NEW_SUBASSEMBLY, cx, |doc, tab| new_id = noshape_ops::assembly::move_to_new_subassembly(doc, tab, &ids));
         if let Some(id) = new_id {

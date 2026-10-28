@@ -2,7 +2,7 @@
 //! its colon commands, copy / paste of instances with their mates and mate
 //! connectors, renaming, hide / show helpers and Unfix all.
 
-use super::{Assembly, Instance, InstanceId, MateConnectorRef, MateId, Placement, SubassemblyLock};
+use super::{Assembly, Instance, InstanceId, MateConnectorRef, MateId, PatternKind, Placement, SubassemblyLock};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -360,32 +360,84 @@ fn repath_into(c: &mut MateConnectorRef, moved: &[InstanceId], sub: InstanceId) 
 }
 
 impl Assembly {
+    /// Patterns that go along when the instances `ids` move to a new
+    /// subassembly (live request 1564: "Dependent references to be moved"):
+    /// those whose seeds all move and whose references (directions, axis,
+    /// mirror plane, seed mate) all end up inside it.
+    pub fn dependent_patterns(&self, ids: &[InstanceId]) -> Vec<MateId> {
+        let base: Vec<InstanceId> = self.instances.iter().filter(|i| ids.contains(&i.id) && self.generated_by(i.id).is_none()).map(|i| i.id).collect();
+        self.subassembly_split(&base).3
+    }
+
+    /// What moves with the instances `base`: (instances with the moving
+    /// patterns' copies, mates, mate connectors, patterns).
+    fn subassembly_split(&self, base: &[InstanceId]) -> (Vec<InstanceId>, Vec<MateId>, Vec<MateId>, Vec<MateId>) {
+        let mut pats: Vec<MateId> = self.patterns.iter().filter(|p| !p.seeds.is_empty() && p.seeds.iter().all(|s| base.contains(s))).map(|p| p.id).collect();
+        loop {
+            let mut moved = base.to_vec();
+            for p in self.patterns.iter().filter(|p| pats.contains(&p.id)) {
+                moved.extend(p.generated.iter().map(|g| g.instance));
+            }
+            let inside = |c: &MateConnectorRef| c.instance != InstanceId::ORIGIN && moved.contains(&c.instance);
+            // Mates entirely among the moved instances (and the connectors they use).
+            let internal: Vec<MateId> = self.mates.iter().filter(|m| m.connectors().all(inside)).map(|m| m.id).collect();
+            let mate_users = |cid: MateId| self.mates.iter().filter(move |m| m.connectors().any(|c| c.connector == Some(cid))).map(|m| m.id);
+            let pattern_users = |cid: MateId| self.patterns.iter().filter(move |p| p.connector_refs().iter().any(|c| c.connector == Some(cid))).map(|p| p.id);
+            // A connector moves when its owner does (or it sits on the origin
+            // and only moving patterns use it) and nothing staying uses it.
+            let moved_conns: Vec<MateId> = self
+                .connectors
+                .iter()
+                .filter(|c| moved.contains(&c.owner()) || (c.owner() == InstanceId::ORIGIN && pattern_users(c.id).any(|p| pats.contains(&p))))
+                .filter(|c| mate_users(c.id).all(|m| internal.contains(&m)) && pattern_users(c.id).all(|p| pats.contains(&p)))
+                .map(|c| c.id)
+                .collect();
+            // A mate using a connector that stays in the parent stays too.
+            let internal: Vec<MateId> = internal.into_iter().filter(|id| self.mate(*id).is_some_and(|m| m.connectors().all(|c| c.connector.is_none_or(|x| moved_conns.contains(&x))))).collect();
+            let resolves = |c: &&MateConnectorRef| match c.connector {
+                Some(x) => moved_conns.contains(&x),
+                None => c.instance == InstanceId::ORIGIN || moved.contains(&c.instance),
+            };
+            let keep: Vec<MateId> = pats
+                .iter()
+                .copied()
+                .filter(|id| {
+                    self.pattern(*id).is_some_and(|p| {
+                        p.connector_refs().iter().all(resolves) && p.seed_mate().is_none_or(|m| internal.contains(&m)) && p.generated.iter().filter_map(|g| g.mate).all(|m| internal.contains(&m))
+                    })
+                })
+                .collect();
+            if keep.len() == pats.len() {
+                return (moved, internal, moved_conns, pats);
+            }
+            pats = keep;
+        }
+    }
+
     /// Onshape "Move to new subassembly": the instances `ids` (with the mates,
-    /// mate connectors, relations and groups entirely among them) move into a
-    /// new assembly, returned; the parent gets one instance of `sub_tab` (named
-    /// `sub_name <n>`, fixed if a moved instance was fixed) at the identity, so
-    /// nothing moves. Mates between moved and remaining instances stay in the
-    /// parent and now reach the moved instances through the subassembly.
+    /// mate connectors, relations and groups entirely among them, and the
+    /// patterns of [`Self::dependent_patterns`] with their copies) move into
+    /// a new assembly, returned; the parent gets one instance of `sub_tab`
+    /// (named `sub_name <n>`, fixed if a moved instance was fixed) at the
+    /// identity, so nothing moves. Mates between moved and remaining
+    /// instances stay in the parent and now reach the moved instances
+    /// through the subassembly.
     /// Returns (subassembly content, new subassembly instance id).
     pub fn move_to_new_subassembly(&mut self, ids: &[InstanceId], sub_tab: crate::document::TabId, sub_name: &str) -> (Assembly, InstanceId) {
-        let moved: Vec<InstanceId> = self.instances.iter().filter(|i| ids.contains(&i.id) && self.generated_by(i.id).is_none()).map(|i| i.id).collect();
+        let base: Vec<InstanceId> = self.instances.iter().filter(|i| ids.contains(&i.id) && self.generated_by(i.id).is_none()).map(|i| i.id).collect();
+        let (moved, internal, moved_conns, moved_pats) = self.subassembly_split(&base);
         let mut sub = Assembly::default();
         let sub_id = InstanceId(self.next_id());
         sub.instances = self.instances.iter().filter(|i| moved.contains(&i.id)).cloned().collect();
         let any_fixed = sub.instances.iter().any(|i| i.fixed);
-        let inside = |c: &MateConnectorRef| c.instance != InstanceId::ORIGIN && moved.contains(&c.instance);
-        // Mates entirely among the moved instances (and the connectors they use).
-        let internal: Vec<MateId> = self.mates.iter().filter(|m| m.connectors().all(inside)).map(|m| m.id).collect();
-        let conn_users = |cid: MateId, a: &Assembly| a.mates.iter().filter(|m| m.connectors().any(|c| c.connector == Some(cid))).map(|m| m.id).collect::<Vec<_>>();
-        let moved_conns: Vec<MateId> = self.connectors.iter().filter(|c| moved.contains(&c.owner()) && conn_users(c.id, self).iter().all(|m| internal.contains(m))).map(|c| c.id).collect();
-        // A mate using a connector that stays in the parent stays too.
-        let internal: Vec<MateId> = internal.into_iter().filter(|id| self.mate(*id).is_some_and(|m| m.connectors().all(|c| c.connector.is_none_or(|x| moved_conns.contains(&x))))).collect();
         sub.mates = self.mates.iter().filter(|m| internal.contains(&m.id)).cloned().collect();
         sub.connectors = self.connectors.iter().filter(|c| moved_conns.contains(&c.id)).cloned().collect();
+        sub.patterns = self.patterns.iter().filter(|p| moved_pats.contains(&p.id)).cloned().collect();
         sub.relations = self.relations.iter().filter(|r| r.mates.iter().all(|m| internal.contains(m))).cloned().collect();
         sub.groups = self.groups.iter().filter(|g| g.instances.iter().all(|i| moved.contains(i))).cloned().collect();
         let moved_groups: Vec<MateId> = sub.groups.iter().map(|g| g.id).collect();
         let moved_rels: Vec<MateId> = sub.relations.iter().map(|r| r.id).collect();
+        self.patterns.retain(|p| !moved_pats.contains(&p.id));
         // Parent: drop what moved, re-path what still points into it.
         self.mates.retain(|m| !internal.contains(&m.id));
         self.connectors.retain(|c| !moved_conns.contains(&c.id));
@@ -415,7 +467,7 @@ impl Assembly {
 
     /// Onshape "Dissolve subassembly": the subassembly instance `sub_inst`
     /// (content `sub`) is replaced by copies of its instances, mates, mate
-    /// connectors, relations and groups at the same world positions; parent
+    /// connectors, relations, groups and patterns at the same world positions; parent
     /// mates into the subassembly are re-pathed. Returns the new instance ids.
     pub fn dissolve_subassembly(&mut self, sub_inst: InstanceId, sub: &Assembly) -> Vec<InstanceId> {
         let Some(si) = self.instance(sub_inst).cloned() else { return vec![] };
@@ -446,6 +498,9 @@ impl Assembly {
         }
         for g in &sub.groups {
             feat_map.insert(g.id, MateId(fresh(&mut next)));
+        }
+        for p in &sub.patterns {
+            feat_map.insert(p.id, MateId(fresh(&mut next)));
         }
         let map_inner = |c: &MateConnectorRef| {
             let mut c = c.clone();
@@ -503,6 +558,42 @@ impl Assembly {
             n.id = feat_map[&g.id];
             n.instances = g.instances.iter().filter_map(|i| inst_map.get(i).copied()).collect();
             self.groups.push(n);
+        }
+        // Patterns come back with their seeds and copies (live request 1564).
+        let inst = |i: InstanceId| inst_map.get(&i).copied().unwrap_or(i);
+        let feat = |m: MateId| feat_map.get(&m).copied().unwrap_or(m);
+        for p in &sub.patterns {
+            let mut n = p.clone();
+            n.id = feat_map[&p.id];
+            n.seeds = p.seeds.iter().map(|i| inst(*i)).collect();
+            for g in &mut n.generated {
+                g.seed = inst(g.seed);
+                g.instance = inst(g.instance);
+                g.mate = g.mate.map(feat);
+                g.target = g.target.as_ref().map(map_inner);
+            }
+            for c in n.connector_refs_mut() {
+                *c = map_inner(c);
+            }
+            match &mut n.kind {
+                PatternKind::PartPattern { mate } => *mate = feat(*mate),
+                PatternKind::Replicate { mate, scope_refs, .. } => {
+                    *mate = feat(*mate);
+                    for e in scope_refs {
+                        e.instance = inst(e.instance);
+                    }
+                }
+                PatternKind::Mirror { derived, placement, .. } => {
+                    for i in derived {
+                        *i = inst(*i);
+                    }
+                    for (i, _) in placement {
+                        *i = inst(*i);
+                    }
+                }
+                PatternKind::Linear { .. } | PatternKind::Circular { .. } => {}
+            }
+            self.patterns.push(n);
         }
         let pos = self.instances.iter().position(|i| i.id == sub_inst).unwrap_or(self.instances.len());
         self.instances.retain(|i| i.id != sub_inst);

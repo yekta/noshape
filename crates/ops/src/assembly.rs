@@ -752,7 +752,8 @@ pub fn movable_to_subassembly(a: &Assembly, ids: &[InstanceId]) -> Vec<InstanceI
 }
 
 /// Move to new subassembly: a new Assembly tab holding the instances (and
-/// their mates), inserted in their place. Returns the new instance.
+/// their mates and dependent patterns), inserted in their place. Returns the
+/// new instance.
 pub fn move_to_new_subassembly(doc: &mut noshape_model::Document, tab: TabId, ids: &[InstanceId]) -> Option<InstanceId> {
     let name = noshape_model::assembly::ops::next_assembly_tab_name(doc);
     let sub_tab = doc.add_tab(&name, noshape_model::document::TabContent::Assembly(Box::default()));

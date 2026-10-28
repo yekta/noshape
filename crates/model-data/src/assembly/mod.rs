@@ -765,6 +765,31 @@ pub struct InstancePattern {
 }
 
 impl InstancePattern {
+    /// The mate connectors the pattern is defined by (directions, axis,
+    /// mirror plane).
+    pub fn connector_refs(&self) -> Vec<&MateConnectorRef> {
+        match &self.kind {
+            PatternKind::Linear { direction, second, .. } => std::iter::once(direction).chain(second.as_ref().map(|s| &s.direction)).collect(),
+            PatternKind::Circular { axis, .. } => vec![axis],
+            PatternKind::Mirror { plane, .. } => vec![plane],
+            PatternKind::PartPattern { .. } | PatternKind::Replicate { .. } => Vec::new(),
+        }
+    }
+    pub fn connector_refs_mut(&mut self) -> Vec<&mut MateConnectorRef> {
+        match &mut self.kind {
+            PatternKind::Linear { direction, second, .. } => std::iter::once(direction).chain(second.as_mut().map(|s| &mut s.direction)).collect(),
+            PatternKind::Circular { axis, .. } => vec![axis],
+            PatternKind::Mirror { plane, .. } => vec![plane],
+            PatternKind::PartPattern { .. } | PatternKind::Replicate { .. } => Vec::new(),
+        }
+    }
+    /// The seed mate a part pattern / replicate re-creates.
+    pub fn seed_mate(&self) -> Option<MateId> {
+        match &self.kind {
+            PatternKind::PartPattern { mate } | PatternKind::Replicate { mate, .. } => Some(*mate),
+            _ => None,
+        }
+    }
     pub fn type_name(&self) -> &'static str {
         match self.kind {
             PatternKind::Linear { .. } => "Linear pattern",
