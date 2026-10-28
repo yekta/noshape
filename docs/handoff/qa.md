@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **12:43 update (green 9da19774):** fuzz 70 (9da1) alive. Drawing pass on qa-scratch/cbd.noshape (counterbore plate +
+  ISO A3 drawing, bin/cbdwg.py): D3 wall thickness, D5, D7 ordinates, D10 (ordinate group red after Suppress + Update) = live;
+  filed P2 DWG-DANGLING-WALL (the wall-thickness dim stays black when its circles go), P3 DWG-MAXMIN-LINE (Ctrl+M won't take
+  a straight edge), P3 DWG-FORESHORTEN-JUMP (label collapses onto the rim; live look asked), P3 DWG-PALETTE-VALUE-EMPTY.
+  Sketch: mirror (selection-first), offset (live's Enter → 5 mm box → 3), slot (Ø20, no box) = live.
 - **12:28 update (greens 8bb8a6d1 → 9da19774):** fuzz 69 (8bb8) × 600 alive. Live answered 1547–1553: filed P3
   BODY-NAME-BY-TYPE (core), P3 GROUP-ROW-ERROR (skasm); SKETCH-START-INFERENCE confirmed; sketch 2.8 and assembly-sweep 5
   = live; SKETCH-HINT-OVERLAP → live has no sketch tool hints at all. Verified: drawing S19 / A7 (format layers, lock),
