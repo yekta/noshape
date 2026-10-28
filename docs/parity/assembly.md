@@ -273,7 +273,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | S2 | Release opens the mate dialog (Fastened) with both MCs filled | E§20 | ✅ | pre-existing | 0.4.10+ / 77870dd4 10-28 |
 | S3 | Ctrl cycles the dragged instance's MCs | E§20 | ✅ | see K11 |  |
 | S4 | `a` / `q` change alignment during the drag | E§20 | ✅ | |  |
-| S5 | Fixed instances cannot be dragged | E§20 | ✅ | |  |
+| S5 | Fixed instances cannot be dragged | E§20 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 
 ## 11. Animate (H:mates "Animating movement", E§6.6)
 
