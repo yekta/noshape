@@ -43,6 +43,43 @@ pub struct Isolation {
     pub expand: usize,
 }
 
+/// The parts Isolate's "Expand: distance" slider at `step` (0 to 10) adds to the chosen ones, as Onshape's isolate
+/// manager (woolsthorpe `maxForProximitySlider`, webgl `getAffectedOccurrencesForExpandEffectByProximity`): the slider
+/// runs to half the model box's diagonal plus the distance from the nearest chosen part's centre to the box's centre
+/// (`model`: what Zoom to fit frames, the shown planes included), in 10 steps; a part joins when its box centre is
+/// nearer than that to a chosen part's box centre. Live (behaviours "Part Studio Isolate…"): five 20 mm blocks 5 mm
+/// apart join at 20 / 40 / 50 / 70 %.
+pub(crate) fn expand_by_distance(model: (glam::DVec3, glam::DVec3), seeds: &[(glam::DVec3, glam::DVec3)], others: &[(BodyId, (glam::DVec3, glam::DVec3))], step: usize) -> Vec<BodyId> {
+    let centre = |(lo, hi): (glam::DVec3, glam::DVec3)| (lo + hi) * 0.5;
+    let seeds: Vec<glam::DVec3> = seeds.iter().map(|b| centre(*b)).collect();
+    let Some(nearest) = seeds.iter().map(|s| s.distance(centre(model))).min_by(f64::total_cmp) else { return Vec::new() };
+    let max = (model.1 - model.0).length() / 2.0 + nearest;
+    let d = max / 10.0 * step as f64;
+    others.iter().filter(|(_, b)| seeds.iter().any(|s| s.distance_squared(centre(*b)) < d * d)).map(|(id, _)| id.clone()).collect()
+}
+
+#[cfg(test)]
+mod expand_by_distance_tests {
+    use super::*;
+    use glam::DVec3;
+    use noshape_model::reference::FeatureId;
+    use std::prelude::v1::test;
+
+    /// Live's "ui iso" studio: Part 1 … 5, 20 × 20 × 15 mm blocks 5 mm apart along X, the default planes (±75 mm)
+    /// shown; Isolate on Part 1 adds Part 2 at 20 %, Part 3 at 40 %, Part 4 at 50 %, Part 5 at 70 %.
+    #[test]
+    fn five_blocks_join_at_lives_steps() {
+        let mm = 1e-3;
+        let block = |i: usize| (DVec3::new(25.0 * i as f64, 0.0, 0.0) * mm, DVec3::new(25.0 * i as f64 + 20.0, 20.0, 15.0) * mm);
+        let id = |i: usize| BodyId { feature: FeatureId(i as u64 + 1), index: 0 };
+        let model = (DVec3::new(-75.0, -75.0, -75.0) * mm, DVec3::new(120.0, 75.0, 75.0) * mm);
+        let others: Vec<_> = (1..5).map(|i| (id(i), block(i))).collect();
+        let joined = |step| expand_by_distance(model, &[block(0)], &others, step).len();
+        let counts: Vec<usize> = (0..=10).map(joined).collect();
+        assert_eq!(counts, [0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 4]);
+    }
+}
+
 /// What the Dynamic suppression dialog sets: a feature's "Unsuppressed if"
 /// expression, or that of every feature in a folder.
 #[derive(Clone, Copy)]
@@ -2005,27 +2042,16 @@ impl PartStudioView {
     /// Display to build the scene from: the regenerated display with
     /// isolate/transparency applied to part colors.
     /// Parts made transparent by Isolate / Make transparent, with the
-    /// "Expand: distance" neighbours: live (behaviours.md "Part Studio
-    /// Isolate…") joins parts whose gap to the chosen ones is within a radius
-    /// growing with the square of the step (gaps 5 / 30 / 55 / 80 mm joined
-    /// at 20 / 40 / 50 / 70 % in a 271 mm model: 0.815 × diagonal × step²).
+    /// "Expand: distance" neighbours ([`expand_by_distance`]).
     pub(super) fn isolation_transparent(&self) -> HashSet<BodyId> {
         let Some(iso) = &self.ui.isolate else { return HashSet::new() };
-        let bounds = |b: &BodyId| self.display.body(b).and_then(|b| b.bounds);
-        let gap = |a: (glam::DVec3, glam::DVec3), b: (glam::DVec3, glam::DVec3)| ((a.0 - b.1).max(b.0 - a.1)).max(glam::DVec3::ZERO).length();
-        let all = self.display.bodies.iter().filter_map(|b| b.bounds).reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)));
-        let radius = all.map_or(0.0, |(lo, hi)| (hi - lo).length() * 0.815 * (iso.expand as f64 / 10.).powi(2));
         let mut chosen: Vec<BodyId> = iso.bodies.clone();
-        if iso.expand > 0 {
-            let seeds: Vec<_> = iso.bodies.iter().filter_map(bounds).collect();
-            for b in &self.display.bodies {
-                if !chosen.contains(&b.id)
-                    && let Some(bb) = b.bounds
-                    && seeds.iter().any(|s| gap(*s, bb) <= radius)
-                {
-                    chosen.push(b.id.clone());
-                }
-            }
+        if iso.expand > 0
+            && let Some(model) = self.zoom_fit_bounds()
+        {
+            let seeds: Vec<_> = iso.bodies.iter().filter_map(|b| self.display.body(b).and_then(|b| b.bounds)).collect();
+            let others: Vec<_> = self.display.bodies.iter().filter(|b| !chosen.contains(&b.id)).filter_map(|b| Some((b.id.clone(), b.bounds?))).collect();
+            chosen.extend(expand_by_distance(model, &seeds, &others, iso.expand));
         }
         self.display
             .bodies
