@@ -2953,8 +2953,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
   }
   // noshape's own Boolean (crates/brep) where it takes the inputs.
-  if (rust_boolean_on() && (!facets.source.empty() || opts.fuzzy > 1e-6 || (opts.glue == 3 && t.size() > 1)))
-    rust_decline("fuzzy, a mesh body, or a pattern's checked glue");
+  if (rust_boolean_on() && (!facets.source.empty() || opts.fuzzy > 1e-6))
+    rust_decline("fuzzy or a mesh body");
   else if (rust_boolean_on())
   {
     TopoDS_Shape                          out;
@@ -2964,7 +2964,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     bool                                  done = false;
     {
       const KernelTimer timer("boolean.rust");
-      done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy);
+      // (A pattern's checked glue: OCCT's result is the plain Boolean's only where the instances just touch.)
+      done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, op == 0 && opts.glue == 3 && t.size() > 1);
     }
     if (done)
     {

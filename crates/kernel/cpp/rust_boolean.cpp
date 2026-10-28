@@ -558,7 +558,7 @@ bool rust_decline(const char* why) { return decline(why); }
 
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
-                  double fuzzy)
+                  double fuzzy, bool touching_only)
 {
   srcs.resize(args.size(), nullptr);
   for (size_t i = 0; i < args.size(); ++i)
@@ -596,7 +596,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   t_built.set = false;
   {
     const KernelTimer timer("boolean.rust.brep");
-    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, r))
+    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, touching_only, r))
       return decline(nullptr);
   }
   const KernelTimer timer("boolean.rust.build");

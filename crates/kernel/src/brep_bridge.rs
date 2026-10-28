@@ -147,7 +147,7 @@ fn origins(o: &[Origin]) -> Vec<u32> {
         .collect()
 }
 
-pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, out: &mut BrepResult) -> bool {
+pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, out: &mut BrepResult) -> bool {
     let op = match op {
         0 => Op::Fuse,
         1 => Op::Cut,
@@ -155,7 +155,7 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, out: &mut BrepRe
     };
     let bodies: Vec<Body> = args.iter().map(body_of).collect();
     let refs: Vec<&Body> = bodies.iter().collect();
-    let r = match noshape_brep::boolean(op, &refs, tol) {
+    let r = match noshape_brep::boolean_touching(op, &refs, tol, touching_only) {
         Ok(r) => r,
         Err(d) => {
             brep_decline(d.0);

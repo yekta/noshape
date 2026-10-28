@@ -17,7 +17,7 @@ mod boolean;
 mod curve2;
 mod fxhash;
 
-pub use boolean::{boolean, Op};
+pub use boolean::{boolean, boolean_touching, Op};
 use glam::DVec3;
 
 /// Distances in (tol, GREY × tol] are ambiguous: the Boolean declines.

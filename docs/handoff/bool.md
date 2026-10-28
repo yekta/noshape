@@ -31,8 +31,8 @@ scratch /root/bool-scratch.
 ## Tests
 - T1 kernel `brep_replay::brep_kept_bodies_give_the_same_result` (each small case's result cut and fused again, from
   its kept body and from a new wrapper: the same).
-- T1 kernel `brep_replay::brep_small_cases_match_occt` (37 corpus cases in tests/data/brep, 12 with cylinders: every
-  one taken, each as OCCT; NOSHAPE_BREP_FACES=1 lists both results' faces, NOSHAPE_BREP_DUMP=<dir> writes both), `brep_replay::brep_results_are_the_same_on_any_thread` (alone vs 16 threads at once).
+- T1 kernel `brep_replay::brep_small_cases_match_occt` (46 corpus cases in tests/data/brep: planes, cylinders,
+  drilled holes, two patterns: every one taken, each as OCCT; NOSHAPE_BREP_FACES=1 lists both results' faces, NOSHAPE_BREP_DUMP=<dir> writes both), `brep_replay::brep_results_are_the_same_on_any_thread` (alone vs 16 threads at once).
 - T1 brep unit tests (boxes, boss, pocket, through hole, step, side by side, two holes, near coincidence).
 - T2 `NOSHAPE_BOOL_CORPUS=/root/core-scratch/bool-corpus cargo test -p noshape-kernel --test all
   brep_replay::brep_corpus_replay -- --ignored --nocapture` (NOSHAPE_BREP_DIFF=1: the differing history records;
@@ -74,6 +74,10 @@ face pairs). Corpus: **349 of 973 taken, 0 differ from OCCT**; < 50 input faces:
 Tangent contacts (19:10): a plane or cylinder touching a cylinder along a line both faces reach gets a section
 there (both faces split along it), as OCCT does: 364 of 973 taken, 0 differ; < 50 input faces median 0.61 ms vs
 23.0 ms.
+
+Patterns (19:40): a pattern's fuse with checked glue (many instances on one part) is taken where the instances
+only touch (no piece of one inside another: OCCT keeps its glued result only then, else trims): 379 of 973 taken,
+0 differ; 50–1000 input faces: 4 cases, median 104 ms vs 754 ms; the 99-instance pattern 126 ms vs 1.24 s.
 
 The 30-feature part (tests/perf/live-30-features, `regen_profile`, dev build, machine load 30–50, two runs each):
 | | Rust Boolean on | off |

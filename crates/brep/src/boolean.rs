@@ -1121,6 +1121,12 @@ fn circle_line(r: f64, x: DVec3, y: DVec3, n: DVec3, c: f64) -> Vec<f64> {
 
 /// The Boolean `op` of the arguments (`args[0]` the object, the rest tools), points within `tol` one.
 pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
+    boolean_touching(op, args, tol, false)
+}
+
+/// The same; with `touching_only`, declines unless the arguments only touch (no piece of one inside another:
+/// a pattern's fuse, which OCCT glues only then).
+pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -> R<Output> {
     if args.len() < 2 {
         return Err(Decline("a Boolean needs an object and a tool"));
     }
@@ -1568,6 +1574,9 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
             return Err(Decline("a piece on two solids"));
         }
         let in_any = states.iter().any(|x| x.1 == State::In);
+        if touching_only && in_any {
+            return Err(Decline("pattern instances overlapping"));
+        }
         let in_obj = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg == 0);
         let in_tool = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg != 0);
         let on = ons.first().copied();
