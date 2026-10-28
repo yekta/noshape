@@ -24,7 +24,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K5 | `h` toggles Show mates mode | H:shortcuts | ✅ | also toolbar button | 0.4.10+ / c9c66d1c 10-27 (Show mates mode banner) |
 | K6 | `Shift+S` toggles Snap mode | H:shortcuts | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | K7 | `Ctrl+M` opens the Mate connector dialog | H:shortcuts | ✅ | bound in Workspace; Assembly handles MateConnectorTool | 0.4.10+ / 77870dd4 10-28 |
-| K8 | `a` flips the primary axis (mate / mate connector dialog, snap drag) | H:shortcuts, E§20 | ✅ | dialog and snap drag |  |
+| K8 | `a` flips the primary axis (mate / mate connector dialog, snap drag) | H:shortcuts, E§20 | ✅ | dialog and snap drag | 8627322e 10-28 (asm5: Revolute pin top rim ↔ front hole rim → pin hangs through; pointer in the graphics, a → flipped, the pin stands up out of the hole; snap-drag half not run) |
 | K9 | `q` reorients the secondary axis during a snap drag | E§20 | ✅ | snap drag (verified); mate / MC dialog |  |
 | K10 | `Shift` (hold) locks mate inference to the hovered face/edge | H:mates, E§6.3 | ✅ | nearest point of the locked entity; click anywhere picks it |  |
 | K11 | `Ctrl` (tap) cycles the dragged connector in snap mode | E§20 | ✅ | Ctrl tap cycles the dragged connector only when the instance has more than the picked one (its explicit connectors); live 570 (a block with no explicit connectors): Ctrl taps don't change the face-centre connector, and ours doesn't either. No message while snap-dragging (live 569) |  |
