@@ -137,7 +137,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 6.6 | Point on curve snap creates a coincident | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.7 | New line horizontal / vertical inference | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.8 | Parallel / perpendicular to the previous segment | B§6 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 6.9 | Wake-up: lines the cursor passed over give parallel / perpendicular inferences | H:automatic_inferencing | ✅ (T:inf) |  |
+| 6.9 | Wake-up: lines the cursor passed over give parallel / perpendicular inferences | H:automatic_inferencing | ✅ (T:inf) | ea572159 10-28 (GUI: hover a free line, start a new line elsewhere, move along its direction → Parallel glyph, the woken line lit orange) |
 | 6.10 | Tangent inference from an arc / spline end | B§6 | ❌ (SKETCH-START-INFERENCE) (T:inf) | ea572159 10-28 (GUI: a line started on a 3 point arc's end shows no tangent inference along the exact tangent) |
 | 6.11 | Inference glyph next to the cursor | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.12 | Inference line yellow dashed (`INFERENCE_SNAP_LINE_COLOR`) | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
