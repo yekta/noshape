@@ -318,7 +318,10 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-28 17:45)
+## Requests to the lead (qa, updated 2026-10-28 20:25)
+- **P1 GREEN-ICONS-PATH (20:25):** greens since 4b9d7eaf are built in /home/ngyekta/projects/noshape-wt/watch; their rust-embed (no
+  debug-embed) reads icons from that path at run time, so on this box the app has no icons. qa copied main's crates/app/assets there
+  as a stopgap (see TICKETS › Lead / build). Please build the green where it runs or turn on rust-embed's debug-embed.
 - **P0 DRAFT-BUDGET-POOL (core, regression of f024fd0d, 18:55):** with the pave-filler pairs on the pool, a Draft's defeaturing
   runs past its 30 s budget forever (memory > 4 GB): tickets/draft-pool-hang-2133.noshape never finishes opening; with
   NOSHAPE_BOP_PAIRS_SERIAL=1 it stops at 30 s and opens in 57 s. Together with BOP-PAIRS-GPF: please make the pairs serial
