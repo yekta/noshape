@@ -241,7 +241,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| X1 | Origin entity pick with inference | E§8.1 | ✅ | |  |
+| X1 | Origin entity pick with inference | E§8.1 | ✅ | | 8627322e 10-28 (asm5 Ctrl+M, hover a hole's top rim → rim outlined, connector preview (disc + triad) at the rim's centre) |
 | X2 | Flip primary, reorient secondary | E§8.1 | ✅ | | 8627322e 10-28 (asm5 Ctrl+M: flip-primary arrow and reorient-secondary buttons at the dialog's foot; their effect not re-run here (mate dialog's a = K8)) |
 | X3 | Move: X/Y/Z translation, rotation axis + angle | E§8.1 | ✅ | | 8627322e 10-28 (☑ Move → X / Y / Z 0 mm with the axis arrows, "Rotate about Z" ▾, Rotation angle 0 deg) |
 | X4 | Origin type Between entities, Realign (primary / secondary axis entity) | E§8.1, H:assembly_mate_connector | ✅ | Between verified in the app, Realign model-tested; entities of the same instance; model test `mate_connector_between_entities_and_realign` | 8627322e 10-28 (Origin type ▾ On entity / Between entities; ☑ Realign → Primary axis entity, Secondary axis entity) |
