@@ -184,11 +184,14 @@ N00. Perf 10-28: v0.4.12's 1× texture orbit / zoom at 18 fps (run 40640263048) 
      18.6 on macOS 15 in the same run; bf131a31~1 and bf131a31 read ~31 on both. The 1× path is timer-paced and
      bimodal (one or two 33 ms ticks per frame); compare it only within one run, or use the 2× frame-driven rows
      (unchanged at 67–75 fps). Landed with it: cef2a10a, the hover band only for a whole hovered part.
-N01. 10-28 06:00–06:30 landed: a237ae16 count fields two-step Enter (live), c8239e05 folder Roll to here / Roll to end
-     and the nested rollback bar, 469aa3c6 parts list properties (7.7), blamed number fields (live "failing parameter
-     marked red"). Residuals: a folder rolled to its top draws the bar above it; the guide's end tick; the parts-list
-     override isn't saved in the document. 3b5ecdee LEFT-RAIL-WHERE-USED (Where used rail panel). psui's TICKETS section
-     has no open item now.
+N01. 10-28 06:00–08:40 landed: a237ae16 count fields two-step Enter (live), c8239e05 folder Roll to here / Roll to
+     end and the nested rollback bar, db5db47b the folder guide's end tick, 469aa3c6 parts list properties (7.7),
+     a801dcd6 blamed number fields (live "failing parameter marked red"), 3b5ecdee Where used rail panel, cef2a10a
+     hover band only for a whole hovered part. part-studio.md parity: 3.19, 6.16, 9.14, 10.1, 11.5, 11.6, 11.7 now ✅;
+     only the P3 13.x rows (release management, configured properties, datums, variable studios, model definitions)
+     are left 🔧. psui's TICKETS section has no open item. Residuals: a folder rolled to its top draws the bar above
+     it (live: nested at its top); the parts-list override isn't saved in the document; cold start first launch
+     1.75–2.9 s on the runners (budget 2 s; the lever is precompiled Metal shader archives in the release job).
 
 N0. 10-28 04:20–06:00 landed: 54324599 Create selection's see-through result faces (3.19), 6f4dc5c3 arrow halo as live
     (6.2), 2960a143 Measure asterisk (4.9), aaaa5b4c STRIP-CLICK-THROUGH (P1), 298fbda5 MASS-MC-FIELD (P2, ops names the
