@@ -103,8 +103,16 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   **only with NOSHAPE_BOP_PAIRS_PARALLEL=1 since 10-28 18:24** (qa BOP-PAIRS-GPF: with it on by default the app
   and the CLI died in ForceInterfEF / an IntTools_Context map on a pool worker, intermittently, as BOOL-THREAD-CRASH
   did with whole booleans parallel); ReduceIntersectionRange's E/E interferences indexed by new vertex (serial,
-  stays on). So the knurl is back near its serial time unless the variable is set; the race is the next thing to
-  find (ASan / TSan on qa's seed 152 Shell replay, tickets/bop-pairs-cli-segv-r152.py, or bisect the six sites). Built lib
+  stays on). So the knurl is back near its serial time unless the variable is set.
+- 0005 (10-28) TKernel OSD_ThreadPool::Launcher::perform counts, per thread, the pool jobs it runs
+  (`noshape_osd_pool_depth()`); the CPU budget's handler (common.cpp on_budget_tick) doesn't jump while it isn't 0
+  (the next tick after). That was BOP-PAIRS-GPF's cause: the budgeted ops (Shell, draft, blends) jumped out of a
+  pool job the evaluating thread takes part in (it runs a share of the items), the workers went on with its
+  abandoned frames. Likely BOOL-THREAD-CRASH's too (whole booleans parallel, same ops). T1 kernel
+  `kernel_core::a_budget_never_stops_a_call_inside_an_occt_thread_pool_loop` (crash_inside_kernel(5): a 0.05 s
+  budget over an OSD_Parallel loop of arithmetic, then a spin): without the check the process died (SIGSEGV) or
+  the loop stopped part way every run; with it 3 of 3 runs finish the loop. (A clock read in the loop hides the
+  bug: the pc sits in the vDSO, where the budget never jumps.) Built lib
   kept at /root/core-scratch/libTKBO.a.0004; the TKBO before it in /root/core-scratch/occt-lib-backup.
 - OCCT 8's gp_Dir / gp_Ax1 constructors are noexcept: a zero vector anywhere is std::terminate (caught by the guard as
   SIGABRT inside bridge calls). Never build a gp_Dir from a vector that can be zero in our C++.

@@ -355,6 +355,21 @@ fn a_kernel_call_over_its_budget_fails() {
 /// out of the C library left its heap locked, the next free() waited forever):
 /// ten 50 ms budgets over a loop that does nothing but allocate, then the heap
 /// still works.
+/// qa BOP-PAIRS-GPF: a CPU budget that runs out while the evaluating thread
+/// takes part in an OCCT thread pool loop stops the work after the loop
+/// (every item done), not inside it (the workers would go on using the
+/// abandoned stack frames).
+#[cfg(target_os = "linux")]
+#[test]
+fn a_budget_never_stops_a_call_inside_an_occt_thread_pool_loop() {
+    // Without the hold (OCCT patch 0005's pool depth) the process died or the
+    // loop stopped part way, here, every time.
+    for _ in 0..3 {
+        let e = crash_inside_kernel(5).unwrap_err().to_string();
+        assert!(e.contains("budget 1 after 4096 of 4096"), "{e}");
+    }
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn a_budget_never_stops_a_call_inside_the_allocator() {

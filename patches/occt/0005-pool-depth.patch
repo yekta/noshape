@@ -1,0 +1,32 @@
+--- a/src/FoundationClasses/TKernel/OSD/OSD_ThreadPool.cxx
++++ b/src/FoundationClasses/TKernel/OSD/OSD_ThreadPool.cxx
+@@ -188,8 +188,29 @@
+ 
+ //=================================================================================================
+ 
++namespace
++{
++// noshape: how many pool jobs this thread is running (it takes part in them
++// and waits for the workers). A CPU budget's siglongjmp out of one would
++// leave the workers on the abandoned stack frames (qa BOP-PAIRS-GPF,
++// BOOL-THREAD-CRASH): noshape's budget doesn't jump while it isn't 0.
++thread_local int THE_NOSHAPE_POOL_DEPTH = 0;
++
++struct NoshapePoolDepth
++{
++  NoshapePoolDepth() { ++THE_NOSHAPE_POOL_DEPTH; }
++  ~NoshapePoolDepth() { --THE_NOSHAPE_POOL_DEPTH; }
++};
++} // namespace
++
++extern "C" Standard_EXPORT int noshape_osd_pool_depth()
++{
++  return THE_NOSHAPE_POOL_DEPTH;
++}
++
+ void OSD_ThreadPool::Launcher::perform(JobInterface& theJob)
+ {
++  const NoshapePoolDepth aDepth;
+   run(theJob);
+   wait();
+ }

@@ -386,7 +386,8 @@ pub fn set_working_scale(k: f64) -> Result<()> {
 }
 
 /// Raises SIGSEGV (`kind` 0), SIGFPE (1), std::terminate (2) or a never-ending loop under a
-/// 0.3 s budget (3, Linux) inside a kernel call: the crash
+/// 0.3 s budget (3, Linux); 4: allocations under short budgets; 5: a short budget over an OCCT
+/// thread pool loop (Linux) inside a kernel call: the crash
 /// guard turns it into an error of that call (tests; not on Windows).
 #[doc(hidden)]
 pub fn crash_inside_kernel(kind: u8) -> Result<()> {

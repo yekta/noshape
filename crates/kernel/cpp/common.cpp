@@ -42,6 +42,7 @@ extern "C" char etext;
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
+#include <OSD_Parallel.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
 #include <NCollection_IncAllocator.hxx>
@@ -1513,6 +1514,29 @@ void crash_inside_kernel(uint8_t kind)
     if (after.back() == 2.0)
       fail_op("allocation took too long");
   }
+#ifdef __linux__
+  else if (kind == 5)
+  {
+    // A budget running out inside an OCCT thread pool loop (qa
+    // BOP-PAIRS-GPF): it stops the work after the loop, never inside it.
+    std::atomic<int> done{0};
+    const int        n      = 4096;
+    const int        reason = run_budgeted(0.05, [&] {
+      OSD_Parallel::For(0, n, [&](int i) {
+        // Arithmetic only (a clock read would put the pc in the vDSO, where
+        // the budget never jumps): a few ms each.
+        volatile double x = i;
+        for (int k = 0; k < 1000000; ++k)
+          x = x * 1.0000001 + 1e-9;
+        ++done;
+      });
+      volatile double y = 0;
+      for (long k = 0; k < 40000000000L; ++k)
+        y = y * 1.0000001 + 1e-9;
+    });
+    fail_op("budget " + std::to_string(reason) + " after " + std::to_string(done.load()) + " of " + std::to_string(n));
+  }
+#endif
   else
     std::raise(SIGSEGV);
 }
@@ -1674,6 +1698,8 @@ const int budget_signal = SIGRTMIN + 3;
 // later free() waited forever) or the heap half updated (likely
 // BOOL-THREAD-CRASH's late "silent" deaths); the next tick, 100 ms of CPU
 // later, finds the thread back in OCCT.
+extern "C" int noshape_osd_pool_depth(); // OCCT patch 0005 (OSD_ThreadPool.cxx)
+
 bool in_own_code(const void* uctx)
 {
   const ucontext_t* uc = static_cast<const ucontext_t*>(uctx);
@@ -1692,7 +1718,10 @@ bool in_own_code(const void* uctx)
 void on_budget_tick(int, siginfo_t*, void* uctx)
 {
   sigjmp_buf* env = budget_jmp;
-  if (env == nullptr || budget_hold > 0 || !in_own_code(uctx))
+  // Not while this thread runs an OCCT thread pool job (its workers would go
+  // on using the abandoned frames: qa BOP-PAIRS-GPF, BOOL-THREAD-CRASH):
+  // OCCT patch 0005 counts them. The next tick after.
+  if (env == nullptr || budget_hold > 0 || noshape_osd_pool_depth() > 0 || !in_own_code(uctx))
     return;
   const bool over   = thread_cpu_seconds() > budget_limit;
   const bool cancel = budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed);
