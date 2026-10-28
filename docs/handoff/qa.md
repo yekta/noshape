@@ -7,8 +7,16 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
-## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf)
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793)
 
+- **18:25 update (green 87ddb793, copied 18:08):** verified DIALOG-EXPR-SCOPE, DIALOG-AC-ENTER, SKETCH-HINT-OVERLAP,
+  SKETCH-RECT-DROPDOWN-NAME. **BOP-PAIRS-GPF: a second crash**, the watcher's debug CLI (main 17:09) segfaulted in
+  BOPAlgo_PaveFiller::ForceInterfEF (CLI fuzz seed 152, a Shell); replays of that Shell (5×) and 80 GUI Extrude edits on
+  live-30-features didn't crash: a rare race. Live answered 1568–1572 → new P3 SKETCH-DIM-CURVE-PAIR, P3 DWG-INFO-TOASTS,
+  P3 EXTRUDE-SKETCH-ROW-CHIP; CURV-GAUSS-NOISE and SKETCH-USE-PRESELECT confirmed by live. Fuzz 78 (87dd) running.
+  Careful: the box hit OOM at 18:02 (earlyoom killed live's Chrome renderers); a debug CLI fuzz grows to 3 GB, run one at a time.
+  Next: SKETCH-S-INSPECT-TOOLS (needs Preferences › Shortcut toolbars, restore after), BOP race hunting on 87ddb793,
+  SKETCH-MODEL-EDGE-SELECT once skasm answers.
 - **17:45 update (green 5267fdaf):** **P0 BOP-PAIRS-GPF**: the green app died (GPF in IntTools_Context on a pool
   worker, dmesg + addr2line) while a Part mirror previewed on a 54-feature CLI-fuzz document; likely f024fd0d (patch 0004).
   Intermittent (2nd try fine). Repro attempts running: Extrude 1 edit loop on live-30-features (bin/editloop.sh, el-a.log).
